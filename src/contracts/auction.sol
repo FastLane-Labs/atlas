@@ -200,6 +200,15 @@ contract FastLaneProtoHandler is ReentrancyGuard, EIP712 {
             unchecked { ++i; }
             gasWaterMark = gasleft();
         }
+
+        // Run a post-searcher verification check with the data from the staging call
+        if (stagingCall.verificationSelector != bytes4(0)) {
+            // Unlike the staging call, this isn't delegatecall
+            (callSuccess,) = stagingCall.to.call(
+                abi.encodeWithSelector(stagingCall.verificationSelector, stagingData)
+            );
+            require(callSuccess, "ERR-07 Verification");
+        }
     }
 
     function _handlePayments(
