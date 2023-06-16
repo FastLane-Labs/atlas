@@ -88,7 +88,7 @@ contract FastLaneProtoHandler is ReentrancyGuard, EIP712 {
     using Escrow for Escrow.SearcherEscrow;
     using ECDSA for bytes32;
 
-    bytes32 private constant TYPE_HASH =
+    bytes32 internal constant _TYPE_HASH =
         keccak256("SearcherMetaTx(address from,address to,uint256 value,uint256 gas,uint256 nonce,bytes data)");
 
     uint256 constant public SEARCHER_GAS_LIMIT = 1_000_000;
@@ -106,10 +106,10 @@ contract FastLaneProtoHandler is ReentrancyGuard, EIP712 {
     uint256 public fastLanePayable; // init at 0
 
     // EOA Address => searcher escrow data
-    mapping(address => Escrow.SearcherEscrow) internal escrowData;
+    mapping(address => Escrow.SearcherEscrow) internal _escrowData;
 
     // track searcher tx hashes to avoid replays... imperfect solution tho
-    mapping(bytes32 => bool) internal hashes;
+    mapping(bytes32 => bool) internal _hashes;
 
     constructor(
             address _fastlanePayee, 
@@ -123,12 +123,15 @@ contract FastLaneProtoHandler is ReentrancyGuard, EIP712 {
         escrowDuration = _escrowDuration;
     }
 
-    function protoCall( // haha get it
+    function protoCall( // haha get it?
         StagingCall calldata stagingCall, // supplied by frontend
         UserCall calldata userCall,
         PayeeData[] calldata payeeData, // supplied by frontend
         SearcherCall[] calldata searcherCalls // supplied by FastLane via frontend integration
     ) external payable nonReentrant() {
+
+        // shameless tbh
+        require(tx.origin == msg.sender, "ERR-00 Sender");
 
         // declare some variables
         bool callSuccess; // reuse memory variable
@@ -158,19 +161,19 @@ contract FastLaneProtoHandler is ReentrancyGuard, EIP712 {
         for (; i < searcherCalls.length;) {
 
             if (callSuccess) {
-                optimisticMark(searcherCalls[i]);
+                _optimisticMark(searcherCalls[i]);
 
             } else if (gasWaterMark < VALIDATION_GAS_LIMIT + SEARCHER_GAS_LIMIT) {
                 // Make sure to leave enough gas for protocol validation calls
-                optimisticMark(searcherCalls[i]);
+                _optimisticMark(searcherCalls[i]);
                 result = SearcherOutcome.OutOfGas;
             
             } else if (tx.gasprice > searcherCalls[i].maxFeePerGas) {
-                optimisticMark(searcherCalls[i]);
+                _optimisticMark(searcherCalls[i]);
                 result = SearcherOutcome.GasPriceOverCap;
 
             } else {
-                result = searcherCallExecutor(searcherCalls[i]);
+                result = _searcherCallExecutor(searcherCalls[i]);
             }
 
             // failures 0,1,2 should be caught at relay / frontend 
@@ -178,18 +181,20 @@ contract FastLaneProtoHandler is ReentrancyGuard, EIP712 {
             if (!callSuccess && uint8(result) > 2) { 
                 x = (tx.gasprice * GWEI * (gasWaterMark - gasleft())) + searcherCalls[i].metaTx.value;
                 
-                escrowData[searcherCalls[i].metaTx.from].total -= uint128(x); // TODO: add in some underflow handling
+                _escrowData[searcherCalls[i].metaTx.from].total -= uint128(x); // TODO: add in some underflow handling
                 gasRebate += x;
             
                 if (result == SearcherOutcome.Success) {
                     callSuccess = true;
                     
+                    // handle gas rebate
                     SafeTransferLib.safeTransferETH(
                             msg.sender, 
                             gasRebate
                     );
 
-
+                    // process protocol payments
+                    _handlePayments(searcherCalls[i].bids, payeeData);
                 }
             }
             unchecked { ++i; }
@@ -197,7 +202,7 @@ contract FastLaneProtoHandler is ReentrancyGuard, EIP712 {
         }
     }
 
-    function handlePayments(
+    function _handlePayments(
         BidData[] calldata bids,
         PayeeData[] calldata payeeData
     ) internal {
@@ -236,11 +241,11 @@ contract FastLaneProtoHandler is ReentrancyGuard, EIP712 {
                     // TODO: even tho we control the frontend which populates the payee
                     // info, this is dangerous af and prob shouldn't be done this way
                     (callSuccess,) = pmtData.payee.delegatecall(
-                            abi.encodeWithSelector(
-                                pmtData.pmtSelector, 
-                                bids[i].token,
-                                payment    
-                            )
+                        abi.encodeWithSelector(
+                            pmtData.pmtSelector, 
+                            bids[i].token,
+                            payment    
+                        )
                     );
                     require(callSuccess, "ERR-05 ProtoPmt");
                 }
@@ -254,26 +259,25 @@ contract FastLaneProtoHandler is ReentrancyGuard, EIP712 {
 
             unchecked{ ++i;}
         }
-
-
-
     }
 
-    function optimisticMark(SearcherCall calldata searcherCall) internal {
-        hashes[keccak256(searcherCall.signature)] = true;
+    function _optimisticMark(SearcherCall calldata searcherCall) internal {
+        _hashes[keccak256(searcherCall.signature)] = true;
 
         // optimistically increment nonce w/o recover once a searcher succeeds
         // this'll save gas, and itll be verified at the relay level to prevent spoofing
-        if (searcherCall.metaTx.nonce == uint256(escrowData[searcherCall.metaTx.from].nonce)) {
-            ++escrowData[searcherCall.metaTx.from].nonce;
+        if (searcherCall.metaTx.nonce == uint256(_escrowData[searcherCall.metaTx.from].nonce)) {
+            unchecked {
+                ++_escrowData[searcherCall.metaTx.from].nonce;
+            }
         }
     }
 
-    function searcherCallExecutor(
+    function _searcherCallExecutor(
         SearcherCall calldata searcherCall
     ) internal returns (SearcherOutcome) {
         
-        Escrow.SearcherEscrow memory searcherEscrow = escrowData[searcherCall.metaTx.from];
+        Escrow.SearcherEscrow memory searcherEscrow = _escrowData[searcherCall.metaTx.from];
 
         uint256 gasLimit = searcherCall.metaTx.gas < SEARCHER_GAS_LIMIT ? searcherCall.metaTx.gas : SEARCHER_GAS_LIMIT;
 
@@ -284,13 +288,13 @@ contract FastLaneProtoHandler is ReentrancyGuard, EIP712 {
 
         bytes32 searcherHash = keccak256(searcherCall.signature);
         
-        if (hashes[searcherHash]) {
+        if (_hashes[searcherHash]) {
             // TODO: emit something to flag the fastlane relay
             // this error should be 100% preventable at the relay level 
             return SearcherOutcome.AlreadyExecuted;
         }
 
-        hashes[searcherHash] = true;
+        _hashes[searcherHash] = true;
 
         if (searcherCall.metaTx.nonce != uint256(searcherEscrow.nonce)) {
             return SearcherOutcome.InvalidNonce;
@@ -302,7 +306,7 @@ contract FastLaneProtoHandler is ReentrancyGuard, EIP712 {
         }
 
         unchecked {
-            ++escrowData[searcherCall.metaTx.from].nonce;
+            ++_escrowData[searcherCall.metaTx.from].nonce;
         }
 
         try this.searcherMetaWrapper(gasLimit, searcherCall) {
@@ -368,7 +372,7 @@ contract FastLaneProtoHandler is ReentrancyGuard, EIP712 {
             bytes calldata signature
     ) public view returns (bool) {
         address signer = _hashTypedDataV4(
-            keccak256(abi.encode(TYPE_HASH, req.from, req.to, req.value, req.gas, req.nonce, keccak256(req.data)))
+            keccak256(abi.encode(_TYPE_HASH, req.from, req.to, req.value, req.gas, req.nonce, keccak256(req.data)))
         ).recover(signature);
         return signer == req.from;
     }
