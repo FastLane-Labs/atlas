@@ -1,6 +1,8 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
+import { IFactory } from "../interfaces/IFactory.sol";
+
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 import { ReentrancyGuard } from "solmate/utils/ReentrancyGuard.sol";
 
@@ -11,25 +13,21 @@ import { FastLaneEscrow } from "./SearcherEscrow.sol";
 import { FastLaneProtoHandler } from "./Handler.sol";
 
 
-contract FastLaneFactory is ThogLock {
+contract FastLaneFactory is IFactory, ThogLock {
 
     uint32 immutable public escrowDuration;
     address immutable public fastLanePayee;
-    address immutable public escrowAddress; 
+    address immutable public escrowAddress;
 
-    uint256 internal _keyCode;
-
-    FastLaneEscrow internal _escrowContract = new FastLaneEscrow();
+    FastLaneEscrow internal _escrowContract = new FastLaneEscrow(uint32(64));
 
     constructor(
-            address _fastlanePayee, 
-            uint256 _protocolShare,
+            address _fastlanePayee,
             uint32 _escrowDuration
 
-    ) ThogLock(address(escrowContract), address(this)) {
+    ) ThogLock(address(_escrowContract), address(this)) {
 
         fastLanePayee = _fastlanePayee;
-        protocolShare = _protocolShare;
         escrowDuration = _escrowDuration;
         escrowAddress = address(_escrowContract);
     }
@@ -41,18 +39,13 @@ contract FastLaneFactory is ThogLock {
         SearcherCall[] calldata searcherCalls // supplied by FastLane via frontend integration
     ) external payable {
 
-        require(!_baseLock, "ERR-F01 FactoryLock");
+        require(_baseLock == BaseLock.Unlocked, "ERR-F00 FactoryLock");
 
         ProtocolData memory protocolData = _protocolData[userCall.to];
 
-        require(protocolData.owner != address(0), "ERR-00 UnsuportedUserTo");
+        require(protocolData.owner != address(0), "ERR-F01 UnsuportedUserTo");
 
-        Lock memory mLock = _thogLock(
-            protocolData.nonce,
-            _getHandlerAddress(protocolData),
-            searcherCalls
-        );
-
+        // NOTE: This is expected to revert if there's already a contract at that location
         FastLaneProtoHandler _handler = new FastLaneProtoHandler{
             salt: keccak256(
                 abi.encodePacked(
@@ -64,19 +57,32 @@ contract FastLaneFactory is ThogLock {
             )
         }(protocolData.split, escrowAddress);
 
+        uint256 lockCode = _initThogLock(
+            address(_handler),
+            userCall,
+            searcherCalls
+        );
+
         _handler.protoCall(
-            mLock,
             stagingCall,
             userCall,
             payeeData,
             searcherCalls
         );
 
+        require(
+            (_baseLock == BaseLock.Pending) && (lockCode == _keyCode),
+            "ERR-F02 Error Unlocking"
+        );
+
+        // _baseLock = BaseLock.Unlocked;
+        delete _baseLock;
+        delete _keyCode;
     }
 
     function _getHandlerAddress(
         ProtocolData memory protocolData
-    ) internal returns (address handlerAddress) {
+    ) internal view returns (address handlerAddress) {
         
         bytes32 salt = keccak256(
             abi.encodePacked(
@@ -99,13 +105,13 @@ contract FastLaneFactory is ThogLock {
         )))));
     }
 
-    function prepOuterLock(uint256 keyCode) external {
+    function initReleaseFactoryThogLock(uint256 keyCode) external {
         // address(this) == _factory
-        require(msg.sender == _escrowAddress, "ERR-T03 InvalidCaller");
-        require(_keyCode == 0);
-        
-        _keyCode = keyCode;
+        require(msg.sender == _escrowAddress, "ERR-F20 InvalidCaller");
+        require(_keyCode == 0, "ERR-F21 KeyTampering");
+        require(_baseLock == BaseLock.Locked, "ERR-F22 NotLocked");
 
+        _keyCode = keyCode;
         _baseLock = BaseLock.Pending;
     }
 

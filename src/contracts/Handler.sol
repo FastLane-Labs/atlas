@@ -1,69 +1,21 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
-import { ReentrancyGuard } from "solmate/utils/ReentrancyGuard.sol";
+import { IHandler } from "../interfaces/IHandler.sol";
+import { ISearcherEscrow } from "../interfaces/ISearcherEscrow.sol";
+import { ISearcherContract } from "../interfaces/ISearcherContract.sol";
 
-import { FastLaneDataTypes } from "./DataTypes.sol";
+import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+
 import { FastLaneErrorsEvents } from "./Emissions.sol";
 
-import { FastLaneEscrow } from "./searcherEscrow.sol";
-import { ThogLock } from "./ThogLock.sol";
-
-interface IFastLaneEscrow {
-    function verify(
-        bytes32 userCallHash,
-        SearcherCall calldata searcherCall
-    ) external returns (uint256, uint256);
-
-    struct SearcherEscrow {
-        uint128 total;
-        uint128 escrowed;
-        uint64 availableOn; // block.number when funds are available.  
-        uint64 lastAccessed;
-        uint32 nonce; // EOA nonce.
-    }
-
-    struct SearcherCall {
-        SearcherMetaTx metaTx;
-        bytes signature;
-        BidData[] bids;
-    }
-
-    struct SearcherMetaTx {
-        address from;
-        address to;
-        uint256 value;
-        uint256 gas;
-        uint256 nonce;
-        bytes32 userCallHash; // hash of user EOA and calldata, for verification of user's tx (if not matched, searcher wont be charged for gas)
-        uint256 maxFeePerGas; // maxFeePerGas searcher is willing to pay.  This goes to validator, not protocol or user
-        bytes32 bidsHash; // searcher's backend must keccak256() their BidData array and include that in the signed meta tx, which we then verify on chain. 
-        bytes data;
-    }
-
-    struct BidData {
-        address token;
-        uint256 bidAmount;
-    }
-}
-
-interface ISearcherContract {
-
-    struct BidData {
-        address token;
-        uint256 bidAmount;
-    }
-
-    function metaFlashCall(
-        address sender, 
-        bytes calldata searcherCalldata, 
-        BidData[] calldata bids
-    ) external payable returns (bool, bytes memory);
-}
+import { ThogLockLib } from "./ThogLock.sol";
 
 
-contract FastLaneProtoHandler is FastLaneDataTypes, FastLaneErrorsEvents, ThogLock {
+contract FastLaneProtoHandler is IHandler, FastLaneErrorsEvents {
+
+    uint256 constant public SEARCHER_GAS_LIMIT = 1_000_000;
+    uint256 constant public VALIDATION_GAS_LIMIT = 500_000;
 
     bytes32 constant internal _SEARCHER_BID_UNPAID = keccak256(abi.encodePacked("SearcherBidUnpaid"));
     bytes32 constant internal _SEARCHER_CALL_REVERTED = keccak256(abi.encodePacked("SearcherCallReverted"));
@@ -77,26 +29,26 @@ contract FastLaneProtoHandler is FastLaneDataTypes, FastLaneErrorsEvents, ThogLo
         uint16 protocolShare, 
         address escrow
 
-    ) ThogLock(escrow, msg.sender) {
+    ) {
         _factory = msg.sender; // TODO: hardcode the factory?
         _escrow = escrow;
 
         _protocolShare = uint256(protocolShare);
 
         // meant to be a single-shot execution environment
-        selfdestruct(payable(_factory));
+        //selfdestruct(payable(_factory));
     
     } 
 
     function protoCall( // haha get it?
-        Lock memory mLock, // TODO: verify nested delegatecall cant access this
         StagingCall calldata stagingCall, // supplied by frontend
         UserCall calldata userCall,
         PayeeData[] calldata payeeData, // supplied by frontend
         SearcherCall[] calldata searcherCalls // supplied by FastLane via frontend integration
     ) external payable {
 
-        mLock._lockCode ^= uint256(keccak256(abi.encodePacked(userCall.from)));
+        // keyCode is in memory - should be immune to tampering by malicious delegatecall
+        uint256 keyCode = uint256(keccak256(abi.encodePacked(userCall.data, userCall.from)));
 
         // verify that the staging data provided by frontend was built around the 
         // actual user call.  
@@ -127,16 +79,14 @@ contract FastLaneProtoHandler is FastLaneDataTypes, FastLaneErrorsEvents, ThogLo
 
         // init some vars for the searcher loop
         uint256 result;
-        uint256 cumulativeGasRebate;
         uint256 gasWaterMark = gasleft();
-        uint256 gasRebate; // might need to put the three gas uints into a struct
         uint256 gasLimit; 
         uint256 i; // init at 0
         callSuccess = false;
 
         for (; i < searcherCalls.length;) {
 
-            (result, gasRebate, gasLimit) = FastLaneEscrow(_escrow).verify(
+            (result, gasLimit) = ISearcherEscrow(_escrow).verify(
                 userCallHash,
                 callSuccess,
                 searcherCalls[i]
@@ -165,7 +115,7 @@ contract FastLaneProtoHandler is FastLaneDataTypes, FastLaneErrorsEvents, ThogLo
             }
 
             if (result & 1 << uint256(SearcherOutcome.PendingUpdate) == 0) {
-                gasRebate += FastLaneEscrow(_escrow).update(
+                ISearcherEscrow(_escrow).update(
                     gasWaterMark,
                     result,
                     searcherCalls[i]
@@ -181,21 +131,15 @@ contract FastLaneProtoHandler is FastLaneDataTypes, FastLaneErrorsEvents, ThogLo
 
                     // process protocol payments
                     _handlePayments(searcherCalls[i].bids, payeeData);
+                    // TODO: who should pay gas cost of payments?
                 }
             }
 
-            mLock = _turnKeyUnsafe(mLock, searcherCalls[i]);
+            keyCode = ThogLockLib.turnKeyUnsafe(keyCode, searcherCalls[i]);
 
-            cumulativeGasRebate += gasRebate;
             unchecked { ++i; }
             gasWaterMark = gasleft();
         }
-
-        // handle gas rebate
-        SafeTransferLib.safeTransferETH(
-            userCall.from, 
-            cumulativeGasRebate
-        );
 
         // Run a post-searcher verification check with the data from the staging call
         if (stagingCall.verificationSelector != bytes4(0)) {
@@ -206,7 +150,19 @@ contract FastLaneProtoHandler is FastLaneDataTypes, FastLaneErrorsEvents, ThogLo
             require(callSuccess, "ERR-07 Verification");
         }
 
-        _unlock(mLock);
+        // unlock the handler, escrow, and factory
+        // NOTE: handler key is unreliable, and while escrow and factory
+        // key can be easily discovered, the unlocking mechanism is only
+        // concerned with charging the searchers responsible for their
+        // rebates, hence the ECDSA check and the doublespend check at the
+        // escrow level. 
+        uint256 gasRebate = ThogLockLib.initThogUnlock(keyCode, _escrow);
+
+        // handle gas rebate
+        SafeTransferLib.safeTransferETH(
+            userCall.from, 
+            gasRebate
+        );
     }
 
     function _handlePayments(
@@ -293,12 +249,11 @@ contract FastLaneProtoHandler is FastLaneDataTypes, FastLaneErrorsEvents, ThogLo
         uint256 gasLimit,
         SearcherCall calldata searcherCall
     ) external {
-
-        // no idea if this require works for a self-external try/catch lul
+        // this is external but will be called from address(this)
+        
         require(msg.sender == address(this), "ERR-04 Self-Call-Only");
 
         // TODO: need to handle native eth
-        // TODO: this contract won't hold balances other than eth, so this might be unnecessary
         uint256[] memory tokenBalances = new uint[](searcherCall.bids.length);
         uint256 i;
 
@@ -316,14 +271,14 @@ contract FastLaneProtoHandler is FastLaneDataTypes, FastLaneErrorsEvents, ThogLo
             searcherCall.bids
         );
 
-        require(success, "SearcherCallReverted");
+        require(success, "ERR-MW01 SearcherCallReverted");
 
         i = 0;
         for (; i < searcherCall.bids.length;) {
             
             require(
                 ERC20(searcherCall.bids[i].token).balanceOf(address(this)) >= tokenBalances[i] + searcherCall.bids[i].bidAmount,
-                "SearcherBidUnpaid"
+                "ERR-MW02 SearcherBidUnpaid"
             );
             
             unchecked {++i;}

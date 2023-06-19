@@ -1,12 +1,12 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import { FastLaneDataTypes } from "./DataTypes.sol";
-//import { FastLaneEscrow } from "./searcherEscrow.sol";
+import { IThogLock } from "../interfaces/IThogLock.sol";
+import { ISearcherEscrow } from "../interfaces/ISearcherEscrow.sol";
+import { IFactory } from "../interfaces/IFactory.sol";
+import { IHandler } from "../interfaces/IHandler.sol";
 
-interface IFactory {
-    function prepOuterLock(uint256 keyCode) external;
-}
+import { FastLaneDataTypes } from "./DataTypes.sol";
 
 // NOTE: This is just a scratch pad for me to explore over-the-top strategies 
 // that almost certainly won't work. In no way should anyone expect this lock system  
@@ -16,37 +16,20 @@ interface IFactory {
 // is just to test outlandish ideas and must be removed before staging or merging
 // into main)
 
-contract ThogLock is FastLaneDataTypes {
+contract ThogLock is FastLaneDataTypes, IThogLock {
 
-    struct Lock {
-        uint8 _alpha;
-        uint8 _omega;
-        uint8 _epsilon;
-        uint32 _nonce;
-        address _caller;
-        address _escrow;
-        address _handler;
-        uint256 _lockCode;
-        uint256 _keyCode;
-    }
-
-    enum BaseLock {
-        Unlocked,
-        Pending,
-        Locked
-    }
-
-    address immutable private _escrowAddress;
-    address immutable private _factoryAddress;
+    address immutable internal _escrowAddress;
+    address immutable internal _factoryAddress;
 
     // basic lock
-    BaseLock private _baseLock;
+    BaseLock internal _baseLock;
 
-    // storage lock
-    Lock private _sLock;
+    // storage lock data
+    uint256 internal _keyCode; 
+    Lock internal _sLock;
 
     // load execution environment data for each protocol
-    mapping(address => ProtocolData) internal _protocolData;
+    mapping(address => IFactory.ProtocolData) internal _protocolData;
 
     constructor(
         address escrowAddress,
@@ -56,75 +39,48 @@ contract ThogLock is FastLaneDataTypes {
         _factoryAddress = factoryAddress;
     }
 
-    function _thogLock(
-        uint32 protocolNonce,
-        address handlerAddress,
+    function _initThogLock(
+        address _activeHandler,
+        UserCall calldata userCall,
         SearcherCall[] calldata searcherCalls
-    ) internal returns (Lock memory mLock) {
+    ) internal returns (uint256 lockCode) {
         // address(this) == _factoryAddress
 
         require(msg.sender == tx.origin, "ERR-T00 InvalidCaller");
 
+        require(msg.sender == userCall.from, "ERR-T02 SenderNotUser");
+
         require(_baseLock == BaseLock.Unlocked, "ERR-T01 Locked");
+
+        lockCode = uint256(keccak256(abi.encodePacked(userCall.data, msg.sender)));
+        
+        uint256 i;
+        for (; i < searcherCalls.length;) {
+            lockCode ^= uint256(keccak256(abi.encodePacked(searcherCalls[i].signature, searcherCalls[i].metaTx.from)));
+            unchecked { ++i; }
+        }
+
+        Lock memory mLock = Lock({
+            _alpha: 0,
+            _omega: uint8(searcherCalls.length),
+            _caller: msg.sender,
+            _lockCode: lockCode
+        });
+
+        ISearcherEscrow(_escrowAddress).setEscrowThogLock(_activeHandler, mLock);
         
         _baseLock = BaseLock.Locked;
 
-        uint256 target;
-        uint256 i;
-        for (; i < searcherCalls.length;) {
-            target ^= uint256(keccak256(searcherCalls[i].signature));
-            unchecked {++i;}
-        }
-
-        mLock = Lock({
-            _alpha: 0,
-            _omega: uint8(searcherCalls.length),
-            _epsilon: uint8(searcherCalls.length),
-            _nonce: protocolNonce,
-            _caller: msg.sender,
-            _escrow: _escrowAddress,
-            _handler: handlerAddress,
-            _lockCode: target,
-            _keyCode: 0
-        });
-
-        // this XOR is removed rapidly by the other contracts
-        // to cross-verify their calldata at *start*. 
-        mLock._lockCode ^= uint256(keccak256(abi.encodePacked(msg.sender)));
-
+        // TODO: lock is assumed breakable at each stage by the delegatecall
+        // the alpha = omega check at end, as well as the initial alpha=0 
+        // count at beginning of searcher repayment calcs, are the focus. 
+        // the XORing will be either removed if unnecessary or made more robust 
+        // by having each stage's result in the escrow contract checked by the 
+        // factory contract. 
     }
 
     function baseLockStatus() external view returns (BaseLock baseLock) {
         baseLock = _baseLock; 
-    }
-
-    function _baseLockStatus() internal view returns (BaseLock baseLock) {
-        baseLock = _baseLock; 
-    }
-
-    function _turnKeyUnsafe(
-        Lock memory mLock,
-        SearcherCall calldata searcherCall
-    ) internal pure returns (Lock memory) {
-
-        require(
-            (
-                mLock._alpha < mLock._epsilon && 
-                mLock._omega > 0 &&
-                mLock._lockCode != 0
-            ), "ERR-T04 NotLocked"
-        );
-
-        // increment the things
-        ++mLock._alpha;
-        --mLock._omega;
-
-        require(mLock._alpha + mLock._omega == mLock._epsilon, "ERR-T05 WrongSum");
-
-        mLock._keyCode ^= uint256(keccak256(searcherCall.signature));
-        mLock._lockCode ^= uint256(keccak256(searcherCall.signature));
-
-        return mLock;
     }
 
     function _turnKeySafe(
@@ -133,82 +89,49 @@ contract ThogLock is FastLaneDataTypes {
         // TODO: Lots of room for gas optimization here
 
         Lock memory mLock = _sLock;
+        uint256 keyCode = _keyCode;
 
         require(
             (
-                mLock._alpha < mLock._epsilon && 
-                mLock._omega > 0 &&
+                mLock._alpha < mLock._omega && 
                 mLock._lockCode != 0
             ), "ERR-T04 NotLocked"
         );
 
         if (mLock._alpha == 0) {
-            mLock._lockCode ^= uint256(keccak256(abi.encodePacked(mLock._caller)));
+            require(keyCode == 0, "ERR-T08 PriorTampering");
         }
 
-        // increment the things
+        require(mLock._alpha < mLock._omega, "ERR-T09 Tampering");
+
+        // increment the key-turn counter
         ++mLock._alpha;
-        --mLock._omega;
 
-        require(mLock._alpha + mLock._omega == mLock._epsilon, "ERR-T05 WrongSum");
+        // apply the signed searcher calldata to the keycode
+        _keyCode ^= uint256(keccak256(abi.encodePacked(searcherCall.signature, searcherCall.metaTx.from)));
 
-        mLock._keyCode ^= uint256(keccak256(searcherCall.signature));
-        mLock._lockCode ^= uint256(keccak256(searcherCall.signature));
-
+        // save mLock back to storage
         _sLock = mLock;
     }
+}
 
-    function releaseInnerLock(uint256 lockCode) external returns (Lock memory mLock) {
-        // address(this) == escrowAddress
-
-        mLock = _sLock;
-
-        require(msg.sender == mLock._handler, "ERR-T03 InvalidCaller");
-
-        require(
-            (
-                mLock._alpha == mLock._epsilon && 
-                mLock._omega == 0 &&
-                mLock._lockCode == 0
-            ), "ERR-T04 MissingKeys"
-        );
-
-        require(lockCode == mLock._keyCode);
-
-        _baseLock = BaseLock.Unlocked;
-
-        IFactory(_factoryAddress).prepOuterLock(mLock._keyCode);
-
-        delete _sLock;
+library ThogLockLib {
+    
+    function turnKeyUnsafe(
+        uint256 keyCode,
+        IHandler.SearcherCall calldata searcherCall
+    ) internal pure returns (uint256 updatedKeyCode) {
+        updatedKeyCode = keyCode ^ uint256(keccak256(abi.encodePacked(searcherCall.signature, searcherCall.metaTx.from)));
     }
 
-
-    function _unlock(Lock memory alphaLock) internal {
+    function initThogUnlock(
+        uint256 _keyCode,
+        address _escrow
+    ) internal returns (uint256 gasRebate) {
         // address(this) == _handlerAddress
-        // checks protoCall's memory lock (hidden from delegatecall) against escrow's lock
+        // checks handler's keyCode memory (hidden from delegatecall) against escrow's lock,
+        // which then checks it against the factory's lock
 
-        Lock memory omegaLock = ThogLock(alphaLock._escrow).releaseInnerLock(alphaLock._lockCode);
-
-        require(alphaLock._omega == omegaLock._alpha, "ERR-T05 CountMismatch1");
-        require(omegaLock._omega == 0, "ERR-T06 CountMismatch2");
-        require(alphaLock._lockCode == omegaLock._keyCode, "ERR-T07 UnlockingFailure1");
-        require(omegaLock._lockCode == 0, "ERR-T08 UnlockingFailure2");
+        gasRebate = ISearcherEscrow(_escrow).releaseEscrowThogLock(_keyCode);
     }
-
-    
-    
-    function _thogUnlock(uint256 safetyLock, uint256 safetyCount) internal {
-        // address(this) == _factoryAddress
-        
-        Lock memory lock = _sLock;
-
-        require(lock._alpha == lock._omega, "ERR-T10 CountMismatch3");
-        require(lock._omega == safetyCount, "ERR-T11 CountMismatch3");
-        require(lock._lockCode == lock._keyCode, "ERR-T08 UnlockingFailure3");
-        require(lock._keyCode == safetyLock, "ERR-T09 UnlockingFailure4");
-
-        _baseLock = BaseLock.Unlocked;
-    }
-
-
 }

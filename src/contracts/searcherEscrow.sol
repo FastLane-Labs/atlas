@@ -1,6 +1,9 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
+import { IFactory } from "../interfaces/IFactory.sol";
+import { ISearcherEscrow } from "../interfaces/ISearcherEscrow.sol";
+
 import { FastLaneDataTypes } from "./DataTypes.sol";
 import { FastLaneErrorsEvents } from "./Emissions.sol";
 import { ThogLock } from "./ThogLock.sol";
@@ -21,10 +24,11 @@ contract FastLaneEscrow is FastLaneErrorsEvents, FastLaneDataTypes, ThogLock, EI
 
     uint256 immutable public chainId;
     address immutable public factory;
+    uint32 immutable public escrowDuration;
 
+    uint256 private _activeGasRebate;
     address private _activeHandler;
 
-    address private _currentUserTo;
     bytes32 private _pendingSearcherKey;
     SearcherEscrow private _pendingEscrowUpdate;
 
@@ -36,31 +40,75 @@ contract FastLaneEscrow is FastLaneErrorsEvents, FastLaneDataTypes, ThogLock, EI
     // track searcher tx hashes to avoid replays... imperfect solution tho
     mapping(bytes32 => bool) private _hashes;
 
-    constructor() ThogLock(address(this), msg.sender) EIP712("ProtoCallHandler", "0.0.1") {
+    constructor(uint32 escrowDurationFromFactory) ThogLock(address(this), msg.sender) EIP712("ProtoCallHandler", "0.0.1") {
         chainId = block.chainid;
         factory = msg.sender;
+        escrowDuration = escrowDurationFromFactory; //TODO: get this as input from factory w/o breaking linearization
     }
 
-    function setUserTo(address currentUserTo) external {
-        
+    function setEscrowThogLock(
+        address activeHandler,
+        Lock memory mLock
+    ) external {
         require(msg.sender == factory, "ERR-E07 InvalidSender");
-        require(_baseLockStatus() == BaseLock.Unlocked, "ERR-E08 Not Unlocked");
-        require(_currentUserTo == address(0), "ERR-E09 TargetAlreadyExists");
-        
-        _currentUserTo = currentUserTo;
+        require(_activeHandler == address(0), "ERR-E11 ExistingHandler");
+        require(_keyCode == 0, "ERR-E12 KeyCodeTampering");
+        require(_baseLock == BaseLock.Unlocked, "ERR-E13 NotUnlocked");
+
+        _baseLock = BaseLock.Locked;
+        _activeHandler = activeHandler;
+        _sLock = mLock;
+    }
+
+    function releaseEscrowThogLock(
+        uint256 handlerKeyCode,
+        uint256 searcherCallCount
+    ) external returns (uint256 gasRebate) {
+        // address(this) == escrowAddress
+        require(msg.sender == _activeHandler, "ERR-T03 InvalidCaller");
+        require(_baseLock == BaseLock.Locked, "ERR-T04 AlreadyUnlocked");
+
+        Lock memory mLock = _sLock;
+        gasRebate = _activeGasRebate;
+
+        // first check that the searcher call counter matches
+        require(mLock._alpha == mLock._omega, "ERR-T04 MissingKeys");
+
+        // check that the handler's count also matches
+        // TODO: probably unnecessary
+        require(searcherCallCount == mLock._omega, "ERR-T04 MissingCalls");
+
+        // check that the handler's key matches the escrow key
+        require(handlerKeyCode == _keyCode, "ERR-T06 InvalidKey1");
+
+        // then check that they match the lockCode
+        require(handlerKeyCode == mLock._lockCode, "ERR-T06 InvalidKey2");
+
+        // then call the factory to set up final verification 
+        // TODO: might be unnecessary
+        IFactory(_factoryAddress).initReleaseFactoryThogLock(handlerKeyCode);
+
+        // _baseLock = BaseLock.Unlocked;
+        delete _baseLock; // TODO: ^ see if there's a gas refund dif here on enums, result should be the same
+        delete _keyCode;
+        delete _sLock;
+        delete _activeGasRebate;
+        delete _activeHandler;
     }
 
     function update(
         uint256 gasWaterMark,
         uint256 result,
         SearcherCall calldata searcherCall
-    ) external returns (uint256 gasRebate) {
+    ) external {
         require(msg.sender == _activeHandler, "ERR-E17 InvalidSender");
         require(keccak256(searcherCall.signature) == _pendingSearcherKey, "ERR-E18 InvalidSignature");
     
         delete _pendingSearcherKey; 
 
         SearcherEscrow memory escrowUpdate = _pendingEscrowUpdate;
+
+        uint256 gasRebate;
 
         // TODO: clean up code / make it readable
         if (
@@ -89,9 +137,9 @@ contract FastLaneEscrow is FastLaneErrorsEvents, FastLaneDataTypes, ThogLock, EI
 
         // make sure we don't underflow 
         // TODO: measure frequency of this. 
-        gasRebate = gasRebate > escrowUpdate.total ? escrowUpdate.total : gasRebate;
+        _activeGasRebate += gasRebate > escrowUpdate.total ? escrowUpdate.total : gasRebate;
                 
-        escrowUpdate.total -= uint128(gasRebate); // TODO: add in some underflow handling
+        escrowUpdate.total -= uint128(gasRebate); 
 
         // NOTE: some nonce updates may still be needed so run this even
         // if the gasRebate = 0
@@ -104,15 +152,17 @@ contract FastLaneEscrow is FastLaneErrorsEvents, FastLaneDataTypes, ThogLock, EI
         bytes32 userCallHash,
         bool callSuccess,
         SearcherCall calldata searcherCall
-    ) external returns (uint256, uint256, uint256) {
+    ) external returns (uint256 result, uint256 gasLimit) {
 
         _turnKeySafe(searcherCall);
 
         if (!_verifySignature(searcherCall.metaTx, searcherCall.signature)) {
-            return (1 << uint256(SearcherOutcome.InvalidSignature), 0, 0);
+            (result, gasLimit) = (1 << uint256(SearcherOutcome.InvalidSignature), 0);
         
         } else {
-            return _verifyCallData(userCallHash, callSuccess, searcherCall);
+            uint256 gasRebate;
+            (result, gasRebate, gasLimit) =  _verifyCallData(userCallHash, callSuccess, searcherCall);
+            _activeGasRebate += gasRebate;
         }
     }
 
