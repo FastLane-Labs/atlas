@@ -41,6 +41,11 @@ contract FastLaneFactory is IFactory, ThogLock {
 
         require(_baseLock == BaseLock.Unlocked, "ERR-F00 FactoryLock");
 
+        // Check that the value of the tx is greater than or equal to the value specified
+        // NOTE: a msg.value *higher* than user value could be used by the staging call.
+        // There is a further check in the handler before the usercall to verify. 
+        require(msg.value >= userCall.value, "ERR-H03 ValueExceedsBalance");
+
         ProtocolData memory protocolData = _protocolData[userCall.to];
 
         require(protocolData.owner != address(0), "ERR-F01 UnsuportedUserTo");
@@ -63,7 +68,7 @@ contract FastLaneFactory is IFactory, ThogLock {
             searcherCalls
         );
 
-        _handler.protoCall(
+        _handler.protoCall{value: msg.value}(
             stagingCall,
             userCall,
             payeeData,

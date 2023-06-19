@@ -32,6 +32,7 @@ interface IHandler {
     /// @dev The stagingSelector's argument types must match the user's call's argument types to properly stage the meta tx.
     struct StagingCall { 
         address to;
+        uint16 callConfig;
         bytes4 stagingSelector;
         bytes4 verificationSelector;
         bytes32 userCallHash; // hash of user EOA and calldata, for verification of user's tx (if not matched, searcher wont be charged for gas)
@@ -46,6 +47,8 @@ interface IHandler {
     struct UserCall {
         address to;
         address from;
+        uint256 gas;
+        uint256 value;
         bytes data;
     }
 
@@ -64,40 +67,5 @@ interface IHandler {
         uint256 payeePercent;
         bytes4 pmtSelector; // func selector (on payee contract) to call for custom pmt function. leave blank if payee receives funds via ERC20 transfer
         // TODO: formalize / customize args for pmtSelector?
-    }
-
-    enum SearcherOutcome {
-        // future task tracking
-        PendingUpdate,
-        ExecutionCompleted,
-        UpdateCompleted,
-        BlockExecution,
-
-        // no user refund (relay error or hostile user)
-        InvalidSignature,
-        InvalidUserHash,
-        InvalidBidsHash,
-        GasPriceOverCap,
-        UserOutOfGas,
-
-        // calldata user refund from searcher
-        InsufficientEscrow,
-        InvalidNonceOver,
-
-        // no call, but full user refund
-        AlreadyExecuted,
-        InvalidNonceUnder,
-        PerBlockLimit, // searchers can only send one tx per block 
-        // (b/c if they sent two we wouldn't be able to flag
-        // builder censorship)
-        InvalidFormat,
-
-        // protocol / external user refund (TODO: keep?)
-        NotWinner, // a higher bidding searcher was successful
-        
-        // call, with full user refund
-        CallReverted,
-        BidNotPaid,
-        Success
     }
 }

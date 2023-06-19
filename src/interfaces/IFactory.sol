@@ -1,7 +1,9 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-interface IFactory {
+import { IThogLock } from "../interfaces/IThogLock.sol";
+
+interface IFactory is IThogLock {
     struct ProtocolData {
         address owner; // the protocol, not fastlane
         uint32 nonce; 
@@ -12,8 +14,10 @@ interface IFactory {
     enum CallConfig { // for readability, will get broken down into pure funcs later
         CallStaging,
         DelegateStaging,
+        FwdValueStaging,
         CallVerification,
-        DelegateVerification
+        DelegateVerification,
+        FwdValueVerification
     }
     
     function initReleaseFactoryThogLock(

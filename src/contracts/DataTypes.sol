@@ -1,10 +1,42 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import { IFactory } from "../interfaces/IFactory.sol";
-import { IHandler } from "../interfaces/IHandler.sol";
+enum SearcherOutcome {
+    // future task tracking
+    PendingUpdate,
+    ExecutionCompleted,
+    UpdateCompleted,
+    BlockExecution,
 
-contract FastLaneDataTypes is IHandler {
+    // no user refund (relay error or hostile user)
+    InvalidSignature,
+    InvalidUserHash,
+    InvalidBidsHash,
+    GasPriceOverCap,
+    UserOutOfGas,
+
+    // calldata user refund from searcher
+    InsufficientEscrow,
+    InvalidNonceOver,
+
+    // no call, but full user refund
+    AlreadyExecuted,
+    InvalidNonceUnder,
+    PerBlockLimit, // searchers can only send one tx per block 
+    // (b/c if they sent two we wouldn't be able to flag
+    // builder censorship)
+    InvalidFormat,
+
+    // protocol / external user refund (TODO: keep?)
+    NotWinner, // a higher bidding searcher was successful
+    
+    // call, with full user refund
+    CallReverted,
+    BidNotPaid,
+    Success
+}
+
+contract FastLaneDataTypes {
 
     uint256 constant public SEARCHER_GAS_LIMIT = 1_000_000;
     uint256 constant public VALIDATION_GAS_LIMIT = 500_000;
@@ -60,4 +92,6 @@ contract FastLaneDataTypes is IHandler {
         1 << uint256(SearcherOutcome.UserOutOfGas) |
         1 << uint256(SearcherOutcome.NotWinner)
     );
+
+
 }

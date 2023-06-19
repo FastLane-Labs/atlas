@@ -4,13 +4,21 @@ pragma solidity ^0.8.16;
 import { IThogLock } from "../interfaces/IThogLock.sol";
 import { IHandler } from "../interfaces/IHandler.sol";
 
-interface ISearcherEscrow {
+//import "../contracts/DataTypes.sol";
+//import { SearcherOutcome } from "../contracts/DataTypes.sol";
+
+interface ISearcherEscrow is IThogLock {
     struct SearcherEscrow {
         uint128 total;
         uint128 escrowed;
         uint64 availableOn; // block.number when funds are available.  
         uint64 lastAccessed;
         uint32 nonce; // EOA nonce.
+    }
+
+    struct ValueTracker {
+        uint128 starting;
+        uint128 transferred;
     }
     
     function verify(
@@ -27,10 +35,11 @@ interface ISearcherEscrow {
 
     function setEscrowThogLock(
         address activeHandler,
-        IThogLock.Lock memory mLock
+        Lock memory mLock
     ) external;
 
     function releaseEscrowThogLock(
-        uint256 keyCode
-    ) external returns (uint256 gasRebate);
+        uint256 handlerKeyCode,
+        uint256 searcherCallCount
+    ) external returns (uint256 gasRebate, uint256 valueReturn);
 }

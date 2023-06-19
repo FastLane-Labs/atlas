@@ -6,7 +6,7 @@ import { ISearcherEscrow } from "../interfaces/ISearcherEscrow.sol";
 import { IFactory } from "../interfaces/IFactory.sol";
 import { IHandler } from "../interfaces/IHandler.sol";
 
-import { FastLaneDataTypes } from "./DataTypes.sol";
+import { SearcherOutcome } from "./DataTypes.sol";
 
 // NOTE: This is just a scratch pad for me to explore over-the-top strategies 
 // that almost certainly won't work. In no way should anyone expect this lock system  
@@ -16,7 +16,7 @@ import { FastLaneDataTypes } from "./DataTypes.sol";
 // is just to test outlandish ideas and must be removed before staging or merging
 // into main)
 
-contract ThogLock is FastLaneDataTypes, IThogLock {
+contract ThogLock is IThogLock {
 
     address immutable internal _escrowAddress;
     address immutable internal _factoryAddress;
@@ -41,8 +41,8 @@ contract ThogLock is FastLaneDataTypes, IThogLock {
 
     function _initThogLock(
         address _activeHandler,
-        UserCall calldata userCall,
-        SearcherCall[] calldata searcherCalls
+        IHandler.UserCall calldata userCall,
+        IHandler.SearcherCall[] calldata searcherCalls
     ) internal returns (uint256 lockCode) {
         // address(this) == _factoryAddress
 
@@ -84,7 +84,7 @@ contract ThogLock is FastLaneDataTypes, IThogLock {
     }
 
     function _turnKeySafe(
-        SearcherCall calldata searcherCall
+        IHandler.SearcherCall calldata searcherCall
     ) internal {
         // TODO: Lots of room for gas optimization here
 
@@ -126,12 +126,13 @@ library ThogLockLib {
 
     function initThogUnlock(
         uint256 _keyCode,
+        uint256 _searcherCallCount,
         address _escrow
-    ) internal returns (uint256 gasRebate) {
+    ) internal returns (uint256 gasRebate, uint256 valueReturn) {
         // address(this) == _handlerAddress
         // checks handler's keyCode memory (hidden from delegatecall) against escrow's lock,
         // which then checks it against the factory's lock
 
-        gasRebate = ISearcherEscrow(_escrow).releaseEscrowThogLock(_keyCode);
+        (gasRebate, valueReturn) = ISearcherEscrow(_escrow).releaseEscrowThogLock(_keyCode, _searcherCallCount);
     }
 }

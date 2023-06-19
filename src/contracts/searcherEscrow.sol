@@ -3,24 +3,18 @@ pragma solidity ^0.8.16;
 
 import { IFactory } from "../interfaces/IFactory.sol";
 import { ISearcherEscrow } from "../interfaces/ISearcherEscrow.sol";
+import { IHandler } from "../interfaces/IHandler.sol";
 
-import { FastLaneDataTypes } from "./DataTypes.sol";
-import { FastLaneErrorsEvents } from "./Emissions.sol";
+import { FastLaneDataTypes, SearcherOutcome } from "./DataTypes.sol";
 import { ThogLock } from "./ThogLock.sol";
+
+import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
 import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 
-contract FastLaneEscrow is FastLaneErrorsEvents, FastLaneDataTypes, ThogLock, EIP712 {
+contract FastLaneEscrow is FastLaneDataTypes, ISearcherEscrow, ThogLock, EIP712 {
     using ECDSA for bytes32;
-
-    struct SearcherEscrow {
-        uint128 total;
-        uint128 escrowed;
-        uint64 availableOn; // block.number when funds are available.  
-        uint64 lastAccessed;
-        uint32 nonce; // EOA nonce.
-    }
 
     uint256 immutable public chainId;
     address immutable public factory;
@@ -29,8 +23,9 @@ contract FastLaneEscrow is FastLaneErrorsEvents, FastLaneDataTypes, ThogLock, EI
     uint256 private _activeGasRebate;
     address private _activeHandler;
 
-    bytes32 private _pendingSearcherKey;
+    address private _pendingSearcher;
     SearcherEscrow private _pendingEscrowUpdate;
+    ValueTracker private _pendingValueTracker;
 
     // NOTE: these storage vars / maps should only be accessible by *signed* searcher transactions
     // and only once per searcher per block (to avoid user-searcher collaborative exploits)
@@ -58,18 +53,22 @@ contract FastLaneEscrow is FastLaneErrorsEvents, FastLaneDataTypes, ThogLock, EI
         _baseLock = BaseLock.Locked;
         _activeHandler = activeHandler;
         _sLock = mLock;
+
+        _pendingValueTracker = ValueTracker({
+            starting: uint128(address(this).balance),
+            transferred: 0
+        });
     }
 
     function releaseEscrowThogLock(
         uint256 handlerKeyCode,
         uint256 searcherCallCount
-    ) external returns (uint256 gasRebate) {
+    ) external returns (uint256 gasRebate, uint256 valueReturn) {
         // address(this) == escrowAddress
         require(msg.sender == _activeHandler, "ERR-T03 InvalidCaller");
         require(_baseLock == BaseLock.Locked, "ERR-T04 AlreadyUnlocked");
 
         Lock memory mLock = _sLock;
-        gasRebate = _activeGasRebate;
 
         // first check that the searcher call counter matches
         require(mLock._alpha == mLock._omega, "ERR-T04 MissingKeys");
@@ -88,23 +87,36 @@ contract FastLaneEscrow is FastLaneErrorsEvents, FastLaneDataTypes, ThogLock, EI
         // TODO: might be unnecessary
         IFactory(_factoryAddress).initReleaseFactoryThogLock(handlerKeyCode);
 
+        // forward the correct value back to the handler for distribution
+        // to the user
+        ValueTracker memory valueTracker = _pendingValueTracker;
+
+        valueReturn = (address(this).balance - valueTracker.starting) + valueTracker.transferred;
+        gasRebate = _activeGasRebate;
+
+        SafeTransferLib.safeTransferETH(
+            msg.sender, // verified above that msg.sender = handler
+            valueReturn + gasRebate
+        );
+
         // _baseLock = BaseLock.Unlocked;
         delete _baseLock; // TODO: ^ see if there's a gas refund dif here on enums, result should be the same
         delete _keyCode;
         delete _sLock;
         delete _activeGasRebate;
         delete _activeHandler;
+        delete _pendingValueTracker;
     }
 
     function update(
         uint256 gasWaterMark,
         uint256 result,
-        SearcherCall calldata searcherCall
+        IHandler.SearcherCall calldata searcherCall
     ) external {
         require(msg.sender == _activeHandler, "ERR-E17 InvalidSender");
-        require(keccak256(searcherCall.signature) == _pendingSearcherKey, "ERR-E18 InvalidSignature");
+        require(searcherCall.metaTx.from == _pendingSearcher, "ERR-E18 InvalidSignature");
     
-        delete _pendingSearcherKey; 
+        delete _pendingSearcher; 
 
         SearcherEscrow memory escrowUpdate = _pendingEscrowUpdate;
 
@@ -151,24 +163,42 @@ contract FastLaneEscrow is FastLaneErrorsEvents, FastLaneDataTypes, ThogLock, EI
     function verify(
         bytes32 userCallHash,
         bool callSuccess,
-        SearcherCall calldata searcherCall
+        IHandler.SearcherCall calldata searcherCall
     ) external returns (uint256 result, uint256 gasLimit) {
+
+        require(msg.sender == _activeHandler, "ERR-SE00 InvalidSender");
+
+        // TODO: lots of testing on bitwise conditions to make sure that
+        // pendingSearcher is always cleared out before every verify
+        require(_pendingSearcher == address(0), "ERR-SE01 ExistingSearcher");
 
         _turnKeySafe(searcherCall);
 
-        if (!_verifySignature(searcherCall.metaTx, searcherCall.signature)) {
-            (result, gasLimit) = (1 << uint256(SearcherOutcome.InvalidSignature), 0);
+        if (_verifySignature(searcherCall.metaTx, searcherCall.signature)) {
+            uint256 gasRebate;
+            bool forwardValue;
+            (result, gasRebate, gasLimit, forwardValue) = _verifyCallData(userCallHash, callSuccess, searcherCall);
+            
+            _activeGasRebate += gasRebate;
+            // _pendingSearcher = searcherCall.metaTx.from; // moved to verifyCallData
+
+            // NOTE: searchers should be informed that using a value parameter 
+            // in their transactions will be extremely gas expensive for them
+            if (forwardValue) {
+                SafeTransferLib.safeTransferETH(
+                    msg.sender, // verified above that msg.sender = handler
+                    searcherCall.metaTx.value
+                );
+            }
         
         } else {
-            uint256 gasRebate;
-            (result, gasRebate, gasLimit) =  _verifyCallData(userCallHash, callSuccess, searcherCall);
-            _activeGasRebate += gasRebate;
+            (result, gasLimit) = (1 << uint256(SearcherOutcome.InvalidSignature), 0);
         }
     }
 
     // TODO: make a more thorough version of this
     function _verifySignature(
-        SearcherMetaTx calldata metaTx, 
+        IHandler.SearcherMetaTx calldata metaTx, 
         bytes calldata signature
     ) internal view returns (bool) {
         
@@ -194,7 +224,7 @@ contract FastLaneEscrow is FastLaneErrorsEvents, FastLaneDataTypes, ThogLock, EI
 
     function _verifyBids(
         bytes32 bidsHash,
-        BidData[] calldata bids
+        IHandler.BidData[] calldata bids
     ) internal pure returns(bool validBid) {
         // NOTE: this should only occur after the searcher's signature on the bidsHash is verified
 
@@ -205,8 +235,8 @@ contract FastLaneEscrow is FastLaneErrorsEvents, FastLaneDataTypes, ThogLock, EI
     function _verifyCallData(
         bytes32 userCallHash,
         bool callSuccess,
-        SearcherCall calldata searcherCall
-    ) internal returns (uint256 result, uint256 gasRebate, uint256 gasLimit) {
+        IHandler.SearcherCall calldata searcherCall
+    ) internal returns (uint256 result, uint256 gasRebate, uint256 gasLimit, bool forwardValue) {
 
         if (callSuccess) {
             result |= 1 << uint256(SearcherOutcome.NotWinner);
@@ -309,10 +339,38 @@ contract FastLaneEscrow is FastLaneErrorsEvents, FastLaneDataTypes, ThogLock, EI
         } else {
             // store for easier access post-execution
             // wtb transient storage <3
-            _pendingSearcherKey = keccak256(searcherCall.signature); 
+            _pendingSearcher = searcherCall.metaTx.from; 
             _pendingEscrowUpdate = searcherEscrow;
 
             result |= 1 << uint256(SearcherOutcome.PendingUpdate);
         }
+
+        forwardValue = (searcherCall.metaTx.value > 0) && ((result >>1) == 0);
     }
+
+    receive() external payable {
+        if (gasleft() > 3_000) {
+            if (msg.sender == _activeHandler && msg.sender != address(0)) {
+                
+                // If not in middle of processing a searcher call, credit
+                // the value to the user via the value tracker
+                if (_pendingSearcher == address(0)) {
+                    _pendingValueTracker.transferred += uint128(msg.value);
+
+                // If there's a pending searcher, that means this is a
+                // refund from handler for the searcher due to a call failure
+                } else {
+                    _escrowData[_pendingSearcher].total += uint128(msg.value);
+                }
+            
+            } else {
+                revert(); // no untracked balance transfers plz
+            }
+        
+        } else {
+            revert(); // no untracked balance transfers plz
+        }
+    }
+
+    fallback() external payable {}
 }

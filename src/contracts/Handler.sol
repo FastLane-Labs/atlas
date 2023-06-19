@@ -4,21 +4,18 @@ pragma solidity ^0.8.16;
 import { IHandler } from "../interfaces/IHandler.sol";
 import { ISearcherEscrow } from "../interfaces/ISearcherEscrow.sol";
 import { ISearcherContract } from "../interfaces/ISearcherContract.sol";
+import { IFactory } from "../interfaces/IFactory.sol";
 
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
 import { FastLaneErrorsEvents } from "./Emissions.sol";
-
+import { SearcherOutcome } from "./DataTypes.sol";
 import { ThogLockLib } from "./ThogLock.sol";
-
 
 contract FastLaneProtoHandler is IHandler, FastLaneErrorsEvents {
 
     uint256 constant public SEARCHER_GAS_LIMIT = 1_000_000;
     uint256 constant public VALIDATION_GAS_LIMIT = 500_000;
-
-    bytes32 constant internal _SEARCHER_BID_UNPAID = keccak256(abi.encodePacked("SearcherBidUnpaid"));
-    bytes32 constant internal _SEARCHER_CALL_REVERTED = keccak256(abi.encodePacked("SearcherCallReverted"));
 
     address immutable internal _factory;
     address immutable internal _escrow;
@@ -46,6 +43,10 @@ contract FastLaneProtoHandler is IHandler, FastLaneErrorsEvents {
         PayeeData[] calldata payeeData, // supplied by frontend
         SearcherCall[] calldata searcherCalls // supplied by FastLane via frontend integration
     ) external payable {
+        // make sure it's the factory calling, although it should be impossible
+        // for anyone else to call seeing as how the contract was just made.
+        require(msg.sender == _factory, "ERR-H00 InvalidSender");
+        require(address(this).balance == 0, "ERR-H00a BalanceNotZero"); // should be impossible
 
         // keyCode is in memory - should be immune to tampering by malicious delegatecall
         uint256 keyCode = uint256(keccak256(abi.encodePacked(userCall.data, userCall.from)));
@@ -56,7 +57,7 @@ contract FastLaneProtoHandler is IHandler, FastLaneErrorsEvents {
 
         // NOTE: the stagingCall can be manipulated by an adversarial user.
         // this first check is meant as a gas-saving courtesy for frontend errors. 
-        require(userCallHash == stagingCall.userCallHash, "ERR-01 UserCalldata");
+        require(userCallHash == stagingCall.userCallHash, "ERR-H01 UserCalldata");
 
         // declare some variables
         bool callSuccess; // reuse memory variable
@@ -64,18 +65,51 @@ contract FastLaneProtoHandler is IHandler, FastLaneErrorsEvents {
         bytes memory returnData; // capture any pre-execution state variables the protocol may need
 
         // Stage the execution environment for the user, if necessary
-        // NOTE: this is a trusted delegatecall... approve & trusted protocols only
+        // NOTE: this may be a trusted delegatecall, but this contract should have totally empty storage
         // NOTE: staging will almost certainly be auto-disabled for any upgradeable contracts
-        if (stagingCall.stagingSelector != bytes4(0)) {
-            (callSuccess, stagingData) = stagingCall.to.delegatecall(
-                    bytes.concat(stagingCall.stagingSelector, userCall.data[4:])
-            );
-            require(callSuccess, "ERR-02 Staging");
+        if (_needsStaging(stagingCall.callConfig)) {
+            // NOTE: the calldata for the staging call must be the user's calldata
+            // NOTE: the staging contracts we're calling should be custom-made for each protocol and 
+            // should be immutable.  A new one should be made, if necessary. 
+            if (_delegateStaging(stagingCall.callConfig)) {
+                (callSuccess, stagingData) = stagingCall.to.delegatecall(
+                    bytes.concat(stagingCall.stagingSelector, userCall.data)
+                );
+                require(callSuccess, "ERR-H02 DelegateStaging");
+            
+            } else {
+                (callSuccess, stagingData) = stagingCall.to.call{
+                    value: _fwdValueStaging(stagingCall.callConfig) ? msg.value : 0 // if staging explicitly needs tx.value, handler doesn't forward it
+                }(
+                    bytes.concat(stagingCall.stagingSelector, userCall.data)
+                );
+                require(callSuccess, "ERR-H02 CallStaging");
+
+            }
         }
 
         // Do the user's call
-        (callSuccess, returnData) = userCall.to.call(userCall.data);
+        // NOTE: balance check is necessary due to the optionality for a different
+        // msg.value to have been used during the staging call
+        require(address(this).balance >= userCall.value, "ERR-H03 ValueExceedsBalance");
+
+        (callSuccess, returnData) = userCall.to.call{
+            value: userCall.value,
+            gas: userCall.gas
+        }(userCall.data);
         require(callSuccess, "ERR-03 UserCall");
+
+        // forward any surplus msg.value to the escrow for tracking
+        // and eventual reimbursement to user (after searcher txs)
+        // are finished processing
+        SafeTransferLib.safeTransferETH(
+            _escrow, 
+            address(this).balance
+        );
+
+        // ###########  END USER EXECUTION #############
+        // ---------------------------------------------
+        // #########  BEGIN SEARCHER EXECUTION ##########
 
         // init some vars for the searcher loop
         uint256 result;
@@ -124,9 +158,9 @@ contract FastLaneProtoHandler is IHandler, FastLaneErrorsEvents {
 
             if (
                 !(callSuccess) && 
-                !(result & 1 << uint256(SearcherOutcome.ExecutionCompleted) == 0)
+                (result & 1 << uint256(SearcherOutcome.ExecutionCompleted) != 0)
             ) { 
-                if (result & 1 << uint256(SearcherOutcome.Success)  == 0) {
+                if (result & 1 << uint256(SearcherOutcome.Success) != 0) {
                     callSuccess = true;
 
                     // process protocol payments
@@ -135,19 +169,33 @@ contract FastLaneProtoHandler is IHandler, FastLaneErrorsEvents {
                 }
             }
 
+            // transfer any unused value from the searcher's call (accrued
+            // either from reverting w/ a msg.value or just transferring back
+            // to here) back to the SearcherEscrow, where the receive func
+            // will properly credit it to the user. 
+            // NOTE: this is only safe due to none of the user's eth being
+            // held in the handler - it was all transferred to escrow earlier.
+            // TODO: verify the logic supporting this integration with the 
+            // case of eth as a bid token in _handlePayments
+            if (address(this).balance != 0) {
+                SafeTransferLib.safeTransferETH(
+                    _escrow, 
+                    address(this).balance
+                );
+            }
+
+            emit SearcherTxResult(
+                userCall.from,
+                userCall.to,
+                searcherCalls[i].metaTx.to,
+                result,
+                i
+            );
+
             keyCode = ThogLockLib.turnKeyUnsafe(keyCode, searcherCalls[i]);
 
             unchecked { ++i; }
             gasWaterMark = gasleft();
-        }
-
-        // Run a post-searcher verification check with the data from the staging call
-        if (stagingCall.verificationSelector != bytes4(0)) {
-            // Unlike the staging call, this isn't delegatecall
-            (callSuccess,) = stagingCall.to.call(
-                abi.encodeWithSelector(stagingCall.verificationSelector, stagingData)
-            );
-            require(callSuccess, "ERR-07 Verification");
         }
 
         // unlock the handler, escrow, and factory
@@ -156,13 +204,60 @@ contract FastLaneProtoHandler is IHandler, FastLaneErrorsEvents {
         // concerned with charging the searchers responsible for their
         // rebates, hence the ECDSA check and the doublespend check at the
         // escrow level. 
-        uint256 gasRebate = ThogLockLib.initThogUnlock(keyCode, _escrow);
 
-        // handle gas rebate
+        // NOTE: gasRebate also includes any eth value accrued for the 
+        // user's benefit
+        (uint256 gasRebate, uint256 valueReturn) = ThogLockLib.initThogUnlock(
+            keyCode, 
+            searcherCalls.length,
+            _escrow
+        );
+
+        // TODO: find better placement for this event emission 
+        // need to allow visibility of callSuccess, but this valueReturn
+        // might change in the verification that follows. 
+        emit UserTxResult(
+            userCall.from,
+            userCall.to,
+            callSuccess,
+            i+1,
+            valueReturn,
+            gasRebate
+        );
+
+        // handle gas rebate prior to verification, incase verification needs
+        // to see the value return
+        // TODO: move this so that it's more gas efficient but safe from the delegate call
         SafeTransferLib.safeTransferETH(
             userCall.from, 
             gasRebate
         );
+
+        // Run a post-searcher verification check with the data from the staging call
+        if (_needsVerification(stagingCall.callConfig)) {
+            if (_delegateVerification(stagingCall.callConfig)) {
+                (callSuccess,) = stagingCall.to.delegatecall(
+                    abi.encodeWithSelector(stagingCall.verificationSelector, stagingData)
+                );
+                require(callSuccess, "ERR-07 DelegateVerification");
+            
+            } else {
+                (callSuccess,) = stagingCall.to.call{
+                    value: _fwdValueStaging(stagingCall.callConfig) ? address(this).balance : 0 // if staging explicitly needs tx.value, handler doesn't forward it
+                }(
+                    abi.encodeWithSelector(stagingCall.verificationSelector, stagingData)
+                );
+                require(callSuccess, "ERR-07 CallVerification");
+            }
+        }
+
+        // return the earned value, if there is any
+        if (valueReturn != 0) {
+            SafeTransferLib.safeTransferETH(
+                userCall.from, 
+                valueReturn
+            );
+        }
     }
 
     function _handlePayments(
@@ -283,5 +378,33 @@ contract FastLaneProtoHandler is IHandler, FastLaneErrorsEvents {
             
             unchecked {++i;}
         }
+    }
+
+    receive() external payable {}
+
+    fallback() external payable {}
+
+    function _needsStaging(uint16 callConfig) internal pure returns (bool needsStaging) {
+        needsStaging = (callConfig & 1 << uint16(IFactory.CallConfig.CallStaging) != 0);
+    }
+
+    function _delegateStaging(uint16 callConfig) internal pure returns (bool delegateStaging) {
+        delegateStaging = (callConfig & 1 << uint16(IFactory.CallConfig.DelegateStaging) != 0);
+    }
+
+    function _fwdValueStaging(uint16 callConfig) internal pure returns (bool fwdValueStaging) {
+        fwdValueStaging = (callConfig & 1 << uint16(IFactory.CallConfig.FwdValueStaging) != 0);
+    }
+
+    function _needsVerification(uint16 callConfig) internal pure returns (bool needsVerification) {
+        needsVerification = (callConfig & 1 << uint16(IFactory.CallConfig.CallStaging) != 0);
+    }
+
+    function _delegateVerification(uint16 callConfig) internal pure returns (bool delegateVerification) {
+        delegateVerification = (callConfig & 1 << uint16(IFactory.CallConfig.DelegateStaging) != 0);
+    }
+
+    function _fwdValueVerification(uint16 callConfig) internal pure returns (bool fwdValueVerification) {
+        fwdValueVerification = (callConfig & 1 << uint16(IFactory.CallConfig.FwdValueStaging) != 0);
     }
 }
