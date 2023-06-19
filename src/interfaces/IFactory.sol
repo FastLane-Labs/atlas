@@ -3,24 +3,23 @@ pragma solidity ^0.8.16;
 
 import { IThogLock } from "../interfaces/IThogLock.sol";
 
-interface IFactory is IThogLock {
-    struct ProtocolData {
-        address owner; // the protocol, not fastlane
-        uint32 nonce; 
-        uint16 callConfig; // bitwise
-        uint16 split; // FL revenue share
-    }
+import {
+    StagingCall,
+    UserCall,
+    PayeeData,
+    SearcherCall
+} from "../libraries/DataTypes.sol";
 
-    enum CallConfig { // for readability, will get broken down into pure funcs later
-        CallStaging,
-        DelegateStaging,
-        FwdValueStaging,
-        CallVerification,
-        DelegateVerification,
-        FwdValueVerification
-    }
-    
+interface IFactory is IThogLock {
+
     function initReleaseFactoryThogLock(
         uint256 keyCode
     ) external;
+
+    function metacall(
+        StagingCall calldata stagingCall, // supplied by frontend
+        UserCall calldata userCall,
+        PayeeData[] calldata payeeData, // supplied by frontend
+        SearcherCall[] calldata searcherCalls // supplied by FastLane via frontend integration
+    ) external payable;
 }

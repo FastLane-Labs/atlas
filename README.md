@@ -1,8 +1,16 @@
 This is a *rough* draft meant to illustrate a few key concepts.  It is absolutely not production ready and has dozens of security flaws and hundrews of missing lines of code. 
 
-Apologies for the lack of readability - functionality/coverage comes first, then simplification. This might not be readable until mid July. 
+Apologies for the lack of readability - functionality/coverage comes first, then simplification. This might not be readable until July.
 
-The way it works is thus:
+The locking system is a work in process and is overly complicated / redundant
+in some instances and insufficient in others. 
+
+Gas optimization will come last.
+
+Note that the backend will probably need to use a reputation system for searcher bids that aren't in the top three in order to not take up too much space in the block.  The further down the the searcherCalls[], the higher the
+reputation requirement for inclusion by the backend. This isnt necessarily required - it's not an economic issue. It's more-so about just being a good member of the ecosystem and not wasting too much precious blockspace. With probabalistic searcher txs that have low success rate but high return-to-cost rate. 
+
+The way the backend / frontend of this protocol works is thus:
 
 1. A protocol will enter into a partnership with FastLane Labs & our partners.
 2. The protocol will integrate the FastLane Frontend API into their own front end.

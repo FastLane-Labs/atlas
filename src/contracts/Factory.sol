@@ -6,12 +6,17 @@ import { IFactory } from "../interfaces/IFactory.sol";
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 import { ReentrancyGuard } from "solmate/utils/ReentrancyGuard.sol";
 
-import { FastLaneDataTypes } from "./DataTypes.sol";
 import { ThogLock } from "./ThogLock.sol";
-
 import { FastLaneEscrow } from "./SearcherEscrow.sol";
-import { FastLaneProtoHandler } from "./Handler.sol";
+import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
 
+import {
+    StagingCall,
+    UserCall,
+    PayeeData,
+    SearcherCall,
+    ProtocolData
+} from "../libraries/DataTypes.sol";
 
 contract FastLaneFactory is IFactory, ThogLock {
 
@@ -51,7 +56,7 @@ contract FastLaneFactory is IFactory, ThogLock {
         require(protocolData.owner != address(0), "ERR-F01 UnsuportedUserTo");
 
         // NOTE: This is expected to revert if there's already a contract at that location
-        FastLaneProtoHandler _handler = new FastLaneProtoHandler{
+        ExecutionEnvironment _executionEnvironment = new ExecutionEnvironment{
             salt: keccak256(
                 abi.encodePacked(
                     escrowAddress,
@@ -63,12 +68,12 @@ contract FastLaneFactory is IFactory, ThogLock {
         }(protocolData.split, escrowAddress);
 
         uint256 lockCode = _initThogLock(
-            address(_handler),
+            address(_executionEnvironment),
             userCall,
             searcherCalls
         );
 
-        _handler.protoCall{value: msg.value}(
+        _executionEnvironment.protoCall{value: msg.value}(
             stagingCall,
             userCall,
             payeeData,

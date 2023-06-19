@@ -3,10 +3,12 @@ pragma solidity ^0.8.16;
 
 import { IThogLock } from "../interfaces/IThogLock.sol";
 import { ISearcherEscrow } from "../interfaces/ISearcherEscrow.sol";
-import { IFactory } from "../interfaces/IFactory.sol";
-import { IHandler } from "../interfaces/IHandler.sol";
 
-import { SearcherOutcome } from "./DataTypes.sol";
+import {
+    UserCall,
+    SearcherCall,
+    ProtocolData
+} from "../libraries/DataTypes.sol";
 
 // NOTE: This is just a scratch pad for me to explore over-the-top strategies 
 // that almost certainly won't work. In no way should anyone expect this lock system  
@@ -29,7 +31,7 @@ contract ThogLock is IThogLock {
     Lock internal _sLock;
 
     // load execution environment data for each protocol
-    mapping(address => IFactory.ProtocolData) internal _protocolData;
+    mapping(address => ProtocolData) internal _protocolData;
 
     constructor(
         address escrowAddress,
@@ -41,8 +43,8 @@ contract ThogLock is IThogLock {
 
     function _initThogLock(
         address _activeHandler,
-        IHandler.UserCall calldata userCall,
-        IHandler.SearcherCall[] calldata searcherCalls
+        UserCall calldata userCall,
+        SearcherCall[] calldata searcherCalls
     ) internal returns (uint256 lockCode) {
         // address(this) == _factoryAddress
 
@@ -84,7 +86,7 @@ contract ThogLock is IThogLock {
     }
 
     function _turnKeySafe(
-        IHandler.SearcherCall calldata searcherCall
+        SearcherCall calldata searcherCall
     ) internal {
         // TODO: Lots of room for gas optimization here
 
@@ -119,7 +121,7 @@ library ThogLockLib {
     
     function turnKeyUnsafe(
         uint256 keyCode,
-        IHandler.SearcherCall calldata searcherCall
+        SearcherCall calldata searcherCall
     ) internal pure returns (uint256 updatedKeyCode) {
         updatedKeyCode = keyCode ^ uint256(keccak256(abi.encodePacked(searcherCall.signature, searcherCall.metaTx.from)));
     }

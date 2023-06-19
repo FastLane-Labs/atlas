@@ -3,15 +3,25 @@ pragma solidity ^0.8.16;
 
 import { IFactory } from "../interfaces/IFactory.sol";
 import { ISearcherEscrow } from "../interfaces/ISearcherEscrow.sol";
-import { IHandler } from "../interfaces/IHandler.sol";
-
-import { FastLaneDataTypes, SearcherOutcome } from "./DataTypes.sol";
-import { ThogLock } from "./ThogLock.sol";
+import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
 
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
 import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
+
+import { ThogLock } from "./ThogLock.sol";
+import { FastLaneDataTypes } from "../libraries/DataTypes.sol";
+
+import {
+    SearcherOutcome,
+    SearcherCall,
+    SearcherMetaTx,
+    BidData,
+    SearcherSafety,
+    StagingCall,
+    ExecutionPhase
+} from "../libraries/DataTypes.sol";
 
 contract FastLaneEscrow is FastLaneDataTypes, ISearcherEscrow, ThogLock, EIP712 {
     using ECDSA for bytes32;
@@ -23,7 +33,15 @@ contract FastLaneEscrow is FastLaneDataTypes, ISearcherEscrow, ThogLock, EIP712 
     uint256 private _activeGasRebate;
     address private _activeHandler;
 
-    address private _pendingSearcher;
+    // searcher contracts need to verify that delegatecall
+    // is not active on the execution environment
+    bool public isDelegatingCall; 
+
+    // TODO: struct pack
+    ExecutionPhase private _executionPhase;
+    address private _pendingSearcherFrom;
+    address private _pendingSearcherTo;
+    SearcherSafety private _pendingSearcherSafety; // Not required, but forces searchers to perform safety checks
     SearcherEscrow private _pendingEscrowUpdate;
     ValueTracker private _pendingValueTracker;
 
@@ -35,10 +53,84 @@ contract FastLaneEscrow is FastLaneDataTypes, ISearcherEscrow, ThogLock, EIP712 
     // track searcher tx hashes to avoid replays... imperfect solution tho
     mapping(bytes32 => bool) private _hashes;
 
-    constructor(uint32 escrowDurationFromFactory) ThogLock(address(this), msg.sender) EIP712("ProtoCallHandler", "0.0.1") {
+    constructor(
+        uint32 escrowDurationFromFactory
+    ) ThogLock(address(this), msg.sender) EIP712("ProtoCallHandler", "0.0.1") 
+    {
         chainId = block.chainid;
         factory = msg.sender;
         escrowDuration = escrowDurationFromFactory; //TODO: get this as input from factory w/o breaking linearization
+    }
+
+    function searcherSafetyLock(
+        address searcherSender, // the searcherCall.metaTx.from
+        address executionCaller // the address of the ExecutionEnvironment 
+        // NOTE: the execution caller is the msg.sender to the searcher's contract
+    ) external returns (bool isSafe) {
+        // an external call so that searcher contracts can verify
+        // that delegatecall isn't being abused. This MUST be used
+        // by every searcher contract!
+        // TODO: use bytes32 key and track keccak256(searcherTo, searcherFrom, activeHandler)
+        isSafe = (
+            !isDelegatingCall &&
+            _executionPhase == ExecutionPhase.SearcherCalls &&
+            _pendingSearcherTo == msg.sender &&
+            _pendingSearcherFrom == searcherSender &&
+            _activeHandler == executionCaller &&
+            _pendingSearcherSafety == SearcherSafety.Requested
+        );
+        
+        if (isSafe) {
+            _pendingSearcherSafety = SearcherSafety.Verified;
+        }
+    }
+
+    function handleDelegateStaging(
+        StagingCall calldata stagingCall,
+        bytes calldata userCallData
+    ) external returns (bytes memory stagingData) {
+        // Escrow contract needs to init all of the execution environment's
+        // delegatecalls so that it can trust the locks.
+        require(!isDelegatingCall, "ERR-E30 AlreadyDelegating");
+        require(msg.sender == _activeHandler, "ERR-E31 InvalidCaller");
+        require(_executionPhase == ExecutionPhase.Staging, "ERR-E32 NotStaging");
+        
+        // Set the lock for searcher safety checks
+        isDelegatingCall = true;
+
+        stagingData = IExecutionEnvironment(
+            payable(msg.sender)
+        ).delegateStagingWrapper(
+            stagingCall,
+            userCallData
+        );
+
+        // Release the lock
+        isDelegatingCall = false;
+    }
+
+    function handleDelegateVerification(
+        StagingCall calldata stagingCall,
+        bytes memory stagingData
+    ) external {
+        // Escrow contract needs to init all of the execution environment's
+        // delegatecalls so that it can trust the locks.
+        require(!isDelegatingCall, "ERR-E33 AlreadyDelegating");
+        require(msg.sender == _activeHandler, "ERR-E34 InvalidCaller");
+        require(_executionPhase == ExecutionPhase.Verification, "ERR-E35 NotVerification");
+        
+        // Set the lock for searcher safety checks
+        isDelegatingCall = true;
+
+        IExecutionEnvironment(
+            payable(msg.sender)
+        ).delegateStagingWrapper(
+            stagingCall,
+            stagingData
+        );
+
+        // Release the lock
+        isDelegatingCall = false;
     }
 
     function setEscrowThogLock(
@@ -49,7 +141,9 @@ contract FastLaneEscrow is FastLaneDataTypes, ISearcherEscrow, ThogLock, EIP712 
         require(_activeHandler == address(0), "ERR-E11 ExistingHandler");
         require(_keyCode == 0, "ERR-E12 KeyCodeTampering");
         require(_baseLock == BaseLock.Unlocked, "ERR-E13 NotUnlocked");
+        require(_executionPhase == ExecutionPhase.Uninitialized, "ERR-E14 AlreadyInitialized");
 
+        _executionPhase = ExecutionPhase.Staging;
         _baseLock = BaseLock.Locked;
         _activeHandler = activeHandler;
         _sLock = mLock;
@@ -67,6 +161,7 @@ contract FastLaneEscrow is FastLaneDataTypes, ISearcherEscrow, ThogLock, EIP712 
         // address(this) == escrowAddress
         require(msg.sender == _activeHandler, "ERR-T03 InvalidCaller");
         require(_baseLock == BaseLock.Locked, "ERR-T04 AlreadyUnlocked");
+        require(_executionPhase == ExecutionPhase.Verification, "ERR-E14 NotVerified");
 
         Lock memory mLock = _sLock;
 
@@ -106,17 +201,22 @@ contract FastLaneEscrow is FastLaneDataTypes, ISearcherEscrow, ThogLock, EIP712 
         delete _activeGasRebate;
         delete _activeHandler;
         delete _pendingValueTracker;
+        delete _executionPhase;
     }
 
     function update(
         uint256 gasWaterMark,
         uint256 result,
-        IHandler.SearcherCall calldata searcherCall
+        SearcherCall calldata searcherCall
     ) external {
+
         require(msg.sender == _activeHandler, "ERR-E17 InvalidSender");
-        require(searcherCall.metaTx.from == _pendingSearcher, "ERR-E18 InvalidSignature");
+        require(searcherCall.metaTx.from == _pendingSearcherFrom, "ERR-E18 InvalidSignature");
+        require(_pendingSearcherSafety == SearcherSafety.Verified, "ERR-E19 NoSearcherSafety");
     
-        delete _pendingSearcher; 
+        delete _pendingSearcherFrom;
+        delete _pendingSearcherTo;
+        delete _pendingSearcherSafety;
 
         SearcherEscrow memory escrowUpdate = _pendingEscrowUpdate;
 
@@ -163,15 +263,19 @@ contract FastLaneEscrow is FastLaneDataTypes, ISearcherEscrow, ThogLock, EIP712 
     function verify(
         bytes32 userCallHash,
         bool callSuccess,
-        IHandler.SearcherCall calldata searcherCall
+        SearcherCall calldata searcherCall
     ) external returns (uint256 result, uint256 gasLimit) {
 
         require(msg.sender == _activeHandler, "ERR-SE00 InvalidSender");
 
         // TODO: lots of testing on bitwise conditions to make sure that
         // pendingSearcher is always cleared out before every verify
-        require(_pendingSearcher == address(0), "ERR-SE01 ExistingSearcher");
+        require(_pendingSearcherFrom == address(0), "ERR-SE01 ExistingSearcher");
 
+        // Make sure that another searcher isnt pending verification
+        require(_pendingSearcherSafety == SearcherSafety.Unset, "ERR-E19 NoSearcherSafety");
+
+        // initialize this part of the key into the lock
         _turnKeySafe(searcherCall);
 
         if (_verifySignature(searcherCall.metaTx, searcherCall.signature)) {
@@ -180,7 +284,6 @@ contract FastLaneEscrow is FastLaneDataTypes, ISearcherEscrow, ThogLock, EIP712 
             (result, gasRebate, gasLimit, forwardValue) = _verifyCallData(userCallHash, callSuccess, searcherCall);
             
             _activeGasRebate += gasRebate;
-            // _pendingSearcher = searcherCall.metaTx.from; // moved to verifyCallData
 
             // NOTE: searchers should be informed that using a value parameter 
             // in their transactions will be extremely gas expensive for them
@@ -198,7 +301,7 @@ contract FastLaneEscrow is FastLaneDataTypes, ISearcherEscrow, ThogLock, EIP712 
 
     // TODO: make a more thorough version of this
     function _verifySignature(
-        IHandler.SearcherMetaTx calldata metaTx, 
+        SearcherMetaTx calldata metaTx, 
         bytes calldata signature
     ) internal view returns (bool) {
         
@@ -224,7 +327,7 @@ contract FastLaneEscrow is FastLaneDataTypes, ISearcherEscrow, ThogLock, EIP712 
 
     function _verifyBids(
         bytes32 bidsHash,
-        IHandler.BidData[] calldata bids
+        BidData[] calldata bids
     ) internal pure returns(bool validBid) {
         // NOTE: this should only occur after the searcher's signature on the bidsHash is verified
 
@@ -235,7 +338,7 @@ contract FastLaneEscrow is FastLaneDataTypes, ISearcherEscrow, ThogLock, EIP712 
     function _verifyCallData(
         bytes32 userCallHash,
         bool callSuccess,
-        IHandler.SearcherCall calldata searcherCall
+        SearcherCall calldata searcherCall
     ) internal returns (uint256 result, uint256 gasRebate, uint256 gasLimit, bool forwardValue) {
 
         if (callSuccess) {
@@ -339,7 +442,9 @@ contract FastLaneEscrow is FastLaneDataTypes, ISearcherEscrow, ThogLock, EIP712 
         } else {
             // store for easier access post-execution
             // wtb transient storage <3
-            _pendingSearcher = searcherCall.metaTx.from; 
+            _pendingSearcherFrom = searcherCall.metaTx.from;
+            _pendingSearcherTo = searcherCall.metaTx.to;
+            _pendingSearcherSafety = SearcherSafety.Requested;
             _pendingEscrowUpdate = searcherEscrow;
 
             result |= 1 << uint256(SearcherOutcome.PendingUpdate);
@@ -354,13 +459,13 @@ contract FastLaneEscrow is FastLaneDataTypes, ISearcherEscrow, ThogLock, EIP712 
                 
                 // If not in middle of processing a searcher call, credit
                 // the value to the user via the value tracker
-                if (_pendingSearcher == address(0)) {
+                if (_pendingSearcherFrom == address(0)) {
                     _pendingValueTracker.transferred += uint128(msg.value);
 
                 // If there's a pending searcher, that means this is a
                 // refund from handler for the searcher due to a call failure
                 } else {
-                    _escrowData[_pendingSearcher].total += uint128(msg.value);
+                    _escrowData[_pendingSearcherFrom].total += uint128(msg.value);
                 }
             
             } else {
@@ -372,5 +477,7 @@ contract FastLaneEscrow is FastLaneDataTypes, ISearcherEscrow, ThogLock, EIP712 
         }
     }
 
-    fallback() external payable {}
+    fallback() external payable {
+        revert(); // no untracked balance transfers plz
+    }
 }

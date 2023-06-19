@@ -2,12 +2,14 @@
 pragma solidity ^0.8.16;
 
 import { IThogLock } from "../interfaces/IThogLock.sol";
-import { IHandler } from "../interfaces/IHandler.sol";
 
-//import "../contracts/DataTypes.sol";
-//import { SearcherOutcome } from "../contracts/DataTypes.sol";
+import {
+    SearcherCall,
+    StagingCall
+} from "../libraries/DataTypes.sol";
 
 interface ISearcherEscrow is IThogLock {
+    
     struct SearcherEscrow {
         uint128 total;
         uint128 escrowed;
@@ -20,17 +22,23 @@ interface ISearcherEscrow is IThogLock {
         uint128 starting;
         uint128 transferred;
     }
+
+    function searcherSafetyLock(
+        address searcherSender, // the searcherCall.metaTx.from
+        address executionCaller // the address of the ExecutionEnvironment 
+        // NOTE: the execution caller is the msg.sender to the searcher's contract
+    ) external returns (bool isSafe);
     
     function verify(
         bytes32 userCallHash,
         bool callSuccess,
-        IHandler.SearcherCall calldata searcherCall
+        SearcherCall calldata searcherCall
     ) external returns (uint256 result, uint256 gasLimit);
 
     function update(
         uint256 gasWaterMark,
         uint256 result,
-        IHandler.SearcherCall calldata searcherCall
+        SearcherCall calldata searcherCall
     ) external;
 
     function setEscrowThogLock(
@@ -42,4 +50,14 @@ interface ISearcherEscrow is IThogLock {
         uint256 handlerKeyCode,
         uint256 searcherCallCount
     ) external returns (uint256 gasRebate, uint256 valueReturn);
+
+    function handleDelegateStaging(
+        StagingCall calldata stagingCall,
+        bytes calldata userCallData
+    ) external returns (bytes memory stagingData);
+
+    function handleDelegateVerification(
+        StagingCall calldata stagingCall,
+        bytes memory stagingData
+    ) external;
 }
