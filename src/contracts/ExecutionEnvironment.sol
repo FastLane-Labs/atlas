@@ -2,7 +2,6 @@
 pragma solidity ^0.8.16;
 
 import { ISearcherEscrow } from "../interfaces/ISearcherEscrow.sol";
-import { ISearcherContract } from "../interfaces/ISearcherContract.sol";
 import { ISafetyChecks } from "../interfaces/ISafetyChecks.sol";
 
 import { SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
@@ -19,9 +18,6 @@ import {
 } from "../libraries/DataTypes.sol";
 
 contract ExecutionEnvironment {
-
-    uint256 constant public SEARCHER_GAS_LIMIT = 1_000_000;
-    uint256 constant public VALIDATION_GAS_LIMIT = 500_000;
 
     address immutable internal _factory;
     address immutable internal _escrow;
@@ -52,7 +48,8 @@ contract ExecutionEnvironment {
         SearcherCall[] calldata searcherCalls // supplied by FastLane via frontend integration
     ) external payable {
         // make sure it's the factory calling, although it should be impossible
-        // for anyone else to call seeing as how the contract was just made.
+        // for anyone else to call seeing as how the contract was just made and
+        // it's a SALT2.
         require(msg.sender == _factory, "ERR-H00 InvalidSender");
 
         // if there's any lingering eth balance, forward it to escrow
@@ -76,21 +73,21 @@ contract ExecutionEnvironment {
         //      0: stagingCall
         //      1: userCall + keccak of prior
         //      2 to n: searcherCalls + keccak of prior
-        uint256 executionIndex;
+        // NOTE: if the staging call is skipped, the userCall has the 0 index.
         bytes32[] memory executionHashChain = _buildExecutionHashChain(
             stagingCall,
             userCall,
             searcherCalls
         );
 
+        // declare some variables
+        uint256 executionIndex; // tracks the index of executionHashChain array for calldata verification
+        bytes memory stagingData; // capture any pre-execution state variables the protocol may need
+        bytes memory userReturnData; // capture any user-returned values the protocol may need
+
         // ###########  END PREPARATION #############
         // ---------------------------------------------
         // #########  BEGIN STAGING EXECUTION ##########
-
-        // declare some variables
-        bool callSuccess; // reuse memory variable
-        bytes memory stagingData; // capture any pre-execution state variables the protocol may need
-        bytes memory userReturnData; // capture any pre-execution state variables the protocol may need
 
         // Stage the execution environment for the user, if necessary
         // NOTE: this may be a trusted delegatecall, but this contract should have totally empty storage
@@ -139,7 +136,7 @@ contract ExecutionEnvironment {
         // init some vars for the searcher loop
         uint256 gasWaterMark = gasleft();
         uint256 i; // init at 0
-        callSuccess = false;
+        bool callSuccess = false;
 
         for (; i < searcherCalls.length;) {
 
@@ -150,8 +147,7 @@ contract ExecutionEnvironment {
                     gasWaterMark,
                     callSuccess,
                     searcherCalls[i]
-                ) && 
-                !callSuccess
+                ) && !callSuccess
             ) {
                 // If this is first successful call, issue payments
                 ISearcherEscrow(_escrow).executePayments(
@@ -162,22 +158,21 @@ contract ExecutionEnvironment {
                 callSuccess = true;
             }
             
-            unchecked { ++i; }
             gasWaterMark = gasleft();
+            unchecked { ++i; }
         }
 
         // ###########  END SEARCHER EXECUTION #############
         // ---------------------------------------------
         // #########  BEGIN VERIFICATION EXECUTION ##########
 
-        // Run a post-searcher verification check with the data from the staging call
-        if (_needsVerification(stagingCall.callConfig)) {
-            ISafetyChecks(_escrow).handleVerification(
-                stagingCall,
-                stagingData,
-                userReturnData
-            );
-        }
+        // Run a post-searcher verification check with the data from the staging call 
+        // and the user's return data.
+        ISafetyChecks(_escrow).handleVerification(
+            stagingCall,
+            stagingData,
+            userReturnData
+        );
 
         // #########  END VERIFICATION EXECUTION ##########
     }
@@ -194,7 +189,7 @@ contract ExecutionEnvironment {
         //      0: stagingCall
         //      1: userCall + keccak of prior
         //      2 to n: searcherCalls + keccak of prior
-
+        // NOTE: if the staging call is skipped, the userCall has the 0 index.
         bool needsStaging = _needsStaging(stagingCall.callConfig);
         uint256 arrayLength = needsStaging ? searcherCalls.length + 2 : searcherCalls.length + 1;
         bytes32[] memory executionHashChain = new bytes32[](arrayLength);
@@ -315,7 +310,8 @@ contract ExecutionEnvironment {
 
         bool callSuccess;
         (callSuccess,) = stagingCall.verificationTo.call{
-            value: _fwdValueStaging(stagingCall.callConfig) ? address(this).balance : 0 // if staging explicitly needs tx.value, handler doesn't forward it
+            // if verification explicitly needs tx.value, handler doesn't forward it
+            value: _fwdValueVerification(stagingCall.callConfig) ? address(this).balance : 0 
         }(
             abi.encodeWithSelector(stagingCall.verificationSelector, stagingData, userReturnData)
         );
@@ -352,20 +348,12 @@ contract ExecutionEnvironment {
         delegateUser = (callConfig & 1 << uint16(CallConfig.DelegateUser) != 0);
     }
 
-    function _delegateVerification(uint16 callConfig) internal pure returns (bool delegateVerification) {
-        delegateVerification = (callConfig & 1 << uint16(CallConfig.DelegateStaging) != 0);
-    }
-
     function _needsStaging(uint16 callConfig) internal pure returns (bool needsStaging) {
         needsStaging = (callConfig & 1 << uint16(CallConfig.CallStaging) != 0);
     }
 
     function _fwdValueStaging(uint16 callConfig) internal pure returns (bool fwdValueStaging) {
         fwdValueStaging = (callConfig & 1 << uint16(CallConfig.FwdValueStaging) != 0);
-    }
-
-    function _needsVerification(uint16 callConfig) internal pure returns (bool needsVerification) {
-        needsVerification = (callConfig & 1 << uint16(CallConfig.CallStaging) != 0);
     }
 
     function _fwdValueVerification(uint16 callConfig) internal pure returns (bool fwdValueVerification) {

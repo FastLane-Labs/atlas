@@ -10,7 +10,6 @@ import {
     SearcherMetaTx,
     BidData,
     StagingCall,
-    EscrowKey,
     UserCall,
     CallConfig
 } from "../libraries/DataTypes.sol";
@@ -227,7 +226,7 @@ contract SafetyChecks is ISafetyChecks {
         } else if (_isExecutionPhase(ExecutionPhase.Staging, escrowKey.lockState)) {
             require(escrowKey.callIndex == 0, "ERR-E35 InvalidIndex");
             escrowKey.lockState = _updateExecutionPhase(
-                ExecutionPhase.UserCall, ExecutionPhase.Uninitialized, escrowKey.lockState
+                ExecutionPhase.UserCall, ExecutionPhase.Staging, escrowKey.lockState
             );
 
             // NOTE: Since the staging call was skipped, decrement the max calls we expect
