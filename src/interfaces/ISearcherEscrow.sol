@@ -1,14 +1,15 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import { IThogLock } from "../interfaces/IThogLock.sol";
-
 import {
     SearcherCall,
-    StagingCall
+    StagingCall,
+    BidData,
+    PayeeData,
+    UserCall
 } from "../libraries/DataTypes.sol";
 
-interface ISearcherEscrow is IThogLock {
+interface ISearcherEscrow {
     
     struct SearcherEscrow {
         uint128 total;
@@ -20,44 +21,27 @@ interface ISearcherEscrow is IThogLock {
 
     struct ValueTracker {
         uint128 starting;
-        uint128 transferred;
+        uint128 transferredIn;
+        uint128 transferredOut;
+        uint128 gasRebate;
     }
 
-    function searcherSafetyLock(
-        address searcherSender, // the searcherCall.metaTx.from
-        address executionCaller // the address of the ExecutionEnvironment 
-        // NOTE: the execution caller is the msg.sender to the searcher's contract
-    ) external returns (bool isSafe);
-    
-    function verify(
+    function executeSearcherCall(
+        bytes32 targetHash,
         bytes32 userCallHash,
+        uint256 gasWaterMark,
         bool callSuccess,
         SearcherCall calldata searcherCall
-    ) external returns (uint256 result, uint256 gasLimit);
+    ) external returns (bool);
 
-    function update(
-        uint256 gasWaterMark,
-        uint256 result,
-        SearcherCall calldata searcherCall
+    function executePayments(
+        uint256 protocolShare,
+        BidData[] calldata winningBids,
+        PayeeData[] calldata payeeData
     ) external;
 
-    function setEscrowThogLock(
-        address activeHandler,
-        Lock memory mLock
-    ) external;
-
-    function releaseEscrowThogLock(
-        uint256 handlerKeyCode,
-        uint256 searcherCallCount
-    ) external returns (uint256 gasRebate, uint256 valueReturn);
-
-    function handleDelegateStaging(
-        StagingCall calldata stagingCall,
-        bytes calldata userCallData
-    ) external returns (bytes memory stagingData);
-
-    function handleDelegateVerification(
-        StagingCall calldata stagingCall,
-        bytes memory stagingData
+    function executeUserRefund(
+        UserCall calldata userCall,
+        bool callSuccess
     ) external;
 }

@@ -1,14 +1,15 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import { IFactory } from "../interfaces/IFactory.sol";
+import { IMetaProtoCall } from "../interfaces/IMetaProtoCall.sol";
 
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 import { ReentrancyGuard } from "solmate/utils/ReentrancyGuard.sol";
 
-import { ThogLock } from "./ThogLock.sol";
 import { FastLaneEscrow } from "./SearcherEscrow.sol";
 import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
+
+import { ReentrancyGuard } from "solmate/utils/ReentrancyGuard.sol";
 
 import {
     StagingCall,
@@ -18,11 +19,14 @@ import {
     ProtocolData
 } from "../libraries/DataTypes.sol";
 
-contract FastLaneFactory is IFactory, ThogLock {
+contract MetaProtoCall is ReentrancyGuard {
 
     uint32 immutable public escrowDuration;
     address immutable public fastLanePayee;
     address immutable public escrowAddress;
+
+    // map to load execution environment parameters for each protocol
+    mapping(address => ProtocolData) public protocolDataMap;
 
     FastLaneEscrow internal _escrowContract = new FastLaneEscrow(uint32(64));
 
@@ -30,8 +34,7 @@ contract FastLaneFactory is IFactory, ThogLock {
             address _fastlanePayee,
             uint32 _escrowDuration
 
-    ) ThogLock(address(_escrowContract), address(this)) {
-
+    ) {
         fastLanePayee = _fastlanePayee;
         escrowDuration = _escrowDuration;
         escrowAddress = address(_escrowContract);
@@ -42,19 +45,19 @@ contract FastLaneFactory is IFactory, ThogLock {
         UserCall calldata userCall,
         PayeeData[] calldata payeeData, // supplied by frontend
         SearcherCall[] calldata searcherCalls // supplied by FastLane via frontend integration
-    ) external payable {
-
-        require(_baseLock == BaseLock.Unlocked, "ERR-F00 FactoryLock");
+    ) external payable nonReentrant {
 
         // Check that the value of the tx is greater than or equal to the value specified
         // NOTE: a msg.value *higher* than user value could be used by the staging call.
         // There is a further check in the handler before the usercall to verify. 
         require(msg.value >= userCall.value, "ERR-H03 ValueExceedsBalance");
 
-        ProtocolData memory protocolData = _protocolData[userCall.to];
+        ProtocolData memory protocolData = protocolDataMap[userCall.to];
 
         require(protocolData.owner != address(0), "ERR-F01 UnsuportedUserTo");
+        require(searcherCalls.length < type(uint8).max -1, "ERR-F02 TooManySearcherCalls");
 
+        // Initialize a new, blank execution environment
         // NOTE: This is expected to revert if there's already a contract at that location
         ExecutionEnvironment _executionEnvironment = new ExecutionEnvironment{
             salt: keccak256(
@@ -67,12 +70,13 @@ contract FastLaneFactory is IFactory, ThogLock {
             )
         }(protocolData.split, escrowAddress);
 
-        uint256 lockCode = _initThogLock(
+        // Initialize the escrow locks
+        _escrowContract.initializeEscrowLocks(
             address(_executionEnvironment),
-            userCall,
-            searcherCalls
+            uint8(searcherCalls.length)
         );
 
+        // handoff to the execution environment
         _executionEnvironment.protoCall{value: msg.value}(
             stagingCall,
             userCall,
@@ -80,14 +84,8 @@ contract FastLaneFactory is IFactory, ThogLock {
             searcherCalls
         );
 
-        require(
-            (_baseLock == BaseLock.Pending) && (lockCode == _keyCode),
-            "ERR-F02 Error Unlocking"
-        );
-
-        // _baseLock = BaseLock.Unlocked;
-        delete _baseLock;
-        delete _keyCode;
+        // release the locks
+        _escrowContract.releaseEscrowLocks();
     }
 
     function _getHandlerAddress(
@@ -107,22 +105,13 @@ contract FastLaneFactory is IFactory, ThogLock {
             bytes1(0xff),
             address(this),
             salt,
-            keccak256(abi.encodePacked(
-                type(FastLaneProtoHandler).creationCode,
-                protocolData.split,
-                escrowAddress
-            ))
-        )))));
+            keccak256(
+                abi.encodePacked(
+                    type(ExecutionEnvironment).creationCode,
+                    protocolData.split,
+                    escrowAddress
+                )
+            )
+        ))))); // this line causes me immeasurable pain
     }
-
-    function initReleaseFactoryThogLock(uint256 keyCode) external {
-        // address(this) == _factory
-        require(msg.sender == _escrowAddress, "ERR-F20 InvalidCaller");
-        require(_keyCode == 0, "ERR-F21 KeyTampering");
-        require(_baseLock == BaseLock.Locked, "ERR-F22 NotLocked");
-
-        _keyCode = keyCode;
-        _baseLock = BaseLock.Pending;
-    }
-
 }

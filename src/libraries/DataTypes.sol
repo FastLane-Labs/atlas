@@ -1,13 +1,6 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-enum ExecutionPhase {
-    Uninitialized,
-    Staging,
-    UserCall,
-    SearcherCalls,
-    Verification
-}
 
 struct ProtocolData {
     address owner; // the protocol, not fastlane
@@ -20,6 +13,8 @@ enum CallConfig { // for readability, will get broken down into pure funcs later
     CallStaging,
     DelegateStaging,
     FwdValueStaging,
+    DelegateUser,
+    FwdValueUser,
     CallVerification,
     DelegateVerification,
     FwdValueVerification
@@ -60,7 +55,8 @@ struct SearcherCall {
 /// @dev This is set by the front end!
 /// @dev The stagingSelector's argument types must match the user's call's argument types to properly stage the meta tx.
 struct StagingCall { 
-    address to;
+    address stagingTo;
+    address verificationTo;
     uint16 callConfig;
     bytes4 stagingSelector;
     bytes4 verificationSelector;

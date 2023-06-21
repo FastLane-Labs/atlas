@@ -2,13 +2,7 @@ This is a *rough* draft meant to illustrate a few key concepts.  It is absolutel
 
 Apologies for the lack of readability - functionality/coverage comes first, then simplification. This might not be readable until July.
 
-The locking system is a work in process and is overly complicated / redundant
-in some instances and insufficient in others. 
-
-Gas optimization will come last.
-
-Note that the backend will probably need to use a reputation system for searcher bids that aren't in the top three in order to not take up too much space in the block.  The further down the the searcherCalls[], the higher the
-reputation requirement for inclusion by the backend. This isnt necessarily required - it's not an economic issue. It's more-so about just being a good member of the ecosystem and not wasting too much precious blockspace. With probabalistic searcher txs that have low success rate but high return-to-cost rate. 
+Gas optimization will come last and reader / getter funcs will come last.
 
 The way the backend / frontend of this protocol works is thus:
 
@@ -26,3 +20,10 @@ The way the backend / frontend of this protocol works is thus:
 12. If the searcher's transaction doesn't generate the profit that it said it would and deposit it on the FastLaneProtoCall Contract, we revert the searcher's whole transaction and execute the next one. Reverted searcher txs don't get their gas money back - the user is refunded either way.
 13. Once the profit is collected, the FastLaneProtoCall Contract will then distribute it out to the beneficiaries *as decided by the protocol*. 
 14. It then runs some more safety checks - as determined by the protocol - and calls it a day.  
+
+Note that there is significant complexity in the lock system.  This was designed to handle
+ALL cases, rather than having to deploy multiple contracts to handle SOME cases, so as to
+avoid the fragmentation (capital inefficiency and upkeep effort) of the searcher's escrowed gas values.  Other factory contracts may be launched with less complexity - such as one that has no delegatecall and therefore no need to create a new contract each time - but the Escrow contract must be designed to handle the *most* complex of those designs or searchers' gas values will be fragmented.
+
+Note that the backend will probably need to use a reputation system for searcher bids that aren't in the top three in order to not take up too much space in the block.  The further down the the searcherCalls[], the higher the
+reputation requirement for inclusion by the backend. This isnt necessarily required - it's not an economic issue. It's more-so about just being a good member of the ecosystem and not wasting too much precious blockspace. With probabalistic searcher txs that have low success rate but high return-to-cost rate. 
