@@ -1,6 +1,20 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
+struct ProtocolProof {
+    address from;
+    address to;
+    uint256 nonce;
+    uint256 deadline;
+    bytes32 userCallHash; // keccak256 of userCall.to, userCall.data
+    bytes32 protocolDataHash; // keccak256 of ProtocolData struct
+    bytes32 searcherChainHash; // keccak256 of the searchers' txs
+}
+
+struct Verification {
+    ProtocolProof proof;
+    bytes signature;
+}
 
 struct ProtocolData {
     address owner; // the protocol, not fastlane
@@ -72,6 +86,7 @@ struct StagingCall {
 struct UserCall {
     address to;
     address from;
+    uint256 deadline;
     uint256 gas;
     uint256 value;
     bytes data;
@@ -128,6 +143,16 @@ enum SearcherOutcome {
     Success
 }
 
+bytes32 constant SEARCHER_TYPE_HASH =
+        keccak256(
+            "SearcherMetaTx(address from,address to,uint256 value,uint256 gas,uint256 nonce,bytes32 userCallHash,uint256 maxFeePerGas,bytes32 bidsHash,bytes data)"
+        );
+
+bytes32 constant PROTOCOL_TYPE_HASH =
+    keccak256(
+        "ProtocolProof(address from,address to,uint256 nonce,uint256 deadline,bytes32 userCallHash,bytes32 protocolDataHash,bytes32 searcherChainHash)"
+    );
+
 contract FastLaneDataTypes {
 
     uint256 constant public SEARCHER_GAS_LIMIT = 1_000_000;
@@ -135,9 +160,7 @@ contract FastLaneDataTypes {
     uint256 constant public GWEI = 1_000_000_000;
     uint256 constant public SEARCHER_GAS_BUFFER = 5; // out of 100
 
-    bytes32 internal constant _TYPE_HASH =
-        keccak256("SearcherMetaTx(address from,address to,uint256 value,uint256 gas,uint256 nonce,bytes32 userCallHash,uint256 maxFeePerGas,bytes32 bidsHash,bytes data)");
-
+    
     uint256 constant internal _NO_REFUND = (
         1 << uint256(SearcherOutcome.InvalidSignature) |
         1 << uint256(SearcherOutcome.InvalidUserHash) |

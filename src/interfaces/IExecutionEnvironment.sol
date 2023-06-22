@@ -22,7 +22,7 @@ interface IExecutionEnvironment {
     function callStagingWrapper(
         StagingCall calldata stagingCall,
         bytes calldata userCallData
-    ) external payable returns (bytes memory stagingData);
+    ) external returns (bytes memory stagingData);
 
     function callUserWrapper(
         UserCall calldata userCall

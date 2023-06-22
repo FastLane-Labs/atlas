@@ -15,14 +15,13 @@ import { FastLaneDataTypes } from "../libraries/DataTypes.sol";
 import { FastLaneErrorsEvents } from "./Emissions.sol";
 
 import {
+    SEARCHER_TYPE_HASH,
     SearcherOutcome,
     SearcherCall,
     SearcherMetaTx,
     BidData,
     SearcherSafety,
     StagingCall,
-    ExecutionPhase,
-    EscrowKey,
     PayeeData,
     UserCall
 } from "../libraries/DataTypes.sol";
@@ -274,7 +273,7 @@ contract FastLaneEscrow is SafetyChecks, SearcherExecution, FastLaneDataTypes, I
         address signer = _hashTypedDataV4(
             keccak256(
                 abi.encode(
-                    _TYPE_HASH, 
+                    SEARCHER_TYPE_HASH, 
                     metaTx.from, 
                     metaTx.to, 
                     metaTx.value, 

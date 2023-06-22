@@ -30,39 +30,40 @@ contract SafetyChecks is ISafetyChecks {
         factory = factoryAddress;
     }
 
-    /*
-    function searcherSafetyCall(
-        address searcherFrom, // the searcherCall.metaTx.from
-        address executionCaller // the address of the ExecutionEnvironment 
-        // NOTE: the execution caller is the msg.sender to the searcher's contract
-    ) external returns (bool isSafe) {
+    
+    // TODO: Add in accounting so that searchers can boost their own escrow
+    // balances (or fund them directly) in the middle of their call. This will
+    // allow us to lend them gas via msg.value that is in excess of what they
+    // have escrowed. 
+    function searcherSafetyCallback() external payable returns (bool isSafe) {
+        // an external call so that searcher contracts can verify
+        // that delegatecall isn't being abused. 
+        // NOTE: Protocol would still work fine if we removed this 
+        // and let searchers handle the safety on their own.  There
+        // are other ways to provide the same safety guarantees on
+        // the contract level. This was chosen because it provides
+        // excellent safety for beginning searchers while having
+        // a minimal increase in gas cost compared with other options. 
 
         EscrowKey memory escrowKey = _escrowKey;
 
-        // an external call so that searcher contracts can verify
-        // that delegatecall isn't being abused. This MUST be used
-        // by every searcher contract!
         isSafe = (
-            //!escrowKey.isDelegatingCall &&
-            escrowKey.executionPhase == uint8(ExecutionPhase.SearcherCalls) &&
-            escrowKey.pendingKey == keccak256(abi.encodePacked(
-                searcherSender,
-                msg.sender,
-                executionCaller,
-                1 << uint8(ExecutionPhase.SearcherCalls)
-            )) &&
-            escrowKey.approvedCaller == executionCaller &&
-            escrowKey.searcherSafety == uint8(SearcherSafety.Requested)
+            escrowKey.approvedCaller == msg.sender &&
+            _isLockDepth(BaseLock.Untrusted, escrowKey.lockState) &&
+            _isExecutionPhase(ExecutionPhase.SearcherCalls, escrowKey.lockState) &&
+            _isSafetyLevel(SearcherSafety.Requested, escrowKey.lockState)
         );
         
         if (isSafe) {
             // TODO: revert if bool fails?
-            escrowKey.searcherSafety = uint8(SearcherSafety.Verified);
+            escrowKey.lockState = _updateSafetyLevel(
+                SearcherSafety.Verified, SearcherSafety.Requested, escrowKey.lockState
+           );
         }
 
         _escrowKey = escrowKey;
     }
-    */
+    
 
     function initializeEscrowLocks(
         address executionEnvironment,
@@ -72,6 +73,7 @@ contract SafetyChecks is ISafetyChecks {
         EscrowKey memory escrowKey = _escrowKey;
         
         require(
+            msg.sender != address(0) &&
             escrowKey.approvedCaller == address(0) &&
             escrowKey.makingPayments == false &&
             escrowKey.paymentsComplete == false &&
@@ -133,70 +135,86 @@ contract SafetyChecks is ISafetyChecks {
         require(_isLockDepth(BaseLock.Active, escrowKey.lockState), "ERR-E30 InvalidLockDepth");
         require(_isExecutionPhase(ExecutionPhase.Staging, escrowKey.lockState), "ERR-E32 AlreadyInitialized");
 
-        bool isDelegateCall = _delegateStaging(stagingCall.callConfig);
+        // determine type of call
+        bool needsStaging = _needsStaging(stagingCall.callConfig);
+        bool isDelegateCall = needsStaging ? _delegateStaging(stagingCall.callConfig) : false;
+        
+        // Use null bytes if staging is skipped, otherwise use actual. 
+        bytes memory stagingBytes; 
+        if (needsStaging) {
+            stagingBytes = bytes.concat(stagingCall.stagingSelector, userCallData);
+        }
 
         // verify the calldata and sequence
         require(
             _validateCall(
                 targetHash,
+                stagingCall.stagingTo,
+                stagingBytes,
                 isDelegateCall,
-                escrowKey.callIndex++, // increment the call index
-                bytes.concat(stagingCall.stagingSelector, userCallData)
+                escrowKey.callIndex++ // increment the call index
             ),
             "ERR-E34 InvalidCallKey" 
         );
-        
-        // handle delegatecall
-        if (isDelegateCall) {
-            // update the lock depth, next caller, and then set the lock for searcher safety checks
-            escrowKey.lockState = _updateLockDepth(
-                BaseLock.DelegatingCall, BaseLock.Active, escrowKey.lockState
-            );
-            escrowKey.approvedCaller = address(0); // no approved escrow callers during staging
-            _escrowKey = escrowKey;
 
-            // call the callback
-            stagingData = IExecutionEnvironment(
-                msg.sender
-            ).delegateStagingWrapper(
-                stagingCall,
-                userCallData
-            );
-
-            // Set the lock depth back 
-            escrowKey.lockState = _updateLockDepth(
-                BaseLock.Active, BaseLock.DelegatingCall, escrowKey.lockState
-            );
+        // Handle staging calls, if needed
+        if (needsStaging) {
             
-        
-        // handle regular call
-        } else { 
-            // update the lock phase and then set the lock for searcher safety checks
-            escrowKey.lockState = _updateLockDepth(
-                BaseLock.Untrusted, BaseLock.Active, escrowKey.lockState
-            );
-            escrowKey.approvedCaller = address(0); // no approved escrow callers during staging
-            _escrowKey = escrowKey;
+            // Handle the 
+            if (isDelegateCall) {
+                // update the lock depth, next caller, and then set the lock for searcher safety checks
+                escrowKey.lockState = _updateLockDepth(
+                    BaseLock.DelegatingCall, BaseLock.Active, escrowKey.lockState
+                );
+                escrowKey.approvedCaller = address(0); // no approved escrow callers during staging
+                _escrowKey = escrowKey;
 
-            // call the callback
-            stagingData = IExecutionEnvironment(
-                payable(msg.sender) // NOTE: msg.value might be different from userCall.value
-            ).callStagingWrapper(
-                stagingCall,
-                userCallData
-            );
+                // call the callback
+                stagingData = IExecutionEnvironment(
+                    msg.sender
+                ).delegateStagingWrapper(
+                    stagingCall,
+                    userCallData
+                );
 
-            // Set the lock depth back
-            escrowKey.lockState = _updateLockDepth(
-                BaseLock.Active, BaseLock.Untrusted, escrowKey.lockState
-            );
+                // Set the lock depth back 
+                escrowKey.lockState = _updateLockDepth(
+                    BaseLock.Active, BaseLock.DelegatingCall, escrowKey.lockState
+                );
+                
+            
+            // handle regular call
+            } else { 
+                // update the lock phase and then set the lock for searcher safety checks
+                escrowKey.lockState = _updateLockDepth(
+                    BaseLock.Untrusted, BaseLock.Active, escrowKey.lockState
+                );
+                escrowKey.approvedCaller = address(0); // no approved escrow callers during staging
+                _escrowKey = escrowKey;
+
+                // call the callback
+                stagingData = IExecutionEnvironment(
+                    payable(msg.sender) // NOTE: msg.value might be different from userCall.value
+                ).callStagingWrapper(
+                    stagingCall,
+                    userCallData
+                );
+
+                // Set the lock depth back
+                escrowKey.lockState = _updateLockDepth(
+                    BaseLock.Active, BaseLock.Untrusted, escrowKey.lockState
+                );
+            }
+
+            // set the approved caller back
+            escrowKey.approvedCaller = msg.sender;
         }
 
         // prep for next step - UserCall - and store the lock
         escrowKey.lockState = _updateExecutionPhase(
             ExecutionPhase.UserCall, ExecutionPhase.Staging, escrowKey.lockState
         );
-        escrowKey.approvedCaller = msg.sender;
+        
         _escrowKey = escrowKey;
     }
 
@@ -216,25 +234,13 @@ contract SafetyChecks is ISafetyChecks {
             "ERR-E31 InvalidCaller"
         );
         require(_isLockDepth(BaseLock.Active, escrowKey.lockState), "ERR-E30 InvalidLockDepth");
-        
+        require(escrowKey.callIndex == 1, "ERR-E35 InvalidIndex");
         // prior stage was supposed to be "staging" but that could have been skipped.
         // Handle staging was NOT skipped
-        if (_isExecutionPhase(ExecutionPhase.UserCall, escrowKey.lockState)) {
-            require(escrowKey.callIndex == 1, "ERR-E35 InvalidIndex");
-
-        // Handle staging was skipped
-        } else if (_isExecutionPhase(ExecutionPhase.Staging, escrowKey.lockState)) {
-            require(escrowKey.callIndex == 0, "ERR-E35 InvalidIndex");
-            escrowKey.lockState = _updateExecutionPhase(
-                ExecutionPhase.UserCall, ExecutionPhase.Staging, escrowKey.lockState
-            );
-
-            // NOTE: Since the staging call was skipped, decrement the max calls we expect
-            escrowKey.callMax -= 1;
-
-        } else {
-            revert("ERR-E32 IncorrectStage");
-        } 
+        require(
+            _isExecutionPhase(ExecutionPhase.UserCall, escrowKey.lockState),
+            "ERR-E35 InvalidStage"
+        ); 
 
         bool isDelegateCall = _delegateUser(callConfig);
 
@@ -242,9 +248,10 @@ contract SafetyChecks is ISafetyChecks {
         require(
             _validateCall(
                 targetHash,
+                userCall.to,
+                userCall.data,
                 isDelegateCall,
-                escrowKey.callIndex++, // post increment the call index
-                userCall.data
+                escrowKey.callIndex++ // post increment the call index
             ),
             "ERR-E34 InvalidCallKey" 
         );
@@ -279,7 +286,7 @@ contract SafetyChecks is ISafetyChecks {
             );
             _escrowKey = escrowKey;
 
-            userReturnData = IExecutionEnvironment(
+            userReturnData = IExecutionEnvironment( // TODO: {value: userCall.value}
                 msg.sender // NOTE: uses the userCall.value for setting, balance is held on execution environment
             ).callUserWrapper(
                 userCall
@@ -323,9 +330,10 @@ contract SafetyChecks is ISafetyChecks {
         require(
             _validateCall(
                 targetHash,
+                searcherTo,
+                searcherCallData,
                 false,
-                escrowKey.callIndex++, // post increment callIndex for next searcher
-                searcherCallData
+                escrowKey.callIndex++ // post increment callIndex for next searcher
             ),
             "ERR-E34 InvalidCallKey" 
         );
@@ -564,14 +572,19 @@ contract SafetyChecks is ISafetyChecks {
 
     function _validateCall(
         bytes32 targetHash,
+        address to,
+        bytes memory executionData, // TODO: make sure memory bytes == calldata bytes for hashing
         bool isDelegateCall,
-        uint256 index,
-        bytes memory executedData
+        uint256 index
     ) internal returns (bool) {
+        
+        bytes32 previousHash = _executionHash;
+
         bytes32 newExecutionHash = keccak256(
             abi.encodePacked(
-                _executionHash,
-                executedData,
+                previousHash,
+                to,
+                executionData,
                 isDelegateCall,
                 index
             )

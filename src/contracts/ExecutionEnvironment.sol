@@ -46,7 +46,10 @@ contract ExecutionEnvironment {
         UserCall calldata userCall,
         PayeeData[] calldata payeeData, // supplied by frontend
         SearcherCall[] calldata searcherCalls // supplied by FastLane via frontend integration
-    ) external payable {
+    ) external 
+        payable 
+        returns (bytes32 userCallHash, bytes32 searcherChainHash) 
+    {
         // make sure it's the factory calling, although it should be impossible
         // for anyone else to call seeing as how the contract was just made and
         // it's a SALT2.
@@ -64,7 +67,7 @@ contract ExecutionEnvironment {
         }
 
         // get the hash of the userCallData for future verification purposes
-        bytes32 userCallHash = keccak256(abi.encodePacked(userCall.to, userCall.data));
+        userCallHash = keccak256(abi.encodePacked(userCall.to, userCall.data));
 
         // build a memory array to later verify execution ordering. Each bytes32 
         // is the hash of the calldata, a bool representing if its a delegatecall
@@ -80,31 +83,33 @@ contract ExecutionEnvironment {
             searcherCalls
         );
 
+        // Set the final hash in the searcher chain as the return value
+        // so that the protocol can verify the match
+        searcherChainHash = executionHashChain[executionHashChain.length-1];
+
         // declare some variables
         uint256 executionIndex; // tracks the index of executionHashChain array for calldata verification
         bytes memory stagingData; // capture any pre-execution state variables the protocol may need
         bytes memory userReturnData; // capture any user-returned values the protocol may need
 
-        // ###########  END PREPARATION #############
+        // ###########  END MEMORY PREPARATION #############
         // ---------------------------------------------
         // #########  BEGIN STAGING EXECUTION ##########
 
         // Stage the execution environment for the user, if necessary
-        // NOTE: this may be a trusted delegatecall, but this contract should have totally empty storage
-        // NOTE: staging will almost certainly be auto-disabled for any upgradeable contracts
-        if (_needsStaging(stagingCall.callConfig)) {
-            // This will ask the safety contract / escrow to activate its locks and then trigger the 
-            // staging callback func in this in this contract. 
-            // NOTE: the calldata for the staging call must be the user's calldata
-            // NOTE: the staging contracts we're calling should be custom-made for each protocol and 
-            // should be immutable.  A new one should be made, if necessary. 
-            stagingData = ISafetyChecks(_escrow).handleStaging(
-                executionHashChain[executionIndex++],
-                stagingCall,
-                userCall.data
-            );
-        }
-
+        // This will ask the safety contract / escrow to activate its locks and then trigger the 
+        // staging callback func in this in this contract. 
+        // NOTE: this may be a trusted delegatecall if the protocol intends it to be, 
+        // but this contract will have empty storage.
+        // NOTE: the calldata for the staging call must be the user's calldata
+        // NOTE: the staging contracts we're calling should be custom-made for each protocol and 
+        // should be immutable.  If an update is required, a new one should be made. 
+        stagingData = ISafetyChecks(_escrow).handleStaging(
+            executionHashChain[executionIndex++],
+            stagingCall,
+            userCall.data
+        );
+        
         // ###########  END STAGING EXECUTION #############
         // ---------------------------------------------
         // #########  BEGIN USER EXECUTION ##########
@@ -182,7 +187,7 @@ contract ExecutionEnvironment {
         UserCall calldata userCall,
         SearcherCall[] calldata searcherCalls // supplied by FastLane via frontend integration
     ) internal pure returns (bytes32[] memory) {
-        // build a memory array to later verify execution ordering. Each bytes32 
+        // build a memory array of hashes to verify execution ordering. Each bytes32 
         // is the hash of the calldata, a bool representing if its a delegatecall
         // or standard call, and a uint256 representing its execution index
         // order is:
@@ -190,39 +195,52 @@ contract ExecutionEnvironment {
         //      1: userCall + keccak of prior
         //      2 to n: searcherCalls + keccak of prior
         // NOTE: if the staging call is skipped, the userCall has the 0 index.
+
+        // memory array 
+        // NOTE: memory arrays are not accessible by delegatecall. This is a key
+        // security feature. Please alert me if this is untrue. 
+        bytes32[] memory executionHashChain = new bytes32[](searcherCalls.length + 2);
+        uint256 i; // array index
+        
         bool needsStaging = _needsStaging(stagingCall.callConfig);
-        uint256 arrayLength = needsStaging ? searcherCalls.length + 2 : searcherCalls.length + 1;
-        bytes32[] memory executionHashChain = new bytes32[](arrayLength);
-        
-        uint256 i;
-        
-        // start with staging call, if it's needed
+
+        // Use null bytes if staging is skipped, otherwise use actual. 
+        bytes memory stagingBytes; 
         if (needsStaging) {
-            executionHashChain[i] = keccak256(
-                abi.encodePacked(
-                    bytes32(0), // initial hash = null
-                    bytes.concat(stagingCall.stagingSelector, userCall.data),
-                    _delegateStaging(stagingCall.callConfig),
-                    i++
-                )
-            );
+            stagingBytes = bytes.concat(stagingCall.stagingSelector, userCall.data);
         }
+        
+        // Start with staging call
+        // NOTE: If staging is skipped, use empty bytes as calldata placeholder
+        executionHashChain[0] = keccak256(
+            abi.encodePacked(
+                bytes32(0), // initial hash = null
+                stagingCall.stagingTo,
+                stagingBytes,
+                needsStaging ? _delegateStaging(stagingCall.callConfig) : false, 
+                i++
+            )
+        );
+        
 
         // then user call
-        executionHashChain[i] = keccak256(
+        executionHashChain[1] = keccak256(
             abi.encodePacked(
-                needsStaging ? executionHashChain[0] : bytes32(0), // initial is nil if no staging
+                executionHashChain[0], // always reference previous hash
+                userCall.to,
                 userCall.data,
                 _delegateUser(stagingCall.callConfig),
                 i++
             )
         );
         
+        // i = 2 when starting searcher loop
         for (; i < executionHashChain.length;) {
             executionHashChain[i] = keccak256(
                 abi.encodePacked(
-                    executionHashChain[i-(needsStaging ? 2 : 1)],
-                    searcherCalls[i].metaTx.data,
+                    executionHashChain[i-1], // reference previous hash
+                    searcherCalls[i-2].metaTx.to, // searcher smart contract
+                    searcherCalls[i-2].metaTx.data, // searcher calls start at 2
                     false, // searchers wont have access to delegatecall
                     i++
                 )
