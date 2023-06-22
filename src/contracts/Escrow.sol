@@ -1,8 +1,9 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import { ISearcherEscrow } from "../interfaces/ISearcherEscrow.sol";
+import { IEscrow } from "../interfaces/IEscrow.sol";
 import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
+import { ICallExecution } from "../interfaces/ICallExecution.sol";
 
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
@@ -10,11 +11,14 @@ import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 
 import { SafetyChecks } from "./SafetyChecks.sol";
-import { SearcherExecution } from "./SearcherExecution.sol";
+import { EscrowExecution } from "./CallExecution.sol";
 import { FastLaneDataTypes } from "../libraries/DataTypes.sol";
 import { FastLaneErrorsEvents } from "./Emissions.sol";
+import { BitStuff } from "./BitStuff.sol"; 
 
 import {
+    SearcherEscrow,
+    SearcherProof,
     SEARCHER_TYPE_HASH,
     SearcherOutcome,
     SearcherCall,
@@ -23,10 +27,13 @@ import {
     SearcherSafety,
     StagingCall,
     PayeeData,
-    UserCall
+    UserCall,
+    EscrowKey,
+    ExecutionPhase,
+    BaseLock
 } from "../libraries/DataTypes.sol";
 
-contract FastLaneEscrow is SafetyChecks, SearcherExecution, FastLaneDataTypes, ISearcherEscrow, EIP712 {
+contract Escrow is EIP712, SafetyChecks, EscrowExecution, FastLaneErrorsEvents, IEscrow {
     using ECDSA for bytes32;
 
     uint32 immutable public escrowDuration;
@@ -48,18 +55,68 @@ contract FastLaneEscrow is SafetyChecks, SearcherExecution, FastLaneDataTypes, I
         escrowDuration = escrowDurationFromFactory; 
     }
 
-    function executeSearcherCall(
-        bytes32 targetHash,
-        bytes32 userCallHash,
-        uint256 gasWaterMark,
-        bool callSuccess,
-        SearcherCall calldata searcherCall
-    ) external returns (bool) {
+    function executeStagingCall(
+        SearcherProof memory proof,
+        StagingCall calldata stagingCall,
+        bytes calldata userCallData
+    ) external stagingLock(stagingCall.callConfig) returns (bytes memory stagingData) {
+        
+        if (_delegateStaging(stagingCall.callConfig)) {
+            stagingData = ICallExecution(
+                msg.sender
+            ).delegateStagingWrapper(
+                proof,
+                stagingCall,
+                userCallData
+            );
 
+        } else {
+            stagingData = ICallExecution(
+                payable(msg.sender) // NOTE: msg.value might be different from userCall.value
+            ).callStagingWrapper(
+                proof,
+                stagingCall,
+                userCallData
+            );
+        }
+    }
+
+    function executeUserCall(
+        SearcherProof memory proof,
+        uint16 callConfig,
+        UserCall calldata userCall
+    ) external userLock(callConfig) returns (bytes memory userReturnData) {
+        
+        if (_delegateUser(callConfig)) {
+            userReturnData = ICallExecution(
+                msg.sender
+            ).delegateUserWrapper(
+                proof, 
+                userCall
+            );
+
+        } else {
+            userReturnData = ICallExecution( // TODO: {value: userCall.value}
+                msg.sender // NOTE: uses the userCall.value for setting, balance is held on execution environment
+            ).callUserWrapper(
+                proof,
+                userCall
+            );
+        }
+    }
+
+    function executeSearcherCall(
+        SearcherProof memory proof,
+        uint256 gasWaterMark,
+        bool auctionAlreadyComplete,
+        SearcherCall calldata searcherCall
+    ) external payable returns (bool) {
+
+        // Activate the lock
+        _activateSearcherLock(searcherCall.metaTx.to);
+
+        // Verify the transaction. 
         (uint256 result, uint256 gasLimit, SearcherEscrow memory searcherEscrow) = _verify(
-            targetHash,
-            userCallHash,
-            callSuccess,
             searcherCall
         );
 
@@ -68,46 +125,71 @@ contract FastLaneEscrow is SafetyChecks, SearcherExecution, FastLaneDataTypes, I
             gasWaterMark,
             tx.gasprice,
             searcherCall.metaTx.maxFeePerGas,
-            callSuccess
+            auctionAlreadyComplete
         );
+
+        SearcherOutcome outcome;
+        uint256 valueRequested;
 
         // If there are no errors, attempt to execute
         // NOTE: the lowest bit is a tracker (PendingUpdate) and can be ignored
-        bool executed;
+        if (_canExecute(result)) {
 
-        if ((result >>1) == 0) {
-            executed = true;
-            result |= (
-                1 << uint256(_searcherCallExecutor(gasLimit, searcherCall)) |
-                1 << uint256(SearcherOutcome.ExecutionCompleted)
+            // Get current Ether balance
+            uint256 currentBalance = address(this).balance;
+            
+            // Send the searcher's msg.value to the execution environment
+            SafeTransferLib.safeTransferETH(
+                msg.sender, 
+                searcherCall.metaTx.value
             );
+
+            // Execute the searcher call
+            (outcome, valueRequested) = _searcherCallWrapper(proof, gasLimit, searcherCall);
+
+            result |= 1 << uint256(outcome);
+
+            if (_executedWithError(result)) {
+                result |= 1 << uint256(SearcherOutcome.ExecutionCompleted);
+
+            } else if (_executionSuccessful(result)) { 
+                // first successful searcher call that paid what it bid
+                auctionAlreadyComplete = true; // cannot be reached if bool is already true
+                result |= 1 << uint256(SearcherOutcome.ExecutionCompleted);
+            }
+
+            // Send back the value requested to pay the searcher's bids
+            if (valueRequested != 0) {
+                SafeTransferLib.safeTransferETH(
+                    msg.sender, 
+                    valueRequested
+                );
+            }
+
+            searcherEscrow.total += uint128(address(this).balance - currentBalance);
         }
 
-        _update(searcherEscrow, gasWaterMark, result, searcherCall);
+        // Release the lock
+        _releaseSearcherLock(searcherCall.metaTx.to, auctionAlreadyComplete);
 
-        if (
-            !callSuccess && (result & 1 << uint256(SearcherOutcome.ExecutionCompleted) != 0)
-        ) { 
-            // first successful searcher call that paid what it bid
-            if (result & 1 << uint256(SearcherOutcome.Success) != 0) {
-                callSuccess = true;
-                // flag the escrow key to initiate payments
-                // TODO: make this more robust?
-                _escrowKey.makingPayments = true; 
-            }
+        // Update the searcher's escrow balances
+        if (_updateEscrow(result)) {
+            _update(searcherEscrow, gasWaterMark, result, searcherCall);
         }
 
         // emit event
-        emit SearcherTxResult(
-            searcherCall.metaTx.to,
-            searcherCall.metaTx.from,
-            executed,
-            callSuccess,
-            executed ? searcherEscrow.nonce - 1 : searcherEscrow.nonce,
-            result
-        );
+        if (_emitEvent(searcherEscrow)) { 
+            emit SearcherTxResult(
+                searcherCall.metaTx.to,
+                searcherCall.metaTx.from,
+                _canExecute(result),
+                outcome == SearcherOutcome.Success,
+                _canExecute(result) ? searcherEscrow.nonce - 1 : searcherEscrow.nonce,
+                result
+            );
+        }
 
-        return callSuccess;
+        return auctionAlreadyComplete;
     }
 
     function executePayments(
@@ -116,7 +198,7 @@ contract FastLaneEscrow is SafetyChecks, SearcherExecution, FastLaneDataTypes, I
         PayeeData[] calldata payeeData
     ) external paymentsLock {
         // process protocol payments
-        _disbursePayments(protocolShare, winningBids, payeeData);
+        ICallExecution(msg.sender).disbursePayments(protocolShare, winningBids, payeeData);
         // TODO: who should pay gas cost of payments?
     } 
 
@@ -178,7 +260,7 @@ contract FastLaneEscrow is SafetyChecks, SearcherExecution, FastLaneDataTypes, I
         uint256 gasWaterMark,
         uint256 result,
         SearcherCall calldata searcherCall
-    )  internal closeSearcherLock {
+    )  internal {
 
         uint256 gasRebate;
         uint256 txValue;
@@ -216,7 +298,7 @@ contract FastLaneEscrow is SafetyChecks, SearcherExecution, FastLaneDataTypes, I
 
             txValue = searcherCall.metaTx.value;
         
-        } else if (result & _NO_REFUND != 0) {
+        } else if (result & _NO_USER_REFUND != 0) {
             // pass
         
         } else {
@@ -244,23 +326,20 @@ contract FastLaneEscrow is SafetyChecks, SearcherExecution, FastLaneDataTypes, I
         _escrowData[searcherCall.metaTx.from] = searcherEscrow;
     }
 
-    function _verify(
-        bytes32 targetHash,
-        bytes32 userCallHash,
-        bool callSuccess,
-        SearcherCall calldata searcherCall
-    ) internal openSearcherLock(targetHash, searcherCall.metaTx.to, searcherCall.metaTx.data)
-        returns (uint256 result, uint256 gasLimit, SearcherEscrow memory searcherEscrow) 
-    {
+    function _verify(SearcherCall calldata searcherCall) internal returns (
+            uint256 result, 
+            uint256 gasLimit, 
+            SearcherEscrow memory searcherEscrow
+    ) {
         // verify searcher's signature
         if (_verifySignature(searcherCall.metaTx, searcherCall.signature)) {
+            
             // verify the searcher has correct usercalldata and the searcher escrow checks
-            (result, gasLimit, searcherEscrow) = _verifySearcherCall(
-                userCallHash, callSuccess, searcherCall
-            );
+            (result, gasLimit, searcherEscrow) = _verifySearcherCall(searcherCall);
             
         } else {
             (result, gasLimit) = (1 << uint256(SearcherOutcome.InvalidSignature), 0);
+            // searcherEscrow returns null
         }
     }
 
@@ -299,8 +378,6 @@ contract FastLaneEscrow is SafetyChecks, SearcherExecution, FastLaneDataTypes, I
     }
 
     function _verifySearcherCall(
-        bytes32 userCallHash,
-        bool callSuccess,
         SearcherCall calldata searcherCall
     ) internal returns (
             uint256 result, 
@@ -308,15 +385,7 @@ contract FastLaneEscrow is SafetyChecks, SearcherExecution, FastLaneDataTypes, I
             SearcherEscrow memory searcherEscrow
     ) {
 
-        if (callSuccess) {
-            result |= 1 << uint256(SearcherOutcome.NotWinner);
-        }
-
-        if (userCallHash != searcherCall.metaTx.userCallHash) {
-            result |= 1 << uint256(SearcherOutcome.InvalidUserHash);
-        }
-
-        bytes32 searcherHash = keccak256(searcherCall.signature);
+        bytes32 searcherHash = keccak256(abi.encode(searcherCall.metaTx.from, searcherCall.signature));
         
         if (_hashes[searcherHash]) {
             result |= 1 << uint256(SearcherOutcome.AlreadyExecuted);
@@ -351,19 +420,18 @@ contract FastLaneEscrow is SafetyChecks, SearcherExecution, FastLaneDataTypes, I
         }
 
         gasLimit = (
-            100 + SEARCHER_GAS_BUFFER
+            100
         ) * (
             searcherCall.metaTx.gas < SEARCHER_GAS_LIMIT ? searcherCall.metaTx.gas : SEARCHER_GAS_LIMIT
         ) / (
-            100
-        ); 
+            100 + SEARCHER_GAS_BUFFER
+        ) + FASTLANE_GAS_BUFFER; 
 
-        // see if searcher's escrow can afford tx gascost + tx value
+        // see if searcher's escrow can afford tx gascost
         if (
             (
                 (tx.gasprice * GWEI * gasLimit) +
-                (searcherCall.metaTx.data.length * 16 * GWEI) +
-                searcherCall.metaTx.value
+                (searcherCall.metaTx.data.length * 16 * GWEI) 
             ) < (
                 searcherEscrow.total - searcherEscrow.escrowed
             ) 
@@ -372,13 +440,31 @@ contract FastLaneEscrow is SafetyChecks, SearcherExecution, FastLaneDataTypes, I
             // charge searcher for calldata so that we can avoid vampire attacks from searcher onto user
             result |= 1 << uint256(SearcherOutcome.InsufficientEscrow);
         }
+
+        // subtract out the gas buffer since the searcher's metaTx won't use it
+        gasLimit -= FASTLANE_GAS_BUFFER;
+
+        // Verify that we can lend the searcher their tx value
+        if (searcherCall.metaTx.value > address(this).balance) {
+            result |= 1 << uint256(SearcherOutcome.CallValueTooHigh);
+        }
     }
 
     receive() external payable {
         if (gasleft() > 3_000) {
+
+            EscrowKey memory escrowKey = _escrowKey;
+
             if (
-                msg.sender == _escrowKey.approvedCaller && 
-                msg.sender != address(0)
+                _isExecutionPhase(ExecutionPhase.Staging, escrowKey.lockState) ||
+                _isExecutionPhase(ExecutionPhase.UserCall, escrowKey.lockState)
+            ) {
+                _pendingValueTracker.transferredIn += uint128(msg.value);
+
+            } else if (
+                _isExecutionPhase(ExecutionPhase.SearcherCalls, escrowKey.lockState) &&
+                escrowKey.callIndex == 2 &&
+                _isLockDepth(BaseLock.Pending, escrowKey.lockState)
             ) {
                 _pendingValueTracker.transferredIn += uint128(msg.value);
             }
@@ -395,11 +481,11 @@ contract FastLaneEscrow is SafetyChecks, SearcherExecution, FastLaneDataTypes, I
         uint256 gasWaterMark,
         uint256 txGasPrice,
         uint256 maxFeePerGas,
-        bool callSuccess
+        bool auctionAlreadyComplete
     ) internal pure returns (uint256) {
         
-        if (callSuccess) {
-            result |= 1 << uint256(SearcherOutcome.NotWinner);
+        if (auctionAlreadyComplete) {
+            result |= 1 << uint256(SearcherOutcome.LostAuction);
         } 
         
         if (gasWaterMark < VALIDATION_GAS_LIMIT + SEARCHER_GAS_LIMIT) {

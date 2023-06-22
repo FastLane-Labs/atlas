@@ -6,18 +6,12 @@ import {
     StagingCall,
     BidData,
     PayeeData,
-    UserCall
+    UserCall,
+    SearcherProof,
+    SearcherEscrow
 } from "../libraries/DataTypes.sol";
 
-interface ISearcherEscrow {
-    
-    struct SearcherEscrow {
-        uint128 total;
-        uint128 escrowed;
-        uint64 availableOn; // block.number when funds are available.  
-        uint64 lastAccessed;
-        uint32 nonce; // EOA nonce.
-    }
+interface IEscrow {
 
     struct ValueTracker {
         uint128 starting;
@@ -26,13 +20,24 @@ interface ISearcherEscrow {
         uint128 gasRebate;
     }
 
+    function executeStagingCall(
+        SearcherProof memory proof,
+        StagingCall calldata stagingCall,
+        bytes calldata userCallData
+    ) external returns (bytes memory stagingData);
+
+    function executeUserCall(
+        SearcherProof memory proof,
+        uint16 callConfig,
+        UserCall calldata userCall
+    ) external returns (bytes memory userReturnData);
+
     function executeSearcherCall(
-        bytes32 targetHash,
-        bytes32 userCallHash,
+        SearcherProof memory proof,
         uint256 gasWaterMark,
-        bool callSuccess,
+        bool auctionAlreadyComplete,
         SearcherCall calldata searcherCall
-    ) external returns (bool);
+    ) external payable returns (bool);
 
     function executePayments(
         uint256 protocolShare,

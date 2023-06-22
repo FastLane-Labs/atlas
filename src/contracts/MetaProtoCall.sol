@@ -6,7 +6,7 @@ import { IMetaProtoCall } from "../interfaces/IMetaProtoCall.sol";
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 import { ReentrancyGuard } from "solmate/utils/ReentrancyGuard.sol";
 
-import { FastLaneEscrow } from "./SearcherEscrow.sol";
+import { Escrow } from "./Escrow.sol";
 import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
 import { ProtocolVerifier } from "./ProtocolVerification.sol";
 
@@ -47,7 +47,7 @@ contract MetaProtoCall is ProtocolVerifier, ReentrancyGuard {
         UserCall calldata userCall, // set by user
         PayeeData[] calldata payeeData, // supplied by frontend
         SearcherCall[] calldata searcherCalls, // supplied by FastLane via frontend integration
-        Verification calldata verification // supplied by front end
+        Verification calldata verification // supplied by front end after it sees the other data
     ) external payable nonReentrant {
 
         // Load protocol data for the user's targeted protocol

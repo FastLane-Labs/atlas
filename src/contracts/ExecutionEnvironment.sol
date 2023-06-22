@@ -1,10 +1,13 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import { ISearcherEscrow } from "../interfaces/ISearcherEscrow.sol";
+import { IEscrow } from "../interfaces/IEscrow.sol";
 import { ISafetyChecks } from "../interfaces/ISafetyChecks.sol";
 
 import { SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
+
+import { CallExecution, CallChain } from "./CallExecution.sol";
+import { BitStuff } from "./BitStuff.sol"; 
 
 import {
     StagingCall,
@@ -14,21 +17,21 @@ import {
     CallConfig,
     SearcherOutcome,
     BidData,
-    PaymentData
+    PaymentData,
+    SearcherProof
 } from "../libraries/DataTypes.sol";
 
-contract ExecutionEnvironment {
+contract ExecutionEnvironment is CallExecution {
+    using CallChain for SearcherProof;
 
     address immutable internal _factory;
     address immutable internal _escrow;
-
     uint256 immutable internal _protocolShare;
 
     constructor(
         uint16 protocolShare, 
         address escrow
-
-    ) {
+    ) CallExecution(escrow) {
         _factory = msg.sender; // TODO: hardcode the factory?
         _escrow = escrow;
 
@@ -92,6 +95,14 @@ contract ExecutionEnvironment {
         bytes memory stagingData; // capture any pre-execution state variables the protocol may need
         bytes memory userReturnData; // capture any user-returned values the protocol may need
 
+        // Build hash chain for sequence verification
+        SearcherProof memory proof = SearcherProof({
+            previousHash: bytes32(0),
+            targetHash: executionHashChain[executionIndex],
+            userCallHash: userCallHash,
+            index: executionIndex++
+        });
+
         // ###########  END MEMORY PREPARATION #############
         // ---------------------------------------------
         // #########  BEGIN STAGING EXECUTION ##########
@@ -104,8 +115,8 @@ contract ExecutionEnvironment {
         // NOTE: the calldata for the staging call must be the user's calldata
         // NOTE: the staging contracts we're calling should be custom-made for each protocol and 
         // should be immutable.  If an update is required, a new one should be made. 
-        stagingData = ISafetyChecks(_escrow).handleStaging(
-            executionHashChain[executionIndex++],
+        stagingData = IEscrow(_escrow).executeStagingCall(
+            proof,
             stagingCall,
             userCall.data
         );
@@ -120,8 +131,10 @@ contract ExecutionEnvironment {
         // msg.value to have been used during the staging call
         require(address(this).balance >= userCall.value, "ERR-H03 ValueExceedsBalance");
 
-        userReturnData = ISafetyChecks(_escrow).handleUser(
-            executionHashChain[executionIndex++],
+        proof = proof.next(executionHashChain);
+
+        userReturnData = IEscrow(_escrow).executeUserCall(
+            proof,
             stagingCall.callConfig,
             userCall
         );
@@ -129,10 +142,12 @@ contract ExecutionEnvironment {
         // forward any surplus msg.value to the escrow for tracking
         // and eventual reimbursement to user (after searcher txs)
         // are finished processing
-        SafeTransferLib.safeTransferETH(
-            _escrow, 
-            address(this).balance
-        );
+        if (address(this).balance != 0) {
+            SafeTransferLib.safeTransferETH(
+                _escrow, 
+                address(this).balance
+            );
+        }
 
         // ###########  END USER EXECUTION #############
         // ---------------------------------------------
@@ -141,26 +156,27 @@ contract ExecutionEnvironment {
         // init some vars for the searcher loop
         uint256 gasWaterMark = gasleft();
         uint256 i; // init at 0
-        bool callSuccess = false;
+        bool auctionAlreadyWon = false;
 
         for (; i < searcherCalls.length;) {
 
+            proof = proof.next(executionHashChain);
+
             if (
-                ISearcherEscrow(_escrow).executeSearcherCall(
-                    executionHashChain[executionIndex++],
-                    userCallHash,
+                IEscrow(_escrow).executeSearcherCall(
+                    proof,
                     gasWaterMark,
-                    callSuccess,
+                    auctionAlreadyWon,
                     searcherCalls[i]
-                ) && !callSuccess
+                ) && !auctionAlreadyWon
             ) {
                 // If this is first successful call, issue payments
-                ISearcherEscrow(_escrow).executePayments(
+                IEscrow(_escrow).executePayments(
                     _protocolShare,
                     searcherCalls[i].bids,
                     payeeData
                 );
-                callSuccess = true;
+                auctionAlreadyWon = true;
             }
             
             gasWaterMark = gasleft();
@@ -222,12 +238,11 @@ contract ExecutionEnvironment {
             )
         );
         
-
         // then user call
         executionHashChain[1] = keccak256(
             abi.encodePacked(
                 executionHashChain[0], // always reference previous hash
-                userCall.to,
+                userCall.from,
                 userCall.data,
                 _delegateUser(stagingCall.callConfig),
                 i++
@@ -239,7 +254,7 @@ contract ExecutionEnvironment {
             executionHashChain[i] = keccak256(
                 abi.encodePacked(
                     executionHashChain[i-1], // reference previous hash
-                    searcherCalls[i-2].metaTx.to, // searcher smart contract
+                    searcherCalls[i-2].metaTx.from, // searcher smart contract
                     searcherCalls[i-2].metaTx.data, // searcher calls start at 2
                     false, // searchers wont have access to delegatecall
                     i++
@@ -250,131 +265,8 @@ contract ExecutionEnvironment {
         return executionHashChain;
     }
 
-    function callStagingWrapper(
-        StagingCall calldata stagingCall,
-        bytes calldata userCallData
-    ) external payable returns (bytes memory stagingData) {
-        // This must be called by the escrow contract to make sure the locks cant
-        // be tampered with
-
-        require(msg.sender == _escrow, "ERR-DCW00 InvalidSenderStaging");
-        
-        bool callSuccess;
-        (callSuccess, stagingData) = stagingCall.stagingTo.call{
-            value: _fwdValueStaging(stagingCall.callConfig) ? msg.value : 0 // if staging explicitly needs tx.value, handler doesn't forward it
-        }(
-            bytes.concat(stagingCall.stagingSelector, userCallData)
-        );
-        require(callSuccess, "ERR-H02 CallStaging");
-    }
-
-    function delegateStagingWrapper(
-        StagingCall calldata stagingCall,
-        bytes calldata userCallData
-    ) external returns (bytes memory stagingData) {
-        // This must be called by the escrow contract to make sure the locks cant
-        // be tampered with
-        require(msg.sender == _escrow, "ERR-DCW00 InvalidSenderStaging");
-
-        bool callSuccess;
-        (callSuccess, stagingData) = stagingCall.stagingTo.delegatecall(
-            bytes.concat(stagingCall.stagingSelector, userCallData)
-        );
-        require(callSuccess, "ERR-DCW01 DelegateStaging");
-    }
-
-    function callUserWrapper(
-        UserCall calldata userCall
-    ) external payable returns (bytes memory userReturnData) {
-        // This must be called by the escrow contract to make sure the locks cant
-        // be tampered with
-
-        require(msg.sender == _escrow, "ERR-DCW00 InvalidSenderStaging");
-
-        bool callSuccess;
-        (callSuccess, userReturnData) = userCall.to.call{
-            value: userCall.value,
-            gas: userCall.gas
-        }(userCall.data);
-        require(callSuccess, "ERR-03 UserCall");
-    }
-
-    function delegateUserWrapper(
-        UserCall calldata userCall
-    ) external returns (bytes memory userReturnData) {
-        // This must be called by the escrow contract to make sure the locks cant
-        // be tampered with
-
-        require(msg.sender == _escrow, "ERR-DCW00 InvalidSenderStaging");
-
-        bool callSuccess;
-        (callSuccess, userReturnData) = userCall.to.delegatecall{
-            // NOTE: no value forwarding for delegatecall
-            gas: userCall.gas
-        }(userCall.data);
-        require(callSuccess, "ERR-03 UserCall");
-    }
-
-    function callVerificationWrapper(
-        StagingCall calldata stagingCall,
-        bytes memory stagingData, 
-        bytes memory userReturnData
-    ) external {
-        // This must be called by the escrow contract to make sure the locks cant
-        // be tampered with.
-        // NOTE: stagingData is the returned data from the staging call.
-        // NOTE: userReturnData is the returned data from the user call
-        require(msg.sender == _escrow, "ERR-DCW02 InvalidSenderVerification");
-
-        bool callSuccess;
-        (callSuccess,) = stagingCall.verificationTo.call{
-            // if verification explicitly needs tx.value, handler doesn't forward it
-            value: _fwdValueVerification(stagingCall.callConfig) ? address(this).balance : 0 
-        }(
-            abi.encodeWithSelector(stagingCall.verificationSelector, stagingData, userReturnData)
-        );
-        require(callSuccess, "ERR-07 CallVerification");
-    }
-
-    function delegateVerificationWrapper(
-        StagingCall calldata stagingCall,
-        bytes memory stagingData, 
-        bytes memory userReturnData
-    ) external {
-        // This must be called by the escrow contract to make sure the locks cant
-        // be tampered with.
-        // NOTE: stagingData is the returned data from the staging call.
-        require(msg.sender == _escrow, "ERR-DCW02 InvalidSenderVerification");
-
-        bool callSuccess;
-        (callSuccess,) = stagingCall.verificationTo.delegatecall(
-            abi.encodeWithSelector(stagingCall.verificationSelector, stagingData, userReturnData)
-        );
-        require(callSuccess, "ERR-DCW03 DelegateVerification");
-    }
-
     receive() external payable {}
 
     fallback() external payable {}
 
-
-    function _delegateStaging(uint16 callConfig) internal pure returns (bool delegateStaging) {
-        delegateStaging = (callConfig & 1 << uint16(CallConfig.DelegateStaging) != 0);
-    }
-
-    function _delegateUser(uint16 callConfig) internal pure returns (bool delegateUser) {
-        delegateUser = (callConfig & 1 << uint16(CallConfig.DelegateUser) != 0);
-    }
-
-    function _needsStaging(uint16 callConfig) internal pure returns (bool needsStaging) {
-        needsStaging = (callConfig & 1 << uint16(CallConfig.CallStaging) != 0);
-    }
-
-    function _fwdValueStaging(uint16 callConfig) internal pure returns (bool fwdValueStaging) {
-        fwdValueStaging = (callConfig & 1 << uint16(CallConfig.FwdValueStaging) != 0);
-    }
-
-    function _fwdValueVerification(uint16 callConfig) internal pure returns (bool fwdValueVerification) {
-        fwdValueVerification = (callConfig & 1 << uint16(CallConfig.FwdValueStaging) != 0);
-    }
 }

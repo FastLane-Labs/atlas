@@ -1,6 +1,14 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
+struct SearcherEscrow {
+    uint128 total;
+    uint128 escrowed;
+    uint64 availableOn; // block.number when funds are available.  
+    uint64 lastAccessed;
+    uint32 nonce; // EOA nonce.
+}
+
 struct ProtocolProof {
     address from;
     address to;
@@ -40,6 +48,13 @@ enum SearcherSafety {
     Verified
 }
 
+struct SearcherProof {
+    bytes32 previousHash;
+    bytes32 targetHash;
+    bytes32 userCallHash;
+    uint256 index;
+}
+
 struct SearcherMetaTx {
     address from;
     address to;
@@ -62,6 +77,35 @@ struct SearcherCall {
     bytes signature;
     BidData[] bids;
 }
+
+struct EscrowKey {
+    address approvedCaller;
+    bool makingPayments;
+    bool paymentsComplete;
+    uint8 callIndex;
+    uint8 callMax;
+    uint64 lockState; // bitwise
+}
+
+enum BaseLock {
+    Unlocked,
+    Pending,
+    Active,
+    Untrusted,
+    DelegatingCall
+}
+
+enum ExecutionPhase {
+    Uninitialized,
+    Staging,
+    UserCall,
+    SearcherCalls,
+    HandlingPayments,
+    UserRefund,
+    Verification,
+    Releasing
+}
+
 
 /// @notice contract call set by front end to prepare state for user's call (IE token transfers to address(this))
 /// @param to address to call
@@ -120,6 +164,7 @@ enum SearcherOutcome {
     InvalidSignature,
     InvalidUserHash,
     InvalidBidsHash,
+    InvalidSequencing,
     GasPriceOverCap,
     UserOutOfGas,
 
@@ -135,11 +180,12 @@ enum SearcherOutcome {
     InvalidFormat,
 
     // protocol / external user refund (TODO: keep?)
-    NotWinner, // a higher bidding searcher was successful
+    LostAuction, // a higher bidding searcher was successful
     
     // call, with full user refund
     CallReverted,
     BidNotPaid,
+    CallValueTooHigh,
     Success
 }
 
@@ -159,19 +205,22 @@ contract FastLaneDataTypes {
     uint256 constant public VALIDATION_GAS_LIMIT = 500_000;
     uint256 constant public GWEI = 1_000_000_000;
     uint256 constant public SEARCHER_GAS_BUFFER = 5; // out of 100
+    uint256 constant public FASTLANE_GAS_BUFFER = 125_000; // integer amount
 
     
-    uint256 constant internal _NO_REFUND = (
+    uint256 constant internal _NO_USER_REFUND = (
         1 << uint256(SearcherOutcome.InvalidSignature) |
         1 << uint256(SearcherOutcome.InvalidUserHash) |
         1 << uint256(SearcherOutcome.InvalidBidsHash) |
-        1 << uint256(SearcherOutcome.GasPriceOverCap) 
+        1 << uint256(SearcherOutcome.GasPriceOverCap) |
+        1 << uint256(SearcherOutcome.InvalidSequencing)
     );
 
     uint256 constant internal _CALLDATA_REFUND = (
         1 << uint256(SearcherOutcome.InsufficientEscrow) |
         1 << uint256(SearcherOutcome.InvalidNonceOver) |
-        1 << uint256(SearcherOutcome.UserOutOfGas) 
+        1 << uint256(SearcherOutcome.UserOutOfGas) |
+        1 << uint256(SearcherOutcome.CallValueTooHigh) 
     );
 
     uint256 constant internal _FULL_REFUND = (
@@ -182,12 +231,13 @@ contract FastLaneDataTypes {
     );
 
     uint256 constant internal _EXTERNAL_REFUND = (
-        1 << uint256(SearcherOutcome.NotWinner)
+        1 << uint256(SearcherOutcome.LostAuction)
     );
 
     uint256 constant internal _EXECUTION_REFUND = (
         1 << uint256(SearcherOutcome.CallReverted) |
         1 << uint256(SearcherOutcome.BidNotPaid) |
+        1 << uint256(SearcherOutcome.CallValueTooHigh) |
         1 << uint256(SearcherOutcome.Success)
     );
 
@@ -205,7 +255,12 @@ contract FastLaneDataTypes {
         1 << uint256(SearcherOutcome.InvalidBidsHash) |
         1 << uint256(SearcherOutcome.GasPriceOverCap) |
         1 << uint256(SearcherOutcome.UserOutOfGas) |
-        1 << uint256(SearcherOutcome.NotWinner)
+        1 << uint256(SearcherOutcome.LostAuction)
+    );
+
+    uint256 constant internal _EXECUTED_WITH_ERROR = (
+        1 << uint256(SearcherOutcome.BidNotPaid) |
+        1 << uint256(SearcherOutcome.CallReverted) 
     );
 
 
