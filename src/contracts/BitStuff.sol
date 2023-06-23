@@ -65,6 +65,14 @@ contract BitStuff is FastLaneDataTypes {
         fwdValueVerification = (callConfig & 1 << uint16(CallConfig.FwdValueStaging) != 0);
     }
 
+    function _cleanExecution(uint16 callConfig) internal pure returns (bool cleanExecution) {
+        cleanExecution = (callConfig & 1 << uint16(CallConfig.CleanExecution) != 0);
+    }
+
+    function _dirtyExecution(uint16 callConfig) internal pure returns (bool cleanExecution) {
+        cleanExecution = (callConfig & 1 << uint16(CallConfig.CleanExecution) != 0);
+    }
+
     // NOTE: Order of bits for LockState:
     // Lowest bits = BaseLock
     // Middle bits = Execution Phase

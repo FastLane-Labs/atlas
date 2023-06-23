@@ -39,7 +39,10 @@ enum CallConfig { // for readability, will get broken down into pure funcs later
     FwdValueUser,
     CallVerification,
     DelegateVerification,
-    FwdValueVerification
+    FwdValueVerification,
+    CleanExecution,
+    DirtyExecution,
+    StaticExecution
 }
 
 enum SearcherSafety {
@@ -183,6 +186,7 @@ enum SearcherOutcome {
     LostAuction, // a higher bidding searcher was successful
     
     // call, with full user refund
+    UnknownError,
     CallReverted,
     BidNotPaid,
     CallValueTooHigh,
@@ -207,7 +211,6 @@ contract FastLaneDataTypes {
     uint256 constant public SEARCHER_GAS_BUFFER = 5; // out of 100
     uint256 constant public FASTLANE_GAS_BUFFER = 125_000; // integer amount
 
-    
     uint256 constant internal _NO_USER_REFUND = (
         1 << uint256(SearcherOutcome.InvalidSignature) |
         1 << uint256(SearcherOutcome.InvalidUserHash) |
@@ -238,6 +241,7 @@ contract FastLaneDataTypes {
         1 << uint256(SearcherOutcome.CallReverted) |
         1 << uint256(SearcherOutcome.BidNotPaid) |
         1 << uint256(SearcherOutcome.CallValueTooHigh) |
+        1 << uint256(SearcherOutcome.UnknownError) |
         1 << uint256(SearcherOutcome.Success)
     );
 

@@ -27,24 +27,31 @@ contract ExecutionEnvironment is CallExecution {
     address immutable internal _factory;
     address immutable internal _escrow;
     uint256 immutable internal _protocolShare;
+    bool immutable internal _dirty; 
+
+    // NOTE: If _dirty is true, that means contract has untrustworthy storage
+    // because it not selfdestructed() on each go. 
 
     constructor(
+        bool isDirty,
         uint16 protocolShare, 
         address escrow
     ) CallExecution(escrow) {
-        _factory = msg.sender; // TODO: hardcode the factory?
+        _factory = msg.sender; 
         _escrow = escrow;
-
+        _dirty = isDirty;
         _protocolShare = uint256(protocolShare);
 
-        // meant to be a single-shot execution environment
+        // Unless otherwise specified, this is meant to be a single-shot 
+        // execution environment.
         // NOTE: selfdestruct will work post EIP-6780 as long as
         // it's called in the same transaction as contract creation
-        //selfdestruct(payable(_factory));
-    
+        if (!_dirty) {
+            selfdestruct(payable(_factory));
+        }
     } 
 
-    function protoCall( // haha get it?
+    function protoCall( 
         StagingCall calldata stagingCall, // supplied by frontend
         UserCall calldata userCall,
         PayeeData[] calldata payeeData, // supplied by frontend
@@ -53,10 +60,8 @@ contract ExecutionEnvironment is CallExecution {
         payable 
         returns (bytes32 userCallHash, bytes32 searcherChainHash) 
     {
-        // make sure it's the factory calling, although it should be impossible
-        // for anyone else to call seeing as how the contract was just made and
-        // it's a SALT2.
-        require(msg.sender == _factory, "ERR-H00 InvalidSender");
+        // Make sure it's the factory calling or a dirty storage contract
+        require(_dirty || msg.sender == _factory, "ERR-H00 InvalidSender");
 
         // if there's any lingering eth balance, forward it to escrow
         if(address(this).balance - msg.value != 0) {

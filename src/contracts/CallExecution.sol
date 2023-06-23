@@ -25,6 +25,9 @@ import {
 string constant SEARCHER_BID_UNPAID = "SearcherBidUnpaid";
 bytes32 constant _SEARCHER_BID_UNPAID = keccak256(abi.encodePacked(SEARCHER_BID_UNPAID));
 
+string constant SEARCHER_MSG_VALUE_UNPAID = "SearcherMsgValueNotRepaid";
+bytes32 constant _SEARCHER_MSG_VALUE_UNPAID = keccak256(abi.encodePacked(SEARCHER_MSG_VALUE_UNPAID));
+
 string constant SEARCHER_CALL_REVERTED = "SearcherCallReverted";
 bytes32 constant _SEARCHER_CALL_REVERTED = keccak256(abi.encodePacked(SEARCHER_CALL_REVERTED));
 
@@ -37,8 +40,8 @@ bytes32 constant _INVALID_SEARCHER_HASH = keccak256(abi.encodePacked(INVALID_SEA
 string constant HASH_CHAIN_BROKEN = "CalldataHashChainMismatch";
 bytes32 constant _HASH_CHAIN_BROKEN = keccak256(abi.encodePacked(HASH_CHAIN_BROKEN));
 
-string constant SEARCHER_VALUE_UNPAID = "SearcherMsgValueNotRepaid";
-bytes32 constant _SEARCHER_VALUE_UNPAID = keccak256(abi.encodePacked(SEARCHER_VALUE_UNPAID));
+// string constant SEARCHER_ETHER_BID_UNPAID = "SearcherMsgValueNotRepaid";
+// bytes32 constant _SEARCHER_ETHER_BID_UNPAID = keccak256(abi.encodePacked(SEARCHER_ETHER_BID_UNPAID));
 
 library CallChain {
     function next(SearcherProof memory self, bytes32[] memory executionHashChain) internal pure returns (SearcherProof memory) {
@@ -84,6 +87,9 @@ contract EscrowExecution is BitStuff {
 
             if (errorSwitch == _SEARCHER_BID_UNPAID) {
                 return (SearcherOutcome.BidNotPaid, 0);
+
+            } else if (errorSwitch == _SEARCHER_MSG_VALUE_UNPAID) {
+                return (SearcherOutcome.CallValueTooHigh, 0);
             
             } else if (errorSwitch == _SEARCHER_CALL_REVERTED) {
                 return (SearcherOutcome.CallReverted, 0);
@@ -94,11 +100,8 @@ contract EscrowExecution is BitStuff {
             } else if (errorSwitch == _HASH_CHAIN_BROKEN) {
                 return (SearcherOutcome.InvalidSequencing, 0);
 
-            } else if (errorSwitch == _SEARCHER_VALUE_UNPAID) {
-                return (SearcherOutcome.CallValueTooHigh, 0);
-            
             } else {
-                return (SearcherOutcome.CallReverted, 0);
+                return (SearcherOutcome.UnknownError, 0);
             }
 
         } catch {
@@ -256,7 +259,6 @@ contract CallExecution is BitStuff {
 
         // Initiate a memory array to track balances to measure if the
         // bid amount is paid.
-        bool etherIsBidToken;
         uint256[] memory tokenBalances = new uint[](searcherCall.bids.length);
         uint256 i;
         for (; i < searcherCall.bids.length;) {
@@ -264,7 +266,6 @@ contract CallExecution is BitStuff {
             // Ether balance
             if (searcherCall.bids[i].token == address(0)) {
                 tokenBalances[i] = address(this).balance;  // NOTE: this is the meta tx value
-                etherIsBidToken = true;
 
             // ERC20 balance
             } else {
@@ -307,18 +308,24 @@ contract CallExecution is BitStuff {
         escrowEtherBalance -= _escrow.balance;
 
         // Verify that the searcher repaid their msg.value
-        require(address(this).balance + escrowEtherBalance >= searcherCall.metaTx.value, SEARCHER_VALUE_UNPAID);
+        require(address(this).balance + escrowEtherBalance >= searcherCall.metaTx.value, SEARCHER_MSG_VALUE_UNPAID);
 
         // Verify that the searcher paid what they bid
+        bool etherIsBidToken;
         i = 0;
         uint256 balance;
         for (; i < searcherCall.bids.length;) {
             
             if (searcherCall.bids[i].token == address(0)) {
+
+                etherIsBidToken = true;
+
                 // First, verify that the bid was paid
                 require(
                     address(this).balance + escrowEtherBalance >= tokenBalances[i] + searcherCall.bids[i].bidAmount,
-                    SEARCHER_BID_UNPAID
+                    SEARCHER_MSG_VALUE_UNPAID 
+                    // TODO: differentiate errors between value not being paid back
+                    // and a bid not being met.
                 );
                 
                 // Check if the the execution environment owes the escrow Ether.     
@@ -374,7 +381,6 @@ contract CallExecution is BitStuff {
         // that'll need to keep their payee array short :(
         
         require(msg.sender == _escrow, "ERR-04 InvalidCaller");
-        
         // declare some vars to make this trainwreck less unreadable
         PaymentData memory pmtData;
         // ERC20 token;

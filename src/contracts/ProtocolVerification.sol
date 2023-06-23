@@ -51,6 +51,9 @@ contract ProtocolVerifier is EIP712 {
         uint64 nonce; // the highest nonce used so far. n+1 is always available
     }
 
+    // map to load execution environment parameters for each protocol
+    mapping(address => ProtocolData) public protocolDataMap;
+
     // map for tracking which EOAs are approved for a given protocol
     //     approver   userCall.to
     mapping(address => ApproverSigningData) public approvedAddressMap;
@@ -70,13 +73,17 @@ contract ProtocolVerifier is EIP712 {
     // party (user, searcher, validator, or a collusion between 
     // all of them) attempts to alter it, this check will fail
     function _verifyProtocol(
-        Verification calldata verification,
-        ProtocolData memory protocolData
-    ) internal returns (bool) {
+        address userCallTo,
+        Verification calldata verification
+    ) internal returns (bool, ProtocolData memory) {
         
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up protocol nonces
         require(_verifySignature(verification), "ERR-PV01 InvalidSignature");
+
+        // Load protocol data for the user's targeted protocol
+        ProtocolData memory protocolData = protocolDataMap[userCallTo];
+
 
         // NOTE: to avoid replay attacks arising from key management errors,
         // the state changes below must be *saved* even if they render the 
@@ -98,14 +105,14 @@ contract ProtocolVerifier is EIP712 {
 
         // make sure this nonce hasn't already been used by this sender
         if (signatureTrackingMap[signingKey] != bytes32(0)) {
-            return false;
+            return (false, protocolData);
         }
         signatureTrackingMap[signingKey] = keccak256(verification.signature);
 
         // make sure the signer is currently enabled by protocol owner
         // NOTE: check must occur after storing signature to prevent replays
         if (!approver.enabled) {
-            return false;
+            return (false, protocolData);
         }
 
         // if the protocol indicated that they only accept sequenced nonces
@@ -116,7 +123,7 @@ contract ProtocolVerifier is EIP712 {
         // to prevent replay attacks. 
         if (approver.sequenced) {
             if (verification.proof.nonce != approver.nonce + 1) {
-                return false;
+                return (false, protocolData);
             }
             unchecked { ++approvedAddressMap[verification.proof.from].nonce;}
         
@@ -135,11 +142,11 @@ contract ProtocolVerifier is EIP712 {
         // submitted by the frontend. 
         // TODO: break struct to elements and use encode for backend simplicity?
         if (!(keccak256(abi.encode(protocolData)) == verification.proof.protocolDataHash)) {
-            return false;
+            return (false, protocolData);
         }
     
         // TODO: consider putting userCallHash verification here
-        return true;
+        return (true, protocolData);
     }
 
     // TODO: make a more thorough version of this

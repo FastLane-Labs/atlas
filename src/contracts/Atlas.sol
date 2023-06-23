@@ -1,16 +1,16 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import { IMetaProtoCall } from "../interfaces/IMetaProtoCall.sol";
-
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
-import { ReentrancyGuard } from "solmate/utils/ReentrancyGuard.sol";
+import { IAtlas } from "../interfaces/IAtlas.sol";
 
 import { Escrow } from "./Escrow.sol";
-import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
+import { Factory } from "./Factory.sol";
 import { ProtocolVerifier } from "./ProtocolVerification.sol";
 
-import { ReentrancyGuard } from "solmate/utils/ReentrancyGuard.sol";
+import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
+import { SketchyStorageEnvironment } from "./SketchyStorage.sol";
+
+import "openzeppelin-contracts/contracts/access/Ownable.sol";
 
 import {
     StagingCall,
@@ -21,26 +21,14 @@ import {
     Verification
 } from "../libraries/DataTypes.sol";
 
-contract MetaProtoCall is ProtocolVerifier, ReentrancyGuard {
+contract Atlas is Factory, ProtocolVerifier {
 
-    uint32 immutable public escrowDuration;
-    address immutable public fastLanePayee;
-    address immutable public escrowAddress;
-
-    // map to load execution environment parameters for each protocol
-    mapping(address => ProtocolData) public protocolDataMap;
-
-    FastLaneEscrow internal _escrowContract = new FastLaneEscrow(uint32(64));
+    bytes32 internal _dirtyLock;
 
     constructor(
-            address _fastlanePayee,
-            uint32 _escrowDuration
-
-    ) {
-        fastLanePayee = _fastlanePayee;
-        escrowDuration = _escrowDuration;
-        escrowAddress = address(_escrowContract);
-    }
+        address _fastlanePayee,
+        uint32 _escrowDuration
+    ) Factory(_fastlanePayee, _escrowDuration) {}
 
     function metacall(
         StagingCall calldata stagingCall, // supplied by frontend
@@ -50,14 +38,14 @@ contract MetaProtoCall is ProtocolVerifier, ReentrancyGuard {
         Verification calldata verification // supplied by front end after it sees the other data
     ) external payable nonReentrant {
 
-        // Load protocol data for the user's targeted protocol
-        ProtocolData memory protocolData = protocolDataMap[userCall.to];
-
         // Verify that the calldata injection came from the protocol frontend
         // NOTE: fail result causes function to return rather than revert. 
         // This allows signature data to be stored, which helps prevent 
         // replay attacks.
-        if (!_verifyProtocol(verification, protocolData)) {
+        (bool invalidCall, ProtocolData memory protocolData) = _verifyProtocol(
+            verification, userCall.to
+        );
+        if (!invalidCall) {
             return;
         }
         // Signature / hashing failures past this point can be safely reverted.
@@ -78,13 +66,14 @@ contract MetaProtoCall is ProtocolVerifier, ReentrancyGuard {
         ExecutionEnvironment _executionEnvironment = new ExecutionEnvironment{
             salt: keccak256(
                 abi.encodePacked(
+                    block.chainid,
                     escrowAddress,
                     protocolData.owner,
                     protocolData.callConfig,
                     protocolData.split
                 )
             )
-        }(protocolData.split, escrowAddress);
+        }(false, protocolData.split, escrowAddress);
 
         // Initialize the escrow locks
         _escrowContract.initializeEscrowLocks(
@@ -115,30 +104,37 @@ contract MetaProtoCall is ProtocolVerifier, ReentrancyGuard {
         _escrowContract.releaseEscrowLocks();
     }
 
-    function _getHandlerAddress(
-        ProtocolData memory protocolData
-    ) internal view returns (address handlerAddress) {
+    function untrustedVerifyProtocol(
+        address userCallTo,
+        Verification calldata verification
+    ) external nonReentrant returns (bool invalidCall, ProtocolData memory protocolData) {
+
+        require(msg.sender == DIRTY_ADDRESS, "ERR-H03 InvalidCaller");
         
-        bytes32 salt = keccak256(
-            abi.encodePacked(
-                escrowAddress,
-                protocolData.owner,
-                protocolData.callConfig,
-                protocolData.split
-            )
+        (invalidCall, protocolData) = _verifyProtocol(userCallTo, verification);
+
+        if (invalidCall) {
+            return (invalidCall, protocolData);
+        }
+
+        // Initialize the escrow locks
+        _escrowContract.initializeEscrowLocks(
+            address(DIRTY_ADDRESS),
+            uint8(searcherCalls.length)
         );
 
-        handlerAddress = address(uint160(uint(keccak256(abi.encodePacked(
-            bytes1(0xff),
-            address(this),
-            salt,
-            keccak256(
-                abi.encodePacked(
-                    type(ExecutionEnvironment).creationCode,
-                    protocolData.split,
-                    escrowAddress
-                )
-            )
-        ))))); // this line causes me immeasurable pain
+        _dirtyLock = keccak256(
+            verification.proof.userCallHash,
+            verification.proof.protocolDataHash,
+            verification.proof.searcherChainHash
+        );
+    }
+
+    function untrustedReleaseLock(bytes32 key) external nonReentrant {
+        require(key == _dirtyLock && key != bytes32(0), "ERR-H04 IncorrectKey");
+        
+        delete _dirtyLock;
+
+        _escrowContract.releaseEscrowLocks();
     }
 }
