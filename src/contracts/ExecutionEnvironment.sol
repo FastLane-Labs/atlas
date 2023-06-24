@@ -58,30 +58,17 @@ contract ExecutionEnvironment is CallExecution {
         ProtocolCall calldata protocolCall, // supplied by frontend
         UserCall calldata userCall,
         PayeeData[] calldata payeeData, // supplied by frontend
-        SearcherCall[] calldata searcherCalls // supplied by FastLane via frontend integration
+        SearcherCall[] calldata searcherCalls, // supplied by FastLane via frontend integration
+        bytes32[] memory executionHashChain // calculated by msg.sender (Factory)
     ) external 
         payable 
-        returns (bytes32, bytes32) 
+        returns (CallChainProof memory proof) 
     {
         // Make sure it's the factory calling or a dirty storage contract
         require(_dirty || msg.sender == _factory, "ERR-H00 InvalidSender");
 
-        // build a memory array to later verify execution ordering. Each bytes32 
-        // is the hash of the calldata, a bool representing if its a delegatecall
-        // or standard call, and a uint256 representing its execution index
-        // order is:
-        //      0: stagingCall
-        //      1: userCall + keccak of prior
-        //      2 to n: searcherCalls + keccak of prior
-        // NOTE: if the staging call is skipped, the userCall has the 0 index.
-        bytes32[] memory executionHashChain = CallVerification.buildExecutionHashChain(
-            protocolCall,
-            userCall,
-            searcherCalls
-        );
-
         // Build initialize proof for executionHashChain for sequence verification
-        CallChainProof memory proof = CallVerification.initializeProof(
+        proof = CallVerification.initializeProof(
             keccak256(abi.encodePacked(userCall.to, userCall.data)), 
             executionHashChain
         );
@@ -175,8 +162,6 @@ contract ExecutionEnvironment is CallExecution {
             stagingReturnData,
             userReturnData
         );
-
-        return (proof.userCallHash, executionHashChain[executionHashChain.length-2]);
 
         // #########  END VERIFICATION EXECUTION ##########
     }

@@ -28,7 +28,7 @@ contract ProtocolVerifier is EIP712 {
         uint256 deadline;
         bytes32 userCallHash; // keccak256 of userCall.to, userCall.data
         bytes32 protocolDataHash; // keccak256 of ProtocolData struct
-        bytes32 searcherChainHash; // keccak256 of the searchers' txs
+        bytes32 callChainHash; // keccak256 of the searchers' txs
     }
 
     struct Verification {
@@ -64,13 +64,13 @@ contract ProtocolVerifier is EIP712 {
 
     constructor() EIP712("ProtoCallHandler", "0.0.1")  {}
 
-    // verify that the protocol's front end generated the staging
+    // Verify that the protocol's front end generated the staging
     // information and that it matches the on-chain data.  
-    // verify that the protocol's front end's data is based on
+    // Verify that the protocol's front end's data is based on
     // the data submitted by the user and by the searchers.
     // NOTE: the protocol's front end is the last party in 
-    // the honest supply chain to submit data.  If any other
-    // party (user, searcher, validator, or a collusion between 
+    // the supply chain to submit data.  If any other party
+    // (user, searcher, FastLane,  or a collusion between 
     // all of them) attempts to alter it, this check will fail
     function _verifyProtocol(
         address userCallTo,
@@ -161,9 +161,9 @@ contract ProtocolVerifier is EIP712 {
                     verification.proof.from, 
                     verification.proof.to, 
                     verification.proof.nonce,
-                    verification.proof.userCallHash,
+                    verification.proof.deadline,
                     verification.proof.protocolDataHash,
-                    verification.proof.searcherChainHash
+                    verification.proof.callChainHash
                 )
             )
         ).recover(verification.signature);

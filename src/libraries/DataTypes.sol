@@ -16,7 +16,7 @@ struct ProtocolProof {
     uint256 deadline;
     bytes32 userCallHash; // keccak256 of userCall.to, userCall.data
     bytes32 protocolDataHash; // keccak256 of ProtocolData struct
-    bytes32 searcherChainHash; // keccak256 of the searchers' txs
+    bytes32 callChainHash; // keccak256 of the searchers' txs
 }
 
 struct Verification {
@@ -189,7 +189,7 @@ bytes32 constant SEARCHER_TYPE_HASH =
 
 bytes32 constant PROTOCOL_TYPE_HASH =
     keccak256(
-        "ProtocolProof(address from,address to,uint256 nonce,uint256 deadline,bytes32 userCallHash,bytes32 protocolDataHash,bytes32 searcherChainHash)"
+        "ProtocolProof(address from,address to,uint256 nonce,uint256 deadline,bytes32 protocolDataHash,bytes32 callChainHash)"
     );
 
 contract FastLaneDataTypes {

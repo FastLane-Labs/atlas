@@ -10,6 +10,8 @@ import { ProtocolVerifier } from "./ProtocolVerification.sol";
 import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
 import { SketchyStorageEnvironment } from "./SketchyStorage.sol";
 
+import { CallVerification } from "../libraries/CallVerification.sol";
+
 import "openzeppelin-contracts/contracts/access/Ownable.sol";
 
 import {
@@ -18,7 +20,8 @@ import {
     PayeeData,
     SearcherCall,
     ProtocolData,
-    Verification
+    Verification,
+    CallChainProof
 } from "../libraries/DataTypes.sol";
 
 contract Atlas is FastLaneFactory, ProtocolVerifier {
@@ -37,6 +40,19 @@ contract Atlas is FastLaneFactory, ProtocolVerifier {
         SearcherCall[] calldata searcherCalls, // supplied by FastLane via frontend integration
         Verification calldata verification // supplied by front end after it sees the other data
     ) external payable nonReentrant {
+        // build a memory array to later verify execution ordering. Each bytes32 
+        // is the hash of the calldata, a bool representing if its a delegatecall
+        // or standard call, and a uint256 representing its execution index
+        // order is:
+        //      0: stagingCall
+        //      1: userCall + keccak of prior
+        //      2 to n: searcherCalls + keccak of prior
+        // NOTE: if the staging call is skipped, the userCall has the 0 index.
+        bytes32[] memory executionHashChain = CallVerification.buildExecutionHashChain(
+            protocolCall,
+            userCall,
+            searcherCalls
+        );
 
         // Verify that the calldata injection came from the protocol frontend
         // NOTE: fail result causes function to return rather than revert. 
@@ -81,23 +97,26 @@ contract Atlas is FastLaneFactory, ProtocolVerifier {
             uint8(searcherCalls.length)
         );
 
-        // handoff to the execution environment, which returns the verified
-        // userCallHash and the final hash of the searcher chain. 
-        (bytes32 userCallHash, bytes32 searcherChainHash) = _executionEnvironment.protoCall(
+        // Handoff to the execution environment, which returns the verified proof
+        CallChainProof memory proof = _executionEnvironment.protoCall(
             protocolCall,
             userCall,
             payeeData,
-            searcherCalls
-        );
-
-        // Verify that the frontend's view of the user's calldata is unaltered - presumably by user
-        require(
-            userCallHash == verification.proof.userCallHash, "ERR-F04 UserCallAltered"
+            searcherCalls,
+            executionHashChain
         );
 
         // Verify that the frontend's view of the searchers' signed calldata was unaltered by user
         require(
-            searcherChainHash == verification.proof.searcherChainHash, "ERR-F05 SearcherCallAltered"
+            executionHashChain[executionHashChain.length-2] == verification.proof.callChainHash, 
+            "ERR-F05 UserCallAltered"
+        );
+
+        // Verify that the execution system's sequencing of the transaction calldata was unaltered by searchers
+        // NOTE: This functions as an "exploit prevention mechanism" as the contract itself already verifies 
+        // trustless execution. 
+        require(
+            proof.previousHash == verification.proof.callChainHash, "ERR-F05 SearcherExploitDetected"
         );
 
         // release the locks
@@ -111,6 +130,7 @@ contract Atlas is FastLaneFactory, ProtocolVerifier {
     ) external nonReentrant returns (bool invalidCall, ProtocolData memory protocolData) {
 
         require(msg.sender == dirtyAddress, "ERR-H03 InvalidCaller");
+        require(_dirtyLock == bytes32(0), "ERR-H04 AlreadyLocked");
         
         (invalidCall, protocolData) = _verifyProtocol(userCallTo, verification);
 
@@ -124,17 +144,12 @@ contract Atlas is FastLaneFactory, ProtocolVerifier {
             uint8(searcherCallsLength)
         );
 
-        _dirtyLock = keccak256(
-            abi.encode(
-                verification.proof.userCallHash,
-                verification.proof.protocolDataHash,
-                verification.proof.searcherChainHash
-            )
-        );
+        // Store the penultimate call hash
+        _dirtyLock = verification.proof.callChainHash;
     }
 
     function untrustedReleaseLock(bytes32 key) external nonReentrant {
-        require(key == _dirtyLock && key != bytes32(0), "ERR-H04 IncorrectKey");
+        require(key == _dirtyLock && key != bytes32(0), "ERR-H05 IncorrectKey");
         
         delete _dirtyLock;
 

@@ -3,6 +3,8 @@ pragma solidity ^0.8.16;
 
 import { IAtlas } from "../interfaces/IAtlas.sol";
 
+import { CallVerification } from "../libraries/CallVerification.sol";
+
 import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
 
 import {
@@ -11,7 +13,8 @@ import {
     PayeeData,
     SearcherCall,
     ProtocolData,
-    Verification
+    Verification,
+    CallChainProof
 } from "../libraries/DataTypes.sol";
 
 contract SketchyStorageEnvironment is ExecutionEnvironment{
@@ -50,6 +53,20 @@ contract SketchyStorageEnvironment is ExecutionEnvironment{
         SearcherCall[] calldata searcherCalls, // supplied by FastLane via frontend integration
         Verification calldata verification // supplied by front end after it sees the other data
     ) external payable {
+        // build a memory array to later verify execution ordering. Each bytes32 
+        // is the hash of the calldata, a bool representing if its a delegatecall
+        // or standard call, and a uint256 representing its execution index
+        // order is:
+        //      0: stagingCall
+        //      1: userCall + keccak of prior
+        //      2 to n: searcherCalls + keccak of prior
+        // NOTE: if the staging call is skipped, the userCall has the 0 index.
+        bytes32[] memory executionHashChain = CallVerification.buildExecutionHashChain(
+            protocolCall,
+            userCall,
+            searcherCalls
+        );
+
         /// Verify that the calldata injection came from the protocol frontend
         // NOTE: fail result causes function to return rather than revert. 
         // This allows signature data to be stored, which helps prevent 
@@ -85,33 +102,28 @@ contract SketchyStorageEnvironment is ExecutionEnvironment{
                 protocolCall,
                 userCall,
                 payeeData,
-                searcherCalls
+                searcherCalls,
+                executionHashChain
             )
         );
         require(callSuccess, "ERR-F10 DelegateCallFail");
-        (bytes32 userCallHash, bytes32 searcherChainHash) = abi.decode(
-            data, (bytes32, bytes32)
-        );
-
-        // Verify that the frontend's view of the user's calldata is unaltered - presumably by user
-        require(
-            userCallHash == verification.proof.userCallHash, "ERR-F04 UserCallAltered"
+        CallChainProof memory proof = abi.decode(
+            data, (CallChainProof)
         );
 
         // Verify that the frontend's view of the searchers' signed calldata was unaltered by user
         require(
-            searcherChainHash == verification.proof.searcherChainHash, "ERR-F05 SearcherCallAltered"
+            executionHashChain[executionHashChain.length-2] == verification.proof.callChainHash, "ERR-F05 UserCallAltered"
         );
 
-        // release the locks
-        IAtlas(factory).untrustedReleaseLock(
-            keccak256(
-                abi.encode(
-                    userCallHash,
-                    verification.proof.protocolDataHash,
-                    searcherChainHash
-                )
-            )
+        // Verify that the execution system's sequencing of the transaction calldata was unaltered by searchers
+        // NOTE: This functions as an "exploit prevention mechanism" as the contract itself already verifies trustless
+        // execution. 
+        require(
+            proof.previousHash == verification.proof.callChainHash, "ERR-F05 SearcherExploitDetected"
         );
+
+        // Release the locks
+        IAtlas(factory).untrustedReleaseLock(proof.previousHash);
     }
 }
