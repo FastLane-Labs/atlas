@@ -10,7 +10,7 @@ import {
     SearcherCall,
     SearcherMetaTx,
     BidData,
-    StagingCall,
+    ProtocolCall,
     UserCall,
     CallConfig,
     EscrowKey,
@@ -117,6 +117,8 @@ contract SafetyChecks is BitStuff {
 
     modifier stagingLock(uint16 callConfig) {
 
+        // msg.sender = ExecutionEnvironment
+
         EscrowKey memory escrowKey = _escrowKey;
 
         // safety contract needs to init all of the execution environment's
@@ -129,62 +131,41 @@ contract SafetyChecks is BitStuff {
         // Handle staging calls, if needed
         if (_needsStaging(callConfig)) {
             
-            // Handle the 
-            if (_delegateStaging(callConfig)) {
-                // update the lock depth, next caller, and then set the lock for searcher safety checks
-                escrowKey.lockState = _updateLockDepth(
-                    BaseLock.DelegatingCall, BaseLock.Active, escrowKey.lockState
-                );
-                escrowKey.approvedCaller = address(0); // no approved escrow callers during staging
-                
-                _escrowKey = escrowKey;
-
-                _;
-
-                escrowKey = _escrowKey;
-
-                // TODO: engage locks or not here, for first blank call?
-
-                // Set the lock depth back 
-                escrowKey.lockState = _updateLockDepth(
-                    BaseLock.Active, BaseLock.DelegatingCall, escrowKey.lockState
-                );
-                
+            // update the lock phase and then set the lock for searcher safety checks
+            escrowKey.lockState = _updateLockDepth(
+                BaseLock.Untrusted, BaseLock.Active, escrowKey.lockState
+            );
+            escrowKey.approvedCaller = address(0); // no approved escrow callers during staging
             
-            // handle regular call
-            } else { 
-                // update the lock phase and then set the lock for searcher safety checks
-                escrowKey.lockState = _updateLockDepth(
-                    BaseLock.Untrusted, BaseLock.Active, escrowKey.lockState
-                );
-                escrowKey.approvedCaller = address(0); // no approved escrow callers during staging
-                
-                _escrowKey = escrowKey;
+            _escrowKey = escrowKey;
 
-                _;
+            _;
 
-                escrowKey = _escrowKey;
+            escrowKey = _escrowKey;
 
-                // Set the lock depth back
-                escrowKey.lockState = _updateLockDepth(
-                    BaseLock.Active, BaseLock.Untrusted, escrowKey.lockState
-                );
-            }
-
+            // Set the lock depth back
+            escrowKey.lockState = _updateLockDepth(
+                BaseLock.Active, BaseLock.Untrusted, escrowKey.lockState
+            );
+            
             // set the approved caller back
-            escrowKey.approvedCaller = msg.sender;
+            escrowKey.approvedCaller = msg.sender; // ExecutionEnvironment
         }
 
-        // prep for next step - UserCall - and store the lock
+        // Prep for next step - UserCall - and store the lock
         escrowKey.lockState = _updateExecutionPhase(
             ExecutionPhase.UserCall, ExecutionPhase.Staging, escrowKey.lockState
         );
+
+        // Increment the callIndex
         unchecked{ ++escrowKey.callIndex; }
         
         _escrowKey = escrowKey;
     }
 
     modifier userLock(uint16 callConfig) {
+        
+        // msg.sender is ExecutionEnvironment
 
         EscrowKey memory escrowKey = _escrowKey;
 
@@ -204,51 +185,33 @@ contract SafetyChecks is BitStuff {
             "ERR-E35 InvalidStage"
         ); 
 
-        bool isDelegateCall = _delegateUser(callConfig);
-
         // set the approved caller.  No approved caller during staging or user calls
         escrowKey.approvedCaller = address(0);
         
-        // handle the user delegatecall case
-        if (isDelegateCall) {
-            // update the lock depth and then set the lock for searcher safety checks
-            escrowKey.lockState = _updateLockDepth(
-                BaseLock.DelegatingCall, BaseLock.Active, escrowKey.lockState
-            );
-            _escrowKey = escrowKey;
+        // update the lock depth and then set the lock for searcher safety checks
+        escrowKey.lockState = _updateLockDepth(
+            BaseLock.Untrusted, BaseLock.Active, escrowKey.lockState
+        );
+        _escrowKey = escrowKey;
 
-            _;
+        _;
 
-            escrowKey = _escrowKey;
+        escrowKey = _escrowKey;
 
-            // Set the lock depth back
-            escrowKey.lockState = _updateLockDepth(
-                BaseLock.Pending, BaseLock.DelegatingCall, escrowKey.lockState
-            );
-        
-        // handle the user regular call case
-        } else {
-            // update the lock depth and then set the lock for searcher safety checks
-            escrowKey.lockState = _updateLockDepth(
-                BaseLock.Untrusted, BaseLock.Active, escrowKey.lockState
-            );
-            _escrowKey = escrowKey;
-
-            _;
-
-            escrowKey = _escrowKey;
-
-            // Set the lock depth back
-            escrowKey.lockState = _updateLockDepth(
-                BaseLock.Pending, BaseLock.Untrusted, escrowKey.lockState
-            );
-        }
+        // Set the lock depth back
+        // NOTE: Pending is used to indicate the first of the Searcher calls
+        escrowKey.lockState = _updateLockDepth(
+            BaseLock.Pending, BaseLock.Untrusted, escrowKey.lockState 
+        );
 
         // prep for next stage - searcher calls - and store the lock
         escrowKey.lockState = _updateExecutionPhase(
             ExecutionPhase.SearcherCalls, ExecutionPhase.UserCall, escrowKey.lockState
         );
-        escrowKey.approvedCaller = msg.sender;
+
+        escrowKey.approvedCaller = msg.sender; // ExecutionEnvironment
+
+        // Increment the callIndex
         unchecked{ ++escrowKey.callIndex; }
 
         _escrowKey = escrowKey;
@@ -258,6 +221,8 @@ contract SafetyChecks is BitStuff {
         address searcherTo
     ) internal {
         
+        // msg.sender is the ExecutionEnvironment
+
         EscrowKey memory escrowKey = _escrowKey;
 
         // check, verify, and initialize the lock
@@ -267,11 +232,11 @@ contract SafetyChecks is BitStuff {
             "ERR-E31 InvalidCaller"
         ); // activeExecutionEnvironment
 
-        // verify the stage
+        // Verify the stage
         if (escrowKey.callIndex == 2) {
-            require(_isLockDepth(BaseLock.Pending, escrowKey.lockState), "ERR-E30 InvalidLockDepth");
+            require(_isLockDepth(BaseLock.Pending, escrowKey.lockState), "ERR-E30a InvalidLockDepth");
         } else {
-            require(_isLockDepth(BaseLock.Active, escrowKey.lockState), "ERR-E30 InvalidLockDepth");
+            require(_isLockDepth(BaseLock.Active, escrowKey.lockState), "ERR-E30b InvalidLockDepth");
         }
         require(_isExecutionPhase(ExecutionPhase.SearcherCalls, escrowKey.lockState), "ERR-E33 IncorrectStage");
         require(escrowKey.callIndex > 1 && escrowKey.callIndex < escrowKey.callMax, "ERR-E35 InvalidIndex");
@@ -295,13 +260,18 @@ contract SafetyChecks is BitStuff {
     }
 
     function _releaseSearcherLock(address searcherTo, bool makePayments) internal {
+
+        // msg.sender is still the ExecutionEnvironment
+
         // NOTE: Searcher should have performed the safety callback, 
         // which would have updated the SearcherSafety level in escrowKey
 
         // load the updated key
         EscrowKey memory escrowKey = _escrowKey;
 
-        require(escrowKey.approvedCaller == searcherTo, "ERR-E60 CallerMismatch");
+        // approvedCaller hasnt been updated yet, so verify it's still the same expected
+        // caller that the Escrow has in memory and submits as an arg. 
+        require(escrowKey.approvedCaller == searcherTo, "ERR-E60 CallerMismatch"); 
         require(escrowKey.approvedCaller != msg.sender, "ERR-E70 PossibleReentry");
 
         // verify and reset the searcher safety requirement and store the escrowkey
@@ -310,7 +280,7 @@ contract SafetyChecks is BitStuff {
             SearcherSafety.Unset, SearcherSafety.Verified, escrowKey.lockState
         );
 
-        // reset the approvedCaller back to the activeExecutionEnvironment
+        // reset the approvedCaller back to the ExecutionEnvironment
         escrowKey.approvedCaller = msg.sender;
 
         // set the lock depth back to active and store the escrowKey
@@ -318,7 +288,8 @@ contract SafetyChecks is BitStuff {
             BaseLock.Active, BaseLock.Untrusted, escrowKey.lockState
         );
 
-        unchecked{ ++escrowKey.callIndex; } // Increment callIndex
+        // Increment the callIndex
+        unchecked{ ++escrowKey.callIndex; } 
 
         // Check if the call was successful and warrants payment processing
         if (makePayments) {
@@ -430,11 +401,7 @@ contract SafetyChecks is BitStuff {
         _escrowKey = escrowKey;
     }
 
-    function handleVerification(
-        StagingCall calldata stagingCall,
-        bytes memory stagingData,
-        bytes memory userReturnData
-    ) external {
+    modifier verificationLock(uint16 callConfig) {
 
         EscrowKey memory escrowKey = _escrowKey;
 
@@ -452,7 +419,7 @@ contract SafetyChecks is BitStuff {
 
 
         // if we don't verification, skip ahead and set lock depth to pending for release
-        if (!_needsVerification(stagingCall.callConfig)) {
+        if (!_needsVerification(callConfig)) {
             escrowKey.lockState = _updateLockDepth(
                 BaseLock.Pending, BaseLock.Active, escrowKey.lockState
             );
@@ -463,50 +430,26 @@ contract SafetyChecks is BitStuff {
             // no approved callers during verification
             escrowKey.approvedCaller = address(0);
 
-            // handle the verification delegatecall case
-            if (_delegateVerification(stagingCall.callConfig)) {
-                
-                // Set the lock depth for searcher safety checks and store it
-                escrowKey.lockState = _updateLockDepth(
-                    BaseLock.DelegatingCall, BaseLock.Active, escrowKey.lockState
-                );
-                _escrowKey = escrowKey;
+            // Set the lock depth for searcher safety checks and store it
+            escrowKey.lockState = _updateLockDepth(
+                BaseLock.Untrusted, BaseLock.Active, escrowKey.lockState
+            );
+            _escrowKey = escrowKey;
 
-                IExecutionEnvironment(
-                    msg.sender
-                ).delegateVerificationWrapper(
-                    stagingCall,
-                    stagingData,
-                    userReturnData
-                );
+            _; 
 
-                // Set the lock depth to pending for final release
-                escrowKey.lockState = _updateLockDepth(
-                    BaseLock.Pending, BaseLock.DelegatingCall, escrowKey.lockState
-                );
-            
-            // handle the verification regular call case
-            } else {
+            escrowKey = _escrowKey;
 
-                // Set the lock depth for searcher safety checks and store it
-                escrowKey.lockState = _updateLockDepth(
-                    BaseLock.Untrusted, BaseLock.Active, escrowKey.lockState
-                );
-                _escrowKey = escrowKey;
+            // reverify a few things 
+            require(escrowKey.approvedCaller == address(0), "ERR-E31 InvalidApprovedCaller");
+            require(_isLockDepth(BaseLock.Untrusted, escrowKey.lockState), "ERR-E30 InvalidLockDepth");
+            require(_isExecutionPhase(ExecutionPhase.Verification, escrowKey.lockState), "ERR-E32 NotVerification");
+            require(escrowKey.callIndex == escrowKey.callMax, "ERR-E35 InvalidIndex");
 
-                IExecutionEnvironment(
-                    msg.sender
-                ).callVerificationWrapper(
-                    stagingCall,
-                    stagingData,
-                    userReturnData
-                );
-
-                // Set the lock depth to pending for final release
-                escrowKey.lockState = _updateLockDepth(
-                    BaseLock.Pending, BaseLock.Untrusted, escrowKey.lockState
-                );
-            }
+            // Set the lock depth to pending for final release
+            escrowKey.lockState = _updateLockDepth(
+                BaseLock.Pending, BaseLock.Untrusted, escrowKey.lockState
+            );
         }
 
         // set the next caller (the factory, finally), update the stage, and store it.
@@ -516,6 +459,15 @@ contract SafetyChecks is BitStuff {
         );
         _escrowKey = escrowKey;
     }
+
+      //////////////////////////////////
+     ////////////  GETTERS  ///////////
+    //////////////////////////////////
+
+    function approvedCaller() external view returns (address) {
+        return _escrowKey.approvedCaller;
+    }
+
 
       //////////////////////////////////
      //////////// BIT MATH ////////////

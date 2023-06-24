@@ -6,7 +6,7 @@ import { IAtlas } from "../interfaces/IAtlas.sol";
 import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
 
 import {
-    StagingCall,
+    ProtocolCall,
     UserCall,
     PayeeData,
     SearcherCall,
@@ -32,17 +32,19 @@ contract SketchyStorageEnvironment is ExecutionEnvironment{
 
     address public immutable factory;
     address public immutable escrow;
+    uint256 public immutable protocolShare;
 
     constructor(
-        uint16 _protocolShare, 
+        uint256 _protocolShare, 
         address _escrow
     ) ExecutionEnvironment(true, _protocolShare, _escrow) {
         factory = msg.sender;
         escrow = _escrow;
+        protocolShare = _protocolShare;
     }
 
     function metacall(
-        StagingCall calldata stagingCall, // supplied by frontend
+        ProtocolCall calldata protocolCall, // supplied by frontend
         UserCall calldata userCall, // set by user
         PayeeData[] calldata payeeData, // supplied by frontend
         SearcherCall[] calldata searcherCalls, // supplied by FastLane via frontend integration
@@ -53,7 +55,9 @@ contract SketchyStorageEnvironment is ExecutionEnvironment{
         // This allows signature data to be stored, which helps prevent 
         // replay attacks.
         (bool invalidCall, ProtocolData memory protocolData) = IAtlas(factory).untrustedVerifyProtocol(
-            verification, userCall.to
+            userCall.to,
+            searcherCalls.length,
+            verification
         );
 
         if (!invalidCall) {
@@ -78,7 +82,7 @@ contract SketchyStorageEnvironment is ExecutionEnvironment{
         (bool callSuccess, bytes memory data) = address(this).delegatecall(
             abi.encodeWithSelector(
                 ExecutionEnvironment.protoCall.selector, 
-                stagingCall,
+                protocolCall,
                 userCall,
                 payeeData,
                 searcherCalls
@@ -101,10 +105,12 @@ contract SketchyStorageEnvironment is ExecutionEnvironment{
 
         // release the locks
         IAtlas(factory).untrustedReleaseLock(
-            keccack256(
-                userCallHash,
-                verification.proof.protocolDataHash,
-                searcherChainHash
+            keccak256(
+                abi.encode(
+                    userCallHash,
+                    verification.proof.protocolDataHash,
+                    searcherChainHash
+                )
             )
         );
     }

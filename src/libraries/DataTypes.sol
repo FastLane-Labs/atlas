@@ -51,7 +51,7 @@ enum SearcherSafety {
     Verified
 }
 
-struct SearcherProof {
+struct CallChainProof {
     bytes32 previousHash;
     bytes32 targetHash;
     bytes32 userCallHash;
@@ -94,8 +94,7 @@ enum BaseLock {
     Unlocked,
     Pending,
     Active,
-    Untrusted,
-    DelegatingCall
+    Untrusted
 }
 
 enum ExecutionPhase {
@@ -115,19 +114,9 @@ enum ExecutionPhase {
 /// @param stagingSelector func selector to call
 /// @dev This is set by the front end!
 /// @dev The stagingSelector's argument types must match the user's call's argument types to properly stage the meta tx.
-struct StagingCall { 
-    address stagingTo;
-    address verificationTo;
+struct ProtocolCall { 
+    address to;
     uint16 callConfig;
-    bytes4 stagingSelector;
-    bytes4 verificationSelector;
-    bytes32 userCallHash; // hash of user EOA and calldata, for verification of user's tx (if not matched, searcher wont be charged for gas)
-    
-    // TODO: allow option for protocol frontends (via relay) to sign this data to prevent hostile users 
-    // from tampering w/ it
-    // NOTE: protocols opting to sign the staging call should be strongly discouraged from doing so as 
-    // the necessity for staging data to be trustless would also imply the existence of attack vectors
-    // that could potentially be accessed by other means. (might be useful for CLOBs tho)
 }
 
 struct UserCall {

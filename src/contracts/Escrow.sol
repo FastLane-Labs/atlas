@@ -11,21 +11,21 @@ import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 
 import { SafetyChecks } from "./SafetyChecks.sol";
-import { EscrowExecution } from "./CallExecution.sol";
+import { SearcherWrapper } from "./SearcherWrapper.sol";
 import { FastLaneDataTypes } from "../libraries/DataTypes.sol";
 import { FastLaneErrorsEvents } from "./Emissions.sol";
 import { BitStuff } from "./BitStuff.sol"; 
 
 import {
     SearcherEscrow,
-    SearcherProof,
+    CallChainProof,
     SEARCHER_TYPE_HASH,
     SearcherOutcome,
     SearcherCall,
     SearcherMetaTx,
     BidData,
     SearcherSafety,
-    StagingCall,
+    ProtocolCall,
     PayeeData,
     UserCall,
     EscrowKey,
@@ -33,7 +33,7 @@ import {
     BaseLock
 } from "../libraries/DataTypes.sol";
 
-contract Escrow is EIP712, SafetyChecks, EscrowExecution, FastLaneErrorsEvents, IEscrow {
+contract Escrow is EIP712, SafetyChecks, SearcherWrapper, IEscrow {
     using ECDSA for bytes32;
 
     uint32 immutable public escrowDuration;
@@ -50,63 +50,41 @@ contract Escrow is EIP712, SafetyChecks, EscrowExecution, FastLaneErrorsEvents, 
 
     constructor(
         uint32 escrowDurationFromFactory
-    ) SafetyChecks(msg.sender) EIP712("ProtoCallHandler", "0.0.1") 
+    ) SafetyChecks(msg.sender) EIP712("ProtoCallHandler", "0.0.1")
     {
         escrowDuration = escrowDurationFromFactory; 
     }
 
     function executeStagingCall(
-        SearcherProof memory proof,
-        StagingCall calldata stagingCall,
+        CallChainProof memory proof,
+        ProtocolCall calldata protocolCall,
         bytes calldata userCallData
-    ) external stagingLock(stagingCall.callConfig) returns (bytes memory stagingData) {
-        
-        if (_delegateStaging(stagingCall.callConfig)) {
-            stagingData = ICallExecution(
-                msg.sender
-            ).delegateStagingWrapper(
-                proof,
-                stagingCall,
-                userCallData
-            );
-
-        } else {
-            stagingData = ICallExecution(
-                payable(msg.sender) // NOTE: msg.value might be different from userCall.value
-            ).callStagingWrapper(
-                proof,
-                stagingCall,
-                userCallData
-            );
-        }
+    ) external stagingLock(protocolCall.callConfig) returns (
+        bytes memory stagingReturnData
+    ) {
+        stagingReturnData = ICallExecution(msg.sender).stagingWrapper(
+            proof,
+            protocolCall.to,
+            userCallData
+        );
     }
 
     function executeUserCall(
-        SearcherProof memory proof,
-        uint16 callConfig,
+        CallChainProof memory proof,
+        ProtocolCall calldata protocolCall,
+        bytes memory stagingReturnData,
         UserCall calldata userCall
-    ) external userLock(callConfig) returns (bytes memory userReturnData) {
-        
-        if (_delegateUser(callConfig)) {
-            userReturnData = ICallExecution(
-                msg.sender
-            ).delegateUserWrapper(
-                proof, 
-                userCall
-            );
-
-        } else {
-            userReturnData = ICallExecution( // TODO: {value: userCall.value}
-                msg.sender // NOTE: uses the userCall.value for setting, balance is held on execution environment
-            ).callUserWrapper(
-                proof,
-                userCall
-            );
-        }
+    ) external userLock(protocolCall.callConfig) returns (bytes memory userReturnData) {
+        userReturnData = ICallExecution(msg.sender).userWrapper(
+            proof, 
+            protocolCall.to,
+            stagingReturnData,
+            userCall
+        );
     }
 
     function executeSearcherCall(
-        SearcherProof memory proof,
+        CallChainProof memory proof,
         uint256 gasWaterMark,
         bool auctionAlreadyComplete,
         SearcherCall calldata searcherCall
@@ -193,12 +171,23 @@ contract Escrow is EIP712, SafetyChecks, EscrowExecution, FastLaneErrorsEvents, 
     }
 
     function executePayments(
-        uint256 protocolShare,
+        ProtocolCall calldata protocolCall,
         BidData[] calldata winningBids,
         PayeeData[] calldata payeeData
     ) external paymentsLock {
         // process protocol payments
-        ICallExecution(msg.sender).disbursePayments(protocolShare, winningBids, payeeData);
+        ICallExecution(msg.sender).allocateRewards(protocolCall.to, winningBids, payeeData);
+        // TODO: who should pay gas cost of payments?
+    } 
+
+    function executeVerificationCall(
+        CallChainProof memory proof,
+        ProtocolCall calldata protocolCall,
+        bytes memory stagingReturnData, 
+        bytes memory userReturnData
+    ) external verificationLock(protocolCall.callConfig) {
+        // process protocol payments
+        ICallExecution(msg.sender).verificationWrapper(proof, protocolCall.to, stagingReturnData, userReturnData);
         // TODO: who should pay gas cost of payments?
     } 
 
@@ -343,6 +332,23 @@ contract Escrow is EIP712, SafetyChecks, EscrowExecution, FastLaneErrorsEvents, 
         }
     }
 
+    function _getSearcherHash(SearcherMetaTx calldata metaTx) internal pure returns (bytes32 searcherHash) {
+        return keccak256(
+            abi.encode(
+                SEARCHER_TYPE_HASH, 
+                metaTx.from, 
+                metaTx.to, 
+                metaTx.value, 
+                metaTx.gas, 
+                metaTx.nonce,
+                metaTx.userCallHash,
+                metaTx.maxFeePerGas,
+                metaTx.bidsHash,
+                keccak256(metaTx.data)
+            )
+        );
+    }
+
     // TODO: make a more thorough version of this
     function _verifySignature(
         SearcherMetaTx calldata metaTx, 
@@ -350,20 +356,7 @@ contract Escrow is EIP712, SafetyChecks, EscrowExecution, FastLaneErrorsEvents, 
     ) internal view returns (bool) {
         
         address signer = _hashTypedDataV4(
-            keccak256(
-                abi.encode(
-                    SEARCHER_TYPE_HASH, 
-                    metaTx.from, 
-                    metaTx.to, 
-                    metaTx.value, 
-                    metaTx.gas, 
-                    metaTx.nonce,
-                    metaTx.userCallHash,
-                    metaTx.maxFeePerGas,
-                    metaTx.bidsHash,
-                    keccak256(metaTx.data)
-                )
-            )
+            _getSearcherHash(metaTx)
         ).recover(signature);
         
         return signer == metaTx.from;

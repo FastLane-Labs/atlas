@@ -4,7 +4,7 @@ pragma solidity ^0.8.16;
 import { IAtlas } from "../interfaces/IAtlas.sol";
 
 import { Escrow } from "./Escrow.sol";
-import { Factory } from "./Factory.sol";
+import { FastLaneFactory } from "./Factory.sol";
 import { ProtocolVerifier } from "./ProtocolVerification.sol";
 
 import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
@@ -13,7 +13,7 @@ import { SketchyStorageEnvironment } from "./SketchyStorage.sol";
 import "openzeppelin-contracts/contracts/access/Ownable.sol";
 
 import {
-    StagingCall,
+    ProtocolCall,
     UserCall,
     PayeeData,
     SearcherCall,
@@ -21,17 +21,17 @@ import {
     Verification
 } from "../libraries/DataTypes.sol";
 
-contract Atlas is Factory, ProtocolVerifier {
+contract Atlas is FastLaneFactory, ProtocolVerifier {
 
     bytes32 internal _dirtyLock;
 
     constructor(
         address _fastlanePayee,
         uint32 _escrowDuration
-    ) Factory(_fastlanePayee, _escrowDuration) {}
+    ) FastLaneFactory(_fastlanePayee, _escrowDuration) {}
 
     function metacall(
-        StagingCall calldata stagingCall, // supplied by frontend
+        ProtocolCall calldata protocolCall, // supplied by frontend
         UserCall calldata userCall, // set by user
         PayeeData[] calldata payeeData, // supplied by frontend
         SearcherCall[] calldata searcherCalls, // supplied by FastLane via frontend integration
@@ -43,7 +43,7 @@ contract Atlas is Factory, ProtocolVerifier {
         // This allows signature data to be stored, which helps prevent 
         // replay attacks.
         (bool invalidCall, ProtocolData memory protocolData) = _verifyProtocol(
-            verification, userCall.to
+            userCall.to, verification
         );
         if (!invalidCall) {
             return;
@@ -84,7 +84,7 @@ contract Atlas is Factory, ProtocolVerifier {
         // handoff to the execution environment, which returns the verified
         // userCallHash and the final hash of the searcher chain. 
         (bytes32 userCallHash, bytes32 searcherChainHash) = _executionEnvironment.protoCall(
-            stagingCall,
+            protocolCall,
             userCall,
             payeeData,
             searcherCalls
@@ -106,10 +106,11 @@ contract Atlas is Factory, ProtocolVerifier {
 
     function untrustedVerifyProtocol(
         address userCallTo,
+        uint256 searcherCallsLength,
         Verification calldata verification
     ) external nonReentrant returns (bool invalidCall, ProtocolData memory protocolData) {
 
-        require(msg.sender == DIRTY_ADDRESS, "ERR-H03 InvalidCaller");
+        require(msg.sender == dirtyAddress, "ERR-H03 InvalidCaller");
         
         (invalidCall, protocolData) = _verifyProtocol(userCallTo, verification);
 
@@ -119,14 +120,16 @@ contract Atlas is Factory, ProtocolVerifier {
 
         // Initialize the escrow locks
         _escrowContract.initializeEscrowLocks(
-            address(DIRTY_ADDRESS),
-            uint8(searcherCalls.length)
+            address(dirtyAddress),
+            uint8(searcherCallsLength)
         );
 
         _dirtyLock = keccak256(
-            verification.proof.userCallHash,
-            verification.proof.protocolDataHash,
-            verification.proof.searcherChainHash
+            abi.encode(
+                verification.proof.userCallHash,
+                verification.proof.protocolDataHash,
+                verification.proof.searcherChainHash
+            )
         );
     }
 

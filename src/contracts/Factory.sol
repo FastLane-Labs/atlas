@@ -9,29 +9,24 @@ import { Escrow } from "./Escrow.sol";
 import { SketchyStorageEnvironment } from "./SketchyStorage.sol";
 import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
 
+import {
+    ProtocolData
+} from "../libraries/DataTypes.sol";
+
 contract FastLaneFactory is Ownable, ReentrancyGuard {
+
+    uint256 constant public PROTOCOL_SHARE = 5;
 
     uint32 immutable public escrowDuration;
     address immutable public fastLanePayee;
 
-    bytes32 constant internal _DIRTY_SALT = keccak256(
-        abi.encodePacked(
-            block.chainid,
-            escrowAddress,
-            "UntrustedExecutionEnvironment", 
-            address(this)
-        )
-    );
+    Escrow internal _escrowContract = new Escrow(uint32(64));
 
-    FastLaneEscrow internal _escrowContract = new FastLaneEscrow(uint32(64));
+    address immutable public escrowAddress;
 
-    address constant public ESCROW_ADDRESS = address(_escrowContract);
+    bytes32 immutable internal _dirtySalt;
 
-    SketchyStorageEnvironment internal _dirtyContract = new SketchyStorageEnvironment{
-        salt: _DIRTY_SALT
-    }(ESCROW_ADDRESS);
-
-    address constant public DIRTY_ADDRESS = address(_dirtyContract);
+    address immutable public dirtyAddress;
 
     constructor(
             address _fastlanePayee,
@@ -40,14 +35,31 @@ contract FastLaneFactory is Ownable, ReentrancyGuard {
     ) {
         fastLanePayee = _fastlanePayee;
         escrowDuration = _escrowDuration;
+
+        escrowAddress = address(_escrowContract);
+
+        _dirtySalt = keccak256(
+            abi.encodePacked(
+                block.chainid,
+                escrowAddress,
+                "UntrustedExecutionEnvironment", 
+                address(this)
+            )
+        );
+
+        SketchyStorageEnvironment _dirtyContract = new SketchyStorageEnvironment{
+            salt: _dirtySalt
+        }(PROTOCOL_SHARE, escrowAddress);
+
+        dirtyAddress = address(_dirtyContract);
     }
 
     // TODO: Consider limiting who can call this
     function revive() external {
-        if (DIRTY_ADDRESS.codehash == bytes(0)) {
-            _dirtyContract = new SketchyStorageEnvironment{
-                salt: _DIRTY_SALT
-            }(ESCROW_ADDRESS);
+        if (dirtyAddress.codehash == bytes32(0)) {
+            new SketchyStorageEnvironment{
+                salt: _dirtySalt
+            }(PROTOCOL_SHARE, escrowAddress);
         }
     }
 
@@ -78,7 +90,7 @@ contract FastLaneFactory is Ownable, ReentrancyGuard {
         ))))); 
     }
 
-    function _getDirtyAddress() internal view returns (address dirtyAddress) {
+    function _getDirtyAddress() internal view returns (address) {
         return dirtyAddress;
     }
 

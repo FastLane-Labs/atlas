@@ -3,11 +3,11 @@ pragma solidity ^0.8.16;
 
 import {
     SearcherCall,
-    StagingCall,
+    ProtocolCall,
     BidData,
     PayeeData,
     UserCall,
-    SearcherProof,
+    CallChainProof,
     SearcherEscrow
 } from "../libraries/DataTypes.sol";
 
@@ -21,28 +21,36 @@ interface IEscrow {
     }
 
     function executeStagingCall(
-        SearcherProof memory proof,
-        StagingCall calldata stagingCall,
+        CallChainProof memory proof,
+        ProtocolCall calldata protocolCall,
         bytes calldata userCallData
-    ) external returns (bytes memory stagingData);
+    ) external returns (bytes memory stagingReturnData);
 
     function executeUserCall(
-        SearcherProof memory proof,
-        uint16 callConfig,
+        CallChainProof memory proof,
+        ProtocolCall calldata protocolCall,
+        bytes memory stagingReturnData,
         UserCall calldata userCall
     ) external returns (bytes memory userReturnData);
 
     function executeSearcherCall(
-        SearcherProof memory proof,
+        CallChainProof memory proof,
         uint256 gasWaterMark,
         bool auctionAlreadyComplete,
         SearcherCall calldata searcherCall
     ) external payable returns (bool);
 
     function executePayments(
-        uint256 protocolShare,
+        ProtocolCall calldata protocolCall,
         BidData[] calldata winningBids,
         PayeeData[] calldata payeeData
+    ) external;
+
+    function executeVerificationCall(
+        CallChainProof memory proof,
+        ProtocolCall calldata protocolCall,
+        bytes memory stagingReturnData, 
+        bytes memory userReturnData
     ) external;
 
     function executeUserRefund(

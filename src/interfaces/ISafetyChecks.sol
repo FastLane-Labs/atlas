@@ -2,16 +2,18 @@
 pragma solidity ^0.8.16;
 
 import {
-    StagingCall,
+    ProtocolCall,
     UserCall,
-    SearcherProof,
+    CallChainProof,
     SearcherCall
 } from "../libraries/DataTypes.sol";
 
 interface ISafetyChecks {
     function handleVerification(
-        StagingCall calldata stagingCall,
+        ProtocolCall calldata protocolCall,
         bytes memory stagingData,
         bytes memory userReturnData
-    ) external
+    ) external;
+
+    function approvedCaller() external view returns (address);
 }

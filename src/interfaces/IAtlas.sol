@@ -2,7 +2,7 @@
 pragma solidity ^0.8.16;
 
 import {
-    StagingCall,
+    ProtocolCall,
     UserCall,
     PayeeData,
     SearcherCall,
@@ -12,7 +12,7 @@ import {
 
 interface IAtlas {
     function metacall(
-        StagingCall calldata stagingCall, // supplied by frontend
+        ProtocolCall calldata protocolCall, // supplied by frontend
         UserCall calldata userCall,
         PayeeData[] calldata payeeData, // supplied by frontend
         SearcherCall[] calldata searcherCalls // supplied by FastLane via frontend integration
@@ -20,6 +20,7 @@ interface IAtlas {
 
     function untrustedVerifyProtocol(
         address userCallTo,
+        uint256 searcherCallsLength,
         Verification calldata verification
     ) external returns (bool, ProtocolData memory);
 

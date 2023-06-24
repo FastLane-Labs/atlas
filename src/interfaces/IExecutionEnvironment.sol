@@ -2,7 +2,7 @@
 pragma solidity ^0.8.16;
 
 import {
-    StagingCall,
+    ProtocolCall,
     UserCall,
     PayeeData,
     SearcherCall,
@@ -15,12 +15,12 @@ import {
 interface IExecutionEnvironment {
 
     function delegateStagingWrapper(
-        StagingCall calldata stagingCall,
+        ProtocolCall calldata protocolCall,
         bytes calldata userCallData
     ) external returns (bytes memory stagingData);
 
     function callStagingWrapper(
-        StagingCall calldata stagingCall,
+        ProtocolCall calldata protocolCall,
         bytes calldata userCallData
     ) external returns (bytes memory stagingData);
 
@@ -33,13 +33,13 @@ interface IExecutionEnvironment {
     ) external returns (bytes memory userReturnData);
 
     function callVerificationWrapper(
-        StagingCall calldata stagingCall,
+        ProtocolCall calldata protocolCall,
         bytes memory stagingData, 
         bytes memory userReturnData
     ) external;
 
     function delegateVerificationWrapper(
-        StagingCall calldata stagingCall,
+        ProtocolCall calldata protocolCall,
         bytes memory stagingData, 
         bytes memory userReturnData
     ) external;

@@ -9,12 +9,14 @@ import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 import { FastLaneErrorsEvents } from "./Emissions.sol";
 import { BitStuff } from "./BitStuff.sol"; 
 
+import { CallVerification } from "../libraries/CallVerification.sol";
+import { ExecutionControl } from "../libraries/ExecutionControl.sol";
+
 import {
-    SearcherProof,
+    CallChainProof,
     SearcherOutcome,
     SearcherCall,
     SearcherMetaTx,
-    StagingCall,
     BidData,
     PayeeData,
     PaymentData,
@@ -22,243 +24,85 @@ import {
     CallConfig
 } from "../libraries/DataTypes.sol";
 
-string constant SEARCHER_BID_UNPAID = "SearcherBidUnpaid";
-bytes32 constant _SEARCHER_BID_UNPAID = keccak256(abi.encodePacked(SEARCHER_BID_UNPAID));
 
-string constant SEARCHER_MSG_VALUE_UNPAID = "SearcherMsgValueNotRepaid";
-bytes32 constant _SEARCHER_MSG_VALUE_UNPAID = keccak256(abi.encodePacked(SEARCHER_MSG_VALUE_UNPAID));
-
-string constant SEARCHER_CALL_REVERTED = "SearcherCallReverted";
-bytes32 constant _SEARCHER_CALL_REVERTED = keccak256(abi.encodePacked(SEARCHER_CALL_REVERTED));
-
-string constant ALTERED_USER_HASH = "AlteredUserCalldataHash";
-bytes32 constant _ALTERED_USER_HASH = keccak256(abi.encodePacked(ALTERED_USER_HASH));
-
-string constant INVALID_SEARCHER_HASH = "InvalidSearcherCalldataHash";
-bytes32 constant _INVALID_SEARCHER_HASH = keccak256(abi.encodePacked(INVALID_SEARCHER_HASH));
-
-string constant HASH_CHAIN_BROKEN = "CalldataHashChainMismatch";
-bytes32 constant _HASH_CHAIN_BROKEN = keccak256(abi.encodePacked(HASH_CHAIN_BROKEN));
-
-// string constant SEARCHER_ETHER_BID_UNPAID = "SearcherMsgValueNotRepaid";
-// bytes32 constant _SEARCHER_ETHER_BID_UNPAID = keccak256(abi.encodePacked(SEARCHER_ETHER_BID_UNPAID));
-
-library CallChain {
-    function next(SearcherProof memory self, bytes32[] memory executionHashChain) internal pure returns (SearcherProof memory) {
-        unchecked { ++self.index; }
-        self.previousHash = self.targetHash;
-        self.targetHash = executionHashChain[self.index];
-        return self;
-    }
-
-    function prove(SearcherProof memory self, address from, bytes memory data, bool isDelegated) internal pure {
-        require(self.targetHash == keccak256(
-                abi.encodePacked(
-                    self.previousHash,
-                    from,
-                    data,
-                    isDelegated, 
-                    self.index
-                )
-            ), HASH_CHAIN_BROKEN
-        );
-    }
-}
-
-contract EscrowExecution is BitStuff {
-
-    function _searcherCallWrapper(
-        SearcherProof memory proof,
-        uint256 gasLimit,
-        SearcherCall calldata searcherCall
-    ) internal returns (SearcherOutcome, uint256) {
-        // Called by the escrow contract, with msg.sender as the execution environment
-
-        // Call the execution environment
-        try ICallExecution(msg.sender).searcherMetaTryCatch(
-            proof, gasLimit, searcherCall
-        ) returns (uint256 searcherValueTransfer) {
-            return (SearcherOutcome.Success, searcherValueTransfer);
-        
-        // TODO: implement cheaper way to do this
-        } catch Error(string memory err)  {
-            
-            bytes32 errorSwitch = keccak256(abi.encodePacked(err));
-
-            if (errorSwitch == _SEARCHER_BID_UNPAID) {
-                return (SearcherOutcome.BidNotPaid, 0);
-
-            } else if (errorSwitch == _SEARCHER_MSG_VALUE_UNPAID) {
-                return (SearcherOutcome.CallValueTooHigh, 0);
-            
-            } else if (errorSwitch == _SEARCHER_CALL_REVERTED) {
-                return (SearcherOutcome.CallReverted, 0);
-
-            } else if (errorSwitch == _ALTERED_USER_HASH) {
-                return (SearcherOutcome.InvalidUserHash, 0);
-            
-            } else if (errorSwitch == _HASH_CHAIN_BROKEN) {
-                return (SearcherOutcome.InvalidSequencing, 0);
-
-            } else {
-                return (SearcherOutcome.UnknownError, 0);
-            }
-
-        } catch {
-            return (SearcherOutcome.CallReverted, 0);
-        }
-    }
-}
-
-contract CallExecution is BitStuff {
-    using CallChain for SearcherProof;
+contract CallExecution is BitStuff, FastLaneErrorsEvents {
+    using CallVerification for CallChainProof;
 
     address immutable internal _escrow;
+    address immutable internal _payee;
 
-    constructor(address escrow) {
+    uint256 immutable internal _payeeShare;
+
+    constructor(address escrow, address payee, uint256 payeeShare) {
         _escrow = escrow;
+        _payee = payee;
+        _payeeShare = payeeShare;
     }
 
     // TODO: this would be the FastLane address - fill in. 
     address constant public FEE_RECIPIENT = address(0); 
 
-    function callStagingWrapper(
-        SearcherProof memory proof,
-        StagingCall calldata stagingCall,
-        bytes calldata userCallData
-    ) external payable returns (bytes memory stagingData) {
-        // This must be called by the escrow contract to make sure the locks cant
-        // be tampered with
-
-        require(msg.sender == _escrow, "ERR-DCW00 InvalidSenderStaging");
-        
-        bytes memory data = bytes.concat(stagingCall.stagingSelector, userCallData);
-
-        proof.prove(stagingCall.stagingTo, data, false);
-
-        bool callSuccess;
-        (callSuccess, stagingData) = stagingCall.stagingTo.call{
-            value: _fwdValueStaging(stagingCall.callConfig) ? msg.value : 0 // if staging explicitly needs tx.value, handler doesn't forward it
-        }(
-            data
-        );
-        require(callSuccess, "ERR-H02 CallStaging");
-    }
-
-    function delegateStagingWrapper(
-        SearcherProof memory proof,
-        StagingCall calldata stagingCall,
+    function stagingWrapper(
+        CallChainProof memory proof,
+        address protocolControl,
         bytes calldata userCallData
     ) external returns (bytes memory stagingData) {
-        // This must be called by the escrow contract to make sure the locks cant
-        // be tampered with
-        require(msg.sender == _escrow, "ERR-DCW00 InvalidSenderStaging");
+        // Executed by the ExecutionEnvironment
+        
+        // This must be called by the escrow contract to ensure the locks are locked
+        require(msg.sender == _escrow, "ERR-CE00 InvalidSenderStaging");
 
-        bytes memory data = bytes.concat(stagingCall.stagingSelector, userCallData);
+        stagingData = ExecutionControl.stage(proof, protocolControl, userCallData);
 
-        proof.prove(stagingCall.stagingTo, data, true);
-
-        bool callSuccess;
-        (callSuccess, stagingData) = stagingCall.stagingTo.delegatecall(
-            bytes.concat(stagingCall.stagingSelector, userCallData)
-        );
-        require(callSuccess, "ERR-DCW01 DelegateStaging");
     }
 
-    function callUserWrapper(
-        SearcherProof memory proof,
+    function userWrapper(
+        CallChainProof memory proof,
+        address protocolControl,
+        bytes memory stagingReturnData,
         UserCall calldata userCall
     ) external payable returns (bytes memory userReturnData) {
-        // This must be called by the escrow contract to make sure the locks cant
-        // be tampered with
+        // Executed by the ExecutionEnvironment
 
-        require(msg.sender == _escrow, "ERR-DCW00 InvalidSenderStaging");
+        // This must be called by the escrow contract to ensure the locks are locked
+        require(msg.sender == _escrow, "ERR-CE00 InvalidSenderStaging");
 
-        proof.prove(userCall.from, userCall.data, false);
-
-        bool callSuccess;
-        (callSuccess, userReturnData) = userCall.to.call{
-            value: userCall.value,
-            gas: userCall.gas
-        }(userCall.data);
-        require(callSuccess, "ERR-03 UserCall");
+        userReturnData = ExecutionControl.user(proof, protocolControl, stagingReturnData, userCall);
     }
 
-    function delegateUserWrapper(
-        SearcherProof memory proof,
-        UserCall calldata userCall
-    ) external returns (bytes memory userReturnData) {
-        // This must be called by the escrow contract to make sure the locks cant
-        // be tampered with
-
-        require(msg.sender == _escrow, "ERR-DCW00 InvalidSenderStaging");
-
-        proof.prove(userCall.from, userCall.data, true);
-
-        bool callSuccess;
-        (callSuccess, userReturnData) = userCall.to.delegatecall{
-            // NOTE: no value forwarding for delegatecall
-            gas: userCall.gas
-        }(userCall.data);
-        require(callSuccess, "ERR-03 UserCall");
-    }
-
-    function callVerificationWrapper(
-        StagingCall calldata stagingCall,
-        bytes memory stagingData, 
+    function verificationWrapper(
+        CallChainProof memory proof,
+        address protocolControl,
+        bytes memory stagingReturnData, 
         bytes memory userReturnData
     ) external {
-        // This must be called by the escrow contract to make sure the locks cant
-        // be tampered with.
-        // NOTE: stagingData is the returned data from the staging call.
-        // NOTE: userReturnData is the returned data from the user call
-        require(msg.sender == _escrow, "ERR-DCW02 InvalidSenderVerification");
+        // Executed by the ExecutionEnvironment
 
-        bool callSuccess;
-        (callSuccess,) = stagingCall.verificationTo.call{
-            // if verification explicitly needs tx.value, handler doesn't forward it
-            value: _fwdValueVerification(stagingCall.callConfig) ? address(this).balance : 0 
-        }(
-            abi.encodeWithSelector(stagingCall.verificationSelector, stagingData, userReturnData)
-        );
-        require(callSuccess, "ERR-07 CallVerification");
+        // This must be called by the escrow contract to ensure the locks are locked
+        require(msg.sender == _escrow, "ERR-CE00 InvalidSenderStaging");
+
+        ExecutionControl.verify(proof, protocolControl, stagingReturnData, userReturnData);
     }
 
-    function delegateVerificationWrapper(
-        StagingCall calldata stagingCall,
-        bytes memory stagingData, 
-        bytes memory userReturnData
-    ) external {
-        // This must be called by the escrow contract to make sure the locks cant
-        // be tampered with.
-        // NOTE: stagingData is the returned data from the staging call.
-        require(msg.sender == _escrow, "ERR-DCW02 InvalidSenderVerification");
-
-        bool callSuccess;
-        (callSuccess,) = stagingCall.verificationTo.delegatecall(
-            abi.encodeWithSelector(stagingCall.verificationSelector, stagingData, userReturnData)
-        );
-        require(callSuccess, "ERR-DCW03 DelegateVerification");
-    }
 
     function searcherMetaTryCatch(
-        SearcherProof memory proof,
+        CallChainProof memory proof,
         uint256 gasLimit,
         SearcherCall calldata searcherCall
-    ) external returns (uint256 searcherValueTransfer) {
+    ) external {
+        // Executed by the ExecutionEnvironment
 
         // Verify that it's the escrow contract calling
         require(msg.sender == _escrow, "ERR-04 InvalidCaller");
         require(
             address(this).balance == searcherCall.metaTx.value,
-            "ERR-05 IncorrectValue"
+            "ERR-CE05 IncorrectValue"
         );
 
         // Searcher may pay the msg.value back to the Escrow contract directly
         uint256 escrowEtherBalance = _escrow.balance;
 
-        // Initiate a memory array to track balances to measure if the
-        // bid amount is paid.
+        // track token balances to measure if the bid amount is paid.
         uint256[] memory tokenBalances = new uint[](searcherCall.bids.length);
         uint256 i;
         for (; i < searcherCall.bids.length;) {
@@ -304,135 +148,83 @@ contract CallExecution is BitStuff {
         require(success, SEARCHER_CALL_REVERTED);
 
         // Get the value delta from the escrow contract
-        // NOTE: reverting on underflow here is intended behavior
-        escrowEtherBalance -= _escrow.balance;
+        // NOTE: reverting on underflow here is intended behavior since the ExecutionEnviront address
+        // should have 0 value. 
+        uint256 escrowBalanceDelta = escrowEtherBalance - _escrow.balance;
 
         // Verify that the searcher repaid their msg.value
-        require(address(this).balance + escrowEtherBalance >= searcherCall.metaTx.value, SEARCHER_MSG_VALUE_UNPAID);
+        require(escrowBalanceDelta >= searcherCall.metaTx.value, SEARCHER_MSG_VALUE_UNPAID);
 
         // Verify that the searcher paid what they bid
         bool etherIsBidToken;
         i = 0;
         uint256 balance;
+
         for (; i < searcherCall.bids.length;) {
             
-            if (searcherCall.bids[i].token == address(0)) {
+            // ERC20 tokens as bid currency
+            if (!(searcherCall.bids[i].token == address(0))) {
 
-                etherIsBidToken = true;
-
-                // First, verify that the bid was paid
-                require(
-                    address(this).balance + escrowEtherBalance >= tokenBalances[i] + searcherCall.bids[i].bidAmount,
-                    SEARCHER_MSG_VALUE_UNPAID 
-                    // TODO: differentiate errors between value not being paid back
-                    // and a bid not being met.
-                );
-                
-                // Check if the the execution environment owes the escrow Ether.     
-                if (address(this).balance > tokenBalances[i] + searcherCall.bids[i].bidAmount) {
-                    // Send the excess back to the escrow since the searcher
-                    // may have flash borrowed from the contract
-
-                    searcherValueTransfer = 
-                        address(this).balance - (tokenBalances[i] + searcherCall.bids[i].bidAmount);
-                    
-                    SafeTransferLib.safeTransferETH(
-                        _escrow, 
-                        searcherValueTransfer
-                    );
-
-                    searcherValueTransfer = 0; // Set to 0 so that none is transferred back
-
-                // Need to transfer Ether from escrow to this contract to pay the bids
-                } else {
-                    searcherValueTransfer = 
-                        (tokenBalances[i] + searcherCall.bids[i].bidAmount) - address(this).balance;
-                }
-
-            } else {
                 balance = ERC20(searcherCall.bids[i].token).balanceOf(address(this));
                 // First, verify that the bid was paid
                 require(
                     balance >= tokenBalances[i] + searcherCall.bids[i].bidAmount,
                     SEARCHER_BID_UNPAID
                 );
+            
+
+            // Native Gas (Ether) as bid currency
+            } else {
+                etherIsBidToken = true;
+
+                balance = address(this).balance;
+                
+                // First, verify that the bid was paid
+                require(
+                    balance >= searcherCall.bids[i].bidAmount, // tokenBalances[i] = 0 for ether
+                    SEARCHER_BID_UNPAID 
+                );
+                
+                // TODO: Logic to check if the the execution environment owes the escrow Ether.     
+
+                tokenBalances[i] = balance; 
             }
 
             unchecked { ++i; }
         }
-        
-        // Handle Ether balances for case in which Ether is not a bid token
-        if (!etherIsBidToken) {
-            SafeTransferLib.safeTransferETH(
-                _escrow, 
-                address(this).balance
-            );
-        }
     }
 
-    function disbursePayments(
-        uint256 protocolShare,
-        BidData[] calldata bids,
+    function allocateRewards(
+        address protocolControl,
+        BidData[] memory bids, // Converted to memory
         PayeeData[] calldata payeeData
     ) external {
-        // NOTE: the relay/frontend will verify that the bid 
-        // and payments arrays are aligned
-        // NOTE: pour one out for the eth mainnet homies
-        // that'll need to keep their payee array short :(
-        
-        require(msg.sender == _escrow, "ERR-04 InvalidCaller");
-        // declare some vars to make this trainwreck less unreadable
-        PaymentData memory pmtData;
-        // ERC20 token;
-        address tokenAddress;
-        uint256 payment;
-        uint256 bidAmount;
-        uint256 remainder;
-        bool callSuccess;
 
-        uint256 i;
-        uint256 k;        
+        // NOTE: the relay/frontend will verify and sign that the bid 
+        // and payments arrays are aligned.  Could check here but.. gas costs :(
+        require(msg.sender == _escrow, "ERR-04 InvalidCaller");
+
+        uint256 totalEtherReward;
+        uint256 payment;
+        uint256 i;      
 
         for (; i < bids.length;) {
-            tokenAddress = bids[i].token;
-            bidAmount = bids[i].bidAmount;
-            remainder = bidAmount;
 
-            for (; k < payeeData[i].payments.length;) {
+            payment = (bids[i].bidAmount * _payeeShare) / 100;
 
-                pmtData = payeeData[i].payments[k];
-                
-                payment = bidAmount * pmtData.payeePercent / (100 + protocolShare);
-                remainder -= payment;
-
-                if (pmtData.pmtSelector != bytes4(0)) {
-                    // TODO: handle native token / ETH
-                    SafeTransferLib.safeTransfer(ERC20(tokenAddress), pmtData.payee, payment);
-                
-                } else {
-                    // TODO: formalize the args for this (or use bytes set by frontend?)
-                    // (it's (address, uint256) atm)
-                    // TODO: even tho we control the frontend which populates the payee
-                    // info, this is dangerous af and prob shouldn't be done this way
-                    // TODO: update lock for this
-                    (callSuccess,) = pmtData.payee.call(
-                        abi.encodeWithSelector(
-                            pmtData.pmtSelector, 
-                            bids[i].token,
-                            payment    
-                        )
-                    );
-                    require(callSuccess, "ERR-05 ProtoPmt");
-                }
-                
-                // Protocol Fee is remainder
-                // NOTE: this assumption does not work for native token / ETH
-                SafeTransferLib.safeTransfer(ERC20(tokenAddress), FEE_RECIPIENT, remainder);
-
-                unchecked{ ++k;}
+            if (bids[i].token != address(0)) {
+                SafeTransferLib.safeTransfer(ERC20(bids[i].token), _payee, payment);
+                totalEtherReward = payment; // NOTE: This is transferred to protocolControl as msg.value
+            
+            } else {
+                SafeTransferLib.safeTransferETH(_payee, payment);
             }
+
+            bids[i].bidAmount -= payment;
 
             unchecked{ ++i;}
         }
+
+        ExecutionControl.allocate(protocolControl, totalEtherReward, bids, payeeData);
     }
 }
