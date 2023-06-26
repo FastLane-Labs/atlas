@@ -26,32 +26,32 @@ import { ProtocolControl } from "../protocol-managed/ProtocolControl.sol";
 
 contract AtlasV4Hook {
 
+    struct StagingReturn {
+        address approvedToken;
+        PoolKey poolKey;
+    }
+
     bytes4 public constant SWAP = IPoolManager.swap.selector;
 
     address public immutable atlas;
     address public immutable hook;
     address public immutable v4Singleton;
-    PoolKey public immutable poolKey;
-    address public immutable token0;
-    address public immutable token1;
-    address public immutable executionEnvironment; 
+
+    PoolKey public poolKey;
+    address public executionEnvironment; 
     // NOTE: ExecutionEnvironment is created with CREATE2, allowing us to know
     // its address in advance. A new contract is created and selfdestructed for each
     // MEV auction to ensure that storage is clean. 
 
+
+
     constructor(
         address _atlas,
-        address _executionEnvironment,
-        address _v4Singleton,
-        PoolKey calldata _poolKey
+        address _v4Singleton
     ) {
-        atlas = atlasEscrow;
+        atlas = _atlas;
         hook = address(this);
-        executionEnvironment = _executionEnvironment;
         v4Singleton = _v4Singleton;
-        poolKey = _poolKey;
-        token0 = address(_poolKey.currency0);
-        token1 = address(_poolKey.currency1);
     }
 
       /////////////////////////////////////////////////////////
@@ -62,21 +62,51 @@ contract AtlasV4Hook {
     function _stageDelegateCall(
         bytes calldata data
     ) internal returns (bytes memory stagingData) {
+        // This function is delegatecalled 
+        // address(this) = ExecutionEnvironment
+        // msg.sender = Escrow
 
         UserCall memory userCall = abi.decode(data, (UserCall));
 
         require(bytes4(userCall.data[:4]) == SWAP, "ERR-H10 InvalidFunction");
+        require(userCall.to == v4Singleton, "ERR-H11 InvalidTo");
+
+        EscrowKey memory escrowKey = ISafetyLocks(atlas).getLockState();
+
+        // Verify that the swapper went through the FastLane Atlas MEV Auction
+        // and that ProtocolControl supplied a valid signature
+        require(address(this) == escrowKey.approvedCaller, "ERR-H01 InvalidCallee");
+        require(escrowKey.lockState == SafetyBits._LOCKED_X_STAGING_X_UNSET, "ERR-H02 InvalidLockStage");
 
         (
             PoolKey memory key, 
             SwapParams memory params
         ) = abi.decode(userCall.data[4:], (PoolKey, SwapParams));
         
+        poolKey = key;
+        executionEnvironment = msg.sender;
+
         // Handle forwarding of token approvals
-        // NOTE: The user will have approved the ExecutionEnvironment
-        // in a prior call
-        // TODO: Finish
-    
+        // NOTE: The user will have approved the ExecutionEnvironment in a prior call
+        
+        StagingReturn memory stagingReturn; // Empty for now
+
+        // TODO: Determine if optimistic transfers are possible
+        // (An example)
+        if (params.zeroForOne) {
+            if (params.amountSpecified > 0) {
+                // ERC20(token0).approve(v4Singleton, amountSpecified);
+                SafeTransferLib.safeTransferFrom(
+                    ERC20(token0), userCall.from, v4Singleton, amountSpecified
+                );
+
+                stagingReturn.approvedToken = token0;
+            }
+        }
+
+        stagingReturn.poolKey = key;
+
+        stagingData = abi.encode(stagingReturn);
     }
 
     // This occurs after a Searcher has successfully paid their bid, which is
@@ -142,7 +172,31 @@ contract AtlasV4Hook {
     function _verificationDelegateCall(
         bytes calldata data
     ) internal returns (bool) {
-        // TODO: Remove the token approvals granted during staging
+        // This function is delegatecalled 
+        // address(this) = ExecutionEnvironment
+        // msg.sender = Escrow
+       
+        (
+            bytes memory stagingReturnData,
+            bytes memory userReturnData
+        ) = abi.decode( 
+            data, 
+            (bytes, bytes)
+        );
+
+        StagingReturn memory stagingReturn = abi.decode(
+            stagingReturnData,
+            (StagingReturn)
+        );
+
+        // If token approvals were granted, rescind them here
+
+        // Run verification checks here
+
+        delete poolKey;
+        delete executionEnvironment;
+
+        return true;
     }
 
 
@@ -171,7 +225,7 @@ contract AtlasV4Hook {
         // msg.sender = ExecutionEnvironment
 
         EscrowKey memory escrowKey = ISafetyLocks(atlas).getLockState();
-
+        // isValidUserLock
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that ProtocolControl supplied a valid signature
         require(msg.sender == executionEnvironment, "ERR-H00 InvalidCaller");

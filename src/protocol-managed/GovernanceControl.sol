@@ -5,6 +5,7 @@ import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
 
 abstract contract GovernanceControl {
 
+    string internal constant NOT_IMPLEMENTED = "NOT IMPLEMENTED";
     // Virtual functions to be overridden by participating protocol governance 
     // (not FastLane) prior to deploying contract. Note that protocol governance
     // will "own" this contract but that it should be immutable.  
@@ -44,8 +45,10 @@ abstract contract GovernanceControl {
     // Protocol exposure: Trustless 
     // User exposure: Trustless 
     function _stageStaticCall(
-        bytes calldata data
-    ) internal view virtual returns (bytes memory stagingData);
+        bytes calldata
+    ) internal view virtual returns (bytes memory) {
+        revert(NOT_IMPLEMENTED);
+    }
 
 
 
@@ -78,8 +81,10 @@ abstract contract GovernanceControl {
     // dirty / malicious storage from previous calls. User would be exposed to high smart contract risk,
     // otherwise. 
     function _userLocalDelegateCall(
-        bytes memory data
-    ) internal virtual returns (bytes memory userReturnData);
+        bytes memory
+    ) internal virtual returns (bytes memory) {
+        revert(NOT_IMPLEMENTED);
+    }
 
     // _userLocalStandardCall
     // Details:
@@ -94,8 +99,10 @@ abstract contract GovernanceControl {
     // NOTE: There is a timelock on governance's ability to change the ProtocolControl contract
     // NOTE: Allowing this is ill-advised unless your reentry / locking system is flawless.
     function _userLocalStandardCall(
-        bytes memory data
-    ) internal virtual returns (bytes memory userReturnData);
+        bytes memory
+    ) internal virtual returns (bytes memory) {
+        revert(NOT_IMPLEMENTED);
+    }
     
       /////////////////////////////////////////////////////////
      //                  VERIFICATION                       //
@@ -115,8 +122,10 @@ abstract contract GovernanceControl {
     //      Container: Inside of the FastLane ExecutionEnvironment
     //      Access: Storage access (read+write) to the ExecutionEnvironment contract
     function _verificationDelegateCall(
-        bytes calldata data
-    ) internal virtual returns (bool);
+        bytes calldata
+    ) internal virtual returns (bool) {
+        revert(NOT_IMPLEMENTED); 
+    }
 
     // _verificationStaticCall
     // Details:
@@ -126,6 +135,8 @@ abstract contract GovernanceControl {
     //      Container: Inside of the ProtocolControl contract
     //      Access: Storage access (read only) to the ProtocolControl contract
     function _verificationStaticCall(
-        bytes calldata data
-    ) internal view virtual returns (bool);
+        bytes calldata
+    ) internal view virtual returns (bool) {
+        revert(NOT_IMPLEMENTED);
+    }
 }
