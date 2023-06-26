@@ -2,13 +2,6 @@
 pragma solidity ^0.8.16;
 
 import {
-    SearcherOutcome,
-    SearcherCall,
-    SearcherMetaTx,
-    BidData,
-    ProtocolCall,
-    UserCall,
-    CallConfig,
     EscrowKey,
     BaseLock,
     ExecutionPhase,
