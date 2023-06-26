@@ -5,10 +5,11 @@ import {
     ProtocolCall,
     UserCall,
     CallChainProof,
-    SearcherCall
+    SearcherCall,
+    EscrowKey
 } from "../libraries/DataTypes.sol";
 
-interface ISafetyChecks {
+interface ISafetyLocks {
     function handleVerification(
         ProtocolCall calldata protocolCall,
         bytes memory stagingData,
@@ -16,4 +17,6 @@ interface ISafetyChecks {
     ) external;
 
     function approvedCaller() external view returns (address);
+
+    function getLockState() external view returns (EscrowKey memory);
 }

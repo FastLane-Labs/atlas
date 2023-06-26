@@ -43,7 +43,7 @@ abstract contract MEVAllocator {
 
     // _allocateStandardCall
     // Details:
-    //  allocate/delegate = 
+    //  allocate/standard call = 
     //      Inputs: MEV Profits (ERC20 balances) and payeeData sourced by protocol frontend 
     //      Function: Executing the function set by ProtocolControl / MEVAllocator
     //      Container: Inside of the ProtocolControl contract

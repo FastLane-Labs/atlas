@@ -14,14 +14,14 @@ library SafetyBits {
     uint64 constant internal _EXECUTION_PHASE_OFFSET = uint64(type(BaseLock).max);
     uint64 constant internal _SAFETY_LEVEL_OFFSET = uint64(type(BaseLock).max) + uint64(type(ExecutionPhase).max);
 
-    uint64 constant internal _UNTRUSTED_X_SEARCHERS_X_REQUESTED = uint64(
-        1 << uint64(BaseLock.Untrusted) |
+    uint64 constant internal _LOCKED_X_SEARCHERS_X_REQUESTED = uint64(
+        1 << uint64(BaseLock.Locked) |
         1 << (_EXECUTION_PHASE_OFFSET + uint64(ExecutionPhase.SearcherCalls)) |
         1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Requested))
     );
 
-    uint64 constant internal _UNTRUSTED_X_SEARCHERS_X_VERIFIED = uint64(
-        1 << uint64(BaseLock.Untrusted) |
+    uint64 constant internal _LOCKED_X_SEARCHERS_X_VERIFIED = uint64(
+        1 << uint64(BaseLock.Locked) |
         1 << (_EXECUTION_PHASE_OFFSET + uint64(ExecutionPhase.SearcherCalls)) |
         1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Verified))
     );
@@ -38,8 +38,8 @@ library SafetyBits {
         1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Unset))
     );
 
-    uint64 constant internal _UNTRUSTED_X_STAGING_X_UNSET = uint64(
-        1 << uint64(BaseLock.Untrusted) |
+    uint64 constant internal _LOCKED_X_STAGING_X_UNSET = uint64(
+        1 << uint64(BaseLock.Locked) |
         1 << (_EXECUTION_PHASE_OFFSET + uint64(ExecutionPhase.Staging)) |
         1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Unset))
     );
@@ -50,8 +50,8 @@ library SafetyBits {
         1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Unset))
     );
 
-    uint64 constant internal _UNTRUSTED_X_USER_X_UNSET = uint64(
-        1 << uint64(BaseLock.Untrusted) |
+    uint64 constant internal _LOCKED_X_USER_X_UNSET = uint64(
+        1 << uint64(BaseLock.Locked) |
         1 << (_EXECUTION_PHASE_OFFSET + uint64(ExecutionPhase.UserCall)) |
         1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Unset))
     );
@@ -75,7 +75,7 @@ library SafetyBits {
     );
 
     uint64 constant internal _LOCK_PAYMENTS = uint64(
-        1 << uint64(BaseLock.Untrusted) |
+        1 << uint64(BaseLock.Locked) |
         1 << (_EXECUTION_PHASE_OFFSET + uint64(ExecutionPhase.HandlingPayments)) |
         1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Unset))
     );
@@ -92,8 +92,8 @@ library SafetyBits {
         1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Unset))
     );
 
-    uint64 constant internal _UNTRUSTED_X_VERIFICATION_X_UNSET = uint64(
-        1 << uint64(BaseLock.Untrusted) |
+    uint64 constant internal _LOCKED_X_VERIFICATION_X_UNSET = uint64(
+        1 << uint64(BaseLock.Locked) |
         1 << (_EXECUTION_PHASE_OFFSET + uint64(ExecutionPhase.Verification)) |
         1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Unset))
     );
@@ -112,7 +112,7 @@ library SafetyBits {
         EscrowKey memory self
     ) internal pure returns (bool) {
         return (
-            (self.lockState == _UNTRUSTED_X_VERIFICATION_X_UNSET) && 
+            (self.lockState == _LOCKED_X_VERIFICATION_X_UNSET) && 
             (self.approvedCaller == address(0)) && 
             (self.callIndex == self.callMax-2)
         );
@@ -121,7 +121,7 @@ library SafetyBits {
     function holdVerificationLock(
         EscrowKey memory self
     ) internal pure returns (EscrowKey memory) {
-        self.lockState = _UNTRUSTED_X_VERIFICATION_X_UNSET;
+        self.lockState = _LOCKED_X_VERIFICATION_X_UNSET;
         self.approvedCaller = address(0);
         return self;
     }
@@ -236,7 +236,7 @@ library SafetyBits {
         address searcherTo
     ) internal pure returns (bool) {
         return (
-            (self.lockState == _UNTRUSTED_X_SEARCHERS_X_VERIFIED) && 
+            (self.lockState == _LOCKED_X_SEARCHERS_X_VERIFIED) && 
             (self.approvedCaller == searcherTo)
         );
     }
@@ -245,7 +245,7 @@ library SafetyBits {
         EscrowKey memory self, 
         address nextSearcher
     ) internal pure returns (EscrowKey memory) {
-        self.lockState = _UNTRUSTED_X_SEARCHERS_X_REQUESTED;
+        self.lockState = _LOCKED_X_SEARCHERS_X_REQUESTED;
         self.approvedCaller = nextSearcher;
         return self;
     }
@@ -285,7 +285,7 @@ library SafetyBits {
     }
 
     function holdUserLock(EscrowKey memory self) internal pure returns (EscrowKey memory) {
-        self.lockState = _UNTRUSTED_X_USER_X_UNSET;
+        self.lockState = _LOCKED_X_USER_X_UNSET;
         self.approvedCaller = address(0);
         return self;
     }
@@ -312,9 +312,9 @@ library SafetyBits {
         return self;
     }
 
-    function holdStagingLock(EscrowKey memory self) internal pure returns (EscrowKey memory) {
-        self.lockState = _UNTRUSTED_X_STAGING_X_UNSET;
-        self.approvedCaller = address(0);
+    function holdStagingLock(EscrowKey memory self, address protocolControl) internal pure returns (EscrowKey memory) {
+        self.lockState = _LOCKED_X_STAGING_X_UNSET;
+        self.approvedCaller = protocolControl;
         return self;
     }
 
@@ -353,12 +353,12 @@ library SafetyBits {
     }
 
     function isValidSearcherCallback(EscrowKey memory self, address caller) internal pure returns (bool) {
-        return (self.lockState == _UNTRUSTED_X_SEARCHERS_X_REQUESTED) && 
+        return (self.lockState == _LOCKED_X_SEARCHERS_X_REQUESTED) && 
             (self.approvedCaller == caller);
     }
 
     function turnSearcherLock(EscrowKey memory self) internal pure returns (EscrowKey memory) {
-        self.lockState = _UNTRUSTED_X_SEARCHERS_X_VERIFIED;
+        self.lockState = _LOCKED_X_SEARCHERS_X_VERIFIED;
         self.approvedCaller = address(0);
         return self;
     }

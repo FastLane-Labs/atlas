@@ -10,7 +10,7 @@ import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 
-import { SafetyChecks } from "./SafetyChecks.sol";
+import { SafetyLocks } from "./SafetyLocks.sol";
 import { SearcherWrapper } from "./SearcherWrapper.sol";
 import { FastLaneDataTypes } from "../libraries/DataTypes.sol";
 import { FastLaneErrorsEvents } from "./Emissions.sol";
@@ -33,7 +33,7 @@ import {
     BaseLock
 } from "../libraries/DataTypes.sol";
 
-contract Escrow is EIP712, SafetyChecks, SearcherWrapper, IEscrow {
+contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
     using ECDSA for bytes32;
 
     uint32 immutable public escrowDuration;
@@ -50,7 +50,7 @@ contract Escrow is EIP712, SafetyChecks, SearcherWrapper, IEscrow {
 
     constructor(
         uint32 escrowDurationFromFactory
-    ) SafetyChecks(msg.sender) EIP712("ProtoCallHandler", "0.0.1")
+    ) SafetyLocks(msg.sender) EIP712("ProtoCallHandler", "0.0.1")
     {
         escrowDuration = escrowDurationFromFactory; 
     }
@@ -58,14 +58,14 @@ contract Escrow is EIP712, SafetyChecks, SearcherWrapper, IEscrow {
     function executeStagingCall(
         CallChainProof memory proof,
         ProtocolCall calldata protocolCall,
-        bytes calldata userCallData
-    ) external stagingLock(protocolCall.callConfig) returns (
+        UserCall calldata userCall
+    ) external stagingLock(protocolCall) returns (
         bytes memory stagingReturnData
     ) {
         stagingReturnData = ICallExecution(msg.sender).stagingWrapper(
             proof,
             protocolCall.to,
-            userCallData
+            userCall
         );
     }
 

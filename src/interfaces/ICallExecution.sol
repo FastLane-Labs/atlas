@@ -19,7 +19,7 @@ interface ICallExecution {
     function stagingWrapper(
         CallChainProof memory proof,
         address protocolControl,
-        bytes calldata userCallData
+        UserCall calldata userCall
     ) external returns (bytes memory stagingData);
 
     function userWrapper(

@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import { ISafetyChecks } from "../interfaces/ISafetyChecks.sol";
+import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
 
 import { GovernanceControl } from "./GovernanceControl.sol";
 import { MEVAllocator } from "./MEVAllocator.sol";
@@ -71,7 +71,7 @@ abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
     modifier onlyApprovedCaller() {
         require(
             msg.sender != address(0) &&
-            msg.sender == ISafetyChecks(fastLaneEscrow).approvedCaller(),
+            msg.sender == ISafetyLocks(fastLaneEscrow).approvedCaller(),
             "InvalidCaller"
         );
         _;

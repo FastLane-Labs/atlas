@@ -2,7 +2,7 @@
 pragma solidity ^0.8.16;
 
 import { IEscrow } from "../interfaces/IEscrow.sol";
-import { ISafetyChecks } from "../interfaces/ISafetyChecks.sol";
+import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
 
 import { CallVerification } from "../libraries/CallVerification.sol";
 
@@ -88,7 +88,7 @@ contract ExecutionEnvironment is CallExecution {
         bytes memory stagingReturnData = IEscrow(_escrow).executeStagingCall(
             proof,
             protocolCall,
-            userCall.data
+            userCall
         );
         
         // ###########  END STAGING EXECUTION #############

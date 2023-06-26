@@ -45,14 +45,14 @@ contract CallExecution is BitStuff, FastLaneErrorsEvents {
     function stagingWrapper(
         CallChainProof memory proof,
         address protocolControl,
-        bytes calldata userCallData
+        UserCall calldata userCall
     ) external returns (bytes memory stagingData) {
         // Executed by the ExecutionEnvironment
         
         // This must be called by the escrow contract to ensure the locks are locked
         require(msg.sender == _escrow, "ERR-CE00 InvalidSenderStaging");
 
-        stagingData = ExecutionControl.stage(proof, protocolControl, userCallData);
+        stagingData = ExecutionControl.stage(proof, protocolControl, userCall);
 
     }
 

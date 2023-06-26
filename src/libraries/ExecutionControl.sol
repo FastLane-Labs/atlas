@@ -27,14 +27,14 @@ library ExecutionControl {
     function stage(
         CallChainProof memory proof,
         address protocolControl,
-        bytes calldata userCallData
+        UserCall calldata userCall
     ) internal returns (bytes memory) {
 
         bool isDelegated = IProtocolControl(protocolControl).stagingDelegated();
 
         bytes memory data = abi.encodeWithSelector(
             IProtocolControl.stageCall.selector, 
-            userCallData
+            userCall
         );
 
         // Verify the proof to ensure this isn't happening out of sequence.
@@ -52,7 +52,7 @@ library ExecutionControl {
         } else {
             return staticWrapper(
                 protocolControl,
-                userCallData
+                data
             );
         }
     }

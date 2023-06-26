@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import { ISafetyChecks } from "../interfaces/ISafetyChecks.sol";
+import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
 
 abstract contract GovernanceControl {
 

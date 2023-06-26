@@ -23,7 +23,7 @@ interface IEscrow {
     function executeStagingCall(
         CallChainProof memory proof,
         ProtocolCall calldata protocolCall,
-        bytes calldata userCallData
+        UserCall calldata userCall
     ) external returns (bytes memory stagingReturnData);
 
     function executeUserCall(

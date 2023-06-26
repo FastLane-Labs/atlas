@@ -22,7 +22,7 @@ import {
 
 } from "../libraries/DataTypes.sol";
 
-contract SafetyChecks is BitStuff {
+contract SafetyLocks is BitStuff {
     using SafetyBits for EscrowKey;
 
     address immutable public factory;
@@ -67,7 +67,7 @@ contract SafetyChecks is BitStuff {
         delete _escrowKey;
     }
 
-    modifier stagingLock(uint16 callConfig) {
+    modifier stagingLock(ProtocolCall calldata protocolCall) {
         // msg.sender = ExecutionEnvironment
         EscrowKey memory escrowKey = _escrowKey;
 
@@ -76,8 +76,8 @@ contract SafetyChecks is BitStuff {
         require(escrowKey.isValidStagingLock(msg.sender), "ERR-E31 InvalidLockStage");
         
         // Handle staging calls, if needed
-        if (_needsStaging(callConfig)) {
-            _escrowKey = escrowKey.holdStagingLock();
+        if (_needsStaging(protocolCall.callConfig)) {
+            _escrowKey = escrowKey.holdStagingLock(protocolCall.to);
             _;
         }
         
@@ -141,7 +141,7 @@ contract SafetyChecks is BitStuff {
 
             _escrowKey = escrowKey.turnSearcherLockPayments(msg.sender);
         
-        // check if this is the final call - if so, prep for UserRefund
+        // Check if this is the final call - if so, prep for UserRefund
         // NOTE: if the payments handling preempts this conditional, 
         // we will set this flag at the end of the payment handling.
         } else if (escrowKey.callIndex == escrowKey.callMax - 2) {
@@ -204,5 +204,9 @@ contract SafetyChecks is BitStuff {
 
     function approvedCaller() external view returns (address) {
         return _escrowKey.approvedCaller;
+    }
+
+    function getLockState() external view returns (EscrowKey memory) {
+        return _escrowKey;
     }
 }

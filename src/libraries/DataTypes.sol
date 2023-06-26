@@ -94,7 +94,7 @@ enum BaseLock {
     Unlocked,
     Pending,
     Active,
-    Untrusted
+    Locked
 }
 
 enum ExecutionPhase {
