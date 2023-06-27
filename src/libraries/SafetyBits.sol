@@ -233,11 +233,11 @@ library SafetyBits {
 
     function confirmSearcherLock(
         EscrowKey memory self,
-        address searcherTo
+        address approvedCaller
     ) internal pure returns (bool) {
         return (
             (self.lockState == _LOCKED_X_SEARCHERS_X_VERIFIED) && 
-            (self.approvedCaller == searcherTo)
+            (self.approvedCaller == approvedCaller)
         );
     }
 
@@ -357,9 +357,9 @@ library SafetyBits {
             (self.approvedCaller == caller);
     }
 
-    function turnSearcherLock(EscrowKey memory self) internal pure returns (EscrowKey memory) {
+    function turnSearcherLock(EscrowKey memory self, address msgSender) internal pure returns (EscrowKey memory) {
         self.lockState = _LOCKED_X_SEARCHERS_X_VERIFIED;
-        self.approvedCaller = address(0);
+        self.approvedCaller = msgSender;
         return self;
     }
 }

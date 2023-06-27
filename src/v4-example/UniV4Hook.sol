@@ -85,7 +85,6 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
 
     // Storage lock
     bytes32 public hashLock; // keccak256(poolKey, executionEnvironment)
-    address public executionEnvironment;
 
     constructor(
         address _atlas,
@@ -95,19 +94,23 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
     ProtocolControl(
         _atlas, 
         true,
+        true,
         false,
         false,
         true, 
+        true,
         true, 
         false 
     ) {
         /*
         ProtocolControl(
             _atlas, // escrowAddress
+            true, // shouldRequireStaging
             true, // shouldDelegateStaging
             false, // shouldExecuteUserLocally
             false, // shouldDelegateUser
             true, // shouldDelegateAllocating
+            true, // shouldRequireVerification
             true, // shouldDelegateVerification
             false // allowRecycledStorage
         )
@@ -263,7 +266,6 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
 
         // Set the storage lock to block reentry / concurrent trading
         hashLock = keccak256(abi.encode(key, msg.sender));
-        executionEnvironment = msg.sender;
     }
 
     function releaseLock(IPoolManager.PoolKey memory key) external {
@@ -282,7 +284,6 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
 
         // Release the storage lock 
         delete hashLock;
-        delete executionEnvironment;
     }
 
 
@@ -335,16 +336,14 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
             // NOTE: This lockState verifies that the user's transaction has already
             // been executed. 
             // NOTE: Searchers must have triggered the safetyCallback on the ExecutionEnvironment
-            // *before* swapping
+            // *before* swapping.  The safetyCallback sets the ExecutionEnvironment as the 
+            // escrowKey.approvedCaller.
 
             // Verify that the pool is valid for a searcher to trade in. 
             require(
-                hashLock == keccak256(abi.encode(key, executionEnvironment)), 
+                hashLock == keccak256(abi.encode(key, escrowKey.approvedCaller)), 
                 "ERR-H04 InvalidPoolKey"
             );
-
-            // Verify that the caller is the correct searcher
-            require(sender == escrowKey.approvedCaller, "ERR-H05 InvalidCaller");
 
         // Case:
         // Other call
@@ -356,7 +355,7 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
 
         // NOTE: Searchers attempting to backrun in this pool will easily be able to precompute
         // the hashLock's value. It should not be used as a lock to keep them out - it is only
-        // meant to prevent searchers
+        // meant to prevent searchers from winning an auction for Pool X but trading in Pool Y. 
 
         return AtlasV4Hook.beforeSwap.selector;
     }

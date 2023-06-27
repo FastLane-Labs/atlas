@@ -47,6 +47,9 @@ contract SearcherWrapper is FastLaneErrorsEvents {
             } else if (errorSwitch == _SEARCHER_CALL_REVERTED) {
                 return (SearcherOutcome.CallReverted, 0);
 
+            } else if (errorSwitch == _SEARCHER_FAILED_CALLBACK) {
+                return (SearcherOutcome.CallbackFailed, 0);
+
             } else if (errorSwitch == _ALTERED_USER_HASH) {
                 return (SearcherOutcome.InvalidUserHash, 0);
             

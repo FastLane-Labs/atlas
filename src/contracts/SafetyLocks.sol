@@ -35,6 +35,25 @@ contract SafetyLocks is BitStuff {
         factory = factoryAddress;
     }
 
+    function searcherSafetyCallback(address msgSender) external payable returns (bool isSafe) {
+        // An external call so that searcher contracts can verify
+        // that delegatecall isn't being abused. 
+        // NOTE: Escrow would still work fine if we removed this 
+        // and let searchers handle the safety on their own.  There
+        // are other ways to provide the same safety guarantees on
+        // the contract level. This was chosen because it provides
+        // excellent safety for beginning searchers while having
+        // a minimal increase in gas cost compared with other options. 
+
+        EscrowKey memory escrowKey = _escrowKey;
+
+        isSafe = escrowKey.isValidSearcherCallback(msg.sender);
+
+        if (isSafe) {
+            _escrowKey = escrowKey.turnSearcherLock(msgSender);
+        } 
+    }
+
     function initializeEscrowLocks(
         address executionEnvironment,
         uint8 searcherCallCount
@@ -109,24 +128,6 @@ contract SafetyLocks is BitStuff {
         _escrowKey = escrowKey.holdSearcherLock(searcherTo);
     }
 
-    function searcherSafetyCallback() external payable returns (bool isSafe) {
-        // An external call so that searcher contracts can verify
-        // that delegatecall isn't being abused. 
-        // NOTE: Escrow would still work fine if we removed this 
-        // and let searchers handle the safety on their own.  There
-        // are other ways to provide the same safety guarantees on
-        // the contract level. This was chosen because it provides
-        // excellent safety for beginning searchers while having
-        // a minimal increase in gas cost compared with other options. 
-
-        EscrowKey memory escrowKey = _escrowKey;
-
-        isSafe = escrowKey.isValidSearcherCallback(msg.sender);
-
-        if (isSafe) {
-            _escrowKey = escrowKey.turnSearcherLock();
-        } 
-    }
 
     // NOTE: Searcher should have performed the safety callback, 
     // which would have updated the SearcherSafety level in escrowKey
@@ -206,6 +207,11 @@ contract SafetyLocks is BitStuff {
 
     function approvedCaller() external view returns (address) {
         return _escrowKey.approvedCaller;
+    }
+
+    // For the Execution Environment to confirm inside of searcher try/catch
+    function confirmSafetyCallback() external view returns (bool) {
+        return _escrowKey.confirmSearcherLock(msg.sender);
     }
 
     function getLockState() external view returns (EscrowKey memory) {

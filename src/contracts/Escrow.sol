@@ -136,6 +136,7 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
                 result |= 1 << uint256(SearcherOutcome.ExecutionCompleted);
             }
 
+            /*
             // Send back the value requested to pay the searcher's bids
             if (valueRequested != 0) {
                 SafeTransferLib.safeTransferETH(
@@ -143,6 +144,7 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
                     valueRequested
                 );
             }
+            */
 
             searcherEscrow.total += uint128(address(this).balance - currentBalance);
         }

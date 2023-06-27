@@ -24,6 +24,9 @@ contract FastLaneErrorsEvents {
     string constant public SEARCHER_BID_UNPAID = "SearcherBidUnpaid";
     bytes32 constant internal _SEARCHER_BID_UNPAID = keccak256(abi.encodePacked(SEARCHER_BID_UNPAID));
 
+    string constant public SEARCHER_FAILED_CALLBACK = "SearcherCallbackFailed";
+    bytes32 constant internal _SEARCHER_FAILED_CALLBACK = keccak256(abi.encodePacked(SEARCHER_FAILED_CALLBACK));
+
     string constant public SEARCHER_MSG_VALUE_UNPAID = "SearcherMsgValueNotRepaid";
     bytes32 constant internal _SEARCHER_MSG_VALUE_UNPAID = keccak256(abi.encodePacked(SEARCHER_MSG_VALUE_UNPAID));
 

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.16;
 
 import { ISearcherContract } from "../interfaces/ISearcherContract.sol";
+import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
 import { ICallExecution } from "../interfaces/ICallExecution.sol";
 
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
@@ -146,6 +147,8 @@ contract CallExecution is FastLaneErrorsEvents {
 
         // Verify that it was successful
         require(success, SEARCHER_CALL_REVERTED);
+
+        require(ISafetyLocks(_escrow).confirmSafetyCallback(), SEARCHER_FAILED_CALLBACK);
 
         // Get the value delta from the escrow contract
         // NOTE: reverting on underflow here is intended behavior since the ExecutionEnviront address

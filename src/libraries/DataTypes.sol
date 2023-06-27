@@ -177,6 +177,7 @@ enum SearcherOutcome {
     CallReverted,
     BidNotPaid,
     CallValueTooHigh,
+    CallbackFailed,
     Success
 }
 
@@ -229,6 +230,7 @@ contract FastLaneDataTypes {
         1 << uint256(SearcherOutcome.BidNotPaid) |
         1 << uint256(SearcherOutcome.CallValueTooHigh) |
         1 << uint256(SearcherOutcome.UnknownError) |
+        1 << uint256(SearcherOutcome.CallbackFailed) |
         1 << uint256(SearcherOutcome.Success)
     );
 

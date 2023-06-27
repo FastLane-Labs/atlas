@@ -47,5 +47,4 @@ interface ICallExecution {
         BidData[] memory bids, // Converted to memory
         PayeeData[] calldata payeeData
     ) external;
-
 }
