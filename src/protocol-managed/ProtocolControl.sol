@@ -15,19 +15,23 @@ abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
 
     address public immutable fastLaneEscrow;
     
+    bool public immutable requireStaging;
     bool public immutable delegateStaging;
     bool public immutable localUser;
     bool public immutable delegateUser;
     bool public immutable delegateAllocating;
+    bool public immutable requireVerification;
     bool public immutable delegateVerification;
     bool public immutable recycledStorage;
 
     constructor(
         address escrowAddress,
+        bool shouldRequireStaging,
         bool shouldDelegateStaging,
         bool shouldExecuteUserLocally,
         bool shouldDelegateUser,
         bool shouldDelegateAllocating,
+        bool shouldRequireVerification,
         bool shouldDelegateVerification,
         bool allowRecycledStorage
         
@@ -45,6 +49,14 @@ abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
             );
         }
 
+        if (shouldDelegateStaging) {
+            require(shouldRequireStaging, "ERR-GC04 InvalidStaging");
+        }
+
+        if (shouldDelegateVerification) {
+            require(shouldRequireVerification, "ERR-GC05 InvalidVerification");
+        }
+
         // NOTE: At this time, MEV Allocation payments are required to be delegatecalled.
         // By the time the MEV Payments are paid, both the user and the searchers will
         // no longer be executing any transactions, and all MEV rewards will be
@@ -58,10 +70,12 @@ abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
 
         fastLaneEscrow = escrowAddress;
 
+        requireStaging = shouldRequireStaging;
         delegateStaging = shouldDelegateStaging;
         localUser = shouldExecuteUserLocally;
         delegateUser = shouldDelegateUser;
         delegateAllocating = shouldDelegateAllocating;
+        requireVerification = shouldRequireVerification;
         delegateVerification = shouldDelegateVerification;
         recycledStorage = allowRecycledStorage;
     }
@@ -125,5 +139,20 @@ abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
 
     function verificationDelegated() external view returns (bool delegated) {
         delegated = delegateVerification;
+    }
+
+    function getCallConfig() external view returns (
+        bool, bool, bool, bool, bool, bool, bool, bool
+    ) {
+        return (
+            requireStaging,
+            delegateStaging,
+            localUser,
+            delegateUser,
+            delegateAllocating,
+            requireVerification,
+            delegateVerification,
+            recycledStorage
+        );
     }
 }

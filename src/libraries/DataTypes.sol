@@ -34,15 +34,12 @@ struct ProtocolData {
 enum CallConfig { // for readability, will get broken down into pure funcs later
     CallStaging,
     DelegateStaging,
-    FwdValueStaging,
     DelegateUser,
-    FwdValueUser,
+    LocalUser,
+    DelegateAllocating,
     CallVerification,
     DelegateVerification,
-    FwdValueVerification,
-    CleanExecution,
-    DirtyExecution,
-    StaticExecution
+    RecycledStorage
 }
 
 enum SearcherSafety {

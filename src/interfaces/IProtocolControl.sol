@@ -19,6 +19,10 @@ interface IProtocolControl {
         bytes calldata data
     ) external returns (bool);
 
+    function getCallConfig() external view returns (
+        bool, bool, bool, bool, bool, bool, bool, bool
+    );
+
     function stagingDelegated() external view returns (bool delegated);
 
     function userDelegated() external view returns (bool delegated);

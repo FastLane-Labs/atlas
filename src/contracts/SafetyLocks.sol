@@ -5,7 +5,8 @@ import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
 
 import { BitStuff } from "./BitStuff.sol"; 
 
-import { SafetyBits } from "../libraries/SafetyBits.sol"; 
+import { SafetyBits } from "../libraries/SafetyBits.sol";
+import { CallBits } from "../libraries/CallBits.sol"; 
 
 import {
     SearcherOutcome,
@@ -24,6 +25,7 @@ import {
 
 contract SafetyLocks is BitStuff {
     using SafetyBits for EscrowKey;
+    using CallBits for uint16;
 
     address immutable public factory;
 
@@ -76,7 +78,7 @@ contract SafetyLocks is BitStuff {
         require(escrowKey.isValidStagingLock(msg.sender), "ERR-E31 InvalidLockStage");
         
         // Handle staging calls, if needed
-        if (_needsStaging(protocolCall.callConfig)) {
+        if (protocolCall.callConfig._needsStaging()) {
             _escrowKey = escrowKey.holdStagingLock(protocolCall.to);
             _;
         }
@@ -187,7 +189,7 @@ contract SafetyLocks is BitStuff {
 
         require(escrowKey.isValidVerificationLock(msg.sender), "ERR-E37 InvalidLockStage");
 
-        if (_needsVerification(callConfig)) {
+        if (callConfig._needsVerification()) {
             _escrowKey = escrowKey.holdVerificationLock();
             _; 
 

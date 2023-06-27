@@ -5,16 +5,20 @@ import { IProtocolControl } from "../interfaces/IProtocolControl.sol";
 
 import { CallVerification } from "../libraries/CallVerification.sol";
 
+import { CallBits } from "../libraries/CallBits.sol";
+
 import {
     BidData,
     PayeeData,
     PaymentData,
     UserCall,
-    CallChainProof
+    CallChainProof,
+    ProtocolCall
 } from "../libraries/DataTypes.sol";
 
 library ExecutionControl {
     using CallVerification for CallChainProof;
+    using CallBits for uint16;
 
     // NOTE: By requiring the staging and verification calls
     // to be either static (no state modifications) or delegated
@@ -26,11 +30,11 @@ library ExecutionControl {
 
     function stage(
         CallChainProof memory proof,
-        address protocolControl,
+        ProtocolCall calldata protocolCall,
         UserCall calldata userCall
     ) internal returns (bytes memory) {
 
-        bool isDelegated = IProtocolControl(protocolControl).stagingDelegated();
+        bool isDelegated = protocolCall.callConfig._delegateStaging();
 
         bytes memory data = abi.encodeWithSelector(
             IProtocolControl.stageCall.selector, 
@@ -39,19 +43,19 @@ library ExecutionControl {
 
         // Verify the proof to ensure this isn't happening out of sequence.
         require(
-            proof.prove(protocolControl, data, isDelegated),
+            proof.prove(protocolCall.to, data, isDelegated),
             "ERR-P01 ProofInvalid"
         );
 
         if (isDelegated) {
             return delegateWrapper(
-                protocolControl,
+                protocolCall.to,
                 data
             );
         
         } else {
             return staticWrapper(
-                protocolControl,
+                protocolCall.to,
                 data
             );
         }
@@ -59,12 +63,13 @@ library ExecutionControl {
 
     function user(
         CallChainProof memory proof,
-        address protocolControl,
+        ProtocolCall calldata protocolCall,
         bytes memory stagingReturnData,
         UserCall calldata userCall
     ) internal returns (bytes memory) {
 
-        (bool delegated, bool local) = IProtocolControl(protocolControl).userDelegatedLocal();
+        bool delegated = protocolCall.callConfig._delegateUser();
+        bool local = protocolCall.callConfig._localUser();
 
         // Verify the proof to ensure this isn't happening out of sequence. 
         require(
@@ -83,7 +88,7 @@ library ExecutionControl {
         } else {
             if (delegated) {
                 return delegateWrapper(
-                    protocolControl,
+                    protocolCall.to,
                     abi.encodeWithSelector(IProtocolControl.userLocalCall.selector,
                         userCall.to, 
                         userCall.value, 
@@ -94,7 +99,7 @@ library ExecutionControl {
             
             } else {
                 return staticWrapper(
-                    protocolControl,
+                    protocolCall.to,
                     abi.encodeWithSelector(
                         IProtocolControl.userLocalCall.selector,
                         userCall.to, 
@@ -108,15 +113,15 @@ library ExecutionControl {
     }
 
     function allocate(
-        address protocolControl,
+        ProtocolCall calldata protocolCall,
         uint256 totalEtherReward,
         BidData[] memory bids,
         PayeeData[] calldata payeeData
     ) internal {
 
-        if (IProtocolControl(protocolControl).allocatingDelegated()) {
+        if (protocolCall.callConfig._delegateAllocating()) {
             delegateWrapper(
-                protocolControl,
+                protocolCall.to,
                 abi.encodeWithSelector(
                     IProtocolControl.allocatingCall.selector,
                     totalEtherReward,
@@ -127,7 +132,7 @@ library ExecutionControl {
         
         } else {
             callWrapper(
-                protocolControl,
+                protocolCall.to,
                 totalEtherReward,
                 abi.encodeWithSelector(
                     IProtocolControl.allocatingCall.selector,
@@ -141,12 +146,12 @@ library ExecutionControl {
 
     function verify(
         CallChainProof memory proof,
-        address protocolControl,
+        ProtocolCall calldata protocolCall,
         bytes memory stagingReturnData,
         bytes memory userReturnData
     ) internal returns (bool) {
 
-        bool isDelegated = IProtocolControl(protocolControl).verificationDelegated();
+        bool isDelegated = protocolCall.callConfig._delegateVerification();
 
         bytes memory data = abi.encodeWithSelector(
             IProtocolControl.verificationCall.selector, 
@@ -156,13 +161,13 @@ library ExecutionControl {
 
         // Verify the proof to ensure this isn't happening out of sequence.
         require(
-            proof.prove(protocolControl, data, isDelegated),
+            proof.prove(protocolCall.to, data, isDelegated),
             "ERR-P01 ProofInvalid"
         );
         if (isDelegated) {
             return abi.decode(
                 delegateWrapper(
-                    protocolControl,
+                    protocolCall.to,
                     data
                 ),
                 (bool)
@@ -171,7 +176,7 @@ library ExecutionControl {
         } else {
             return abi.decode(
                 staticWrapper(
-                    protocolControl,
+                    protocolCall.to,
                     data
                 ),
                 (bool)

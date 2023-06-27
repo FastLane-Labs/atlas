@@ -37,42 +37,6 @@ contract BitStuff is FastLaneDataTypes {
         return searcherEscrow.total != 0 || searcherEscrow.nonce != 0;
     }
 
-    function _needsStaging(uint16 callConfig) internal pure returns (bool needsStaging) {
-        needsStaging = (callConfig & 1 << uint16(CallConfig.CallStaging) != 0);
-    }
-
-    function _delegateStaging(uint16 callConfig) internal pure returns (bool delegateStaging) {
-        delegateStaging = (callConfig & 1 << uint16(CallConfig.DelegateStaging) != 0);
-    }
-
-    function _fwdValueStaging(uint16 callConfig) internal pure returns (bool fwdValueStaging) {
-        fwdValueStaging = (callConfig & 1 << uint16(CallConfig.FwdValueStaging) != 0);
-    }
-
-    function _delegateUser(uint16 callConfig) internal pure returns (bool delegateUser) {
-        delegateUser = (callConfig & 1 << uint16(CallConfig.DelegateUser) != 0);
-    }
-
-    function _delegateVerification(uint16 callConfig) internal pure returns (bool delegateVerification) {
-        delegateVerification = (callConfig & 1 << uint16(CallConfig.DelegateStaging) != 0);
-    }
-
-    function _needsVerification(uint16 callConfig) internal pure returns (bool needsVerification) {
-        needsVerification = (callConfig & 1 << uint16(CallConfig.CallStaging) != 0);
-    }
-
-    function _fwdValueVerification(uint16 callConfig) internal pure returns (bool fwdValueVerification) {
-        fwdValueVerification = (callConfig & 1 << uint16(CallConfig.FwdValueStaging) != 0);
-    }
-
-    function _cleanExecution(uint16 callConfig) internal pure returns (bool cleanExecution) {
-        cleanExecution = (callConfig & 1 << uint16(CallConfig.CleanExecution) != 0);
-    }
-
-    function _dirtyExecution(uint16 callConfig) internal pure returns (bool cleanExecution) {
-        cleanExecution = (callConfig & 1 << uint16(CallConfig.CleanExecution) != 0);
-    }
-
     // NOTE: Order of bits for LockState:
     // Lowest bits = BaseLock
     // Middle bits = Execution Phase

@@ -18,20 +18,20 @@ interface ICallExecution {
 
     function stagingWrapper(
         CallChainProof memory proof,
-        address protocolControl,
+        ProtocolCall calldata protocolCall,
         UserCall calldata userCall
     ) external returns (bytes memory stagingData);
 
     function userWrapper(
         CallChainProof memory proof,
-        address protocolControl,
+        ProtocolCall calldata protocolCall,
         bytes memory stagingReturnData,
         UserCall calldata userCall
     ) external payable returns (bytes memory userReturnData);
 
     function verificationWrapper(
         CallChainProof memory proof,
-        address protocolControl,
+        ProtocolCall calldata protocolCall,
         bytes memory stagingReturnData, 
         bytes memory userReturnData
     ) external;
@@ -43,7 +43,7 @@ interface ICallExecution {
     ) external;
 
     function allocateRewards(
-        address protocolControl,
+        ProtocolCall calldata protocolCall,
         BidData[] memory bids, // Converted to memory
         PayeeData[] calldata payeeData
     ) external;

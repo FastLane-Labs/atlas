@@ -7,7 +7,6 @@ import { ICallExecution } from "../interfaces/ICallExecution.sol";
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
 import { FastLaneErrorsEvents } from "./Emissions.sol";
-import { BitStuff } from "./BitStuff.sol"; 
 
 import { CallVerification } from "../libraries/CallVerification.sol";
 import { ExecutionControl } from "../libraries/ExecutionControl.sol";
@@ -21,11 +20,12 @@ import {
     PayeeData,
     PaymentData,
     UserCall,
-    CallConfig
+    CallConfig,
+    ProtocolCall
 } from "../libraries/DataTypes.sol";
 
 
-contract CallExecution is BitStuff, FastLaneErrorsEvents {
+contract CallExecution is FastLaneErrorsEvents {
     using CallVerification for CallChainProof;
 
     address immutable internal _escrow;
@@ -44,7 +44,7 @@ contract CallExecution is BitStuff, FastLaneErrorsEvents {
 
     function stagingWrapper(
         CallChainProof memory proof,
-        address protocolControl,
+        ProtocolCall calldata protocolCall,
         UserCall calldata userCall
     ) external returns (bytes memory stagingData) {
         // Executed by the ExecutionEnvironment
@@ -52,13 +52,13 @@ contract CallExecution is BitStuff, FastLaneErrorsEvents {
         // This must be called by the escrow contract to ensure the locks are locked
         require(msg.sender == _escrow, "ERR-CE00 InvalidSenderStaging");
 
-        stagingData = ExecutionControl.stage(proof, protocolControl, userCall);
+        stagingData = ExecutionControl.stage(proof, protocolCall, userCall);
 
     }
 
     function userWrapper(
         CallChainProof memory proof,
-        address protocolControl,
+        ProtocolCall calldata protocolCall,
         bytes memory stagingReturnData,
         UserCall calldata userCall
     ) external payable returns (bytes memory userReturnData) {
@@ -67,12 +67,12 @@ contract CallExecution is BitStuff, FastLaneErrorsEvents {
         // This must be called by the escrow contract to ensure the locks are locked
         require(msg.sender == _escrow, "ERR-CE00 InvalidSenderStaging");
 
-        userReturnData = ExecutionControl.user(proof, protocolControl, stagingReturnData, userCall);
+        userReturnData = ExecutionControl.user(proof, protocolCall, stagingReturnData, userCall);
     }
 
     function verificationWrapper(
         CallChainProof memory proof,
-        address protocolControl,
+        ProtocolCall calldata protocolCall,
         bytes memory stagingReturnData, 
         bytes memory userReturnData
     ) external {
@@ -81,7 +81,7 @@ contract CallExecution is BitStuff, FastLaneErrorsEvents {
         // This must be called by the escrow contract to ensure the locks are locked
         require(msg.sender == _escrow, "ERR-CE00 InvalidSenderStaging");
 
-        ExecutionControl.verify(proof, protocolControl, stagingReturnData, userReturnData);
+        ExecutionControl.verify(proof, protocolCall, stagingReturnData, userReturnData);
     }
 
 
@@ -195,7 +195,7 @@ contract CallExecution is BitStuff, FastLaneErrorsEvents {
     }
 
     function allocateRewards(
-        address protocolControl,
+        ProtocolCall calldata protocolCall,
         BidData[] memory bids, // Converted to memory
         PayeeData[] calldata payeeData
     ) external {
@@ -225,6 +225,6 @@ contract CallExecution is BitStuff, FastLaneErrorsEvents {
             unchecked{ ++i;}
         }
 
-        ExecutionControl.allocate(protocolControl, totalEtherReward, bids, payeeData);
+        ExecutionControl.allocate(protocolCall, totalEtherReward, bids, payeeData);
     }
 }

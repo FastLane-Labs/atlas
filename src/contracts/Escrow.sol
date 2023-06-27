@@ -64,7 +64,7 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
     ) {
         stagingReturnData = ICallExecution(msg.sender).stagingWrapper(
             proof,
-            protocolCall.to,
+            protocolCall,
             userCall
         );
     }
@@ -74,10 +74,10 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
         ProtocolCall calldata protocolCall,
         bytes memory stagingReturnData,
         UserCall calldata userCall
-    ) external userLock(protocolCall.callConfig) returns (bytes memory userReturnData) {
+    ) external userLock(protocolCall) returns (bytes memory userReturnData) {
         userReturnData = ICallExecution(msg.sender).userWrapper(
             proof, 
-            protocolCall.to,
+            protocolCall,
             stagingReturnData,
             userCall
         );
@@ -176,7 +176,7 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
         PayeeData[] calldata payeeData
     ) external paymentsLock {
         // process protocol payments
-        ICallExecution(msg.sender).allocateRewards(protocolCall.to, winningBids, payeeData);
+        ICallExecution(msg.sender).allocateRewards(protocolCall, winningBids, payeeData);
         // TODO: who should pay gas cost of payments?
     } 
 
@@ -187,7 +187,7 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
         bytes memory userReturnData
     ) external verificationLock(protocolCall.callConfig) {
         // process protocol payments
-        ICallExecution(msg.sender).verificationWrapper(proof, protocolCall.to, stagingReturnData, userReturnData);
+        ICallExecution(msg.sender).verificationWrapper(proof, protocolCall, stagingReturnData, userReturnData);
         // TODO: who should pay gas cost of payments?
     } 
 

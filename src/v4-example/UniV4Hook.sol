@@ -5,7 +5,7 @@ pragma solidity ^0.8.16;
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
 // V4 Imports
-import {IHooks} from "@uniswap/v4-core/contracts/interfaces/IHooks.sol";
+// import {IHooks} from "@uniswap/v4-core/contracts/interfaces/IHooks.sol";
 // import {IPoolManager} from "@uniswap/v4-core/contracts/interfaces/IPoolManager.sol";
 // import {BaseHook} from "@uniswap/periphery-next/contracts/BaseHook.sol";
 
@@ -26,6 +26,9 @@ import { MEVAllocator } from "../protocol-managed/MEVAllocator.sol";
 
 
 interface IPoolManager {
+    type Currency is address;
+    type BalanceDelta is int256;
+
     struct SwapParams {
         bool zeroForOne;
         int256 amountSpecified;
@@ -40,9 +43,26 @@ interface IPoolManager {
     }
     
     function swap(PoolKey memory key, SwapParams memory params) external returns (BalanceDelta);
-
     function donate(PoolKey memory key, uint256 amount0, uint256 amount1) external returns (BalanceDelta);
+}
 
+interface IHooks {
+    function beforeSwap(
+        address sender, 
+        IPoolManager.PoolKey calldata key, 
+        IPoolManager.SwapParams calldata params
+    ) external returns (bytes4);
+
+    struct Calls {
+        bool beforeInitialize;
+        bool afterInitialize;
+        bool beforeModifyPosition;
+        bool afterModifyPosition;
+        bool beforeSwap;
+        bool afterSwap;
+        bool beforeDonate;
+        bool afterDonate;
+    }
 }
 
 // NOTE: Uniswap V4 is unique in that it would not require a frontend integration.
@@ -50,7 +70,7 @@ interface IPoolManager {
 // sent wherever the hook creators wish.  In this example, the MEV auction proceeds 
 // are donated back to the pool. 
 
-contract AtlasV4Hook is ProtocolControl, MEVAllocator {
+contract AtlasV4Hook is MEVAllocator, ProtocolControl {
 
     struct StagingReturn {
         address approvedToken;
@@ -71,7 +91,6 @@ contract AtlasV4Hook is ProtocolControl, MEVAllocator {
         address _atlas,
         address _v4Singleton
     ) 
-    BaseHook(_v4Singleton) 
     MEVAllocator() 
     ProtocolControl(
         _atlas, 
@@ -106,17 +125,18 @@ contract AtlasV4Hook is ProtocolControl, MEVAllocator {
     /////////////// DELEGATED CALLS //////////////////
     function _stageDelegateCall(
         bytes calldata data
-    ) internal returns (bytes memory stagingData) {
+    ) internal override returns (bytes memory stagingData) {
         // This function is delegatecalled 
         // address(this) = ExecutionEnvironment
         // msg.sender = Atlas Escrow
 
-        UserCall memory userCall = abi.decode(data, (UserCall));
+        // TODO: Finalize UserCall struct and hardcode the location
+        // of the func selector.
+        require(bytes4(data[4:8]) == SWAP, "ERR-H10 InvalidFunction"); 
+       
+        UserCall memory userCall = abi.decode(data[4:], (UserCall));
 
-        require(bytes4(userCall.data[:4]) == SWAP, "ERR-H10 InvalidFunction");
         require(userCall.to == v4Singleton, "ERR-H11 InvalidTo");
-
-        EscrowKey memory escrowKey = ISafetyLocks(atlas).getLockState();
 
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that ProtocolControl supplied a valid signature
@@ -125,7 +145,7 @@ contract AtlasV4Hook is ProtocolControl, MEVAllocator {
         (
             IPoolManager.PoolKey memory key, 
             IPoolManager.SwapParams memory params
-        ) = abi.decode(userCall.data[4:], (IPoolManager.PoolKey, IPoolManager.SwapParams));
+        ) = abi.decode(userCall.data, (IPoolManager.PoolKey, IPoolManager.SwapParams));
 
         // Perform more checks and activate the lock
         AtlasV4Hook(hook).setLock(key);
@@ -133,7 +153,11 @@ contract AtlasV4Hook is ProtocolControl, MEVAllocator {
         // Handle forwarding of token approvals, or token transfers. 
         // NOTE: The user will have approved the ExecutionEnvironment in a prior call
         StagingReturn memory stagingReturn = StagingReturn({
-            approvedToken: params.zeroForOne ? address(key.currency0) : address(key.currency1),
+            approvedToken: (
+                params.zeroForOne ? 
+                IPoolManager.Currency.unwrap(key.currency0) : 
+                IPoolManager.Currency.unwrap(key.currency1) 
+            ),
             poolKey: key
         });
 
@@ -144,7 +168,10 @@ contract AtlasV4Hook is ProtocolControl, MEVAllocator {
                 // Buying Pool's token1 with amountSpecified of User's token0
                 // ERC20(token0).approve(v4Singleton, amountSpecified);
                 SafeTransferLib.safeTransferFrom(
-                    ERC20(address(key.currency0)), userCall.from, v4Singleton, amountSpecified
+                    ERC20(IPoolManager.Currency.unwrap(key.currency0)), 
+                    userCall.from, 
+                    v4Singleton, // <- TODO: confirm
+                    uint256(params.amountSpecified)
                 );
             
             } else {
@@ -155,7 +182,6 @@ contract AtlasV4Hook is ProtocolControl, MEVAllocator {
         } else {
             if (params.amountSpecified > 0) {
                 // Buying Pool's token0 with amountSpecified of User's token1
-            
             
             } else {
                 // Buying amountSpecified of Pool's token0 with User's token1
@@ -171,7 +197,7 @@ contract AtlasV4Hook is ProtocolControl, MEVAllocator {
     // held in ExecutionEnvironment.
     function _allocatingDelegateCall(
         bytes calldata data
-    ) internal {
+    ) internal override {
         // This function is delegatecalled 
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
@@ -197,14 +223,14 @@ contract AtlasV4Hook is ProtocolControl, MEVAllocator {
 
     function _verificationDelegateCall(
         bytes calldata data
-    ) internal returns (bool) {
+    ) internal override returns (bool) {
         // This function is delegatecalled 
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
        
         (
             bytes memory stagingReturnData,
-            bytes memory userReturnData
+            //bytes memory userReturnData
         ) = abi.decode( 
             data, 
             (bytes, bytes)
@@ -264,8 +290,8 @@ contract AtlasV4Hook is ProtocolControl, MEVAllocator {
      //                      V4 HOOKS                       //
     /////////////////////////////////////////////////////////
 
-    function getHooksCalls() public pure override returns (Hooks.Calls memory) {
-        return Hooks.Calls({
+    function getHooksCalls() public pure returns (IHooks.Calls memory) { // override
+        return IHooks.Calls({
             beforeInitialize: false,
             afterInitialize: false,
             beforeModifyPosition: false,
@@ -281,7 +307,7 @@ contract AtlasV4Hook is ProtocolControl, MEVAllocator {
         address sender, 
         IPoolManager.PoolKey calldata key, 
         IPoolManager.SwapParams calldata
-    ) external returns (bytes4)
+    ) external view returns (bytes4)
     {
         // This function is a standard call
         // address(this) = hook
