@@ -284,9 +284,9 @@ library SafetyBits {
         return self;
     }
 
-    function holdUserLock(EscrowKey memory self) internal pure returns (EscrowKey memory) {
+    function holdUserLock(EscrowKey memory self, address protocolControl) internal pure returns (EscrowKey memory) {
         self.lockState = _LOCKED_X_USER_X_UNSET;
-        self.approvedCaller = address(0);
+        self.approvedCaller = protocolControl;
         return self;
     }
 

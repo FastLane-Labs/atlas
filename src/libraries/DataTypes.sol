@@ -133,6 +133,7 @@ struct UserCall {
 struct PayeeData {
     address token;
     PaymentData[] payments;
+    bytes data;
 }
 
 /// @param payee address to pay

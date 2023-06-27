@@ -6,8 +6,8 @@ import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
 // V4 Imports
 import {IHooks} from "@uniswap/v4-core/contracts/interfaces/IHooks.sol";
-import {IPoolManager} from "@uniswap/v4-core/contracts/interfaces/IPoolManager.sol";
-import {BaseHook} from "@uniswap/periphery-next/contracts/BaseHook.sol";
+// import {IPoolManager} from "@uniswap/v4-core/contracts/interfaces/IPoolManager.sol";
+// import {BaseHook} from "@uniswap/periphery-next/contracts/BaseHook.sol";
 
 // Atlas Base Imports
 import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
@@ -22,13 +22,39 @@ import {
 
 // Atlas Protocol-Control Imports
 import { ProtocolControl } from "../protocol-managed/ProtocolControl.sol";
+import { MEVAllocator } from "../protocol-managed/MEVAllocator.sol";
 
 
-contract AtlasV4Hook {
+interface IPoolManager {
+    struct SwapParams {
+        bool zeroForOne;
+        int256 amountSpecified;
+        uint160 sqrtPriceLimitX96;
+    }
+    struct PoolKey {
+        Currency currency0;
+        Currency currency1;
+        uint24 fee;
+        int24 tickSpacing;
+        IHooks hooks;
+    }
+    
+    function swap(PoolKey memory key, SwapParams memory params) external returns (BalanceDelta);
+
+    function donate(PoolKey memory key, uint256 amount0, uint256 amount1) external returns (BalanceDelta);
+
+}
+
+// NOTE: Uniswap V4 is unique in that it would not require a frontend integration.
+// Instead, hooks can be used to enforce that the proceeds of the MEV auctions are 
+// sent wherever the hook creators wish.  In this example, the MEV auction proceeds 
+// are donated back to the pool. 
+
+contract AtlasV4Hook is ProtocolControl, MEVAllocator {
 
     struct StagingReturn {
         address approvedToken;
-        PoolKey poolKey;
+        IPoolManager.PoolKey poolKey;
     }
 
     bytes4 public constant SWAP = IPoolManager.swap.selector;
@@ -37,18 +63,37 @@ contract AtlasV4Hook {
     address public immutable hook;
     address public immutable v4Singleton;
 
-    PoolKey public poolKey;
-    address public executionEnvironment; 
-    // NOTE: ExecutionEnvironment is created with CREATE2, allowing us to know
-    // its address in advance. A new contract is created and selfdestructed for each
-    // MEV auction to ensure that storage is clean. 
-
-
+    // Storage lock
+    bytes32 public hashLock; // keccak256(poolKey, executionEnvironment)
+    address public executionEnvironment;
 
     constructor(
         address _atlas,
         address _v4Singleton
+    ) 
+    BaseHook(_v4Singleton) 
+    MEVAllocator() 
+    ProtocolControl(
+        _atlas, 
+        true,
+        false,
+        false,
+        true, 
+        true, 
+        false 
     ) {
+        /*
+        ProtocolControl(
+            _atlas, // escrowAddress
+            true, // shouldDelegateStaging
+            false, // shouldExecuteUserLocally
+            false, // shouldDelegateUser
+            true, // shouldDelegateAllocating
+            true, // shouldDelegateVerification
+            false // allowRecycledStorage
+        )
+        */ 
+
         atlas = _atlas;
         hook = address(this);
         v4Singleton = _v4Singleton;
@@ -58,13 +103,13 @@ contract AtlasV4Hook {
      //                   ATLAS CALLS                       //
     /////////////////////////////////////////////////////////
 
-    // This occurs prior to the User's call being executed
+    /////////////// DELEGATED CALLS //////////////////
     function _stageDelegateCall(
         bytes calldata data
     ) internal returns (bytes memory stagingData) {
         // This function is delegatecalled 
         // address(this) = ExecutionEnvironment
-        // msg.sender = Escrow
+        // msg.sender = Atlas Escrow
 
         UserCall memory userCall = abi.decode(data, (UserCall));
 
@@ -75,37 +120,50 @@ contract AtlasV4Hook {
 
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that ProtocolControl supplied a valid signature
-        require(address(this) == escrowKey.approvedCaller, "ERR-H01 InvalidCallee");
-        require(escrowKey.lockState == SafetyBits._LOCKED_X_STAGING_X_UNSET, "ERR-H02 InvalidLockStage");
+        require(msg.sender == atlas, "ERR-H00 InvalidCaller");
 
         (
-            PoolKey memory key, 
-            SwapParams memory params
-        ) = abi.decode(userCall.data[4:], (PoolKey, SwapParams));
-        
-        poolKey = key;
-        executionEnvironment = msg.sender;
+            IPoolManager.PoolKey memory key, 
+            IPoolManager.SwapParams memory params
+        ) = abi.decode(userCall.data[4:], (IPoolManager.PoolKey, IPoolManager.SwapParams));
 
-        // Handle forwarding of token approvals
+        // Perform more checks and activate the lock
+        AtlasV4Hook(hook).setLock(key);
+
+        // Handle forwarding of token approvals, or token transfers. 
         // NOTE: The user will have approved the ExecutionEnvironment in a prior call
-        
-        StagingReturn memory stagingReturn; // Empty for now
+        StagingReturn memory stagingReturn = StagingReturn({
+            approvedToken: params.zeroForOne ? address(key.currency0) : address(key.currency1),
+            poolKey: key
+        });
 
         // TODO: Determine if optimistic transfers are possible
         // (An example)
         if (params.zeroForOne) {
             if (params.amountSpecified > 0) {
+                // Buying Pool's token1 with amountSpecified of User's token0
                 // ERC20(token0).approve(v4Singleton, amountSpecified);
                 SafeTransferLib.safeTransferFrom(
-                    ERC20(token0), userCall.from, v4Singleton, amountSpecified
+                    ERC20(address(key.currency0)), userCall.from, v4Singleton, amountSpecified
                 );
+            
+            } else {
+                // Buying amountSpecified of Pool's token1 with User's token0
 
-                stagingReturn.approvedToken = token0;
+            }
+        
+        } else {
+            if (params.amountSpecified > 0) {
+                // Buying Pool's token0 with amountSpecified of User's token1
+            
+            
+            } else {
+                // Buying amountSpecified of Pool's token0 with User's token1
+
             }
         }
 
-        stagingReturn.poolKey = key;
-
+        // Return value
         stagingData = abi.encode(stagingReturn);
     }
 
@@ -120,53 +178,21 @@ contract AtlasV4Hook {
 
         // Pull the calldata into memory
         (
-            uint256 totalEtherReward,
+            ,
             BidData[] memory bids,
             PayeeData[] memory payeeData
         ) = abi.decode(data, (uint256, BidData[], PayeeData[]));
 
-        // TODO: Verify donate function's handling of unwrapped Ether
-        uint256 token0DonateAmount;
-        uint256 token1DonateAmount;
+        // NOTE: ProtocolVerifier has verified the PayeeData[] and BidData[] format
+        // BidData[0] = token0
+        // BidData[1] = token1
 
-        // Memory variables for loops
-        uint256 i;
-        uint256 k;
-        PaymentData memory pmtData;
+        uint256 token0DonateAmount = bids[0].bidAmount * payeeData[0].payments[0].payeePercent / 100;
+        uint256 token1DonateAmount = bids[1].bidAmount * payeeData[1].payments[0].payeePercent / 100;
 
-        // TODO: Build V4-specific structs to avoid loops here
-        for (; i < bids.length;) {
-            tokenAddress = bids[i].token;
-            bidAmount = bids[i].bidAmount;
+        IPoolManager.PoolKey memory key = abi.decode(payeeData[0].data, (IPoolManager.PoolKey));
 
-            if (bids[i].token == token0) {
-                for (; k < payeeData[i].payments.length;) {
-                    if (payeeData[i].payments[k].payee == hook){ 
-                        token0DonateAmount = bids[i].bidAmount * pmtData.payeePercent / 100;
-                        k = 0;  // reset k for other token loop
-                        break;
-                    }
-                    unchecked{ ++k;}
-                }
-
-            } else if (bids[i].token == token1) {
-                for (; k < payeeData[i].payments.length;) {
-                    if (payeeData[i].payments[k].payee == hook){ 
-                        token1DonateAmount = bids[i].bidAmount * pmtData.payeePercent / 100;
-                        k = 0;  // reset k for other token loop
-                        break;
-                    }
-                    unchecked{ ++k;}
-                }
-            }
-
-            if (token0DonateAmount != 0 && token1DonateAmount != 0) {
-                break;
-            }
-            unchecked{ ++i;}
-        }
-
-        IPoolManager(v4Singleton).donate(poolKey, token0DonateAmount, token1DonateAmount);
+        IPoolManager(v4Singleton).donate(key, token0DonateAmount, token1DonateAmount);
     }
 
     function _verificationDelegateCall(
@@ -189,48 +215,122 @@ contract AtlasV4Hook {
             (StagingReturn)
         );
 
-        // If token approvals were granted, rescind them here
-
-        // Run verification checks here
-
-        delete poolKey;
-        delete executionEnvironment;
+        AtlasV4Hook(hook).releaseLock(stagingReturn.poolKey);
 
         return true;
+    }
+
+    /////////////// EXTERNAL CALLS //////////////////
+    function setLock(IPoolManager.PoolKey memory key) external {
+        // This function is a standard call 
+        // address(this) = hook
+        // msg.sender = ExecutionEnvironment
+
+        EscrowKey memory escrowKey = ISafetyLocks(atlas).getLockState();
+
+        // Verify that the swapper went through the FastLane Atlas MEV Auction
+        // and that ProtocolControl supplied a valid signature
+        require(address(this) == hook, "ERR-H00 InvalidCallee");
+        require(hook == escrowKey.approvedCaller, "ERR-H01 InvalidCaller");
+        require(escrowKey.lockState == SafetyBits._LOCKED_X_STAGING_X_UNSET, "ERR-H02 InvalidLockStage");
+        require(hashLock == bytes32(0), "ERR-H03 AlreadyActive");
+
+        // Set the storage lock to block reentry / concurrent trading
+        hashLock = keccak256(abi.encode(key, msg.sender));
+        executionEnvironment = msg.sender;
+    }
+
+    function releaseLock(IPoolManager.PoolKey memory key) external {
+        // This function is a standard call 
+        // address(this) = hook
+        // msg.sender = ExecutionEnvironment
+
+        EscrowKey memory escrowKey = ISafetyLocks(atlas).getLockState();
+
+        // Verify that the swapper went through the FastLane Atlas MEV Auction
+        // and that ProtocolControl supplied a valid signature
+        require(address(this) == hook, "ERR-H20 InvalidCallee");
+        require(hook == escrowKey.approvedCaller, "ERR-H21 InvalidCaller");
+        require(escrowKey.lockState == SafetyBits._LOCKED_X_VERIFICATION_X_UNSET, "ERR-H22 InvalidLockStage");
+        require(hashLock == keccak256(abi.encode(key, msg.sender)), "ERR-H23 InvalidKey");
+
+        // Release the storage lock 
+        delete hashLock;
+        delete executionEnvironment;
     }
 
 
       /////////////////////////////////////////////////////////
      //                      V4 HOOKS                       //
     /////////////////////////////////////////////////////////
+
     function getHooksCalls() public pure override returns (Hooks.Calls memory) {
         return Hooks.Calls({
             beforeInitialize: false,
             afterInitialize: false,
             beforeModifyPosition: false,
             afterModifyPosition: false,
-            beforeSwap: true,
+            beforeSwap: true, // <-- 
             afterSwap: false,
             beforeDonate: false,
             afterDonate: false
         });
     }
 
-    function beforeSwap(address, IPoolManager.PoolKey calldata, IPoolManager.SwapParams calldata)
-        external
-        returns (bytes4)
+    function beforeSwap(
+        address sender, 
+        IPoolManager.PoolKey calldata key, 
+        IPoolManager.SwapParams calldata
+    ) external returns (bytes4)
     {
-        // Not delegatecall
+        // This function is a standard call
         // address(this) = hook
-        // msg.sender = ExecutionEnvironment
-
-        EscrowKey memory escrowKey = ISafetyLocks(atlas).getLockState();
-        // isValidUserLock
+        // msg.sender = v4Singleton
+    
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that ProtocolControl supplied a valid signature
-        require(msg.sender == executionEnvironment, "ERR-H00 InvalidCaller");
-        require(address(this) == escrowKey.approvedCaller, "ERR-H01 InvalidCallee");
-        require(escrowKey.lockState == SafetyBits._LOCKED_X_STAGING_X_UNSET, "ERR-H02 InvalidLockStage");
+        require(address(this) == hook, "ERR-H00 InvalidCallee");
+        require(msg.sender == v4Singleton, "ERR-H01 InvalidCaller"); // TODO: Confirm this
+
+        EscrowKey memory escrowKey = ISafetyLocks(atlas).getLockState();
+        
+        // Case:
+        // User call
+        if (escrowKey.lockState == SafetyBits._LOCKED_X_USER_X_UNSET) {
+            // Sender = ExecutionEnvironment
+
+            // Verify that the pool is valid for the user to trade in.
+            require(keccak256(abi.encode(key, sender)) == hashLock, "ERR-H02 InvalidSwapper");
+
+        // Case:
+        // Searcher call
+        } else if (escrowKey.lockState == SafetyBits._LOCKED_X_SEARCHERS_X_VERIFIED) {
+            // Sender = Searcher contract
+            // NOTE: This lockState verifies that the user's transaction has already
+            // been executed. 
+            // NOTE: Searchers must have triggered the safetyCallback on the ExecutionEnvironment
+            // *before* swapping
+
+            // Verify that the pool is valid for a searcher to trade in. 
+            require(
+                hashLock == keccak256(abi.encode(key, executionEnvironment)), 
+                "ERR-H04 InvalidPoolKey"
+            );
+
+            // Verify that the caller is the correct searcher
+            require(sender == escrowKey.approvedCaller, "ERR-H05 InvalidCaller");
+
+        // Case:
+        // Other call
+        } else {
+            // Revert
+            revert("ERR-H02 InvalidLockStage");
+        }
+        
+
+        // NOTE: Searchers attempting to backrun in this pool will easily be able to precompute
+        // the hashLock's value. It should not be used as a lock to keep them out - it is only
+        // meant to prevent searchers
 
         return AtlasV4Hook.beforeSwap.selector;
     }

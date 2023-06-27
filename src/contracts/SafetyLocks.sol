@@ -84,13 +84,13 @@ contract SafetyLocks is BitStuff {
         _escrowKey = escrowKey.turnStagingLock(msg.sender);
     }
 
-    modifier userLock(uint16 callConfig) {
+    modifier userLock(ProtocolCall calldata protocolCall) {
         // msg.sender is ExecutionEnvironment
         EscrowKey memory escrowKey = _escrowKey;
 
         require(escrowKey.isValidUserLock(msg.sender), "ERR-E32 InvalidLockStage");
             
-        _escrowKey = escrowKey.holdUserLock();
+        _escrowKey = escrowKey.holdUserLock(protocolCall.to);
         _;
 
         _escrowKey = escrowKey.turnUserLock(msg.sender);
