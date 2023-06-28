@@ -3,6 +3,11 @@ pragma solidity ^0.8.16;
 
 import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
 
+import {
+    BidData,
+    PayeeData
+} from "../libraries/DataTypes.sol";
+
 abstract contract GovernanceControl {
 
     string internal constant NOT_IMPLEMENTED = "NOT IMPLEMENTED";
@@ -139,4 +144,21 @@ abstract contract GovernanceControl {
     ) internal view virtual returns (bool) {
         revert(NOT_IMPLEMENTED);
     }
+
+
+      /////////////////////////////////////////////////////////
+     //                 GETTERS & HELPERS                   //
+    /////////////////////////////////////////////////////////
+    //
+    // View functions used by the backend to verify bid format
+    // and by the factory and ProtocolVerifier to verify the
+    // backend.  
+
+    function getPayeeData(bytes calldata data) 
+        external virtual 
+        returns (PayeeData[] memory);
+    
+    function getBidFormat(bytes calldata data) 
+        external virtual
+        returns (BidData[] memory);
 }

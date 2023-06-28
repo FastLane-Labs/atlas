@@ -286,6 +286,73 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
         delete hashLock;
     }
 
+    ///////////////// GETTERS & HELPERS // //////////////////
+    function getPayeeData(
+        bytes calldata data
+    ) external pure returns (
+        PayeeData[] memory
+    ) {
+        // This function is called by the backend to get the
+        // payee data, and by the Atlas Factory to generate a 
+        // hash to verify the backend. 
+
+        IPoolManager.PoolKey memory key = abi.decode(
+            data, 
+            (IPoolManager.PoolKey)
+        ); 
+
+        PaymentData[] memory payments = new PaymentData[](1);
+
+        payments[0] = PaymentData({
+            payee: address(key.hooks),
+            payeePercent: 100
+        });
+
+        PayeeData[] memory payeeData = new PayeeData[](2);
+
+        payeeData[0] = PayeeData({
+            token: IPoolManager.Currency.unwrap(key.currency0),
+            payments: payments,
+            data: data
+        });
+
+        payeeData[1] = PayeeData({
+            token: IPoolManager.Currency.unwrap(key.currency1),
+            payments: payments,
+            data: data
+        });
+
+        return payeeData;
+    }
+
+    function getBidFormat(
+        bytes calldata data
+    ) external pure returns (
+        BidData[] memory
+    ) {
+        // This is a helper function called by searchers
+        // so that they can get the proper format for 
+        // submitting their bids to the hook. 
+        
+        IPoolManager.PoolKey memory key = abi.decode(
+            data, 
+            (IPoolManager.PoolKey)
+        ); 
+
+        BidData[] memory bidData = new BidData[](2);
+
+        bidData[0] = BidData({
+            token: IPoolManager.Currency.unwrap(key.currency0),
+            bidAmount: 0 // <- searcher must update
+        });
+
+        bidData[1] = BidData({
+            token: IPoolManager.Currency.unwrap(key.currency1),
+            bidAmount: 0 // <- searcher must update
+        });
+
+        return bidData;
+    }
 
       /////////////////////////////////////////////////////////
      //                      V4 HOOKS                       //

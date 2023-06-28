@@ -1,6 +1,11 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
+import {
+    BidData,
+    PayeeData
+} from "../libraries/DataTypes.sol";
+
 interface IProtocolControl {
 
     function stageCall(
@@ -22,6 +27,14 @@ interface IProtocolControl {
     function getCallConfig() external view returns (
         bool, bool, bool, bool, bool, bool, bool, bool
     );
+
+    function getPayeeData(bytes calldata data) 
+        external 
+        returns (PayeeData[] memory);
+    
+    function getBidFormat(bytes calldata data) 
+        external
+        returns (BidData[] memory);
 
     function stagingDelegated() external view returns (bool delegated);
 

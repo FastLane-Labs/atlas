@@ -139,8 +139,6 @@ struct PayeeData {
 struct PaymentData {
     address payee;
     uint256 payeePercent;
-    bytes4 pmtSelector; // func selector (on payee contract) to call for custom pmt function. leave blank if payee receives funds via ERC20 transfer
-    // TODO: formalize / customize args for pmtSelector?
 }
 
 enum SearcherOutcome {
