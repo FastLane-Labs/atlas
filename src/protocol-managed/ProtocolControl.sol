@@ -3,18 +3,24 @@ pragma solidity ^0.8.16;
 
 import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
 
+import { CallBits } from "../libraries/CallBits.sol";
+
 import { GovernanceControl } from "./GovernanceControl.sol";
 import { MEVAllocator } from "./MEVAllocator.sol";
 
 import {
     BidData,
-    PayeeData
+    PayeeData,
+    ProtocolCall
 } from "../libraries/DataTypes.sol";
 
 abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
 
-    address public immutable fastLaneEscrow;
+
+    address public immutable atlas;
+    address public immutable governance;
     
+    bool public immutable sequenced;
     bool public immutable requireStaging;
     bool public immutable delegateStaging;
     bool public immutable localUser;
@@ -26,6 +32,8 @@ abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
 
     constructor(
         address escrowAddress,
+        address governanceAddress,
+        bool shouldRequireSequencedNonces,
         bool shouldRequireStaging,
         bool shouldDelegateStaging,
         bool shouldExecuteUserLocally,
@@ -36,6 +44,8 @@ abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
         bool allowRecycledStorage
         
     ) {
+
+        sequenced = shouldRequireSequencedNonces;
 
         // Disallow delegatecall when recycled storage is used
         if(allowRecycledStorage) {
@@ -68,7 +78,8 @@ abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
             // TODO: Consider allowing
         }
 
-        fastLaneEscrow = escrowAddress;
+        atlas = escrowAddress;
+        governance = governanceAddress;
 
         requireStaging = shouldRequireStaging;
         delegateStaging = shouldDelegateStaging;
@@ -85,7 +96,7 @@ abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
     modifier onlyApprovedCaller() {
         require(
             msg.sender != address(0) &&
-            msg.sender == ISafetyLocks(fastLaneEscrow).approvedCaller(),
+            msg.sender == ISafetyLocks(atlas).approvedCaller(),
             "InvalidCaller"
         );
         _;
@@ -141,10 +152,32 @@ abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
         delegated = delegateVerification;
     }
 
-    function getCallConfig() external view returns (
-        bool, bool, bool, bool, bool, bool, bool, bool
+    function requireSequencedNonces() external view returns (bool isSequenced) {
+        isSequenced = sequenced;
+    }
+
+    function getProtocolCall() external view returns (ProtocolCall memory protocolCall) {
+        protocolCall = ProtocolCall({
+            to: address(this),
+            callConfig: CallBits._buildCallConfig(
+                sequenced,
+                requireStaging,
+                delegateStaging,
+                localUser,
+                delegateUser,
+                delegateAllocating,
+                requireVerification,
+                delegateVerification,
+                recycledStorage
+            )
+        });
+    }
+
+     function _getCallConfig() internal view returns (
+        bool, bool, bool, bool, bool, bool, bool, bool, bool
     ) {
         return (
+            sequenced,
             requireStaging,
             delegateStaging,
             localUser,
@@ -154,5 +187,17 @@ abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
             delegateVerification,
             recycledStorage
         );
+    }
+
+    function getCallConfig() external view returns (
+        bool, bool, bool, bool, bool, bool, bool, bool, bool
+    ) {
+        return _getCallConfig();
+    }
+
+    function getProtocolSignatory() external view returns (
+        address governanceAddress
+    ) {
+        governanceAddress = governance;
     }
 }

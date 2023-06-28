@@ -3,7 +3,8 @@ pragma solidity ^0.8.16;
 
 import {
     BidData,
-    PayeeData
+    PayeeData,
+    ProtocolCall
 } from "../libraries/DataTypes.sol";
 
 interface IProtocolControl {
@@ -24,8 +25,10 @@ interface IProtocolControl {
         bytes calldata data
     ) external returns (bool);
 
+    function getProtocolCall() external view returns (ProtocolCall memory protocolCall);
+
     function getCallConfig() external view returns (
-        bool, bool, bool, bool, bool, bool, bool, bool
+        bool, bool, bool, bool, bool, bool, bool, bool, bool
     );
 
     function getPayeeData(bytes calldata data) 
@@ -35,6 +38,12 @@ interface IProtocolControl {
     function getBidFormat(bytes calldata data) 
         external
         returns (BidData[] memory);
+
+    function getProtocolSignatory() external view returns (
+        address governanceAddress
+    );
+
+    function requireSequencedNonces() external view returns (bool isSequenced);
 
     function stagingDelegated() external view returns (bool delegated);
 

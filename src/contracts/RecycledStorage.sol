@@ -12,12 +12,11 @@ import {
     UserCall,
     PayeeData,
     SearcherCall,
-    ProtocolData,
     Verification,
     CallChainProof
 } from "../libraries/DataTypes.sol";
 
-contract SketchyStorageEnvironment is ExecutionEnvironment{
+contract RecycledStorage is ExecutionEnvironment {
 
     // This contract is meant as a simple but untrusted implementation
     // of a way to use delegatecall.  If one of the approved protocols
@@ -71,15 +70,15 @@ contract SketchyStorageEnvironment is ExecutionEnvironment{
         // NOTE: fail result causes function to return rather than revert. 
         // This allows signature data to be stored, which helps prevent 
         // replay attacks.
-        (bool invalidCall, ProtocolData memory protocolData) = IAtlas(factory).untrustedVerifyProtocol(
-            userCall.to,
-            searcherCalls.length,
-            verification
-        );
+        if (
+            !IAtlas(factory).untrustedVerifyProtocol(
+                userCall.to,
+                searcherCalls.length,
+                protocolCall,
+                verification
+            )
+        ) { return; }
 
-        if (!invalidCall) {
-            return;
-        }
         // Signature / hashing failures past this point can be safely reverted.
         // This is because those reverts are caused by invalid signatures or 
         // altered calldata, both of which are keys in the protocol's signature
@@ -89,7 +88,6 @@ contract SketchyStorageEnvironment is ExecutionEnvironment{
         // NOTE: a msg.value *higher* than user value could be used by the staging call.
         // There is a further check in the handler before the usercall to verify. 
         require(msg.value >= userCall.value, "ERR-DS03 ValueExceedsBalance");
-        require(protocolData.owner != address(0), "ERR-DS01 UnsuportedUserTo");
         require(searcherCalls.length < type(uint8).max -1, "ERR-DS02 TooManySearcherCalls");
         require(block.number <= userCall.deadline, "ERR-DS03 DeadlineExceeded");
 

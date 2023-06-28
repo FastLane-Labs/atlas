@@ -13,6 +13,7 @@ library CallBits {
 
     function buildCallConfig(address protocolControl) internal view returns (uint16 callConfig) {
         (
+            bool sequenced,
             bool requireStaging,
             bool delegateStaging,
             bool localUser,
@@ -22,6 +23,35 @@ library CallBits {
             bool delegateVerification,
             bool recycledStorage
         ) = IProtocolControl(protocolControl).getCallConfig();
+        
+        // WTB tuple unpacking :*(
+        callConfig = _buildCallConfig(
+             sequenced,
+             requireStaging,
+             delegateStaging,
+             localUser,
+             delegateUser,
+             delegateAllocating,
+             requireVerification,
+             delegateVerification,
+             recycledStorage
+        );
+    }
+
+    function _buildCallConfig(
+        bool sequenced,
+        bool requireStaging,
+        bool delegateStaging,
+        bool localUser,
+        bool delegateUser,
+        bool delegateAllocating,
+        bool requireVerification,
+        bool delegateVerification,
+        bool recycledStorage
+    ) internal pure returns (uint16 callConfig) {
+        if (sequenced) {
+            callConfig ^= _ONE << uint16(CallConfig.Sequenced);
+        }
 
         if (requireStaging) {
             callConfig ^= _ONE << uint16(CallConfig.CallStaging);
@@ -79,6 +109,10 @@ library CallBits {
 
     function _recycledStorage(uint16 callConfig) internal pure returns (bool recycledStorage) {
         recycledStorage = (callConfig & 1 << uint16(CallConfig.RecycledStorage) != 0);
+    }
+
+    function _sequencedNonces(uint16 callConfig) internal pure returns (bool sequenced) {
+        sequenced = (callConfig & 1 << uint16(CallConfig.Sequenced) != 0);
     }
 
 }

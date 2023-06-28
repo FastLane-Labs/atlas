@@ -6,23 +6,30 @@ import {
     UserCall,
     PayeeData,
     SearcherCall,
-    Verification,
-    ProtocolData
+    Verification
 } from "../libraries/DataTypes.sol";
 
 interface IAtlas {
     function metacall(
-        ProtocolCall calldata protocolCall, // supplied by frontend
+        ProtocolCall calldata protocolCall, 
         UserCall calldata userCall,
-        PayeeData[] calldata payeeData, // supplied by frontend
-        SearcherCall[] calldata searcherCalls // supplied by FastLane via frontend integration
+        PayeeData[] calldata payeeData, 
+        SearcherCall[] calldata searcherCalls,
+        Verification calldata verification 
     ) external payable;
+
+    function getExecutionEnvironment(
+        address protocolControl
+    ) external view returns (
+        address executionEnvironment
+    );
 
     function untrustedVerifyProtocol(
         address userCallTo,
         uint256 searcherCallsLength,
+        ProtocolCall calldata protocolCall,
         Verification calldata verification
-    ) external returns (bool, ProtocolData memory);
+    ) external returns (bool);
 
     function untrustedReleaseLock(bytes32 key) external;
 }

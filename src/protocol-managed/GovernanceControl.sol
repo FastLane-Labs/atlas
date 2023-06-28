@@ -10,7 +10,7 @@ import {
 
 abstract contract GovernanceControl {
 
-    string internal constant NOT_IMPLEMENTED = "NOT IMPLEMENTED";
+    string internal constant _NOT_IMPLEMENTED = "NOT IMPLEMENTED";
     // Virtual functions to be overridden by participating protocol governance 
     // (not FastLane) prior to deploying contract. Note that protocol governance
     // will "own" this contract but that it should be immutable.  
@@ -52,7 +52,7 @@ abstract contract GovernanceControl {
     function _stageStaticCall(
         bytes calldata
     ) internal view virtual returns (bytes memory) {
-        revert(NOT_IMPLEMENTED);
+        revert(_NOT_IMPLEMENTED);
     }
 
 
@@ -88,7 +88,7 @@ abstract contract GovernanceControl {
     function _userLocalDelegateCall(
         bytes memory
     ) internal virtual returns (bytes memory) {
-        revert(NOT_IMPLEMENTED);
+        revert(_NOT_IMPLEMENTED);
     }
 
     // _userLocalStandardCall
@@ -106,7 +106,7 @@ abstract contract GovernanceControl {
     function _userLocalStandardCall(
         bytes memory
     ) internal virtual returns (bytes memory) {
-        revert(NOT_IMPLEMENTED);
+        revert(_NOT_IMPLEMENTED);
     }
     
       /////////////////////////////////////////////////////////
@@ -129,7 +129,7 @@ abstract contract GovernanceControl {
     function _verificationDelegateCall(
         bytes calldata
     ) internal virtual returns (bool) {
-        revert(NOT_IMPLEMENTED); 
+        revert(_NOT_IMPLEMENTED); 
     }
 
     // _verificationStaticCall
@@ -142,7 +142,7 @@ abstract contract GovernanceControl {
     function _verificationStaticCall(
         bytes calldata
     ) internal view virtual returns (bool) {
-        revert(NOT_IMPLEMENTED);
+        revert(_NOT_IMPLEMENTED);
     }
 
 

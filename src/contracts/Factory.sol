@@ -1,19 +1,21 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
+import { IProtocolControl } from "../interfaces/IProtocolControl.sol";
+
 import "openzeppelin-contracts/contracts/access/Ownable.sol";
 
 import { ReentrancyGuard } from "solmate/utils/ReentrancyGuard.sol";
 
 import { Escrow } from "./Escrow.sol";
-import { SketchyStorageEnvironment } from "./SketchyStorage.sol";
+import { RecycledStorage } from "./RecycledStorage.sol";
 import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
 
-import {
-    ProtocolData
+import { 
+    ProtocolCall 
 } from "../libraries/DataTypes.sol";
 
-contract FastLaneFactory is Ownable, ReentrancyGuard {
+contract Factory is ReentrancyGuard {
 
     uint256 constant public PROTOCOL_SHARE = 5;
 
@@ -47,7 +49,7 @@ contract FastLaneFactory is Ownable, ReentrancyGuard {
             )
         );
 
-        SketchyStorageEnvironment _dirtyContract = new SketchyStorageEnvironment{
+        RecycledStorage _dirtyContract = new RecycledStorage{
             salt: _dirtySalt
         }(PROTOCOL_SHARE, escrowAddress);
 
@@ -57,38 +59,52 @@ contract FastLaneFactory is Ownable, ReentrancyGuard {
     // TODO: Consider limiting who can call this
     function revive() external {
         if (dirtyAddress.codehash == bytes32(0)) {
-            new SketchyStorageEnvironment{
+            new RecycledStorage{
                 salt: _dirtySalt
             }(PROTOCOL_SHARE, escrowAddress);
         }
     }
 
-    function _getHandlerAddress(
-        ProtocolData memory protocolData
-    ) internal view returns (address handlerAddress) {
+    function getExecutionEnvironment(
+        address protocolControl
+    ) external view returns (
+        address executionEnvironment
+    ) {
+        executionEnvironment = _getExecutionEnvironment(protocolControl);
+    }
+
+    function _getExecutionEnvironment(
+        address protocolControl
+    ) internal view returns (
+        address executionEnvironment
+    ) {
+        
+        ProtocolCall memory protocolCall = IProtocolControl(protocolControl).getProtocolCall();
         
         bytes32 salt = keccak256(
             abi.encodePacked(
+                block.chainid,
                 escrowAddress,
-                protocolData.owner,
-                protocolData.callConfig,
-                protocolData.split
+                protocolCall.to,
+                protocolCall.callConfig,
+                PROTOCOL_SHARE
             )
         );
 
-        handlerAddress = address(uint160(uint(keccak256(abi.encodePacked(
+        executionEnvironment = address(uint160(uint(keccak256(abi.encodePacked(
             bytes1(0xff),
             address(this),
             salt,
             keccak256(
                 abi.encodePacked(
                     type(ExecutionEnvironment).creationCode,
-                    protocolData.split,
+                    PROTOCOL_SHARE,
                     escrowAddress
                 )
             )
         ))))); 
     }
+    
 
     function _getDirtyAddress() internal view returns (address) {
         return dirtyAddress;

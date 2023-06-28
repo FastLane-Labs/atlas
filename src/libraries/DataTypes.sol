@@ -9,13 +9,17 @@ struct SearcherEscrow {
     uint32 nonce; // EOA nonce.
 }
 
+struct ProtocolCall { 
+    address to;
+    uint16 callConfig;
+}
+
 struct ProtocolProof {
     address from;
     address to;
     uint256 nonce;
     uint256 deadline;
     bytes32 userCallHash; // keccak256 of userCall.to, userCall.data
-    bytes32 protocolDataHash; // keccak256 of ProtocolData struct
     bytes32 callChainHash; // keccak256 of the searchers' txs
 }
 
@@ -24,14 +28,20 @@ struct Verification {
     bytes signature;
 }
 
-struct ProtocolData {
-    address owner; // the protocol, not fastlane
-    uint32 nonce; 
+struct GovernanceData {
+    address governance;
     uint16 callConfig; // bitwise
-    uint16 split; // FL revenue share
+    uint64 lastUpdate; 
+}
+
+struct ApproverSigningData {
+    address governance; // signing on behalf of
+    bool enabled; // EOA has been disabled if false
+    uint64 nonce; // the highest nonce used so far. n+1 is always available
 }
 
 enum CallConfig { // for readability, will get broken down into pure funcs later
+    Sequenced,
     CallStaging,
     DelegateStaging,
     DelegateUser,
@@ -103,17 +113,6 @@ enum ExecutionPhase {
     UserRefund,
     Verification,
     Releasing
-}
-
-
-/// @notice contract call set by front end to prepare state for user's call (IE token transfers to address(this))
-/// @param to address to call
-/// @param stagingSelector func selector to call
-/// @dev This is set by the front end!
-/// @dev The stagingSelector's argument types must match the user's call's argument types to properly stage the meta tx.
-struct ProtocolCall { 
-    address to;
-    uint16 callConfig;
 }
 
 struct UserCall {

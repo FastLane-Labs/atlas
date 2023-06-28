@@ -78,8 +78,6 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
     }
 
     bytes4 public constant SWAP = IPoolManager.swap.selector;
-
-    address public immutable atlas;
     address public immutable hook;
     address public immutable v4Singleton;
 
@@ -92,7 +90,9 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
     ) 
     MEVAllocator() 
     ProtocolControl(
-        _atlas, 
+        _atlas,
+        msg.sender,
+        true,
         true,
         true,
         false,
@@ -105,6 +105,7 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
         /*
         ProtocolControl(
             _atlas, // escrowAddress
+            true, // shouldRequireSequencedNonces
             true, // shouldRequireStaging
             true, // shouldDelegateStaging
             false, // shouldExecuteUserLocally
@@ -116,7 +117,6 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
         )
         */ 
 
-        atlas = _atlas;
         hook = address(this);
         v4Singleton = _v4Singleton;
     }
@@ -289,7 +289,7 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
     ///////////////// GETTERS & HELPERS // //////////////////
     function getPayeeData(
         bytes calldata data
-    ) external pure returns (
+    ) external pure override returns (
         PayeeData[] memory
     ) {
         // This function is called by the backend to get the
@@ -327,7 +327,7 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
 
     function getBidFormat(
         bytes calldata data
-    ) external pure returns (
+    ) external pure override returns (
         BidData[] memory
     ) {
         // This is a helper function called by searchers

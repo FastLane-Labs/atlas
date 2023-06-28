@@ -4,11 +4,10 @@ pragma solidity ^0.8.16;
 import { IAtlas } from "../interfaces/IAtlas.sol";
 
 import { Escrow } from "./Escrow.sol";
-import { FastLaneFactory } from "./Factory.sol";
+import { Factory } from "./Factory.sol";
 import { ProtocolVerifier } from "./ProtocolVerification.sol";
 
 import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
-import { SketchyStorageEnvironment } from "./SketchyStorage.sol";
 
 import { CallVerification } from "../libraries/CallVerification.sol";
 
@@ -19,19 +18,18 @@ import {
     UserCall,
     PayeeData,
     SearcherCall,
-    ProtocolData,
     Verification,
     CallChainProof
 } from "../libraries/DataTypes.sol";
 
-contract Atlas is FastLaneFactory, ProtocolVerifier {
+contract Atlas is Factory, ProtocolVerifier {
 
     bytes32 internal _dirtyLock;
 
     constructor(
         address _fastlanePayee,
         uint32 _escrowDuration
-    ) FastLaneFactory(_fastlanePayee, _escrowDuration) {}
+    ) Factory(_fastlanePayee, _escrowDuration) {}
 
     function metacall(
         ProtocolCall calldata protocolCall, // supplied by frontend
@@ -58,12 +56,10 @@ contract Atlas is FastLaneFactory, ProtocolVerifier {
         // NOTE: fail result causes function to return rather than revert. 
         // This allows signature data to be stored, which helps prevent 
         // replay attacks.
-        (bool invalidCall, ProtocolData memory protocolData) = _verifyProtocol(
-            userCall.to, verification
-        );
-        if (!invalidCall) {
+        if (!_verifyProtocol(userCall.to, protocolCall, verification)) {
             return;
         }
+
         // Signature / hashing failures past this point can be safely reverted.
         // This is because those reverts are caused by invalid signatures or 
         // altered calldata, both of which are keys in the protocol's signature
@@ -73,7 +69,6 @@ contract Atlas is FastLaneFactory, ProtocolVerifier {
         // NOTE: a msg.value *higher* than user value could be used by the staging call.
         // There is a further check in the handler before the usercall to verify. 
         require(msg.value >= userCall.value, "ERR-H03 ValueExceedsBalance");
-        require(protocolData.owner != address(0), "ERR-F01 UnsuportedUserTo");
         require(searcherCalls.length < type(uint8).max -1, "ERR-F02 TooManySearcherCalls");
         require(block.number <= userCall.deadline, "ERR-F03 DeadlineExceeded");
 
@@ -84,12 +79,12 @@ contract Atlas is FastLaneFactory, ProtocolVerifier {
                 abi.encodePacked(
                     block.chainid,
                     escrowAddress,
-                    protocolData.owner,
-                    protocolData.callConfig,
-                    protocolData.split
+                    protocolCall.to,
+                    protocolCall.callConfig,
+                    PROTOCOL_SHARE
                 )
             )
-        }(false, protocolData.split, escrowAddress);
+        }(false, PROTOCOL_SHARE, escrowAddress);
 
         // Initialize the escrow locks
         _escrowContract.initializeEscrowLocks(
@@ -126,16 +121,15 @@ contract Atlas is FastLaneFactory, ProtocolVerifier {
     function untrustedVerifyProtocol(
         address userCallTo,
         uint256 searcherCallsLength,
+        ProtocolCall calldata protocolCall,
         Verification calldata verification
-    ) external nonReentrant returns (bool invalidCall, ProtocolData memory protocolData) {
+    ) external nonReentrant returns (bool invalidCall) {
 
         require(msg.sender == dirtyAddress, "ERR-H03 InvalidCaller");
         require(_dirtyLock == bytes32(0), "ERR-H04 AlreadyLocked");
         
-        (invalidCall, protocolData) = _verifyProtocol(userCallTo, verification);
-
-        if (invalidCall) {
-            return (invalidCall, protocolData);
+        if (!_verifyProtocol(userCallTo, protocolCall, verification)) {
+            return false;
         }
 
         // Initialize the escrow locks
@@ -146,6 +140,8 @@ contract Atlas is FastLaneFactory, ProtocolVerifier {
 
         // Store the penultimate call hash
         _dirtyLock = verification.proof.callChainHash;
+
+        return true;
     }
 
     function untrustedReleaseLock(bytes32 key) external nonReentrant {
