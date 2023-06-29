@@ -13,13 +13,13 @@ import "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 import { SafetyLocks } from "./SafetyLocks.sol";
 import { SearcherWrapper } from "./SearcherWrapper.sol";
 import { FastLaneErrorsEvents } from "./Emissions.sol";
-import { EscrowBits } from "../libraries/EscrowBits.sol"; 
-
 
 import "../types/CallTypes.sol";
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
 import "../types/VerificationTypes.sol";
+
+import { EscrowBits } from "../libraries/EscrowBits.sol"; 
 
 contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
     using ECDSA for bytes32;

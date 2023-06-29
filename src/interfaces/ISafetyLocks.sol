@@ -11,6 +11,13 @@ interface ISafetyLocks {
         bytes memory userReturnData
     ) external;
 
+    function initializeEscrowLocks(
+        address executionEnvironment,
+        uint8 searcherCallCount
+    ) external;
+
+    function releaseEscrowLocks() external;
+
     function approvedCaller() external view returns (address);
 
     function getLockState() external view returns (EscrowKey memory);

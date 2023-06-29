@@ -21,15 +21,16 @@ library CallVerification {
     }
 
     function addVerificationCallProof(
-        bytes32[] memory self,
+        CallChainProof memory self,
         address to,
         bool isDelegated,
         bytes memory stagingReturnData,
         bytes memory userReturnData
-    ) internal pure returns (bytes32[] memory) {
-        self[self.length-1] = keccak256(
+    ) internal pure returns (CallChainProof memory) {
+        self.previousHash = self.targetHash;
+        self.targetHash = keccak256(
             abi.encodePacked(
-                self[self.length-2],
+                self.previousHash,
                 to,
                 abi.encodeWithSelector(
                     IProtocolControl.verificationCall.selector, 
@@ -37,7 +38,7 @@ library CallVerification {
                     userReturnData
                 ),
                 isDelegated, 
-                self.length-1
+                ++self.index
             )
         );
         return self;

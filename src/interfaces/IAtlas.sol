@@ -24,12 +24,17 @@ interface IAtlas {
         address executionEnvironment
     );
 
-    function untrustedVerifyProtocol(
+    function userDirectVerifyProtocol(
+        address userCallFrom,
         address userCallTo,
         uint256 searcherCallsLength,
         ProtocolCall calldata protocolCall,
         Verification calldata verification
     ) external returns (bool);
 
-    function untrustedReleaseLock(bytes32 key) external;
+    function userDirectReleaseLock(
+        address userCallFrom,
+        bytes32 key,
+        ProtocolCall calldata protocolCall
+    ) external;
 }

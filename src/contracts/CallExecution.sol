@@ -9,90 +9,26 @@ import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
 import { FastLaneErrorsEvents } from "./Emissions.sol";
 
-import { CallVerification } from "../libraries/CallVerification.sol";
-import { ExecutionControl } from "../libraries/ExecutionControl.sol";
-
 import "../types/CallTypes.sol";
 import "../types/VerificationTypes.sol";
 
-// TODO: this would be the FastLane address - fill in. 
-address constant FEE_RECIPIENT = address(0); 
+import { CallVerification } from "../libraries/CallVerification.sol";
+import { ExecutionControl } from "../libraries/ExecutionControl.sol";
 
 contract CallExecution is FastLaneErrorsEvents {
     using CallVerification for CallChainProof;
 
-    address immutable public owner;
-    address immutable internal _escrow;
-    address immutable internal _factory;
-    address immutable internal _payee;
-    uint256 immutable internal _payeeShare;
+    uint256 constant public ATLAS_SHARE = 5; // TODO: this would be the FastLane address - fill in. 
+    address constant public ATLAS_RECIPIENT = address(0); 
 
-    constructor(address user, address escrow, address factory, uint256 payeeShare) {
-        owner = user;
-        _escrow = escrow;
-        _factory = factory;
-        _payee = FEE_RECIPIENT;
-        _payeeShare = payeeShare;
-    }
+    address immutable public user;
+    address immutable public escrow;
+    address immutable public factory;
 
-    function withdrawERC20(address token, uint256 amount) external {
-        require(msg.sender == owner, "ERR-EC01 NotEnvironmentOwner");
-
-        if (ERC20(token).balanceOf(address(this)) >= amount) {
-            SafeTransferLib.safeTransfer(
-                ERC20(token), 
-                msg.sender, 
-                amount
-            );
-
-        } else {
-            revert("ERR-EC02 BalanceTooLow");
-        }
-    }
-
-    function factoryWithdrawERC20(address user, address token, uint256 amount) external {
-        require(msg.sender == _factory, "ERR-EC10 NotFactory");
-        require(user == owner, "ERR-EC11 NotEnvironmentOwner");
-
-        if (ERC20(token).balanceOf(address(this)) >= amount) {
-            SafeTransferLib.safeTransfer(
-                ERC20(token), 
-                owner, 
-                amount
-            );
-
-        } else {
-            revert("ERR-EC02 BalanceTooLow");
-        }
-    }
-
-    function withdrawEther(uint256 amount) external {
-        require(msg.sender == owner, "ERR-EC01 NotEnvironmentOwner");
-
-        if (address(this).balance >= amount) {
-            SafeTransferLib.safeTransferETH(
-                msg.sender, 
-                amount
-            );
-            
-        } else {
-            revert("ERR-EC03 BalanceTooLow");
-        }
-    }
-
-    function factoryWithdrawEther(address user, uint256 amount) external {
-        require(msg.sender == _factory, "ERR-EC10 NotFactory");
-        require(user == owner, "ERR-EC11 NotEnvironmentOwner");
-
-        if (address(this).balance >= amount) {
-            SafeTransferLib.safeTransferETH(
-                owner, 
-                amount
-            );
-            
-        } else {
-            revert("ERR-EC03 BalanceTooLow");
-        }
+    constructor(address _user, address _escrow, address _factory) {
+        user = _user;
+        escrow = _escrow;
+        factory = _factory;
     }
 
     function stagingWrapper(
@@ -100,10 +36,9 @@ contract CallExecution is FastLaneErrorsEvents {
         ProtocolCall calldata protocolCall,
         UserCall calldata userCall
     ) external returns (bytes memory stagingData) {
-        // Executed by the ExecutionEnvironment
-        
-        // This must be called by the escrow contract to ensure the locks are locked
-        require(msg.sender == _escrow, "ERR-CE00 InvalidSenderStaging");
+        // msg.sender = escrow
+        // address(this) = ExecutionEnvironment
+        require(msg.sender == escrow, "ERR-CE00 InvalidSenderStaging");
 
         stagingData = ExecutionControl.stage(proof, protocolCall, userCall);
 
@@ -115,10 +50,9 @@ contract CallExecution is FastLaneErrorsEvents {
         bytes memory stagingReturnData,
         UserCall calldata userCall
     ) external payable returns (bytes memory userReturnData) {
-        // Executed by the ExecutionEnvironment
-
-        // This must be called by the escrow contract to ensure the locks are locked
-        require(msg.sender == _escrow, "ERR-CE00 InvalidSenderStaging");
+        // msg.sender = escrow
+        // address(this) = ExecutionEnvironment
+        require(msg.sender == escrow, "ERR-CE00 InvalidSenderStaging");
 
         userReturnData = ExecutionControl.user(proof, protocolCall, stagingReturnData, userCall);
     }
@@ -129,10 +63,9 @@ contract CallExecution is FastLaneErrorsEvents {
         bytes memory stagingReturnData, 
         bytes memory userReturnData
     ) external {
-        // Executed by the ExecutionEnvironment
-
-        // This must be called by the escrow contract to ensure the locks are locked
-        require(msg.sender == _escrow, "ERR-CE00 InvalidSenderStaging");
+        // msg.sender = escrow
+        // address(this) = ExecutionEnvironment
+        require(msg.sender == escrow, "ERR-CE00 InvalidSenderStaging");
 
         ExecutionControl.verify(proof, protocolCall, stagingReturnData, userReturnData);
     }
@@ -143,17 +76,16 @@ contract CallExecution is FastLaneErrorsEvents {
         uint256 gasLimit,
         SearcherCall calldata searcherCall
     ) external {
-        // Executed by the ExecutionEnvironment
-
-        // Verify that it's the escrow contract calling
-        require(msg.sender == _escrow, "ERR-04 InvalidCaller");
+        // msg.sender = escrow
+        // address(this) = ExecutionEnvironment
+        require(msg.sender == escrow, "ERR-04 InvalidCaller");
         require(
             address(this).balance == searcherCall.metaTx.value,
             "ERR-CE05 IncorrectValue"
         );
 
         // Searcher may pay the msg.value back to the Escrow contract directly
-        uint256 escrowEtherBalance = _escrow.balance;
+        uint256 escrowEtherBalance = escrow.balance;
 
         // track token balances to measure if the bid amount is paid.
         uint256[] memory tokenBalances = new uint[](searcherCall.bids.length);
@@ -200,12 +132,12 @@ contract CallExecution is FastLaneErrorsEvents {
         // Verify that it was successful
         require(success, SEARCHER_CALL_REVERTED);
 
-        require(ISafetyLocks(_escrow).confirmSafetyCallback(), SEARCHER_FAILED_CALLBACK);
+        require(ISafetyLocks(escrow).confirmSafetyCallback(), SEARCHER_FAILED_CALLBACK);
 
         // Get the value delta from the escrow contract
         // NOTE: reverting on underflow here is intended behavior since the ExecutionEnviront address
         // should have 0 value. 
-        uint256 escrowBalanceDelta = escrowEtherBalance - _escrow.balance;
+        uint256 escrowBalanceDelta = escrowEtherBalance - escrow.balance;
 
         // Verify that the searcher repaid their msg.value
         require(escrowBalanceDelta >= searcherCall.metaTx.value, SEARCHER_MSG_VALUE_UNPAID);
@@ -254,10 +186,9 @@ contract CallExecution is FastLaneErrorsEvents {
         BidData[] memory bids, // Converted to memory
         PayeeData[] calldata payeeData
     ) external {
-
-        // NOTE: the relay/frontend will verify and sign that the bid 
-        // and payments arrays are aligned.  Could check here but.. gas costs :(
-        require(msg.sender == _escrow, "ERR-04 InvalidCaller");
+        // msg.sender = escrow
+        // address(this) = ExecutionEnvironment
+        require(msg.sender == escrow, "ERR-04 InvalidCaller");
 
         uint256 totalEtherReward;
         uint256 payment;
@@ -265,14 +196,14 @@ contract CallExecution is FastLaneErrorsEvents {
 
         for (; i < bids.length;) {
 
-            payment = (bids[i].bidAmount * _payeeShare) / 100;
+            payment = (bids[i].bidAmount * ATLAS_SHARE) / 100;
 
             if (bids[i].token != address(0)) {
-                SafeTransferLib.safeTransfer(ERC20(bids[i].token), _payee, payment);
-                totalEtherReward = payment; // NOTE: This is transferred to protocolControl as msg.value
+                SafeTransferLib.safeTransfer(ERC20(bids[i].token), ATLAS_RECIPIENT, payment);
+                totalEtherReward = bids[i].bidAmount - payment; // NOTE: This is transferred to protocolControl as msg.value
             
             } else {
-                SafeTransferLib.safeTransferETH(_payee, payment);
+                SafeTransferLib.safeTransferETH(ATLAS_RECIPIENT, payment);
             }
 
             bids[i].bidAmount -= payment;

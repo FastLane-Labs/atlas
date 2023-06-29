@@ -2,8 +2,17 @@
 pragma solidity ^0.8.16;
 
 import "../types/CallTypes.sol";
+import { CallChainProof } from "../types/VerificationTypes.sol";
 
 interface IExecutionEnvironment {
+
+    function protoCall( 
+        ProtocolCall calldata protocolCall, // supplied by frontend
+        UserCall calldata userCall,
+        PayeeData[] calldata payeeData, // supplied by frontend
+        SearcherCall[] calldata searcherCalls, // supplied by FastLane via frontend integration
+        bytes32[] calldata executionHashChain // calculated by msg.sender (Factory)
+    ) external payable returns (CallChainProof memory);
 
     function delegateStagingWrapper(
         ProtocolCall calldata protocolCall,

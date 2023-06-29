@@ -44,11 +44,11 @@ contract SafetyLocks {
         address executionEnvironment,
         uint8 searcherCallCount
     ) external {
-        
+        require(msg.sender == factory, "ERR-ES02 InvalidSender");
+
         EscrowKey memory escrowKey = _escrowKey;
         
         require(
-            msg.sender != address(0) &&
             escrowKey.approvedCaller == address(0) &&
             escrowKey.makingPayments == false &&
             escrowKey.paymentsComplete == false &&
@@ -57,7 +57,6 @@ contract SafetyLocks {
             escrowKey.lockState == uint64(0),
             "ERR-ES001 AlreadyInitialized"
         );
-        require(msg.sender == factory, "ERR-ES02 InvalidSender");
 
         _escrowKey = escrowKey.initializeEscrowLock(
             searcherCallCount,

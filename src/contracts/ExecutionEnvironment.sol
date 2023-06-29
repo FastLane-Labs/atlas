@@ -2,9 +2,6 @@
 pragma solidity ^0.8.16;
 
 import { IEscrow } from "../interfaces/IEscrow.sol";
-import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
-
-import { CallVerification } from "../libraries/CallVerification.sol";
 
 import { SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 
@@ -13,22 +10,24 @@ import { CallExecution } from "./CallExecution.sol";
 import "../types/CallTypes.sol";
 import "../types/VerificationTypes.sol";
 
+import { CallVerification } from "../libraries/CallVerification.sol";
+
 contract ExecutionEnvironment is CallExecution {
     using CallVerification for CallChainProof;
     using CallVerification for bytes32[];
 
-    bool immutable internal _dirty; 
-
-    // NOTE: If _dirty is true, that means contract has untrustworthy storage
-    // because it not selfdestructed() on each go. 
+    address immutable public control;
+    uint16 immutable public config;
 
     constructor(
-        address user,
-        address escrow,
-        bool isRecycled,
-        uint256 protocolShare
-    ) CallExecution(user, escrow, msg.sender, protocolShare) {
-        _dirty = isRecycled;
+        address _user,
+        address _escrow,
+        address _factory,
+        address _protocolControl,
+        uint16 _callConfig
+    ) CallExecution(_user, _escrow, _factory) {
+        control = _protocolControl;
+        config = _callConfig;
     } 
 
     function protoCall( 
@@ -36,15 +35,27 @@ contract ExecutionEnvironment is CallExecution {
         UserCall calldata userCall,
         PayeeData[] calldata payeeData, // supplied by frontend
         SearcherCall[] calldata searcherCalls, // supplied by FastLane via frontend integration
-        bytes32[] memory executionHashChain // calculated by msg.sender (Factory)
-    ) external 
-        payable 
+        bytes32[] calldata executionHashChain // calculated by msg.sender (Factory)
+    ) external payable returns (CallChainProof memory) { 
+        return _protoCall(
+            protocolCall,
+            userCall,
+            payeeData,
+            searcherCalls,
+            executionHashChain
+        );
+    }
+
+    function _protoCall( 
+        ProtocolCall calldata protocolCall,
+        UserCall calldata userCall,
+        PayeeData[] calldata payeeData, 
+        SearcherCall[] calldata searcherCalls, 
+        bytes32[] memory executionHashChain 
+    ) internal validSender(protocolCall, userCall) 
         returns (CallChainProof memory proof) 
     {
-        // Make sure it's the factory calling or a dirty storage contract
-        require(_dirty || msg.sender == _factory, "ERR-H00 InvalidSender");
-
-        // Build initialize proof for executionHashChain for sequence verification
+        // Initialize proof for executionHashChain for sequence verification
         proof = CallVerification.initializeProof(
             keccak256(abi.encodePacked(userCall.to, userCall.data)), 
             executionHashChain
@@ -62,7 +73,7 @@ contract ExecutionEnvironment is CallExecution {
         // NOTE: the calldata for the staging call must be the user's calldata
         // NOTE: the staging contracts we're calling should be custom-made for each protocol and 
         // should be immutable.  If an update is required, a new one should be made. 
-        bytes memory stagingReturnData = IEscrow(_escrow).executeStagingCall(
+        bytes memory stagingReturnData = IEscrow(escrow).executeStagingCall(
             proof,
             protocolCall,
             userCall
@@ -80,19 +91,11 @@ contract ExecutionEnvironment is CallExecution {
 
         proof = proof.next(executionHashChain);
 
-        bytes memory userReturnData = IEscrow(_escrow).executeUserCall(
+        bytes memory userReturnData = IEscrow(escrow).executeUserCall(
             proof,
             protocolCall,
             stagingReturnData,
             userCall
-        );
-
-        // Build the final proof now that we know its input data
-        executionHashChain = executionHashChain.addVerificationCallProof(
-            protocolCall.to,
-            CallVerification.delegateVerification(protocolCall.callConfig),
-            stagingReturnData,
-            userReturnData
         );
         
         // forward any surplus msg.value to the escrow for tracking
@@ -100,7 +103,7 @@ contract ExecutionEnvironment is CallExecution {
         // are finished processing
         if (address(this).balance != 0) {
             SafeTransferLib.safeTransferETH(
-                _escrow, 
+                escrow, 
                 address(this).balance
             );
         }
@@ -109,21 +112,12 @@ contract ExecutionEnvironment is CallExecution {
         // ---------------------------------------------
         // #########  BEGIN SEARCHER EXECUTION ##########
 
-        uint256 i; // init at 0
-        bool auctionWon = false;
-
-        for (; i < searcherCalls.length;) {
-
-            proof = proof.next(executionHashChain);
-
-            if (_iterateSearcher(proof, searcherCalls[i], auctionWon)) {
-                if (!auctionWon) {
-                    auctionWon = true;
-                    _handlePayments(protocolCall, searcherCalls[i].bids, payeeData);
-                }
-            }
-            unchecked { ++i; }
-        }
+        _iterateSearchers(
+            protocolCall,
+            payeeData,
+            searcherCalls,
+            executionHashChain
+        );
 
         // ###########  END SEARCHER EXECUTION #############
         // ---------------------------------------------
@@ -131,9 +125,15 @@ contract ExecutionEnvironment is CallExecution {
 
         // Run a post-searcher verification check with the data from the staging call 
         // and the user's return data.
-        proof = proof.next(executionHashChain);
+        // Build the final proof now that we know its input data
+        proof = proof.addVerificationCallProof(
+            protocolCall.to,
+            CallVerification.delegateVerification(protocolCall.callConfig),
+            stagingReturnData,
+            userReturnData
+        );
 
-        IEscrow(_escrow).executeVerificationCall(
+        IEscrow(escrow).executeVerificationCall(
             proof,
             protocolCall,
             stagingReturnData,
@@ -143,25 +143,37 @@ contract ExecutionEnvironment is CallExecution {
         // #########  END VERIFICATION EXECUTION ##########
     }
 
-    function _iterateSearcher(
-        CallChainProof memory proof,
-        SearcherCall calldata searcherCall,
-        bool auctionAlreadyWon
-    ) internal returns (bool) {
-        uint256 gasWaterMark = gasleft();
+    function _iterateSearchers(
+        ProtocolCall calldata protocolCall,
+        PayeeData[] calldata payeeData,
+        SearcherCall[] calldata searcherCalls,
+        bytes32[] memory executionHashChain
+    ) internal returns (CallChainProof memory proof) {
+        uint256 i; // init at 0
+        bool auctionAlreadyWon = false;
+        uint256 gasWaterMark;
 
-        if (
-            IEscrow(_escrow).executeSearcherCall(
-                proof,
-                gasWaterMark,
-                auctionAlreadyWon,
-                searcherCall
-            ) && !auctionAlreadyWon
-        ) {
-            
-            auctionAlreadyWon = true;
+        for (; i < searcherCalls.length;) {
+
+            gasWaterMark = gasleft();
+
+            proof = proof.next(executionHashChain);
+
+            if (
+                IEscrow(escrow).executeSearcherCall(
+                    proof,
+                    gasWaterMark,
+                    auctionAlreadyWon,
+                    searcherCalls[i]
+                )
+            ) {
+                if (!auctionAlreadyWon) {
+                    auctionAlreadyWon = true;
+                    _handlePayments(protocolCall, searcherCalls[i].bids, payeeData);
+                }
+            }
+            unchecked { ++i; }
         }
-        return auctionAlreadyWon;
     }
 
     function _handlePayments(
@@ -170,11 +182,23 @@ contract ExecutionEnvironment is CallExecution {
         PayeeData[] calldata payeeData
     ) internal {
         // If this is first successful call, issue payments
-        IEscrow(_escrow).executePayments(
+        IEscrow(escrow).executePayments(
             protocolCall,
             bids,
             payeeData
         );
+    }
+
+    modifier validSender(
+        ProtocolCall calldata protocolCall, // supplied by frontend
+        UserCall calldata userCall
+    ) {
+        require(userCall.from == user, "ERR-EE01 InvalidUser");
+        require(protocolCall.to == control, "ERR-EE02 InvalidControl");
+        require(protocolCall.callConfig == config, "ERR-EE03 InvalidConfig");
+        require(msg.sender == factory || msg.sender == user, "ERR-EE04 InvalidSender");
+        require(tx.origin == user, "ERR-EE05 InvalidOrigin");
+        _;
     }
 
     receive() external payable {}

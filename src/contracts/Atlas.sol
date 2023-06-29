@@ -1,156 +1,137 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import { IAtlas } from "../interfaces/IAtlas.sol";
+import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
+import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
 
-import { Escrow } from "./Escrow.sol";
 import { Factory } from "./Factory.sol";
 import { ProtocolVerifier } from "./ProtocolVerification.sol";
-
-import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
-
-import { CallVerification } from "../libraries/CallVerification.sol";
-
-import "openzeppelin-contracts/contracts/access/Ownable.sol";
+import { Metacall } from "./Metacall.sol";
 
 import "../types/CallTypes.sol";
 import "../types/VerificationTypes.sol";
 
-contract Atlas is Factory, ProtocolVerifier {
+import { CallVerification } from "../libraries/CallVerification.sol";
 
-    bytes32 internal _dirtyLock;
+contract Atlas is Metacall, Factory, ProtocolVerifier {
+
+    bytes32 internal _userLock;
 
     constructor(
         address _fastlanePayee,
         uint32 _escrowDuration
-    ) Factory(_fastlanePayee, _escrowDuration) {}
+    ) Factory(_escrowDuration) {}
 
-    function metacall(
-        ProtocolCall calldata protocolCall, // supplied by frontend
-        UserCall calldata userCall, // set by user
-        PayeeData[] calldata payeeData, // supplied by frontend
-        SearcherCall[] calldata searcherCalls, // supplied by FastLane via frontend integration
-        Verification calldata verification // supplied by front end after it sees the other data
-    ) external payable nonReentrant {
-        // build a memory array to later verify execution ordering. Each bytes32 
-        // is the hash of the calldata, a bool representing if its a delegatecall
-        // or standard call, and a uint256 representing its execution index
-        // order is:
-        //      0: stagingCall
-        //      1: userCall + keccak of prior
-        //      2 to n: searcherCalls + keccak of prior
-        // NOTE: if the staging call is skipped, the userCall has the 0 index.
-        bytes32[] memory executionHashChain = CallVerification.buildExecutionHashChain(
-            protocolCall,
-            userCall,
-            searcherCalls
-        );
-
-        // Verify that the calldata injection came from the protocol frontend
-        // NOTE: fail result causes function to return rather than revert. 
-        // This allows signature data to be stored, which helps prevent 
-        // replay attacks.
-        if (!_verifyProtocol(userCall.to, protocolCall, verification)) {
-            return;
-        }
-
-        // Signature / hashing failures past this point can be safely reverted.
-        // This is because those reverts are caused by invalid signatures or 
-        // altered calldata, both of which are keys in the protocol's signature
-        // and which will *always* fail, making replay attacks impossible. 
-
-        // Check that the value of the tx is greater than or equal to the value specified
-        // NOTE: a msg.value *higher* than user value could be used by the staging call.
-        // There is a further check in the handler before the usercall to verify. 
-        require(msg.value >= userCall.value, "ERR-H03 ValueExceedsBalance");
-        require(searcherCalls.length < type(uint8).max -1, "ERR-F02 TooManySearcherCalls");
-        require(block.number <= userCall.deadline, "ERR-F03 DeadlineExceeded");
-
-        
-        ExecutionEnvironment _executionEnvironment;
-
-        // Calculate the user's execution environment address
-        ExecutionEnvironment environment = ExecutionEnvironment(payable(_getExecutionEnvironment(msg.sender, protocolCall.to)));
-
-        // Initialize a new, blank execution environment for the user if there isn't one already
-        if (address(environment).codehash == bytes32(0)) {
-            _executionEnvironment = new ExecutionEnvironment{
-                salt: keccak256(
-                    abi.encodePacked(
-                        block.chainid,
-                        msg.sender, // User
-                        escrowAddress,
-                        protocolCall.to,
-                        protocolCall.callConfig,
-                        PROTOCOL_SHARE
-                    )
-                )
-            }(msg.sender, escrowAddress, false, PROTOCOL_SHARE);
+    function _validateProtocolControl(
+        address userCallTo,
+        uint256 searcherCallsLength,
+        ProtocolCall calldata protocolCall,
+        Verification calldata verification
+    ) internal override returns (bool) {
+        if (!_verifyProtocol(userCallTo, protocolCall, verification)) {
+            return false;
         }
 
         // Initialize the escrow locks
-        _escrowContract.initializeEscrowLocks(
-            address(_executionEnvironment),
-            uint8(searcherCalls.length)
+        ISafetyLocks(escrow).initializeEscrowLocks(
+            address(msg.sender),
+            uint8(searcherCallsLength)
         );
 
-        // Handoff to the execution environment, which returns the verified proof
-        CallChainProof memory proof = _executionEnvironment.protoCall(
+        return true;
+    }
+
+    function _prepEnvironment(ProtocolCall calldata protocolCall) internal override returns (address environment) {
+        // Calculate the user's execution environment address
+        environment = _getExecutionEnvironment(msg.sender, protocolCall.to);
+
+        // Initialize a new, blank execution environment for the user if there isn't one already
+        if (environment.codehash == bytes32(0)) {
+            environment = _deployExecutionEnvironment(
+                msg.sender,
+                protocolCall
+            );
+        }
+    }
+
+    function _execute(
+        address environment,
+        ProtocolCall calldata protocolCall,
+        UserCall calldata userCall,
+        PayeeData[] calldata payeeData, 
+        SearcherCall[] calldata searcherCalls, 
+        bytes32[] memory executionHashChain 
+    ) internal override returns (CallChainProof memory) {
+        return IExecutionEnvironment(environment).protoCall(
             protocolCall,
             userCall,
             payeeData,
             searcherCalls,
             executionHashChain
         );
-
-        // Verify that the frontend's view of the searchers' signed calldata was unaltered by user
-        require(
-            executionHashChain[executionHashChain.length-2] == verification.proof.callChainHash, 
-            "ERR-F05 UserCallAltered"
-        );
-
-        // Verify that the execution system's sequencing of the transaction calldata was unaltered by searchers
-        // NOTE: This functions as an "exploit prevention mechanism" as the contract itself already verifies 
-        // trustless execution. 
-        require(
-            proof.previousHash == verification.proof.callChainHash, "ERR-F05 SearcherExploitDetected"
-        );
-
-        // release the locks
-        _escrowContract.releaseEscrowLocks();
     }
 
-    function untrustedVerifyProtocol(
+    function _releaseLock(bytes32, ProtocolCall calldata) internal override {
+        ISafetyLocks(escrow).releaseEscrowLocks();
+    }
+
+    function userDirectVerifyProtocol(
+        address userCallFrom,
         address userCallTo,
         uint256 searcherCallsLength,
         ProtocolCall calldata protocolCall,
         Verification calldata verification
-    ) external nonReentrant returns (bool invalidCall) {
-
-        require(msg.sender == dirtyAddress, "ERR-H03 InvalidCaller");
-        require(_dirtyLock == bytes32(0), "ERR-H04 AlreadyLocked");
+    ) external returns (bool invalidCall) {
+        require(
+            environments[msg.sender] == keccak256(
+                abi.encodePacked(
+                    userCallFrom,
+                    protocolCall.to,
+                    protocolCall.callConfig
+                )
+            ), 
+            "ERR-H03 InvalidCaller"
+        );
+        require(userCallFrom == tx.origin, "ERR-H04 InvalidCaller");
+        require(_userLock == bytes32(0), "ERR-H05 AlreadyLocked");
         
         if (!_verifyProtocol(userCallTo, protocolCall, verification)) {
             return false;
         }
 
         // Initialize the escrow locks
-        _escrowContract.initializeEscrowLocks(
-            address(dirtyAddress),
+        ISafetyLocks(escrow).initializeEscrowLocks(
+            address(msg.sender),
             uint8(searcherCallsLength)
         );
 
         // Store the penultimate call hash
-        _dirtyLock = verification.proof.callChainHash;
+        _userLock = verification.proof.callChainHash;
 
         return true;
     }
 
-    function untrustedReleaseLock(bytes32 key) external nonReentrant {
-        require(key == _dirtyLock && key != bytes32(0), "ERR-H05 IncorrectKey");
-        
-        delete _dirtyLock;
+    function userDirectReleaseLock(
+        address userCallFrom,
+        bytes32 key,
+        ProtocolCall calldata protocolCall
+    ) external {
 
-        _escrowContract.releaseEscrowLocks();
+        require(
+            environments[msg.sender] == keccak256(
+                abi.encodePacked(
+                    userCallFrom,
+                    protocolCall.to,
+                    protocolCall.callConfig
+                )
+            ), 
+            "ERR-H03 InvalidCaller"
+        );
+        require(userCallFrom == tx.origin, "ERR-H04 InvalidCaller");
+        require(key == _userLock && key != bytes32(0), "ERR-H05 IncorrectKey");
+        
+        delete _userLock;
+
+        ISafetyLocks(escrow).releaseEscrowLocks();
     }
 }
