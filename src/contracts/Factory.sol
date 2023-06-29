@@ -11,9 +11,7 @@ import { Escrow } from "./Escrow.sol";
 import { RecycledStorage } from "./RecycledStorage.sol";
 import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
 
-import { 
-    ProtocolCall 
-} from "../libraries/DataTypes.sol";
+import "../types/CallTypes.sol";
 
 contract Factory is ReentrancyGuard {
 

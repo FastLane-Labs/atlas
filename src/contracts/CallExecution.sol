@@ -12,18 +12,8 @@ import { FastLaneErrorsEvents } from "./Emissions.sol";
 import { CallVerification } from "../libraries/CallVerification.sol";
 import { ExecutionControl } from "../libraries/ExecutionControl.sol";
 
-import {
-    CallChainProof,
-    SearcherOutcome,
-    SearcherCall,
-    SearcherMetaTx,
-    BidData,
-    PayeeData,
-    PaymentData,
-    UserCall,
-    CallConfig,
-    ProtocolCall
-} from "../libraries/DataTypes.sol";
+import "../types/CallTypes.sol";
+import "../types/VerificationTypes.sol";
 
 
 contract CallExecution is FastLaneErrorsEvents {

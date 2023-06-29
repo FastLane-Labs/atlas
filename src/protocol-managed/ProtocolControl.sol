@@ -8,11 +8,7 @@ import { CallBits } from "../libraries/CallBits.sol";
 import { GovernanceControl } from "./GovernanceControl.sol";
 import { MEVAllocator } from "./MEVAllocator.sol";
 
-import {
-    BidData,
-    PayeeData,
-    ProtocolCall
-} from "../libraries/DataTypes.sol";
+import "../types/CallTypes.sol";
 
 abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
 

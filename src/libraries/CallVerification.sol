@@ -3,13 +3,8 @@ pragma solidity ^0.8.16;
 
 import { IProtocolControl } from "../interfaces/IProtocolControl.sol";
 
-import {
-    CallChainProof,
-    ProtocolCall,
-    UserCall,
-    SearcherCall,
-    CallConfig
-} from "../libraries/DataTypes.sol";
+import "../types/CallTypes.sol";
+import "../types/VerificationTypes.sol";
 
 library CallVerification {
    

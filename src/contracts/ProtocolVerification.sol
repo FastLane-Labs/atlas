@@ -9,14 +9,10 @@ import { IProtocolControl } from "../interfaces/IProtocolControl.sol";
 
 import { CallBits } from "../libraries/CallBits.sol";
 
-import {
-    ProtocolCall,
-    ProtocolProof,
-    Verification,
-    ApproverSigningData,
-    GovernanceData,
-    PROTOCOL_TYPE_HASH
-} from "../libraries/DataTypes.sol";
+import "../types/CallTypes.sol";
+import "../types/GovernanceTypes.sol";
+import { Verification } from "../types/VerificationTypes.sol";
+
 
 import { ProtocolIntegration } from "./ProtocolIntegration.sol";
 
@@ -28,6 +24,10 @@ import { ProtocolIntegration } from "./ProtocolIntegration.sol";
 contract ProtocolVerifier is EIP712, ProtocolIntegration {
     using ECDSA for bytes32;
     using CallBits for uint16;
+
+    bytes32 constant public PROTOCOL_TYPE_HASH = keccak256(
+        "ProtocolProof(address from,address to,uint256 nonce,uint256 deadline,bytes32 protocolDataHash,bytes32 callChainHash)"
+    );
 
     constructor() EIP712("ProtoCallHandler", "0.0.1")  {}
 
@@ -60,7 +60,7 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
         // users not having to trust the front end at all - a huge 
         // improvement over the current experience.
 
-        ApproverSigningData memory signatory = signatories[verification.proof.from]; 
+        ApproverSigningData memory signatory = signatories[verification.proof.from];
 
         // generate the signing key
         bytes32 signingKey = keccak256(abi.encode(
@@ -147,5 +147,4 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
         
         return signer == verification.proof.from;
     }
-
 }

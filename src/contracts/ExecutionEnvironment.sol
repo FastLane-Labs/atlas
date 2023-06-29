@@ -9,19 +9,9 @@ import { CallVerification } from "../libraries/CallVerification.sol";
 import { SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
 
 import { CallExecution } from "./CallExecution.sol";
-import { BitStuff } from "./BitStuff.sol"; 
 
-import {
-    ProtocolCall,
-    UserCall,
-    PayeeData,
-    SearcherCall,
-    CallConfig,
-    SearcherOutcome,
-    BidData,
-    PaymentData,
-    CallChainProof
-} from "../libraries/DataTypes.sol";
+import "../types/CallTypes.sol";
+import "../types/VerificationTypes.sol";
 
 contract ExecutionEnvironment is CallExecution {
     using CallVerification for CallChainProof;

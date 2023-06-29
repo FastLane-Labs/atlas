@@ -12,13 +12,9 @@ import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 // Atlas Base Imports
 import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol"; 
-import { 
-    EscrowKey,
-    BidData,
-    PayeeData,
-    PaymentData,
-    UserCall
-} from "../libraries/DataTypes.sol";
+
+import "../types/CallTypes.sol";
+import "../types/LockTypes.sol";
 
 // Atlas Protocol-Control Imports
 import { ProtocolControl } from "../protocol-managed/ProtocolControl.sol";

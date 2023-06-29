@@ -1,16 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import {
-    ProtocolCall,
-    UserCall,
-    PayeeData,
-    SearcherCall,
-    CallConfig,
-    SearcherOutcome,
-    BidData,
-    PaymentData
-} from "../libraries/DataTypes.sol";
+import "../types/CallTypes.sol";
 
 interface IExecutionEnvironment {
 

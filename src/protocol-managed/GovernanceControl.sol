@@ -3,10 +3,7 @@ pragma solidity ^0.8.16;
 
 import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
 
-import {
-    BidData,
-    PayeeData
-} from "../libraries/DataTypes.sol";
+import "../types/CallTypes.sol";
 
 abstract contract GovernanceControl {
 

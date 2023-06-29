@@ -12,26 +12,14 @@ import "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 
 import { SafetyLocks } from "./SafetyLocks.sol";
 import { SearcherWrapper } from "./SearcherWrapper.sol";
-import { FastLaneDataTypes } from "../libraries/DataTypes.sol";
 import { FastLaneErrorsEvents } from "./Emissions.sol";
-import { BitStuff } from "./BitStuff.sol"; 
+import { EscrowBits } from "../libraries/EscrowBits.sol"; 
 
-import {
-    SearcherEscrow,
-    CallChainProof,
-    SEARCHER_TYPE_HASH,
-    SearcherOutcome,
-    SearcherCall,
-    SearcherMetaTx,
-    BidData,
-    SearcherSafety,
-    ProtocolCall,
-    PayeeData,
-    UserCall,
-    EscrowKey,
-    ExecutionPhase,
-    BaseLock
-} from "../libraries/DataTypes.sol";
+
+import "../types/CallTypes.sol";
+import "../types/EscrowTypes.sol";
+import "../types/LockTypes.sol";
+import "../types/VerificationTypes.sol";
 
 contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
     using ECDSA for bytes32;
@@ -53,6 +41,15 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
     ) SafetyLocks(msg.sender) EIP712("ProtoCallHandler", "0.0.1")
     {
         escrowDuration = escrowDurationFromFactory; 
+    }
+
+    function deposit(address searcherMetaTxSigner) external payable returns (uint256 newBalance) {
+        _escrowData[searcherMetaTxSigner].total += uint128(msg.value); 
+        newBalance = uint256(_escrowData[searcherMetaTxSigner].total);
+    }
+
+    function getNextNonce(address searcherMetaTxSigner) external view returns (uint256 nextNonce) {
+        nextNonce = uint256(_escrowData[searcherMetaTxSigner].nonce)+1;
     }
 
     function executeStagingCall(
@@ -107,7 +104,7 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
         uint256 valueRequested;
 
         // If there are no errors, attempt to execute
-        if (_canExecute(result)) {
+        if (EscrowBits.canExecute(result)) {
 
             // Get current Ether balance
             uint256 currentBalance = address(this).balance;
@@ -123,10 +120,10 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
 
             result |= 1 << uint256(outcome);
 
-            if (_executedWithError(result)) {
+            if (EscrowBits.executedWithError(result)) {
                 result |= 1 << uint256(SearcherOutcome.ExecutionCompleted);
 
-            } else if (_executionSuccessful(result)) { 
+            } else if (EscrowBits.executionSuccessful(result)) { 
                 // first successful searcher call that paid what it bid
                 auctionAlreadyComplete = true; // cannot be reached if bool is already true
                 result |= 1 << uint256(SearcherOutcome.ExecutionCompleted);
@@ -146,18 +143,18 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
         }
 
         // Update the searcher's escrow balances
-        if (_updateEscrow(result)) {
+        if (EscrowBits.updateEscrow(result)) {
             _update(searcherEscrow, gasWaterMark, result, searcherCall);
         }
 
         // emit event
-        if (_emitEvent(searcherEscrow)) { 
+        if (EscrowBits.emitEvent(searcherEscrow)) { 
             emit SearcherTxResult(
                 searcherCall.metaTx.to,
                 searcherCall.metaTx.from,
-                _canExecute(result),
+                EscrowBits.canExecute(result),
                 outcome == SearcherOutcome.Success,
-                _canExecute(result) ? searcherEscrow.nonce - 1 : searcherEscrow.nonce,
+                EscrowBits.canExecute(result) ? searcherEscrow.nonce - 1 : searcherEscrow.nonce,
                 result
             );
         }
@@ -262,39 +259,39 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
         uint256 txValue;
 
         // TODO: clean up code / make it readable
-        if (result & _FULL_REFUND != 0) {
+        if (result & EscrowBits._FULL_REFUND != 0) {
             gasRebate = (
-                100 + SEARCHER_GAS_BUFFER
+                100 + EscrowBits.SEARCHER_GAS_BUFFER
             ) * (
                 // TODO: simplify/fix formula for calldata - verify. 
-                (tx.gasprice * GWEI * (gasWaterMark-gasleft())) +
-                (tx.gasprice * GWEI * (searcherCall.metaTx.data.length * 16))
+                (tx.gasprice * EscrowBits.GWEI * (gasWaterMark-gasleft())) +
+                (tx.gasprice * EscrowBits.GWEI * (searcherCall.metaTx.data.length * 16))
             ) / 100;
 
             txValue = searcherCall.metaTx.value;
         
         // TODO: figure out what is fair for this(or if it just doesnt happen?)
-        } else if (result & _EXTERNAL_REFUND != 0) {
+        } else if (result & EscrowBits._EXTERNAL_REFUND != 0) {
             // TODO: simplify/fix formula for calldata - verify. 
             gasRebate = (
-                (tx.gasprice * GWEI * (gasWaterMark-gasleft())) +
-                (tx.gasprice * GWEI * (searcherCall.metaTx.data.length * 16))
+                (tx.gasprice * EscrowBits.GWEI * (gasWaterMark-gasleft())) +
+                (tx.gasprice * EscrowBits.GWEI * (searcherCall.metaTx.data.length * 16))
             );
 
             txValue = searcherCall.metaTx.value;
 
         
-        } else if (result & _CALLDATA_REFUND != 0) {
+        } else if (result & EscrowBits._CALLDATA_REFUND != 0) {
             gasRebate = (
-                100 + SEARCHER_GAS_BUFFER
+                100 + EscrowBits.SEARCHER_GAS_BUFFER
             ) * (
                 // TODO: simplify/fix formula for calldata - verify. 
-                (tx.gasprice * GWEI * (searcherCall.metaTx.data.length * 16))
+                (tx.gasprice * EscrowBits.GWEI * (searcherCall.metaTx.data.length * 16))
             ) / 100;
 
             txValue = searcherCall.metaTx.value;
         
-        } else if (result & _NO_USER_REFUND != 0) {
+        } else if (result & EscrowBits._NO_USER_REFUND != 0) {
             // pass
         
         } else {
@@ -395,15 +392,15 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
 
         searcherEscrow = _escrowData[searcherCall.metaTx.from];
         
-        if (searcherCall.metaTx.nonce < uint256(searcherEscrow.nonce)) {
+        if (searcherCall.metaTx.nonce <= uint256(searcherEscrow.nonce)) {
             result |= 1 << uint256(SearcherOutcome.InvalidNonceUnder);
 
-        } else if (searcherCall.metaTx.nonce > uint256(searcherEscrow.nonce)) {
+        } else if (searcherCall.metaTx.nonce > uint256(searcherEscrow.nonce)+1) {
             result |= 1 << uint256(SearcherOutcome.InvalidNonceOver);
 
             // TODO: reconsider the jump up for gapped nonces? Intent is to mitigate dmg 
             // potential inflicted by a hostile searcher/builder. 
-            searcherEscrow.nonce = uint32(searcherCall.metaTx.nonce + 1); 
+            searcherEscrow.nonce = uint32(searcherCall.metaTx.nonce); 
 
         } else {
             ++searcherEscrow.nonce;
@@ -422,16 +419,16 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
         gasLimit = (
             100
         ) * (
-            searcherCall.metaTx.gas < SEARCHER_GAS_LIMIT ? searcherCall.metaTx.gas : SEARCHER_GAS_LIMIT
+            searcherCall.metaTx.gas < EscrowBits.SEARCHER_GAS_LIMIT ? searcherCall.metaTx.gas : EscrowBits.SEARCHER_GAS_LIMIT
         ) / (
-            100 + SEARCHER_GAS_BUFFER
-        ) + FASTLANE_GAS_BUFFER; 
+            100 + EscrowBits.SEARCHER_GAS_BUFFER
+        ) + EscrowBits.FASTLANE_GAS_BUFFER; 
 
         // see if searcher's escrow can afford tx gascost
         if (
             (
-                (tx.gasprice * GWEI * gasLimit) +
-                (searcherCall.metaTx.data.length * 16 * GWEI) 
+                (tx.gasprice * EscrowBits.GWEI * gasLimit) +
+                (searcherCall.metaTx.data.length * 16 * EscrowBits.GWEI) 
             ) < (
                 searcherEscrow.total - searcherEscrow.escrowed
             ) 
@@ -442,7 +439,7 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
         }
 
         // subtract out the gas buffer since the searcher's metaTx won't use it
-        gasLimit -= FASTLANE_GAS_BUFFER;
+        gasLimit -= EscrowBits.FASTLANE_GAS_BUFFER;
 
         // Verify that we can lend the searcher their tx value
         if (searcherCall.metaTx.value > address(this).balance) {
@@ -456,15 +453,15 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
             EscrowKey memory escrowKey = _escrowKey;
 
             if (
-                _isExecutionPhase(ExecutionPhase.Staging, escrowKey.lockState) ||
-                _isExecutionPhase(ExecutionPhase.UserCall, escrowKey.lockState)
+                EscrowBits.isExecutionPhase(ExecutionPhase.Staging, escrowKey.lockState) ||
+                EscrowBits.isExecutionPhase(ExecutionPhase.UserCall, escrowKey.lockState)
             ) {
                 _pendingValueTracker.transferredIn += uint128(msg.value);
 
             } else if (
-                _isExecutionPhase(ExecutionPhase.SearcherCalls, escrowKey.lockState) &&
+                EscrowBits.isExecutionPhase(ExecutionPhase.SearcherCalls, escrowKey.lockState) &&
                 escrowKey.callIndex == 2 &&
-                _isLockDepth(BaseLock.Pending, escrowKey.lockState)
+                EscrowBits.isLockDepth(BaseLock.Pending, escrowKey.lockState)
             ) {
                 _pendingValueTracker.transferredIn += uint128(msg.value);
             }
@@ -488,7 +485,7 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
             result |= 1 << uint256(SearcherOutcome.LostAuction);
         } 
         
-        if (gasWaterMark < VALIDATION_GAS_LIMIT + SEARCHER_GAS_LIMIT) {
+        if (gasWaterMark < EscrowBits.VALIDATION_GAS_LIMIT + EscrowBits.SEARCHER_GAS_LIMIT) {
             // Make sure to leave enough gas for protocol validation calls
             result |= 1 << uint256(SearcherOutcome.UserOutOfGas);
         } 

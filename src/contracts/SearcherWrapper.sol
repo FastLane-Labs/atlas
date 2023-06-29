@@ -5,18 +5,9 @@ import { ICallExecution } from "../interfaces/ICallExecution.sol";
 
 import { FastLaneErrorsEvents } from "./Emissions.sol";
 
-import {
-    CallChainProof,
-    SearcherOutcome,
-    SearcherCall,
-    SearcherMetaTx,
-    BidData,
-    PayeeData,
-    PaymentData,
-    UserCall,
-    CallConfig
-} from "../libraries/DataTypes.sol";
-
+import "../types/CallTypes.sol";
+import "../types/VerificationTypes.sol";
+import { SearcherOutcome } from "../types/EscrowTypes.sol";
 
 contract SearcherWrapper is FastLaneErrorsEvents {
 
@@ -34,9 +25,7 @@ contract SearcherWrapper is FastLaneErrorsEvents {
         ) {
             return (SearcherOutcome.Success, 0);
         
-        // TODO: implement cheaper way to do this
         } catch Error(string memory err)  {
-            
             bytes32 errorSwitch = keccak256(abi.encodePacked(err));
 
             if (errorSwitch == _SEARCHER_BID_UNPAID) {

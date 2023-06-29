@@ -1,13 +1,8 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import {
-    ProtocolCall,
-    UserCall,
-    PayeeData,
-    SearcherCall,
-    Verification
-} from "../libraries/DataTypes.sol";
+import "../types/CallTypes.sol";
+import "../types/VerificationTypes.sol";
 
 interface IAtlas {
     function metacall(

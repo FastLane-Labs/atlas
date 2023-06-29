@@ -3,9 +3,7 @@ pragma solidity ^0.8.16;
 
 import { IProtocolControl } from "../interfaces/IProtocolControl.sol";
 
-import {
-    CallConfig
-} from "../libraries/DataTypes.sol";
+import "../types/CallTypes.sol";
 
 library CallBits {
 

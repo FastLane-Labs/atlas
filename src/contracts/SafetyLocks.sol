@@ -3,27 +3,13 @@ pragma solidity ^0.8.16;
 
 import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
 
-import { BitStuff } from "./BitStuff.sol"; 
-
 import { SafetyBits } from "../libraries/SafetyBits.sol";
 import { CallBits } from "../libraries/CallBits.sol"; 
 
-import {
-    SearcherOutcome,
-    SearcherCall,
-    SearcherMetaTx,
-    BidData,
-    ProtocolCall,
-    UserCall,
-    CallConfig,
-    EscrowKey,
-    BaseLock,
-    ExecutionPhase,
-    SearcherSafety
+import "../types/CallTypes.sol";
+import "../types/LockTypes.sol";
 
-} from "../libraries/DataTypes.sol";
-
-contract SafetyLocks is BitStuff {
+contract SafetyLocks {
     using SafetyBits for EscrowKey;
     using CallBits for uint16;
 

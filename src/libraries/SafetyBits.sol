@@ -1,13 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import {
-    EscrowKey,
-    BaseLock,
-    ExecutionPhase,
-    SearcherSafety
-
-} from "../libraries/DataTypes.sol";
+import "../types/LockTypes.sol";
 
 library SafetyBits {
 

@@ -7,14 +7,8 @@ import { CallVerification } from "../libraries/CallVerification.sol";
 
 import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
 
-import {
-    ProtocolCall,
-    UserCall,
-    PayeeData,
-    SearcherCall,
-    Verification,
-    CallChainProof
-} from "../libraries/DataTypes.sol";
+import "../types/CallTypes.sol";
+import "../types/VerificationTypes.sol";
 
 contract RecycledStorage is ExecutionEnvironment {
 

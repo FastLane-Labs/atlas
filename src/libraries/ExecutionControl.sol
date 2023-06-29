@@ -7,14 +7,8 @@ import { CallVerification } from "../libraries/CallVerification.sol";
 
 import { CallBits } from "../libraries/CallBits.sol";
 
-import {
-    BidData,
-    PayeeData,
-    PaymentData,
-    UserCall,
-    CallChainProof,
-    ProtocolCall
-} from "../libraries/DataTypes.sol";
+import "../types/CallTypes.sol";
+import "../types/VerificationTypes.sol";
 
 library ExecutionControl {
     using CallVerification for CallChainProof;

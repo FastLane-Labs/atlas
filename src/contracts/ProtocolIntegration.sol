@@ -1,7 +1,6 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import "openzeppelin-contracts/contracts/access/Ownable.sol";
 import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 
@@ -9,13 +8,7 @@ import { IProtocolControl } from "../interfaces/IProtocolControl.sol";
 
 import { CallBits } from "../libraries/CallBits.sol";
 
-import {
-    ProtocolCall,
-    ProtocolProof,
-    Verification,
-    ApproverSigningData,
-    GovernanceData
-} from "../libraries/DataTypes.sol";
+import "../types/GovernanceTypes.sol";
 
 contract ProtocolIntegration {
     using CallBits for uint16;
@@ -139,5 +132,7 @@ contract ProtocolIntegration {
         protocols[key] = bytes32(0);
     }
 
-
+    function getNextNonce(address governanceSignatory) external view returns (uint256 nextNonce) {
+        nextNonce = uint256(signatories[governanceSignatory].nonce)+1;
+    }
 }

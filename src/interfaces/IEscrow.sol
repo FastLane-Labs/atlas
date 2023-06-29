@@ -1,24 +1,14 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import {
-    SearcherCall,
-    ProtocolCall,
-    BidData,
-    PayeeData,
-    UserCall,
-    CallChainProof,
-    SearcherEscrow
-} from "../libraries/DataTypes.sol";
+import "../types/CallTypes.sol";
+import "../types/VerificationTypes.sol";
 
 interface IEscrow {
 
-    struct ValueTracker {
-        uint128 starting;
-        uint128 transferredIn;
-        uint128 transferredOut;
-        uint128 gasRebate;
-    }
+    function deposit(address searcherMetaTxSigner) external payable returns (uint256 newBalance);
+
+    function getNextNonce(address searcherMetaTxSigner) external view returns (uint256 nextNonce);
 
     function executeStagingCall(
         CallChainProof memory proof,

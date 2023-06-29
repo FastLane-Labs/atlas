@@ -1,13 +1,8 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import {
-    ProtocolCall,
-    UserCall,
-    CallChainProof,
-    SearcherCall,
-    EscrowKey
-} from "../libraries/DataTypes.sol";
+import "../types/CallTypes.sol";
+import "../types/LockTypes.sol";
 
 interface ISafetyLocks {
     function handleVerification(

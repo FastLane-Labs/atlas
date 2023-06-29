@@ -2,11 +2,8 @@
 pragma solidity ^0.8.16;
 
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
-import {
-    BidData,
-    PayeeData,
-    PaymentData
-} from "../libraries/DataTypes.sol";
+
+import "../types/CallTypes.sol";
 
 abstract contract MEVAllocator {
 
