@@ -1,6 +1,12 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
+import {
+    PayeeData,
+    BidData,
+    ProtocolCall
+} from "../libraries/DataTypes.sol";
+
 contract FastLaneErrorsEvents {
 
     // NOTE: nonce is the executed nonce
@@ -19,6 +25,13 @@ contract FastLaneErrorsEvents {
         bool searcherSuccess,
         uint256 valueReturned,
         uint256 gasRefunded
+    );
+
+    event MEVPaymentFailure(
+        address indexed protocolControl,
+        uint16 callConfig,
+        BidData[] winningBids,
+        PayeeData[] payeeData
     );
 
     string constant public SEARCHER_BID_UNPAID = "SearcherBidUnpaid";

@@ -25,7 +25,8 @@ contract SearcherWrapper is FastLaneErrorsEvents {
         uint256 gasLimit,
         SearcherCall calldata searcherCall
     ) internal returns (SearcherOutcome, uint256) {
-        // Called by the escrow contract, with msg.sender as the execution environment
+        // address(this) = Escrow 
+        // msg.sender = ExecutionEnvironment
 
         // Call the execution environment
         try ICallExecution(msg.sender).searcherMetaTryCatch(

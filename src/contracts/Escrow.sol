@@ -88,10 +88,7 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
         uint256 gasWaterMark,
         bool auctionAlreadyComplete,
         SearcherCall calldata searcherCall
-    ) external payable returns (bool) {
-
-        // Activate the lock
-        _activateSearcherLock(searcherCall.metaTx.to);
+    ) external payable searcherLock(searcherCall.metaTx.to) returns (bool) {
 
         // Verify the transaction. 
         (uint256 result, uint256 gasLimit, SearcherEscrow memory searcherEscrow) = _verify(
@@ -110,7 +107,6 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
         uint256 valueRequested;
 
         // If there are no errors, attempt to execute
-        // NOTE: the lowest bit is a tracker (PendingUpdate) and can be ignored
         if (_canExecute(result)) {
 
             // Get current Ether balance
@@ -134,23 +130,20 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
                 // first successful searcher call that paid what it bid
                 auctionAlreadyComplete = true; // cannot be reached if bool is already true
                 result |= 1 << uint256(SearcherOutcome.ExecutionCompleted);
-            }
 
-            /*
-            // Send back the value requested to pay the searcher's bids
-            if (valueRequested != 0) {
-                SafeTransferLib.safeTransferETH(
-                    msg.sender, 
-                    valueRequested
-                );
+                /*
+                // TODO: Finish the "optimistic lending of msg.value from escrow" portion. 
+                // Send back the value requested to pay the searcher's bids
+                if (valueRequested != 0) {
+                    SafeTransferLib.safeTransferETH(
+                        msg.sender, 
+                        valueRequested
+                    );
+                }
+                */
             }
-            */
-
             searcherEscrow.total += uint128(address(this).balance - currentBalance);
         }
-
-        // Release the lock
-        _releaseSearcherLock(searcherCall.metaTx.to, auctionAlreadyComplete);
 
         // Update the searcher's escrow balances
         if (_updateEscrow(result)) {
@@ -168,18 +161,30 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
                 result
             );
         }
-
         return auctionAlreadyComplete;
     }
 
+    // TODO: who should pay gas cost of MEV Payments?
+    // TODO: Should payment failure trigger subsequent searcher calls?
+    // (Note that balances are held in the execution environment, meaning
+    // that payment failure is typically a result of a flaw in the 
+    // ProtocolControl contract)
     function executePayments(
         ProtocolCall calldata protocolCall,
         BidData[] calldata winningBids,
         PayeeData[] calldata payeeData
     ) external paymentsLock {
         // process protocol payments
-        ICallExecution(msg.sender).allocateRewards(protocolCall, winningBids, payeeData);
-        // TODO: who should pay gas cost of payments?
+         try ICallExecution(msg.sender).allocateRewards(
+            protocolCall, winningBids, payeeData
+        ) {} catch { 
+            emit MEVPaymentFailure(
+                protocolCall.to,
+                protocolCall.callConfig,
+                winningBids,
+                payeeData
+            );
+        }
     } 
 
     function executeVerificationCall(

@@ -97,7 +97,7 @@ contract SafetyLocks is BitStuff {
         require(escrowKey.isValidStagingLock(msg.sender), "ERR-E31 InvalidLockStage");
         
         // Handle staging calls, if needed
-        if (protocolCall.callConfig._needsStaging()) {
+        if (protocolCall.callConfig.needsStagingCall()) {
             _escrowKey = escrowKey.holdStagingLock(protocolCall.to);
             _;
         }
@@ -117,44 +117,45 @@ contract SafetyLocks is BitStuff {
         _escrowKey = escrowKey.turnUserLock(msg.sender);
     }
 
-    function _activateSearcherLock(
-        address searcherTo
-    ) internal {
+    modifier searcherLock(address searcherTo) {
         // msg.sender is the ExecutionEnvironment
         EscrowKey memory escrowKey = _escrowKey;
 
         require(escrowKey.isValidSearcherLock(msg.sender), "ERR-E33 InvalidLockStage");
 
         _escrowKey = escrowKey.holdSearcherLock(searcherTo);
-    }
 
+        _;
 
-    // NOTE: Searcher should have performed the safety callback, 
-    // which would have updated the SearcherSafety level in escrowKey
-    function _releaseSearcherLock(address searcherTo, bool makePayments) internal {
-        // msg.sender is still the ExecutionEnvironment
-        EscrowKey memory escrowKey = _escrowKey;
+        // NOTE: The searcher call will revert if the searcher does not activate the 
+        // searcherSafetyCallback *within* the searcher try/catch wrapper.
+        escrowKey = _escrowKey;
 
-        require(escrowKey.confirmSearcherLock(searcherTo), "ERR-E34 InvalidLockStage");
-
-        // Check if the call was successful and warrants payment processing
-        if (makePayments) {
+        // CASE: Searcher call successful
+        if (escrowKey.confirmSearcherLock(msg.sender)) {
             require(!escrowKey.makingPayments, "ERR-E28 ImproperAccess");
             require(!escrowKey.paymentsComplete, "ERR-E29 AlreadyPaid");
 
             _escrowKey = escrowKey.turnSearcherLockPayments(msg.sender);
         
-        // Check if this is the final call - if so, prep for UserRefund
-        // NOTE: if the payments handling preempts this conditional, 
-        // we will set this flag at the end of the payment handling.
-        } else if (escrowKey.callIndex == escrowKey.callMax - 2) {
-            _escrowKey = escrowKey.turnSearcherLockRefund(msg.sender);
+        // CASE: Searcher call unsuccessful && lock unaltered
+        } else if (escrowKey.isRevertedSearcherLock(searcherTo)) {
+
+            // NESTED CASE: Searcher is last searcher
+            if (escrowKey.callIndex == escrowKey.callMax - 2) {
+                _escrowKey = escrowKey.turnSearcherLockRefund(msg.sender);
+            
+            // NESTED CASE: Searcher is not last searcher
+            } else {
+                _escrowKey = escrowKey.turnSearcherLockNext(msg.sender);
+            }
         
-        // Next searcher
+        // CASE: lock altered / Invalid lock access
         } else {
-            _escrowKey = escrowKey.turnSearcherLockNext(msg.sender);
+            revert("ERR-E25 InvalidLockState");
         }
     }
+
 
     modifier paymentsLock() {
         // msg.sender is still the ExecutionEnvironment
@@ -190,7 +191,7 @@ contract SafetyLocks is BitStuff {
 
         require(escrowKey.isValidVerificationLock(msg.sender), "ERR-E37 InvalidLockStage");
 
-        if (callConfig._needsVerification()) {
+        if (callConfig.needsVerificationCall()) {
             _escrowKey = escrowKey.holdVerificationLock();
             _; 
 

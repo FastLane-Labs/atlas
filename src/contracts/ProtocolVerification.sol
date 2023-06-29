@@ -106,7 +106,7 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
         // which builders or validators may be able to profit via censorship.
         // Protocols are encouraged to rely on the deadline parameter 
         // to prevent replay attacks. 
-        if (protocolCall.callConfig._sequencedNonces()) {
+        if (protocolCall.callConfig.needsSequencedNonces()) {
             if (verification.proof.nonce != signatory.nonce + 1) {
                 return (false);
             }

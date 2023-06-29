@@ -159,7 +159,7 @@ abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
     function getProtocolCall() external view returns (ProtocolCall memory protocolCall) {
         protocolCall = ProtocolCall({
             to: address(this),
-            callConfig: CallBits._buildCallConfig(
+            callConfig: CallBits.encodeCallConfig(
                 sequenced,
                 requireStaging,
                 delegateStaging,

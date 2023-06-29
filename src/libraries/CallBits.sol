@@ -25,7 +25,7 @@ library CallBits {
         ) = IProtocolControl(protocolControl).getCallConfig();
         
         // WTB tuple unpacking :*(
-        callConfig = _buildCallConfig(
+        callConfig = encodeCallConfig(
              sequenced,
              requireStaging,
              delegateStaging,
@@ -38,7 +38,7 @@ library CallBits {
         );
     }
 
-    function _buildCallConfig(
+    function encodeCallConfig(
         bool sequenced,
         bool requireStaging,
         bool delegateStaging,
@@ -79,39 +79,39 @@ library CallBits {
         }
     }
 
-    function _needsStaging(uint16 callConfig) internal pure returns (bool needsStaging) {
+    function needsStagingCall(uint16 callConfig) internal pure returns (bool needsStaging) {
         needsStaging = (callConfig & 1 << uint16(CallConfig.CallStaging) != 0);
     }
 
-    function _delegateStaging(uint16 callConfig) internal pure returns (bool delegateStaging) {
+    function needsDelegateStaging(uint16 callConfig) internal pure returns (bool delegateStaging) {
         delegateStaging = (callConfig & 1 << uint16(CallConfig.DelegateStaging) != 0);
     }
 
-    function _localUser(uint16 callConfig) internal pure returns (bool localUser) {
+    function needsLocalUser(uint16 callConfig) internal pure returns (bool localUser) {
         localUser = (callConfig & 1 << uint16(CallConfig.LocalUser) != 0);
     }
 
-    function _delegateUser(uint16 callConfig) internal pure returns (bool delegateUser) {
+    function needsDelegateUser(uint16 callConfig) internal pure returns (bool delegateUser) {
         delegateUser = (callConfig & 1 << uint16(CallConfig.DelegateUser) != 0);
     }
 
-    function _delegateAllocating(uint16 callConfig) internal pure returns (bool delegateAllocating) {
+    function needsDelegateAllocating(uint16 callConfig) internal pure returns (bool delegateAllocating) {
         delegateAllocating = (callConfig & 1 << uint16(CallConfig.DelegateAllocating) != 0);
     }
 
-    function _delegateVerification(uint16 callConfig) internal pure returns (bool delegateVerification) {
+    function needsDelegateVerification(uint16 callConfig) internal pure returns (bool delegateVerification) {
         delegateVerification = (callConfig & 1 << uint16(CallConfig.DelegateVerification) != 0);
     }
 
-    function _needsVerification(uint16 callConfig) internal pure returns (bool needsVerification) {
+    function needsVerificationCall(uint16 callConfig) internal pure returns (bool needsVerification) {
         needsVerification = (callConfig & 1 << uint16(CallConfig.CallVerification) != 0);
     }
 
-    function _recycledStorage(uint16 callConfig) internal pure returns (bool recycledStorage) {
+    function allowsRecycledStorage(uint16 callConfig) internal pure returns (bool recycledStorage) {
         recycledStorage = (callConfig & 1 << uint16(CallConfig.RecycledStorage) != 0);
     }
 
-    function _sequencedNonces(uint16 callConfig) internal pure returns (bool sequenced) {
+    function needsSequencedNonces(uint16 callConfig) internal pure returns (bool sequenced) {
         sequenced = (callConfig & 1 << uint16(CallConfig.Sequenced) != 0);
     }
 

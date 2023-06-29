@@ -34,7 +34,7 @@ library ExecutionControl {
         UserCall calldata userCall
     ) internal returns (bytes memory) {
 
-        bool isDelegated = protocolCall.callConfig._delegateStaging();
+        bool isDelegated = protocolCall.callConfig.needsDelegateStaging();
 
         bytes memory data = abi.encodeWithSelector(
             IProtocolControl.stageCall.selector, 
@@ -68,8 +68,8 @@ library ExecutionControl {
         UserCall calldata userCall
     ) internal returns (bytes memory) {
 
-        bool delegated = protocolCall.callConfig._delegateUser();
-        bool local = protocolCall.callConfig._localUser();
+        bool delegated = protocolCall.callConfig.needsDelegateUser();
+        bool local = protocolCall.callConfig.needsLocalUser();
 
         // Verify the proof to ensure this isn't happening out of sequence. 
         require(
@@ -119,8 +119,8 @@ library ExecutionControl {
         PayeeData[] calldata payeeData
     ) internal {
 
-        if (protocolCall.callConfig._delegateAllocating()) {
-            delegateWrapper(
+        if (protocolCall.callConfig.needsDelegateAllocating()) {
+             delegateWrapper(
                 protocolCall.to,
                 abi.encodeWithSelector(
                     IProtocolControl.allocatingCall.selector,
@@ -151,7 +151,7 @@ library ExecutionControl {
         bytes memory userReturnData
     ) internal returns (bool) {
 
-        bool isDelegated = protocolCall.callConfig._delegateVerification();
+        bool isDelegated = protocolCall.callConfig.needsDelegateVerification();
 
         bytes memory data = abi.encodeWithSelector(
             IProtocolControl.verificationCall.selector, 

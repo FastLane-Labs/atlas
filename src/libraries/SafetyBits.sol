@@ -241,6 +241,16 @@ library SafetyBits {
         );
     }
 
+    function isRevertedSearcherLock(
+        EscrowKey memory self,
+        address revertedSearcher
+    ) internal pure returns (bool) {
+        return (
+            (self.lockState == _LOCKED_X_SEARCHERS_X_REQUESTED) && 
+            (self.approvedCaller == revertedSearcher)
+        );
+    }
+
     function holdSearcherLock(
         EscrowKey memory self, 
         address nextSearcher
