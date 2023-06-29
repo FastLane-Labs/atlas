@@ -10,6 +10,7 @@ import { CallBits } from "../libraries/CallBits.sol";
 
 import "../types/GovernanceTypes.sol";
 
+
 contract ProtocolIntegration {
     using CallBits for uint16;
 

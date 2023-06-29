@@ -2,8 +2,7 @@
 pragma solidity ^0.8.16;
 
 import { IProtocolControl } from "../interfaces/IProtocolControl.sol";
-
-import "openzeppelin-contracts/contracts/access/Ownable.sol";
+import { ICallExecution } from "../interfaces/ICallExecution.sol";
 
 import { ReentrancyGuard } from "solmate/utils/ReentrancyGuard.sol";
 
@@ -54,7 +53,29 @@ contract Factory is ReentrancyGuard {
         dirtyAddress = address(_dirtyContract);
     }
 
-    // TODO: Consider limiting who can call this
+    // USER TOKEN WITHDRAWAL FUNCS
+    function withdrawERC20(address token, uint256 amount, ProtocolCall memory protocolCall) external {
+       
+        if (protocolCall.callConfig == uint16(0)) {
+            protocolCall = IProtocolControl(protocolCall.to).getProtocolCall();
+        }
+
+        ICallExecution(
+            _getExecutionEnvironmentCustom(msg.sender, protocolCall)
+        ).factoryWithdrawERC20(msg.sender, token, amount);
+    }
+
+    function withdrawEther(uint256 amount, ProtocolCall memory protocolCall) external {
+        if (protocolCall.callConfig == uint16(0)) {
+            protocolCall = IProtocolControl(protocolCall.to).getProtocolCall();
+        }
+
+        ICallExecution(
+            _getExecutionEnvironmentCustom(msg.sender, protocolCall)
+        ).factoryWithdrawEther(msg.sender, amount);
+    }
+
+    // FACTORY FUNCTIONS
     function revive() external {
         if (dirtyAddress.codehash == bytes32(0)) {
             new RecycledStorage{
@@ -64,24 +85,36 @@ contract Factory is ReentrancyGuard {
     }
 
     function getExecutionEnvironment(
+        address user,
         address protocolControl
     ) external view returns (
         address executionEnvironment
     ) {
-        executionEnvironment = _getExecutionEnvironment(protocolControl);
+        executionEnvironment = _getExecutionEnvironment(user, protocolControl);
     }
 
     function _getExecutionEnvironment(
+        address user,
         address protocolControl
     ) internal view returns (
         address executionEnvironment
-    ) {
-        
+    ) { 
         ProtocolCall memory protocolCall = IProtocolControl(protocolControl).getProtocolCall();
-        
+        return _getExecutionEnvironmentCustom(user, protocolCall);
+    }
+
+    // NOTE: This func is used to generate the address of user ExecutionEnvironments that have 
+    // been deprecated due to ProtocolControl changes of callConfig. 
+    function _getExecutionEnvironmentCustom(
+        address user,
+        ProtocolCall memory protocolCall
+    ) internal view returns (
+        address executionEnvironment
+    ) {
         bytes32 salt = keccak256(
             abi.encodePacked(
                 block.chainid,
+                user,
                 escrowAddress,
                 protocolCall.to,
                 protocolCall.callConfig,
@@ -96,8 +129,10 @@ contract Factory is ReentrancyGuard {
             keccak256(
                 abi.encodePacked(
                     type(ExecutionEnvironment).creationCode,
-                    PROTOCOL_SHARE,
-                    escrowAddress
+                    user,
+                    escrowAddress,
+                    false,
+                    PROTOCOL_SHARE
                 )
             )
         ))))); 

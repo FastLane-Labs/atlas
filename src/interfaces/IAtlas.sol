@@ -5,6 +5,7 @@ import "../types/CallTypes.sol";
 import "../types/VerificationTypes.sol";
 
 interface IAtlas {
+    
     function metacall(
         ProtocolCall calldata protocolCall, 
         UserCall calldata userCall,
@@ -12,6 +13,10 @@ interface IAtlas {
         SearcherCall[] calldata searcherCalls,
         Verification calldata verification 
     ) external payable;
+
+    function withdrawERC20(address token, uint256 amount, ProtocolCall memory protocolCall) external;
+    function withdrawEther(uint256 amount, ProtocolCall memory protocolCall) external;
+
 
     function getExecutionEnvironment(
         address protocolControl

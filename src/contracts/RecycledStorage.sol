@@ -26,18 +26,10 @@ contract RecycledStorage is ExecutionEnvironment {
     // Most importantly of all, do not trust ANY calls *originating* from 
     // this address.
 
-    address public immutable factory;
-    address public immutable escrow;
-    uint256 public immutable protocolShare;
-
     constructor(
         uint256 _protocolShare, 
         address _escrow
-    ) ExecutionEnvironment(true, _protocolShare, _escrow) {
-        factory = msg.sender;
-        escrow = _escrow;
-        protocolShare = _protocolShare;
-    }
+    ) ExecutionEnvironment(msg.sender, _escrow, true, _protocolShare) {}
 
     function metacall(
         ProtocolCall calldata protocolCall, // supplied by frontend
@@ -65,7 +57,7 @@ contract RecycledStorage is ExecutionEnvironment {
         // This allows signature data to be stored, which helps prevent 
         // replay attacks.
         if (
-            !IAtlas(factory).untrustedVerifyProtocol(
+            !IAtlas(_factory).untrustedVerifyProtocol(
                 userCall.to,
                 searcherCalls.length,
                 protocolCall,
@@ -116,6 +108,6 @@ contract RecycledStorage is ExecutionEnvironment {
         );
 
         // Release the locks
-        IAtlas(factory).untrustedReleaseLock(proof.previousHash);
+        IAtlas(_factory).untrustedReleaseLock(proof.previousHash);
     }
 }

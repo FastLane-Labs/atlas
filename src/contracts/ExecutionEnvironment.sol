@@ -17,31 +17,18 @@ contract ExecutionEnvironment is CallExecution {
     using CallVerification for CallChainProof;
     using CallVerification for bytes32[];
 
-    address immutable internal _factory;
-
     bool immutable internal _dirty; 
 
     // NOTE: If _dirty is true, that means contract has untrustworthy storage
     // because it not selfdestructed() on each go. 
 
     constructor(
+        address user,
+        address escrow,
         bool isRecycled,
-        uint256 protocolShare,
-
-        address escrow
-    ) CallExecution(escrow, address(0), protocolShare) {
-        _factory = msg.sender; 
+        uint256 protocolShare
+    ) CallExecution(user, escrow, msg.sender, protocolShare) {
         _dirty = isRecycled;
-
-        // Unless otherwise specified, this is meant to be a single-shot 
-        // execution environment.
-        // NOTE: selfdestruct will work post EIP-6780 as long as
-        // it's called in the same transaction as contract creation
-        
-        // COMMENTED OUT FOR TEST PURPOSES
-        //if (!_dirty) {
-        //    selfdestruct(payable(_factory));
-        //}
     } 
 
     function protoCall( 

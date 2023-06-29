@@ -15,23 +15,85 @@ import { ExecutionControl } from "../libraries/ExecutionControl.sol";
 import "../types/CallTypes.sol";
 import "../types/VerificationTypes.sol";
 
+// TODO: this would be the FastLane address - fill in. 
+address constant FEE_RECIPIENT = address(0); 
 
 contract CallExecution is FastLaneErrorsEvents {
     using CallVerification for CallChainProof;
 
+    address immutable public owner;
     address immutable internal _escrow;
+    address immutable internal _factory;
     address immutable internal _payee;
-
     uint256 immutable internal _payeeShare;
 
-    constructor(address escrow, address payee, uint256 payeeShare) {
+    constructor(address user, address escrow, address factory, uint256 payeeShare) {
+        owner = user;
         _escrow = escrow;
-        _payee = payee;
+        _factory = factory;
+        _payee = FEE_RECIPIENT;
         _payeeShare = payeeShare;
     }
 
-    // TODO: this would be the FastLane address - fill in. 
-    address constant public FEE_RECIPIENT = address(0); 
+    function withdrawERC20(address token, uint256 amount) external {
+        require(msg.sender == owner, "ERR-EC01 NotEnvironmentOwner");
+
+        if (ERC20(token).balanceOf(address(this)) >= amount) {
+            SafeTransferLib.safeTransfer(
+                ERC20(token), 
+                msg.sender, 
+                amount
+            );
+
+        } else {
+            revert("ERR-EC02 BalanceTooLow");
+        }
+    }
+
+    function factoryWithdrawERC20(address user, address token, uint256 amount) external {
+        require(msg.sender == _factory, "ERR-EC10 NotFactory");
+        require(user == owner, "ERR-EC11 NotEnvironmentOwner");
+
+        if (ERC20(token).balanceOf(address(this)) >= amount) {
+            SafeTransferLib.safeTransfer(
+                ERC20(token), 
+                owner, 
+                amount
+            );
+
+        } else {
+            revert("ERR-EC02 BalanceTooLow");
+        }
+    }
+
+    function withdrawEther(uint256 amount) external {
+        require(msg.sender == owner, "ERR-EC01 NotEnvironmentOwner");
+
+        if (address(this).balance >= amount) {
+            SafeTransferLib.safeTransferETH(
+                msg.sender, 
+                amount
+            );
+            
+        } else {
+            revert("ERR-EC03 BalanceTooLow");
+        }
+    }
+
+    function factoryWithdrawEther(address user, uint256 amount) external {
+        require(msg.sender == _factory, "ERR-EC10 NotFactory");
+        require(user == owner, "ERR-EC11 NotEnvironmentOwner");
+
+        if (address(this).balance >= amount) {
+            SafeTransferLib.safeTransferETH(
+                owner, 
+                amount
+            );
+            
+        } else {
+            revert("ERR-EC03 BalanceTooLow");
+        }
+    }
 
     function stagingWrapper(
         CallChainProof memory proof,

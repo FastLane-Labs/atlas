@@ -66,19 +66,27 @@ contract Atlas is Factory, ProtocolVerifier {
         require(searcherCalls.length < type(uint8).max -1, "ERR-F02 TooManySearcherCalls");
         require(block.number <= userCall.deadline, "ERR-F03 DeadlineExceeded");
 
-        // Initialize a new, blank execution environment
-        // NOTE: This is expected to revert if there's already a contract at that location
-        ExecutionEnvironment _executionEnvironment = new ExecutionEnvironment{
-            salt: keccak256(
-                abi.encodePacked(
-                    block.chainid,
-                    escrowAddress,
-                    protocolCall.to,
-                    protocolCall.callConfig,
-                    PROTOCOL_SHARE
+        
+        ExecutionEnvironment _executionEnvironment;
+
+        // Calculate the user's execution environment address
+        ExecutionEnvironment environment = ExecutionEnvironment(payable(_getExecutionEnvironment(msg.sender, protocolCall.to)));
+
+        // Initialize a new, blank execution environment for the user if there isn't one already
+        if (address(environment).codehash == bytes32(0)) {
+            _executionEnvironment = new ExecutionEnvironment{
+                salt: keccak256(
+                    abi.encodePacked(
+                        block.chainid,
+                        msg.sender, // User
+                        escrowAddress,
+                        protocolCall.to,
+                        protocolCall.callConfig,
+                        PROTOCOL_SHARE
+                    )
                 )
-            )
-        }(false, PROTOCOL_SHARE, escrowAddress);
+            }(msg.sender, escrowAddress, false, PROTOCOL_SHARE);
+        }
 
         // Initialize the escrow locks
         _escrowContract.initializeEscrowLocks(
