@@ -4,3 +4,5 @@
 /lib
 /lib/uniswap
 /lib/uniswap/*
+.env
+/test/searcher

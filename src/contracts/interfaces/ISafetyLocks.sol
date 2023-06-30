@@ -22,5 +22,7 @@ interface ISafetyLocks {
 
     function getLockState() external view returns (EscrowKey memory);
 
+    function searcherSafetyCallback(address msgSender) external payable returns (bool isSafe);
+
     function confirmSafetyCallback() external view returns (bool);
 }

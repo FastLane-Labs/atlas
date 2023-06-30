@@ -18,6 +18,8 @@ interface IAtlas {
     function withdrawEther(uint256 amount, ProtocolCall memory protocolCall) external;
 
 
+    function getEscrowAddress() external view returns (address escrowAddress);
+
     function getExecutionEnvironment(
         address protocolControl
     ) external view returns (

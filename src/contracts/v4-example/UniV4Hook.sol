@@ -17,8 +17,8 @@ import "../types/CallTypes.sol";
 import "../types/LockTypes.sol";
 
 // Atlas Protocol-Control Imports
-import { ProtocolControl } from "../protocol-managed/ProtocolControl.sol";
-import { MEVAllocator } from "../protocol-managed/MEVAllocator.sol";
+import { ProtocolControl } from "../protocol/ProtocolControl.sol";
+import { MEVAllocator } from "../protocol/MEVAllocator.sol";
 
 
 interface IPoolManager {

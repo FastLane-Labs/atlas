@@ -44,6 +44,18 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
     }
 
     function deposit(address searcherMetaTxSigner) external payable returns (uint256 newBalance) {
+        // NOTE: The escrow accounting system cannot currently handle deposits made mid-transaction. 
+        EscrowKey memory escrowKey = _escrowKey;
+        require(
+            escrowKey.approvedCaller == address(0) &&
+            escrowKey.makingPayments == false &&
+            escrowKey.paymentsComplete == false &&
+            escrowKey.callIndex == uint8(0) &&
+            escrowKey.callMax == uint8(0) &&
+            escrowKey.lockState == uint64(0),
+            "ERR-ES001 AlreadyInitialized"
+        );
+        
         _escrowData[searcherMetaTxSigner].total += uint128(msg.value); 
         newBalance = uint256(_escrowData[searcherMetaTxSigner].total);
     }

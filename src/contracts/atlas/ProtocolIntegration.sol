@@ -130,7 +130,7 @@ contract ProtocolIntegration {
             )
         );
 
-        protocols[key] = bytes32(0);
+        delete protocols[key];
     }
 
     function getNextNonce(address governanceSignatory) external view returns (uint256 nextNonce) {

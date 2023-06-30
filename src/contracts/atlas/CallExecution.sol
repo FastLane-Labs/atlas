@@ -135,7 +135,7 @@ contract CallExecution is FastLaneErrorsEvents {
         require(ISafetyLocks(escrow).confirmSafetyCallback(), SEARCHER_FAILED_CALLBACK);
 
         // Get the value delta from the escrow contract
-        // NOTE: reverting on underflow here is intended behavior since the ExecutionEnviront address
+        // NOTE: reverting on underflow here is intended behavior since the ExecutionEnvironment address
         // should have 0 value. 
         uint256 escrowBalanceDelta = escrowEtherBalance - escrow.balance;
 

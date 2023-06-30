@@ -60,6 +60,10 @@ contract Factory {
         executionEnvironment = _getExecutionEnvironment(user, protocolControl);
     }
 
+    function getEscrowAddress() external view returns (address escrowAddress) {
+        escrowAddress = escrow;
+    }
+
     function _salt() internal view returns (bytes32 salt) {
         salt = keccak256(
             abi.encodePacked(
