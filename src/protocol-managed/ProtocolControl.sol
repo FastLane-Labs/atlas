@@ -13,7 +13,7 @@ import "../types/CallTypes.sol";
 abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
 
 
-    address public immutable atlas;
+    address public immutable escrow;
     address public immutable governance;
     
     bool public immutable sequenced;
@@ -38,11 +38,11 @@ abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
         bool shouldRequireVerification,
         bool shouldDelegateVerification,
         bool allowRecycledStorage
-        
     ) {
 
         sequenced = shouldRequireSequencedNonces;
 
+        /*
         // Disallow delegatecall when recycled storage is used
         if(allowRecycledStorage) {
             require(
@@ -54,6 +54,7 @@ abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
                 "ERR-GC01 DelegatingWithRecyled"
             );
         }
+        */
 
         if (shouldDelegateStaging) {
             require(shouldRequireStaging, "ERR-GC04 InvalidStaging");
@@ -74,7 +75,7 @@ abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
             // TODO: Consider allowing
         }
 
-        atlas = escrowAddress;
+        escrow = escrowAddress;
         governance = governanceAddress;
 
         requireStaging = shouldRequireStaging;
@@ -92,7 +93,7 @@ abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
     modifier onlyApprovedCaller() {
         require(
             msg.sender != address(0) &&
-            msg.sender == ISafetyLocks(atlas).approvedCaller(),
+            msg.sender == ISafetyLocks(escrow).approvedCaller(),
             "InvalidCaller"
         );
         _;

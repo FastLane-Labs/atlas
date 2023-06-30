@@ -80,13 +80,18 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
     // Storage lock
     bytes32 public hashLock; // keccak256(poolKey, executionEnvironment)
 
+    // Map to track when "Non Adversarial" flow is allowed.
+    // NOTE: This hook is meant to be used for multiple pairs
+    // key: keccak(token0, token1, block.number)
+    mapping(bytes32 => bool) public sequenceLock;
+
     constructor(
-        address _atlas,
+        address _escrow,
         address _v4Singleton
     ) 
     MEVAllocator() 
     ProtocolControl(
-        _atlas,
+        _escrow,
         msg.sender,
         true,
         true,
@@ -100,7 +105,7 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
     ) {
         /*
         ProtocolControl(
-            _atlas, // escrowAddress
+            _escrow, // escrowAddress
             true, // shouldRequireSequencedNonces
             true, // shouldRequireStaging
             true, // shouldDelegateStaging
@@ -139,7 +144,7 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
 
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that ProtocolControl supplied a valid signature
-        require(msg.sender == atlas, "ERR-H00 InvalidCaller");
+        require(msg.sender == escrow, "ERR-H00 InvalidCaller");
 
         (
             IPoolManager.PoolKey memory key, 
@@ -218,6 +223,17 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
         IPoolManager.PoolKey memory key = abi.decode(payeeData[0].data, (IPoolManager.PoolKey));
 
         IPoolManager(v4Singleton).donate(key, token0DonateAmount, token1DonateAmount);
+
+        // Flag the pool to be open for trading for the remainder of the block
+        bytes32 sequenceKey = keccak256(
+            abi.encodePacked(
+                IPoolManager.Currency.unwrap(key.currency0), 
+                IPoolManager.Currency.unwrap(key.currency1),
+                block.number
+            )
+        );
+
+        sequenceLock[sequenceKey] = true;
     }
 
     function _verificationDelegateCall(
@@ -251,7 +267,7 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
         // address(this) = hook
         // msg.sender = ExecutionEnvironment
 
-        EscrowKey memory escrowKey = ISafetyLocks(atlas).getLockState();
+        EscrowKey memory escrowKey = ISafetyLocks(escrow).getLockState();
 
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that ProtocolControl supplied a valid signature
@@ -269,7 +285,7 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
         // address(this) = hook
         // msg.sender = ExecutionEnvironment
 
-        EscrowKey memory escrowKey = ISafetyLocks(atlas).getLockState();
+        EscrowKey memory escrowKey = ISafetyLocks(escrow).getLockState();
 
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that ProtocolControl supplied a valid signature
@@ -382,7 +398,7 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
         require(address(this) == hook, "ERR-H00 InvalidCallee");
         require(msg.sender == v4Singleton, "ERR-H01 InvalidCaller"); // TODO: Confirm this
 
-        EscrowKey memory escrowKey = ISafetyLocks(atlas).getLockState();
+        EscrowKey memory escrowKey = ISafetyLocks(escrow).getLockState();
         
         // Case:
         // User call
@@ -411,8 +427,21 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
         // Case:
         // Other call
         } else {
-            // Revert
-            revert("ERR-H02 InvalidLockStage");
+            // Determine if the sequenced order was processed earlier in the block
+            bytes32 sequenceKey = keccak256(
+                abi.encodePacked(
+                    IPoolManager.Currency.unwrap(key.currency0), 
+                    IPoolManager.Currency.unwrap(key.currency1),
+                    block.number
+                )
+            );
+
+            if (!sequenceLock[sequenceKey]) {
+                // TODO: Add in ability to "cache" the unsequenced transaction in storage.
+                // Currently, Uni V4 will either fully execute the trade or throw a revert,
+                // undoing any SSTORE made by the hook. 
+                revert("ERR-H02 InvalidLockStage");
+            }
         }
         
 
@@ -422,6 +451,4 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
 
         return AtlasV4Hook.beforeSwap.selector;
     }
-
-
 }

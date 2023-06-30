@@ -6,11 +6,9 @@ import "../types/VerificationTypes.sol";
 
 interface ICallExecution {
 
-    function withdrawERC20(address token, uint256 amount) external;
     function factoryWithdrawERC20(address user, address token, uint256 amount) external;
-    function withdrawEther(uint256 amount) external;
     function factoryWithdrawEther(address user, uint256 amount) external;
-
+    
     function stagingWrapper(
         CallChainProof memory proof,
         ProtocolCall calldata protocolCall,
