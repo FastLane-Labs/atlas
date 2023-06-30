@@ -56,6 +56,7 @@ contract UserDirect is Metacall, ExecutionEnvironment {
     ) internal override view returns (address environment) {
         require(protocolCall.to == control, "ERR-UD01 InvalidControl");
         require(protocolCall.callConfig == config, "ERR-UD02 InvalidConfig");
+        require(msg.sender == user, "ERR-UD03 InvalidCaller");
         environment = address(this);
     }
 
@@ -145,5 +146,25 @@ contract UserDirect is Metacall, ExecutionEnvironment {
         } else {
             revert("ERR-EC03 BalanceTooLow");
         }
+    }
+
+    function getUser() external view returns (address _user) {
+        _user = user;
+    }
+
+    function getProtocolControl() external view returns (address _control) {
+        _control = control;
+    }
+
+    function getFactory() external view returns (address _factory) {
+        _factory = factory;
+    }
+
+    function getEscrow() external view returns (address _escrow) {
+        _escrow = escrow;
+    }
+
+    function getCallConfig() external view returns (uint16 _config) {
+        _config = config;
     }
 }
