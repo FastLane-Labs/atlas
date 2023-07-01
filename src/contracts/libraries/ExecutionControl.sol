@@ -37,7 +37,7 @@ library ExecutionControl {
 
         // Verify the proof to ensure this isn't happening out of sequence.
         require(
-            proof.prove(protocolCall.to, data, isDelegated),
+            proof.prove(protocolCall.to, userCall.data, isDelegated),
             "ERR-P01 ProofInvalid"
         );
 

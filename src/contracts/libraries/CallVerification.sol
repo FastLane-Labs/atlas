@@ -20,34 +20,6 @@ library CallVerification {
         });
     }
 
-    function addVerificationCallProof(
-        CallChainProof memory self,
-        address to,
-        bool isDelegated,
-        bytes memory stagingReturnData,
-        bytes memory userReturnData
-    ) internal pure returns (CallChainProof memory) {
-        self.previousHash = self.targetHash;
-        self.targetHash = keccak256(
-            abi.encodePacked(
-                self.previousHash,
-                to,
-                abi.encodeWithSelector(
-                    IProtocolControl.verificationCall.selector, 
-                    stagingReturnData,
-                    userReturnData
-                ),
-                isDelegated, 
-                ++self.index
-            )
-        );
-        return self;
-    }
-
-    function delegateVerification(uint16 callConfig) internal pure returns (bool) {
-        return (callConfig & 1 << uint16(CallConfig.DelegateStaging) != 0);
-    }
-
     function next(
         CallChainProof memory self, 
         bytes32[] memory executionHashChain
@@ -76,6 +48,34 @@ library CallVerification {
         );
     }
 
+    function addVerificationCallProof(
+        CallChainProof memory self,
+        address to,
+        bool isDelegated,
+        bytes memory stagingReturnData,
+        bytes memory userReturnData
+    ) internal pure returns (CallChainProof memory) {
+        self.previousHash = self.targetHash;
+        self.targetHash = keccak256(
+            abi.encodePacked(
+                self.previousHash,
+                to,
+                abi.encodeWithSelector(
+                    IProtocolControl.verificationCall.selector, 
+                    stagingReturnData,
+                    userReturnData
+                ),
+                isDelegated, 
+                ++self.index
+            )
+        );
+        return self;
+    }
+
+    function delegateVerification(uint16 callConfig) internal pure returns (bool) {
+        return (callConfig & 1 << uint16(CallConfig.DelegateStaging) != 0);
+    }
+
     function buildExecutionHashChain(
         ProtocolCall calldata protocolCall, // supplied by frontend
         UserCall calldata userCall,
@@ -93,7 +93,7 @@ library CallVerification {
         // NOTE: memory arrays are not accessible by delegatecall. This is a key
         // security feature. 
         executionHashChain = new bytes32[](searcherCalls.length + 3);
-        uint256 i; // array index
+        uint256 i = 0; // array index
         
         // Start with staging call
         executionHashChain[0] = keccak256(
@@ -101,7 +101,7 @@ library CallVerification {
                 bytes32(0), // initial hash = null
                 protocolCall.to,
                 userCall.data,
-                true, 
+                delegateStaging(protocolCall.callConfig), 
                 i
             )
         );
@@ -140,6 +140,10 @@ library CallVerification {
 
     function delegateUser(uint16 callConfig) internal pure returns (bool) {
         return (callConfig & 1 << uint16(CallConfig.DelegateUser) != 0);
+    }
+
+    function delegateStaging(uint16 callConfig) internal pure returns (bool) {
+        return (callConfig & 1 << uint16(CallConfig.DelegateStaging) != 0);
     }
 }
 
