@@ -27,4 +27,7 @@ contract TestConstants {
 
     address constant public V2_FXS_ETH = address(0xecBa967D84fCF0405F6b32Bc45F4d36BfDBB2E81);
     address constant public S2_FXS_ETH = address(0x61eB53ee427aB4E007d78A9134AaCb3101A2DC23);
+
+    address constant public POOL_ONE = V2_FXS_ETH;
+    address constant public POOL_TWO = S2_FXS_ETH;
 }

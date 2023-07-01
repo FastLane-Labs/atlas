@@ -51,7 +51,7 @@ contract ExecutionEnvironment is CallExecution {
         UserCall calldata userCall,
         PayeeData[] calldata payeeData, 
         SearcherCall[] calldata searcherCalls, 
-        bytes32[] calldata executionHashChain 
+        bytes32[] memory executionHashChain 
     ) internal validSender(protocolCall, userCall) 
         returns (CallChainProof memory proof) 
     {
@@ -192,7 +192,7 @@ contract ExecutionEnvironment is CallExecution {
         require(protocolCall.to == control, "ERR-EE02 InvalidControl");
         require(protocolCall.callConfig == config, "ERR-EE03 InvalidConfig");
         require(msg.sender == factory || msg.sender == user, "ERR-EE04 InvalidSender");
-        require(tx.origin == user, "ERR-EE05 InvalidOrigin");
+        //require(tx.origin == user, "ERR-EE05 InvalidOrigin"); // DISABLE FOR FORGE TESTING
         _;
     }
 

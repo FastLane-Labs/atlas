@@ -14,6 +14,8 @@ import {V2ProtocolControl} from "../../src/contracts/v2-example/V2ProtocolContro
 
 import {TestConstants} from "./TestConstants.sol";
 
+import {Helper} from "../Helpers.sol";
+
 contract BaseTest is Test, TestConstants {
     address public me = address(this);
     
@@ -37,6 +39,8 @@ contract BaseTest is Test, TestConstants {
     Searcher public searcherTwo;
 
     V2ProtocolControl public control;
+
+    Helper public helper;
 
     // Fork stuff
     ChainVars public chain = MAINNET;
@@ -80,5 +84,7 @@ contract BaseTest is Test, TestConstants {
         IEscrow(escrow).deposit{value: 1E18}(searcherTwoEOA);
 
         vm.stopPrank();
+
+        helper = new Helper(address(control), escrow, address(atlas));
     }
 }

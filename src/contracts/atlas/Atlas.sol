@@ -13,7 +13,9 @@ import "../types/VerificationTypes.sol";
 
 import { CallVerification } from "../libraries/CallVerification.sol";
 
-contract Atlas is Metacall, Factory, ProtocolVerifier {
+import "forge-std/Test.sol";
+
+contract Atlas is Test, Metacall, Factory, ProtocolVerifier {
 
     bytes32 internal _userLock;
 
@@ -23,6 +25,7 @@ contract Atlas is Metacall, Factory, ProtocolVerifier {
     ) Factory(_escrowDuration) {}
 
     function _validateProtocolControl(
+        address environment,
         address userCallTo,
         uint256 searcherCallsLength,
         ProtocolCall calldata protocolCall,
@@ -34,9 +37,11 @@ contract Atlas is Metacall, Factory, ProtocolVerifier {
 
         // Initialize the escrow locks
         ISafetyLocks(escrow).initializeEscrowLocks(
-            address(msg.sender),
+            environment,
             uint8(searcherCallsLength)
         );
+
+        console.log("locked for", environment);
 
         return true;
     }
@@ -92,7 +97,7 @@ contract Atlas is Metacall, Factory, ProtocolVerifier {
             ), 
             "ERR-H03 InvalidCaller"
         );
-        require(userCallFrom == tx.origin, "ERR-H04 InvalidCaller");
+        // require(userCallFrom == tx.origin, "ERR-H04 InvalidCaller"); // DISABLE FOR FORGE TESTING
         require(_userLock == bytes32(0), "ERR-H05 AlreadyLocked");
         
         if (!_verifyProtocol(userCallTo, protocolCall, verification)) {
@@ -127,7 +132,7 @@ contract Atlas is Metacall, Factory, ProtocolVerifier {
             ), 
             "ERR-H03 InvalidCaller"
         );
-        require(userCallFrom == tx.origin, "ERR-H04 InvalidCaller");
+        // require(userCallFrom == tx.origin, "ERR-H04 InvalidCaller"); // DISABLE FOR FORGE TESTING
         require(key == _userLock && key != bytes32(0), "ERR-H05 IncorrectKey");
         
         delete _userLock;

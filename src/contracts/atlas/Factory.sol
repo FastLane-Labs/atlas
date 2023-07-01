@@ -9,7 +9,9 @@ import { UserDirect } from "./UserDirect.sol";
 
 import "../types/CallTypes.sol";
 
-contract Factory {
+import "forge-std/Test.sol";
+
+contract Factory is Test {
 
     uint32 immutable public escrowDuration;
     address immutable public escrow;
@@ -58,6 +60,7 @@ contract Factory {
         address executionEnvironment
     ) {
         executionEnvironment = _getExecutionEnvironment(user, protocolControl);
+        console.log("executionEnvironment",executionEnvironment);
     }
 
     function getEscrowAddress() external view returns (address escrowAddress) {
@@ -133,6 +136,8 @@ contract Factory {
         );
 
         environment = address(_environment);
+
+        console.log("environment", environment);
 
         environments[environment] = keccak256(abi.encodePacked(
             user,

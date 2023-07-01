@@ -26,13 +26,20 @@ abstract contract Metacall is ReentrancyGuard {
             searcherCalls
         );
 
+        // Get the execution environment
+        address environment = _prepEnvironment(protocolCall);
+
         // Verify that the calldata injection came from the protocol frontend
         // NOTE: fail result causes function to return rather than revert. 
         // This allows signature data to be stored, which helps prevent 
         // replay attacks.
-        if (!_validateProtocolControl(userCall.to, searcherCalls.length, protocolCall, verification)) {
+        if (!_validateProtocolControl(environment, userCall.to, searcherCalls.length, protocolCall, verification)) {
             return;
         }
+        require(
+            keccak256(abi.encode(payeeData)) == verification.proof.payeeHash,
+            "ERR-H02 PayeeMismatch"
+        );
         
         // Check that the value of the tx is greater than or equal to the value specified
         // NOTE: a msg.value *higher* than user value could be used by the staging call.
@@ -43,7 +50,7 @@ abstract contract Metacall is ReentrancyGuard {
 
         // Handoff to the execution environment, which returns the verified proof
         CallChainProof memory proof = _execute(
-            _prepEnvironment(protocolCall),
+            environment,
             protocolCall,
             userCall,
             payeeData,
@@ -64,6 +71,7 @@ abstract contract Metacall is ReentrancyGuard {
 
     // VIRTUAL FUNCTIONS
     function _validateProtocolControl(
+        address environment,
         address userCallTo,
         uint256 searcherCallsLength,
         ProtocolCall calldata protocolCall,

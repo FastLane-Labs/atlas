@@ -37,6 +37,7 @@ contract UserDirect is Metacall, ExecutionEnvironment {
     }
 
     function _validateProtocolControl(
+        address,
         address userCallTo,
         uint256 searcherCallsLength,
         ProtocolCall calldata protocolCall,

@@ -18,6 +18,7 @@ struct ProtocolProof {
     address to;
     uint256 nonce;
     uint256 deadline;
+    bytes32 payeeHash;
     bytes32 userCallHash; // keccak256 of userCall.to, userCall.data
     bytes32 callChainHash; // keccak256 of the searchers' txs
 }

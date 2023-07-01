@@ -120,7 +120,7 @@ library CallVerification {
         unchecked { ++i;}
         
         // i = 2 when starting searcher loop
-        for (; i < executionHashChain.length;) {
+        for (; i < executionHashChain.length-1;) {
             executionHashChain[i] = keccak256(
                 abi.encodePacked(
                     executionHashChain[i-1], // reference previous hash
