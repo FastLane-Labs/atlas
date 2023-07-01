@@ -51,28 +51,24 @@ contract ExecutionEnvironment is CallExecution {
         UserCall calldata userCall,
         PayeeData[] calldata payeeData, 
         SearcherCall[] calldata searcherCalls, 
-        bytes32[] memory executionHashChain 
+        bytes32[] calldata executionHashChain 
     ) internal validSender(protocolCall, userCall) 
         returns (CallChainProof memory proof) 
     {
         // Initialize proof for executionHashChain for sequence verification
         proof = CallVerification.initializeProof(
             keccak256(abi.encodePacked(userCall.to, userCall.data)), 
-            executionHashChain
+            executionHashChain[0]
         );
 
         // ###########  END MEMORY PREPARATION #############
         // ---------------------------------------------
         // #########  BEGIN STAGING EXECUTION ##########
 
-        // Stage the execution environment for the user, if necessary
-        // This will ask the safety contract / escrow to activate its locks and then trigger the 
-        // staging callback func in this in this contract. 
-        // NOTE: this may be a trusted delegatecall if the protocol intends it to be, 
-        // but this contract will have empty storage.
-        // NOTE: the calldata for the staging call must be the user's calldata
-        // NOTE: the staging contracts we're calling should be custom-made for each protocol and 
-        // should be immutable.  If an update is required, a new one should be made. 
+        // Stage the execution environment for the user, if necessary.
+        // NOTE: The calldata for the staging call is the user's calldata
+        // NOTE: The staging contracts should be immutable and custom-made 
+        // by each protocol's governance team.
         bytes memory stagingReturnData = IEscrow(escrow).executeStagingCall(
             proof,
             protocolCall,
@@ -98,9 +94,8 @@ contract ExecutionEnvironment is CallExecution {
             userCall
         );
         
-        // forward any surplus msg.value to the escrow for tracking
-        // and eventual reimbursement to user (after searcher txs)
-        // are finished processing
+        // Forward and store any surplus msg.value in the escrow for tracking
+        // and eventual reimbursement to user.
         if (address(this).balance != 0) {
             SafeTransferLib.safeTransferETH(
                 escrow, 
@@ -112,7 +107,7 @@ contract ExecutionEnvironment is CallExecution {
         // ---------------------------------------------
         // #########  BEGIN SEARCHER EXECUTION ##########
 
-        _iterateSearchers(
+        proof = _iterateSearchers(
             protocolCall,
             payeeData,
             searcherCalls,

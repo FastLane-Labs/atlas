@@ -10,11 +10,11 @@ library CallVerification {
    
     function initializeProof(
         bytes32 userCallHash,
-        bytes32[] memory executionHashChain
+        bytes32 executionHashChainZeroIndex
     ) internal pure returns (CallChainProof memory) {
         return CallChainProof({
             previousHash: bytes32(0),
-            targetHash: executionHashChain[0],
+            targetHash: executionHashChainZeroIndex,
             userCallHash: userCallHash,
             index: 0
         });
@@ -88,11 +88,10 @@ library CallVerification {
         //      0: stagingCall
         //      1: userCall + keccak of prior
         //      2 to n: searcherCalls + keccak of prior
-        // NOTE: if the staging call is skipped, the userCall has the 0 index.
 
         // memory array 
         // NOTE: memory arrays are not accessible by delegatecall. This is a key
-        // security feature. Please alert me if anyone can disprove this 
+        // security feature. 
         executionHashChain = new bytes32[](searcherCalls.length + 3);
         uint256 i; // array index
         
