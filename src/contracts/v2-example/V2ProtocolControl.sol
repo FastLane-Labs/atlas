@@ -145,15 +145,12 @@ contract V2ProtocolControl is Test, MEVAllocator, ProtocolControl {
             console.log("userBalance", ERC20(tokenUserIsSelling).balanceOf(userCallFrom));
             console.log("EEAllowance", ERC20(tokenUserIsSelling).allowance(userCallFrom, address(this)));
             console.log("---");
-
         }
         
 
         // This is a V2 swap, so optimistically transfer the tokens
         // NOTE: The user should have approved the ExecutionEnvironment for token transfers
         ERC20(tokenUserIsSelling).transferFrom(userCallFrom, userCallTo, amountUserIsSelling); 
-
-        console.log("c");
 
         bytes memory emptyData;
         return emptyData;

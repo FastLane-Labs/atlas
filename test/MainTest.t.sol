@@ -37,17 +37,17 @@ contract MainTest is BaseTest {
         
         ProtocolCall memory protocolCall = helper.getProtocolCall();
         
-        UserCall memory userCall = helper.buildUserCall(POOL_ONE, userEOA, 1E17, 0);
+        UserCall memory userCall = helper.buildUserCall(POOL_ONE, userEOA, 2E17, 0);
         
         PayeeData[] memory payeeData = helper.getPayeeData();
 
         SearcherCall[] memory searcherCalls = new SearcherCall[](2);
 
         searcherCalls[0] = helper.buildSearcherCall(
-            userCall, searcherOneEOA, address(searcherOne), 1E15
+            userCall, searcherOneEOA, address(searcherOne), 2E14
         );
         searcherCalls[1] = helper.buildSearcherCall(
-            userCall, searcherTwoEOA, address(searcherTwo), 2E15
+            userCall, searcherTwoEOA, address(searcherTwo), 1E14
         );
         
         Verification memory verification = helper.buildVerification(

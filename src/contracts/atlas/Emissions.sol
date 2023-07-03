@@ -17,8 +17,6 @@ contract FastLaneErrorsEvents {
 
     event UserTxResult(
         address indexed user,
-        address indexed protocol,
-        bool searcherSuccess,
         uint256 valueReturned,
         uint256 gasRefunded
     );

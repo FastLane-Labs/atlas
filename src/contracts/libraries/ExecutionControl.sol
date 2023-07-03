@@ -11,8 +11,8 @@ import "../types/CallTypes.sol";
 import "../types/VerificationTypes.sol";
 
 import "forge-std/Test.sol";
-contract ExecutionControl is Test {
-//library ExecutionControl {
+// contract ExecutionControl is Test {
+library ExecutionControl {
     using CallVerification for CallChainProof;
     using CallBits for uint16;
 
@@ -44,8 +44,6 @@ contract ExecutionControl is Test {
             proof.prove(protocolCall.to, stagingCalldata, isDelegated),
             "ERR-P01 ProofInvalid"
         );
-
-        console.log("protocolCall.to",protocolCall.to);
 
         if (isDelegated) {
             return delegateWrapper(

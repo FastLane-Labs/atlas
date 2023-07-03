@@ -66,7 +66,7 @@ contract Atlas is Test, Metacall, Factory, ProtocolVerifier {
         PayeeData[] calldata payeeData, 
         SearcherCall[] calldata searcherCalls, 
         bytes32[] memory executionHashChain 
-    ) internal override returns (CallChainProof memory) {
+    ) internal override returns (bytes32) {
         return IExecutionEnvironment(environment).protoCall(
             protocolCall,
             userCall,

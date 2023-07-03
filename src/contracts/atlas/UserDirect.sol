@@ -68,14 +68,15 @@ contract UserDirect is Metacall, ExecutionEnvironment {
         PayeeData[] calldata payeeData, 
         SearcherCall[] calldata searcherCalls, 
         bytes32[] memory executionHashChain 
-    ) internal override returns (CallChainProof memory) {
-        return _protoCall(
+    ) internal override returns (bytes32) {
+        CallChainProof memory proof = _protoCall(
             protocolCall,
             userCall,
             payeeData,
             searcherCalls,
             executionHashChain
         );
+        return proof.previousHash;
     }
 
     function _releaseLock(

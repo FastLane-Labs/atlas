@@ -36,14 +36,15 @@ contract ExecutionEnvironment is CallExecution {
         PayeeData[] calldata payeeData, // supplied by frontend
         SearcherCall[] calldata searcherCalls, // supplied by FastLane via frontend integration
         bytes32[] calldata executionHashChain // calculated by msg.sender (Factory)
-    ) external payable returns (CallChainProof memory) { 
-        return _protoCall(
+    ) external payable returns (bytes32) { 
+        CallChainProof memory proof = _protoCall(
             protocolCall,
             userCall,
             payeeData,
             searcherCalls,
             executionHashChain
         );
+        return proof.previousHash;
     }
 
     function _protoCall( 
@@ -57,7 +58,7 @@ contract ExecutionEnvironment is CallExecution {
     {
         // Initialize proof for executionHashChain for sequence verification
         proof = CallVerification.initializeProof(
-            keccak256(abi.encodePacked(userCall.to, userCall.data)), 
+            userCall, 
             executionHashChain[0]
         );
 
@@ -85,7 +86,7 @@ contract ExecutionEnvironment is CallExecution {
         // msg.value to have been used during the staging call
         require(address(this).balance >= userCall.value, "ERR-H03 ValueExceedsBalance");
 
-        proof = proof.next(executionHashChain);
+        proof = proof.next(executionHashChain[proof.index+1]);
 
         bytes memory userReturnData = IEscrow(escrow).executeUserCall(
             proof,
@@ -93,15 +94,6 @@ contract ExecutionEnvironment is CallExecution {
             stagingReturnData,
             userCall
         );
-        
-        // Forward and store any surplus msg.value in the escrow for tracking
-        // and eventual reimbursement to user.
-        if (address(this).balance != 0) {
-            SafeTransferLib.safeTransferETH(
-                escrow, 
-                address(this).balance
-            );
-        }
 
         // ###########  END USER EXECUTION #############
         // ---------------------------------------------
@@ -113,6 +105,8 @@ contract ExecutionEnvironment is CallExecution {
             searcherCalls,
             executionHashChain
         );
+
+        IEscrow(escrow).executeUserRefund(userCall.from);
 
         // ###########  END SEARCHER EXECUTION #############
         // ---------------------------------------------
@@ -134,7 +128,6 @@ contract ExecutionEnvironment is CallExecution {
             stagingReturnData,
             userReturnData
         );
-
         // #########  END VERIFICATION EXECUTION ##########
     }
 
@@ -148,11 +141,20 @@ contract ExecutionEnvironment is CallExecution {
         bool auctionAlreadyWon = false;
         uint256 gasWaterMark;
 
+        // Forward and store any surplus msg.value in the escrow for tracking
+        // and eventual reimbursement to user.
+        if (address(this).balance != 0) {
+            SafeTransferLib.safeTransferETH(
+                escrow, 
+                address(this).balance
+            );
+        }
+
         for (; i < searcherCalls.length;) {
 
             gasWaterMark = gasleft();
 
-            proof = proof.next(executionHashChain);
+            proof = proof.next(executionHashChain[proof.index+1]);
 
             if (
                 IEscrow(escrow).executeSearcherCall(
@@ -169,6 +171,7 @@ contract ExecutionEnvironment is CallExecution {
             }
             unchecked { ++i; }
         }
+        proof = proof.next(executionHashChain[proof.index+1]);
     }
 
     function _handlePayments(

@@ -12,7 +12,7 @@ interface IExecutionEnvironment {
         PayeeData[] calldata payeeData, // supplied by frontend
         SearcherCall[] calldata searcherCalls, // supplied by FastLane via frontend integration
         bytes32[] calldata executionHashChain // calculated by msg.sender (Factory)
-    ) external payable returns (CallChainProof memory);
+    ) external payable returns (bytes32);
 
     function delegateStagingWrapper(
         ProtocolCall calldata protocolCall,

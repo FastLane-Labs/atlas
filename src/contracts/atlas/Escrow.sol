@@ -210,8 +210,7 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
     } 
 
     function executeUserRefund(
-        UserCall calldata userCall,
-        bool callSuccess
+        address userCallFrom
     ) external refundLock {
         
         // TODO: searcher msg.value is being counted for gas rebate (double counted)
@@ -239,9 +238,7 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
         );
 
         emit UserTxResult(
-            userCall.from,
-            userCall.to,
-            callSuccess,
+            userCallFrom,
             valueReturn > 0 ? uint256(valueReturn) : 0,
             uint256(pendingValueTracker.gasRebate)
         );
@@ -255,7 +252,7 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
         require(valueReturn > 0, "ERR-E002 UnpaidValue");
 
         SafeTransferLib.safeTransferETH(
-            userCall.from, 
+            userCallFrom, 
             uint256(valueReturn + gasRebate)
         );
 
@@ -284,7 +281,7 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
 
             txValue = searcherCall.metaTx.value;
         
-        // TODO: figure out what is fair for this(or if it just doesnt happen?)
+        // TODO: figure out what is fair for this (or if it just doesnt happen?)
         } else if (result & EscrowBits._EXTERNAL_REFUND != 0) {
             // TODO: simplify/fix formula for calldata - verify. 
             gasRebate = (

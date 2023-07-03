@@ -9,24 +9,25 @@ import "../types/VerificationTypes.sol";
 library CallVerification {
    
     function initializeProof(
-        bytes32 userCallHash,
+        UserCall calldata userCall,
         bytes32 executionHashChainZeroIndex
     ) internal pure returns (CallChainProof memory) {
         return CallChainProof({
             previousHash: bytes32(0),
             targetHash: executionHashChainZeroIndex,
-            userCallHash: userCallHash,
+            userCallHash: keccak256(abi.encodePacked(userCall.to, userCall.data)),
             index: 0
         });
     }
 
     function next(
         CallChainProof memory self, 
-        bytes32[] memory executionHashChain
+        bytes32 nextHash
     ) internal pure returns (CallChainProof memory) 
     {
         self.previousHash = self.targetHash;
-        self.targetHash = executionHashChain[++self.index];
+        self.targetHash = nextHash;
+        unchecked { ++self.index; }
         return self;
     }
 
@@ -116,7 +117,7 @@ library CallVerification {
         executionHashChain[1] = keccak256(
             abi.encodePacked(
                 executionHashChain[0], // always reference previous hash
-                userCall.from,
+                userCall.to,
                 userCall.data,
                 delegateUser(protocolCall.callConfig),
                 i

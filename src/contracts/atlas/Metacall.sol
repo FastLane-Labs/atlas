@@ -26,6 +26,11 @@ abstract contract Metacall is ReentrancyGuard {
             searcherCalls
         );
 
+        require(
+            executionHashChain[executionHashChain.length-2] == verification.proof.callChainHash, 
+            "ERR-F05 InvalidCallChain"
+        );
+
         // Get the execution environment
         address environment = _prepEnvironment(protocolCall);
 
@@ -49,7 +54,7 @@ abstract contract Metacall is ReentrancyGuard {
         require(block.number <= userCall.deadline, "ERR-F03 DeadlineExceeded");
 
         // Handoff to the execution environment, which returns the verified proof
-        CallChainProof memory proof = _execute(
+        bytes32 callChainHash = _execute(
             environment,
             protocolCall,
             userCall,
@@ -58,15 +63,8 @@ abstract contract Metacall is ReentrancyGuard {
             executionHashChain
         );
 
-        // Verify that the execution system's sequencing of the transaction calldata was unaltered by searchers
-        // NOTE: This functions as an "exploit prevention mechanism" as the contract itself already verifies 
-        // trustless execution. 
-        require(
-            proof.previousHash == verification.proof.callChainHash, "ERR-F05 SearcherExploitDetected"
-        );
-
         // Release the lock
-        _releaseLock(proof.previousHash, protocolCall);
+        _releaseLock(callChainHash, protocolCall);
     }
 
     // VIRTUAL FUNCTIONS
@@ -87,7 +85,7 @@ abstract contract Metacall is ReentrancyGuard {
         PayeeData[] calldata payeeData, 
         SearcherCall[] calldata searcherCalls, 
         bytes32[] memory executionHashChain 
-    ) internal virtual returns (CallChainProof memory);
+    ) internal virtual returns (bytes32 callChainHash);
 
     function _releaseLock(bytes32 key, ProtocolCall calldata protocolCall) internal virtual;
 }

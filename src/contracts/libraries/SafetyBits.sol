@@ -128,7 +128,7 @@ library SafetyBits {
             (self.lockState == _ACTIVE_X_VERIFICATION_X_UNSET) && 
             (caller != address(0)) &&
             (self.approvedCaller == caller) && 
-            (self.callIndex == self.callMax-2)
+            (self.callIndex == self.callMax-1)
         );
     }
 
@@ -146,10 +146,9 @@ library SafetyBits {
         address caller
     ) internal pure returns (bool) {
         return (
-            (self.lockState == _ACTIVE_X_REFUND_X_UNSET) && 
-            (caller != address(0)) &&
+            (self.lockState == _ACTIVE_X_REFUND_X_UNSET) &&
             (self.approvedCaller == caller) && 
-            (self.callIndex == self.callMax-2)
+            (self.callIndex == self.callMax-1)
         );
     }
 
@@ -340,7 +339,7 @@ library SafetyBits {
     ) internal pure returns (bool) {
         return (
             (self.approvedCaller == caller) &&
-            (self.callMax == self.callIndex-1) &&
+            (self.callMax == self.callIndex) &&
             (self.lockState == _PENDING_X_RELEASING_X_UNSET)
         );
     }

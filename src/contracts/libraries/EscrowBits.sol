@@ -70,7 +70,10 @@ library EscrowBits {
 
     uint256 constant internal _EXECUTED_WITH_ERROR = (
         1 << uint256(SearcherOutcome.BidNotPaid) |
-        1 << uint256(SearcherOutcome.CallReverted) 
+        1 << uint256(SearcherOutcome.CallReverted) |
+        1 << uint256(SearcherOutcome.BidNotPaid) |
+        1 << uint256(SearcherOutcome.CallValueTooHigh) |
+        1 << uint256(SearcherOutcome.CallbackFailed) 
     );
 
     function canExecute(uint256 result) internal pure returns (bool) {

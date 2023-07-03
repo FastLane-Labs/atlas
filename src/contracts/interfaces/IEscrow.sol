@@ -44,7 +44,6 @@ interface IEscrow {
     ) external;
 
     function executeUserRefund(
-        UserCall calldata userCall,
-        bool callSuccess
+        address userCallFrom
     ) external;
 }

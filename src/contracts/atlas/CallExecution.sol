@@ -17,7 +17,7 @@ import { ExecutionControl } from "../libraries/ExecutionControl.sol";
 
 import "forge-std/Test.sol";
 
-contract CallExecution is Test, ExecutionControl, FastLaneErrorsEvents {
+contract CallExecution is Test, FastLaneErrorsEvents {
     using CallVerification for CallChainProof;
 
     uint256 constant public ATLAS_SHARE = 5; // TODO: this would be the FastLane address - fill in. 
