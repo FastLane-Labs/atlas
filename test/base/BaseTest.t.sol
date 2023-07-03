@@ -51,6 +51,10 @@ contract BaseTest is Test, TestConstants {
         vm.selectFork(forkNetwork);
         vm.rollFork(forkNetwork, chain.FORK_BLOCK);
 
+        // Deal to user
+        deal(TOKEN_ZERO, address(userEOA), 10E30);
+        deal(TOKEN_ONE, address(userEOA), 10E30);
+
         // Deploy contracts
         vm.startPrank(payee);
 

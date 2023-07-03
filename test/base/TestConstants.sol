@@ -30,4 +30,6 @@ contract TestConstants {
 
     address constant public POOL_ONE = V2_FXS_ETH;
     address constant public POOL_TWO = S2_FXS_ETH;
+    address constant public TOKEN_ZERO = FXS_ADDRESS;
+    address constant public TOKEN_ONE = WETH_ADDRESS;
 }

@@ -10,7 +10,9 @@ import { CallBits } from "../libraries/CallBits.sol";
 import "../types/CallTypes.sol";
 import "../types/VerificationTypes.sol";
 
-library ExecutionControl {
+import "forge-std/Test.sol";
+contract ExecutionControl is Test {
+//library ExecutionControl {
     using CallVerification for CallChainProof;
     using CallBits for uint16;
 
@@ -29,28 +31,38 @@ library ExecutionControl {
     ) internal returns (bytes memory) {
 
         bool isDelegated = protocolCall.callConfig.needsDelegateStaging();
-
-        bytes memory data = abi.encodeWithSelector(
-            IProtocolControl.stageCall.selector, 
-            userCall
+        
+        bytes memory stagingCalldata = abi.encode(
+            userCall.to, 
+            userCall.from,
+            bytes4(userCall.data), 
+            userCall.data[4:]
         );
 
         // Verify the proof to ensure this isn't happening out of sequence.
         require(
-            proof.prove(protocolCall.to, userCall.data, isDelegated),
+            proof.prove(protocolCall.to, stagingCalldata, isDelegated),
             "ERR-P01 ProofInvalid"
         );
+
+        console.log("protocolCall.to",protocolCall.to);
 
         if (isDelegated) {
             return delegateWrapper(
                 protocolCall.to,
-                data
+                abi.encodeWithSelector(
+                    IProtocolControl.stageCall.selector, 
+                    stagingCalldata
+                )
             );
         
         } else {
             return staticWrapper(
                 protocolCall.to,
-                data
+                abi.encodeWithSelector(
+                    IProtocolControl.stageCall.selector, 
+                    stagingCalldata
+                )
             );
         }
     }
@@ -187,7 +199,7 @@ library ExecutionControl {
         (bool success, bytes memory returnData) = protocolControl.delegatecall(
             data
         );
-        require(success, "ERR-EC01 DelegateRevert");
+        require(success, "ERR-EC02 DelegateRevert");
         return returnData;
     }
 
@@ -199,7 +211,7 @@ library ExecutionControl {
         (bool success, bytes memory returnData) = protocolControl.staticcall(
             data
         );
-        require(success, "ERR-EC02 StaticRevert");
+        require(success, "ERR-EC03 StaticRevert");
         return returnData;
     }
 
@@ -214,7 +226,7 @@ library ExecutionControl {
         }(
             data
         );
-        require(success, "ERR-EC03a CallRevert");
+        require(success, "ERR-EC04a CallRevert");
         return returnData;
     }
 
@@ -229,7 +241,7 @@ library ExecutionControl {
         }(
             data
         );
-        require(success, "ERR-EC03b CallRevert");
+        require(success, "ERR-EC04b CallRevert");
         return returnData;
     }
 }

@@ -17,7 +17,7 @@ import { ExecutionControl } from "../libraries/ExecutionControl.sol";
 
 import "forge-std/Test.sol";
 
-contract CallExecution is FastLaneErrorsEvents {
+contract CallExecution is Test, ExecutionControl, FastLaneErrorsEvents {
     using CallVerification for CallChainProof;
 
     uint256 constant public ATLAS_SHARE = 5; // TODO: this would be the FastLane address - fill in. 
@@ -40,10 +40,10 @@ contract CallExecution is FastLaneErrorsEvents {
     ) external returns (bytes memory stagingData) {
         // msg.sender = escrow
         // address(this) = ExecutionEnvironment
+        console.log("initiating stagingWrapper");
         require(msg.sender == escrow, "ERR-CE00 InvalidSenderStaging");
 
         stagingData = ExecutionControl.stage(proof, protocolCall, userCall);
-
     }
 
     function userWrapper(

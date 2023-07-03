@@ -22,12 +22,14 @@ import { IUniswapV2Pair } from "./interfaces/IUniswapV2Pair.sol";
 
 // Misc
 import { SwapMath } from "./SwapMath.sol";
+import "forge-std/Test.sol";
 
 interface IWETH {
     function deposit() external payable;
     function withdraw(uint wad) external;
 }
-contract V2ProtocolControl is MEVAllocator, ProtocolControl {
+
+contract V2ProtocolControl is Test, MEVAllocator, ProtocolControl {
 
     address constant public WETH = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     address constant public GOVERNANCE_TOKEN = address(0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984);
@@ -64,6 +66,8 @@ contract V2ProtocolControl is MEVAllocator, ProtocolControl {
     ) {
         control = address(this);
         govIsTok0 = (IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token0() == GOVERNANCE_TOKEN);
+
+        console.log("protocolControl", address(this));
     }
 
     /*
@@ -85,33 +89,71 @@ contract V2ProtocolControl is MEVAllocator, ProtocolControl {
     function _stageDelegateCall(
         bytes calldata data
     ) internal override returns (bytes memory) {
-        require(bytes4(data[:4]) == SWAP, "ERR-H10 InvalidFunction"); 
+        (
+            address userCallTo,
+            address userCallFrom,
+            bytes4 userFuncSelector,
+            bytes memory userCalldata
+        ) = abi.decode(data, (address, address, bytes4, bytes));
+
+        require(bytes4(userFuncSelector) == SWAP, "ERR-H10 InvalidFunction"); 
 
         // NOTE: This is a very direct example to facilitate the creation of a testing environment.  
         // Using this example in production is ill-advised. 
-
-        UserCall memory userCall = abi.decode(data[4:], (UserCall));
 
         (
             uint256 amount0Out, 
             uint256 amount1Out, 
             , // address recipient // Unused
             // bytes memory swapData // Unused
-        ) = abi.decode(userCall.data, (uint256, uint256, address, bytes));
+        ) = abi.decode(userCalldata, (uint256, uint256, address, bytes));
 
         address tokenUserIsSelling = amount0Out > amount1Out ?
-            IUniswapV2Pair(userCall.to).token1() :
-            IUniswapV2Pair(userCall.to).token0() ;
+            IUniswapV2Pair(userCallTo).token1() :
+            IUniswapV2Pair(userCallTo).token0() ;
 
-        (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(userCall.to).getReserves();
 
-        uint256 amountUserIsSelling = amount0Out > amount1Out ?
-            SwapMath.getAmountIn(amount0Out, uint256(token1Balance), uint256(token0Balance)) :
-            SwapMath.getAmountIn(amount1Out, uint256(token0Balance), uint256(token1Balance)) ;
+        (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(userCallTo).getReserves();
+
+        console.log("---");
+        console.log("protocolControlExecutingAs",address(this));
+        console.log("---");
+        console.log("amount0Out   ", amount0Out);
+        console.log("token0Balance", token0Balance);
+        console.log("---");
+        console.log("amount1Out   ", amount1Out);
+        console.log("token1Balance", token1Balance);
+        console.log("---");
+
+        uint256 amount0In = amount1Out == 0 ? 0 : SwapMath.getAmountIn(amount1Out, uint256(token0Balance), uint256(token1Balance));
+        uint256 amount1In = amount0Out == 0 ? 0 : SwapMath.getAmountIn(amount0Out, uint256(token1Balance), uint256(token0Balance));
+
+        require(
+            uint256(token0Balance) > amount0Out && uint256(token1Balance) > amount1Out,
+            "ERR H11 AmountExceedsInventory"
+        );
+
+        uint256 amountUserIsSelling = amount0Out > amount1Out ? amount1In : amount0In;
+
+        if (amount0Out > amount1Out) {
+            console.log("amount1In  ", amount1In);
+            console.log("userBalance", ERC20(tokenUserIsSelling).balanceOf(userCallFrom));
+            console.log("EEAllowance", ERC20(tokenUserIsSelling).allowance(userCallFrom, address(this)));
+            console.log("---");
+        } else {
+            console.log("amount0In  ", amount0In);
+            console.log("userBalance", ERC20(tokenUserIsSelling).balanceOf(userCallFrom));
+            console.log("EEAllowance", ERC20(tokenUserIsSelling).allowance(userCallFrom, address(this)));
+            console.log("---");
+
+        }
+        
 
         // This is a V2 swap, so optimistically transfer the tokens
         // NOTE: The user should have approved the ExecutionEnvironment for token transfers
-        ERC20(tokenUserIsSelling).transferFrom(userCall.from, userCall.to, amountUserIsSelling); 
+        ERC20(tokenUserIsSelling).transferFrom(userCallFrom, userCallTo, amountUserIsSelling); 
+
+        console.log("c");
 
         bytes memory emptyData;
         return emptyData;

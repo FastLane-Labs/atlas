@@ -100,7 +100,12 @@ library CallVerification {
             abi.encodePacked(
                 bytes32(0), // initial hash = null
                 protocolCall.to,
-                userCall.data,
+                abi.encode(
+                    userCall.to, 
+                    userCall.from, 
+                    bytes4(userCall.data), 
+                    userCall.data[4:]
+                ),
                 delegateStaging(protocolCall.callConfig), 
                 i
             )

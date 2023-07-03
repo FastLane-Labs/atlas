@@ -10,7 +10,9 @@ import { MEVAllocator } from "./MEVAllocator.sol";
 
 import "../types/CallTypes.sol";
 
-abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
+import "forge-std/Test.sol";
+
+abstract contract ProtocolControl is Test, MEVAllocator, GovernanceControl {
 
 
     address public immutable escrow;
@@ -90,36 +92,40 @@ abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
 
     // Safety and support functions and modifiers that make the relationship between protocol 
     // and FastLane's backend trustless.
-    modifier onlyApprovedCaller() {
-        require(
-            msg.sender != address(0) &&
-            msg.sender == ISafetyLocks(escrow).approvedCaller(),
-            "InvalidCaller"
-        );
+    modifier onlyApprovedCaller(bool isDelegated) {
+        if (isDelegated) {
+            require(msg.sender == escrow, "ERR-PC060 InvalidCaller");
+        } else {
+            require(
+                msg.sender == ISafetyLocks(escrow).approvedCaller(),
+                "ERR-PC061 InvalidCaller"
+            );
+        }
         _;
     }
 
     function stageCall(
         bytes calldata data
-    ) external onlyApprovedCaller returns (bytes memory) {
+    ) external onlyApprovedCaller(delegateStaging) returns (bytes memory) {
+        console.log("protocolControl initiating stageCall");
         return delegateStaging ? _stageDelegateCall(data) : _stageStaticCall(data);
     }
 
     function userLocalCall(
         bytes calldata data
-    ) external onlyApprovedCaller returns (bytes memory) {
+    ) external onlyApprovedCaller(delegateUser) returns (bytes memory) {
         return delegateUser ? _userLocalDelegateCall(data) : _userLocalStandardCall(data);
     }
 
     function allocatingCall(
         bytes calldata data
-    ) external onlyApprovedCaller {
+    ) external onlyApprovedCaller(true) {
         return _allocatingDelegateCall(data);
     }
 
     function verificationCall(
         bytes calldata data
-    ) external onlyApprovedCaller returns (bool) {
+    ) external onlyApprovedCaller(delegateVerification) returns (bool) {
         return delegateVerification ? _verificationDelegateCall(data) : _verificationStaticCall(data);
     }
 

@@ -16,6 +16,7 @@ contract Factory is Test {
     uint32 immutable public escrowDuration;
     address immutable public escrow;
     address immutable public factory;
+    bytes32 immutable public salt;
 
     Escrow public escrowContract = new Escrow(uint32(64));
 
@@ -28,6 +29,13 @@ contract Factory is Test {
 
         escrow = address(escrowContract);
         factory = address(this);
+        salt = keccak256(
+            abi.encodePacked(
+                block.chainid,
+                factory,
+                escrow
+            )
+        );
     }
 
     // USER TOKEN WITHDRAWAL FUNCS
@@ -60,21 +68,14 @@ contract Factory is Test {
         address executionEnvironment
     ) {
         executionEnvironment = _getExecutionEnvironment(user, protocolControl);
-        console.log("executionEnvironment",executionEnvironment);
+        console.log("--------");
+        console.log("user",user);
+        console.log("predicted executionEnvironment",executionEnvironment);
+        console.log("--------");
     }
 
     function getEscrowAddress() external view returns (address escrowAddress) {
         escrowAddress = escrow;
-    }
-
-    function _salt() internal view returns (bytes32 salt) {
-        salt = keccak256(
-            abi.encodePacked(
-                block.chainid,
-                address(this),
-                escrow
-            )
-        );
     }
 
     function _getExecutionEnvironment(
@@ -99,21 +100,25 @@ contract Factory is Test {
         address protocolControl = protocolCall.to;
         uint16 callConfig = protocolCall.callConfig;
 
-        environment = address(uint160(uint(keccak256(abi.encodePacked(
-            bytes1(0xff),
-            address(this),
-            _salt(),
-            keccak256(
-                abi.encodePacked(
-                    type(UserDirect).creationCode,
-                    user,
-                    escrow,
-                    address(this),
-                    protocolControl,
-                    callConfig
+        environment = address(uint160(uint256(
+            keccak256(abi.encodePacked(
+                bytes1(0xff),
+                address(this),
+                salt,
+                keccak256(
+                    abi.encodePacked(
+                        type(UserDirect).creationCode,
+                        abi.encode(
+                            user,
+                            escrow,
+                            address(this),
+                            protocolControl,
+                            callConfig
+                        )
+                    )
                 )
             )
-        ))))); 
+        )))); 
     }
 
     function _deployExecutionEnvironment(
@@ -126,7 +131,7 @@ contract Factory is Test {
         uint16 callConfig = protocolCall.callConfig;
 
         UserDirect _environment = new UserDirect{
-            salt: _salt()
+            salt: salt
         }(
             user, 
             escrow,
@@ -137,7 +142,7 @@ contract Factory is Test {
 
         environment = address(_environment);
 
-        console.log("environment", environment);
+        console.log("actual environment", environment);
 
         environments[environment] = keccak256(abi.encodePacked(
             user,
