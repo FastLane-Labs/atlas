@@ -21,14 +21,10 @@ import "../types/VerificationTypes.sol";
 
 import { EscrowBits } from "../libraries/EscrowBits.sol"; 
 
-import "forge-std/Test.sol";
-
 contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
     using ECDSA for bytes32;
 
     uint32 immutable public escrowDuration;
-
-    ValueTracker private _pendingValueTracker;
 
     // NOTE: these storage vars / maps should only be accessible by *signed* searcher transactions
     // and only once per searcher per block (to avoid user-searcher collaborative exploits)
@@ -67,7 +63,7 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
     }
 
     function executeStagingCall(
-        CallChainProof memory proof,
+        CallChainProof calldata proof,
         ProtocolCall calldata protocolCall,
         UserCall calldata userCall
     ) external stagingLock(protocolCall) returns (
@@ -81,7 +77,7 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
     }
 
     function executeUserCall(
-        CallChainProof memory proof,
+        CallChainProof calldata proof,
         ProtocolCall calldata protocolCall,
         bytes memory stagingReturnData,
         UserCall calldata userCall
@@ -95,11 +91,13 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
     }
 
     function executeSearcherCall(
-        CallChainProof memory proof,
-        uint256 gasWaterMark,
+        CallChainProof calldata proof,
         bool auctionAlreadyComplete,
         SearcherCall calldata searcherCall
     ) external payable searcherLock(searcherCall.metaTx.to) returns (bool) {
+        
+        // Set the gas baseline
+        uint256 gasWaterMark = gasleft();
 
         // Verify the transaction. 
         (uint256 result, uint256 gasLimit, SearcherEscrow memory searcherEscrow) = _verify(
@@ -137,7 +135,7 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
             if (EscrowBits.executedWithError(result)) {
                 result |= 1 << uint256(SearcherOutcome.ExecutionCompleted);
 
-            } else if (EscrowBits.executionSuccessful(result)) { 
+            } else if (EscrowBits.executionSuccessful(result)) {
                 // first successful searcher call that paid what it bid
                 auctionAlreadyComplete = true; // cannot be reached if bool is already true
                 result |= 1 << uint256(SearcherOutcome.ExecutionCompleted);
@@ -162,7 +160,7 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
         }
 
         // emit event
-        if (EscrowBits.emitEvent(searcherEscrow)) { 
+        if (EscrowBits.emitEvent(searcherEscrow)) {
             emit SearcherTxResult(
                 searcherCall.metaTx.to,
                 searcherCall.metaTx.from,
@@ -188,7 +186,7 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
         // process protocol payments
          try ICallExecution(msg.sender).allocateRewards(
             protocolCall, winningBids, payeeData
-        ) {} catch { 
+        ) {} catch {
             emit MEVPaymentFailure(
                 protocolCall.to,
                 protocolCall.callConfig,
@@ -199,7 +197,7 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
     } 
 
     function executeVerificationCall(
-        CallChainProof memory proof,
+        CallChainProof calldata proof,
         ProtocolCall calldata protocolCall,
         bytes memory stagingReturnData, 
         bytes memory userReturnData
@@ -208,6 +206,16 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
         ICallExecution(msg.sender).verificationWrapper(proof, protocolCall, stagingReturnData, userReturnData);
         // TODO: who should pay gas cost of payments?
     } 
+
+    /*
+    function _intLog(string memory s, int256 x) internal view {
+        if (x < 0){
+            console.log(s, "-", uint256(x * -1));
+        } else {
+            console.log(s, "+", uint256(x));
+        }
+    }
+    */
 
     function executeUserRefund(
         address userCallFrom
@@ -226,6 +234,16 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
         int256 transferredIn = int256(uint256(pendingValueTracker.transferredIn));
         int256 transferredOut = int256(uint256(pendingValueTracker.transferredOut));
         int256 gasRebate = int256(uint256(pendingValueTracker.gasRebate));
+
+        /*
+        console.log("===gas refund===");
+        _intLog("startingBalance", startingBalance);
+        _intLog("endingBalance  ", endingBalance);
+        _intLog("transferredIn  ", transferredIn);
+        _intLog("transferredOut ", transferredOut);
+        _intLog("gasRebate      ", gasRebate);
+        console.log("===-------===");
+        */
 
         int256 valueReturn = (
             (
@@ -249,7 +267,7 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
         // refunds aren't accounted for until the end of the transaction and would only benefit 
         // the user. User could technically vampire attack naive searchers that way and profit 
         // from the value return, but informed searchers should be able to identify and block it.
-        require(valueReturn > 0, "ERR-E002 UnpaidValue");
+        require(valueReturn >= 0, "ERR-E002 UnpaidValue");
 
         SafeTransferLib.safeTransferETH(
             userCallFrom, 
@@ -268,6 +286,7 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
 
         uint256 gasRebate;
         uint256 txValue;
+        uint256 gasUsed = gasWaterMark-gasleft();
 
         // TODO: clean up code / make it readable
         if (result & EscrowBits._FULL_REFUND != 0) {
@@ -275,36 +294,34 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
                 100 + EscrowBits.SEARCHER_GAS_BUFFER
             ) * (
                 // TODO: simplify/fix formula for calldata - verify. 
-                (tx.gasprice * EscrowBits.GWEI * (gasWaterMark-gasleft())) +
-                (tx.gasprice * EscrowBits.GWEI * (searcherCall.metaTx.data.length * 16))
+                (tx.gasprice * gasUsed) +
+                (tx.gasprice * (searcherCall.metaTx.data.length * 16))
             ) / 100;
 
             txValue = searcherCall.metaTx.value;
-        
+
         // TODO: figure out what is fair for this (or if it just doesnt happen?)
         } else if (result & EscrowBits._EXTERNAL_REFUND != 0) {
             // TODO: simplify/fix formula for calldata - verify. 
             gasRebate = (
-                (tx.gasprice * EscrowBits.GWEI * (gasWaterMark-gasleft())) +
-                (tx.gasprice * EscrowBits.GWEI * (searcherCall.metaTx.data.length * 16))
+                (tx.gasprice * gasUsed) +
+                (tx.gasprice * (searcherCall.metaTx.data.length * 16))
             );
-
             txValue = searcherCall.metaTx.value;
-
         
         } else if (result & EscrowBits._CALLDATA_REFUND != 0) {
             gasRebate = (
                 100 + EscrowBits.SEARCHER_GAS_BUFFER
             ) * (
                 // TODO: simplify/fix formula for calldata - verify. 
-                (tx.gasprice * EscrowBits.GWEI * (searcherCall.metaTx.data.length * 16))
+                (tx.gasprice * (searcherCall.metaTx.data.length * 16))
             ) / 100;
 
             txValue = searcherCall.metaTx.value;
-        
+
         } else if (result & EscrowBits._NO_USER_REFUND != 0) {
             // pass
-        
+            
         } else {
             revert("ERR-SE72 UncoveredResult");
         }
@@ -323,8 +340,10 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
             searcherEscrow.total : 
             gasRebate ;
 
-        _pendingValueTracker.gasRebate += uint128(gasRebate);
-        searcherEscrow.total -= uint128(gasRebate); 
+        unchecked {
+            _pendingValueTracker.gasRebate += uint128(gasRebate);
+            searcherEscrow.total -= uint128(gasRebate); 
+        }
 
         // save the escrow data back into storage
         _escrowData[searcherCall.metaTx.from] = searcherEscrow;
@@ -340,7 +359,7 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
             
             // verify the searcher has correct usercalldata and the searcher escrow checks
             (result, gasLimit, searcherEscrow) = _verifySearcherCall(searcherCall);
-            
+
         } else {
             (result, gasLimit) = (1 << uint256(SearcherOutcome.InvalidSignature), 0);
             // searcherEscrow returns null
@@ -438,15 +457,11 @@ contract Escrow is EIP712, SafetyLocks, SearcherWrapper, IEscrow {
             100 + EscrowBits.SEARCHER_GAS_BUFFER
         ) + EscrowBits.FASTLANE_GAS_BUFFER; 
 
+        uint256 gasCost = (tx.gasprice * gasLimit) +
+                (searcherCall.metaTx.data.length * 16 * tx.gasprice);
+
         // see if searcher's escrow can afford tx gascost
-        if (
-            (
-                (tx.gasprice * EscrowBits.GWEI * gasLimit) +
-                (searcherCall.metaTx.data.length * 16 * EscrowBits.GWEI) 
-            ) < (
-                searcherEscrow.total - searcherEscrow.escrowed
-            ) 
-        ) {
+        if (gasCost > searcherEscrow.total - searcherEscrow.escrowed) {
             
             // charge searcher for calldata so that we can avoid vampire attacks from searcher onto user
             result |= 1 << uint256(SearcherOutcome.InsufficientEscrow);

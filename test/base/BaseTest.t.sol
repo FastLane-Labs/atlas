@@ -80,6 +80,9 @@ contract BaseTest is Test, TestConstants {
 
         vm.stopPrank();
 
+        deal(TOKEN_ZERO, address(searcherOne), 10E24);
+        deal(TOKEN_ONE, address(searcherOne), 10E24);
+
         vm.deal(searcherTwoEOA, 100E18);
         
         vm.startPrank(searcherTwoEOA);
@@ -88,6 +91,9 @@ contract BaseTest is Test, TestConstants {
         IEscrow(escrow).deposit{value: 1E18}(searcherTwoEOA);
 
         vm.stopPrank();
+
+        deal(TOKEN_ZERO, address(searcherTwo), 10E24);
+        deal(TOKEN_ONE, address(searcherTwo), 10E24);
 
         helper = new Helper(address(control), escrow, address(atlas));
     }

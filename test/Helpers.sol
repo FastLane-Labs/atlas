@@ -65,9 +65,12 @@ contract Helper is Test, TestConstants {
     function buildUserCall(
         address to,
         address from,
-        uint256 amount0Out, 
-        uint256 amount1Out
+        address tokenIn
     ) public view returns (UserCall memory userCall) {
+        (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(to).getReserves();
+        
+        address token0 = IUniswapV2Pair(to).token0();
+
         userCall = UserCall({
             to: to,
             from: from,
@@ -75,8 +78,8 @@ contract Helper is Test, TestConstants {
             gas: gas,
             value: 0,
             data: buildV2SwapCalldata(
-                amount0Out,
-                amount1Out,
+                tokenIn == token0 ? 0 : uint256(token0Balance)/2,
+                tokenIn == token0 ? uint256(token1Balance)/2 : 0,
                 from
             )
         });
@@ -100,6 +103,8 @@ contract Helper is Test, TestConstants {
         UserCall memory userCall,
         address searcherEOA,
         address searcherContract,
+        address poolOne,
+        address poolTwo,
         uint256 bidAmount
     ) public returns (SearcherCall memory searcherCall) {
         searcherCall.bids = getBidData(bidAmount);
@@ -114,8 +119,8 @@ contract Helper is Test, TestConstants {
             bidsHash: keccak256(abi.encode(searcherCall.bids)),
             data: abi.encodeWithSelector(
                 BlindBackrun.executeArbitrage.selector, 
-                POOL_ONE,
-                POOL_TWO
+                poolOne,
+                poolTwo
             )
         });
     }

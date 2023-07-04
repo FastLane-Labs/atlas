@@ -7,7 +7,17 @@ import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
 
 import "../types/CallTypes.sol";
 
+import "forge-std/Test.sol";
+
+interface IWETH9 {
+    function deposit() external payable ;
+    function withdraw(uint wad) external payable;
+}
+
+// contract SearcherBase is Test {
 contract SearcherBase {
+
+    address constant public WETH_ADDRESS = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
     address immutable private _owner;
     address immutable private _escrow;
@@ -38,15 +48,45 @@ contract SearcherBase {
         // Safety checks
         require(sender == _owner, "INVALID CALLER");
         uint256 msgValueOwed = msg.value;
+
+        // Track starting balances
+        uint256[] memory balances = new uint256[](bids.length);
+        uint256 i;
+        for (; i < bids.length;) {
+            balances[i] = ERC20(
+                bids[i].token != address(0) ? bids[i].token : WETH_ADDRESS
+            ).balanceOf(address(this));
+
+            unchecked {++i;}
+        }
         
         _;
 
+        uint256 newBalance;
+        uint256 balanceDelta;
         // Handle bid payment
-        uint256 i;
+        i = 0;
         for (; i < bids.length;) {
 
+            newBalance = ERC20(
+                bids[i].token != address(0) ? bids[i].token : WETH_ADDRESS
+            ).balanceOf(address(this));
+
+            balanceDelta = newBalance > balances[i] ? newBalance - balances[i] : 0;
+
+            /*
+            console.log("---SEARCHER BID---");
+            console.log("Searcher      ",address(this));
+            console.log("BidToken      ",bids[i].token);
+            console.log("BalanceDelta  ",balanceDelta);
+            console.log("BidAmount     ",bids[i].bidAmount);
+            console.log("SearcherProfit", balanceDelta > bids[i].bidAmount ? balanceDelta - bids[i].bidAmount : 0);
+            console.log("---============---");
+            */
+            
             // Ether balance
             if (bids[i].token == address(0)) {
+                IWETH9(WETH_ADDRESS).withdraw(bids[i].bidAmount);
                 SafeTransferLib.safeTransferETH(msg.sender, bids[i].bidAmount);
 
             // ERC20 balance

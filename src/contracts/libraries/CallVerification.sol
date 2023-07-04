@@ -12,10 +12,11 @@ library CallVerification {
         UserCall calldata userCall,
         bytes32 executionHashChainZeroIndex
     ) internal pure returns (CallChainProof memory) {
+        bytes32 userCallHash = keccak256(abi.encodePacked(userCall.to, userCall.data));
         return CallChainProof({
             previousHash: bytes32(0),
             targetHash: executionHashChainZeroIndex,
-            userCallHash: keccak256(abi.encodePacked(userCall.to, userCall.data)),
+            userCallHash: userCallHash,
             index: 0
         });
     }
@@ -32,7 +33,7 @@ library CallVerification {
     }
 
     function prove(
-        CallChainProof memory self, 
+        CallChainProof calldata self, 
         address from, 
         bytes memory data, 
         bool isDelegated

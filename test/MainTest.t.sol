@@ -24,6 +24,7 @@ import {Helper} from "./Helpers.sol";
 import "forge-std/Test.sol";
 
 contract MainTest is BaseTest {
+    /// forge-config: default.gas_price = 15000000000
     function setUp() public virtual override {
         BaseTest.setUp();
     }
@@ -37,17 +38,17 @@ contract MainTest is BaseTest {
         
         ProtocolCall memory protocolCall = helper.getProtocolCall();
         
-        UserCall memory userCall = helper.buildUserCall(POOL_ONE, userEOA, 2E17, 0);
+        UserCall memory userCall = helper.buildUserCall(POOL_ONE, userEOA, TOKEN_ONE);
         
         PayeeData[] memory payeeData = helper.getPayeeData();
 
         SearcherCall[] memory searcherCalls = new SearcherCall[](2);
 
         searcherCalls[0] = helper.buildSearcherCall(
-            userCall, searcherOneEOA, address(searcherOne), 2E14
+            userCall, searcherOneEOA, address(searcherOne), POOL_ONE, POOL_TWO, 2E17
         );
         searcherCalls[1] = helper.buildSearcherCall(
-            userCall, searcherTwoEOA, address(searcherTwo), 1E14
+            userCall, searcherTwoEOA, address(searcherTwo), POOL_TWO, POOL_ONE, 1E17
         );
         
         Verification memory verification = helper.buildVerification(
@@ -77,6 +78,7 @@ contract MainTest is BaseTest {
                 verification
             )
         );
+
         assertTrue(success);
     }
 }

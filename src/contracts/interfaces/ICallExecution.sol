@@ -10,27 +10,27 @@ interface ICallExecution {
     function factoryWithdrawEther(address user, uint256 amount) external;
     
     function stagingWrapper(
-        CallChainProof memory proof,
+        CallChainProof calldata proof,
         ProtocolCall calldata protocolCall,
         UserCall calldata userCall
     ) external returns (bytes memory stagingData);
 
     function userWrapper(
-        CallChainProof memory proof,
+        CallChainProof calldata proof,
         ProtocolCall calldata protocolCall,
         bytes memory stagingReturnData,
         UserCall calldata userCall
     ) external payable returns (bytes memory userReturnData);
 
     function verificationWrapper(
-        CallChainProof memory proof,
+        CallChainProof calldata proof,
         ProtocolCall calldata protocolCall,
         bytes memory stagingReturnData, 
         bytes memory userReturnData
     ) external;
 
     function searcherMetaTryCatch(
-        CallChainProof memory proof,
+        CallChainProof calldata proof,
         uint256 gasLimit,
         SearcherCall calldata searcherCall
     ) external;

@@ -12,7 +12,7 @@ import { SearcherOutcome } from "../types/EscrowTypes.sol";
 contract SearcherWrapper is FastLaneErrorsEvents {
 
     function _searcherCallWrapper(
-        CallChainProof memory proof,
+        CallChainProof calldata proof,
         uint256 gasLimit,
         SearcherCall calldata searcherCall
     ) internal returns (SearcherOutcome, uint256) {
@@ -27,6 +27,7 @@ contract SearcherWrapper is FastLaneErrorsEvents {
         
         } catch Error(string memory err)  {
             bytes32 errorSwitch = keccak256(abi.encodePacked(err));
+
 
             if (errorSwitch == _SEARCHER_BID_UNPAID) {
                 return (SearcherOutcome.BidNotPaid, 0);
@@ -47,7 +48,7 @@ contract SearcherWrapper is FastLaneErrorsEvents {
                 return (SearcherOutcome.InvalidSequencing, 0);
 
             } else {
-                return (SearcherOutcome.UnknownError, 0);
+                return (SearcherOutcome.EVMError, 0);
             }
 
         } catch {

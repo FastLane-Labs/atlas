@@ -15,9 +15,7 @@ import "../types/VerificationTypes.sol";
 import { CallVerification } from "../libraries/CallVerification.sol";
 import { ExecutionControl } from "../libraries/ExecutionControl.sol";
 
-import "forge-std/Test.sol";
-
-contract CallExecution is Test, FastLaneErrorsEvents {
+contract CallExecution is FastLaneErrorsEvents {
     using CallVerification for CallChainProof;
 
     uint256 constant public ATLAS_SHARE = 5; // TODO: this would be the FastLane address - fill in. 
@@ -34,20 +32,19 @@ contract CallExecution is Test, FastLaneErrorsEvents {
     }
 
     function stagingWrapper(
-        CallChainProof memory proof,
+        CallChainProof calldata proof,
         ProtocolCall calldata protocolCall,
         UserCall calldata userCall
     ) external returns (bytes memory stagingData) {
         // msg.sender = escrow
         // address(this) = ExecutionEnvironment
-        console.log("initiating stagingWrapper");
         require(msg.sender == escrow, "ERR-CE00 InvalidSenderStaging");
 
         stagingData = ExecutionControl.stage(proof, protocolCall, userCall);
     }
 
     function userWrapper(
-        CallChainProof memory proof,
+        CallChainProof calldata proof,
         ProtocolCall calldata protocolCall,
         bytes memory stagingReturnData,
         UserCall calldata userCall
@@ -60,7 +57,7 @@ contract CallExecution is Test, FastLaneErrorsEvents {
     }
 
     function verificationWrapper(
-        CallChainProof memory proof,
+        CallChainProof calldata proof,
         ProtocolCall calldata protocolCall,
         bytes memory stagingReturnData, 
         bytes memory userReturnData
@@ -74,7 +71,7 @@ contract CallExecution is Test, FastLaneErrorsEvents {
 
 
     function searcherMetaTryCatch(
-        CallChainProof memory proof,
+        CallChainProof calldata proof,
         uint256 gasLimit,
         SearcherCall calldata searcherCall
     ) external {
@@ -110,15 +107,13 @@ contract CallExecution is Test, FastLaneErrorsEvents {
         ////////////////////////////
 
         // Verify that the searcher's view of the user's calldata hasn't been altered
-        // NOTE: Technically this check is redundant since the user's calldata is in the
-        // searcher hash chain as verified below.
+        // NOTE: Although this check may seem redundant since the user's calldata is in the
+        // searcher hash chain as verified below, remember that the protocol submits the  
+        // full hash chain, which user verifies. This check therefore allows the searcher
+        // not to have to worry about user+protocol collaboration to exploit the searcher. 
         require(proof.userCallHash == searcherCall.metaTx.userCallHash, ALTERED_USER_HASH);
 
         // Verify that the searcher's calldata is unaltered and being executed in the correct order
-        // NOTE: This is NOT meant to protect the searcher's smart contract - it can be accessed with
-        // copied versions of this data via delegatecall and therefore requires other protection.
-        // The purpose of this is to ensure that the searcher doesn't have to trust the FastLane relay, 
-        // the protocol frontend, or the user.
         proof.prove(searcherCall.metaTx.from, searcherCall.metaTx.data, false);
 
         // Execute the searcher call. 
@@ -197,22 +192,19 @@ contract CallExecution is Test, FastLaneErrorsEvents {
         uint256 i;      
 
         for (; i < bids.length;) {
-
             payment = (bids[i].bidAmount * ATLAS_SHARE) / 100;
-
+           
             if (bids[i].token != address(0)) {
                 SafeTransferLib.safeTransfer(ERC20(bids[i].token), ATLAS_RECIPIENT, payment);
                 totalEtherReward = bids[i].bidAmount - payment; // NOTE: This is transferred to protocolControl as msg.value
-            
+
             } else {
                 SafeTransferLib.safeTransferETH(ATLAS_RECIPIENT, payment);
             }
 
             bids[i].bidAmount -= payment;
-
             unchecked{ ++i;}
         }
-
         ExecutionControl.allocate(protocolCall, totalEtherReward, bids, payeeData);
     }
 }

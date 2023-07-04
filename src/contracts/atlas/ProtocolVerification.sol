@@ -13,7 +13,6 @@ import "../types/CallTypes.sol";
 import "../types/GovernanceTypes.sol";
 import { Verification } from "../types/VerificationTypes.sol";
 
-
 import { ProtocolIntegration } from "./ProtocolIntegration.sol";
 
 // This contract exists so that protocol frontends can sign and confirm the

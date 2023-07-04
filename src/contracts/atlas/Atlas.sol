@@ -13,9 +13,7 @@ import "../types/VerificationTypes.sol";
 
 import { CallVerification } from "../libraries/CallVerification.sol";
 
-import "forge-std/Test.sol";
-
-contract Atlas is Test, Metacall, Factory, ProtocolVerifier {
+contract Atlas is Metacall, Factory, ProtocolVerifier {
 
     bytes32 internal _userLock;
 
@@ -40,9 +38,6 @@ contract Atlas is Test, Metacall, Factory, ProtocolVerifier {
             environment,
             uint8(searcherCallsLength)
         );
-
-        console.log("locked for", environment);
-
         return true;
     }
 

@@ -87,7 +87,7 @@ contract ExecutionEnvironment is CallExecution {
         require(address(this).balance >= userCall.value, "ERR-H03 ValueExceedsBalance");
 
         proof = proof.next(executionHashChain[proof.index+1]);
-
+       
         bytes memory userReturnData = IEscrow(escrow).executeUserCall(
             proof,
             protocolCall,
@@ -103,6 +103,7 @@ contract ExecutionEnvironment is CallExecution {
             protocolCall,
             payeeData,
             searcherCalls,
+            proof,
             executionHashChain
         );
 
@@ -128,6 +129,7 @@ contract ExecutionEnvironment is CallExecution {
             stagingReturnData,
             userReturnData
         );
+
         // #########  END VERIFICATION EXECUTION ##########
     }
 
@@ -135,11 +137,11 @@ contract ExecutionEnvironment is CallExecution {
         ProtocolCall calldata protocolCall,
         PayeeData[] calldata payeeData,
         SearcherCall[] calldata searcherCalls,
+        CallChainProof memory proof,
         bytes32[] memory executionHashChain
-    ) internal returns (CallChainProof memory proof) {
+    ) internal returns (CallChainProof memory) {
         uint256 i; // init at 0
         bool auctionAlreadyWon = false;
-        uint256 gasWaterMark;
 
         // Forward and store any surplus msg.value in the escrow for tracking
         // and eventual reimbursement to user.
@@ -151,19 +153,13 @@ contract ExecutionEnvironment is CallExecution {
         }
 
         for (; i < searcherCalls.length;) {
-
-            gasWaterMark = gasleft();
-
             proof = proof.next(executionHashChain[proof.index+1]);
 
-            if (
-                IEscrow(escrow).executeSearcherCall(
-                    proof,
-                    gasWaterMark,
-                    auctionAlreadyWon,
-                    searcherCalls[i]
-                )
-            ) {
+            if (IEscrow(escrow).executeSearcherCall(
+                proof,
+                auctionAlreadyWon,
+                searcherCalls[i]
+            )) {
                 if (!auctionAlreadyWon) {
                     auctionAlreadyWon = true;
                     _handlePayments(protocolCall, searcherCalls[i].bids, payeeData);
@@ -171,7 +167,7 @@ contract ExecutionEnvironment is CallExecution {
             }
             unchecked { ++i; }
         }
-        proof = proof.next(executionHashChain[proof.index+1]);
+        return proof.next(executionHashChain[proof.index+1]);
     }
 
     function _handlePayments(

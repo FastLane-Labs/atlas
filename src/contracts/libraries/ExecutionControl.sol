@@ -10,8 +10,6 @@ import { CallBits } from "../libraries/CallBits.sol";
 import "../types/CallTypes.sol";
 import "../types/VerificationTypes.sol";
 
-import "forge-std/Test.sol";
-// contract ExecutionControl is Test {
 library ExecutionControl {
     using CallVerification for CallChainProof;
     using CallBits for uint16;
@@ -25,7 +23,7 @@ library ExecutionControl {
     // that the delegatecall function then accesses. 
 
     function stage(
-        CallChainProof memory proof,
+        CallChainProof calldata proof,
         ProtocolCall calldata protocolCall,
         UserCall calldata userCall
     ) internal returns (bytes memory) {
@@ -66,7 +64,7 @@ library ExecutionControl {
     }
 
     function user(
-        CallChainProof memory proof,
+        CallChainProof calldata proof,
         ProtocolCall calldata protocolCall,
         bytes memory stagingReturnData,
         UserCall calldata userCall
@@ -149,7 +147,7 @@ library ExecutionControl {
     }
 
     function verify(
-        CallChainProof memory proof,
+        CallChainProof calldata proof,
         ProtocolCall calldata protocolCall,
         bytes memory stagingReturnData,
         bytes memory userReturnData

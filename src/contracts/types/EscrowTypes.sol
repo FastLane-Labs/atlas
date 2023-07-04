@@ -51,6 +51,7 @@ enum SearcherOutcome {
     BidNotPaid,
     CallValueTooHigh,
     CallbackFailed,
+    EVMError,
     Success
 }
 

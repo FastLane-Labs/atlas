@@ -10,10 +10,7 @@ import { MEVAllocator } from "./MEVAllocator.sol";
 
 import "../types/CallTypes.sol";
 
-import "forge-std/Test.sol";
-
-abstract contract ProtocolControl is Test, MEVAllocator, GovernanceControl {
-
+abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
 
     address public immutable escrow;
     address public immutable governance;
@@ -107,7 +104,6 @@ abstract contract ProtocolControl is Test, MEVAllocator, GovernanceControl {
     function stageCall(
         bytes calldata data
     ) external onlyApprovedCaller(delegateStaging) returns (bytes memory) {
-        console.log("protocolControl initiating stageCall");
         return delegateStaging ? _stageDelegateCall(data) : _stageStaticCall(data);
     }
 

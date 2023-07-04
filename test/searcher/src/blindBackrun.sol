@@ -27,7 +27,7 @@ contract BlindBackrun is Ownable {
         bool isWETHZero;
     }
 
-    address constant public WETH_ADDRESS = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    address constant private _WETH_ADDRESS = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
     /*
     address public immutable WETH_ADDRESS;
@@ -51,18 +51,21 @@ contract BlindBackrun is Ownable {
         
         require(msg.sender == address(this), "INVALID CALLER"); // Atlas meta-tx integration
 
-        uint256 balanceBefore = IERC20(WETH_ADDRESS).balanceOf(address(this));
+        uint256 balanceBefore = IERC20(_WETH_ADDRESS).balanceOf(address(this));
         IUniswapV2Pair firstPair = IUniswapV2Pair(firstPairAddress);
         IUniswapV2Pair secondPair = IUniswapV2Pair(secondPairAddress);
+
+        // console.log("bb balanceBefore",balanceBefore);
 
         PairReserves memory firstPairData = getPairData(firstPair);
         PairReserves memory secondPairData = getPairData(secondPair);
 
         uint256 amountIn = getAmountIn(firstPairData, secondPairData);
-        IERC20(WETH_ADDRESS).transfer(firstPairAddress, amountIn);
+        IERC20(_WETH_ADDRESS).transfer(firstPairAddress, amountIn);
         
         uint256 firstPairAmountOut;
         uint256 finalAmountOut;
+
         if (firstPairData.isWETHZero == true){
             firstPairAmountOut = getAmountOut(amountIn, firstPairData.reserve0, firstPairData.reserve1);
             finalAmountOut = getAmountOut(firstPairAmountOut, secondPairData.reserve1, secondPairData.reserve0);
@@ -76,12 +79,13 @@ contract BlindBackrun is Ownable {
             firstPair.swap(firstPairAmountOut, 0, secondPairAddress, "");          
             secondPair.swap(0, finalAmountOut, address(this), "");
         }
-        
-        uint256 balanceAfter = IERC20(WETH_ADDRESS).balanceOf(address(this));
+
+        uint256 balanceAfter = IERC20(_WETH_ADDRESS).balanceOf(address(this));
+
         require(balanceAfter > balanceBefore, "Arbitrage failed");
         // uint profit = balanceAfter.sub(balanceBefore);
         // uint profitToCoinbase = profit.mul(percentageToPayToCoinbase).div(100);
-        // IWETH(WETH_ADDRESS).withdraw(profitToCoinbase);
+        // IWETH(_WETH_ADDRESS).withdraw(profitToCoinbase);
         // block.coinbase.transfer(profitToCoinbase);
     }
 
@@ -107,7 +111,7 @@ contract BlindBackrun is Ownable {
         uint256 price;
 
         bool isWETHZero = false;
-        if (pair.token0() == WETH_ADDRESS) {
+        if (pair.token0() == _WETH_ADDRESS) {
             price = reserve1.mul(1e18).div(reserve0);
             isWETHZero = true;
         } else {
@@ -150,8 +154,8 @@ contract BlindBackrun is Ownable {
     /// @notice Transfers all WETH held by the contract to the contract owner.
     /// @dev Only the contract owner can call this function.
     function withdrawWETHToOwner() external onlyOwner {
-        uint256 balance = IERC20(WETH_ADDRESS).balanceOf(address(this));
-        IERC20(WETH_ADDRESS).transfer(msg.sender, balance);
+        uint256 balance = IERC20(_WETH_ADDRESS).balanceOf(address(this));
+        IERC20(_WETH_ADDRESS).transfer(msg.sender, balance);
     }
 
     /// @notice Transfers all ETH held by the contract to the contract owner.

@@ -40,6 +40,9 @@ contract FastLaneErrorsEvents {
     string constant public SEARCHER_CALL_REVERTED = "SearcherCallReverted";
     bytes32 constant internal _SEARCHER_CALL_REVERTED = keccak256(abi.encodePacked(SEARCHER_CALL_REVERTED));
 
+    string constant public SEARCHER_EVM_ERROR = "SearcherEVMError";
+    bytes32 constant internal _SEARCHER_EVM_ERROR = keccak256(abi.encodePacked(SEARCHER_EVM_ERROR));
+
     string constant public ALTERED_USER_HASH = "AlteredUserCalldataHash";
     bytes32 constant internal _ALTERED_USER_HASH = keccak256(abi.encodePacked(ALTERED_USER_HASH));
 

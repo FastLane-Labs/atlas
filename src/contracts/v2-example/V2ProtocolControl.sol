@@ -22,18 +22,23 @@ import { IUniswapV2Pair } from "./interfaces/IUniswapV2Pair.sol";
 
 // Misc
 import { SwapMath } from "./SwapMath.sol";
-import "forge-std/Test.sol";
+
+// import "forge-std/Test.sol";
 
 interface IWETH {
     function deposit() external payable;
     function withdraw(uint wad) external;
 }
 
-contract V2ProtocolControl is Test, MEVAllocator, ProtocolControl {
+contract V2ProtocolControl is MEVAllocator, ProtocolControl {
 
     address constant public WETH = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     address constant public GOVERNANCE_TOKEN = address(0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984);
     address constant public WETH_X_GOVERNANCE_POOL = address(0xd3d2E2692501A5c9Ca623199D38826e513033a17);
+
+    address constant public BURN_ADDRESS = address(uint160(uint256(keccak256(abi.encodePacked(
+        "GOVERNANCE TOKEN BURN ADDRESS"
+    )))));
 
     bytes4 constant public SWAP = bytes4(IUniswapV2Pair.swap.selector);
 
@@ -66,8 +71,11 @@ contract V2ProtocolControl is Test, MEVAllocator, ProtocolControl {
     ) {
         control = address(this);
         govIsTok0 = (IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token0() == GOVERNANCE_TOKEN);
-
-        console.log("protocolControl", address(this));
+        if (govIsTok0) {
+            require(IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token1() == WETH, "INVALID TOKEN PAIR");
+        } else {
+            require(IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token0() == WETH, "INVALID TOKEN PAIR");
+        }
     }
 
     /*
@@ -115,6 +123,8 @@ contract V2ProtocolControl is Test, MEVAllocator, ProtocolControl {
 
         (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(userCallTo).getReserves();
 
+        /*
+        // ENABLE FOR FOUNDRY TESTING
         console.log("---");
         console.log("protocolControlExecutingAs",address(this));
         console.log("---");
@@ -124,6 +134,7 @@ contract V2ProtocolControl is Test, MEVAllocator, ProtocolControl {
         console.log("amount1Out   ", amount1Out);
         console.log("token1Balance", token1Balance);
         console.log("---");
+        */
 
         uint256 amount0In = amount1Out == 0 ? 0 : SwapMath.getAmountIn(amount1Out, uint256(token0Balance), uint256(token1Balance));
         uint256 amount1In = amount0Out == 0 ? 0 : SwapMath.getAmountIn(amount0Out, uint256(token1Balance), uint256(token0Balance));
@@ -135,6 +146,8 @@ contract V2ProtocolControl is Test, MEVAllocator, ProtocolControl {
 
         uint256 amountUserIsSelling = amount0Out > amount1Out ? amount1In : amount0In;
 
+        /*
+        // ENABLE FOR FOUNDRY TESTING
         if (amount0Out > amount1Out) {
             console.log("amount1In  ", amount1In);
             console.log("userBalance", ERC20(tokenUserIsSelling).balanceOf(userCallFrom));
@@ -146,6 +159,7 @@ contract V2ProtocolControl is Test, MEVAllocator, ProtocolControl {
             console.log("EEAllowance", ERC20(tokenUserIsSelling).allowance(userCallFrom, address(this)));
             console.log("---");
         }
+        */
         
 
         // This is a V2 swap, so optimistically transfer the tokens
@@ -178,12 +192,10 @@ contract V2ProtocolControl is Test, MEVAllocator, ProtocolControl {
         // Decrement the balance by 1 so that the contract keeps the storage slot
         // initialized. 
         unchecked { --balance; } 
-    
-        ERC20(WETH).transfer(WETH_X_GOVERNANCE_POOL, balance); 
-
-        bytes memory nullBytes;
 
         (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).getReserves();
+
+        ERC20(WETH).transfer(WETH_X_GOVERNANCE_POOL, balance); 
 
         uint256 amount0Out;
         uint256 amount1Out;
@@ -203,10 +215,11 @@ contract V2ProtocolControl is Test, MEVAllocator, ProtocolControl {
             );
         }
 
+        bytes memory nullBytes;
         IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).swap(
             amount0Out, 
             amount1Out, 
-            address(0), // This sends the tokens to the null address, which burns the governance token.
+            BURN_ADDRESS, 
             nullBytes
         );
 
@@ -216,6 +229,13 @@ contract V2ProtocolControl is Test, MEVAllocator, ProtocolControl {
             govIsTok0 ? amount0Out : amount1Out
         );
 
+        /*
+        // ENABLE FOR FOUNDRY TESTING
+        console.log("----====++++====----");
+        console.log("Protocol Control");
+        console.log("Governance Tokens Burned:", govIsTok0 ? amount0Out : amount1Out);
+        console.log("----====++++====----");
+        */
     }
 
     ///////////////// GETTERS & HELPERS // //////////////////
