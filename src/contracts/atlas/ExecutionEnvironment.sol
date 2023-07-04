@@ -13,6 +13,8 @@ import { CallChainProof } from "../types/VerificationTypes.sol";
 import { CallVerification } from "../libraries/CallVerification.sol";
 import { CallBits } from "../libraries/CallBits.sol";
 
+import "forge-std/Test.sol";
+
 import {
     ALTERED_USER_HASH,
     SEARCHER_CALL_REVERTED,
@@ -21,15 +23,18 @@ import {
     SEARCHER_BID_UNPAID
  } from "./Emissions.sol";
 
-contract ExecutionEnvironment {
+contract ExecutionEnvironment is Test {
     using CallVerification for CallChainProof;
     using CallBits for uint16;
 
+    /*
     address immutable public control;
     uint16 immutable public config;
     address immutable public user;
+    */
     address immutable public atlas;
 
+    /*
     constructor(
         address _user,
         address _atlas,
@@ -46,6 +51,19 @@ contract ExecutionEnvironment {
             // selfdestruct(payable(_atlas));
         }
     } 
+    */
+    constructor(
+        address _atlas
+    ) {
+        atlas = _atlas;
+    }
+
+    function _user() internal view returns (address user) {
+        assembly {
+            user := shr(96, calldataload(sub(calldatasize(), 20)))
+        }
+        console.log("user",user);
+    }
 
       //////////////////////////////////
      ///    CORE CALL FUNCTIONS     ///
@@ -352,7 +370,7 @@ contract ExecutionEnvironment {
      //  USER SUPPORT / ACCESS FUNCTIONS  //
     ///////////////////////////////////////
     function withdrawERC20(address token, uint256 amount) external {
-        require(msg.sender == user, "ERR-EC01 NotEnvironmentOwner");
+        require(msg.sender == _user(), "ERR-EC01 NotEnvironmentOwner");
 
         if (ERC20(token).balanceOf(address(this)) >= amount) {
             SafeTransferLib.safeTransfer(
@@ -368,12 +386,12 @@ contract ExecutionEnvironment {
 
     function factoryWithdrawERC20(address msgSender, address token, uint256 amount) external {
         require(msg.sender == atlas, "ERR-EC10 NotFactory");
-        require(msgSender == user, "ERR-EC11 NotEnvironmentOwner");
+        require(msgSender == _user(), "ERR-EC11 NotEnvironmentOwner");
 
         if (ERC20(token).balanceOf(address(this)) >= amount) {
             SafeTransferLib.safeTransfer(
                 ERC20(token), 
-                user, 
+                _user(), 
                 amount
             );
 
@@ -383,7 +401,7 @@ contract ExecutionEnvironment {
     }
 
     function withdrawEther(uint256 amount) external {
-        require(msg.sender == user, "ERR-EC01 NotEnvironmentOwner");
+        require(msg.sender == _user(), "ERR-EC01 NotEnvironmentOwner");
 
         if (address(this).balance >= amount) {
             SafeTransferLib.safeTransferETH(
@@ -398,11 +416,11 @@ contract ExecutionEnvironment {
 
     function factoryWithdrawEther(address msgSender, uint256 amount) external {
         require(msg.sender == atlas, "ERR-EC10 NotFactory");
-        require(msgSender == user, "ERR-EC11 NotEnvironmentOwner");
+        require(msgSender == _user(), "ERR-EC11 NotEnvironmentOwner");
 
         if (address(this).balance >= amount) {
             SafeTransferLib.safeTransferETH(
-                user, 
+                _user(), 
                 amount
             );
             
@@ -411,32 +429,12 @@ contract ExecutionEnvironment {
         }
     }
 
-    function getUser() external view returns (address _user) {
-        _user = user;
-    }
-
-    function getProtocolControl() external view returns (address _control) {
-        _control = control;
+    function getUser() external view returns (address user) {
+        user = _user();
     }
 
     function getEscrow() external view returns (address _escrow) {
         _escrow = atlas;
-    }
-
-    function getCallConfig() external view returns (uint16 _config) {
-        _config = config;
-    }
-
-    modifier validSender(
-        ProtocolCall calldata protocolCall, // supplied by frontend
-        UserCall calldata userCall
-    ) {
-        require(userCall.from == user, "ERR-EE01 InvalidUser");
-        require(protocolCall.to == control, "ERR-EE02 InvalidControl");
-        require(protocolCall.callConfig == config, "ERR-EE03 InvalidConfig");
-        require(msg.sender == atlas || msg.sender == user, "ERR-EE04 InvalidSender");
-        //require(tx.origin == user, "ERR-EE05 InvalidOrigin"); // DISABLE FOR FORGE TESTING
-        _;
     }
 
     receive() external payable {}

@@ -39,7 +39,6 @@ interface IExecutionEnvironment {
     ) external;
 
     function getUser() external view returns (address _user);
-    function getProtocolControl() external view returns (address _control);
     function getFactory() external view returns (address _factory);
     function getEscrow() external view returns (address _escrow);
     function getCallConfig() external view returns (uint16 _config);

@@ -5,14 +5,17 @@ import { IProtocolControl } from "../interfaces/IProtocolControl.sol";
 import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
 
 import { Escrow } from "./Escrow.sol";
+import { Mimic } from "./Mimic.sol";
 import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
 
 import "../types/CallTypes.sol";
+
 
 contract Factory is Escrow {
 
     //address immutable public atlas;
     bytes32 immutable public salt;
+    address immutable public execution;
 
     mapping(address => bytes32) public environments;
 
@@ -25,6 +28,14 @@ contract Factory is Escrow {
                 atlas,
                 msg.sender
             )
+        );
+
+        execution = _deployExecutionEnvironmentTemplate(
+            address(this), 
+            ProtocolCall({
+                to: address(0),
+                callConfig: uint16(0)
+            })
         );
     }
 
@@ -78,14 +89,15 @@ contract Factory is Escrow {
     // been deprecated due to ProtocolControl changes of callConfig. 
     function _getExecutionEnvironmentCustom(
         address user,
-        ProtocolCall memory protocolCall
+        ProtocolCall memory
     ) internal view returns (
         address environment
     ) {
 
-        address protocolControl = protocolCall.to;
-        uint16 callConfig = protocolCall.callConfig;
+        //address protocolControl = protocolCall.to;
+        //uint16 callConfig = protocolCall.callConfig;
 
+        /*
         environment = address(uint160(uint256(
             keccak256(abi.encodePacked(
                 bytes1(0xff),
@@ -103,7 +115,25 @@ contract Factory is Escrow {
                     )
                 )
             )
-        )))); 
+        ))));
+        */ 
+
+        environment = address(uint160(uint256(
+            keccak256(abi.encodePacked(
+                bytes1(0xff),
+                address(this),
+                salt,
+                keccak256(
+                    abi.encodePacked(
+                        type(Mimic).creationCode,
+                        abi.encode(
+                            user,
+                            execution
+                        )
+                    )
+                )
+            )
+        ))));
     }
 
     function _deployExecutionEnvironment(
@@ -115,13 +145,38 @@ contract Factory is Escrow {
         address protocolControl = protocolCall.to;
         uint16 callConfig = protocolCall.callConfig;
 
-        ExecutionEnvironment _environment = new ExecutionEnvironment{
+        Mimic _environment = new Mimic{
             salt: salt
         }(
             user, 
-            atlas,
+            execution
+        );
+
+        environment = address(_environment);
+
+        environments[environment] = keccak256(abi.encodePacked(
+            user,
             protocolControl,
             callConfig
+        ));
+    }
+
+    function _deployExecutionEnvironmentTemplate(
+        address user,
+        ProtocolCall memory protocolCall
+    ) internal returns (
+        address environment
+    ) {
+        address protocolControl = protocolCall.to;
+        uint16 callConfig = protocolCall.callConfig;
+
+        ExecutionEnvironment _environment = new ExecutionEnvironment{
+            salt: salt
+        }(
+            //user, 
+            atlas//,
+            //protocolControl,
+            //callConfig
         );
 
         environment = address(_environment);
