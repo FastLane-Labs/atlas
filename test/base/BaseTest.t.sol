@@ -58,7 +58,7 @@ contract BaseTest is Test, TestConstants {
         // Deploy contracts
         vm.startPrank(payee);
 
-        atlas = new Atlas(payee, 64);
+        atlas = new Atlas(64);
         escrow = atlas.getEscrowAddress();
 
         vm.stopPrank();

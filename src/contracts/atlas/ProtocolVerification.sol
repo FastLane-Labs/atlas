@@ -1,16 +1,14 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import "openzeppelin-contracts/contracts/access/Ownable.sol";
 import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
-
-import { IProtocolControl } from "../interfaces/IProtocolControl.sol";
 
 import { CallBits } from "../libraries/CallBits.sol";
 
 import "../types/CallTypes.sol";
 import "../types/GovernanceTypes.sol";
+
 import { Verification } from "../types/VerificationTypes.sol";
 
 import { ProtocolIntegration } from "./ProtocolIntegration.sol";
@@ -28,8 +26,8 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
         "ProtocolProof(address from,address to,uint256 nonce,uint256 deadline,bytes32 protocolDataHash,bytes32 callChainHash)"
     );
 
-    constructor() EIP712("ProtoCallHandler", "0.0.1")  {}
-
+    constructor() EIP712("ProtoCallHandler", "0.0.1") {}
+    //EIP712("ProtoCallHandler", "0.0.1")
 
     // Verify that the protocol's front end generated the staging
     // information and that it matches the on-chain data.  

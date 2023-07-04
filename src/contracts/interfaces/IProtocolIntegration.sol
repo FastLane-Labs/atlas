@@ -13,6 +13,6 @@ interface IProtocolIntegration {
 
     function disableProtocol(address protocolControl, address protocol) external;
 
-    function getNextNonce(address governanceSignatory) external view returns (uint256 nextNonce);
+    function nextGovernanceNonce(address governanceSignatory) external view returns (uint256 nextNonce);
     
 }

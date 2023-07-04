@@ -33,7 +33,10 @@ abstract contract GovernanceControl {
     // Protocol exposure: Trustless 
     // User exposure: Trustless 
     function _stageDelegateCall(
-        bytes calldata data
+        address to,
+        address from,
+        bytes4 userSelector,
+        bytes calldata userData
     ) internal virtual returns (bytes memory stagingData);
 
     // _stageStaticCall
@@ -47,6 +50,9 @@ abstract contract GovernanceControl {
     // Protocol exposure: Trustless 
     // User exposure: Trustless 
     function _stageStaticCall(
+        address,
+        address,
+        bytes4,
         bytes calldata
     ) internal view virtual returns (bytes memory) {
         revert(_NOT_IMPLEMENTED);

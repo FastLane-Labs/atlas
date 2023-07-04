@@ -35,8 +35,7 @@ library CallVerification {
     function prove(
         CallChainProof calldata self, 
         address from, 
-        bytes memory data, 
-        bool isDelegated
+        bytes memory data
     ) internal pure returns (bool) 
     {
         return self.targetHash == keccak256(
@@ -44,7 +43,6 @@ library CallVerification {
                 self.previousHash,
                 from,
                 data,
-                isDelegated, 
                 self.index
             )
         );
@@ -53,7 +51,6 @@ library CallVerification {
     function addVerificationCallProof(
         CallChainProof memory self,
         address to,
-        bool isDelegated,
         bytes memory stagingReturnData,
         bytes memory userReturnData
     ) internal pure returns (CallChainProof memory) {
@@ -67,15 +64,10 @@ library CallVerification {
                     stagingReturnData,
                     userReturnData
                 ),
-                isDelegated, 
                 ++self.index
             )
         );
         return self;
-    }
-
-    function delegateVerification(uint16 callConfig) internal pure returns (bool) {
-        return (callConfig & 1 << uint16(CallConfig.DelegateStaging) != 0);
     }
 
     function buildExecutionHashChain(
@@ -102,13 +94,13 @@ library CallVerification {
             abi.encodePacked(
                 bytes32(0), // initial hash = null
                 protocolCall.to,
-                abi.encode(
+                abi.encodeWithSelector(
+                    IProtocolControl.stageCall.selector,
                     userCall.to, 
                     userCall.from, 
                     bytes4(userCall.data), 
                     userCall.data[4:]
                 ),
-                delegateStaging(protocolCall.callConfig), 
                 i
             )
         );
@@ -120,7 +112,6 @@ library CallVerification {
                 executionHashChain[0], // always reference previous hash
                 userCall.to,
                 userCall.data,
-                delegateUser(protocolCall.callConfig),
                 i
             )
         );
@@ -133,7 +124,6 @@ library CallVerification {
                     executionHashChain[i-1], // reference previous hash
                     searcherCalls[i-2].metaTx.from, // searcher smart contract
                     searcherCalls[i-2].metaTx.data, // searcher calls start at 2
-                    false, // searchers wont have access to delegatecall
                     i
                 )
             );
@@ -143,14 +133,6 @@ library CallVerification {
         // because it is dependent on the outcome of the staging and user calls
         // but it can be updated once those become known, which is AFTER the 
         // staging and user calls but BEFORE the searcher calls. 
-    }
-
-    function delegateUser(uint16 callConfig) internal pure returns (bool) {
-        return (callConfig & 1 << uint16(CallConfig.DelegateUser) != 0);
-    }
-
-    function delegateStaging(uint16 callConfig) internal pure returns (bool) {
-        return (callConfig & 1 << uint16(CallConfig.DelegateStaging) != 0);
     }
 }
 

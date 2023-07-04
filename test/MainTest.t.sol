@@ -64,6 +64,11 @@ contract MainTest is BaseTest {
         address executionEnvironment = IAtlas(address(atlas)).getExecutionEnvironment(userEOA, address(control));
         vm.label(address(executionEnvironment), "ENVIRONMENT");
 
+        console.log("userEOA",userEOA);
+        console.log("atlas", address(atlas));
+        console.log("control", address(control));
+        console.log("executionEnvironment",executionEnvironment);
+
         // User must approve the execution environment
         ERC20(TOKEN_ZERO).approve(executionEnvironment, type(uint256).max);
         ERC20(TOKEN_ONE).approve(executionEnvironment, type(uint256).max);

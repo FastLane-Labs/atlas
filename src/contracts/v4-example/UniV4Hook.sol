@@ -128,19 +128,20 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
 
     /////////////// DELEGATED CALLS //////////////////
     function _stageDelegateCall(
-        bytes calldata data
+        address to,
+        address from,
+        bytes4 userSelector,
+        bytes calldata userData
     ) internal override returns (bytes memory stagingData) {
         // This function is delegatecalled 
         // address(this) = ExecutionEnvironment
         // msg.sender = Atlas Escrow
 
-        // TODO: Finalize UserCall struct and hardcode the location
-        // of the func selector.
-        require(bytes4(data[4:8]) == SWAP, "ERR-H10 InvalidFunction"); 
+        require(userSelector == SWAP, "ERR-H10 InvalidFunction"); 
        
-        UserCall memory userCall = abi.decode(data[4:], (UserCall));
+        UserCall memory userCall = abi.decode(userData, (UserCall));
 
-        require(userCall.to == v4Singleton, "ERR-H11 InvalidTo");
+        require(to == v4Singleton, "ERR-H11 InvalidTo");
 
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that ProtocolControl supplied a valid signature
@@ -173,7 +174,7 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
                 // ERC20(token0).approve(v4Singleton, amountSpecified);
                 SafeTransferLib.safeTransferFrom(
                     ERC20(IPoolManager.Currency.unwrap(key.currency0)), 
-                    userCall.from, 
+                    from, 
                     v4Singleton, // <- TODO: confirm
                     uint256(params.amountSpecified)
                 );

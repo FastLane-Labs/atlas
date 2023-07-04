@@ -6,7 +6,7 @@ import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
 // Atlas Base Imports
 import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
-import { IUserDirect } from "../interfaces/IUserDirect.sol";
+import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
 
 import { SafetyBits } from "../libraries/SafetyBits.sol"; 
 
@@ -95,16 +95,13 @@ contract V2ProtocolControl is MEVAllocator, ProtocolControl {
     */
 
     function _stageDelegateCall(
-        bytes calldata data
+        address to,
+        address from,
+        bytes4 userSelector,
+        bytes calldata userData
     ) internal override returns (bytes memory) {
-        (
-            address userCallTo,
-            address userCallFrom,
-            bytes4 userFuncSelector,
-            bytes memory userCalldata
-        ) = abi.decode(data, (address, address, bytes4, bytes));
 
-        require(bytes4(userFuncSelector) == SWAP, "ERR-H10 InvalidFunction"); 
+        require(userSelector == SWAP, "ERR-H10 InvalidFunction"); 
 
         // NOTE: This is a very direct example to facilitate the creation of a testing environment.  
         // Using this example in production is ill-advised. 
@@ -114,14 +111,15 @@ contract V2ProtocolControl is MEVAllocator, ProtocolControl {
             uint256 amount1Out, 
             , // address recipient // Unused
             // bytes memory swapData // Unused
-        ) = abi.decode(userCalldata, (uint256, uint256, address, bytes));
+        ) = abi.decode(userData, (uint256, uint256, address, bytes));
 
+        /*
         address tokenUserIsSelling = amount0Out > amount1Out ?
-            IUniswapV2Pair(userCallTo).token1() :
-            IUniswapV2Pair(userCallTo).token0() ;
+            IUniswapV2Pair(to).token1() :
+            IUniswapV2Pair(to).token0() ;
+        */
 
-
-        (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(userCallTo).getReserves();
+        (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(to).getReserves();
 
         /*
         // ENABLE FOR FOUNDRY TESTING
@@ -139,12 +137,7 @@ contract V2ProtocolControl is MEVAllocator, ProtocolControl {
         uint256 amount0In = amount1Out == 0 ? 0 : SwapMath.getAmountIn(amount1Out, uint256(token0Balance), uint256(token1Balance));
         uint256 amount1In = amount0Out == 0 ? 0 : SwapMath.getAmountIn(amount0Out, uint256(token1Balance), uint256(token0Balance));
 
-        require(
-            uint256(token0Balance) > amount0Out && uint256(token1Balance) > amount1Out,
-            "ERR H11 AmountExceedsInventory"
-        );
-
-        uint256 amountUserIsSelling = amount0Out > amount1Out ? amount1In : amount0In;
+        // uint256 amountUserIsSelling = amount0Out > amount1Out ? amount1In : amount0In;
 
         /*
         // ENABLE FOR FOUNDRY TESTING
@@ -161,10 +154,11 @@ contract V2ProtocolControl is MEVAllocator, ProtocolControl {
         }
         */
         
-
         // This is a V2 swap, so optimistically transfer the tokens
         // NOTE: The user should have approved the ExecutionEnvironment for token transfers
-        ERC20(tokenUserIsSelling).transferFrom(userCallFrom, userCallTo, amountUserIsSelling); 
+        ERC20(
+            amount0Out > amount1Out ? IUniswapV2Pair(to).token1():IUniswapV2Pair(to).token0()
+        ).transferFrom(from, to, amount0In > amount1In ? amount0In : amount1In); 
 
         bytes memory emptyData;
         return emptyData;
@@ -224,7 +218,7 @@ contract V2ProtocolControl is MEVAllocator, ProtocolControl {
         );
 
         emit BurnedGovernanceToken(
-            IUserDirect(address(this)).getUser(),
+            IExecutionEnvironment(address(this)).getUser(),
             GOVERNANCE_TOKEN,
             govIsTok0 ? amount0Out : amount1Out
         );

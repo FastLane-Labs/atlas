@@ -2,6 +2,7 @@
 pragma solidity ^0.8.16;
 
 import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
+import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
 
 import { CallBits } from "../libraries/CallBits.sol";
 
@@ -10,7 +11,9 @@ import { MEVAllocator } from "./MEVAllocator.sol";
 
 import "../types/CallTypes.sol";
 
-abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
+import "forge-std/Test.sol";
+
+abstract contract ProtocolControl is Test, MEVAllocator, GovernanceControl {
 
     address public immutable escrow;
     address public immutable governance;
@@ -38,9 +41,8 @@ abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
         bool shouldDelegateVerification,
         bool allowRecycledStorage
     ) {
-
         sequenced = shouldRequireSequencedNonces;
-
+        
         /*
         // Disallow delegatecall when recycled storage is used
         if(allowRecycledStorage) {
@@ -102,9 +104,16 @@ abstract contract ProtocolControl is MEVAllocator, GovernanceControl {
     }
 
     function stageCall(
-        bytes calldata data
+        address to,
+        address from,
+        bytes4 userSelector,
+        bytes calldata userData
     ) external onlyApprovedCaller(delegateStaging) returns (bytes memory) {
-        return delegateStaging ? _stageDelegateCall(data) : _stageStaticCall(data);
+        return (
+            delegateStaging ? 
+            _stageDelegateCall(to, from, userSelector, userData) : 
+            _stageStaticCall(to, from, userSelector, userData) 
+        );
     }
 
     function userLocalCall(

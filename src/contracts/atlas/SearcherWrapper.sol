@@ -1,29 +1,38 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import { ICallExecution } from "../interfaces/ICallExecution.sol";
+import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+
+import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
 
 import { FastLaneErrorsEvents } from "./Emissions.sol";
 
 import "../types/CallTypes.sol";
 import "../types/VerificationTypes.sol";
+
 import { SearcherOutcome } from "../types/EscrowTypes.sol";
 
 contract SearcherWrapper is FastLaneErrorsEvents {
 
     function _searcherCallWrapper(
-        CallChainProof calldata proof,
+        SearcherCall calldata searcherCall,
+        CallChainProof memory proof,
         uint256 gasLimit,
-        SearcherCall calldata searcherCall
+        address environment
     ) internal returns (SearcherOutcome, uint256) {
         // address(this) = Escrow 
         // msg.sender = ExecutionEnvironment
 
+        // Get current Ether balance
+        uint256 currentBalance = address(this).balance;
+
         // Call the execution environment
-        try ICallExecution(msg.sender).searcherMetaTryCatch(
-            proof, gasLimit, searcherCall
+        try IExecutionEnvironment(environment).searcherMetaTryCatch{
+            value: searcherCall.metaTx.value
+        }(
+            proof, gasLimit, currentBalance, searcherCall
         ) {
-            return (SearcherOutcome.Success, 0);
+            return (SearcherOutcome.Success, address(this).balance - currentBalance);
         
         } catch Error(string memory err)  {
             bytes32 errorSwitch = keccak256(abi.encodePacked(err));

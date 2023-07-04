@@ -2,36 +2,28 @@
 pragma solidity ^0.8.16;
 
 import { IProtocolControl } from "../interfaces/IProtocolControl.sol";
-import { ICallExecution } from "../interfaces/ICallExecution.sol";
+import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
 
 import { Escrow } from "./Escrow.sol";
-import { UserDirect } from "./UserDirect.sol";
+import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
 
 import "../types/CallTypes.sol";
 
-contract Factory {
+contract Factory is Escrow {
 
-    uint32 immutable public escrowDuration;
-    address immutable public escrow;
-    address immutable public factory;
+    //address immutable public atlas;
     bytes32 immutable public salt;
-
-    Escrow public escrowContract = new Escrow(uint32(64));
 
     mapping(address => bytes32) public environments;
 
-    constructor(
-            uint32 _escrowDuration
-    ) {
-        escrowDuration = _escrowDuration;
+    constructor(uint32 _escrowDuration) Escrow(_escrowDuration) {
 
-        escrow = address(escrowContract);
-        factory = address(this);
+        //atlas = msg.sender;
         salt = keccak256(
             abi.encodePacked(
                 block.chainid,
-                factory,
-                escrow
+                atlas,
+                msg.sender
             )
         );
     }
@@ -43,7 +35,7 @@ contract Factory {
             protocolCall = IProtocolControl(protocolCall.to).getProtocolCall();
         }
 
-        ICallExecution(
+        IExecutionEnvironment(
             _getExecutionEnvironmentCustom(msg.sender, protocolCall)
         ).factoryWithdrawERC20(msg.sender, token, amount);
     }
@@ -53,7 +45,7 @@ contract Factory {
             protocolCall = IProtocolControl(protocolCall.to).getProtocolCall();
         }
 
-        ICallExecution(
+        IExecutionEnvironment(
             _getExecutionEnvironmentCustom(msg.sender, protocolCall)
         ).factoryWithdrawEther(msg.sender, amount);
     }
@@ -69,7 +61,7 @@ contract Factory {
     }
 
     function getEscrowAddress() external view returns (address escrowAddress) {
-        escrowAddress = escrow;
+        escrowAddress = atlas;
     }
 
     function _getExecutionEnvironment(
@@ -101,11 +93,10 @@ contract Factory {
                 salt,
                 keccak256(
                     abi.encodePacked(
-                        type(UserDirect).creationCode,
+                        type(ExecutionEnvironment).creationCode,
                         abi.encode(
                             user,
-                            escrow,
-                            address(this),
+                            atlas,
                             protocolControl,
                             callConfig
                         )
@@ -124,12 +115,11 @@ contract Factory {
         address protocolControl = protocolCall.to;
         uint16 callConfig = protocolCall.callConfig;
 
-        UserDirect _environment = new UserDirect{
+        ExecutionEnvironment _environment = new ExecutionEnvironment{
             salt: salt
         }(
             user, 
-            escrow,
-            address(this),
+            atlas,
             protocolControl,
             callConfig
         );

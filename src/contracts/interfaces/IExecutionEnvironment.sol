@@ -5,42 +5,48 @@ import "../types/CallTypes.sol";
 import { CallChainProof } from "../types/VerificationTypes.sol";
 
 interface IExecutionEnvironment {
-
-    function protoCall( 
-        ProtocolCall calldata protocolCall, // supplied by frontend
-        UserCall calldata userCall,
-        PayeeData[] calldata payeeData, // supplied by frontend
-        SearcherCall[] calldata searcherCalls, // supplied by FastLane via frontend integration
-        bytes32[] calldata executionHashChain // calculated by msg.sender (Factory)
-    ) external payable returns (bytes32);
-
-    function delegateStagingWrapper(
+    
+    function stagingWrapper(
+        CallChainProof calldata proof,
         ProtocolCall calldata protocolCall,
-        bytes calldata userCallData
-    ) external returns (bytes memory stagingData);
+        UserCall calldata userCall
+    ) external payable returns (bytes memory stagingData);
 
-    function callStagingWrapper(
+    function userWrapper(
+        CallChainProof calldata proof,
         ProtocolCall calldata protocolCall,
-        bytes calldata userCallData
-    ) external returns (bytes memory stagingData);
-
-    function callUserWrapper(
         UserCall calldata userCall
     ) external payable returns (bytes memory userReturnData);
 
-    function delegateUserWrapper(
-        UserCall calldata userCall
-    ) external returns (bytes memory userReturnData);
-
-    function callVerificationWrapper(
+    function verificationWrapper(
+        CallChainProof calldata proof,
         ProtocolCall calldata protocolCall,
-        bytes memory stagingData, 
+        bytes memory stagingReturnData, 
         bytes memory userReturnData
+    ) payable external;
+
+    function searcherMetaTryCatch(
+        CallChainProof calldata proof,
+        uint256 gasLimit,
+        uint256 escrowBalance,
+        SearcherCall calldata searcherCall
+    ) payable external;
+
+    function allocateRewards(
+        ProtocolCall calldata protocolCall,
+        BidData[] calldata bids, // Converted to memory
+        PayeeData[] calldata payeeData
     ) external;
 
-    function delegateVerificationWrapper(
-        ProtocolCall calldata protocolCall,
-        bytes memory stagingData, 
-        bytes memory userReturnData
-    ) external;
+    function getUser() external view returns (address _user);
+    function getProtocolControl() external view returns (address _control);
+    function getFactory() external view returns (address _factory);
+    function getEscrow() external view returns (address _escrow);
+    function getCallConfig() external view returns (uint16 _config);
+
+    function withdrawERC20(address token, uint256 amount) external;
+    function withdrawEther(uint256 amount) external;
+
+    function factoryWithdrawERC20(address user, address token, uint256 amount) external;
+    function factoryWithdrawEther(address user, uint256 amount) external;
 }

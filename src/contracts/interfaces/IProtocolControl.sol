@@ -6,7 +6,10 @@ import "../types/CallTypes.sol";
 interface IProtocolControl {
 
     function stageCall(
-        bytes calldata data
+        address to,
+        address from,
+        bytes4 userSelector,
+        bytes calldata userData
     ) external returns (bytes memory);
 
     function userLocalCall(

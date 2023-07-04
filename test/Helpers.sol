@@ -55,11 +55,11 @@ contract Helper is Test, TestConstants {
     }
 
     function searcherNextNonce(address searcherMetaTxSigner) public view returns (uint256) {
-        return IEscrow(escrow).getNextNonce(searcherMetaTxSigner);
+        return IEscrow(escrow).nextSearcherNonce(searcherMetaTxSigner);
     }
 
     function governanceNextNonce(address signatory) public view returns (uint256) {
-        return IProtocolIntegration(atlas).getNextNonce(signatory);
+        return IProtocolIntegration(atlas).nextGovernanceNonce(signatory);
     }
 
     function buildUserCall(

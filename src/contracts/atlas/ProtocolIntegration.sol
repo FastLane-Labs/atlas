@@ -1,9 +1,6 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
-import "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
-
 import { IProtocolControl } from "../interfaces/IProtocolControl.sol";
 
 import { CallBits } from "../libraries/CallBits.sol";
@@ -28,7 +25,6 @@ contract ProtocolIntegration {
     // map for tracking usage of protocol-owned EOAs and signatures 
     //  keccak256(from, nonce) => keccak256(signature)
     mapping(bytes32 => bytes32) public signatureTrackingMap;
-
 
     mapping(bytes32 => bytes32) public protocols;
 
@@ -132,7 +128,7 @@ contract ProtocolIntegration {
         delete protocols[key];
     }
 
-    function getNextNonce(address governanceSignatory) external view returns (uint256 nextNonce) {
+    function nextGovernanceNonce(address governanceSignatory) external view returns (uint256 nextNonce) {
         nextNonce = uint256(signatories[governanceSignatory].nonce)+1;
     }
 }

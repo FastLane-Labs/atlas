@@ -3,6 +3,15 @@ pragma solidity ^0.8.16;
 
 import "../types/CallTypes.sol";
 
+string constant SEARCHER_BID_UNPAID = "SearcherBidUnpaid";
+string constant SEARCHER_FAILED_CALLBACK = "SearcherCallbackFailed";
+string constant SEARCHER_MSG_VALUE_UNPAID = "SearcherMsgValueNotRepaid";
+string constant SEARCHER_CALL_REVERTED = "SearcherCallReverted";
+string constant SEARCHER_EVM_ERROR = "SearcherEVMError";
+string constant ALTERED_USER_HASH = "AlteredUserCalldataHash";
+string constant INVALID_SEARCHER_HASH = "InvalidSearcherCalldataHash";
+string constant HASH_CHAIN_BROKEN = "CalldataHashChainMismatch";
+
 contract FastLaneErrorsEvents {
 
     // NOTE: nonce is the executed nonce
@@ -28,28 +37,13 @@ contract FastLaneErrorsEvents {
         PayeeData[] payeeData
     );
 
-    string constant public SEARCHER_BID_UNPAID = "SearcherBidUnpaid";
     bytes32 constant internal _SEARCHER_BID_UNPAID = keccak256(abi.encodePacked(SEARCHER_BID_UNPAID));
-
-    string constant public SEARCHER_FAILED_CALLBACK = "SearcherCallbackFailed";
     bytes32 constant internal _SEARCHER_FAILED_CALLBACK = keccak256(abi.encodePacked(SEARCHER_FAILED_CALLBACK));
-
-    string constant public SEARCHER_MSG_VALUE_UNPAID = "SearcherMsgValueNotRepaid";
     bytes32 constant internal _SEARCHER_MSG_VALUE_UNPAID = keccak256(abi.encodePacked(SEARCHER_MSG_VALUE_UNPAID));
-
-    string constant public SEARCHER_CALL_REVERTED = "SearcherCallReverted";
     bytes32 constant internal _SEARCHER_CALL_REVERTED = keccak256(abi.encodePacked(SEARCHER_CALL_REVERTED));
-
-    string constant public SEARCHER_EVM_ERROR = "SearcherEVMError";
     bytes32 constant internal _SEARCHER_EVM_ERROR = keccak256(abi.encodePacked(SEARCHER_EVM_ERROR));
-
-    string constant public ALTERED_USER_HASH = "AlteredUserCalldataHash";
     bytes32 constant internal _ALTERED_USER_HASH = keccak256(abi.encodePacked(ALTERED_USER_HASH));
-
-    string constant public INVALID_SEARCHER_HASH = "InvalidSearcherCalldataHash";
     bytes32 constant internal _INVALID_SEARCHER_HASH = keccak256(abi.encodePacked(INVALID_SEARCHER_HASH));
-
-    string constant public HASH_CHAIN_BROKEN = "CalldataHashChainMismatch";
     bytes32 constant internal _HASH_CHAIN_BROKEN = keccak256(abi.encodePacked(HASH_CHAIN_BROKEN));
 
     // string constant SEARCHER_ETHER_BID_UNPAID = "SearcherMsgValueNotRepaid";

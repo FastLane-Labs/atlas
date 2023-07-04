@@ -6,7 +6,7 @@ import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
 import { CallBits } from "../libraries/CallBits.sol"; 
 
-import "../types/CallTypes.sol";
+import { ProtocolCall } from  "../types/CallTypes.sol";
 import "../types/LockTypes.sol";
 import "../types/EscrowTypes.sol";
 
@@ -14,13 +14,13 @@ contract SafetyLocks {
     using SafetyBits for EscrowKey;
     using CallBits for uint16;
 
-    address immutable public factory;
+    address immutable public atlas;
 
     ValueTracker internal _pendingValueTracker;
     EscrowKey internal _escrowKey;
 
-    constructor(address factoryAddress) {
-        factory = factoryAddress;
+    constructor() {
+        atlas = address(this);
     }
 
     function searcherSafetyCallback(address msgSender) external payable returns (bool isSafe) {
@@ -42,11 +42,10 @@ contract SafetyLocks {
         } 
     }
 
-    function initializeEscrowLocks(
+    function _initializeEscrowLocks(
         address executionEnvironment,
         uint8 searcherCallCount
-    ) external {
-        require(msg.sender == factory, "ERR-SL002 InvalidSender");
+    ) internal {
 
         EscrowKey memory escrowKey = _escrowKey;
         
@@ -65,26 +64,25 @@ contract SafetyLocks {
             executionEnvironment
         );
         unchecked {
-            _pendingValueTracker.starting = uint128(address(this).balance);
+            _pendingValueTracker.starting = uint128(address(this).balance - msg.value);
         }
     }
 
-    function releaseEscrowLocks() external {
+    function _releaseEscrowLocks() internal {
         require(
-            msg.sender == factory &&
-            _escrowKey.canReleaseEscrowLock(msg.sender),
+            _escrowKey.canReleaseEscrowLock(address(this)),
             "ERR-SL004 NotUnlockable"
         );
         delete _escrowKey;
     }
 
-    modifier stagingLock(ProtocolCall calldata protocolCall) {
+    modifier stagingLock(ProtocolCall calldata protocolCall, address environment) {
         // msg.sender = ExecutionEnvironment
         EscrowKey memory escrowKey = _escrowKey;
 
         // Safety contract needs to init all of the execution environment's
         // Unsafe calls so that it can trust the locks.
-        require(escrowKey.isValidStagingLock(msg.sender), "ERR-SL031 InvalidLockStage");
+        require(escrowKey.isValidStagingLock(environment), "ERR-SL031 InvalidLockStage");
         
         // Handle staging calls, if needed
         if (protocolCall.callConfig.needsStagingCall()) {
@@ -92,26 +90,26 @@ contract SafetyLocks {
             _;
         }
         
-        _escrowKey = escrowKey.turnStagingLock(msg.sender);
+        _escrowKey = escrowKey.turnStagingLock(environment);
     }
 
-    modifier userLock(ProtocolCall calldata protocolCall) {
+    modifier userLock(ProtocolCall calldata protocolCall, address environment) {
         // msg.sender is ExecutionEnvironment
         EscrowKey memory escrowKey = _escrowKey;
 
-        require(escrowKey.isValidUserLock(msg.sender), "ERR-SL032 InvalidLockStage");
+        require(escrowKey.isValidUserLock(environment), "ERR-SL032 InvalidLockStage");
             
         _escrowKey = escrowKey.holdUserLock(protocolCall.to);
         _;
 
-        _escrowKey = escrowKey.turnUserLock(msg.sender);
+        _escrowKey = escrowKey.turnUserLock(environment);
     }
 
-    modifier searcherLock(address searcherTo) {
+    modifier searcherLock(address searcherTo, address environment) {
         // msg.sender is the ExecutionEnvironment
         EscrowKey memory escrowKey = _escrowKey;
 
-        require(escrowKey.isValidSearcherLock(msg.sender), "ERR-SL033 InvalidLockStage");
+        require(escrowKey.isValidSearcherLock(environment), "ERR-SL033 InvalidLockStage");
 
         _escrowKey = escrowKey.holdSearcherLock(searcherTo);
 
@@ -122,21 +120,21 @@ contract SafetyLocks {
         escrowKey = _escrowKey;
 
         // CASE: Searcher call successful
-        if (escrowKey.confirmSearcherLock(msg.sender)) {
+        if (escrowKey.confirmSearcherLock(environment)) {
             require(!escrowKey.makingPayments, "ERR-SL034 ImproperAccess");
             require(!escrowKey.paymentsComplete, "ERR-SL035 AlreadyPaid");
-            _escrowKey = escrowKey.turnSearcherLockPayments(msg.sender);
+            _escrowKey = escrowKey.turnSearcherLockPayments(environment);
         
         // CASE: Searcher call unsuccessful && lock unaltered
         } else if (escrowKey.isRevertedSearcherLock(searcherTo)) {
             
             // NESTED CASE: Searcher is last searcher
             if (escrowKey.callIndex == escrowKey.callMax - 2) {
-                _escrowKey = escrowKey.turnSearcherLockRefund(msg.sender);
+                _escrowKey = escrowKey.turnSearcherLockRefund(environment);
             
             // NESTED CASE: Searcher is not last searcher
             } else {
-                _escrowKey = escrowKey.turnSearcherLockNext(msg.sender);
+                _escrowKey = escrowKey.turnSearcherLockNext(environment);
             }
         
         // CASE: lock altered / Invalid lock access
@@ -146,39 +144,39 @@ contract SafetyLocks {
     }
 
 
-    modifier paymentsLock() {
+    modifier paymentsLock(address environment) {
         // msg.sender is still the ExecutionEnvironment
         EscrowKey memory escrowKey = _escrowKey;
 
-        require(escrowKey.isValidPaymentsLock(msg.sender), "ERR-SL037 InvalidLockStage");
+        require(escrowKey.isValidPaymentsLock(environment), "ERR-SL037 InvalidLockStage");
 
         _escrowKey = escrowKey.holdPaymentsLock();
         _;
 
         if (escrowKey.callIndex == escrowKey.callMax-1) {
-            _escrowKey = escrowKey.turnPaymentsLockRefund(msg.sender);
+            _escrowKey = escrowKey.turnPaymentsLockRefund(environment);
         
         // Next searcher
         } else {
-            _escrowKey = escrowKey.turnPaymentsLockSearcher(msg.sender);
+            _escrowKey = escrowKey.turnPaymentsLockSearcher(environment);
         }
     }
 
-    modifier refundLock() {
+    modifier refundLock(address environment) {
         // msg.sender = ExecutionEnvironment
         EscrowKey memory escrowKey = _escrowKey;
 
-        require(escrowKey.isValidRefundLock(msg.sender), "ERR-SL038 InvalidLockStage");
+        require(escrowKey.isValidRefundLock(environment), "ERR-SL038 InvalidLockStage");
         _;
        
-        _escrowKey = escrowKey.turnRefundLock(msg.sender);
+        _escrowKey = escrowKey.turnRefundLock(environment);
     }
 
-    modifier verificationLock(uint16 callConfig) {
+    modifier verificationLock(uint16 callConfig, address environment) {
         // msg.sender = ExecutionEnvironment
         EscrowKey memory escrowKey = _escrowKey;
 
-        require(escrowKey.isValidVerificationLock(msg.sender), "ERR-SL039 InvalidLockStage");
+        require(escrowKey.isValidVerificationLock(environment), "ERR-SL039 InvalidLockStage");
 
         if (callConfig.needsVerificationCall()) {
             _escrowKey = escrowKey.holdVerificationLock();
@@ -188,7 +186,7 @@ contract SafetyLocks {
             require(escrowKey.confirmVerificationLock(), "ERR-SL040 LockInvalid");
         }
 
-        _escrowKey = escrowKey.turnVerificationLock(factory);
+        _escrowKey = escrowKey.turnVerificationLock(atlas);
     }
 
       //////////////////////////////////
