@@ -27,42 +27,29 @@ contract ExecutionEnvironment is Test {
     using CallVerification for CallChainProof;
     using CallBits for uint16;
 
-    /*
-    address immutable public control;
-    uint16 immutable public config;
-    address immutable public user;
-    */
     address immutable public atlas;
 
-    /*
-    constructor(
-        address _user,
-        address _atlas,
-        address _protocolControl,
-        uint16 _callConfig
-    ) {
-        user = _user;
-        atlas = _atlas;
-        control = _protocolControl;
-        config = _callConfig;
-        if (!_callConfig.allowsRecycledStorage()) {
-            // NOTE: selfdestruct will continue to work post EIP-6780 when it is triggered
-            // in the same transaction as contract creation, which is what we do here.
-            // selfdestruct(payable(_atlas));
-        }
-    } 
-    */
-    constructor(
-        address _atlas
-    ) {
+    constructor(address _atlas) {
         atlas = _atlas;
     }
 
-    function _user() internal view returns (address user) {
+    // MIMIC INTERACTION FUNCTIONS
+    function _config() internal pure returns (uint16 config) {
         assembly {
-            user := shr(96, calldataload(sub(calldatasize(), 20)))
+            config := shr(240, calldataload(sub(calldatasize(), 2)))
         }
-        console.log("user",user);
+    }
+
+    function _control() internal pure returns (address control) {
+        assembly {
+            control := shr(96, calldataload(sub(calldatasize(), 22)))
+        }
+    }
+
+    function _user() internal pure returns (address user) {
+        assembly {
+            user := shr(96, calldataload(sub(calldatasize(), 42)))
+        }
     }
 
       //////////////////////////////////
@@ -70,12 +57,15 @@ contract ExecutionEnvironment is Test {
     //////////////////////////////////
     function stagingWrapper(
         CallChainProof calldata proof,
-        ProtocolCall calldata protocolCall,
         UserCall calldata userCall
     ) external returns (bytes memory stagingData) {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
-        require(msg.sender == atlas, "ERR-CE00 InvalidSenderStaging");
+
+        address control = _control();
+        uint16 config = _config();
+
+        require(msg.sender == atlas && userCall.from == _user(), "ERR-CE00 InvalidSenderStaging");
 
         bytes memory stagingCalldata = abi.encodeWithSelector(
             IProtocolControl.stageCall.selector,
@@ -87,20 +77,20 @@ contract ExecutionEnvironment is Test {
 
         // Verify the proof to ensure this isn't happening out of sequence.
         require(
-            proof.prove(protocolCall.to, stagingCalldata),
+            proof.prove(control, stagingCalldata),
             "ERR-P01 ProofInvalid"
         );
 
         bool success;
 
-        if (protocolCall.callConfig.needsDelegateStaging()) {
-            (success, stagingData) = protocolCall.to.delegatecall(
+        if (config.needsDelegateStaging()) {
+            (success, stagingData) = control.delegatecall(
                 stagingCalldata
             );
             require(success, "ERR-EC02 DelegateRevert");
         
         } else {
-            (success, stagingData) = protocolCall.to.staticcall(
+            (success, stagingData) = control.staticcall(
                 stagingCalldata
             );
             require(success, "ERR-EC03 StaticRevert");
@@ -109,12 +99,15 @@ contract ExecutionEnvironment is Test {
 
     function userWrapper(
         CallChainProof calldata proof,
-        ProtocolCall calldata protocolCall,
         UserCall calldata userCall
     ) external payable returns (bytes memory userReturnData) {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
-        require(msg.sender == atlas, "ERR-CE00 InvalidSenderStaging");
+
+        address user = _user();
+        uint16 config = _config();
+
+        require(msg.sender == atlas && userCall.from == user, "ERR-CE00 InvalidSenderUser");
         require(address(this).balance >= userCall.value, "ERR-CE01 ValueExceedsBalance");
 
         // Verify the proof to ensure this isn't happening out of sequence. 
@@ -126,7 +119,7 @@ contract ExecutionEnvironment is Test {
         bool success;
 
         // regular user call - executed at regular destination and not performed locally
-        if (!protocolCall.callConfig.needsLocalUser()) {
+        if (!config.needsLocalUser()) {
 
             (success, userReturnData) = userCall.to.call{
                 value: userCall.value
@@ -136,8 +129,8 @@ contract ExecutionEnvironment is Test {
             require(success, "ERR-EC04a CallRevert");
         
         } else {
-            if (protocolCall.callConfig.needsDelegateUser()) {
-                (success, userReturnData) = protocolCall.to.delegatecall(
+            if (config.needsDelegateUser()) {
+                (success, userReturnData) = _control().delegatecall(
                     abi.encodeWithSelector(
                         IProtocolControl.userLocalCall.selector,
                         userCall.to, 
@@ -152,20 +145,26 @@ contract ExecutionEnvironment is Test {
             }
         }
 
-        uint256 balance = address(this).balance;
-        if (balance > 0) {
-            SafeTransferLib.safeTransferETH(
-                msg.sender, 
-                balance
-            );
+        if (!config.allowsRecycledStorage()) {
+            // NOTE: selfdestruct will continue to work post EIP-6780 when it is triggered
+            // in the same transaction as contract creation, which is what we do here.
+            selfdestruct(payable(user));
+
+        } else {
+            uint256 balance = address(this).balance;
+            if (balance > 0) {
+                SafeTransferLib.safeTransferETH(
+                    msg.sender, 
+                    balance
+                );
+            }
         }
     }
 
     function verificationWrapper(
         CallChainProof calldata proof,
-        ProtocolCall calldata protocolCall,
-        bytes memory stagingReturnData, 
-        bytes memory userReturnData
+        bytes calldata stagingReturnData, 
+        bytes calldata userReturnData
     ) external {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
@@ -179,18 +178,18 @@ contract ExecutionEnvironment is Test {
 
         // Verify the proof to ensure this isn't happening out of sequence.
         require(
-            proof.prove(protocolCall.to, data),
+            proof.prove(_control(), data),
             "ERR-P01 ProofInvalid"
         );
-        if (protocolCall.callConfig.needsDelegateVerification()) {
-            (bool success, bytes memory returnData) = protocolCall.to.delegatecall(
+        if (_config().needsDelegateVerification()) {
+            (bool success, bytes memory returnData) = _control().delegatecall(
                 data
             );
             require(success, "ERR-EC02 DelegateRevert");
             require(abi.decode(returnData, (bool)), "ERR-EC03 DelegateUnsuccessful");
         
         } else {
-            (bool success, bytes memory returnData) = protocolCall.to.staticcall(
+            (bool success, bytes memory returnData) = _control().staticcall(
                 data
             );
             require(success, "ERR-EC03 StaticRevert");
@@ -308,7 +307,6 @@ contract ExecutionEnvironment is Test {
     }
 
     function allocateRewards(
-        ProtocolCall calldata protocolCall,
         BidData[] calldata bids,
         PayeeData[] calldata payeeData
     ) external {
@@ -340,8 +338,8 @@ contract ExecutionEnvironment is Test {
             }
         }
 
-        if (protocolCall.callConfig.needsDelegateAllocating()) {
-            (bool success,) = protocolCall.to.delegatecall(
+        if (_config().needsDelegateAllocating()) {
+            (bool success,) = _control().delegatecall(
                 abi.encodeWithSelector(
                     IProtocolControl.allocatingCall.selector,
                     totalEtherReward,
@@ -352,7 +350,7 @@ contract ExecutionEnvironment is Test {
             require(success, "ERR-EC02 DelegateRevert");
         
         } else {
-            (bool success,) = protocolCall.to.call{
+            (bool success,) = _control().call{
                 value: totalEtherReward
             }(
                 abi.encodeWithSelector(
@@ -429,12 +427,20 @@ contract ExecutionEnvironment is Test {
         }
     }
 
-    function getUser() external view returns (address user) {
+    function getUser() external pure returns (address user) {
         user = _user();
     }
 
-    function getEscrow() external view returns (address _escrow) {
-        _escrow = atlas;
+    function getControl() external pure returns (address control) {
+        control = _control();
+    }
+
+    function getConfig() external pure returns (uint16 config) {
+        config = _config();
+    }
+
+    function getEscrow() external view returns (address escrow) {
+        escrow = atlas;
     }
 
     receive() external payable {}

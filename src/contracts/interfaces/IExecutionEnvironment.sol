@@ -8,21 +8,18 @@ interface IExecutionEnvironment {
     
     function stagingWrapper(
         CallChainProof calldata proof,
-        ProtocolCall calldata protocolCall,
         UserCall calldata userCall
     ) external payable returns (bytes memory stagingData);
 
     function userWrapper(
         CallChainProof calldata proof,
-        ProtocolCall calldata protocolCall,
         UserCall calldata userCall
     ) external payable returns (bytes memory userReturnData);
 
     function verificationWrapper(
         CallChainProof calldata proof,
-        ProtocolCall calldata protocolCall,
-        bytes memory stagingReturnData, 
-        bytes memory userReturnData
+        bytes calldata stagingReturnData, 
+        bytes calldata userReturnData
     ) payable external;
 
     function searcherMetaTryCatch(
@@ -33,16 +30,15 @@ interface IExecutionEnvironment {
     ) payable external;
 
     function allocateRewards(
-        ProtocolCall calldata protocolCall,
         BidData[] calldata bids, // Converted to memory
         PayeeData[] calldata payeeData
     ) external;
 
-    function getUser() external view returns (address _user);
-    function getFactory() external view returns (address _factory);
-    function getEscrow() external view returns (address _escrow);
-    function getCallConfig() external view returns (uint16 _config);
-
+    function getUser() external pure returns (address user);
+    function getControl() external pure returns (address control);
+    function getConfig() external pure returns (uint16 config);
+    function getEscrow() external view returns (address escrow);
+    
     function withdrawERC20(address token, uint256 amount) external;
     function withdrawEther(uint256 amount) external;
 

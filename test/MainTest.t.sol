@@ -8,6 +8,7 @@ import {IAtlas} from "../src/contracts/interfaces/IAtlas.sol";
 import {IProtocolIntegration} from "../src/contracts/interfaces/IProtocolIntegration.sol";
 
 import {Atlas} from "../src/contracts/atlas/Atlas.sol";
+import {Mimic} from "../src/contracts/atlas/Mimic.sol";
 
 import {V2ProtocolControl} from "../src/contracts/v2-example/V2ProtocolControl.sol";
 
@@ -86,4 +87,51 @@ contract MainTest is BaseTest {
 
         assertTrue(success);
     }
+
+    /*
+    function testMimic() public {
+        address aaaaa = address(this);
+        address bbbbb = msg.sender;
+        address ccccc = address(this);
+        uint16 ddddd = uint16(0x1111);
+        // Mimic mimic = new Mimic();
+        //console.log("----");
+        //console.log("runtime code:");
+        //console.logBytes(address(mimic).code);
+        console.log("aaaaa", aaaaa);
+        console.log("bbbbb", bbbbb);
+        console.log("ccccc", ccccc);
+        console.log("----");
+        console.log("creation code:");
+        console.logBytes(type(Mimic).creationCode);
+        console.log("----");
+
+        bytes memory creationCode = type(Mimic).creationCode;
+        //bytes memory creationCode = new bytes(790);
+        assembly {
+            mstore(add(creationCode, 85), add(
+                shl(96, aaaaa), 
+                0x73ffffffffffffffffffffff
+            ))
+            mstore(add(creationCode, 131), add(
+                shl(96, bbbbb), 
+                0x73ffffffffffffffffffffff
+            ))
+            mstore(add(creationCode, 152), add(
+                shl(96, ccccc), 
+                add(
+                    add(
+                        shl(88, 0x61), 
+                        shl(72, ddddd)
+                    ),
+                    0x604051602001610082
+                )
+            ))
+        }
+        
+        console.log("assembly modified code:");
+        console.logBytes(creationCode);
+        console.log("----");
+    }
+    */
 }

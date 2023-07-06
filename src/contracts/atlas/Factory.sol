@@ -10,14 +10,13 @@ import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
 
 import "../types/CallTypes.sol";
 
+import "forge-std/Test.sol";
 
-contract Factory is Escrow {
+contract Factory is Test, Escrow {
 
     //address immutable public atlas;
     bytes32 immutable public salt;
     address immutable public execution;
-
-    mapping(address => bytes32) public environments;
 
     constructor(uint32 _escrowDuration) Escrow(_escrowDuration) {
 
@@ -89,49 +88,18 @@ contract Factory is Escrow {
     // been deprecated due to ProtocolControl changes of callConfig. 
     function _getExecutionEnvironmentCustom(
         address user,
-        ProtocolCall memory
+        ProtocolCall memory protocolCall
     ) internal view returns (
         address environment
     ) {
-
-        //address protocolControl = protocolCall.to;
-        //uint16 callConfig = protocolCall.callConfig;
-
-        /*
         environment = address(uint160(uint256(
             keccak256(abi.encodePacked(
                 bytes1(0xff),
                 address(this),
                 salt,
-                keccak256(
-                    abi.encodePacked(
-                        type(ExecutionEnvironment).creationCode,
-                        abi.encode(
-                            user,
-                            atlas,
-                            protocolControl,
-                            callConfig
-                        )
-                    )
-                )
-            )
-        ))));
-        */ 
-
-        environment = address(uint160(uint256(
-            keccak256(abi.encodePacked(
-                bytes1(0xff),
-                address(this),
-                salt,
-                keccak256(
-                    abi.encodePacked(
-                        type(Mimic).creationCode,
-                        abi.encode(
-                            user,
-                            execution
-                        )
-                    )
-                )
+                keccak256(abi.encodePacked(
+                    _getMimicCreationCode(execution, user, protocolCall)
+                ))
             )
         ))));
     }
@@ -139,52 +107,52 @@ contract Factory is Escrow {
     function _deployExecutionEnvironment(
         address user,
         ProtocolCall memory protocolCall
-    ) internal returns (
-        address environment
-    ) {
-        address protocolControl = protocolCall.to;
-        uint16 callConfig = protocolCall.callConfig;
+    ) internal returns (address environment) {
 
-        Mimic _environment = new Mimic{
-            salt: salt
-        }(
-            user, 
-            execution
-        );
-
-        environment = address(_environment);
-
-        environments[environment] = keccak256(abi.encodePacked(
-            user,
-            protocolControl,
-            callConfig
-        ));
+        bytes memory creationCode = _getMimicCreationCode(execution, user, protocolCall);
+        bytes32 memSalt = salt;
+        assembly {
+            environment := create2(0, add(creationCode, 32), mload(creationCode), memSalt)
+        }
     }
 
     function _deployExecutionEnvironmentTemplate(
-        address user,
-        ProtocolCall memory protocolCall
-    ) internal returns (
-        address environment
-    ) {
-        address protocolControl = protocolCall.to;
-        uint16 callConfig = protocolCall.callConfig;
+        address,
+        ProtocolCall memory
+    ) internal returns (address environment) {
 
         ExecutionEnvironment _environment = new ExecutionEnvironment{
             salt: salt
-        }(
-            //user, 
-            atlas//,
-            //protocolControl,
-            //callConfig
-        );
+        }(atlas);
 
         environment = address(_environment);
+    }
 
-        environments[environment] = keccak256(abi.encodePacked(
-            user,
-            protocolControl,
-            callConfig
-        ));
+    function _getMimicCreationCode(address executionLib, address user, ProtocolCall memory protocolCall) internal pure returns (bytes memory creationCode) {
+        address protocolControl = protocolCall.to;
+        uint16 callConfig = protocolCall.callConfig;
+        
+        // NOTE: Changing compiler settings or solidity versions can break this.
+        creationCode = type(Mimic).creationCode;
+        assembly {
+            mstore(add(creationCode, 85), add(
+                shl(96, executionLib), 
+                0x73ffffffffffffffffffffff
+            ))
+            mstore(add(creationCode, 131), add(
+                shl(96, user), 
+                0x73ffffffffffffffffffffff
+            ))
+            mstore(add(creationCode, 152), add(
+                shl(96, protocolControl), 
+                add(
+                    add(
+                        shl(88, 0x61), 
+                        shl(72, callConfig)
+                    ),
+                    0x604051602001610082
+                )
+            ))
+        }
     }
 } 

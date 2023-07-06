@@ -32,6 +32,8 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     // track searcher tx hashes to avoid replays... imperfect solution tho
     mapping(bytes32 => bool) private _hashes;
 
+    uint256 internal _gasRebate;
+
     constructor(
         uint32 escrowDurationFromFactory //,
         //address _atlas
@@ -79,7 +81,6 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
             value: msg.value
         }(
             proof,
-            protocolCall,
             userCall
         );
     }
@@ -91,8 +92,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         address environment
     ) internal userLock(protocolCall, environment) returns (bytes memory userReturnData) {
         userReturnData = IExecutionEnvironment(environment).userWrapper(
-            proof, 
-            protocolCall,
+            proof,
             userCall
         );
     }
@@ -167,7 +167,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     ) internal paymentsLock(environment) {
         // process protocol payments
          try IExecutionEnvironment(environment).allocateRewards(
-            protocolCall, winningBids, payeeData
+            winningBids, payeeData
         ) {} catch {
             emit MEVPaymentFailure(
                 protocolCall.to,
@@ -186,7 +186,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         address environment
     ) internal verificationLock(protocolCall.callConfig, environment) {
         // process protocol payments
-        IExecutionEnvironment(environment).verificationWrapper(proof, protocolCall, stagingReturnData, userReturnData);
+        IExecutionEnvironment(environment).verificationWrapper(proof, stagingReturnData, userReturnData);
         // TODO: who should pay gas cost of payments?
     } 
 
@@ -205,59 +205,20 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         address environment
     ) internal refundLock(environment) {
         
-        // TODO: searcher msg.value is being counted for gas rebate (double counted)
-        // TODO: handle all the value transfer cases
-        ValueTracker memory pendingValueTracker = _pendingValueTracker;
-
-        // lazy way to avoid underflow/overflow
-        // TODO: be better
-
-        int256 startingBalance = int256(uint256(pendingValueTracker.starting));
-        int256 endingBalance = int256(address(this).balance);
-        int256 transferredIn = int256(uint256(pendingValueTracker.transferredIn));
-        int256 transferredOut = int256(uint256(pendingValueTracker.transferredOut));
-        int256 gasRebate = int256(uint256(pendingValueTracker.gasRebate));
-
-        /*
-        console.log("===gas refund===");
-        _intLog("startingBalance", startingBalance);
-        _intLog("endingBalance  ", endingBalance);
-        _intLog("transferredIn  ", transferredIn);
-        _intLog("transferredOut ", transferredOut);
-        _intLog("gasRebate      ", gasRebate);
-        console.log("===-------===");
-        */
-
-        int256 valueReturn = (
-            (
-                endingBalance - startingBalance // total net
-            ) + (
-                gasRebate // add back in the gasRebate which was debited from searcher escrow
-            ) - (
-                transferredOut - transferredIn // subtract net outflows (IE add net inflows)
-            )
-        );
+        uint256 gasRebate = _gasRebate;
 
         emit UserTxResult(
             userCallFrom,
-            valueReturn > 0 ? uint256(valueReturn) : 0,
-            uint256(pendingValueTracker.gasRebate)
+            0,
+            gasRebate
         );
-
-        // TODO: should revert on a negative valueReturn? should subtract from gasRefund?
-        // thought: if we subtract from refund that allows users to play a salmonella-esque
-        // game of gas chicken w/ naive searchers by gaming the storage refunds, since the 
-        // refunds aren't accounted for until the end of the transaction and would only benefit 
-        // the user. User could technically vampire attack naive searchers that way and profit 
-        // from the value return, but informed searchers should be able to identify and block it.
-        require(valueReturn >= 0, "ERR-E002 UnpaidValue");
 
         SafeTransferLib.safeTransferETH(
             userCallFrom, 
-            uint256(valueReturn + gasRebate)
+            gasRebate
         );
 
-        delete _pendingValueTracker;
+        delete _gasRebate;
     }
 
     function _update(
@@ -310,8 +271,6 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         }
 
         // handle overspending from txValue
-        // TODO: not sure if necessary
-        // TODO: if is necessary, fix via _pendingValueTracker
         if (gasRebate + txValue > searcherEscrow.total - searcherEscrow.escrowed) {
             uint256 escrowDelta = (gasRebate + txValue) - (searcherEscrow.total - searcherEscrow.escrowed);
             searcherEscrow.total -= uint128(searcherEscrow.total > escrowDelta ? escrowDelta : searcherEscrow.total);
@@ -324,7 +283,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
             gasRebate ;
 
         unchecked {
-            _pendingValueTracker.gasRebate += uint128(gasRebate);
+            _gasRebate += gasRebate;
             searcherEscrow.total -= uint128(gasRebate); 
         }
 
@@ -471,26 +430,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         }
     }
 
-    receive() external payable {
-        if (gasleft() > 3_000) {
-
-            EscrowKey memory escrowKey = _escrowKey;
-
-            if (
-                EscrowBits.isExecutionPhase(ExecutionPhase.Staging, escrowKey.lockState) ||
-                EscrowBits.isExecutionPhase(ExecutionPhase.UserCall, escrowKey.lockState)
-            ) {
-                _pendingValueTracker.transferredIn += uint128(msg.value);
-
-            } else if (
-                EscrowBits.isExecutionPhase(ExecutionPhase.SearcherCalls, escrowKey.lockState) &&
-                escrowKey.callIndex == 2 &&
-                EscrowBits.isLockDepth(BaseLock.Pending, escrowKey.lockState)
-            ) {
-                _pendingValueTracker.transferredIn += uint128(msg.value);
-            }
-        }
-    }
+    receive() external payable {}
 
     fallback() external payable {
         revert(); // no untracked balance transfers plz. (not that this fully stops it)

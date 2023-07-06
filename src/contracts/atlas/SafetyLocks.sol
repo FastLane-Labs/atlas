@@ -16,7 +16,6 @@ contract SafetyLocks {
 
     address immutable public atlas;
 
-    ValueTracker internal _pendingValueTracker;
     EscrowKey internal _escrowKey;
 
     constructor() {
@@ -63,9 +62,6 @@ contract SafetyLocks {
             searcherCallCount,
             executionEnvironment
         );
-        unchecked {
-            _pendingValueTracker.starting = uint128(address(this).balance - msg.value);
-        }
     }
 
     function _releaseEscrowLocks() internal {
