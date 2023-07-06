@@ -7,7 +7,8 @@ struct EscrowKey {
     bool paymentsComplete;
     uint8 callIndex;
     uint8 callMax;
-    uint64 lockState; // bitwise
+    uint16 lockState; // bitwise
+    uint32 gasRefund;
 }
 
 enum SearcherSafety {

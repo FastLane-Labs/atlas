@@ -13,7 +13,7 @@ import { CallChainProof } from "../types/VerificationTypes.sol";
 import { CallVerification } from "../libraries/CallVerification.sol";
 import { CallBits } from "../libraries/CallBits.sol";
 
-import "forge-std/Test.sol";
+// import "forge-std/Test.sol";
 
 import {
     ALTERED_USER_HASH,
@@ -23,7 +23,7 @@ import {
     SEARCHER_BID_UNPAID
  } from "./Emissions.sol";
 
-contract ExecutionEnvironment is Test {
+contract ExecutionEnvironment {
     using CallVerification for CallChainProof;
     using CallBits for uint16;
 
@@ -75,11 +75,8 @@ contract ExecutionEnvironment is Test {
             userCall.data[4:]
         );
 
-        // Verify the proof to ensure this isn't happening out of sequence.
-        require(
-            proof.prove(control, stagingCalldata),
-            "ERR-P01 ProofInvalid"
-        );
+        // Verify the proof so that the callee knows this isn't happening out of sequence.
+        require(proof.prove(control, stagingCalldata), "ERR-P01 ProofInvalid");
 
         bool success;
 
@@ -110,11 +107,8 @@ contract ExecutionEnvironment is Test {
         require(msg.sender == atlas && userCall.from == user, "ERR-CE00 InvalidSenderUser");
         require(address(this).balance >= userCall.value, "ERR-CE01 ValueExceedsBalance");
 
-        // Verify the proof to ensure this isn't happening out of sequence. 
-        require(
-            proof.prove(userCall.to, userCall.data),
-            "ERR-P01 ProofInvalid"
-        );
+        // Verify the proof so that the callee knows this isn't happening out of sequence.
+        require(proof.prove(userCall.to, userCall.data), "ERR-P01 ProofInvalid");
 
         bool success;
 
@@ -154,7 +148,7 @@ contract ExecutionEnvironment is Test {
             uint256 balance = address(this).balance;
             if (balance > 0) {
                 SafeTransferLib.safeTransferETH(
-                    msg.sender, 
+                    payable(user), 
                     balance
                 );
             }
@@ -176,24 +170,22 @@ contract ExecutionEnvironment is Test {
             userReturnData
         );
 
-        // Verify the proof to ensure this isn't happening out of sequence.
-        require(
-            proof.prove(_control(), data),
-            "ERR-P01 ProofInvalid"
-        );
+        // Verify the proof so that the callee knows this isn't happening out of sequence.
+        require(proof.prove(_control(), data), "ERR-P01 ProofInvalid");
+
         if (_config().needsDelegateVerification()) {
             (bool success, bytes memory returnData) = _control().delegatecall(
                 data
             );
             require(success, "ERR-EC02 DelegateRevert");
-            require(abi.decode(returnData, (bool)), "ERR-EC03 DelegateUnsuccessful");
+            require(abi.decode(returnData, (bool)), "ERR-EC03a DelegateUnsuccessful");
         
         } else {
             (bool success, bytes memory returnData) = _control().staticcall(
                 data
             );
             require(success, "ERR-EC03 StaticRevert");
-            require(abi.decode(returnData, (bool)), "ERR-EC03 DelegateUnsuccessful");
+            require(abi.decode(returnData, (bool)), "ERR-EC03b DelegateUnsuccessful");
         }
     }
 

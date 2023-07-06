@@ -5,91 +5,91 @@ import "../types/LockTypes.sol";
 
 library SafetyBits {
 
-    uint64 constant internal _EXECUTION_PHASE_OFFSET = uint64(type(BaseLock).max);
-    uint64 constant internal _SAFETY_LEVEL_OFFSET = uint64(type(BaseLock).max) + uint64(type(ExecutionPhase).max);
+    uint16 constant internal _EXECUTION_PHASE_OFFSET = uint16(type(BaseLock).max);
+    uint16 constant internal _SAFETY_LEVEL_OFFSET = uint16(type(BaseLock).max) + uint16(type(ExecutionPhase).max);
 
-    uint64 constant internal _LOCKED_X_SEARCHERS_X_REQUESTED = uint64(
-        1 << uint64(BaseLock.Locked) |
-        1 << (_EXECUTION_PHASE_OFFSET + uint64(ExecutionPhase.SearcherCalls)) |
-        1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Requested))
+    uint16 constant internal _LOCKED_X_SEARCHERS_X_REQUESTED = uint16(
+        1 << uint16(BaseLock.Locked) |
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SearcherCalls)) |
+        1 << (_SAFETY_LEVEL_OFFSET + uint16(SearcherSafety.Requested))
     );
 
-    uint64 constant internal _LOCKED_X_SEARCHERS_X_VERIFIED = uint64(
-        1 << uint64(BaseLock.Locked) |
-        1 << (_EXECUTION_PHASE_OFFSET + uint64(ExecutionPhase.SearcherCalls)) |
-        1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Verified))
+    uint16 constant internal _LOCKED_X_SEARCHERS_X_VERIFIED = uint16(
+        1 << uint16(BaseLock.Locked) |
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SearcherCalls)) |
+        1 << (_SAFETY_LEVEL_OFFSET + uint16(SearcherSafety.Verified))
     );
 
-    uint64 constant internal _ACTIVE_X_STAGING_X_UNSET = uint64(
-        1 << uint64(BaseLock.Active) |
-        1 << (_EXECUTION_PHASE_OFFSET + uint64(ExecutionPhase.Staging)) |
-        1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Unset))
+    uint16 constant internal _ACTIVE_X_STAGING_X_UNSET = uint16(
+        1 << uint16(BaseLock.Active) |
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Staging)) |
+        1 << (_SAFETY_LEVEL_OFFSET + uint16(SearcherSafety.Unset))
     );
 
-    uint64 constant internal _PENDING_X_RELEASING_X_UNSET = uint64(
-        1 << uint64(BaseLock.Pending) |
-        1 << (_EXECUTION_PHASE_OFFSET + uint64(ExecutionPhase.Releasing)) |
-        1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Unset))
+    uint16 constant internal _PENDING_X_RELEASING_X_UNSET = uint16(
+        1 << uint16(BaseLock.Pending) |
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Releasing)) |
+        1 << (_SAFETY_LEVEL_OFFSET + uint16(SearcherSafety.Unset))
     );
 
-    uint64 constant internal _LOCKED_X_STAGING_X_UNSET = uint64(
-        1 << uint64(BaseLock.Locked) |
-        1 << (_EXECUTION_PHASE_OFFSET + uint64(ExecutionPhase.Staging)) |
-        1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Unset))
+    uint16 constant internal _LOCKED_X_STAGING_X_UNSET = uint16(
+        1 << uint16(BaseLock.Locked) |
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Staging)) |
+        1 << (_SAFETY_LEVEL_OFFSET + uint16(SearcherSafety.Unset))
     );
 
-    uint64 constant internal _ACTIVE_X_USER_X_UNSET = uint64(
-        1 << uint64(BaseLock.Active) |
-        1 << (_EXECUTION_PHASE_OFFSET + uint64(ExecutionPhase.UserCall)) |
-        1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Unset))
+    uint16 constant internal _ACTIVE_X_USER_X_UNSET = uint16(
+        1 << uint16(BaseLock.Active) |
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserCall)) |
+        1 << (_SAFETY_LEVEL_OFFSET + uint16(SearcherSafety.Unset))
     );
 
-    uint64 constant internal _LOCKED_X_USER_X_UNSET = uint64(
-        1 << uint64(BaseLock.Locked) |
-        1 << (_EXECUTION_PHASE_OFFSET + uint64(ExecutionPhase.UserCall)) |
-        1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Unset))
+    uint16 constant internal _LOCKED_X_USER_X_UNSET = uint16(
+        1 << uint16(BaseLock.Locked) |
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserCall)) |
+        1 << (_SAFETY_LEVEL_OFFSET + uint16(SearcherSafety.Unset))
     );
 
-    uint64 constant internal _PENDING_X_SEARCHER_X_UNSET = uint64(
-        1 << uint64(BaseLock.Pending) |
-        1 << (_EXECUTION_PHASE_OFFSET + uint64(ExecutionPhase.SearcherCalls)) |
-        1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Unset))
+    uint16 constant internal _PENDING_X_SEARCHER_X_UNSET = uint16(
+        1 << uint16(BaseLock.Pending) |
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SearcherCalls)) |
+        1 << (_SAFETY_LEVEL_OFFSET + uint16(SearcherSafety.Unset))
     );
 
-    uint64 constant internal _ACTIVE_X_SEARCHER_X_UNSET = uint64(
-        1 << uint64(BaseLock.Pending) |
-        1 << (_EXECUTION_PHASE_OFFSET + uint64(ExecutionPhase.SearcherCalls)) |
-        1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Unset))
+    uint16 constant internal _ACTIVE_X_SEARCHER_X_UNSET = uint16(
+        1 << uint16(BaseLock.Pending) |
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SearcherCalls)) |
+        1 << (_SAFETY_LEVEL_OFFSET + uint16(SearcherSafety.Unset))
     );
 
-    uint64 constant internal _START_PAYMENTS = uint64(
-        1 << uint64(BaseLock.Pending) |
-        1 << (_EXECUTION_PHASE_OFFSET + uint64(ExecutionPhase.HandlingPayments)) |
-        1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Unset))
+    uint16 constant internal _START_PAYMENTS = uint16(
+        1 << uint16(BaseLock.Pending) |
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.HandlingPayments)) |
+        1 << (_SAFETY_LEVEL_OFFSET + uint16(SearcherSafety.Unset))
     );
 
-    uint64 constant internal _LOCK_PAYMENTS = uint64(
-        1 << uint64(BaseLock.Locked) |
-        1 << (_EXECUTION_PHASE_OFFSET + uint64(ExecutionPhase.HandlingPayments)) |
-        1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Unset))
+    uint16 constant internal _LOCK_PAYMENTS = uint16(
+        1 << uint16(BaseLock.Locked) |
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.HandlingPayments)) |
+        1 << (_SAFETY_LEVEL_OFFSET + uint16(SearcherSafety.Unset))
     );
 
-    uint64 constant internal _ACTIVE_X_REFUND_X_UNSET = uint64(
-        1 << uint64(BaseLock.Pending) |
-        1 << (_EXECUTION_PHASE_OFFSET + uint64(ExecutionPhase.UserRefund)) |
-        1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Unset))
+    uint16 constant internal _ACTIVE_X_REFUND_X_UNSET = uint16(
+        1 << uint16(BaseLock.Pending) |
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserRefund)) |
+        1 << (_SAFETY_LEVEL_OFFSET + uint16(SearcherSafety.Unset))
     );
 
-    uint64 constant internal _ACTIVE_X_VERIFICATION_X_UNSET = uint64(
-        1 << uint64(BaseLock.Pending) |
-        1 << (_EXECUTION_PHASE_OFFSET + uint64(ExecutionPhase.Verification)) |
-        1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Unset))
+    uint16 constant internal _ACTIVE_X_VERIFICATION_X_UNSET = uint16(
+        1 << uint16(BaseLock.Pending) |
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Verification)) |
+        1 << (_SAFETY_LEVEL_OFFSET + uint16(SearcherSafety.Unset))
     );
 
-    uint64 constant internal _LOCKED_X_VERIFICATION_X_UNSET = uint64(
-        1 << uint64(BaseLock.Locked) |
-        1 << (_EXECUTION_PHASE_OFFSET + uint64(ExecutionPhase.Verification)) |
-        1 << (_SAFETY_LEVEL_OFFSET + uint64(SearcherSafety.Unset))
+    uint16 constant internal _LOCKED_X_VERIFICATION_X_UNSET = uint16(
+        1 << uint16(BaseLock.Locked) |
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Verification)) |
+        1 << (_SAFETY_LEVEL_OFFSET + uint16(SearcherSafety.Unset))
     );
 
     function turnVerificationLock(

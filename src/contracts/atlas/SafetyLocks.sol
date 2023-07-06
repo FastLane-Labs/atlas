@@ -54,7 +54,8 @@ contract SafetyLocks {
             escrowKey.paymentsComplete == false &&
             escrowKey.callIndex == uint8(0) &&
             escrowKey.callMax == uint8(0) &&
-            escrowKey.lockState == uint64(0),
+            escrowKey.lockState == uint16(0) &&
+            escrowKey.gasRefund == uint32(0),
             "ERR-SL003 AlreadyInitialized"
         );
 
@@ -73,7 +74,9 @@ contract SafetyLocks {
     }
 
     modifier stagingLock(ProtocolCall calldata protocolCall, address environment) {
-        // msg.sender = ExecutionEnvironment
+        // msg.sender = user EOA
+        // address(this) = atlas
+
         EscrowKey memory escrowKey = _escrowKey;
 
         // Safety contract needs to init all of the execution environment's
@@ -90,7 +93,9 @@ contract SafetyLocks {
     }
 
     modifier userLock(ProtocolCall calldata protocolCall, address environment) {
-        // msg.sender is ExecutionEnvironment
+        // msg.sender = user EOA
+        // address(this) = atlas
+
         EscrowKey memory escrowKey = _escrowKey;
 
         require(escrowKey.isValidUserLock(environment), "ERR-SL032 InvalidLockStage");
@@ -101,29 +106,40 @@ contract SafetyLocks {
         _escrowKey = escrowKey.turnUserLock(environment);
     }
 
-    modifier searcherLock(address searcherTo, address environment) {
-        // msg.sender is the ExecutionEnvironment
+    function _openSearcherLock(address searcherTo, address environment) internal {
+        // msg.sender = user EOA
+        // address(this) = atlas
+
         EscrowKey memory escrowKey = _escrowKey;
 
         require(escrowKey.isValidSearcherLock(environment), "ERR-SL033 InvalidLockStage");
 
         _escrowKey = escrowKey.holdSearcherLock(searcherTo);
+    }
 
-        _;
+    function _closeSearcherLock(address searcherTo, address environment, uint256 gasRebate) internal {
+        // msg.sender = user EOA
+        // address(this) = atlas
 
         // NOTE: The searcher call will revert if the searcher does not activate the 
         // searcherSafetyCallback *within* the searcher try/catch wrapper.
-        escrowKey = _escrowKey;
+        EscrowKey memory escrowKey = _escrowKey;
 
         // CASE: Searcher call successful
         if (escrowKey.confirmSearcherLock(environment)) {
             require(!escrowKey.makingPayments, "ERR-SL034 ImproperAccess");
             require(!escrowKey.paymentsComplete, "ERR-SL035 AlreadyPaid");
+            if (gasRebate != 0) {
+                escrowKey.gasRefund += uint32(gasRebate);
+            }
             _escrowKey = escrowKey.turnSearcherLockPayments(environment);
         
         // CASE: Searcher call unsuccessful && lock unaltered
-        } else if (escrowKey.isRevertedSearcherLock(searcherTo)) {
-            
+        } else if (escrowKey.isRevertedSearcherLock(searcherTo)) { // TODO: rename this to not be so onerous
+            if (gasRebate != 0) {
+                escrowKey.gasRefund += uint32(gasRebate);
+            }
+
             // NESTED CASE: Searcher is last searcher
             if (escrowKey.callIndex == escrowKey.callMax - 2) {
                 _escrowKey = escrowKey.turnSearcherLockRefund(environment);
@@ -141,7 +157,9 @@ contract SafetyLocks {
 
 
     modifier paymentsLock(address environment) {
-        // msg.sender is still the ExecutionEnvironment
+        // msg.sender = user EOA
+        // address(this) = atlas
+
         EscrowKey memory escrowKey = _escrowKey;
 
         require(escrowKey.isValidPaymentsLock(environment), "ERR-SL037 InvalidLockStage");
@@ -159,7 +177,9 @@ contract SafetyLocks {
     }
 
     modifier refundLock(address environment) {
-        // msg.sender = ExecutionEnvironment
+        // msg.sender = user EOA
+        // address(this) = atlas
+
         EscrowKey memory escrowKey = _escrowKey;
 
         require(escrowKey.isValidRefundLock(environment), "ERR-SL038 InvalidLockStage");
@@ -169,7 +189,9 @@ contract SafetyLocks {
     }
 
     modifier verificationLock(uint16 callConfig, address environment) {
-        // msg.sender = ExecutionEnvironment
+        // msg.sender = user EOA
+        // address(this) = atlas
+        
         EscrowKey memory escrowKey = _escrowKey;
 
         require(escrowKey.isValidVerificationLock(environment), "ERR-SL039 InvalidLockStage");

@@ -72,7 +72,7 @@ contract Atlas is Test, Factory {
         // Release the lock
         _releaseEscrowLocks();
 
-        console.log("remaining call gas cost",gasMarker - gasleft());
+        console.log("ex contract creation gas cost",gasMarker - gasleft());
     }
 
 

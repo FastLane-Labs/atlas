@@ -19,7 +19,9 @@ import { EscrowBits } from "../libraries/EscrowBits.sol";
 import { CallChainProof } from "../libraries/CallVerification.sol"; 
 import { ProtocolVerifier } from "./ProtocolVerification.sol";
 
-contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
+import "forge-std/Test.sol";
+
+contract Escrow is Test, ProtocolVerifier, SafetyLocks, SearcherWrapper {
     using ECDSA for bytes32;
 
     uint32 immutable public escrowDuration;
@@ -31,8 +33,6 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
 
     // track searcher tx hashes to avoid replays... imperfect solution tho
     mapping(bytes32 => bool) private _hashes;
-
-    uint256 internal _gasRebate;
 
     constructor(
         uint32 escrowDurationFromFactory //,
@@ -54,7 +54,8 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
             escrowKey.paymentsComplete == false &&
             escrowKey.callIndex == uint8(0) &&
             escrowKey.callMax == uint8(0) &&
-            escrowKey.lockState == uint64(0),
+            escrowKey.lockState == uint16(0) &&
+            escrowKey.gasRefund == uint32(0),
             "ERR-E001 AlreadyInitialized"
         );
         
@@ -102,10 +103,14 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         CallChainProof memory proof,
         bool auctionAlreadyComplete,
         address environment
-    ) internal searcherLock(searcherCall.metaTx.to, environment) returns (bool) {
+    ) internal returns (bool) {
         
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
+        uint256 gasRebate;
+
+        // Open the searcher lock
+        _openSearcherLock(searcherCall.metaTx.to, environment);
 
         // Verify the transaction. 
         (uint256 result, uint256 gasLimit, SearcherEscrow memory searcherEscrow) = _verify(
@@ -135,11 +140,6 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
             }
         }
 
-        // Update the searcher's escrow balances
-        if (EscrowBits.updateEscrow(result)) {
-            _update(searcherCall.metaTx, searcherEscrow, gasWaterMark, result);
-        }
-
         // emit event
         if (EscrowBits.emitEvent(searcherEscrow)) {
             emit SearcherTxResult(
@@ -151,6 +151,15 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
                 result
             );
         }
+
+        // Update the searcher's escrow balances
+        if (EscrowBits.updateEscrow(result)) {
+            gasRebate = _update(searcherCall.metaTx, searcherEscrow, gasWaterMark, result);
+        }
+
+        // Close the searcher lock
+        _closeSearcherLock(searcherCall.metaTx.to, environment, gasRebate);
+
         return auctionAlreadyComplete;
     }
 
@@ -165,6 +174,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         PayeeData[] calldata payeeData,
         address environment
     ) internal paymentsLock(environment) {
+        uint256 gasWatermark = gasleft();
         // process protocol payments
          try IExecutionEnvironment(environment).allocateRewards(
             winningBids, payeeData
@@ -176,6 +186,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
                 payeeData
             );
         }
+        console.log("allocate payments gas cost", gasWatermark-gasleft());
     } 
 
     function _executeVerificationCall(
@@ -185,9 +196,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         bytes memory userReturnData,
         address environment
     ) internal verificationLock(protocolCall.callConfig, environment) {
-        // process protocol payments
         IExecutionEnvironment(environment).verificationWrapper(proof, stagingReturnData, userReturnData);
-        // TODO: who should pay gas cost of payments?
     } 
 
     /*
@@ -205,20 +214,22 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         address environment
     ) internal refundLock(environment) {
         
-        uint256 gasRebate = _gasRebate;
+        uint256 gasRebate = uint256(_escrowKey.gasRefund) * tx.gasprice;
 
+        /*
         emit UserTxResult(
             userCallFrom,
             0,
             gasRebate
         );
+        */
 
         SafeTransferLib.safeTransferETH(
             userCallFrom, 
             gasRebate
         );
 
-        delete _gasRebate;
+        console.log("user gas refund", uint256(_escrowKey.gasRefund));
     }
 
     function _update(
@@ -226,69 +237,46 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         SearcherEscrow memory searcherEscrow,
         uint256 gasWaterMark,
         uint256 result
-    )  internal {
-
-        uint256 gasRebate;
-        uint256 txValue;
-        uint256 gasUsed = gasWaterMark-gasleft();
-
-        // TODO: clean up code / make it readable
-        if (result & EscrowBits._FULL_REFUND != 0) {
-            gasRebate = (
-                100 + EscrowBits.SEARCHER_GAS_BUFFER
-            ) * (
-                // TODO: simplify/fix formula for calldata - verify. 
-                (tx.gasprice * gasUsed) +
-                (tx.gasprice * (metaTx.data.length * 16))
-            ) / 100;
-
-            txValue = metaTx.value;
-
-        // TODO: figure out what is fair for this (or if it just doesnt happen?)
-        } else if (result & EscrowBits._EXTERNAL_REFUND != 0) {
-            // TODO: simplify/fix formula for calldata - verify. 
-            gasRebate = (
-                (tx.gasprice * gasUsed) +
-                (tx.gasprice * (metaTx.data.length * 16))
-            );
-            txValue = metaTx.value;
-        
-        } else if (result & EscrowBits._CALLDATA_REFUND != 0) {
-            gasRebate = (
-                100 + EscrowBits.SEARCHER_GAS_BUFFER
-            ) * (
-                // TODO: simplify/fix formula for calldata - verify. 
-                (tx.gasprice * (metaTx.data.length * 16))
-            ) / 100;
-
-            txValue = metaTx.value;
-
-        } else if (result & EscrowBits._NO_USER_REFUND != 0) {
-            // pass
-            
-        } else {
-            revert("ERR-SE72 UncoveredResult");
-        }
-
-        // handle overspending from txValue
-        if (gasRebate + txValue > searcherEscrow.total - searcherEscrow.escrowed) {
-            uint256 escrowDelta = (gasRebate + txValue) - (searcherEscrow.total - searcherEscrow.escrowed);
-            searcherEscrow.total -= uint128(searcherEscrow.total > escrowDelta ? escrowDelta : searcherEscrow.total);
-            searcherEscrow.escrowed -= uint128(searcherEscrow.escrowed > escrowDelta ? escrowDelta : searcherEscrow.escrowed);
-        }
-
-        // make sure we don't underflow 
-        gasRebate = gasRebate > searcherEscrow.total - txValue ? 
-            searcherEscrow.total : 
-            gasRebate ;
+    )  internal returns (uint256 gasRebate) {
 
         unchecked {
-            _gasRebate += gasRebate;
-            searcherEscrow.total -= uint128(gasRebate); 
-        }
+            uint256 gasUsed = gasWaterMark-gasleft();
 
-        // save the escrow data back into storage
-        _escrowData[metaTx.from] = searcherEscrow;
+            if (result & EscrowBits._FULL_REFUND != 0) {
+                gasRebate = gasUsed + (metaTx.data.length * 16);
+
+            // TODO: figure out what is fair for this (or if it just doesnt happen?)
+            } else if (result & EscrowBits._EXTERNAL_REFUND != 0) {
+                // TODO: simplify/fix formula for calldata - verify. 
+                gasRebate = gasUsed + (metaTx.data.length * 16);
+            
+            } else if (result & EscrowBits._CALLDATA_REFUND != 0) {
+                gasRebate = (metaTx.data.length * 16);
+
+            } else if (result & EscrowBits._NO_USER_REFUND != 0) {
+                // pass
+                
+            } else {
+                revert("ERR-SE72 UncoveredResult");
+            }
+
+            if (gasRebate != 0) {
+                // Calculate what the searcher owes
+                gasRebate *= tx.gasprice;
+                
+                gasRebate = gasRebate > searcherEscrow.total ? 
+                    searcherEscrow.total : 
+                    gasRebate ;
+
+                searcherEscrow.total -= uint128(gasRebate);
+
+                // NOTE: This will cause an error if you are simulating with a gasPrice of 0
+                gasRebate /= tx.gasprice;
+
+                // save the escrow data back into storage
+                _escrowData[metaTx.from] = searcherEscrow;
+            }
+        }
     }
 
     function _verify(
