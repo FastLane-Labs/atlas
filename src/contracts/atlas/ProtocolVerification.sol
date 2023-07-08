@@ -9,7 +9,7 @@ import {CallBits} from "../libraries/CallBits.sol";
 import "../types/CallTypes.sol";
 import "../types/GovernanceTypes.sol";
 
-import {Verification} from "../types/VerificationTypes.sol";
+import {Verification, ProtocolProof} from "../types/VerificationTypes.sol";
 
 import {ProtocolIntegration} from "./ProtocolIntegration.sol";
 
@@ -23,7 +23,7 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
     using CallBits for uint16;
 
     bytes32 public constant PROTOCOL_TYPE_HASH = keccak256(
-        "ProtocolProof(address from,address to,uint256 nonce,uint256 deadline,bytes32 protocolDataHash,bytes32 callChainHash)"
+        "ProtocolProof(address from,address to,uint256 nonce,uint256 deadline,bytes32 payeeHash,bytes32 userCallHash,bytes32 callChainHash)"
     );
 
     constructor() EIP712("ProtoCallHandler", "0.0.1") {}
@@ -110,25 +110,29 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
         return (true);
     }
 
-    // TODO: make a more thorough version of this
-    function _verifySignature(Verification calldata verification) internal view returns (bool) {
-        /* COMMENTED OUT FOR TESTING
-        address signer = _hashTypedDataV4(
-            keccak256(
-                abi.encode(
-                    PROTOCOL_TYPE_HASH, 
-                    verification.proof.from, 
-                    verification.proof.to, 
-                    verification.proof.nonce,
-                    verification.proof.deadline,
-                    verification.proof.userCallHash,
-                    verification.proof.callChainHash
-                )
+    function _getProofHash(ProtocolProof memory proof) internal pure returns (bytes32 proofHash) {
+        proofHash = keccak256(
+            abi.encode(
+                PROTOCOL_TYPE_HASH,
+                proof.from,
+                proof.to,
+                proof.nonce,
+                proof.deadline,
+                proof.payeeHash,
+                proof.userCallHash,
+                proof.callChainHash
             )
-        ).recover(verification.signature);
-        
+        );
+    }
+
+    function _verifySignature(Verification calldata verification) internal view returns (bool) {
+        address signer = _hashTypedDataV4(_getProofHash(verification.proof)).recover(verification.signature);
+
         return signer == verification.proof.from;
-        */
-        return true;
+        // return true;
+    }
+
+    function getVerificationPayload(Verification memory verification) public view returns (bytes32 payload) {
+        payload = _hashTypedDataV4(_getProofHash(verification.proof));
     }
 }

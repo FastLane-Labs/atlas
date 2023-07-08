@@ -21,14 +21,14 @@ contract BaseTest is Test, TestConstants {
 
     address public payee = makeAddr("FastLanePayee");
 
-    address public governanceEOA = makeAddr("ProtocolGovernanceEOA");
-    uint256 public governancePK = 1111;
+    uint256 public governancePK = 11111;
+    address public governanceEOA = vm.addr(governancePK);
 
-    address public searcherOneEOA = makeAddr("SearcherEOA1");
-    uint256 public searcherOnePK = 2222;
+    uint256 public searcherOnePK = 22222;
+    address public searcherOneEOA = vm.addr(searcherOnePK);
 
-    address public searcherTwoEOA = makeAddr("SearcherEOA2");
-    uint256 public searcherTwoPK = 3333;
+    uint256 public searcherTwoPK = 33333;
+    address public searcherTwoEOA = vm.addr(searcherTwoPK);
 
     address public userEOA = makeAddr("UserEOA");
 
@@ -43,13 +43,13 @@ contract BaseTest is Test, TestConstants {
     Helper public helper;
 
     // Fork stuff
-    ChainVars public chain = MAINNET;
+    ChainVars public chain = mainnet;
     uint256 public forkNetwork;
 
     function setUp() public virtual {
-        forkNetwork = vm.createFork(vm.envString(chain.RPC_URL_KEY));
+        forkNetwork = vm.createFork(vm.envString(chain.rpcUrlKey));
         vm.selectFork(forkNetwork);
-        vm.rollFork(forkNetwork, chain.FORK_BLOCK);
+        vm.rollFork(forkNetwork, chain.forkBlock);
 
         // Deal to user
         deal(TOKEN_ZERO, address(userEOA), 10e30);

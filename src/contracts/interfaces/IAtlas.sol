@@ -32,4 +32,8 @@ interface IAtlas {
     ) external returns (bool);
 
     function userDirectReleaseLock(address userCallFrom, bytes32 key, ProtocolCall calldata protocolCall) external;
+
+    function getVerificationPayload(Verification memory verification) external view returns (bytes32 payload);
+
+    function getSearcherPayload(SearcherMetaTx calldata metaTx) external view returns (bytes32 payload);
 }

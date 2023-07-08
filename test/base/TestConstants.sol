@@ -9,12 +9,12 @@ contract TestConstants {
     uint256 public constant BLOCK_START = 17441786;
 
     // MAINNET
-    ChainVars public MAINNET = ChainVars({RPC_URL_KEY: "MAINNET_RPC_URL", FORK_BLOCK: BLOCK_START});
+    ChainVars public mainnet = ChainVars({rpcUrlKey: "MAINNET_RPC_URL", forkBlock: BLOCK_START});
 
     // Structs
     struct ChainVars {
-        string RPC_URL_KEY;
-        uint256 FORK_BLOCK;
+        string rpcUrlKey;
+        uint256 forkBlock;
     }
 
     // Constants

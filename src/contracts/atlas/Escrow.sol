@@ -260,16 +260,13 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         );
     }
 
-    // TODO: make a more thorough version of this
+    function getSearcherPayload(SearcherMetaTx calldata metaTx) public view returns (bytes32 payload) {
+        payload = _hashTypedDataV4(_getSearcherHash(metaTx));
+    }
+
     function _verifySignature(SearcherMetaTx calldata metaTx, bytes calldata signature) internal view returns (bool) {
-        /* COMMENTED OUT FOR TESTING
-        address signer = _hashTypedDataV4(
-            _getSearcherHash(metaTx)
-        ).recover(signature);
-        
+        address signer = _hashTypedDataV4(_getSearcherHash(metaTx)).recover(signature);
         return signer == metaTx.from;
-        */
-        return true;
     }
 
     function _verifyBids(bytes32 bidsHash, BidData[] calldata bids) internal pure returns (bool validBid) {

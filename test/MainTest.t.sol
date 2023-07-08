@@ -21,6 +21,7 @@ import "../src/contracts/types/VerificationTypes.sol";
 
 import {BaseTest} from "./base/BaseTest.t.sol";
 import {Helper} from "./Helpers.sol";
+import {VerificationSigner} from "./VerificationSigner.sol";
 
 import "forge-std/Test.sol";
 
@@ -44,13 +45,31 @@ contract MainTest is BaseTest {
 
         SearcherCall[] memory searcherCalls = new SearcherCall[](2);
 
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+
+        // First SearcherCall
         searcherCalls[0] =
             helper.buildSearcherCall(userCall, searcherOneEOA, address(searcherOne), POOL_ONE, POOL_TWO, 2e17);
+
+        (v, r, s) = vm.sign(searcherOnePK, IAtlas(address(atlas)).getSearcherPayload(searcherCalls[0].metaTx));
+        searcherCalls[0].signature = abi.encodePacked(r, s, v);
+
+        // Second SearcherCall
         searcherCalls[1] =
             helper.buildSearcherCall(userCall, searcherTwoEOA, address(searcherTwo), POOL_TWO, POOL_ONE, 1e17);
 
+        (v, r, s) = vm.sign(searcherTwoPK, IAtlas(address(atlas)).getSearcherPayload(searcherCalls[1].metaTx));
+        searcherCalls[1].signature = abi.encodePacked(r, s, v);
+
+        // Verification call
         Verification memory verification =
             helper.buildVerification(governanceEOA, protocolCall, userCall, payeeData, searcherCalls);
+
+        (v, r, s) = vm.sign(governancePK, IAtlas(address(atlas)).getVerificationPayload(verification));
+
+        verification.signature = abi.encodePacked(r, s, v);
 
         vm.startPrank(userEOA);
 
