@@ -58,8 +58,6 @@ library EscrowBits {
             | 1 << uint256(SearcherOutcome.InvalidFormat)
     );
 
-    uint256 internal constant _EXTERNAL_REFUND = (1 << uint256(SearcherOutcome.LostAuction));
-
     function canExecute(uint256 result) internal pure returns (bool) {
         return ((result >> 1) == 0);
     }

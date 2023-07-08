@@ -199,11 +199,6 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
 
             if (result & EscrowBits._FULL_REFUND != 0) {
                 gasRebate = gasUsed + (metaTx.data.length * 16);
-
-                // TODO: figure out what is fair for this (or if it just doesnt happen?)
-            } else if (result & EscrowBits._EXTERNAL_REFUND != 0) {
-                // TODO: simplify/fix formula for calldata - verify.
-                gasRebate = gasUsed + (metaTx.data.length * 16);
             } else if (result & EscrowBits._CALLDATA_REFUND != 0) {
                 gasRebate = (metaTx.data.length * 16);
             } else if (result & EscrowBits._NO_USER_REFUND != 0) {
