@@ -21,7 +21,7 @@ interface IAtlas {
     function getEscrowAddress() external view returns (address escrowAddress);
 
     function getExecutionEnvironment(
-        address user,
+        UserCall calldata userCall,
         address protocolControl
     ) external view returns (
         address executionEnvironment

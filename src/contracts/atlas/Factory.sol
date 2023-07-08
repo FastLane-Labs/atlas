@@ -39,6 +39,7 @@ contract Factory is Test, Escrow {
     }
 
     // USER TOKEN WITHDRAWAL FUNCS
+    /*
     function withdrawERC20(address token, uint256 amount, ProtocolCall memory protocolCall) external {
        
         if (protocolCall.callConfig == uint16(0)) {
@@ -59,35 +60,39 @@ contract Factory is Test, Escrow {
             _getExecutionEnvironmentCustom(msg.sender, protocolCall)
         ).factoryWithdrawEther(msg.sender, amount);
     }
+    */
 
     // GETTERS
-    function getExecutionEnvironment(
-        address user,
-        address protocolControl
-    ) external view returns (
-        address executionEnvironment
-    ) {
-        executionEnvironment = _getExecutionEnvironment(user, protocolControl);
-    }
-
     function getEscrowAddress() external view returns (address escrowAddress) {
         escrowAddress = atlas;
     }
 
+    function getExecutionEnvironment(
+        UserCall calldata userCall,
+        address protocolControl
+    ) external view returns (
+        address executionEnvironment
+    ) {
+        bytes32 userCallHash = keccak256(abi.encodePacked(userCall.to, userCall.data));
+        executionEnvironment = _getExecutionEnvironment(userCall.from, userCallHash, protocolControl);
+    }
+
     function _getExecutionEnvironment(
         address user,
+        bytes32 userCallHash,
         address protocolControl
     ) internal view returns (
         address executionEnvironment
     ) { 
         ProtocolCall memory protocolCall = IProtocolControl(protocolControl).getProtocolCall();
-        return _getExecutionEnvironmentCustom(user, protocolCall);
+        return _getExecutionEnvironmentCustom(user, userCallHash, protocolCall);
     }
 
     // NOTE: This func is used to generate the address of user ExecutionEnvironments that have 
     // been deprecated due to ProtocolControl changes of callConfig. 
     function _getExecutionEnvironmentCustom(
         address user,
+        bytes32 userCallHash,
         ProtocolCall memory protocolCall
     ) internal view returns (
         address environment
@@ -98,18 +103,21 @@ contract Factory is Test, Escrow {
                 address(this),
                 salt,
                 keccak256(abi.encodePacked(
-                    _getMimicCreationCode(execution, user, protocolCall)
+                    _getMimicCreationCode(protocolCall.to, protocolCall.callConfig, execution, user, userCallHash)
                 ))
             )
         ))));
     }
 
     function _deployExecutionEnvironment(
-        address user,
-        ProtocolCall memory protocolCall
+        ProtocolCall calldata protocolCall,
+        bytes32 userCallHash
     ) internal returns (address environment) {
 
-        bytes memory creationCode = _getMimicCreationCode(execution, user, protocolCall);
+        bytes memory creationCode = _getMimicCreationCode(
+            protocolCall.to, protocolCall.callConfig, execution, msg.sender, userCallHash
+        );
+
         bytes32 memSalt = salt;
         assembly {
             environment := create2(0, add(creationCode, 32), mload(creationCode), memSalt)
@@ -128,10 +136,13 @@ contract Factory is Test, Escrow {
         environment = address(_environment);
     }
 
-    function _getMimicCreationCode(address executionLib, address user, ProtocolCall memory protocolCall) internal pure returns (bytes memory creationCode) {
-        address protocolControl = protocolCall.to;
-        uint16 callConfig = protocolCall.callConfig;
-        
+    function _getMimicCreationCode(
+            address protocolControl,
+            uint16 callConfig,
+            address executionLib, 
+            address user, 
+            bytes32 userCallHash
+    ) internal pure returns (bytes memory creationCode) {
         // NOTE: Changing compiler settings or solidity versions can break this.
         creationCode = type(Mimic).creationCode;
         assembly {
@@ -150,9 +161,10 @@ contract Factory is Test, Escrow {
                         shl(88, 0x61), 
                         shl(72, callConfig)
                     ),
-                    0x604051602001610082
+                    0x7f0000000000000000
                 )
             ))
+            mstore(add(creationCode, 176), userCallHash)
         }
     }
 } 

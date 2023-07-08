@@ -62,7 +62,7 @@ contract MainTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        address executionEnvironment = IAtlas(address(atlas)).getExecutionEnvironment(userEOA, address(control));
+        address executionEnvironment = IAtlas(address(atlas)).getExecutionEnvironment(userCall, address(control));
         vm.label(address(executionEnvironment), "ENVIRONMENT");
 
         console.log("userEOA",userEOA);
@@ -94,6 +94,7 @@ contract MainTest is BaseTest {
         address bbbbb = msg.sender;
         address ccccc = address(this);
         uint16 ddddd = uint16(0x1111);
+        bytes32 eeeee = keccak256(abi.encodePacked(uint256(0x2222)));
         // Mimic mimic = new Mimic();
         //console.log("----");
         //console.log("runtime code:");
@@ -101,6 +102,7 @@ contract MainTest is BaseTest {
         console.log("aaaaa", aaaaa);
         console.log("bbbbb", bbbbb);
         console.log("ccccc", ccccc);
+        console.logBytes32(eeeee);
         console.log("----");
         console.log("creation code:");
         console.logBytes(type(Mimic).creationCode);
@@ -124,9 +126,10 @@ contract MainTest is BaseTest {
                         shl(88, 0x61), 
                         shl(72, ddddd)
                     ),
-                    0x604051602001610082
+                    0x7f0000000000000000
                 )
             ))
+            mstore(add(creationCode, 176), eeeee)
         }
         
         console.log("assembly modified code:");

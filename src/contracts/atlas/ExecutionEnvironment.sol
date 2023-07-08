@@ -13,7 +13,7 @@ import { CallChainProof } from "../types/VerificationTypes.sol";
 import { CallVerification } from "../libraries/CallVerification.sol";
 import { CallBits } from "../libraries/CallBits.sol";
 
-// import "forge-std/Test.sol";
+import "forge-std/Test.sol";
 
 import {
     ALTERED_USER_HASH,
@@ -23,7 +23,7 @@ import {
     SEARCHER_BID_UNPAID
  } from "./Emissions.sol";
 
-contract ExecutionEnvironment {
+contract ExecutionEnvironment is Test {
     using CallVerification for CallChainProof;
     using CallBits for uint16;
 
@@ -34,21 +34,27 @@ contract ExecutionEnvironment {
     }
 
     // MIMIC INTERACTION FUNCTIONS
+    function _userCallHash() internal pure returns (bytes32 userCallHash) {
+        assembly {
+            userCallHash := calldataload(sub(calldatasize(), 32))
+        }
+    }
+
     function _config() internal pure returns (uint16 config) {
         assembly {
-            config := shr(240, calldataload(sub(calldatasize(), 2)))
+            config := shr(240, calldataload(sub(calldatasize(), 34)))
         }
     }
 
     function _control() internal pure returns (address control) {
         assembly {
-            control := shr(96, calldataload(sub(calldatasize(), 22)))
+            control := shr(96, calldataload(sub(calldatasize(), 54)))
         }
     }
 
     function _user() internal pure returns (address user) {
         assembly {
-            user := shr(96, calldataload(sub(calldatasize(), 42)))
+            user := shr(96, calldataload(sub(calldatasize(), 74)))
         }
     }
 
@@ -66,8 +72,12 @@ contract ExecutionEnvironment {
         uint16 config = _config();
 
         require(msg.sender == atlas && userCall.from == _user(), "ERR-CE00 InvalidSenderStaging");
+        require(
+            keccak256(abi.encodePacked(userCall.to, userCall.data)) == _userCallHash(), 
+            "ERR-CD01 CalldataInvalid"
+        );
 
-        bytes memory stagingCalldata = abi.encodeWithSelector(
+        stagingData = abi.encodeWithSelector(
             IProtocolControl.stageCall.selector,
             userCall.to, 
             userCall.from,
@@ -76,28 +86,31 @@ contract ExecutionEnvironment {
         );
 
         // Verify the proof so that the callee knows this isn't happening out of sequence.
-        require(proof.prove(control, stagingCalldata), "ERR-P01 ProofInvalid");
+        require(proof.prove(control, stagingData), "ERR-P01 ProofInvalid");
 
         bool success;
 
         if (config.needsDelegateStaging()) {
             (success, stagingData) = control.delegatecall(
-                stagingCalldata
+                stagingData
             );
             require(success, "ERR-EC02 DelegateRevert");
         
         } else {
             (success, stagingData) = control.staticcall(
-                stagingCalldata
+                stagingData
             );
             require(success, "ERR-EC03 StaticRevert");
+        }
+
+        if (!config.needsVerificationCall()) {
+            delete stagingData;
         }
     }
 
     function userWrapper(
-        CallChainProof calldata proof,
         UserCall calldata userCall
-    ) external payable returns (bytes memory userReturnData) {
+    ) external payable returns (bytes memory userData) {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 
@@ -105,17 +118,18 @@ contract ExecutionEnvironment {
         uint16 config = _config();
 
         require(msg.sender == atlas && userCall.from == user, "ERR-CE00 InvalidSenderUser");
+        require(
+            keccak256(abi.encodePacked(userCall.to, userCall.data)) == _userCallHash(), 
+            "ERR-CD02 CalldataInvalid"
+        );
         require(address(this).balance >= userCall.value, "ERR-CE01 ValueExceedsBalance");
-
-        // Verify the proof so that the callee knows this isn't happening out of sequence.
-        require(proof.prove(userCall.to, userCall.data), "ERR-P01 ProofInvalid");
 
         bool success;
 
         // regular user call - executed at regular destination and not performed locally
         if (!config.needsLocalUser()) {
 
-            (success, userReturnData) = userCall.to.call{
+            (success, userData) = userCall.to.call{
                 value: userCall.value
             }(
                 userCall.data
@@ -124,14 +138,13 @@ contract ExecutionEnvironment {
         
         } else {
             if (config.needsDelegateUser()) {
-                (success, userReturnData) = _control().delegatecall(
-                    abi.encodeWithSelector(
-                        IProtocolControl.userLocalCall.selector,
-                        userCall.to, 
-                        userCall.value,
-                        userCall.data
-                    )
+                userData = abi.encodeWithSelector(
+                    IProtocolControl.userLocalCall.selector,
+                    userCall.to, 
+                    userCall.value,
+                    userCall.data
                 );
+                (success, userData) = _control().delegatecall(userData);
                 require(success, "ERR-EC02 DelegateRevert");
             
             } else {
@@ -139,20 +152,13 @@ contract ExecutionEnvironment {
             }
         }
 
-        if (!config.allowsRecycledStorage()) {
-            // NOTE: selfdestruct will continue to work post EIP-6780 when it is triggered
-            // in the same transaction as contract creation, which is what we do here.
-            selfdestruct(payable(user));
-
-        } else {
-            uint256 balance = address(this).balance;
-            if (balance > 0) {
-                SafeTransferLib.safeTransferETH(
-                    payable(user), 
-                    balance
-                );
-            }
+        if (!config.needsVerificationCall()) {
+            delete userData;
         }
+
+        // NOTE: selfdestruct will continue to work post EIP-6780 when it is triggered
+        // in the same transaction as contract creation, which is what we do here.
+        // selfdestruct(payable(user)); // NOTE: Must comment out for forge tests
     }
 
     function verificationWrapper(
@@ -229,10 +235,10 @@ contract ExecutionEnvironment {
         // searcher hash chain as verified below, remember that the protocol submits the  
         // full hash chain, which user verifies. This check therefore allows the searcher
         // not to have to worry about user+protocol collaboration to exploit the searcher. 
-        require(proof.userCallHash == searcherCall.metaTx.userCallHash, ALTERED_USER_HASH);
+        require(searcherCall.metaTx.userCallHash == _userCallHash(), ALTERED_USER_HASH);
 
         // Verify that the searcher's calldata is unaltered and being executed in the correct order
-        proof.prove(searcherCall.metaTx.from, searcherCall.metaTx.data);
+        proof.proveCD(searcherCall.metaTx.from, searcherCall.metaTx.data);
 
         // Execute the searcher call. 
         (bool success,) = ISearcherContract(searcherCall.metaTx.to).metaFlashCall{

@@ -9,27 +9,61 @@ import "../types/VerificationTypes.sol";
 library CallVerification {
    
     function initializeProof(
-        UserCall calldata userCall,
-        bytes32 executionHashChainZeroIndex
+        ProtocolCall calldata protocolCall,
+        UserCall calldata userCall
     ) internal pure returns (CallChainProof memory) {
-        bytes32 userCallHash = keccak256(abi.encodePacked(userCall.to, userCall.data));
         return CallChainProof({
             previousHash: bytes32(0),
-            targetHash: executionHashChainZeroIndex,
-            userCallHash: userCallHash,
+            targetHash: keccak256(
+                abi.encodePacked(
+                    bytes32(0), // initial hash = null
+                    protocolCall.to,
+                    abi.encodeWithSelector(
+                        IProtocolControl.stageCall.selector,
+                        userCall.to, 
+                        userCall.from, 
+                        bytes4(userCall.data), 
+                        userCall.data[4:]
+                    ),
+                    uint256(0)
+                )
+            ),
             index: 0
         });
     }
 
     function next(
         CallChainProof memory self, 
-        bytes32 nextHash
+        address from,
+        bytes calldata data
     ) internal pure returns (CallChainProof memory) 
     {
         self.previousHash = self.targetHash;
-        self.targetHash = nextHash;
-        unchecked { ++self.index; }
+        self.targetHash = keccak256(
+            abi.encodePacked(
+                self.previousHash,
+                from,
+                data,
+                ++self.index
+            )
+        );
         return self;
+    }
+
+    function proveCD(
+        CallChainProof calldata self, 
+        address from, 
+        bytes calldata data
+    ) internal pure returns (bool) 
+    {
+        return self.targetHash == keccak256(
+            abi.encodePacked(
+                self.previousHash,
+                from,
+                data,
+                self.index
+            )
+        );
     }
 
     function prove(
@@ -86,7 +120,7 @@ library CallVerification {
         // memory array 
         // NOTE: memory arrays are not accessible by delegatecall. This is a key
         // security feature. 
-        executionHashChain = new bytes32[](searcherCalls.length + 3);
+        executionHashChain = new bytes32[](searcherCalls.length + 2);
         uint256 i = 0; // array index
         
         // Start with staging call
@@ -110,7 +144,7 @@ library CallVerification {
         executionHashChain[1] = keccak256(
             abi.encodePacked(
                 executionHashChain[0], // always reference previous hash
-                userCall.to,
+                userCall.from,
                 userCall.data,
                 i
             )
@@ -118,7 +152,7 @@ library CallVerification {
         unchecked { ++i;}
         
         // i = 2 when starting searcher loop
-        for (; i < executionHashChain.length-1;) {
+        for (; i < executionHashChain.length;) {
             executionHashChain[i] = keccak256(
                 abi.encodePacked(
                     executionHashChain[i-1], // reference previous hash

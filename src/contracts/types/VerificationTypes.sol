@@ -9,7 +9,6 @@ struct Verification {
 struct CallChainProof {
     bytes32 previousHash;
     bytes32 targetHash;
-    bytes32 userCallHash;
     uint256 index;
 }
 

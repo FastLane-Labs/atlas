@@ -146,7 +146,7 @@ contract Helper is Test, TestConstants {
             deadline: deadline,
             payeeHash: keccak256(abi.encode(payeeData)),
             userCallHash: keccak256(abi.encodePacked(userCall.to, userCall.data)),
-            callChainHash: executionHashChain[executionHashChain.length-2]
+            callChainHash: executionHashChain[executionHashChain.length-1]
         });
     }
 }

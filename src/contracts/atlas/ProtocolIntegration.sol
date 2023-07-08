@@ -22,10 +22,6 @@ contract ProtocolIntegration {
     //     approver   userCall.to
     mapping(address => ApproverSigningData) public signatories;
     
-    // map for tracking usage of protocol-owned EOAs and signatures 
-    //  keccak256(from, nonce) => keccak256(signature)
-    mapping(bytes32 => bytes32) public signatureTrackingMap;
-
     mapping(bytes32 => bytes32) public protocols;
 
     // Integrates a new protocol

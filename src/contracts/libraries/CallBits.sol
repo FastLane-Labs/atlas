@@ -9,6 +9,20 @@ library CallBits {
 
     uint16 constant internal _ONE = uint16(1);
 
+    /*
+    TODO: Figure out why labeling these constants and referencing the constant uses more gas
+    than computing directly. Implied uint256 conversion?
+    uint16 constant internal _NEEDS_STAGING = _ONE << uint16(CallConfig.CallStaging);
+    uint16 constant internal _NEEDS_DELEGATE_STAGING = _ONE << uint16(CallConfig.DelegateStaging);
+    uint16 constant internal _NEEDS_LOCAL_USER = _ONE << uint16(CallConfig.LocalUser);
+    uint16 constant internal _NEEDS_DELEGATE_USER = _ONE << uint16(CallConfig.DelegateUser);
+    uint16 constant internal _NEEDS_DELEGATE_ALLOCATING = _ONE << uint16(CallConfig.DelegateAllocating);
+    uint16 constant internal _NEEDS_VERIFICATION = _ONE << uint16(CallConfig.CallVerification);
+    uint16 constant internal _NEEDS_DELEGATE_VERIFICATION = _ONE << uint16(CallConfig.DelegateVerification);
+    uint16 constant internal _NEEDS_SEQUENCED_NONCES = _ONE << uint16(CallConfig.Sequenced);
+    uint16 constant internal _ALLOWS_RECYCLED_STORAGE = _ONE << uint16(CallConfig.RecycledStorage);
+    */
+
     function buildCallConfig(address protocolControl) internal view returns (uint16 callConfig) {
         (
             bool sequenced,

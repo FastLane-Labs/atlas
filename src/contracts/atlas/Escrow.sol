@@ -9,6 +9,7 @@ import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 
 import { SafetyLocks } from "./SafetyLocks.sol";
 import { SearcherWrapper } from "./SearcherWrapper.sol";
+import { ProtocolVerifier } from "./ProtocolVerification.sol";
 
 import "../types/CallTypes.sol";
 import "../types/EscrowTypes.sol";
@@ -17,12 +18,13 @@ import "../types/VerificationTypes.sol";
 
 import { EscrowBits } from "../libraries/EscrowBits.sol"; 
 import { CallChainProof } from "../libraries/CallVerification.sol"; 
-import { ProtocolVerifier } from "./ProtocolVerification.sol";
+import { CallVerification } from "../libraries/CallVerification.sol";
 
-import "forge-std/Test.sol";
+// import "forge-std/Test.sol";
 
-contract Escrow is Test, ProtocolVerifier, SafetyLocks, SearcherWrapper {
+contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     using ECDSA for bytes32;
+    using CallVerification for CallChainProof;
 
     uint32 immutable public escrowDuration;
 
@@ -30,9 +32,6 @@ contract Escrow is Test, ProtocolVerifier, SafetyLocks, SearcherWrapper {
     // and only once per searcher per block (to avoid user-searcher collaborative exploits)
     // EOA Address => searcher escrow data
     mapping(address => SearcherEscrow) private _escrowData;
-
-    // track searcher tx hashes to avoid replays... imperfect solution tho
-    mapping(bytes32 => bool) private _hashes;
 
     constructor(
         uint32 escrowDurationFromFactory //,
@@ -87,15 +86,10 @@ contract Escrow is Test, ProtocolVerifier, SafetyLocks, SearcherWrapper {
     }
 
     function _executeUserCall(
-        ProtocolCall calldata protocolCall,
         UserCall calldata userCall,
-        CallChainProof memory proof,
         address environment
-    ) internal userLock(protocolCall, environment) returns (bytes memory userReturnData) {
-        userReturnData = IExecutionEnvironment(environment).userWrapper(
-            proof,
-            userCall
-        );
+    ) internal userLock(userCall, environment) returns (bytes memory userReturnData) {
+        userReturnData = IExecutionEnvironment(environment).userWrapper(userCall);
     }
 
     function _executeSearcherCall(
@@ -174,7 +168,6 @@ contract Escrow is Test, ProtocolVerifier, SafetyLocks, SearcherWrapper {
         PayeeData[] calldata payeeData,
         address environment
     ) internal paymentsLock(environment) {
-        uint256 gasWatermark = gasleft();
         // process protocol payments
          try IExecutionEnvironment(environment).allocateRewards(
             winningBids, payeeData
@@ -186,7 +179,6 @@ contract Escrow is Test, ProtocolVerifier, SafetyLocks, SearcherWrapper {
                 payeeData
             );
         }
-        console.log("allocate payments gas cost", gasWatermark-gasleft());
     } 
 
     function _executeVerificationCall(
@@ -196,23 +188,18 @@ contract Escrow is Test, ProtocolVerifier, SafetyLocks, SearcherWrapper {
         bytes memory userReturnData,
         address environment
     ) internal verificationLock(protocolCall.callConfig, environment) {
+        proof = proof.addVerificationCallProof(
+            protocolCall.to,
+            stagingReturnData,
+            userReturnData
+        );
+        
         IExecutionEnvironment(environment).verificationWrapper(proof, stagingReturnData, userReturnData);
     } 
 
-    /*
-    function _intLog(string memory s, int256 x) internal view {
-        if (x < 0){
-            console.log(s, "-", uint256(x * -1));
-        } else {
-            console.log(s, "+", uint256(x));
-        }
-    }
-    */
-
     function _executeUserRefund(
-        address userCallFrom,
-        address environment
-    ) internal refundLock(environment) {
+        address userCallFrom
+    ) internal {
         
         uint256 gasRebate = uint256(_escrowKey.gasRefund) * tx.gasprice;
 
@@ -228,8 +215,6 @@ contract Escrow is Test, ProtocolVerifier, SafetyLocks, SearcherWrapper {
             userCallFrom, 
             gasRebate
         );
-
-        console.log("user gas refund", uint256(_escrowKey.gasRefund));
     }
 
     function _update(
@@ -283,7 +268,7 @@ contract Escrow is Test, ProtocolVerifier, SafetyLocks, SearcherWrapper {
         SearcherCall calldata searcherCall,
         uint256 gasWaterMark,
         bool auctionAlreadyComplete
-    ) internal returns (
+    ) internal view returns (
         uint256 result, 
         uint256 gasLimit, 
         SearcherEscrow memory searcherEscrow
@@ -351,19 +336,11 @@ contract Escrow is Test, ProtocolVerifier, SafetyLocks, SearcherWrapper {
 
     function _verifySearcherCall(
         SearcherCall calldata searcherCall
-    ) internal returns (
+    ) internal view returns (
             uint256 result, 
             uint256 gasLimit,
             SearcherEscrow memory searcherEscrow
     ) {
-
-        bytes32 searcherHash = keccak256(abi.encode(searcherCall.metaTx.from, searcherCall.signature));
-        
-        if (_hashes[searcherHash]) {
-            result |= 1 << uint256(SearcherOutcome.AlreadyExecuted);
-        } else {
-            _hashes[searcherHash] = true;
-        }
 
         searcherEscrow = _escrowData[searcherCall.metaTx.from];
         

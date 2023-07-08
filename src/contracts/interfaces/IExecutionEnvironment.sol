@@ -12,7 +12,6 @@ interface IExecutionEnvironment {
     ) external payable returns (bytes memory stagingData);
 
     function userWrapper(
-        CallChainProof calldata proof,
         UserCall calldata userCall
     ) external payable returns (bytes memory userReturnData);
 

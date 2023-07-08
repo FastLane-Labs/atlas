@@ -28,9 +28,10 @@ contract Mimic {
                         shl(88, 0x61), 
                         shl(72, callConfig)
                     ),
-                    0x604051602001610082
+                    0x7f0000000000000000
                 )
             ))
+            mstore(add(creationCode, 176), userCallHash)
         }
     */
 
@@ -42,7 +43,8 @@ contract Mimic {
                 msg.data, 
                 address(0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB),
                 address(0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC),
-                uint16(0x2222)
+                uint16(0x2222),
+                bytes32(uint256(0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee))
             )
         );
         if (!success) { revert(); }

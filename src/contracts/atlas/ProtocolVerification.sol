@@ -27,7 +27,6 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
     );
 
     constructor() EIP712("ProtoCallHandler", "0.0.1") {}
-    //EIP712("ProtoCallHandler", "0.0.1")
 
     // Verify that the protocol's front end generated the staging
     // information and that it matches the on-chain data.  
@@ -59,22 +58,10 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
 
         ApproverSigningData memory signatory = signatories[verification.proof.from];
 
-        // generate the signing key
-        bytes32 signingKey = keccak256(abi.encode(
-            verification.proof.from,
-            verification.proof.nonce
-        ));
-
         if (verification.proof.to != protocolCall.to) {
             return (false);
         }
         
-        // make sure this nonce hasn't already been used by this sender
-        if (signatureTrackingMap[signingKey] != bytes32(0)) {
-            return (false);
-        }
-        signatureTrackingMap[signingKey] = keccak256(verification.signature);
-
         // Make sure the signer is currently enabled by protocol owner
         // NOTE: check must occur after storing signature to prevent replays
         if (!signatory.enabled) {
@@ -117,7 +104,9 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
         // it if so.  This ensures nonce + 1 will always be available. 
         } else {
             if (verification.proof.nonce > signatory.nonce + 1) {
-                signatories[verification.proof.from].nonce = uint64(verification.proof.nonce) + 1;
+                unchecked {
+                    signatories[verification.proof.from].nonce = uint64(verification.proof.nonce) + 1;
+                }
             
             } else {
                 unchecked { ++signatories[verification.proof.from].nonce;}
