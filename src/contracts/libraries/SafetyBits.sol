@@ -249,8 +249,7 @@ library SafetyBits {
                     (self.lockState == _LOCKED_X_SEARCHERS_X_REQUESTED) && (caller != address(0))
                         && (self.approvedCaller != address(0)) && (self.approvedCaller != caller) && (self.callIndex > 2)
                         && (self.callIndex < self.callMax - 1)
-                ) // < self.callMax - 1
-                ;
+                ); // < self.callMax - 1
             }
         }
     }
@@ -310,9 +309,8 @@ library SafetyBits {
     }
 
     function canReleaseEscrowLock(EscrowKey memory self, address caller) internal pure returns (bool) {
-        return ((self.approvedCaller == caller) && (self.callIndex == self.callMax)) //&&
+        return ((self.approvedCaller == caller) && (self.callIndex == self.callMax)); //&&
             //(self.lockState == _LOCKED_X_VERIFICATION_X_UNSET)
-        ;
     }
 
     function initializeEscrowLock(EscrowKey memory self, bool needsStaging, uint8 searcherCallCount, address nextCaller)
