@@ -1,23 +1,22 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
-import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
+import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
+import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
 
-import { CallBits } from "../libraries/CallBits.sol";
+import {CallBits} from "../libraries/CallBits.sol";
 
-import { GovernanceControl } from "./GovernanceControl.sol";
-import { MEVAllocator } from "./MEVAllocator.sol";
+import {GovernanceControl} from "./GovernanceControl.sol";
+import {MEVAllocator} from "./MEVAllocator.sol";
 
 import "../types/CallTypes.sol";
 
 import "forge-std/Test.sol";
 
 abstract contract ProtocolControl is Test, MEVAllocator, GovernanceControl {
-
     address public immutable escrow;
     address public immutable governance;
-    
+
     bool public immutable sequenced;
     bool public immutable requireStaging;
     bool public immutable delegateStaging;
@@ -42,7 +41,7 @@ abstract contract ProtocolControl is Test, MEVAllocator, GovernanceControl {
         bool allowRecycledStorage
     ) {
         sequenced = shouldRequireSequencedNonces;
-        
+
         /*
         // Disallow delegatecall when recycled storage is used
         if(allowRecycledStorage) {
@@ -68,7 +67,7 @@ abstract contract ProtocolControl is Test, MEVAllocator, GovernanceControl {
         // NOTE: At this time, MEV Allocation payments are required to be delegatecalled.
         // By the time the MEV Payments are paid, both the user and the searchers will
         // no longer be executing any transactions, and all MEV rewards will be
-        // held in the ExecutionEnvironment 
+        // held in the ExecutionEnvironment
         require(shouldDelegateAllocating, "ERR-GC02 NotDelegateAllocating");
 
         if (shouldDelegateUser) {
@@ -89,48 +88,38 @@ abstract contract ProtocolControl is Test, MEVAllocator, GovernanceControl {
         recycledStorage = allowRecycledStorage;
     }
 
-    // Safety and support functions and modifiers that make the relationship between protocol 
+    // Safety and support functions and modifiers that make the relationship between protocol
     // and FastLane's backend trustless.
     modifier onlyApprovedCaller(bool isDelegated) {
         if (isDelegated) {
             require(msg.sender == escrow, "ERR-PC060 InvalidCaller");
         } else {
-            require(
-                msg.sender == ISafetyLocks(escrow).approvedCaller(),
-                "ERR-PC061 InvalidCaller"
-            );
+            require(msg.sender == ISafetyLocks(escrow).approvedCaller(), "ERR-PC061 InvalidCaller");
         }
         _;
     }
 
-    function stageCall(
-        address to,
-        address from,
-        bytes4 userSelector,
-        bytes calldata userData
-    ) external onlyApprovedCaller(delegateStaging) returns (bytes memory) {
+    function stageCall(address to, address from, bytes4 userSelector, bytes calldata userData)
+        external
+        onlyApprovedCaller(delegateStaging)
+        returns (bytes memory)
+    {
         return (
-            delegateStaging ? 
-            _stageDelegateCall(to, from, userSelector, userData) : 
-            _stageStaticCall(to, from, userSelector, userData) 
+            delegateStaging
+                ? _stageDelegateCall(to, from, userSelector, userData)
+                : _stageStaticCall(to, from, userSelector, userData)
         );
     }
 
-    function userLocalCall(
-        bytes calldata data
-    ) external onlyApprovedCaller(delegateUser) returns (bytes memory) {
+    function userLocalCall(bytes calldata data) external onlyApprovedCaller(delegateUser) returns (bytes memory) {
         return delegateUser ? _userLocalDelegateCall(data) : _userLocalStandardCall(data);
     }
 
-    function allocatingCall(
-        bytes calldata data
-    ) external onlyApprovedCaller(true) {
+    function allocatingCall(bytes calldata data) external onlyApprovedCaller(true) {
         return _allocatingDelegateCall(data);
     }
 
-    function verificationCall(
-        bytes calldata data
-    ) external onlyApprovedCaller(delegateVerification) returns (bool) {
+    function verificationCall(bytes calldata data) external onlyApprovedCaller(delegateVerification) returns (bool) {
         return delegateVerification ? _verificationDelegateCall(data) : _verificationStaticCall(data);
     }
 
@@ -177,13 +166,11 @@ abstract contract ProtocolControl is Test, MEVAllocator, GovernanceControl {
                 requireVerification,
                 delegateVerification,
                 recycledStorage
-            )
+                )
         });
     }
 
-     function _getCallConfig() internal view returns (
-        bool, bool, bool, bool, bool, bool, bool, bool, bool
-    ) {
+    function _getCallConfig() internal view returns (bool, bool, bool, bool, bool, bool, bool, bool, bool) {
         return (
             sequenced,
             requireStaging,
@@ -197,15 +184,11 @@ abstract contract ProtocolControl is Test, MEVAllocator, GovernanceControl {
         );
     }
 
-    function getCallConfig() external view returns (
-        bool, bool, bool, bool, bool, bool, bool, bool, bool
-    ) {
+    function getCallConfig() external view returns (bool, bool, bool, bool, bool, bool, bool, bool, bool) {
         return _getCallConfig();
     }
 
-    function getProtocolSignatory() external view returns (
-        address governanceAddress
-    ) {
+    function getProtocolSignatory() external view returns (address governanceAddress) {
         governanceAddress = governance;
     }
 }

@@ -4,7 +4,7 @@ pragma solidity ^0.8.16;
 struct GovernanceData {
     address governance;
     uint16 callConfig; // bitwise
-    uint64 lastUpdate; 
+    uint64 lastUpdate;
 }
 
 struct ApproverSigningData {

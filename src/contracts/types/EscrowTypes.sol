@@ -4,7 +4,7 @@ pragma solidity ^0.8.16;
 struct SearcherEscrow {
     uint128 total;
     uint128 escrowed;
-    uint64 availableOn; // block.number when funds are available.  
+    uint64 availableOn; // block.number when funds are available.
     uint64 lastAccessed;
     uint32 nonce; // EOA nonce.
 }
@@ -16,13 +16,13 @@ struct ValueTracker {
     uint128 gasRebate;
 }
 
-enum SearcherOutcome {
-    // future task tracking
+enum SearcherOutcome
+// future task tracking
+{
     PendingUpdate,
     ExecutionCompleted,
     UpdateCompleted,
     BlockExecution,
-
     // no user refund (relay error or hostile user)
     InvalidSignature,
     InvalidUserHash,
@@ -30,21 +30,17 @@ enum SearcherOutcome {
     InvalidSequencing,
     GasPriceOverCap,
     UserOutOfGas,
-
     // calldata user refund from searcher
     InsufficientEscrow,
     InvalidNonceOver,
-
     // no call, but full user refund
     AlreadyExecuted,
     InvalidNonceUnder,
-    PerBlockLimit, // searchers can only send one tx per block 
+    PerBlockLimit, // searchers can only send one tx per block
     // if they sent two we wouldn't be able to flag builder censorship
     InvalidFormat,
-
     // protocol / external user refund (TODO: keep?)
     LostAuction, // a higher bidding searcher was successful
-    
     // call, with full user refund
     UnknownError,
     CallReverted,
@@ -55,7 +51,6 @@ enum SearcherOutcome {
     Success
 }
 
-bytes32 constant SEARCHER_TYPE_HASH =
-        keccak256(
-            "SearcherMetaTx(address from,address to,uint256 value,uint256 gas,uint256 nonce,bytes32 userCallHash,uint256 maxFeePerGas,bytes32 bidsHash,bytes data)"
-        );
+bytes32 constant SEARCHER_TYPE_HASH = keccak256(
+    "SearcherMetaTx(address from,address to,uint256 value,uint256 gas,uint256 nonce,bytes32 userCallHash,uint256 maxFeePerGas,bytes32 bidsHash,bytes data)"
+);

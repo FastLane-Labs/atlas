@@ -1,17 +1,17 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import { ISearcherContract } from "../interfaces/ISearcherContract.sol";
-import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
-import { IProtocolControl } from "../interfaces/IProtocolControl.sol";
+import {ISearcherContract} from "../interfaces/ISearcherContract.sol";
+import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
+import {IProtocolControl} from "../interfaces/IProtocolControl.sol";
 
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
 import {UserCall, ProtocolCall, SearcherCall, BidData, PayeeData} from "../types/CallTypes.sol";
-import { CallChainProof } from "../types/VerificationTypes.sol";
+import {CallChainProof} from "../types/VerificationTypes.sol";
 
-import { CallVerification } from "../libraries/CallVerification.sol";
-import { CallBits } from "../libraries/CallBits.sol";
+import {CallVerification} from "../libraries/CallVerification.sol";
+import {CallBits} from "../libraries/CallBits.sol";
 
 import "forge-std/Test.sol";
 
@@ -21,13 +21,13 @@ import {
     SEARCHER_MSG_VALUE_UNPAID,
     SEARCHER_FAILED_CALLBACK,
     SEARCHER_BID_UNPAID
- } from "./Emissions.sol";
+} from "./Emissions.sol";
 
 contract ExecutionEnvironment is Test {
     using CallVerification for CallChainProof;
     using CallBits for uint16;
 
-    address immutable public atlas;
+    address public immutable atlas;
 
     constructor(address _atlas) {
         atlas = _atlas;
@@ -58,13 +58,13 @@ contract ExecutionEnvironment is Test {
         }
     }
 
-      //////////////////////////////////
-     ///    CORE CALL FUNCTIONS     ///
     //////////////////////////////////
-    function stagingWrapper(
-        CallChainProof calldata proof,
-        UserCall calldata userCall
-    ) external returns (bytes memory stagingData) {
+    ///    CORE CALL FUNCTIONS     ///
+    //////////////////////////////////
+    function stagingWrapper(CallChainProof calldata proof, UserCall calldata userCall)
+        external
+        returns (bytes memory stagingData)
+    {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 
@@ -72,17 +72,10 @@ contract ExecutionEnvironment is Test {
         uint16 config = _config();
 
         require(msg.sender == atlas && userCall.from == _user(), "ERR-CE00 InvalidSenderStaging");
-        require(
-            keccak256(abi.encodePacked(userCall.to, userCall.data)) == _userCallHash(), 
-            "ERR-CD01 CalldataInvalid"
-        );
+        require(keccak256(abi.encodePacked(userCall.to, userCall.data)) == _userCallHash(), "ERR-CD01 CalldataInvalid");
 
         stagingData = abi.encodeWithSelector(
-            IProtocolControl.stageCall.selector,
-            userCall.to, 
-            userCall.from,
-            bytes4(userCall.data), 
-            userCall.data[4:]
+            IProtocolControl.stageCall.selector, userCall.to, userCall.from, bytes4(userCall.data), userCall.data[4:]
         );
 
         // Verify the proof so that the callee knows this isn't happening out of sequence.
@@ -91,15 +84,10 @@ contract ExecutionEnvironment is Test {
         bool success;
 
         if (config.needsDelegateStaging()) {
-            (success, stagingData) = control.delegatecall(
-                stagingData
-            );
+            (success, stagingData) = control.delegatecall(stagingData);
             require(success, "ERR-EC02 DelegateRevert");
-        
         } else {
-            (success, stagingData) = control.staticcall(
-                stagingData
-            );
+            (success, stagingData) = control.staticcall(stagingData);
             require(success, "ERR-EC03 StaticRevert");
         }
 
@@ -108,9 +96,7 @@ contract ExecutionEnvironment is Test {
         }
     }
 
-    function userWrapper(
-        UserCall calldata userCall
-    ) external payable returns (bytes memory userData) {
+    function userWrapper(UserCall calldata userCall) external payable returns (bytes memory userData) {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 
@@ -118,35 +104,22 @@ contract ExecutionEnvironment is Test {
         uint16 config = _config();
 
         require(msg.sender == atlas && userCall.from == user, "ERR-CE00 InvalidSenderUser");
-        require(
-            keccak256(abi.encodePacked(userCall.to, userCall.data)) == _userCallHash(), 
-            "ERR-CD02 CalldataInvalid"
-        );
+        require(keccak256(abi.encodePacked(userCall.to, userCall.data)) == _userCallHash(), "ERR-CD02 CalldataInvalid");
         require(address(this).balance >= userCall.value, "ERR-CE01 ValueExceedsBalance");
 
         bool success;
 
         // regular user call - executed at regular destination and not performed locally
         if (!config.needsLocalUser()) {
-
-            (success, userData) = userCall.to.call{
-                value: userCall.value
-            }(
-                userCall.data
-            );
+            (success, userData) = userCall.to.call{value: userCall.value}(userCall.data);
             require(success, "ERR-EC04a CallRevert");
-        
         } else {
             if (config.needsDelegateUser()) {
                 userData = abi.encodeWithSelector(
-                    IProtocolControl.userLocalCall.selector,
-                    userCall.to, 
-                    userCall.value,
-                    userCall.data
+                    IProtocolControl.userLocalCall.selector, userCall.to, userCall.value, userCall.data
                 );
                 (success, userData) = _control().delegatecall(userData);
                 require(success, "ERR-EC02 DelegateRevert");
-            
             } else {
                 revert("ERR-P02 UserCallStatic");
             }
@@ -163,38 +136,29 @@ contract ExecutionEnvironment is Test {
 
     function verificationWrapper(
         CallChainProof calldata proof,
-        bytes calldata stagingReturnData, 
+        bytes calldata stagingReturnData,
         bytes calldata userReturnData
     ) external {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
         require(msg.sender == atlas, "ERR-CE00 InvalidSenderStaging");
 
-        bytes memory data = abi.encodeWithSelector(
-            IProtocolControl.verificationCall.selector, 
-            stagingReturnData,
-            userReturnData
-        );
+        bytes memory data =
+            abi.encodeWithSelector(IProtocolControl.verificationCall.selector, stagingReturnData, userReturnData);
 
         // Verify the proof so that the callee knows this isn't happening out of sequence.
         require(proof.prove(_control(), data), "ERR-P01 ProofInvalid");
 
         if (_config().needsDelegateVerification()) {
-            (bool success, bytes memory returnData) = _control().delegatecall(
-                data
-            );
+            (bool success, bytes memory returnData) = _control().delegatecall(data);
             require(success, "ERR-EC02 DelegateRevert");
             require(abi.decode(returnData, (bool)), "ERR-EC03a DelegateUnsuccessful");
-        
         } else {
-            (bool success, bytes memory returnData) = _control().staticcall(
-                data
-            );
+            (bool success, bytes memory returnData) = _control().staticcall(data);
             require(success, "ERR-EC03 StaticRevert");
             require(abi.decode(returnData, (bool)), "ERR-EC03b DelegateUnsuccessful");
         }
     }
-
 
     function searcherMetaTryCatch(
         CallChainProof calldata proof,
@@ -205,50 +169,44 @@ contract ExecutionEnvironment is Test {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
         require(msg.sender == atlas, "ERR-04 InvalidCaller");
-        require(
-            address(this).balance == searcherCall.metaTx.value,
-            "ERR-CE05 IncorrectValue"
-        );
+        require(address(this).balance == searcherCall.metaTx.value, "ERR-CE05 IncorrectValue");
 
         // Track token balances to measure if the bid amount is paid.
         uint256[] memory tokenBalances = new uint[](searcherCall.bids.length);
         uint256 i;
         for (; i < searcherCall.bids.length;) {
-
             // Ether balance
             if (searcherCall.bids[i].token == address(0)) {
-                tokenBalances[i] = msg.value;  // NOTE: this is the meta tx value
+                tokenBalances[i] = msg.value; // NOTE: this is the meta tx value
 
-            // ERC20 balance
+                // ERC20 balance
             } else {
                 tokenBalances[i] = ERC20(searcherCall.bids[i].token).balanceOf(address(this));
             }
-            unchecked {++i;}
+            unchecked {
+                ++i;
+            }
         }
 
-          ////////////////////////////
-         // SEARCHER SAFETY CHECKS //
+        ////////////////////////////
+        // SEARCHER SAFETY CHECKS //
         ////////////////////////////
 
         // Verify that the searcher's view of the user's calldata hasn't been altered
         // NOTE: Although this check may seem redundant since the user's calldata is in the
-        // searcher hash chain as verified below, remember that the protocol submits the  
+        // searcher hash chain as verified below, remember that the protocol submits the
         // full hash chain, which user verifies. This check therefore allows the searcher
-        // not to have to worry about user+protocol collaboration to exploit the searcher. 
+        // not to have to worry about user+protocol collaboration to exploit the searcher.
         require(searcherCall.metaTx.userCallHash == _userCallHash(), ALTERED_USER_HASH);
 
         // Verify that the searcher's calldata is unaltered and being executed in the correct order
         proof.proveCD(searcherCall.metaTx.from, searcherCall.metaTx.data);
 
-        // Execute the searcher call. 
+        // Execute the searcher call.
         (bool success,) = ISearcherContract(searcherCall.metaTx.to).metaFlashCall{
-            gas: gasLimit, 
+            gas: gasLimit,
             value: searcherCall.metaTx.value
-        }(
-            searcherCall.metaTx.from,
-            searcherCall.metaTx.data,
-            searcherCall.bids
-        );
+        }(searcherCall.metaTx.from, searcherCall.metaTx.data, searcherCall.bids);
 
         // Verify that it was successful
         require(success, SEARCHER_CALL_REVERTED);
@@ -260,43 +218,35 @@ contract ExecutionEnvironment is Test {
         uint256 balance;
 
         for (; i < searcherCall.bids.length;) {
-            
             // ERC20 tokens as bid currency
             if (!(searcherCall.bids[i].token == address(0))) {
                 balance = ERC20(searcherCall.bids[i].token).balanceOf(address(this));
-                require(
-                    balance >= tokenBalances[i] + searcherCall.bids[i].bidAmount,
-                    SEARCHER_BID_UNPAID
-                );
-            
-            // Native Gas (Ether) as bid currency
+                require(balance >= tokenBalances[i] + searcherCall.bids[i].bidAmount, SEARCHER_BID_UNPAID);
+
+                // Native Gas (Ether) as bid currency
             } else {
                 balance = address(this).balance;
                 require(
                     balance >= searcherCall.bids[i].bidAmount, // tokenBalances[i] = 0 for ether
-                    SEARCHER_BID_UNPAID 
+                    SEARCHER_BID_UNPAID
                 );
 
                 etherIsBidToken = true;
-                
+
                 // Transfer any surplus Ether back to escrow to add to searcher's balance
                 if (balance > searcherCall.bids[i].bidAmount) {
-                    SafeTransferLib.safeTransferETH(
-                        atlas, 
-                        balance - searcherCall.bids[i].bidAmount
-                    );
+                    SafeTransferLib.safeTransferETH(atlas, balance - searcherCall.bids[i].bidAmount);
                 }
             }
-            unchecked { ++i; }
+            unchecked {
+                ++i;
+            }
         }
 
         if (!etherIsBidToken) {
             uint256 currentBalance = address(this).balance;
             if (currentBalance > 0) {
-                SafeTransferLib.safeTransferETH(
-                    atlas, 
-                    currentBalance
-                );
+                SafeTransferLib.safeTransferETH(atlas, currentBalance);
             }
         }
 
@@ -304,32 +254,28 @@ contract ExecutionEnvironment is Test {
         require(atlas.balance >= escrowBalance, SEARCHER_MSG_VALUE_UNPAID);
     }
 
-    function allocateRewards(
-        BidData[] calldata bids,
-        PayeeData[] calldata payeeData
-    ) external {
+    function allocateRewards(BidData[] calldata bids, PayeeData[] calldata payeeData) external {
         // msg.sender = escrow
         // address(this) = ExecutionEnvironment
         require(msg.sender == atlas, "ERR-04 InvalidCaller");
 
         uint256 totalEtherReward;
         uint256 payment;
-        uint256 i;      
+        uint256 i;
 
         BidData[] memory netBids = new BidData[](bids.length);
 
         for (; i < bids.length;) {
             payment = (bids[i].bidAmount * 5) / 100;
-           
+
             if (bids[i].token != address(0)) {
                 SafeTransferLib.safeTransfer(ERC20(bids[i].token), address(0xa71a5), payment);
                 totalEtherReward = bids[i].bidAmount - payment; // NOTE: This is transferred to protocolControl as msg.value
-
             } else {
                 SafeTransferLib.safeTransferETH(address(0xa71a5), payment);
             }
 
-            unchecked{ 
+            unchecked {
                 netBids[i].token = bids[i].token;
                 netBids[i].bidAmount = bids[i].bidAmount - payment;
                 ++i;
@@ -338,43 +284,25 @@ contract ExecutionEnvironment is Test {
 
         if (_config().needsDelegateAllocating()) {
             (bool success,) = _control().delegatecall(
-                abi.encodeWithSelector(
-                    IProtocolControl.allocatingCall.selector,
-                    totalEtherReward,
-                    bids,
-                    payeeData
-                )
+                abi.encodeWithSelector(IProtocolControl.allocatingCall.selector, totalEtherReward, bids, payeeData)
             );
             require(success, "ERR-EC02 DelegateRevert");
-        
         } else {
-            (bool success,) = _control().call{
-                value: totalEtherReward
-            }(
-                abi.encodeWithSelector(
-                    IProtocolControl.allocatingCall.selector,
-                    totalEtherReward,
-                    bids,
-                    payeeData
-                )
+            (bool success,) = _control().call{value: totalEtherReward}(
+                abi.encodeWithSelector(IProtocolControl.allocatingCall.selector, totalEtherReward, bids, payeeData)
             );
             require(success, "ERR-EC04b CallRevert");
         }
     }
 
-      ///////////////////////////////////////
-     //  USER SUPPORT / ACCESS FUNCTIONS  //
+    ///////////////////////////////////////
+    //  USER SUPPORT / ACCESS FUNCTIONS  //
     ///////////////////////////////////////
     function withdrawERC20(address token, uint256 amount) external {
         require(msg.sender == _user(), "ERR-EC01 NotEnvironmentOwner");
 
         if (ERC20(token).balanceOf(address(this)) >= amount) {
-            SafeTransferLib.safeTransfer(
-                ERC20(token), 
-                msg.sender, 
-                amount
-            );
-
+            SafeTransferLib.safeTransfer(ERC20(token), msg.sender, amount);
         } else {
             revert("ERR-EC02 BalanceTooLow");
         }
@@ -385,12 +313,7 @@ contract ExecutionEnvironment is Test {
         require(msgSender == _user(), "ERR-EC11 NotEnvironmentOwner");
 
         if (ERC20(token).balanceOf(address(this)) >= amount) {
-            SafeTransferLib.safeTransfer(
-                ERC20(token), 
-                _user(), 
-                amount
-            );
-
+            SafeTransferLib.safeTransfer(ERC20(token), _user(), amount);
         } else {
             revert("ERR-EC02 BalanceTooLow");
         }
@@ -400,11 +323,7 @@ contract ExecutionEnvironment is Test {
         require(msg.sender == _user(), "ERR-EC01 NotEnvironmentOwner");
 
         if (address(this).balance >= amount) {
-            SafeTransferLib.safeTransferETH(
-                msg.sender, 
-                amount
-            );
-            
+            SafeTransferLib.safeTransferETH(msg.sender, amount);
         } else {
             revert("ERR-EC03 BalanceTooLow");
         }
@@ -415,11 +334,7 @@ contract ExecutionEnvironment is Test {
         require(msgSender == _user(), "ERR-EC11 NotEnvironmentOwner");
 
         if (address(this).balance >= amount) {
-            SafeTransferLib.safeTransferETH(
-                _user(), 
-                amount
-            );
-            
+            SafeTransferLib.safeTransferETH(_user(), amount);
         } else {
             revert("ERR-EC03 BalanceTooLow");
         }
@@ -444,5 +359,4 @@ contract ExecutionEnvironment is Test {
     receive() external payable {}
 
     fallback() external payable {}
-
 }

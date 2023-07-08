@@ -24,7 +24,7 @@ struct SearcherMetaTx {
     uint256 nonce;
     bytes32 userCallHash; // hash of user EOA and calldata, for verification of user's tx (if not matched, searcher wont be charged for gas)
     uint256 maxFeePerGas; // maxFeePerGas searcher is willing to pay.  This goes to validator, not protocol or user
-    bytes32 bidsHash; // searcher's backend must keccak256() their BidData array and include that in the signed meta tx, which we then verify on chain. 
+    bytes32 bidsHash; // searcher's backend must keccak256() their BidData array and include that in the signed meta tx, which we then verify on chain.
     bytes data;
 }
 
@@ -44,12 +44,12 @@ struct PaymentData {
     uint256 payeePercent;
 }
 
-struct ProtocolCall { 
+struct ProtocolCall {
     address to;
     uint16 callConfig;
 }
 
-enum CallConfig { 
+enum CallConfig {
     Sequenced,
     CallStaging,
     DelegateStaging,

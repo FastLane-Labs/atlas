@@ -32,6 +32,7 @@ Atlas is a system that combines a highly advanced smart contract with a frontend
 - Due to the safety checks, the overall gas cost is expected to be higher than it would be for the sum of the individual transactions. Note that Protocol Governance will have the capacity to simulate the net gas cost increase and to only initiate an Atlas transaction when deemed prudent.
 
 - Atlas represents a less efficient use of block space than traditional, infrastructure-based MEV capture systems. This arises due to the checks and verifications that allow Atlas to function without relying on privacy guarantees from centralized, third-party infrastructure or off-chain agreements with permissioned builders.  
+
 ### Notes:
 
 Note that there is significant complexity in the lock system.  This was designed to handle ALL cases, rather than having to deploy multiple contracts to handle SOME cases, so as to avoid the fragmentation (capital inefficiency and upkeep effort) of the searcher's escrowed gas values.  Other factory contracts may be launched with less complexity - such as one that has no delegatecall and therefore no need to create a new contract each time - but the Escrow contract must be designed to handle the *most* complex of those designs or searchers' gas values will be fragmented.

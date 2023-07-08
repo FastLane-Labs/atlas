@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.18;
 
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
 import {IEscrow} from "../src/contracts/interfaces/IEscrow.sol";
 import {IAtlas} from "../src/contracts/interfaces/IAtlas.sol";
@@ -31,44 +31,36 @@ contract MainTest is BaseTest {
     }
 
     function testMain() public {
-        
         vm.label(userEOA, "USER");
         vm.label(escrow, "ESCROW");
         vm.label(address(atlas), "ATLAS");
         vm.label(address(control), "PCONTROL");
-        
+
         ProtocolCall memory protocolCall = helper.getProtocolCall();
-        
+
         UserCall memory userCall = helper.buildUserCall(POOL_ONE, userEOA, TOKEN_ONE);
-        
+
         PayeeData[] memory payeeData = helper.getPayeeData();
 
         SearcherCall[] memory searcherCalls = new SearcherCall[](2);
 
-        searcherCalls[0] = helper.buildSearcherCall(
-            userCall, searcherOneEOA, address(searcherOne), POOL_ONE, POOL_TWO, 2E17
-        );
-        searcherCalls[1] = helper.buildSearcherCall(
-            userCall, searcherTwoEOA, address(searcherTwo), POOL_TWO, POOL_ONE, 1E17
-        );
-        
-        Verification memory verification = helper.buildVerification(
-            governanceEOA,
-            protocolCall,
-            userCall,
-            payeeData,
-            searcherCalls
-        );
+        searcherCalls[0] =
+            helper.buildSearcherCall(userCall, searcherOneEOA, address(searcherOne), POOL_ONE, POOL_TWO, 2e17);
+        searcherCalls[1] =
+            helper.buildSearcherCall(userCall, searcherTwoEOA, address(searcherTwo), POOL_TWO, POOL_ONE, 1e17);
+
+        Verification memory verification =
+            helper.buildVerification(governanceEOA, protocolCall, userCall, payeeData, searcherCalls);
 
         vm.startPrank(userEOA);
 
         address executionEnvironment = IAtlas(address(atlas)).getExecutionEnvironment(userCall, address(control));
         vm.label(address(executionEnvironment), "ENVIRONMENT");
 
-        console.log("userEOA",userEOA);
+        console.log("userEOA", userEOA);
         console.log("atlas", address(atlas));
         console.log("control", address(control));
-        console.log("executionEnvironment",executionEnvironment);
+        console.log("executionEnvironment", executionEnvironment);
 
         // User must approve the execution environment
         ERC20(TOKEN_ZERO).approve(executionEnvironment, type(uint256).max);
@@ -76,12 +68,7 @@ contract MainTest is BaseTest {
 
         (bool success,) = address(atlas).call(
             abi.encodeWithSelector(
-                atlas.metacall.selector, 
-                protocolCall,
-                userCall,
-                payeeData,
-                searcherCalls,
-                verification
+                atlas.metacall.selector, protocolCall, userCall, payeeData, searcherCalls, verification
             )
         );
 

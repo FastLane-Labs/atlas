@@ -1,13 +1,12 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import { IProtocolControl } from "../interfaces/IProtocolControl.sol";
+import {IProtocolControl} from "../interfaces/IProtocolControl.sol";
 
 import "../types/CallTypes.sol";
 
 library CallBits {
-
-    uint16 constant internal _ONE = uint16(1);
+    uint16 internal constant _ONE = uint16(1);
 
     /*
     TODO: Figure out why labeling these constants and referencing the constant uses more gas
@@ -35,18 +34,18 @@ library CallBits {
             bool delegateVerification,
             bool recycledStorage
         ) = IProtocolControl(protocolControl).getCallConfig();
-        
+
         // WTB tuple unpacking :*(
         callConfig = encodeCallConfig(
-             sequenced,
-             requireStaging,
-             delegateStaging,
-             localUser,
-             delegateUser,
-             delegateAllocating,
-             requireVerification,
-             delegateVerification,
-             recycledStorage
+            sequenced,
+            requireStaging,
+            delegateStaging,
+            localUser,
+            delegateUser,
+            delegateAllocating,
+            requireVerification,
+            delegateVerification,
+            recycledStorage
         );
     }
 
@@ -126,5 +125,4 @@ library CallBits {
     function needsSequencedNonces(uint16 callConfig) internal pure returns (bool sequenced) {
         sequenced = (callConfig & 1 << uint16(CallConfig.Sequenced) != 0);
     }
-
 }

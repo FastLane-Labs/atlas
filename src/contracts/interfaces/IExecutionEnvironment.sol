@@ -2,31 +2,28 @@
 pragma solidity ^0.8.16;
 
 import "../types/CallTypes.sol";
-import { CallChainProof } from "../types/VerificationTypes.sol";
+import {CallChainProof} from "../types/VerificationTypes.sol";
 
 interface IExecutionEnvironment {
-    
-    function stagingWrapper(
-        CallChainProof calldata proof,
-        UserCall calldata userCall
-    ) external payable returns (bytes memory stagingData);
+    function stagingWrapper(CallChainProof calldata proof, UserCall calldata userCall)
+        external
+        payable
+        returns (bytes memory stagingData);
 
-    function userWrapper(
-        UserCall calldata userCall
-    ) external payable returns (bytes memory userReturnData);
+    function userWrapper(UserCall calldata userCall) external payable returns (bytes memory userReturnData);
 
     function verificationWrapper(
         CallChainProof calldata proof,
-        bytes calldata stagingReturnData, 
+        bytes calldata stagingReturnData,
         bytes calldata userReturnData
-    ) payable external;
+    ) external payable;
 
     function searcherMetaTryCatch(
         CallChainProof calldata proof,
         uint256 gasLimit,
         uint256 escrowBalance,
         SearcherCall calldata searcherCall
-    ) payable external;
+    ) external payable;
 
     function allocateRewards(
         BidData[] calldata bids, // Converted to memory
@@ -37,7 +34,7 @@ interface IExecutionEnvironment {
     function getControl() external pure returns (address control);
     function getConfig() external pure returns (uint16 config);
     function getEscrow() external view returns (address escrow);
-    
+
     function withdrawERC20(address token, uint256 amount) external;
     function withdrawEther(uint256 amount) external;
 

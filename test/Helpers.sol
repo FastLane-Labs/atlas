@@ -20,13 +20,12 @@ import {CallVerification} from "../src/contracts/libraries/CallVerification.sol"
 import "forge-std/Test.sol";
 
 contract Helper is Test, TestConstants {
-
-    address immutable public control;
-    address immutable public escrow;
-    address immutable public atlas;
-    uint256 immutable public maxFeePerGas;
-    uint256 immutable public deadline;
-    uint256 immutable public gas;
+    address public immutable control;
+    address public immutable escrow;
+    address public immutable atlas;
+    uint256 public immutable maxFeePerGas;
+    uint256 public immutable deadline;
+    uint256 public immutable gas;
 
     constructor(address protocolControl, address escrowAddress, address atlasAddress) {
         control = protocolControl;
@@ -46,9 +45,7 @@ contract Helper is Test, TestConstants {
         return IProtocolControl(control).getProtocolCall();
     }
 
-    function getBidData(uint256 amount) 
-        public returns (BidData[] memory bids) 
-    {
+    function getBidData(uint256 amount) public returns (BidData[] memory bids) {
         bytes memory nullData;
         bids = IProtocolControl(control).getBidFormat(nullData);
         bids[0].bidAmount = amount;
@@ -62,13 +59,9 @@ contract Helper is Test, TestConstants {
         return IProtocolIntegration(atlas).nextGovernanceNonce(signatory);
     }
 
-    function buildUserCall(
-        address to,
-        address from,
-        address tokenIn
-    ) public view returns (UserCall memory userCall) {
+    function buildUserCall(address to, address from, address tokenIn) public view returns (UserCall memory userCall) {
         (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(to).getReserves();
-        
+
         address token0 = IUniswapV2Pair(to).token0();
 
         userCall = UserCall({
@@ -78,25 +71,17 @@ contract Helper is Test, TestConstants {
             gas: gas,
             value: 0,
             data: buildV2SwapCalldata(
-                tokenIn == token0 ? 0 : uint256(token0Balance)/2,
-                tokenIn == token0 ? uint256(token1Balance)/2 : 0,
-                from
-            )
+                tokenIn == token0 ? 0 : uint256(token0Balance) / 2, tokenIn == token0 ? uint256(token1Balance) / 2 : 0, from
+                )
         });
     }
 
-    function buildV2SwapCalldata(
-        uint256 amount0Out, 
-        uint256 amount1Out, 
-        address recipient
-    ) public pure returns (bytes memory data) {
-        data = abi.encodeWithSelector(
-            IUniswapV2Pair.swap.selector, 
-            amount0Out,
-            amount1Out,
-            recipient,
-            data
-        );
+    function buildV2SwapCalldata(uint256 amount0Out, uint256 amount1Out, address recipient)
+        public
+        pure
+        returns (bytes memory data)
+    {
+        data = abi.encodeWithSelector(IUniswapV2Pair.swap.selector, amount0Out, amount1Out, recipient, data);
     }
 
     function buildSearcherCall(
@@ -117,11 +102,7 @@ contract Helper is Test, TestConstants {
             userCallHash: keccak256(abi.encodePacked(userCall.to, userCall.data)),
             maxFeePerGas: maxFeePerGas,
             bidsHash: keccak256(abi.encode(searcherCall.bids)),
-            data: abi.encodeWithSelector(
-                BlindBackrun.executeArbitrage.selector, 
-                poolOne,
-                poolTwo
-            )
+            data: abi.encodeWithSelector(BlindBackrun.executeArbitrage.selector, poolOne, poolTwo)
         });
     }
 
@@ -132,12 +113,8 @@ contract Helper is Test, TestConstants {
         PayeeData[] memory payeeData,
         SearcherCall[] calldata searcherCalls
     ) public view returns (Verification memory verification) {
-
-        bytes32[] memory executionHashChain = CallVerification.buildExecutionHashChain(
-            protocolCall,
-            userCall,
-            searcherCalls
-        );
+        bytes32[] memory executionHashChain =
+            CallVerification.buildExecutionHashChain(protocolCall, userCall, searcherCalls);
 
         verification.proof = ProtocolProof({
             from: governanceEOA,
@@ -146,7 +123,7 @@ contract Helper is Test, TestConstants {
             deadline: deadline,
             payeeHash: keccak256(abi.encode(payeeData)),
             userCallHash: keccak256(abi.encodePacked(userCall.to, userCall.data)),
-            callChainHash: executionHashChain[executionHashChain.length-1]
+            callChainHash: executionHashChain[executionHashChain.length - 1]
         });
     }
 }

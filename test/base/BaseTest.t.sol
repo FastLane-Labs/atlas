@@ -18,10 +18,10 @@ import {Helper} from "../Helpers.sol";
 
 contract BaseTest is Test, TestConstants {
     address public me = address(this);
-    
-    address public payee = makeAddr("FastLanePayee"); 
 
-    address public governanceEOA = makeAddr("ProtocolGovernanceEOA"); 
+    address public payee = makeAddr("FastLanePayee");
+
+    address public governanceEOA = makeAddr("ProtocolGovernanceEOA");
     uint256 public governancePK = 1111;
 
     address public searcherOneEOA = makeAddr("SearcherEOA1");
@@ -52,8 +52,8 @@ contract BaseTest is Test, TestConstants {
         vm.rollFork(forkNetwork, chain.FORK_BLOCK);
 
         // Deal to user
-        deal(TOKEN_ZERO, address(userEOA), 10E30);
-        deal(TOKEN_ONE, address(userEOA), 10E30);
+        deal(TOKEN_ZERO, address(userEOA), 10e30);
+        deal(TOKEN_ONE, address(userEOA), 10e30);
 
         // Deploy contracts
         vm.startPrank(payee);
@@ -71,29 +71,29 @@ contract BaseTest is Test, TestConstants {
 
         vm.stopPrank();
 
-        vm.deal(searcherOneEOA, 100E18);
+        vm.deal(searcherOneEOA, 100e18);
 
         vm.startPrank(searcherOneEOA);
 
         searcherOne = new Searcher(escrow, searcherOneEOA);
-        IEscrow(escrow).deposit{value: 1E18}(searcherOneEOA);
+        IEscrow(escrow).deposit{value: 1e18}(searcherOneEOA);
 
         vm.stopPrank();
 
-        deal(TOKEN_ZERO, address(searcherOne), 10E24);
-        deal(TOKEN_ONE, address(searcherOne), 10E24);
+        deal(TOKEN_ZERO, address(searcherOne), 10e24);
+        deal(TOKEN_ONE, address(searcherOne), 10e24);
 
-        vm.deal(searcherTwoEOA, 100E18);
-        
+        vm.deal(searcherTwoEOA, 100e18);
+
         vm.startPrank(searcherTwoEOA);
 
         searcherTwo = new Searcher(escrow, searcherTwoEOA);
-        IEscrow(escrow).deposit{value: 1E18}(searcherTwoEOA);
+        IEscrow(escrow).deposit{value: 1e18}(searcherTwoEOA);
 
         vm.stopPrank();
 
-        deal(TOKEN_ZERO, address(searcherTwo), 10E24);
-        deal(TOKEN_ONE, address(searcherTwo), 10E24);
+        deal(TOKEN_ZERO, address(searcherTwo), 10e24);
+        deal(TOKEN_ONE, address(searcherTwo), 10e24);
 
         helper = new Helper(address(control), escrow, address(atlas));
     }

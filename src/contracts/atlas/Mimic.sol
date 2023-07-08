@@ -40,14 +40,14 @@ contract Mimic {
     fallback(bytes calldata) external payable returns (bytes memory) {
         (bool success, bytes memory output) = address(0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa).delegatecall(
             abi.encodePacked(
-                msg.data, 
+                msg.data,
                 address(0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB),
                 address(0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC),
                 uint16(0x2222),
                 bytes32(uint256(0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee))
             )
         );
-        if (!success) { revert(); }
+        if (!success) revert();
         return output;
     }
 }

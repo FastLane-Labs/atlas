@@ -1,45 +1,38 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
-import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
+import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
 
 import "../types/CallTypes.sol";
 
 import "forge-std/Test.sol";
 
 interface IWETH9 {
-    function deposit() external payable ;
-    function withdraw(uint wad) external payable;
+    function deposit() external payable;
+    function withdraw(uint256 wad) external payable;
 }
 
 // contract SearcherBase is Test {
 contract SearcherBase {
+    address public constant WETH_ADDRESS = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
-    address constant public WETH_ADDRESS = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-
-    address immutable private _owner;
-    address immutable private _escrow;
+    address private immutable _owner;
+    address private immutable _escrow;
 
     constructor(address atlasEscrow, address owner) {
         _owner = owner;
         _escrow = atlasEscrow;
     }
 
-    function metaFlashCall(
-        address sender, 
-        bytes calldata searcherCalldata, 
-        BidData[] calldata bids
-    ) external payable safetyFirst(sender, bids) 
-        returns (bool success, bytes memory data) 
+    function metaFlashCall(address sender, bytes calldata searcherCalldata, BidData[] calldata bids)
+        external
+        payable
+        safetyFirst(sender, bids)
+        returns (bool success, bytes memory data)
     {
-        (
-            success, 
-            data
-        ) = address(this).call{
-            value: msg.value
-        }(searcherCalldata);
+        (success, data) = address(this).call{value: msg.value}(searcherCalldata);
 
         require(success, "CALL UNSUCCESSFUL");
     }
@@ -53,13 +46,13 @@ contract SearcherBase {
         uint256[] memory balances = new uint256[](bids.length);
         uint256 i;
         for (; i < bids.length;) {
-            balances[i] = ERC20(
-                bids[i].token != address(0) ? bids[i].token : WETH_ADDRESS
-            ).balanceOf(address(this));
+            balances[i] = ERC20(bids[i].token != address(0) ? bids[i].token : WETH_ADDRESS).balanceOf(address(this));
 
-            unchecked {++i;}
+            unchecked {
+                ++i;
+            }
         }
-        
+
         _;
 
         uint256 newBalance;
@@ -67,10 +60,7 @@ contract SearcherBase {
         // Handle bid payment
         i = 0;
         for (; i < bids.length;) {
-
-            newBalance = ERC20(
-                bids[i].token != address(0) ? bids[i].token : WETH_ADDRESS
-            ).balanceOf(address(this));
+            newBalance = ERC20(bids[i].token != address(0) ? bids[i].token : WETH_ADDRESS).balanceOf(address(this));
 
             balanceDelta = newBalance > balances[i] ? newBalance - balances[i] : 0;
 
@@ -83,17 +73,19 @@ contract SearcherBase {
             console.log("SearcherProfit", balanceDelta > bids[i].bidAmount ? balanceDelta - bids[i].bidAmount : 0);
             console.log("---============---");
             */
-            
+
             // Ether balance
             if (bids[i].token == address(0)) {
                 IWETH9(WETH_ADDRESS).withdraw(bids[i].bidAmount);
                 SafeTransferLib.safeTransferETH(msg.sender, bids[i].bidAmount);
 
-            // ERC20 balance
+                // ERC20 balance
             } else {
                 SafeTransferLib.safeTransfer(ERC20(bids[i].token), msg.sender, bids[i].bidAmount);
             }
-            unchecked {++i;}
+            unchecked {
+                ++i;
+            }
         }
 
         // NOTE: Because this is nested inside of an Atlas meta transaction, if someone is attempting
@@ -101,9 +93,7 @@ contract SearcherBase {
         // so feel free to run the safety checks at the end of the call.
         // NOTE: The searcherSafetyCallback is mandatory - if it is not called then the searcher
         // transaction will revert.  It is payable and can be used to repay a msg.value loan from the
-        // Atlas Escrow. 
-        require(ISafetyLocks(_escrow).searcherSafetyCallback{
-            value: msgValueOwed
-        }(msg.sender), "INVALID SEQUENCE");
+        // Atlas Escrow.
+        require(ISafetyLocks(_escrow).searcherSafetyCallback{value: msgValueOwed}(msg.sender), "INVALID SEQUENCE");
     }
 }
