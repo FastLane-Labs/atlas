@@ -85,6 +85,8 @@ contract MainTest is BaseTest {
         ERC20(TOKEN_ZERO).approve(executionEnvironment, type(uint256).max);
         ERC20(TOKEN_ONE).approve(executionEnvironment, type(uint256).max);
 
+        uint256 userBalance = userEOA.balance;
+
         (bool success,) = address(atlas).call(
             abi.encodeWithSelector(
                 atlas.metacall.selector, protocolCall, userCall, payeeData, searcherCalls, verification
@@ -92,6 +94,9 @@ contract MainTest is BaseTest {
         );
 
         assertTrue(success);
+        console.log("user gas refund received",userEOA.balance - userBalance);
+        console.log("user refund equivalent gas usage", (userEOA.balance - userBalance)/tx.gasprice);
+        
     }
 
     /*

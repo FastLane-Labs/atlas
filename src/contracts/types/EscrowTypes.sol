@@ -1,12 +1,17 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
+uint256 constant CALLDATA_LENGTH_PREMIUM = 32; // 16 (default) * 2
+
 struct SearcherEscrow {
     uint128 total;
+    uint32 nonce; // EOA nonce.
+    uint64 lastAccessed; // block.number
+}
+
+struct SearcherWithdrawal {
     uint128 escrowed;
     uint64 availableOn; // block.number when funds are available.
-    uint64 lastAccessed;
-    uint32 nonce; // EOA nonce.
 }
 
 struct ValueTracker {

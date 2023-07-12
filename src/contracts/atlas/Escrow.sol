@@ -31,7 +31,8 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     // NOTE: these storage vars / maps should only be accessible by *signed* searcher transactions
     // and only once per searcher per block (to avoid user-searcher collaborative exploits)
     // EOA Address => searcher escrow data
-    mapping(address => SearcherEscrow) private _escrowData;
+    mapping(address => SearcherEscrow) internal _escrowData;
+    mapping(address => SearcherWithdrawal) internal _withdrawalData;
 
     constructor(
         uint32 escrowDurationFromFactory //,
@@ -198,9 +199,9 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
             uint256 gasUsed = gasWaterMark - gasleft();
 
             if (result & EscrowBits._FULL_REFUND != 0) {
-                gasRebate = gasUsed + (metaTx.data.length * 16);
+                gasRebate = gasUsed + (metaTx.data.length * CALLDATA_LENGTH_PREMIUM);
             } else if (result & EscrowBits._CALLDATA_REFUND != 0) {
-                gasRebate = (metaTx.data.length * 16);
+                gasRebate = (metaTx.data.length * CALLDATA_LENGTH_PREMIUM);
             } else if (result & EscrowBits._NO_USER_REFUND != 0) {
                 // pass
             } else {
@@ -220,6 +221,10 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
 
                 // save the escrow data back into storage
                 _escrowData[metaTx.from] = searcherEscrow;
+            
+            // Check if need to save escrowData due to nonce update but not gasRebate
+            } else if (result & EscrowBits._NO_NONCE_UPDATE == 0) {
+                _escrowData[metaTx.from].nonce = searcherEscrow.nonce;
             }
         }
     }
@@ -281,49 +286,52 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     {
         searcherEscrow = _escrowData[searcherCall.metaTx.from];
 
-        if (searcherCall.metaTx.nonce <= uint256(searcherEscrow.nonce)) {
-            result |= 1 << uint256(SearcherOutcome.InvalidNonceUnder);
-        } else if (searcherCall.metaTx.nonce > uint256(searcherEscrow.nonce) + 1) {
-            result |= 1 << uint256(SearcherOutcome.InvalidNonceOver);
+        unchecked {
 
-            // TODO: reconsider the jump up for gapped nonces? Intent is to mitigate dmg
-            // potential inflicted by a hostile searcher/builder.
-            searcherEscrow.nonce = uint32(searcherCall.metaTx.nonce);
-        } else {
-            ++searcherEscrow.nonce;
-        }
+            if (searcherCall.metaTx.nonce <= uint256(searcherEscrow.nonce)) {
+                result |= 1 << uint256(SearcherOutcome.InvalidNonceUnder);
+            } else if (searcherCall.metaTx.nonce > uint256(searcherEscrow.nonce) + 1) {
+                result |= 1 << uint256(SearcherOutcome.InvalidNonceOver);
 
-        if (searcherEscrow.lastAccessed >= uint64(block.number)) {
-            result |= 1 << uint256(SearcherOutcome.PerBlockLimit);
-        } else {
-            searcherEscrow.lastAccessed = uint64(block.number);
-        }
+                // TODO: reconsider the jump up for gapped nonces? Intent is to mitigate dmg
+                // potential inflicted by a hostile searcher/builder.
+                searcherEscrow.nonce = uint32(searcherCall.metaTx.nonce);
+            } else {
+                ++searcherEscrow.nonce;
+            }
 
-        if (!_verifyBids(searcherCall.metaTx.bidsHash, searcherCall.bids)) {
-            result |= 1 << uint256(SearcherOutcome.InvalidBidsHash);
-        }
+            if (searcherEscrow.lastAccessed >= uint64(block.number)) {
+                result |= 1 << uint256(SearcherOutcome.PerBlockLimit);
+            } else {
+                searcherEscrow.lastAccessed = uint64(block.number);
+            }
 
-        gasLimit = (100)
-            * (
-                searcherCall.metaTx.gas < EscrowBits.SEARCHER_GAS_LIMIT
-                    ? searcherCall.metaTx.gas
-                    : EscrowBits.SEARCHER_GAS_LIMIT
-            ) / (100 + EscrowBits.SEARCHER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
+            if (!_verifyBids(searcherCall.metaTx.bidsHash, searcherCall.bids)) {
+                result |= 1 << uint256(SearcherOutcome.InvalidBidsHash);
+            }
 
-        uint256 gasCost = (tx.gasprice * gasLimit) + (searcherCall.metaTx.data.length * 16 * tx.gasprice);
+            gasLimit = (100)
+                * (
+                    searcherCall.metaTx.gas < EscrowBits.SEARCHER_GAS_LIMIT
+                        ? searcherCall.metaTx.gas
+                        : EscrowBits.SEARCHER_GAS_LIMIT
+                ) / (100 + EscrowBits.SEARCHER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
 
-        // see if searcher's escrow can afford tx gascost
-        if (gasCost > searcherEscrow.total - searcherEscrow.escrowed) {
-            // charge searcher for calldata so that we can avoid vampire attacks from searcher onto user
-            result |= 1 << uint256(SearcherOutcome.InsufficientEscrow);
-        }
+            uint256 gasCost = (tx.gasprice * gasLimit) + (searcherCall.metaTx.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
 
-        // subtract out the gas buffer since the searcher's metaTx won't use it
-        gasLimit -= EscrowBits.FASTLANE_GAS_BUFFER;
+            // see if searcher's escrow can afford tx gascost
+            if (gasCost > searcherEscrow.total - _withdrawalData[searcherCall.metaTx.from].escrowed) {
+                // charge searcher for calldata so that we can avoid vampire attacks from searcher onto user
+                result |= 1 << uint256(SearcherOutcome.InsufficientEscrow);
+            }
 
-        // Verify that we can lend the searcher their tx value
-        if (searcherCall.metaTx.value > address(this).balance) {
-            result |= 1 << uint256(SearcherOutcome.CallValueTooHigh);
+            // Verify that we can lend the searcher their tx value
+            if (searcherCall.metaTx.value > address(this).balance - (gasLimit * tx.gasprice)) {
+                result |= 1 << uint256(SearcherOutcome.CallValueTooHigh);
+            }
+
+            // subtract out the gas buffer since the searcher's metaTx won't use it
+            gasLimit -= EscrowBits.FASTLANE_GAS_BUFFER;
         }
     }
 
