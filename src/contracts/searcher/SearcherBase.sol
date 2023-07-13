@@ -29,7 +29,8 @@ contract SearcherBase {
     function metaFlashCall(address sender, bytes calldata searcherCalldata, BidData[] calldata bids)
         external
         payable
-        safetyFirst(sender, bids)
+        safetyFirst(sender)
+        payBids(bids)
         returns (bool success, bytes memory data)
     {
         (success, data) = address(this).call{value: msg.value}(searcherCalldata);
@@ -37,11 +38,23 @@ contract SearcherBase {
         require(success, "CALL UNSUCCESSFUL");
     }
 
-    modifier safetyFirst(address sender, BidData[] calldata bids) {
+    modifier safetyFirst(address sender) {
         // Safety checks
         require(sender == _owner, "INVALID CALLER");
         uint256 msgValueOwed = msg.value;
 
+        _;
+
+        // NOTE: Because this is nested inside of an Atlas meta transaction, if someone is attempting
+        // to innappropriately access your smart contract then THEY will have to pay for the gas...
+        // so feel free to run the safety checks at the end of the call.
+        // NOTE: The searcherSafetyCallback is mandatory - if it is not called then the searcher
+        // transaction will revert.  It is payable and can be used to repay a msg.value loan from the
+        // Atlas Escrow.
+        require(ISafetyLocks(_escrow).searcherSafetyCallback{value: msgValueOwed}(msg.sender), "INVALID SEQUENCE");
+    }
+
+    modifier payBids(BidData[] calldata bids) {
         // Track starting balances
         uint256[] memory balances = new uint256[](bids.length);
         uint256 i;
@@ -87,13 +100,6 @@ contract SearcherBase {
                 ++i;
             }
         }
-
-        // NOTE: Because this is nested inside of an Atlas meta transaction, if someone is attempting
-        // to innappropriately access your smart contract then THEY will have to pay for the gas...
-        // so feel free to run the safety checks at the end of the call.
-        // NOTE: The searcherSafetyCallback is mandatory - if it is not called then the searcher
-        // transaction will revert.  It is payable and can be used to repay a msg.value loan from the
-        // Atlas Escrow.
-        require(ISafetyLocks(_escrow).searcherSafetyCallback{value: msgValueOwed}(msg.sender), "INVALID SEQUENCE");
+        
     }
 }

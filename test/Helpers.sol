@@ -110,7 +110,6 @@ contract Helper is Test, TestConstants {
         address governanceEOA,
         ProtocolCall calldata protocolCall,
         UserCall calldata userCall,
-        PayeeData[] memory payeeData,
         SearcherCall[] calldata searcherCalls
     ) public view returns (Verification memory verification) {
         bytes32[] memory executionHashChain =
@@ -121,7 +120,6 @@ contract Helper is Test, TestConstants {
             to: control,
             nonce: governanceNextNonce(governanceEOA),
             deadline: deadline,
-            payeeHash: keccak256(abi.encode(payeeData)),
             userCallHash: keccak256(abi.encodePacked(userCall.to, userCall.data)),
             callChainHash: executionHashChain[executionHashChain.length - 1]
         });

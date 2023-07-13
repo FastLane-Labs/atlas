@@ -1,6 +1,8 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
+import {IProtocolControl} from "../interfaces/IProtocolControl.sol";
+
 import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
 import "../types/CallTypes.sol";
@@ -18,14 +20,13 @@ abstract contract MEVAllocator {
     // Data should be decoded as:
     //
     //      uint256 totalEtherReward,
-    //      BidData[] memory bids,
-    //      PayeeData[] memory payeeData
+    //      BidData[] memory bids
     //
 
     // _allocateDelegateCall
     // Details:
     //  allocate/delegate =
-    //      Inputs: MEV Profits (ERC20 balances) and payeeData sourced by protocol frontend
+    //      Inputs: MEV Profits (ERC20 balances) 
     //      Function: Executing the function set by ProtocolControl / MEVAllocator
     //      Container: Inside of the FastLane ExecutionEnvironment
     //      Access: With storage access (read + write) only to the ExecutionEnvironment
@@ -57,7 +58,13 @@ abstract contract MEVAllocator {
 }
 
 contract AllocationExample {
-    function _exampleAllocateMEV(BidData[] memory bids, PayeeData[] memory payeeData) internal {
+    address public immutable control;
+
+    constructor() {
+        control = address(this);
+    }
+
+    function _exampleAllocateMEV(BidData[] memory bids) internal {
         PaymentData memory pmtData;
 
         address tokenAddress;
@@ -67,6 +74,10 @@ contract AllocationExample {
 
         uint256 i;
         uint256 k;
+
+        bytes memory nullBytes;
+
+        PayeeData[] memory payeeData = IProtocolControl(control).getPayeeData(nullBytes);
 
         for (; i < bids.length;) {
             tokenAddress = bids[i].token;

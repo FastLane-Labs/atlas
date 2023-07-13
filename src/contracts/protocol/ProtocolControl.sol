@@ -16,6 +16,7 @@ import "forge-std/Test.sol";
 abstract contract ProtocolControl is Test, MEVAllocator, GovernanceControl {
     address public immutable escrow;
     address public immutable governance;
+    address public immutable control;
 
     bool public immutable sequenced;
     bool public immutable requireStaging;
@@ -40,6 +41,8 @@ abstract contract ProtocolControl is Test, MEVAllocator, GovernanceControl {
         bool shouldDelegateVerification,
         bool allowRecycledStorage
     ) {
+        control = address(this);
+
         sequenced = shouldRequireSequencedNonces;
 
         /*

@@ -7,7 +7,7 @@ import {IProtocolControl} from "../interfaces/IProtocolControl.sol";
 
 import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
-import {UserCall, ProtocolCall, SearcherCall, BidData, PayeeData} from "../types/CallTypes.sol";
+import {UserCall, ProtocolCall, SearcherCall, BidData} from "../types/CallTypes.sol";
 import {CallChainProof} from "../types/VerificationTypes.sol";
 
 import {CallVerification} from "../libraries/CallVerification.sol";
@@ -254,7 +254,7 @@ contract ExecutionEnvironment is Test {
         require(atlas.balance >= escrowBalance, SEARCHER_MSG_VALUE_UNPAID);
     }
 
-    function allocateRewards(BidData[] calldata bids, PayeeData[] calldata payeeData) external {
+    function allocateRewards(BidData[] calldata bids) external {
         // msg.sender = escrow
         // address(this) = ExecutionEnvironment
         require(msg.sender == atlas, "ERR-04 InvalidCaller");
@@ -284,12 +284,12 @@ contract ExecutionEnvironment is Test {
 
         if (_config().needsDelegateAllocating()) {
             (bool success,) = _control().delegatecall(
-                abi.encodeWithSelector(IProtocolControl.allocatingCall.selector, totalEtherReward, bids, payeeData)
+                abi.encodeWithSelector(IProtocolControl.allocatingCall.selector, abi.encode(totalEtherReward, bids))
             );
             require(success, "ERR-EC02 DelegateRevert");
         } else {
             (bool success,) = _control().call{value: totalEtherReward}(
-                abi.encodeWithSelector(IProtocolControl.allocatingCall.selector, totalEtherReward, bids, payeeData)
+                abi.encodeWithSelector(IProtocolControl.allocatingCall.selector, abi.encode(totalEtherReward, bids))
             );
             require(success, "ERR-EC04b CallRevert");
         }

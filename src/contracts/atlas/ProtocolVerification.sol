@@ -23,7 +23,7 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
     using CallBits for uint16;
 
     bytes32 public constant PROTOCOL_TYPE_HASH = keccak256(
-        "ProtocolProof(address from,address to,uint256 nonce,uint256 deadline,bytes32 payeeHash,bytes32 userCallHash,bytes32 callChainHash)"
+        "ProtocolProof(address from,address to,uint256 nonce,uint256 deadline,bytes32 userCallHash,bytes32 callChainHash)"
     );
 
     constructor() EIP712("ProtoCallHandler", "0.0.1") {}
@@ -118,7 +118,6 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
                 proof.to,
                 proof.nonce,
                 proof.deadline,
-                proof.payeeHash,
                 proof.userCallHash,
                 proof.callChainHash
             )

@@ -26,7 +26,7 @@ contract FastLaneErrorsEvents {
     event UserTxResult(address indexed user, uint256 valueReturned, uint256 gasRefunded);
 
     event MEVPaymentFailure(
-        address indexed protocolControl, uint16 callConfig, BidData[] winningBids, PayeeData[] payeeData
+        address indexed protocolControl, uint16 callConfig, BidData[] winningBids
     );
 
     bytes32 internal constant _SEARCHER_BID_UNPAID = keccak256(abi.encodePacked(SEARCHER_BID_UNPAID));

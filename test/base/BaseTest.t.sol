@@ -96,5 +96,8 @@ contract BaseTest is Test, TestConstants {
         deal(TOKEN_ONE, address(searcherTwo), 10e24);
 
         helper = new Helper(address(control), escrow, address(atlas));
+
+        deal(TOKEN_ZERO, address(atlas), 1);
+        deal(TOKEN_ONE, address(atlas), 1);
     }
 }

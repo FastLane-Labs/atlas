@@ -41,8 +41,6 @@ contract MainTest is BaseTest {
 
         UserCall memory userCall = helper.buildUserCall(POOL_ONE, userEOA, TOKEN_ONE);
 
-        PayeeData[] memory payeeData = helper.getPayeeData();
-
         SearcherCall[] memory searcherCalls = new SearcherCall[](2);
 
         uint8 v;
@@ -65,7 +63,7 @@ contract MainTest is BaseTest {
 
         // Verification call
         Verification memory verification =
-            helper.buildVerification(governanceEOA, protocolCall, userCall, payeeData, searcherCalls);
+            helper.buildVerification(governanceEOA, protocolCall, userCall, searcherCalls);
 
         (v, r, s) = vm.sign(governancePK, IAtlas(address(atlas)).getVerificationPayload(verification));
 
@@ -89,7 +87,7 @@ contract MainTest is BaseTest {
 
         (bool success,) = address(atlas).call(
             abi.encodeWithSelector(
-                atlas.metacall.selector, protocolCall, userCall, payeeData, searcherCalls, verification
+                atlas.metacall.selector, protocolCall, userCall, searcherCalls, verification
             )
         );
 

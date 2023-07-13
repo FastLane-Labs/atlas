@@ -31,6 +31,9 @@ interface IWETH {
 }
 
 contract V2ProtocolControl is MEVAllocator, ProtocolControl {
+
+    uint256 public constant CONTROL_GAS_USAGE = 250_000;
+
     address public constant WETH = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     address public constant GOVERNANCE_TOKEN = address(0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984);
     address public constant WETH_X_GOVERNANCE_POOL = address(0xd3d2E2692501A5c9Ca623199D38826e513033a17);
@@ -40,17 +43,14 @@ contract V2ProtocolControl is MEVAllocator, ProtocolControl {
 
     bytes4 public constant SWAP = bytes4(IUniswapV2Pair.swap.selector);
 
-    address public immutable control;
-
     bool public immutable govIsTok0;
 
-    event BurnedGovernanceToken(address indexed user, address indexed token, uint256 amount);
+    event GiftedGovernanceToken(address indexed user, address indexed token, uint256 amount);
 
     constructor(address _escrow)
         MEVAllocator()
         ProtocolControl(_escrow, msg.sender, false, true, true, false, false, true, false, false, true)
     {
-        control = address(this);
         govIsTok0 = (IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token0() == GOVERNANCE_TOKEN);
         if (govIsTok0) {
             require(IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token1() == WETH, "INVALID TOKEN PAIR");
@@ -152,20 +152,31 @@ contract V2ProtocolControl is MEVAllocator, ProtocolControl {
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
 
-        // NOTE: ProtocolVerifier has verified the PayeeData[] and BidData[] format
-        // BidData[0] = address(0) <== Ether
+        // NOTE: ProtocolVerifier has verified the BidData[] format
+        // BidData[0] = address(WETH) <== WETH
 
-        // MEV Rewards were collected in Ether
-        uint256 balance = address(this).balance;
+        address user = IExecutionEnvironment(address(this)).getUser();
 
+        // MEV Rewards were collected in WETH
+        uint256 balance = ERC20(WETH).balanceOf(address(this));
+
+        // TODO: remove this to allow graceful return?
         require(balance > 0, "ERR-AC01 NoBalance");
 
-        IWETH(WETH).deposit{value: balance}();
-
-        // Decrement the balance by 1 so that the contract keeps the storage slot
-        // initialized.
-        unchecked {
-            --balance;
+        // Refund the user any extra gas costs
+        uint256 userGasOverage = tx.gasprice * CONTROL_GAS_USAGE;
+        
+        // CASE: gas costs exceed MEV
+        if (balance <= userGasOverage) {
+            IWETH(WETH).withdraw(balance); // should null out the balance
+            SafeTransferLib.safeTransferETH(user, balance);
+            return;
+        
+        // CASE: MEV exceeds gas costs
+        } else {
+            IWETH(WETH).withdraw(userGasOverage); // should null out the balance
+            SafeTransferLib.safeTransferETH(user, userGasOverage);
+            balance -= userGasOverage;
         }
 
         (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).getReserves();
@@ -184,11 +195,9 @@ contract V2ProtocolControl is MEVAllocator, ProtocolControl {
         }
 
         bytes memory nullBytes;
-        IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).swap(amount0Out, amount1Out, BURN_ADDRESS, nullBytes);
+        IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).swap(amount0Out, amount1Out, user, nullBytes);
 
-        emit BurnedGovernanceToken(
-            IExecutionEnvironment(address(this)).getUser(), GOVERNANCE_TOKEN, govIsTok0 ? amount0Out : amount1Out
-        );
+        emit GiftedGovernanceToken(user, GOVERNANCE_TOKEN, govIsTok0 ? amount0Out : amount1Out);
 
         /*
         // ENABLE FOR FOUNDRY TESTING
@@ -213,7 +222,7 @@ contract V2ProtocolControl is MEVAllocator, ProtocolControl {
 
         PayeeData[] memory payeeData = new PayeeData[](1);
 
-        payeeData[0] = PayeeData({token: address(0), payments: payments, data: data});
+        payeeData[0] = PayeeData({token: WETH, payments: payments, data: data});
         return payeeData;
     }
 
@@ -225,7 +234,7 @@ contract V2ProtocolControl is MEVAllocator, ProtocolControl {
         BidData[] memory bidData = new BidData[](1);
 
         bidData[0] = BidData({
-            token: address(0),
+            token: WETH,
             bidAmount: 0 // <- searcher must update
         });
 

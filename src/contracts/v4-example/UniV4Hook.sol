@@ -70,17 +70,25 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
         IPoolManager.PoolKey poolKey;
     }
 
+    struct PoolKey {
+        bool initialized;
+        IPoolManager.PoolKey key;
+    }
+
     bytes4 public constant SWAP = IPoolManager.swap.selector;
     address public immutable hook;
     address public immutable v4Singleton;
 
     // Storage lock
-    bytes32 public hashLock; // keccak256(poolKey, executionEnvironment)
+    // keccak256(poolKey, executionEnvironment)
+    bytes32 public hashLock; // TODO: Transient storage <-
 
     // Map to track when "Non Adversarial" flow is allowed.
     // NOTE: This hook is meant to be used for multiple pairs
     // key: keccak(token0, token1, block.number)
     mapping(bytes32 => bool) public sequenceLock;
+
+    PoolKey internal _currentKey; // TODO: Transient storage <-
 
     constructor(address _escrow, address _v4Singleton)
         MEVAllocator()
@@ -119,6 +127,9 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
         // address(this) = ExecutionEnvironment
         // msg.sender = Atlas Escrow
 
+
+        require(!_currentKey.initialized, "ERR-H09 AlreadyInitialized");
+
         require(userSelector == SWAP, "ERR-H10 InvalidFunction");
 
         UserCall memory userCall = abi.decode(userData, (UserCall));
@@ -129,11 +140,18 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
         // and that ProtocolControl supplied a valid signature
         require(msg.sender == escrow, "ERR-H00 InvalidCaller");
 
+
         (IPoolManager.PoolKey memory key, IPoolManager.SwapParams memory params) =
             abi.decode(userCall.data, (IPoolManager.PoolKey, IPoolManager.SwapParams));
 
         // Perform more checks and activate the lock
         AtlasV4Hook(hook).setLock(key);
+
+        // Store the key so that we can access it at verification
+        _currentKey = PoolKey({
+            initialized: true, // TODO: consider using a lock array like v4 so we can handle multiple?
+            key: key
+        });
 
         // Handle forwarding of token approvals, or token transfers.
         // NOTE: The user will have approved the ExecutionEnvironment in a prior call
@@ -180,17 +198,19 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
 
+        require(!_currentKey.initialized, "ERR-H09 AlreadyInitialized");
+        
         // Pull the calldata into memory
-        (, BidData[] memory bids, PayeeData[] memory payeeData) = abi.decode(data, (uint256, BidData[], PayeeData[]));
+        (, BidData[] memory bids) = abi.decode(data, (uint256, BidData[]));
 
-        // NOTE: ProtocolVerifier has verified the PayeeData[] and BidData[] format
+        // NOTE: ProtocolVerifier has verified the BidData[] format
         // BidData[0] = token0
         // BidData[1] = token1
 
-        uint256 token0DonateAmount = bids[0].bidAmount * payeeData[0].payments[0].payeePercent / 100;
-        uint256 token1DonateAmount = bids[1].bidAmount * payeeData[1].payments[0].payeePercent / 100;
+        uint256 token0DonateAmount = bids[0].bidAmount;
+        uint256 token1DonateAmount = bids[1].bidAmount;
 
-        IPoolManager.PoolKey memory key = abi.decode(payeeData[0].data, (IPoolManager.PoolKey));
+        IPoolManager.PoolKey memory key = _currentKey.key;
 
         IPoolManager(v4Singleton).donate(key, token0DonateAmount, token1DonateAmount);
 
@@ -217,6 +237,8 @@ contract AtlasV4Hook is MEVAllocator, ProtocolControl {
         StagingReturn memory stagingReturn = abi.decode(stagingReturnData, (StagingReturn));
 
         AtlasV4Hook(hook).releaseLock(stagingReturn.poolKey);
+
+        delete _currentKey;
 
         return true;
     }

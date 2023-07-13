@@ -8,7 +8,6 @@ interface IAtlas {
     function metacall(
         ProtocolCall calldata protocolCall,
         UserCall calldata userCall,
-        PayeeData[] calldata payeeData,
         SearcherCall[] calldata searcherCalls,
         Verification calldata verification
     ) external payable;

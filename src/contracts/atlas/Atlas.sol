@@ -21,10 +21,10 @@ contract Atlas is Test, Factory {
     function metacall(
         ProtocolCall calldata protocolCall, // supplied by frontend
         UserCall calldata userCall, // set by user
-        PayeeData[] calldata payeeData, // supplied by frontend
         SearcherCall[] calldata searcherCalls, // supplied by FastLane via frontend integration
         Verification calldata verification // supplied by front end after it sees the other data
     ) external payable {
+
         uint256 gasMarker = gasleft();
 
         // Verify that the calldata injection came from the protocol frontend
@@ -34,8 +34,6 @@ contract Atlas is Test, Factory {
         if (!_verifyProtocol(userCall.to, protocolCall, verification)) {
             return;
         }
-
-        require(keccak256(abi.encode(payeeData)) == verification.proof.payeeHash, "ERR-H02 PayeeMismatch");
 
         // Check that the value of the tx is greater than or equal to the value specified
         // NOTE: a msg.value *higher* than user value could be used by the staging call.
@@ -61,7 +59,7 @@ contract Atlas is Test, Factory {
         _initializeEscrowLocks(protocolCall, environment, uint8(searcherCalls.length));
 
         // Begin execution
-        bytes32 callChainHashHead = _execute(protocolCall, userCall, payeeData, searcherCalls, environment);
+        bytes32 callChainHashHead = _execute(protocolCall, userCall, searcherCalls, environment);
 
         require(callChainHashHead == verification.proof.callChainHash, "ERR-F05 InvalidCallChain");
 
@@ -81,7 +79,6 @@ contract Atlas is Test, Factory {
     function _execute(
         ProtocolCall calldata protocolCall,
         UserCall calldata userCall,
-        PayeeData[] calldata payeeData,
         SearcherCall[] calldata searcherCalls,
         address environment
     ) internal returns (bytes32) {
@@ -102,7 +99,7 @@ contract Atlas is Test, Factory {
 
             auctionAlreadyWon = auctionAlreadyWon
                 || _searcherExecutionIteration(
-                    protocolCall, payeeData, searcherCalls[i], proof, auctionAlreadyWon, environment
+                    protocolCall, searcherCalls[i], proof, auctionAlreadyWon, environment
                 );
             unchecked {
                 ++i;
@@ -118,7 +115,6 @@ contract Atlas is Test, Factory {
 
     function _searcherExecutionIteration(
         ProtocolCall calldata protocolCall,
-        PayeeData[] calldata payeeData,
         SearcherCall calldata searcherCall,
         CallChainProof memory proof,
         bool auctionAlreadyWon,
@@ -127,7 +123,7 @@ contract Atlas is Test, Factory {
         if (_executeSearcherCall(searcherCall, proof, auctionAlreadyWon, environment)) {
             if (!auctionAlreadyWon) {
                 auctionAlreadyWon = true;
-                _executePayments(protocolCall, searcherCall.bids, payeeData, environment);
+                _executePayments(protocolCall, searcherCall.bids, environment);
             }
         }
         return auctionAlreadyWon;

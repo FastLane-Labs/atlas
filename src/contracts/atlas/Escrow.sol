@@ -85,25 +85,24 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     function _executeSearcherCall(
         SearcherCall calldata searcherCall,
         CallChainProof memory proof,
-        bool auctionAlreadyComplete,
+        bool isAuctionAlreadyComplete,
         address environment
     ) internal returns (bool) {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
-        uint256 gasRebate;
-
-        // Open the searcher lock
-        _openSearcherLock(searcherCall.metaTx.to, environment);
 
         // Verify the transaction.
         (uint256 result, uint256 gasLimit, SearcherEscrow memory searcherEscrow) =
-            _verify(searcherCall, gasWaterMark, auctionAlreadyComplete);
+            _verify(searcherCall, gasWaterMark, isAuctionAlreadyComplete);
 
         SearcherOutcome outcome;
         uint256 escrowSurplus;
 
         // If there are no errors, attempt to execute
         if (EscrowBits.canExecute(result)) {
+            // Open the searcher lock
+            _openSearcherLock(searcherCall.metaTx.to, environment);
+
             // Execute the searcher call
             (outcome, escrowSurplus) = _searcherCallWrapper(searcherCall, proof, gasLimit, environment);
 
@@ -117,32 +116,44 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
                 result |= 1 << uint256(SearcherOutcome.ExecutionCompleted);
             } else if (EscrowBits.executionSuccessful(result)) {
                 // first successful searcher call that paid what it bid
-                auctionAlreadyComplete = true; // cannot be reached if bool is already true
+                isAuctionAlreadyComplete = true; // cannot be reached if bool is already true
                 result |= 1 << uint256(SearcherOutcome.ExecutionCompleted);
             }
-        }
+        
 
-        // emit event
-        if (EscrowBits.emitEvent(searcherEscrow)) {
+            uint256 gasRebate; // TODO: can reuse gasWaterMark here for gas efficiency if it really matters
+
+            // Update the searcher's escrow balances
+            if (EscrowBits.updateEscrow(result)) {
+                gasRebate = _update(searcherCall.metaTx, searcherEscrow, gasWaterMark, result);
+            }
+
+            // Close the searcher lock
+            _closeSearcherLock(searcherCall.metaTx.to, environment, gasRebate);
+
+            // emit event
             emit SearcherTxResult(
                 searcherCall.metaTx.to,
                 searcherCall.metaTx.from,
-                EscrowBits.canExecute(result),
+                true,
                 outcome == SearcherOutcome.Success,
-                EscrowBits.canExecute(result) ? searcherEscrow.nonce - 1 : searcherEscrow.nonce,
+                searcherEscrow.nonce,
+                result
+            );
+
+        } else {
+            // emit event
+            emit SearcherTxResult(
+                searcherCall.metaTx.to,
+                searcherCall.metaTx.from,
+                false,
+                false,
+                searcherEscrow.nonce,
                 result
             );
         }
 
-        // Update the searcher's escrow balances
-        if (EscrowBits.updateEscrow(result)) {
-            gasRebate = _update(searcherCall.metaTx, searcherEscrow, gasWaterMark, result);
-        }
-
-        // Close the searcher lock
-        _closeSearcherLock(searcherCall.metaTx.to, environment, gasRebate);
-
-        return auctionAlreadyComplete;
+        return isAuctionAlreadyComplete;
     }
 
     // TODO: who should pay gas cost of MEV Payments?
@@ -153,13 +164,12 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     function _executePayments(
         ProtocolCall calldata protocolCall,
         BidData[] calldata winningBids,
-        PayeeData[] calldata payeeData,
         address environment
     ) internal paymentsLock(environment) {
         // process protocol payments
-        try IExecutionEnvironment(environment).allocateRewards(winningBids, payeeData) {}
+        try IExecutionEnvironment(environment).allocateRewards(winningBids) {}
         catch {
-            emit MEVPaymentFailure(protocolCall.to, protocolCall.callConfig, winningBids, payeeData);
+            emit MEVPaymentFailure(protocolCall.to, protocolCall.callConfig, winningBids);
         }
     }
 
