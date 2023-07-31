@@ -12,7 +12,7 @@ import "../types/CallTypes.sol";
 
 import "forge-std/Test.sol";
 
-contract Factory is Test, Escrow {
+contract Factory is Escrow {
     //address immutable public atlas;
     bytes32 public immutable salt;
     address public immutable execution;

@@ -11,7 +11,7 @@ import {CallBits} from "../libraries/CallBits.sol";
 
 import "forge-std/Test.sol";
 
-contract Atlas is Test, Factory {
+contract Atlas is Factory {
     using CallVerification for CallChainProof;
     using CallVerification for bytes32[];
     using CallBits for uint16;

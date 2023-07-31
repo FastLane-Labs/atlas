@@ -23,7 +23,7 @@ import {
     SEARCHER_BID_UNPAID
 } from "./Emissions.sol";
 
-contract ExecutionEnvironment is Test {
+contract ExecutionEnvironment {
     using CallVerification for CallChainProof;
     using CallBits for uint16;
 
