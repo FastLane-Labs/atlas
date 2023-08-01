@@ -7,13 +7,13 @@ import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
 import {CallBits} from "../libraries/CallBits.sol";
 
 import {GovernanceControl} from "./GovernanceControl.sol";
-import {MEVAllocator} from "./MEVAllocator.sol";
+import {ExecutionBase} from "./ExecutionBase.sol";
 
 import "../types/CallTypes.sol";
 
 import "forge-std/Test.sol";
 
-abstract contract ProtocolControl is Test, MEVAllocator, GovernanceControl {
+abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
     address public immutable escrow;
     address public immutable governance;
     address public immutable control;
@@ -45,19 +45,6 @@ abstract contract ProtocolControl is Test, MEVAllocator, GovernanceControl {
 
         sequenced = shouldRequireSequencedNonces;
 
-        /*
-        // Disallow delegatecall when recycled storage is used
-        if(allowRecycledStorage) {
-            require(
-                (
-                    (!shouldDelegateStaging) &&
-                    (!shouldDelegateUser) &&
-                    (!shouldDelegateVerification)
-                ),
-                "ERR-GC01 DelegatingWithRecyled"
-            );
-        }
-        */
 
         if (shouldDelegateStaging) {
             require(shouldRequireStaging, "ERR-GC04 InvalidStaging");
@@ -67,10 +54,6 @@ abstract contract ProtocolControl is Test, MEVAllocator, GovernanceControl {
             require(shouldRequireVerification, "ERR-GC05 InvalidVerification");
         }
 
-        // NOTE: At this time, MEV Allocation payments are required to be delegatecalled.
-        // By the time the MEV Payments are paid, both the user and the searchers will
-        // no longer be executing any transactions, and all MEV rewards will be
-        // held in the ExecutionEnvironment
         require(shouldDelegateAllocating, "ERR-GC02 NotDelegateAllocating");
 
         if (shouldDelegateUser) {
@@ -107,11 +90,7 @@ abstract contract ProtocolControl is Test, MEVAllocator, GovernanceControl {
         onlyApprovedCaller(delegateStaging)
         returns (bytes memory)
     {
-        return (
-            delegateStaging
-                ? _stageDelegateCall(to, from, userSelector, userData)
-                : _stageStaticCall(to, from, userSelector, userData)
-        );
+        return _stageCall(to, from, userSelector, userData);
     }
 
     function userLocalCall(bytes calldata data) external onlyApprovedCaller(delegateUser) returns (bytes memory) {
@@ -119,11 +98,11 @@ abstract contract ProtocolControl is Test, MEVAllocator, GovernanceControl {
     }
 
     function allocatingCall(bytes calldata data) external onlyApprovedCaller(true) {
-        return _allocatingDelegateCall(data);
+        return _allocatingCall(data);
     }
 
     function verificationCall(bytes calldata data) external onlyApprovedCaller(delegateVerification) returns (bool) {
-        return delegateVerification ? _verificationDelegateCall(data) : _verificationStaticCall(data);
+        return _verificationCall(data);
     }
 
     // View functions

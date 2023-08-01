@@ -86,6 +86,7 @@ contract Helper is Test, TestConstants {
 
     function buildSearcherCall(
         UserCall memory userCall,
+        ProtocolCall memory protocolCall,
         address searcherEOA,
         address searcherContract,
         address poolOne,
@@ -99,8 +100,9 @@ contract Helper is Test, TestConstants {
             gas: gas,
             value: 0,
             nonce: searcherNextNonce(searcherEOA),
-            userCallHash: keccak256(abi.encodePacked(userCall.to, userCall.data)),
             maxFeePerGas: maxFeePerGas,
+            userCallHash: keccak256(abi.encodePacked(userCall.to, userCall.data)),
+            controlCodeHash: protocolCall.to.codehash,
             bidsHash: keccak256(abi.encode(searcherCall.bids)),
             data: abi.encodeWithSelector(BlindBackrun.executeArbitrage.selector, poolOne, poolTwo)
         });
@@ -121,7 +123,8 @@ contract Helper is Test, TestConstants {
             nonce: governanceNextNonce(governanceEOA),
             deadline: deadline,
             userCallHash: keccak256(abi.encodePacked(userCall.to, userCall.data)),
-            callChainHash: executionHashChain[executionHashChain.length - 1]
+            callChainHash: executionHashChain[executionHashChain.length - 1],
+            controlCodeHash: protocolCall.to.codehash
         });
     }
 }

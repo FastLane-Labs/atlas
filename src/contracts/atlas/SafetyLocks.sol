@@ -10,7 +10,9 @@ import {ProtocolCall, UserCall} from "../types/CallTypes.sol";
 import "../types/LockTypes.sol";
 import "../types/EscrowTypes.sol";
 
-contract SafetyLocks {
+import "forge-std/Test.sol";
+
+contract SafetyLocks is Test {
     using SafetyBits for EscrowKey;
     using CallBits for uint16;
 
@@ -166,6 +168,11 @@ contract SafetyLocks {
         }
     }
 
+    function _notMadJustDisappointed() internal {
+        EscrowKey memory escrowKey = _escrowKey;
+        _escrowKey = escrowKey.setAllSearchersFailed();
+    }
+
     //////////////////////////////////
     ////////////  GETTERS  ///////////
     //////////////////////////////////
@@ -177,9 +184,5 @@ contract SafetyLocks {
     // For the Execution Environment to confirm inside of searcher try/catch
     function confirmSafetyCallback() external view returns (bool) {
         return _escrowKey.confirmSearcherLock(msg.sender);
-    }
-
-    function getLockState() external view returns (EscrowKey memory) {
-        return _escrowKey;
     }
 }

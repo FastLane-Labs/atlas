@@ -17,14 +17,12 @@ import "../types/LockTypes.sol";
 import "../types/VerificationTypes.sol";
 
 import {EscrowBits} from "../libraries/EscrowBits.sol";
-import {CallChainProof} from "../libraries/CallVerification.sol";
 import {CallVerification} from "../libraries/CallVerification.sol";
 
 // import "forge-std/Test.sol";
 
 contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     using ECDSA for bytes32;
-    using CallVerification for CallChainProof;
 
     uint32 public immutable escrowDuration;
 
@@ -68,10 +66,9 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     function _executeStagingCall(
         ProtocolCall calldata protocolCall,
         UserCall calldata userCall,
-        CallChainProof memory proof,
         address environment
     ) internal stagingLock(protocolCall, environment) returns (bytes memory stagingReturnData) {
-        stagingReturnData = IExecutionEnvironment(environment).stagingWrapper{value: msg.value}(proof, userCall);
+        stagingReturnData = IExecutionEnvironment(environment).stagingWrapper{value: msg.value}(userCall);
     }
 
     function _executeUserCall(UserCall calldata userCall, address environment)
@@ -84,7 +81,6 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
 
     function _executeSearcherCall(
         SearcherCall calldata searcherCall,
-        CallChainProof memory proof,
         bool isAuctionAlreadyComplete,
         address environment
     ) internal returns (bool) {
@@ -104,7 +100,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
             _openSearcherLock(searcherCall.metaTx.to, environment);
 
             // Execute the searcher call
-            (outcome, escrowSurplus) = _searcherCallWrapper(searcherCall, proof, gasLimit, environment);
+            (outcome, escrowSurplus) = _searcherCallWrapper(searcherCall, gasLimit, environment);
 
             unchecked {
                 searcherEscrow.total += uint128(escrowSurplus);
@@ -120,7 +116,6 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
                 result |= 1 << uint256(SearcherOutcome.ExecutionCompleted);
             }
         
-
             uint256 gasRebate; // TODO: can reuse gasWaterMark here for gas efficiency if it really matters
 
             // Update the searcher's escrow balances
@@ -175,17 +170,14 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
 
     function _executeVerificationCall(
         ProtocolCall calldata protocolCall,
-        CallChainProof memory proof,
         bytes memory stagingReturnData,
         bytes memory userReturnData,
         address environment
     ) internal verificationLock(protocolCall.callConfig, environment) {
-        proof = proof.addVerificationCallProof(protocolCall.to, stagingReturnData, userReturnData);
-
-        IExecutionEnvironment(environment).verificationWrapper(proof, stagingReturnData, userReturnData);
+        IExecutionEnvironment(environment).verificationWrapper(stagingReturnData, userReturnData);
     }
 
-    function _executeUserRefund(address userCallFrom) internal {
+    function _executeGasRefund(address gasPayor) internal {
         uint256 gasRebate = uint256(_escrowKey.gasRefund) * tx.gasprice;
 
         /*
@@ -196,7 +188,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         );
         */
 
-        SafeTransferLib.safeTransferETH(userCallFrom, gasRebate);
+        SafeTransferLib.safeTransferETH(gasPayor, gasRebate);
     }
 
     function _update(
@@ -267,8 +259,9 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
                 metaTx.value,
                 metaTx.gas,
                 metaTx.nonce,
-                metaTx.userCallHash,
                 metaTx.maxFeePerGas,
+                metaTx.userCallHash,
+                metaTx.controlCodeHash,
                 metaTx.bidsHash,
                 keccak256(metaTx.data)
             )

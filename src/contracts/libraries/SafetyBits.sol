@@ -62,6 +62,12 @@ library SafetyBits {
             | 1 << (_SAFETY_LEVEL_OFFSET + uint16(SearcherSafety.Unset))
     );
 
+    uint16 internal constant _NO_SEARCHER_SUCCESS = uint16(
+        1 << uint16(BaseLock.Active) | 
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Verification)) | 
+        1 << (_SAFETY_LEVEL_OFFSET + uint16(SearcherSafety.Unset))
+    );
+
     uint16 internal constant _ACTIVE_X_REFUND_X_UNSET = uint16(
         1 << uint16(BaseLock.Pending) | 1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserRefund))
             | 1 << (_SAFETY_LEVEL_OFFSET + uint16(SearcherSafety.Unset))
@@ -110,6 +116,17 @@ library SafetyBits {
         return self;
     }
 
+    function setAllSearchersFailed(EscrowKey memory self)
+        internal
+        pure
+        returns (EscrowKey memory)
+    {
+        self.lockState = _NO_SEARCHER_SUCCESS;
+        self.approvedCaller = address(0);
+        self.callIndex = self.callMax - 1;
+        return self;
+    }    
+
     function isValidVerificationLock(EscrowKey memory self, address caller) internal pure returns (bool) {
         // CASE: Previous searcher was successful
         if ((self.lockState == _LOCK_PAYMENTS)) {
@@ -118,26 +135,19 @@ library SafetyBits {
                     && (self.callIndex < self.callMax)
             );
 
-            // CASE: No searchers were successful
+        // CASE: No searchers were successful
+        } else if (self.lockState == _NO_SEARCHER_SUCCESS) {
+            return (
+                (!self.makingPayments) && (!self.paymentsComplete) && 
+                (self.callIndex == self.callMax - 1) && (self.approvedCaller == address(0))
+            );
+        
         } else {
             return (
                 (self.lockState == _LOCKED_X_SEARCHERS_X_REQUESTED) && (caller != address(0))
                     && (self.approvedCaller == caller) && (self.callIndex == self.callMax - 1)
             );
         }
-    }
-
-    function turnRefundLock(EscrowKey memory self, address approvedCaller) internal pure returns (EscrowKey memory) {
-        self.lockState = _ACTIVE_X_VERIFICATION_X_UNSET;
-        self.approvedCaller = approvedCaller;
-        return self;
-    }
-
-    function isValidRefundLock(EscrowKey memory self, address caller) internal pure returns (bool) {
-        return (
-            (self.lockState == _ACTIVE_X_REFUND_X_UNSET) && (self.approvedCaller == caller)
-                && (self.callIndex == self.callMax - 2)
-        );
     }
 
     function turnPaymentsLockSearcher(EscrowKey memory self, address approvedCaller)

@@ -35,6 +35,8 @@ contract Atlas is Test, Factory {
             return;
         }
 
+        // TODO: Make sure all searcher nonces are incremented on fail. 
+
         // Check that the value of the tx is greater than or equal to the value specified
         // NOTE: a msg.value *higher* than user value could be used by the staging call.
         // There is a further check in the handler before the usercall to verify.
@@ -49,7 +51,7 @@ contract Atlas is Test, Factory {
         gasMarker = gasleft();
 
         // Get the execution environment
-        address environment = _prepEnvironment(protocolCall, keccak256(abi.encodePacked(userCall.to, userCall.data)));
+        address environment = _setExecutionEnvironment(protocolCall, userCall.from, verification.proof.controlCodeHash);
 
         console.log("contract creation gas cost", gasMarker - gasleft());
 
@@ -61,19 +63,16 @@ contract Atlas is Test, Factory {
         // Begin execution
         bytes32 callChainHashHead = _execute(protocolCall, userCall, searcherCalls, environment);
 
+        // Verify that the meta transactions were executed in the correct sequence
         require(callChainHashHead == verification.proof.callChainHash, "ERR-F05 InvalidCallChain");
+
+        // Gas Refund to sender
+        _executeGasRefund(msg.sender);
 
         // Release the lock
         _releaseEscrowLocks();
 
         console.log("ex contract creation gas cost", gasMarker - gasleft());
-    }
-
-    function _prepEnvironment(ProtocolCall calldata protocolCall, bytes32 userCallHash)
-        internal
-        returns (address environment)
-    {
-        environment = _deployExecutionEnvironment(protocolCall, userCallHash);
     }
 
     function _execute(
@@ -85,8 +84,9 @@ contract Atlas is Test, Factory {
         // Build the CallChainProof.  The penultimate hash will be used
         // to verify against the hash supplied by ProtocolControl
         CallChainProof memory proof = CallVerification.initializeProof(protocolCall, userCall);
+        bytes32 userCallHash = keccak256(abi.encodePacked(userCall.to, userCall.data));
 
-        bytes memory stagingReturnData = _executeStagingCall(protocolCall, userCall, proof, environment);
+        bytes memory stagingReturnData = _executeStagingCall(protocolCall, userCall, environment);
 
         proof = proof.next(userCall.from, userCall.data);
 
@@ -94,33 +94,41 @@ contract Atlas is Test, Factory {
 
         uint256 i;
         bool auctionAlreadyWon;
+
         for (; i < searcherCalls.length;) {
+
             proof = proof.next(searcherCalls[i].metaTx.from, searcherCalls[i].metaTx.data);
 
-            auctionAlreadyWon = auctionAlreadyWon
-                || _searcherExecutionIteration(
-                    protocolCall, searcherCalls[i], proof, auctionAlreadyWon, environment
-                );
+            // Only execute searcher meta tx if userCallHash matches 
+            if (userCallHash == searcherCalls[i].metaTx.userCallHash) {
+                auctionAlreadyWon = auctionAlreadyWon
+                    || _searcherExecutionIteration(
+                        protocolCall, searcherCalls[i], auctionAlreadyWon, environment
+                    );
+            }
+
             unchecked {
                 ++i;
             }
         }
 
-        _executeUserRefund(userCall.from);
+        // If no searcher was successful, manually transition the lock
+        if (!auctionAlreadyWon) {
+            _notMadJustDisappointed();
+        }
 
-        _executeVerificationCall(protocolCall, proof, stagingReturnData, userReturnData, environment);
-
+        _executeVerificationCall(protocolCall, stagingReturnData, userReturnData, environment);
+        
         return proof.targetHash;
     }
 
     function _searcherExecutionIteration(
         ProtocolCall calldata protocolCall,
         SearcherCall calldata searcherCall,
-        CallChainProof memory proof,
         bool auctionAlreadyWon,
         address environment
     ) internal returns (bool) {
-        if (_executeSearcherCall(searcherCall, proof, auctionAlreadyWon, environment)) {
+        if (_executeSearcherCall(searcherCall, auctionAlreadyWon, environment)) {
             if (!auctionAlreadyWon) {
                 auctionAlreadyWon = true;
                 _executePayments(protocolCall, searcherCall.bids, environment);

@@ -23,7 +23,7 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
     using CallBits for uint16;
 
     bytes32 public constant PROTOCOL_TYPE_HASH = keccak256(
-        "ProtocolProof(address from,address to,uint256 nonce,uint256 deadline,bytes32 userCallHash,bytes32 callChainHash)"
+        "ProtocolProof(address from,address to,uint256 nonce,uint256 deadline,bytes32 userCallHash,bytes32 callChainHash,bytes32 controlCodeHash)"
     );
 
     constructor() EIP712("ProtoCallHandler", "0.0.1") {}
@@ -79,7 +79,14 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
             return (false);
         }
 
-        // if the protocol indicated that they only accept sequenced nonces
+        // Verify that ProtocolControl hasn't been updated.  
+        // NOTE: Performing this check here allows the searchers' checks 
+        // to be against the verification proof's controlCodeHash to save gas. 
+        if (controlCodeHash != verification.proof.controlCodeHash) {
+            return (false);
+        }
+
+        // If the protocol indicated that they only accept sequenced nonces
         // (IE for FCFS execution), check and make sure the order is correct
         // NOTE: allowing only sequenced nonces could create a scenario in
         // which builders or validators may be able to profit via censorship.
@@ -119,7 +126,8 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
                 proof.nonce,
                 proof.deadline,
                 proof.userCallHash,
-                proof.callChainHash
+                proof.callChainHash,
+                proof.controlCodeHash
             )
         );
     }

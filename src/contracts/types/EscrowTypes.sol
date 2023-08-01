@@ -57,5 +57,5 @@ enum SearcherOutcome
 }
 
 bytes32 constant SEARCHER_TYPE_HASH = keccak256(
-    "SearcherMetaTx(address from,address to,uint256 value,uint256 gas,uint256 nonce,bytes32 userCallHash,uint256 maxFeePerGas,bytes32 bidsHash,bytes data)"
+    "SearcherMetaTx(address from,address to,uint256 value,uint256 gas,uint256 nonce,bytes32 userCallHash,bytes32 controlCodeHash,uint256 maxFeePerGas,bytes32 bidsHash,bytes data)"
 );

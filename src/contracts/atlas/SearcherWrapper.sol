@@ -15,7 +15,6 @@ import {SearcherOutcome} from "../types/EscrowTypes.sol";
 contract SearcherWrapper is FastLaneErrorsEvents {
     function _searcherCallWrapper(
         SearcherCall calldata searcherCall,
-        CallChainProof memory proof,
         uint256 gasLimit,
         address environment
     ) internal returns (SearcherOutcome, uint256) {
@@ -27,7 +26,7 @@ contract SearcherWrapper is FastLaneErrorsEvents {
 
         // Call the execution environment
         try IExecutionEnvironment(environment).searcherMetaTryCatch{value: searcherCall.metaTx.value}(
-            proof, gasLimit, currentBalance, searcherCall
+            gasLimit, currentBalance, searcherCall
         ) {
             return (SearcherOutcome.Success, address(this).balance - currentBalance);
         } catch Error(string memory err) {

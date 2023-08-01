@@ -2,10 +2,9 @@
 pragma solidity ^0.8.16;
 
 import "../types/CallTypes.sol";
-import {CallChainProof} from "../types/VerificationTypes.sol";
 
 interface IExecutionEnvironment {
-    function stagingWrapper(CallChainProof calldata proof, UserCall calldata userCall)
+    function stagingWrapper(UserCall calldata userCall)
         external
         payable
         returns (bytes memory stagingData);
@@ -13,13 +12,11 @@ interface IExecutionEnvironment {
     function userWrapper(UserCall calldata userCall) external payable returns (bytes memory userReturnData);
 
     function verificationWrapper(
-        CallChainProof calldata proof,
         bytes calldata stagingReturnData,
         bytes calldata userReturnData
     ) external payable;
 
     function searcherMetaTryCatch(
-        CallChainProof calldata proof,
         uint256 gasLimit,
         uint256 escrowBalance,
         SearcherCall calldata searcherCall

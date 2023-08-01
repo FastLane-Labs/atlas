@@ -15,7 +15,6 @@ import "../types/LockTypes.sol";
 
 // Atlas Protocol-Control Imports
 import {ProtocolControl} from "../protocol/ProtocolControl.sol";
-import {MEVAllocator} from "../protocol/MEVAllocator.sol";
 
 // Uni V2 Imports
 import {IUniswapV2Pair} from "./interfaces/IUniswapV2Pair.sol";
@@ -30,7 +29,7 @@ interface IWETH {
     function withdraw(uint256 wad) external;
 }
 
-contract V2ProtocolControl is MEVAllocator, ProtocolControl {
+contract V2ProtocolControl is ProtocolControl {
 
     uint256 public constant CONTROL_GAS_USAGE = 250_000;
 
@@ -48,7 +47,6 @@ contract V2ProtocolControl is MEVAllocator, ProtocolControl {
     event GiftedGovernanceToken(address indexed user, address indexed token, uint256 amount);
 
     constructor(address _escrow)
-        MEVAllocator()
         ProtocolControl(_escrow, msg.sender, false, true, true, false, false, true, false, false, true)
     {
         govIsTok0 = (IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token0() == GOVERNANCE_TOKEN);
@@ -75,15 +73,12 @@ contract V2ProtocolControl is MEVAllocator, ProtocolControl {
     )
     */
 
-    function _stageDelegateCall(address to, address from, bytes4 userSelector, bytes calldata userData)
+    function _stageCall(address to, address, bytes4 userSelector, bytes calldata userData)
         internal
         override
         returns (bytes memory)
     {
         require(userSelector == SWAP, "ERR-H10 InvalidFunction");
-
-        // NOTE: This is a very direct example to facilitate the creation of a testing environment.
-        // Using this example in production is ill-advised.
 
         (
             uint256 amount0Out,
@@ -92,53 +87,20 @@ contract V2ProtocolControl is MEVAllocator, ProtocolControl {
                 // bytes memory swapData // Unused
         ) = abi.decode(userData, (uint256, uint256, address, bytes));
 
-        /*
-        address tokenUserIsSelling = amount0Out > amount1Out ?
-            IUniswapV2Pair(to).token1() :
-            IUniswapV2Pair(to).token0() ;
-        */
-
         (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(to).getReserves();
-
-        /*
-        // ENABLE FOR FOUNDRY TESTING
-        console.log("---");
-        console.log("protocolControlExecutingAs",address(this));
-        console.log("---");
-        console.log("amount0Out   ", amount0Out);
-        console.log("token0Balance", token0Balance);
-        console.log("---");
-        console.log("amount1Out   ", amount1Out);
-        console.log("token1Balance", token1Balance);
-        console.log("---");
-        */
 
         uint256 amount0In =
             amount1Out == 0 ? 0 : SwapMath.getAmountIn(amount1Out, uint256(token0Balance), uint256(token1Balance));
         uint256 amount1In =
             amount0Out == 0 ? 0 : SwapMath.getAmountIn(amount0Out, uint256(token1Balance), uint256(token0Balance));
 
-        // uint256 amountUserIsSelling = amount0Out > amount1Out ? amount1In : amount0In;
-
-        /*
-        // ENABLE FOR FOUNDRY TESTING
-        if (amount0Out > amount1Out) {
-            console.log("amount1In  ", amount1In);
-            console.log("userBalance", ERC20(tokenUserIsSelling).balanceOf(userCallFrom));
-            console.log("EEAllowance", ERC20(tokenUserIsSelling).allowance(userCallFrom, address(this)));
-            console.log("---");
-        } else {
-            console.log("amount0In  ", amount0In);
-            console.log("userBalance", ERC20(tokenUserIsSelling).balanceOf(userCallFrom));
-            console.log("EEAllowance", ERC20(tokenUserIsSelling).allowance(userCallFrom, address(this)));
-            console.log("---");
-        }
-        */
 
         // This is a V2 swap, so optimistically transfer the tokens
         // NOTE: The user should have approved the ExecutionEnvironment for token transfers
-        ERC20(amount0Out > amount1Out ? IUniswapV2Pair(to).token1() : IUniswapV2Pair(to).token0()).transferFrom(
-            from, to, amount0In > amount1In ? amount0In : amount1In
+        _transferUserERC20(
+            amount0Out > amount1Out ? IUniswapV2Pair(to).token1() : IUniswapV2Pair(to).token0(),
+            to, 
+            amount0In > amount1In ? amount0In : amount1In
         );
 
         bytes memory emptyData;
@@ -147,7 +109,7 @@ contract V2ProtocolControl is MEVAllocator, ProtocolControl {
 
     // This occurs after a Searcher has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocatingDelegateCall(bytes calldata) internal override {
+    function _allocatingCall(bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
@@ -155,7 +117,7 @@ contract V2ProtocolControl is MEVAllocator, ProtocolControl {
         // NOTE: ProtocolVerifier has verified the BidData[] format
         // BidData[0] = address(WETH) <== WETH
 
-        address user = IExecutionEnvironment(address(this)).getUser();
+        address user = _user();
 
         // MEV Rewards were collected in WETH
         uint256 balance = ERC20(WETH).balanceOf(address(this));

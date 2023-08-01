@@ -21,7 +21,7 @@ abstract contract GovernanceControl {
     //     bytes calldata userCallData
     //
 
-    // _stageDelegateCall
+    // _stageCall
     // Details:
     //  staging/delegate =
     //      Inputs: User's calldata
@@ -31,24 +31,11 @@ abstract contract GovernanceControl {
     //
     // Protocol exposure: Trustless
     // User exposure: Trustless
-    function _stageDelegateCall(address to, address from, bytes4 userSelector, bytes calldata userData)
+    function _stageCall(address to, address from, bytes4 userSelector, bytes calldata userData)
         internal
         virtual
         returns (bytes memory stagingData);
 
-    // _stageStaticCall
-    // Details:
-    //  staging/static =
-    //      Inputs: User's calldata
-    //      Function: Executing the function set by ProtocolControl
-    //      Container: Inside of the ProtocolControl contract
-    //      Access: With storage access (read only) to the ProtocolControl
-    //
-    // Protocol exposure: Trustless
-    // User exposure: Trustless
-    function _stageStaticCall(address, address, bytes4, bytes calldata) internal view virtual returns (bytes memory) {
-        revert(_NOT_IMPLEMENTED);
-    }
 
     /////////////////////////////////////////////////////////
     //                  USER                               //
@@ -99,6 +86,22 @@ abstract contract GovernanceControl {
     }
 
     /////////////////////////////////////////////////////////
+    //                MEV ALLOCATION                       //
+    /////////////////////////////////////////////////////////
+    //
+    // _allocatingCall
+    // Details:
+    //  allocate/delegate =
+    //      Inputs: MEV Profits (ERC20 balances) 
+    //      Function: Executing the function set by ProtocolControl / MEVAllocator
+    //      Container: Inside of the FastLane ExecutionEnvironment
+    //      Access: With storage access (read + write) only to the ExecutionEnvironment
+    //
+    // Protocol exposure: Trustless
+    // User exposure: Trustless
+    function _allocatingCall(bytes calldata data) internal virtual;
+
+    /////////////////////////////////////////////////////////
     //                  VERIFICATION                       //
     /////////////////////////////////////////////////////////
     //
@@ -108,25 +111,14 @@ abstract contract GovernanceControl {
     //    bytes memory userReturnData
     //
 
-    // _verificationDelegateCall
+    // _verificationCall
     // Details:
     //  verification/delegatecall =
     //      Inputs: User's return data + staging call's returnData
     //      Function: Executing the function set by ProtocolControl
     //      Container: Inside of the FastLane ExecutionEnvironment
     //      Access: Storage access (read+write) to the ExecutionEnvironment contract
-    function _verificationDelegateCall(bytes calldata) internal virtual returns (bool) {
-        revert(_NOT_IMPLEMENTED);
-    }
-
-    // _verificationStaticCall
-    // Details:
-    //  verification/delegatecall =
-    //      Inputs: User's return data + staging call's returnData
-    //      Function: Executing the function set by ProtocolControl
-    //      Container: Inside of the ProtocolControl contract
-    //      Access: Storage access (read only) to the ProtocolControl contract
-    function _verificationStaticCall(bytes calldata) internal view virtual returns (bool) {
+    function _verificationCall(bytes calldata) internal virtual returns (bool) {
         revert(_NOT_IMPLEMENTED);
     }
 

@@ -49,14 +49,14 @@ contract MainTest is BaseTest {
 
         // First SearcherCall
         searcherCalls[0] =
-            helper.buildSearcherCall(userCall, searcherOneEOA, address(searcherOne), POOL_ONE, POOL_TWO, 2e17);
+            helper.buildSearcherCall(userCall, protocolCall, searcherOneEOA, address(searcherOne), POOL_ONE, POOL_TWO, 2e17);
 
         (v, r, s) = vm.sign(searcherOnePK, IAtlas(address(atlas)).getSearcherPayload(searcherCalls[0].metaTx));
         searcherCalls[0].signature = abi.encodePacked(r, s, v);
 
         // Second SearcherCall
         searcherCalls[1] =
-            helper.buildSearcherCall(userCall, searcherTwoEOA, address(searcherTwo), POOL_TWO, POOL_ONE, 1e17);
+            helper.buildSearcherCall(userCall, protocolCall, searcherTwoEOA, address(searcherTwo), POOL_TWO, POOL_ONE, 1e17);
 
         (v, r, s) = vm.sign(searcherTwoPK, IAtlas(address(atlas)).getSearcherPayload(searcherCalls[1].metaTx));
         searcherCalls[1].signature = abi.encodePacked(r, s, v);
@@ -80,8 +80,8 @@ contract MainTest is BaseTest {
         console.log("executionEnvironment", executionEnvironment);
 
         // User must approve the execution environment
-        ERC20(TOKEN_ZERO).approve(executionEnvironment, type(uint256).max);
-        ERC20(TOKEN_ONE).approve(executionEnvironment, type(uint256).max);
+        ERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
+        ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
 
         uint256 userBalance = userEOA.balance;
 
@@ -95,6 +95,56 @@ contract MainTest is BaseTest {
         console.log("user gas refund received",userEOA.balance - userBalance);
         console.log("user refund equivalent gas usage", (userEOA.balance - userBalance)/tx.gasprice);
         
+        vm.stopPrank();
+
+        console.log("");
+        console.log("-");
+        console.log("-");
+
+        // Second attempt
+        protocolCall = helper.getProtocolCall();
+
+        userCall = helper.buildUserCall(POOL_ONE, userEOA, TOKEN_ONE);
+
+        // First SearcherCall
+        searcherCalls[0] =
+            helper.buildSearcherCall(userCall, protocolCall, searcherOneEOA, address(searcherOne), POOL_ONE, POOL_TWO, 2e17);
+
+        (v, r, s) = vm.sign(searcherOnePK, IAtlas(address(atlas)).getSearcherPayload(searcherCalls[0].metaTx));
+        searcherCalls[0].signature = abi.encodePacked(r, s, v);
+
+        // Second SearcherCall
+        searcherCalls[1] =
+            helper.buildSearcherCall(userCall, protocolCall, searcherTwoEOA, address(searcherTwo), POOL_TWO, POOL_ONE, 1e17);
+
+        (v, r, s) = vm.sign(searcherTwoPK, IAtlas(address(atlas)).getSearcherPayload(searcherCalls[1].metaTx));
+        searcherCalls[1].signature = abi.encodePacked(r, s, v);
+
+        // Verification call
+        verification =
+            helper.buildVerification(governanceEOA, protocolCall, userCall, searcherCalls);
+
+        (v, r, s) = vm.sign(governancePK, IAtlas(address(atlas)).getVerificationPayload(verification));
+
+        verification.signature = abi.encodePacked(r, s, v);
+
+        vm.startPrank(userEOA);
+
+        executionEnvironment = IAtlas(address(atlas)).getExecutionEnvironment(userCall, address(control));
+        
+        userBalance = userEOA.balance;
+
+        (success,) = address(atlas).call(
+            abi.encodeWithSelector(
+                atlas.metacall.selector, protocolCall, userCall, searcherCalls, verification
+            )
+        );
+
+        assertTrue(success);
+        console.log("user gas refund received",userEOA.balance - userBalance);
+        console.log("user refund equivalent gas usage", (userEOA.balance - userBalance)/tx.gasprice);
+
+        vm.stopPrank();
     }
 
     /*

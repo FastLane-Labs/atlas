@@ -19,4 +19,5 @@ struct ProtocolProof {
     uint256 deadline;
     bytes32 userCallHash; // keccak256 of userCall.to, userCall.data
     bytes32 callChainHash; // keccak256 of the searchers' txs
+    bytes32 controlCodeHash; // ProtocolControl.codehash
 }
