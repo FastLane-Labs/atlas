@@ -6,6 +6,13 @@ import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
 import "../types/CallTypes.sol";
 
 abstract contract GovernanceControl {
+
+    address internal immutable _executionBase;
+
+    constructor () {
+        _executionBase = address(this);
+    }
+
     string internal constant _NOT_IMPLEMENTED = "NOT IMPLEMENTED";
     // Virtual functions to be overridden by participating protocol governance
     // (not FastLane) prior to deploying contract. Note that protocol governance
@@ -21,7 +28,7 @@ abstract contract GovernanceControl {
     //     bytes calldata userCallData
     //
 
-    // _stageCall
+    // _stagingCall
     // Details:
     //  staging/delegate =
     //      Inputs: User's calldata
@@ -31,7 +38,7 @@ abstract contract GovernanceControl {
     //
     // Protocol exposure: Trustless
     // User exposure: Trustless
-    function _stageCall(address to, address from, bytes4 userSelector, bytes calldata userData)
+    function _stagingCall(address to, address from, bytes4 userSelector, bytes calldata userData)
         internal
         virtual
         returns (bytes memory stagingData);

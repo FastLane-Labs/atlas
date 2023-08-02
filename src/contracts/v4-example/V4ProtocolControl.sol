@@ -71,7 +71,7 @@ contract V4ProtocolControl is ProtocolControl {
     /////////////////////////////////////////////////////////
 
     /////////////// DELEGATED CALLS //////////////////
-    function _stageCall(address to, address from, bytes4 userSelector, bytes calldata userData)
+    function _stagingCall(address to, address from, bytes4 userSelector, bytes calldata userData)
         internal
         override
         returns (bytes memory stagingData)

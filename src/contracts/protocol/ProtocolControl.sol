@@ -41,10 +41,8 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         bool shouldDelegateVerification,
         bool allowRecycledStorage
     ) {
-        control = address(this);
 
         sequenced = shouldRequireSequencedNonces;
-
 
         if (shouldDelegateStaging) {
             require(shouldRequireStaging, "ERR-GC04 InvalidStaging");
@@ -61,6 +59,7 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
             // TODO: Consider allowing
         }
 
+        control = address(this);
         escrow = escrowAddress;
         governance = governanceAddress;
 
@@ -76,6 +75,21 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
 
     // Safety and support functions and modifiers that make the relationship between protocol
     // and FastLane's backend trustless.
+    modifier mustBeDelegated() {
+        require(address(this) != control, "ERR-EB001 MustBeDelegated");
+        _;
+    }
+
+    modifier onlyApprovedDelegateCaller() {
+        require(msg.sender == escrow, "ERR-PC060 InvalidCaller");
+        _;
+    }
+
+    modifier onlyApprovedStandardCaller() {
+        require(msg.sender == ISafetyLocks(escrow).approvedCaller(), "ERR-PC061 InvalidCaller");
+        _;
+    }
+
     modifier onlyApprovedCaller(bool isDelegated) {
         if (isDelegated) {
             require(msg.sender == escrow, "ERR-PC060 InvalidCaller");
@@ -85,23 +99,38 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         _;
     }
 
-    function stageCall(address to, address from, bytes4 userSelector, bytes calldata userData)
+    function stagingCall(address to, address from, bytes4 userSelector, bytes calldata userData)
         external
-        onlyApprovedCaller(delegateStaging)
+        mustBeDelegated
+        onlyApprovedDelegateCaller
         returns (bytes memory)
     {
-        return _stageCall(to, from, userSelector, userData);
+        return _stagingCall(to, from, userSelector, userData);
     }
 
-    function userLocalCall(bytes calldata data) external onlyApprovedCaller(delegateUser) returns (bytes memory) {
+    function userLocalCall(bytes calldata data) 
+        external 
+        mustBeDelegated
+        onlyApprovedDelegateCaller
+        returns (bytes memory) 
+    {
         return delegateUser ? _userLocalDelegateCall(data) : _userLocalStandardCall(data);
     }
 
-    function allocatingCall(bytes calldata data) external onlyApprovedCaller(true) {
+    function allocatingCall(bytes calldata data) 
+        external 
+        mustBeDelegated
+        onlyApprovedDelegateCaller
+    {
         return _allocatingCall(data);
     }
 
-    function verificationCall(bytes calldata data) external onlyApprovedCaller(delegateVerification) returns (bool) {
+    function verificationCall(bytes calldata data) 
+        external 
+        mustBeDelegated
+        onlyApprovedDelegateCaller 
+        returns (bool) 
+    {
         return _verificationCall(data);
     }
 

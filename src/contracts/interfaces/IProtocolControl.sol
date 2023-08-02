@@ -4,7 +4,7 @@ pragma solidity ^0.8.16;
 import "../types/CallTypes.sol";
 
 interface IProtocolControl {
-    function stageCall(address to, address from, bytes4 userSelector, bytes calldata userData)
+    function stagingCall(address to, address from, bytes4 userSelector, bytes calldata userData)
         external
         returns (bytes memory);
 

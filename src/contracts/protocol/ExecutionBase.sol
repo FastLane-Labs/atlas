@@ -9,6 +9,8 @@ contract ExecutionBase {
     // via delegatecall, but can be added to ProtocolControl as funcs that 
     // can be used during ProtocolControl's delegated funcs
     
+    // Returns the address(ProtocolControl).codehash for the calling
+    // ExecutionEnvironment's ProtocolControl
     function _controlCodeHash() internal pure returns (bytes32 controlCodeHash) {
         assembly {
             controlCodeHash := calldataload(sub(calldatasize(), 32))

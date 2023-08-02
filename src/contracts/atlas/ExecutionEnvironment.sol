@@ -71,7 +71,7 @@ contract ExecutionEnvironment is Test {
         require(msg.sender == atlas && userCall.from == _user(), "ERR-CE00 InvalidSenderStaging");
 
         bytes memory stagingData = abi.encodeWithSelector(
-            IProtocolControl.stageCall.selector, userCall.to, userCall.from, bytes4(userCall.data), userCall.data[4:]
+            IProtocolControl.stagingCall.selector, userCall.to, userCall.from, bytes4(userCall.data), userCall.data[4:]
         );
 
         stagingData = abi.encodePacked(

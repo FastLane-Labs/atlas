@@ -19,7 +19,7 @@ library CallVerification {
                     bytes32(0), // initial hash = null
                     protocolCall.to,
                     abi.encodeWithSelector(
-                        IProtocolControl.stageCall.selector,
+                        IProtocolControl.stagingCall.selector,
                         userCall.to,
                         userCall.from,
                         bytes4(userCall.data),
@@ -93,7 +93,7 @@ library CallVerification {
                 bytes32(0), // initial hash = null
                 protocolCall.to,
                 abi.encodeWithSelector(
-                    IProtocolControl.stageCall.selector,
+                    IProtocolControl.stagingCall.selector,
                     userCall.to,
                     userCall.from,
                     bytes4(userCall.data),
