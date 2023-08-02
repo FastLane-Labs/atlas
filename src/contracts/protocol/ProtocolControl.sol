@@ -75,13 +75,22 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
 
     // Safety and support functions and modifiers that make the relationship between protocol
     // and FastLane's backend trustless.
+    modifier validControl() {
+        require(control == _control(), "ERR-PC050 InvalidControl");
+        _;
+    }
     modifier mustBeDelegated() {
-        require(address(this) != control, "ERR-EB001 MustBeDelegated");
+        require(address(this) != control, "ERR-PC051 MustBeDelegated");
         _;
     }
 
     modifier onlyApprovedDelegateCaller() {
         require(msg.sender == escrow, "ERR-PC060 InvalidCaller");
+        _;
+    }
+
+    modifier mustBeCalled() {
+        require(address(this) == control, "ERR-PC052 MustBeCalled");
         _;
     }
 
@@ -93,9 +102,12 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
     modifier onlyApprovedCaller(bool isDelegated) {
         if (isDelegated) {
             require(msg.sender == escrow, "ERR-PC060 InvalidCaller");
+            require(address(this) != control, "ERR-PC051 MustBeDelegated");
         } else {
             require(msg.sender == ISafetyLocks(escrow).approvedCaller(), "ERR-PC061 InvalidCaller");
+            require(address(this) == control, "ERR-PC052 MustBeCalled");
         }
+        require(control == _control(), "ERR-PC053 InvalidControl");
         _;
     }
 
@@ -103,6 +115,7 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         external
         mustBeDelegated
         onlyApprovedDelegateCaller
+        validControl
         returns (bytes memory)
     {
         return _stagingCall(to, from, userSelector, userData);
@@ -112,6 +125,7 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         external 
         mustBeDelegated
         onlyApprovedDelegateCaller
+        validControl
         returns (bytes memory) 
     {
         return delegateUser ? _userLocalDelegateCall(data) : _userLocalStandardCall(data);
@@ -121,6 +135,7 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         external 
         mustBeDelegated
         onlyApprovedDelegateCaller
+        validControl
     {
         return _allocatingCall(data);
     }
@@ -129,6 +144,7 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         external 
         mustBeDelegated
         onlyApprovedDelegateCaller 
+        validControl
         returns (bool) 
     {
         return _verificationCall(data);
