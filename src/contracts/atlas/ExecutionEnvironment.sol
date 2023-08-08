@@ -19,7 +19,8 @@ import {
     SEARCHER_CALL_REVERTED,
     SEARCHER_MSG_VALUE_UNPAID,
     SEARCHER_FAILED_CALLBACK,
-    SEARCHER_BID_UNPAID
+    SEARCHER_BID_UNPAID,
+    INTENT_UNFULFILLED
 } from "./Emissions.sol";
 
 contract ExecutionEnvironment is Test {
@@ -166,7 +167,8 @@ contract ExecutionEnvironment is Test {
     function searcherMetaTryCatch(
         uint256 gasLimit,
         uint256 escrowBalance,
-        SearcherCall calldata searcherCall
+        SearcherCall calldata searcherCall,
+        bytes calldata stagingReturnData
     ) external payable {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
@@ -206,6 +208,19 @@ contract ExecutionEnvironment is Test {
         // Verify that it was successful
         require(success, SEARCHER_CALL_REVERTED);
         require(ISafetyLocks(atlas).confirmSafetyCallback(), SEARCHER_FAILED_CALLBACK);
+
+        // If this was a user intent, handle and verify fulfillment
+        if (_config().needsSearcherFullfillment()) {
+            bytes memory data;
+            (success, data) = _control().delegatecall(
+                abi.encodeWithSelector(IProtocolControl.fulfillmentCall.selector, stagingReturnData)
+            );
+            require(success, INTENT_UNFULFILLED);
+
+            success = abi.decode(data, (bool));
+            require(success, INTENT_UNFULFILLED);
+        }
+
 
         // Verify that the searcher paid what they bid
         bool etherIsBidToken;

@@ -103,7 +103,7 @@ contract Atlas is Test, Factory {
             if (userCallHash == searcherCalls[i].metaTx.userCallHash) {
                 auctionAlreadyWon = auctionAlreadyWon
                     || _searcherExecutionIteration(
-                        protocolCall, searcherCalls[i], auctionAlreadyWon, environment
+                        protocolCall, searcherCalls[i], stagingReturnData, auctionAlreadyWon, environment
                     );
             }
 
@@ -125,10 +125,11 @@ contract Atlas is Test, Factory {
     function _searcherExecutionIteration(
         ProtocolCall calldata protocolCall,
         SearcherCall calldata searcherCall,
+        bytes memory stagingReturnData,
         bool auctionAlreadyWon,
         address environment
     ) internal returns (bool) {
-        if (_executeSearcherCall(searcherCall, auctionAlreadyWon, environment)) {
+        if (_executeSearcherCall(searcherCall, stagingReturnData, auctionAlreadyWon, environment)) {
             if (!auctionAlreadyWon) {
                 auctionAlreadyWon = true;
                 _executePayments(protocolCall, searcherCall.bids, environment);

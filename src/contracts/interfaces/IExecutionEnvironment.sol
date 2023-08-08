@@ -19,7 +19,8 @@ interface IExecutionEnvironment {
     function searcherMetaTryCatch(
         uint256 gasLimit,
         uint256 escrowBalance,
-        SearcherCall calldata searcherCall
+        SearcherCall calldata searcherCall,
+        bytes calldata stagingReturnData
     ) external payable;
 
     function allocateRewards(

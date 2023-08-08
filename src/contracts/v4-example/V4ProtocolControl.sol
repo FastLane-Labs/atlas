@@ -45,20 +45,37 @@ contract V4ProtocolControl is ProtocolControl {
     PoolKey internal _currentKey; // TODO: Transient storage <-
 
     constructor(address _escrow, address _v4Singleton)
-        ProtocolControl(_escrow, msg.sender, true, true, true, false, false, true, true, true, false)
+        ProtocolControl(
+            _escrow, 
+            msg.sender, 
+            false, 
+            true, 
+            false, 
+            false, 
+            false, 
+            false, 
+            true, 
+            false, 
+            true,
+            true,
+            true
+        )
     {
         /*
         ProtocolControl(
-            _escrow, // escrowAddress
-            true, // shouldRequireSequencedNonces
-            true, // shouldRequireStaging
-            true, // shouldDelegateStaging
-            false, // shouldExecuteUserLocally
-            false, // shouldDelegateUser
-            true, // shouldDelegateAllocating
-            true, // shouldRequireVerification
-            true, // shouldDelegateVerification
-            false // allowRecycledStorage
+            address _escrow,
+            address _governance,
+            bool _sequenced,
+            bool _requireStaging,
+            bool _localUser,
+            bool _delegateUser,
+            bool _searcherFulfillment,
+            bool _requireVerification,
+            bool _zeroSearchers,
+            bool _reuseUserOp,
+            bool _userBundler,
+            bool _protocolBundler,
+            bool _unknownBundler
         )
         */
 

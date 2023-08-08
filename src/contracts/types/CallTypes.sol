@@ -53,11 +53,13 @@ struct ProtocolCall {
 enum CallConfig {
     Sequenced,
     CallStaging,
-    DelegateStaging,
     DelegateUser,
     LocalUser,
-    DelegateAllocating,
+    SearcherFulfillment,
     CallVerification,
-    DelegateVerification,
-    RecycledStorage
+    ZeroSearchers,
+    ReuseUserOp,
+    UserBundler,
+    ProtocolBundler,
+    UnknownBundler
 }

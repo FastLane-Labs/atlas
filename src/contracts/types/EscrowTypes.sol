@@ -50,6 +50,7 @@ enum SearcherOutcome
     UnknownError,
     CallReverted,
     BidNotPaid,
+    IntentUnfulfilled,
     CallValueTooHigh,
     CallbackFailed,
     EVMError,

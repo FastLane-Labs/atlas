@@ -8,67 +8,55 @@ import "../types/CallTypes.sol";
 library CallBits {
     uint16 internal constant _ONE = uint16(1);
 
-    /*
-    TODO: Figure out why labeling these constants and referencing the constant uses more gas
-    than computing directly. Implied uint256 conversion?
-    uint16 constant internal _NEEDS_STAGING = _ONE << uint16(CallConfig.CallStaging);
-    uint16 constant internal _NEEDS_DELEGATE_STAGING = _ONE << uint16(CallConfig.DelegateStaging);
-    uint16 constant internal _NEEDS_LOCAL_USER = _ONE << uint16(CallConfig.LocalUser);
-    uint16 constant internal _NEEDS_DELEGATE_USER = _ONE << uint16(CallConfig.DelegateUser);
-    uint16 constant internal _NEEDS_DELEGATE_ALLOCATING = _ONE << uint16(CallConfig.DelegateAllocating);
-    uint16 constant internal _NEEDS_VERIFICATION = _ONE << uint16(CallConfig.CallVerification);
-    uint16 constant internal _NEEDS_DELEGATE_VERIFICATION = _ONE << uint16(CallConfig.DelegateVerification);
-    uint16 constant internal _NEEDS_SEQUENCED_NONCES = _ONE << uint16(CallConfig.Sequenced);
-    uint16 constant internal _ALLOWS_RECYCLED_STORAGE = _ONE << uint16(CallConfig.RecycledStorage);
-    */
-
     function buildCallConfig(address protocolControl) internal view returns (uint16 callConfig) {
         (
             bool sequenced,
             bool requireStaging,
-            bool delegateStaging,
             bool localUser,
             bool delegateUser,
-            bool delegateAllocating,
+            bool searcherFulfillment,
             bool requireVerification,
-            bool delegateVerification,
-            bool recycledStorage
+            bool zeroSearchers,
+            bool reuseUserOp,
+            bool userBundler,
+            bool protocolBundler,
+            bool unknownBundler
         ) = IProtocolControl(protocolControl).getCallConfig();
 
         // WTB tuple unpacking :*(
         callConfig = encodeCallConfig(
-            sequenced,
-            requireStaging,
-            delegateStaging,
-            localUser,
-            delegateUser,
-            delegateAllocating,
-            requireVerification,
-            delegateVerification,
-            recycledStorage
+             sequenced,
+             requireStaging,
+             localUser,
+             delegateUser,
+             searcherFulfillment,
+             requireVerification,
+             zeroSearchers,
+             reuseUserOp,
+             userBundler,
+             protocolBundler,
+             unknownBundler
         );
     }
 
     function encodeCallConfig(
         bool sequenced,
         bool requireStaging,
-        bool delegateStaging,
         bool localUser,
         bool delegateUser,
-        bool delegateAllocating,
+        bool searcherFulfillment,
         bool requireVerification,
-        bool delegateVerification,
-        bool recycledStorage
+        bool zeroSearchers,
+        bool reuseUserOp,
+        bool userBundler,
+        bool protocolBundler,
+        bool unknownBundler
     ) internal pure returns (uint16 callConfig) {
         if (sequenced) {
             callConfig ^= _ONE << uint16(CallConfig.Sequenced);
         }
-
         if (requireStaging) {
             callConfig ^= _ONE << uint16(CallConfig.CallStaging);
-            if (delegateStaging) {
-                callConfig ^= _ONE << uint16(CallConfig.DelegateStaging);
-            }
         }
         if (localUser) {
             callConfig ^= _ONE << uint16(CallConfig.LocalUser);
@@ -76,26 +64,35 @@ library CallBits {
         if (delegateUser) {
             callConfig ^= _ONE << uint16(CallConfig.DelegateUser);
         }
-        if (delegateAllocating) {
-            callConfig ^= _ONE << uint16(CallConfig.DelegateAllocating);
+        if (searcherFulfillment) {
+            callConfig ^= _ONE << uint16(CallConfig.SearcherFulfillment);
         }
         if (requireVerification) {
             callConfig ^= _ONE << uint16(CallConfig.CallVerification);
-            if (delegateVerification) {
-                callConfig ^= _ONE << uint16(CallConfig.DelegateVerification);
-            }
         }
-        if (recycledStorage) {
-            callConfig ^= _ONE << uint16(CallConfig.RecycledStorage);
+        if (zeroSearchers) {
+            callConfig ^= _ONE << uint16(CallConfig.ZeroSearchers);
         }
+        if (reuseUserOp) {
+            callConfig ^= _ONE << uint16(CallConfig.ReuseUserOp);
+        }
+        if (userBundler) {
+            callConfig ^= _ONE << uint16(CallConfig.UserBundler);
+        }
+        if (protocolBundler) {
+            callConfig ^= _ONE << uint16(CallConfig.ProtocolBundler);
+        }
+        if (unknownBundler) {
+            callConfig ^= _ONE << uint16(CallConfig.UnknownBundler);
+        }
+    }
+
+    function needsSequencedNonces(uint16 callConfig) internal pure returns (bool sequenced) {
+        sequenced = (callConfig & 1 << uint16(CallConfig.Sequenced) != 0);
     }
 
     function needsStagingCall(uint16 callConfig) internal pure returns (bool needsStaging) {
         needsStaging = (callConfig & 1 << uint16(CallConfig.CallStaging) != 0);
-    }
-
-    function needsDelegateStaging(uint16 callConfig) internal pure returns (bool delegateStaging) {
-        delegateStaging = (callConfig & 1 << uint16(CallConfig.DelegateStaging) != 0);
     }
 
     function needsLocalUser(uint16 callConfig) internal pure returns (bool localUser) {
@@ -106,23 +103,31 @@ library CallBits {
         delegateUser = (callConfig & 1 << uint16(CallConfig.DelegateUser) != 0);
     }
 
-    function needsDelegateAllocating(uint16 callConfig) internal pure returns (bool delegateAllocating) {
-        delegateAllocating = (callConfig & 1 << uint16(CallConfig.DelegateAllocating) != 0);
-    }
-
-    function needsDelegateVerification(uint16 callConfig) internal pure returns (bool delegateVerification) {
-        delegateVerification = (callConfig & 1 << uint16(CallConfig.DelegateVerification) != 0);
+    function needsSearcherFullfillment(uint16 callConfig) internal pure returns (bool searcherFulfillment) {
+        searcherFulfillment = (callConfig & 1 << uint16(CallConfig.SearcherFulfillment) != 0);
     }
 
     function needsVerificationCall(uint16 callConfig) internal pure returns (bool needsVerification) {
         needsVerification = (callConfig & 1 << uint16(CallConfig.CallVerification) != 0);
     }
 
-    function allowsRecycledStorage(uint16 callConfig) internal pure returns (bool recycledStorage) {
-        recycledStorage = (callConfig & 1 << uint16(CallConfig.RecycledStorage) != 0);
+    function allowsZeroSearchers(uint16 callConfig) internal pure returns (bool zeroSearchers) {
+        zeroSearchers = (callConfig & 1 << uint16(CallConfig.ZeroSearchers) != 0);
     }
 
-    function needsSequencedNonces(uint16 callConfig) internal pure returns (bool sequenced) {
-        sequenced = (callConfig & 1 << uint16(CallConfig.Sequenced) != 0);
+    function allowsReuseUserOps(uint16 callConfig) internal pure returns (bool reuseUserOp) {
+        reuseUserOp = (callConfig & 1 << uint16(CallConfig.ReuseUserOp) != 0);
+    }
+
+    function allowsUserBundler(uint16 callConfig) internal pure returns (bool userBundler) {
+        userBundler = (callConfig & 1 << uint16(CallConfig.UserBundler) != 0);
+    }
+
+    function allowsProtocolBundler(uint16 callConfig) internal pure returns (bool protocolBundler) {
+        protocolBundler = (callConfig & 1 << uint16(CallConfig.ProtocolBundler) != 0);
+    }
+
+    function allowsUnknownBundler(uint16 callConfig) internal pure returns (bool unknownBundler) {
+        unknownBundler = (callConfig & 1 << uint16(CallConfig.UnknownBundler) != 0);
     }
 }

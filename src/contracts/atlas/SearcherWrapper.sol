@@ -14,19 +14,20 @@ import {SearcherOutcome} from "../types/EscrowTypes.sol";
 
 contract SearcherWrapper is FastLaneErrorsEvents {
     function _searcherCallWrapper(
-        SearcherCall calldata searcherCall,
         uint256 gasLimit,
-        address environment
+        address environment,
+        SearcherCall calldata searcherCall,
+        bytes memory stagingReturnData
     ) internal returns (SearcherOutcome, uint256) {
-        // address(this) = Escrow
-        // msg.sender = ExecutionEnvironment
+        // address(this) = Atlas/Escrow
+        // msg.sender = tx.origin
 
         // Get current Ether balance
         uint256 currentBalance = address(this).balance;
 
         // Call the execution environment
         try IExecutionEnvironment(environment).searcherMetaTryCatch{value: searcherCall.metaTx.value}(
-            gasLimit, currentBalance, searcherCall
+            gasLimit, currentBalance, searcherCall, stagingReturnData
         ) {
             return (SearcherOutcome.Success, address(this).balance - currentBalance);
         } catch Error(string memory err) {
@@ -36,6 +37,8 @@ contract SearcherWrapper is FastLaneErrorsEvents {
                 return (SearcherOutcome.BidNotPaid, 0);
             } else if (errorSwitch == _SEARCHER_MSG_VALUE_UNPAID) {
                 return (SearcherOutcome.CallValueTooHigh, 0);
+            } else if (errorSwitch == _INTENT_UNFULFILLED) {
+                return (SearcherOutcome.IntentUnfulfilled, 0);
             } else if (errorSwitch == _SEARCHER_CALL_REVERTED) {
                 return (SearcherOutcome.CallReverted, 0);
             } else if (errorSwitch == _SEARCHER_FAILED_CALLBACK) {

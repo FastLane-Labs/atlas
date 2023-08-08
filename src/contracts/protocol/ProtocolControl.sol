@@ -20,57 +20,48 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
 
     bool public immutable sequenced;
     bool public immutable requireStaging;
-    bool public immutable delegateStaging;
     bool public immutable localUser;
     bool public immutable delegateUser;
-    bool public immutable delegateAllocating;
+    bool public immutable searcherFulfillment;
     bool public immutable requireVerification;
-    bool public immutable delegateVerification;
-    bool public immutable recycledStorage;
+    bool public immutable zeroSearchers;
+    bool public immutable reuseUserOp;
+    bool public immutable userBundler;
+    bool public immutable protocolBundler;
+    bool public immutable unknownBundler;
 
     constructor(
-        address escrowAddress,
-        address governanceAddress,
-        bool shouldRequireSequencedNonces,
-        bool shouldRequireStaging,
-        bool shouldDelegateStaging,
-        bool shouldExecuteUserLocally,
-        bool shouldDelegateUser,
-        bool shouldDelegateAllocating,
-        bool shouldRequireVerification,
-        bool shouldDelegateVerification,
-        bool allowRecycledStorage
+        address _escrow,
+        address _governance,
+        bool _sequenced,
+        bool _requireStaging,
+        bool _localUser,
+        bool _delegateUser,
+        bool _searcherFulfillment,
+        bool _requireVerification,
+        bool _zeroSearchers,
+        bool _reuseUserOp,
+        bool _userBundler,
+        bool _protocolBundler,
+        bool _unknownBundler
     ) {
 
-        sequenced = shouldRequireSequencedNonces;
-
-        if (shouldDelegateStaging) {
-            require(shouldRequireStaging, "ERR-GC04 InvalidStaging");
-        }
-
-        if (shouldDelegateVerification) {
-            require(shouldRequireVerification, "ERR-GC05 InvalidVerification");
-        }
-
-        require(shouldDelegateAllocating, "ERR-GC02 NotDelegateAllocating");
-
-        if (shouldDelegateUser) {
-            require(shouldExecuteUserLocally, "ERR-GC03 SelfDelegating");
-            // TODO: Consider allowing
-        }
-
         control = address(this);
-        escrow = escrowAddress;
-        governance = governanceAddress;
 
-        requireStaging = shouldRequireStaging;
-        delegateStaging = shouldDelegateStaging;
-        localUser = shouldExecuteUserLocally;
-        delegateUser = shouldDelegateUser;
-        delegateAllocating = shouldDelegateAllocating;
-        requireVerification = shouldRequireVerification;
-        delegateVerification = shouldDelegateVerification;
-        recycledStorage = allowRecycledStorage;
+        escrow = _escrow;
+        governance = _governance;
+
+        sequenced = _sequenced;
+        requireStaging = _requireStaging;
+        localUser = _localUser;
+        delegateUser = _delegateUser;
+        searcherFulfillment = _searcherFulfillment;
+        requireVerification = _requireVerification;
+        zeroSearchers = _zeroSearchers;
+        reuseUserOp = _reuseUserOp;
+        userBundler = _userBundler; 
+        protocolBundler = _protocolBundler;
+        unknownBundler = _unknownBundler;
     }
 
     // Safety and support functions and modifiers that make the relationship between protocol
@@ -131,6 +122,16 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         return delegateUser ? _userLocalDelegateCall(data) : _userLocalStandardCall(data);
     }
 
+    function fulfillmentCall(bytes calldata data) 
+        external 
+        mustBeDelegated
+        onlyApprovedDelegateCaller
+        validControl
+        returns (bool)
+    {
+        return _fulfillmentCall(data);
+    }
+
     function allocatingCall(bytes calldata data) 
         external 
         mustBeDelegated
@@ -151,10 +152,6 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
     }
 
     // View functions
-    function stagingDelegated() external view returns (bool delegated) {
-        delegated = delegateStaging;
-    }
-
     function userDelegated() external view returns (bool delegated) {
         delegated = delegateUser;
     }
@@ -168,14 +165,6 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         local = localUser;
     }
 
-    function allocatingDelegated() external view returns (bool delegated) {
-        delegated = delegateAllocating;
-    }
-
-    function verificationDelegated() external view returns (bool delegated) {
-        delegated = delegateVerification;
-    }
-
     function requireSequencedNonces() external view returns (bool isSequenced) {
         isSequenced = sequenced;
     }
@@ -186,32 +175,36 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
             callConfig: CallBits.encodeCallConfig(
                 sequenced,
                 requireStaging,
-                delegateStaging,
                 localUser,
                 delegateUser,
-                delegateAllocating,
+                searcherFulfillment,
                 requireVerification,
-                delegateVerification,
-                recycledStorage
-                )
+                zeroSearchers,
+                reuseUserOp,
+                userBundler,
+                protocolBundler,
+                unknownBundler
+            )
         });
     }
 
-    function _getCallConfig() internal view returns (bool, bool, bool, bool, bool, bool, bool, bool, bool) {
+    function _getCallConfig() internal view returns (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool) {
         return (
             sequenced,
             requireStaging,
-            delegateStaging,
             localUser,
             delegateUser,
-            delegateAllocating,
+            searcherFulfillment,
             requireVerification,
-            delegateVerification,
-            recycledStorage
+            zeroSearchers,
+            reuseUserOp,
+            userBundler,
+            protocolBundler,
+            unknownBundler
         );
     }
 
-    function getCallConfig() external view returns (bool, bool, bool, bool, bool, bool, bool, bool, bool) {
+    function getCallConfig() external view returns (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool) {
         return _getCallConfig();
     }
 

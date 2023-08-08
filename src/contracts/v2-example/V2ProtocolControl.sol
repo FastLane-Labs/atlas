@@ -47,7 +47,21 @@ contract V2ProtocolControl is ProtocolControl {
     event GiftedGovernanceToken(address indexed user, address indexed token, uint256 amount);
 
     constructor(address _escrow)
-        ProtocolControl(_escrow, msg.sender, false, true, true, false, false, true, false, false, true)
+        ProtocolControl(
+            _escrow, 
+            msg.sender, 
+            false, 
+            true, 
+            false, 
+            false, 
+            false, 
+            false, 
+            true, 
+            false, 
+            true,
+            true,
+            true
+        )
     {
         govIsTok0 = (IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token0() == GOVERNANCE_TOKEN);
         if (govIsTok0) {
@@ -59,17 +73,19 @@ contract V2ProtocolControl is ProtocolControl {
 
     /*
     constructor(
-        address escrowAddress,
-        address governanceAddress,
-        bool shouldRequireSequencedNonces,
-        bool shouldRequireStaging,
-        bool shouldDelegateStaging,
-        bool shouldExecuteUserLocally,
-        bool shouldDelegateUser,
-        bool shouldDelegateAllocating,
-        bool shouldRequireVerification,
-        bool shouldDelegateVerification,
-        bool allowRecycledStorage
+        address _escrow,
+        address _governance,
+        bool _sequenced,
+        bool _requireStaging,
+        bool _localUser,
+        bool _delegateUser,
+        bool _searcherFulfillment,
+        bool _requireVerification,
+        bool _zeroSearchers,
+        bool _reuseUserOp,
+        bool _userBundler,
+        bool _protocolBundler,
+        bool _unknownBundler
     )
     */
 

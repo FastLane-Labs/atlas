@@ -12,12 +12,14 @@ interface IProtocolControl {
 
     function allocatingCall(bytes calldata data) external;
 
-    function verificationCall(bytes calldata data) external returns (bool);
+    function fulfillmentCall(bytes calldata data) external returns (bytes memory);
+
+    function verificationCall(bytes calldata data) external returns (bytes memory);
 
     function getProtocolCall() external view returns (ProtocolCall memory protocolCall);
 
-    function getCallConfig() external view returns (bool, bool, bool, bool, bool, bool, bool, bool, bool);
-
+    function getCallConfig() external view returns (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool);
+    
     function getPayeeData(bytes calldata data) external returns (PayeeData[] memory);
 
     function getBidFormat(bytes calldata data) external returns (BidData[] memory);

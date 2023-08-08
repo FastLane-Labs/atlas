@@ -109,6 +109,30 @@ abstract contract GovernanceControl {
     function _allocatingCall(bytes calldata data) internal virtual;
 
     /////////////////////////////////////////////////////////
+    //              INTENT FULFILLMENT                     //
+    /////////////////////////////////////////////////////////
+    //
+    // Data should be decoded as:
+    //
+    //    bytes memory stagingReturnData
+    //
+
+    // _fulfillmentCall
+    // Details:
+    //  fulfillment/delegatecall =
+    //      Inputs: staging call's returnData
+    //      Function: Executing the function set by ProtocolControl
+    //      Container: Inside of the FastLane ExecutionEnvironment
+    //      Access: Storage access (read+write) to the ExecutionEnvironment contract
+    //      NOTE: This happens *inside* of the searcher's try/catch wrapper
+    //      and is designed to make sure that if the searcher is fulfilling
+    //      the user's 'intent.'
+
+    function _fulfillmentCall(bytes calldata) internal virtual returns (bool) {
+        revert(_NOT_IMPLEMENTED);
+    }
+
+    /////////////////////////////////////////////////////////
     //                  VERIFICATION                       //
     /////////////////////////////////////////////////////////
     //

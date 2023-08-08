@@ -23,6 +23,7 @@ import {CallVerification} from "../libraries/CallVerification.sol";
 
 contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     using ECDSA for bytes32;
+    using EscrowBits for uint256;
 
     uint32 public immutable escrowDuration;
 
@@ -81,6 +82,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
 
     function _executeSearcherCall(
         SearcherCall calldata searcherCall,
+        bytes memory stagingReturnData,
         bool isAuctionAlreadyComplete,
         address environment
     ) internal returns (bool) {
@@ -95,12 +97,12 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         uint256 escrowSurplus;
 
         // If there are no errors, attempt to execute
-        if (EscrowBits.canExecute(result)) {
+        if (result.canExecute()) {
             // Open the searcher lock
             _openSearcherLock(searcherCall.metaTx.to, environment);
 
             // Execute the searcher call
-            (outcome, escrowSurplus) = _searcherCallWrapper(searcherCall, gasLimit, environment);
+            (outcome, escrowSurplus) = _searcherCallWrapper(gasLimit, environment, searcherCall, stagingReturnData);
 
             unchecked {
                 searcherEscrow.total += uint128(escrowSurplus);
@@ -108,9 +110,9 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
 
             result |= 1 << uint256(outcome);
 
-            if (EscrowBits.executedWithError(result)) {
+            if (result.executedWithError()) {
                 result |= 1 << uint256(SearcherOutcome.ExecutionCompleted);
-            } else if (EscrowBits.executionSuccessful(result)) {
+            } else if (result.executionSuccessful()) {
                 // first successful searcher call that paid what it bid
                 isAuctionAlreadyComplete = true; // cannot be reached if bool is already true
                 result |= 1 << uint256(SearcherOutcome.ExecutionCompleted);
@@ -119,7 +121,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
             uint256 gasRebate; // TODO: can reuse gasWaterMark here for gas efficiency if it really matters
 
             // Update the searcher's escrow balances
-            if (EscrowBits.updateEscrow(result)) {
+            if (result.updateEscrow()) {
                 gasRebate = _update(searcherCall.metaTx, searcherEscrow, gasWaterMark, result);
             }
 
