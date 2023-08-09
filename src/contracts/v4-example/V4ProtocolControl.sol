@@ -102,7 +102,7 @@ contract V4ProtocolControl is ProtocolControl {
 
         require(userSelector == SWAP, "ERR-H10 InvalidFunction");
 
-        UserCall memory userCall = abi.decode(userData, (UserCall));
+        UserMetaTx memory userCall = abi.decode(userData, (UserMetaTx));
 
         require(to == v4Singleton, "ERR-H11 InvalidTo");
 

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.16;
 
 import {Factory} from "./Factory.sol";
+import {UserVerifier} from "./UserVerification.sol";
 
 import "../types/CallTypes.sol";
 import "../types/VerificationTypes.sol";
@@ -18,6 +19,13 @@ contract Atlas is Test, Factory {
 
     constructor(uint32 _escrowDuration) Factory(_escrowDuration) {}
 
+    function createExecutionEnvironment(ProtocolCall calldata protocolCall) external returns (address environment) {
+        environment = _setExecutionEnvironment(protocolCall, msg.sender, protocolCall.to.codehash);
+        //if (userNonces[msg.sender] == 0) {
+        //    unchecked{ ++userNonces[msg.sender];}
+        //}
+    }
+
     function metacall(
         ProtocolCall calldata protocolCall, // supplied by frontend
         UserCall calldata userCall, // set by user
@@ -28,34 +36,56 @@ contract Atlas is Test, Factory {
         uint256 gasMarker = gasleft();
 
         // Verify that the calldata injection came from the protocol frontend
-        // NOTE: fail result causes function to return rather than revert.
-        // This allows signature data to be stored, which helps prevent
-        // replay attacks.
-        if (!_verifyProtocol(userCall.to, protocolCall, verification)) {
-            return;
-        }
-
-        // TODO: Make sure all searcher nonces are incremented on fail. 
+        // and that the signatures are valid. 
+        bool valid = _verifyProtocol(userCall.metaTx.to, protocolCall, verification) && _verifyUser(protocolCall, userCall);
 
         // Check that the value of the tx is greater than or equal to the value specified
         // NOTE: a msg.value *higher* than user value could be used by the staging call.
         // There is a further check in the handler before the usercall to verify.
-        require(msg.value >= userCall.value, "ERR-H03 ValueExceedsBalance");
-        require(searcherCalls.length < type(uint8).max - 1, "ERR-F02 TooManySearcherCalls");
-        require(
-            block.number <= userCall.deadline && block.number <= verification.proof.deadline, "ERR-F03 DeadlineExceeded"
-        );
+        if(msg.value < userCall.metaTx.value) { valid = false; }
+        if(searcherCalls.length >= type(uint8).max - 1) { valid = false; }
+        if(block.number > userCall.metaTx.deadline || block.number > verification.proof.deadline) { valid = false; }
+        if(tx.gasprice > userCall.metaTx.maxFeePerGas) { valid = false; }
+        if (!protocolCall.callConfig.allowsZeroSearchers() || protocolCall.callConfig.needsSearcherFullfillment()) {
+            if (searcherCalls.length == 0) { valid = false;}
+        }
 
-        console.log("initial verification gas cost", gasMarker - gasleft());
-
-        gasMarker = gasleft();
 
         // Get the execution environment
-        address environment = _setExecutionEnvironment(protocolCall, userCall.from, verification.proof.controlCodeHash);
+        address environment = _getExecutionEnvironmentCustom(userCall.metaTx.from, verification.proof.controlCodeHash, protocolCall.to, protocolCall.callConfig);
+        valid = valid && environment.codehash != bytes32(0);
 
-        console.log("contract creation gas cost", gasMarker - gasleft());
+        // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
+        // replay attacks.
+        if (!valid) {
+            return;
+        }
 
-        gasMarker = gasleft();
+        try this.execute{value: msg.value}(protocolCall, userCall.metaTx, searcherCalls, environment, verification.proof.callChainHash) 
+            returns (uint256 accruedGasRebate) {
+            // Gas Refund to sender only if execution is successful
+            _executeGasRefund(msg.sender, accruedGasRebate);
+
+        } catch {
+            // TODO: This portion needs more nuanced logic
+            if (protocolCall.callConfig.allowsReuseUserOps()) {
+                revert("ERR-F07 RevertToReuse");
+            }
+        }
+
+
+        console.log("total gas used", gasMarker - gasleft());
+    }
+
+    function execute(
+        ProtocolCall calldata protocolCall,
+        UserMetaTx calldata userCall,
+        SearcherCall[] calldata searcherCalls,
+        address environment,
+        bytes32 callChainHash
+    ) external payable returns (uint256 accruedGasRebate) {
+        // This is a self.call made externally so that it can be used with try/catch
+        require(msg.sender == address(this), "ERR-F06 InvalidAccess");
 
         // Initialize the locks
         _initializeEscrowLocks(protocolCall, environment, uint8(searcherCalls.length));
@@ -64,20 +94,17 @@ contract Atlas is Test, Factory {
         bytes32 callChainHashHead = _execute(protocolCall, userCall, searcherCalls, environment);
 
         // Verify that the meta transactions were executed in the correct sequence
-        require(callChainHashHead == verification.proof.callChainHash, "ERR-F05 InvalidCallChain");
+        require(callChainHashHead == callChainHash, "ERR-F05 InvalidCallChain");
 
-        // Gas Refund to sender
-        _executeGasRefund(msg.sender);
+        accruedGasRebate = _getAccruedGasRebate();
 
         // Release the lock
         _releaseEscrowLocks();
-
-        console.log("ex contract creation gas cost", gasMarker - gasleft());
     }
 
     function _execute(
         ProtocolCall calldata protocolCall,
-        UserCall calldata userCall,
+        UserMetaTx calldata userCall,
         SearcherCall[] calldata searcherCalls,
         address environment
     ) internal returns (bytes32) {
@@ -114,6 +141,9 @@ contract Atlas is Test, Factory {
 
         // If no searcher was successful, manually transition the lock
         if (!auctionAlreadyWon) {
+            if (protocolCall.callConfig.needsSearcherFullfillment()) {
+                revert("ERR-F08 UserNotFulfilled");
+            }
             _notMadJustDisappointed();
         }
 

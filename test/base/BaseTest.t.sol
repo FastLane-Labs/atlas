@@ -14,7 +14,7 @@ import {V2ProtocolControl} from "../../src/contracts/v2-example/V2ProtocolContro
 
 import {TestConstants} from "./TestConstants.sol";
 
-import {Helper} from "../Helpers.sol";
+import {V2Helper} from "../V2Helper.sol";
 
 contract BaseTest is Test, TestConstants {
     address public me = address(this);
@@ -30,7 +30,8 @@ contract BaseTest is Test, TestConstants {
     uint256 public searcherTwoPK = 33333;
     address public searcherTwoEOA = vm.addr(searcherTwoPK);
 
-    address public userEOA = makeAddr("UserEOA");
+    uint256 public userPK = 44444;
+    address public userEOA = vm.addr(userPK);
 
     Atlas public atlas;
     address public escrow;
@@ -40,7 +41,7 @@ contract BaseTest is Test, TestConstants {
 
     V2ProtocolControl public control;
 
-    Helper public helper;
+    V2Helper public helper;
 
     // Fork stuff
     ChainVars public chain = mainnet;
@@ -95,7 +96,7 @@ contract BaseTest is Test, TestConstants {
         deal(TOKEN_ZERO, address(searcherTwo), 10e24);
         deal(TOKEN_ONE, address(searcherTwo), 10e24);
 
-        helper = new Helper(address(control), escrow, address(atlas));
+        helper = new V2Helper(address(control), escrow, address(atlas));
 
         deal(TOKEN_ZERO, address(atlas), 1);
         deal(TOKEN_ONE, address(atlas), 1);

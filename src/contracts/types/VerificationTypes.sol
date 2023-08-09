@@ -2,6 +2,7 @@
 pragma solidity ^0.8.16;
 
 struct Verification {
+    address to; // Atlas
     ProtocolProof proof;
     bytes signature;
 }

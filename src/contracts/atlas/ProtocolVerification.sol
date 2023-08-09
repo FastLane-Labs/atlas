@@ -26,7 +26,18 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
         "ProtocolProof(address from,address to,uint256 nonce,uint256 deadline,bytes32 userCallHash,bytes32 callChainHash,bytes32 controlCodeHash)"
     );
 
+    bytes32 public constant USER_TYPE_HASH = keccak256(
+        "UserMetaTx(address from,address to,uint256 deadline,uint256 gas,uint256 nonce,uint256 maxFeePerGas,uint256 value,address control,bytes32 data)"
+    );
+
+    mapping(address => uint256) public userNonces;
+
     constructor() EIP712("ProtoCallHandler", "0.0.1") {}
+
+
+    // 
+    // PROTOCOL VERIFICATION
+    //
 
     // Verify that the protocol's front end generated the staging
     // information and that it matches the on-chain data.
@@ -42,7 +53,7 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
     {
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up protocol nonces
-        require(_verifySignature(verification), "ERR-PV01 InvalidSignature");
+        require(_verifyProtocolSignature(verification), "ERR-PV01 InvalidSignature");
 
         // NOTE: to avoid replay attacks arising from key management errors,
         // the state changes below must be *saved* even if they render the
@@ -107,10 +118,12 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
                 unchecked {
                     signatories[verification.proof.from].nonce = uint64(verification.proof.nonce) + 1;
                 }
-            } else {
+            } else if (verification.proof.nonce == signatory.nonce + 1) {
                 unchecked {
                     ++signatories[verification.proof.from].nonce;
                 }
+            } else {
+                return false;
             }
         }
 
@@ -132,7 +145,7 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
         );
     }
 
-    function _verifySignature(Verification calldata verification) internal view returns (bool) {
+    function _verifyProtocolSignature(Verification calldata verification) internal view returns (bool) {
         address signer = _hashTypedDataV4(_getProofHash(verification.proof)).recover(verification.signature);
 
         return signer == verification.proof.from;
@@ -141,5 +154,89 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
 
     function getVerificationPayload(Verification memory verification) public view returns (bytes32 payload) {
         payload = _hashTypedDataV4(_getProofHash(verification.proof));
+    }
+
+    //
+    // USER VERIFICATION
+    //
+
+    // Verify the user's meta transaction
+    function _verifyUser(ProtocolCall calldata protocolCall, UserCall calldata userCall)
+        internal
+        returns (bool)
+    {
+        
+        // Verify the signature before storing any data to avoid
+        // spoof transactions clogging up protocol userNonces
+        require(_verifyUserSignature(userCall), "ERR-UV01 InvalidSignature");
+
+        if (userCall.metaTx.control != protocolCall.to) {
+            return (false);
+        }
+
+        uint256 userNonce = userNonces[userCall.metaTx.from];
+
+        // If the protocol indicated that they only accept sequenced userNonces
+        // (IE for FCFS execution), check and make sure the order is correct
+        // NOTE: allowing only sequenced userNonces could create a scenario in
+        // which builders or validators may be able to profit via censorship.
+        // Protocols are encouraged to rely on the deadline parameter
+        // to prevent replay attacks.
+        if (protocolCall.callConfig.needsSequencedNonces()) {
+            if (userCall.metaTx.nonce != userNonce + 1) {
+                return (false);
+            }
+            unchecked {
+                ++userNonces[userCall.metaTx.from];
+            }
+
+            // If not sequenced, check to see if this nonce is highest and store
+            // it if so.  This ensures nonce + 1 will always be available.
+        } else {
+            if (userCall.metaTx.nonce > userNonce + 1) {
+                unchecked {
+                    userNonces[userCall.metaTx.from] = userCall.metaTx.nonce + 1;
+                }
+            } else if (userCall.metaTx.nonce == userNonce + 1) {
+                unchecked {
+                    ++userNonces[userCall.metaTx.from];
+                }
+            } else {
+                return false;
+            }
+        }
+
+        return (true);
+    }
+
+    function _getProofHash(UserMetaTx memory metaTx) internal pure returns (bytes32 proofHash) {
+        proofHash = keccak256(
+            abi.encode(
+                USER_TYPE_HASH,
+                metaTx.from,
+                metaTx.to,
+                metaTx.deadline,
+                metaTx.gas,
+                metaTx.nonce,
+                metaTx.maxFeePerGas,
+                metaTx.value,
+                metaTx.control,
+                keccak256(metaTx.data)
+            )
+        );
+    }
+
+    function _verifyUserSignature(UserCall calldata userCall) internal view returns (bool) {
+        address signer = _hashTypedDataV4(_getProofHash(userCall.metaTx)).recover(userCall.signature);
+
+        return signer == userCall.metaTx.from;
+    }
+
+    function getUserCallPayload(UserCall memory userCall) public view returns (bytes32 payload) {
+        payload = _hashTypedDataV4(_getProofHash(userCall.metaTx));
+    }
+
+    function nextUserNonce(address user) external view returns (uint256 nextNonce) {
+        nextNonce = userNonces[user] + 1;
     }
 }

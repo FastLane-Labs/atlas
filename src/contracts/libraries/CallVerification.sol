@@ -7,7 +7,7 @@ import "../types/CallTypes.sol";
 import "../types/VerificationTypes.sol";
 
 library CallVerification {
-    function initializeProof(ProtocolCall calldata protocolCall, UserCall calldata userCall)
+    function initializeProof(ProtocolCall calldata protocolCall, UserMetaTx calldata userCall)
         internal
         pure
         returns (CallChainProof memory)
@@ -94,10 +94,10 @@ library CallVerification {
                 protocolCall.to,
                 abi.encodeWithSelector(
                     IProtocolControl.stagingCall.selector,
-                    userCall.to,
-                    userCall.from,
-                    bytes4(userCall.data),
-                    userCall.data[4:]
+                    userCall.metaTx.to,
+                    userCall.metaTx.from,
+                    bytes4(userCall.metaTx.data),
+                    userCall.metaTx.data[4:]
                 ),
                 i
             )
@@ -110,8 +110,8 @@ library CallVerification {
         executionHashChain[1] = keccak256(
             abi.encodePacked(
                 executionHashChain[0], // always reference previous hash
-                userCall.from,
-                userCall.data,
+                userCall.metaTx.from,
+                userCall.metaTx.data,
                 i
             )
         );

@@ -2,15 +2,25 @@
 pragma solidity ^0.8.16;
 
 struct UserCall {
-    address to;
+    address to; // Atlas
+    UserMetaTx metaTx;
+    bytes signature;
+}
+
+struct UserMetaTx {
     address from;
+    address to;
     uint256 deadline;
     uint256 gas;
+    uint256 nonce;
+    uint256 maxFeePerGas;
     uint256 value;
+    address control;
     bytes data;
 }
 
 struct SearcherCall {
+    address to; // Atlas
     SearcherMetaTx metaTx;
     bytes signature;
     BidData[] bids;

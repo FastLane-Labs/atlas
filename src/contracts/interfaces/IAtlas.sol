@@ -5,6 +5,8 @@ import "../types/CallTypes.sol";
 import "../types/VerificationTypes.sol";
 
 interface IAtlas {
+    function createExecutionEnvironment(ProtocolCall calldata protocolCall) external returns (address environment);
+    
     function metacall(
         ProtocolCall calldata protocolCall,
         UserCall calldata userCall,
@@ -35,4 +37,8 @@ interface IAtlas {
     function getVerificationPayload(Verification memory verification) external view returns (bytes32 payload);
 
     function getSearcherPayload(SearcherMetaTx calldata metaTx) external view returns (bytes32 payload);
+
+    function getUserCallPayload(UserCall memory userCall) external view returns (bytes32 payload);
+
+    function nextUserNonce(address user) external view returns (uint256 nextNonce);
 }

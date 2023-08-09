@@ -20,7 +20,7 @@ import "../src/contracts/types/LockTypes.sol";
 import "../src/contracts/types/VerificationTypes.sol";
 
 import {BaseTest} from "./base/BaseTest.t.sol";
-import {Helper} from "./Helpers.sol";
+import {V2Helper} from "./V2Helper.sol";
 import {VerificationSigner} from "./VerificationSigner.sol";
 
 import "forge-std/Test.sol";
@@ -37,15 +37,18 @@ contract MainTest is BaseTest {
         vm.label(address(atlas), "ATLAS");
         vm.label(address(control), "PCONTROL");
 
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+
         ProtocolCall memory protocolCall = helper.getProtocolCall();
 
         UserCall memory userCall = helper.buildUserCall(POOL_ONE, userEOA, TOKEN_ONE);
 
-        SearcherCall[] memory searcherCalls = new SearcherCall[](2);
+        (v, r, s) = vm.sign(userPK, IAtlas(address(atlas)).getUserCallPayload(userCall));
+        userCall.signature = abi.encodePacked(r, s, v);
 
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
+        SearcherCall[] memory searcherCalls = new SearcherCall[](2);
 
         // First SearcherCall
         searcherCalls[0] =
@@ -71,7 +74,7 @@ contract MainTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        address executionEnvironment = IAtlas(address(atlas)).getExecutionEnvironment(userCall, address(control));
+        address executionEnvironment = IAtlas(address(atlas)).createExecutionEnvironment(protocolCall);
         vm.label(address(executionEnvironment), "ENVIRONMENT");
 
         console.log("userEOA", userEOA);
@@ -79,7 +82,7 @@ contract MainTest is BaseTest {
         console.log("control", address(control));
         console.log("executionEnvironment", executionEnvironment);
 
-        // User must approve the execution environment
+        // User must approve Atlas
         ERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
         ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
 
@@ -97,6 +100,7 @@ contract MainTest is BaseTest {
         
         vm.stopPrank();
 
+        /*
         console.log("");
         console.log("-");
         console.log("-");
@@ -145,6 +149,7 @@ contract MainTest is BaseTest {
         console.log("user refund equivalent gas usage", (userEOA.balance - userBalance)/tx.gasprice);
 
         vm.stopPrank();
+        */
     }
 
     /*

@@ -61,7 +61,7 @@ contract Factory is Test, Escrow, TokenTransfers {
         view
         returns (address executionEnvironment)
     {
-        executionEnvironment = _getExecutionEnvironment(userCall.from, protocolControl.codehash, protocolControl);
+        executionEnvironment = _getExecutionEnvironment(userCall.metaTx.from, protocolControl.codehash, protocolControl);
     }
 
     function _getExecutionEnvironment(address user, bytes32 controlCodeHash, address protocolControl)

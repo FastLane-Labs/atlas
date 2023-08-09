@@ -66,13 +66,13 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     ///////////////////////////////////////////////////
     function _executeStagingCall(
         ProtocolCall calldata protocolCall,
-        UserCall calldata userCall,
+        UserMetaTx calldata userCall,
         address environment
     ) internal stagingLock(protocolCall, environment) returns (bytes memory stagingReturnData) {
         stagingReturnData = IExecutionEnvironment(environment).stagingWrapper{value: msg.value}(userCall);
     }
 
-    function _executeUserCall(UserCall calldata userCall, address environment)
+    function _executeUserCall(UserMetaTx calldata userCall, address environment)
         internal
         userLock(userCall, environment)
         returns (bytes memory userReturnData)
@@ -179,8 +179,12 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         IExecutionEnvironment(environment).verificationWrapper(stagingReturnData, userReturnData);
     }
 
-    function _executeGasRefund(address gasPayor) internal {
-        uint256 gasRebate = uint256(_escrowKey.gasRefund) * tx.gasprice;
+    function _getAccruedGasRebate() internal view returns (uint256 accruedGasRebate) {
+        accruedGasRebate = uint256(_escrowKey.gasRefund);
+    }
+
+    function _executeGasRefund(address gasPayor, uint256 accruedGasRebate) internal {
+        uint256 gasRebate = accruedGasRebate * tx.gasprice;
 
         /*
         emit UserTxResult(

@@ -4,12 +4,12 @@ pragma solidity ^0.8.16;
 import "../types/CallTypes.sol";
 
 interface IExecutionEnvironment {
-    function stagingWrapper(UserCall calldata userCall)
+    function stagingWrapper(UserMetaTx calldata userCall)
         external
         payable
         returns (bytes memory stagingData);
 
-    function userWrapper(UserCall calldata userCall) external payable returns (bytes memory userReturnData);
+    function userWrapper(UserMetaTx calldata userCall) external payable returns (bytes memory userReturnData);
 
     function verificationWrapper(
         bytes calldata stagingReturnData,

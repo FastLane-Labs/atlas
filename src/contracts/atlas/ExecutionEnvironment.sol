@@ -7,7 +7,7 @@ import {IProtocolControl} from "../interfaces/IProtocolControl.sol";
 
 import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
-import {UserCall, ProtocolCall, SearcherCall, BidData} from "../types/CallTypes.sol";
+import {UserMetaTx, ProtocolCall, SearcherCall, BidData} from "../types/CallTypes.sol";
 
 import {CallVerification} from "../libraries/CallVerification.sol";
 import {CallBits} from "../libraries/CallBits.sol";
@@ -60,7 +60,7 @@ contract ExecutionEnvironment is Test {
     //////////////////////////////////
     ///    CORE CALL FUNCTIONS     ///
     //////////////////////////////////
-    function stagingWrapper(UserCall calldata userCall)
+    function stagingWrapper(UserMetaTx calldata userCall)
         external
         returns (bytes memory)
     {
@@ -92,7 +92,7 @@ contract ExecutionEnvironment is Test {
 
     }
 
-    function userWrapper(UserCall calldata userCall) external payable returns (bytes memory userData) {
+    function userWrapper(UserMetaTx calldata userCall) external payable returns (bytes memory userData) {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 

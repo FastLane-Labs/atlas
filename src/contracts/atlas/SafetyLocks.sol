@@ -6,7 +6,7 @@ import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
 import {SafetyBits} from "../libraries/SafetyBits.sol";
 import {CallBits} from "../libraries/CallBits.sol";
 
-import {ProtocolCall, UserCall} from "../types/CallTypes.sol";
+import {ProtocolCall, UserMetaTx} from "../types/CallTypes.sol";
 import "../types/LockTypes.sol";
 import "../types/EscrowTypes.sol";
 
@@ -84,14 +84,13 @@ contract SafetyLocks is Test {
         }
     }
 
-    modifier userLock(UserCall calldata userCall, address environment) {
+    modifier userLock(UserMetaTx calldata userCall, address environment) {
         // msg.sender = user EOA
         // address(this) = atlas
 
         EscrowKey memory escrowKey = _escrowKey;
 
         require(escrowKey.isValidUserLock(environment), "ERR-SL032 InvalidLockStage");
-        require(userCall.from == msg.sender, "ERR-SL070 SenderNotFrom");
 
         // NOTE: the approvedCaller is set to the userCall's to so that it can callback
         // into the ExecutionEnvironment if needed.
