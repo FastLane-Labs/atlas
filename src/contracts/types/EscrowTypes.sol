@@ -51,6 +51,7 @@ enum SearcherOutcome
     CallReverted,
     BidNotPaid,
     IntentUnfulfilled,
+    SearcherStagingFailed,
     CallValueTooHigh,
     CallbackFailed,
     EVMError,

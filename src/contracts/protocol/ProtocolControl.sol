@@ -22,6 +22,7 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
     bool public immutable requireStaging;
     bool public immutable localUser;
     bool public immutable delegateUser;
+    bool public immutable searcherStaging;
     bool public immutable searcherFulfillment;
     bool public immutable requireVerification;
     bool public immutable zeroSearchers;
@@ -37,6 +38,7 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         bool _requireStaging,
         bool _localUser,
         bool _delegateUser,
+        bool _searcherStaging,
         bool _searcherFulfillment,
         bool _requireVerification,
         bool _zeroSearchers,
@@ -55,6 +57,7 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         requireStaging = _requireStaging;
         localUser = _localUser;
         delegateUser = _delegateUser;
+        searcherStaging = _searcherStaging;
         searcherFulfillment = _searcherFulfillment;
         requireVerification = _requireVerification;
         zeroSearchers = _zeroSearchers;
@@ -122,6 +125,16 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         return delegateUser ? _userLocalDelegateCall(data) : _userLocalStandardCall(data);
     }
 
+    function searcherStagingCall(bytes calldata data) 
+        external 
+        mustBeDelegated
+        onlyApprovedDelegateCaller
+        validControl
+        returns (bool)
+    {
+        return _searcherStagingCall(data);
+    }
+
     function fulfillmentCall(bytes calldata data) 
         external 
         mustBeDelegated
@@ -177,6 +190,7 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
                 requireStaging,
                 localUser,
                 delegateUser,
+                searcherStaging,
                 searcherFulfillment,
                 requireVerification,
                 zeroSearchers,
@@ -188,12 +202,13 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         });
     }
 
-    function _getCallConfig() internal view returns (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool) {
+    function _getCallConfig() internal view returns (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool) {
         return (
             sequenced,
             requireStaging,
             localUser,
             delegateUser,
+            searcherStaging,
             searcherFulfillment,
             requireVerification,
             zeroSearchers,
@@ -204,7 +219,7 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         );
     }
 
-    function getCallConfig() external view returns (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool) {
+    function getCallConfig() external view returns (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool) {
         return _getCallConfig();
     }
 

@@ -112,20 +112,44 @@ abstract contract GovernanceControl {
     //              INTENT FULFILLMENT                     //
     /////////////////////////////////////////////////////////
     //
-    // Data should be decoded as:
-    //
-    //    bytes memory stagingReturnData
-    //
 
-    // _fulfillmentCall
+    // _searcherStagingCall
+    //
     // Details:
-    //  fulfillment/delegatecall =
-    //      Inputs: staging call's returnData
+    //  Data should be decoded as:
+    //
+    //    bytes memory stagingReturnData, address searcherTo
+    //
+    //  fulfillment(staging)/delegatecall =
+    //      Inputs: staging call's returnData, winning searcher to address
     //      Function: Executing the function set by ProtocolControl
     //      Container: Inside of the FastLane ExecutionEnvironment
     //      Access: Storage access (read+write) to the ExecutionEnvironment contract
     //      NOTE: This happens *inside* of the searcher's try/catch wrapper
-    //      and is designed to make sure that if the searcher is fulfilling
+    //      and is designed to give the searcher everything they need to fulfill
+    //      the user's 'intent.'
+
+    function _searcherStagingCall(bytes calldata) internal virtual returns (bool) {
+        revert(_NOT_IMPLEMENTED);
+    }
+
+
+    // _fulfillmentCall
+    //
+    // Details:
+    //
+    //  Data should be decoded as:
+    //
+    //    bytes memory stagingReturnData, address searcherTo
+    //
+
+    //  fulfillment(verification)/delegatecall =
+    //      Inputs: staging call's returnData, winning searcher to address
+    //      Function: Executing the function set by ProtocolControl
+    //      Container: Inside of the FastLane ExecutionEnvironment
+    //      Access: Storage access (read+write) to the ExecutionEnvironment contract
+    //      NOTE: This happens *inside* of the searcher's try/catch wrapper
+    //      and is designed to make sure that the searcher is fulfilling
     //      the user's 'intent.'
 
     function _fulfillmentCall(bytes calldata) internal virtual returns (bool) {

@@ -47,6 +47,8 @@ contract SearcherWrapper is FastLaneErrorsEvents {
                 return (SearcherOutcome.InvalidUserHash, 0);
             } else if (errorSwitch == _HASH_CHAIN_BROKEN) {
                 return (SearcherOutcome.InvalidSequencing, 0);
+            } else if (errorSwitch == _SEARCHER_STAGING_FAILED) {
+                return (SearcherOutcome.SearcherStagingFailed, 0);
             } else {
                 return (SearcherOutcome.EVMError, 0);
             }

@@ -18,7 +18,8 @@ library EscrowBits {
         1 << uint256(SearcherOutcome.CallReverted) | 1 << uint256(SearcherOutcome.BidNotPaid)
             | 1 << uint256(SearcherOutcome.CallValueTooHigh) | 1 << uint256(SearcherOutcome.UnknownError)
             | 1 << uint256(SearcherOutcome.CallbackFailed) | 1 << uint256(SearcherOutcome.IntentUnfulfilled)
-            | 1 << uint256(SearcherOutcome.EVMError) | 1 << uint256(SearcherOutcome.Success)
+            | 1 << uint256(SearcherOutcome.EVMError) | 1 << uint256(SearcherOutcome.SearcherStagingFailed)
+            | 1 << uint256(SearcherOutcome.Success)
     );
 
     uint256 internal constant _NO_NONCE_UPDATE = (
@@ -37,7 +38,7 @@ library EscrowBits {
         1 << uint256(SearcherOutcome.CallReverted) | 1 << uint256(SearcherOutcome.BidNotPaid)
             | 1 << uint256(SearcherOutcome.CallValueTooHigh) | 1 << uint256(SearcherOutcome.UnknownError)
             | 1 << uint256(SearcherOutcome.CallbackFailed) | 1 << uint256(SearcherOutcome.IntentUnfulfilled)
-            | 1 << uint256(SearcherOutcome.EVMError) 
+            | 1 << uint256(SearcherOutcome.SearcherStagingFailed) | 1 << uint256(SearcherOutcome.EVMError) 
     );
 
     uint256 internal constant _EXECUTED_SUCCESSFULLY = (1 << uint256(SearcherOutcome.Success));

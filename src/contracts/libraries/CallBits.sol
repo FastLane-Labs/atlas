@@ -14,6 +14,7 @@ library CallBits {
             bool requireStaging,
             bool localUser,
             bool delegateUser,
+            bool searcherStaging,
             bool searcherFulfillment,
             bool requireVerification,
             bool zeroSearchers,
@@ -29,6 +30,7 @@ library CallBits {
              requireStaging,
              localUser,
              delegateUser,
+             searcherStaging,
              searcherFulfillment,
              requireVerification,
              zeroSearchers,
@@ -44,6 +46,7 @@ library CallBits {
         bool requireStaging,
         bool localUser,
         bool delegateUser,
+        bool searcherStaging,
         bool searcherFulfillment,
         bool requireVerification,
         bool zeroSearchers,
@@ -63,6 +66,9 @@ library CallBits {
         }
         if (delegateUser) {
             callConfig ^= _ONE << uint16(CallConfig.DelegateUser);
+        }
+        if (searcherStaging) {
+            callConfig ^= _ONE << uint16(CallConfig.SearcherStaging);
         }
         if (searcherFulfillment) {
             callConfig ^= _ONE << uint16(CallConfig.SearcherFulfillment);
@@ -101,6 +107,10 @@ library CallBits {
 
     function needsDelegateUser(uint16 callConfig) internal pure returns (bool delegateUser) {
         delegateUser = (callConfig & 1 << uint16(CallConfig.DelegateUser) != 0);
+    }
+
+    function needsSearcherStaging(uint16 callConfig) internal pure returns (bool searcherStaging) {
+        searcherStaging = (callConfig & 1 << uint16(CallConfig.SearcherStaging) != 0);
     }
 
     function needsSearcherFullfillment(uint16 callConfig) internal pure returns (bool searcherFulfillment) {

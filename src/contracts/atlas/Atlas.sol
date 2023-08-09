@@ -39,21 +39,20 @@ contract Atlas is Test, Factory {
         // and that the signatures are valid. 
         bool valid = _verifyProtocol(userCall.metaTx.to, protocolCall, verification) && _verifyUser(protocolCall, userCall);
 
-        // Check that the value of the tx is greater than or equal to the value specified
-        // NOTE: a msg.value *higher* than user value could be used by the staging call.
-        // There is a further check in the handler before the usercall to verify.
-        if(msg.value < userCall.metaTx.value) { valid = false; }
-        if(searcherCalls.length >= type(uint8).max - 1) { valid = false; }
-        if(block.number > userCall.metaTx.deadline || block.number > verification.proof.deadline) { valid = false; }
-        if(tx.gasprice > userCall.metaTx.maxFeePerGas) { valid = false; }
-        if (!protocolCall.callConfig.allowsZeroSearchers() || protocolCall.callConfig.needsSearcherFullfillment()) {
-            if (searcherCalls.length == 0) { valid = false;}
-        }
-
-
         // Get the execution environment
         address environment = _getExecutionEnvironmentCustom(userCall.metaTx.from, verification.proof.controlCodeHash, protocolCall.to, protocolCall.callConfig);
-        valid = valid && environment.codehash != bytes32(0);
+
+        // Check that the value of the tx is greater than or equal to the value specified
+        if (msg.value < userCall.metaTx.value) { valid = false; }
+        //if (msg.sender != tx.origin) { valid = false; }
+        if (searcherCalls.length >= type(uint8).max - 1) { valid = false; }
+        if (block.number > userCall.metaTx.deadline || block.number > verification.proof.deadline) { valid = false; }
+        if (tx.gasprice > userCall.metaTx.maxFeePerGas) { valid = false; }
+        if (environment.codehash == bytes32(0)) { valid = false; }
+        if (!protocolCall.callConfig.allowsZeroSearchers() || protocolCall.callConfig.needsSearcherFullfillment()) {
+            if (searcherCalls.length == 0) { valid = false; }
+        }
+        // TODO: More checks 
 
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
@@ -64,7 +63,7 @@ contract Atlas is Test, Factory {
         try this.execute{value: msg.value}(protocolCall, userCall.metaTx, searcherCalls, environment, verification.proof.callChainHash) 
             returns (uint256 accruedGasRebate) {
             // Gas Refund to sender only if execution is successful
-            _executeGasRefund(msg.sender, accruedGasRebate);
+            _executeGasRefund(gasMarker, accruedGasRebate, userCall.metaTx.from);
 
         } catch {
             // TODO: This portion needs more nuanced logic
@@ -120,7 +119,7 @@ contract Atlas is Test, Factory {
         bytes memory userReturnData = _executeUserCall(userCall, environment);
 
         uint256 i;
-        bool auctionAlreadyWon;
+        bool auctionWon;
 
         for (; i < searcherCalls.length;) {
 
@@ -128,10 +127,11 @@ contract Atlas is Test, Factory {
 
             // Only execute searcher meta tx if userCallHash matches 
             if (userCallHash == searcherCalls[i].metaTx.userCallHash) {
-                auctionAlreadyWon = auctionAlreadyWon
-                    || _searcherExecutionIteration(
-                        protocolCall, searcherCalls[i], stagingReturnData, auctionAlreadyWon, environment
-                    );
+                if (!auctionWon && _searcherExecutionIteration(
+                        protocolCall, searcherCalls[i], stagingReturnData, auctionWon, environment
+                    )) {
+                        auctionWon = true;
+                    }
             }
 
             unchecked {
@@ -140,7 +140,7 @@ contract Atlas is Test, Factory {
         }
 
         // If no searcher was successful, manually transition the lock
-        if (!auctionAlreadyWon) {
+        if (!auctionWon) {
             if (protocolCall.callConfig.needsSearcherFullfillment()) {
                 revert("ERR-F08 UserNotFulfilled");
             }

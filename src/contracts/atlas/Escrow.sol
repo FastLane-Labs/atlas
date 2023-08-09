@@ -25,6 +25,9 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     using ECDSA for bytes32;
     using EscrowBits for uint256;
 
+    uint256 constant public BUNDLER_PREMIUM = 110; // the amount over cost that bundlers get paid
+    uint256 constant public BUNDLER_BASE = 100;
+
     uint32 public immutable escrowDuration;
 
     // NOTE: these storage vars / maps should only be accessible by *signed* searcher transactions
@@ -59,6 +62,19 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
 
     function nextSearcherNonce(address searcherMetaTxSigner) external view returns (uint256 nextNonce) {
         nextNonce = uint256(_escrowData[searcherMetaTxSigner].nonce) + 1;
+    }
+
+    ///////////////////////////////////////////////////
+    /// EXTERNAL FUNCTIONS FOR BUNDLER INTERACTION  ///
+    ///////////////////////////////////////////////////
+
+    function donateToBundler() external payable {
+        // NOTE: All donations in excess of 10% greater than cost are forwarded
+        // to the user. 
+        require(_escrowKey.lockState != 0, "ERR-E079 DonateRequiresLock");
+
+        uint256 gasRebate = msg.value / tx.gasprice;
+        _escrowKey.gasRefund += uint32(gasRebate);
     }
 
     ///////////////////////////////////////////////////
@@ -183,18 +199,20 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         accruedGasRebate = uint256(_escrowKey.gasRefund);
     }
 
-    function _executeGasRefund(address gasPayor, uint256 accruedGasRebate) internal {
-        uint256 gasRebate = accruedGasRebate * tx.gasprice;
+    function _executeGasRefund(uint256 gasMarker, uint256 accruedGasRebate, address user) internal {
+        uint256 gasFeeSpent = (gasMarker + 21_000 - gasleft()) * tx.gasprice;
+        uint256 gasFeeCredit = accruedGasRebate * tx.gasprice;
 
-        /*
-        emit UserTxResult(
-            userCallFrom,
-            0,
-            gasRebate
-        );
-        */
-
-        SafeTransferLib.safeTransferETH(gasPayor, gasRebate);
+        if (gasFeeCredit * BUNDLER_BASE > gasFeeSpent * BUNDLER_PREMIUM) {
+            uint256 gasFeeRebate = gasFeeSpent * BUNDLER_PREMIUM / BUNDLER_BASE;
+            gasFeeCredit -= gasFeeRebate;
+            SafeTransferLib.safeTransferETH(msg.sender, gasFeeRebate);
+            SafeTransferLib.safeTransferETH(user, gasFeeCredit);
+            // TODO: Consider tipping validator / builder here to incentivize a non-adversarial environment?
+        
+        } else {
+            SafeTransferLib.safeTransferETH(msg.sender, gasFeeCredit);
+        }
     }
 
     function _update(

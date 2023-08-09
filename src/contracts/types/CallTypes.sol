@@ -15,7 +15,7 @@ struct UserMetaTx {
     uint256 nonce;
     uint256 maxFeePerGas;
     uint256 value;
-    address control;
+    address control; // address for staging / validation funcs
     bytes data;
 }
 
@@ -65,6 +65,7 @@ enum CallConfig {
     CallStaging,
     DelegateUser,
     LocalUser,
+    SearcherStaging,
     SearcherFulfillment,
     CallVerification,
     ZeroSearchers,

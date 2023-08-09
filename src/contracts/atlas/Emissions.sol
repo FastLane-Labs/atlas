@@ -12,6 +12,7 @@ string constant ALTERED_USER_HASH = "AlteredUserCalldataHash";
 string constant INVALID_SEARCHER_HASH = "InvalidSearcherCalldataHash";
 string constant HASH_CHAIN_BROKEN = "CalldataHashChainMismatch";
 string constant INTENT_UNFULFILLED = "IntentUnfulfilled";
+string constant SEARCHER_STAGING_FAILED = "SearcherStagingFailed";
 
 contract FastLaneErrorsEvents {
     // NOTE: nonce is the executed nonce
@@ -39,6 +40,7 @@ contract FastLaneErrorsEvents {
     bytes32 internal constant _INVALID_SEARCHER_HASH = keccak256(abi.encodePacked(INVALID_SEARCHER_HASH));
     bytes32 internal constant _HASH_CHAIN_BROKEN = keccak256(abi.encodePacked(HASH_CHAIN_BROKEN));
     bytes32 internal constant _INTENT_UNFULFILLED = keccak256(abi.encodePacked(INTENT_UNFULFILLED));
+    bytes32 internal constant _SEARCHER_STAGING_FAILED = keccak256(abi.encodePacked(SEARCHER_STAGING_FAILED));
 
     // string constant SEARCHER_ETHER_BID_UNPAID = "SearcherMsgValueNotRepaid";
     // bytes32 constant _SEARCHER_ETHER_BID_UNPAID = keccak256(abi.encodePacked(SEARCHER_ETHER_BID_UNPAID));

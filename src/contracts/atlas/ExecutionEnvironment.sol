@@ -20,7 +20,8 @@ import {
     SEARCHER_MSG_VALUE_UNPAID,
     SEARCHER_FAILED_CALLBACK,
     SEARCHER_BID_UNPAID,
-    INTENT_UNFULFILLED
+    INTENT_UNFULFILLED,
+    SEARCHER_STAGING_FAILED
 } from "./Emissions.sol";
 
 contract ExecutionEnvironment is Test {
@@ -147,11 +148,8 @@ contract ExecutionEnvironment is Test {
         // address(this) = ExecutionEnvironment
         require(msg.sender == atlas, "ERR-CE00 InvalidSenderStaging");
 
-        bytes memory data =
-            abi.encodeWithSelector(IProtocolControl.verificationCall.selector, stagingReturnData, userReturnData);
-
-        data = abi.encodePacked(
-            data,
+        bytes memory data = abi.encodePacked(
+            abi.encodeWithSelector(IProtocolControl.verificationCall.selector, stagingReturnData, userReturnData),
             _user(),
             _control(),
             _config(),
@@ -198,9 +196,22 @@ contract ExecutionEnvironment is Test {
 
         // Verify that the ProtocolControl contract matches the searcher's expectations
         require(searcherCall.metaTx.controlCodeHash == _controlCodeHash(), ALTERED_USER_HASH);
+        bool success;
+
+        // Handle any searcher staging, if necessary
+        if (_config().needsSearcherStaging()) {
+            bytes memory data;
+            (success, data) = _control().delegatecall(
+                abi.encodeWithSelector(IProtocolControl.searcherStagingCall.selector, stagingReturnData, searcherCall.metaTx.to)
+            );
+            require(success, SEARCHER_STAGING_FAILED);
+
+            success = abi.decode(data, (bool));
+            require(success, SEARCHER_STAGING_FAILED);
+        }
 
         // Execute the searcher call.
-        (bool success,) = ISearcherContract(searcherCall.metaTx.to).metaFlashCall{
+        (success,) = ISearcherContract(searcherCall.metaTx.to).metaFlashCall{
             gas: gasLimit,
             value: searcherCall.metaTx.value
         }(searcherCall.metaTx.from, searcherCall.metaTx.data, searcherCall.bids);
@@ -213,7 +224,7 @@ contract ExecutionEnvironment is Test {
         if (_config().needsSearcherFullfillment()) {
             bytes memory data;
             (success, data) = _control().delegatecall(
-                abi.encodeWithSelector(IProtocolControl.fulfillmentCall.selector, stagingReturnData)
+                abi.encodeWithSelector(IProtocolControl.fulfillmentCall.selector, stagingReturnData, searcherCall.metaTx.to)
             );
             require(success, INTENT_UNFULFILLED);
 
