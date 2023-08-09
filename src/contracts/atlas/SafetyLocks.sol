@@ -85,7 +85,7 @@ contract SafetyLocks is Test {
     }
 
     modifier userLock(UserMetaTx calldata userCall, address environment) {
-        // msg.sender = user EOA
+        // msg.sender = address(this) (inside try/catch)
         // address(this) = atlas
 
         EscrowKey memory escrowKey = _escrowKey;
