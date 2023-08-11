@@ -31,6 +31,15 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
     );
 
     mapping(address => uint256) public userNonces;
+    
+    struct NonceTracker {
+        uint64 asyncFloor;
+        uint64 asyncCeiling;
+        uint64 blockingLast;
+    }
+
+    //  keccak256(from, callConfig, nonce) => to
+    mapping(bytes32 => address) public asyncNonceFills;
 
     constructor() EIP712("ProtoCallHandler", "0.0.1") {}
 
@@ -85,15 +94,18 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
         // To avoid exposure to social engineering vulnerabilities, disgruntled
         // former employees, or beneficiary uncertainty during intra-DAO conflict,
         // governance should refrain from using a proxy contract for ProtocolControl.
-        bytes32 controlCodeHash = protocolCall.to.codehash;
-        if (controlCodeHash == bytes32(0) || protocols[key] != controlCodeHash) {
+        if (protocolCall.to.codehash == bytes32(0) || protocols[key] != protocolCall.to.codehash) {
             return (false);
         }
 
         // Verify that ProtocolControl hasn't been updated.  
         // NOTE: Performing this check here allows the searchers' checks 
         // to be against the verification proof's controlCodeHash to save gas. 
-        if (controlCodeHash != verification.proof.controlCodeHash) {
+        if (protocolCall.to.codehash != verification.proof.controlCodeHash) {
+            return (false);
+        }
+
+        if (verification.proof.nonce > type(uint64).max - 1) {
             return (false);
         }
 
@@ -103,28 +115,27 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
         // which builders or validators may be able to profit via censorship.
         // Protocols are encouraged to rely on the deadline parameter
         // to prevent replay attacks.
+
         if (protocolCall.callConfig.needsSequencedNonces()) {
             if (verification.proof.nonce != signatory.nonce + 1) {
                 return (false);
             }
-            unchecked {
-                ++signatories[verification.proof.from].nonce;
-            }
 
+            unchecked {++signatories[verification.proof.from].nonce;}
+            
             // If not sequenced, check to see if this nonce is highest and store
             // it if so.  This ensures nonce + 1 will always be available.
         } else {
-            if (verification.proof.nonce > signatory.nonce + 1) {
-                unchecked {
-                    signatories[verification.proof.from].nonce = uint64(verification.proof.nonce) + 1;
-                }
-            } else if (verification.proof.nonce == signatory.nonce + 1) {
-                unchecked {
-                    ++signatories[verification.proof.from].nonce;
-                }
-            } else {
-                return false;
+            // NOTE: including the callConfig in the asyncNonceKey should prevent
+            // issues occuring when a protocol may switch configs between blocking 
+            // and async, since callConfig can double as another seed. 
+            bytes32 asyncNonceKey = keccak256(abi.encode(verification.proof.from, protocolCall.callConfig, verification.proof.nonce + 1));
+            
+            if (asyncNonceFills[asyncNonceKey] != address(0)) {
+                return (false);
             }
+
+            asyncNonceFills[asyncNonceKey] = protocolCall.to;
         }
 
         return (true);
@@ -174,6 +185,10 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
             return (false);
         }
 
+        if (userCall.metaTx.nonce > type(uint64).max - 1) {
+            return (false);
+        }
+
         uint256 userNonce = userNonces[userCall.metaTx.from];
 
         // If the protocol indicated that they only accept sequenced userNonces
@@ -186,24 +201,22 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
             if (userCall.metaTx.nonce != userNonce + 1) {
                 return (false);
             }
-            unchecked {
-                ++userNonces[userCall.metaTx.from];
-            }
+
+            unchecked {++userNonces[userCall.metaTx.from];}
 
             // If not sequenced, check to see if this nonce is highest and store
             // it if so.  This ensures nonce + 1 will always be available.
         } else {
-            if (userCall.metaTx.nonce > userNonce + 1) {
-                unchecked {
-                    userNonces[userCall.metaTx.from] = userCall.metaTx.nonce + 1;
-                }
-            } else if (userCall.metaTx.nonce == userNonce + 1) {
-                unchecked {
-                    ++userNonces[userCall.metaTx.from];
-                }
-            } else {
-                return false;
+            // NOTE: including the callConfig in the asyncNonceKey should prevent
+            // issues occuring when a protocol may switch configs between blocking 
+            // and async, since callConfig can double as another seed. 
+            bytes32 asyncNonceKey = keccak256(abi.encode(userCall.metaTx.from, protocolCall.callConfig, userCall.metaTx.nonce + 1));
+            
+            if (asyncNonceFills[asyncNonceKey] != address(0)) {
+                return (false);
             }
+
+            asyncNonceFills[asyncNonceKey] = protocolCall.to;
         }
 
         return (true);

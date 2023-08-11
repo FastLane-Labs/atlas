@@ -71,6 +71,7 @@ contract ExecutionEnvironment is Test {
         address control = _control();
 
         require(msg.sender == atlas && userCall.from == _user(), "ERR-CE00 InvalidSenderStaging");
+        require(userCall.to != address(this), "ERR-EV008 InvalidTo");
 
         bytes memory stagingData = abi.encodeWithSelector(
             IProtocolControl.stagingCall.selector, userCall.to, userCall.from, bytes4(userCall.data), userCall.data[4:]
@@ -102,6 +103,7 @@ contract ExecutionEnvironment is Test {
 
         require(msg.sender == atlas && userCall.from == user, "ERR-CE00 InvalidSenderUser");
         require(address(this).balance >= userCall.value, "ERR-CE01 ValueExceedsBalance");
+        require(userCall.to != address(this), "ERR-EV008 InvalidTo");
 
         bool success;
 
@@ -172,6 +174,7 @@ contract ExecutionEnvironment is Test {
         // address(this) = ExecutionEnvironment
         require(msg.sender == atlas, "ERR-04 InvalidCaller");
         require(address(this).balance == searcherCall.metaTx.value, "ERR-CE05 IncorrectValue");
+        require(searcherCall.metaTx.to != address(this), "ERR-EV008 InvalidTo");
 
         // Track token balances to measure if the bid amount is paid.
         uint256[] memory tokenBalances = new uint[](searcherCall.bids.length);

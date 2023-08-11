@@ -23,11 +23,13 @@ contract ProtocolIntegration {
 
     mapping(bytes32 => bytes32) public protocols;
 
-    // Integrates a new protocol
+    // Permissionlessly integrates a new protocol
     function initializeGovernance(address protocolControl) external {
         address owner = IProtocolControl(protocolControl).getProtocolSignatory();
 
         require(msg.sender == owner, "ERR-V50 OnlyGovernance");
+
+        require(signatories[owner].governance == address(0), "ERR-V49 OwnerActive");
 
         uint16 callConfig = CallBits.buildCallConfig(protocolControl);
 
@@ -41,6 +43,8 @@ contract ProtocolIntegration {
         GovernanceData memory govData = governance[protocolControl];
 
         require(msg.sender == govData.governance, "ERR-V50 OnlyGovernance");
+
+        require(signatories[signatory].governance == address(0), "ERR-V49 SignatoryActive");
 
         signatories[signatory] = ApproverSigningData({governance: protocolControl, enabled: true, nonce: 0});
     }

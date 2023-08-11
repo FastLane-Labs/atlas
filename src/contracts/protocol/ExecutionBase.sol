@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import {ITokenTransfers} from "../interfaces/ITokenTransfers.sol";
+import {IPermit69} from "../interfaces/IPermit69.sol";
 
 contract ExecutionBase {
 
@@ -40,7 +40,7 @@ contract ExecutionBase {
         address destination,
         uint256 amount
     ) internal {
-        ITokenTransfers(msg.sender).transferUserERC20(
+        IPermit69(msg.sender).transferUserERC20(
             token, destination, amount, _user(), _control(), _config()
         );
     }
@@ -50,7 +50,7 @@ contract ExecutionBase {
         address destination,
         uint256 amount
     ) internal {
-        ITokenTransfers(msg.sender).transferProtocolERC20(
+        IPermit69(msg.sender).transferProtocolERC20(
             token, destination, amount, _user(), _control(), _config()
         );
     }

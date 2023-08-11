@@ -2,7 +2,6 @@
 pragma solidity ^0.8.16;
 
 import {Factory} from "./Factory.sol";
-import {UserVerifier} from "./UserVerification.sol";
 
 import "../types/CallTypes.sol";
 import "../types/VerificationTypes.sol";

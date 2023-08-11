@@ -6,7 +6,16 @@ import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 import "../types/LockTypes.sol";
 import {ProtocolCall} from "../types/CallTypes.sol";
 
-abstract contract TokenTransfers {
+// NOTE: IPermit69 only works inside of the Atlas environment - specifically
+// inside of the custom ExecutionEnvironments that each user deploys when
+// interacting with Atlas in a manner controlled by the DeFi protocol.
+
+// The name comes from the reciprocal nature of the token transfers. Both
+// the user and the ProtocolControl can transfer tokens from the User
+// and the ProtocolControl contracts... but only if they each have granted
+// token approval to the Atlas main contract, and only during specific phases
+// of the Atlas execution process.
+abstract contract Permit69 {
     using SafeTransferLib for ERC20;
 
     uint16 internal constant _EXECUTION_PHASE_OFFSET = uint16(type(BaseLock).max);

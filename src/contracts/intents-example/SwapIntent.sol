@@ -75,7 +75,18 @@ contract SwapIntentController is ProtocolControl {
         require(address(this) != control, "ERR-PI004 MustBeDelegated");
 
 
-        require(ERC20(swapIntent.tokenUserSells).balanceOf(_user()) >= swapIntent.amountUserSells, "ERR-PI005 InsufficientBalance");
+        uint256 sellTokenBalance = ERC20(swapIntent.tokenUserSells).balanceOf(address(this));
+
+        // Transfer the tokens that the user is selling into the ExecutionEnvironment
+        if (sellTokenBalance > swapIntent.amountUserSells) {
+            ERC20(swapIntent.tokenUserSells).safeTransfer(_user(), sellTokenBalance - swapIntent.amountUserSells);
+        
+        } else if (sellTokenBalance > 0) {
+            _transferUserERC20(swapIntent.tokenUserSells, address(this), swapIntent.amountUserSells - sellTokenBalance);
+        
+        } else { 
+            _transferUserERC20(swapIntent.tokenUserSells, address(this), swapIntent.amountUserSells);
+        }
     }
 
     function _stagingCall(address to, address, bytes4 userSelector, bytes calldata userData)
@@ -92,10 +103,8 @@ contract SwapIntentController is ProtocolControl {
         // There should never be a balance on this ExecutionEnvironment, but check
         // so that the auction accounting isn't imbalanced by unexpected inventory. 
 
-        uint256 sellTokenBalance = ERC20(swapIntent.tokenUserSells).balanceOf(address(this));
-        if (sellTokenBalance > 0) {
-            ERC20(swapIntent.tokenUserSells).safeTransfer(_user(), sellTokenBalance);
-        }
+        require(swapIntent.tokenUserSells != swapIntent.surplusToken, "ERR-PI008 SellIsSurplus");
+        // TODO: If user is Selling Eth, convert it to WETH rather than rejecting. 
 
         uint256 buyTokenBalance = ERC20(swapIntent.tokenUserBuys).balanceOf(address(this));
         if (buyTokenBalance > 0) {
@@ -123,7 +132,11 @@ contract SwapIntentController is ProtocolControl {
         SwapIntent memory swapIntent = abi.decode(stagingReturnData, (SwapIntent));
 
         // Optimistically transfer the searcher contract the tokens that the user is selling
-        _transferUserERC20(swapIntent.tokenUserSells, searcherTo, swapIntent.amountUserSells);
+        ERC20(swapIntent.tokenUserSells).safeTransfer(searcherTo, swapIntent.amountUserSells);
+        
+        // TODO: Permit69 is currently disabled during searcher phase, but there is currently
+        // no understood attack vector possible. Consider enabling to save gas on a transfer?
+        //_transferUserERC20(swapIntent.tokenUserSells, searcherTo, swapIntent.amountUserSells);
         return true;
     }
 

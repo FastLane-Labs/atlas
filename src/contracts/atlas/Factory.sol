@@ -7,14 +7,14 @@ import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
 import {Escrow} from "./Escrow.sol";
 import {Mimic} from "./Mimic.sol";
 import {ExecutionEnvironment} from "./ExecutionEnvironment.sol";
-import {TokenTransfers} from "./TokenTransfers.sol";
+import {Permit69} from "./Permit69.sol";
 
 import "../types/CallTypes.sol";
 import {EscrowKey} from "../types/LockTypes.sol";
 
 import "forge-std/Test.sol";
 
-contract Factory is Test, Escrow, TokenTransfers {
+contract Factory is Test, Escrow, Permit69 {
     //address immutable public atlas;
     bytes32 public immutable salt;
     address public immutable execution;
