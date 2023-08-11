@@ -5,3 +5,4 @@
 /lib/uniswap
 /lib/uniswap/*
 .env
+.DS_Store
