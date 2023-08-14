@@ -16,7 +16,8 @@ import {SwapIntentController, SwapIntent} from "src/contracts/intents-example/Sw
 // 2. Is the Atlas contract always also the Escrow contract? Would Escrow ever be separate?
 // 3. What is staging call and staging lock? How does it work?
 //      A: Checks protocolCall config for requireStaging, then calls holdStagingLock() on EscrowKey
-// 4. What is userSelector (bytes4) in _stagingCall?
+// 4. When is SwapIntentController deployed and where is it called or passed as arg
+//      A: SwapIntentContoller is ProtocolControl, must be deployed and passed into txBuilder
 
 // Refactor Ideas:
 // 1. Lots of bitwise operations explicitly coded in contracts - could be a helper lib thats more readable
@@ -28,14 +29,16 @@ import {SwapIntentController, SwapIntent} from "src/contracts/intents-example/Sw
 
 
 contract SwapIntentTest is BaseTest {
-
+    SwapIntentController public swapIntentController;
     TxBuilder public txBuilder;
 
     function setUp() public virtual override {
         BaseTest.setUp();
 
+        swapIntentController = new SwapIntentController(address(escrow));
+
         txBuilder = new TxBuilder({
-            protocolControl: address(control),
+            protocolControl: address(swapIntentController),
             escrowAddress: address(escrow),
             atlasAddress: address(atlas)
         });
@@ -65,7 +68,6 @@ contract SwapIntentTest is BaseTest {
         });
         // swap(SwapIntent calldata) selector = 0x98434997
         bytes memory userCallData = abi.encodeWithSelector(SwapIntentController.swap.selector, swapIntent);
-
         console.log("userCallData:");
         console.logBytes(userCallData);
 
@@ -78,13 +80,20 @@ contract SwapIntentTest is BaseTest {
             data: userCallData
         });
 
+        // searcherCallData is similar to userCallData
+        // decodes to [bytes stagingReturnData, address searcherTo]
+        // where stagingReturnData decodes to SwapIntent (same as in userCallData)
+        bytes memory searcherCallData = abi.encode(swapIntent, searcherOneEOA);
+        console.log("searcherCallData:");
+        console.logBytes(searcherCallData);
+
         // Builds the SearcherCall
         searcherCall = txBuilder.buildSearcherCall({
             userCall: userCall,
             protocolCall: protocolCall,
-            searcherCallData: "", // TODO update
+            searcherCallData: searcherCallData,
             searcherEOA: searcherOneEOA,
-            searcherContract: address(searcherOne),
+            searcherContract: address(searcherOne), // TODO 
             bidAmount: 1e18
         });
 
