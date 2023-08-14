@@ -9,6 +9,8 @@ import {TxBuilder} from "../src/contracts/helpers/TxBuilder.sol";
 import {ProtocolCall, UserCall, SearcherCall} from "../src/contracts/types/CallTypes.sol";
 import {Verification} from "../src/contracts/types/VerificationTypes.sol";
 
+import {SwapIntentController, SwapIntent} from "src/contracts/intents-example/SwapIntent.sol";
+
 // QUESTIONS:
 // 1. What is escrowDuration (constructor arg in Atlas, Escrow.sol)? Where is it used?
 // 2. Is the Atlas contract always also the Escrow contract? Would Escrow ever be separate?
@@ -49,17 +51,23 @@ contract SwapIntentTest is BaseTest {
         SearcherCall memory searcherCall; // First and only searcher will succeed
         Verification memory verification; 
 
-
-        // uint8 v;
-        // bytes32 r;
-        // bytes32 s;
-
         protocolCall = txBuilder.getProtocolCall();
 
         // userCallData is used in delegatecall from exec env to control, calling stagingCall
-        // first 4 bytes are "userSelector" param in stagingCall in ProtocolControl
+        // first 4 bytes are "userSelector" param in stagingCall in ProtocolControl - swap() selector
         // rest of data is "userData" param
-        bytes memory userCallData = ""; // TODO finish
+        SwapIntent memory swapIntent = SwapIntent({
+            tokenUserBuys: FXS_ADDRESS,
+            amountUserBuys: 20e18,
+            tokenUserSells: WETH_ADDRESS, 
+            amountUserSells: 10e18,
+            surplusToken: address(0)
+        });
+        // swap(SwapIntent calldata) selector = 0x98434997
+        bytes memory userCallData = abi.encodeWithSelector(SwapIntentController.swap.selector, swapIntent);
+
+        console.log("userCallData:");
+        console.logBytes(userCallData);
 
         // Builds the metaTx and to parts of userCall, signature still to be set
         userCall = txBuilder.buildUserCall({
