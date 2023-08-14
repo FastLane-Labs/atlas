@@ -12,11 +12,17 @@ import {Verification} from "../src/contracts/types/VerificationTypes.sol";
 // QUESTIONS:
 // 1. What is escrowDuration (constructor arg in Atlas, Escrow.sol)? Where is it used?
 // 2. Is the Atlas contract always also the Escrow contract? Would Escrow ever be separate?
+// 3. What is staging call and staging lock? How does it work?
+//      A: Checks protocolCall config for requireStaging, then calls holdStagingLock() on EscrowKey
+// 4. What is userSelector (bytes4) in _stagingCall?
 
 // Refactor Ideas:
 // 1. Lots of bitwise operations explicitly coded in contracts - could be a helper lib thats more readable
 // 2. helper is currently a V2Helper and shared from BaseTest. Should only be in Uni V2 related tests
 // 3. Need a more generic helper for BaseTest
+
+// Doc Ideas:
+// 1. Step by step instructions for building a metacall transaction (for internal testing, and integrating protocols)
 
 
 contract SwapIntentTest is BaseTest {
@@ -50,13 +56,18 @@ contract SwapIntentTest is BaseTest {
 
         protocolCall = txBuilder.getProtocolCall();
 
+        // userCallData is used in delegatecall from exec env to control, calling stagingCall
+        // first 4 bytes are "userSelector" param in stagingCall in ProtocolControl
+        // rest of data is "userData" param
+        bytes memory userCallData = ""; // TODO finish
+
         // Builds the metaTx and to parts of userCall, signature still to be set
         userCall = txBuilder.buildUserCall({
             from: userEOA, // NOTE: Would from ever not be user?
             to: address(atlas),
             maxFeePerGas: 0, // TODO update
             value: 0,
-            data: "" // TODO update
+            data: userCallData
         });
 
         // Builds the SearcherCall
@@ -72,6 +83,8 @@ contract SwapIntentTest is BaseTest {
         searcherCalls[0] = searcherCall;
 
 
+        // Frontend creates verification after seeing rest of data
+        // verification;
 
 
         address executionEnvironment = atlas.createExecutionEnvironment(protocolCall);
