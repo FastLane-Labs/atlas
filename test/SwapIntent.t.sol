@@ -3,6 +3,8 @@ pragma solidity ^0.8.18;
 
 import "forge-std/Test.sol";
 
+import {ERC20} from "solmate/tokens/ERC20.sol";
+
 import {BaseTest} from "./base/BaseTest.t.sol";
 import {TxBuilder} from "../src/contracts/helpers/TxBuilder.sol";
 
@@ -10,6 +12,7 @@ import {ProtocolCall, UserCall, SearcherCall} from "../src/contracts/types/CallT
 import {Verification} from "../src/contracts/types/VerificationTypes.sol";
 
 import {SwapIntentController, SwapIntent} from "src/contracts/intents-example/SwapIntent.sol";
+import {SearcherBase} from "../src/contracts/searcher/SearcherBase.sol";
 
 // QUESTIONS:
 
@@ -18,6 +21,7 @@ import {SwapIntentController, SwapIntent} from "src/contracts/intents-example/Sw
 // 2. helper is currently a V2Helper and shared from BaseTest. Should only be in Uni V2 related tests
 // 3. Need a more generic helper for BaseTest
 // 4. Gonna be lots of StackTooDeep errors. Maybe need a way to elegantly deal with that in BaseTest
+// 5. Change metaFlashCall structure in SearcherBase - maybe virtual fn to be overridden, which hooks for checks
 
 // Doc Ideas:
 // 1. Step by step instructions for building a metacall transaction (for internal testing, and integrating protocols)
@@ -151,13 +155,25 @@ contract SwapIntentTest is BaseTest {
 }
 
 
-contract SimpleRFQSearcher {
+contract SimpleRFQSearcher is SearcherBase {
 
     address public immutable owner;
 
-    constructor() {
+    constructor(address atlas) SearcherBase(atlas, msg.sender) {
         owner = msg.sender;
     }
 
-    // TODO function that can be called by Atlas and pays out 20 FXS if 10 WETH in searcher contract 
+    // TODO function that can be called by Atlas and pays out 20 FXS if 10 WETH in searcher contract
+
+    function fulfillRFQ(
+        address tokenIn,
+        uint256 amountIn,
+        address tokenOut,
+        uint256 amountOut
+    ) public {
+        require(ERC20(tokenIn).balanceOf(address(this)) >= amountIn, "Did not receive enough tokenIn");
+        require(ERC20(tokenOut).balanceOf(address(this)) >= amountOut, "Not enough tokenOut to fulfill");
+
+        ERC20(tokenOut).transfer(msg.sender, amountOut);
+    }
 }
