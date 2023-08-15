@@ -149,3 +149,15 @@ contract SwapIntentTest is BaseTest {
         assertEq(FXS.balanceOf(userEOA), userFxsBalanceBefore + amountFxsOut, "Did not receive enough FXS");
     }
 }
+
+
+contract SimpleRFQSearcher {
+
+    address public immutable owner;
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    // TODO function that can be called by Atlas and pays out 20 FXS if 10 WETH in searcher contract 
+}
