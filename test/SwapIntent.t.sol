@@ -23,13 +23,24 @@ import {SwapIntentController, SwapIntent} from "src/contracts/intents-example/Sw
 // 1. Lots of bitwise operations explicitly coded in contracts - could be a helper lib thats more readable
 // 2. helper is currently a V2Helper and shared from BaseTest. Should only be in Uni V2 related tests
 // 3. Need a more generic helper for BaseTest
+// 4. Gonna be lots of StackTooDeep errors. Maybe need a way to elegantly deal with that in BaseTest
 
 // Doc Ideas:
 // 1. Step by step instructions for building a metacall transaction (for internal testing, and integrating protocols)
 
+// To Understand Better:
+// 1. The lock system (and look for any gas optimizations / ways to reduce lock actions)
+
 contract SwapIntentTest is BaseTest {
     SwapIntentController public swapIntentController;
     TxBuilder public txBuilder;
+    Sig public sig;
+
+    struct Sig {
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+    }
 
     function setUp() public virtual override {
         BaseTest.setUp();
@@ -45,16 +56,14 @@ contract SwapIntentTest is BaseTest {
 
     function testAtlasSwapUsingIntent() public {
         // Swap 10 WETH for 20 FXS
+        uint256 amountWethIn = 10e18;
+        uint256 amountFxsOut = 20e18;
 
         // Input params for Atlas.metacall() - will be populated below
         ProtocolCall memory protocolCall;
         UserCall memory userCall;
         SearcherCall[] memory searcherCalls = new SearcherCall[](1);
         Verification memory verification;
-
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
 
         protocolCall = txBuilder.getProtocolCall();
 
@@ -63,9 +72,9 @@ contract SwapIntentTest is BaseTest {
         // rest of data is "userData" param
         SwapIntent memory swapIntent = SwapIntent({
             tokenUserBuys: FXS_ADDRESS,
-            amountUserBuys: 20e18,
+            amountUserBuys: amountFxsOut,
             tokenUserSells: WETH_ADDRESS,
-            amountUserSells: 10e18,
+            amountUserSells: amountWethIn,
             surplusToken: address(0)
         });
         // swap(SwapIntent calldata) selector = 0x98434997
@@ -83,8 +92,8 @@ contract SwapIntentTest is BaseTest {
         });
 
         // User signs the userCall
-        (v, r, s) = vm.sign(userPK, atlas.getUserCallPayload(userCall));
-        userCall.signature = abi.encodePacked(r, s, v);
+        (sig.v, sig.r, sig.s) = vm.sign(userPK, atlas.getUserCallPayload(userCall));
+        userCall.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // searcherCallData is similar to userCallData
         // decodes to [bytes stagingReturnData, address searcherTo]
@@ -104,15 +113,15 @@ contract SwapIntentTest is BaseTest {
         });
 
         // Searcher signs the searcherCall
-        (v, r, s) = vm.sign(searcherOnePK, atlas.getSearcherPayload(searcherCalls[0].metaTx));
-        searcherCalls[0].signature = abi.encodePacked(r, s, v);
+        (sig.v, sig.r, sig.s) = vm.sign(searcherOnePK, atlas.getSearcherPayload(searcherCalls[0].metaTx));
+        searcherCalls[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Frontend creates verification calldata after seeing rest of data
         verification = txBuilder.buildVerification(governanceEOA, protocolCall, userCall, searcherCalls);
 
         // Frontend signs the verification payload
-        (v, r, s) = vm.sign(governancePK, atlas.getVerificationPayload(verification));
-        verification.signature = abi.encodePacked(r, s, v);
+        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getVerificationPayload(verification));
+        verification.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         address executionEnvironment = atlas.createExecutionEnvironment(protocolCall);
         vm.label(address(executionEnvironment), "EXECUTION ENV");
@@ -123,6 +132,14 @@ contract SwapIntentTest is BaseTest {
         console.log("control", address(control));
         console.log("executionEnvironment", executionEnvironment);
 
+        // Check user token balances before
+        uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);
+        uint256 userFxsBalanceBefore = FXS.balanceOf(userEOA);
+
+        console.log("userWethBalanceBefore", userWethBalanceBefore);
+        console.log("userFxsBalanceBefore", userFxsBalanceBefore);
+        assertTrue(userWethBalanceBefore > amountWethIn, "Not enough starting WETH");
+
         vm.startPrank(userEOA);
         // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
         atlas.metacall({
@@ -132,5 +149,9 @@ contract SwapIntentTest is BaseTest {
             verification: verification
         });
         vm.stopPrank();
+
+        // Check user token balances after
+        assertEq(WETH.balanceOf(userEOA), userWethBalanceBefore - amountWethIn, "Did not spend enough WETH");
+        assertEq(FXS.balanceOf(userEOA), userFxsBalanceBefore + amountFxsOut, "Did not receive enough FXS");
     }
 }
