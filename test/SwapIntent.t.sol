@@ -110,10 +110,7 @@ contract SwapIntentTest is BaseTest {
         // The data below is also needed I think:
         bytes memory extraSearcherCallData = abi.encodeWithSelector(
             SimpleRFQSearcher.fulfillRFQ.selector, 
-            WETH_ADDRESS,
-            swapIntent.amountUserSells,
-            FXS_ADDRESS,
-            swapIntent.amountUserBuys
+            swapIntent
         );
         console.log("extra searcherCallData:");
         console.logBytes(extraSearcherCallData);
@@ -122,7 +119,7 @@ contract SwapIntentTest is BaseTest {
         searcherCalls[0] = txBuilder.buildSearcherCall({
             userCall: userCall,
             protocolCall: protocolCall,
-            searcherCallData: searcherCallData, // TODO need searcher contract and function to execute
+            searcherCallData: extraSearcherCallData, // TODO need searcher contract and function to execute
             searcherEOA: searcherOneEOA,
             searcherContract: address(rfqSearcher),
             bidAmount: 1e18
@@ -185,14 +182,16 @@ contract SimpleRFQSearcher is SearcherBase {
     }
 
     function fulfillRFQ(
-        address tokenIn,
-        uint256 amountIn,
-        address tokenOut,
-        uint256 amountOut
+        SwapIntent calldata swapIntent
     ) public {
-        require(ERC20(tokenIn).balanceOf(address(this)) >= amountIn, "Did not receive enough tokenIn");
-        require(ERC20(tokenOut).balanceOf(address(this)) >= amountOut, "Not enough tokenOut to fulfill");
 
-        ERC20(tokenOut).transfer(msg.sender, amountOut);
+        console.log("fulfillRFQ called");
+        console.log("swapIntent.amountUserSells", swapIntent.amountUserSells);
+        console.log("swapIntent.amountUserBuys", swapIntent.amountUserBuys);
+
+        require(ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells, "Did not receive enough tokenIn");
+        require(ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys, "Not enough tokenOut to fulfill");
+
+        ERC20(swapIntent.tokenUserBuys).transfer(msg.sender, swapIntent.amountUserBuys);
     }
 }
