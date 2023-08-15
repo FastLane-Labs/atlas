@@ -12,12 +12,6 @@ import {Verification} from "../src/contracts/types/VerificationTypes.sol";
 import {SwapIntentController, SwapIntent} from "src/contracts/intents-example/SwapIntent.sol";
 
 // QUESTIONS:
-// 1. What is escrowDuration (constructor arg in Atlas, Escrow.sol)? Where is it used?
-// 2. Is the Atlas contract always also the Escrow contract? Would Escrow ever be separate?
-// 3. What is staging call and staging lock? How does it work?
-//      A: Checks protocolCall config for requireStaging, then calls holdStagingLock() on EscrowKey
-// 4. When is SwapIntentController deployed and where is it called or passed as arg
-//      A: SwapIntentContoller is ProtocolControl, must be deployed and passed into txBuilder
 
 // Refactor Ideas:
 // 1. Lots of bitwise operations explicitly coded in contracts - could be a helper lib thats more readable
