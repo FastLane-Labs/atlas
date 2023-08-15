@@ -54,8 +54,19 @@ contract SwapIntentTest is BaseTest {
 
     function testAtlasSwapUsingIntent() public {
         // Swap 10 WETH for 20 FXS
-        uint256 amountWethIn = 10e18;
-        uint256 amountFxsOut = 20e18;
+        SwapIntent memory swapIntent = SwapIntent({
+            tokenUserBuys: FXS_ADDRESS,
+            amountUserBuys: 20e18,
+            tokenUserSells: WETH_ADDRESS,
+            amountUserSells: 10e18,
+            surplusToken: address(0)
+        });
+
+        // Searcher deploys the RFQ searcher contract (defined at bottom of this file)
+        vm.prank(searcherOneEOA);
+        SimpleRFQSearcher rfqSearcher = new SimpleRFQSearcher(address(atlas));
+        // Give 20 FXS to RFQ searcher contract
+        deal(FXS_ADDRESS, address(rfqSearcher), swapIntent.amountUserBuys);
 
         // Input params for Atlas.metacall() - will be populated below
         ProtocolCall memory protocolCall;
@@ -68,13 +79,7 @@ contract SwapIntentTest is BaseTest {
         // userCallData is used in delegatecall from exec env to control, calling stagingCall
         // first 4 bytes are "userSelector" param in stagingCall in ProtocolControl - swap() selector
         // rest of data is "userData" param
-        SwapIntent memory swapIntent = SwapIntent({
-            tokenUserBuys: FXS_ADDRESS,
-            amountUserBuys: amountFxsOut,
-            tokenUserSells: WETH_ADDRESS,
-            amountUserSells: amountWethIn,
-            surplusToken: address(0)
-        });
+        
         // swap(SwapIntent calldata) selector = 0x98434997
         bytes memory userCallData = abi.encodeWithSelector(SwapIntentController.swap.selector, swapIntent);
         console.log("userCallData:");
@@ -96,9 +101,22 @@ contract SwapIntentTest is BaseTest {
         // searcherCallData is similar to userCallData
         // decodes to [bytes stagingReturnData, address searcherTo]
         // where stagingReturnData decodes to SwapIntent (same as in userCallData)
-        bytes memory searcherCallData = abi.encode(swapIntent, searcherOneEOA);
+        bytes memory searcherCallData = abi.encode(swapIntent, address(rfqSearcher));
         console.log("searcherCallData:");
         console.logBytes(searcherCallData);
+
+        // TODO need a way to pass function selector and params of searcher contract in searcherCallData
+        // Not sure if the SwapIntent controller is set up to do that and the SwapIntent data obj
+        // The data below is also needed I think:
+        bytes memory extraSearcherCallData = abi.encodeWithSelector(
+            SimpleRFQSearcher.fulfillRFQ.selector, 
+            WETH_ADDRESS,
+            swapIntent.amountUserSells,
+            FXS_ADDRESS,
+            swapIntent.amountUserBuys
+        );
+        console.log("extra searcherCallData:");
+        console.logBytes(extraSearcherCallData);
 
         // Builds the SearcherCall
         searcherCalls[0] = txBuilder.buildSearcherCall({
@@ -106,7 +124,7 @@ contract SwapIntentTest is BaseTest {
             protocolCall: protocolCall,
             searcherCallData: searcherCallData, // TODO need searcher contract and function to execute
             searcherEOA: searcherOneEOA,
-            searcherContract: address(searcherOne), // TODO
+            searcherContract: address(rfqSearcher),
             bidAmount: 1e18
         });
 
@@ -136,9 +154,12 @@ contract SwapIntentTest is BaseTest {
 
         console.log("userWethBalanceBefore", userWethBalanceBefore);
         console.log("userFxsBalanceBefore", userFxsBalanceBefore);
-        assertTrue(userWethBalanceBefore > amountWethIn, "Not enough starting WETH");
+        assertTrue(userWethBalanceBefore > swapIntent.amountUserSells, "Not enough starting WETH");
 
         vm.startPrank(userEOA);
+        // User approves Atlas to take 10 WETH
+        WETH.approve(address(atlas), swapIntent.amountUserSells);
+        
         // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
         atlas.metacall({
             protocolCall: protocolCall,
@@ -149,8 +170,8 @@ contract SwapIntentTest is BaseTest {
         vm.stopPrank();
 
         // Check user token balances after
-        assertEq(WETH.balanceOf(userEOA), userWethBalanceBefore - amountWethIn, "Did not spend enough WETH");
-        assertEq(FXS.balanceOf(userEOA), userFxsBalanceBefore + amountFxsOut, "Did not receive enough FXS");
+        assertEq(WETH.balanceOf(userEOA), userWethBalanceBefore - swapIntent.amountUserSells, "Did not spend enough WETH");
+        assertEq(FXS.balanceOf(userEOA), userFxsBalanceBefore + swapIntent.amountUserBuys, "Did not receive enough FXS");
     }
 }
 
@@ -162,8 +183,6 @@ contract SimpleRFQSearcher is SearcherBase {
     constructor(address atlas) SearcherBase(atlas, msg.sender) {
         owner = msg.sender;
     }
-
-    // TODO function that can be called by Atlas and pays out 20 FXS if 10 WETH in searcher contract
 
     function fulfillRFQ(
         address tokenIn,
