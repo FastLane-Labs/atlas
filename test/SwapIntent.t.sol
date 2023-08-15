@@ -43,7 +43,15 @@ contract SwapIntentTest is BaseTest {
     function setUp() public virtual override {
         BaseTest.setUp();
 
-        swapIntentController = new SwapIntentController(address(escrow));
+        // Creating new gov address (ERR-V49 OwnerActive if already registered with controller) 
+        governancePK = 11112;
+        governanceEOA = vm.addr(governancePK);
+
+        // Deploy new searcher from new gov and initialize in Atlas
+        vm.startPrank(governanceEOA);
+        swapIntentController = new SwapIntentController(address(escrow));        
+        atlas.initializeGovernance(address(swapIntentController));
+        vm.stopPrank();
 
         txBuilder = new TxBuilder({
             protocolControl: address(swapIntentController),
@@ -63,8 +71,11 @@ contract SwapIntentTest is BaseTest {
         });
 
         // Searcher deploys the RFQ searcher contract (defined at bottom of this file)
-        vm.prank(searcherOneEOA);
+        vm.startPrank(searcherOneEOA);
         SimpleRFQSearcher rfqSearcher = new SimpleRFQSearcher(address(atlas));
+        atlas.deposit{value: 1e18}(searcherOneEOA);
+        vm.stopPrank();
+
         // Give 20 FXS to RFQ searcher contract
         deal(FXS_ADDRESS, address(rfqSearcher), swapIntent.amountUserBuys);
 
