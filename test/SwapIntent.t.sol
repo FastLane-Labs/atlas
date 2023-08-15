@@ -27,7 +27,6 @@ import {SwapIntentController, SwapIntent} from "src/contracts/intents-example/Sw
 // Doc Ideas:
 // 1. Step by step instructions for building a metacall transaction (for internal testing, and integrating protocols)
 
-
 contract SwapIntentTest is BaseTest {
     SwapIntentController public swapIntentController;
     TxBuilder public txBuilder;
@@ -50,9 +49,12 @@ contract SwapIntentTest is BaseTest {
         // Input params for Atlas.metacall() - will be populated below
         ProtocolCall memory protocolCall;
         UserCall memory userCall;
-        SearcherCall[] memory searcherCalls = new SearcherCall[](1); 
-        SearcherCall memory searcherCall; // First and only searcher will succeed
-        Verification memory verification; 
+        SearcherCall[] memory searcherCalls = new SearcherCall[](1);
+        Verification memory verification;
+
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
 
         protocolCall = txBuilder.getProtocolCall();
 
@@ -62,7 +64,7 @@ contract SwapIntentTest is BaseTest {
         SwapIntent memory swapIntent = SwapIntent({
             tokenUserBuys: FXS_ADDRESS,
             amountUserBuys: 20e18,
-            tokenUserSells: WETH_ADDRESS, 
+            tokenUserSells: WETH_ADDRESS,
             amountUserSells: 10e18,
             surplusToken: address(0)
         });
@@ -80,6 +82,10 @@ contract SwapIntentTest is BaseTest {
             data: userCallData
         });
 
+        // User signs the userCall
+        (v, r, s) = vm.sign(userPK, atlas.getUserCallPayload(userCall));
+        userCall.signature = abi.encodePacked(r, s, v);
+
         // searcherCallData is similar to userCallData
         // decodes to [bytes stagingReturnData, address searcherTo]
         // where stagingReturnData decodes to SwapIntent (same as in userCallData)
@@ -88,35 +94,34 @@ contract SwapIntentTest is BaseTest {
         console.logBytes(searcherCallData);
 
         // Builds the SearcherCall
-        searcherCall = txBuilder.buildSearcherCall({
+        searcherCalls[0] = txBuilder.buildSearcherCall({
             userCall: userCall,
             protocolCall: protocolCall,
-            searcherCallData: searcherCallData,
+            searcherCallData: searcherCallData, // TODO need searcher contract and function to execute
             searcherEOA: searcherOneEOA,
-            searcherContract: address(searcherOne), // TODO 
+            searcherContract: address(searcherOne), // TODO
             bidAmount: 1e18
         });
 
-        searcherCalls[0] = searcherCall;
+        // Searcher signs the searcherCall
+        (v, r, s) = vm.sign(searcherOnePK, atlas.getSearcherPayload(searcherCalls[0].metaTx));
+        searcherCalls[0].signature = abi.encodePacked(r, s, v);
 
+        // Frontend creates verification calldata after seeing rest of data
+        verification = txBuilder.buildVerification(governanceEOA, protocolCall, userCall, searcherCalls);
 
-        // Frontend creates verification after seeing rest of data
-        // verification;
-
+        // Frontend signs the verification payload
+        (v, r, s) = vm.sign(governancePK, atlas.getVerificationPayload(verification));
+        verification.signature = abi.encodePacked(r, s, v);
 
         address executionEnvironment = atlas.createExecutionEnvironment(protocolCall);
         vm.label(address(executionEnvironment), "EXECUTION ENV");
-
 
         console.log("userEOA", userEOA);
         console.log("atlas", address(atlas)); // ATLAS == ESCROW
         console.log("escrow", address(escrow)); // ATLAS == ESCROW
         console.log("control", address(control));
         console.log("executionEnvironment", executionEnvironment);
-
-
-
-
 
         vm.startPrank(userEOA);
         // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
@@ -127,9 +132,5 @@ contract SwapIntentTest is BaseTest {
             verification: verification
         });
         vm.stopPrank();
-
-
-
     }
-
 }
