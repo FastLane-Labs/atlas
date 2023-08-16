@@ -39,9 +39,20 @@ contract Atlas is Test, Factory {
 
         // Verify that the calldata injection came from the protocol frontend
         // and that the signatures are valid. 
-        bool valid = _verifyProtocol(userCall.metaTx.to, protocolCall, verification) && _verifyUser(protocolCall, userCall);
-        console.log("valid before any checks?", valid);
+        bool valid = true;
         
+        // Only verify signatures of meta txs if the original signer isn't the bundler
+        // TODO: Consider extra reentrancy defense here?
+        if (verification.proof.from != msg.sender && !_verifyProtocol(userCall.metaTx.to, protocolCall, verification)) {
+            valid = false;
+        }
+        
+        if (userCall.metaTx.from != msg.sender && !_verifyUser(protocolCall, userCall)) { 
+            valid = false; 
+        }
+
+        // TODO: Add optionality to bypass ProtocolControl signatures if user can fully bundle tx
+
         // Get the execution environment
         address environment = _getExecutionEnvironmentCustom(userCall.metaTx.from, verification.proof.controlCodeHash, protocolCall.to, protocolCall.callConfig);
 
