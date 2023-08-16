@@ -73,6 +73,10 @@ contract SwapIntentTest is BaseTest {
             surplusToken: address(0)
         });
 
+        // TODO remove
+        console.log("swapIntentController.delegateUser()");
+        console.log(swapIntentController.delegateUser());
+
         // Searcher deploys the RFQ searcher contract (defined at bottom of this file)
         vm.startPrank(searcherOneEOA);
         SimpleRFQSearcher rfqSearcher = new SimpleRFQSearcher(address(atlas));
@@ -102,7 +106,7 @@ contract SwapIntentTest is BaseTest {
         userCall = txBuilder.buildUserCall({
             from: userEOA, // NOTE: Would from ever not be user?
             to: address(swapIntentController),
-            maxFeePerGas: 50, // TODO update
+            maxFeePerGas: tx.gasprice + 1, // TODO update
             value: 0,
             data: userCallData
         });
