@@ -134,6 +134,12 @@ contract ExecutionEnvironment is Test {
                     _controlCodeHash()
                 );
 
+                console.log("_control output in userWrapper:");
+                console.log(_control());
+
+                console.log("data in delegatecall:");
+                console.logBytes(userData);
+
                 (success, userData) = _control().delegatecall(userData);
                 require(success, "ERR-EC02 DelegateRevert");
             } else {

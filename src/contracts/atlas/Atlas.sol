@@ -34,8 +34,8 @@ contract Atlas is Test, Factory {
 
         uint256 gasMarker = gasleft();
 
-        console.log("_verifyProtocol:", _verifyProtocol(userCall.metaTx.to, protocolCall, verification));
-        console.log("_verifyUser:", _verifyUser(protocolCall, userCall));
+        // console.log("_verifyProtocol:", _verifyProtocol(userCall.metaTx.to, protocolCall, verification));
+        // console.log("_verifyUser:", _verifyUser(protocolCall, userCall));
 
         // Verify that the calldata injection came from the protocol frontend
         // and that the signatures are valid. 
@@ -43,6 +43,9 @@ contract Atlas is Test, Factory {
         
         // Only verify signatures of meta txs if the original signer isn't the bundler
         // TODO: Consider extra reentrancy defense here?
+
+        console.log("verification.proof.from:", verification.proof.from);
+        console.log("msg.sender:", msg.sender);
         if (verification.proof.from != msg.sender && !_verifyProtocol(userCall.metaTx.to, protocolCall, verification)) {
             valid = false;
         }
@@ -56,6 +59,7 @@ contract Atlas is Test, Factory {
         // Get the execution environment
         address environment = _getExecutionEnvironmentCustom(userCall.metaTx.from, verification.proof.controlCodeHash, protocolCall.to, protocolCall.callConfig);
 
+        console.log("valid before other checks:", valid);
         console.log("metacall: value check");
         // Check that the value of the tx is greater than or equal to the value specified
         if (msg.value < userCall.metaTx.value) { valid = false; }
@@ -141,6 +145,8 @@ contract Atlas is Test, Factory {
         bytes memory stagingReturnData = _executeStagingCall(protocolCall, userCall, environment);
 
         proof = proof.next(userCall.from, userCall.data);
+
+        console.log("just before _executeUserCall");
 
         bytes memory userReturnData = _executeUserCall(userCall, environment);
 

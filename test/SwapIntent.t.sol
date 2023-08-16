@@ -47,6 +47,7 @@ contract SwapIntentTest is BaseTest {
         // Creating new gov address (ERR-V49 OwnerActive if already registered with controller) 
         governancePK = 11112;
         governanceEOA = vm.addr(governancePK);
+        console.log("governanceEOA", governanceEOA);
 
         // Deploy new SwapIntent Controller from new gov and initialize in Atlas
         vm.startPrank(governanceEOA);
@@ -157,7 +158,7 @@ contract SwapIntentTest is BaseTest {
         console.log("userEOA", userEOA);
         console.log("atlas", address(atlas)); // ATLAS == ESCROW
         console.log("escrow", address(escrow)); // ATLAS == ESCROW
-        console.log("control", address(control));
+        console.log("control", address(swapIntentController));
         console.log("executionEnvironment", executionEnvironment);
 
         // Check user token balances before

@@ -71,9 +71,15 @@ contract SwapIntentController is ProtocolControl {
 
     // swap() selector = 0x98434997
     function swap(SwapIntent calldata swapIntent) external payable {
+        console.log("swap called");
+        console.log("msg.sender", msg.sender);
+        console.log("escrow", escrow);
+
         require(msg.sender == escrow, "ERR-PI002 InvalidSender");
         require(ISafetyLocks(escrow).approvedCaller() == control, "ERR-PI003 InvalidLockState");
         require(address(this) != control, "ERR-PI004 MustBeDelegated");
+
+        console.log("got here in swap in SwapIntent");
 
 
         uint256 sellTokenBalance = ERC20(swapIntent.tokenUserSells).balanceOf(address(this));

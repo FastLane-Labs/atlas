@@ -122,6 +122,7 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         validControl
         returns (bytes memory) 
     {
+        console.log("delegate user?", delegateUser); // never gets here
         return delegateUser ? _userLocalDelegateCall(data) : _userLocalStandardCall(data);
     }
 
