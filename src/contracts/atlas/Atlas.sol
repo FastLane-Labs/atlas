@@ -34,10 +34,14 @@ contract Atlas is Test, Factory {
 
         uint256 gasMarker = gasleft();
 
+        console.log("_verifyProtocol:", _verifyProtocol(userCall.metaTx.to, protocolCall, verification));
+        console.log("_verifyUser:", _verifyUser(protocolCall, userCall));
+
         // Verify that the calldata injection came from the protocol frontend
         // and that the signatures are valid. 
         bool valid = _verifyProtocol(userCall.metaTx.to, protocolCall, verification) && _verifyUser(protocolCall, userCall);
-
+        console.log("valid before any checks?", valid);
+        
         // Get the execution environment
         address environment = _getExecutionEnvironmentCustom(userCall.metaTx.from, verification.proof.controlCodeHash, protocolCall.to, protocolCall.callConfig);
 

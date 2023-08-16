@@ -48,10 +48,11 @@ contract SwapIntentTest is BaseTest {
         governancePK = 11112;
         governanceEOA = vm.addr(governancePK);
 
-        // Deploy new searcher from new gov and initialize in Atlas
+        // Deploy new SwapIntent Controller from new gov and initialize in Atlas
         vm.startPrank(governanceEOA);
         swapIntentController = new SwapIntentController(address(escrow));        
         atlas.initializeGovernance(address(swapIntentController));
+        atlas.integrateProtocol(address(swapIntentController), address(swapIntentController));
         vm.stopPrank();
 
         txBuilder = new TxBuilder({
