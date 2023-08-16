@@ -17,59 +17,44 @@ import "../types/LockTypes.sol";
 import {ProtocolControl} from "../protocol/ProtocolControl.sol";
 
 // Uni V2 Imports
+import {IUniswapV2Router01} from "./interfaces/IUniswapV2Router01.sol";
+import {IUniswapV2Router02} from "./interfaces/IUniswapV2Router02.sol";
 import {IUniswapV2Pair} from "./interfaces/IUniswapV2Pair.sol";
 
 // Misc
-import {SwapMath} from "./SwapMath.sol";
+import {IWETH} from "./interfaces/IWETH.sol";
 
 // import "forge-std/Test.sol";
 
-interface IWETH {
-    function deposit() external payable;
-    function withdraw(uint256 wad) external;
-}
-
 contract V2ProtocolControl is ProtocolControl {
+    address public immutable uniswapV2Router02;
+    address public immutable governanceToken;
+    address public immutable WETH;
+
+    mapping(bytes4 => bool) public allowedSelectors;
 
     uint256 public constant CONTROL_GAS_USAGE = 250_000;
 
-    address public constant WETH = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-    address public constant GOVERNANCE_TOKEN = address(0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984);
-    address public constant WETH_X_GOVERNANCE_POOL = address(0xd3d2E2692501A5c9Ca623199D38826e513033a17);
+    event GasRefunded(address indexed to, uint256 amount);
+    event BurnedGovernanceToken(address indexed user, address indexed token, uint256 amount);
 
-    address public constant BURN_ADDRESS =
-        address(uint160(uint256(keccak256(abi.encodePacked("GOVERNANCE TOKEN BURN ADDRESS")))));
-
-    bytes4 public constant SWAP = bytes4(IUniswapV2Pair.swap.selector);
-
-    bool public immutable govIsTok0;
-
-    event GiftedGovernanceToken(address indexed user, address indexed token, uint256 amount);
-
-    constructor(address _escrow)
-        ProtocolControl(
-            _escrow, 
-            msg.sender, 
-            false, 
-            true, 
-            false, 
-            false, 
-            false,
-            false, 
-            false, 
-            true, 
-            false, 
-            true,
-            true,
-            true
-        )
+    constructor(address _escrow, address _uniswapV2Router02, address _governanceToken)
+        ProtocolControl(_escrow, msg.sender, false, true, false, false, false, false, false, true, false, true, true, true)
     {
-        govIsTok0 = (IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token0() == GOVERNANCE_TOKEN);
-        if (govIsTok0) {
-            require(IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token1() == WETH, "INVALID TOKEN PAIR");
-        } else {
-            require(IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token0() == WETH, "INVALID TOKEN PAIR");
-        }
+        uniswapV2Router02 = _uniswapV2Router02;
+        governanceToken = _governanceToken;
+        WETH = IUniswapV2Router02(uniswapV2Router02).WETH();
+
+        allowedSelectors[bytes4(IUniswapV2Router01.swapExactTokensForTokens.selector)] = true;
+        allowedSelectors[bytes4(IUniswapV2Router01.swapTokensForExactTokens.selector)] = true;
+        allowedSelectors[bytes4(IUniswapV2Router01.swapExactETHForTokens.selector)] = true;
+        allowedSelectors[bytes4(IUniswapV2Router01.swapTokensForExactETH.selector)] = true;
+        allowedSelectors[bytes4(IUniswapV2Router01.swapExactTokensForETH.selector)] = true;
+        allowedSelectors[bytes4(IUniswapV2Router01.swapETHForExactTokens.selector)] = true;
+        allowedSelectors[bytes4(IUniswapV2Router02.swapExactTokensForTokensSupportingFeeOnTransferTokens.selector)] =
+            true;
+        allowedSelectors[bytes4(IUniswapV2Router02.swapExactETHForTokensSupportingFeeOnTransferTokens.selector)] = true;
+        allowedSelectors[bytes4(IUniswapV2Router02.swapExactTokensForETHSupportingFeeOnTransferTokens.selector)] = true;
     }
 
     /*
@@ -91,35 +76,16 @@ contract V2ProtocolControl is ProtocolControl {
     )
     */
 
-    function _stagingCall(address to, address, bytes4 userSelector, bytes calldata userData)
+    function _stagingCall(address, address, bytes4 userSelector, bytes calldata)
         internal
+        view
         override
         returns (bytes memory)
     {
-        require(userSelector == SWAP, "ERR-H10 InvalidFunction");
+        // Only checks that the called function is allowed
+        require(allowedSelectors[userSelector], "ERR-H10 InvalidFunction");
 
-        (
-            uint256 amount0Out,
-            uint256 amount1Out,
-            , // address recipient // Unused
-                // bytes memory swapData // Unused
-        ) = abi.decode(userData, (uint256, uint256, address, bytes));
-
-        (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(to).getReserves();
-
-        uint256 amount0In =
-            amount1Out == 0 ? 0 : SwapMath.getAmountIn(amount1Out, uint256(token0Balance), uint256(token1Balance));
-        uint256 amount1In =
-            amount0Out == 0 ? 0 : SwapMath.getAmountIn(amount0Out, uint256(token1Balance), uint256(token0Balance));
-
-
-        // This is a V2 swap, so optimistically transfer the tokens
-        // NOTE: The user should have approved the ExecutionEnvironment for token transfers
-        _transferUserERC20(
-            amount0Out > amount1Out ? IUniswapV2Pair(to).token1() : IUniswapV2Pair(to).token0(),
-            to, 
-            amount0In > amount1In ? amount0In : amount1In
-        );
+        // User must have approved UniswapV2Router02 to transferFrom the tokens they are selling
 
         bytes memory emptyData;
         return emptyData;
@@ -132,60 +98,43 @@ contract V2ProtocolControl is ProtocolControl {
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
 
-        // NOTE: ProtocolVerifier has verified the BidData[] format
-        // BidData[0] = address(WETH) <== WETH
-
         address user = _user();
 
         // MEV Rewards were collected in WETH
         uint256 balance = ERC20(WETH).balanceOf(address(this));
 
-        // TODO: remove this to allow graceful return?
-        require(balance > 0, "ERR-AC01 NoBalance");
+        if (balance == 0) {
+            // oops?
+            return;
+        }
 
         // Refund the user any extra gas costs
         uint256 userGasOverage = tx.gasprice * CONTROL_GAS_USAGE;
-        
-        // CASE: gas costs exceed MEV
-        if (balance <= userGasOverage) {
-            IWETH(WETH).withdraw(balance); // should null out the balance
-            SafeTransferLib.safeTransferETH(user, balance);
+        uint256 refundAmount = userGasOverage > balance ? balance : userGasOverage;
+
+        IWETH(WETH).withdraw(refundAmount);
+        SafeTransferLib.safeTransferETH(user, refundAmount);
+        emit GasRefunded(user, refundAmount);
+
+        balance -= refundAmount;
+
+        if (balance == 0) {
+            // No balance left
             return;
-        
-        // CASE: MEV exceeds gas costs
-        } else {
-            IWETH(WETH).withdraw(userGasOverage); // should null out the balance
-            SafeTransferLib.safeTransferETH(user, userGasOverage);
-            balance -= userGasOverage;
         }
 
-        (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).getReserves();
+        // Swap the WETH balance to governance token
+        IWETH(WETH).approve(uniswapV2Router02, balance);
 
-        ERC20(WETH).transfer(WETH_X_GOVERNANCE_POOL, balance);
+        address[] memory path = new address[](2);
+        path[0] = WETH;
+        path[1] = governanceToken;
 
-        uint256 amount0Out;
-        uint256 amount1Out;
+        uint256 burnedAmount = IUniswapV2Router02(uniswapV2Router02).swapExactTokensForTokens(
+            balance, 0, path, address(0), block.timestamp
+        )[1];
 
-        if (govIsTok0) {
-            amount0Out = ((997_000 * balance) * uint256(token0Balance))
-                / ((uint256(token1Balance) * 1_000_000) + (997_000 * balance));
-        } else {
-            amount1Out = ((997_000 * balance) * uint256(token1Balance))
-                / (((uint256(token0Balance) * 1_000_000) + (997_000 * balance)));
-        }
-
-        bytes memory nullBytes;
-        IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).swap(amount0Out, amount1Out, user, nullBytes);
-
-        emit GiftedGovernanceToken(user, GOVERNANCE_TOKEN, govIsTok0 ? amount0Out : amount1Out);
-
-        /*
-        // ENABLE FOR FOUNDRY TESTING
-        console.log("----====++++====----");
-        console.log("Protocol Control");
-        console.log("Governance Tokens Burned:", govIsTok0 ? amount0Out : amount1Out);
-        console.log("----====++++====----");
-        */
+        emit BurnedGovernanceToken(user, governanceToken, burnedAmount);
     }
 
     ///////////////// GETTERS & HELPERS // //////////////////
@@ -206,11 +155,7 @@ contract V2ProtocolControl is ProtocolControl {
         return payeeData;
     }
 
-    function getBidFormat(bytes calldata) external pure override returns (BidData[] memory) {
-        // This is a helper function called by searchers
-        // so that they can get the proper format for
-        // submitting their bids to the hook.
-
+    function getBidFormat(bytes calldata) external view override returns (BidData[] memory) {
         BidData[] memory bidData = new BidData[](1);
 
         bidData[0] = BidData({
