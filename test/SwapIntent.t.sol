@@ -22,6 +22,7 @@ import {SearcherBase} from "../src/contracts/searcher/SearcherBase.sol";
 // 3. Need a more generic helper for BaseTest
 // 4. Gonna be lots of StackTooDeep errors. Maybe need a way to elegantly deal with that in BaseTest
 // 5. Change metaFlashCall structure in SearcherBase - maybe virtual fn to be overridden, which hooks for checks
+// 6. Maybe emit error msg or some other better UX for error if !valid in metacall()
 
 // Doc Ideas:
 // 1. Step by step instructions for building a metacall transaction (for internal testing, and integrating protocols)
@@ -78,14 +79,13 @@ contract SwapIntentTest is BaseTest {
 
         // Give 20 FXS to RFQ searcher contract
         deal(FXS_ADDRESS, address(rfqSearcher), swapIntent.amountUserBuys);
+        assertEq(FXS.balanceOf(address(rfqSearcher)), swapIntent.amountUserBuys, "Did not give enough FXS to searcher");
 
         // Input params for Atlas.metacall() - will be populated below
-        ProtocolCall memory protocolCall;
+        ProtocolCall memory protocolCall = txBuilder.getProtocolCall();
         UserCall memory userCall;
         SearcherCall[] memory searcherCalls = new SearcherCall[](1);
         Verification memory verification;
-
-        protocolCall = txBuilder.getProtocolCall();
 
         // userCallData is used in delegatecall from exec env to control, calling stagingCall
         // first 4 bytes are "userSelector" param in stagingCall in ProtocolControl - swap() selector
@@ -100,7 +100,7 @@ contract SwapIntentTest is BaseTest {
         userCall = txBuilder.buildUserCall({
             from: userEOA, // NOTE: Would from ever not be user?
             to: address(atlas),
-            maxFeePerGas: 0, // TODO update
+            maxFeePerGas: 50, // TODO update
             value: 0,
             data: userCallData
         });

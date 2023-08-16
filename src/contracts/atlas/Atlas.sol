@@ -41,16 +41,28 @@ contract Atlas is Test, Factory {
         // Get the execution environment
         address environment = _getExecutionEnvironmentCustom(userCall.metaTx.from, verification.proof.controlCodeHash, protocolCall.to, protocolCall.callConfig);
 
+        console.log("metacall: value check");
         // Check that the value of the tx is greater than or equal to the value specified
         if (msg.value < userCall.metaTx.value) { valid = false; }
+        console.log(valid);
+        console.log("metacall: searcher calls length check");
         //if (msg.sender != tx.origin) { valid = false; }
         if (searcherCalls.length >= type(uint8).max - 1) { valid = false; }
+        console.log(valid);
+        console.log("metacall: block num check");
         if (block.number > userCall.metaTx.deadline || block.number > verification.proof.deadline) { valid = false; }
+        console.log(valid);
+        console.log("metacall: gas price check");
         if (tx.gasprice > userCall.metaTx.maxFeePerGas) { valid = false; }
+        console.log(valid);
+        console.log("metacall: env codehash check");
         if (environment.codehash == bytes32(0)) { valid = false; }
+        console.log(valid);
+        console.log("metacall: searcher config check");
         if (!protocolCall.callConfig.allowsZeroSearchers() || protocolCall.callConfig.needsSearcherFullfillment()) {
             if (searcherCalls.length == 0) { valid = false; }
         }
+        console.log(valid);
         // TODO: More checks 
 
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
