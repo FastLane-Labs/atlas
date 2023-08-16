@@ -122,8 +122,11 @@ contract ExecutionEnvironment is Test {
 
         } else {
             if (config.needsDelegateUser()) {
+
+                console.log("moose");
+
                 userData = abi.encodeWithSelector(
-                    IProtocolControl.userLocalCall.selector, userCall.to, userCall.value, userCall.data
+                    IProtocolControl.userLocalCall.selector, userCall.data
                 );
 
                 userData = abi.encodePacked(
