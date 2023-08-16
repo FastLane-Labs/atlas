@@ -100,7 +100,7 @@ contract SwapIntentTest is BaseTest {
         // Builds the metaTx and to parts of userCall, signature still to be set
         userCall = txBuilder.buildUserCall({
             from: userEOA, // NOTE: Would from ever not be user?
-            to: address(atlas),
+            to: address(swapIntentController),
             maxFeePerGas: 50, // TODO update
             value: 0,
             data: userCallData
@@ -151,7 +151,7 @@ contract SwapIntentTest is BaseTest {
         vm.startPrank(userEOA);
         address executionEnvironment = atlas.createExecutionEnvironment(protocolCall);
         vm.stopPrank();
-        
+
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
         console.log("userEOA", userEOA);
