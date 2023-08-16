@@ -99,6 +99,8 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
         // former employees, or beneficiary uncertainty during intra-DAO conflict,
         // governance should refrain from using a proxy contract for ProtocolControl.
         console.log("check to addr has code");
+        console.logBytes32(protocolCall.to.codehash);
+        console.logBytes32(protocols[key]);
         if (protocolCall.to.codehash == bytes32(0) || protocols[key] != protocolCall.to.codehash) {
             return (false);
         }

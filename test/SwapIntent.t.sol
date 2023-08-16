@@ -148,7 +148,10 @@ contract SwapIntentTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getVerificationPayload(verification));
         verification.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
+        vm.startPrank(userEOA);
         address executionEnvironment = atlas.createExecutionEnvironment(protocolCall);
+        vm.stopPrank();
+        
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
         console.log("userEOA", userEOA);
