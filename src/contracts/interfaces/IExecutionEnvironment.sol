@@ -24,7 +24,8 @@ interface IExecutionEnvironment {
     ) external payable;
 
     function allocateRewards(
-        BidData[] calldata bids // Converted to memory
+        BidData[] calldata bids, // Converted to memory
+        bytes memory stagingReturnData
     ) external;
 
     function getUser() external pure returns (address user);

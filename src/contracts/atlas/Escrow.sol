@@ -177,10 +177,11 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     function _executePayments(
         ProtocolCall calldata protocolCall,
         BidData[] calldata winningBids,
+        bytes memory stagingReturnData,
         address environment
     ) internal paymentsLock(environment) {
         // process protocol payments
-        try IExecutionEnvironment(environment).allocateRewards(winningBids) {}
+        try IExecutionEnvironment(environment).allocateRewards(winningBids, stagingReturnData) {}
         catch {
             emit MEVPaymentFailure(protocolCall.to, protocolCall.callConfig, winningBids);
         }

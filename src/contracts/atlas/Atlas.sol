@@ -173,7 +173,7 @@ contract Atlas is Test, Factory {
         if (_executeSearcherCall(searcherCall, stagingReturnData, auctionAlreadyWon, environment)) {
             if (!auctionAlreadyWon) {
                 auctionAlreadyWon = true;
-                _executePayments(protocolCall, searcherCall.bids, environment);
+                _executePayments(protocolCall, searcherCall.bids, stagingReturnData, environment);
             }
         }
         return auctionAlreadyWon;
