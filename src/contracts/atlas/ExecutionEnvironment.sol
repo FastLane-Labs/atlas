@@ -144,8 +144,6 @@ contract ExecutionEnvironment is Test {
                 console.logBytes(userData);
 
                 (success, userData) = _control().delegatecall(userData);
-                
-                console.log("it broke above rip");
                 require(success, "ERR-EC02 DelegateRevert");
             } else {
                 revert("ERR-P02 UserCallStatic");

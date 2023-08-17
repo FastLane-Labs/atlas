@@ -73,10 +73,6 @@ contract SwapIntentTest is BaseTest {
             surplusToken: address(0)
         });
 
-        // TODO remove
-        console.log("swapIntentController.delegateUser()");
-        console.log(swapIntentController.delegateUser());
-
         // Searcher deploys the RFQ searcher contract (defined at bottom of this file)
         vm.startPrank(searcherOneEOA);
         SimpleRFQSearcher rfqSearcher = new SimpleRFQSearcher(address(atlas));
@@ -92,6 +88,11 @@ contract SwapIntentTest is BaseTest {
         UserCall memory userCall;
         SearcherCall[] memory searcherCalls = new SearcherCall[](1);
         Verification memory verification;
+
+        vm.startPrank(userEOA);
+        address executionEnvironment = atlas.createExecutionEnvironment(protocolCall);
+        vm.stopPrank();
+        vm.label(address(executionEnvironment), "EXECUTION ENV");
 
         // userCallData is used in delegatecall from exec env to control, calling stagingCall
         // first 4 bytes are "userSelector" param in stagingCall in ProtocolControl - swap() selector
@@ -127,7 +128,8 @@ contract SwapIntentTest is BaseTest {
         // The data below is also needed I think:
         bytes memory extraSearcherCallData = abi.encodeWithSelector(
             SimpleRFQSearcher.fulfillRFQ.selector, 
-            swapIntent
+            swapIntent,
+            executionEnvironment
         );
         console.log("extra searcherCallData:");
         console.logBytes(extraSearcherCallData);
@@ -153,11 +155,7 @@ contract SwapIntentTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getVerificationPayload(verification));
         verification.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-        vm.startPrank(userEOA);
-        address executionEnvironment = atlas.createExecutionEnvironment(protocolCall);
-        vm.stopPrank();
-
-        vm.label(address(executionEnvironment), "EXECUTION ENV");
+        
 
         console.log("userEOA", userEOA);
         console.log("atlas", address(atlas)); // ATLAS == ESCROW
@@ -174,7 +172,8 @@ contract SwapIntentTest is BaseTest {
         assertTrue(userWethBalanceBefore > swapIntent.amountUserSells, "Not enough starting WETH");
 
         vm.startPrank(userEOA);
-        // User approves Atlas to take 10 WETH
+        // User approves swapIntentController to take 10 WETH
+        // TODO should we be approving Atlas or the controller to take the WETH?
         WETH.approve(address(atlas), swapIntent.amountUserSells);
         
         // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
@@ -202,16 +201,21 @@ contract SimpleRFQSearcher is SearcherBase {
     }
 
     function fulfillRFQ(
-        SwapIntent calldata swapIntent
+        SwapIntent calldata swapIntent,
+        address executionEnvironment
     ) public {
 
         console.log("fulfillRFQ called");
         console.log("swapIntent.amountUserSells", swapIntent.amountUserSells);
         console.log("swapIntent.amountUserBuys", swapIntent.amountUserBuys);
+        console.log("msg.sender", msg.sender);
+        console.log("exec env", executionEnvironment);
+
+        console.log(ERC20(swapIntent.tokenUserSells).balanceOf(address(this)));
 
         require(ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells, "Did not receive enough tokenIn");
         require(ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys, "Not enough tokenOut to fulfill");
 
-        ERC20(swapIntent.tokenUserBuys).transfer(msg.sender, swapIntent.amountUserBuys);
+        ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
     }
 }

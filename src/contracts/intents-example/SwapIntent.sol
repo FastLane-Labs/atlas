@@ -32,6 +32,8 @@ struct SwapIntent {
 contract SwapIntentController is ProtocolControl {
     using SafeTransferLib for ERC20;
 
+    mapping(address user => SwapIntent order) public orders;
+
     constructor(address _escrow)
         ProtocolControl(
             _escrow, 
@@ -79,21 +81,24 @@ contract SwapIntentController is ProtocolControl {
         require(ISafetyLocks(escrow).approvedCaller() == control, "ERR-PI003 InvalidLockState");
         require(address(this) != control, "ERR-PI004 MustBeDelegated");
 
-        console.log("got here in swap in SwapIntent");
-
-
         uint256 sellTokenBalance = ERC20(swapIntent.tokenUserSells).balanceOf(address(this));
 
         // Transfer the tokens that the user is selling into the ExecutionEnvironment
         if (sellTokenBalance > swapIntent.amountUserSells) {
+            console.log("branch1");
             ERC20(swapIntent.tokenUserSells).safeTransfer(_user(), sellTokenBalance - swapIntent.amountUserSells);
-        
         } else if (sellTokenBalance > 0) {
+            console.log("branch2");
             _transferUserERC20(swapIntent.tokenUserSells, address(this), swapIntent.amountUserSells - sellTokenBalance);
-        
         } else { 
+            console.log("branch3");
             _transferUserERC20(swapIntent.tokenUserSells, address(this), swapIntent.amountUserSells);
         }
+
+        orders[_user()] = swapIntent;
+
+        console.log("balance of sell token in controller", ERC20(swapIntent.tokenUserSells).balanceOf(address(this)));
+        console.log("_user", _user());
     }
 
     function _stagingCall(address to, address, bytes4 userSelector, bytes calldata userData)
@@ -193,9 +198,12 @@ contract SwapIntentController is ProtocolControl {
     }
 
     function _verificationCall(bytes calldata data) internal override returns (bool) {
-        // This function is delegatecalled
-        // address(this) = ExecutionEnvironment
-        // msg.sender = Escrow
+        // NOTE: this is where the swap transfers to recipients happen
+        console.logBytes(data);
+
+        SwapIntent memory userOrder = orders[_user()];
+
+        ERC20(userOrder.tokenUserBuys).safeTransfer(_user(), userOrder.amountUserBuys);
     }
 
     /////////////////////////////////////////////////////////
