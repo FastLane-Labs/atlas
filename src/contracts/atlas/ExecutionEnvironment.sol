@@ -214,9 +214,16 @@ contract ExecutionEnvironment is Test {
 
         // Handle any searcher staging, if necessary
         if (_config().needsSearcherStaging()) {
-            bytes memory data;
+            bytes memory data = abi.encodePacked(
+                abi.encodeWithSelector(IProtocolControl.searcherStagingCall.selector, stagingReturnData, searcherCall.metaTx.to),
+                _user(),
+                _control(),
+                _config(),
+                _controlCodeHash()
+            );
+
             (success, data) = _control().delegatecall(
-                abi.encodeWithSelector(IProtocolControl.searcherStagingCall.selector, stagingReturnData, searcherCall.metaTx.to)
+                data
             );
             require(success, SEARCHER_STAGING_FAILED);
 
@@ -236,9 +243,16 @@ contract ExecutionEnvironment is Test {
 
         // If this was a user intent, handle and verify fulfillment
         if (_config().needsSearcherFullfillment()) {
-            bytes memory data;
+            bytes memory data = abi.encodePacked(
+                abi.encodeWithSelector(IProtocolControl.fulfillmentCall.selector, stagingReturnData, searcherCall.metaTx.to),
+                _user(),
+                _control(),
+                _config(),
+                _controlCodeHash()
+            );
+
             (success, data) = _control().delegatecall(
-                abi.encodeWithSelector(IProtocolControl.fulfillmentCall.selector, stagingReturnData, searcherCall.metaTx.to)
+                data
             );
             require(success, INTENT_UNFULFILLED);
 

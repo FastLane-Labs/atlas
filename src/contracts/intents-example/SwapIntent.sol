@@ -70,7 +70,7 @@ contract SwapIntentController is ProtocolControl {
     */
 
     // swap() selector = 0x98434997
-    function swap(SwapIntent calldata swapIntent) external payable {
+    function swap(SwapIntent memory swapIntent) public payable {
         console.log("swap called");
         console.log("msg.sender", msg.sender);
         console.log("escrow", escrow);
@@ -132,6 +132,17 @@ contract SwapIntentController is ProtocolControl {
         }
 
         return userData;
+    }
+
+    function _userLocalDelegateCall(bytes calldata data) internal override returns (bytes memory nullData) {
+        console.log("sup 1");
+        console.logBytes(data);
+        if (bytes4(data) == this.swap.selector) {
+            SwapIntent memory swapIntent = abi.decode(data[4:], (SwapIntent));
+
+            swap(swapIntent);
+        }
+        
     }
 
     function _searcherStagingCall(bytes calldata data) internal override returns (bool) {
