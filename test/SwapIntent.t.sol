@@ -35,6 +35,9 @@ contract SwapIntentTest is BaseTest {
     TxBuilder public txBuilder;
     Sig public sig;
 
+    ERC20 DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+    address DAI_ADDRESS = address(DAI);
+
     struct Sig {
         uint8 v;
         bytes32 r;
@@ -64,14 +67,23 @@ contract SwapIntentTest is BaseTest {
     }
 
     function testAtlasSwapUsingIntent() public {
-        // Swap 10 WETH for 20 FXS
+        // Swap 10 WETH for 20 DAI
         SwapIntent memory swapIntent = SwapIntent({
-            tokenUserBuys: FXS_ADDRESS,
+            tokenUserBuys: DAI_ADDRESS,
             amountUserBuys: 20e18,
             tokenUserSells: WETH_ADDRESS,
             amountUserSells: 10e18,
             surplusToken: address(0)
         });
+
+        console.log("only swapIntent data");
+        console.logBytes(abi.encode(swapIntent));
+        console.log(swapIntent.tokenUserBuys);
+        console.log(swapIntent.amountUserBuys);
+        console.log(swapIntent.tokenUserSells);
+        console.log(swapIntent.amountUserSells);
+        console.log(swapIntent.surplusToken);
+
 
         // Searcher deploys the RFQ searcher contract (defined at bottom of this file)
         vm.startPrank(searcherOneEOA);
@@ -79,9 +91,9 @@ contract SwapIntentTest is BaseTest {
         atlas.deposit{value: 1e18}(searcherOneEOA);
         vm.stopPrank();
 
-        // Give 20 FXS to RFQ searcher contract
-        deal(FXS_ADDRESS, address(rfqSearcher), swapIntent.amountUserBuys);
-        assertEq(FXS.balanceOf(address(rfqSearcher)), swapIntent.amountUserBuys, "Did not give enough FXS to searcher");
+        // Give 20 DAI to RFQ searcher contract
+        deal(DAI_ADDRESS, address(rfqSearcher), swapIntent.amountUserBuys);
+        assertEq(DAI.balanceOf(address(rfqSearcher)), swapIntent.amountUserBuys, "Did not give enough DAI to searcher");
 
         // Input params for Atlas.metacall() - will be populated below
         ProtocolCall memory protocolCall = txBuilder.getProtocolCall();
@@ -158,10 +170,10 @@ contract SwapIntentTest is BaseTest {
 
         // Check user token balances before
         uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);
-        uint256 userFxsBalanceBefore = FXS.balanceOf(userEOA);
+        uint256 userDaiBalanceBefore = DAI.balanceOf(userEOA);
 
         console.log("userWethBalanceBefore", userWethBalanceBefore);
-        console.log("userFxsBalanceBefore", userFxsBalanceBefore);
+        console.log("userDaiBalanceBefore", userDaiBalanceBefore);
         assertTrue(userWethBalanceBefore > swapIntent.amountUserSells, "Not enough starting WETH");
 
         vm.startPrank(userEOA);
@@ -180,7 +192,7 @@ contract SwapIntentTest is BaseTest {
 
         // Check user token balances after
         assertEq(WETH.balanceOf(userEOA), userWethBalanceBefore - swapIntent.amountUserSells, "Did not spend enough WETH");
-        assertEq(FXS.balanceOf(userEOA), userFxsBalanceBefore + swapIntent.amountUserBuys, "Did not receive enough FXS");
+        assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + swapIntent.amountUserBuys, "Did not receive enough DAI");
     }
 }
 
@@ -197,18 +209,17 @@ contract SimpleRFQSearcher is SearcherBase {
         SwapIntent calldata swapIntent,
         address executionEnvironment
     ) public {
-
         console.log("fulfillRFQ called");
-        console.log("swapIntent.amountUserSells", swapIntent.amountUserSells);
-        console.log("swapIntent.amountUserBuys", swapIntent.amountUserBuys);
-        console.log("msg.sender", msg.sender);
         console.log("exec env", executionEnvironment);
 
-        console.log(ERC20(swapIntent.tokenUserSells).balanceOf(address(this)));
+        console.log("WETH in searcher", ERC20(swapIntent.tokenUserSells).balanceOf(address(this)));
+        console.log("DAI in searcher", ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)));
 
         require(ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells, "Did not receive enough tokenIn");
         require(ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys, "Not enough tokenOut to fulfill");
 
         ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
+        
+        console.log("DAI in searcher after transfer", ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)));
     }
 }
