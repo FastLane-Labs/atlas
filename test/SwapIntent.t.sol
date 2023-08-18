@@ -116,29 +116,22 @@ contract SwapIntentTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(userPK, atlas.getUserCallPayload(userCall));
         userCall.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-        // searcherCallData is similar to userCallData
-        // decodes to [bytes stagingReturnData, address searcherTo]
-        // where stagingReturnData decodes to SwapIntent (same as in userCallData)
-        bytes memory searcherCallData = abi.encode(swapIntent, address(rfqSearcher));
-        console.log("searcherCallData:");
-        console.logBytes(searcherCallData);
 
-        // TODO need a way to pass function selector and params of searcher contract in searcherCallData
-        // Not sure if the SwapIntent controller is set up to do that and the SwapIntent data obj
-        // The data below is also needed I think:
-        bytes memory extraSearcherCallData = abi.encodeWithSelector(
+        // Build searcher calldata (function selector on searcher contract and its params)
+        bytes memory searcherCallData = abi.encodeWithSelector(
             SimpleRFQSearcher.fulfillRFQ.selector, 
             swapIntent,
             executionEnvironment
         );
-        console.log("extra searcherCallData:");
-        console.logBytes(extraSearcherCallData);
+        console.log("searcherCallData:");
+        console.logBytes(searcherCallData);
+        console.log("searcher contract addr", address(rfqSearcher));
 
         // Builds the SearcherCall
         searcherCalls[0] = txBuilder.buildSearcherCall({
             userCall: userCall,
             protocolCall: protocolCall,
-            searcherCallData: extraSearcherCallData, // TODO need searcher contract and function to execute
+            searcherCallData: searcherCallData,
             searcherEOA: searcherOneEOA,
             searcherContract: address(rfqSearcher),
             bidAmount: 1e18

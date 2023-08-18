@@ -220,6 +220,11 @@ contract ExecutionEnvironment is Test {
                 _controlCodeHash()
             );
 
+            console.logBytes(abi.encodeWithSelector(IProtocolControl.searcherStagingCall.selector, stagingReturnData, searcherCall.metaTx.to));
+            console.log("saercher contract addr", searcherCall.metaTx.to);
+            console.log("one more data check");
+            console.logBytes(data);
+
             (success, data) = _control().delegatecall(
                 data
             );

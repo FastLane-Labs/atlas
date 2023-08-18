@@ -125,7 +125,6 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         validControl
         returns (bytes memory) 
     {
-        console.log("delegate user?", delegateUser); // never gets here
         return delegateUser ? _userLocalDelegateCall(data) : _userLocalStandardCall(data);
     }
 
@@ -136,6 +135,8 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         validControl
         returns (bool)
     {
+        console.log("searcher staging call");
+        console.logBytes(data);
         return _searcherStagingCall(data);
     }
 

@@ -151,8 +151,14 @@ contract SwapIntentController is ProtocolControl {
     }
 
     function _searcherStagingCall(bytes calldata data) internal override returns (bool) {
+        console.log("starts _searcherStagingCall");
+        console.logBytes(data);
         (bytes memory stagingReturnData, address searcherTo) = abi.decode(data, (bytes, address));
         SwapIntent memory swapIntent = abi.decode(stagingReturnData, (SwapIntent));
+
+        console.log("token to sell balance", ERC20(swapIntent.tokenUserSells).balanceOf(address(this)));
+        console.log("amount to sell", swapIntent.amountUserSells);
+        console.log("searcher addr", searcherTo);
 
         // Optimistically transfer the searcher contract the tokens that the user is selling
         ERC20(swapIntent.tokenUserSells).safeTransfer(searcherTo, swapIntent.amountUserSells);
@@ -163,6 +169,7 @@ contract SwapIntentController is ProtocolControl {
         return true;
     }
 
+    // Checking intent was fulfilled, and user has received their tokens, happens here
     function _fulfillmentCall(bytes calldata data) internal override returns (bool) {
         (bytes memory stagingReturnData,) = abi.decode(data, (bytes, address));
         SwapIntent memory swapIntent = abi.decode(stagingReturnData, (SwapIntent));
@@ -195,15 +202,6 @@ contract SwapIntentController is ProtocolControl {
         // NOTE: donateToBundler caps the donation at 110% of total gas cost.
         // Any remainder is then sent to the user. 
         IEscrow(escrow).donateToBundler{value: address(this).balance}();
-    }
-
-    function _verificationCall(bytes calldata data) internal override returns (bool) {
-        // NOTE: this is where the swap transfers to recipients happen
-        console.logBytes(data);
-
-        SwapIntent memory userOrder = orders[_user()];
-
-        ERC20(userOrder.tokenUserBuys).safeTransfer(_user(), userOrder.amountUserBuys);
     }
 
     /////////////////////////////////////////////////////////
