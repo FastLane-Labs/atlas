@@ -212,18 +212,24 @@ contract ExecutionEnvironment is Test {
 
         // Handle any searcher staging, if necessary
         if (_config().needsSearcherStaging()) {
+            // Gives correct SwapIntent, but wrong searcherTo addr
+            // bytes memory searcherStagingCallData = abi.encodePacked(stagingReturnData, searcherCall.metaTx.to);
+            // Gives correct searcher addr, but messed up SwapIntent data
+            // bytes memory searcherStagingCallData = abi.encode(stagingReturnData, searcherCall.metaTx.to);
+            // Now trying swapping the order around
+
+            console.log("Incoming stagingReturnData:");
+            console.logBytes(stagingReturnData);
+
+            bytes memory searcherStagingCallData = abi.encode(searcherCall.metaTx.to, stagingReturnData);
             bytes memory data = abi.encodePacked(
-                abi.encodeWithSelector(IProtocolControl.searcherStagingCall.selector, stagingReturnData, searcherCall.metaTx.to),
+                abi.encodeWithSelector(IProtocolControl.searcherStagingCall.selector, searcherStagingCallData),
                 _user(),
                 _control(),
                 _config(),
                 _controlCodeHash()
             );
 
-            console.logBytes(abi.encodeWithSelector(IProtocolControl.searcherStagingCall.selector, stagingReturnData, searcherCall.metaTx.to));
-            console.log("saercher contract addr", searcherCall.metaTx.to);
-            console.log("one more data check");
-            console.logBytes(data);
 
             (success, data) = _control().delegatecall(
                 data

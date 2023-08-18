@@ -150,14 +150,33 @@ contract SwapIntentController is ProtocolControl {
         
     }
 
+    function testDelegateCall(bytes calldata data) public returns (bytes memory sameData) {
+        console.log("in testDelegateCall");
+        console.logBytes(data);
+
+        (bytes memory stagingReturnData, address searcherTo) = abi.decode(data, (bytes, address));
+        // (, SwapIntent memory swapIntent , address searcherTo) = abi.decode(data, (bytes, SwapIntent, address));
+
+        console.log("retrieved searcher addr", searcherTo);
+       
+        return data;
+    }
+
     function _searcherStagingCall(bytes calldata data) internal override returns (bool) {
         console.log("starts _searcherStagingCall");
         console.logBytes(data);
-        (bytes memory stagingReturnData, address searcherTo) = abi.decode(data, (bytes, address));
-        SwapIntent memory swapIntent = abi.decode(stagingReturnData, (SwapIntent));
+        // (bytes memory stagingReturnData, address searcherTo) = abi.decode(data, (bytes, address));
+        // (address searcherTo, bytes memory stagingReturnData) = abi.decode(data, (address, bytes));
+        // SwapIntent memory swapIntent = abi.decode(stagingReturnData, (SwapIntent));
+
+        (address searcherTo, bytes memory stagingReturnData) = abi.decode(data, (address, bytes));
+        (,,SwapIntent memory swapIntent) = abi.decode(stagingReturnData, (bytes32, bytes32, SwapIntent));
 
         console.log("token to sell balance", ERC20(swapIntent.tokenUserSells).balanceOf(address(this)));
+        console.log("token to sell", swapIntent.tokenUserSells);
         console.log("amount to sell", swapIntent.amountUserSells);
+        console.log("token to buy", swapIntent.tokenUserBuys);
+        console.log("amount to buy", swapIntent.amountUserBuys);
         console.log("searcher addr", searcherTo);
 
         // Optimistically transfer the searcher contract the tokens that the user is selling
