@@ -76,15 +76,6 @@ contract SwapIntentTest is BaseTest {
             surplusToken: address(0)
         });
 
-        console.log("only swapIntent data");
-        console.logBytes(abi.encode(swapIntent));
-        console.log(swapIntent.tokenUserBuys);
-        console.log(swapIntent.amountUserBuys);
-        console.log(swapIntent.tokenUserSells);
-        console.log(swapIntent.amountUserSells);
-        console.log(swapIntent.surplusToken);
-
-
         // Searcher deploys the RFQ searcher contract (defined at bottom of this file)
         vm.startPrank(searcherOneEOA);
         SimpleRFQSearcher rfqSearcher = new SimpleRFQSearcher(address(atlas));
@@ -112,8 +103,6 @@ contract SwapIntentTest is BaseTest {
         
         // swap(SwapIntent calldata) selector = 0x98434997
         bytes memory userCallData = abi.encodeWithSelector(SwapIntentController.swap.selector, swapIntent);
-        console.log("userCallData:");
-        console.logBytes(userCallData);
 
         // Builds the metaTx and to parts of userCall, signature still to be set
         userCall = txBuilder.buildUserCall({
@@ -128,16 +117,12 @@ contract SwapIntentTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(userPK, atlas.getUserCallPayload(userCall));
         userCall.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-
         // Build searcher calldata (function selector on searcher contract and its params)
         bytes memory searcherCallData = abi.encodeWithSelector(
             SimpleRFQSearcher.fulfillRFQ.selector, 
             swapIntent,
             executionEnvironment
         );
-        console.log("searcherCallData:");
-        console.logBytes(searcherCallData);
-        console.log("searcher contract addr", address(rfqSearcher));
 
         // Builds the SearcherCall
         searcherCalls[0] = txBuilder.buildSearcherCall({
@@ -160,27 +145,13 @@ contract SwapIntentTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getVerificationPayload(verification));
         verification.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-        
-
-        console.log("userEOA", userEOA);
-        console.log("atlas", address(atlas)); // ATLAS == ESCROW
-        console.log("escrow", address(escrow)); // ATLAS == ESCROW
-        console.log("control", address(swapIntentController));
-        console.log("executionEnvironment", executionEnvironment);
-
         // Check user token balances before
         uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);
         uint256 userDaiBalanceBefore = DAI.balanceOf(userEOA);
-
-        console.log("userWethBalanceBefore", userWethBalanceBefore);
-        console.log("userDaiBalanceBefore", userDaiBalanceBefore);
         assertTrue(userWethBalanceBefore > swapIntent.amountUserSells, "Not enough starting WETH");
 
         vm.startPrank(userEOA);
-        // User approves swapIntentController to take 10 WETH
-        // TODO should we be approving Atlas or the controller to take the WETH?
         WETH.approve(address(atlas), swapIntent.amountUserSells);
-        
         // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
         atlas.metacall({
             protocolCall: protocolCall,
@@ -198,28 +169,17 @@ contract SwapIntentTest is BaseTest {
 
 
 contract SimpleRFQSearcher is SearcherBase {
-
-    address public immutable owner;
-
-    constructor(address atlas) SearcherBase(atlas, msg.sender) {
-        owner = msg.sender;
-    }
+    constructor(address atlas) SearcherBase(atlas, msg.sender) {}
 
     function fulfillRFQ(
         SwapIntent calldata swapIntent,
         address executionEnvironment
     ) public {
-        console.log("fulfillRFQ called");
-        console.log("exec env", executionEnvironment);
-
-        console.log("WETH in searcher", ERC20(swapIntent.tokenUserSells).balanceOf(address(this)));
-        console.log("DAI in searcher", ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)));
-
         require(ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells, "Did not receive enough tokenIn");
         require(ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys, "Not enough tokenOut to fulfill");
-
         ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
-        
-        console.log("DAI in searcher after transfer", ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)));
     }
+
+    fallback() external payable {}
+    receive() external payable {}
 }
