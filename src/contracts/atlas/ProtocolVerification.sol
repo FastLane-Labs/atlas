@@ -13,6 +13,8 @@ import {Verification, ProtocolProof} from "../types/VerificationTypes.sol";
 
 import {ProtocolIntegration} from "./ProtocolIntegration.sol";
 
+import "forge-std/Test.sol"; // TODO remove
+
 // This contract exists so that protocol frontends can sign and confirm the
 // calldata for users.  Users already trust the frontends to build and verify
 // their calldata.  This allows users to know that any CallData sourced via
@@ -100,7 +102,7 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
 
         // Verify that ProtocolControl hasn't been updated.  
         // NOTE: Performing this check here allows the searchers' checks 
-        // to be against the verification proof's controlCodeHash to save gas. 
+        // to be against the verification proof's controlCodeHash to save gas.
         if (protocolCall.to.codehash != verification.proof.controlCodeHash) {
             return (false);
         }
@@ -115,7 +117,6 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
         // which builders or validators may be able to profit via censorship.
         // Protocols are encouraged to rely on the deadline parameter
         // to prevent replay attacks.
-
         if (protocolCall.callConfig.needsSequencedNonces()) {
             if (verification.proof.nonce != signatory.nonce + 1) {
                 return (false);

@@ -83,7 +83,6 @@ contract Atlas is Test, Factory {
             }
         }
 
-
         console.log("total gas used", gasMarker - gasleft());
     }
 

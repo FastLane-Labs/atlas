@@ -17,7 +17,7 @@ import "../types/LockTypes.sol";
 // Atlas Protocol-Control Imports
 import {ProtocolControl} from "../protocol/ProtocolControl.sol";
 
-// import "forge-std/Test.sol";
+import "forge-std/Test.sol";
 
 struct SwapIntent {
     address tokenUserBuys;
@@ -31,6 +31,8 @@ struct SwapIntent {
 
 contract SwapIntentController is ProtocolControl {
     using SafeTransferLib for ERC20;
+
+    mapping(address user => SwapIntent order) public orders;
 
     constructor(address _escrow)
         ProtocolControl(
@@ -69,24 +71,24 @@ contract SwapIntentController is ProtocolControl {
     )
     */
 
-    function swap(SwapIntent calldata swapIntent) external payable {
+    // swap() selector = 0x98434997
+    function swap(SwapIntent memory swapIntent) public payable {
         require(msg.sender == escrow, "ERR-PI002 InvalidSender");
         require(ISafetyLocks(escrow).approvedCaller() == control, "ERR-PI003 InvalidLockState");
         require(address(this) != control, "ERR-PI004 MustBeDelegated");
-
 
         uint256 sellTokenBalance = ERC20(swapIntent.tokenUserSells).balanceOf(address(this));
 
         // Transfer the tokens that the user is selling into the ExecutionEnvironment
         if (sellTokenBalance > swapIntent.amountUserSells) {
             ERC20(swapIntent.tokenUserSells).safeTransfer(_user(), sellTokenBalance - swapIntent.amountUserSells);
-        
         } else if (sellTokenBalance > 0) {
             _transferUserERC20(swapIntent.tokenUserSells, address(this), swapIntent.amountUserSells - sellTokenBalance);
-        
         } else { 
             _transferUserERC20(swapIntent.tokenUserSells, address(this), swapIntent.amountUserSells);
         }
+
+        orders[_user()] = swapIntent;
     }
 
     function _stagingCall(address to, address, bytes4 userSelector, bytes calldata userData)
@@ -127,9 +129,18 @@ contract SwapIntentController is ProtocolControl {
         return userData;
     }
 
+    function _userLocalDelegateCall(bytes calldata data) internal override returns (bytes memory nullData) {
+        if (bytes4(data) == this.swap.selector) {
+            SwapIntent memory swapIntent = abi.decode(data[4:], (SwapIntent));
+
+            swap(swapIntent);
+        }
+        
+    }
+
     function _searcherStagingCall(bytes calldata data) internal override returns (bool) {
-        (bytes memory stagingReturnData, address searcherTo) = abi.decode(data, (bytes, address));
-        SwapIntent memory swapIntent = abi.decode(stagingReturnData, (SwapIntent));
+        (address searcherTo, bytes memory stagingReturnData) = abi.decode(data, (address, bytes));
+        (,,SwapIntent memory swapIntent) = abi.decode(stagingReturnData, (bytes32, bytes32, SwapIntent));
 
         // Optimistically transfer the searcher contract the tokens that the user is selling
         ERC20(swapIntent.tokenUserSells).safeTransfer(searcherTo, swapIntent.amountUserSells);
@@ -140,6 +151,7 @@ contract SwapIntentController is ProtocolControl {
         return true;
     }
 
+    // Checking intent was fulfilled, and user has received their tokens, happens here
     function _fulfillmentCall(bytes calldata data) internal override returns (bool) {
         (bytes memory stagingReturnData,) = abi.decode(data, (bytes, address));
         SwapIntent memory swapIntent = abi.decode(stagingReturnData, (SwapIntent));
@@ -172,12 +184,6 @@ contract SwapIntentController is ProtocolControl {
         // NOTE: donateToBundler caps the donation at 110% of total gas cost.
         // Any remainder is then sent to the user. 
         IEscrow(escrow).donateToBundler{value: address(this).balance}();
-    }
-
-    function _verificationCall(bytes calldata data) internal override returns (bool) {
-        // This function is delegatecalled
-        // address(this) = ExecutionEnvironment
-        // msg.sender = Escrow
     }
 
     /////////////////////////////////////////////////////////

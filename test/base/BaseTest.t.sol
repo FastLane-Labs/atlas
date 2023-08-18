@@ -100,5 +100,10 @@ contract BaseTest is Test, TestConstants {
 
         deal(TOKEN_ZERO, address(atlas), 1);
         deal(TOKEN_ONE, address(atlas), 1);
+
+        vm.label(userEOA, "USER");
+        vm.label(escrow, "ESCROW");
+        vm.label(address(atlas), "ATLAS");
+        vm.label(address(control), "PROTOCOL CONTROL");
     }
 }

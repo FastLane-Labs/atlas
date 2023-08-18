@@ -5,6 +5,8 @@ import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
 
 import "../types/CallTypes.sol";
 
+import "forge-std/Test.sol";
+
 abstract contract GovernanceControl {
 
     address internal immutable _executionBase;
@@ -50,10 +52,7 @@ abstract contract GovernanceControl {
     //
     // Data should be decoded as:
     //
-    //    address userCallTo,
-    //    uint256 userCallValue,
-    //    bytes memory stagingReturnData,
-    //    bytes memory userCallData
+    //    bytes calldata userCallData
     //
     // NOTE: stagingReturnData is the returned data from the staging transaction
 
@@ -72,7 +71,7 @@ abstract contract GovernanceControl {
     // and there's no way for FastLane to certify that ProtocolControl isn't accidentally accessing
     // dirty / malicious storage from previous calls. User would be exposed to high smart contract risk,
     // otherwise.
-    function _userLocalDelegateCall(bytes memory) internal virtual returns (bytes memory) {
+    function _userLocalDelegateCall(bytes calldata) internal virtual returns (bytes memory) {
         revert(_NOT_IMPLEMENTED);
     }
 
@@ -88,7 +87,7 @@ abstract contract GovernanceControl {
     // User exposure: Trustless
     // NOTE: There is a timelock on governance's ability to change the ProtocolControl contract
     // NOTE: Allowing this is ill-advised unless your reentry / locking system is flawless.
-    function _userLocalStandardCall(bytes memory) internal virtual returns (bytes memory) {
+    function _userLocalStandardCall(bytes calldata) internal virtual returns (bytes memory) {
         revert(_NOT_IMPLEMENTED);
     }
 

@@ -32,11 +32,6 @@ contract MainTest is BaseTest {
     }
 
     function testMain() public {
-        vm.label(userEOA, "USER");
-        vm.label(escrow, "ESCROW");
-        vm.label(address(atlas), "ATLAS");
-        vm.label(address(control), "PCONTROL");
-
         uint8 v;
         bytes32 r;
         bytes32 s;
@@ -75,7 +70,7 @@ contract MainTest is BaseTest {
         vm.startPrank(userEOA);
 
         address executionEnvironment = IAtlas(address(atlas)).createExecutionEnvironment(protocolCall);
-        vm.label(address(executionEnvironment), "ENVIRONMENT");
+        vm.label(address(executionEnvironment), "EXECUTION ENV");
 
         console.log("userEOA", userEOA);
         console.log("atlas", address(atlas));

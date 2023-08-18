@@ -61,7 +61,7 @@ contract TxBuilder {
         address from,
         address to,
         uint256 maxFeePerGas,
-        uint256,
+        uint256 value, // TODO check this is actually intended to be the value param. Was unnamed before.
         bytes memory data
     ) public view returns (UserCall memory userCall) {
         userCall.to = atlas;
@@ -72,7 +72,7 @@ contract TxBuilder {
             gas: gas,
             nonce: userNextNonce(from),
             maxFeePerGas: maxFeePerGas,
-            value: 0,
+            value: value,
             control: control,
             data: data
         });

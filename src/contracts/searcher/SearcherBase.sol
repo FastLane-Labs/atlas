@@ -18,6 +18,7 @@ interface IWETH9 {
 contract SearcherBase {
     address public constant WETH_ADDRESS = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
+    // TODO consider making these accessible (internal) for searchers which may want to use them
     address private immutable _owner;
     address private immutable _escrow;
 

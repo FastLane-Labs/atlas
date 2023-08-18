@@ -41,4 +41,5 @@ interface IProtocolControl {
     function allocatingDelegated() external view returns (bool delegated);
 
     function verificationDelegated() external view returns (bool delegated);
+
 }
