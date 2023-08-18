@@ -278,7 +278,7 @@ contract ExecutionEnvironment is Test {
         require(atlas.balance >= escrowBalance, SEARCHER_MSG_VALUE_UNPAID);
     }
 
-    function allocateRewards(BidData[] calldata bids) external {
+    function allocateRewards(BidData[] calldata bids, bytes memory stagingReturnData) external {
         // msg.sender = escrow
         // address(this) = ExecutionEnvironment
         require(msg.sender == atlas, "ERR-04 InvalidCaller");
@@ -306,7 +306,7 @@ contract ExecutionEnvironment is Test {
             }
         }
 
-        bytes memory allocateData = abi.encodeWithSelector(IProtocolControl.allocatingCall.selector, abi.encode(totalEtherReward, bids));
+        bytes memory allocateData = abi.encodeWithSelector(IProtocolControl.allocatingCall.selector, abi.encode(totalEtherReward, bids, stagingReturnData));
 
         allocateData = abi.encodePacked(
             allocateData,
