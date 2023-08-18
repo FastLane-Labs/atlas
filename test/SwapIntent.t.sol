@@ -147,7 +147,18 @@ contract SwapIntentTest is BaseTest {
         // Check user token balances before
         uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);
         uint256 userDaiBalanceBefore = DAI.balanceOf(userEOA);
-        assertTrue(userWethBalanceBefore > swapIntent.amountUserSells, "Not enough starting WETH");
+
+        vm.prank(userEOA); // Burn all users WETH except 10 so logs are more readable
+        WETH.transfer(address(1), userWethBalanceBefore - swapIntent.amountUserSells);
+        userWethBalanceBefore = WETH.balanceOf(userEOA);
+
+        assertTrue(userWethBalanceBefore >= swapIntent.amountUserSells, "Not enough starting WETH");
+
+        console.log("\nBEFORE METACALL");
+        console.log("User WETH balance", WETH.balanceOf(userEOA));
+        console.log("User DAI balance", DAI.balanceOf(userEOA));
+        console.log("Searcher WETH balance", WETH.balanceOf(address(rfqSearcher)));
+        console.log("Searcher DAI balance", DAI.balanceOf(address(rfqSearcher)));
 
         vm.startPrank(userEOA);
         WETH.approve(address(atlas), swapIntent.amountUserSells);
@@ -159,6 +170,12 @@ contract SwapIntentTest is BaseTest {
             verification: verification
         });
         vm.stopPrank();
+
+        console.log("\nAFTER METACALL");
+        console.log("User WETH balance", WETH.balanceOf(userEOA));
+        console.log("User DAI balance", DAI.balanceOf(userEOA));
+        console.log("Searcher WETH balance", WETH.balanceOf(address(rfqSearcher)));
+        console.log("Searcher DAI balance", DAI.balanceOf(address(rfqSearcher)));
 
         // Check user token balances after
         assertEq(WETH.balanceOf(userEOA), userWethBalanceBefore - swapIntent.amountUserSells, "Did not spend enough WETH");
