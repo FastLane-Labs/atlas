@@ -34,18 +34,12 @@ contract Atlas is Test, Factory {
 
         uint256 gasMarker = gasleft();
 
-        // console.log("_verifyProtocol:", _verifyProtocol(userCall.metaTx.to, protocolCall, verification));
-        // console.log("_verifyUser:", _verifyUser(protocolCall, userCall));
-
         // Verify that the calldata injection came from the protocol frontend
         // and that the signatures are valid. 
         bool valid = true;
         
         // Only verify signatures of meta txs if the original signer isn't the bundler
         // TODO: Consider extra reentrancy defense here?
-
-        console.log("verification.proof.from:", verification.proof.from);
-        console.log("msg.sender:", msg.sender);
         if (verification.proof.from != msg.sender && !_verifyProtocol(userCall.metaTx.to, protocolCall, verification)) {
             valid = false;
         }
@@ -59,29 +53,16 @@ contract Atlas is Test, Factory {
         // Get the execution environment
         address environment = _getExecutionEnvironmentCustom(userCall.metaTx.from, verification.proof.controlCodeHash, protocolCall.to, protocolCall.callConfig);
 
-        console.log("valid before other checks:", valid);
-        console.log("metacall: value check");
         // Check that the value of the tx is greater than or equal to the value specified
         if (msg.value < userCall.metaTx.value) { valid = false; }
-        console.log(valid);
-        console.log("metacall: searcher calls length check");
         //if (msg.sender != tx.origin) { valid = false; }
         if (searcherCalls.length >= type(uint8).max - 1) { valid = false; }
-        console.log(valid);
-        console.log("metacall: block num check");
         if (block.number > userCall.metaTx.deadline || block.number > verification.proof.deadline) { valid = false; }
-        console.log(valid);
-        console.log("metacall: gas price check");
         if (tx.gasprice > userCall.metaTx.maxFeePerGas) { valid = false; }
-        console.log(valid);
-        console.log("metacall: env codehash check");
         if (environment.codehash == bytes32(0)) { valid = false; }
-        console.log(valid);
-        console.log("metacall: searcher config check");
         if (!protocolCall.callConfig.allowsZeroSearchers() || protocolCall.callConfig.needsSearcherFullfillment()) {
             if (searcherCalls.length == 0) { valid = false; }
         }
-        console.log(valid);
         // TODO: More checks 
 
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
@@ -101,7 +82,6 @@ contract Atlas is Test, Factory {
                 revert("ERR-F07 RevertToReuse");
             }
         }
-
 
         console.log("total gas used", gasMarker - gasleft());
     }
@@ -145,8 +125,6 @@ contract Atlas is Test, Factory {
         bytes memory stagingReturnData = _executeStagingCall(protocolCall, userCall, environment);
 
         proof = proof.next(userCall.from, userCall.data);
-
-        console.log("just before _executeUserCall");
 
         bytes memory userReturnData = _executeUserCall(userCall, environment);
 

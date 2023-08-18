@@ -50,7 +50,6 @@ contract SwapIntentTest is BaseTest {
         // Creating new gov address (ERR-V49 OwnerActive if already registered with controller) 
         governancePK = 11112;
         governanceEOA = vm.addr(governancePK);
-        console.log("governanceEOA", governanceEOA);
 
         // Deploy new SwapIntent Controller from new gov and initialize in Atlas
         vm.startPrank(governanceEOA);

@@ -72,7 +72,6 @@ abstract contract GovernanceControl {
     // dirty / malicious storage from previous calls. User would be exposed to high smart contract risk,
     // otherwise.
     function _userLocalDelegateCall(bytes calldata) internal virtual returns (bytes memory) {
-        console.log("user local delegate call not implemented");
         revert(_NOT_IMPLEMENTED);
     }
 
@@ -89,7 +88,6 @@ abstract contract GovernanceControl {
     // NOTE: There is a timelock on governance's ability to change the ProtocolControl contract
     // NOTE: Allowing this is ill-advised unless your reentry / locking system is flawless.
     function _userLocalStandardCall(bytes calldata) internal virtual returns (bytes memory) {
-        console.log("user local standard call not implemented");
         revert(_NOT_IMPLEMENTED);
     }
 

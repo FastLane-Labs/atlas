@@ -70,18 +70,15 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
     // Safety and support functions and modifiers that make the relationship between protocol
     // and FastLane's backend trustless.
     modifier validControl() {
-        console.log("modifier: valid control");
         require(control == _control(), "ERR-PC050 InvalidControl");
         _;
     }
     modifier mustBeDelegated() {
-        console.log("modifier: must be delegated");
         require(address(this) != control, "ERR-PC051 MustBeDelegated");
         _;
     }
 
     modifier onlyApprovedDelegateCaller() {
-        console.log("modifier: only approved delegate caller");
         require(msg.sender == escrow, "ERR-PC060 InvalidCaller");
         _;
     }
@@ -135,8 +132,6 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         validControl
         returns (bool)
     {
-        console.log("searcher staging call");
-        console.logBytes(data);
         return _searcherStagingCall(data);
     }
 

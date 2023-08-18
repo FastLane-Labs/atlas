@@ -78,14 +78,12 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
 
         ApproverSigningData memory signatory = signatories[verification.proof.from];
 
-        console.log("checking verification proof to == protocolCall.to");
         if (verification.proof.to != protocolCall.to) {
             return (false);
         }
 
         // Make sure the signer is currently enabled by protocol owner
         // NOTE: check must occur after storing signature to prevent replays
-        console.log("checking signatory is enabled");
         if (!signatory.enabled) {
             return (false);
         }
@@ -98,9 +96,6 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
         // To avoid exposure to social engineering vulnerabilities, disgruntled
         // former employees, or beneficiary uncertainty during intra-DAO conflict,
         // governance should refrain from using a proxy contract for ProtocolControl.
-        console.log("check to addr has code");
-        console.logBytes32(protocolCall.to.codehash);
-        console.logBytes32(protocols[key]);
         if (protocolCall.to.codehash == bytes32(0) || protocols[key] != protocolCall.to.codehash) {
             return (false);
         }
@@ -108,12 +103,10 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
         // Verify that ProtocolControl hasn't been updated.  
         // NOTE: Performing this check here allows the searchers' checks 
         // to be against the verification proof's controlCodeHash to save gas.
-        console.log("check controlCodeHash");
         if (protocolCall.to.codehash != verification.proof.controlCodeHash) {
             return (false);
         }
 
-        console.log("check nonce");
         if (verification.proof.nonce > type(uint64).max - 1) {
             return (false);
         }
@@ -124,8 +117,6 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
         // which builders or validators may be able to profit via censorship.
         // Protocols are encouraged to rely on the deadline parameter
         // to prevent replay attacks.
-
-        console.log("check nonce sequence");
         if (protocolCall.callConfig.needsSequencedNonces()) {
             if (verification.proof.nonce != signatory.nonce + 1) {
                 return (false);

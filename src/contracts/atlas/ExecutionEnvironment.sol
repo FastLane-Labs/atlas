@@ -123,8 +123,6 @@ contract ExecutionEnvironment is Test {
         } else {
             if (config.needsDelegateUser()) {
 
-                console.log("moose");
-
                 userData = abi.encodeWithSelector(
                     IProtocolControl.userLocalCall.selector, userCall.data
                 );
@@ -136,12 +134,6 @@ contract ExecutionEnvironment is Test {
                     config,
                     _controlCodeHash()
                 );
-
-                console.log("_control output in userWrapper:");
-                console.log(_control());
-
-                console.log("data in delegatecall:");
-                console.logBytes(userData);
 
                 (success, userData) = _control().delegatecall(userData);
                 require(success, "ERR-EC02 DelegateRevert");
@@ -212,15 +204,9 @@ contract ExecutionEnvironment is Test {
 
         // Handle any searcher staging, if necessary
         if (_config().needsSearcherStaging()) {
-            // Gives correct SwapIntent, but wrong searcherTo addr
-            // bytes memory searcherStagingCallData = abi.encodePacked(stagingReturnData, searcherCall.metaTx.to);
-            // Gives correct searcher addr, but messed up SwapIntent data
-            // bytes memory searcherStagingCallData = abi.encode(stagingReturnData, searcherCall.metaTx.to);
-            // Now trying swapping the order around
 
-            console.log("Incoming stagingReturnData:");
-            console.logBytes(stagingReturnData);
-
+            // NOTE: Before SwapIntent test bugs and fixes, this was ordered as [stagingReturnData, searcherCall.metaTx.to]
+            // In case order matters somewhere else. But it shouldn't. Except existing ProtocolControl Impls with searcherStagingCall fns.
             bytes memory searcherStagingCallData = abi.encode(searcherCall.metaTx.to, stagingReturnData);
             bytes memory data = abi.encodePacked(
                 abi.encodeWithSelector(IProtocolControl.searcherStagingCall.selector, searcherStagingCallData),

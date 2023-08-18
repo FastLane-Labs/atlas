@@ -73,10 +73,6 @@ contract SwapIntentController is ProtocolControl {
 
     // swap() selector = 0x98434997
     function swap(SwapIntent memory swapIntent) public payable {
-        console.log("swap called");
-        console.log("msg.sender", msg.sender);
-        console.log("escrow", escrow);
-
         require(msg.sender == escrow, "ERR-PI002 InvalidSender");
         require(ISafetyLocks(escrow).approvedCaller() == control, "ERR-PI003 InvalidLockState");
         require(address(this) != control, "ERR-PI004 MustBeDelegated");
@@ -85,20 +81,14 @@ contract SwapIntentController is ProtocolControl {
 
         // Transfer the tokens that the user is selling into the ExecutionEnvironment
         if (sellTokenBalance > swapIntent.amountUserSells) {
-            console.log("branch1");
             ERC20(swapIntent.tokenUserSells).safeTransfer(_user(), sellTokenBalance - swapIntent.amountUserSells);
         } else if (sellTokenBalance > 0) {
-            console.log("branch2");
             _transferUserERC20(swapIntent.tokenUserSells, address(this), swapIntent.amountUserSells - sellTokenBalance);
         } else { 
-            console.log("branch3");
             _transferUserERC20(swapIntent.tokenUserSells, address(this), swapIntent.amountUserSells);
         }
 
         orders[_user()] = swapIntent;
-
-        console.log("balance of sell token in controller", ERC20(swapIntent.tokenUserSells).balanceOf(address(this)));
-        console.log("_user", _user());
     }
 
     function _stagingCall(address to, address, bytes4 userSelector, bytes calldata userData)
@@ -140,8 +130,6 @@ contract SwapIntentController is ProtocolControl {
     }
 
     function _userLocalDelegateCall(bytes calldata data) internal override returns (bytes memory nullData) {
-        console.log("sup 1");
-        console.logBytes(data);
         if (bytes4(data) == this.swap.selector) {
             SwapIntent memory swapIntent = abi.decode(data[4:], (SwapIntent));
 
@@ -151,21 +139,8 @@ contract SwapIntentController is ProtocolControl {
     }
 
     function _searcherStagingCall(bytes calldata data) internal override returns (bool) {
-        console.log("starts _searcherStagingCall");
-        console.logBytes(data);
-        // (bytes memory stagingReturnData, address searcherTo) = abi.decode(data, (bytes, address));
-        // (address searcherTo, bytes memory stagingReturnData) = abi.decode(data, (address, bytes));
-        // SwapIntent memory swapIntent = abi.decode(stagingReturnData, (SwapIntent));
-
         (address searcherTo, bytes memory stagingReturnData) = abi.decode(data, (address, bytes));
         (,,SwapIntent memory swapIntent) = abi.decode(stagingReturnData, (bytes32, bytes32, SwapIntent));
-
-        console.log("token to sell balance", ERC20(swapIntent.tokenUserSells).balanceOf(address(this)));
-        console.log("token to sell", swapIntent.tokenUserSells);
-        console.log("amount to sell", swapIntent.amountUserSells);
-        console.log("token to buy", swapIntent.tokenUserBuys);
-        console.log("amount to buy", swapIntent.amountUserBuys);
-        console.log("searcher addr", searcherTo);
 
         // Optimistically transfer the searcher contract the tokens that the user is selling
         ERC20(swapIntent.tokenUserSells).safeTransfer(searcherTo, swapIntent.amountUserSells);
