@@ -150,18 +150,6 @@ contract SwapIntentController is ProtocolControl {
         
     }
 
-    function testDelegateCall(bytes calldata data) public returns (bytes memory sameData) {
-        console.log("in testDelegateCall");
-        console.logBytes(data);
-
-        (bytes memory stagingReturnData, address searcherTo) = abi.decode(data, (bytes, address));
-        // (, SwapIntent memory swapIntent , address searcherTo) = abi.decode(data, (bytes, SwapIntent, address));
-
-        console.log("retrieved searcher addr", searcherTo);
-       
-        return data;
-    }
-
     function _searcherStagingCall(bytes calldata data) internal override returns (bool) {
         console.log("starts _searcherStagingCall");
         console.logBytes(data);
