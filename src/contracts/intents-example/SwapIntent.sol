@@ -19,20 +19,42 @@ import {ProtocolControl} from "../protocol/ProtocolControl.sol";
 
 import "forge-std/Test.sol";
 
+struct Condition {
+    address antecedent;
+    bytes context;
+}
+
+// This is the SwapIntent that the user inputs
 struct SwapIntent {
     address tokenUserBuys;
     uint256 amountUserBuys;
     address tokenUserSells;
     uint256 amountUserSells;
-    address surplusToken; // NOTE: Typically will be address(0) / ETH for gas refund
-    // NOTE: surplusToken is the base currency of the auction
+    address auctionBaseCurrency; // NOTE: Typically will be address(0) / ETH for gas refund
+    bool searcherMustReimburseGas; // If true, the searcher must reimburse the bundler for the user's and control's gas cost 
+    Condition[] conditions; // Optional. Address and calldata that the user can staticcall to verify arbitrary conditions on chain
+}
+
+// This struct is for passing around data internally
+struct SwapData {
+    address tokenUserBuys;
+    uint256 amountUserBuys;
+    address tokenUserSells;
+    uint256 amountUserSells;
+    address auctionBaseCurrency; // NOTE: Typically will be address(0) / ETH for gas refund
+    uint256 searcherGasLiability; // the amount of user gas that the searcher must refund
 }
 
 
 contract SwapIntentController is ProtocolControl {
     using SafeTransferLib for ERC20;
 
-    mapping(address user => SwapIntent order) public orders;
+    uint256 constant public USER_CONDITION_GAS_LIMIT = 20_000; 
+    uint256 constant public MAX_USER_CONDITIONS = 5;
+    // NOTE: Conditionals will only be static called to prevent the user from arbitrarily altering state prior to 
+    // the execution of the Searchers' calls. 
+
+    uint256 constant public EXPECTED_GAS_USAGE_EX_SEARCHER = 200_000;
 
     constructor(address _escrow)
         ProtocolControl(
@@ -72,23 +94,18 @@ contract SwapIntentController is ProtocolControl {
     */
 
     // swap() selector = 0x98434997
-    function swap(SwapIntent memory swapIntent) public payable {
+    function swap(bytes calldata data) public payable {
         require(msg.sender == escrow, "ERR-PI002 InvalidSender");
         require(ISafetyLocks(escrow).approvedCaller() == control, "ERR-PI003 InvalidLockState");
         require(address(this) != control, "ERR-PI004 MustBeDelegated");
 
-        uint256 sellTokenBalance = ERC20(swapIntent.tokenUserSells).balanceOf(address(this));
+        // NOTE: To avoid redundant memory buildup, we pass the user's calldata all the way through
+        // to the swap function. Because of this, it will still have its function selector. 
+        require(bytes4(data) == this.swap.selector, "ERR-PI005 NoDuplicateSelector");
 
-        // Transfer the tokens that the user is selling into the ExecutionEnvironment
-        if (sellTokenBalance > swapIntent.amountUserSells) {
-            ERC20(swapIntent.tokenUserSells).safeTransfer(_user(), sellTokenBalance - swapIntent.amountUserSells);
-        } else if (sellTokenBalance > 0) {
-            _transferUserERC20(swapIntent.tokenUserSells, address(this), swapIntent.amountUserSells - sellTokenBalance);
-        } else { 
-            _transferUserERC20(swapIntent.tokenUserSells, address(this), swapIntent.amountUserSells);
-        }
+        SwapIntent memory swapIntent =abi.decode(data[4:], (SwapIntent));
 
-        orders[_user()] = swapIntent;
+        require(ERC20(swapIntent.tokenUserSells).balanceOf(_user()) >= swapIntent.amountUserSells, "ERR-PI020 InsufficientUserBalance");
     }
 
     function _stagingCall(address to, address, bytes4 userSelector, bytes calldata userData)
@@ -102,70 +119,127 @@ contract SwapIntentController is ProtocolControl {
         // This protocol control currently requires all 
         SwapIntent memory swapIntent = abi.decode(userData, (SwapIntent));
 
-        // There should never be a balance on this ExecutionEnvironment, but check
-        // so that the auction accounting isn't imbalanced by unexpected inventory. 
+        // There should never be a balance on this ExecutionEnvironment greater than 1, but check
+        // anyway so that the auction accounting isn't imbalanced by unexpected inventory. 
 
-        require(swapIntent.tokenUserSells != swapIntent.surplusToken, "ERR-PI008 SellIsSurplus");
+        require(swapIntent.tokenUserSells != swapIntent.auctionBaseCurrency, "ERR-PI008 SellIsSurplus");
         // TODO: If user is Selling Eth, convert it to WETH rather than rejecting. 
 
+        // TODO: Could maintain a balance of "1" of each token to allow the user to save gas over multiple uses
         uint256 buyTokenBalance = ERC20(swapIntent.tokenUserBuys).balanceOf(address(this));
-        if (buyTokenBalance > 0) {
+        if (buyTokenBalance > 0) { 
             ERC20(swapIntent.tokenUserBuys).safeTransfer(_user(), buyTokenBalance);
         }
-        
-        if (swapIntent.surplusToken != swapIntent.tokenUserSells || swapIntent.surplusToken != swapIntent.tokenUserBuys) {
-            if (swapIntent.surplusToken == address(0)) {
-                uint256 surplusTokenBalance = address(this).balance;
-                SafeTransferLib.safeTransferETH(_user(), surplusTokenBalance);
+
+        uint256 sellTokenBalance = ERC20(swapIntent.tokenUserSells).balanceOf(address(this));
+        if (sellTokenBalance > 0) {
+            ERC20(swapIntent.tokenUserSells).safeTransfer(_user(), sellTokenBalance);
+        }
+
+        if (swapIntent.auctionBaseCurrency != swapIntent.tokenUserSells || swapIntent.auctionBaseCurrency != swapIntent.tokenUserBuys) {
+            if (swapIntent.auctionBaseCurrency == address(0)) {
+                uint256 auctionBaseCurrencyBalance = address(this).balance;
+                SafeTransferLib.safeTransferETH(_user(), auctionBaseCurrencyBalance);
             
             } else {
-                uint256 surplusTokenBalance = ERC20(swapIntent.surplusToken).balanceOf(address(this));
-                if (surplusTokenBalance > 0) {
-                    ERC20(swapIntent.tokenUserBuys).safeTransfer(_user(), surplusTokenBalance);
+                uint256 auctionBaseCurrencyBalance = ERC20(swapIntent.auctionBaseCurrency).balanceOf(address(this));
+                if (auctionBaseCurrencyBalance > 0) {
+                    ERC20(swapIntent.tokenUserBuys).safeTransfer(_user(), auctionBaseCurrencyBalance);
                 }
             }
         }
 
-        return userData;
+        // Make a SwapData memory struct so that we don't have to pass around the full intent anymore
+        SwapData memory swapData = SwapData({
+            tokenUserBuys: swapIntent.tokenUserBuys,
+            amountUserBuys: swapIntent.amountUserBuys,
+            tokenUserSells: swapIntent.tokenUserSells,
+            amountUserSells: swapIntent.amountUserSells,
+            auctionBaseCurrency: swapIntent.auctionBaseCurrency,
+            searcherGasLiability: swapIntent.searcherMustReimburseGas ? EXPECTED_GAS_USAGE_EX_SEARCHER : 0
+        });
+
+
+        // If the user added any swap conditions, verify them here:
+        if (swapIntent.conditions.length > 0) {
+            // Track the excess gas that the user spends with their checks
+            uint256 gasMarker = gasleft();
+
+            uint256 i;
+            bool valid;
+            uint256 maxUserConditions = swapIntent.conditions.length > MAX_USER_CONDITIONS ? MAX_USER_CONDITIONS : swapIntent.conditions.length;
+            
+            for (; i < maxUserConditions; ) {
+                (valid,) = swapIntent.conditions[i].antecedent.staticcall{gas: USER_CONDITION_GAS_LIMIT}(
+                    swapIntent.conditions[i].context
+                );
+                require(valid, "ERR-PI021 ConditionUnsound");
+                
+                unchecked{ ++i; }
+            }
+            if (swapIntent.searcherMustReimburseGas) {
+                swapData.searcherGasLiability += (gasMarker - gasleft());
+            }
+        }
+
+        return abi.encode(swapData);
     }
 
     function _userLocalDelegateCall(bytes calldata data) internal override returns (bytes memory nullData) {
         if (bytes4(data) == this.swap.selector) {
-            SwapIntent memory swapIntent = abi.decode(data[4:], (SwapIntent));
-
-            swap(swapIntent);
+            swap(data);
         }
-        
+        return nullData;
     }
 
-    function _searcherStagingCall(bytes calldata data) internal override returns (bool) {
+    function _searcherPreCall(bytes calldata data) internal override returns (bool) {
+      
         (address searcherTo, bytes memory stagingReturnData) = abi.decode(data, (address, bytes));
-        (,,SwapIntent memory swapIntent) = abi.decode(stagingReturnData, (bytes32, bytes32, SwapIntent));
+        
+        if (searcherTo == address(this) || searcherTo == _control() || searcherTo == escrow) {
+            return false;
+        }
+
+        SwapData memory swapData = abi.decode(stagingReturnData, (SwapData));
 
         // Optimistically transfer the searcher contract the tokens that the user is selling
-        ERC20(swapIntent.tokenUserSells).safeTransfer(searcherTo, swapIntent.amountUserSells);
+        _transferUserERC20(swapData.tokenUserSells, searcherTo, swapData.amountUserSells);
         
-        // TODO: Permit69 is currently disabled during searcher phase, but there is currently
-        // no understood attack vector possible. Consider enabling to save gas on a transfer?
-        //_transferUserERC20(swapIntent.tokenUserSells, searcherTo, swapIntent.amountUserSells);
+        // TODO: Permit69 is currently enabled during searcher phase, but there is low conviction that this
+        // does not enable an attack vector. Consider enabling to save gas on a transfer?
         return true;
     }
 
     // Checking intent was fulfilled, and user has received their tokens, happens here
-    function _fulfillmentCall(bytes calldata data) internal override returns (bool) {
-        (bytes memory stagingReturnData,) = abi.decode(data, (bytes, address));
-        SwapIntent memory swapIntent = abi.decode(stagingReturnData, (SwapIntent));
+    function _searcherPostCall(bytes calldata data) internal override returns (bool) {
+       
+        (address searcherTo, bytes memory stagingReturnData) = abi.decode(data, (address, bytes));
 
-        uint256 buyTokenBalance = ERC20(swapIntent.tokenUserBuys).balanceOf(address(this));
+        SwapData memory swapData = abi.decode(stagingReturnData, (SwapData));
+
+        if (swapData.searcherGasLiability > 0) {
+            // NOTE: Winning searcher does not have to reimburse for other searchers
+            uint256 expectedGasReimbursement = swapData.searcherGasLiability * tx.gasprice;
+
+            // Is this check unnecessary since it'll just throw inside the try/catch?
+            // if (address(this).balance < expectedGasReimbursement) {
+            //    return false;
+            //}
+
+            // NOTE: This sends any surplus donations back to the searcher
+            IEscrow(escrow).donateToBundler{value: expectedGasReimbursement}(searcherTo);
+        }
+
+        uint256 buyTokenBalance = ERC20(swapData.tokenUserBuys).balanceOf(address(this));
         
-        if (buyTokenBalance >= swapIntent.amountUserBuys) {
+        if (buyTokenBalance >= swapData.amountUserBuys) {
 
-            // Make sure not to transfer any extra surplus token, since that will be used
+            // Make sure not to transfer any extra 'auctionBaseCurrency' token, since that will be used
             // for the auction measurements
-            if (swapIntent.tokenUserBuys != swapIntent.surplusToken) {
-                ERC20(swapIntent.tokenUserBuys).safeTransfer(_user(), buyTokenBalance);
+            if (swapData.tokenUserBuys != swapData.auctionBaseCurrency) {
+                ERC20(swapData.tokenUserBuys).safeTransfer(_user(), buyTokenBalance);
             } else {
-                ERC20(swapIntent.tokenUserBuys).safeTransfer(_user(), swapIntent.amountUserBuys);
+                ERC20(swapData.tokenUserBuys).safeTransfer(_user(), swapData.amountUserBuys);
             }
             return true;
         
@@ -176,14 +250,31 @@ contract SwapIntentController is ProtocolControl {
 
     // This occurs after a Searcher has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocatingCall(bytes calldata) internal override {
+    function _allocatingCall(bytes calldata data) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
 
         // NOTE: donateToBundler caps the donation at 110% of total gas cost.
-        // Any remainder is then sent to the user. 
-        IEscrow(escrow).donateToBundler{value: address(this).balance}();
+        // Any remainder is then sent to the specified recipient. 
+        // IEscrow(escrow).donateToBundler{value: address(this).balance}();
+        (,,bytes memory stagingReturnData) = abi.decode(data, (uint256, BidData[], bytes));
+
+        SwapData memory swapData = abi.decode(stagingReturnData, (SwapData));
+
+        if (swapData.auctionBaseCurrency != address(0)) {
+            uint256 auctionTokenBalance = ERC20(swapData.auctionBaseCurrency).balanceOf(address(this));
+            ERC20(swapData.auctionBaseCurrency).safeTransfer(_user(), auctionTokenBalance);
+        
+        // If the searcher was already required to reimburse the user's gas, don't reallocate
+        // Ether surplus to the bundler
+        } else if (swapData.searcherGasLiability > 0) {
+            SafeTransferLib.safeTransferETH(_user(), address(this).balance);
+
+        // Donate the ether to the bundler, with the surplus going back to the user
+        } else {
+            IEscrow(escrow).donateToBundler{value: address(this).balance}(_user());
+        }
     }
 
     /////////////////////////////////////////////////////////

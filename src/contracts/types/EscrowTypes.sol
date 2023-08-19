@@ -21,6 +21,12 @@ struct ValueTracker {
     uint128 gasRebate;
 }
 
+struct GasDonation {
+    address recipient;
+    uint32 net;
+    uint32 cumulative;
+}
+
 enum SearcherOutcome
 // future task tracking
 {

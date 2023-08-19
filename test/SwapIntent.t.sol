@@ -11,7 +11,7 @@ import {TxBuilder} from "../src/contracts/helpers/TxBuilder.sol";
 import {ProtocolCall, UserCall, SearcherCall} from "../src/contracts/types/CallTypes.sol";
 import {Verification} from "../src/contracts/types/VerificationTypes.sol";
 
-import {SwapIntentController, SwapIntent} from "src/contracts/intents-example/SwapIntent.sol";
+import {SwapIntentController, SwapIntent, Condition} from "src/contracts/intents-example/SwapIntent.sol";
 import {SearcherBase} from "../src/contracts/searcher/SearcherBase.sol";
 
 // QUESTIONS:
@@ -67,12 +67,16 @@ contract SwapIntentTest is BaseTest {
 
     function testAtlasSwapUsingIntent() public {
         // Swap 10 WETH for 20 DAI
+        Condition[] memory conditions = new Condition[](0);
+
         SwapIntent memory swapIntent = SwapIntent({
             tokenUserBuys: DAI_ADDRESS,
             amountUserBuys: 20e18,
             tokenUserSells: WETH_ADDRESS,
             amountUserSells: 10e18,
-            surplusToken: address(0)
+            auctionBaseCurrency: address(0),
+            searcherMustReimburseGas: false,
+            conditions: conditions
         });
 
         // Searcher deploys the RFQ searcher contract (defined at bottom of this file)

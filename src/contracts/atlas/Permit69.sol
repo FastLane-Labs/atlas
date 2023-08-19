@@ -24,6 +24,7 @@ abstract contract Permit69 {
     uint16 internal constant _SAFE_USER_TRANSFER = uint16(
         1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Staging)) | 
         1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserCall)) |
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SearcherCalls)) | // TODO: This may be removed later due to security risk
         1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Verification))
     );
 
@@ -54,7 +55,8 @@ abstract contract Permit69 {
         uint16 callConfig
     ) external {
         // Verify that the caller is legitimate
-        // NOTE: Use the *current* protocolControl's codehash to help mitigate social engineering bamboozles. 
+        // NOTE: Use the *current* protocolControl's codehash to help mitigate social engineering bamboozles if, for example, 
+        // a DAO is having internal issues. 
         require(msg.sender == _getExecutionEnvironmentCustom(user, protocolControl.codehash, protocolControl, callConfig), "ERR-T001 ProtocolTransfer");
 
         // Verify that the user is in control (or approved the protocol's control) of the ExecutionEnvironment

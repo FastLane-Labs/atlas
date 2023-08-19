@@ -43,7 +43,7 @@ abstract contract GovernanceControl {
     function _stagingCall(address to, address from, bytes4 userSelector, bytes calldata userData)
         internal
         virtual
-        returns (bytes memory stagingData);
+        returns (bytes memory);
 
 
     /////////////////////////////////////////////////////////
@@ -112,12 +112,12 @@ abstract contract GovernanceControl {
     /////////////////////////////////////////////////////////
     //
 
-    // _searcherStagingCall
+    // _searcherPreCall
     //
     // Details:
     //  Data should be decoded as:
     //
-    //    bytes memory stagingReturnData, address searcherTo
+    //    address searcherTo, bytes memory stagingReturnData
     //
     //  fulfillment(staging)/delegatecall =
     //      Inputs: staging call's returnData, winning searcher to address
@@ -128,18 +128,18 @@ abstract contract GovernanceControl {
     //      and is designed to give the searcher everything they need to fulfill
     //      the user's 'intent.'
 
-    function _searcherStagingCall(bytes calldata) internal virtual returns (bool) {
+    function _searcherPreCall(bytes calldata) internal virtual returns (bool) {
         revert(_NOT_IMPLEMENTED);
     }
 
 
-    // _fulfillmentCall
+    // _searcherPostCall
     //
     // Details:
     //
     //  Data should be decoded as:
     //
-    //    bytes memory stagingReturnData, address searcherTo
+    //    address searcherTo, bytes memory stagingReturnData
     //
 
     //  fulfillment(verification)/delegatecall =
@@ -151,7 +151,7 @@ abstract contract GovernanceControl {
     //      and is designed to make sure that the searcher is fulfilling
     //      the user's 'intent.'
 
-    function _fulfillmentCall(bytes calldata) internal virtual returns (bool) {
+    function _searcherPostCall(bytes calldata) internal virtual returns (bool) {
         revert(_NOT_IMPLEMENTED);
     }
 

@@ -60,7 +60,7 @@ contract Atlas is Test, Factory {
         if (block.number > userCall.metaTx.deadline || block.number > verification.proof.deadline) { valid = false; }
         if (tx.gasprice > userCall.metaTx.maxFeePerGas) { valid = false; }
         if (environment.codehash == bytes32(0)) { valid = false; }
-        if (!protocolCall.callConfig.allowsZeroSearchers() || protocolCall.callConfig.needsSearcherFullfillment()) {
+        if (!protocolCall.callConfig.allowsZeroSearchers() || protocolCall.callConfig.needsSearcherPostCall()) {
             if (searcherCalls.length == 0) { valid = false; }
         }
         // TODO: More checks 
@@ -77,7 +77,7 @@ contract Atlas is Test, Factory {
             _executeGasRefund(gasMarker, accruedGasRebate, userCall.metaTx.from);
 
         } catch {
-            // TODO: This portion needs more nuanced logic
+            // TODO: This portion needs more nuanced logic to prevent the replay of failed searcher txs
             if (protocolCall.callConfig.allowsReuseUserOps()) {
                 revert("ERR-F07 RevertToReuse");
             }
@@ -151,7 +151,7 @@ contract Atlas is Test, Factory {
 
         // If no searcher was successful, manually transition the lock
         if (!auctionWon) {
-            if (protocolCall.callConfig.needsSearcherFullfillment()) {
+            if (protocolCall.callConfig.needsSearcherPostCall()) {
                 revert("ERR-F08 UserNotFulfilled");
             }
             _notMadJustDisappointed();
