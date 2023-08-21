@@ -18,4 +18,22 @@ contract Permit69Test is BaseTest {
         BaseTest.setUp();
     }
 
+    // transferUserERC20 tests
+
+    function testTransferUserERC20RevertsIfCallerNotExecutionEnv() public {}
+
+    function testTransferUserERC20RevertsIfLockStateNotValid() public {}
+
+    function testTransferUserERC20SuccessfullyTransfersTokens() public {}
+
+    // transferProtocolERC20 tests
+
+    function testTransferProtocolERC20RevertsIfCallerNotExecutionEnv() public {}
+
+    function testTransferProtocolERC20RevertsIfLockStateNotValid() public {}
+
+    function testTransferProtocolERC20SuccessfullyTransfersTokens() public {}
+
+
+
 }
