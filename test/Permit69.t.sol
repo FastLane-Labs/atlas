@@ -7,8 +7,9 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 
 import {BaseTest} from "./base/BaseTest.t.sol";
 
-import {ProtocolCall, UserCall, SearcherCall} from "../src/contracts/types/CallTypes.sol";
-import {Verification} from "../src/contracts/types/VerificationTypes.sol";
+
+import {Permit69} from "src/contracts/atlas/Permit69.sol";
+import "src/contracts/types/LockTypes.sol";
 
 
 
@@ -46,4 +47,23 @@ contract Permit69Test is BaseTest {
 
     function testConstantValueOfSafeProtocolTransfer() public {}
 
+
+}
+
+// Mock Atlas with standard implementations of Permit69's virtual functions
+contract MockAtlasForPermit69Tests is Permit69 {
+    function _getExecutionEnvironmentCustom(
+        address user,
+        bytes32 controlCodeHash,
+        address protocolControl,
+        uint16 callConfig
+    ) internal view virtual override returns (address environment) {}
+
+    function _getLockState()
+        internal
+        view
+        virtual
+        override
+        returns (EscrowKey memory)
+    {}
 }
