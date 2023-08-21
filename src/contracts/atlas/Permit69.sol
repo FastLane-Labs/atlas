@@ -59,7 +59,7 @@ abstract contract Permit69 {
         _verifyCallerIsExecutionEnv(user, protocolControl.codehash, protocolControl, callConfig);
 
         // Verify that the user is in control (or approved the protocol's control) of the ExecutionEnvironment
-        _verifyLockState(_SAFE_USER_TRANSFER);
+        _verifyLockState({safeExecutionPhaseSet: _SAFE_USER_TRANSFER});
 
         // Transfer token
         ERC20(token).safeTransferFrom(user, destination, amount);
@@ -77,7 +77,7 @@ abstract contract Permit69 {
         _verifyCallerIsExecutionEnv(user, protocolControl.codehash, protocolControl, callConfig);
 
         // Verify that the protocol is in control of the ExecutionEnvironment
-        _verifyLockState(_SAFE_PROTOCOL_TRANSFER);
+        _verifyLockState({safeExecutionPhaseSet: _SAFE_PROTOCOL_TRANSFER});
 
         // Transfer token
         ERC20(token).safeTransferFrom(protocolControl, destination, amount);
