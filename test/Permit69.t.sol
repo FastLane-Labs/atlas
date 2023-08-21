@@ -22,7 +22,9 @@ contract Permit69Test is BaseTest {
 
     function testTransferUserERC20RevertsIfCallerNotExecutionEnv() public {}
 
-    function testTransferUserERC20RevertsIfLockStateNotValid() public {}
+    function testTransferUserERC20RevertsIfLockStateNotValid() public {
+        // Check reverts at all invalid execution phases
+    }
 
     function testTransferUserERC20SuccessfullyTransfersTokens() public {}
 
@@ -30,10 +32,18 @@ contract Permit69Test is BaseTest {
 
     function testTransferProtocolERC20RevertsIfCallerNotExecutionEnv() public {}
 
-    function testTransferProtocolERC20RevertsIfLockStateNotValid() public {}
+    function testTransferProtocolERC20RevertsIfLockStateNotValid() public {
+        // Check reverts at all invalid execution phases
+    }
 
     function testTransferProtocolERC20SuccessfullyTransfersTokens() public {}
 
+    // constants tests
 
+    function testConstantValueOfExecutionPhaseOffset() public {}
+
+    function testConstantValueOfSafeUserTransfer() public {}
+
+    function testConstantValueOfSafeProtocolTransfer() public {}
 
 }

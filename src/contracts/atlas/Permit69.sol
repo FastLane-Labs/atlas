@@ -58,8 +58,8 @@ abstract contract Permit69 {
         // NOTE: Use the *current* protocolControl's codehash to help mitigate social engineering bamboozles.
         _verifyCallerIsExecutionEnv(user, protocolControl.codehash, protocolControl, callConfig);
 
-        // Verify that the protocol is in control of the ExecutionEnvironment
-        _verifyLockState();
+        // Verify that the user is in control (or approved the protocol's control) of the ExecutionEnvironment
+        _verifyLockState(_SAFE_USER_TRANSFER);
 
         // Transfer token
         ERC20(token).safeTransferFrom(user, destination, amount);
@@ -77,7 +77,7 @@ abstract contract Permit69 {
         _verifyCallerIsExecutionEnv(user, protocolControl.codehash, protocolControl, callConfig);
 
         // Verify that the protocol is in control of the ExecutionEnvironment
-        _verifyLockState();
+        _verifyLockState(_SAFE_PROTOCOL_TRANSFER);
 
         // Transfer token
         ERC20(token).safeTransferFrom(protocolControl, destination, amount);
@@ -95,7 +95,7 @@ abstract contract Permit69 {
         );
     }
 
-    function _verifyLockState() internal view {
-        require(_getLockState().lockState & _SAFE_PROTOCOL_TRANSFER != 0, "ERR-T002 ProtocolTransfer");
+    function _verifyLockState(uint16 safeExecutionPhaseSet) internal view {
+        require(_getLockState().lockState & safeExecutionPhaseSet != 0, "ERR-T002 ProtocolTransfer");
     }
 }
