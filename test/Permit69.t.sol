@@ -50,8 +50,33 @@ contract Permit69Test is BaseTest {
 
 }
 
+// TODO probably refactor some of this stuff to a shared folder of standard implementations
 // Mock Atlas with standard implementations of Permit69's virtual functions
 contract MockAtlasForPermit69Tests is Permit69 {
+
+    // Declared in SafetyLocks.sol in the canonical Atlas system
+    // The only property relevant to testing Permit69 is _escrowKey.lockState (bitwise uint16)
+    EscrowKey internal _escrowKey;
+
+    // Public functions to expose the internal constants for testing
+    function getExecutionPhaseOffset() public view returns (uint256) {
+        return _EXECUTION_PHASE_OFFSET;
+    }
+
+    function getSafeUserTransfer() public view returns (uint16) {
+        return _SAFE_USER_TRANSFER;
+    }
+
+    function getSafeProtocolTransfer() public view returns (uint16) {
+        return _SAFE_PROTOCOL_TRANSFER;
+    }
+
+    // Setters for testing
+    function setEscrowKey(EscrowKey memory escrowKey) public {
+        _escrowKey = escrowKey;
+    }
+
+    // Overriding the virtual functions in Permit69
     function _getExecutionEnvironmentCustom(
         address user,
         bytes32 controlCodeHash,
@@ -59,11 +84,14 @@ contract MockAtlasForPermit69Tests is Permit69 {
         uint16 callConfig
     ) internal view virtual override returns (address environment) {}
 
+    // Implemented in Factory.sol in the canonical Atlas system
     function _getLockState()
         internal
         view
         virtual
         override
         returns (EscrowKey memory)
-    {}
+    {
+        return _escrowKey;
+    }
 }
