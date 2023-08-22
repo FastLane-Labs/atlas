@@ -62,8 +62,8 @@ contract Permit69Test is BaseTest {
 
     function testConstantValueOfSafeUserTransfer() public {
         // Safe phases for user transfers are Staging, UserCall, and Verification
-        // stagePhaseSafe = 0000 0000 0010 0000
-        uint16 stagePhaseSafe = uint16(
+        // stagingPhaseSafe = 0000 0000 0010 0000
+        uint16 stagingPhaseSafe = uint16(
             1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Staging))
         );
         // userCallPhaseSafe = 0000 0000 0100 0000
@@ -76,7 +76,7 @@ contract Permit69Test is BaseTest {
         );
 
         uint16 expectedSafeUserTransferBitMap = 
-                stagePhaseSafe
+                stagingPhaseSafe
             |   userCallPhaseSafe
             |   verificationPhaseSafe;
         
@@ -87,9 +87,37 @@ contract Permit69Test is BaseTest {
         );
     }
 
-    function testConstantValueOfSafeProtocolTransfer() public {}
+    function testConstantValueOfSafeProtocolTransfer() public {
+        // Safe phases for protocol transfers are Staging, HandlingPayments, UserRefund, and Verification
+        // stagingPhaseSafe = 0000 0000 0010 0000
+        uint16 stagingPhaseSafe = uint16(
+            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Staging))
+        );
+        // handlingPaymentsPhaseSafe = 0000 0001 0000 0000
+        uint16 handlingPaymentsPhaseSafe = uint16(
+            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.HandlingPayments))
+        );
+        // userRefundPhaseSafe = 0000 0010 0000 0000
+        uint16 userRefundPhaseSafe = uint16(
+            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.UserRefund))
+        );
+        // verificationPhaseSafe = 0000 0100 0000 0000
+        uint16 verificationPhaseSafe = uint16(
+            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Verification))
+        );
 
-
+        uint16 expectedSafeProtocolTransferBitMap = 
+                stagingPhaseSafe
+            |   handlingPaymentsPhaseSafe
+            |   userRefundPhaseSafe
+            |   verificationPhaseSafe;
+        
+        assertEq(
+            mockAtlas.getSafeProtocolTransfer(),
+            expectedSafeProtocolTransferBitMap,
+            'Expected to be the bitwise OR of the safe phases (0000 0111 0010 0000)'
+        );
+    }
 }
 
 // TODO probably refactor some of this stuff to a shared folder of standard implementations
