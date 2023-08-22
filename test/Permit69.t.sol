@@ -48,9 +48,10 @@ contract Permit69Test is BaseTest {
     function testConstantValueOfExecutionPhaseOffset() public {
         // Offset skips BaseLock bits to get to ExecutionPhase bits
         // i.e. 4 right-most bits of skipped for BaseLock (xxxx xxxx xxxx 0000)
+        // NOTE: An extra skip is added to account for ExecutionPhase values starting at 0
         assertEq(
             mockAtlas.getExecutionPhaseOffset(),
-            uint16(type(BaseLock).max),
+            uint16(type(BaseLock).max) + 1,
             'Offset not same as num of items in BaseLock enum'
         );
         assertEq(
@@ -61,6 +62,7 @@ contract Permit69Test is BaseTest {
     }
 
     function testConstantValueOfSafeUserTransfer() public {
+        string memory expectedBitMapString = "0000010001100000";
         // Safe phases for user transfers are Staging, UserCall, and Verification
         // stagingPhaseSafe = 0000 0000 0010 0000
         uint16 stagingPhaseSafe = uint16(
@@ -85,13 +87,19 @@ contract Permit69Test is BaseTest {
             expectedSafeUserTransferBitMap,
             'Expected to be the bitwise OR of the safe phases (0000 0100 0110 0000)'
         );
+        assertEq(
+            uint16ToBinaryString(expectedSafeUserTransferBitMap),
+            expectedBitMapString,
+            "Binary string form of bit map not as expected"
+        );
     }
 
     function testConstantValueOfSafeProtocolTransfer() public {
+        string memory expectedBitMapString = "0000011100100000";
         // Safe phases for protocol transfers are Staging, HandlingPayments, UserRefund, and Verification
         // stagingPhaseSafe = 0000 0000 0010 0000
         uint16 stagingPhaseSafe = uint16(
-            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Staging))
+            uint16(1) << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Staging))
         );
         // handlingPaymentsPhaseSafe = 0000 0001 0000 0000
         uint16 handlingPaymentsPhaseSafe = uint16(
@@ -111,12 +119,40 @@ contract Permit69Test is BaseTest {
             |   handlingPaymentsPhaseSafe
             |   userRefundPhaseSafe
             |   verificationPhaseSafe;
-        
+
         assertEq(
             mockAtlas.getSafeProtocolTransfer(),
             expectedSafeProtocolTransferBitMap,
             'Expected to be the bitwise OR of the safe phases (0000 0111 0010 0000)'
         );
+        assertEq(
+            uint16ToBinaryString(expectedSafeProtocolTransferBitMap),
+            expectedBitMapString,
+            "Binary string form of bit map not as expected"
+        );
+    }
+
+    // String <> uint16 binary Converter Utility
+    function uint16ToBinaryString(uint16 n) public view returns (string memory) {
+        uint256 newN = uint256(n);
+        // revert on out of range input
+        require(newN < 65536, "n too large");
+
+        bytes memory output = new bytes(16);
+
+        uint256 i = 0;
+        for (; i < 16; i++) {
+            if(newN == 0) {
+                // Now that we've filled in the last 1, fill rest of 0s in
+                for(;i < 16; i++) {
+                    output[15 - i] = bytes1("0");
+                }
+                break;
+            }
+            output[15 - i] = (newN % 2 == 1) ? bytes1("1") : bytes1("0");
+            newN /= 2;
+        }
+        return string(output);
     }
 }
 
