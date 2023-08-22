@@ -18,7 +18,8 @@ import {ProtocolCall} from "../types/CallTypes.sol";
 abstract contract Permit69 {
     using SafeTransferLib for ERC20;
 
-    uint16 internal constant _EXECUTION_PHASE_OFFSET = uint16(type(BaseLock).max);
+    // Add 1 because values of the ExecutionPhase enum start at 0
+    uint16 internal constant _EXECUTION_PHASE_OFFSET = uint16(type(BaseLock).max) + 1;
 
     // NOTE: No user transfers allowed during UserRefund or HandlingPayments
     uint16 internal constant _SAFE_USER_TRANSFER = uint16(
