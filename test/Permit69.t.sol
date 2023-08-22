@@ -15,8 +15,12 @@ import "src/contracts/types/LockTypes.sol";
 
 contract Permit69Test is BaseTest {
 
+    MockAtlasForPermit69Tests mockAtlas;
+
     function setUp() public virtual override {
         BaseTest.setUp();
+
+        mockAtlas = new MockAtlasForPermit69Tests();
     }
 
     // transferUserERC20 tests
@@ -41,9 +45,47 @@ contract Permit69Test is BaseTest {
 
     // constants tests
 
-    function testConstantValueOfExecutionPhaseOffset() public {}
+    function testConstantValueOfExecutionPhaseOffset() public {
+        // Offset skips BaseLock bits to get to ExecutionPhase bits
+        // i.e. 4 right-most bits of skipped for BaseLock (xxxx xxxx xxxx 0000)
+        assertEq(
+            mockAtlas.getExecutionPhaseOffset(),
+            uint16(type(BaseLock).max),
+            'Offset not same as num of items in BaseLock enum'
+        );
+        assertEq(
+            uint16(type(BaseLock).max),
+            uint16(3),
+            'Expected 4 items in BaseLock enum'
+        );
+    }
 
-    function testConstantValueOfSafeUserTransfer() public {}
+    function testConstantValueOfSafeUserTransfer() public {
+        // Safe phases for user transfers are Staging, UserCall, and Verification
+        // stagePhaseSafe = 0000 0000 0010 0000
+        uint16 stagePhaseSafe = uint16(
+            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Staging))
+        );
+        // userCallPhaseSafe = 0000 0000 0100 0000
+        uint16 userCallPhaseSafe = uint16(
+            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.UserCall))
+        );
+        // verificationPhaseSafe = 0000 0100 0000 0000
+        uint16 verificationPhaseSafe = uint16(
+            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Verification))
+        );
+
+        uint16 expectedSafeUserTransferBitMap = 
+                stagePhaseSafe
+            |   userCallPhaseSafe
+            |   verificationPhaseSafe;
+        
+        assertEq(
+            mockAtlas.getSafeUserTransfer(),
+            expectedSafeUserTransferBitMap,
+            'Expected to be the bitwise OR of the safe phases (0000 0100 0110 0000)'
+        );
+    }
 
     function testConstantValueOfSafeProtocolTransfer() public {}
 
@@ -59,7 +101,7 @@ contract MockAtlasForPermit69Tests is Permit69 {
     EscrowKey internal _escrowKey;
 
     // Public functions to expose the internal constants for testing
-    function getExecutionPhaseOffset() public view returns (uint256) {
+    function getExecutionPhaseOffset() public view returns (uint16) {
         return _EXECUTION_PHASE_OFFSET;
     }
 
