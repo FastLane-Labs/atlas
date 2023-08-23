@@ -125,24 +125,25 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         return delegateUser ? _userLocalDelegateCall(data) : _userLocalStandardCall(data);
     }
 
-    function searcherStagingCall(bytes calldata data) 
+    function searcherPreCall(bytes calldata data) 
         external 
         mustBeDelegated
         onlyApprovedDelegateCaller
         validControl
         returns (bool)
     {
-        return _searcherStagingCall(data);
+        return _searcherPreCall(data);
     }
 
-    function fulfillmentCall(bytes calldata data) 
+    function searcherPostCall(bytes calldata data) 
         external 
         mustBeDelegated
         onlyApprovedDelegateCaller
         validControl
         returns (bool)
     {
-        return _fulfillmentCall(data);
+        
+        return _searcherPostCall(data);
     }
 
     function allocatingCall(bytes calldata data) 

@@ -68,8 +68,6 @@ contract ExecutionEnvironment is Test {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 
-        address control = _control();
-
         require(msg.sender == atlas && userCall.from == _user(), "ERR-CE00 InvalidSenderStaging");
         require(userCall.to != address(this), "ERR-EV008 InvalidTo");
 
@@ -77,21 +75,20 @@ contract ExecutionEnvironment is Test {
             IProtocolControl.stagingCall.selector, userCall.to, userCall.from, bytes4(userCall.data), userCall.data[4:]
         );
 
-        stagingData = abi.encodePacked(
-            stagingData,
-            _user(),
-            _control(),
-            _config(),
-            _controlCodeHash()
+
+        (bool success, bytes memory stagingReturnData) = _control().delegatecall(
+            abi.encodePacked(
+                stagingData,
+                _user(),
+                _control(),
+                _config(),
+                _controlCodeHash()
+            )
         );
 
-        bool success;
-
-        (success, stagingData) = control.delegatecall(stagingData);
         require(success, "ERR-EC02 DelegateRevert");
 
-        return stagingData;
-
+        return abi.decode(stagingReturnData, (bytes));
     }
 
     function userWrapper(UserMetaTx calldata userCall) external payable returns (bytes memory userData) {
@@ -122,8 +119,9 @@ contract ExecutionEnvironment is Test {
 
         } else {
             if (config.needsDelegateUser()) {
+
                 userData = abi.encodeWithSelector(
-                    IProtocolControl.userLocalCall.selector, userCall.to, userCall.value, userCall.data
+                    IProtocolControl.userLocalCall.selector, userCall.data
                 );
 
                 userData = abi.encodePacked(
@@ -184,7 +182,7 @@ contract ExecutionEnvironment is Test {
             if (searcherCall.bids[i].token == address(0)) {
                 tokenBalances[i] = msg.value; // NOTE: this is the meta tx value
 
-                // ERC20 balance
+            // ERC20 balance
             } else {
                 tokenBalances[i] = ERC20(searcherCall.bids[i].token).balanceOf(address(this));
             }
@@ -203,9 +201,22 @@ contract ExecutionEnvironment is Test {
 
         // Handle any searcher staging, if necessary
         if (_config().needsSearcherStaging()) {
-            bytes memory data;
+
+            //bytes memory data = abi.encode(searcherCall.metaTx.to, stagingReturnData);
+
+            bytes memory data = abi.encodeWithSelector(
+                IProtocolControl.searcherPreCall.selector, 
+                abi.encode(searcherCall.metaTx.to, stagingReturnData)
+            );
+
             (success, data) = _control().delegatecall(
-                abi.encodeWithSelector(IProtocolControl.searcherStagingCall.selector, stagingReturnData, searcherCall.metaTx.to)
+                abi.encodePacked(
+                    data,
+                    _user(),
+                    _control(),
+                    _config(),
+                    _controlCodeHash()
+                )
             );
             require(success, SEARCHER_STAGING_FAILED);
 
@@ -224,10 +235,26 @@ contract ExecutionEnvironment is Test {
         require(ISafetyLocks(atlas).confirmSafetyCallback(), SEARCHER_FAILED_CALLBACK);
 
         // If this was a user intent, handle and verify fulfillment
-        if (_config().needsSearcherFullfillment()) {
-            bytes memory data;
+        if (_config().needsSearcherPostCall()) {
+            
+            bytes memory data = stagingReturnData;
+
+            data = abi.encode(searcherCall.metaTx.to, data);
+
+            data = abi.encodeWithSelector(
+                IProtocolControl.searcherPostCall.selector, 
+                // searcherCall.metaTx.to, 
+                data
+            );
+
             (success, data) = _control().delegatecall(
-                abi.encodeWithSelector(IProtocolControl.fulfillmentCall.selector, stagingReturnData, searcherCall.metaTx.to)
+                abi.encodePacked(
+                    data,
+                    _user(),
+                    _control(),
+                    _config(),
+                    _controlCodeHash()
+                )
             );
             require(success, INTENT_UNFULFILLED);
 
@@ -278,7 +305,7 @@ contract ExecutionEnvironment is Test {
         require(atlas.balance >= escrowBalance, SEARCHER_MSG_VALUE_UNPAID);
     }
 
-    function allocateRewards(BidData[] calldata bids) external {
+    function allocateRewards(BidData[] calldata bids, bytes memory stagingReturnData) external {
         // msg.sender = escrow
         // address(this) = ExecutionEnvironment
         require(msg.sender == atlas, "ERR-04 InvalidCaller");
@@ -306,7 +333,7 @@ contract ExecutionEnvironment is Test {
             }
         }
 
-        bytes memory allocateData = abi.encodeWithSelector(IProtocolControl.allocatingCall.selector, abi.encode(totalEtherReward, bids));
+        bytes memory allocateData = abi.encodeWithSelector(IProtocolControl.allocatingCall.selector, abi.encode(totalEtherReward, bids, stagingReturnData));
 
         allocateData = abi.encodePacked(
             allocateData,

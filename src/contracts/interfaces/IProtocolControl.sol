@@ -12,9 +12,9 @@ interface IProtocolControl {
 
     function allocatingCall(bytes calldata data) external;
 
-    function searcherStagingCall(bytes calldata data) external returns (bool);
+    function searcherPreCall(bytes calldata data) external returns (bool);
 
-    function fulfillmentCall(bytes calldata data) external returns (bytes memory);
+    function searcherPostCall(bytes calldata data) external returns (bool);
 
     function verificationCall(bytes calldata data) external returns (bytes memory);
 
@@ -41,4 +41,5 @@ interface IProtocolControl {
     function allocatingDelegated() external view returns (bool delegated);
 
     function verificationDelegated() external view returns (bool delegated);
+
 }

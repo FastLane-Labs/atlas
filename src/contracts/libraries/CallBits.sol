@@ -113,7 +113,7 @@ library CallBits {
         searcherStaging = (callConfig & 1 << uint16(CallConfig.SearcherStaging) != 0);
     }
 
-    function needsSearcherFullfillment(uint16 callConfig) internal pure returns (bool searcherFulfillment) {
+    function needsSearcherPostCall(uint16 callConfig) internal pure returns (bool searcherFulfillment) {
         searcherFulfillment = (callConfig & 1 << uint16(CallConfig.SearcherFulfillment) != 0);
     }
 

@@ -36,7 +36,19 @@ contract Atlas is Test, Factory {
 
         // Verify that the calldata injection came from the protocol frontend
         // and that the signatures are valid. 
-        bool valid = _verifyProtocol(userCall.metaTx.to, protocolCall, verification) && _verifyUser(protocolCall, userCall);
+        bool valid = true;
+        
+        // Only verify signatures of meta txs if the original signer isn't the bundler
+        // TODO: Consider extra reentrancy defense here?
+        if (verification.proof.from != msg.sender && !_verifyProtocol(userCall.metaTx.to, protocolCall, verification)) {
+            valid = false;
+        }
+        
+        if (userCall.metaTx.from != msg.sender && !_verifyUser(protocolCall, userCall)) { 
+            valid = false; 
+        }
+
+        // TODO: Add optionality to bypass ProtocolControl signatures if user can fully bundle tx
 
         // Get the execution environment
         address environment = _getExecutionEnvironmentCustom(userCall.metaTx.from, verification.proof.controlCodeHash, protocolCall.to, protocolCall.callConfig);
@@ -48,7 +60,7 @@ contract Atlas is Test, Factory {
         if (block.number > userCall.metaTx.deadline || block.number > verification.proof.deadline) { valid = false; }
         if (tx.gasprice > userCall.metaTx.maxFeePerGas) { valid = false; }
         if (environment.codehash == bytes32(0)) { valid = false; }
-        if (!protocolCall.callConfig.allowsZeroSearchers() || protocolCall.callConfig.needsSearcherFullfillment()) {
+        if (!protocolCall.callConfig.allowsZeroSearchers() || protocolCall.callConfig.needsSearcherPostCall()) {
             if (searcherCalls.length == 0) { valid = false; }
         }
         // TODO: More checks 
@@ -65,12 +77,11 @@ contract Atlas is Test, Factory {
             _executeGasRefund(gasMarker, accruedGasRebate, userCall.metaTx.from);
 
         } catch {
-            // TODO: This portion needs more nuanced logic
+            // TODO: This portion needs more nuanced logic to prevent the replay of failed searcher txs
             if (protocolCall.callConfig.allowsReuseUserOps()) {
                 revert("ERR-F07 RevertToReuse");
             }
         }
-
 
         console.log("total gas used", gasMarker - gasleft());
     }
@@ -140,7 +151,7 @@ contract Atlas is Test, Factory {
 
         // If no searcher was successful, manually transition the lock
         if (!auctionWon) {
-            if (protocolCall.callConfig.needsSearcherFullfillment()) {
+            if (protocolCall.callConfig.needsSearcherPostCall()) {
                 revert("ERR-F08 UserNotFulfilled");
             }
             _notMadJustDisappointed();
@@ -161,7 +172,7 @@ contract Atlas is Test, Factory {
         if (_executeSearcherCall(searcherCall, stagingReturnData, auctionAlreadyWon, environment)) {
             if (!auctionAlreadyWon) {
                 auctionAlreadyWon = true;
-                _executePayments(protocolCall, searcherCall.bids, environment);
+                _executePayments(protocolCall, searcherCall.bids, stagingReturnData, environment);
             }
         }
         return auctionAlreadyWon;
