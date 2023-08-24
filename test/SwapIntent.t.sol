@@ -67,7 +67,147 @@ contract SwapIntentTest is BaseTest {
         
     }
 
-    function testAtlasSwapUsingIntent() public {
+    function testAtlasSwapIntentWithBasicRFQ() public {
+        // Swap 10 WETH for 20 DAI
+
+        UserCondition userCondition = new UserCondition();
+
+        Condition[] memory conditions = new Condition[](2);
+        conditions[0] = Condition({
+            antecedent: address(userCondition),
+            context: abi.encodeWithSelector(UserCondition.isLessThanFive.selector, 3)
+        });
+        conditions[1] = Condition({
+            antecedent: address(userCondition),
+            context: abi.encodeWithSelector(UserCondition.isLessThanFive.selector, 4)
+        });
+
+        SwapIntent memory swapIntent = SwapIntent({
+            tokenUserBuys: DAI_ADDRESS,
+            amountUserBuys: 20e18,
+            tokenUserSells: WETH_ADDRESS,
+            amountUserSells: 10e18,
+            auctionBaseCurrency: address(0),
+            searcherMustReimburseGas: false,
+            conditions: conditions
+        });
+
+        // Searcher deploys the RFQ searcher contract (defined at bottom of this file)
+        vm.startPrank(searcherOneEOA);
+        SimpleRFQSearcher rfqSearcher = new SimpleRFQSearcher(address(atlas));
+        atlas.deposit{value: 1e18}(searcherOneEOA);
+        vm.stopPrank();
+
+        // Give 20 DAI to RFQ searcher contract
+        deal(DAI_ADDRESS, address(rfqSearcher), swapIntent.amountUserBuys);
+        assertEq(DAI.balanceOf(address(rfqSearcher)), swapIntent.amountUserBuys, "Did not give enough DAI to searcher");
+
+        // Input params for Atlas.metacall() - will be populated below
+        ProtocolCall memory protocolCall = txBuilder.getProtocolCall();
+        UserCall memory userCall;
+        SearcherCall[] memory searcherCalls = new SearcherCall[](1);
+        Verification memory verification;
+
+        vm.startPrank(userEOA);
+        address executionEnvironment = atlas.createExecutionEnvironment(protocolCall);
+        vm.stopPrank();
+        vm.label(address(executionEnvironment), "EXECUTION ENV");
+
+        // userCallData is used in delegatecall from exec env to control, calling stagingCall
+        // first 4 bytes are "userSelector" param in stagingCall in ProtocolControl - swap() selector
+        // rest of data is "userData" param
+        
+        // swap(SwapIntent calldata) selector = 0x98434997
+        bytes memory userCallData = abi.encodeWithSelector(SwapIntentController.swap.selector, swapIntent);
+
+        // Builds the metaTx and to parts of userCall, signature still to be set
+        userCall = txBuilder.buildUserCall({
+            from: userEOA, // NOTE: Would from ever not be user?
+            to: address(swapIntentController),
+            maxFeePerGas: tx.gasprice + 1, // TODO update
+            value: 0,
+            data: userCallData
+        });
+
+        // User signs the userCall
+        (sig.v, sig.r, sig.s) = vm.sign(userPK, atlas.getUserCallPayload(userCall));
+        userCall.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        // Build searcher calldata (function selector on searcher contract and its params)
+        bytes memory searcherCallData = abi.encodeWithSelector(
+            SimpleRFQSearcher.fulfillRFQ.selector, 
+            swapIntent,
+            executionEnvironment
+        );
+
+        // Builds the SearcherCall
+        searcherCalls[0] = txBuilder.buildSearcherCall({
+            userCall: userCall,
+            protocolCall: protocolCall,
+            searcherCallData: searcherCallData,
+            searcherEOA: searcherOneEOA,
+            searcherContract: address(rfqSearcher),
+            bidAmount: 1e18
+        });
+
+        // Searcher signs the searcherCall
+        (sig.v, sig.r, sig.s) = vm.sign(searcherOnePK, atlas.getSearcherPayload(searcherCalls[0].metaTx));
+        searcherCalls[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        // Frontend creates verification calldata after seeing rest of data
+        verification = txBuilder.buildVerification(governanceEOA, protocolCall, userCall, searcherCalls);
+
+        // Frontend signs the verification payload
+        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getVerificationPayload(verification));
+        verification.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        // Check user token balances before
+        uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);
+        uint256 userDaiBalanceBefore = DAI.balanceOf(userEOA);
+
+        vm.prank(userEOA); // Burn all users WETH except 10 so logs are more readable
+        WETH.transfer(address(1), userWethBalanceBefore - swapIntent.amountUserSells);
+        userWethBalanceBefore = WETH.balanceOf(userEOA);
+
+        assertTrue(userWethBalanceBefore >= swapIntent.amountUserSells, "Not enough starting WETH");
+
+        console.log("\nBEFORE METACALL");
+        console.log("User WETH balance", WETH.balanceOf(userEOA));
+        console.log("User DAI balance", DAI.balanceOf(userEOA));
+        console.log("Searcher WETH balance", WETH.balanceOf(address(rfqSearcher)));
+        console.log("Searcher DAI balance", DAI.balanceOf(address(rfqSearcher)));
+
+        vm.startPrank(userEOA);
+        
+        assertFalse(atlas.testUserCall(userCall), "UserCall tested true");
+        
+        WETH.approve(address(atlas), swapIntent.amountUserSells);
+
+        assertTrue(atlas.testUserCall(userCall), "UserCall tested true");
+        assertTrue(atlas.testUserCall(userCall.metaTx), "UserMetaTx tested true");
+
+
+        // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
+        atlas.metacall({
+            protocolCall: protocolCall,
+            userCall: userCall,
+            searcherCalls: searcherCalls,
+            verification: verification
+        });
+        vm.stopPrank();
+
+        console.log("\nAFTER METACALL");
+        console.log("User WETH balance", WETH.balanceOf(userEOA));
+        console.log("User DAI balance", DAI.balanceOf(userEOA));
+        console.log("Searcher WETH balance", WETH.balanceOf(address(rfqSearcher)));
+        console.log("Searcher DAI balance", DAI.balanceOf(address(rfqSearcher)));
+
+        // Check user token balances after
+        assertEq(WETH.balanceOf(userEOA), userWethBalanceBefore - swapIntent.amountUserSells, "Did not spend enough WETH");
+        assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + swapIntent.amountUserBuys, "Did not receive enough DAI");
+    }
+
+    function testAtlasSwapIntentWithUniswapSearcher() public {
         // Swap 10 WETH for 20 DAI
 
         UserCondition userCondition = new UserCondition();
