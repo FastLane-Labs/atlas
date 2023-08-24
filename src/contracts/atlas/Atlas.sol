@@ -1,6 +1,8 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
+import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
+
 import {Factory} from "./Factory.sol";
 
 import "../types/CallTypes.sol";
@@ -177,4 +179,35 @@ contract Atlas is Test, Factory {
         }
         return auctionAlreadyWon;
     }
+
+    function testUserCall(UserMetaTx calldata userMetaTx) external view returns (bool) {
+        address control = userMetaTx.control;
+        uint16 callConfig = CallBits.buildCallConfig(control);
+        return _testUserCall(userMetaTx, control, callConfig);
+    }
+
+    function testUserCall(UserCall calldata userCall) external view returns (bool) {
+        if (userCall.to != address(this)) {return false;}
+        address control = userCall.metaTx.control;
+        uint16 callConfig = CallBits.buildCallConfig(control);
+
+        ProtocolCall memory protocolCall = ProtocolCall(userCall.metaTx.control, callConfig);
+
+        return _validateUser(protocolCall, userCall) && _testUserCall(userCall.metaTx, control, callConfig);
+    }
+
+    function _testUserCall(UserMetaTx calldata userMetaTx, address control, uint16 callConfig) internal view returns (bool) {
+        if (callConfig == 0) {
+            return false;
+        }
+
+        address environment = _getExecutionEnvironmentCustom(
+            userMetaTx.from, control.codehash, control, callConfig);
+
+        if (environment.codehash == bytes32(0) || control.codehash == bytes32(0)) {
+            return false;
+        } 
+        return IExecutionEnvironment(environment).validateUserCall(userMetaTx);
+    }
+    
 }

@@ -345,7 +345,46 @@ contract ExecutionEnvironment is Test {
 
         (bool success,) = _control().delegatecall(allocateData);
         require(success, "ERR-EC02 DelegateRevert");
-       
+    }
+
+    function validateUserCall(UserMetaTx calldata userMetaTx)   
+        external 
+        // view 
+        returns (bool) {
+        // msg.sender = atlas
+        // address(this) = ExecutionEnvironment
+        require(msg.sender == atlas, "ERR-CE00 InvalidSenderStaging");
+
+        if (userMetaTx.from != _user()) {
+            return false;
+        }
+
+        if (userMetaTx.control != _control()) {
+            return false;
+        }
+
+        if (userMetaTx.deadline < block.number) {
+            return false;
+        }
+
+        if (_controlCodeHash() != _control().codehash) {
+            return false;
+        }
+
+        bytes memory data = abi.encodePacked(
+            abi.encodeWithSelector(IProtocolControl.validateUserCall.selector, userMetaTx),
+            _user(),
+            _control(),
+            _config(),
+            _controlCodeHash()
+        );
+
+        (bool success, bytes memory returnData) = _control().delegatecall(data);
+
+        if (!success) {
+            return false;
+        }
+        return abi.decode(returnData, (bool));
     }
 
     ///////////////////////////////////////

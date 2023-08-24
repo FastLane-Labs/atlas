@@ -11,7 +11,7 @@ import {TxBuilder} from "../src/contracts/helpers/TxBuilder.sol";
 import {ProtocolCall, UserCall, SearcherCall} from "../src/contracts/types/CallTypes.sol";
 import {Verification} from "../src/contracts/types/VerificationTypes.sol";
 
-import {SwapIntentController, SwapIntent, Condition} from "src/contracts/intents-example/SwapIntent.sol";
+import {SwapIntentController, SwapIntent, Condition} from "../src/contracts/intents-example/SwapIntent.sol";
 import {SearcherBase} from "../src/contracts/searcher/SearcherBase.sol";
 
 // QUESTIONS:
@@ -63,11 +63,24 @@ contract SwapIntentTest is BaseTest {
             escrowAddress: address(escrow),
             atlasAddress: address(atlas)
         });
+
+        
     }
 
     function testAtlasSwapUsingIntent() public {
         // Swap 10 WETH for 20 DAI
-        Condition[] memory conditions = new Condition[](0);
+
+        UserCondition userCondition = new UserCondition();
+
+        Condition[] memory conditions = new Condition[](2);
+        conditions[0] = Condition({
+            antecedent: address(userCondition),
+            context: abi.encodeWithSelector(UserCondition.isLessThanFive.selector, 3)
+        });
+        conditions[1] = Condition({
+            antecedent: address(userCondition),
+            context: abi.encodeWithSelector(UserCondition.isLessThanFive.selector, 4)
+        });
 
         SwapIntent memory swapIntent = SwapIntent({
             tokenUserBuys: DAI_ADDRESS,
@@ -165,7 +178,15 @@ contract SwapIntentTest is BaseTest {
         console.log("Searcher DAI balance", DAI.balanceOf(address(rfqSearcher)));
 
         vm.startPrank(userEOA);
+        
+        assertFalse(atlas.testUserCall(userCall), "UserCall tested true");
+        
         WETH.approve(address(atlas), swapIntent.amountUserSells);
+
+        assertTrue(atlas.testUserCall(userCall), "UserCall tested true");
+        assertTrue(atlas.testUserCall(userCall.metaTx), "UserMetaTx tested true");
+
+
         // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
         atlas.metacall({
             protocolCall: protocolCall,
@@ -202,4 +223,20 @@ contract SimpleRFQSearcher is SearcherBase {
 
     fallback() external payable {}
     receive() external payable {}
+}
+
+contract UserCondition {
+    bool valid = true;
+
+    function enable() external {
+        valid = true;
+    }
+
+    function disable() external {
+        valid = false;
+    }
+
+    function isLessThanFive(uint256 n) external view returns (bool) {
+        return valid && n < 5;
+    }
 }
