@@ -235,7 +235,7 @@ contract SwapIntentTest is BaseTest {
         // Searcher deploys the RFQ searcher contract (defined at bottom of this file)
         vm.startPrank(searcherOneEOA);
         UniswapIntentSearcher uniswapSearcher = new UniswapIntentSearcher(address(atlas));
-        atlas.deposit{value: 1e18}(searcherOneEOA);
+        deal(WETH_ADDRESS, address(uniswapSearcher), 1e18); // 1 WETH to searcher to pay bid
         vm.stopPrank();
 
         // Input params for Atlas.metacall() - will be populated below
@@ -401,6 +401,9 @@ contract UniswapIntentSearcher is SearcherBase {
         require(msg.sender == address(this), "Not called via metaFlashCall");
         _;
     }
+
+    fallback() external payable {}
+    receive() external payable {}
 }
 
 contract UserCondition {
