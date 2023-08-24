@@ -1,0 +1,24 @@
+{
+    "name": "atlas",
+    "version": "1.0.0",
+    "repository": "https://github.com/Polygon-Fast-Lane/atlas",
+    "author": "FastLane",
+    "scripts": {
+      "expenv": "export $(grep -v '^#' .env | xargs)",
+      "source": "source .env",
+      "allexport": "set -o allexport; source .env; set +o allexport",
+      "reinstall": "rm -rf node_modules && rm -f yarn.lock && yarn clean && yarn",
+      "coverage": "forge coverage --report lcov && genhtml lcov.info -o report --branch-coverage && open report/index.html",
+      "gas": "forge test -vv --gas-report",
+      "ftest": "source .env && forge test --gas-price=1500000000",
+      "ftest-fork": "source .env && forge test -vvv --fork-url ${ALCHEMY_APIKEY_MUMBAI} --fork-block-number 26702726 --gas-report",
+      "anvil": "anvil",
+      "anvil-mainnet-fork": "source .env && anvil --fork-url ${MAINNET_RPC_URL} --fork-block-number ${MAINNET_FORK_BLOCK_NUMBER}",
+      "mappings": "forge remappings > remappings.txt",
+      "slither": "slither . --compile-force-framework foundry --filter-paths 'test|lib'",
+      "snapshot": "source .env && forge snapshot -vvv --gas-report",
+      "sizes": "forge build --sizes",
+      "solc": "solc-select install 0.8.18 && solc-select use 0.8.18"
+    }
+  }
+  
