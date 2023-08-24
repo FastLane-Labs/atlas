@@ -209,18 +209,7 @@ contract SwapIntentTest is BaseTest {
 
     function testAtlasSwapIntentWithUniswapSearcher() public {
         // Swap 10 WETH for 20 DAI
-
-        UserCondition userCondition = new UserCondition();
-
-        Condition[] memory conditions = new Condition[](2);
-        conditions[0] = Condition({
-            antecedent: address(userCondition),
-            context: abi.encodeWithSelector(UserCondition.isLessThanFive.selector, 3)
-        });
-        conditions[1] = Condition({
-            antecedent: address(userCondition),
-            context: abi.encodeWithSelector(UserCondition.isLessThanFive.selector, 4)
-        });
+        Condition[] memory conditions;
 
         SwapIntent memory swapIntent = SwapIntent({
             tokenUserBuys: DAI_ADDRESS,
@@ -348,7 +337,8 @@ contract SwapIntentTest is BaseTest {
     }
 }
 
-
+// This searcher magically has the tokens needed to fulfil the user's swap.
+// This might involve an offchain RFQ system
 contract SimpleRFQSearcher is SearcherBase {
     constructor(address atlas) SearcherBase(atlas, msg.sender) {}
 
@@ -363,6 +353,27 @@ contract SimpleRFQSearcher is SearcherBase {
 
     fallback() external payable {}
     receive() external payable {}
+}
+
+contract UniswapIntentSearcher is SearcherBase {
+    constructor(address atlas) SearcherBase(atlas, msg.sender) {}
+
+    function fulfillWithSwap(
+        SwapIntent calldata swapIntent,
+        address executionEnvironment
+    ) public onlySelf {
+        // TODO Swap user's sold tokens through Uniswap
+        require(ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells, "Did not receive enough tokenIn");
+        require(ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys, "Not enough tokenOut to fulfill");
+        ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
+    }
+
+    // This ensures a function can only be called through metaFlashCall
+    // which includes security checks to work safely with Atlas
+    modifier onlySelf() {
+        require(msg.sender == address(this), "Not called via metaFlashCall");
+        _;
+    }
 }
 
 contract UserCondition {
