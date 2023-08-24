@@ -218,31 +218,6 @@ contract SwapIntentTest is BaseTest {
         assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + swapIntent.amountUserBuys, "Did not receive enough DAI");
     }
 
-    // TODO delete this and move to searcher
-    function testUniswapGG() public {
-
-        IUniV2Router02 router = IUniV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
-
-        console.log("user dai:", DAI.balanceOf(userEOA));
-        console.log("attempting to swap 10 WETH for DAI...");
-
-        address[] memory path = new address[](2);
-        path[0] = WETH_ADDRESS;
-        path[1] = DAI_ADDRESS;
-         
-        vm.startPrank(userEOA);
-        WETH.approve(address(router), 10e18);
-        router.swapExactTokensForTokens({
-            amountIn: 10e18,
-            amountOutMin: 20e18,
-            path: path,
-            to: userEOA,
-            deadline: block.timestamp
-        });
-
-        console.log("user dai:", DAI.balanceOf(userEOA));
-    }
-
     function testAtlasSwapIntentWithUniswapSearcher() public {
         // Swap 10 WETH for 20 DAI
         Condition[] memory conditions;
@@ -259,13 +234,9 @@ contract SwapIntentTest is BaseTest {
 
         // Searcher deploys the RFQ searcher contract (defined at bottom of this file)
         vm.startPrank(searcherOneEOA);
-        SimpleRFQSearcher rfqSearcher = new SimpleRFQSearcher(address(atlas));
+        UniswapIntentSearcher uniswapSearcher = new UniswapIntentSearcher(address(atlas));
         atlas.deposit{value: 1e18}(searcherOneEOA);
         vm.stopPrank();
-
-        // Give 20 DAI to RFQ searcher contract
-        deal(DAI_ADDRESS, address(rfqSearcher), swapIntent.amountUserBuys);
-        assertEq(DAI.balanceOf(address(rfqSearcher)), swapIntent.amountUserBuys, "Did not give enough DAI to searcher");
 
         // Input params for Atlas.metacall() - will be populated below
         ProtocolCall memory protocolCall = txBuilder.getProtocolCall();
@@ -300,7 +271,7 @@ contract SwapIntentTest is BaseTest {
 
         // Build searcher calldata (function selector on searcher contract and its params)
         bytes memory searcherCallData = abi.encodeWithSelector(
-            SimpleRFQSearcher.fulfillRFQ.selector, 
+            UniswapIntentSearcher.fulfillWithSwap.selector, 
             swapIntent,
             executionEnvironment
         );
@@ -311,7 +282,7 @@ contract SwapIntentTest is BaseTest {
             protocolCall: protocolCall,
             searcherCallData: searcherCallData,
             searcherEOA: searcherOneEOA,
-            searcherContract: address(rfqSearcher),
+            searcherContract: address(uniswapSearcher),
             bidAmount: 1e18
         });
 
@@ -339,8 +310,8 @@ contract SwapIntentTest is BaseTest {
         console.log("\nBEFORE METACALL");
         console.log("User WETH balance", WETH.balanceOf(userEOA));
         console.log("User DAI balance", DAI.balanceOf(userEOA));
-        console.log("Searcher WETH balance", WETH.balanceOf(address(rfqSearcher)));
-        console.log("Searcher DAI balance", DAI.balanceOf(address(rfqSearcher)));
+        console.log("Searcher WETH balance", WETH.balanceOf(address(uniswapSearcher)));
+        console.log("Searcher DAI balance", DAI.balanceOf(address(uniswapSearcher)));
 
         vm.startPrank(userEOA);
         
@@ -350,6 +321,9 @@ contract SwapIntentTest is BaseTest {
 
         assertTrue(atlas.testUserCall(userCall), "UserCall tested true");
         assertTrue(atlas.testUserCall(userCall.metaTx), "UserMetaTx tested true");
+
+        // Check searcher does NOT have DAI - it must use Uniswap to get it during metacall
+        assertEq(DAI.balanceOf(address(uniswapSearcher)), 0, "Searcher has DAI before metacall");
 
 
         // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
@@ -364,8 +338,8 @@ contract SwapIntentTest is BaseTest {
         console.log("\nAFTER METACALL");
         console.log("User WETH balance", WETH.balanceOf(userEOA));
         console.log("User DAI balance", DAI.balanceOf(userEOA));
-        console.log("Searcher WETH balance", WETH.balanceOf(address(rfqSearcher)));
-        console.log("Searcher DAI balance", DAI.balanceOf(address(rfqSearcher)));
+        console.log("Searcher WETH balance", WETH.balanceOf(address(uniswapSearcher)));
+        console.log("Searcher DAI balance", DAI.balanceOf(address(uniswapSearcher)));
 
         // Check user token balances after
         assertEq(WETH.balanceOf(userEOA), userWethBalanceBefore - swapIntent.amountUserSells, "Did not spend enough WETH");
@@ -392,15 +366,32 @@ contract SimpleRFQSearcher is SearcherBase {
 }
 
 contract UniswapIntentSearcher is SearcherBase {
+    IUniV2Router02 router = IUniV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
+
     constructor(address atlas) SearcherBase(atlas, msg.sender) {}
 
     function fulfillWithSwap(
         SwapIntent calldata swapIntent,
         address executionEnvironment
     ) public onlySelf {
-        // TODO Swap user's sold tokens through Uniswap
+        // Checks recieved expected tokens from Atlas on behalf of user to swap
         require(ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells, "Did not receive enough tokenIn");
-        require(ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys, "Not enough tokenOut to fulfill");
+
+        address[] memory path = new address[](2);
+        path[0] = swapIntent.tokenUserSells;
+        path[1] = swapIntent.tokenUserBuys;
+
+        // Attempt to sell all tokens for as many as possible of tokenUserBuys
+        ERC20(swapIntent.tokenUserSells).approve(address(router), swapIntent.amountUserSells);
+        router.swapExactTokensForTokens({
+            amountIn: swapIntent.amountUserSells,
+            amountOutMin: swapIntent.amountUserBuys, // will revert here if not enough to fulfill intent
+            path: path,
+            to: address(this),
+            deadline: block.timestamp
+        });
+
+        // Send min tokens back to user to fulfill intent, rest are profit for searcher
         ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
     }
 
