@@ -30,6 +30,17 @@ import {SearcherBase} from "../src/contracts/searcher/SearcherBase.sol";
 // To Understand Better:
 // 1. The lock system (and look for any gas optimizations / ways to reduce lock actions)
 
+
+interface IUniV2Router02 {
+    function swapExactTokensForTokens(
+        uint amountIn,
+        uint amountOutMin,
+        address[] calldata path,
+        address to,
+        uint deadline
+    ) external returns (uint[] memory amounts);
+}
+
 contract SwapIntentTest is BaseTest {
     SwapIntentController public swapIntentController;
     TxBuilder public txBuilder;
@@ -205,6 +216,31 @@ contract SwapIntentTest is BaseTest {
         // Check user token balances after
         assertEq(WETH.balanceOf(userEOA), userWethBalanceBefore - swapIntent.amountUserSells, "Did not spend enough WETH");
         assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + swapIntent.amountUserBuys, "Did not receive enough DAI");
+    }
+
+    // TODO delete this and move to searcher
+    function testUniswapGG() public {
+
+        IUniV2Router02 router = IUniV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
+
+        console.log("user dai:", DAI.balanceOf(userEOA));
+        console.log("attempting to swap 10 WETH for DAI...");
+
+        address[] memory path = new address[](2);
+        path[0] = WETH_ADDRESS;
+        path[1] = DAI_ADDRESS;
+         
+        vm.startPrank(userEOA);
+        WETH.approve(address(router), 10e18);
+        router.swapExactTokensForTokens({
+            amountIn: 10e18,
+            amountOutMin: 20e18,
+            path: path,
+            to: userEOA,
+            deadline: block.timestamp
+        });
+
+        console.log("user dai:", DAI.balanceOf(userEOA));
     }
 
     function testAtlasSwapIntentWithUniswapSearcher() public {
