@@ -7,7 +7,7 @@ interface IProtocolControl {
 
     function validateUserCall(UserMetaTx calldata userMetaTx) external view returns (bool);
 
-    function stagingCall(address to, address from, bytes4 userSelector, bytes calldata userData)
+    function stagingCall(UserMetaTx calldata userMetaTx)
         external
         returns (bytes memory);
 
@@ -27,7 +27,9 @@ interface IProtocolControl {
     
     function getPayeeData(bytes calldata data) external returns (PayeeData[] memory);
 
-    function getBidFormat(bytes calldata data) external returns (BidData[] memory);
+    function getBidFormat(UserMetaTx calldata userMetaTx) external view returns (BidData[] memory);
+
+    function getBidValue(SearcherCall calldata searcherCall) external view returns (uint256);
 
     function getProtocolSignatory() external view returns (address governanceAddress);
 

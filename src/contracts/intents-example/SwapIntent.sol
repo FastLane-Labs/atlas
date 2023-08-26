@@ -112,16 +112,20 @@ contract SwapIntentController is ProtocolControl {
         require(ERC20(swapIntent.tokenUserSells).balanceOf(_user()) >= swapIntent.amountUserSells, "ERR-PI020 InsufficientUserBalance");
     }
 
-    function _stagingCall(address to, address, bytes4 userSelector, bytes calldata userData)
+    //////////////////////////////////
+    //   ATLAS OVERRIDE FUNCTIONS   //
+    //////////////////////////////////
+
+    function _stagingCall(UserMetaTx calldata userMetaTx)
         internal
         override
         returns (bytes memory)
     {
-        require(userSelector == this.swap.selector, "ERR-PI001 InvalidSelector");
-        require(to == control, "ERR-PI006 InvalidUserTo");
+        require(bytes4(userMetaTx.data) == this.swap.selector, "ERR-PI001 InvalidSelector");
+        require(userMetaTx.to == control, "ERR-PI006 InvalidUserTo");
 
         // This protocol control currently requires all 
-        SwapIntent memory swapIntent = abi.decode(userData, (SwapIntent));
+        SwapIntent memory swapIntent = abi.decode(userMetaTx.data[4:], (SwapIntent));
 
         // There should never be a balance on this ExecutionEnvironment greater than 1, but check
         // anyway so that the auction accounting isn't imbalanced by unexpected inventory. 
@@ -305,19 +309,30 @@ contract SwapIntentController is ProtocolControl {
         return payeeData;
     }
 
-    function getBidFormat(bytes calldata) external pure override returns (BidData[] memory) {
+    function getBidFormat(UserMetaTx calldata userMetaTx) external pure override returns (BidData[] memory) {
         // This is a helper function called by searchers
         // so that they can get the proper format for
         // submitting their bids to the hook.
 
+        (SwapIntent memory swapIntent) = abi.decode(userMetaTx.data[4:], (SwapIntent));
+    
         BidData[] memory bidData = new BidData[](1);
 
         bidData[0] = BidData({
-            token: address(0), // <-- ETH
+            token: swapIntent.auctionBaseCurrency, 
             bidAmount: 0 // <- searcher must update
         });
 
         return bidData;
+    }
+
+    function getBidValue(SearcherCall calldata searcherCall)
+        external
+        pure
+        override
+        returns (uint256) 
+    {
+        return searcherCall.bids[0].bidAmount;
     }
 
     // NOTE: This helper function is still delegatecalled inside of the execution environment

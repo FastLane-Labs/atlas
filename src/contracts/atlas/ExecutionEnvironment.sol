@@ -61,18 +61,18 @@ contract ExecutionEnvironment is Test {
     //////////////////////////////////
     ///    CORE CALL FUNCTIONS     ///
     //////////////////////////////////
-    function stagingWrapper(UserMetaTx calldata userCall)
+    function stagingWrapper(UserMetaTx calldata userMetaTx)
         external
         returns (bytes memory)
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 
-        require(msg.sender == atlas && userCall.from == _user(), "ERR-CE00 InvalidSenderStaging");
-        require(userCall.to != address(this), "ERR-EV008 InvalidTo");
+        require(msg.sender == atlas && userMetaTx.from == _user(), "ERR-CE00 InvalidSenderStaging");
+        require(userMetaTx.to != address(this), "ERR-EV008 InvalidTo");
 
         bytes memory stagingData = abi.encodeWithSelector(
-            IProtocolControl.stagingCall.selector, userCall.to, userCall.from, bytes4(userCall.data), userCall.data[4:]
+            IProtocolControl.stagingCall.selector, userMetaTx
         );
 
 

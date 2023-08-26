@@ -44,17 +44,19 @@ contract MainTest is BaseTest {
         userCall.signature = abi.encodePacked(r, s, v);
 
         SearcherCall[] memory searcherCalls = new SearcherCall[](2);
-
+        bytes memory searcherCallData;
         // First SearcherCall
+        searcherCallData = helper.buildV2SearcherCallData(POOL_TWO, POOL_ONE);
         searcherCalls[0] =
-            helper.buildSearcherCall(userCall, protocolCall, searcherOneEOA, address(searcherOne), POOL_ONE, POOL_TWO, 2e17);
+            helper.buildSearcherCall(userCall, protocolCall, searcherCallData, searcherOneEOA, address(searcherOne), 2e17);
 
         (v, r, s) = vm.sign(searcherOnePK, IAtlas(address(atlas)).getSearcherPayload(searcherCalls[0].metaTx));
         searcherCalls[0].signature = abi.encodePacked(r, s, v);
 
         // Second SearcherCall
+        searcherCallData = helper.buildV2SearcherCallData(POOL_ONE, POOL_TWO);
         searcherCalls[1] =
-            helper.buildSearcherCall(userCall, protocolCall, searcherTwoEOA, address(searcherTwo), POOL_TWO, POOL_ONE, 1e17);
+            helper.buildSearcherCall(userCall, protocolCall, searcherCallData, searcherTwoEOA, address(searcherTwo), 1e17);
 
         (v, r, s) = vm.sign(searcherTwoPK, IAtlas(address(atlas)).getSearcherPayload(searcherCalls[1].metaTx));
         searcherCalls[1].signature = abi.encodePacked(r, s, v);

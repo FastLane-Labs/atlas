@@ -105,14 +105,14 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         _;
     }
 
-    function stagingCall(address to, address from, bytes4 userSelector, bytes calldata userData)
+    function stagingCall(UserMetaTx calldata userMetaTx)
         external
         mustBeDelegated
         onlyApprovedDelegateCaller
         validControl
         returns (bytes memory)
     {
-        return _stagingCall(to, from, userSelector, userData);
+        return _stagingCall(userMetaTx);
     }
 
     function userLocalCall(bytes calldata data) 

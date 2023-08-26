@@ -14,8 +14,7 @@ import {CallBits} from "../libraries/CallBits.sol";
 import "forge-std/Test.sol";
 
 contract Atlas is Test, Factory {
-    using CallVerification for CallChainProof;
-    using CallVerification for bytes32[];
+    using CallVerification for UserMetaTx;
     using CallBits for uint16;
 
     constructor(uint32 _escrowDuration) Factory(_escrowDuration) {}
@@ -90,22 +89,21 @@ contract Atlas is Test, Factory {
 
     function execute(
         ProtocolCall calldata protocolCall,
-        UserMetaTx calldata userCall,
+        UserMetaTx calldata userMetaTx,
         SearcherCall[] calldata searcherCalls,
         address environment,
         bytes32 callChainHash
     ) external payable returns (uint256 accruedGasRebate) {
         // This is a self.call made externally so that it can be used with try/catch
         require(msg.sender == address(this), "ERR-F06 InvalidAccess");
-
+        {
+        require(callChainHash == CallVerification.getCallChainHash(protocolCall, userMetaTx, searcherCalls), "ERR-F07 InvalidSequence");
+        }
         // Initialize the locks
         _initializeEscrowLocks(protocolCall, environment, uint8(searcherCalls.length));
 
         // Begin execution
-        bytes32 callChainHashHead = _execute(protocolCall, userCall, searcherCalls, environment);
-
-        // Verify that the meta transactions were executed in the correct sequence
-        require(callChainHashHead == callChainHash, "ERR-F05 InvalidCallChain");
+        _execute(protocolCall, userMetaTx, searcherCalls, environment);
 
         accruedGasRebate = _getAccruedGasRebate();
 
@@ -115,27 +113,23 @@ contract Atlas is Test, Factory {
 
     function _execute(
         ProtocolCall calldata protocolCall,
-        UserMetaTx calldata userCall,
+        UserMetaTx calldata userMetaTx,
         SearcherCall[] calldata searcherCalls,
         address environment
-    ) internal returns (bytes32) {
+    ) internal {
         // Build the CallChainProof.  The penultimate hash will be used
         // to verify against the hash supplied by ProtocolControl
-        CallChainProof memory proof = CallVerification.initializeProof(protocolCall, userCall);
-        bytes32 userCallHash = keccak256(abi.encodePacked(userCall.to, userCall.data));
+       
+        bytes32 userCallHash = userMetaTx.getUserCallHash();
 
-        bytes memory stagingReturnData = _executeStagingCall(protocolCall, userCall, environment);
+        bytes memory stagingReturnData = _executeStagingCall(protocolCall, userMetaTx, environment);
 
-        proof = proof.next(userCall.from, userCall.data);
-
-        bytes memory userReturnData = _executeUserCall(userCall, environment);
+        bytes memory userReturnData = _executeUserCall(userMetaTx, environment);
 
         uint256 i;
         bool auctionWon;
 
         for (; i < searcherCalls.length;) {
-
-            proof = proof.next(searcherCalls[i].metaTx.from, searcherCalls[i].metaTx.data);
 
             // Only execute searcher meta tx if userCallHash matches 
             if (userCallHash == searcherCalls[i].metaTx.userCallHash) {
@@ -160,8 +154,6 @@ contract Atlas is Test, Factory {
         }
 
         _executeVerificationCall(protocolCall, stagingReturnData, userReturnData, environment);
-        
-        return proof.targetHash;
     }
 
     function _searcherExecutionIteration(

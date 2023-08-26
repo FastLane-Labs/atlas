@@ -66,6 +66,14 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         nextNonce = uint256(_escrowData[searcherMetaTxSigner].nonce) + 1;
     }
 
+    function searcherEscrowBalance(address searcherMetaTxSigner) external view returns (uint256 balance) {
+        balance = uint256(_escrowData[searcherMetaTxSigner].total);
+    }
+
+    function searcherLastActiveBlock(address searcherMetaTxSigner) external view returns (uint256 lastBlock) {
+        lastBlock = uint256(_escrowData[searcherMetaTxSigner].lastAccessed);
+    }
+
     ///////////////////////////////////////////////////
     /// EXTERNAL FUNCTIONS FOR BUNDLER INTERACTION  ///
     ///////////////////////////////////////////////////
@@ -133,18 +141,18 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     ///////////////////////////////////////////////////
     function _executeStagingCall(
         ProtocolCall calldata protocolCall,
-        UserMetaTx calldata userCall,
+        UserMetaTx calldata userMetaTx,
         address environment
     ) internal stagingLock(protocolCall, environment) returns (bytes memory stagingReturnData) {
-        stagingReturnData = IExecutionEnvironment(environment).stagingWrapper{value: msg.value}(userCall);
+        stagingReturnData = IExecutionEnvironment(environment).stagingWrapper{value: msg.value}(userMetaTx);
     }
 
-    function _executeUserCall(UserMetaTx calldata userCall, address environment)
+    function _executeUserCall(UserMetaTx calldata userMetaTx, address environment)
         internal
-        userLock(userCall, environment)
+        userLock(userMetaTx, environment)
         returns (bytes memory userReturnData)
     {
-        userReturnData = IExecutionEnvironment(environment).userWrapper(userCall);
+        userReturnData = IExecutionEnvironment(environment).userWrapper(userMetaTx);
     }
 
     function _executeSearcherCall(

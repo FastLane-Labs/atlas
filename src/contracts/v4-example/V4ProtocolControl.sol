@@ -89,7 +89,7 @@ contract V4ProtocolControl is ProtocolControl {
     /////////////////////////////////////////////////////////
 
     /////////////// DELEGATED CALLS //////////////////
-    function _stagingCall(address to, address from, bytes4 userSelector, bytes calldata userData)
+    function _stagingCall(UserMetaTx calldata userMetaTx)
         internal
         override
         returns (bytes memory stagingData)
@@ -101,11 +101,9 @@ contract V4ProtocolControl is ProtocolControl {
 
         require(!_currentKey.initialized, "ERR-H09 AlreadyInitialized");
 
-        require(userSelector == SWAP, "ERR-H10 InvalidFunction");
+        require(bytes4(userMetaTx.data) == SWAP, "ERR-H10 InvalidFunction");
 
-        UserMetaTx memory userCall = abi.decode(userData, (UserMetaTx));
-
-        require(to == v4Singleton, "ERR-H11 InvalidTo");
+        require(userMetaTx.to == v4Singleton, "ERR-H11 InvalidTo");
 
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that ProtocolControl supplied a valid signature
@@ -113,7 +111,7 @@ contract V4ProtocolControl is ProtocolControl {
 
 
         (IPoolManager.PoolKey memory key, IPoolManager.SwapParams memory params) =
-            abi.decode(userCall.data, (IPoolManager.PoolKey, IPoolManager.SwapParams));
+            abi.decode(userMetaTx.data[4:], (IPoolManager.PoolKey, IPoolManager.SwapParams));
 
         // Perform more checks and activate the lock
         V4ProtocolControl(hook).setLock(key);
@@ -143,7 +141,7 @@ contract V4ProtocolControl is ProtocolControl {
                 // ERC20(token0).approve(v4Singleton, amountSpecified);
                 SafeTransferLib.safeTransferFrom(
                     ERC20(IPoolManager.Currency.unwrap(key.currency0)),
-                    from,
+                    userMetaTx.from,
                     v4Singleton, // <- TODO: confirm
                     uint256(params.amountSpecified)
                 );
@@ -272,12 +270,13 @@ contract V4ProtocolControl is ProtocolControl {
         return payeeData;
     }
 
-    function getBidFormat(bytes calldata data) external pure override returns (BidData[] memory) {
+    function getBidFormat(UserMetaTx calldata userMetaTx) external pure override returns (BidData[] memory) {
         // This is a helper function called by searchers
         // so that they can get the proper format for
         // submitting their bids to the hook.
 
-        IPoolManager.PoolKey memory key = abi.decode(data, (IPoolManager.PoolKey));
+        (IPoolManager.PoolKey memory key,) =
+            abi.decode(userMetaTx.data, (IPoolManager.PoolKey, IPoolManager.SwapParams));
 
         BidData[] memory bidData = new BidData[](2);
 
@@ -292,5 +291,14 @@ contract V4ProtocolControl is ProtocolControl {
         });
 
         return bidData;
+    }
+
+    function getBidValue(SearcherCall calldata searcherCall)
+        external
+        pure
+        override
+        returns (uint256) 
+    {
+        return searcherCall.bids[0].bidAmount;
     }
 }

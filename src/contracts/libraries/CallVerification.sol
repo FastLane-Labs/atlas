@@ -7,135 +7,61 @@ import "../types/CallTypes.sol";
 import "../types/VerificationTypes.sol";
 
 library CallVerification {
-    function initializeProof(ProtocolCall calldata protocolCall, UserMetaTx calldata userCall)
-        internal
-        pure
-        returns (CallChainProof memory)
-    {
-        return CallChainProof({
-            previousHash: bytes32(0),
-            targetHash: keccak256(
+    function getUserCallHash(UserMetaTx calldata userMetaTx) internal pure returns (bytes32 userCallHash) {
+        userCallHash = keccak256(abi.encode(userMetaTx));
+    }
+
+    function getBidsHash(BidData[] calldata bidData) internal pure returns (bytes32 bidsHash) {
+        return keccak256(abi.encode(bidData));
+    }
+
+    function getBidsHashFromMem(BidData[] memory bidData) internal pure returns (bytes32 bidsHash) {
+        return keccak256(abi.encode(bidData));
+    }
+
+    function getCallChainHash(
+        ProtocolCall calldata protocolCall,
+        UserMetaTx calldata userMetaTx,
+        SearcherCall[] calldata searcherCalls
+    ) internal pure returns (bytes32 callSequenceHash) {
+        
+        uint256 i;
+        if (protocolCall.callConfig & 1 << uint16(CallConfig.CallStaging) != 0) {
+            // Start with staging call if staging is needed
+            callSequenceHash = keccak256(
                 abi.encodePacked(
-                    bytes32(0), // initial hash = null
+                    callSequenceHash, // initial hash = null
                     protocolCall.to,
                     abi.encodeWithSelector(
                         IProtocolControl.stagingCall.selector,
-                        userCall.to,
-                        userCall.from,
-                        bytes4(userCall.data),
-                        userCall.data[4:]
+                        userMetaTx
                     ),
-                    uint256(0)
+                    i++
                 )
-                ),
-            index: 0
-        });
-    }
-
-    function next(CallChainProof memory self, address from, bytes calldata data)
-        internal
-        pure
-        returns (CallChainProof memory)
-    {
-        self.previousHash = self.targetHash;
-        self.targetHash = keccak256(abi.encodePacked(self.previousHash, from, data, ++self.index));
-        return self;
-    }
-
-    function proveCD(CallChainProof calldata self, address from, bytes calldata data) internal pure returns (bool) {
-        return self.targetHash == keccak256(abi.encodePacked(self.previousHash, from, data, self.index));
-    }
-
-    function prove(CallChainProof calldata self, address from, bytes memory data) internal pure returns (bool) {
-        return self.targetHash == keccak256(abi.encodePacked(self.previousHash, from, data, self.index));
-    }
-
-    function addVerificationCallProof(
-        CallChainProof memory self,
-        address to,
-        bytes memory stagingReturnData,
-        bytes memory userReturnData
-    ) internal pure returns (CallChainProof memory) {
-        self.previousHash = self.targetHash;
-        self.targetHash = keccak256(
-            abi.encodePacked(
-                self.previousHash,
-                to,
-                abi.encodeWithSelector(IProtocolControl.verificationCall.selector, stagingReturnData, userReturnData),
-                ++self.index
-            )
-        );
-        return self;
-    }
-
-    function buildExecutionHashChain(
-        ProtocolCall calldata protocolCall, // supplied by frontend
-        UserCall calldata userCall,
-        SearcherCall[] calldata searcherCalls // supplied by FastLane via frontend integration
-    ) internal pure returns (bytes32[] memory executionHashChain) {
-        // build a memory array of hashes to verify execution ordering. Each bytes32
-        // is the hash of the calldata, a bool representing if its a delegatecall
-        // or standard call, and a uint256 representing its execution index
-        // order is:
-        //      0: stagingCall
-        //      1: userCall + keccak of prior
-        //      2 to n: searcherCalls + keccak of prior
-
-        // memory array
-        // NOTE: memory arrays are not accessible by delegatecall. This is a key
-        // security feature.
-        executionHashChain = new bytes32[](searcherCalls.length + 2);
-        uint256 i = 0; // array index
-
-        // Start with staging call
-        executionHashChain[0] = keccak256(
-            abi.encodePacked(
-                bytes32(0), // initial hash = null
-                protocolCall.to,
-                abi.encodeWithSelector(
-                    IProtocolControl.stagingCall.selector,
-                    userCall.metaTx.to,
-                    userCall.metaTx.from,
-                    bytes4(userCall.metaTx.data),
-                    userCall.metaTx.data[4:]
-                ),
-                i
-            )
-        );
-        unchecked {
-            ++i;
+            );
         }
 
         // then user call
-        executionHashChain[1] = keccak256(
+        callSequenceHash = keccak256(
             abi.encodePacked(
-                executionHashChain[0], // always reference previous hash
-                userCall.metaTx.from,
-                userCall.metaTx.data,
-                i
+                callSequenceHash, // always reference previous hash
+                abi.encode(userMetaTx),
+                i++
             )
         );
-        unchecked {
-            ++i;
-        }
 
-        // i = 2 when starting searcher loop
-        for (; i < executionHashChain.length;) {
-            executionHashChain[i] = keccak256(
+        // then searcher calls
+        uint256 count = searcherCalls.length;
+        uint256 n;
+        for (; n<count;) {
+            callSequenceHash = keccak256(
                 abi.encodePacked(
-                    executionHashChain[i - 1], // reference previous hash
-                    searcherCalls[i - 2].metaTx.from, // searcher smart contract
-                    searcherCalls[i - 2].metaTx.data, // searcher calls start at 2
-                    i
+                    callSequenceHash, // reference previous hash
+                    abi.encode(searcherCalls[n].metaTx), // searcher call
+                    i++
                 )
             );
-            unchecked {
-                ++i;
-            }
+            unchecked {++n;}
         }
-        // NOTE: We do not have a way to confirm the verification input calldata
-        // because it is dependent on the outcome of the staging and user calls
-        // but it can be updated once those become known, which is AFTER the
-        // staging and user calls but BEFORE the searcher calls.
     }
 }
