@@ -9,86 +9,49 @@ import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
 import {UserMetaTx, ProtocolCall, SearcherCall, BidData} from "../types/CallTypes.sol";
 
+import {Base} from "../protocol/ExecutionBase.sol";
+
 import {CallVerification} from "../libraries/CallVerification.sol";
 import {CallBits} from "../libraries/CallBits.sol";
 
-import "forge-std/Test.sol";
+// import "forge-std/Test.sol";
 
 import {
-    ALTERED_USER_HASH,
-    SEARCHER_CALL_REVERTED,
-    SEARCHER_MSG_VALUE_UNPAID,
-    SEARCHER_FAILED_CALLBACK,
-    SEARCHER_BID_UNPAID,
-    INTENT_UNFULFILLED,
-    SEARCHER_STAGING_FAILED
+    FastLaneErrorsEvents
 } from "./Emissions.sol";
 
-contract ExecutionEnvironment is Test {
+contract ExecutionEnvironment is Base {
     using CallBits for uint16;
 
-    address public immutable atlas;
 
-    constructor(address _atlas) {
-        atlas = _atlas;
-    }
-
-    // MIMIC INTERACTION FUNCTIONS
-    function _controlCodeHash() internal pure returns (bytes32 controlCodeHash) {
-        assembly {
-            controlCodeHash := calldataload(sub(calldatasize(), 32))
-        }
-    }
-
-    function _config() internal pure returns (uint16 config) {
-        assembly {
-            config := shr(240, calldataload(sub(calldatasize(), 34)))
-        }
-    }
-
-    function _control() internal pure returns (address control) {
-        assembly {
-            control := shr(96, calldataload(sub(calldatasize(), 54)))
-        }
-    }
-
-    function _user() internal pure returns (address user) {
-        assembly {
-            user := shr(96, calldataload(sub(calldatasize(), 74)))
-        }
-    }
+    constructor(address _atlas) Base(_atlas) {}
 
     //////////////////////////////////
     ///    CORE CALL FUNCTIONS     ///
     //////////////////////////////////
-    function stagingWrapper(UserMetaTx calldata userCall)
+    function stagingWrapper(UserMetaTx calldata userMetaTx)
         external
         returns (bytes memory)
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 
-        require(msg.sender == atlas && userCall.from == _user(), "ERR-CE00 InvalidSenderStaging");
-        require(userCall.to != address(this), "ERR-EV008 InvalidTo");
+        require(msg.sender == atlas && userMetaTx.from == _user(), "ERR-CE00 InvalidSenderStaging");
+        require(userMetaTx.to != address(this), "ERR-EV008 InvalidTo");
 
         bytes memory stagingData = abi.encodeWithSelector(
-            IProtocolControl.stagingCall.selector, userCall.to, userCall.from, bytes4(userCall.data), userCall.data[4:]
+            IProtocolControl.stagingCall.selector, userMetaTx
         );
 
-
-        (bool success, bytes memory stagingReturnData) = _control().delegatecall(
-            abi.encodePacked(
-                stagingData,
-                _user(),
-                _control(),
-                _config(),
-                _controlCodeHash()
-            )
+        bool success;
+        (success, stagingData) = _control().delegatecall(
+            forward(stagingData)
         );
 
         require(success, "ERR-EC02 DelegateRevert");
 
-        return abi.decode(stagingReturnData, (bytes));
+        stagingData = abi.decode(stagingData, (bytes));
+        return stagingData;
     }
 
     function userWrapper(UserMetaTx calldata userCall) external payable returns (bytes memory userData) {
@@ -107,13 +70,7 @@ contract ExecutionEnvironment is Test {
         // regular user call - executed at regular destination and not performed locally
         if (!config.needsLocalUser()) {
             (success, userData) = userCall.to.call{value: userCall.value}(
-                abi.encodePacked(
-                    userCall.data,
-                    user,
-                    _control(),
-                    config,
-                    _controlCodeHash()
-                )
+                forward(userCall.data)
             );
             require(success, "ERR-EC04a CallRevert");
 
@@ -124,15 +81,8 @@ contract ExecutionEnvironment is Test {
                     IProtocolControl.userLocalCall.selector, userCall.data
                 );
 
-                userData = abi.encodePacked(
-                    userData,
-                    user,
-                    _control(),
-                    config,
-                    _controlCodeHash()
-                );
+                (success, userData) = _control().delegatecall(forward(userData));
 
-                (success, userData) = _control().delegatecall(userData);
                 require(success, "ERR-EC02 DelegateRevert");
             } else {
                 revert("ERR-P02 UserCallStatic");
@@ -148,15 +98,10 @@ contract ExecutionEnvironment is Test {
         // address(this) = ExecutionEnvironment
         require(msg.sender == atlas, "ERR-CE00 InvalidSenderStaging");
 
-        bytes memory data = abi.encodePacked(
-            abi.encodeWithSelector(IProtocolControl.verificationCall.selector, stagingReturnData, userReturnData),
-            _user(),
-            _control(),
-            _config(),
-            _controlCodeHash()
-        );
+        bytes memory data = abi.encodeWithSelector(
+            IProtocolControl.verificationCall.selector, stagingReturnData, userReturnData);
 
-        (bool success, bytes memory returnData) = _control().delegatecall(data);
+        (bool success, bytes memory returnData) = _control().delegatecall(forward(data));
 
         require(success, "ERR-EC02 DelegateRevert");
         require(abi.decode(returnData, (bool)), "ERR-EC03a DelegateUnsuccessful");
@@ -196,32 +141,33 @@ contract ExecutionEnvironment is Test {
         ////////////////////////////
 
         // Verify that the ProtocolControl contract matches the searcher's expectations
-        require(searcherCall.metaTx.controlCodeHash == _controlCodeHash(), ALTERED_USER_HASH);
+        if(searcherCall.metaTx.controlCodeHash != _controlCodeHash()) {
+            revert FastLaneErrorsEvents.AlteredControlHash();
+        }
+
         bool success;
 
         // Handle any searcher staging, if necessary
         if (_config().needsSearcherStaging()) {
 
-            //bytes memory data = abi.encode(searcherCall.metaTx.to, stagingReturnData);
+            bytes memory data = abi.encode(searcherCall.metaTx.to, stagingReturnData);
 
-            bytes memory data = abi.encodeWithSelector(
+            data = abi.encodeWithSelector(
                 IProtocolControl.searcherPreCall.selector, 
-                abi.encode(searcherCall.metaTx.to, stagingReturnData)
+                data
             );
 
             (success, data) = _control().delegatecall(
-                abi.encodePacked(
-                    data,
-                    _user(),
-                    _control(),
-                    _config(),
-                    _controlCodeHash()
-                )
+                forward(data)
             );
-            require(success, SEARCHER_STAGING_FAILED);
+            if(!success) {
+                revert FastLaneErrorsEvents.SearcherStagingFailed();
+            } 
 
             success = abi.decode(data, (bool));
-            require(success, SEARCHER_STAGING_FAILED);
+            if(!success) {
+                revert FastLaneErrorsEvents.SearcherStagingFailed();
+            } 
         }
 
         // Execute the searcher call.
@@ -231,8 +177,9 @@ contract ExecutionEnvironment is Test {
         }(searcherCall.metaTx.from, searcherCall.metaTx.data, searcherCall.bids);
 
         // Verify that it was successful
-        require(success, SEARCHER_CALL_REVERTED);
-        require(ISafetyLocks(atlas).confirmSafetyCallback(), SEARCHER_FAILED_CALLBACK);
+        if(!success) {
+            revert FastLaneErrorsEvents.SearcherCallReverted();
+        } 
 
         // If this was a user intent, handle and verify fulfillment
         if (_config().needsSearcherPostCall()) {
@@ -248,18 +195,16 @@ contract ExecutionEnvironment is Test {
             );
 
             (success, data) = _control().delegatecall(
-                abi.encodePacked(
-                    data,
-                    _user(),
-                    _control(),
-                    _config(),
-                    _controlCodeHash()
-                )
+                forward(data)
             );
-            require(success, INTENT_UNFULFILLED);
+            if(!success) {
+                revert FastLaneErrorsEvents.SearcherVerificationFailed();
+            } 
 
             success = abi.decode(data, (bool));
-            require(success, INTENT_UNFULFILLED);
+            if(!success) {
+                revert FastLaneErrorsEvents.IntentUnfulfilled();
+            }
         }
 
 
@@ -272,16 +217,17 @@ contract ExecutionEnvironment is Test {
             // ERC20 tokens as bid currency
             if (!(searcherCall.bids[i].token == address(0))) {
                 balance = ERC20(searcherCall.bids[i].token).balanceOf(address(this));
-                require(balance >= tokenBalances[i] + searcherCall.bids[i].bidAmount, SEARCHER_BID_UNPAID);
+                if (balance < tokenBalances[i] + searcherCall.bids[i].bidAmount) {
+                    revert FastLaneErrorsEvents.SearcherBidUnpaid();
+                }
 
                 // Native Gas (Ether) as bid currency
             } else {
                 balance = address(this).balance;
-                require(
-                    balance >= searcherCall.bids[i].bidAmount, // tokenBalances[i] = 0 for ether
-                    SEARCHER_BID_UNPAID
-                );
-
+                if (balance < searcherCall.bids[i].bidAmount) { // tokenBalances[i] = 0 for ether
+                    revert FastLaneErrorsEvents.SearcherBidUnpaid();
+                }
+        
                 etherIsBidToken = true;
 
                 // Transfer any surplus Ether back to escrow to add to searcher's balance
@@ -302,7 +248,11 @@ contract ExecutionEnvironment is Test {
         }
 
         // Verify that the searcher repaid their msg.value
-        require(atlas.balance >= escrowBalance, SEARCHER_MSG_VALUE_UNPAID);
+        // TODO: Add in a more discerning func that'll silo the 
+        // donations to prevent double counting. 
+        if (atlas.balance < escrowBalance) {
+            revert FastLaneErrorsEvents.SearcherMsgValueUnpaid();
+        }
     }
 
     function allocateRewards(BidData[] calldata bids, bytes memory stagingReturnData) external {
@@ -335,15 +285,7 @@ contract ExecutionEnvironment is Test {
 
         bytes memory allocateData = abi.encodeWithSelector(IProtocolControl.allocatingCall.selector, abi.encode(totalEtherReward, bids, stagingReturnData));
 
-        allocateData = abi.encodePacked(
-            allocateData,
-            _user(),
-            _control(),
-            _config(),
-            _controlCodeHash()
-        );
-
-        (bool success,) = _control().delegatecall(allocateData);
+        (bool success,) = _control().delegatecall(forward(allocateData));
         require(success, "ERR-EC02 DelegateRevert");
     }
 
@@ -371,15 +313,10 @@ contract ExecutionEnvironment is Test {
             return false;
         }
 
-        bytes memory data = abi.encodePacked(
-            abi.encodeWithSelector(IProtocolControl.validateUserCall.selector, userMetaTx),
-            _user(),
-            _control(),
-            _config(),
-            _controlCodeHash()
-        );
+        bytes memory data = abi.encodeWithSelector(
+            IProtocolControl.validateUserCall.selector, userMetaTx);
 
-        (bool success, bytes memory returnData) = _control().delegatecall(data);
+        (bool success, bytes memory returnData) = _control().delegatecall(forward(data));
 
         if (!success) {
             return false;

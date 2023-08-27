@@ -37,6 +37,7 @@ enum SearcherOutcome
     // no user refund (relay error or hostile user)
     InvalidSignature,
     InvalidUserHash,
+    InvalidControlHash,
     InvalidBidsHash,
     InvalidSequencing,
     GasPriceOverCap,

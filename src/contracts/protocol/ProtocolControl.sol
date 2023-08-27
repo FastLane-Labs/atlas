@@ -46,7 +46,7 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         bool _userBundler,
         bool _protocolBundler,
         bool _unknownBundler
-    ) {
+    ) ExecutionBase(_escrow) {
 
         control = address(this);
 
@@ -88,31 +88,26 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         _;
     }
 
-    modifier onlyApprovedStandardCaller() {
-        require(msg.sender == ISafetyLocks(escrow).approvedCaller(), "ERR-PC061 InvalidCaller");
-        _;
-    }
-
     modifier onlyApprovedCaller(bool isDelegated) {
         if (isDelegated) {
             require(msg.sender == escrow, "ERR-PC060 InvalidCaller");
             require(address(this) != control, "ERR-PC051 MustBeDelegated");
         } else {
-            require(msg.sender == ISafetyLocks(escrow).approvedCaller(), "ERR-PC061 InvalidCaller");
+            require(msg.sender == ISafetyLocks(escrow).activeEnvironment(), "ERR-PC061 InvalidCaller");
             require(address(this) == control, "ERR-PC052 MustBeCalled");
         }
         require(control == _control(), "ERR-PC053 InvalidControl");
         _;
     }
 
-    function stagingCall(address to, address from, bytes4 userSelector, bytes calldata userData)
+    function stagingCall(UserMetaTx calldata userMetaTx)
         external
         mustBeDelegated
         onlyApprovedDelegateCaller
         validControl
         returns (bytes memory)
     {
-        return _stagingCall(to, from, userSelector, userData);
+        return _stagingCall(userMetaTx);
     }
 
     function userLocalCall(bytes calldata data) 

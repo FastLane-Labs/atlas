@@ -91,21 +91,21 @@ contract V2ProtocolControl is ProtocolControl {
     )
     */
 
-    function _stagingCall(address to, address, bytes4 userSelector, bytes calldata userData)
+    function _stagingCall(UserMetaTx calldata userMetaTx)
         internal
         override
         returns (bytes memory)
     {
-        require(userSelector == SWAP, "ERR-H10 InvalidFunction");
+        require(bytes4(userMetaTx.data) == SWAP, "ERR-H10 InvalidFunction");
 
         (
             uint256 amount0Out,
             uint256 amount1Out,
             , // address recipient // Unused
                 // bytes memory swapData // Unused
-        ) = abi.decode(userData, (uint256, uint256, address, bytes));
+        ) = abi.decode(userMetaTx.data[4:], (uint256, uint256, address, bytes));
 
-        (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(to).getReserves();
+        (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(userMetaTx.to).getReserves();
 
         uint256 amount0In =
             amount1Out == 0 ? 0 : SwapMath.getAmountIn(amount1Out, uint256(token0Balance), uint256(token1Balance));
@@ -116,8 +116,8 @@ contract V2ProtocolControl is ProtocolControl {
         // This is a V2 swap, so optimistically transfer the tokens
         // NOTE: The user should have approved the ExecutionEnvironment for token transfers
         _transferUserERC20(
-            amount0Out > amount1Out ? IUniswapV2Pair(to).token1() : IUniswapV2Pair(to).token0(),
-            to, 
+            amount0Out > amount1Out ? IUniswapV2Pair(userMetaTx.to).token1() : IUniswapV2Pair(userMetaTx.to).token0(),
+            userMetaTx.to, 
             amount0In > amount1In ? amount0In : amount1In
         );
 
@@ -206,7 +206,7 @@ contract V2ProtocolControl is ProtocolControl {
         return payeeData;
     }
 
-    function getBidFormat(bytes calldata) external pure override returns (BidData[] memory) {
+    function getBidFormat(UserMetaTx calldata) external pure override returns (BidData[] memory) {
         // This is a helper function called by searchers
         // so that they can get the proper format for
         // submitting their bids to the hook.
@@ -220,4 +220,15 @@ contract V2ProtocolControl is ProtocolControl {
 
         return bidData;
     }
+
+    function getBidValue(SearcherCall calldata searcherCall)
+        external
+        pure
+        override
+        returns (uint256) 
+    {
+        return searcherCall.bids[0].bidAmount;
+    }
+
+
 }

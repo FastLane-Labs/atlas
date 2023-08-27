@@ -40,7 +40,7 @@ abstract contract GovernanceControl {
     //
     // Protocol exposure: Trustless
     // User exposure: Trustless
-    function _stagingCall(address to, address from, bytes4 userSelector, bytes calldata userData)
+    function _stagingCall(UserMetaTx calldata userMetaTx)
         internal
         virtual
         returns (bytes memory);
@@ -187,7 +187,9 @@ abstract contract GovernanceControl {
         return true;
     }
 
-    function getPayeeData(bytes calldata data) external virtual returns (PayeeData[] memory);
+    function getPayeeData(bytes calldata data) external view virtual returns (PayeeData[] memory);
 
-    function getBidFormat(bytes calldata data) external virtual returns (BidData[] memory);
+    function getBidFormat(UserMetaTx calldata userMetaTx) external view virtual returns (BidData[] memory);
+
+    function getBidValue(SearcherCall calldata searcherCall) external view virtual returns (uint256);
 }

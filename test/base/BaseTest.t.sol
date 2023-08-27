@@ -7,6 +7,7 @@ import {IEscrow} from "../../src/contracts/interfaces/IEscrow.sol";
 import {IProtocolIntegration} from "../../src/contracts/interfaces/IProtocolIntegration.sol";
 
 import {Atlas} from "../../src/contracts/atlas/Atlas.sol";
+import {Sorter} from "../../src/contracts/atlas/Sorter.sol";
 
 import {Searcher} from "../searcher/src/TestSearcher.sol";
 
@@ -36,6 +37,8 @@ contract BaseTest is Test, TestConstants {
     Atlas public atlas;
     address public escrow;
 
+    Sorter public sorter;
+
     Searcher public searcherOne;
     Searcher public searcherTwo;
 
@@ -61,6 +64,7 @@ contract BaseTest is Test, TestConstants {
 
         atlas = new Atlas(64);
         escrow = atlas.getEscrowAddress();
+        sorter = new Sorter(address(atlas), escrow);
 
         vm.stopPrank();
         vm.startPrank(governanceEOA);

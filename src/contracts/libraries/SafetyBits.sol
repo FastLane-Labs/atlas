@@ -199,6 +199,12 @@ library SafetyBits {
         return self;
     }
 
+    function allocationComplete(EscrowKey memory self) internal pure returns (EscrowKey memory) {
+        self.makingPayments = false;
+        self.paymentsComplete = true;
+        return self;
+    }
+
     function isValidPaymentsLock(EscrowKey memory self, address caller) internal pure returns (bool) {
         return (
             (self.lockState == _LOCK_PAYMENTS) && (caller != address(0)) && (self.approvedCaller == caller)
@@ -251,9 +257,6 @@ library SafetyBits {
     function holdSearcherLock(EscrowKey memory self, address nextSearcher) internal pure returns (EscrowKey memory) {
         self.lockState = _LOCKED_X_SEARCHERS_X_REQUESTED;
         self.approvedCaller = nextSearcher;
-        unchecked {
-            ++self.callIndex;
-        }
         return self;
     }
 

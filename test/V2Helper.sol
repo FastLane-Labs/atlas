@@ -55,22 +55,10 @@ contract V2Helper is Test, TestConstants, TxBuilder {
         data = abi.encodeWithSelector(IUniswapV2Pair.swap.selector, amount0Out, amount1Out, recipient, data);
     }
 
-    function buildSearcherCall(
-        UserCall memory userCall,
-        ProtocolCall memory protocolCall,
-        address searcherEOA,
-        address searcherContract,
+    function buildV2SearcherCallData(
         address poolOne,
-        address poolTwo,
-        uint256 bidAmount
-    ) public returns (SearcherCall memory searcherCall) {
-        return TxBuilder.buildSearcherCall(
-            userCall, 
-            protocolCall, 
-            abi.encodeWithSelector(BlindBackrun.executeArbitrage.selector, poolOne, poolTwo),
-            searcherEOA, 
-            searcherContract,  
-            bidAmount
-        );
+        address poolTwo
+    ) public pure returns (bytes memory data) {
+        data = abi.encodeWithSelector(BlindBackrun.executeArbitrage.selector, poolOne, poolTwo);
     }
 }

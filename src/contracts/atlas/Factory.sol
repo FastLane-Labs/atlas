@@ -52,6 +52,10 @@ contract Factory is Test, Escrow, Permit69 {
     */
 
     // GETTERS
+    function environment() public view override returns (address _environment) {
+        _environment = activeEnvironment;
+    }
+
     function getEscrowAddress() external view returns (address escrowAddress) {
         escrowAddress = atlas;
     }
@@ -80,9 +84,9 @@ contract Factory is Test, Escrow, Permit69 {
         internal
         view
         override
-        returns (address environment)
+        returns (address executionEnvironment)
     {
-        environment = address(
+        executionEnvironment = address(
             uint160(
                 uint256(
                     keccak256(
@@ -106,12 +110,12 @@ contract Factory is Test, Escrow, Permit69 {
 
     function _setExecutionEnvironment(ProtocolCall calldata protocolCall, address user, bytes32 controlCodeHash)
         internal
-        returns (address environment)
+        returns (address executionEnvironment)
     {
         bytes memory creationCode =
             _getMimicCreationCode(protocolCall.to, protocolCall.callConfig, execution, user, controlCodeHash);
 
-        environment = address(
+        executionEnvironment = address(
             uint160(
                 uint256(
                     keccak256(
@@ -126,20 +130,20 @@ contract Factory is Test, Escrow, Permit69 {
             )
         );
 
-        if (environment.codehash == bytes32(0)) {
+        if (executionEnvironment.codehash == bytes32(0)) {
             bytes32 memSalt = salt;
             assembly {
-                environment := create2(0, add(creationCode, 32), mload(creationCode), memSalt)
+                executionEnvironment := create2(0, add(creationCode, 32), mload(creationCode), memSalt)
             }
         }
     }
 
-    function _deployExecutionEnvironmentTemplate(address, ProtocolCall memory) internal returns (address environment) {
+    function _deployExecutionEnvironmentTemplate(address, ProtocolCall memory) internal returns (address executionEnvironment) {
         ExecutionEnvironment _environment = new ExecutionEnvironment{
             salt: salt
         }(atlas);
 
-        environment = address(_environment);
+        executionEnvironment = address(_environment);
     }
 
     function _getMimicCreationCode(
@@ -160,13 +164,5 @@ contract Factory is Test, Escrow, Permit69 {
             )
             mstore(add(creationCode, 176), controlCodeHash)
         }
-    }
-
-    function _getLockState() internal view override returns (EscrowKey memory) {
-        return _escrowKey;
-    }
-
-    function getLockState() external view returns (EscrowKey memory) {
-        return _escrowKey;
     }
 }

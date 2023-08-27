@@ -16,6 +16,9 @@ import {CallVerification} from "../libraries/CallVerification.sol";
 import "forge-std/Test.sol";
 
 contract TxBuilder {
+    using CallVerification for UserMetaTx;
+    using CallVerification for BidData[];
+
     address public immutable control;
     address public immutable escrow;
     address public immutable atlas;
@@ -39,9 +42,8 @@ contract TxBuilder {
         return IProtocolControl(control).getProtocolCall();
     }
 
-    function getBidData(uint256 amount) public returns (BidData[] memory bids) {
-        bytes memory nullData;
-        bids = IProtocolControl(control).getBidFormat(nullData);
+    function getBidData(UserMetaTx calldata userMetaTx, uint256 amount) public view returns (BidData[] memory bids) {
+        bids = IProtocolControl(control).getBidFormat(userMetaTx);
         bids[0].bidAmount = amount;
     }
 
@@ -79,15 +81,15 @@ contract TxBuilder {
     }
 
     function buildSearcherCall(
-        UserCall memory userCall,
-        ProtocolCall memory protocolCall,
-        bytes memory searcherCallData,
+        UserCall calldata userCall,
+        ProtocolCall calldata protocolCall,
+        bytes calldata searcherCallData,
         address searcherEOA,
         address searcherContract,
         uint256 bidAmount
-    ) public returns (SearcherCall memory searcherCall) {
+    ) public view returns (SearcherCall memory searcherCall) {
         searcherCall.to = atlas;
-        searcherCall.bids = getBidData(bidAmount);
+        searcherCall.bids = getBidData(userCall.metaTx, bidAmount);
         searcherCall.metaTx = SearcherMetaTx({
             from: searcherEOA,
             to: searcherContract,
@@ -95,9 +97,9 @@ contract TxBuilder {
             value: 0,
             nonce: searcherNextNonce(searcherEOA),
             maxFeePerGas: userCall.metaTx.maxFeePerGas,
-            userCallHash: keccak256(abi.encodePacked(userCall.metaTx.to, userCall.metaTx.data)),
+            userCallHash: userCall.metaTx.getUserCallHash(),
             controlCodeHash: protocolCall.to.codehash,
-            bidsHash: keccak256(abi.encode(searcherCall.bids)),
+            bidsHash: searcherCall.bids.getBidsHashFromMem(),
             data: searcherCallData
         });
     }
@@ -108,17 +110,17 @@ contract TxBuilder {
         UserCall calldata userCall,
         SearcherCall[] calldata searcherCalls
     ) public view returns (Verification memory verification) {
-        bytes32[] memory executionHashChain =
-            CallVerification.buildExecutionHashChain(protocolCall, userCall, searcherCalls);
-
         verification.to = atlas;
+        bytes32 userCallHash = userCall.metaTx.getUserCallHash();
+        bytes32 callChainHash = CallVerification.getCallChainHash(protocolCall, userCall.metaTx, searcherCalls);
+
         verification.proof = ProtocolProof({
             from: governanceEOA,
             to: control,
             nonce: governanceNextNonce(governanceEOA),
             deadline: deadline,
-            userCallHash: keccak256(abi.encodePacked(userCall.metaTx.to, userCall.metaTx.data)),
-            callChainHash: executionHashChain[executionHashChain.length - 1],
+            userCallHash: userCallHash,
+            callChainHash: callChainHash,
             controlCodeHash: protocolCall.to.codehash
         });
     }
