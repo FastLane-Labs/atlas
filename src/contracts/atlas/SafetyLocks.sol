@@ -20,6 +20,8 @@ contract SafetyLocks is Test {
 
     EscrowKey internal _escrowKey;
 
+    address public activeEnvironment;
+
     constructor() {
         atlas = address(this);
     }
@@ -27,61 +29,36 @@ contract SafetyLocks is Test {
     function searcherSafetyCallback(address msgSender) external payable returns (bool isSafe) {
         // An external call so that searcher contracts can verify
         // that delegatecall isn't being abused.
-        // NOTE: Escrow would still work fine if we removed this
-        // and let searchers handle the safety on their own.  There
-        // are other ways to provide the same safety guarantees on
-        // the contract level. This was chosen because it provides
-        // excellent safety for beginning searchers while having
-        // a minimal increase in gas cost compared with other options.
 
-        EscrowKey memory escrowKey = _escrowKey;
-
-        isSafe = escrowKey.isValidSearcherCallback(msg.sender);
-
-        if (isSafe) {
-            _escrowKey = escrowKey.turnSearcherLock(msgSender);
-        }
+        isSafe = msgSender == activeEnvironment;
     }
 
     function _initializeEscrowLocks(
         ProtocolCall calldata protocolCall,
         address executionEnvironment,
         uint8 searcherCallCount
-    ) internal {
-        EscrowKey memory escrowKey = _escrowKey;
+    ) internal returns (EscrowKey memory self) {
 
-        require(
-            escrowKey.approvedCaller == address(0) && escrowKey.makingPayments == false
-                && escrowKey.paymentsComplete == false && escrowKey.callIndex == uint8(0) && escrowKey.callMax == uint8(0)
-                && escrowKey.lockState == uint16(0) && escrowKey.gasRefund == uint32(0),
-            "ERR-SL003 AlreadyInitialized"
-        );
+        require(activeEnvironment == address(0), "ERR-SL003 AlreadyInitialized");
 
-        _escrowKey = escrowKey.initializeEscrowLock(
+        activeEnvironment = executionEnvironment;
+
+        self = self.initializeEscrowLock(
             protocolCall.callConfig.needsStagingCall(), searcherCallCount, executionEnvironment
         );
     }
 
-    function _releaseEscrowLocks() internal {
-        require(_escrowKey.canReleaseEscrowLock(address(this)), "ERR-SL004 NotUnlockable");
-        delete _escrowKey;
+    function _releaseEscrowLocks(EscrowKey memory self) internal {
+        require(self.canReleaseEscrowLock(address(this)), "ERR-SL004 NotUnlockable");
+        delete activeEnvironment;
     }
 
-    modifier stagingLock(ProtocolCall calldata protocolCall, address environment) {
-        // msg.sender = user EOA
-        // address(this) = atlas
-
-        EscrowKey memory escrowKey = _escrowKey;
-
-        // Safety contract needs to init all of the execution environment's
-        // Unsafe calls so that it can trust the locks.
-        require(escrowKey.isValidStagingLock(environment), "ERR-SL031 InvalidLockStage");
-
-        // Handle staging calls, if needed
-        if (protocolCall.callConfig.needsStagingCall()) {
-            _escrowKey = escrowKey.holdStagingLock(protocolCall.to);
-            _;
-        }
+    function _stagingLock(EscrowKey memory self, ProtocolCall calldata protocolCall, address environment)
+        internal
+        returns (EscrowKey memory){
+        
+        return self.holdStagingLock(protocolCall.to);
+        
     }
 
     modifier userLock(UserMetaTx calldata userCall, address environment) {

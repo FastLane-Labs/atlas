@@ -18,12 +18,14 @@ import "../types/VerificationTypes.sol";
 
 import {EscrowBits} from "../libraries/EscrowBits.sol";
 import {CallVerification} from "../libraries/CallVerification.sol";
+import {CallBits} from "../libraries/CallBits.sol";
 
 // import "forge-std/Test.sol";
 
 contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     using ECDSA for bytes32;
     using EscrowBits for uint256;
+    using CallBits for uint16;    
 
     uint256 constant public BUNDLER_PREMIUM = 110; // the amount over cost that bundlers get paid
     uint256 constant public BUNDLER_BASE = 100;
@@ -136,7 +138,9 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         UserMetaTx calldata userCall,
         address environment
     ) internal stagingLock(protocolCall, environment) returns (bytes memory stagingReturnData) {
-        stagingReturnData = IExecutionEnvironment(environment).stagingWrapper{value: msg.value}(userCall);
+        if (protocolCall.callConfig.needsStagingCall()) {
+            stagingReturnData = IExecutionEnvironment(environment).stagingWrapper{value: msg.value}(userCall);
+        }
     }
 
     function _executeUserCall(UserMetaTx calldata userCall, address environment)

@@ -6,10 +6,12 @@ import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
 import {Factory} from "./Factory.sol";
 
 import "../types/CallTypes.sol";
+import "../types/LockTypes.sol";
 import "../types/VerificationTypes.sol";
 
 import {CallVerification} from "../libraries/CallVerification.sol";
 import {CallBits} from "../libraries/CallBits.sol";
+import {SafetyBits} from "../libraries/SafetyBits.sol";
 
 import "forge-std/Test.sol";
 
@@ -17,6 +19,7 @@ contract Atlas is Test, Factory {
     using CallVerification for CallChainProof;
     using CallVerification for bytes32[];
     using CallBits for uint16;
+    using SafetyBits for EscrowKey;
 
     constructor(uint32 _escrowDuration) Factory(_escrowDuration) {}
 
@@ -98,9 +101,6 @@ contract Atlas is Test, Factory {
         // This is a self.call made externally so that it can be used with try/catch
         require(msg.sender == address(this), "ERR-F06 InvalidAccess");
 
-        // Initialize the locks
-        _initializeEscrowLocks(protocolCall, environment, uint8(searcherCalls.length));
-
         // Begin execution
         bytes32 callChainHashHead = _execute(protocolCall, userCall, searcherCalls, environment);
 
@@ -124,7 +124,13 @@ contract Atlas is Test, Factory {
         CallChainProof memory proof = CallVerification.initializeProof(protocolCall, userCall);
         bytes32 userCallHash = keccak256(abi.encodePacked(userCall.to, userCall.data));
 
-        bytes memory stagingReturnData = _executeStagingCall(protocolCall, userCall, environment);
+        // Initialize the locks
+        EscrowKey memory key = _initializeEscrowLocks(protocolCall, environment, uint8(searcherCalls.length));
+
+        bytes memory stagingReturnData;
+        if (protocolCall.callConfig.needsStagingCall()) {
+            stagingReturnData = _executeStagingCall(protocolCall, userCall, environment);
+        }
 
         proof = proof.next(userCall.from, userCall.data);
 

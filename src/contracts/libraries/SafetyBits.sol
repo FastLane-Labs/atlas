@@ -83,6 +83,24 @@ library SafetyBits {
             | 1 << (_SAFETY_LEVEL_OFFSET + uint16(SearcherSafety.Unset))
     );
 
+    function pack(EscrowKey memory self)
+        internal
+        pure
+        returns (bytes32 packedKey)
+    {
+        packedKey = bytes32(
+            abi.encodePacked(
+                self.approvedCaller,
+                self.makingPayments,
+                self.paymentsComplete,
+                self.callIndex,
+                self.callMax,
+                self.lockState,
+                self.gasRefund
+            )
+        );
+    }
+
     function turnVerificationLock(EscrowKey memory self, address approvedCaller)
         internal
         pure

@@ -147,6 +147,34 @@ contract MainTest is BaseTest {
         */
     }
 
+    function testLock() public {
+        EscrowKey memory key = EscrowKey({
+            approvedCaller: address(0x123),
+            makingPayments: false,
+            paymentsComplete: false,
+            callIndex: 1,
+            callMax: 3,
+            lockState: uint16(72),
+            gasRefund: 100_000
+        });
+
+        bytes memory unpackedKey = abi.encode(key);
+
+        bytes memory packedKey = abi.encodePacked(
+            key.approvedCaller,
+            key.makingPayments,
+            key.paymentsComplete,
+            key.callIndex,
+            key.callMax,
+            key.lockState,
+            key.gasRefund
+        );
+
+        console.logBytes(packedKey);
+        bytes32 z = bytes32(packedKey);
+        console.logBytes32(z);
+    }
+
     /*
     function testMimic() public {
         address aaaaa = address(this);
