@@ -47,19 +47,25 @@ contract MainTest is BaseTest {
         bytes memory searcherCallData;
         // First SearcherCall
         searcherCallData = helper.buildV2SearcherCallData(POOL_TWO, POOL_ONE);
-        searcherCalls[0] =
+        searcherCalls[1] =
             helper.buildSearcherCall(userCall, protocolCall, searcherCallData, searcherOneEOA, address(searcherOne), 2e17);
 
         (v, r, s) = vm.sign(searcherOnePK, IAtlas(address(atlas)).getSearcherPayload(searcherCalls[0].metaTx));
-        searcherCalls[0].signature = abi.encodePacked(r, s, v);
+        searcherCalls[1].signature = abi.encodePacked(r, s, v);
 
         // Second SearcherCall
         searcherCallData = helper.buildV2SearcherCallData(POOL_ONE, POOL_TWO);
-        searcherCalls[1] =
+        searcherCalls[0] =
             helper.buildSearcherCall(userCall, protocolCall, searcherCallData, searcherTwoEOA, address(searcherTwo), 1e17);
 
         (v, r, s) = vm.sign(searcherTwoPK, IAtlas(address(atlas)).getSearcherPayload(searcherCalls[1].metaTx));
-        searcherCalls[1].signature = abi.encodePacked(r, s, v);
+        searcherCalls[0].signature = abi.encodePacked(r, s, v);
+
+        console.log("topBid before sorting",searcherCalls[0].bids[0].bidAmount);
+        
+        searcherCalls = sorter.sortBids(userCall, searcherCalls);
+
+        console.log("topBid after sorting ",searcherCalls[0].bids[0].bidAmount);
 
         // Verification call
         Verification memory verification =

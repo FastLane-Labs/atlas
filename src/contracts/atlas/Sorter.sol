@@ -11,7 +11,7 @@ import "../types/CallTypes.sol";
 import {CallBits} from "../libraries/CallBits.sol";
 import {CallVerification} from "../libraries/CallVerification.sol";
 
-contract Sequencer {
+contract Sorter {
 
     address immutable public atlas;
     address immutable public escrow;
@@ -26,7 +26,7 @@ contract Sequencer {
         bool valid;
     }
 
-    function sequence(
+    function sortBids(
         UserCall calldata userCall, 
         SearcherCall[] calldata searcherCalls
     ) external view returns (SearcherCall[] memory) {
@@ -183,6 +183,7 @@ contract Sequencer {
                         sorted[count-1-n] = i;
                     }
                 }
+                unchecked {++i;}
             }
 
             // Mark the lowest & highest bids invalid (Used)
