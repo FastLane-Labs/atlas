@@ -7,25 +7,47 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 
 import {BaseTest} from "./base/BaseTest.t.sol";
 
-
 import {Permit69} from "src/contracts/atlas/Permit69.sol";
+import {Mimic} from "src/contracts/atlas/Mimic.sol";
 import "src/contracts/types/LockTypes.sol";
 
-
-
 contract Permit69Test is BaseTest {
+    bytes constant CALLER_IS_NOT_EXECUTION_ENV = bytes("ERR-T001 ProtocolTransfer");
+    bytes constant LOCK_STATE_NOT_VALID = bytes("ERR-T002 ProtocolTransfer");
+
+    uint16 constant EXEC_PHASE_STAGING = uint16(1 << (uint16(type(BaseLock).max) + 1 + uint16(ExecutionPhase.Staging)));
+
+    address mockExecutionEnvAddress = address(0x13371337);
+
+    EscrowKey escrowKey;
 
     MockAtlasForPermit69Tests mockAtlas;
 
     function setUp() public virtual override {
         BaseTest.setUp();
 
+        escrowKey = EscrowKey({
+            approvedCaller: address(0),
+            makingPayments: false,
+            paymentsComplete: false,
+            callIndex: 0,
+            callMax: 0,
+            lockState: EXEC_PHASE_STAGING,
+            gasRefund: 0
+        });
+
         mockAtlas = new MockAtlasForPermit69Tests();
+        mockAtlas.setEscrowKey(escrowKey);
+        mockAtlas.setEnvironment(mockExecutionEnvAddress);
     }
 
     // transferUserERC20 tests
 
-    function testTransferUserERC20RevertsIfCallerNotExecutionEnv() public {}
+    function testTransferUserERC20RevertsIfCallerNotExecutionEnv() public {
+        vm.prank(searcherOneEOA);
+        vm.expectRevert(CALLER_IS_NOT_EXECUTION_ENV);
+        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, address(0), uint16(0));
+    }
 
     function testTransferUserERC20RevertsIfLockStateNotValid() public {
         // Check reverts at all invalid execution phases
@@ -52,40 +74,28 @@ contract Permit69Test is BaseTest {
         assertEq(
             mockAtlas.getExecutionPhaseOffset(),
             uint16(type(BaseLock).max) + 1,
-            'Offset not same as num of items in BaseLock enum'
+            "Offset not same as num of items in BaseLock enum"
         );
-        assertEq(
-            uint16(type(BaseLock).max),
-            uint16(3),
-            'Expected 4 items in BaseLock enum'
-        );
+        assertEq(uint16(type(BaseLock).max), uint16(3), "Expected 4 items in BaseLock enum");
     }
 
     function testConstantValueOfSafeUserTransfer() public {
         string memory expectedBitMapString = "0000010001100000";
         // Safe phases for user transfers are Staging, UserCall, and Verification
         // stagingPhaseSafe = 0000 0000 0010 0000
-        uint16 stagingPhaseSafe = uint16(
-            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Staging))
-        );
+        uint16 stagingPhaseSafe = uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Staging)));
         // userCallPhaseSafe = 0000 0000 0100 0000
-        uint16 userCallPhaseSafe = uint16(
-            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.UserCall))
-        );
+        uint16 userCallPhaseSafe = uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.UserCall)));
         // verificationPhaseSafe = 0000 0100 0000 0000
-        uint16 verificationPhaseSafe = uint16(
-            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Verification))
-        );
+        uint16 verificationPhaseSafe =
+            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Verification)));
 
-        uint16 expectedSafeUserTransferBitMap = 
-                stagingPhaseSafe
-            |   userCallPhaseSafe
-            |   verificationPhaseSafe;
-        
+        uint16 expectedSafeUserTransferBitMap = stagingPhaseSafe | userCallPhaseSafe | verificationPhaseSafe;
+
         assertEq(
             mockAtlas.getSafeUserTransfer(),
             expectedSafeUserTransferBitMap,
-            'Expected to be the bitwise OR of the safe phases (0000 0100 0110 0000)'
+            "Expected to be the bitwise OR of the safe phases (0000 0100 0110 0000)"
         );
         assertEq(
             uint16ToBinaryString(expectedSafeUserTransferBitMap),
@@ -98,32 +108,25 @@ contract Permit69Test is BaseTest {
         string memory expectedBitMapString = "0000011100100000";
         // Safe phases for protocol transfers are Staging, HandlingPayments, UserRefund, and Verification
         // stagingPhaseSafe = 0000 0000 0010 0000
-        uint16 stagingPhaseSafe = uint16(
-            uint16(1) << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Staging))
-        );
+        uint16 stagingPhaseSafe =
+            uint16(uint16(1) << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Staging)));
         // handlingPaymentsPhaseSafe = 0000 0001 0000 0000
-        uint16 handlingPaymentsPhaseSafe = uint16(
-            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.HandlingPayments))
-        );
+        uint16 handlingPaymentsPhaseSafe =
+            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.HandlingPayments)));
         // userRefundPhaseSafe = 0000 0010 0000 0000
-        uint16 userRefundPhaseSafe = uint16(
-            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.UserRefund))
-        );
+        uint16 userRefundPhaseSafe =
+            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.UserRefund)));
         // verificationPhaseSafe = 0000 0100 0000 0000
-        uint16 verificationPhaseSafe = uint16(
-            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Verification))
-        );
+        uint16 verificationPhaseSafe =
+            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Verification)));
 
-        uint16 expectedSafeProtocolTransferBitMap = 
-                stagingPhaseSafe
-            |   handlingPaymentsPhaseSafe
-            |   userRefundPhaseSafe
-            |   verificationPhaseSafe;
+        uint16 expectedSafeProtocolTransferBitMap =
+            stagingPhaseSafe | handlingPaymentsPhaseSafe | userRefundPhaseSafe | verificationPhaseSafe;
 
         assertEq(
             mockAtlas.getSafeProtocolTransfer(),
             expectedSafeProtocolTransferBitMap,
-            'Expected to be the bitwise OR of the safe phases (0000 0111 0010 0000)'
+            "Expected to be the bitwise OR of the safe phases (0000 0111 0010 0000)"
         );
         assertEq(
             uint16ToBinaryString(expectedSafeProtocolTransferBitMap),
@@ -142,9 +145,9 @@ contract Permit69Test is BaseTest {
 
         uint256 i = 0;
         for (; i < 16; i++) {
-            if(newN == 0) {
+            if (newN == 0) {
                 // Now that we've filled in the last 1, fill rest of 0s in
-                for(;i < 16; i++) {
+                for (; i < 16; i++) {
                     output[15 - i] = bytes1("0");
                 }
                 break;
@@ -159,10 +162,10 @@ contract Permit69Test is BaseTest {
 // TODO probably refactor some of this stuff to a shared folder of standard implementations
 // Mock Atlas with standard implementations of Permit69's virtual functions
 contract MockAtlasForPermit69Tests is Permit69 {
-
     // Declared in SafetyLocks.sol in the canonical Atlas system
     // The only property relevant to testing Permit69 is _escrowKey.lockState (bitwise uint16)
     EscrowKey internal _escrowKey;
+    address internal _environment;
 
     // Public functions to expose the internal constants for testing
     function getExecutionPhaseOffset() public view returns (uint16) {
@@ -182,22 +185,22 @@ contract MockAtlasForPermit69Tests is Permit69 {
         _escrowKey = escrowKey;
     }
 
+    function setEnvironment(address environment) public {
+        _environment = environment;
+    }
+
     // Overriding the virtual functions in Permit69
     function _getExecutionEnvironmentCustom(
         address user,
         bytes32 controlCodeHash,
         address protocolControl,
         uint16 callConfig
-    ) internal view virtual override returns (address environment) {}
+    ) internal view virtual override returns (address environment) {
+        return _environment;
+    }
 
     // Implemented in Factory.sol in the canonical Atlas system
-    function _getLockState()
-        internal
-        view
-        virtual
-        override
-        returns (EscrowKey memory)
-    {
+    function _getLockState() internal view virtual override returns (EscrowKey memory) {
         return _escrowKey;
     }
 }
