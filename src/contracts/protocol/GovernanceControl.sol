@@ -183,6 +183,9 @@ abstract contract GovernanceControl {
     // View functions used by the backend to verify bid format
     // and by the factory and ProtocolVerifier to verify the
     // backend.
+    function _validateUserCall(UserMetaTx calldata) internal view virtual returns (bool) {
+        return true;
+    }
 
     function getPayeeData(bytes calldata data) external virtual returns (PayeeData[] memory);
 

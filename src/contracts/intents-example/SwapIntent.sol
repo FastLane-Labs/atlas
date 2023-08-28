@@ -93,6 +93,10 @@ contract SwapIntentController is ProtocolControl {
     )
     */
 
+    //////////////////////////////////
+    // CONTRACT-SPECIFIC FUNCTIONS  //
+    //////////////////////////////////
+
     // swap() selector = 0x98434997
     function swap(bytes calldata data) public payable {
         require(msg.sender == escrow, "ERR-PI002 InvalidSender");
@@ -165,15 +169,18 @@ contract SwapIntentController is ProtocolControl {
             // Track the excess gas that the user spends with their checks
             uint256 gasMarker = gasleft();
 
+            require(swapIntent.conditions.length <= MAX_USER_CONDITIONS, "ERR-PI019 TooManyConditions");
+
             uint256 i;
             bool valid;
-            uint256 maxUserConditions = swapIntent.conditions.length > MAX_USER_CONDITIONS ? MAX_USER_CONDITIONS : swapIntent.conditions.length;
-            
+            uint256 maxUserConditions = swapIntent.conditions.length;
+            bytes memory conditionData;
+
             for (; i < maxUserConditions; ) {
-                (valid,) = swapIntent.conditions[i].antecedent.staticcall{gas: USER_CONDITION_GAS_LIMIT}(
+                (valid, conditionData) = swapIntent.conditions[i].antecedent.staticcall{gas: USER_CONDITION_GAS_LIMIT}(
                     swapIntent.conditions[i].context
                 );
-                require(valid, "ERR-PI021 ConditionUnsound");
+                require(valid && abi.decode(conditionData, (bool)), "ERR-PI021 ConditionUnsound");
                 
                 unchecked{ ++i; }
             }
@@ -311,5 +318,49 @@ contract SwapIntentController is ProtocolControl {
         });
 
         return bidData;
+    }
+
+    // NOTE: This helper function is still delegatecalled inside of the execution environment
+    function _validateUserCall(UserMetaTx calldata userMetaTx) internal view override returns (bool) {
+        if (bytes4(userMetaTx.data) != this.swap.selector) {
+            return false;
+        }
+
+        SwapIntent memory swapIntent =abi.decode(userMetaTx.data[4:], (SwapIntent));
+
+        // Check that user has enough tokens
+        if (ERC20(swapIntent.tokenUserSells).balanceOf(_user()) < swapIntent.amountUserSells) {
+            return false;
+        }
+
+        // Check that the correct permit has been granted
+        if (ERC20(swapIntent.tokenUserSells).allowance(_user(), escrow) < swapIntent.amountUserSells) {
+            return false;
+        }
+
+        uint256 maxUserConditions = swapIntent.conditions.length;
+        if (maxUserConditions > MAX_USER_CONDITIONS) {
+            return false;
+        }
+
+        uint256 i;
+        bool valid;
+        bytes memory conditionData;
+
+        for (; i < maxUserConditions; ) {
+            (valid, conditionData) = swapIntent.conditions[i].antecedent.staticcall{gas: USER_CONDITION_GAS_LIMIT}(
+                swapIntent.conditions[i].context
+            );
+            if (!valid) {
+                return false;
+            }
+            valid = abi.decode(conditionData, (bool));
+            if (!valid) {
+                return false;
+            }
+            
+            unchecked{ ++i; }
+        }
+        return true;
     }
 }
