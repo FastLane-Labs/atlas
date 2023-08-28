@@ -18,6 +18,7 @@ contract Permit69Test is BaseTest {
     uint16 constant EXEC_PHASE_STAGING = uint16(1 << (uint16(type(BaseLock).max) + 1 + uint16(ExecutionPhase.Staging)));
 
     address mockExecutionEnvAddress = address(0x13371337);
+    address mockProtocolControl = address(0x123321);
 
     EscrowKey escrowKey;
 
@@ -50,6 +51,8 @@ contract Permit69Test is BaseTest {
         mockAtlas = new MockAtlasForPermit69Tests();
         mockAtlas.setEscrowKey(escrowKey);
         mockAtlas.setEnvironment(mockExecutionEnvAddress);
+
+        deal(WETH_ADDRESS, mockProtocolControl, 100e18);
     }
 
     // transferUserERC20 tests
@@ -70,7 +73,7 @@ contract Permit69Test is BaseTest {
         );
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, address(0), uint16(0));
+        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0));
 
         // SearcherCalls
         escrowKey.lockState = uint16(
@@ -78,7 +81,7 @@ contract Permit69Test is BaseTest {
         );
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, address(0), uint16(0));
+        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0));
 
         // HandlingPayments
         escrowKey.lockState = uint16(
@@ -86,7 +89,7 @@ contract Permit69Test is BaseTest {
         );
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, address(0), uint16(0));
+        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0));
 
         // UserRefund
         escrowKey.lockState = uint16(
@@ -94,7 +97,7 @@ contract Permit69Test is BaseTest {
         );
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, address(0), uint16(0));
+        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0));
 
         // Releasing
         escrowKey.lockState = uint16(
@@ -102,7 +105,7 @@ contract Permit69Test is BaseTest {
         );
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, address(0), uint16(0));
+        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0));
 
         vm.stopPrank();
     }
@@ -117,7 +120,7 @@ contract Permit69Test is BaseTest {
         WETH.approve(address(mockAtlas), wethTransferred);
 
         vm.prank(mockExecutionEnvAddress);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, wethTransferred, userEOA, address(0), uint16(0));
+        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, wethTransferred, userEOA, mockProtocolControl, uint16(0));
     
         assertEq(WETH.balanceOf(userEOA), userWethBefore - wethTransferred, "User did not lose WETH");
         assertEq(WETH.balanceOf(searcherOneEOA), searcherWethBefore + wethTransferred, "Searcher did not gain WETH");
@@ -125,10 +128,49 @@ contract Permit69Test is BaseTest {
 
     // transferProtocolERC20 tests
 
-    function testTransferProtocolERC20RevertsIfCallerNotExecutionEnv() public {}
+    function testTransferProtocolERC20RevertsIfCallerNotExecutionEnv() public {
+        vm.prank(searcherOneEOA);
+        vm.expectRevert(CALLER_IS_NOT_EXECUTION_ENV);
+        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0));
+    }
 
     function testTransferProtocolERC20RevertsIfLockStateNotValid() public {
         // Check reverts at all invalid execution phases
+        vm.startPrank(mockExecutionEnvAddress);
+
+        // Uninitialized
+        escrowKey.lockState = uint16(
+            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Uninitialized))
+        );
+        mockAtlas.setEscrowKey(escrowKey);
+        vm.expectRevert(LOCK_STATE_NOT_VALID);
+        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0));
+
+        // UserCall
+        escrowKey.lockState = uint16(
+            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.UserCall))
+        );
+        mockAtlas.setEscrowKey(escrowKey);
+        vm.expectRevert(LOCK_STATE_NOT_VALID);
+        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0));
+
+        // SearcherCalls
+        escrowKey.lockState = uint16(
+            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.SearcherCalls))
+        );
+        mockAtlas.setEscrowKey(escrowKey);
+        vm.expectRevert(LOCK_STATE_NOT_VALID);
+        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0));
+
+        // Releasing
+        escrowKey.lockState = uint16(
+            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Releasing))
+        );
+        mockAtlas.setEscrowKey(escrowKey);
+        vm.expectRevert(LOCK_STATE_NOT_VALID);
+        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0));        
+
+        vm.stopPrank();
     }
 
     function testTransferProtocolERC20SuccessfullyTransfersTokens() public {}
