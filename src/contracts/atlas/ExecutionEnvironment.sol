@@ -4,17 +4,19 @@ pragma solidity ^0.8.16;
 import {ISearcherContract} from "../interfaces/ISearcherContract.sol";
 import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
 import {IProtocolControl} from "../interfaces/IProtocolControl.sol";
+import {IPermit69} from "../interfaces/IPermit69.sol";
 
 import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
-import {UserMetaTx, ProtocolCall, SearcherCall, BidData} from "../types/CallTypes.sol";
+import {UserMetaTx, ProtocolCall, SearcherCall, SearcherMetaTx, BidData} from "../types/CallTypes.sol";
+import {ExecutionPhase} from "../types/LockTypes.sol";
 
 import {Base} from "../protocol/ExecutionBase.sol";
 
 import {CallVerification} from "../libraries/CallVerification.sol";
 import {CallBits} from "../libraries/CallBits.sol";
 
-// import "forge-std/Test.sol";
+import "forge-std/Test.sol";
 
 import {
     FastLaneErrorsEvents
@@ -22,21 +24,46 @@ import {
 
 contract ExecutionEnvironment is Base {
     using CallBits for uint16;
-
-
+    
     constructor(address _atlas) Base(_atlas) {}
+
+    modifier validUser(UserMetaTx calldata userMetaTx) {
+        if (userMetaTx.from != _user()) {
+            revert("ERR-CE02 InvalidUser");
+        }
+        if (userMetaTx.to == address(this) || userMetaTx.to == atlas) {
+            revert("ERR-EV007 InvalidTo");
+        }
+        _;
+    }
+
+    modifier validSearcher(SearcherMetaTx calldata searcherMetaTx) {
+        {
+        address searcherTo = searcherMetaTx.to;
+        if (searcherTo == address(this) || searcherTo == _control() || searcherTo == atlas) {
+            revert("ERR-EV008 InvalidTo");
+        }
+        if (searcherTo != _approvedCaller()) {
+            revert("ERR-EV009 WrongSearcher");
+        }
+        }
+        _;
+    }
+
 
     //////////////////////////////////
     ///    CORE CALL FUNCTIONS     ///
     //////////////////////////////////
     function stagingWrapper(UserMetaTx calldata userMetaTx)
         external
+        onlyAtlasEnvironment
+        validUser(userMetaTx)
+        validPhase(ExecutionPhase.Staging)
         returns (bytes memory)
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 
-        require(msg.sender == atlas && userMetaTx.from == _user(), "ERR-CE00 InvalidSenderStaging");
         require(userMetaTx.to != address(this), "ERR-EV008 InvalidTo");
 
         bytes memory stagingData = abi.encodeWithSelector(
@@ -54,23 +81,28 @@ contract ExecutionEnvironment is Base {
         return stagingData;
     }
 
-    function userWrapper(UserMetaTx calldata userCall) external payable returns (bytes memory userData) {
+    function userWrapper(UserMetaTx calldata userMetaTx) 
+        external 
+        payable
+        onlyAtlasEnvironment
+        validUser(userMetaTx)
+        onlyActiveEnvironment
+        validPhase(ExecutionPhase.UserCall)
+        returns (bytes memory userData) 
+    {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 
-        address user = _user();
         uint16 config = _config();
 
-        require(msg.sender == atlas && userCall.from == user, "ERR-CE00 InvalidSenderUser");
-        require(address(this).balance >= userCall.value, "ERR-CE01 ValueExceedsBalance");
-        require(userCall.to != address(this), "ERR-EV008 InvalidTo");
+        require(address(this).balance >= userMetaTx.value, "ERR-CE01 ValueExceedsBalance");
 
         bool success;
 
         // regular user call - executed at regular destination and not performed locally
         if (!config.needsLocalUser()) {
-            (success, userData) = userCall.to.call{value: userCall.value}(
-                forward(userCall.data)
+            (success, userData) = userMetaTx.to.call{value: userMetaTx.value}(
+                forward(userMetaTx.data)
             );
             require(success, "ERR-EC04a CallRevert");
 
@@ -78,7 +110,7 @@ contract ExecutionEnvironment is Base {
             if (config.needsDelegateUser()) {
 
                 userData = abi.encodeWithSelector(
-                    IProtocolControl.userLocalCall.selector, userCall.data
+                    IProtocolControl.userLocalCall.selector, userMetaTx.data
                 );
 
                 (success, userData) = _control().delegatecall(forward(userData));
@@ -90,34 +122,38 @@ contract ExecutionEnvironment is Base {
         }
     }
 
-    function verificationWrapper(
-        bytes calldata stagingReturnData,
-        bytes calldata userReturnData
-    ) external {
+    function verificationWrapper(bytes calldata stagingReturnData, bytes calldata userReturnData) 
+        external 
+        onlyAtlasEnvironment
+        validPhase(ExecutionPhase.Verification)
+    {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
-        require(msg.sender == atlas, "ERR-CE00 InvalidSenderStaging");
 
         bytes memory data = abi.encodeWithSelector(
             IProtocolControl.verificationCall.selector, stagingReturnData, userReturnData);
-
-        (bool success, bytes memory returnData) = _control().delegatecall(forward(data));
+        
+        bool success;
+        (success, data) = _control().delegatecall(forward(data));
 
         require(success, "ERR-EC02 DelegateRevert");
-        require(abi.decode(returnData, (bool)), "ERR-EC03a DelegateUnsuccessful");
+        require(abi.decode(data, (bool)), "ERR-EC03a DelegateUnsuccessful");
     }
 
     function searcherMetaTryCatch(
-        uint256 gasLimit,
-        uint256 escrowBalance,
-        SearcherCall calldata searcherCall,
+        uint256 gasLimit, 
+        uint256 escrowBalance, 
+        SearcherCall calldata searcherCall, 
         bytes calldata stagingReturnData
-    ) external payable {
+    ) 
+        external payable 
+        onlyAtlasEnvironment 
+        validSearcher(searcherCall.metaTx)
+        validPhase(ExecutionPhase.SearcherCalls)
+    {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
-        require(msg.sender == atlas, "ERR-04 InvalidCaller");
         require(address(this).balance == searcherCall.metaTx.value, "ERR-CE05 IncorrectValue");
-        require(searcherCall.metaTx.to != address(this), "ERR-EV008 InvalidTo");
 
         // Track token balances to measure if the bid amount is paid.
         uint256[] memory tokenBalances = new uint[](searcherCall.bids.length);
@@ -255,10 +291,13 @@ contract ExecutionEnvironment is Base {
         }
     }
 
-    function allocateRewards(BidData[] calldata bids, bytes memory stagingReturnData) external {
+    function allocateRewards(BidData[] calldata bids, bytes memory stagingReturnData) 
+        external 
+        onlyAtlasEnvironment
+        validPhase(ExecutionPhase.HandlingPayments)
+    {
         // msg.sender = escrow
         // address(this) = ExecutionEnvironment
-        require(msg.sender == atlas, "ERR-04 InvalidCaller");
 
         uint256 totalEtherReward;
         uint256 payment;
@@ -289,14 +328,17 @@ contract ExecutionEnvironment is Base {
         require(success, "ERR-EC02 DelegateRevert");
     }
 
+    ///////////////////////////////////////
+    //   HELPER / SEQUENCING FUNCTIONS   //
+    ///////////////////////////////////////
+
     function validateUserCall(UserMetaTx calldata userMetaTx)   
         external 
         // view 
+        // onlyAtlas
         returns (bool) {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
-        require(msg.sender == atlas, "ERR-CE00 InvalidSenderStaging");
-
         if (userMetaTx.from != _user()) {
             return false;
         }

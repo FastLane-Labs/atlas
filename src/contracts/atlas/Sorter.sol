@@ -58,7 +58,7 @@ contract Sorter {
     function _verifyBidFormat(
         BidData[] memory bidFormat, 
         SearcherCall calldata searcherCall
-    ) internal view returns (bool) {
+    ) internal pure returns (bool) {
         uint256 count = bidFormat.length;
         if (searcherCall.bids.length != count) {
             return false;

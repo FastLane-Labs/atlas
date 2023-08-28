@@ -104,10 +104,10 @@ contract Atlas is Test, Factory {
         address executionEnvironment,
         bytes32 callChainHash
     ) external payable returns (uint256 accruedGasRebate) {
+        {
         // This is a self.call made externally so that it can be used with try/catch
         require(msg.sender == address(this), "ERR-F06 InvalidAccess");
         
-        {
         // verify the call sequence
         require(callChainHash == CallVerification.getCallChainHash(protocolCall, userMetaTx, searcherCalls), "ERR-F07 InvalidSequence");
         }
@@ -162,8 +162,8 @@ contract Atlas is Test, Factory {
             key = key.setAllSearchersFailed();
         }
 
-        key = key.holdVerificationLock(address(this));
         if (protocolCall.callConfig.needsVerificationCall()) {
+            key = key.holdVerificationLock(address(this));
             _executeVerificationCall(stagingReturnData, userReturnData, executionEnvironment, key.pack());
         }
         return uint256(key.gasRefund);

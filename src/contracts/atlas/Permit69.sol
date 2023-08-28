@@ -19,6 +19,24 @@ import {ProtocolCall} from "../types/CallTypes.sol";
 abstract contract Permit69 {
     using SafeTransferLib for ERC20;
 
+    uint16 internal constant _EXECUTION_PHASE_OFFSET = uint16(type(BaseLock).max);
+    
+    // NOTE: No user transfers allowed during UserRefund or HandlingPayments
+    uint16 internal constant _SAFE_USER_TRANSFER = uint16(
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Staging)) | 
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserCall)) |
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SearcherCalls)) | // TODO: This may be removed later due to security risk
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Verification))
+    );
+
+    // NOTE: No protocol transfers allowed during UserCall 
+    uint16 internal constant _SAFE_PROTOCOL_TRANSFER = uint16(
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Staging)) | 
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.HandlingPayments)) |
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserRefund)) |
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Verification))
+    );
+
     // Virtual Functions defined by other Atlas modules
     function _getExecutionEnvironmentCustom(address user, bytes32 controlCodeHash, address protocolControl, uint16 callConfig)
         internal
@@ -35,15 +53,21 @@ abstract contract Permit69 {
         uint256 amount,
         address user, 
         address protocolControl,
-        uint16 callConfig
+        uint16 callConfig,
+        uint16 lockState
     ) external {
         // Verify that the caller is legitimate
         // NOTE: Use the *current* protocolControl's codehash to help mitigate social engineering bamboozles if, for example, 
         // a DAO is having internal issues. 
-        require(msg.sender == _getExecutionEnvironmentCustom(user, protocolControl.codehash, protocolControl, callConfig), "ERR-T001 UserTransfer");
+        require(msg.sender == _getExecutionEnvironmentCustom(
+            user, protocolControl.codehash, protocolControl, callConfig), 
+            "ERR-T000 UserTransfer");
 
         // Verify that the user is in control (or approved the protocol's control) of the ExecutionEnvironment
-        require(msg.sender == environment(), "ERR-T002 UserTransfer");
+        require(msg.sender == environment(), "ERR-T001 UserTransfer");
+
+        // Verify that the user is in control (or approved the protocol's control) of the ExecutionEnvironment
+        require(lockState & _SAFE_USER_TRANSFER != 0, "ERR-T002 UserTransfer");
 
         // Transfer token
         ERC20(token).safeTransferFrom(user, destination, amount);
@@ -55,13 +79,17 @@ abstract contract Permit69 {
         uint256 amount,
         address user, 
         address protocolControl,
-        uint16 callConfig
+        uint16 callConfig,
+        uint16 lockState
     ) external {
         // Verify that the caller is legitimate
         require(msg.sender == _getExecutionEnvironmentCustom(user, protocolControl.codehash, protocolControl, callConfig), "ERR-T003 ProtocolTransfer");
 
         // Verify that the user is in control (or approved the protocol's control) of the ExecutionEnvironment
-        require(msg.sender == environment(), "ERR-T004 ProtocolTransfer");
+        require(msg.sender == environment(), "ERR-T004 InvalidEnvironment");
+
+        // Verify that the protocol is in control of the ExecutionEnvironment
+        require(lockState & _SAFE_PROTOCOL_TRANSFER != 0, "ERR-T005 ProtocolTransfer");
 
         // Transfer token
         ERC20(token).safeTransferFrom(protocolControl, destination, amount);

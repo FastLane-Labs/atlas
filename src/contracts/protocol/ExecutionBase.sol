@@ -4,18 +4,52 @@ pragma solidity ^0.8.16;
 import {IPermit69} from "../interfaces/IPermit69.sol";
 import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
 
+import {ExecutionPhase, BaseLock} from "../types/LockTypes.sol";
+
 // import "forge-std/Test.sol";
 
 contract Base {
     address public immutable atlas;
+    address public immutable source;
+    bytes32 public immutable salt;
 
     constructor(address _atlas) {
         atlas = _atlas;
+        source = address(this);
+        salt = keccak256(abi.encodePacked(block.chainid, atlas, "Atlas 1.0"));
     }
 
     // These functions only work inside of the ExecutionEnvironment (mimic)
     // via delegatecall, but can be added to ProtocolControl as funcs that 
     // can be used during ProtocolControl's delegated funcs
+
+    // NOTE the validEnvironment modifier is relatively expensive and only needs to be checked once,
+    // (if at all), so do it during the user phase or bypass entirely.
+    modifier onlyActiveEnvironment() {
+        if (address(this) != _activeEnvironment()) {
+            revert("ERR-EV010 WrongEnvironment");
+        }
+        _;
+    }
+
+    modifier validPhase(ExecutionPhase phase) {
+        {
+        if (uint16(1<<(uint16(type(BaseLock).max) + uint16(phase))) & _lockState() == 0) {
+            revert("ERR-EV011 WrongPhase");
+        }
+        }
+        _;
+    }
+
+    modifier onlyAtlasEnvironment() {
+        if (address(this) == source) {
+            revert("ERR-CE00 NotDelegated");
+        }
+        if (msg.sender != atlas) {
+            revert("ERR-CE01 InvalidSender");
+        }
+        _;
+    }
     
     function forward(bytes memory data) internal pure returns (bytes memory) {
         // TODO: simplify this into just the bytes
@@ -76,37 +110,37 @@ contract Base {
 
     function _gasRefund() internal pure returns (uint32 gasRefund) {
         assembly {
-            gasRefund := shr(224, calldataload(sub(calldatasize(), 96)))
+            gasRefund := shr(224, calldataload(sub(calldatasize(), 80)))
         }
     }
 
     function _lockState() internal pure returns (uint16 lockState) {
         assembly {
-            lockState := shr(240, calldataload(sub(calldatasize(), 100)))
+            lockState := shr(240, calldataload(sub(calldatasize(), 82)))
         }
     }
 
     function _callMax() internal pure returns (uint8 callMax) {
         assembly {
-            callMax := shr(248, calldataload(sub(calldatasize(), 102)))
+            callMax := shr(248, calldataload(sub(calldatasize(), 83)))
         }
     }
 
     function _callIndex() internal pure returns (uint8 callIndex) {
         assembly {
-            callIndex := shr(248, calldataload(sub(calldatasize(), 103)))
+            callIndex := shr(248, calldataload(sub(calldatasize(), 84)))
         }
     }
 
     function _paymentsComplete() internal pure returns (bool paymentsComplete) {
         assembly {
-            paymentsComplete := shr(248, calldataload(sub(calldatasize(), 104)))
+            paymentsComplete := shr(248, calldataload(sub(calldatasize(), 85)))
         }
     }
 
     function _makingPayments() internal pure returns (bool makingPayments) {
         assembly {
-            makingPayments := shr(248, calldataload(sub(calldatasize(), 105)))
+            makingPayments := shr(248, calldataload(sub(calldatasize(), 86)))
         }
     }
 
@@ -130,11 +164,12 @@ contract ExecutionBase is Base {
         address destination,
         uint256 amount
     ) internal {
-        if (msg.sender == atlas) {
-            IPermit69(atlas).transferUserERC20(
-                token, destination, amount, _user(), _control(), _config()
-            );
+        if(msg.sender != atlas) { 
+            revert("ERR-EB001 InvalidSender");
         }
+        IPermit69(atlas).transferUserERC20(
+            token, destination, amount, _user(), _control(), _config(), _lockState()
+        );
     }
 
     function _transferProtocolERC20(
@@ -142,10 +177,11 @@ contract ExecutionBase is Base {
         address destination,
         uint256 amount
     ) internal {
-        if (msg.sender == atlas) {
-            IPermit69(msg.sender).transferProtocolERC20(
-                token, destination, amount, _user(), _control(), _config()
-            );
+        if(msg.sender != atlas) { 
+            revert("ERR-EB001 InvalidSender");
         }
+        IPermit69(atlas).transferProtocolERC20(
+            token, destination, amount, _user(), _control(), _config(), _lockState()
+        );
     }
 }

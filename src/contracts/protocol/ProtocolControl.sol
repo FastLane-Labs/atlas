@@ -4,6 +4,8 @@ pragma solidity ^0.8.16;
 import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
 import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
 
+import {ExecutionPhase} from "../types/LockTypes.sol";
+
 import {CallBits} from "../libraries/CallBits.sol";
 
 import {GovernanceControl} from "./GovernanceControl.sol";
@@ -69,17 +71,10 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
 
     // Safety and support functions and modifiers that make the relationship between protocol
     // and FastLane's backend trustless.
+
+    // Modifiers
     modifier validControl() {
         require(control == _control(), "ERR-PC050 InvalidControl");
-        _;
-    }
-    modifier mustBeDelegated() {
-        require(address(this) != control, "ERR-PC051 MustBeDelegated");
-        _;
-    }
-
-    modifier onlyApprovedDelegateCaller() {
-        require(msg.sender == escrow, "ERR-PC060 InvalidCaller");
         _;
     }
 
@@ -88,23 +83,12 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         _;
     }
 
-    modifier onlyApprovedCaller(bool isDelegated) {
-        if (isDelegated) {
-            require(msg.sender == escrow, "ERR-PC060 InvalidCaller");
-            require(address(this) != control, "ERR-PC051 MustBeDelegated");
-        } else {
-            require(msg.sender == ISafetyLocks(escrow).activeEnvironment(), "ERR-PC061 InvalidCaller");
-            require(address(this) == control, "ERR-PC052 MustBeCalled");
-        }
-        require(control == _control(), "ERR-PC053 InvalidControl");
-        _;
-    }
-
+    // Functions
     function stagingCall(UserMetaTx calldata userMetaTx)
         external
-        mustBeDelegated
-        onlyApprovedDelegateCaller
+        onlyAtlasEnvironment
         validControl
+        validPhase(ExecutionPhase.Staging)
         returns (bytes memory)
     {
         return _stagingCall(userMetaTx);
@@ -112,9 +96,9 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
 
     function userLocalCall(bytes calldata data) 
         external 
-        mustBeDelegated
-        onlyApprovedDelegateCaller
+        onlyAtlasEnvironment
         validControl
+        validPhase(ExecutionPhase.UserCall)
         returns (bytes memory) 
     {
         return delegateUser ? _userLocalDelegateCall(data) : _userLocalStandardCall(data);
@@ -122,9 +106,9 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
 
     function searcherPreCall(bytes calldata data) 
         external 
-        mustBeDelegated
-        onlyApprovedDelegateCaller
+        onlyAtlasEnvironment
         validControl
+        validPhase(ExecutionPhase.SearcherCalls)
         returns (bool)
     {
         return _searcherPreCall(data);
@@ -132,9 +116,9 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
 
     function searcherPostCall(bytes calldata data) 
         external 
-        mustBeDelegated
-        onlyApprovedDelegateCaller
+        onlyAtlasEnvironment
         validControl
+        validPhase(ExecutionPhase.SearcherCalls)
         returns (bool)
     {
         
@@ -143,18 +127,18 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
 
     function allocatingCall(bytes calldata data) 
         external 
-        mustBeDelegated
-        onlyApprovedDelegateCaller
+        onlyAtlasEnvironment
         validControl
+        validPhase(ExecutionPhase.HandlingPayments)
     {
         return _allocatingCall(data);
     }
 
     function verificationCall(bytes calldata data) 
         external 
-        mustBeDelegated
-        onlyApprovedDelegateCaller 
+        onlyAtlasEnvironment
         validControl
+        validPhase(ExecutionPhase.Verification)
         returns (bool) 
     {
         return _verificationCall(data);
@@ -163,8 +147,7 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
     function validateUserCall(UserMetaTx calldata userMetaTx) 
         external 
         view
-        mustBeDelegated
-        onlyApprovedDelegateCaller 
+        onlyAtlasEnvironment
         validControl
         returns (bool) 
     {

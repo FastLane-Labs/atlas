@@ -21,7 +21,7 @@ contract Factory is Test, Escrow, Permit69 {
 
     constructor(uint32 _escrowDuration) Escrow(_escrowDuration) {
         //atlas = msg.sender;
-        salt = keccak256(abi.encodePacked(block.chainid, atlas, msg.sender));
+        salt = keccak256(abi.encodePacked(block.chainid, atlas, "Atlas 1.0"));
 
         execution =
             _deployExecutionEnvironmentTemplate(address(this), ProtocolCall({to: address(0), callConfig: uint16(0)}));

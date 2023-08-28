@@ -96,7 +96,8 @@ library SafetyBits {
                 self.callIndex,
                 self.callMax,
                 self.lockState,
-                self.gasRefund
+                self.gasRefund,
+                uint16(0)
             )
         );
     }
