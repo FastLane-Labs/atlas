@@ -23,6 +23,17 @@ contract Permit69Test is BaseTest {
 
     MockAtlasForPermit69Tests mockAtlas;
 
+//     enum ExecutionPhase {
+//     Uninitialized,
+//     Staging,
+//     UserCall,
+//     SearcherCalls,
+//     HandlingPayments,
+//     UserRefund,
+//     Verification,
+//     Releasing
+// }
+
     function setUp() public virtual override {
         BaseTest.setUp();
 
@@ -51,6 +62,49 @@ contract Permit69Test is BaseTest {
 
     function testTransferUserERC20RevertsIfLockStateNotValid() public {
         // Check reverts at all invalid execution phases
+        vm.startPrank(mockExecutionEnvAddress);
+
+        // Uninitialized
+        escrowKey.lockState = uint16(
+            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Uninitialized))
+        );
+        mockAtlas.setEscrowKey(escrowKey);
+        vm.expectRevert(LOCK_STATE_NOT_VALID);
+        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, address(0), uint16(0));
+
+        // SearcherCalls
+        escrowKey.lockState = uint16(
+            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.SearcherCalls))
+        );
+        mockAtlas.setEscrowKey(escrowKey);
+        vm.expectRevert(LOCK_STATE_NOT_VALID);
+        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, address(0), uint16(0));
+
+        // HandlingPayments
+        escrowKey.lockState = uint16(
+            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.HandlingPayments))
+        );
+        mockAtlas.setEscrowKey(escrowKey);
+        vm.expectRevert(LOCK_STATE_NOT_VALID);
+        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, address(0), uint16(0));
+
+        // UserRefund
+        escrowKey.lockState = uint16(
+            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.UserRefund))
+        );
+        mockAtlas.setEscrowKey(escrowKey);
+        vm.expectRevert(LOCK_STATE_NOT_VALID);
+        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, address(0), uint16(0));
+
+        // Releasing
+        escrowKey.lockState = uint16(
+            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Releasing))
+        );
+        mockAtlas.setEscrowKey(escrowKey);
+        vm.expectRevert(LOCK_STATE_NOT_VALID);
+        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, address(0), uint16(0));
+
+        vm.stopPrank();
     }
 
     function testTransferUserERC20SuccessfullyTransfersTokens() public {}
@@ -109,7 +163,7 @@ contract Permit69Test is BaseTest {
         // Safe phases for protocol transfers are Staging, HandlingPayments, UserRefund, and Verification
         // stagingPhaseSafe = 0000 0000 0010 0000
         uint16 stagingPhaseSafe =
-            uint16(uint16(1) << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Staging)));
+            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Staging)));
         // handlingPaymentsPhaseSafe = 0000 0001 0000 0000
         uint16 handlingPaymentsPhaseSafe =
             uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.HandlingPayments)));
