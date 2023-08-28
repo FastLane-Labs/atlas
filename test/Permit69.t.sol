@@ -107,7 +107,21 @@ contract Permit69Test is BaseTest {
         vm.stopPrank();
     }
 
-    function testTransferUserERC20SuccessfullyTransfersTokens() public {}
+    function testTransferUserERC20SuccessfullyTransfersTokens() public {
+        uint256 wethTransferred = 10e18;
+
+        uint256 userWethBefore = WETH.balanceOf(userEOA);
+        uint256 searcherWethBefore = WETH.balanceOf(searcherOneEOA);
+
+        vm.prank(userEOA);
+        WETH.approve(address(mockAtlas), wethTransferred);
+
+        vm.prank(mockExecutionEnvAddress);
+        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, wethTransferred, userEOA, address(0), uint16(0));
+    
+        assertEq(WETH.balanceOf(userEOA), userWethBefore - wethTransferred, "User did not lose WETH");
+        assertEq(WETH.balanceOf(searcherOneEOA), searcherWethBefore + wethTransferred, "Searcher did not gain WETH");
+    }
 
     // transferProtocolERC20 tests
 
