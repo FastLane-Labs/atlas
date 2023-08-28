@@ -223,6 +223,54 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
         return (true);
     }
 
+    function _validateUser(ProtocolCall memory protocolCall, UserCall calldata userCall)
+        internal
+        view
+        returns (bool)
+    {
+        
+        // Verify the signature before storing any data to avoid
+        // spoof transactions clogging up protocol userNonces
+        if (!_verifyUserSignature(userCall)) {
+            return (false);
+        }
+
+        if (userCall.metaTx.control != protocolCall.to) {
+            return (false);
+        }
+
+        if (userCall.metaTx.nonce > type(uint64).max - 1) {
+            return (false);
+        }
+
+        uint256 userNonce = userNonces[userCall.metaTx.from];
+
+        // If the protocol indicated that they only accept sequenced userNonces
+        // (IE for FCFS execution), check and make sure the order is correct
+        // NOTE: allowing only sequenced userNonces could create a scenario in
+        // which builders or validators may be able to profit via censorship.
+        // Protocols are encouraged to rely on the deadline parameter
+        // to prevent replay attacks.
+        if (protocolCall.callConfig.needsSequencedNonces()) {
+            if (userCall.metaTx.nonce != userNonce + 1) {
+                return (false);
+            }
+
+            // If not sequenced, check to see if this nonce is highest and store
+            // it if so.  This ensures nonce + 1 will always be available.
+        } else {
+            // NOTE: including the callConfig in the asyncNonceKey should prevent
+            // issues occuring when a protocol may switch configs between blocking 
+            // and async, since callConfig can double as another seed. 
+            bytes32 asyncNonceKey = keccak256(abi.encode(userCall.metaTx.from, protocolCall.callConfig, userCall.metaTx.nonce + 1));
+            
+            if (asyncNonceFills[asyncNonceKey] != address(0)) {
+                return (false);
+            }
+        }
+        return (true);
+    }
+
     function _getProofHash(UserMetaTx memory metaTx) internal pure returns (bytes32 proofHash) {
         proofHash = keccak256(
             abi.encode(

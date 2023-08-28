@@ -68,8 +68,6 @@ contract ExecutionEnvironment is Test {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 
-        address control = _control();
-
         require(msg.sender == atlas && userCall.from == _user(), "ERR-CE00 InvalidSenderStaging");
         require(userCall.to != address(this), "ERR-EV008 InvalidTo");
 
@@ -77,21 +75,20 @@ contract ExecutionEnvironment is Test {
             IProtocolControl.stagingCall.selector, userCall.to, userCall.from, bytes4(userCall.data), userCall.data[4:]
         );
 
-        stagingData = abi.encodePacked(
-            stagingData,
-            _user(),
-            _control(),
-            _config(),
-            _controlCodeHash()
+
+        (bool success, bytes memory stagingReturnData) = _control().delegatecall(
+            abi.encodePacked(
+                stagingData,
+                _user(),
+                _control(),
+                _config(),
+                _controlCodeHash()
+            )
         );
 
-        bool success;
-
-        (success, stagingData) = control.delegatecall(stagingData);
         require(success, "ERR-EC02 DelegateRevert");
 
-        return stagingData;
-
+        return abi.decode(stagingReturnData, (bytes));
     }
 
     function userWrapper(UserMetaTx calldata userCall) external payable returns (bytes memory userData) {
@@ -185,7 +182,7 @@ contract ExecutionEnvironment is Test {
             if (searcherCall.bids[i].token == address(0)) {
                 tokenBalances[i] = msg.value; // NOTE: this is the meta tx value
 
-                // ERC20 balance
+            // ERC20 balance
             } else {
                 tokenBalances[i] = ERC20(searcherCall.bids[i].token).balanceOf(address(this));
             }
@@ -205,20 +202,21 @@ contract ExecutionEnvironment is Test {
         // Handle any searcher staging, if necessary
         if (_config().needsSearcherStaging()) {
 
-            // NOTE: Before SwapIntent test bugs and fixes, this was ordered as [stagingReturnData, searcherCall.metaTx.to]
-            // In case order matters somewhere else. But it shouldn't. Except existing ProtocolControl Impls with searcherStagingCall fns.
-            bytes memory searcherStagingCallData = abi.encode(searcherCall.metaTx.to, stagingReturnData);
-            bytes memory data = abi.encodePacked(
-                abi.encodeWithSelector(IProtocolControl.searcherStagingCall.selector, searcherStagingCallData),
-                _user(),
-                _control(),
-                _config(),
-                _controlCodeHash()
+            //bytes memory data = abi.encode(searcherCall.metaTx.to, stagingReturnData);
+
+            bytes memory data = abi.encodeWithSelector(
+                IProtocolControl.searcherPreCall.selector, 
+                abi.encode(searcherCall.metaTx.to, stagingReturnData)
             );
 
-
             (success, data) = _control().delegatecall(
-                data
+                abi.encodePacked(
+                    data,
+                    _user(),
+                    _control(),
+                    _config(),
+                    _controlCodeHash()
+                )
             );
             require(success, SEARCHER_STAGING_FAILED);
 
@@ -237,17 +235,26 @@ contract ExecutionEnvironment is Test {
         require(ISafetyLocks(atlas).confirmSafetyCallback(), SEARCHER_FAILED_CALLBACK);
 
         // If this was a user intent, handle and verify fulfillment
-        if (_config().needsSearcherFullfillment()) {
-            bytes memory data = abi.encodePacked(
-                abi.encodeWithSelector(IProtocolControl.fulfillmentCall.selector, stagingReturnData, searcherCall.metaTx.to),
-                _user(),
-                _control(),
-                _config(),
-                _controlCodeHash()
+        if (_config().needsSearcherPostCall()) {
+            
+            bytes memory data = stagingReturnData;
+
+            data = abi.encode(searcherCall.metaTx.to, data);
+
+            data = abi.encodeWithSelector(
+                IProtocolControl.searcherPostCall.selector, 
+                // searcherCall.metaTx.to, 
+                data
             );
 
             (success, data) = _control().delegatecall(
-                data
+                abi.encodePacked(
+                    data,
+                    _user(),
+                    _control(),
+                    _config(),
+                    _controlCodeHash()
+                )
             );
             require(success, INTENT_UNFULFILLED);
 
@@ -338,7 +345,46 @@ contract ExecutionEnvironment is Test {
 
         (bool success,) = _control().delegatecall(allocateData);
         require(success, "ERR-EC02 DelegateRevert");
-       
+    }
+
+    function validateUserCall(UserMetaTx calldata userMetaTx)   
+        external 
+        // view 
+        returns (bool) {
+        // msg.sender = atlas
+        // address(this) = ExecutionEnvironment
+        require(msg.sender == atlas, "ERR-CE00 InvalidSenderStaging");
+
+        if (userMetaTx.from != _user()) {
+            return false;
+        }
+
+        if (userMetaTx.control != _control()) {
+            return false;
+        }
+
+        if (userMetaTx.deadline < block.number) {
+            return false;
+        }
+
+        if (_controlCodeHash() != _control().codehash) {
+            return false;
+        }
+
+        bytes memory data = abi.encodePacked(
+            abi.encodeWithSelector(IProtocolControl.validateUserCall.selector, userMetaTx),
+            _user(),
+            _control(),
+            _config(),
+            _controlCodeHash()
+        );
+
+        (bool success, bytes memory returnData) = _control().delegatecall(data);
+
+        if (!success) {
+            return false;
+        }
+        return abi.decode(returnData, (bool));
     }
 
     ///////////////////////////////////////

@@ -11,7 +11,7 @@ import "../types/CallTypes.sol";
 import "../types/VerificationTypes.sol";
 
 import {SearcherOutcome} from "../types/EscrowTypes.sol";
-
+ 
 contract SearcherWrapper is FastLaneErrorsEvents {
     function _searcherCallWrapper(
         uint256 gasLimit,

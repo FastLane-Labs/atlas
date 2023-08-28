@@ -28,6 +28,8 @@ interface IExecutionEnvironment {
         bytes memory stagingReturnData
     ) external;
 
+    function validateUserCall(UserMetaTx calldata userMetaTx) external view returns (bool);
+
     function getUser() external pure returns (address user);
     function getControl() external pure returns (address control);
     function getConfig() external pure returns (uint16 config);
