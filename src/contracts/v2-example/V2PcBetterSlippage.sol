@@ -21,7 +21,8 @@ import {IUniswapV2Router02} from "./interfaces/IUniswapV2Router02.sol";
  * @notice Example of Uniswap V2 integration, with the following features:
     * - The user intent is to perform a swap on Uniswap V2 router only (no liquidity adding/removal operations)
     * - The bundler is the user, they front the overall gas cost
-    * - All MEV is collected as the token the user is buying, improving slippage on the swap
+    * - All MEV is collected as the token the user is setting an exact amount on (output token for exactInput, input token for exactOutput),
+    * improving slippage on the swap
 */
 contract V2PcBetterSlippage is ProtocolControl {
     address public immutable bundler;
@@ -135,22 +136,33 @@ contract V2PcBetterSlippage is ProtocolControl {
             funcSelector == bytes4(IUniswapV2Router01.swapExactTokensForTokens.selector)
                 || funcSelector == bytes4(IUniswapV2Router01.swapTokensForExactTokens.selector)
                 || funcSelector == bytes4(IUniswapV2Router02.swapExactTokensForTokensSupportingFeeOnTransferTokens.selector)
+                || funcSelector == bytes4(IUniswapV2Router01.swapTokensForExactETH.selector)
         ) {
             (,, path,,) = abi.decode(data, (uint256, uint256, address[], address, uint256));
+            if (
+                funcSelector == bytes4(IUniswapV2Router01.swapTokensForExactTokens.selector)
+                    || funcSelector == bytes4(IUniswapV2Router01.swapTokensForExactETH.selector)
+            ) {
+                bidToken = path[0];
+            } else {
+                bidToken = path[path.length - 1];
+            }
         } else if (
             funcSelector == bytes4(IUniswapV2Router01.swapExactETHForTokens.selector)
                 || funcSelector == bytes4(IUniswapV2Router01.swapETHForExactTokens.selector)
                 || funcSelector == bytes4(IUniswapV2Router02.swapExactETHForTokensSupportingFeeOnTransferTokens.selector)
         ) {
             (, path,,) = abi.decode(data, (uint256, address[], address, uint256));
+            if (funcSelector == bytes4(IUniswapV2Router01.swapETHForExactTokens.selector)) {
+                bidToken = address(0);
+            } else {
+                bidToken = path[path.length - 1];
+            }
         } else if (
-            funcSelector == bytes4(IUniswapV2Router01.swapTokensForExactETH.selector)
-                || funcSelector == bytes4(IUniswapV2Router01.swapExactTokensForETH.selector)
+            funcSelector == bytes4(IUniswapV2Router01.swapExactTokensForETH.selector)
                 || funcSelector == bytes4(IUniswapV2Router02.swapExactTokensForETHSupportingFeeOnTransferTokens.selector)
         ) {
-            return address(0);
+            bidToken = address(0);
         }
-
-        bidToken = path[path.length - 1];
     }
 }
