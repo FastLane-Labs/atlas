@@ -21,19 +21,7 @@ contract Permit69Test is BaseTest {
     address mockProtocolControl = address(0x123321);
 
     EscrowKey escrowKey;
-
     MockAtlasForPermit69Tests mockAtlas;
-
-//     enum ExecutionPhase {
-//     Uninitialized,
-//     Staging,
-//     UserCall,
-//     SearcherCalls,
-//     HandlingPayments,
-//     UserRefund,
-//     Verification,
-//     Releasing
-// }
 
     function setUp() public virtual override {
         BaseTest.setUp();
@@ -173,7 +161,21 @@ contract Permit69Test is BaseTest {
         vm.stopPrank();
     }
 
-    function testTransferProtocolERC20SuccessfullyTransfersTokens() public {}
+    function testTransferProtocolERC20SuccessfullyTransfersTokens() public {
+        uint256 wethTransferred = 10e18;
+
+        uint256 protocolWethBefore = WETH.balanceOf(mockProtocolControl);
+        uint256 searcherWethBefore = WETH.balanceOf(searcherOneEOA);
+
+        vm.prank(mockProtocolControl);
+        WETH.approve(address(mockAtlas), wethTransferred);
+
+        vm.prank(mockExecutionEnvAddress);
+        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, wethTransferred, userEOA, mockProtocolControl, uint16(0));
+    
+        assertEq(WETH.balanceOf(mockProtocolControl), protocolWethBefore - wethTransferred, "Protocol did not lose WETH");
+        assertEq(WETH.balanceOf(searcherOneEOA), searcherWethBefore + wethTransferred, "Searcher did not gain WETH");
+    }
 
     // constants tests
 
