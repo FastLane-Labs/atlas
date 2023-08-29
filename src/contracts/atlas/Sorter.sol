@@ -128,7 +128,7 @@ contract Sorter {
         SortingData[] memory sortingData = new SortingData[](count);
 
         uint256 i;
-        uint256 invalid;
+        uint256 invalidCount;
         for (;i<count;) {
             if (
                 _verifyBidFormat(bidFormat, searcherCalls[i]) && 
