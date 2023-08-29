@@ -63,14 +63,6 @@ contract Permit69Test is BaseTest {
         vm.expectRevert(LOCK_STATE_NOT_VALID);
         mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0));
 
-        // SearcherCalls
-        escrowKey.lockState = uint16(
-            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.SearcherCalls))
-        );
-        mockAtlas.setEscrowKey(escrowKey);
-        vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0));
-
         // HandlingPayments
         escrowKey.lockState = uint16(
             1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.HandlingPayments))
@@ -192,22 +184,25 @@ contract Permit69Test is BaseTest {
     }
 
     function testConstantValueOfSafeUserTransfer() public {
-        string memory expectedBitMapString = "0000010001100000";
+        string memory expectedBitMapString = "0000010011100000";
         // Safe phases for user transfers are Staging, UserCall, and Verification
         // stagingPhaseSafe = 0000 0000 0010 0000
         uint16 stagingPhaseSafe = uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Staging)));
         // userCallPhaseSafe = 0000 0000 0100 0000
         uint16 userCallPhaseSafe = uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.UserCall)));
+        // searcherCallsPhaseSafe = 0000 0000 1000 0000
+        uint16 searcherCallsPhaseSafe =
+            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.SearcherCalls)));
         // verificationPhaseSafe = 0000 0100 0000 0000
         uint16 verificationPhaseSafe =
             uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Verification)));
 
-        uint16 expectedSafeUserTransferBitMap = stagingPhaseSafe | userCallPhaseSafe | verificationPhaseSafe;
+        uint16 expectedSafeUserTransferBitMap = stagingPhaseSafe | userCallPhaseSafe | searcherCallsPhaseSafe | verificationPhaseSafe;
 
         assertEq(
             mockAtlas.getSafeUserTransfer(),
             expectedSafeUserTransferBitMap,
-            "Expected to be the bitwise OR of the safe phases (0000 0100 0110 0000)"
+            "Expected to be the bitwise OR of the safe phases (0000 0100 1110 0000)"
         );
         assertEq(
             uint16ToBinaryString(expectedSafeUserTransferBitMap),
