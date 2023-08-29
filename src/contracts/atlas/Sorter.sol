@@ -180,7 +180,7 @@ contract Sorter {
                         sorted[n] = i;
                     }
                     if (sortingData[i].amount < bottomBid) {
-                        sorted[count-1-n] = i;
+                        sorted[count-invalid-1-n] = i;
                     }
                 }
                 unchecked {++i;}
