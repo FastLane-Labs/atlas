@@ -35,7 +35,7 @@ contract Sorter {
 
         uint256 count = searcherCalls.length;
 
-        (SortingData[] memory sortingData, uint256 invalid) = _getSortingData(
+        (SortingData[] memory sortingData, uint256 invalidCount) = _getSortingData(
             protocolCall, userCall, searcherCalls, count);
 
         uint256[] memory sorted = _sort(sortingData, count, invalid);
