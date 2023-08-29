@@ -18,8 +18,9 @@ import {ProtocolCall} from "../types/CallTypes.sol";
 abstract contract Permit69 {
     using SafeTransferLib for ERC20;
 
-    uint16 internal constant _EXECUTION_PHASE_OFFSET = uint16(type(BaseLock).max);
-    
+    // Add 1 because values of the ExecutionPhase enum start at 0
+    uint16 internal constant _EXECUTION_PHASE_OFFSET = uint16(type(BaseLock).max) + 1;
+
     // NOTE: No user transfers allowed during UserRefund or HandlingPayments
     uint16 internal constant _SAFE_USER_TRANSFER = uint16(
         1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Staging)) | 
@@ -28,20 +29,21 @@ abstract contract Permit69 {
         1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Verification))
     );
 
-    // NOTE: No protocol transfers allowed during UserCall 
+    // NOTE: No protocol transfers allowed during UserCall
     uint16 internal constant _SAFE_PROTOCOL_TRANSFER = uint16(
-        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Staging)) | 
-        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.HandlingPayments)) |
-        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserRefund)) |
-        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Verification))
+        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Staging))
+            | 1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.HandlingPayments))
+            | 1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserRefund))
+            | 1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Verification))
     );
 
     // Virtual Functions defined by other Atlas modules
-    function _getExecutionEnvironmentCustom(address user, bytes32 controlCodeHash, address protocolControl, uint16 callConfig)
-        internal
-        view
-        virtual
-        returns (address environment);
+    function _getExecutionEnvironmentCustom(
+        address user,
+        bytes32 controlCodeHash,
+        address protocolControl,
+        uint16 callConfig
+    ) internal view virtual returns (address environment);
 
     function _getLockState() internal view virtual returns (EscrowKey memory);
 
@@ -50,7 +52,7 @@ abstract contract Permit69 {
         address token,
         address destination,
         uint256 amount,
-        address user, 
+        address user,
         address protocolControl,
         uint16 callConfig
     ) external {
@@ -60,7 +62,7 @@ abstract contract Permit69 {
         require(msg.sender == _getExecutionEnvironmentCustom(user, protocolControl.codehash, protocolControl, callConfig), "ERR-T001 ProtocolTransfer");
 
         // Verify that the user is in control (or approved the protocol's control) of the ExecutionEnvironment
-        require(_getLockState().lockState & _SAFE_USER_TRANSFER != 0, "ERR-T002 ProtocolTransfer");
+        _verifyLockState({safeExecutionPhaseSet: _SAFE_USER_TRANSFER});
 
         // Transfer token
         ERC20(token).safeTransferFrom(user, destination, amount);
@@ -70,17 +72,33 @@ abstract contract Permit69 {
         address token,
         address destination,
         uint256 amount,
-        address user, 
+        address user,
         address protocolControl,
         uint16 callConfig
     ) external {
         // Verify that the caller is legitimate
-        require(msg.sender == _getExecutionEnvironmentCustom(user, protocolControl.codehash, protocolControl, callConfig), "ERR-T003 ProtocolTransfer");
+        _verifyCallerIsExecutionEnv(user, protocolControl.codehash, protocolControl, callConfig);
 
         // Verify that the protocol is in control of the ExecutionEnvironment
-        require(_getLockState().lockState & _SAFE_PROTOCOL_TRANSFER != 0, "ERR-T004 ProtocolTransfer");
+        _verifyLockState({safeExecutionPhaseSet: _SAFE_PROTOCOL_TRANSFER});
 
         // Transfer token
         ERC20(token).safeTransferFrom(protocolControl, destination, amount);
+    }
+
+    function _verifyCallerIsExecutionEnv(
+        address user,
+        bytes32 controlCodehash,
+        address protocolControl,
+        uint16 callConfig
+    ) internal view {
+        require(
+            msg.sender == _getExecutionEnvironmentCustom(user, controlCodehash, protocolControl, callConfig),
+            "ERR-T001 ProtocolTransfer"
+        );
+    }
+
+    function _verifyLockState(uint16 safeExecutionPhaseSet) internal view {
+        require(_getLockState().lockState & safeExecutionPhaseSet != 0, "ERR-T002 ProtocolTransfer");
     }
 }
