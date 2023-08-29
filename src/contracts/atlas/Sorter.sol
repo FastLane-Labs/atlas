@@ -150,7 +150,7 @@ contract Sorter {
             unchecked{ ++i; }            
         }
 
-        return (sortingData, invalid);
+        return (sortingData, invalidCount);
     }
 
     function _sort(
