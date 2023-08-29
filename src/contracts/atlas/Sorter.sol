@@ -42,7 +42,7 @@ contract Sorter {
 
         SearcherCall[] memory searcherCallsSorted = new SearcherCall[](count - invalidCount);
 
-        count -= invalid;
+        count -= invalidCount;
         uint256 i = 0;
 
         for (;i<count;) {
