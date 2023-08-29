@@ -4,7 +4,9 @@ pragma solidity ^0.8.16;
 import {IPermit69} from "../interfaces/IPermit69.sol";
 import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
 
-import {ExecutionPhase, BaseLock} from "../types/LockTypes.sol";
+import {ExecutionPhase} from "../types/LockTypes.sol";
+
+import {EXECUTION_PHASE_OFFSET} from "../libraries/SafetyBits.sol";
 
 // import "forge-std/Test.sol";
 
@@ -34,7 +36,7 @@ contract Base {
 
     modifier validPhase(ExecutionPhase phase) {
         {
-        if (uint16(1<<(uint16(type(BaseLock).max) + uint16(phase))) & _lockState() == 0) {
+        if (uint16(1<<(EXECUTION_PHASE_OFFSET + uint16(phase))) & _lockState() == 0) {
             revert("ERR-EV011 WrongPhase");
         }
         }

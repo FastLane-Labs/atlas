@@ -6,6 +6,7 @@ import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
 import "../types/LockTypes.sol";
 import {ProtocolCall} from "../types/CallTypes.sol";
+import {EXECUTION_PHASE_OFFSET, SAFETY_LEVEL_OFFSET} from "../libraries/SafetyBits.sol";
 
 // NOTE: IPermit69 only works inside of the Atlas environment - specifically
 // inside of the custom ExecutionEnvironments that each user deploys when
@@ -19,30 +20,29 @@ import {ProtocolCall} from "../types/CallTypes.sol";
 abstract contract Permit69 {
     using SafeTransferLib for ERC20;
 
-    uint16 internal constant _EXECUTION_PHASE_OFFSET = uint16(type(BaseLock).max);
-    
     // NOTE: No user transfers allowed during UserRefund or HandlingPayments
     uint16 internal constant _SAFE_USER_TRANSFER = uint16(
-        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Staging)) | 
-        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserCall)) |
-        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SearcherCalls)) | // TODO: This may be removed later due to security risk
-        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Verification))
+        1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Staging)) | 
+        1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserCall)) |
+        1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SearcherCalls)) | // TODO: This may be removed later due to security risk
+        1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Verification))
     );
 
-    // NOTE: No protocol transfers allowed during UserCall 
+    // NOTE: No protocol transfers allowed during UserCall
     uint16 internal constant _SAFE_PROTOCOL_TRANSFER = uint16(
-        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Staging)) | 
-        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.HandlingPayments)) |
-        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserRefund)) |
-        1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Verification))
+        1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Staging))
+        | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.HandlingPayments))
+        | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserRefund))
+        | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Verification))
     );
 
     // Virtual Functions defined by other Atlas modules
-    function _getExecutionEnvironmentCustom(address user, bytes32 controlCodeHash, address protocolControl, uint16 callConfig)
-        internal
-        view
-        virtual
-        returns (address environment);
+    function _getExecutionEnvironmentCustom(
+        address user,
+        bytes32 controlCodeHash,
+        address protocolControl,
+        uint16 callConfig
+    ) internal view virtual returns (address environment);
 
     function environment() public view virtual returns (address);
 
@@ -51,7 +51,7 @@ abstract contract Permit69 {
         address token,
         address destination,
         uint256 amount,
-        address user, 
+        address user,
         address protocolControl,
         uint16 callConfig,
         uint16 lockState
@@ -59,15 +59,13 @@ abstract contract Permit69 {
         // Verify that the caller is legitimate
         // NOTE: Use the *current* protocolControl's codehash to help mitigate social engineering bamboozles if, for example, 
         // a DAO is having internal issues. 
-        require(msg.sender == _getExecutionEnvironmentCustom(
-            user, protocolControl.codehash, protocolControl, callConfig), 
-            "ERR-T000 UserTransfer");
+        _verifyCallerIsExecutionEnv(user, protocolControl, callConfig);
 
-        // Verify that the user is in control (or approved the protocol's control) of the ExecutionEnvironment
-        require(msg.sender == environment(), "ERR-T001 UserTransfer");
-
-        // Verify that the user is in control (or approved the protocol's control) of the ExecutionEnvironment
-        require(lockState & _SAFE_USER_TRANSFER != 0, "ERR-T002 UserTransfer");
+        // Verify the lock state
+        _verifyLockState({
+            lockState: lockState, 
+            safeExecutionPhaseSet: _SAFE_USER_TRANSFER
+        });
 
         // Transfer token
         ERC20(token).safeTransferFrom(user, destination, amount);
@@ -77,21 +75,37 @@ abstract contract Permit69 {
         address token,
         address destination,
         uint256 amount,
-        address user, 
+        address user,
         address protocolControl,
         uint16 callConfig,
         uint16 lockState
     ) external {
         // Verify that the caller is legitimate
-        require(msg.sender == _getExecutionEnvironmentCustom(user, protocolControl.codehash, protocolControl, callConfig), "ERR-T003 ProtocolTransfer");
+        _verifyCallerIsExecutionEnv(user, protocolControl, callConfig);
 
-        // Verify that the user is in control (or approved the protocol's control) of the ExecutionEnvironment
-        require(msg.sender == environment(), "ERR-T004 InvalidEnvironment");
-
-        // Verify that the protocol is in control of the ExecutionEnvironment
-        require(lockState & _SAFE_PROTOCOL_TRANSFER != 0, "ERR-T005 ProtocolTransfer");
+        // Verify the lock state
+        _verifyLockState({
+            lockState: lockState, 
+            safeExecutionPhaseSet: _SAFE_PROTOCOL_TRANSFER
+        });
 
         // Transfer token
         ERC20(token).safeTransferFrom(protocolControl, destination, amount);
+    }
+
+    function _verifyCallerIsExecutionEnv(
+        address user,
+        address protocolControl,
+        uint16 callConfig
+    ) internal view {
+        require(
+            msg.sender == _getExecutionEnvironmentCustom(user, protocolControl.codehash, protocolControl, callConfig),
+            "ERR-T001 EnvironmentMismatch"
+        );
+    }
+
+    function _verifyLockState(uint16 lockState, uint16 safeExecutionPhaseSet) internal view {
+        require(lockState & safeExecutionPhaseSet != 0, "ERR-T002 InvalidLockState");
+        require(msg.sender == environment(), "ERR-T003 EnvironmentNotActive");
     }
 }
