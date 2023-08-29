@@ -40,7 +40,7 @@ contract Sorter {
 
         uint256[] memory sorted = _sort(sortingData, count, invalidCount);
 
-        SearcherCall[] memory searcherCallsSorted = new SearcherCall[](count - invalid);
+        SearcherCall[] memory searcherCallsSorted = new SearcherCall[](count - invalidCount);
 
         count -= invalid;
         uint256 i = 0;
