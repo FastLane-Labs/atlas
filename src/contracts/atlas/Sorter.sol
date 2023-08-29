@@ -145,7 +145,7 @@ contract Sorter {
                     amount: 0,
                     valid: false
                 });
-                unchecked{ ++invalid; }
+                unchecked{ ++invalidCount; }
             }
             unchecked{ ++i; }            
         }
