@@ -5,7 +5,7 @@ import "../types/LockTypes.sol";
 
 library SafetyBits {
     uint16 internal constant _EXECUTION_PHASE_OFFSET = uint16(type(BaseLock).max) + 1;
-    uint16 internal constant _SAFETY_LEVEL_OFFSET = uint16(type(BaseLock).max) + uint16(type(ExecutionPhase).max) + 1;
+    uint16 internal constant _SAFETY_LEVEL_OFFSET = _EXECUTION_PHASE_OFFSET + uint16(type(ExecutionPhase).max) + 1;
 
     uint16 internal constant _LOCKED_X_SEARCHERS_X_REQUESTED = uint16(
         1 << uint16(BaseLock.Locked) | 1 << (_EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SearcherCalls))
