@@ -6,22 +6,24 @@ import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
 import {Factory} from "./Factory.sol";
 
 import "../types/CallTypes.sol";
+import "../types/LockTypes.sol";
 import "../types/VerificationTypes.sol";
 
 import {CallVerification} from "../libraries/CallVerification.sol";
 import {CallBits} from "../libraries/CallBits.sol";
+import {SafetyBits} from "../libraries/SafetyBits.sol";
 
 import "forge-std/Test.sol";
 
 contract Atlas is Test, Factory {
-    using CallVerification for CallChainProof;
-    using CallVerification for bytes32[];
+    using CallVerification for UserMetaTx;
     using CallBits for uint16;
+    using SafetyBits for EscrowKey;
 
     constructor(uint32 _escrowDuration) Factory(_escrowDuration) {}
 
-    function createExecutionEnvironment(ProtocolCall calldata protocolCall) external returns (address environment) {
-        environment = _setExecutionEnvironment(protocolCall, msg.sender, protocolCall.to.codehash);
+    function createExecutionEnvironment(ProtocolCall calldata protocolCall) external returns (address executionEnvironment) {
+        executionEnvironment = _setExecutionEnvironment(protocolCall, msg.sender, protocolCall.to.codehash);
         //if (userNonces[msg.sender] == 0) {
         //    unchecked{ ++userNonces[msg.sender];}
         //}
@@ -53,7 +55,7 @@ contract Atlas is Test, Factory {
         // TODO: Add optionality to bypass ProtocolControl signatures if user can fully bundle tx
 
         // Get the execution environment
-        address environment = _getExecutionEnvironmentCustom(userCall.metaTx.from, verification.proof.controlCodeHash, protocolCall.to, protocolCall.callConfig);
+        address executionEnvironment = _getExecutionEnvironmentCustom(userCall.metaTx.from, verification.proof.controlCodeHash, protocolCall.to, protocolCall.callConfig);
 
         // Check that the value of the tx is greater than or equal to the value specified
         if (msg.value < userCall.metaTx.value) { valid = false; }
@@ -61,7 +63,7 @@ contract Atlas is Test, Factory {
         if (searcherCalls.length >= type(uint8).max - 1) { valid = false; }
         if (block.number > userCall.metaTx.deadline || block.number > verification.proof.deadline) { valid = false; }
         if (tx.gasprice > userCall.metaTx.maxFeePerGas) { valid = false; }
-        if (environment.codehash == bytes32(0)) { valid = false; }
+        if (executionEnvironment.codehash == bytes32(0)) { valid = false; }
         if (!protocolCall.callConfig.allowsZeroSearchers() || protocolCall.callConfig.needsSearcherPostCall()) {
             if (searcherCalls.length == 0) { valid = false; }
         }
@@ -73,8 +75,12 @@ contract Atlas is Test, Factory {
             return;
         }
 
-        try this.execute{value: msg.value}(protocolCall, userCall.metaTx, searcherCalls, environment, verification.proof.callChainHash) 
+        // Initialize the lock
+        _initializeEscrowLock(executionEnvironment);
+
+        try this.execute{value: msg.value}(protocolCall, userCall.metaTx, searcherCalls, executionEnvironment, verification.proof.callChainHash) 
             returns (uint256 accruedGasRebate) {
+            console.log("accruedGasRebate",accruedGasRebate);
             // Gas Refund to sender only if execution is successful
             _executeGasRefund(gasMarker, accruedGasRebate, userCall.metaTx.from);
 
@@ -85,69 +91,66 @@ contract Atlas is Test, Factory {
             }
         }
 
+        // Release the lock
+        _releaseEscrowLock();
+
         console.log("total gas used", gasMarker - gasleft());
     }
 
     function execute(
         ProtocolCall calldata protocolCall,
-        UserMetaTx calldata userCall,
+        UserMetaTx calldata userMetaTx,
         SearcherCall[] calldata searcherCalls,
-        address environment,
+        address executionEnvironment,
         bytes32 callChainHash
     ) external payable returns (uint256 accruedGasRebate) {
+        {
         // This is a self.call made externally so that it can be used with try/catch
         require(msg.sender == address(this), "ERR-F06 InvalidAccess");
-
-        // Initialize the locks
-        _initializeEscrowLocks(protocolCall, environment, uint8(searcherCalls.length));
-
+        
+        // verify the call sequence
+        require(callChainHash == CallVerification.getCallChainHash(protocolCall, userMetaTx, searcherCalls), "ERR-F07 InvalidSequence");
+        }
         // Begin execution
-        bytes32 callChainHashHead = _execute(protocolCall, userCall, searcherCalls, environment);
-
-        // Verify that the meta transactions were executed in the correct sequence
-        require(callChainHashHead == callChainHash, "ERR-F05 InvalidCallChain");
-
-        accruedGasRebate = _getAccruedGasRebate();
-
-        // Release the lock
-        _releaseEscrowLocks();
+        accruedGasRebate = _execute(protocolCall, userMetaTx, searcherCalls, executionEnvironment);
     }
 
     function _execute(
         ProtocolCall calldata protocolCall,
-        UserMetaTx calldata userCall,
+        UserMetaTx calldata userMetaTx,
         SearcherCall[] calldata searcherCalls,
-        address environment
-    ) internal returns (bytes32) {
+        address executionEnvironment
+    ) internal returns (uint256 accruedGasRebate) {
         // Build the CallChainProof.  The penultimate hash will be used
         // to verify against the hash supplied by ProtocolControl
-        CallChainProof memory proof = CallVerification.initializeProof(protocolCall, userCall);
-        bytes32 userCallHash = keccak256(abi.encodePacked(userCall.to, userCall.data));
+       
+        bytes32 userCallHash = userMetaTx.getUserCallHash();
 
-        bytes memory stagingReturnData = _executeStagingCall(protocolCall, userCall, environment);
+        // Initialize the locks
+        EscrowKey memory key = _buildEscrowLock(protocolCall, executionEnvironment, uint8(searcherCalls.length));
 
-        proof = proof.next(userCall.from, userCall.data);
+        bytes memory stagingReturnData;
+        if (protocolCall.callConfig.needsStagingCall()) {
+            key = key.holdStagingLock(protocolCall.to);
+            stagingReturnData = _executeStagingCall(userMetaTx, executionEnvironment, key.pack());
+        }
 
-        bytes memory userReturnData = _executeUserCall(userCall, environment);
+        key = key.holdUserLock(userMetaTx.to);
+        bytes memory userReturnData = _executeUserCall(userMetaTx, executionEnvironment, key.pack());
 
-        uint256 i;
         bool auctionWon;
 
-        for (; i < searcherCalls.length;) {
-
-            proof = proof.next(searcherCalls[i].metaTx.from, searcherCalls[i].metaTx.data);
+        for (; key.callIndex < key.callMax - 1;) {
 
             // Only execute searcher meta tx if userCallHash matches 
-            if (userCallHash == searcherCalls[i].metaTx.userCallHash) {
-                if (!auctionWon && _searcherExecutionIteration(
-                        protocolCall, searcherCalls[i], stagingReturnData, auctionWon, environment
-                    )) {
-                        auctionWon = true;
-                    }
+            if (!auctionWon && userCallHash == searcherCalls[key.callIndex-2].metaTx.userCallHash) {
+                (auctionWon, key) = _searcherExecutionIteration(
+                        protocolCall, searcherCalls[key.callIndex-2], stagingReturnData, auctionWon, executionEnvironment, key
+                    );
             }
 
             unchecked {
-                ++i;
+                ++key.callIndex;
             }
         }
 
@@ -156,28 +159,30 @@ contract Atlas is Test, Factory {
             if (protocolCall.callConfig.needsSearcherPostCall()) {
                 revert("ERR-F08 UserNotFulfilled");
             }
-            _notMadJustDisappointed();
+            key = key.setAllSearchersFailed();
         }
 
-        _executeVerificationCall(protocolCall, stagingReturnData, userReturnData, environment);
-        
-        return proof.targetHash;
+        if (protocolCall.callConfig.needsVerificationCall()) {
+            key = key.holdVerificationLock(address(this));
+            _executeVerificationCall(stagingReturnData, userReturnData, executionEnvironment, key.pack());
+        }
+        return uint256(key.gasRefund);
     }
 
     function _searcherExecutionIteration(
         ProtocolCall calldata protocolCall,
         SearcherCall calldata searcherCall,
         bytes memory stagingReturnData,
-        bool auctionAlreadyWon,
-        address environment
-    ) internal returns (bool) {
-        if (_executeSearcherCall(searcherCall, stagingReturnData, auctionAlreadyWon, environment)) {
-            if (!auctionAlreadyWon) {
-                auctionAlreadyWon = true;
-                _executePayments(protocolCall, searcherCall.bids, stagingReturnData, environment);
-            }
+        bool auctionWon,
+        address executionEnvironment,
+        EscrowKey memory key
+    ) internal returns (bool, EscrowKey memory) {
+        (auctionWon, key) = _executeSearcherCall(searcherCall, stagingReturnData, executionEnvironment, key);
+        if (auctionWon) {
+            _executePayments(protocolCall, searcherCall.bids, stagingReturnData, executionEnvironment, key.pack());
+            key = key.allocationComplete();
         }
-        return auctionAlreadyWon;
+        return (auctionWon, key);
     }
 
     function testUserCall(UserMetaTx calldata userMetaTx) external view returns (bool) {
@@ -201,13 +206,12 @@ contract Atlas is Test, Factory {
             return false;
         }
 
-        address environment = _getExecutionEnvironmentCustom(
+        address executionEnvironment = _getExecutionEnvironmentCustom(
             userMetaTx.from, control.codehash, control, callConfig);
 
-        if (environment.codehash == bytes32(0) || control.codehash == bytes32(0)) {
+        if (executionEnvironment.codehash == bytes32(0) || control.codehash == bytes32(0)) {
             return false;
         } 
-        return IExecutionEnvironment(environment).validateUserCall(userMetaTx);
+        return IExecutionEnvironment(executionEnvironment).validateUserCall(userMetaTx);
     }
-    
 }

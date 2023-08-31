@@ -52,6 +52,7 @@ contract SearcherBase {
         // NOTE: The searcherSafetyCallback is mandatory - if it is not called then the searcher
         // transaction will revert.  It is payable and can be used to repay a msg.value loan from the
         // Atlas Escrow.
+        
         require(ISafetyLocks(_escrow).searcherSafetyCallback{value: msgValueOwed}(msg.sender), "INVALID SEQUENCE");
     }
 

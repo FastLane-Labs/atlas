@@ -18,12 +18,16 @@ import "../types/VerificationTypes.sol";
 
 import {EscrowBits} from "../libraries/EscrowBits.sol";
 import {CallVerification} from "../libraries/CallVerification.sol";
+import {CallBits} from "../libraries/CallBits.sol";
+import {SafetyBits} from "../libraries/SafetyBits.sol";
 
 // import "forge-std/Test.sol";
 
 contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     using ECDSA for bytes32;
     using EscrowBits for uint256;
+    using CallBits for uint16;    
+    using SafetyBits for EscrowKey;
 
     uint256 constant public BUNDLER_PREMIUM = 110; // the amount over cost that bundlers get paid
     uint256 constant public BUNDLER_BASE = 100;
@@ -50,13 +54,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     ///////////////////////////////////////////////////
     function deposit(address searcherMetaTxSigner) external payable returns (uint256 newBalance) {
         // NOTE: The escrow accounting system cannot currently handle deposits made mid-transaction.
-        EscrowKey memory escrowKey = _escrowKey;
-        require(
-            escrowKey.approvedCaller == address(0) && escrowKey.makingPayments == false
-                && escrowKey.paymentsComplete == false && escrowKey.callIndex == uint8(0) && escrowKey.callMax == uint8(0)
-                && escrowKey.lockState == uint16(0) && escrowKey.gasRefund == uint32(0),
-            "ERR-E001 AlreadyInitialized"
-        );
+        require(activeEnvironment == address(0), "ERR-E001 AlreadyInitialized");
 
         _escrowData[searcherMetaTxSigner].total += uint128(msg.value);
         newBalance = uint256(_escrowData[searcherMetaTxSigner].total);
@@ -64,6 +62,14 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
 
     function nextSearcherNonce(address searcherMetaTxSigner) external view returns (uint256 nextNonce) {
         nextNonce = uint256(_escrowData[searcherMetaTxSigner].nonce) + 1;
+    }
+
+    function searcherEscrowBalance(address searcherMetaTxSigner) external view returns (uint256 balance) {
+        balance = uint256(_escrowData[searcherMetaTxSigner].total);
+    }
+
+    function searcherLastActiveBlock(address searcherMetaTxSigner) external view returns (uint256 lastBlock) {
+        lastBlock = uint256(_escrowData[searcherMetaTxSigner].lastAccessed);
     }
 
     ///////////////////////////////////////////////////
@@ -80,7 +86,8 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     function donateToBundler(address surplusRecipient) external payable {
         // NOTE: All donations in excess of 10% greater than cost are forwarded
         // to the surplusReceiver. 
-        require(_escrowKey.lockState != 0, "ERR-E079 DonateRequiresLock");
+
+        require(msg.sender != address(0) && msg.sender == activeEnvironment, "ERR-E079 DonateRequiresLock");
         if (msg.value == 0) {
             return;
         }
@@ -132,45 +139,63 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     ///             INTERNAL FUNCTIONS              ///
     ///////////////////////////////////////////////////
     function _executeStagingCall(
-        ProtocolCall calldata protocolCall,
-        UserMetaTx calldata userCall,
-        address environment
-    ) internal stagingLock(protocolCall, environment) returns (bytes memory stagingReturnData) {
-        stagingReturnData = IExecutionEnvironment(environment).stagingWrapper{value: msg.value}(userCall);
+        UserMetaTx calldata userMetaTx,
+        address environment,
+        bytes32 lockBytes
+    ) 
+        internal 
+        returns (bytes memory stagingData) 
+    {
+        bool success;
+        stagingData = abi.encodeWithSelector(IExecutionEnvironment.stagingWrapper.selector, userMetaTx);
+        stagingData = abi.encodePacked(stagingData, lockBytes);
+        (success, stagingData) = environment.call{value: msg.value}(stagingData);
+        require(success, "ERR-E001 StagingFail");
+        stagingData = abi.decode(stagingData, (bytes));
     }
 
-    function _executeUserCall(UserMetaTx calldata userCall, address environment)
+    function _executeUserCall(
+        UserMetaTx calldata userMetaTx, 
+        address environment,
+        bytes32 lockBytes
+    )
         internal
-        userLock(userCall, environment)
-        returns (bytes memory userReturnData)
+        returns (bytes memory userData)
     {
-        userReturnData = IExecutionEnvironment(environment).userWrapper(userCall);
+        bool success;
+        userData = abi.encodeWithSelector(IExecutionEnvironment.userWrapper.selector, userMetaTx);
+        userData = abi.encodePacked(userData, lockBytes);
+        // TODO: Handle msg.value quirks
+        (success, userData) = environment.call(userData);
+        require(success, "ERR-E002 UserFail");
+        userData = abi.decode(userData, (bytes));
     }
 
     function _executeSearcherCall(
         SearcherCall calldata searcherCall,
         bytes memory stagingReturnData,
-        bool isAuctionAlreadyComplete,
-        address environment
-    ) internal returns (bool) {
+        address environment,
+        EscrowKey memory key
+    ) internal returns (bool, EscrowKey memory) {
 
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
 
         // Verify the transaction.
         (uint256 result, uint256 gasLimit, SearcherEscrow memory searcherEscrow) =
-            _verify(searcherCall, gasWaterMark, isAuctionAlreadyComplete);
+            _verify(searcherCall, gasWaterMark, false);
 
         SearcherOutcome outcome;
         uint256 escrowSurplus;
+        bool auctionWon;
 
         // If there are no errors, attempt to execute
         if (result.canExecute()) {
             // Open the searcher lock
-            _openSearcherLock(searcherCall.metaTx.to, environment);
-
+            key = key.holdSearcherLock(searcherCall.metaTx.to);
+           
             // Execute the searcher call
-            (outcome, escrowSurplus) = _searcherCallWrapper(gasLimit, environment, searcherCall, stagingReturnData);
+            (outcome, escrowSurplus) = _searcherCallWrapper(gasLimit, environment, searcherCall, stagingReturnData, key.pack());
 
             unchecked {
                 searcherEscrow.total += uint128(escrowSurplus);
@@ -182,19 +207,15 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
                 result |= 1 << uint256(SearcherOutcome.ExecutionCompleted);
             } else if (result.executionSuccessful()) {
                 // first successful searcher call that paid what it bid
-                isAuctionAlreadyComplete = true; // cannot be reached if bool is already true
+                auctionWon = true; // cannot be reached if bool is already true
                 result |= 1 << uint256(SearcherOutcome.ExecutionCompleted);
+                key = key.turnSearcherLockPayments(environment);
             }
-        
-            uint256 gasRebate; // TODO: can reuse gasWaterMark here for gas efficiency if it really matters
 
-            // Update the searcher's escrow balances
+            // Update the searcher's escrow balances and the accumulated refund
             if (result.updateEscrow()) {
-                gasRebate = _update(searcherCall.metaTx, searcherEscrow, gasWaterMark, result);
+                key.gasRefund += uint32(_update(searcherCall.metaTx, searcherEscrow, gasWaterMark, result));
             }
-
-            // Close the searcher lock
-            _closeSearcherLock(searcherCall.metaTx.to, environment, gasRebate);
 
             // emit event
             emit SearcherTxResult(
@@ -218,7 +239,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
             );
         }
 
-        return isAuctionAlreadyComplete;
+        return (auctionWon, key);
     }
 
     // TODO: who should pay gas cost of MEV Payments?
@@ -229,27 +250,31 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     function _executePayments(
         ProtocolCall calldata protocolCall,
         BidData[] calldata winningBids,
-        bytes memory stagingReturnData,
-        address environment
-    ) internal paymentsLock(environment) {
+        bytes memory data, //stagingReturnData
+        address environment,
+        bytes32 lockBytes
+    ) internal {
         // process protocol payments
-        try IExecutionEnvironment(environment).allocateRewards(winningBids, stagingReturnData) {}
-        catch {
+        bool success;
+        data = abi.encodeWithSelector(IExecutionEnvironment.allocateRewards.selector, winningBids, data);
+        data = abi.encodePacked(data, lockBytes);
+        (success, ) = environment.call(data);
+        if (!success) {
             emit MEVPaymentFailure(protocolCall.to, protocolCall.callConfig, winningBids);
         }
     }
 
     function _executeVerificationCall(
-        ProtocolCall calldata protocolCall,
         bytes memory stagingReturnData,
         bytes memory userReturnData,
-        address environment
-    ) internal verificationLock(protocolCall.callConfig, environment) {
-        IExecutionEnvironment(environment).verificationWrapper(stagingReturnData, userReturnData);
-    }
-
-    function _getAccruedGasRebate() internal view returns (uint256 accruedGasRebate) {
-        accruedGasRebate = uint256(_escrowKey.gasRefund);
+        address environment,
+        bytes32 lockBytes
+    ) internal {
+        bool success;
+        bytes memory verificationData = abi.encodeWithSelector(IExecutionEnvironment.verificationWrapper.selector, stagingReturnData, userReturnData);
+        verificationData = abi.encodePacked(verificationData, lockBytes);
+        (success,) = environment.call{value: msg.value}(verificationData);
+        require(success, "ERR-E005 VerificationFail");
     }
 
     function _executeGasRefund(uint256 gasMarker, uint256 accruedGasRebate, address user) internal {

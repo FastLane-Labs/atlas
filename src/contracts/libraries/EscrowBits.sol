@@ -46,7 +46,7 @@ library EscrowBits {
     uint256 internal constant _NO_USER_REFUND = (
         1 << uint256(SearcherOutcome.InvalidSignature) | 1 << uint256(SearcherOutcome.InvalidUserHash)
             | 1 << uint256(SearcherOutcome.InvalidBidsHash) | 1 << uint256(SearcherOutcome.GasPriceOverCap)
-            | 1 << uint256(SearcherOutcome.InvalidSequencing)
+            | 1 << uint256(SearcherOutcome.InvalidSequencing) | 1 << uint256(SearcherOutcome.InvalidControlHash)
     );
 
     uint256 internal constant _CALLDATA_REFUND = (

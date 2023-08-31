@@ -17,42 +17,44 @@ contract SearcherWrapper is FastLaneErrorsEvents {
         uint256 gasLimit,
         address environment,
         SearcherCall calldata searcherCall,
-        bytes memory stagingReturnData
+        bytes memory data, //stagingReturnData
+        bytes32 lockBytes
     ) internal returns (SearcherOutcome, uint256) {
         // address(this) = Atlas/Escrow
         // msg.sender = tx.origin
 
         // Get current Ether balance
         uint256 currentBalance = address(this).balance;
+        bool success;
 
-        // Call the execution environment
-        try IExecutionEnvironment(environment).searcherMetaTryCatch{value: searcherCall.metaTx.value}(
-            gasLimit, currentBalance, searcherCall, stagingReturnData
-        ) {
+        data = abi.encodeWithSelector(
+            IExecutionEnvironment(environment).searcherMetaTryCatch.selector, gasLimit, currentBalance, searcherCall, data);
+        
+        data = abi.encodePacked(data, lockBytes);
+
+        (success, data) = environment.call{value: searcherCall.metaTx.value}(data);
+        if (success) {
             return (SearcherOutcome.Success, address(this).balance - currentBalance);
-        } catch Error(string memory err) {
-            bytes32 errorSwitch = keccak256(abi.encodePacked(err));
+        }
+        bytes4 errorSwitch = bytes4(data);
 
-            if (errorSwitch == _SEARCHER_BID_UNPAID) {
-                return (SearcherOutcome.BidNotPaid, 0);
-            } else if (errorSwitch == _SEARCHER_MSG_VALUE_UNPAID) {
-                return (SearcherOutcome.CallValueTooHigh, 0);
-            } else if (errorSwitch == _INTENT_UNFULFILLED) {
-                return (SearcherOutcome.IntentUnfulfilled, 0);
-            } else if (errorSwitch == _SEARCHER_CALL_REVERTED) {
-                return (SearcherOutcome.CallReverted, 0);
-            } else if (errorSwitch == _SEARCHER_FAILED_CALLBACK) {
-                return (SearcherOutcome.CallbackFailed, 0);
-            } else if (errorSwitch == _ALTERED_USER_HASH) {
-                return (SearcherOutcome.InvalidUserHash, 0);
-            } else if (errorSwitch == _HASH_CHAIN_BROKEN) {
-                return (SearcherOutcome.InvalidSequencing, 0);
-            } else if (errorSwitch == _SEARCHER_STAGING_FAILED) {
-                return (SearcherOutcome.SearcherStagingFailed, 0);
-            } else {
-                return (SearcherOutcome.EVMError, 0);
-            }
-        } catch {
+        if (errorSwitch == SearcherBidUnpaid.selector) {
+            return (SearcherOutcome.BidNotPaid, 0);
+        } else if (errorSwitch == SearcherMsgValueUnpaid.selector) {
+            return (SearcherOutcome.CallValueTooHigh, 0);
+        } else if (errorSwitch == IntentUnfulfilled.selector) {
+            return (SearcherOutcome.IntentUnfulfilled, 0);
+        } else if (errorSwitch == SearcherCallReverted.selector) {
+            return (SearcherOutcome.CallReverted, 0);
+        } else if (errorSwitch == SearcherFailedCallback.selector) {
+            return (SearcherOutcome.CallbackFailed, 0);
+        } else if (errorSwitch == AlteredControlHash.selector) {
+            return (SearcherOutcome.InvalidControlHash, 0);
+        } else if (errorSwitch == SearcherStagingFailed.selector) {
+            return (SearcherOutcome.SearcherStagingFailed, 0);
+        } else if (errorSwitch == SearcherVerificationFailed.selector) {
+            return (SearcherOutcome.IntentUnfulfilled, 0);
+        } else {
             return (SearcherOutcome.CallReverted, 0);
         }
     }

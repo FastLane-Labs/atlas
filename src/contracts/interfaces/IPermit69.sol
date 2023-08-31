@@ -21,7 +21,8 @@ interface IPermit69 {
         uint256 amount,
         address user, 
         address protocolControl,
-        uint16 callConfig
+        uint16 callConfig,
+        uint16 lockState
     ) external;
 
     function transferProtocolERC20(
@@ -30,6 +31,7 @@ interface IPermit69 {
         uint256 amount,
         address user, 
         address protocolControl,
-        uint16 callConfig
+        uint16 callConfig,
+        uint16 lockState
     ) external;
 }

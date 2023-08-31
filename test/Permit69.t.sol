@@ -7,15 +7,19 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 
 import {BaseTest} from "./base/BaseTest.t.sol";
 
-import {Permit69} from "src/contracts/atlas/Permit69.sol";
-import {Mimic} from "src/contracts/atlas/Mimic.sol";
-import "src/contracts/types/LockTypes.sol";
+import {Permit69} from "../src/contracts/atlas/Permit69.sol";
+import {Mimic} from "../src/contracts/atlas/Mimic.sol";
+
+import {EXECUTION_PHASE_OFFSET, SAFETY_LEVEL_OFFSET} from "../src/contracts/libraries/SafetyBits.sol";
+
+import "../src/contracts/types/LockTypes.sol";
 
 contract Permit69Test is BaseTest {
-    bytes constant CALLER_IS_NOT_EXECUTION_ENV = bytes("ERR-T001 ProtocolTransfer");
-    bytes constant LOCK_STATE_NOT_VALID = bytes("ERR-T002 ProtocolTransfer");
+    bytes constant CALLER_IS_NOT_EXECUTION_ENV = bytes("ERR-T001 EnvironmentMismatch");
+    bytes constant LOCK_STATE_NOT_VALID = bytes("ERR-T002 InvalidLockState");
+    bytes constant CALLER_IS_NOT_ACTIVE = bytes("ERR-T003 EnvironmentNotActive");
 
-    uint16 constant EXEC_PHASE_STAGING = uint16(1 << (uint16(type(BaseLock).max) + 1 + uint16(ExecutionPhase.Staging)));
+    uint16 constant EXEC_PHASE_STAGING = uint16(1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Staging)));
 
     address mockExecutionEnvAddress = address(0x13371337);
     address mockProtocolControl = address(0x123321);
@@ -48,7 +52,7 @@ contract Permit69Test is BaseTest {
     function testTransferUserERC20RevertsIfCallerNotExecutionEnv() public {
         vm.prank(searcherOneEOA);
         vm.expectRevert(CALLER_IS_NOT_EXECUTION_ENV);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, address(0), uint16(0));
+        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, address(0), uint16(0), escrowKey.lockState);
     }
 
     function testTransferUserERC20RevertsIfLockStateNotValid() public {
@@ -61,7 +65,7 @@ contract Permit69Test is BaseTest {
         );
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0));
+        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0), escrowKey.lockState);
 
         // HandlingPayments
         escrowKey.lockState = uint16(
@@ -69,7 +73,7 @@ contract Permit69Test is BaseTest {
         );
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0));
+        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0), escrowKey.lockState);
 
         // UserRefund
         escrowKey.lockState = uint16(
@@ -77,7 +81,7 @@ contract Permit69Test is BaseTest {
         );
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0));
+        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0), escrowKey.lockState);
 
         // Releasing
         escrowKey.lockState = uint16(
@@ -85,7 +89,7 @@ contract Permit69Test is BaseTest {
         );
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0));
+        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0), escrowKey.lockState);
 
         vm.stopPrank();
     }
@@ -100,7 +104,7 @@ contract Permit69Test is BaseTest {
         WETH.approve(address(mockAtlas), wethTransferred);
 
         vm.prank(mockExecutionEnvAddress);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, wethTransferred, userEOA, mockProtocolControl, uint16(0));
+        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, wethTransferred, userEOA, mockProtocolControl, uint16(0), escrowKey.lockState);
     
         assertEq(WETH.balanceOf(userEOA), userWethBefore - wethTransferred, "User did not lose WETH");
         assertEq(WETH.balanceOf(searcherOneEOA), searcherWethBefore + wethTransferred, "Searcher did not gain WETH");
@@ -111,7 +115,7 @@ contract Permit69Test is BaseTest {
     function testTransferProtocolERC20RevertsIfCallerNotExecutionEnv() public {
         vm.prank(searcherOneEOA);
         vm.expectRevert(CALLER_IS_NOT_EXECUTION_ENV);
-        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0));
+        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0), escrowKey.lockState);
     }
 
     function testTransferProtocolERC20RevertsIfLockStateNotValid() public {
@@ -124,7 +128,7 @@ contract Permit69Test is BaseTest {
         );
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0));
+        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0), escrowKey.lockState);
 
         // UserCall
         escrowKey.lockState = uint16(
@@ -132,7 +136,7 @@ contract Permit69Test is BaseTest {
         );
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0));
+        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0), escrowKey.lockState);
 
         // SearcherCalls
         escrowKey.lockState = uint16(
@@ -140,7 +144,7 @@ contract Permit69Test is BaseTest {
         );
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0));
+        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0), escrowKey.lockState);
 
         // Releasing
         escrowKey.lockState = uint16(
@@ -148,7 +152,7 @@ contract Permit69Test is BaseTest {
         );
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0));        
+        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0), escrowKey.lockState);        
 
         vm.stopPrank();
     }
@@ -163,7 +167,7 @@ contract Permit69Test is BaseTest {
         WETH.approve(address(mockAtlas), wethTransferred);
 
         vm.prank(mockExecutionEnvAddress);
-        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, wethTransferred, userEOA, mockProtocolControl, uint16(0));
+        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, wethTransferred, userEOA, mockProtocolControl, uint16(0), escrowKey.lockState);
     
         assertEq(WETH.balanceOf(mockProtocolControl), protocolWethBefore - wethTransferred, "Protocol did not lose WETH");
         assertEq(WETH.balanceOf(searcherOneEOA), searcherWethBefore + wethTransferred, "Searcher did not gain WETH");
@@ -276,7 +280,7 @@ contract MockAtlasForPermit69Tests is Permit69 {
 
     // Public functions to expose the internal constants for testing
     function getExecutionPhaseOffset() public view returns (uint16) {
-        return _EXECUTION_PHASE_OFFSET;
+        return EXECUTION_PHASE_OFFSET;
     }
 
     function getSafeUserTransfer() public view returns (uint16) {
@@ -292,8 +296,12 @@ contract MockAtlasForPermit69Tests is Permit69 {
         _escrowKey = escrowKey;
     }
 
-    function setEnvironment(address environment) public {
-        _environment = environment;
+    function setEnvironment(address activeEnvironment) public {
+        _environment = activeEnvironment;
+    }
+
+    function environment() public view override returns (address activeEnvironment) {
+        activeEnvironment = _environment;
     }
 
     // Overriding the virtual functions in Permit69
@@ -302,12 +310,12 @@ contract MockAtlasForPermit69Tests is Permit69 {
         bytes32 controlCodeHash,
         address protocolControl,
         uint16 callConfig
-    ) internal view virtual override returns (address environment) {
-        return _environment;
+    ) internal view virtual override returns (address activeEnvironment) {
+        activeEnvironment = _environment;
     }
 
     // Implemented in Factory.sol in the canonical Atlas system
-    function _getLockState() internal view virtual override returns (EscrowKey memory) {
+    function _getLockState() internal view virtual returns (EscrowKey memory) {
         return _escrowKey;
     }
 }
