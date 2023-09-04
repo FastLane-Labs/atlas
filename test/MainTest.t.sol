@@ -52,7 +52,7 @@ contract MainTest is BaseTest {
 
         (v, r, s) = vm.sign(searcherOnePK, IAtlas(address(atlas)).getSearcherPayload(searcherCalls[1].metaTx));
         searcherCalls[1].signature = abi.encodePacked(r, s, v);
-
+        
         // Second SearcherCall
         searcherCallData = helper.buildV2SearcherCallData(POOL_ONE, POOL_TWO);
         searcherCalls[0] =

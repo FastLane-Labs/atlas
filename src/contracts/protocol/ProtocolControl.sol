@@ -22,6 +22,8 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
 
     bool public immutable sequenced;
     bool public immutable requireStaging;
+    bool public immutable trackStagingReturnData;
+    bool public immutable trackUserReturnData;
     bool public immutable localUser;
     bool public immutable delegateUser;
     bool public immutable searcherStaging;
@@ -38,6 +40,8 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         address _governance,
         bool _sequenced,
         bool _requireStaging,
+        bool _trackStagingReturnData,
+        bool _trackUserReturnData,
         bool _localUser,
         bool _delegateUser,
         bool _searcherStaging,
@@ -57,6 +61,8 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
 
         sequenced = _sequenced;
         requireStaging = _requireStaging;
+        trackStagingReturnData = _trackStagingReturnData;
+        trackUserReturnData = _trackUserReturnData;
         localUser = _localUser;
         delegateUser = _delegateUser;
         searcherStaging = _searcherStaging;
@@ -178,6 +184,8 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
             callConfig: CallBits.encodeCallConfig(
                 sequenced,
                 requireStaging,
+                trackStagingReturnData,
+                trackUserReturnData,
                 localUser,
                 delegateUser,
                 searcherStaging,
@@ -192,10 +200,12 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         });
     }
 
-    function _getCallConfig() internal view returns (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool) {
+    function _getCallConfig() internal view returns (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool) {
         return (
             sequenced,
             requireStaging,
+            trackStagingReturnData,
+            trackUserReturnData,
             localUser,
             delegateUser,
             searcherStaging,
@@ -209,7 +219,7 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         );
     }
 
-    function getCallConfig() external view returns (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool) {
+    function getCallConfig() external view returns (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool) {
         return _getCallConfig();
     }
 

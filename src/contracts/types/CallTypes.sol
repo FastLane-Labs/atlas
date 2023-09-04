@@ -63,6 +63,8 @@ struct ProtocolCall {
 enum CallConfig {
     Sequenced,
     CallStaging,
+    TrackStagingReturnData,
+    TrackUserReturnData,
     DelegateUser,
     LocalUser,
     SearcherStaging,

@@ -12,6 +12,8 @@ library CallBits {
         (
             bool sequenced,
             bool requireStaging,
+            bool trackStagingReturnData,
+            bool trackUserReturnData,
             bool localUser,
             bool delegateUser,
             bool searcherStaging,
@@ -28,6 +30,8 @@ library CallBits {
         callConfig = encodeCallConfig(
              sequenced,
              requireStaging,
+             trackStagingReturnData,
+             trackUserReturnData,
              localUser,
              delegateUser,
              searcherStaging,
@@ -44,6 +48,8 @@ library CallBits {
     function encodeCallConfig(
         bool sequenced,
         bool requireStaging,
+        bool trackStagingReturnData,
+        bool trackUserReturnData,
         bool localUser,
         bool delegateUser,
         bool searcherStaging,
@@ -60,6 +66,12 @@ library CallBits {
         }
         if (requireStaging) {
             callConfig ^= _ONE << uint16(CallConfig.CallStaging);
+        }
+        if (trackStagingReturnData) {
+            callConfig ^= _ONE << uint16(CallConfig.TrackStagingReturnData);
+        }
+        if (trackUserReturnData) {
+            callConfig ^= _ONE << uint16(CallConfig.TrackUserReturnData);
         }
         if (localUser) {
             callConfig ^= _ONE << uint16(CallConfig.LocalUser);
@@ -99,6 +111,14 @@ library CallBits {
 
     function needsStagingCall(uint16 callConfig) internal pure returns (bool needsStaging) {
         needsStaging = (callConfig & 1 << uint16(CallConfig.CallStaging) != 0);
+    }
+
+    function needsStagingReturnData(uint16 callConfig) internal pure returns (bool needsReturnData) {
+        needsReturnData = (callConfig & 1 << uint16(CallConfig.TrackStagingReturnData) != 0);
+    }
+
+    function needsUserReturnData(uint16 callConfig) internal pure returns (bool needsReturnData) {
+        needsReturnData = (callConfig & 1 << uint16(CallConfig.TrackUserReturnData) != 0);
     }
 
     function needsLocalUser(uint16 callConfig) internal pure returns (bool localUser) {
