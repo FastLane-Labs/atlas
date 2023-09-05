@@ -7,6 +7,11 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 
 import {BaseTest} from "./base/BaseTest.t.sol";
 
+import {SwapIntentController, SwapIntent} from "../src/contracts/intents-example/SwapIntent.sol";
+
+import {SearcherBase} from "../src/contracts/searcher/SearcherBase.sol";
+
+
 
 contract Permit69Test is BaseTest {
     function setUp() public virtual override {
@@ -32,4 +37,31 @@ contract Permit69Test is BaseTest {
 
     }
 
+}
+
+
+// This searcher magically has the tokens needed to fulfil the user's swap.
+// This might involve an offchain RFQ system
+contract SimpleRFQSearcher is SearcherBase {
+    constructor(address atlas) SearcherBase(atlas, msg.sender) {}
+
+    function fulfillRFQ(
+        SwapIntent calldata swapIntent,
+        address executionEnvironment
+    ) public payable {
+        console.log("msg.value in searcher", msg.value);
+        require(ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells, "Did not receive enough tokenIn");
+        require(ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys, "Not enough tokenOut to fulfill");
+        ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
+    }
+
+    // This ensures a function can only be called through metaFlashCall
+    // which includes security checks to work safely with Atlas
+    modifier onlySelf() {
+        require(msg.sender == address(this), "Not called via metaFlashCall");
+        _;
+    }
+
+    fallback() external payable {}
+    receive() external payable {}
 }
