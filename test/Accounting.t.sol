@@ -71,6 +71,12 @@ contract Permit69Test is BaseTest {
         // 1. Some ETH must be sent via msg.value in the metacall (???)
         // 2. The ProtocolControl contract must call donateToBundler(searcherAddress)
 
+        // TODO 
+        // Read through Escrow.sol entirely to understand gas donations and refunds
+
+        // Things Noticed:
+        // The metacall tx succeeds even though the user's intent was not fulfilled (fails before calling searcher)
+
         // msg.value settings
         uint256 userMsgValue = 2e18;
         uint256 searcherMsgValue = 1e18;

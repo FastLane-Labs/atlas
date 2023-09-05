@@ -21,7 +21,7 @@ import {CallVerification} from "../libraries/CallVerification.sol";
 import {CallBits} from "../libraries/CallBits.sol";
 import {SafetyBits} from "../libraries/SafetyBits.sol";
 
-// import "forge-std/Test.sol";
+import "forge-std/Test.sol";
 
 contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     using ECDSA for bytes32;
@@ -84,6 +84,8 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     // reimbursement mechanism is finalized.
 
     function donateToBundler(address surplusRecipient) external payable {
+        console.log("Donate to bundler called");
+        console.log("msg.value in donateToBundler:", msg.value);
         // NOTE: All donations in excess of 10% greater than cost are forwarded
         // to the surplusReceiver. 
 
