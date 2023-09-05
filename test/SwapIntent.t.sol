@@ -361,6 +361,13 @@ contract SimpleRFQSearcher is SearcherBase {
         ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
     }
 
+    // This ensures a function can only be called through metaFlashCall
+    // which includes security checks to work safely with Atlas
+    modifier onlySelf() {
+        require(msg.sender == address(this), "Not called via metaFlashCall");
+        _;
+    }
+
     fallback() external payable {}
     receive() external payable {}
 }
