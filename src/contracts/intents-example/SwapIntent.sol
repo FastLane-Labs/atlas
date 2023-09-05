@@ -60,40 +60,24 @@ contract SwapIntentController is ProtocolControl {
         ProtocolControl(
             _escrow, 
             msg.sender, 
-            false, 
-            true, 
-            false,
-            false,
-            true, 
-            true, 
-            true,
-            true, 
-            false, 
-            false, 
-            true, 
-            true,
-            true,
-            true)
+            CallConfig({
+                sequenced: false,
+                requireStaging: true,
+                trackStagingReturnData: false,
+                trackUserReturnData: false,
+                localUser: true,
+                delegateUser: true,
+                searcherStaging: true,
+                searcherFulfillment: true,
+                requireVerification: false,
+                zeroSearchers: false,
+                reuseUserOp: true,
+                userBundler: true,
+                protocolBundler: true,
+                unknownBundler: true
+            })
+        )
     {}
-
-    /*
-    constructor(
-        address escrowAddress,
-        address governanceAddress,
-        bool _sequenced, -> false
-        bool _requireStaging, -> true
-        bool _localUser, -> true
-        bool _delegateUser, -> true
-        bool _searcherStaging, -> true
-        bool _searcherFulfillment, -> true
-        bool _requireVerification, -> false
-        bool _zeroSearchers, -> false
-        bool _reuseUserOp, -> true
-        bool _userBundler, -> true
-        bool _protocolBundler, -> true
-        bool _unknownBundler -> true
-    )
-    */
 
     //////////////////////////////////
     // CONTRACT-SPECIFIC FUNCTIONS  //

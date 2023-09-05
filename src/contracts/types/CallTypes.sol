@@ -60,16 +60,33 @@ struct ProtocolCall {
     uint16 callConfig;
 }
 
-enum CallConfig {
+struct CallConfig {
+    bool sequenced;
+    bool requireStaging;
+    bool trackStagingReturnData;
+    bool trackUserReturnData;
+    bool delegateUser;
+    bool localUser;
+    bool searcherStaging;
+    bool searcherFulfillment;
+    bool requireVerification;
+    bool zeroSearchers;
+    bool reuseUserOp;
+    bool userBundler;
+    bool protocolBundler;
+    bool unknownBundler;
+}
+
+enum CallConfigIndex {
     Sequenced,
-    CallStaging,
+    RequireStaging,
     TrackStagingReturnData,
     TrackUserReturnData,
     DelegateUser,
     LocalUser,
     SearcherStaging,
     SearcherFulfillment,
-    CallVerification,
+    RequireVerification,
     ZeroSearchers,
     ReuseUserOp,
     UserBundler,

@@ -20,10 +20,7 @@ interface IProtocolControl {
 
     function getProtocolCall() external view returns (ProtocolCall memory protocolCall);
 
-    function getCallConfig()
-        external
-        view
-        returns (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool);
+    function getCallConfig() external view returns (CallConfig memory callConfig);
 
     function getPayeeData(bytes calldata data) external returns (PayeeData[] memory);
 

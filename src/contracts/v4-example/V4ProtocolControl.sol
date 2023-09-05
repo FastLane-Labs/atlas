@@ -48,40 +48,24 @@ contract V4ProtocolControl is ProtocolControl {
         ProtocolControl(
             _escrow, 
             msg.sender, 
-            false, 
-            true, 
-            false,
-            false,
-            false, 
-            false, 
-            false,
-            false, 
-            false, 
-            true, 
-            false, 
-            true,
-            true,
-            true
+            CallConfig({
+                sequenced: false,
+                requireStaging: true,
+                trackStagingReturnData: false,
+                trackUserReturnData: false,
+                localUser: false,
+                delegateUser: false,
+                searcherStaging: false,
+                searcherFulfillment: false,
+                requireVerification: false,
+                zeroSearchers: true,
+                reuseUserOp: false,
+                userBundler: true,
+                protocolBundler: true,
+                unknownBundler: true
+            })
         )
     {
-        /*
-        ProtocolControl(
-            address _escrow,
-            address _governance,
-            bool _sequenced,
-            bool _requireStaging,
-            bool _localUser,
-            bool _delegateUser,
-            bool _searcherFulfillment,
-            bool _requireVerification,
-            bool _zeroSearchers,
-            bool _reuseUserOp,
-            bool _userBundler,
-            bool _protocolBundler,
-            bool _unknownBundler
-        )
-        */
-
         hook = address(this);
         v4Singleton = _v4Singleton;
     }
