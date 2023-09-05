@@ -31,6 +31,8 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         escrow = _escrow;
         governance = _governance;
         callConfig = _callConfig;
+
+        console.log("constructor callConfig.delegateUser: %s", callConfig.delegateUser);
     }
 
     // Safety and support functions and modifiers that make the relationship between protocol
@@ -65,6 +67,7 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         validPhase(ExecutionPhase.UserCall)
         returns (bytes memory) 
     {
+        console.log("userLocalCall callConfig.delegateUser: %s", callConfig.delegateUser);
         return callConfig.delegateUser ? _userLocalDelegateCall(data) : _userLocalStandardCall(data);
     }
 
