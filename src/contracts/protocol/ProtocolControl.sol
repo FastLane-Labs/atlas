@@ -19,8 +19,7 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
     address public immutable escrow;
     address public immutable governance;
     address public immutable control;
-
-    CallConfig public callConfig;
+    uint16 public immutable callConfig;
 
     constructor(
         address _escrow,
@@ -30,9 +29,7 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         control = address(this);
         escrow = _escrow;
         governance = _governance;
-        callConfig = _callConfig;
-
-        console.log("constructor callConfig.delegateUser: %s", callConfig.delegateUser);
+        callConfig = CallBits.encodeCallConfig(_callConfig);
     }
 
     // Safety and support functions and modifiers that make the relationship between protocol
@@ -67,8 +64,7 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         validPhase(ExecutionPhase.UserCall)
         returns (bytes memory) 
     {
-        console.log("userLocalCall callConfig.delegateUser: %s", callConfig.delegateUser);
-        return callConfig.delegateUser ? _userLocalDelegateCall(data) : _userLocalStandardCall(data);
+        return CallBits.needsDelegateUser(callConfig) ? _userLocalDelegateCall(data) : _userLocalStandardCall(data);
     }
 
     function searcherPreCall(bytes calldata data) 
@@ -123,31 +119,31 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
 
     // View functions
     function userDelegated() external view returns (bool delegated) {
-        delegated = callConfig.delegateUser;
+        delegated = CallBits.needsDelegateUser(callConfig);
     }
 
     function userLocal() external view returns (bool local) {
-        local = callConfig.localUser;
+        local = CallBits.needsLocalUser(callConfig);
     }
 
     function userDelegatedLocal() external view returns (bool delegated, bool local) {
-        delegated = callConfig.delegateUser;
-        local = callConfig.localUser;
+        delegated = CallBits.needsDelegateUser(callConfig);
+        local = CallBits.needsLocalUser(callConfig);
     }
 
     function requireSequencedNonces() external view returns (bool isSequenced) {
-        isSequenced = callConfig.sequenced;
+        isSequenced = CallBits.needsSequencedNonces(callConfig);
     }
 
     function getProtocolCall() external view returns (ProtocolCall memory protocolCall) {
         protocolCall = ProtocolCall({
             to: address(this),
-            callConfig: CallBits.encodeCallConfig(callConfig)
+            callConfig: callConfig
         });
     }
 
     function _getCallConfig() internal view returns (CallConfig memory) {
-        return callConfig;
+        return CallBits.decodeCallConfig(callConfig);
     }
 
     function getCallConfig() external view returns (CallConfig memory) {

@@ -13,49 +13,68 @@ library CallBits {
         callConfig = encodeCallConfig(callconfig);
     }
 
-    function encodeCallConfig(CallConfig memory callconfig) internal pure returns (uint16 callConfig) {
-        if (callconfig.sequenced) {
-            callConfig ^= _ONE << uint16(CallConfigIndex.Sequenced);
+    function encodeCallConfig(CallConfig memory callConfig) internal pure returns (uint16 encodedCallConfig) {
+        if (callConfig.sequenced) {
+            encodedCallConfig ^= _ONE << uint16(CallConfigIndex.Sequenced);
         }
-        if (callconfig.requireStaging) {
-            callConfig ^= _ONE << uint16(CallConfigIndex.RequireStaging);
+        if (callConfig.requireStaging) {
+            encodedCallConfig ^= _ONE << uint16(CallConfigIndex.RequireStaging);
         }
-        if (callconfig.trackStagingReturnData) {
-            callConfig ^= _ONE << uint16(CallConfigIndex.TrackStagingReturnData);
+        if (callConfig.trackStagingReturnData) {
+            encodedCallConfig ^= _ONE << uint16(CallConfigIndex.TrackStagingReturnData);
         }
-        if (callconfig.trackUserReturnData) {
-            callConfig ^= _ONE << uint16(CallConfigIndex.TrackUserReturnData);
+        if (callConfig.trackUserReturnData) {
+            encodedCallConfig ^= _ONE << uint16(CallConfigIndex.TrackUserReturnData);
         }
-        if (callconfig.delegateUser) {
-            callConfig ^= _ONE << uint16(CallConfigIndex.DelegateUser);
+        if (callConfig.delegateUser) {
+            encodedCallConfig ^= _ONE << uint16(CallConfigIndex.DelegateUser);
         }
-        if (callconfig.localUser) {
-            callConfig ^= _ONE << uint16(CallConfigIndex.LocalUser);
+        if (callConfig.localUser) {
+            encodedCallConfig ^= _ONE << uint16(CallConfigIndex.LocalUser);
         }
-        if (callconfig.searcherStaging) {
-            callConfig ^= _ONE << uint16(CallConfigIndex.SearcherStaging);
+        if (callConfig.searcherStaging) {
+            encodedCallConfig ^= _ONE << uint16(CallConfigIndex.SearcherStaging);
         }
-        if (callconfig.searcherFulfillment) {
-            callConfig ^= _ONE << uint16(CallConfigIndex.SearcherFulfillment);
+        if (callConfig.searcherFulfillment) {
+            encodedCallConfig ^= _ONE << uint16(CallConfigIndex.SearcherFulfillment);
         }
-        if (callconfig.requireVerification) {
-            callConfig ^= _ONE << uint16(CallConfigIndex.RequireVerification);
+        if (callConfig.requireVerification) {
+            encodedCallConfig ^= _ONE << uint16(CallConfigIndex.RequireVerification);
         }
-        if (callconfig.zeroSearchers) {
-            callConfig ^= _ONE << uint16(CallConfigIndex.ZeroSearchers);
+        if (callConfig.zeroSearchers) {
+            encodedCallConfig ^= _ONE << uint16(CallConfigIndex.ZeroSearchers);
         }
-        if (callconfig.reuseUserOp) {
-            callConfig ^= _ONE << uint16(CallConfigIndex.ReuseUserOp);
+        if (callConfig.reuseUserOp) {
+            encodedCallConfig ^= _ONE << uint16(CallConfigIndex.ReuseUserOp);
         }
-        if (callconfig.userBundler) {
-            callConfig ^= _ONE << uint16(CallConfigIndex.UserBundler);
+        if (callConfig.userBundler) {
+            encodedCallConfig ^= _ONE << uint16(CallConfigIndex.UserBundler);
         }
-        if (callconfig.protocolBundler) {
-            callConfig ^= _ONE << uint16(CallConfigIndex.ProtocolBundler);
+        if (callConfig.protocolBundler) {
+            encodedCallConfig ^= _ONE << uint16(CallConfigIndex.ProtocolBundler);
         }
-        if (callconfig.unknownBundler) {
-            callConfig ^= _ONE << uint16(CallConfigIndex.UnknownBundler);
+        if (callConfig.unknownBundler) {
+            encodedCallConfig ^= _ONE << uint16(CallConfigIndex.UnknownBundler);
         }
+    }
+
+    function decodeCallConfig(uint16 encodedCallConfig) internal pure returns (CallConfig memory) {
+        return CallConfig({
+            sequenced: needsSequencedNonces(encodedCallConfig),
+            requireStaging: needsStagingCall(encodedCallConfig),
+            trackStagingReturnData: needsStagingReturnData(encodedCallConfig),
+            trackUserReturnData: needsUserReturnData(encodedCallConfig),
+            delegateUser: needsDelegateUser(encodedCallConfig),
+            localUser: needsLocalUser(encodedCallConfig),
+            searcherStaging: needsSearcherStaging(encodedCallConfig),
+            searcherFulfillment: needsSearcherPostCall(encodedCallConfig),
+            requireVerification: needsVerificationCall(encodedCallConfig),
+            zeroSearchers: allowsZeroSearchers(encodedCallConfig),
+            reuseUserOp: allowsReuseUserOps(encodedCallConfig),
+            userBundler: allowsUserBundler(encodedCallConfig),
+            protocolBundler: allowsProtocolBundler(encodedCallConfig),
+            unknownBundler: allowsUnknownBundler(encodedCallConfig)
+        });
     }
 
     function needsSequencedNonces(uint16 callConfig) internal pure returns (bool sequenced) {
