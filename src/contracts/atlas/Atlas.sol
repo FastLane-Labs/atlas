@@ -36,6 +36,8 @@ contract Atlas is Test, Factory {
         Verification calldata verification // supplied by front end after it sees the other data
     ) external payable {
 
+        console.log("started metacall");
+
         uint256 gasMarker = gasleft();
 
         // Verify that the calldata injection came from the protocol frontend
@@ -77,6 +79,8 @@ contract Atlas is Test, Factory {
 
         // Initialize the lock
         _initializeEscrowLock(executionEnvironment);
+
+        console.log("before this.execute in atlas");
 
         try this.execute{value: msg.value}(protocolCall, userCall.metaTx, searcherCalls, executionEnvironment, verification.proof.callChainHash) 
             returns (uint256 accruedGasRebate) {

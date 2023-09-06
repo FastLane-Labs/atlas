@@ -153,7 +153,15 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     {
         bool success;
         stagingData = abi.encodeWithSelector(IExecutionEnvironment.stagingWrapper.selector, userMetaTx);
+        
+        console.log("stagingData for before adding lockBytes:");
+        console.logBytes(stagingData);
+
         stagingData = abi.encodePacked(stagingData, lockBytes);
+
+        console.log("stagingData for stagingWrapper call:");
+        console.logBytes(stagingData);
+
         (success, stagingData) = environment.call{value: msg.value}(stagingData);
         require(success, "ERR-E001 StagingFail");
         stagingData = abi.decode(stagingData, (bytes));

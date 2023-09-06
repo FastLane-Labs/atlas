@@ -64,6 +64,8 @@ contract ExecutionEnvironment is Base {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 
+        console.log("got in staging wrapper in exec env");
+
         require(userMetaTx.to != address(this), "ERR-EV008 InvalidTo");
 
         bytes memory stagingData = abi.encodeWithSelector(

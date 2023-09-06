@@ -17,7 +17,7 @@ import {SearcherBase} from "../src/contracts/searcher/SearcherBase.sol";
 
 
 
-contract Permit69Test is BaseTest {
+contract AccountingTest is BaseTest {
 
     SwapIntentController public swapIntentController;
     TxBuilder public txBuilder;
@@ -76,10 +76,14 @@ contract Permit69Test is BaseTest {
 
         // Things Noticed:
         // The metacall tx succeeds even though the user's intent was not fulfilled (fails before calling searcher)
+        // This ^ is intended behaviour with the returns gracefully thing to record nonce,
+        // but might be misleading UX
 
         // msg.value settings
         uint256 userMsgValue = 2e18;
         uint256 searcherMsgValue = 1e18;
+
+        deal(userEOA, userMsgValue);
 
         // Same as basic SwapIntent test - Swap 10 WETH for 20 DAI
         Condition[] memory conditions;
@@ -190,9 +194,11 @@ contract Permit69Test is BaseTest {
         assertTrue(atlas.testUserCall(userCall), "UserCall tested false");
         assertTrue(atlas.testUserCall(userCall.metaTx), "UserMetaTx tested false");
 
+        console.log("user eth balance", address(userEOA).balance);
+
 
         // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
-        atlas.metacall({
+        atlas.metacall{value: userMsgValue}({
             protocolCall: protocolCall,
             userCall: userCall,
             searcherCalls: searcherCalls,
