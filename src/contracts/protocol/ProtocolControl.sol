@@ -1,9 +1,6 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
-import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
-
 import {ExecutionPhase} from "../types/LockTypes.sol";
 
 import {CallBits} from "../libraries/CallBits.sol";

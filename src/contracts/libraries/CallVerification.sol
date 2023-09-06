@@ -4,7 +4,6 @@ pragma solidity ^0.8.16;
 import {IProtocolControl} from "../interfaces/IProtocolControl.sol";
 
 import "../types/CallTypes.sol";
-import "../types/VerificationTypes.sol";
 
 library CallVerification {
     function getUserCallHash(UserMetaTx calldata userMetaTx) internal pure returns (bytes32 userCallHash) {

@@ -24,9 +24,6 @@ contract Atlas is Test, Factory {
 
     function createExecutionEnvironment(ProtocolCall calldata protocolCall) external returns (address executionEnvironment) {
         executionEnvironment = _setExecutionEnvironment(protocolCall, msg.sender, protocolCall.to.codehash);
-        //if (userNonces[msg.sender] == 0) {
-        //    unchecked{ ++userNonces[msg.sender];}
-        //}
     }
 
     function metacall(

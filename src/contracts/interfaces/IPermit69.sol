@@ -1,9 +1,6 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import "../types/CallTypes.sol";
-import "../types/VerificationTypes.sol";
-
 interface IPermit69 {
     // NOTE: IPermit69 only works inside of the Atlas environment - specifically
     // inside of the custom ExecutionEnvironments that each user deploys when

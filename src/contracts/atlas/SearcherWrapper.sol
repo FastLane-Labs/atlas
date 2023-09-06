@@ -1,14 +1,11 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
-
 import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
 
 import {FastLaneErrorsEvents} from "./Emissions.sol";
 
 import "../types/CallTypes.sol";
-import "../types/VerificationTypes.sol";
 
 import {SearcherOutcome} from "../types/EscrowTypes.sol";
  

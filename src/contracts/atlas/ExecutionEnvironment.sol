@@ -4,7 +4,6 @@ pragma solidity ^0.8.16;
 import {ISearcherContract} from "../interfaces/ISearcherContract.sol";
 import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
 import {IProtocolControl} from "../interfaces/IProtocolControl.sol";
-import {IPermit69} from "../interfaces/IPermit69.sol";
 
 import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
@@ -13,7 +12,6 @@ import {ExecutionPhase} from "../types/LockTypes.sol";
 
 import {Base} from "../protocol/ExecutionBase.sol";
 
-import {CallVerification} from "../libraries/CallVerification.sol";
 import {CallBits} from "../libraries/CallBits.sol";
 
 import "forge-std/Test.sol";
