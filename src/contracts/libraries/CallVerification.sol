@@ -11,11 +11,7 @@ library CallVerification {
         userCallHash = keccak256(abi.encode(userMetaTx));
     }
 
-    function getBidsHash(BidData[] calldata bidData) internal pure returns (bytes32 bidsHash) {
-        return keccak256(abi.encode(bidData));
-    }
-
-    function getBidsHashFromMem(BidData[] memory bidData) internal pure returns (bytes32 bidsHash) {
+    function getBidsHash(BidData[] memory bidData) internal pure returns (bytes32 bidsHash) {
         return keccak256(abi.encode(bidData));
     }
 

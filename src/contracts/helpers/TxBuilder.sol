@@ -99,7 +99,7 @@ contract TxBuilder {
             maxFeePerGas: userCall.metaTx.maxFeePerGas,
             userCallHash: userCall.metaTx.getUserCallHash(),
             controlCodeHash: protocolCall.to.codehash,
-            bidsHash: searcherCall.bids.getBidsHashFromMem(),
+            bidsHash: searcherCall.bids.getBidsHash(),
             data: searcherCallData
         });
     }
