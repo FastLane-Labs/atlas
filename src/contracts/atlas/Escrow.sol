@@ -85,7 +85,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
 
     function donateToBundler(address surplusRecipient) external payable {
         console.log("Donate to bundler called");
-        console.log("msg.value in donateToBundler:", msg.value);
+        console.log("donateToBundler: msg.value:", msg.value);
         // NOTE: All donations in excess of 10% greater than cost are forwarded
         // to the surplusReceiver. 
 
@@ -95,6 +95,9 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         }
 
         uint32 gasRebate = uint32(msg.value / tx.gasprice);
+
+        console.log("donateToBundler: tx.gasprice:", tx.gasprice);
+        console.log("donateToBundler: gasRebate:", gasRebate);
 
         uint256 donationCount = _donations.length;
 

@@ -187,6 +187,7 @@ contract SwapIntentTest is BaseTest {
         console.log("User DAI balance", DAI.balanceOf(userEOA));
         console.log("Searcher WETH balance", WETH.balanceOf(address(rfqSearcher)));
         console.log("Searcher DAI balance", DAI.balanceOf(address(rfqSearcher)));
+        console.log(""); // give space for internal logs
 
         vm.startPrank(userEOA);
         
@@ -194,8 +195,8 @@ contract SwapIntentTest is BaseTest {
         
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
-        assertTrue(atlas.testUserCall(userCall), "UserCall tested true");
-        assertTrue(atlas.testUserCall(userCall.metaTx), "UserMetaTx tested true");
+        assertTrue(atlas.testUserCall(userCall), "UserCall tested false");
+        assertTrue(atlas.testUserCall(userCall.metaTx), "UserMetaTx tested false");
 
 
         // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
