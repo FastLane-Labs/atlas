@@ -173,7 +173,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
 
     function _executeSearcherCall(
         SearcherCall calldata searcherCall,
-        bytes memory stagingReturnData,
+        bytes memory returnData,
         address environment,
         EscrowKey memory key
     ) internal returns (bool, EscrowKey memory) {
@@ -195,7 +195,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
             key = key.holdSearcherLock(searcherCall.metaTx.to);
            
             // Execute the searcher call
-            (outcome, escrowSurplus) = _searcherCallWrapper(gasLimit, environment, searcherCall, stagingReturnData, key.pack());
+            (outcome, escrowSurplus) = _searcherCallWrapper(gasLimit, environment, searcherCall, returnData, key.pack());
 
             unchecked {
                 searcherEscrow.total += uint128(escrowSurplus);
@@ -250,13 +250,13 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     function _executePayments(
         ProtocolCall calldata protocolCall,
         BidData[] calldata winningBids,
-        bytes memory data, //stagingReturnData
+        bytes memory returnData,
         address environment,
         bytes32 lockBytes
     ) internal {
         // process protocol payments
         bool success;
-        data = abi.encodeWithSelector(IExecutionEnvironment.allocateRewards.selector, winningBids, data);
+        bytes memory data = abi.encodeWithSelector(IExecutionEnvironment.allocateRewards.selector, winningBids, returnData);
         data = abi.encodePacked(data, lockBytes);
         (success, ) = environment.call(data);
         if (!success) {
@@ -265,13 +265,12 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     }
 
     function _executeVerificationCall(
-        bytes memory stagingReturnData,
-        bytes memory userReturnData,
+        bytes memory returnData,
         address environment,
         bytes32 lockBytes
     ) internal {
         bool success;
-        bytes memory verificationData = abi.encodeWithSelector(IExecutionEnvironment.verificationWrapper.selector, stagingReturnData, userReturnData);
+        bytes memory verificationData = abi.encodeWithSelector(IExecutionEnvironment.verificationWrapper.selector, returnData);
         verificationData = abi.encodePacked(verificationData, lockBytes);
         (success,) = environment.call{value: msg.value}(verificationData);
         require(success, "ERR-E005 VerificationFail");

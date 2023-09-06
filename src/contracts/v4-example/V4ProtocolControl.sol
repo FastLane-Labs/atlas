@@ -51,7 +51,7 @@ contract V4ProtocolControl is ProtocolControl {
             CallConfig({
                 sequenced: false,
                 requireStaging: true,
-                trackStagingReturnData: false,
+                trackStagingReturnData: true,
                 trackUserReturnData: false,
                 localUser: false,
                 delegateUser: false,
@@ -184,12 +184,9 @@ contract V4ProtocolControl is ProtocolControl {
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
 
-        (
-            bytes memory stagingReturnData,
-            //bytes memory userReturnData
-        ) = abi.decode(data, (bytes, bytes));
+        (bytes memory returnData) = abi.decode(data, (bytes));
 
-        StagingReturn memory stagingReturn = abi.decode(stagingReturnData, (StagingReturn));
+        StagingReturn memory stagingReturn = abi.decode(returnData, (StagingReturn));
 
         V4ProtocolControl(hook).releaseLock(stagingReturn.poolKey);
 

@@ -58,8 +58,8 @@ library CallBits {
         }
     }
 
-    function decodeCallConfig(uint16 encodedCallConfig) internal pure returns (CallConfig memory) {
-        return CallConfig({
+    function decodeCallConfig(uint16 encodedCallConfig) internal pure returns (CallConfig memory callConfig) {
+        callConfig = CallConfig({
             sequenced: needsSequencedNonces(encodedCallConfig),
             requireStaging: needsStagingCall(encodedCallConfig),
             trackStagingReturnData: needsStagingReturnData(encodedCallConfig),

@@ -63,7 +63,7 @@ contract SwapIntentController is ProtocolControl {
             CallConfig({
                 sequenced: false,
                 requireStaging: true,
-                trackStagingReturnData: false,
+                trackStagingReturnData: true,
                 trackUserReturnData: false,
                 localUser: true,
                 delegateUser: true,
@@ -191,14 +191,12 @@ contract SwapIntentController is ProtocolControl {
     }
 
     function _searcherPreCall(bytes calldata data) internal override returns (bool) {
-     
-        (address searcherTo, bytes memory stagingReturnData) = abi.decode(data, (address, bytes));
-        
+        (address searcherTo, bytes memory returnData) = abi.decode(data, (address, bytes));
         if (searcherTo == address(this) || searcherTo == _control() || searcherTo == escrow) {
             return false;
         }
 
-        SwapData memory swapData = abi.decode(stagingReturnData, (SwapData));
+        SwapData memory swapData = abi.decode(returnData, (SwapData));
 
         // Optimistically transfer the searcher contract the tokens that the user is selling
         _transferUserERC20(swapData.tokenUserSells, searcherTo, swapData.amountUserSells);
@@ -211,9 +209,9 @@ contract SwapIntentController is ProtocolControl {
     // Checking intent was fulfilled, and user has received their tokens, happens here
     function _searcherPostCall(bytes calldata data) internal override returns (bool) {
        
-        (address searcherTo, bytes memory stagingReturnData) = abi.decode(data, (address, bytes));
+        (address searcherTo, bytes memory returnData) = abi.decode(data, (address, bytes));
 
-        SwapData memory swapData = abi.decode(stagingReturnData, (SwapData));
+        SwapData memory swapData = abi.decode(returnData, (SwapData));
 
         if (swapData.searcherGasLiability > 0) {
             // NOTE: Winning searcher does not have to reimburse for other searchers
@@ -256,9 +254,9 @@ contract SwapIntentController is ProtocolControl {
         // NOTE: donateToBundler caps the donation at 110% of total gas cost.
         // Any remainder is then sent to the specified recipient. 
         // IEscrow(escrow).donateToBundler{value: address(this).balance}();
-        (,,bytes memory stagingReturnData) = abi.decode(data, (uint256, BidData[], bytes));
+        (,,bytes memory returnData) = abi.decode(data, (uint256, BidData[], bytes));
 
-        SwapData memory swapData = abi.decode(stagingReturnData, (SwapData));
+        SwapData memory swapData = abi.decode(returnData, (SwapData));
 
         if (swapData.auctionBaseCurrency != address(0)) {
             uint256 auctionTokenBalance = ERC20(swapData.auctionBaseCurrency).balanceOf(address(this));

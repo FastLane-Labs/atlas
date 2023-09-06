@@ -126,6 +126,8 @@ contract Atlas is Test, Factory {
        
         bytes32 userCallHash = userMetaTx.getUserCallHash();
 
+        uint16 callConfig = CallBits.buildCallConfig(userMetaTx.control);
+
         // Initialize the locks
         EscrowKey memory key = _buildEscrowLock(protocolCall, executionEnvironment, uint8(searcherCalls.length));
 
@@ -138,6 +140,14 @@ contract Atlas is Test, Factory {
         key = key.holdUserLock(userMetaTx.to);
         bytes memory userReturnData = _executeUserCall(userMetaTx, executionEnvironment, key.pack());
 
+        bytes memory returnData;
+        if (CallBits.needsStagingReturnData(callConfig)) {
+            returnData = stagingReturnData;
+        }
+        if (CallBits.needsUserReturnData(callConfig)) {
+            returnData = bytes.concat(returnData, userReturnData);
+        }
+
         bool auctionWon;
 
         for (; key.callIndex < key.callMax - 1;) {
@@ -145,7 +155,7 @@ contract Atlas is Test, Factory {
             // Only execute searcher meta tx if userCallHash matches 
             if (!auctionWon && userCallHash == searcherCalls[key.callIndex-2].metaTx.userCallHash) {
                 (auctionWon, key) = _searcherExecutionIteration(
-                        protocolCall, searcherCalls[key.callIndex-2], stagingReturnData, auctionWon, executionEnvironment, key
+                        protocolCall, searcherCalls[key.callIndex-2], returnData, auctionWon, executionEnvironment, key
                     );
             }
 
@@ -164,7 +174,7 @@ contract Atlas is Test, Factory {
 
         if (protocolCall.callConfig.needsVerificationCall()) {
             key = key.holdVerificationLock(address(this));
-            _executeVerificationCall(stagingReturnData, userReturnData, executionEnvironment, key.pack());
+            _executeVerificationCall(returnData, executionEnvironment, key.pack());
         }
         return uint256(key.gasRefund);
     }
@@ -172,14 +182,14 @@ contract Atlas is Test, Factory {
     function _searcherExecutionIteration(
         ProtocolCall calldata protocolCall,
         SearcherCall calldata searcherCall,
-        bytes memory stagingReturnData,
+        bytes memory returnData,
         bool auctionWon,
         address executionEnvironment,
         EscrowKey memory key
     ) internal returns (bool, EscrowKey memory) {
-        (auctionWon, key) = _executeSearcherCall(searcherCall, stagingReturnData, executionEnvironment, key);
+        (auctionWon, key) = _executeSearcherCall(searcherCall, returnData, executionEnvironment, key);
         if (auctionWon) {
-            _executePayments(protocolCall, searcherCall.bids, stagingReturnData, executionEnvironment, key.pack());
+            _executePayments(protocolCall, searcherCall.bids, returnData, executionEnvironment, key.pack());
             key = key.allocationComplete();
         }
         return (auctionWon, key);
