@@ -451,6 +451,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     {
         searcherEscrow = _escrowData[searcherCall.metaTx.from];
 
+        // TODO big unchecked block - audit/review carefully
         unchecked {
 
             if (searcherCall.metaTx.nonce <= uint256(searcherEscrow.nonce)) {

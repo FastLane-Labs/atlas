@@ -56,28 +56,18 @@ contract AccountingTest is BaseTest {
 
 
     function testSearcherEthValueIsNotDoubleCountedViaSurplusAccounting() public {
-
-        // TODO
-        // Define metacall where signer pays 2 ETH in msg.value
-        // Define searcher (attacker) who requires 1 ETH in their searcher value param
-        // Use SwapIntent as ProtocolControl because calls donateToBundler(searcherAddress)
-
-        // See donateToBundler() function in Escrow.sol
-        // which is called by Exec Env
-        // which delegatecalls donateToBundler in a ProtocolControl contract e.g. SwapIntent (_searcherPostCall)
-
-
-        // Criteria for this exploit to work:
-        // 1. Some ETH must be sent via msg.value in the metacall (???)
-        // 2. The ProtocolControl contract must call donateToBundler(searcherAddress)
-
-        // TODO 
-        // Read through Escrow.sol entirely to understand gas donations and refunds
-
         // Things Noticed:
         // The metacall tx succeeds even though the user's intent was not fulfilled (fails before calling searcher)
         // This ^ is intended behaviour with the returns gracefully thing to record nonce,
         // but might be misleading UX
+
+        // TODO New Plan
+        // 1. How do ETH funds flow in before escrowed?
+        // 2. Find accounting logic for escrowed gas balances of all searchers (source of lent ETH)
+        //  -> Escrow.sol L489 - checks if searcher escrow can meet estimated searcher gas cost
+        // 3. Find gas donation accounting logic
+        //  -> Escrow.sol donateToBundler(addr surplusRecipient) ????
+        // Any donation/repayment would be double counted
 
         // msg.value settings
         uint256 userMsgValue = 2e18;
@@ -130,7 +120,7 @@ contract AccountingTest is BaseTest {
             from: userEOA,
             to: address(swapIntentController),
             maxFeePerGas: tx.gasprice + 1,
-            value: userMsgValue,
+            value: 0,
             data: userCallData
         });
 
@@ -152,10 +142,10 @@ contract AccountingTest is BaseTest {
             searcherCallData: searcherCallData,
             searcherEOA: searcherOneEOA,
             searcherContract: address(rfqSearcher),
-            bidAmount: 1e18
+            bidAmount: 0
         });
 
-        searcherCalls[0].metaTx.value = searcherMsgValue;
+        // searcherCalls[0].metaTx.value = searcherMsgValue; // TODO add back
 
         // Searcher signs the searcherCall
         (sig.v, sig.r, sig.s) = vm.sign(searcherOnePK, atlas.getSearcherPayload(searcherCalls[0].metaTx));
@@ -196,9 +186,8 @@ contract AccountingTest is BaseTest {
 
         console.log("user eth balance", address(userEOA).balance);
 
-
-        // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
-        atlas.metacall{value: userMsgValue}({
+        // TODO start here - maybe see if msgValue comes from somewhere else? Focus on searcher value 
+        atlas.metacall{value: 0}({
             protocolCall: protocolCall,
             userCall: userCall,
             searcherCalls: searcherCalls,
@@ -230,6 +219,7 @@ contract SimpleRFQSearcher is SearcherBase {
         SwapIntent calldata swapIntent,
         address executionEnvironment
     ) public payable {
+        console.log("SEARCHER START");
         console.log("msg.value in searcher", msg.value);
         require(ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells, "Did not receive enough tokenIn");
         require(ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys, "Not enough tokenOut to fulfill");
