@@ -14,7 +14,7 @@ contract SearcherWrapper is FastLaneErrorsEvents {
         uint256 gasLimit,
         address environment,
         SearcherCall calldata searcherCall,
-        bytes memory data, //stagingReturnData
+        bytes memory returnData,
         bytes32 lockBytes
     ) internal returns (SearcherOutcome, uint256) {
         // address(this) = Atlas/Escrow
@@ -24,8 +24,8 @@ contract SearcherWrapper is FastLaneErrorsEvents {
         uint256 currentBalance = address(this).balance;
         bool success;
 
-        data = abi.encodeWithSelector(
-            IExecutionEnvironment(environment).searcherMetaTryCatch.selector, gasLimit, currentBalance, searcherCall, data);
+        bytes memory data = abi.encodeWithSelector(
+            IExecutionEnvironment(environment).searcherMetaTryCatch.selector, gasLimit, currentBalance, searcherCall, returnData);
         
         data = abi.encodePacked(data, lockBytes);
 

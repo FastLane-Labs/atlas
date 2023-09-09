@@ -11,21 +11,18 @@ interface IExecutionEnvironment {
 
     function userWrapper(UserMetaTx calldata userCall) external payable returns (bytes memory userReturnData);
 
-    function verificationWrapper(
-        bytes calldata stagingReturnData,
-        bytes calldata userReturnData
-    ) external payable;
+    function verificationWrapper(bytes calldata returnData) external payable;
 
     function searcherMetaTryCatch(
         uint256 gasLimit,
         uint256 escrowBalance,
         SearcherCall calldata searcherCall,
-        bytes calldata stagingReturnData
+        bytes calldata returnData
     ) external payable;
 
     function allocateRewards(
         BidData[] calldata bids, // Converted to memory
-        bytes memory stagingReturnData
+        bytes memory returnData
     ) external;
 
     function validateUserCall(UserMetaTx calldata userMetaTx) external view returns (bool);

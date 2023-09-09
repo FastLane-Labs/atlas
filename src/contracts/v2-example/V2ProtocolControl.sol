@@ -50,18 +50,22 @@ contract V2ProtocolControl is ProtocolControl {
         ProtocolControl(
             _escrow, 
             msg.sender, 
-            false, 
-            true, 
-            false, 
-            false, 
-            false,
-            false, 
-            false, 
-            true, 
-            false, 
-            true,
-            true,
-            true
+            CallConfig({
+                sequenced: false,
+                requireStaging: true,
+                trackStagingReturnData: false,
+                trackUserReturnData: false,
+                localUser: false,
+                delegateUser: false,
+                searcherStaging: false,
+                searcherFulfillment: false,
+                requireVerification: false,
+                zeroSearchers: true,
+                reuseUserOp: false,
+                userBundler: true,
+                protocolBundler: true,
+                unknownBundler: true
+            })
         )
     {
         govIsTok0 = (IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token0() == GOVERNANCE_TOKEN);
@@ -71,25 +75,6 @@ contract V2ProtocolControl is ProtocolControl {
             require(IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token0() == WETH, "INVALID TOKEN PAIR");
         }
     }
-
-    /*
-    constructor(
-        address _escrow,
-        address _governance,
-        bool _sequenced,
-        bool _requireStaging,
-        bool _localUser,
-        bool _delegateUser,
-        bool _searcherStaging,
-        bool _searcherFulfillment,
-        bool _requireVerification,
-        bool _zeroSearchers,
-        bool _reuseUserOp,
-        bool _userBundler,
-        bool _protocolBundler,
-        bool _unknownBundler
-    )
-    */
 
     function _stagingCall(UserMetaTx calldata userMetaTx)
         internal

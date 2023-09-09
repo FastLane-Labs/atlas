@@ -97,30 +97,28 @@ contract ExecutionEnvironment is Base {
 
         bool success;
 
-        // regular user call - executed at regular destination and not performed locally
         if (!config.needsLocalUser()) {
+            // regular user call - executed at regular destination and not performed locally
             (success, userData) = userMetaTx.to.call{value: userMetaTx.value}(
                 forward(userMetaTx.data)
             );
             require(success, "ERR-EC04a CallRevert");
 
+        } else if (config.needsDelegateUser()) {
+            userData = abi.encodeWithSelector(
+                IProtocolControl.userLocalCall.selector, userMetaTx.data
+            );
+
+            (success, userData) = _control().delegatecall(forward(userData));
+
+            require(success, "ERR-EC02 DelegateRevert");
         } else {
-            if (config.needsDelegateUser()) {
-
-                userData = abi.encodeWithSelector(
-                    IProtocolControl.userLocalCall.selector, userMetaTx.data
-                );
-
-                (success, userData) = _control().delegatecall(forward(userData));
-
-                require(success, "ERR-EC02 DelegateRevert");
-            } else {
-                revert("ERR-P02 UserCallStatic");
-            }
+            revert("ERR-P02 UserCallStatic");
         }
+        userData = abi.decode(userData, (bytes));
     }
 
-    function verificationWrapper(bytes calldata stagingReturnData, bytes calldata userReturnData) 
+    function verificationWrapper(bytes calldata returnData) 
         external 
         onlyAtlasEnvironment
         validPhase(ExecutionPhase.Verification)
@@ -129,7 +127,7 @@ contract ExecutionEnvironment is Base {
         // address(this) = ExecutionEnvironment
 
         bytes memory data = abi.encodeWithSelector(
-            IProtocolControl.verificationCall.selector, stagingReturnData, userReturnData);
+            IProtocolControl.verificationCall.selector, returnData);
         
         bool success;
         (success, data) = _control().delegatecall(forward(data));
@@ -142,7 +140,7 @@ contract ExecutionEnvironment is Base {
         uint256 gasLimit, 
         uint256 escrowBalance, 
         SearcherCall calldata searcherCall, 
-        bytes calldata stagingReturnData
+        bytes calldata returnData
     ) 
         external payable 
         onlyAtlasEnvironment 
@@ -184,7 +182,7 @@ contract ExecutionEnvironment is Base {
         // Handle any searcher staging, if necessary
         if (_config().needsSearcherStaging()) {
 
-            bytes memory data = abi.encode(searcherCall.metaTx.to, stagingReturnData);
+            bytes memory data = abi.encode(searcherCall.metaTx.to, returnData);
 
             data = abi.encodeWithSelector(
                 IProtocolControl.searcherPreCall.selector, 
@@ -218,7 +216,7 @@ contract ExecutionEnvironment is Base {
         // If this was a user intent, handle and verify fulfillment
         if (_config().needsSearcherPostCall()) {
             
-            bytes memory data = stagingReturnData;
+            bytes memory data = returnData;
 
             data = abi.encode(searcherCall.metaTx.to, data);
 
@@ -289,7 +287,7 @@ contract ExecutionEnvironment is Base {
         }
     }
 
-    function allocateRewards(BidData[] calldata bids, bytes memory stagingReturnData) 
+    function allocateRewards(BidData[] calldata bids, bytes memory returnData) 
         external 
         onlyAtlasEnvironment
         validPhase(ExecutionPhase.HandlingPayments)
@@ -320,7 +318,7 @@ contract ExecutionEnvironment is Base {
             }
         }
 
-        bytes memory allocateData = abi.encodeWithSelector(IProtocolControl.allocatingCall.selector, abi.encode(totalEtherReward, bids, stagingReturnData));
+        bytes memory allocateData = abi.encodeWithSelector(IProtocolControl.allocatingCall.selector, abi.encode(totalEtherReward, bids, returnData));
 
         (bool success,) = _control().delegatecall(forward(allocateData));
         require(success, "ERR-EC02 DelegateRevert");

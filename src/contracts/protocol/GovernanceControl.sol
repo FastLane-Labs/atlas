@@ -115,7 +115,7 @@ abstract contract GovernanceControl {
     // Details:
     //  Data should be decoded as:
     //
-    //    address searcherTo, bytes memory stagingReturnData
+    //    address searcherTo, bytes memory returnData
     //
     //  fulfillment(staging)/delegatecall =
     //      Inputs: staging call's returnData, winning searcher to address
@@ -137,7 +137,7 @@ abstract contract GovernanceControl {
     //
     //  Data should be decoded as:
     //
-    //    address searcherTo, bytes memory stagingReturnData
+    //    address searcherTo, bytes memory returnData
     //
 
     //  fulfillment(verification)/delegatecall =
@@ -159,8 +159,7 @@ abstract contract GovernanceControl {
     //
     // Data should be decoded as:
     //
-    //    bytes memory stagingReturnData,
-    //    bytes memory userReturnData
+    //    bytes memory returnData
     //
 
     // _verificationCall

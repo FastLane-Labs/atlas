@@ -48,38 +48,24 @@ contract V4ProtocolControl is ProtocolControl {
         ProtocolControl(
             _escrow, 
             msg.sender, 
-            false, 
-            true, 
-            false, 
-            false, 
-            false,
-            false, 
-            false, 
-            true, 
-            false, 
-            true,
-            true,
-            true
+            CallConfig({
+                sequenced: false,
+                requireStaging: true,
+                trackStagingReturnData: true,
+                trackUserReturnData: false,
+                localUser: false,
+                delegateUser: false,
+                searcherStaging: false,
+                searcherFulfillment: false,
+                requireVerification: false,
+                zeroSearchers: true,
+                reuseUserOp: false,
+                userBundler: true,
+                protocolBundler: true,
+                unknownBundler: true
+            })
         )
     {
-        /*
-        ProtocolControl(
-            address _escrow,
-            address _governance,
-            bool _sequenced,
-            bool _requireStaging,
-            bool _localUser,
-            bool _delegateUser,
-            bool _searcherFulfillment,
-            bool _requireVerification,
-            bool _zeroSearchers,
-            bool _reuseUserOp,
-            bool _userBundler,
-            bool _protocolBundler,
-            bool _unknownBundler
-        )
-        */
-
         hook = address(this);
         v4Singleton = _v4Singleton;
     }
@@ -198,12 +184,9 @@ contract V4ProtocolControl is ProtocolControl {
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
 
-        (
-            bytes memory stagingReturnData,
-            //bytes memory userReturnData
-        ) = abi.decode(data, (bytes, bytes));
+        (bytes memory returnData) = abi.decode(data, (bytes));
 
-        StagingReturn memory stagingReturn = abi.decode(stagingReturnData, (StagingReturn));
+        StagingReturn memory stagingReturn = abi.decode(returnData, (StagingReturn));
 
         V4ProtocolControl(hook).releaseLock(stagingReturn.poolKey);
 

@@ -55,38 +55,24 @@ contract SwapIntentController is ProtocolControl {
         ProtocolControl(
             _escrow, 
             msg.sender, 
-            false, 
-            true, 
-            true, 
-            true, 
-            true,
-            true, 
-            false, 
-            false, 
-            true, 
-            true,
-            true,
-            true)
+            CallConfig({
+                sequenced: false,
+                requireStaging: true,
+                trackStagingReturnData: true,
+                trackUserReturnData: false,
+                localUser: true,
+                delegateUser: true,
+                searcherStaging: true,
+                searcherFulfillment: true,
+                requireVerification: false,
+                zeroSearchers: false,
+                reuseUserOp: true,
+                userBundler: true,
+                protocolBundler: true,
+                unknownBundler: true
+            })
+        )
     {}
-
-    /*
-    constructor(
-        address escrowAddress,
-        address governanceAddress,
-        bool _sequenced, -> false
-        bool _requireStaging, -> true
-        bool _localUser, -> true
-        bool _delegateUser, -> true
-        bool _searcherStaging, -> true
-        bool _searcherFulfillment, -> true
-        bool _requireVerification, -> false
-        bool _zeroSearchers, -> false
-        bool _reuseUserOp, -> true
-        bool _userBundler, -> true
-        bool _protocolBundler, -> true
-        bool _unknownBundler -> true
-    )
-    */
 
     //////////////////////////////////
     // CONTRACT-SPECIFIC FUNCTIONS  //
@@ -200,14 +186,12 @@ contract SwapIntentController is ProtocolControl {
     }
 
     function _searcherPreCall(bytes calldata data) internal override returns (bool) {
-     
-        (address searcherTo, bytes memory stagingReturnData) = abi.decode(data, (address, bytes));
-        
+        (address searcherTo, bytes memory returnData) = abi.decode(data, (address, bytes));
         if (searcherTo == address(this) || searcherTo == _control() || searcherTo == escrow) {
             return false;
         }
 
-        SwapData memory swapData = abi.decode(stagingReturnData, (SwapData));
+        SwapData memory swapData = abi.decode(returnData, (SwapData));
 
         // Optimistically transfer the searcher contract the tokens that the user is selling
         _transferUserERC20(swapData.tokenUserSells, searcherTo, swapData.amountUserSells);
@@ -220,9 +204,9 @@ contract SwapIntentController is ProtocolControl {
     // Checking intent was fulfilled, and user has received their tokens, happens here
     function _searcherPostCall(bytes calldata data) internal override returns (bool) {
        
-        (address searcherTo, bytes memory stagingReturnData) = abi.decode(data, (address, bytes));
+        (address searcherTo, bytes memory returnData) = abi.decode(data, (address, bytes));
 
-        SwapData memory swapData = abi.decode(stagingReturnData, (SwapData));
+        SwapData memory swapData = abi.decode(returnData, (SwapData));
 
         if (swapData.searcherGasLiability > 0) {
             // NOTE: Winning searcher does not have to reimburse for other searchers
@@ -265,9 +249,9 @@ contract SwapIntentController is ProtocolControl {
         // NOTE: donateToBundler caps the donation at 110% of total gas cost.
         // Any remainder is then sent to the specified recipient. 
         // IEscrow(escrow).donateToBundler{value: address(this).balance}();
-        (,,bytes memory stagingReturnData) = abi.decode(data, (uint256, BidData[], bytes));
+        (,,bytes memory returnData) = abi.decode(data, (uint256, BidData[], bytes));
 
-        SwapData memory swapData = abi.decode(stagingReturnData, (SwapData));
+        SwapData memory swapData = abi.decode(returnData, (SwapData));
 
         if (swapData.auctionBaseCurrency != address(0)) {
             uint256 auctionTokenBalance = ERC20(swapData.auctionBaseCurrency).balanceOf(address(this));

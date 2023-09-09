@@ -4,12 +4,9 @@ pragma solidity ^0.8.16;
 import "../types/CallTypes.sol";
 
 interface IProtocolControl {
-
     function validateUserCall(UserMetaTx calldata userMetaTx) external view returns (bool);
 
-    function stagingCall(UserMetaTx calldata userMetaTx)
-        external
-        returns (bytes memory);
+    function stagingCall(UserMetaTx calldata userMetaTx) external returns (bytes memory);
 
     function userLocalCall(bytes calldata data) external returns (bytes memory);
 
@@ -23,8 +20,8 @@ interface IProtocolControl {
 
     function getProtocolCall() external view returns (ProtocolCall memory protocolCall);
 
-    function getCallConfig() external view returns (bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool);
-    
+    function getCallConfig() external view returns (CallConfig memory callConfig);
+
     function getPayeeData(bytes calldata data) external returns (PayeeData[] memory);
 
     function getBidFormat(UserMetaTx calldata userMetaTx) external view returns (BidData[] memory);
@@ -46,5 +43,4 @@ interface IProtocolControl {
     function allocatingDelegated() external view returns (bool delegated);
 
     function verificationDelegated() external view returns (bool delegated);
-
 }
