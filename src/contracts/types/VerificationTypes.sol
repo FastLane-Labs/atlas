@@ -7,12 +7,6 @@ struct Verification {
     bytes signature;
 }
 
-struct CallChainProof {
-    bytes32 previousHash;
-    bytes32 targetHash;
-    uint256 index;
-}
-
 struct ProtocolProof {
     address from;
     address to;

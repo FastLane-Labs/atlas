@@ -1,8 +1,6 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
-
 import "../types/CallTypes.sol";
 
 import "forge-std/Test.sol";

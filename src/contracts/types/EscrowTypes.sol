@@ -14,13 +14,6 @@ struct SearcherWithdrawal {
     uint64 availableOn; // block.number when funds are available.
 }
 
-struct ValueTracker {
-    uint128 starting;
-    uint128 transferredIn;
-    uint128 transferredOut;
-    uint128 gasRebate;
-}
-
 struct GasDonation {
     address recipient;
     uint32 net;

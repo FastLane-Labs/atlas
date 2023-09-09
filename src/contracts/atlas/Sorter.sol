@@ -1,14 +1,11 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
-import {IAtlas} from "../interfaces/IAtlas.sol";
 import {IEscrow} from "../interfaces/IEscrow.sol";
 import {IProtocolControl} from "../interfaces/IProtocolControl.sol";
 
 import "../types/CallTypes.sol";
 
-import {CallBits} from "../libraries/CallBits.sol";
 import {CallVerification} from "../libraries/CallVerification.sol";
 
 import "forge-std/Test.sol";

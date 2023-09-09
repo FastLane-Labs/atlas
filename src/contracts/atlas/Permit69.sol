@@ -2,10 +2,8 @@
 pragma solidity ^0.8.16;
 
 import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
-//import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
 
 import "../types/LockTypes.sol";
-import {ProtocolCall} from "../types/CallTypes.sol";
 import {EXECUTION_PHASE_OFFSET, SAFETY_LEVEL_OFFSET} from "../libraries/SafetyBits.sol";
 
 // NOTE: IPermit69 only works inside of the Atlas environment - specifically

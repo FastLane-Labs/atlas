@@ -7,8 +7,6 @@ import {IEscrow} from "../interfaces/IEscrow.sol";
 import {IAtlas} from "../interfaces/IAtlas.sol";
 
 import "../types/CallTypes.sol";
-import "../types/EscrowTypes.sol";
-import "../types/LockTypes.sol";
 import "../types/VerificationTypes.sol";
 
 import {CallVerification} from "../libraries/CallVerification.sol";
@@ -99,7 +97,7 @@ contract TxBuilder {
             maxFeePerGas: userCall.metaTx.maxFeePerGas,
             userCallHash: userCall.metaTx.getUserCallHash(),
             controlCodeHash: protocolCall.to.codehash,
-            bidsHash: searcherCall.bids.getBidsHashFromMem(),
+            bidsHash: searcherCall.bids.getBidsHash(),
             data: searcherCallData
         });
     }

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.16;
 
 import {IProtocolControl} from "../interfaces/IProtocolControl.sol";
-import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
 
 import {Escrow} from "./Escrow.sol";
 import {Mimic} from "./Mimic.sol";
@@ -10,7 +9,6 @@ import {ExecutionEnvironment} from "./ExecutionEnvironment.sol";
 import {Permit69} from "./Permit69.sol";
 
 import "../types/CallTypes.sol";
-import {EscrowKey} from "../types/LockTypes.sol";
 
 import "forge-std/Test.sol";
 
@@ -26,30 +24,6 @@ contract Factory is Test, Escrow, Permit69 {
         execution =
             _deployExecutionEnvironmentTemplate(address(this), ProtocolCall({to: address(0), callConfig: uint16(0)}));
     }
-
-    // USER TOKEN WITHDRAWAL FUNCS
-    /*
-    function withdrawERC20(address token, uint256 amount, ProtocolCall memory protocolCall) external {
-       
-        if (protocolCall.callConfig == uint16(0)) {
-            protocolCall = IProtocolControl(protocolCall.to).getProtocolCall();
-        }
-
-        IExecutionEnvironment(
-            _getExecutionEnvironmentCustom(msg.sender, protocolCall)
-        ).factoryWithdrawERC20(msg.sender, token, amount);
-    }
-
-    function withdrawEther(uint256 amount, ProtocolCall memory protocolCall) external {
-        if (protocolCall.callConfig == uint16(0)) {
-            protocolCall = IProtocolControl(protocolCall.to).getProtocolCall();
-        }
-
-        IExecutionEnvironment(
-            _getExecutionEnvironmentCustom(msg.sender, protocolCall)
-        ).factoryWithdrawEther(msg.sender, amount);
-    }
-    */
 
     // GETTERS
     function environment() public view override returns (address _environment) {

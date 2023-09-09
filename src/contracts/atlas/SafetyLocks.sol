@@ -1,14 +1,11 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
-
 import {SafetyBits} from "../libraries/SafetyBits.sol";
 import {CallBits} from "../libraries/CallBits.sol";
 
 import {ProtocolCall, UserMetaTx} from "../types/CallTypes.sol";
 import "../types/LockTypes.sol";
-import "../types/EscrowTypes.sol";
 
 import "forge-std/Test.sol";
 
@@ -53,8 +50,4 @@ contract SafetyLocks is Test {
     function _releaseEscrowLock() internal {
         delete activeEnvironment;
     }
-
-    //////////////////////////////////
-    ////////////  GETTERS  ///////////
-    //////////////////////////////////
 }

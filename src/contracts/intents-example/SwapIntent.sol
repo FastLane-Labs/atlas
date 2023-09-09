@@ -5,14 +5,9 @@ pragma solidity ^0.8.16;
 import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
 // Atlas Base Imports
-import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
-import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
 import {IEscrow} from "../interfaces/IEscrow.sol";
 
-import {SafetyBits} from "../libraries/SafetyBits.sol";
-
 import "../types/CallTypes.sol";
-import "../types/LockTypes.sol";
 
 // Atlas Protocol-Control Imports
 import {ProtocolControl} from "../protocol/ProtocolControl.sol";

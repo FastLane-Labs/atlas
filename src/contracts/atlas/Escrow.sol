@@ -14,10 +14,8 @@ import {ProtocolVerifier} from "./ProtocolVerification.sol";
 import "../types/CallTypes.sol";
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
-import "../types/VerificationTypes.sol";
 
 import {EscrowBits} from "../libraries/EscrowBits.sol";
-import {CallVerification} from "../libraries/CallVerification.sol";
 import {CallBits} from "../libraries/CallBits.sol";
 import {SafetyBits} from "../libraries/SafetyBits.sol";
 
