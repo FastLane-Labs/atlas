@@ -94,7 +94,7 @@ contract Base {
 
     function _config() internal pure returns (uint32 config) {
         assembly {
-            config := shr(240, calldataload(sub(calldatasize(), 36)))
+            config := shr(224, calldataload(sub(calldatasize(), 36)))
         }
     }
 
