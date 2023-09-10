@@ -8,6 +8,7 @@ import {IProtocolControl} from "../interfaces/IProtocolControl.sol";
 import {Sorter} from "./Sorter.sol";
 
 import "../types/CallTypes.sol";
+import "../types/VerificationTypes.sol";
 
 struct StoredSearcherOperation {
     address from;
@@ -54,8 +55,8 @@ enum DurationType {
     ManualSearcher, // A searcher can end the auction
     ManualAny, // Anyone can end the auction
     SpecificBlock, // End on a specific block
-    SpecificTime, // End at a specific timestamp (ill advised)
     DurationBlock, // End after a specific number of blocks have passed
+    SpecificTime, // End at a specific timestamp (ill advised)
     DurationTime // End after a specific amount of time has passed (ill advised)
 }
 
@@ -63,6 +64,42 @@ struct AuctionDuration {
     DurationType dType;
     address caller;
     uint64 value;
+}
+
+function setDuration(AuctionDuration memory duration) view returns (AuctionDuration memory) {
+    DurationType dType = duration.dType;
+    
+    if (dType == DurationType.DurationBlock) {
+        duration.value += uint64(block.number);
+
+    } else if (dType == DurationType.DurationTime) {
+        duration.value += uint64(block.timestamp); // for the L2s?
+    } 
+
+    return duration;
+}
+
+function confirmDuration(AuctionDuration memory duration) view returns (bool) {
+    DurationType dType = duration.dType;
+    uint8 dByte = uint8(dType);
+
+    // case: msg.sender check
+    if (dByte < uint8(DurationType.ManualAny)) {
+        return msg.sender == duration.caller;
+    }
+
+    // case: any
+    if (dType == DurationType.ManualAny) {
+        return true;
+    }
+
+    // case:  a block.number check
+    if (dByte < uint8(DurationType.SpecificTime)) {
+        return duration.value >= uint64(block.number);
+    }
+
+    // case: time stamp check
+    return duration.value >= uint64(block.timestamp);
 }
 
 struct Auction {
@@ -77,6 +114,7 @@ struct Auction {
 // Designed for a magical world in which concerns over gas cost 
 // don't lead to a dependency on centralized infrastructure...
 contract BidManager is Sorter {
+    using {setDuration, confirmDuration} for AuctionDuration;
 
     uint256 immutable public maxSearcherBids; // 32
     uint64 immutable public reputationScalingFactor; // 1_000
@@ -119,7 +157,7 @@ contract BidManager is Sorter {
             active: true,
             bidCount: 0,
             executionEnvironment: executionEnvironment,
-            duration: duration,
+            duration: duration.setDuration(),
             userOperation: userCall.metaTx
         });
     }
@@ -196,6 +234,76 @@ contract BidManager is Sorter {
         });
     }
 
+    function processAuction(UserCall calldata userCall) external {
+        uint256 gasMeter = gasleft();
+
+        bytes32 auctionKey = _getAuctionKey(userCall.metaTx);
+
+        Auction memory auction = _auctions[auctionKey];
+
+        require(auction.duration.confirmDuration(), "ERR-BM008 AuctionIncomplete");
+
+        SearcherCall[] memory searcherCalls = new SearcherCall[](auction.bidCount);
+
+        bytes memory nullBytes;
+        BidPointer memory ptr;
+        StoredSearcherOperation memory storedOp;
+        bytes32 key;
+
+        uint256 i;
+        for (;i<auction.bidCount;) {
+            key = keccak256(abi.encodePacked(auctionKey, i));
+            ptr = _bids[key];
+            storedOp = _searchers[ptr.from].ops[ptr.searcherIndex];
+            
+            searcherCalls[i] = SearcherCall({
+                to: atlas,
+                metaTx: SearcherMetaTx({
+                    from: storedOp.from,
+                    to: storedOp.to,
+                    value: storedOp.value,
+                    gas: storedOp.gas,
+                    nonce: storedOp.nonce,
+                    maxFeePerGas: storedOp.maxFeePerGas,
+                    deadline: uint256(storedOp.deadline),
+                    userCallHash: storedOp.userCallHash,
+                    controlCodeHash: storedOp.controlCodeHash,
+                    bidsHash: bytes32(0), // already verified
+                    data: storedOp.data
+                }),
+                signature: nullBytes,
+                bids: storedOp.searcherBid
+            });
+
+            delete _searchers[ptr.from].ops[ptr.searcherIndex];
+            delete _bids[key];
+            
+            key = keccak256(abi.encodePacked(auctionKey, ptr.from));
+            delete _active[key];
+            
+            unchecked {++i;}
+        }
+
+        delete _auctions[auctionKey];
+
+        searcherCalls = _sortBids(userCall, searcherCalls);
+
+        Verification memory verification;
+        ProtocolCall memory protocolCall = IProtocolControl(userCall.metaTx.control).getProtocolCall();
+    
+        // Forward the extra gas costs from the auctioneering to Atlas as calldata
+        (bool success,) = atlas.call(
+            abi.encodePacked(
+                abi.encodeWithSelector(
+                    IAtlas.metacall.selector, protocolCall, userCall, searcherCalls, verification
+                ),
+                gasMeter
+            )
+        );
+        require(success, "ERR-BM009 MetacallFailure");
+    }
+
+    // Helpers
     function getAuctionKey(UserMetaTx calldata userMetaTx) external pure returns (bytes32 auctionKey) {
         auctionKey = keccak256(abi.encode(userMetaTx));
     }

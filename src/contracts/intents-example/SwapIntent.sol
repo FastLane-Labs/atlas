@@ -25,7 +25,7 @@ struct SwapIntent {
     uint256 amountUserBuys;
     address tokenUserSells;
     uint256 amountUserSells;
-    address auctionBaseCurrency; // NOTE: Typically will be address(0) / ETH for gas refund
+    address auctionBaseCurrency; // Searchers compete to give the most (or take the least) of this token. 
     bool searcherMustReimburseGas; // If true, the searcher must reimburse the bundler for the user's and control's gas cost 
     Condition[] conditions; // Optional. Address and calldata that the user can staticcall to verify arbitrary conditions on chain
 }

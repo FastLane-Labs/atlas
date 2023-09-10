@@ -55,18 +55,45 @@ contract Sorter {
         return searcherCallsSorted;
     }
 
+    function _sortBids(
+        UserCall calldata userCall, 
+        SearcherCall[] memory searcherCalls
+    ) internal view returns (SearcherCall[] memory) {
+
+        ProtocolCall memory protocolCall = IProtocolControl(userCall.metaTx.control).getProtocolCall();
+
+        uint256 count = searcherCalls.length;
+
+        (SortingData[] memory sortingData, uint256 invalid) = _getSortingData(
+            protocolCall, userCall, searcherCalls, count);
+
+        uint256[] memory sorted = _sort(sortingData, count, invalid);
+
+        SearcherCall[] memory searcherCallsSorted = new SearcherCall[](count - invalid);
+
+        count -= invalid;
+        uint256 i = 0;
+
+        for (;i<count;) {
+            searcherCallsSorted[i] = searcherCalls[sorted[i]];
+            unchecked { ++i; }
+        }
+
+        return searcherCallsSorted;
+    }
+
     function _verifyBidFormat(
         BidData[] memory bidFormat, 
-        SearcherCall calldata searcherCall
+        BidData[] memory bids
     ) internal pure returns (bool) {
         uint256 count = bidFormat.length;
-        if (searcherCall.bids.length != count) {
+        if (bids.length != count) {
             return false;
         }
 
         uint256 i;
         for (;i<count;) {
-            if (searcherCall.bids[i].token != bidFormat[i].token) {
+            if (bids[i].token != bidFormat[i].token) {
                 return false;
             }
             unchecked{ ++i; }
@@ -77,43 +104,43 @@ contract Sorter {
     function _verifySearcherEligibility(
         ProtocolCall memory protocolCall,
         UserMetaTx calldata userMetaTx, 
-        SearcherCall calldata searcherCall
+        SearcherMetaTx memory searcherMetaTx
     ) internal view returns (bool) {
         // Verify that the searcher submitted the correct callhash
         bytes32 userCallHash = CallVerification.getUserCallHash(userMetaTx);
-        if (searcherCall.metaTx.userCallHash != userCallHash) {
+        if (searcherMetaTx.userCallHash != userCallHash) {
             return false;
         }
 
         // Make sure the searcher has enough funds escrowed
         // TODO: subtract any pending withdrawals
         if (!protocolCall.callConfig.needsOnChainBids()) {
-            uint256 searcherBalance = IEscrow(escrow).searcherEscrowBalance(searcherCall.metaTx.from);
-            if (searcherBalance < searcherCall.metaTx.maxFeePerGas * searcherCall.metaTx.gas) {
+            uint256 searcherBalance = IEscrow(escrow).searcherEscrowBalance(searcherMetaTx.from);
+            if (searcherBalance < searcherMetaTx.maxFeePerGas * searcherMetaTx.gas) {
                 return false;
             }
 
             // Searchers can only do one tx per block - this prevents double counting escrow balances.
             // TODO: Add in "targetBlockNumber" as an arg?
-            uint256 searcherLastActiveBlock = IEscrow(escrow).searcherLastActiveBlock(searcherCall.metaTx.from);
+            uint256 searcherLastActiveBlock = IEscrow(escrow).searcherLastActiveBlock(searcherMetaTx.from);
             if (searcherLastActiveBlock >= block.number) {
                 return false;
             }
 
             // Make sure the searcher nonce is accurate
-            uint256 nextSearcherNonce = IEscrow(escrow).nextSearcherNonce(searcherCall.metaTx.from);
-            if (nextSearcherNonce != searcherCall.metaTx.nonce) {
+            uint256 nextSearcherNonce = IEscrow(escrow).nextSearcherNonce(searcherMetaTx.from);
+            if (nextSearcherNonce != searcherMetaTx.nonce) {
                 return false;
             }
         }
 
         // Make sure that the searcher has the correct codehash for protocol control contract
-        if (protocolCall.to.codehash != searcherCall.metaTx.controlCodeHash) {
+        if (protocolCall.to.codehash != searcherMetaTx.controlCodeHash) {
             return false;
         }
 
         // Make sure that the searcher's maxFeePerGas matches or exceeds the user's
-        if (searcherCall.metaTx.maxFeePerGas < userMetaTx.maxFeePerGas) {
+        if (searcherMetaTx.maxFeePerGas < userMetaTx.maxFeePerGas) {
             return false;
         }
 
@@ -123,7 +150,7 @@ contract Sorter {
     function _getSortingData(
         ProtocolCall memory protocolCall, 
         UserCall calldata userCall, 
-        SearcherCall[] calldata searcherCalls,
+        SearcherCall[] memory searcherCalls,
         uint256 count
     ) internal view returns (SortingData[] memory, uint256){
 
@@ -135,8 +162,8 @@ contract Sorter {
         uint256 invalid;
         for (;i<count;) {
             if (
-                _verifyBidFormat(bidFormat, searcherCalls[i]) && 
-                _verifySearcherEligibility(protocolCall, userCall.metaTx, searcherCalls[i])
+                _verifyBidFormat(bidFormat, searcherCalls[i].bids) && 
+                _verifySearcherEligibility(protocolCall, userCall.metaTx, searcherCalls[i].metaTx)
             ) {
                 sortingData[i] = SortingData({
                     amount: IProtocolControl(protocolCall.to).getBidValue(searcherCalls[i]),
