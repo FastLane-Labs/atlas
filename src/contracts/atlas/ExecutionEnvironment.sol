@@ -21,7 +21,7 @@ import {
 } from "./Emissions.sol";
 
 contract ExecutionEnvironment is Base {
-    using CallBits for uint16;
+    using CallBits for uint32;
     
     constructor(address _atlas) Base(_atlas) {}
 
@@ -91,7 +91,7 @@ contract ExecutionEnvironment is Base {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 
-        uint16 config = _config();
+        uint32 config = _config();
 
         require(address(this).balance >= userMetaTx.value, "ERR-CE01 ValueExceedsBalance");
 
@@ -419,7 +419,7 @@ contract ExecutionEnvironment is Base {
         control = _control();
     }
 
-    function getConfig() external pure returns (uint16 config) {
+    function getConfig() external pure returns (uint32 config) {
         config = _config();
     }
 

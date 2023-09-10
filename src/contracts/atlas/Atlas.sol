@@ -17,7 +17,7 @@ import "forge-std/Test.sol";
 
 contract Atlas is Test, Factory {
     using CallVerification for UserMetaTx;
-    using CallBits for uint16;
+    using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
     constructor(uint32 _escrowDuration) Factory(_escrowDuration) {}
@@ -123,7 +123,7 @@ contract Atlas is Test, Factory {
        
         bytes32 userCallHash = userMetaTx.getUserCallHash();
 
-        uint16 callConfig = CallBits.buildCallConfig(userMetaTx.control);
+        uint32 callConfig = CallBits.buildCallConfig(userMetaTx.control);
 
         // Initialize the locks
         EscrowKey memory key = _buildEscrowLock(protocolCall, executionEnvironment, uint8(searcherCalls.length));
@@ -194,21 +194,21 @@ contract Atlas is Test, Factory {
 
     function testUserCall(UserMetaTx calldata userMetaTx) external view returns (bool) {
         address control = userMetaTx.control;
-        uint16 callConfig = CallBits.buildCallConfig(control);
+        uint32 callConfig = CallBits.buildCallConfig(control);
         return _testUserCall(userMetaTx, control, callConfig);
     }
 
     function testUserCall(UserCall calldata userCall) external view returns (bool) {
         if (userCall.to != address(this)) {return false;}
         address control = userCall.metaTx.control;
-        uint16 callConfig = CallBits.buildCallConfig(control);
+        uint32 callConfig = CallBits.buildCallConfig(control);
 
         ProtocolCall memory protocolCall = ProtocolCall(userCall.metaTx.control, callConfig);
 
         return _validateUser(protocolCall, userCall) && _testUserCall(userCall.metaTx, control, callConfig);
     }
 
-    function _testUserCall(UserMetaTx calldata userMetaTx, address control, uint16 callConfig) internal view returns (bool) {
+    function _testUserCall(UserMetaTx calldata userMetaTx, address control, uint32 callConfig) internal view returns (bool) {
         if (callConfig == 0) {
             return false;
         }

@@ -21,7 +21,7 @@ library CallVerification {
     ) internal pure returns (bytes32 callSequenceHash) {
         
         uint256 i;
-        if (protocolCall.callConfig & 1 << uint16(CallConfigIndex.RequireStaging) != 0) {
+        if (protocolCall.callConfig & 1 << uint32(CallConfigIndex.RequireStaging) != 0) {
             // Start with staging call if staging is needed
             callSequenceHash = keccak256(
                 abi.encodePacked(

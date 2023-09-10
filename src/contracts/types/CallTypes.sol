@@ -57,7 +57,7 @@ struct PaymentData {
 
 struct ProtocolCall {
     address to;
-    uint16 callConfig;
+    uint32 callConfig;
 }
 
 struct CallConfig {

@@ -309,7 +309,7 @@ contract MockAtlasForPermit69Tests is Permit69 {
         address user,
         bytes32 controlCodeHash,
         address protocolControl,
-        uint16 callConfig
+        uint32 callConfig
     ) internal view virtual override returns (address activeEnvironment) {
         activeEnvironment = _environment;
     }

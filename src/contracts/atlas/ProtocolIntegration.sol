@@ -8,7 +8,7 @@ import {CallBits} from "../libraries/CallBits.sol";
 import "../types/GovernanceTypes.sol";
 
 contract ProtocolIntegration {
-    using CallBits for uint16;
+    using CallBits for uint32;
 
     // NOTE: To prevent builder censorship, protocol nonces can be
     // processed in any order so long as they arent duplicated and
@@ -31,7 +31,7 @@ contract ProtocolIntegration {
 
         require(signatories[owner].governance == address(0), "ERR-V49 OwnerActive");
 
-        uint16 callConfig = CallBits.buildCallConfig(protocolControl);
+        uint32 callConfig = CallBits.buildCallConfig(protocolControl);
 
         governance[protocolControl] =
             GovernanceData({governance: owner, callConfig: callConfig, lastUpdate: uint64(block.number)});

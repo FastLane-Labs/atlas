@@ -92,63 +92,63 @@ contract Base {
         }
     }
 
-    function _config() internal pure returns (uint16 config) {
+    function _config() internal pure returns (uint32 config) {
         assembly {
-            config := shr(240, calldataload(sub(calldatasize(), 34)))
+            config := shr(240, calldataload(sub(calldatasize(), 36)))
         }
     }
 
     function _control() internal pure returns (address control) {
         assembly {
-            control := shr(96, calldataload(sub(calldatasize(), 54)))
+            control := shr(96, calldataload(sub(calldatasize(), 56)))
         }
     }
 
     function _user() internal pure returns (address user) {
         assembly {
-            user := shr(96, calldataload(sub(calldatasize(), 74)))
+            user := shr(96, calldataload(sub(calldatasize(), 76)))
         }
     }
 
     function _gasRefund() internal pure returns (uint32 gasRefund) {
         assembly {
-            gasRefund := shr(224, calldataload(sub(calldatasize(), 80)))
+            gasRefund := shr(224, calldataload(sub(calldatasize(), 82)))
         }
     }
 
     function _lockState() internal pure returns (uint16 lockState) {
         assembly {
-            lockState := shr(240, calldataload(sub(calldatasize(), 82)))
+            lockState := shr(240, calldataload(sub(calldatasize(), 84)))
         }
     }
 
     function _callMax() internal pure returns (uint8 callMax) {
         assembly {
-            callMax := shr(248, calldataload(sub(calldatasize(), 83)))
+            callMax := shr(248, calldataload(sub(calldatasize(), 85)))
         }
     }
 
     function _callIndex() internal pure returns (uint8 callIndex) {
         assembly {
-            callIndex := shr(248, calldataload(sub(calldatasize(), 84)))
+            callIndex := shr(248, calldataload(sub(calldatasize(), 86)))
         }
     }
 
     function _paymentsComplete() internal pure returns (bool paymentsComplete) {
         assembly {
-            paymentsComplete := shr(248, calldataload(sub(calldatasize(), 85)))
+            paymentsComplete := shr(248, calldataload(sub(calldatasize(), 87)))
         }
     }
 
     function _makingPayments() internal pure returns (bool makingPayments) {
         assembly {
-            makingPayments := shr(248, calldataload(sub(calldatasize(), 86)))
+            makingPayments := shr(248, calldataload(sub(calldatasize(), 88)))
         }
     }
 
     function _approvedCaller() internal pure returns (address approvedCaller) {
         assembly {
-            approvedCaller := shr(96, calldataload(sub(calldatasize(), 106)))
+            approvedCaller := shr(96, calldataload(sub(calldatasize(), 108)))
         }
     }
 

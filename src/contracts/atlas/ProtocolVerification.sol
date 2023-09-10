@@ -21,7 +21,7 @@ import "forge-std/Test.sol"; // TODO remove
 // frontend
 contract ProtocolVerifier is EIP712, ProtocolIntegration {
     using ECDSA for bytes32;
-    using CallBits for uint16;
+    using CallBits for uint32;
 
     bytes32 public constant PROTOCOL_TYPE_HASH = keccak256(
         "ProtocolProof(address from,address to,uint256 nonce,uint256 deadline,bytes32 userCallHash,bytes32 callChainHash,bytes32 controlCodeHash)"

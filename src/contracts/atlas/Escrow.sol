@@ -24,7 +24,7 @@ import {SafetyBits} from "../libraries/SafetyBits.sol";
 contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     using ECDSA for bytes32;
     using EscrowBits for uint256;
-    using CallBits for uint16;    
+    using CallBits for uint32;    
     using SafetyBits for EscrowKey;
 
     uint256 constant public BUNDLER_PREMIUM = 110; // the amount over cost that bundlers get paid

@@ -11,7 +11,7 @@ import "forge-std/Test.sol";
 
 contract SafetyLocks is Test {
     using SafetyBits for EscrowKey;
-    using CallBits for uint16;
+    using CallBits for uint32;
 
     address public immutable atlas;
 
