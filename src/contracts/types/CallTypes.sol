@@ -33,6 +33,7 @@ struct SearcherMetaTx {
     uint256 gas;
     uint256 nonce;
     uint256 maxFeePerGas; // maxFeePerGas searcher is willing to pay.  This goes to validator, not protocol or user
+    uint256 deadline;
     bytes32 userCallHash; // hash of user EOA and calldata, for verification of user's tx (if not matched, searcher wont be charged for gas)
     bytes32 controlCodeHash; // ProtocolControl.codehash
     bytes32 bidsHash; // searcher's backend must keccak256() their BidData array and include that in the signed meta tx, which we then verify on chain.
@@ -91,5 +92,6 @@ enum CallConfigIndex {
     ReuseUserOp,
     UserBundler,
     ProtocolBundler,
-    UnknownBundler
+    UnknownBundler,
+    OnChainBids
 }

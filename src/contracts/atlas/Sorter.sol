@@ -8,9 +8,12 @@ import "../types/CallTypes.sol";
 
 import {CallVerification} from "../libraries/CallVerification.sol";
 
+import {CallBits} from "../libraries/CallBits.sol";
+
 import "forge-std/Test.sol";
 
 contract Sorter {
+    using CallBits for uint16;
 
     address immutable public atlas;
     address immutable public escrow;
@@ -84,22 +87,24 @@ contract Sorter {
 
         // Make sure the searcher has enough funds escrowed
         // TODO: subtract any pending withdrawals
-        uint256 searcherBalance = IEscrow(escrow).searcherEscrowBalance(searcherCall.metaTx.from);
-        if (searcherBalance < searcherCall.metaTx.maxFeePerGas * searcherCall.metaTx.gas) {
-            return false;
-        }
+        if (!protocolCall.callConfig.needsOnChainBids()) {
+            uint256 searcherBalance = IEscrow(escrow).searcherEscrowBalance(searcherCall.metaTx.from);
+            if (searcherBalance < searcherCall.metaTx.maxFeePerGas * searcherCall.metaTx.gas) {
+                return false;
+            }
 
-        // Searchers can only do one tx per block - this prevents double counting escrow balances.
-        // TODO: Add in "targetBlockNumber" as an arg?
-        uint256 searcherLastActiveBlock = IEscrow(escrow).searcherLastActiveBlock(searcherCall.metaTx.from);
-        if (searcherLastActiveBlock >= block.number) {
-            return false;
-        }
+            // Searchers can only do one tx per block - this prevents double counting escrow balances.
+            // TODO: Add in "targetBlockNumber" as an arg?
+            uint256 searcherLastActiveBlock = IEscrow(escrow).searcherLastActiveBlock(searcherCall.metaTx.from);
+            if (searcherLastActiveBlock >= block.number) {
+                return false;
+            }
 
-        // Make sure the searcher nonce is accurate
-        uint256 nextSearcherNonce = IEscrow(escrow).nextSearcherNonce(searcherCall.metaTx.from);
-        if (nextSearcherNonce != searcherCall.metaTx.nonce) {
-            return false;
+            // Make sure the searcher nonce is accurate
+            uint256 nextSearcherNonce = IEscrow(escrow).nextSearcherNonce(searcherCall.metaTx.from);
+            if (nextSearcherNonce != searcherCall.metaTx.nonce) {
+                return false;
+            }
         }
 
         // Make sure that the searcher has the correct codehash for protocol control contract

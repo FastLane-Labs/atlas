@@ -132,4 +132,8 @@ library CallBits {
     function allowsUnknownBundler(uint16 callConfig) internal pure returns (bool unknownBundler) {
         unknownBundler = (callConfig & 1 << uint16(CallConfigIndex.UnknownBundler) != 0);
     }
+
+    function needsOnChainBids(uint16 callConfig) internal pure returns (bool onChainBids) {
+        onChainBids = (callConfig & 1 << uint16(CallConfigIndex.OnChainBids) != 0);
+    }
 }

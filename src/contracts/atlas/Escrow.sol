@@ -10,6 +10,7 @@ import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import {SafetyLocks} from "./SafetyLocks.sol";
 import {SearcherWrapper} from "./SearcherWrapper.sol";
 import {ProtocolVerifier} from "./ProtocolVerification.sol";
+import {BidManager} from "./BidManager.sol";
 
 import "../types/CallTypes.sol";
 import "../types/EscrowTypes.sol";
@@ -30,7 +31,9 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     uint256 constant public BUNDLER_PREMIUM = 110; // the amount over cost that bundlers get paid
     uint256 constant public BUNDLER_BASE = 100;
 
-    uint32 public immutable escrowDuration;
+    uint64 public immutable escrowDuration;
+
+    address public immutable bidManager;
 
     // NOTE: these storage vars / maps should only be accessible by *signed* searcher transactions
     // and only once per searcher per block (to avoid user-searcher collaborative exploits)
@@ -44,7 +47,10 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         uint32 escrowDurationFromFactory //,
             //address _atlas
     ) SafetyLocks() {
-        escrowDuration = escrowDurationFromFactory;
+        escrowDuration = uint64(escrowDurationFromFactory);
+
+        BidManager bm = new BidManager(32, 1_000);
+        bidManager = address(bm);
     }
 
     ///////////////////////////////////////////////////
@@ -170,6 +176,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     }
 
     function _executeSearcherCall(
+        ProtocolCall calldata protocolCall,
         SearcherCall calldata searcherCall,
         bytes memory returnData,
         address environment,
@@ -181,7 +188,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
 
         // Verify the transaction.
         (uint256 result, uint256 gasLimit, SearcherEscrow memory searcherEscrow) =
-            _verify(searcherCall, gasWaterMark, false);
+            _verify(protocolCall, searcherCall, gasWaterMark, false);
 
         SearcherOutcome outcome;
         uint256 escrowSurplus;
@@ -377,15 +384,15 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         }
     }
 
-    function _verify(SearcherCall calldata searcherCall, uint256 gasWaterMark, bool auctionAlreadyComplete)
+    function _verify(ProtocolCall calldata protocolCall, SearcherCall calldata searcherCall, uint256 gasWaterMark, bool auctionAlreadyComplete)
         internal
         view
         returns (uint256 result, uint256 gasLimit, SearcherEscrow memory searcherEscrow)
     {
-        // verify searcher's signature
-        if (_verifySignature(searcherCall.metaTx, searcherCall.signature)) {
+        // verify searcher's signature (bypass if signature was verified at storage time)
+        if (protocolCall.callConfig.needsOnChainBids() || _verifySignature(searcherCall.metaTx, searcherCall.signature)) {
             // verify the searcher has correct usercalldata and the searcher escrow checks
-            (result, gasLimit, searcherEscrow) = _verifySearcherCall(searcherCall);
+            (result, gasLimit, searcherEscrow) = _verifySearcherCall(protocolCall, searcherCall);
         } else {
             (result, gasLimit) = (1 << uint256(SearcherOutcome.InvalidSignature), 0);
             // searcherEscrow returns null
@@ -428,63 +435,158 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         validBid = keccak256(abi.encode(bids)) == bidsHash;
     }
 
-    function _verifySearcherCall(SearcherCall calldata searcherCall)
+    function _verifySearcherCall(ProtocolCall calldata protocolCall, SearcherCall calldata searcherCall)
         internal
         view
         returns (uint256 result, uint256 gasLimit, SearcherEscrow memory searcherEscrow)
     {
         searcherEscrow = _escrowData[searcherCall.metaTx.from];
+        bool verified = protocolCall.callConfig.needsOnChainBids();
 
         unchecked {
 
+            // CASE: searcher call was stored on chain
+            if (verified) {
+                // signature and nonce were verified during call storage, nonce was incremented at that time
+                // therefore the metaTx nonce must be <= stored nonce
+                if (searcherCall.metaTx.nonce > uint256(searcherEscrow.nonce)) {
+                    result |= 1 << uint256(SearcherOutcome.InvalidNonceOver); // should be impossible, but keep in place for now for testing
+                }
+                searcherEscrow.lastAccessed = uint64(block.number);
+
+            // CASE: searcher call was NOT stored on chain
+            } else {        
+                // signature and nonce must be verified        
+                if (searcherCall.metaTx.nonce <= uint256(searcherEscrow.nonce)) {
+                    result |= 1 << uint256(SearcherOutcome.InvalidNonceUnder);
+                } else if (searcherCall.metaTx.nonce > uint256(searcherEscrow.nonce) + 1) {
+                    result |= 1 << uint256(SearcherOutcome.InvalidNonceOver);
+
+                    // TODO: reconsider the jump up for gapped nonces? Intent is to mitigate dmg
+                    // potential inflicted by a hostile searcher/builder.
+                    searcherEscrow.nonce = uint32(searcherCall.metaTx.nonce);
+                } else {
+                    ++searcherEscrow.nonce;
+                }
+
+                // if searcher calls are stored on chain, bypass the "one call per block" rule
+                if (searcherEscrow.lastAccessed >= uint64(block.number)) {
+                    result |= 1 << uint256(SearcherOutcome.PerBlockLimit);
+                } else {
+                    searcherEscrow.lastAccessed = uint64(block.number);
+                }
+
+                if (!_verifyBids(searcherCall.metaTx.bidsHash, searcherCall.bids)) {
+                    result |= 1 << uint256(SearcherOutcome.InvalidBidsHash);
+                }
+            }
+
+            if (searcherCall.metaTx.controlCodeHash != protocolCall.to.codehash) {
+                result |= 1 << uint256(SearcherOutcome.InvalidControlHash); 
+            }
+        }
+
+        gasLimit = (100)
+            * (
+                searcherCall.metaTx.gas < EscrowBits.SEARCHER_GAS_LIMIT
+                    ? searcherCall.metaTx.gas
+                    : EscrowBits.SEARCHER_GAS_LIMIT
+            ) / (100 + EscrowBits.SEARCHER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
+
+        uint256 gasCost = (tx.gasprice * gasLimit) + (searcherCall.metaTx.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
+
+        // see if searcher's escrow can afford tx gascost
+        // NOTE: If the searcherCall was already verified via storage, the escrow check is already done
+        if (!verified || gasCost > _withdrawalData[searcherCall.metaTx.from].escrowed) {
+            // charge searcher for calldata so that we can avoid vampire attacks from searcher onto user
+            result |= 1 << uint256(SearcherOutcome.InsufficientEscrow);
+        }
+
+        // Verify that we can lend the searcher their tx value
+        if (searcherCall.metaTx.value > address(this).balance - (gasLimit * tx.gasprice)) {
+            result |= 1 << uint256(SearcherOutcome.CallValueTooHigh);
+        }
+
+        // subtract out the gas buffer since the searcher's metaTx won't use it
+        gasLimit -= EscrowBits.FASTLANE_GAS_BUFFER;
+    }
+
+    function verifySearcherStorage(ProtocolCall calldata protocolCall, SearcherCall calldata searcherCall)
+        external
+        returns (bool invalid, uint128 gasCost)
+    {
+        require(msg.sender == bidManager && activeEnvironment == address(0), "ERR-E009 InvalidStorageAdd");
+        require(_verifySignature(searcherCall.metaTx, searcherCall.signature), "ERR-E010 InvalidSignature");
+
+        SearcherEscrow memory searcherEscrow = _escrowData[searcherCall.metaTx.from];
+        SearcherWithdrawal memory searcherWithdrawal = _withdrawalData[searcherCall.metaTx.from];
+
+        unchecked {
+                  
             if (searcherCall.metaTx.nonce <= uint256(searcherEscrow.nonce)) {
-                result |= 1 << uint256(SearcherOutcome.InvalidNonceUnder);
+                invalid = true;
+            
             } else if (searcherCall.metaTx.nonce > uint256(searcherEscrow.nonce) + 1) {
-                result |= 1 << uint256(SearcherOutcome.InvalidNonceOver);
+                invalid = true;
 
                 // TODO: reconsider the jump up for gapped nonces? Intent is to mitigate dmg
                 // potential inflicted by a hostile searcher/builder.
                 searcherEscrow.nonce = uint32(searcherCall.metaTx.nonce);
+
             } else {
                 ++searcherEscrow.nonce;
             }
 
-            if (searcherEscrow.lastAccessed >= uint64(block.number)) {
-                result |= 1 << uint256(SearcherOutcome.PerBlockLimit);
-            } else {
-                searcherEscrow.lastAccessed = uint64(block.number);
-            }
-
             if (!_verifyBids(searcherCall.metaTx.bidsHash, searcherCall.bids)) {
-                result |= 1 << uint256(SearcherOutcome.InvalidBidsHash);
+                invalid = true;
             }
-
-            gasLimit = (100)
-                * (
-                    searcherCall.metaTx.gas < EscrowBits.SEARCHER_GAS_LIMIT
-                        ? searcherCall.metaTx.gas
-                        : EscrowBits.SEARCHER_GAS_LIMIT
-                ) / (100 + EscrowBits.SEARCHER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
-
-            uint256 gasCost = (tx.gasprice * gasLimit) + (searcherCall.metaTx.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
-
-            // see if searcher's escrow can afford tx gascost
-            if (gasCost > searcherEscrow.total - _withdrawalData[searcherCall.metaTx.from].escrowed) {
-                // charge searcher for calldata so that we can avoid vampire attacks from searcher onto user
-                result |= 1 << uint256(SearcherOutcome.InsufficientEscrow);
+            
+            if (searcherCall.metaTx.controlCodeHash != protocolCall.to.codehash) {
+                invalid = true;
             }
-
-            // Verify that we can lend the searcher their tx value
-            if (searcherCall.metaTx.value > address(this).balance - (gasLimit * tx.gasprice)) {
-                result |= 1 << uint256(SearcherOutcome.CallValueTooHigh);
-            }
-
-            // subtract out the gas buffer since the searcher's metaTx won't use it
-            gasLimit -= EscrowBits.FASTLANE_GAS_BUFFER;
         }
+
+        uint256 gasLimit = (100)
+            * (
+                searcherCall.metaTx.gas < EscrowBits.SEARCHER_GAS_LIMIT
+                    ? searcherCall.metaTx.gas
+                    : EscrowBits.SEARCHER_GAS_LIMIT
+            ) / (100 + EscrowBits.SEARCHER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
+
+        uint256 gasPrice = searcherCall.metaTx.maxFeePerGas;
+        gasCost = uint128((gasPrice * gasLimit) + (searcherCall.metaTx.data.length * CALLDATA_LENGTH_PREMIUM * gasPrice));
+
+        // see if searcher's escrow can afford tx gascost
+        if (gasCost > searcherEscrow.total - searcherWithdrawal.escrowed) {
+            invalid = true;
+        }
+
+        searcherWithdrawal.escrowed += gasCost;
+
+        uint64 settledOn = uint64(searcherCall.metaTx.deadline) + escrowDuration;
+        if (searcherWithdrawal.availableOn < settledOn) {
+            searcherWithdrawal.availableOn = settledOn;
+        } 
+
+        // Verify that we can lend the searcher their tx value
+        if (searcherCall.metaTx.value > address(this).balance - (gasLimit * gasPrice)) {
+            invalid = true;
+        }
+
+        // Always update the searcher's nonce
+        _escrowData[searcherCall.metaTx.from] = searcherEscrow;
+
+        // Only update the escrowed balance if call is valid
+        if (!invalid) {
+            _withdrawalData[searcherCall.metaTx.from] = searcherWithdrawal;
+        }
+
+        return (invalid, gasCost);
     }
 
-    receive() external payable {}
+    receive() external payable {
+        revert(); // no untracked balance transfers plz. (not that this fully stops it)
+    }
 
     fallback() external payable {
         revert(); // no untracked balance transfers plz. (not that this fully stops it)
