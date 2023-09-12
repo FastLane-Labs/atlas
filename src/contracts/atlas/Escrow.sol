@@ -485,11 +485,22 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
 
             uint256 gasCost = (tx.gasprice * gasLimit) + (searcherCall.metaTx.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
 
+
+            console.log("SEARCHER GAS COST CHECKS IN ESCROW:");
+            console.log("gasCost \t\t", gasCost);
+            console.log("searcherEscrow.total \t", searcherEscrow.total);
+            console.log("_withdrawalData[searcherCall.metaTx.from].escrowed", _withdrawalData[searcherCall.metaTx.from].escrowed);
+
             // see if searcher's escrow can afford tx gascost
             if (gasCost > searcherEscrow.total - _withdrawalData[searcherCall.metaTx.from].escrowed) {
                 // charge searcher for calldata so that we can avoid vampire attacks from searcher onto user
                 result |= 1 << uint256(SearcherOutcome.InsufficientEscrow);
             }
+
+            console.log("SEARCHER MSG.VALUE CHECKS IN ESCROW:");
+            console.log("searcherCall.metaTx.value \t", searcherCall.metaTx.value);
+            console.log("Atlas.balance \t\t", address(this).balance);
+            console.log("gasLimit X tx.gasprice \t", gasLimit * tx.gasprice);
 
             // Verify that we can lend the searcher their tx value
             if (searcherCall.metaTx.value > address(this).balance - (gasLimit * tx.gasprice)) {
