@@ -205,6 +205,7 @@ contract SwapIntentController is ProtocolControl {
     }
 
     function _searcherPreCall(bytes calldata data) internal override returns (bool) {
+        console.log("inside _searcherPreCall impl in SwapIntentController");
      
         (address searcherTo, bytes memory stagingReturnData) = abi.decode(data, (address, bytes));
         

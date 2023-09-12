@@ -190,13 +190,23 @@ contract ExecutionEnvironment is Base {
 
             bytes memory data = abi.encode(searcherCall.metaTx.to, stagingReturnData);
 
+            console.log("trying to delegatecall searcher pre call");
+
             data = abi.encodeWithSelector(
                 IProtocolControl.searcherPreCall.selector, 
                 data
             );
 
+            console.log("data before forward wrapper");
+            console.logBytes(data); 
+
+            data = forward(data);
+
+            console.log("data after forward wrapper");
+            console.logBytes(data);
+
             (success, data) = _control().delegatecall(
-                forward(data)
+                data
             );
             if(!success) {
                 revert FastLaneErrorsEvents.SearcherStagingFailed();

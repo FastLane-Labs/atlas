@@ -35,7 +35,6 @@ contract Base {
     }
 
     modifier validPhase(ExecutionPhase phase) {
-        console.log("got in valid phase");
         {
         if (uint16(1<<(EXECUTION_PHASE_OFFSET + uint16(phase))) & _lockState() == 0) {
             revert("ERR-EV011 WrongPhase");
@@ -45,7 +44,6 @@ contract Base {
     }
 
     modifier onlyAtlasEnvironment() {
-        console.log("only Atlas env modifier");
         if (address(this) == source) {
             revert("ERR-CE00 NotDelegated");
         }

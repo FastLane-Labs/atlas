@@ -72,8 +72,11 @@ contract AccountingTest is BaseTest {
         // msg.value settings
         uint256 userMsgValue = 2e18;
         uint256 searcherMsgValue = 1e18;
+        uint256 gasCostCoverAmount = 1e16; // 0.01 ETH - gas is about 0.00164 ETH
+        uint256 atlasStartBalance = searcherMsgValue * 12 / 10; // Extra in Atlas for call gas cost
 
         deal(userEOA, userMsgValue);
+        deal(address(atlas), atlasStartBalance); // Searcher borrows 1 ETH from Atlas balance
 
         console.log("atlas balalnnce", address(atlas).balance);
 
@@ -92,7 +95,7 @@ contract AccountingTest is BaseTest {
         // Searcher deploys the RFQ searcher contract (defined at bottom of this file)
         vm.startPrank(searcherOneEOA);
         SimpleRFQSearcher rfqSearcher = new SimpleRFQSearcher(address(atlas));
-        // atlas.deposit{value: 1e18}(searcherOneEOA);
+        atlas.deposit{value: gasCostCoverAmount}(searcherOneEOA);
         vm.stopPrank();
 
         // Give 20 DAI to RFQ searcher contract
@@ -147,7 +150,7 @@ contract AccountingTest is BaseTest {
             bidAmount: 0
         });
 
-        // searcherCalls[0].metaTx.value = searcherMsgValue; // TODO add back
+        searcherCalls[0].metaTx.value = searcherMsgValue;
 
         // Searcher signs the searcherCall
         (sig.v, sig.r, sig.s) = vm.sign(searcherOnePK, atlas.getSearcherPayload(searcherCalls[0].metaTx));
