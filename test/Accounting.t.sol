@@ -75,6 +75,8 @@ contract AccountingTest is BaseTest {
 
         deal(userEOA, userMsgValue);
 
+        console.log("atlas balalnnce", address(atlas).balance);
+
         // Same as basic SwapIntent test - Swap 10 WETH for 20 DAI
         Condition[] memory conditions;
         SwapIntent memory swapIntent = SwapIntent({

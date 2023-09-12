@@ -30,9 +30,13 @@ contract MainTest is BaseTest {
     function setUp() public virtual override {
         BaseTest.setUp();
 
-        // Deposit ETH from Searcher signer to pay for searcher's gas 
+        // Deposit ETH from Searcher1 signer to pay for searcher's gas 
         vm.prank(searcherOneEOA); 
         atlas.deposit{value: 1e18}(searcherOneEOA);
+
+        // Deposit ETH from Searcher2 signer to pay for searcher's gas
+        vm.prank(searcherTwoEOA);
+        atlas.deposit{value: 1e18}(searcherTwoEOA);
     }
 
     function testMain() public {
