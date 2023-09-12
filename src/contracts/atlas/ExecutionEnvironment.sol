@@ -192,6 +192,9 @@ contract ExecutionEnvironment is Base {
 
             console.log("trying to delegatecall searcher pre call");
 
+            console.log("data before adding selector");
+            console.logBytes(data);
+
             data = abi.encodeWithSelector(
                 IProtocolControl.searcherPreCall.selector, 
                 data
@@ -202,7 +205,7 @@ contract ExecutionEnvironment is Base {
 
             data = forward(data);
 
-            console.log("data after forward wrapper");
+            console.log("final data just before delegatecall");
             console.logBytes(data);
 
             (success, data) = _control().delegatecall(
