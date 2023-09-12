@@ -75,7 +75,9 @@ contract SwapIntentTest is BaseTest {
             atlasAddress: address(atlas)
         });
 
-        
+        // Deposit ETH from Searcher signer to pay for searcher's gas 
+        vm.prank(searcherOneEOA); 
+        atlas.deposit{value: 1e18}(searcherOneEOA);
     }
 
     function testAtlasSwapIntentWithBasicRFQ() public {
@@ -106,7 +108,6 @@ contract SwapIntentTest is BaseTest {
         // Searcher deploys the RFQ searcher contract (defined at bottom of this file)
         vm.startPrank(searcherOneEOA);
         SimpleRFQSearcher rfqSearcher = new SimpleRFQSearcher(address(atlas));
-        atlas.deposit{value: 1e18}(searcherOneEOA);
         vm.stopPrank();
 
         // Give 20 DAI to RFQ searcher contract

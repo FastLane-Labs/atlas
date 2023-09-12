@@ -78,12 +78,9 @@ contract BaseTest is Test, TestConstants {
 
         vm.deal(searcherOneEOA, 100e18);
 
-        vm.startPrank(searcherOneEOA);
-
+        vm.prank(searcherOneEOA);
         searcherOne = new Searcher(escrow, searcherOneEOA);
-        // IEscrow(escrow).deposit{value: 1e18}(searcherOneEOA);
 
-        vm.stopPrank();
 
         deal(TOKEN_ZERO, address(searcherOne), 10e24);
         deal(TOKEN_ONE, address(searcherOne), 10e24);

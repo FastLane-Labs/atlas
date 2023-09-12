@@ -29,6 +29,10 @@ contract MainTest is BaseTest {
     /// forge-config: default.gas_price = 15000000000
     function setUp() public virtual override {
         BaseTest.setUp();
+
+        // Deposit ETH from Searcher signer to pay for searcher's gas 
+        vm.prank(searcherOneEOA); 
+        atlas.deposit{value: 1e18}(searcherOneEOA);
     }
 
     function testMain() public {
