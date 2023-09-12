@@ -111,6 +111,7 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         validPhase(ExecutionPhase.SearcherCalls)
         returns (bool)
     {
+        console.log("inside searcherPreCall in ProtocolControl.sol");
         return _searcherPreCall(data);
     }
 

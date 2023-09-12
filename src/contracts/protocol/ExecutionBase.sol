@@ -44,6 +44,7 @@ contract Base {
     }
 
     modifier onlyAtlasEnvironment() {
+        console.log("onlyAtlasEnvironment modifier");
         if (address(this) == source) {
             revert("ERR-CE00 NotDelegated");
         }
