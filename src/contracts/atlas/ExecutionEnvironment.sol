@@ -156,6 +156,7 @@ contract ExecutionEnvironment is Base {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
         require(address(this).balance == searcherCall.metaTx.value, "ERR-CE05 IncorrectValue");
+        console.log("passed the check for exec env balance == searcher call value");
 
         // Track token balances to measure if the bid amount is paid.
         uint256[] memory tokenBalances = new uint[](searcherCall.bids.length);
@@ -187,6 +188,9 @@ contract ExecutionEnvironment is Base {
 
         // Handle any searcher staging, if necessary
         if (_config().needsSearcherStaging()) {
+
+            console.log("stagingReturnData in needsSearcherStaging");
+            console.logBytes(stagingReturnData);
 
             bytes memory data = abi.encode(searcherCall.metaTx.to, stagingReturnData);
 

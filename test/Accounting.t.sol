@@ -71,12 +71,16 @@ contract AccountingTest is BaseTest {
 
         // msg.value settings
         uint256 userMsgValue = 2e18;
-        uint256 searcherMsgValue = 1e18;
+        uint256 searcherMsgValue = 1e18; // TODO works with 0, breaks with 1e18
         uint256 gasCostCoverAmount = 1e16; // 0.01 ETH - gas is about 0.00164 ETH
         uint256 atlasStartBalance = searcherMsgValue * 12 / 10; // Extra in Atlas for call gas cost
 
         deal(userEOA, userMsgValue);
-        deal(address(atlas), atlasStartBalance); // Searcher borrows 1 ETH from Atlas balance
+
+        // TODO trying to give Atlas ETH in a more tracked way:
+        // deal(address(atlas), atlasStartBalance); // Searcher borrows 1 ETH from Atlas balance
+        vm.prank(searcherTwoEOA);
+        atlas.deposit{value: atlasStartBalance}(searcherTwoEOA); // Searcher borrows 1 ETH from Atlas balance
 
         console.log("atlas balalnnce", address(atlas).balance);
 

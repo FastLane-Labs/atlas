@@ -497,6 +497,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
 
             // Verify that we can lend the searcher their tx value
             if (searcherCall.metaTx.value > address(this).balance - (gasLimit * tx.gasprice)) {
+                console.log("inside if to verify that we can lend the searcher their tx value");
                 result |= 1 << uint256(SearcherOutcome.CallValueTooHigh);
             }
 
