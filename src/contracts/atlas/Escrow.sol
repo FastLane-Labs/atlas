@@ -231,25 +231,25 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
             }
 
             // emit event
-            emit SearcherTxResult(
-                searcherCall.metaTx.to,
-                searcherCall.metaTx.from,
-                true,
-                outcome == SearcherOutcome.Success,
-                searcherEscrow.nonce,
-                result
-            );
+            emit SearcherTxResult({
+                searcherTo: searcherCall.metaTx.to,
+                searcherFrom: searcherCall.metaTx.from,
+                executed: true,
+                success: outcome == SearcherOutcome.Success,
+                nonce: searcherEscrow.nonce,
+                result: result
+            });
 
         } else {
             // emit event
-            emit SearcherTxResult(
-                searcherCall.metaTx.to,
-                searcherCall.metaTx.from,
-                false,
-                false,
-                searcherEscrow.nonce,
-                result
-            );
+            emit SearcherTxResult({
+                searcherTo: searcherCall.metaTx.to,
+                searcherFrom: searcherCall.metaTx.from,
+                executed: false,
+                success: false,
+                nonce: searcherEscrow.nonce,
+                result: result
+            });
         }
 
         return (auctionWon, key);
