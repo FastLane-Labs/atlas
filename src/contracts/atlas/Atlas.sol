@@ -31,7 +31,7 @@ contract Atlas is Test, Factory {
         UserCall calldata userCall, // set by user
         SearcherCall[] calldata searcherCalls, // supplied by FastLane via frontend integration
         Verification calldata verification // supplied by front end after it sees the other data
-    ) external payable {
+    ) public payable returns (bool auctionWon) {
 
         uint256 gasMarker = gasleft();
 
@@ -69,15 +69,16 @@ contract Atlas is Test, Factory {
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
         if (!valid) {
-            return;
+            return false;
         }
 
         // Initialize the lock
         _initializeEscrowLock(executionEnvironment);
 
         try this.execute{value: msg.value}(protocolCall, userCall.metaTx, searcherCalls, executionEnvironment, verification.proof.callChainHash) 
-            returns (uint256 accruedGasRebate) {
+            returns (bool _auctionWon, uint256 accruedGasRebate) {
             console.log("accruedGasRebate",accruedGasRebate);
+            auctionWon = _auctionWon;
             // Gas Refund to sender only if execution is successful
             _executeGasRefund(gasMarker, accruedGasRebate, userCall.metaTx.from);
 
@@ -100,7 +101,7 @@ contract Atlas is Test, Factory {
         SearcherCall[] calldata searcherCalls,
         address executionEnvironment,
         bytes32 callChainHash
-    ) external payable returns (uint256 accruedGasRebate) {
+    ) external payable returns (bool auctionWon, uint256 accruedGasRebate) {
         {
         // This is a self.call made externally so that it can be used with try/catch
         require(msg.sender == address(this), "ERR-F06 InvalidAccess");
@@ -109,7 +110,7 @@ contract Atlas is Test, Factory {
         require(callChainHash == CallVerification.getCallChainHash(protocolCall, userMetaTx, searcherCalls), "ERR-F07 InvalidSequence");
         }
         // Begin execution
-        accruedGasRebate = _execute(protocolCall, userMetaTx, searcherCalls, executionEnvironment);
+        (auctionWon, accruedGasRebate) = _execute(protocolCall, userMetaTx, searcherCalls, executionEnvironment);
     }
 
     function _execute(
@@ -117,7 +118,7 @@ contract Atlas is Test, Factory {
         UserMetaTx calldata userMetaTx,
         SearcherCall[] calldata searcherCalls,
         address executionEnvironment
-    ) internal returns (uint256 accruedGasRebate) {
+    ) internal returns (bool auctionWon, uint256 accruedGasRebate) {
         // Build the CallChainProof.  The penultimate hash will be used
         // to verify against the hash supplied by ProtocolControl
        
@@ -145,8 +146,6 @@ contract Atlas is Test, Factory {
             returnData = bytes.concat(returnData, userReturnData);
         }
 
-        bool auctionWon;
-
         for (; key.callIndex < key.callMax - 1;) {
 
             // Only execute searcher meta tx if userCallHash matches 
@@ -173,7 +172,7 @@ contract Atlas is Test, Factory {
             key = key.holdVerificationLock(address(this));
             _executeVerificationCall(returnData, executionEnvironment, key.pack());
         }
-        return uint256(key.gasRefund);
+        return (auctionWon, uint256(key.gasRefund));
     }
 
     function _searcherExecutionIteration(
@@ -222,20 +221,40 @@ contract Atlas is Test, Factory {
         return IExecutionEnvironment(executionEnvironment).validateUserCall(userMetaTx);
     }
 
-    function testSearcherCall(
+    function metacallSimulation(
         ProtocolCall calldata protocolCall,
         UserCall calldata userCall,
-        SearcherCall calldata searcherCall,
+        SearcherCall[] calldata searcherCalls,
         Verification calldata verification
-    ) external payable returns (bool) {
-        SearcherCall[] memory searcherCalls = new SearcherCall[](1);
-        searcherCalls[0] = searcherCall;
-        
-        try this.metacall{value: msg.value}(protocolCall, userCall, searcherCalls, verification) {
-            return true;
+    ) external payable {
+        if (!metacall(protocolCall, userCall, searcherCalls, verification)) {
+            revert("ERR-S01 NoAuctionWinner");
         }
-        catch {
-            return false;
+        revert("ERR-S00 SimulationPassed");
+    }
+
+    function testSearcherCalls(
+        ProtocolCall calldata protocolCall,
+        UserCall calldata userCall,
+        SearcherCall[] calldata searcherCalls,
+        Verification calldata verification
+    ) external payable returns (bool auctionWon) {
+        try this.metacallSimulation{value: msg.value}(protocolCall, userCall, searcherCalls, verification) {}
+        catch (bytes memory revertData) {
+            for (uint256 i; i < revertData.length-4;) {
+                revertData[i] = revertData[i+4];
+                unchecked{ ++i; }
+            }
+            bytes32 revertMsg = keccak256(abi.decode(revertData, (bytes)));
+
+            if (
+                revertMsg == keccak256(abi.encodePacked("ERR-S01 NoAuctionWinner"))
+                    || revertMsg == keccak256(abi.encodePacked("ERR-F08 UserNotFulfilled"))
+            ) {
+                auctionWon = false;
+            } else {
+                auctionWon = true;
+            }
         }
     }
 }
