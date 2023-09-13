@@ -221,4 +221,21 @@ contract Atlas is Test, Factory {
         } 
         return IExecutionEnvironment(executionEnvironment).validateUserCall(userMetaTx);
     }
+
+    function testSearcherCall(
+        ProtocolCall calldata protocolCall,
+        UserCall calldata userCall,
+        SearcherCall calldata searcherCall,
+        Verification calldata verification
+    ) external payable returns (bool) {
+        SearcherCall[] memory searcherCalls = new SearcherCall[](1);
+        searcherCalls[0] = searcherCall;
+        
+        try this.metacall{value: msg.value}(protocolCall, userCall, searcherCalls, verification) {
+            return true;
+        }
+        catch {
+            return false;
+        }
+    }
 }

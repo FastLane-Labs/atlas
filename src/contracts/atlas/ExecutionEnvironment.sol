@@ -115,7 +115,6 @@ contract ExecutionEnvironment is Base {
         } else {
             revert("ERR-P02 UserCallStatic");
         }
-        userData = abi.decode(userData, (bytes));
     }
 
     function verificationWrapper(bytes calldata returnData) 
