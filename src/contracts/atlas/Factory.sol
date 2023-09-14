@@ -138,14 +138,14 @@ contract Factory is Test, Escrow, Permit69 {
                     shl(96, protocolControl), 
                     add(
                         add(
-                            shl(88, 0x61), 
-                            shl(72, callConfig)
+                            shl(88, 0x63), 
+                            shl(56, callConfig)
                         ), 
                         0x7f000000000000
                     )
                 )
             )
-            mstore(add(creationCode, 176), controlCodeHash)
+            mstore(add(creationCode, 178), controlCodeHash)
         }
     }
 }
