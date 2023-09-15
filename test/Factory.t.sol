@@ -38,7 +38,11 @@ contract FactoryTest is BaseTest {
     function testExecutionEnvironmentAddress() public {
         address expectedExecutionEnvironment = 0xf8927cd848a3D1BCA26634E25a89ccE8feb7A65F;
 
-        assertEq(atlas.createExecutionEnvironment(protocolControl.getProtocolCall()), expectedExecutionEnvironment);
+        assertEq(
+            atlas.createExecutionEnvironment(protocolControl.getProtocolCall()), 
+            expectedExecutionEnvironment, 
+            "Create exec env address not same as predicted"
+        );
 
         UserMetaTx memory userMetaTx = UserMetaTx({
             from: address(this),
@@ -53,7 +57,11 @@ contract FactoryTest is BaseTest {
         });
         UserCall memory userCall = UserCall({to: address(0x1), metaTx: userMetaTx, signature: "signature"});
 
-        assertEq(atlas.getExecutionEnvironment(userCall, address(protocolControl)), expectedExecutionEnvironment);
+        assertEq(
+            atlas.getExecutionEnvironment(userCall, address(protocolControl)), 
+            expectedExecutionEnvironment,
+            "atlas.getExecEnv address not same as predicted"
+        );
     }
 
     function testGetEscrowAddress() public {
