@@ -15,7 +15,9 @@ contract SafetyLocks is Test {
 
     address public immutable atlas;
 
-    address public activeEnvironment;
+    address internal constant UNLOCKED = address(1);
+
+    address public activeEnvironment = UNLOCKED;
 
     constructor() {
         atlas = address(this);
@@ -28,8 +30,7 @@ contract SafetyLocks is Test {
         isSafe = msgSender == activeEnvironment;
     }
 
-    function _initializeEscrowLock(address executionEnvironment) internal {
-        require(activeEnvironment == address(0), "ERR-SL003 AlreadyInitialized");
+    function _initializeEscrowLock(address executionEnvironment) onlyWhenUnlocked internal {
 
         activeEnvironment = executionEnvironment;
     }
@@ -48,6 +49,11 @@ contract SafetyLocks is Test {
     }
 
     function _releaseEscrowLock() internal {
-        delete activeEnvironment;
+        activeEnvironment = UNLOCKED;
+    }
+
+    modifier onlyWhenUnlocked() {
+        require(activeEnvironment == UNLOCKED, "ERR-SL003 AlreadyInitialized");
+        _;
     }
 }
