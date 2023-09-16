@@ -4,19 +4,19 @@ pragma solidity ^0.8.16;
 import "../types/CallTypes.sol";
 
 interface IExecutionEnvironment {
-    function stagingWrapper(UserMetaTx calldata userCall)
+    function preOpsWrapper(UserCall calldata userOp)
         external
         payable
-        returns (bytes memory stagingData);
+        returns (bytes memory preOpsData);
 
-    function userWrapper(UserMetaTx calldata userCall) external payable returns (bytes memory userReturnData);
+    function userWrapper(UserCall calldata userOp) external payable returns (bytes memory userReturnData);
 
-    function verificationWrapper(bytes calldata returnData) external payable;
+    function postOpsWrapper(bytes calldata returnData) external payable;
 
-    function searcherMetaTryCatch(
+    function solverMetaTryCatch(
         uint256 gasLimit,
         uint256 escrowBalance,
-        SearcherCall calldata searcherCall,
+        SolverOperation calldata solverOp,
         bytes calldata returnData
     ) external payable;
 
@@ -25,7 +25,7 @@ interface IExecutionEnvironment {
         bytes memory returnData
     ) external;
 
-    function validateUserCall(UserMetaTx calldata userMetaTx) external view returns (bool);
+    function validateUserOperation(UserCall calldata uCall) external view returns (bool);
 
     function getUser() external pure returns (address user);
     function getControl() external pure returns (address control);

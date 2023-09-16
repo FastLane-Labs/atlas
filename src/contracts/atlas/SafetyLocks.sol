@@ -4,7 +4,7 @@ pragma solidity ^0.8.16;
 import {SafetyBits} from "../libraries/SafetyBits.sol";
 import {CallBits} from "../libraries/CallBits.sol";
 
-import {ProtocolCall, UserMetaTx} from "../types/CallTypes.sol";
+import {DAppConfig, UserCall} from "../types/CallTypes.sol";
 import "../types/LockTypes.sol";
 
 import "forge-std/Test.sol";
@@ -23,8 +23,8 @@ contract SafetyLocks is Test {
         atlas = address(this);
     }
 
-    function searcherSafetyCallback(address msgSender) external payable returns (bool isSafe) {
-        // An external call so that searcher contracts can verify
+    function solverSafetyCallback(address msgSender) external payable returns (bool isSafe) {
+        // An external call so that solver contracts can verify
         // that delegatecall isn't being abused.
 
         isSafe = msgSender == activeEnvironment;
@@ -36,15 +36,15 @@ contract SafetyLocks is Test {
     }
 
     function _buildEscrowLock(
-        ProtocolCall calldata protocolCall,
+        DAppConfig calldata dConfig,
         address executionEnvironment,
-        uint8 searcherCallCount
+        uint8 solverOpCount
     ) internal view returns (EscrowKey memory self) {
 
         require(activeEnvironment == executionEnvironment, "ERR-SL004 NotInitialized");
 
         self = self.initializeEscrowLock(
-            protocolCall.callConfig.needsStagingCall(), searcherCallCount, executionEnvironment
+            dConfig.callConfig.needsPreOpsCall(), solverOpCount, executionEnvironment
         );
     }
 

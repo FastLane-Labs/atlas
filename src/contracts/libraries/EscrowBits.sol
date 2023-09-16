@@ -10,42 +10,42 @@ library EscrowBits {
     uint256 public constant FASTLANE_GAS_BUFFER = 125_000; // integer amount
 
     uint256 internal constant _EXECUTION_REFUND = (
-        1 << uint256(SearcherOutcome.CallReverted) | 1 << uint256(SearcherOutcome.BidNotPaid)
-            | 1 << uint256(SearcherOutcome.CallValueTooHigh) | 1 << uint256(SearcherOutcome.UnknownError)
-            | 1 << uint256(SearcherOutcome.CallbackFailed) | 1 << uint256(SearcherOutcome.IntentUnfulfilled)
-            | 1 << uint256(SearcherOutcome.EVMError) | 1 << uint256(SearcherOutcome.SearcherStagingFailed)
-            | 1 << uint256(SearcherOutcome.Success)
+        1 << uint256(SolverOutcome.CallReverted) | 1 << uint256(SolverOutcome.BidNotPaid)
+            | 1 << uint256(SolverOutcome.CallValueTooHigh) | 1 << uint256(SolverOutcome.UnknownError)
+            | 1 << uint256(SolverOutcome.CallbackFailed) | 1 << uint256(SolverOutcome.IntentUnfulfilled)
+            | 1 << uint256(SolverOutcome.EVMError) | 1 << uint256(SolverOutcome.PreSolverFailed)
+            | 1 << uint256(SolverOutcome.Success)
     );
 
     uint256 internal constant _NO_NONCE_UPDATE = (
-        1 << uint256(SearcherOutcome.InvalidSignature) | 1 << uint256(SearcherOutcome.AlreadyExecuted)
-            | 1 << uint256(SearcherOutcome.InvalidNonceUnder)
+        1 << uint256(SolverOutcome.InvalidSignature) | 1 << uint256(SolverOutcome.AlreadyExecuted)
+            | 1 << uint256(SolverOutcome.InvalidNonceUnder)
     );
 
     uint256 internal constant _EXECUTED_WITH_ERROR = (
-        1 << uint256(SearcherOutcome.CallReverted) | 1 << uint256(SearcherOutcome.BidNotPaid)
-            | 1 << uint256(SearcherOutcome.CallValueTooHigh) | 1 << uint256(SearcherOutcome.UnknownError)
-            | 1 << uint256(SearcherOutcome.CallbackFailed) | 1 << uint256(SearcherOutcome.IntentUnfulfilled)
-            | 1 << uint256(SearcherOutcome.SearcherStagingFailed) | 1 << uint256(SearcherOutcome.EVMError) 
+        1 << uint256(SolverOutcome.CallReverted) | 1 << uint256(SolverOutcome.BidNotPaid)
+            | 1 << uint256(SolverOutcome.CallValueTooHigh) | 1 << uint256(SolverOutcome.UnknownError)
+            | 1 << uint256(SolverOutcome.CallbackFailed) | 1 << uint256(SolverOutcome.IntentUnfulfilled)
+            | 1 << uint256(SolverOutcome.PreSolverFailed) | 1 << uint256(SolverOutcome.EVMError) 
     );
 
-    uint256 internal constant _EXECUTED_SUCCESSFULLY = (1 << uint256(SearcherOutcome.Success));
+    uint256 internal constant _EXECUTED_SUCCESSFULLY = (1 << uint256(SolverOutcome.Success));
 
     uint256 internal constant _NO_USER_REFUND = (
-        1 << uint256(SearcherOutcome.InvalidSignature) | 1 << uint256(SearcherOutcome.InvalidUserHash)
-            | 1 << uint256(SearcherOutcome.InvalidBidsHash) | 1 << uint256(SearcherOutcome.GasPriceOverCap)
-            | 1 << uint256(SearcherOutcome.InvalidSequencing) | 1 << uint256(SearcherOutcome.InvalidControlHash)
+        1 << uint256(SolverOutcome.InvalidSignature) | 1 << uint256(SolverOutcome.InvalidUserHash)
+            | 1 << uint256(SolverOutcome.InvalidBidsHash) | 1 << uint256(SolverOutcome.GasPriceOverCap)
+            | 1 << uint256(SolverOutcome.InvalidSequencing) | 1 << uint256(SolverOutcome.InvalidControlHash)
     );
 
     uint256 internal constant _CALLDATA_REFUND = (
-        1 << uint256(SearcherOutcome.InsufficientEscrow) | 1 << uint256(SearcherOutcome.InvalidNonceOver)
-            | 1 << uint256(SearcherOutcome.UserOutOfGas) | 1 << uint256(SearcherOutcome.CallValueTooHigh)
+        1 << uint256(SolverOutcome.InsufficientEscrow) | 1 << uint256(SolverOutcome.InvalidNonceOver)
+            | 1 << uint256(SolverOutcome.UserOutOfGas) | 1 << uint256(SolverOutcome.CallValueTooHigh)
     );
 
     uint256 internal constant _FULL_REFUND = (
-        _EXECUTION_REFUND | 1 << uint256(SearcherOutcome.AlreadyExecuted)
-            | 1 << uint256(SearcherOutcome.InvalidNonceUnder) | 1 << uint256(SearcherOutcome.PerBlockLimit)
-            | 1 << uint256(SearcherOutcome.InvalidFormat)
+        _EXECUTION_REFUND | 1 << uint256(SolverOutcome.AlreadyExecuted)
+            | 1 << uint256(SolverOutcome.InvalidNonceUnder) | 1 << uint256(SolverOutcome.PerBlockLimit)
+            | 1 << uint256(SolverOutcome.InvalidFormat)
     );
 
     function canExecute(uint256 result) internal pure returns (bool) {

@@ -3,9 +3,9 @@ pragma solidity ^0.8.18;
 
 import {TxBuilder} from "../src/contracts/helpers/TxBuilder.sol";
 
-import {IUniswapV2Pair} from "../src/contracts/v2-example/interfaces/IUniswapV2Pair.sol";
+import {IUniswapV2Pair} from "../src/contracts/examples/v2-example/interfaces/IUniswapV2Pair.sol";
 
-import {BlindBackrun} from "./searcher/src/blindBackrun.sol";
+import {BlindBackrun} from "./solver/src/blindBackrun.sol";
 
 import "../src/contracts/types/CallTypes.sol";
 import "../src/contracts/types/EscrowTypes.sol";
@@ -20,8 +20,8 @@ contract V2Helper is Test, TestConstants, TxBuilder {
    
     uint256 public immutable maxFeePerGas;
 
-    constructor(address protocolControl, address escrowAddress, address atlasAddress) 
-        TxBuilder(protocolControl, escrowAddress, atlasAddress)
+    constructor(address controller, address escrowAddress, address atlasAddress) 
+        TxBuilder(controller, escrowAddress, atlasAddress)
     {
         maxFeePerGas = tx.gasprice * 2;
     }
@@ -31,12 +31,12 @@ contract V2Helper is Test, TestConstants, TxBuilder {
         return TxBuilder.getPayeeData(nullData);
     }
 
-    function buildUserCall(address to, address from, address tokenIn) public view returns (UserCall memory userCall) {
+    function buildUserOperation(address to, address from, address tokenIn) public view returns (UserOperation memory userOp) {
         (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(to).getReserves();
 
         address token0 = IUniswapV2Pair(to).token0();
 
-        return TxBuilder.buildUserCall(
+        return TxBuilder.buildUserOperation(
             from,
             to,
             maxFeePerGas,
@@ -55,7 +55,7 @@ contract V2Helper is Test, TestConstants, TxBuilder {
         data = abi.encodeWithSelector(IUniswapV2Pair.swap.selector, amount0Out, amount1Out, recipient, data);
     }
 
-    function buildV2SearcherCallData(
+    function buildV2SolverOperationData(
         address poolOne,
         address poolTwo
     ) public pure returns (bytes memory data) {

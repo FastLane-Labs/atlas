@@ -22,7 +22,7 @@ contract Mimic {
                 0x73ffffffffffffffffffffff
             ))
             mstore(add(creationCode, 152), add(
-                shl(96, protocolControl), 
+                shl(96, controller), 
                 add(
                     add(
                         shl(88, 0x61), 
