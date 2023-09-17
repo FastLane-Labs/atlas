@@ -104,16 +104,6 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         return _verificationCall(data);
     }
 
-    function validateUserCall(UserMetaTx calldata userMetaTx) 
-        external 
-        view
-        onlyAtlasEnvironment
-        validControl
-        returns (bool) 
-    {
-        return _validateUserCall(userMetaTx);
-    }
-
     // View functions
     function userDelegated() external view returns (bool delegated) {
         delegated = CallBits.needsDelegateUser(callConfig);

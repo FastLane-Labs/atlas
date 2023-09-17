@@ -327,39 +327,6 @@ contract ExecutionEnvironment is Base {
     //   HELPER / SEQUENCING FUNCTIONS   //
     ///////////////////////////////////////
 
-    function validateUserCall(UserMetaTx calldata userMetaTx)   
-        external 
-        // view 
-        // onlyAtlas
-        returns (bool) {
-        // msg.sender = atlas
-        // address(this) = ExecutionEnvironment
-        if (userMetaTx.from != _user()) {
-            return false;
-        }
-
-        if (userMetaTx.control != _control()) {
-            return false;
-        }
-
-        if (userMetaTx.deadline < block.number) {
-            return false;
-        }
-
-        if (_controlCodeHash() != _control().codehash) {
-            return false;
-        }
-
-        bytes memory data = abi.encodeWithSelector(
-            IProtocolControl.validateUserCall.selector, userMetaTx);
-
-        (bool success, bytes memory returnData) = _control().delegatecall(forward(data));
-
-        if (!success) {
-            return false;
-        }
-        return abi.decode(returnData, (bool));
-    }
 
     ///////////////////////////////////////
     //  USER SUPPORT / ACCESS FUNCTIONS  //

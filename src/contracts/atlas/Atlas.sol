@@ -4,6 +4,7 @@ pragma solidity ^0.8.16;
 import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
 
 import {Factory} from "./Factory.sol";
+import {UserSimulationFailed, UserUnexpectedSuccess, UserSimulationSucceeded} from "./Emissions.sol";
 
 import "../types/CallTypes.sol";
 import "../types/LockTypes.sol";
@@ -191,34 +192,80 @@ contract Atlas is Test, Factory {
         return (auctionWon, key);
     }
 
-    function testUserCall(UserMetaTx calldata userMetaTx) external view returns (bool) {
+    function testUserCall(UserMetaTx calldata userMetaTx) public returns (bool) {
         address control = userMetaTx.control;
         uint16 callConfig = CallBits.buildCallConfig(control);
-        return _testUserCall(userMetaTx, control, callConfig);
-    }
 
-    function testUserCall(UserCall calldata userCall) external view returns (bool) {
-        if (userCall.to != address(this)) {return false;}
-        address control = userCall.metaTx.control;
-        uint16 callConfig = CallBits.buildCallConfig(control);
+        ProtocolCall memory protocolCall = ProtocolCall(userMetaTx.control, callConfig);
 
-        ProtocolCall memory protocolCall = ProtocolCall(userCall.metaTx.control, callConfig);
+        /*
+        // COMMENTED OUT FOR TESTS
+        bool success;
+        bytes memory data = abi.encodeWithSelector(
+            this.testUserCallWrapper.selector, 
+            protocolCall,
+            userMetaTx
+        );
 
-        return _validateUser(protocolCall, userCall) && _testUserCall(userCall.metaTx, control, callConfig);
-    }
+        (success, data) = address(this).call{value: userMetaTx.value}(data);
+        if (success) {
+            revert UserUnexpectedSuccess();
+        }
 
-    function _testUserCall(UserMetaTx calldata userMetaTx, address control, uint16 callConfig) internal view returns (bool) {
-        if (callConfig == 0) {
+        bytes4 errorSwitch = bytes4(data);
+        if (errorSwitch == UserSimulationSucceeded.selector) {
+            return true;
+        } else {
             return false;
+        }
+        */
+        try this.testUserCallWrapper(protocolCall, userMetaTx) {
+            revert UserUnexpectedSuccess();
+        
+        } catch (bytes memory data) {
+            bytes4 errorSwitch = bytes4(data);
+            if (errorSwitch == UserSimulationSucceeded.selector) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+    }
+
+    function testUserCall(UserCall calldata userCall) external returns (bool) {
+        if (userCall.to != address(this)) {return false;}
+        return testUserCall(userCall.metaTx);
+    }
+
+    function testUserCallWrapper(ProtocolCall calldata protocolCall, UserMetaTx calldata userMetaTx) external {
+        require(msg.sender == address(this), "ERR-SIM001 MustCallSelf");
+
+        if (protocolCall.callConfig == 0) {
+            revert UserSimulationFailed();
         }
 
         address executionEnvironment = _getExecutionEnvironmentCustom(
-            userMetaTx.from, control.codehash, control, callConfig);
+            userMetaTx.from, protocolCall.to.codehash, protocolCall.to, protocolCall.callConfig);
 
-        if (executionEnvironment.codehash == bytes32(0) || control.codehash == bytes32(0)) {
-            return false;
+        _initializeEscrowLock(executionEnvironment);
+
+        if (executionEnvironment.codehash == bytes32(0) || protocolCall.to.codehash == bytes32(0)) {
+            revert UserSimulationFailed();
         } 
-        return IExecutionEnvironment(executionEnvironment).validateUserCall(userMetaTx);
+
+        // Initialize the locks
+        EscrowKey memory key = _buildEscrowLock(protocolCall, executionEnvironment, uint8(2));
+
+        bytes memory stagingReturnData;
+        if (protocolCall.callConfig.needsStagingCall()) {
+            key = key.holdStagingLock(protocolCall.to);
+            stagingReturnData = _executeStagingCall(userMetaTx, executionEnvironment, key.pack());
+        }
+
+        key = key.holdUserLock(userMetaTx.to);
+        _executeUserCall(userMetaTx, executionEnvironment, key.pack());
+        
+        revert UserSimulationSucceeded();
     }
 
     function metacallSimulation(

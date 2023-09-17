@@ -4,7 +4,6 @@ pragma solidity ^0.8.16;
 import "../types/CallTypes.sol";
 
 interface IProtocolControl {
-    function validateUserCall(UserMetaTx calldata userMetaTx) external view returns (bool);
 
     function stagingCall(UserMetaTx calldata userMetaTx) external returns (bytes memory);
 

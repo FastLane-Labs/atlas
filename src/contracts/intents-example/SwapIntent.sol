@@ -314,48 +314,4 @@ contract SwapIntentController is ProtocolControl {
     {
         return searcherCall.bids[0].bidAmount;
     }
-
-    // NOTE: This helper function is still delegatecalled inside of the execution environment
-    function _validateUserCall(UserMetaTx calldata userMetaTx) internal view override returns (bool) {
-        if (bytes4(userMetaTx.data) != this.swap.selector) {
-            return false;
-        }
-
-        SwapIntent memory swapIntent =abi.decode(userMetaTx.data[4:], (SwapIntent));
-
-        // Check that user has enough tokens
-        if (ERC20(swapIntent.tokenUserSells).balanceOf(_user()) < swapIntent.amountUserSells) {
-            return false;
-        }
-
-        // Check that the correct permit has been granted
-        if (ERC20(swapIntent.tokenUserSells).allowance(_user(), escrow) < swapIntent.amountUserSells) {
-            return false;
-        }
-
-        uint256 maxUserConditions = swapIntent.conditions.length;
-        if (maxUserConditions > MAX_USER_CONDITIONS) {
-            return false;
-        }
-
-        uint256 i;
-        bool valid;
-        bytes memory conditionData;
-
-        for (; i < maxUserConditions; ) {
-            (valid, conditionData) = swapIntent.conditions[i].antecedent.staticcall{gas: USER_CONDITION_GAS_LIMIT}(
-                swapIntent.conditions[i].context
-            );
-            if (!valid) {
-                return false;
-            }
-            valid = abi.decode(conditionData, (bool));
-            if (!valid) {
-                return false;
-            }
-            
-            unchecked{ ++i; }
-        }
-        return true;
-    }
 }
