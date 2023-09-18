@@ -207,7 +207,7 @@ contract V4DAppControl is DAppControl {
         // and that DAppControl supplied a valid signature
         require(address(this) == hook, "ERR-H00 InvalidCallee");
         require(hook == escrowKey.approvedCaller, "ERR-H01 InvalidCaller");
-        require(escrowKey.lockState == SafetyBits._LOCKED_X_STAGING_X_UNSET, "ERR-H02 InvalidLockStage");
+        require(escrowKey.lockState == SafetyBits._LOCKED_X_PRE_OPS_X_UNSET, "ERR-H02 InvalidLockStage");
         require(hashLock == bytes32(0), "ERR-H03 AlreadyActive");
 
         // Set the storage lock to block reentry / concurrent trading

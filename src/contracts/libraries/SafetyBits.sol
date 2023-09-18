@@ -18,7 +18,7 @@ library SafetyBits {
             | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Verified))
     );
 
-    uint16 internal constant _ACTIVE_X_STAGING_X_UNSET = uint16(
+    uint16 internal constant _ACTIVE_X_PRE_OPS_X_UNSET = uint16(
         1 << uint16(BaseLock.Active) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps))
             | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Unset))
     );
@@ -28,7 +28,7 @@ library SafetyBits {
             | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Unset))
     );
 
-    uint16 internal constant _LOCKED_X_STAGING_X_UNSET = uint16(
+    uint16 internal constant _LOCKED_X_PRE_OPS_X_UNSET = uint16(
         1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps))
             | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Unset))
     );
@@ -150,7 +150,7 @@ library SafetyBits {
     }
 
     function holdPreOpsLock(EscrowKey memory self, address controller) internal pure returns (EscrowKey memory) {
-        self.lockState = _LOCKED_X_STAGING_X_UNSET;
+        self.lockState = _LOCKED_X_PRE_OPS_X_UNSET;
         self.approvedCaller = controller;
         unchecked {
             ++self.callIndex;
@@ -166,7 +166,7 @@ library SafetyBits {
         self.approvedCaller = nextCaller;
         self.callMax = solverOpCount + 3;
         self.callIndex = needsPreOps ? 0 : 1;
-        self.lockState = needsPreOps ? _ACTIVE_X_STAGING_X_UNSET : _ACTIVE_X_USER_X_UNSET;
+        self.lockState = needsPreOps ? _ACTIVE_X_PRE_OPS_X_UNSET : _ACTIVE_X_USER_X_UNSET;
         return self;
     }
 

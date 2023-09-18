@@ -19,7 +19,7 @@ abstract contract GovernanceControl {
     // will "own" this contract but that it should be immutable.
 
     /////////////////////////////////////////////////////////
-    //                  STAGING                            //
+    //                  PRE OPS                            //
     /////////////////////////////////////////////////////////
     //
     // PreOps:

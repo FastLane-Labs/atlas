@@ -20,7 +20,7 @@ contract Permit69Test is BaseTest {
     bytes constant LOCK_STATE_NOT_VALID = bytes("ERR-T002 InvalidLockState");
     bytes constant CALLER_IS_NOT_ACTIVE = bytes("ERR-T003 EnvironmentNotActive");
 
-    uint16 constant EXEC_PHASE_STAGING = uint16(1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps)));
+    uint16 constant EXEC_PHASE_PRE_OPS = uint16(1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps)));
 
     address mockExecutionEnvAddress = address(0x13371337);
     address mockDAppControl = address(0x123321);
@@ -37,7 +37,7 @@ contract Permit69Test is BaseTest {
             paymentsComplete: false,
             callIndex: 0,
             callMax: 0,
-            lockState: EXEC_PHASE_STAGING,
+            lockState: EXEC_PHASE_PRE_OPS,
             gasRefund: 0
         });
 

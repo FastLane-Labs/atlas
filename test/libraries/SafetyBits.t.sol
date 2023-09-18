@@ -31,9 +31,9 @@ contract SafetyBitsTest is Test {
 
         expectedBitMapString = "0001000000100100";
         assertEq(
-            TestUtils.uint16ToBinaryString(SafetyBits._ACTIVE_X_STAGING_X_UNSET),
+            TestUtils.uint16ToBinaryString(SafetyBits._ACTIVE_X_PRE_OPS_X_UNSET),
             expectedBitMapString,
-            "_ACTIVE_X_STAGING_X_UNSET incorrect"
+            "_ACTIVE_X_PRE_OPS_X_UNSET incorrect"
         );
 
         expectedBitMapString = "0001100000000010";
@@ -45,9 +45,9 @@ contract SafetyBitsTest is Test {
 
         expectedBitMapString = "0001000000101000";
         assertEq(
-            TestUtils.uint16ToBinaryString(SafetyBits._LOCKED_X_STAGING_X_UNSET),
+            TestUtils.uint16ToBinaryString(SafetyBits._LOCKED_X_PRE_OPS_X_UNSET),
             expectedBitMapString,
-            "_LOCKED_X_STAGING_X_UNSET incorrect"
+            "_LOCKED_X_PRE_OPS_X_UNSET incorrect"
         );
 
         expectedBitMapString = "0001000001000100";
@@ -112,7 +112,7 @@ contract SafetyBitsTest is Test {
         assertTrue(key.paymentsComplete == false);
         assertTrue(key.callIndex == 0);
         assertTrue(key.callMax == 4);
-        assertTrue(key.lockState == SafetyBits._ACTIVE_X_STAGING_X_UNSET);
+        assertTrue(key.lockState == SafetyBits._ACTIVE_X_PRE_OPS_X_UNSET);
         assertTrue(key.gasRefund == 0);
     }
 
@@ -168,10 +168,10 @@ contract SafetyBitsTest is Test {
         assertTrue(key.callIndex == 1);
     }
 
-    function testHoldStagingLock() public {
+    function testHoldPreOpsLock() public {
         EscrowKey memory key = initializeEscrowLock();
         key = key.holdPreOpsLock(address(1));
-        assertTrue(key.lockState == SafetyBits._LOCKED_X_STAGING_X_UNSET);
+        assertTrue(key.lockState == SafetyBits._LOCKED_X_PRE_OPS_X_UNSET);
         assertTrue(key.approvedCaller == address(1));
         assertTrue(key.callIndex == 1);
     }
