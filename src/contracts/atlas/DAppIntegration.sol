@@ -10,20 +10,20 @@ import "../types/GovernanceTypes.sol";
 contract DAppIntegration {
     using CallBits for uint16;
 
-    // NOTE: To prevent builder censorship, protocol nonces can be
+    // NOTE: To prevent builder censorship, dapp nonces can be
     // processed in any order so long as they arent duplicated and
-    // as long as the protocol opts in to it
+    // as long as the dapp opts in to it
 
     // controller => govData
     mapping(address => GovernanceData) public governance;
 
-    // map for tracking which EOAs are approved for a given protocol
+    // map for tracking which EOAs are approved for a given dapp
     //     approver   userOp.to
     mapping(address => ApproverSigningData) public signatories;
 
     mapping(bytes32 => bytes32) public dapps;
 
-    // Permissionlessly integrates a new protocol
+    // Permissionlessly integrates a new dapp
     function initializeGovernance(address controller) external {
         address owner = IDAppControl(controller).getDAppSignatory();
 
@@ -59,24 +59,24 @@ contract DAppIntegration {
         signatories[signatory].enabled = false;
     }
 
-    function integrateDApp(address controller, address protocol) external {
+    function integrateDApp(address controller, address dappControl) external {
         GovernanceData memory govData = governance[controller];
 
         require(msg.sender == govData.governance, "ERR-V50 OnlyGovernance");
 
-        bytes32 key = keccak256(abi.encode(controller, protocol, govData.governance, govData.callConfig));
+        bytes32 key = keccak256(abi.encode(controller, dappControl, govData.governance, govData.callConfig));
 
-        protocols[key] = controller.codehash;
+        dapps[key] = controller.codehash;
     }
 
-    function disableDApp(address controller, address protocol) external {
+    function disableDApp(address controller, address dappControl) external {
         GovernanceData memory govData = governance[controller];
 
         require(msg.sender == govData.governance, "ERR-V50 OnlyGovernance");
 
-        bytes32 key = keccak256(abi.encode(controller, protocol, govData.governance, govData.callConfig));
+        bytes32 key = keccak256(abi.encode(controller, dappControl, govData.governance, govData.callConfig));
 
-        delete protocols[key];
+        delete dapps[key];
     }
 
     function nextGovernanceNonce(address governanceSignatory) external view returns (uint256 nextNonce) {
