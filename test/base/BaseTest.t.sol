@@ -9,7 +9,7 @@ import {IDAppIntegration} from "../../src/contracts/interfaces/IDAppIntegration.
 import {Atlas} from "../../src/contracts/atlas/Atlas.sol";
 import {Sorter} from "../../src/contracts/helpers/Sorter.sol";
 
-import {Solver} from "../solver/src/TestSolver.sol";
+import {Solver} from "src/contracts/solver/src/TestSolver.sol";
 
 import {V2DAppControl} from "../../src/contracts/examples/v2-example/V2DAppControl.sol";
 

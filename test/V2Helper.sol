@@ -5,7 +5,7 @@ import {TxBuilder} from "../src/contracts/helpers/TxBuilder.sol";
 
 import {IUniswapV2Pair} from "../src/contracts/examples/v2-example/interfaces/IUniswapV2Pair.sol";
 
-import {BlindBackrun} from "./solver/src/blindBackrun.sol";
+import {BlindBackrun} from "src/contracts/solver/src/blindBackrun.sol";
 
 import "../src/contracts/types/CallTypes.sol";
 import "../src/contracts/types/EscrowTypes.sol";

@@ -12,7 +12,7 @@ import {Mimic} from "../src/contracts/atlas/Mimic.sol";
 
 import {V2DAppControl} from "../src/contracts/examples/v2-example/V2DAppControl.sol";
 
-import {Solver} from "./solver/src/TestSolver.sol";
+import {Solver} from "src/contracts/solver/src/TestSolver.sol";
 
 import "../src/contracts/types/CallTypes.sol";
 import "../src/contracts/types/EscrowTypes.sol";
