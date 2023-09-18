@@ -16,10 +16,7 @@ contract FastLaneErrorsEvents {
 
     event UserTxResult(address indexed user, uint256 valueReturned, uint256 gasRefunded);
 
-    event MEVPaymentFailure(
-        address indexed protocolControl, uint16 callConfig, BidData[] winningBids
-    );
-
+    event MEVPaymentFailure(address indexed protocolControl, uint16 callConfig, BidData[] winningBids);
 
     error SearcherBidUnpaid();
     error SearcherFailedCallback();
@@ -33,4 +30,9 @@ contract FastLaneErrorsEvents {
     error IntentUnfulfilled();
     error SearcherStagingFailed();
     error SearcherVerificationFailed();
+
+    error UserNotFulfilled();
+    error NoAuctionWinner();
+
+    error SimulationPassed();
 }

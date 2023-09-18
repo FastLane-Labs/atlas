@@ -5,6 +5,8 @@ import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
 
 import {Factory} from "./Factory.sol";
 
+import {FastLaneErrorsEvents} from "./Emissions.sol";
+
 import "../types/CallTypes.sol";
 import "../types/LockTypes.sol";
 import "../types/VerificationTypes.sol";
@@ -163,7 +165,7 @@ contract Atlas is Test, Factory {
         // If no searcher was successful, manually transition the lock
         if (!auctionWon) {
             if (protocolCall.callConfig.needsSearcherPostCall()) {
-                revert("ERR-F08 UserNotFulfilled");
+                revert UserNotFulfilled();
             }
             key = key.setAllSearchersFailed();
         }
@@ -228,9 +230,9 @@ contract Atlas is Test, Factory {
         Verification calldata verification
     ) external payable {
         if (!metacall(protocolCall, userCall, searcherCalls, verification)) {
-            revert("ERR-S01 NoAuctionWinner");
+            revert NoAuctionWinner();
         }
-        revert("ERR-S00 SimulationPassed");
+        revert SimulationPassed();
     }
 
     function testSearcherCalls(
@@ -239,18 +241,14 @@ contract Atlas is Test, Factory {
         SearcherCall[] calldata searcherCalls,
         Verification calldata verification
     ) external payable returns (bool auctionWon) {
+        if (searcherCalls.length == 0) {
+            return false;
+        }
+
         try this.metacallSimulation{value: msg.value}(protocolCall, userCall, searcherCalls, verification) {}
         catch (bytes memory revertData) {
-            for (uint256 i; i < revertData.length-4;) {
-                revertData[i] = revertData[i+4];
-                unchecked{ ++i; }
-            }
-            bytes32 revertMsg = keccak256(abi.decode(revertData, (bytes)));
-
-            if (
-                revertMsg == keccak256(abi.encodePacked("ERR-S01 NoAuctionWinner"))
-                    || revertMsg == keccak256(abi.encodePacked("ERR-F08 UserNotFulfilled"))
-            ) {
+            bytes4 errorSwitch = bytes4(revertData);
+            if (errorSwitch == UserNotFulfilled.selector || errorSwitch == NoAuctionWinner.selector) {
                 auctionWon = false;
             } else {
                 auctionWon = true;
