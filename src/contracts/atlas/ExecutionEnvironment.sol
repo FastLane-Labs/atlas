@@ -110,12 +110,12 @@ contract ExecutionEnvironment is Base {
             );
 
             (success, userData) = _control().delegatecall(forward(userData));
-
             require(success, "ERR-EC02 DelegateRevert");
+            userData = abi.decode(userData, (bytes));
+
         } else {
             revert("ERR-P02 UserOperationStatic");
         }
-        userData = abi.decode(userData, (bytes));
     }
 
     function postOpsWrapper(bytes calldata returnData) 
