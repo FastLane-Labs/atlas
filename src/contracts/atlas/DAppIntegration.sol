@@ -21,7 +21,7 @@ contract DAppIntegration {
     //     approver   userOp.to
     mapping(address => ApproverSigningData) public signatories;
 
-    mapping(bytes32 => bytes32) public protocols;
+    mapping(bytes32 => bytes32) public dapps;
 
     // Permissionlessly integrates a new protocol
     function initializeGovernance(address controller) external {
