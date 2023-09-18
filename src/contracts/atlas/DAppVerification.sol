@@ -23,7 +23,7 @@ contract DAppVerification is EIP712, DAppIntegration {
     using ECDSA for bytes32;
     using CallBits for uint16;
 
-    bytes32 public constant PROTOCOL_TYPE_HASH = keccak256(
+    bytes32 public constant DAPP_TYPE_HASH = keccak256(
         "DAppProof(address from,address to,uint256 nonce,uint256 deadline,bytes32 userOpHash,bytes32 callChainHash,bytes32 controlCodeHash)"
     );
 
@@ -46,7 +46,7 @@ contract DAppVerification is EIP712, DAppIntegration {
 
 
     // 
-    // PROTOCOL VERIFICATION
+    // DAPP VERIFICATION
     //
 
     // Verify that the protocol's front end generated the preOps
@@ -144,7 +144,7 @@ contract DAppVerification is EIP712, DAppIntegration {
     function _getProofHash(DAppProof memory proof) internal pure returns (bytes32 proofHash) {
         proofHash = keccak256(
             abi.encode(
-                PROTOCOL_TYPE_HASH,
+                DAPP_TYPE_HASH,
                 proof.from,
                 proof.to,
                 proof.nonce,
