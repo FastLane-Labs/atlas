@@ -17,16 +17,16 @@ contract SafetyBitsTest is Test {
     function testConstants() public {
         string memory expectedBitMapString = "0010000010001000";
         assertEq(
-            TestUtils.uint16ToBinaryString(SafetyBits._LOCKED_X_SEARCHERS_X_REQUESTED),
+            TestUtils.uint16ToBinaryString(SafetyBits._LOCKED_X_SOLVERS_X_REQUESTED),
             expectedBitMapString,
-            "_LOCKED_X_SEARCHERS_X_REQUESTED incorrect"
+            "_LOCKED_X_SOLVERS_X_REQUESTED incorrect"
         );
 
         expectedBitMapString = "0100000010001000";
         assertEq(
-            TestUtils.uint16ToBinaryString(SafetyBits._LOCKED_X_SEARCHERS_X_VERIFIED),
+            TestUtils.uint16ToBinaryString(SafetyBits._LOCKED_X_SOLVERS_X_VERIFIED),
             expectedBitMapString,
-            "_LOCKED_X_SEARCHERS_X_VERIFIED incorrect"
+            "_LOCKED_X_SOLVERS_X_VERIFIED incorrect"
         );
 
         expectedBitMapString = "0001000000100100";
@@ -66,16 +66,16 @@ contract SafetyBitsTest is Test {
 
         expectedBitMapString = "0001000010000010";
         assertEq(
-            TestUtils.uint16ToBinaryString(SafetyBits._PENDING_X_SEARCHER_X_UNSET),
+            TestUtils.uint16ToBinaryString(SafetyBits._PENDING_X_SOLVER_X_UNSET),
             expectedBitMapString,
-            "_PENDING_X_SEARCHER_X_UNSET incorrect"
+            "_PENDING_X_SOLVER_X_UNSET incorrect"
         );
 
         expectedBitMapString = "0001000010000010";
         assertEq(
-            TestUtils.uint16ToBinaryString(SafetyBits._ACTIVE_X_SEARCHER_X_UNSET),
+            TestUtils.uint16ToBinaryString(SafetyBits._ACTIVE_X_SOLVER_X_UNSET),
             expectedBitMapString,
-            "_ACTIVE_X_SEARCHER_X_UNSET incorrect"
+            "_ACTIVE_X_SOLVER_X_UNSET incorrect"
         );
 
         expectedBitMapString = "0001000100001000";
@@ -85,9 +85,9 @@ contract SafetyBitsTest is Test {
 
         expectedBitMapString = "0001010000000100";
         assertEq(
-            TestUtils.uint16ToBinaryString(SafetyBits._NO_SEARCHER_SUCCESS),
+            TestUtils.uint16ToBinaryString(SafetyBits._NO_SOLVER_SUCCESS),
             expectedBitMapString,
-            "_NO_SEARCHER_SUCCESS incorrect"
+            "_NO_SOLVER_SUCCESS incorrect"
         );
 
         expectedBitMapString = "0001001000000010";
@@ -130,10 +130,10 @@ contract SafetyBitsTest is Test {
         assertTrue(key.callIndex == 1);
     }
 
-    function testSetAllSearchersFailed() public {
+    function testSetAllSolversFailed() public {
         EscrowKey memory key = initializeEscrowLock();
-        key = key.setAllSearchersFailed();
-        assertTrue(key.lockState == SafetyBits._NO_SEARCHER_SUCCESS);
+        key = key.setAllSolversFailed();
+        assertTrue(key.lockState == SafetyBits._NO_SOLVER_SUCCESS);
         assertTrue(key.approvedCaller == address(0));
         assertTrue(key.callIndex == 3);
     }
@@ -145,18 +145,18 @@ contract SafetyBitsTest is Test {
         assertTrue(key.paymentsComplete == true);
     }
 
-    function testTurnSearcherLockPayments() public {
+    function testTurnSolverLockPayments() public {
         EscrowKey memory key = initializeEscrowLock();
-        key = key.turnSearcherLockPayments(address(1));
+        key = key.turnSolverLockPayments(address(1));
         assertTrue(key.makingPayments == true);
         assertTrue(key.lockState == SafetyBits._LOCK_PAYMENTS);
         assertTrue(key.approvedCaller == address(1));
     }
 
-    function testHoldSearcherLock() public {
+    function testHoldSolverLock() public {
         EscrowKey memory key = initializeEscrowLock();
-        key = key.holdSearcherLock(address(1));
-        assertTrue(key.lockState == SafetyBits._LOCKED_X_SEARCHERS_X_REQUESTED);
+        key = key.holdSolverLock(address(1));
+        assertTrue(key.lockState == SafetyBits._LOCKED_X_SOLVERS_X_REQUESTED);
         assertTrue(key.approvedCaller == address(1));
     }
 
@@ -170,16 +170,16 @@ contract SafetyBitsTest is Test {
 
     function testHoldStagingLock() public {
         EscrowKey memory key = initializeEscrowLock();
-        key = key.holdStagingLock(address(1));
+        key = key.holdPreOpsLock(address(1));
         assertTrue(key.lockState == SafetyBits._LOCKED_X_STAGING_X_UNSET);
         assertTrue(key.approvedCaller == address(1));
         assertTrue(key.callIndex == 1);
     }
 
-    function testTurnSearcherLock() public {
+    function testTurnSolverLock() public {
         EscrowKey memory key = initializeEscrowLock();
-        key = key.turnSearcherLock(address(1));
-        assertTrue(key.lockState == SafetyBits._LOCKED_X_SEARCHERS_X_VERIFIED);
+        key = key.turnSolverLock(address(1));
+        assertTrue(key.lockState == SafetyBits._LOCKED_X_SOLVERS_X_VERIFIED);
         assertTrue(key.approvedCaller == address(1));
     }
 }

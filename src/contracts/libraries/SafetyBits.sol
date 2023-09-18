@@ -8,12 +8,12 @@ uint16 constant SAFETY_LEVEL_OFFSET = uint16(type(BaseLock).max) + uint16(type(E
 
 library SafetyBits {
 
-    uint16 internal constant _LOCKED_X_SEARCHERS_X_REQUESTED = uint16(
+    uint16 internal constant _LOCKED_X_SOLVERS_X_REQUESTED = uint16(
         1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations))
             | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Requested))
     );
 
-    uint16 internal constant _LOCKED_X_SEARCHERS_X_VERIFIED = uint16(
+    uint16 internal constant _LOCKED_X_SOLVERS_X_VERIFIED = uint16(
         1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations))
             | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Verified))
     );
@@ -43,12 +43,12 @@ library SafetyBits {
             | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Unset))
     );
 
-    uint16 internal constant _PENDING_X_SEARCHER_X_UNSET = uint16(
+    uint16 internal constant _PENDING_X_SOLVER_X_UNSET = uint16(
         1 << uint16(BaseLock.Pending) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations))
             | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Unset))
     );
 
-    uint16 internal constant _ACTIVE_X_SEARCHER_X_UNSET = uint16(
+    uint16 internal constant _ACTIVE_X_SOLVER_X_UNSET = uint16(
         1 << uint16(BaseLock.Pending) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations))
             | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Unset))
     );
@@ -58,7 +58,7 @@ library SafetyBits {
             | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Unset))
     );
 
-    uint16 internal constant _NO_SEARCHER_SUCCESS = uint16(
+    uint16 internal constant _NO_SOLVER_SUCCESS = uint16(
         1 << uint16(BaseLock.Active) | 
         1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps)) |
         1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Unset))
@@ -111,7 +111,7 @@ library SafetyBits {
         pure
         returns (EscrowKey memory)
     {
-        self.lockState = _NO_SEARCHER_SUCCESS;
+        self.lockState = _NO_SOLVER_SUCCESS;
         self.approvedCaller = address(0);
         self.callIndex = self.callMax - 1;
         return self;
@@ -135,7 +135,7 @@ library SafetyBits {
     }
 
     function holdSolverLock(EscrowKey memory self, address nextSolver) internal pure returns (EscrowKey memory) {
-        self.lockState = _LOCKED_X_SEARCHERS_X_REQUESTED;
+        self.lockState = _LOCKED_X_SOLVERS_X_REQUESTED;
         self.approvedCaller = nextSolver;
         return self;
     }
@@ -171,7 +171,7 @@ library SafetyBits {
     }
 
     function turnSolverLock(EscrowKey memory self, address msgSender) internal pure returns (EscrowKey memory) {
-        self.lockState = _LOCKED_X_SEARCHERS_X_VERIFIED;
+        self.lockState = _LOCKED_X_SOLVERS_X_VERIFIED;
         self.approvedCaller = msgSender;
         return self;
     }

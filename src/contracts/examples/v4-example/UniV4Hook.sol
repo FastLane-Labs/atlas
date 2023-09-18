@@ -80,7 +80,7 @@ contract UniV4Hook is V4DAppControl {
 
             // Case:
             // Solver call
-        } else if (escrowKey.lockState == SafetyBits._LOCKED_X_SEARCHERS_X_VERIFIED) {
+        } else if (escrowKey.lockState == SafetyBits._LOCKED_X_SOLVERS_X_VERIFIED) {
             // Sender = Solver contract
             // NOTE: This lockState verifies that the user's transaction has already
             // been executed.
