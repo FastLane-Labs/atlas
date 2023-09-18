@@ -50,9 +50,8 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     ///////////////////////////////////////////////////
     /// EXTERNAL FUNCTIONS FOR SEARCHER INTERACTION ///
     ///////////////////////////////////////////////////
-    function deposit(address searcherMetaTxSigner) external payable returns (uint256 newBalance) {
+    function deposit(address searcherMetaTxSigner) onlyWhenUnlocked external payable returns (uint256 newBalance) {
         // NOTE: The escrow accounting system cannot currently handle deposits made mid-transaction.
-        require(activeEnvironment == address(0), "ERR-E001 AlreadyInitialized");
 
         _escrowData[searcherMetaTxSigner].total += uint128(msg.value);
         newBalance = uint256(_escrowData[searcherMetaTxSigner].total);
