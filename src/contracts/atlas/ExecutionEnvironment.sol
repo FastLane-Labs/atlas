@@ -169,7 +169,7 @@ contract ExecutionEnvironment is Base {
         }
 
         ////////////////////////////
-        // SEARCHER SAFETY CHECKS //
+        // SOLVER SAFETY CHECKS //
         ////////////////////////////
 
         // Verify that the DAppControl contract matches the solver's expectations

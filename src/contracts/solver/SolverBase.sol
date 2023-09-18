@@ -80,7 +80,7 @@ contract SolverBase {
             balanceDelta = newBalance > balances[i] ? newBalance - balances[i] : 0;
 
             /*
-            console.log("---SEARCHER BID---");
+            console.log("---SOLVER BID---");
             console.log("Solver      ",address(this));
             console.log("BidToken      ",bids[i].token);
             console.log("BalanceDelta  ",balanceDelta);

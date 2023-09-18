@@ -48,7 +48,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
     }
 
     ///////////////////////////////////////////////////
-    /// EXTERNAL FUNCTIONS FOR SEARCHER INTERACTION ///
+    /// EXTERNAL FUNCTIONS FOR SOLVER INTERACTION ///
     ///////////////////////////////////////////////////
     function deposit(address solverSigner) onlyWhenUnlocked external payable returns (uint256 newBalance) {
         // NOTE: The escrow accounting system cannot currently handle deposits made mid-transaction.
@@ -398,7 +398,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
     function _getSolverHash(SolverCall calldata fCall) internal pure returns (bytes32 solverHash) {
         return keccak256(
             abi.encode(
-                SEARCHER_TYPE_HASH,
+                SOLVER_TYPE_HASH,
                 fCall.from,
                 fCall.to,
                 fCall.value,
@@ -460,10 +460,10 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
 
             gasLimit = (100)
                 * (
-                    solverOp.call.gas < EscrowBits.SEARCHER_GAS_LIMIT
+                    solverOp.call.gas < EscrowBits.SOLVER_GAS_LIMIT
                         ? solverOp.call.gas
-                        : EscrowBits.SEARCHER_GAS_LIMIT
-                ) / (100 + EscrowBits.SEARCHER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
+                        : EscrowBits.SOLVER_GAS_LIMIT
+                ) / (100 + EscrowBits.SOLVER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
 
             uint256 gasCost = (tx.gasprice * gasLimit) + (solverOp.call.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
 
@@ -501,7 +501,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
             result |= 1 << uint256(SolverOutcome.LostAuction);
         }
 
-        if (gasWaterMark < EscrowBits.VALIDATION_GAS_LIMIT + EscrowBits.SEARCHER_GAS_LIMIT) {
+        if (gasWaterMark < EscrowBits.VALIDATION_GAS_LIMIT + EscrowBits.SOLVER_GAS_LIMIT) {
             // Make sure to leave enough gas for protocol validation calls
             result |= 1 << uint256(SolverOutcome.UserOutOfGas);
         }

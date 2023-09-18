@@ -49,7 +49,7 @@ contract SwapIntentController is DAppControl {
     // NOTE: Conditionals will only be static called to prevent the user from arbitrarily altering state prior to 
     // the execution of the Solvers' calls. 
 
-    uint256 constant public EXPECTED_GAS_USAGE_EX_SEARCHER = 200_000;
+    uint256 constant public EXPECTED_GAS_USAGE_EX_SOLVER = 200_000;
 
     constructor(address _escrow)
         DAppControl(
@@ -145,7 +145,7 @@ contract SwapIntentController is DAppControl {
             tokenUserSells: swapIntent.tokenUserSells,
             amountUserSells: swapIntent.amountUserSells,
             auctionBaseCurrency: swapIntent.auctionBaseCurrency,
-            solverGasLiability: swapIntent.solverMustReimburseGas ? EXPECTED_GAS_USAGE_EX_SEARCHER : 0
+            solverGasLiability: swapIntent.solverMustReimburseGas ? EXPECTED_GAS_USAGE_EX_SOLVER : 0
         });
 
 
