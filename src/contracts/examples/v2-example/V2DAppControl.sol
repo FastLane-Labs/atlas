@@ -5,16 +5,16 @@ pragma solidity ^0.8.16;
 import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
 // Atlas Base Imports
-import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
-import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
+import {ISafetyLocks} from "../../interfaces/ISafetyLocks.sol";
+import {IExecutionEnvironment} from "../../interfaces/IExecutionEnvironment.sol";
 
-import {SafetyBits} from "../libraries/SafetyBits.sol";
+import {SafetyBits} from "../../libraries/SafetyBits.sol";
 
-import "../types/CallTypes.sol";
-import "../types/LockTypes.sol";
+import "../../types/CallTypes.sol";
+import "../../types/LockTypes.sol";
 
-// Atlas Protocol-Control Imports
-import {ProtocolControl} from "../protocol/ProtocolControl.sol";
+// Atlas DApp-Control Imports
+import {DAppControl} from "../../dapp/DAppControl.sol";
 
 // Uni V2 Imports
 import {IUniswapV2Pair} from "./interfaces/IUniswapV2Pair.sol";
@@ -29,7 +29,7 @@ interface IWETH {
     function withdraw(uint256 wad) external;
 }
 
-contract V2ProtocolControl is ProtocolControl {
+contract V2DAppControl is DAppControl {
 
     uint256 public constant CONTROL_GAS_USAGE = 250_000;
 
@@ -47,23 +47,23 @@ contract V2ProtocolControl is ProtocolControl {
     event GiftedGovernanceToken(address indexed user, address indexed token, uint256 amount);
 
     constructor(address _escrow)
-        ProtocolControl(
+        DAppControl(
             _escrow, 
             msg.sender, 
             CallConfig({
                 sequenced: false,
-                requireStaging: true,
-                trackStagingReturnData: false,
+                requirePreOps: true,
+                trackPreOpsReturnData: false,
                 trackUserReturnData: false,
                 localUser: false,
                 delegateUser: false,
-                searcherStaging: false,
-                searcherFulfillment: false,
-                requireVerification: false,
-                zeroSearchers: true,
+                preSolver: false,
+                postSolver: false,
+                requirePostOps: false,
+                zeroSolvers: true,
                 reuseUserOp: false,
                 userBundler: true,
-                protocolBundler: true,
+                dAppBundler: true,
                 unknownBundler: true
             })
         )
@@ -76,21 +76,21 @@ contract V2ProtocolControl is ProtocolControl {
         }
     }
 
-    function _stagingCall(UserMetaTx calldata userMetaTx)
+    function _preOpsCall(UserCall calldata uCall)
         internal
         override
         returns (bytes memory)
     {
-        require(bytes4(userMetaTx.data) == SWAP, "ERR-H10 InvalidFunction");
+        require(bytes4(uCall.data) == SWAP, "ERR-H10 InvalidFunction");
 
         (
             uint256 amount0Out,
             uint256 amount1Out,
             , // address recipient // Unused
                 // bytes memory swapData // Unused
-        ) = abi.decode(userMetaTx.data[4:], (uint256, uint256, address, bytes));
+        ) = abi.decode(uCall.data[4:], (uint256, uint256, address, bytes));
 
-        (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(userMetaTx.to).getReserves();
+        (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(uCall.to).getReserves();
 
         uint256 amount0In =
             amount1Out == 0 ? 0 : SwapMath.getAmountIn(amount1Out, uint256(token0Balance), uint256(token1Balance));
@@ -101,8 +101,8 @@ contract V2ProtocolControl is ProtocolControl {
         // This is a V2 swap, so optimistically transfer the tokens
         // NOTE: The user should have approved the ExecutionEnvironment for token transfers
         _transferUserERC20(
-            amount0Out > amount1Out ? IUniswapV2Pair(userMetaTx.to).token1() : IUniswapV2Pair(userMetaTx.to).token0(),
-            userMetaTx.to, 
+            amount0Out > amount1Out ? IUniswapV2Pair(uCall.to).token1() : IUniswapV2Pair(uCall.to).token0(),
+            uCall.to, 
             amount0In > amount1In ? amount0In : amount1In
         );
 
@@ -110,14 +110,14 @@ contract V2ProtocolControl is ProtocolControl {
         return emptyData;
     }
 
-    // This occurs after a Searcher has successfully paid their bid, which is
+    // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocatingCall(bytes calldata) internal override {
+    function _allocateValueCall(bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
 
-        // NOTE: ProtocolVerifier has verified the BidData[] format
+        // NOTE: DAppVerification has verified the BidData[] format
         // BidData[0] = address(WETH) <== WETH
 
         address user = _user();
@@ -167,7 +167,7 @@ contract V2ProtocolControl is ProtocolControl {
         /*
         // ENABLE FOR FOUNDRY TESTING
         console.log("----====++++====----");
-        console.log("Protocol Control");
+        console.log("DApp Control");
         console.log("Governance Tokens Burned:", govIsTok0 ? amount0Out : amount1Out);
         console.log("----====++++====----");
         */
@@ -191,8 +191,8 @@ contract V2ProtocolControl is ProtocolControl {
         return payeeData;
     }
 
-    function getBidFormat(UserMetaTx calldata) external pure override returns (BidData[] memory) {
-        // This is a helper function called by searchers
+    function getBidFormat(UserCall calldata) external pure override returns (BidData[] memory) {
+        // This is a helper function called by solvers
         // so that they can get the proper format for
         // submitting their bids to the hook.
 
@@ -200,19 +200,19 @@ contract V2ProtocolControl is ProtocolControl {
 
         bidData[0] = BidData({
             token: WETH,
-            bidAmount: 0 // <- searcher must update
+            bidAmount: 0 // <- solver must update
         });
 
         return bidData;
     }
 
-    function getBidValue(SearcherCall calldata searcherCall)
+    function getBidValue(SolverOperation calldata solverOp)
         external
         pure
         override
         returns (uint256) 
     {
-        return searcherCall.bids[0].bidAmount;
+        return solverOp.bids[0].bidAmount;
     }
 
 

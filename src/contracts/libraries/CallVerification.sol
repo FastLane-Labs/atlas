@@ -1,13 +1,13 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import {IProtocolControl} from "../interfaces/IProtocolControl.sol";
+import {IDAppControl} from "../interfaces/IDAppControl.sol";
 
 import "../types/CallTypes.sol";
 
 library CallVerification {
-    function getUserCallHash(UserMetaTx calldata userMetaTx) internal pure returns (bytes32 userCallHash) {
-        userCallHash = keccak256(abi.encode(userMetaTx));
+    function getUserOperationHash(UserCall calldata uCall) internal pure returns (bytes32 userOpHash) {
+        userOpHash = keccak256(abi.encode(uCall));
     }
 
     function getBidsHash(BidData[] memory bidData) internal pure returns (bytes32 bidsHash) {
@@ -15,21 +15,21 @@ library CallVerification {
     }
 
     function getCallChainHash(
-        ProtocolCall calldata protocolCall,
-        UserMetaTx calldata userMetaTx,
-        SearcherCall[] calldata searcherCalls
+        DAppConfig calldata dConfig,
+        UserCall calldata uCall,
+        SolverOperation[] calldata solverOps
     ) internal pure returns (bytes32 callSequenceHash) {
         
         uint256 i;
-        if (protocolCall.callConfig & 1 << uint16(CallConfigIndex.RequireStaging) != 0) {
-            // Start with staging call if staging is needed
+        if (dConfig.callConfig & 1 << uint16(CallConfigIndex.RequirePreOps) != 0) {
+            // Start with preOps call if preOps is needed
             callSequenceHash = keccak256(
                 abi.encodePacked(
                     callSequenceHash, // initial hash = null
-                    protocolCall.to,
+                    dConfig.to,
                     abi.encodeWithSelector(
-                        IProtocolControl.stagingCall.selector,
-                        userMetaTx
+                        IDAppControl.preOpsCall.selector,
+                        uCall
                     ),
                     i++
                 )
@@ -40,19 +40,19 @@ library CallVerification {
         callSequenceHash = keccak256(
             abi.encodePacked(
                 callSequenceHash, // always reference previous hash
-                abi.encode(userMetaTx),
+                abi.encode(uCall),
                 i++
             )
         );
 
-        // then searcher calls
-        uint256 count = searcherCalls.length;
+        // then solver calls
+        uint256 count = solverOps.length;
         uint256 n;
         for (; n<count;) {
             callSequenceHash = keccak256(
                 abi.encodePacked(
                     callSequenceHash, // reference previous hash
-                    abi.encode(searcherCalls[n].metaTx), // searcher call
+                    abi.encode(solverOps[n].call), // solver call
                     i++
                 )
             );

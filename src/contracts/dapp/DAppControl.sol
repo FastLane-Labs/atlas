@@ -6,13 +6,13 @@ import {ExecutionPhase} from "../types/LockTypes.sol";
 import {CallBits} from "../libraries/CallBits.sol";
 
 import {GovernanceControl} from "./GovernanceControl.sol";
-import {ExecutionBase} from "./ExecutionBase.sol";
+import {ExecutionBase} from "../common/ExecutionBase.sol";
 
 import "../types/CallTypes.sol";
 
 import "forge-std/Test.sol";
 
-abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
+abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
     address public immutable escrow;
     address public immutable governance;
     address public immutable control;
@@ -29,7 +29,7 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         callConfig = CallBits.encodeCallConfig(_callConfig);
     }
 
-    // Safety and support functions and modifiers that make the relationship between protocol
+    // Safety and support functions and modifiers that make the relationship between dApp
     // and FastLane's backend trustless.
 
     // Modifiers
@@ -44,74 +44,74 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
     }
 
     // Functions
-    function stagingCall(UserMetaTx calldata userMetaTx)
+    function preOpsCall(UserCall calldata uCall)
         external
         onlyAtlasEnvironment
         validControl
-        validPhase(ExecutionPhase.Staging)
+        validPhase(ExecutionPhase.PreOps)
         returns (bytes memory)
     {
-        return _stagingCall(userMetaTx);
+        return _preOpsCall(uCall);
     }
 
     function userLocalCall(bytes calldata data) 
         external 
         onlyAtlasEnvironment
         validControl
-        validPhase(ExecutionPhase.UserCall)
+        validPhase(ExecutionPhase.UserOperation)
         returns (bytes memory) 
     {
         return CallBits.needsDelegateUser(callConfig) ? _userLocalDelegateCall(data) : _userLocalStandardCall(data);
     }
 
-    function searcherPreCall(bytes calldata data) 
+    function preSolverCall(bytes calldata data) 
         external 
         onlyAtlasEnvironment
         validControl
-        validPhase(ExecutionPhase.SearcherCalls)
+        validPhase(ExecutionPhase.SolverOperations)
         returns (bool)
     {
-        return _searcherPreCall(data);
+        return _preSolverCall(data);
     }
 
-    function searcherPostCall(bytes calldata data) 
+    function postSolverCall(bytes calldata data) 
         external 
         onlyAtlasEnvironment
         validControl
-        validPhase(ExecutionPhase.SearcherCalls)
+        validPhase(ExecutionPhase.SolverOperations)
         returns (bool)
     {
         
-        return _searcherPostCall(data);
+        return _postSolverCall(data);
     }
 
-    function allocatingCall(bytes calldata data) 
+    function allocateValueCall(bytes calldata data) 
         external 
         onlyAtlasEnvironment
         validControl
         validPhase(ExecutionPhase.HandlingPayments)
     {
-        return _allocatingCall(data);
+        return _allocateValueCall(data);
     }
 
-    function verificationCall(bytes calldata data) 
+    function postOpsCall(bytes calldata data) 
         external 
         onlyAtlasEnvironment
         validControl
-        validPhase(ExecutionPhase.Verification)
+        validPhase(ExecutionPhase.PostOps)
         returns (bool) 
     {
-        return _verificationCall(data);
+        return _postOpsCall(data);
     }
 
-    function validateUserCall(UserMetaTx calldata userMetaTx) 
+    function validateUserOperation(UserCall calldata uCall) 
         external 
         view
         onlyAtlasEnvironment
         validControl
         returns (bool) 
     {
-        return _validateUserCall(userMetaTx);
+        return _validateUserOperation(uCall);
     }
 
     // View functions
@@ -132,8 +132,8 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         isSequenced = CallBits.needsSequencedNonces(callConfig);
     }
 
-    function getProtocolCall() external view returns (ProtocolCall memory protocolCall) {
-        protocolCall = ProtocolCall({
+    function getDAppConfig() external view returns (DAppConfig memory dConfig) {
+        dConfig = DAppConfig({
             to: address(this),
             callConfig: callConfig
         });
@@ -147,7 +147,7 @@ abstract contract ProtocolControl is Test, GovernanceControl, ExecutionBase {
         return _getCallConfig();
     }
 
-    function getProtocolSignatory() external view returns (address governanceAddress) {
+    function getDAppSignatory() external view returns (address governanceAddress) {
         governanceAddress = governance;
     }
 }

@@ -8,7 +8,7 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 import {BaseTest} from "./base/BaseTest.t.sol";
 import "./base/TestUtils.sol";
 
-import {Permit69} from "../src/contracts/atlas/Permit69.sol";
+import {Permit69} from "../src/contracts/common/Permit69.sol";
 import {Mimic} from "../src/contracts/atlas/Mimic.sol";
 
 import {EXECUTION_PHASE_OFFSET, SAFETY_LEVEL_OFFSET} from "../src/contracts/libraries/SafetyBits.sol";
@@ -20,10 +20,10 @@ contract Permit69Test is BaseTest {
     bytes constant LOCK_STATE_NOT_VALID = bytes("ERR-T002 InvalidLockState");
     bytes constant CALLER_IS_NOT_ACTIVE = bytes("ERR-T003 EnvironmentNotActive");
 
-    uint16 constant EXEC_PHASE_STAGING = uint16(1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Staging)));
+    uint16 constant EXEC_PHASE_PRE_OPS = uint16(1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps)));
 
     address mockExecutionEnvAddress = address(0x13371337);
-    address mockProtocolControl = address(0x123321);
+    address mockDAppControl = address(0x123321);
 
     EscrowKey escrowKey;
     MockAtlasForPermit69Tests mockAtlas;
@@ -37,7 +37,7 @@ contract Permit69Test is BaseTest {
             paymentsComplete: false,
             callIndex: 0,
             callMax: 0,
-            lockState: EXEC_PHASE_STAGING,
+            lockState: EXEC_PHASE_PRE_OPS,
             gasRefund: 0
         });
 
@@ -45,15 +45,15 @@ contract Permit69Test is BaseTest {
         mockAtlas.setEscrowKey(escrowKey);
         mockAtlas.setEnvironment(mockExecutionEnvAddress);
 
-        deal(WETH_ADDRESS, mockProtocolControl, 100e18);
+        deal(WETH_ADDRESS, mockDAppControl, 100e18);
     }
 
     // transferUserERC20 tests
 
-    function testTransferUserERC20RevertsIfCallerNotExecutionEnv() public {
-        vm.prank(searcherOneEOA);
+    function testTransferUserERC20RevertsIsCallerNotExecutionEnv() public {
+        vm.prank(solverOneEOA);
         vm.expectRevert(CALLER_IS_NOT_EXECUTION_ENV);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, address(0), uint16(0), escrowKey.lockState);
+        mockAtlas.transferUserERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, address(0), uint16(0), escrowKey.lockState);
     }
 
     function testTransferUserERC20RevertsIfLockStateNotValid() public {
@@ -66,7 +66,7 @@ contract Permit69Test is BaseTest {
         );
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0), escrowKey.lockState);
+        mockAtlas.transferUserERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);
 
         // HandlingPayments
         escrowKey.lockState = uint16(
@@ -74,7 +74,7 @@ contract Permit69Test is BaseTest {
         );
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0), escrowKey.lockState);
+        mockAtlas.transferUserERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);
 
         // UserRefund
         escrowKey.lockState = uint16(
@@ -82,7 +82,7 @@ contract Permit69Test is BaseTest {
         );
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0), escrowKey.lockState);
+        mockAtlas.transferUserERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);
 
         // Releasing
         escrowKey.lockState = uint16(
@@ -90,7 +90,7 @@ contract Permit69Test is BaseTest {
         );
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0), escrowKey.lockState);
+        mockAtlas.transferUserERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);
 
         vm.stopPrank();
     }
@@ -99,27 +99,27 @@ contract Permit69Test is BaseTest {
         uint256 wethTransferred = 10e18;
 
         uint256 userWethBefore = WETH.balanceOf(userEOA);
-        uint256 searcherWethBefore = WETH.balanceOf(searcherOneEOA);
+        uint256 solverWethBefore = WETH.balanceOf(solverOneEOA);
 
         vm.prank(userEOA);
         WETH.approve(address(mockAtlas), wethTransferred);
 
         vm.prank(mockExecutionEnvAddress);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, searcherOneEOA, wethTransferred, userEOA, mockProtocolControl, uint16(0), escrowKey.lockState);
+        mockAtlas.transferUserERC20(WETH_ADDRESS, solverOneEOA, wethTransferred, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);
     
         assertEq(WETH.balanceOf(userEOA), userWethBefore - wethTransferred, "User did not lose WETH");
-        assertEq(WETH.balanceOf(searcherOneEOA), searcherWethBefore + wethTransferred, "Searcher did not gain WETH");
+        assertEq(WETH.balanceOf(solverOneEOA), solverWethBefore + wethTransferred, "Solver did not gain WETH");
     }
 
-    // transferProtocolERC20 tests
+    // transferDAppERC20 tests
 
-    function testTransferProtocolERC20RevertsIfCallerNotExecutionEnv() public {
-        vm.prank(searcherOneEOA);
+    function testTransferDAppERC20RevertsIsCallerNotExecutionEnv() public {
+        vm.prank(solverOneEOA);
         vm.expectRevert(CALLER_IS_NOT_EXECUTION_ENV);
-        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0), escrowKey.lockState);
+        mockAtlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);
     }
 
-    function testTransferProtocolERC20RevertsIfLockStateNotValid() public {
+    function testTransferDAppERC20RevertsIfLockStateNotValid() public {
         // Check reverts at all invalid execution phases
         vm.startPrank(mockExecutionEnvAddress);
 
@@ -129,23 +129,23 @@ contract Permit69Test is BaseTest {
         );
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0), escrowKey.lockState);
+        mockAtlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);
 
-        // UserCall
+        // UserOperation
         escrowKey.lockState = uint16(
-            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.UserCall))
+            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.UserOperation))
         );
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0), escrowKey.lockState);
+        mockAtlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);
 
-        // SearcherCalls
+        // SolverOperations
         escrowKey.lockState = uint16(
-            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.SearcherCalls))
+            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.SolverOperations))
         );
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0), escrowKey.lockState);
+        mockAtlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);
 
         // Releasing
         escrowKey.lockState = uint16(
@@ -153,25 +153,25 @@ contract Permit69Test is BaseTest {
         );
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, 10e18, userEOA, mockProtocolControl, uint16(0), escrowKey.lockState);        
+        mockAtlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);        
 
         vm.stopPrank();
     }
 
-    function testTransferProtocolERC20SuccessfullyTransfersTokens() public {
+    function testTransferDAppERC20SuccessfullyTransfersTokens() public {
         uint256 wethTransferred = 10e18;
 
-        uint256 protocolWethBefore = WETH.balanceOf(mockProtocolControl);
-        uint256 searcherWethBefore = WETH.balanceOf(searcherOneEOA);
+        uint256 dAppWethBefore = WETH.balanceOf(mockDAppControl);
+        uint256 solverWethBefore = WETH.balanceOf(solverOneEOA);
 
-        vm.prank(mockProtocolControl);
+        vm.prank(mockDAppControl);
         WETH.approve(address(mockAtlas), wethTransferred);
 
         vm.prank(mockExecutionEnvAddress);
-        mockAtlas.transferProtocolERC20(WETH_ADDRESS, searcherOneEOA, wethTransferred, userEOA, mockProtocolControl, uint16(0), escrowKey.lockState);
+        mockAtlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, wethTransferred, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);
     
-        assertEq(WETH.balanceOf(mockProtocolControl), protocolWethBefore - wethTransferred, "Protocol did not lose WETH");
-        assertEq(WETH.balanceOf(searcherOneEOA), searcherWethBefore + wethTransferred, "Searcher did not gain WETH");
+        assertEq(WETH.balanceOf(mockDAppControl), dAppWethBefore - wethTransferred, "DApp did not lose WETH");
+        assertEq(WETH.balanceOf(solverOneEOA), solverWethBefore + wethTransferred, "Solver did not gain WETH");
     }
 
     // constants tests
@@ -190,19 +190,19 @@ contract Permit69Test is BaseTest {
 
     function testConstantValueOfSafeUserTransfer() public {
         string memory expectedBitMapString = "0000010011100000";
-        // Safe phases for user transfers are Staging, UserCall, and Verification
-        // stagingPhaseSafe = 0000 0000 0010 0000
-        uint16 stagingPhaseSafe = uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Staging)));
-        // userCallPhaseSafe = 0000 0000 0100 0000
-        uint16 userCallPhaseSafe = uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.UserCall)));
-        // searcherCallsPhaseSafe = 0000 0000 1000 0000
-        uint16 searcherCallsPhaseSafe =
-            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.SearcherCalls)));
+        // Safe phases for user transfers are PreOps, UserOperation, and Verification
+        // preOpsPhaseSafe = 0000 0000 0010 0000
+        uint16 preOpsPhaseSafe = uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.PreOps)));
+        // userOpPhaseSafe = 0000 0000 0100 0000
+        uint16 userOpPhaseSafe = uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.UserOperation)));
+        // solverOpsPhaseSafe = 0000 0000 1000 0000
+        uint16 solverOpsPhaseSafe =
+            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.SolverOperations)));
         // verificationPhaseSafe = 0000 0100 0000 0000
         uint16 verificationPhaseSafe =
-            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Verification)));
+            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.PostOps)));
 
-        uint16 expectedSafeUserTransferBitMap = stagingPhaseSafe | userCallPhaseSafe | searcherCallsPhaseSafe | verificationPhaseSafe;
+        uint16 expectedSafeUserTransferBitMap = preOpsPhaseSafe | userOpPhaseSafe | solverOpsPhaseSafe | verificationPhaseSafe;
 
         assertEq(
             mockAtlas.getSafeUserTransfer(),
@@ -216,12 +216,12 @@ contract Permit69Test is BaseTest {
         );
     }
 
-    function testConstantValueOfSafeProtocolTransfer() public {
+    function testConstantValueOfSafeDAppTransfer() public {
         string memory expectedBitMapString = "0000011100100000";
-        // Safe phases for protocol transfers are Staging, HandlingPayments, UserRefund, and Verification
-        // stagingPhaseSafe = 0000 0000 0010 0000
-        uint16 stagingPhaseSafe =
-            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Staging)));
+        // Safe phases for dApp transfers are PreOps, HandlingPayments, UserRefund, and Verification
+        // preOpsPhaseSafe = 0000 0000 0010 0000
+        uint16 preOpsPhaseSafe =
+            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.PreOps)));
         // handlingPaymentsPhaseSafe = 0000 0001 0000 0000
         uint16 handlingPaymentsPhaseSafe =
             uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.HandlingPayments)));
@@ -230,18 +230,18 @@ contract Permit69Test is BaseTest {
             uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.UserRefund)));
         // verificationPhaseSafe = 0000 0100 0000 0000
         uint16 verificationPhaseSafe =
-            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Verification)));
+            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.PostOps)));
 
-        uint16 expectedSafeProtocolTransferBitMap =
-            stagingPhaseSafe | handlingPaymentsPhaseSafe | userRefundPhaseSafe | verificationPhaseSafe;
+        uint16 expectedSafeDAppTransferBitMap =
+            preOpsPhaseSafe | handlingPaymentsPhaseSafe | userRefundPhaseSafe | verificationPhaseSafe;
 
         assertEq(
-            mockAtlas.getSafeProtocolTransfer(),
-            expectedSafeProtocolTransferBitMap,
+            mockAtlas.getSafeDAppTransfer(),
+            expectedSafeDAppTransferBitMap,
             "Expected to be the bitwise OR of the safe phases (0000 0111 0010 0000)"
         );
         assertEq(
-            TestUtils.uint16ToBinaryString(expectedSafeProtocolTransferBitMap),
+            TestUtils.uint16ToBinaryString(expectedSafeDAppTransferBitMap),
             expectedBitMapString,
             "Binary string form of bit map not as expected"
         );
@@ -265,8 +265,8 @@ contract MockAtlasForPermit69Tests is Permit69 {
         return _SAFE_USER_TRANSFER;
     }
 
-    function getSafeProtocolTransfer() public view returns (uint16) {
-        return _SAFE_PROTOCOL_TRANSFER;
+    function getSafeDAppTransfer() public view returns (uint16) {
+        return _SAFE_DAPP_TRANSFER;
     }
 
     // Setters for testing
@@ -286,7 +286,7 @@ contract MockAtlasForPermit69Tests is Permit69 {
     function _getExecutionEnvironmentCustom(
         address user,
         bytes32 controlCodeHash,
-        address protocolControl,
+        address controller,
         uint16 callConfig
     ) internal view virtual override returns (address activeEnvironment) {
         activeEnvironment = _environment;

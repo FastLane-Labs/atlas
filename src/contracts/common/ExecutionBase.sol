@@ -22,8 +22,8 @@ contract Base {
     }
 
     // These functions only work inside of the ExecutionEnvironment (mimic)
-    // via delegatecall, but can be added to ProtocolControl as funcs that 
-    // can be used during ProtocolControl's delegated funcs
+    // via delegatecall, but can be added to DAppControl as funcs that 
+    // can be used during DAppControl's delegated funcs
 
     // NOTE the validEnvironment modifier is relatively expensive and only needs to be checked once,
     // (if at all), so do it during the user phase or bypass entirely.
@@ -84,8 +84,8 @@ contract Base {
         );
     }
 
-    // Returns the address(ProtocolControl).codehash for the calling
-    // ExecutionEnvironment's ProtocolControl
+    // Returns the address(DAppControl).codehash for the calling
+    // ExecutionEnvironment's DAppControl
     function _controlCodeHash() internal pure returns (bytes32 controlCodeHash) {
         assembly {
             controlCodeHash := calldataload(sub(calldatasize(), 32))
@@ -174,7 +174,7 @@ contract ExecutionBase is Base {
         );
     }
 
-    function _transferProtocolERC20(
+    function _transferDAppERC20(
         address token,
         address destination,
         uint256 amount
@@ -182,7 +182,7 @@ contract ExecutionBase is Base {
         if(msg.sender != atlas) { 
             revert("ERR-EB001 InvalidSender");
         }
-        IPermit69(atlas).transferProtocolERC20(
+        IPermit69(atlas).transferDAppERC20(
             token, destination, amount, _user(), _control(), _config(), _lockState()
         );
     }

@@ -5,21 +5,21 @@ pragma solidity ^0.8.18;
 import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
 // Atlas Base Imports
-import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
-import {SafetyBits} from "../libraries/SafetyBits.sol";
+import {ISafetyLocks} from "../../interfaces/ISafetyLocks.sol";
+import {SafetyBits} from "../../libraries/SafetyBits.sol";
 
-import "../types/CallTypes.sol";
-import "../types/LockTypes.sol";
+import "../../types/CallTypes.sol";
+import "../../types/LockTypes.sol";
 
-// Atlas Protocol-Control Imports
-import {ProtocolControl} from "../protocol/ProtocolControl.sol";
+// Atlas DApp-Control Imports
+import {DAppControl} from "../../dapp/DAppControl.sol";
 
 // V4 Imports
 import {IPoolManager} from "./IPoolManager.sol";
 import {IHooks} from "./IHooks.sol";
 
-contract V4ProtocolControl is ProtocolControl {
-    struct StagingReturn {
+contract V4DAppControl is DAppControl {
+    struct PreOpsReturn {
         address approvedToken;
         IPoolManager.PoolKey poolKey;
     }
@@ -45,23 +45,23 @@ contract V4ProtocolControl is ProtocolControl {
     PoolKey internal _currentKey; // TODO: Transient storage <-
 
     constructor(address _escrow, address _v4Singleton)
-        ProtocolControl(
+        DAppControl(
             _escrow, 
             msg.sender, 
             CallConfig({
                 sequenced: false,
-                requireStaging: true,
-                trackStagingReturnData: true,
+                requirePreOps: true,
+                trackPreOpsReturnData: true,
                 trackUserReturnData: false,
                 localUser: false,
                 delegateUser: false,
-                searcherStaging: false,
-                searcherFulfillment: false,
-                requireVerification: false,
-                zeroSearchers: true,
+                preSolver: false,
+                postSolver: false,
+                requirePostOps: false,
+                zeroSolvers: true,
                 reuseUserOp: false,
                 userBundler: true,
-                protocolBundler: true,
+                dAppBundler: true,
                 unknownBundler: true
             })
         )
@@ -75,10 +75,10 @@ contract V4ProtocolControl is ProtocolControl {
     /////////////////////////////////////////////////////////
 
     /////////////// DELEGATED CALLS //////////////////
-    function _stagingCall(UserMetaTx calldata userMetaTx)
+    function _preOpsCall(UserCall calldata uCall)
         internal
         override
-        returns (bytes memory stagingData)
+        returns (bytes memory preOpsData)
     {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
@@ -87,20 +87,20 @@ contract V4ProtocolControl is ProtocolControl {
 
         require(!_currentKey.initialized, "ERR-H09 AlreadyInitialized");
 
-        require(bytes4(userMetaTx.data) == SWAP, "ERR-H10 InvalidFunction");
+        require(bytes4(uCall.data) == SWAP, "ERR-H10 InvalidFunction");
 
-        require(userMetaTx.to == v4Singleton, "ERR-H11 InvalidTo");
+        require(uCall.to == v4Singleton, "ERR-H11 InvalidTo");
 
         // Verify that the swapper went through the FastLane Atlas MEV Auction
-        // and that ProtocolControl supplied a valid signature
+        // and that DAppControl supplied a valid signature
         require(msg.sender == escrow, "ERR-H00 InvalidCaller");
 
 
         (IPoolManager.PoolKey memory key, IPoolManager.SwapParams memory params) =
-            abi.decode(userMetaTx.data[4:], (IPoolManager.PoolKey, IPoolManager.SwapParams));
+            abi.decode(uCall.data[4:], (IPoolManager.PoolKey, IPoolManager.SwapParams));
 
         // Perform more checks and activate the lock
-        V4ProtocolControl(hook).setLock(key);
+        V4DAppControl(hook).setLock(key);
 
         // Store the key so that we can access it at verification
         _currentKey = PoolKey({
@@ -110,7 +110,7 @@ contract V4ProtocolControl is ProtocolControl {
 
         // Handle forwarding of token approvals, or token transfers.
         // NOTE: The user will have approved the ExecutionEnvironment in a prior call
-        StagingReturn memory stagingReturn = StagingReturn({
+        PreOpsReturn memory preOpsReturn = PreOpsReturn({
             approvedToken: (
                 params.zeroForOne
                     ? IPoolManager.Currency.unwrap(key.currency0)
@@ -127,7 +127,7 @@ contract V4ProtocolControl is ProtocolControl {
                 // ERC20(token0).approve(v4Singleton, amountSpecified);
                 SafeTransferLib.safeTransferFrom(
                     ERC20(IPoolManager.Currency.unwrap(key.currency0)),
-                    userMetaTx.from,
+                    uCall.from,
                     v4Singleton, // <- TODO: confirm
                     uint256(params.amountSpecified)
                 );
@@ -143,12 +143,12 @@ contract V4ProtocolControl is ProtocolControl {
         }
 
         // Return value
-        stagingData = abi.encode(stagingReturn);
+        preOpsData = abi.encode(preOpsReturn);
     }
 
-    // This occurs after a Searcher has successfully paid their bid, which is
+    // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocatingCall(bytes calldata data) internal override {
+    function _allocateValueCall(bytes calldata data) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
@@ -158,7 +158,7 @@ contract V4ProtocolControl is ProtocolControl {
         // Pull the calldata into memory
         (, BidData[] memory bids) = abi.decode(data, (uint256, BidData[]));
 
-        // NOTE: ProtocolVerifier has verified the BidData[] format
+        // NOTE: DAppVerification has verified the BidData[] format
         // BidData[0] = token0
         // BidData[1] = token1
 
@@ -179,16 +179,16 @@ contract V4ProtocolControl is ProtocolControl {
         sequenceLock[sequenceKey] = true;
     }
 
-    function _verificationCall(bytes calldata data) internal override returns (bool) {
+    function _postOpsCall(bytes calldata data) internal override returns (bool) {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
 
         (bytes memory returnData) = abi.decode(data, (bytes));
 
-        StagingReturn memory stagingReturn = abi.decode(returnData, (StagingReturn));
+        PreOpsReturn memory preOpsReturn = abi.decode(returnData, (PreOpsReturn));
 
-        V4ProtocolControl(hook).releaseLock(stagingReturn.poolKey);
+        V4DAppControl(hook).releaseLock(preOpsReturn.poolKey);
 
         delete _currentKey;
 
@@ -204,10 +204,10 @@ contract V4ProtocolControl is ProtocolControl {
         EscrowKey memory escrowKey = ISafetyLocks(escrow).getLockState();
 
         // Verify that the swapper went through the FastLane Atlas MEV Auction
-        // and that ProtocolControl supplied a valid signature
+        // and that DAppControl supplied a valid signature
         require(address(this) == hook, "ERR-H00 InvalidCallee");
         require(hook == escrowKey.approvedCaller, "ERR-H01 InvalidCaller");
-        require(escrowKey.lockState == SafetyBits._LOCKED_X_STAGING_X_UNSET, "ERR-H02 InvalidLockStage");
+        require(escrowKey.lockState == SafetyBits._LOCKED_X_PRE_OPS_X_UNSET, "ERR-H02 InvalidLockStage");
         require(hashLock == bytes32(0), "ERR-H03 AlreadyActive");
 
         // Set the storage lock to block reentry / concurrent trading
@@ -222,7 +222,7 @@ contract V4ProtocolControl is ProtocolControl {
         EscrowKey memory escrowKey = ISafetyLocks(escrow).getLockState();
 
         // Verify that the swapper went through the FastLane Atlas MEV Auction
-        // and that ProtocolControl supplied a valid signature
+        // and that DAppControl supplied a valid signature
         require(address(this) == hook, "ERR-H20 InvalidCallee");
         require(hook == escrowKey.approvedCaller, "ERR-H21 InvalidCaller");
         require(escrowKey.lockState == SafetyBits._LOCKED_X_VERIFICATION_X_UNSET, "ERR-H22 InvalidLockStage");
@@ -253,35 +253,35 @@ contract V4ProtocolControl is ProtocolControl {
         return payeeData;
     }
 
-    function getBidFormat(UserMetaTx calldata userMetaTx) external pure override returns (BidData[] memory) {
-        // This is a helper function called by searchers
+    function getBidFormat(UserCall calldata uCall) external pure override returns (BidData[] memory) {
+        // This is a helper function called by solvers
         // so that they can get the proper format for
         // submitting their bids to the hook.
 
         (IPoolManager.PoolKey memory key,) =
-            abi.decode(userMetaTx.data, (IPoolManager.PoolKey, IPoolManager.SwapParams));
+            abi.decode(uCall.data, (IPoolManager.PoolKey, IPoolManager.SwapParams));
 
         BidData[] memory bidData = new BidData[](2);
 
         bidData[0] = BidData({
             token: IPoolManager.Currency.unwrap(key.currency0),
-            bidAmount: 0 // <- searcher must update
+            bidAmount: 0 // <- solver must update
         });
 
         bidData[1] = BidData({
             token: IPoolManager.Currency.unwrap(key.currency1),
-            bidAmount: 0 // <- searcher must update
+            bidAmount: 0 // <- solver must update
         });
 
         return bidData;
     }
 
-    function getBidValue(SearcherCall calldata searcherCall)
+    function getBidValue(SolverOperation calldata solverOp)
         external
         pure
         override
         returns (uint256) 
     {
-        return searcherCall.bids[0].bidAmount;
+        return solverOp.bids[0].bidAmount;
     }
 }

@@ -14,31 +14,31 @@ abstract contract GovernanceControl {
     }
 
     string internal constant _NOT_IMPLEMENTED = "NOT IMPLEMENTED";
-    // Virtual functions to be overridden by participating protocol governance
-    // (not FastLane) prior to deploying contract. Note that protocol governance
+    // Virtual functions to be overridden by participating dApp governance
+    // (not FastLane) prior to deploying contract. Note that dApp governance
     // will "own" this contract but that it should be immutable.
 
     /////////////////////////////////////////////////////////
-    //                  STAGING                            //
+    //                  PRE OPS                            //
     /////////////////////////////////////////////////////////
     //
-    // Staging:
+    // PreOps:
     // Data should be decoded as:
     //
-    //     bytes calldata userCallData
+    //     bytes calldata userOpData
     //
 
-    // _stagingCall
+    // _preOpsCall
     // Details:
-    //  staging/delegate =
+    //  preOps/delegate =
     //      Inputs: User's calldata
-    //      Function: Executing the function set by ProtocolControl
+    //      Function: Executing the function set by DAppControl
     //      Container: Inside of the FastLane ExecutionEnvironment
     //      Access: With storage access (read + write) only to the ExecutionEnvironment
     //
-    // Protocol exposure: Trustless
+    // DApp exposure: Trustless
     // User exposure: Trustless
-    function _stagingCall(UserMetaTx calldata userMetaTx)
+    function _preOpsCall(UserCall calldata uCall)
         internal
         virtual
         returns (bytes memory);
@@ -50,23 +50,23 @@ abstract contract GovernanceControl {
     //
     // Data should be decoded as:
     //
-    //    bytes calldata userCallData
+    //    bytes calldata userOpData
     //
-    // NOTE: stagingReturnData is the returned data from the staging transaction
+    // NOTE: preOpsReturnData is the returned data from the preOps transaction
 
     // _userLocalDelegateCall
     // Details:
     //  user/local/delegate =
-    //      Inputs: User's calldata + staging call's returnData
-    //      Function: Executing the function set by ProtocolControl
+    //      Inputs: User's calldata + preOps call's returnData
+    //      Function: Executing the function set by DAppControl
     //      Container: Inside of the FastLane ExecutionEnvironment
     //      Access: With storage access (read + write) to the ExecutionEnvironment
     //
-    // Protocol exposure: Trustless
+    // DApp exposure: Trustless
     // User exposure: Trustless
     // NOTE: To mitigate the risk of exploit, this is disabled if ProtococolControl has enabled
     // "recycled storage."  The Trustless assumptions are only as good as the underlying smart contract,
-    // and there's no way for FastLane to certify that ProtocolControl isn't accidentally accessing
+    // and there's no way for FastLane to certify that DAppControl isn't accidentally accessing
     // dirty / malicious storage from previous calls. User would be exposed to high smart contract risk,
     // otherwise.
     function _userLocalDelegateCall(bytes calldata) internal virtual returns (bytes memory) {
@@ -76,14 +76,14 @@ abstract contract GovernanceControl {
     // _userLocalStandardCall
     // Details:
     //  user/local/standard =
-    //      Inputs: User's calldata + staging call's returnData
-    //      Function: Executing the function set by ProtocolControl
-    //      Container: Inside of the ProtocolControl contract
-    //      Access: Storage access (read+WRITE) to the ProtocolControl contract
+    //      Inputs: User's calldata + preOps call's returnData
+    //      Function: Executing the function set by DAppControl
+    //      Container: Inside of the DAppControl contract
+    //      Access: Storage access (read+WRITE) to the DAppControl contract
     //
-    // Protocol exposure: Trustless, but high risk of contract exploit by malicious user
+    // DApp exposure: Trustless, but high risk of contract exploit by malicious user
     // User exposure: Trustless
-    // NOTE: There is a timelock on governance's ability to change the ProtocolControl contract
+    // NOTE: There is a timelock on governance's ability to change the DAppControl contract
     // NOTE: Allowing this is ill-advised unless your reentry / locking system is flawless.
     function _userLocalStandardCall(bytes calldata) internal virtual returns (bytes memory) {
         revert(_NOT_IMPLEMENTED);
@@ -93,63 +93,63 @@ abstract contract GovernanceControl {
     //                MEV ALLOCATION                       //
     /////////////////////////////////////////////////////////
     //
-    // _allocatingCall
+    // _allocateValueCall
     // Details:
     //  allocate/delegate =
     //      Inputs: MEV Profits (ERC20 balances) 
-    //      Function: Executing the function set by ProtocolControl / MEVAllocator
+    //      Function: Executing the function set by DAppControl / MEVAllocator
     //      Container: Inside of the FastLane ExecutionEnvironment
     //      Access: With storage access (read + write) only to the ExecutionEnvironment
     //
-    // Protocol exposure: Trustless
+    // DApp exposure: Trustless
     // User exposure: Trustless
-    function _allocatingCall(bytes calldata data) internal virtual;
+    function _allocateValueCall(bytes calldata data) internal virtual;
 
     /////////////////////////////////////////////////////////
     //              INTENT FULFILLMENT                     //
     /////////////////////////////////////////////////////////
     //
 
-    // _searcherPreCall
+    // _preSolverCall
     //
     // Details:
     //  Data should be decoded as:
     //
-    //    address searcherTo, bytes memory returnData
+    //    address solverTo, bytes memory returnData
     //
-    //  fulfillment(staging)/delegatecall =
-    //      Inputs: staging call's returnData, winning searcher to address
-    //      Function: Executing the function set by ProtocolControl
+    //  fulfillment(preOps)/delegatecall =
+    //      Inputs: preOps call's returnData, winning solver to address
+    //      Function: Executing the function set by DAppControl
     //      Container: Inside of the FastLane ExecutionEnvironment
     //      Access: Storage access (read+write) to the ExecutionEnvironment contract
-    //      NOTE: This happens *inside* of the searcher's try/catch wrapper
-    //      and is designed to give the searcher everything they need to fulfill
+    //      NOTE: This happens *inside* of the solver's try/catch wrapper
+    //      and is designed to give the solver everything they need to fulfill
     //      the user's 'intent.'
 
-    function _searcherPreCall(bytes calldata) internal virtual returns (bool) {
+    function _preSolverCall(bytes calldata) internal virtual returns (bool) {
         revert(_NOT_IMPLEMENTED);
     }
 
 
-    // _searcherPostCall
+    // _postSolverCall
     //
     // Details:
     //
     //  Data should be decoded as:
     //
-    //    address searcherTo, bytes memory returnData
+    //    address solverTo, bytes memory returnData
     //
 
     //  fulfillment(verification)/delegatecall =
-    //      Inputs: staging call's returnData, winning searcher to address
-    //      Function: Executing the function set by ProtocolControl
+    //      Inputs: preOps call's returnData, winning solver to address
+    //      Function: Executing the function set by DAppControl
     //      Container: Inside of the FastLane ExecutionEnvironment
     //      Access: Storage access (read+write) to the ExecutionEnvironment contract
-    //      NOTE: This happens *inside* of the searcher's try/catch wrapper
-    //      and is designed to make sure that the searcher is fulfilling
+    //      NOTE: This happens *inside* of the solver's try/catch wrapper
+    //      and is designed to make sure that the solver is fulfilling
     //      the user's 'intent.'
 
-    function _searcherPostCall(bytes calldata) internal virtual returns (bool) {
+    function _postSolverCall(bytes calldata) internal virtual returns (bool) {
         revert(_NOT_IMPLEMENTED);
     }
 
@@ -162,14 +162,14 @@ abstract contract GovernanceControl {
     //    bytes memory returnData
     //
 
-    // _verificationCall
+    // _postOpsCall
     // Details:
     //  verification/delegatecall =
-    //      Inputs: User's return data + staging call's returnData
-    //      Function: Executing the function set by ProtocolControl
+    //      Inputs: User's return data + preOps call's returnData
+    //      Function: Executing the function set by DAppControl
     //      Container: Inside of the FastLane ExecutionEnvironment
     //      Access: Storage access (read+write) to the ExecutionEnvironment contract
-    function _verificationCall(bytes calldata) internal virtual returns (bool) {
+    function _postOpsCall(bytes calldata) internal virtual returns (bool) {
         revert(_NOT_IMPLEMENTED);
     }
 
@@ -178,15 +178,15 @@ abstract contract GovernanceControl {
     /////////////////////////////////////////////////////////
     //
     // View functions used by the backend to verify bid format
-    // and by the factory and ProtocolVerifier to verify the
+    // and by the factory and DAppVerification to verify the
     // backend.
-    function _validateUserCall(UserMetaTx calldata) internal view virtual returns (bool) {
+    function _validateUserOperation(UserCall calldata) internal view virtual returns (bool) {
         return true;
     }
 
     function getPayeeData(bytes calldata data) external view virtual returns (PayeeData[] memory);
 
-    function getBidFormat(UserMetaTx calldata userMetaTx) external view virtual returns (BidData[] memory);
+    function getBidFormat(UserCall calldata uCall) external view virtual returns (BidData[] memory);
 
-    function getBidValue(SearcherCall calldata searcherCall) external view virtual returns (uint256);
+    function getBidValue(SolverOperation calldata solverOp) external view virtual returns (uint256);
 }

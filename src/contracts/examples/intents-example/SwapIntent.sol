@@ -5,12 +5,12 @@ pragma solidity ^0.8.16;
 import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
 // Atlas Base Imports
-import {IEscrow} from "../interfaces/IEscrow.sol";
+import {IEscrow} from "../../interfaces/IEscrow.sol";
 
-import "../types/CallTypes.sol";
+import "../../types/CallTypes.sol";
 
-// Atlas Protocol-Control Imports
-import {ProtocolControl} from "../protocol/ProtocolControl.sol";
+// Atlas DApp-Control Imports
+import {DAppControl} from "../../dapp/DAppControl.sol";
 
 import "forge-std/Test.sol";
 
@@ -26,7 +26,7 @@ struct SwapIntent {
     address tokenUserSells;
     uint256 amountUserSells;
     address auctionBaseCurrency; // NOTE: Typically will be address(0) / ETH for gas refund
-    bool searcherMustReimburseGas; // If true, the searcher must reimburse the bundler for the user's and control's gas cost 
+    bool solverMustReimburseGas; // If true, the solver must reimburse the bundler for the user's and control's gas cost 
     Condition[] conditions; // Optional. Address and calldata that the user can staticcall to verify arbitrary conditions on chain
 }
 
@@ -37,38 +37,38 @@ struct SwapData {
     address tokenUserSells;
     uint256 amountUserSells;
     address auctionBaseCurrency; // NOTE: Typically will be address(0) / ETH for gas refund
-    uint256 searcherGasLiability; // the amount of user gas that the searcher must refund
+    uint256 solverGasLiability; // the amount of user gas that the solver must refund
 }
 
 
-contract SwapIntentController is ProtocolControl {
+contract SwapIntentController is DAppControl {
     using SafeTransferLib for ERC20;
 
     uint256 constant public USER_CONDITION_GAS_LIMIT = 20_000; 
     uint256 constant public MAX_USER_CONDITIONS = 5;
     // NOTE: Conditionals will only be static called to prevent the user from arbitrarily altering state prior to 
-    // the execution of the Searchers' calls. 
+    // the execution of the Solvers' calls. 
 
-    uint256 constant public EXPECTED_GAS_USAGE_EX_SEARCHER = 200_000;
+    uint256 constant public EXPECTED_GAS_USAGE_EX_SOLVER = 200_000;
 
     constructor(address _escrow)
-        ProtocolControl(
+        DAppControl(
             _escrow, 
             msg.sender, 
             CallConfig({
                 sequenced: false,
-                requireStaging: true,
-                trackStagingReturnData: true,
+                requirePreOps: true,
+                trackPreOpsReturnData: true,
                 trackUserReturnData: false,
                 localUser: true,
                 delegateUser: true,
-                searcherStaging: true,
-                searcherFulfillment: true,
-                requireVerification: false,
-                zeroSearchers: false,
+                preSolver: true,
+                postSolver: true,
+                requirePostOps: false,
+                zeroSolvers: false,
                 reuseUserOp: true,
                 userBundler: true,
-                protocolBundler: true,
+                dAppBundler: true,
                 unknownBundler: true
             })
         )
@@ -97,16 +97,16 @@ contract SwapIntentController is ProtocolControl {
     //   ATLAS OVERRIDE FUNCTIONS   //
     //////////////////////////////////
 
-    function _stagingCall(UserMetaTx calldata userMetaTx)
+    function _preOpsCall(UserCall calldata uCall)
         internal
         override
         returns (bytes memory)
     {
-        require(bytes4(userMetaTx.data) == this.swap.selector, "ERR-PI001 InvalidSelector");
-        require(userMetaTx.to == control, "ERR-PI006 InvalidUserTo");
+        require(bytes4(uCall.data) == this.swap.selector, "ERR-PI001 InvalidSelector");
+        require(uCall.to == control, "ERR-PI006 InvalidUserTo");
 
-        // This protocol control currently requires all 
-        SwapIntent memory swapIntent = abi.decode(userMetaTx.data[4:], (SwapIntent));
+        // This dApp control currently requires all 
+        SwapIntent memory swapIntent = abi.decode(uCall.data[4:], (SwapIntent));
 
         // There should never be a balance on this ExecutionEnvironment greater than 1, but check
         // anyway so that the auction accounting isn't imbalanced by unexpected inventory. 
@@ -145,7 +145,7 @@ contract SwapIntentController is ProtocolControl {
             tokenUserSells: swapIntent.tokenUserSells,
             amountUserSells: swapIntent.amountUserSells,
             auctionBaseCurrency: swapIntent.auctionBaseCurrency,
-            searcherGasLiability: swapIntent.searcherMustReimburseGas ? EXPECTED_GAS_USAGE_EX_SEARCHER : 0
+            solverGasLiability: swapIntent.solverMustReimburseGas ? EXPECTED_GAS_USAGE_EX_SOLVER : 0
         });
 
 
@@ -169,13 +169,13 @@ contract SwapIntentController is ProtocolControl {
                 
                 unchecked{ ++i; }
             }
-            if (swapIntent.searcherMustReimburseGas) {
-                swapData.searcherGasLiability += (gasMarker - gasleft());
+            if (swapIntent.solverMustReimburseGas) {
+                swapData.solverGasLiability += (gasMarker - gasleft());
             }
         }
 
-        bytes memory stagingReturnData = abi.encode(swapData);
-        return stagingReturnData;
+        bytes memory preOpsReturnData = abi.encode(swapData);
+        return preOpsReturnData;
     }
 
     function _userLocalDelegateCall(bytes calldata data) internal override returns (bytes memory nullData) {
@@ -185,40 +185,40 @@ contract SwapIntentController is ProtocolControl {
         return nullData;
     }
 
-    function _searcherPreCall(bytes calldata data) internal override returns (bool) {
-        (address searcherTo, bytes memory returnData) = abi.decode(data, (address, bytes));
-        if (searcherTo == address(this) || searcherTo == _control() || searcherTo == escrow) {
+    function _preSolverCall(bytes calldata data) internal override returns (bool) {
+        (address solverTo, bytes memory returnData) = abi.decode(data, (address, bytes));
+        if (solverTo == address(this) || solverTo == _control() || solverTo == escrow) {
             return false;
         }
 
         SwapData memory swapData = abi.decode(returnData, (SwapData));
 
-        // Optimistically transfer the searcher contract the tokens that the user is selling
-        _transferUserERC20(swapData.tokenUserSells, searcherTo, swapData.amountUserSells);
+        // Optimistically transfer the solver contract the tokens that the user is selling
+        _transferUserERC20(swapData.tokenUserSells, solverTo, swapData.amountUserSells);
         
-        // TODO: Permit69 is currently enabled during searcher phase, but there is low conviction that this
+        // TODO: Permit69 is currently enabled during solver phase, but there is low conviction that this
         // does not enable an attack vector. Consider enabling to save gas on a transfer?
         return true;
     }
 
     // Checking intent was fulfilled, and user has received their tokens, happens here
-    function _searcherPostCall(bytes calldata data) internal override returns (bool) {
+    function _postSolverCall(bytes calldata data) internal override returns (bool) {
        
-        (address searcherTo, bytes memory returnData) = abi.decode(data, (address, bytes));
+        (address solverTo, bytes memory returnData) = abi.decode(data, (address, bytes));
 
         SwapData memory swapData = abi.decode(returnData, (SwapData));
 
-        if (swapData.searcherGasLiability > 0) {
-            // NOTE: Winning searcher does not have to reimburse for other searchers
-            uint256 expectedGasReimbursement = swapData.searcherGasLiability * tx.gasprice;
+        if (swapData.solverGasLiability > 0) {
+            // NOTE: Winning solver does not have to reimburse for other solvers
+            uint256 expectedGasReimbursement = swapData.solverGasLiability * tx.gasprice;
 
             // Is this check unnecessary since it'll just throw inside the try/catch?
             // if (address(this).balance < expectedGasReimbursement) {
             //    return false;
             //}
 
-            // NOTE: This sends any surplus donations back to the searcher
-            IEscrow(escrow).donateToBundler{value: expectedGasReimbursement}(searcherTo);
+            // NOTE: This sends any surplus donations back to the solver
+            IEscrow(escrow).donateToBundler{value: expectedGasReimbursement}(solverTo);
         }
 
         uint256 buyTokenBalance = ERC20(swapData.tokenUserBuys).balanceOf(address(this));
@@ -239,9 +239,9 @@ contract SwapIntentController is ProtocolControl {
         }
     }
 
-    // This occurs after a Searcher has successfully paid their bid, which is
+    // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocatingCall(bytes calldata data) internal override {
+    function _allocateValueCall(bytes calldata data) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
@@ -257,9 +257,9 @@ contract SwapIntentController is ProtocolControl {
             uint256 auctionTokenBalance = ERC20(swapData.auctionBaseCurrency).balanceOf(address(this));
             ERC20(swapData.auctionBaseCurrency).safeTransfer(_user(), auctionTokenBalance);
         
-        // If the searcher was already required to reimburse the user's gas, don't reallocate
+        // If the solver was already required to reimburse the user's gas, don't reallocate
         // Ether surplus to the bundler
-        } else if (swapData.searcherGasLiability > 0) {
+        } else if (swapData.solverGasLiability > 0) {
             SafeTransferLib.safeTransferETH(_user(), address(this).balance);
 
         // Donate the ether to the bundler, with the surplus going back to the user
@@ -289,39 +289,39 @@ contract SwapIntentController is ProtocolControl {
         return payeeData;
     }
 
-    function getBidFormat(UserMetaTx calldata userMetaTx) external pure override returns (BidData[] memory) {
-        // This is a helper function called by searchers
+    function getBidFormat(UserCall calldata uCall) external pure override returns (BidData[] memory) {
+        // This is a helper function called by solvers
         // so that they can get the proper format for
         // submitting their bids to the hook.
 
-        (SwapIntent memory swapIntent) = abi.decode(userMetaTx.data[4:], (SwapIntent));
+        (SwapIntent memory swapIntent) = abi.decode(uCall.data[4:], (SwapIntent));
     
         BidData[] memory bidData = new BidData[](1);
 
         bidData[0] = BidData({
             token: swapIntent.auctionBaseCurrency, 
-            bidAmount: 0 // <- searcher must update
+            bidAmount: 0 // <- solver must update
         });
 
         return bidData;
     }
 
-    function getBidValue(SearcherCall calldata searcherCall)
+    function getBidValue(SolverOperation calldata solverOp)
         external
         pure
         override
         returns (uint256) 
     {
-        return searcherCall.bids[0].bidAmount;
+        return solverOp.bids[0].bidAmount;
     }
 
     // NOTE: This helper function is still delegatecalled inside of the execution environment
-    function _validateUserCall(UserMetaTx calldata userMetaTx) internal view override returns (bool) {
-        if (bytes4(userMetaTx.data) != this.swap.selector) {
+    function _validateUserOperation(UserCall calldata uCall) internal view override returns (bool) {
+        if (bytes4(uCall.data) != this.swap.selector) {
             return false;
         }
 
-        SwapIntent memory swapIntent =abi.decode(userMetaTx.data[4:], (SwapIntent));
+        SwapIntent memory swapIntent =abi.decode(uCall.data[4:], (SwapIntent));
 
         // Check that user has enough tokens
         if (ERC20(swapIntent.tokenUserSells).balanceOf(_user()) < swapIntent.amountUserSells) {

@@ -5,9 +5,9 @@ import "../types/CallTypes.sol";
 
 contract FastLaneErrorsEvents {
     // NOTE: nonce is the executed nonce
-    event SearcherTxResult(
-        address indexed searcherTo,
-        address indexed searcherFrom,
+    event SolverTxResult(
+        address indexed solverTo,
+        address indexed solverFrom,
         bool executed,
         bool success,
         uint256 nonce,
@@ -17,20 +17,20 @@ contract FastLaneErrorsEvents {
     event UserTxResult(address indexed user, uint256 valueReturned, uint256 gasRefunded);
 
     event MEVPaymentFailure(
-        address indexed protocolControl, uint16 callConfig, BidData[] winningBids
+        address indexed controller, uint16 callConfig, BidData[] winningBids
     );
 
 
-    error SearcherBidUnpaid();
-    error SearcherFailedCallback();
-    error SearcherMsgValueUnpaid();
-    error SearcherCallReverted();
-    error SearcherEVMError();
+    error SolverBidUnpaid();
+    error SolverFailedCallback();
+    error SolverMsgValueUnpaid();
+    error SolverOperationReverted();
+    error SolverEVMError();
     error AlteredUserHash();
     error AlteredControlHash();
-    error InvalidSearcherHash();
+    error InvalidSolverHash();
     error HashChainBroken();
     error IntentUnfulfilled();
-    error SearcherStagingFailed();
-    error SearcherVerificationFailed();
+    error PreSolverFailed();
+    error PostSolverFailed();
 }

@@ -30,7 +30,6 @@ contract BlindBackrun is Ownable {
 
     /*
     address public immutable WETH_ADDRESS;
-
     constructor(address _wethAddress) {
         WETH_ADDRESS = _wethAddress;
     }

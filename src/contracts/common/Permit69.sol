@@ -8,11 +8,11 @@ import {EXECUTION_PHASE_OFFSET, SAFETY_LEVEL_OFFSET} from "../libraries/SafetyBi
 
 // NOTE: IPermit69 only works inside of the Atlas environment - specifically
 // inside of the custom ExecutionEnvironments that each user deploys when
-// interacting with Atlas in a manner controlled by the DeFi protocol.
+// interacting with Atlas in a manner controlled by the DeFi dApp.
 
 // The name comes from the reciprocal nature of the token transfers. Both
-// the user and the ProtocolControl can transfer tokens from the User
-// and the ProtocolControl contracts... but only if they each have granted
+// the user and the DAppControl can transfer tokens from the User
+// and the DAppControl contracts... but only if they each have granted
 // token approval to the Atlas main contract, and only during specific phases
 // of the Atlas execution process.
 abstract contract Permit69 {
@@ -20,25 +20,25 @@ abstract contract Permit69 {
 
     // NOTE: No user transfers allowed during UserRefund or HandlingPayments
     uint16 internal constant _SAFE_USER_TRANSFER = uint16(
-        1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Staging)) | 
-        1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserCall)) |
-        1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SearcherCalls)) | // TODO: This may be removed later due to security risk
-        1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Verification))
+        1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps)) | 
+        1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserOperation)) |
+        1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations)) | // TODO: This may be removed later due to security risk
+        1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
     );
 
-    // NOTE: No protocol transfers allowed during UserCall
-    uint16 internal constant _SAFE_PROTOCOL_TRANSFER = uint16(
-        1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Staging))
+    // NOTE: No Dapp transfers allowed during UserOperation
+    uint16 internal constant _SAFE_DAPP_TRANSFER = uint16(
+        1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps))
         | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.HandlingPayments))
         | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserRefund))
-        | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Verification))
+        | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
     );
 
     // Virtual Functions defined by other Atlas modules
     function _getExecutionEnvironmentCustom(
         address user,
         bytes32 controlCodeHash,
-        address protocolControl,
+        address controller,
         uint16 callConfig
     ) internal view virtual returns (address environment);
 
@@ -50,14 +50,14 @@ abstract contract Permit69 {
         address destination,
         uint256 amount,
         address user,
-        address protocolControl,
+        address controller,
         uint16 callConfig,
         uint16 lockState
     ) external {
         // Verify that the caller is legitimate
-        // NOTE: Use the *current* protocolControl's codehash to help mitigate social engineering bamboozles if, for example, 
+        // NOTE: Use the *current* controller's codehash to help mitigate social engineering bamboozles if, for example, 
         // a DAO is having internal issues. 
-        _verifyCallerIsExecutionEnv(user, protocolControl, callConfig);
+        _verifyCallerIsExecutionEnv(user, controller, callConfig);
 
         // Verify the lock state
         _verifyLockState({
@@ -69,35 +69,35 @@ abstract contract Permit69 {
         ERC20(token).safeTransferFrom(user, destination, amount);
     }
 
-    function transferProtocolERC20(
+    function transferDAppERC20(
         address token,
         address destination,
         uint256 amount,
         address user,
-        address protocolControl,
+        address controller,
         uint16 callConfig,
         uint16 lockState
     ) external {
         // Verify that the caller is legitimate
-        _verifyCallerIsExecutionEnv(user, protocolControl, callConfig);
+        _verifyCallerIsExecutionEnv(user, controller, callConfig);
 
         // Verify the lock state
         _verifyLockState({
             lockState: lockState, 
-            safeExecutionPhaseSet: _SAFE_PROTOCOL_TRANSFER
+            safeExecutionPhaseSet: _SAFE_DAPP_TRANSFER
         });
 
         // Transfer token
-        ERC20(token).safeTransferFrom(protocolControl, destination, amount);
+        ERC20(token).safeTransferFrom(controller, destination, amount);
     }
 
     function _verifyCallerIsExecutionEnv(
         address user,
-        address protocolControl,
+        address controller,
         uint16 callConfig
     ) internal view {
         require(
-            msg.sender == _getExecutionEnvironmentCustom(user, protocolControl.codehash, protocolControl, callConfig),
+            msg.sender == _getExecutionEnvironmentCustom(user, controller.codehash, controller, callConfig),
             "ERR-T001 EnvironmentMismatch"
         );
     }

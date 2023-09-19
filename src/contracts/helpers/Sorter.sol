@@ -2,7 +2,7 @@
 pragma solidity ^0.8.16;
 
 import {IEscrow} from "../interfaces/IEscrow.sol";
-import {IProtocolControl} from "../interfaces/IProtocolControl.sol";
+import {IDAppControl} from "../interfaces/IDAppControl.sol";
 
 import "../types/CallTypes.sol";
 
@@ -26,44 +26,44 @@ contract Sorter {
     }
 
     function sortBids(
-        UserCall calldata userCall, 
-        SearcherCall[] calldata searcherCalls
-    ) external view returns (SearcherCall[] memory) {
+        UserOperation calldata userOp, 
+        SolverOperation[] calldata solverOps
+    ) external view returns (SolverOperation[] memory) {
 
-        ProtocolCall memory protocolCall = IProtocolControl(userCall.metaTx.control).getProtocolCall();
+        DAppConfig memory dConfig = IDAppControl(userOp.call.control).getDAppConfig();
 
-        uint256 count = searcherCalls.length;
+        uint256 count = solverOps.length;
 
         (SortingData[] memory sortingData, uint256 invalid) = _getSortingData(
-            protocolCall, userCall, searcherCalls, count);
+            dConfig, userOp, solverOps, count);
 
         uint256[] memory sorted = _sort(sortingData, count, invalid);
 
-        SearcherCall[] memory searcherCallsSorted = new SearcherCall[](count - invalid);
+        SolverOperation[] memory solverOpsSorted = new SolverOperation[](count - invalid);
 
         count -= invalid;
         uint256 i = 0;
 
         for (;i<count;) {
-            searcherCallsSorted[i] = searcherCalls[sorted[i]];
+            solverOpsSorted[i] = solverOps[sorted[i]];
             unchecked { ++i; }
         }
 
-        return searcherCallsSorted;
+        return solverOpsSorted;
     }
 
     function _verifyBidFormat(
         BidData[] memory bidFormat, 
-        SearcherCall calldata searcherCall
+        SolverOperation calldata solverOp
     ) internal pure returns (bool) {
         uint256 count = bidFormat.length;
-        if (searcherCall.bids.length != count) {
+        if (solverOp.bids.length != count) {
             return false;
         }
 
         uint256 i;
         for (;i<count;) {
-            if (searcherCall.bids[i].token != bidFormat[i].token) {
+            if (solverOp.bids[i].token != bidFormat[i].token) {
                 return false;
             }
             unchecked{ ++i; }
@@ -71,44 +71,44 @@ contract Sorter {
         return true;
     }
 
-    function _verifySearcherEligibility(
-        ProtocolCall memory protocolCall,
-        UserMetaTx calldata userMetaTx, 
-        SearcherCall calldata searcherCall
+    function _verifySolverEligibility(
+        DAppConfig memory dConfig,
+        UserCall calldata uCall, 
+        SolverOperation calldata solverOp
     ) internal view returns (bool) {
-        // Verify that the searcher submitted the correct callhash
-        bytes32 userCallHash = CallVerification.getUserCallHash(userMetaTx);
-        if (searcherCall.metaTx.userCallHash != userCallHash) {
+        // Verify that the solver submitted the correct callhash
+        bytes32 userOpHash = CallVerification.getUserOperationHash(uCall);
+        if (solverOp.call.userOpHash != userOpHash) {
             return false;
         }
 
-        // Make sure the searcher has enough funds escrowed
+        // Make sure the solver has enough funds escrowed
         // TODO: subtract any pending withdrawals
-        uint256 searcherBalance = IEscrow(escrow).searcherEscrowBalance(searcherCall.metaTx.from);
-        if (searcherBalance < searcherCall.metaTx.maxFeePerGas * searcherCall.metaTx.gas) {
+        uint256 solverBalance = IEscrow(escrow).solverEscrowBalance(solverOp.call.from);
+        if (solverBalance < solverOp.call.maxFeePerGas * solverOp.call.gas) {
             return false;
         }
 
-        // Searchers can only do one tx per block - this prevents double counting escrow balances.
+        // Solvers can only do one tx per block - this prevents double counting escrow balances.
         // TODO: Add in "targetBlockNumber" as an arg?
-        uint256 searcherLastActiveBlock = IEscrow(escrow).searcherLastActiveBlock(searcherCall.metaTx.from);
-        if (searcherLastActiveBlock >= block.number) {
+        uint256 solverLastActiveBlock = IEscrow(escrow).solverLastActiveBlock(solverOp.call.from);
+        if (solverLastActiveBlock >= block.number) {
             return false;
         }
 
-        // Make sure the searcher nonce is accurate
-        uint256 nextSearcherNonce = IEscrow(escrow).nextSearcherNonce(searcherCall.metaTx.from);
-        if (nextSearcherNonce != searcherCall.metaTx.nonce) {
+        // Make sure the solver nonce is accurate
+        uint256 nextSolverNonce = IEscrow(escrow).nextSolverNonce(solverOp.call.from);
+        if (nextSolverNonce != solverOp.call.nonce) {
             return false;
         }
 
-        // Make sure that the searcher has the correct codehash for protocol control contract
-        if (protocolCall.to.codehash != searcherCall.metaTx.controlCodeHash) {
+        // Make sure that the solver has the correct codehash for dApp control contract
+        if (dConfig.to.codehash != solverOp.call.controlCodeHash) {
             return false;
         }
 
-        // Make sure that the searcher's maxFeePerGas matches or exceeds the user's
-        if (searcherCall.metaTx.maxFeePerGas < userMetaTx.maxFeePerGas) {
+        // Make sure that the solver's maxFeePerGas matches or exceeds the user's
+        if (solverOp.call.maxFeePerGas < uCall.maxFeePerGas) {
             return false;
         }
 
@@ -116,13 +116,13 @@ contract Sorter {
     }
 
     function _getSortingData(
-        ProtocolCall memory protocolCall, 
-        UserCall calldata userCall, 
-        SearcherCall[] calldata searcherCalls,
+        DAppConfig memory dConfig, 
+        UserOperation calldata userOp, 
+        SolverOperation[] calldata solverOps,
         uint256 count
     ) internal view returns (SortingData[] memory, uint256){
 
-        BidData[] memory bidFormat = IProtocolControl(protocolCall.to).getBidFormat(userCall.metaTx);
+        BidData[] memory bidFormat = IDAppControl(dConfig.to).getBidFormat(userOp.call);
 
         SortingData[] memory sortingData = new SortingData[](count);
 
@@ -130,11 +130,11 @@ contract Sorter {
         uint256 invalid;
         for (;i<count;) {
             if (
-                _verifyBidFormat(bidFormat, searcherCalls[i]) && 
-                _verifySearcherEligibility(protocolCall, userCall.metaTx, searcherCalls[i])
+                _verifyBidFormat(bidFormat, solverOps[i]) && 
+                _verifySolverEligibility(dConfig, userOp.call, solverOps[i])
             ) {
                 sortingData[i] = SortingData({
-                    amount: IProtocolControl(protocolCall.to).getBidValue(searcherCalls[i]),
+                    amount: IDAppControl(dConfig.to).getBidValue(solverOps[i]),
                     valid: true
                 });
                 

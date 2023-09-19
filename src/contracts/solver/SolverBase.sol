@@ -14,11 +14,11 @@ interface IWETH9 {
     function withdraw(uint256 wad) external payable;
 }
 
-// contract SearcherBase is Test {
-contract SearcherBase {
+// contract SolverBase is Test {
+contract SolverBase {
     address public constant WETH_ADDRESS = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
-    // TODO consider making these accessible (internal) for searchers which may want to use them
+    // TODO consider making these accessible (internal) for solvers which may want to use them
     address private immutable _owner;
     address private immutable _escrow;
 
@@ -27,14 +27,14 @@ contract SearcherBase {
         _escrow = atlasEscrow;
     }
 
-    function metaFlashCall(address sender, bytes calldata searcherCalldata, BidData[] calldata bids)
+    function atlasSolverCall(address sender, BidData[] calldata bids, bytes calldata solverOpData)
         external
         payable
         safetyFirst(sender)
         payBids(bids)
         returns (bool success, bytes memory data)
     {
-        (success, data) = address(this).call{value: msg.value}(searcherCalldata);
+        (success, data) = address(this).call{value: msg.value}(solverOpData);
 
         require(success, "CALL UNSUCCESSFUL");
     }
@@ -49,11 +49,11 @@ contract SearcherBase {
         // NOTE: Because this is nested inside of an Atlas meta transaction, if someone is attempting
         // to innappropriately access your smart contract then THEY will have to pay for the gas...
         // so feel free to run the safety checks at the end of the call.
-        // NOTE: The searcherSafetyCallback is mandatory - if it is not called then the searcher
+        // NOTE: The solverSafetyCallback is mandatory - if it is not called then the solver
         // transaction will revert.  It is payable and can be used to repay a msg.value loan from the
         // Atlas Escrow.
         
-        require(ISafetyLocks(_escrow).searcherSafetyCallback{value: msgValueOwed}(msg.sender), "INVALID SEQUENCE");
+        require(ISafetyLocks(_escrow).solverSafetyCallback{value: msgValueOwed}(msg.sender), "INVALID SEQUENCE");
     }
 
     modifier payBids(BidData[] calldata bids) {
@@ -80,12 +80,12 @@ contract SearcherBase {
             balanceDelta = newBalance > balances[i] ? newBalance - balances[i] : 0;
 
             /*
-            console.log("---SEARCHER BID---");
-            console.log("Searcher      ",address(this));
+            console.log("---SOLVER BID---");
+            console.log("Solver      ",address(this));
             console.log("BidToken      ",bids[i].token);
             console.log("BalanceDelta  ",balanceDelta);
             console.log("BidAmount     ",bids[i].bidAmount);
-            console.log("SearcherProfit", balanceDelta > bids[i].bidAmount ? balanceDelta - bids[i].bidAmount : 0);
+            console.log("SolverProfit", balanceDelta > bids[i].bidAmount ? balanceDelta - bids[i].bidAmount : 0);
             console.log("---============---");
             */
 

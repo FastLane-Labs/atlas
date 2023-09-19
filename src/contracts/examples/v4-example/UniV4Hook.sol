@@ -9,13 +9,13 @@ import {IPoolManager} from "./IPoolManager.sol";
 import {IHooks} from "./IHooks.sol";
 
 // Atlas Imports
-import {V4ProtocolControl} from "./V4ProtocolControl.sol";
+import {V4DAppControl} from "./V4DAppControl.sol";
 
-import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
-import {SafetyBits} from "../libraries/SafetyBits.sol";
+import {ISafetyLocks} from "../../interfaces/ISafetyLocks.sol";
+import {SafetyBits} from "../../libraries/SafetyBits.sol";
 
-import "../types/CallTypes.sol";
-import "../types/LockTypes.sol";
+import "../../types/CallTypes.sol";
+import "../../types/LockTypes.sol";
 
 // NOTE: Uniswap V4 is unique in that it would not require a frontend integration.
 // Instead, hooks can be used to enforce that the proceeds of the MEV auctions are
@@ -27,9 +27,9 @@ import "../types/LockTypes.sol";
     //                      V4 HOOK                        //
     /////////////////////////////////////////////////////////
 
-contract UniV4Hook is V4ProtocolControl {
+contract UniV4Hook is V4DAppControl {
 
-    constructor(address _escrow, address _v4Singleton) V4ProtocolControl(_escrow, _v4Singleton) {}
+    constructor(address _escrow, address _v4Singleton) V4DAppControl(_escrow, _v4Singleton) {}
     
     function getHooksCalls() public pure returns (IHooks.Calls memory) {
         // override
@@ -64,7 +64,7 @@ contract UniV4Hook is V4ProtocolControl {
         // msg.sender = v4Singleton
 
         // Verify that the swapper went through the FastLane Atlas MEV Auction
-        // and that ProtocolControl supplied a valid signature
+        // and that DAppControl supplied a valid signature
         require(address(this) == hook, "ERR-H00 InvalidCallee");
         require(msg.sender == v4Singleton, "ERR-H01 InvalidCaller"); // TODO: Confirm this
 
@@ -79,16 +79,16 @@ contract UniV4Hook is V4ProtocolControl {
             require(keccak256(abi.encode(key, sender)) == hashLock, "ERR-H02 InvalidSwapper");
 
             // Case:
-            // Searcher call
-        } else if (escrowKey.lockState == SafetyBits._LOCKED_X_SEARCHERS_X_VERIFIED) {
-            // Sender = Searcher contract
+            // Solver call
+        } else if (escrowKey.lockState == SafetyBits._LOCKED_X_SOLVERS_X_VERIFIED) {
+            // Sender = Solver contract
             // NOTE: This lockState verifies that the user's transaction has already
             // been executed.
-            // NOTE: Searchers must have triggered the safetyCallback on the ExecutionEnvironment
+            // NOTE: Solvers must have triggered the safetyCallback on the ExecutionEnvironment
             // *before* swapping.  The safetyCallback sets the ExecutionEnvironment as the
             // escrowKey.approvedCaller.
 
-            // Verify that the pool is valid for a searcher to trade in.
+            // Verify that the pool is valid for a solver to trade in.
             require(hashLock == keccak256(abi.encode(key, escrowKey.approvedCaller)), "ERR-H04 InvalidPoolKey");
 
             // Case:
@@ -111,9 +111,9 @@ contract UniV4Hook is V4ProtocolControl {
             }
         }
 
-        // NOTE: Searchers attempting to backrun in this pool will easily be able to precompute
+        // NOTE: Solvers attempting to backrun in this pool will easily be able to precompute
         // the hashLock's value. It should not be used as a lock to keep them out - it is only
-        // meant to prevent searchers from winning an auction for Pool X but trading in Pool Y.
+        // meant to prevent solvers from winning an auction for Pool X but trading in Pool Y.
 
         return UniV4Hook.beforeSwap.selector;
     }

@@ -8,27 +8,27 @@ import {CallBits} from "../libraries/CallBits.sol";
 import "../types/CallTypes.sol";
 import "../types/GovernanceTypes.sol";
 
-import {Verification, ProtocolProof} from "../types/VerificationTypes.sol";
+import {Verification, DAppProof} from "../types/VerificationTypes.sol";
 
-import {ProtocolIntegration} from "./ProtocolIntegration.sol";
+import {DAppIntegration} from "./DAppIntegration.sol";
 
 import "forge-std/Test.sol"; // TODO remove
 
-// This contract exists so that protocol frontends can sign and confirm the
+// This contract exists so that dapp frontends can sign and confirm the
 // calldata for users.  Users already trust the frontends to build and verify
 // their calldata.  This allows users to know that any CallData sourced via
 // an external relay (such as FastLane) has been verified by the already-trusted
 // frontend
-contract ProtocolVerifier is EIP712, ProtocolIntegration {
+contract DAppVerification is EIP712, DAppIntegration {
     using ECDSA for bytes32;
     using CallBits for uint16;
 
-    bytes32 public constant PROTOCOL_TYPE_HASH = keccak256(
-        "ProtocolProof(address from,address to,uint256 nonce,uint256 deadline,bytes32 userCallHash,bytes32 callChainHash,bytes32 controlCodeHash)"
+    bytes32 public constant DAPP_TYPE_HASH = keccak256(
+        "DAppProof(address from,address to,uint256 nonce,uint256 deadline,bytes32 userOpHash,bytes32 callChainHash,bytes32 controlCodeHash)"
     );
 
     bytes32 public constant USER_TYPE_HASH = keccak256(
-        "UserMetaTx(address from,address to,uint256 deadline,uint256 gas,uint256 nonce,uint256 maxFeePerGas,uint256 value,address control,bytes32 data)"
+        "UserCall(address from,address to,uint256 deadline,uint256 gas,uint256 nonce,uint256 maxFeePerGas,uint256 value,address control,bytes32 data)"
     );
 
     mapping(address => uint256) public userNonces;
@@ -46,29 +46,29 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
 
 
     // 
-    // PROTOCOL VERIFICATION
+    // DAPP VERIFICATION
     //
 
-    // Verify that the protocol's front end generated the staging
+    // Verify that the dapp's front end generated the preOps
     // information and that it matches the on-chain data.
-    // Verify that the protocol's front end's data is based on
-    // the data submitted by the user and by the searchers.
-    // NOTE: the protocol's front end is the last party in
+    // Verify that the dapp's front end's data is based on
+    // the data submitted by the user and by the solvers.
+    // NOTE: the dapp's front end is the last party in
     // the supply chain to submit data.  If any other party
-    // (user, searcher, FastLane,  or a collusion between
+    // (user, solver, FastLane,  or a collusion between
     // all of them) attempts to alter it, this check will fail
-    function _verifyProtocol(address userCallTo, ProtocolCall calldata protocolCall, Verification calldata verification)
+    function _verifyDApp(address userOpTo, DAppConfig calldata dConfig, Verification calldata verification)
         internal
         returns (bool)
     {
         // Verify the signature before storing any data to avoid
-        // spoof transactions clogging up protocol nonces
-        require(_verifyProtocolSignature(verification), "ERR-PV01 InvalidSignature");
+        // spoof transactions clogging up dapp nonces
+        require(_verifyDAppSignature(verification), "ERR-PV01 InvalidSignature");
 
         // NOTE: to avoid replay attacks arising from key management errors,
         // the state changes below must be *saved* even if they render the
         // transaction invalid.
-        // TODO: consider protocol-owned gas escrow.  Enshrined account
+        // TODO: consider dapp-owned gas escrow.  Enshrined account
         // abstraction may render that redundant at a large scale, but
         // allocating different parts of the tx to different parties
         // will allow for optimized trustlessness. This could lead to
@@ -77,32 +77,32 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
 
         ApproverSigningData memory signatory = signatories[verification.proof.from];
 
-        if (verification.proof.to != protocolCall.to) {
+        if (verification.proof.to != dConfig.to) {
             return (false);
         }
 
-        // Make sure the signer is currently enabled by protocol owner
+        // Make sure the signer is currently enabled by dapp owner
         // NOTE: check must occur after storing signature to prevent replays
         if (!signatory.enabled) {
             return (false);
         }
 
-        // Verify that the protocol is onboarded and that the call config is
+        // Verify that the dapp is onboarded and that the call config is
         // genuine.
-        bytes32 key = keccak256(abi.encode(protocolCall.to, userCallTo, signatory.governance, protocolCall.callConfig));
+        bytes32 key = keccak256(abi.encode(dConfig.to, userOpTo, signatory.governance, dConfig.callConfig));
 
-        // NOTE: This check does not work if ProtocolControl is a proxy contract.
+        // NOTE: This check does not work if DAppControl is a proxy contract.
         // To avoid exposure to social engineering vulnerabilities, disgruntled
         // former employees, or beneficiary uncertainty during intra-DAO conflict,
-        // governance should refrain from using a proxy contract for ProtocolControl.
-        if (protocolCall.to.codehash == bytes32(0) || protocols[key] != protocolCall.to.codehash) {
+        // governance should refrain from using a proxy contract for DAppControl.
+        if (dConfig.to.codehash == bytes32(0) || dapps[key] != dConfig.to.codehash) {
             return (false);
         }
 
-        // Verify that ProtocolControl hasn't been updated.  
-        // NOTE: Performing this check here allows the searchers' checks 
+        // Verify that DAppControl hasn't been updated.  
+        // NOTE: Performing this check here allows the solvers' checks 
         // to be against the verification proof's controlCodeHash to save gas.
-        if (protocolCall.to.codehash != verification.proof.controlCodeHash) {
+        if (dConfig.to.codehash != verification.proof.controlCodeHash) {
             return (false);
         }
 
@@ -110,13 +110,13 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
             return (false);
         }
 
-        // If the protocol indicated that they only accept sequenced nonces
+        // If the dapp indicated that they only accept sequenced nonces
         // (IE for FCFS execution), check and make sure the order is correct
         // NOTE: allowing only sequenced nonces could create a scenario in
         // which builders or validators may be able to profit via censorship.
-        // Protocols are encouraged to rely on the deadline parameter
+        // DApps are encouraged to rely on the deadline parameter
         // to prevent replay attacks.
-        if (protocolCall.callConfig.needsSequencedNonces()) {
+        if (dConfig.callConfig.needsSequencedNonces()) {
             if (verification.proof.nonce != signatory.nonce + 1) {
                 return (false);
             }
@@ -127,36 +127,36 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
             // it if so.  This ensures nonce + 1 will always be available.
         } else {
             // NOTE: including the callConfig in the asyncNonceKey should prevent
-            // issues occuring when a protocol may switch configs between blocking 
+            // issues occuring when a dapp may switch configs between blocking 
             // and async, since callConfig can double as another seed. 
-            bytes32 asyncNonceKey = keccak256(abi.encode(verification.proof.from, protocolCall.callConfig, verification.proof.nonce + 1));
+            bytes32 asyncNonceKey = keccak256(abi.encode(verification.proof.from, dConfig.callConfig, verification.proof.nonce + 1));
             
             if (asyncNonceFills[asyncNonceKey] != address(0)) {
                 return (false);
             }
 
-            asyncNonceFills[asyncNonceKey] = protocolCall.to;
+            asyncNonceFills[asyncNonceKey] = dConfig.to;
         }
 
         return (true);
     }
 
-    function _getProofHash(ProtocolProof memory proof) internal pure returns (bytes32 proofHash) {
+    function _getProofHash(DAppProof memory proof) internal pure returns (bytes32 proofHash) {
         proofHash = keccak256(
             abi.encode(
-                PROTOCOL_TYPE_HASH,
+                DAPP_TYPE_HASH,
                 proof.from,
                 proof.to,
                 proof.nonce,
                 proof.deadline,
-                proof.userCallHash,
+                proof.userOpHash,
                 proof.callChainHash,
                 proof.controlCodeHash
             )
         );
     }
 
-    function _verifyProtocolSignature(Verification calldata verification) internal view returns (bool) {
+    function _verifyDAppSignature(Verification calldata verification) internal view returns (bool) {
         address signer = _hashTypedDataV4(_getProofHash(verification.proof)).recover(verification.signature);
 
         return signer == verification.proof.from;
@@ -172,86 +172,86 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
     //
 
     // Verify the user's meta transaction
-    function _verifyUser(ProtocolCall calldata protocolCall, UserCall calldata userCall)
+    function _verifyUser(DAppConfig calldata dConfig, UserOperation calldata userOp)
         internal
         returns (bool)
     {
         
         // Verify the signature before storing any data to avoid
-        // spoof transactions clogging up protocol userNonces
-        require(_verifyUserSignature(userCall), "ERR-UV01 InvalidSignature");
+        // spoof transactions clogging up dapp userNonces
+        require(_verifyUserSignature(userOp), "ERR-UV01 InvalidSignature");
 
-        if (userCall.metaTx.control != protocolCall.to) {
+        if (userOp.call.control != dConfig.to) {
             return (false);
         }
 
-        if (userCall.metaTx.nonce > type(uint64).max - 1) {
+        if (userOp.call.nonce > type(uint64).max - 1) {
             return (false);
         }
 
-        uint256 userNonce = userNonces[userCall.metaTx.from];
+        uint256 userNonce = userNonces[userOp.call.from];
 
-        // If the protocol indicated that they only accept sequenced userNonces
+        // If the dapp indicated that they only accept sequenced userNonces
         // (IE for FCFS execution), check and make sure the order is correct
         // NOTE: allowing only sequenced userNonces could create a scenario in
         // which builders or validators may be able to profit via censorship.
-        // Protocols are encouraged to rely on the deadline parameter
+        // DApps are encouraged to rely on the deadline parameter
         // to prevent replay attacks.
-        if (protocolCall.callConfig.needsSequencedNonces()) {
-            if (userCall.metaTx.nonce != userNonce + 1) {
+        if (dConfig.callConfig.needsSequencedNonces()) {
+            if (userOp.call.nonce != userNonce + 1) {
                 return (false);
             }
 
-            unchecked {++userNonces[userCall.metaTx.from];}
+            unchecked {++userNonces[userOp.call.from];}
 
             // If not sequenced, check to see if this nonce is highest and store
             // it if so.  This ensures nonce + 1 will always be available.
         } else {
             // NOTE: including the callConfig in the asyncNonceKey should prevent
-            // issues occuring when a protocol may switch configs between blocking 
+            // issues occuring when a dapp may switch configs between blocking 
             // and async, since callConfig can double as another seed. 
-            bytes32 asyncNonceKey = keccak256(abi.encode(userCall.metaTx.from, protocolCall.callConfig, userCall.metaTx.nonce + 1));
+            bytes32 asyncNonceKey = keccak256(abi.encode(userOp.call.from, dConfig.callConfig, userOp.call.nonce + 1));
             
             if (asyncNonceFills[asyncNonceKey] != address(0)) {
                 return (false);
             }
 
-            asyncNonceFills[asyncNonceKey] = protocolCall.to;
+            asyncNonceFills[asyncNonceKey] = dConfig.to;
         }
 
         return (true);
     }
 
-    function _validateUser(ProtocolCall memory protocolCall, UserCall calldata userCall)
+    function _validateUser(DAppConfig memory dConfig, UserOperation calldata userOp)
         internal
         view
         returns (bool)
     {
         
         // Verify the signature before storing any data to avoid
-        // spoof transactions clogging up protocol userNonces
-        if (!_verifyUserSignature(userCall)) {
+        // spoof transactions clogging up dapp userNonces
+        if (!_verifyUserSignature(userOp)) {
             return (false);
         }
 
-        if (userCall.metaTx.control != protocolCall.to) {
+        if (userOp.call.control != dConfig.to) {
             return (false);
         }
 
-        if (userCall.metaTx.nonce > type(uint64).max - 1) {
+        if (userOp.call.nonce > type(uint64).max - 1) {
             return (false);
         }
 
-        uint256 userNonce = userNonces[userCall.metaTx.from];
+        uint256 userNonce = userNonces[userOp.call.from];
 
-        // If the protocol indicated that they only accept sequenced userNonces
+        // If the dapp indicated that they only accept sequenced userNonces
         // (IE for FCFS execution), check and make sure the order is correct
         // NOTE: allowing only sequenced userNonces could create a scenario in
         // which builders or validators may be able to profit via censorship.
-        // Protocols are encouraged to rely on the deadline parameter
+        // DApps are encouraged to rely on the deadline parameter
         // to prevent replay attacks.
-        if (protocolCall.callConfig.needsSequencedNonces()) {
-            if (userCall.metaTx.nonce != userNonce + 1) {
+        if (dConfig.callConfig.needsSequencedNonces()) {
+            if (userOp.call.nonce != userNonce + 1) {
                 return (false);
             }
 
@@ -259,9 +259,9 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
             // it if so.  This ensures nonce + 1 will always be available.
         } else {
             // NOTE: including the callConfig in the asyncNonceKey should prevent
-            // issues occuring when a protocol may switch configs between blocking 
+            // issues occuring when a dapp may switch configs between blocking 
             // and async, since callConfig can double as another seed. 
-            bytes32 asyncNonceKey = keccak256(abi.encode(userCall.metaTx.from, protocolCall.callConfig, userCall.metaTx.nonce + 1));
+            bytes32 asyncNonceKey = keccak256(abi.encode(userOp.call.from, dConfig.callConfig, userOp.call.nonce + 1));
             
             if (asyncNonceFills[asyncNonceKey] != address(0)) {
                 return (false);
@@ -270,31 +270,31 @@ contract ProtocolVerifier is EIP712, ProtocolIntegration {
         return (true);
     }
 
-    function _getProofHash(UserMetaTx memory metaTx) internal pure returns (bytes32 proofHash) {
+    function _getProofHash(UserCall memory uCall) internal pure returns (bytes32 proofHash) {
         proofHash = keccak256(
             abi.encode(
                 USER_TYPE_HASH,
-                metaTx.from,
-                metaTx.to,
-                metaTx.deadline,
-                metaTx.gas,
-                metaTx.nonce,
-                metaTx.maxFeePerGas,
-                metaTx.value,
-                metaTx.control,
-                keccak256(metaTx.data)
+                uCall.from,
+                uCall.to,
+                uCall.deadline,
+                uCall.gas,
+                uCall.nonce,
+                uCall.maxFeePerGas,
+                uCall.value,
+                uCall.control,
+                keccak256(uCall.data)
             )
         );
     }
 
-    function _verifyUserSignature(UserCall calldata userCall) internal view returns (bool) {
-        address signer = _hashTypedDataV4(_getProofHash(userCall.metaTx)).recover(userCall.signature);
+    function _verifyUserSignature(UserOperation calldata userOp) internal view returns (bool) {
+        address signer = _hashTypedDataV4(_getProofHash(userOp.call)).recover(userOp.signature);
 
-        return signer == userCall.metaTx.from;
+        return signer == userOp.call.from;
     }
 
-    function getUserCallPayload(UserCall memory userCall) public view returns (bytes32 payload) {
-        payload = _hashTypedDataV4(_getProofHash(userCall.metaTx));
+    function getUserOperationPayload(UserOperation memory userOp) public view returns (bytes32 payload) {
+        payload = _hashTypedDataV4(_getProofHash(userOp.call));
     }
 
     function nextUserNonce(address user) external view returns (uint256 nextNonce) {
