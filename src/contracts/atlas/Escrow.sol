@@ -8,8 +8,8 @@ import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 
 import {SafetyLocks} from "./SafetyLocks.sol";
-import {SearcherWrapper} from "./SearcherWrapper.sol";
-import {ProtocolVerifier} from "./ProtocolVerification.sol";
+import {SolverWrapper} from "./SolverWrapper.sol";
+import {DAppVerification} from "./DAppVerification.sol";
 
 import "../types/CallTypes.sol";
 import "../types/EscrowTypes.sol";
@@ -21,7 +21,7 @@ import {SafetyBits} from "../libraries/SafetyBits.sol";
 
 // import "forge-std/Test.sol";
 
-contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
+contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
     using ECDSA for bytes32;
     using EscrowBits for uint256;
     using CallBits for uint32;    
@@ -32,11 +32,11 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
 
     uint32 public immutable escrowDuration;
 
-    // NOTE: these storage vars / maps should only be accessible by *signed* searcher transactions
-    // and only once per searcher per block (to avoid user-searcher collaborative exploits)
-    // EOA Address => searcher escrow data
-    mapping(address => SearcherEscrow) internal _escrowData;
-    mapping(address => SearcherWithdrawal) internal _withdrawalData;
+    // NOTE: these storage vars / maps should only be accessible by *signed* solver transactions
+    // and only once per solver per block (to avoid user-solver collaborative exploits)
+    // EOA Address => solver escrow data
+    mapping(address => SolverEscrow) internal _escrowData;
+    mapping(address => SolverWithdrawal) internal _withdrawalData;
 
     GasDonation[] internal _donations;
 
@@ -48,35 +48,34 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     }
 
     ///////////////////////////////////////////////////
-    /// EXTERNAL FUNCTIONS FOR SEARCHER INTERACTION ///
+    /// EXTERNAL FUNCTIONS FOR SOLVER INTERACTION ///
     ///////////////////////////////////////////////////
-    function deposit(address searcherMetaTxSigner) external payable returns (uint256 newBalance) {
+    function deposit(address solverSigner) onlyWhenUnlocked external payable returns (uint256 newBalance) {
         // NOTE: The escrow accounting system cannot currently handle deposits made mid-transaction.
-        require(activeEnvironment == address(0), "ERR-E001 AlreadyInitialized");
 
-        _escrowData[searcherMetaTxSigner].total += uint128(msg.value);
-        newBalance = uint256(_escrowData[searcherMetaTxSigner].total);
+        _escrowData[solverSigner].total += uint128(msg.value);
+        newBalance = uint256(_escrowData[solverSigner].total);
     }
 
-    function nextSearcherNonce(address searcherMetaTxSigner) external view returns (uint256 nextNonce) {
-        nextNonce = uint256(_escrowData[searcherMetaTxSigner].nonce) + 1;
+    function nextSolverNonce(address solverSigner) external view returns (uint256 nextNonce) {
+        nextNonce = uint256(_escrowData[solverSigner].nonce) + 1;
     }
 
-    function searcherEscrowBalance(address searcherMetaTxSigner) external view returns (uint256 balance) {
-        balance = uint256(_escrowData[searcherMetaTxSigner].total);
+    function solverEscrowBalance(address solverSigner) external view returns (uint256 balance) {
+        balance = uint256(_escrowData[solverSigner].total);
     }
 
-    function searcherLastActiveBlock(address searcherMetaTxSigner) external view returns (uint256 lastBlock) {
-        lastBlock = uint256(_escrowData[searcherMetaTxSigner].lastAccessed);
+    function solverLastActiveBlock(address solverSigner) external view returns (uint256 lastBlock) {
+        lastBlock = uint256(_escrowData[solverSigner].lastAccessed);
     }
 
     ///////////////////////////////////////////////////
     /// EXTERNAL FUNCTIONS FOR BUNDLER INTERACTION  ///
     ///////////////////////////////////////////////////
 
-    // TODO: The balance checks on escrow that verify that the searcher
+    // TODO: The balance checks on escrow that verify that the solver
     // paid back any msg.value that they borrowed are currently not set up 
-    // to handle gas donations to the bundler from the searcher.
+    // to handle gas donations to the bundler from the solver.
     // THIS IS EXPLOITABLE - DO NOT USE THIS CONTRACT IN PRODUCTION
     // This attack vector will be addressed explicitly once the gas 
     // reimbursement mechanism is finalized.
@@ -136,24 +135,24 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     ///////////////////////////////////////////////////
     ///             INTERNAL FUNCTIONS              ///
     ///////////////////////////////////////////////////
-    function _executeStagingCall(
-        UserMetaTx calldata userMetaTx,
+    function _executePreOpsCall(
+        UserCall calldata uCall,
         address environment,
         bytes32 lockBytes
     ) 
         internal 
-        returns (bytes memory stagingData) 
+        returns (bytes memory preOpsData) 
     {
         bool success;
-        stagingData = abi.encodeWithSelector(IExecutionEnvironment.stagingWrapper.selector, userMetaTx);
-        stagingData = abi.encodePacked(stagingData, lockBytes);
-        (success, stagingData) = environment.call{value: msg.value}(stagingData);
-        require(success, "ERR-E001 StagingFail");
-        stagingData = abi.decode(stagingData, (bytes));
+        preOpsData = abi.encodeWithSelector(IExecutionEnvironment.preOpsWrapper.selector, uCall);
+        preOpsData = abi.encodePacked(preOpsData, lockBytes);
+        (success, preOpsData) = environment.call{value: msg.value}(preOpsData);
+        require(success, "ERR-E001 PreOpsFail");
+        preOpsData = abi.decode(preOpsData, (bytes));
     }
 
-    function _executeUserCall(
-        UserMetaTx calldata userMetaTx, 
+    function _executeUserOperation(
+        UserCall calldata uCall, 
         address environment,
         bytes32 lockBytes
     )
@@ -161,7 +160,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         returns (bytes memory userData)
     {
         bool success;
-        userData = abi.encodeWithSelector(IExecutionEnvironment.userWrapper.selector, userMetaTx);
+        userData = abi.encodeWithSelector(IExecutionEnvironment.userWrapper.selector, uCall);
         userData = abi.encodePacked(userData, lockBytes);
         // TODO: Handle msg.value quirks
         (success, userData) = environment.call(userData);
@@ -169,8 +168,8 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         userData = abi.decode(userData, (bytes));
     }
 
-    function _executeSearcherCall(
-        SearcherCall calldata searcherCall,
+    function _executeSolverOperation(
+        SolverOperation calldata solverOp,
         bytes memory returnData,
         address environment,
         EscrowKey memory key
@@ -180,59 +179,59 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         uint256 gasWaterMark = gasleft();
 
         // Verify the transaction.
-        (uint256 result, uint256 gasLimit, SearcherEscrow memory searcherEscrow) =
-            _verify(searcherCall, gasWaterMark, false);
+        (uint256 result, uint256 gasLimit, SolverEscrow memory solverEscrow) =
+            _verify(solverOp, gasWaterMark, false);
 
-        SearcherOutcome outcome;
+        SolverOutcome outcome;
         uint256 escrowSurplus;
         bool auctionWon;
 
         // If there are no errors, attempt to execute
         if (result.canExecute()) {
-            // Open the searcher lock
-            key = key.holdSearcherLock(searcherCall.metaTx.to);
+            // Open the solver lock
+            key = key.holdSolverLock(solverOp.call.to);
            
-            // Execute the searcher call
-            (outcome, escrowSurplus) = _searcherCallWrapper(gasLimit, environment, searcherCall, returnData, key.pack());
+            // Execute the solver call
+            (outcome, escrowSurplus) = _solverOpWrapper(gasLimit, environment, solverOp, returnData, key.pack());
 
             unchecked {
-                searcherEscrow.total += uint128(escrowSurplus);
+                solverEscrow.total += uint128(escrowSurplus);
             }
 
             result |= 1 << uint256(outcome);
 
             if (result.executedWithError()) {
-                result |= 1 << uint256(SearcherOutcome.ExecutionCompleted);
+                result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
             } else if (result.executionSuccessful()) {
-                // first successful searcher call that paid what it bid
+                // first successful solver call that paid what it bid
                 auctionWon = true; // cannot be reached if bool is already true
-                result |= 1 << uint256(SearcherOutcome.ExecutionCompleted);
-                key = key.turnSearcherLockPayments(environment);
+                result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
+                key = key.turnSolverLockPayments(environment);
             }
 
-            // Update the searcher's escrow balances and the accumulated refund
+            // Update the solver's escrow balances and the accumulated refund
             if (result.updateEscrow()) {
-                key.gasRefund += uint32(_update(searcherCall.metaTx, searcherEscrow, gasWaterMark, result));
+                key.gasRefund += uint32(_update(solverOp.call, solverEscrow, gasWaterMark, result));
             }
 
             // emit event
-            emit SearcherTxResult(
-                searcherCall.metaTx.to,
-                searcherCall.metaTx.from,
+            emit SolverTxResult(
+                solverOp.call.to,
+                solverOp.call.from,
                 true,
-                outcome == SearcherOutcome.Success,
-                searcherEscrow.nonce,
+                outcome == SolverOutcome.Success,
+                solverEscrow.nonce,
                 result
             );
 
         } else {
             // emit event
-            emit SearcherTxResult(
-                searcherCall.metaTx.to,
-                searcherCall.metaTx.from,
+            emit SolverTxResult(
+                solverOp.call.to,
+                solverOp.call.from,
                 false,
                 false,
-                searcherEscrow.nonce,
+                solverEscrow.nonce,
                 result
             );
         }
@@ -241,37 +240,37 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     }
 
     // TODO: who should pay gas cost of MEV Payments?
-    // TODO: Should payment failure trigger subsequent searcher calls?
+    // TODO: Should payment failure trigger subsequent solver calls?
     // (Note that balances are held in the execution environment, meaning
     // that payment failure is typically a result of a flaw in the
-    // ProtocolControl contract)
-    function _executePayments(
-        ProtocolCall calldata protocolCall,
+    // DAppControl contract)
+    function _allocateValue(
+        DAppConfig calldata dConfig,
         BidData[] calldata winningBids,
         bytes memory returnData,
         address environment,
         bytes32 lockBytes
     ) internal {
-        // process protocol payments
+        // process dApp payments
         bool success;
-        bytes memory data = abi.encodeWithSelector(IExecutionEnvironment.allocateRewards.selector, winningBids, returnData);
+        bytes memory data = abi.encodeWithSelector(IExecutionEnvironment.allocateValue.selector, winningBids, returnData);
         data = abi.encodePacked(data, lockBytes);
         (success, ) = environment.call(data);
         if (!success) {
-            emit MEVPaymentFailure(protocolCall.to, protocolCall.callConfig, winningBids);
+            emit MEVPaymentFailure(dConfig.to, dConfig.callConfig, winningBids);
         }
     }
 
-    function _executeVerificationCall(
+    function _executePostOpsCall(
         bytes memory returnData,
         address environment,
         bytes32 lockBytes
     ) internal {
         bool success;
-        bytes memory verificationData = abi.encodeWithSelector(IExecutionEnvironment.verificationWrapper.selector, returnData);
-        verificationData = abi.encodePacked(verificationData, lockBytes);
-        (success,) = environment.call{value: msg.value}(verificationData);
-        require(success, "ERR-E005 VerificationFail");
+        bytes memory postOpsData = abi.encodeWithSelector(IExecutionEnvironment.postOpsWrapper.selector, returnData);
+        postOpsData = abi.encodePacked(postOpsData, lockBytes);
+        (success,) = environment.call{value: msg.value}(postOpsData);
+        require(success, "ERR-E005 PostOpsFail");
     }
 
     function _executeGasRefund(uint256 gasMarker, uint256 accruedGasRebate, address user) internal {
@@ -293,12 +292,12 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
             
             returnFactor = 100;
 
-        // CASE: There are no donations, so just refund the searcher credits
+        // CASE: There are no donations, so just refund the solver credits
         } else if (donations.length == 0) {
             SafeTransferLib.safeTransferETH(msg.sender, gasFeesCredit);
             return;
 
-        // CASE: There are no donations, so just refund the searcher credits and return
+        // CASE: There are no donations, so just refund the solver credits and return
         } else if (donations[donations.length-1].cumulative == 0) {
             SafeTransferLib.safeTransferETH(msg.sender, gasFeesCredit);
             return;
@@ -338,8 +337,8 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     }
 
     function _update(
-        SearcherMetaTx calldata metaTx,
-        SearcherEscrow memory searcherEscrow,
+        SolverCall calldata sCall,
+        SolverEscrow memory solverEscrow,
         uint256 gasWaterMark,
         uint256 result
     ) internal returns (uint256 gasRebate) {
@@ -347,9 +346,9 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
             uint256 gasUsed = gasWaterMark - gasleft();
 
             if (result & EscrowBits._FULL_REFUND != 0) {
-                gasRebate = gasUsed + (metaTx.data.length * CALLDATA_LENGTH_PREMIUM);
+                gasRebate = gasUsed + (sCall.data.length * CALLDATA_LENGTH_PREMIUM);
             } else if (result & EscrowBits._CALLDATA_REFUND != 0) {
-                gasRebate = (metaTx.data.length * CALLDATA_LENGTH_PREMIUM);
+                gasRebate = (sCall.data.length * CALLDATA_LENGTH_PREMIUM);
             } else if (result & EscrowBits._NO_USER_REFUND != 0) {
                 // pass
             } else {
@@ -357,129 +356,129 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
             }
 
             if (gasRebate != 0) {
-                // Calculate what the searcher owes
+                // Calculate what the solver owes
                 gasRebate *= tx.gasprice;
 
-                gasRebate = gasRebate > searcherEscrow.total ? searcherEscrow.total : gasRebate;
+                gasRebate = gasRebate > solverEscrow.total ? solverEscrow.total : gasRebate;
 
-                searcherEscrow.total -= uint128(gasRebate);
+                solverEscrow.total -= uint128(gasRebate);
 
                 // NOTE: This will cause an error if you are simulating with a gasPrice of 0
                 gasRebate /= tx.gasprice;
 
                 // save the escrow data back into storage
-                _escrowData[metaTx.from] = searcherEscrow;
+                _escrowData[sCall.from] = solverEscrow;
             
             // Check if need to save escrowData due to nonce update but not gasRebate
             } else if (result & EscrowBits._NO_NONCE_UPDATE == 0) {
-                _escrowData[metaTx.from].nonce = searcherEscrow.nonce;
+                _escrowData[sCall.from].nonce = solverEscrow.nonce;
             }
         }
     }
 
-    function _verify(SearcherCall calldata searcherCall, uint256 gasWaterMark, bool auctionAlreadyComplete)
+    function _verify(SolverOperation calldata solverOp, uint256 gasWaterMark, bool auctionAlreadyComplete)
         internal
         view
-        returns (uint256 result, uint256 gasLimit, SearcherEscrow memory searcherEscrow)
+        returns (uint256 result, uint256 gasLimit, SolverEscrow memory solverEscrow)
     {
-        // verify searcher's signature
-        if (_verifySignature(searcherCall.metaTx, searcherCall.signature)) {
-            // verify the searcher has correct usercalldata and the searcher escrow checks
-            (result, gasLimit, searcherEscrow) = _verifySearcherCall(searcherCall);
+        // verify solver's signature
+        if (_verifySignature(solverOp.call, solverOp.signature)) {
+            // verify the solver has correct usercalldata and the solver escrow checks
+            (result, gasLimit, solverEscrow) = _verifySolverOperation(solverOp);
         } else {
-            (result, gasLimit) = (1 << uint256(SearcherOutcome.InvalidSignature), 0);
-            // searcherEscrow returns null
+            (result, gasLimit) = (1 << uint256(SolverOutcome.InvalidSignature), 0);
+            // solverEscrow returns null
         }
 
-        result = _searcherCallPreCheck(
-            result, gasWaterMark, tx.gasprice, searcherCall.metaTx.maxFeePerGas, auctionAlreadyComplete
+        result = _solverOpPreCheck(
+            result, gasWaterMark, tx.gasprice, solverOp.call.maxFeePerGas, auctionAlreadyComplete
         );
     }
 
-    function _getSearcherHash(SearcherMetaTx calldata metaTx) internal pure returns (bytes32 searcherHash) {
+    function _getSolverHash(SolverCall calldata sCall) internal pure returns (bytes32 solverHash) {
         return keccak256(
             abi.encode(
-                SEARCHER_TYPE_HASH,
-                metaTx.from,
-                metaTx.to,
-                metaTx.value,
-                metaTx.gas,
-                metaTx.nonce,
-                metaTx.maxFeePerGas,
-                metaTx.userCallHash,
-                metaTx.controlCodeHash,
-                metaTx.bidsHash,
-                keccak256(metaTx.data)
+                SOLVER_TYPE_HASH,
+                sCall.from,
+                sCall.to,
+                sCall.value,
+                sCall.gas,
+                sCall.nonce,
+                sCall.maxFeePerGas,
+                sCall.userOpHash,
+                sCall.controlCodeHash,
+                sCall.bidsHash,
+                keccak256(sCall.data)
             )
         );
     }
 
-    function getSearcherPayload(SearcherMetaTx calldata metaTx) public view returns (bytes32 payload) {
-        payload = _hashTypedDataV4(_getSearcherHash(metaTx));
+    function getSolverPayload(SolverCall calldata sCall) public view returns (bytes32 payload) {
+        payload = _hashTypedDataV4(_getSolverHash(sCall));
     }
 
-    function _verifySignature(SearcherMetaTx calldata metaTx, bytes calldata signature) internal view returns (bool) {
-        address signer = _hashTypedDataV4(_getSearcherHash(metaTx)).recover(signature);
-        return signer == metaTx.from;
+    function _verifySignature(SolverCall calldata sCall, bytes calldata signature) internal view returns (bool) {
+        address signer = _hashTypedDataV4(_getSolverHash(sCall)).recover(signature);
+        return signer == sCall.from;
     }
 
     function _verifyBids(bytes32 bidsHash, BidData[] calldata bids) internal pure returns (bool validBid) {
-        // NOTE: this should only occur after the searcher's signature on the bidsHash is verified
+        // NOTE: this should only occur after the solver's signature on the bidsHash is verified
         validBid = keccak256(abi.encode(bids)) == bidsHash;
     }
 
-    function _verifySearcherCall(SearcherCall calldata searcherCall)
+    function _verifySolverOperation(SolverOperation calldata solverOp)
         internal
         view
-        returns (uint256 result, uint256 gasLimit, SearcherEscrow memory searcherEscrow)
+        returns (uint256 result, uint256 gasLimit, SolverEscrow memory solverEscrow)
     {
-        searcherEscrow = _escrowData[searcherCall.metaTx.from];
+        solverEscrow = _escrowData[solverOp.call.from];
 
         unchecked {
 
-            if (searcherCall.metaTx.nonce <= uint256(searcherEscrow.nonce)) {
-                result |= 1 << uint256(SearcherOutcome.InvalidNonceUnder);
-            } else if (searcherCall.metaTx.nonce > uint256(searcherEscrow.nonce) + 1) {
-                result |= 1 << uint256(SearcherOutcome.InvalidNonceOver);
+            if (solverOp.call.nonce <= uint256(solverEscrow.nonce)) {
+                result |= 1 << uint256(SolverOutcome.InvalidNonceUnder);
+            } else if (solverOp.call.nonce > uint256(solverEscrow.nonce) + 1) {
+                result |= 1 << uint256(SolverOutcome.InvalidNonceOver);
 
                 // TODO: reconsider the jump up for gapped nonces? Intent is to mitigate dmg
-                // potential inflicted by a hostile searcher/builder.
-                searcherEscrow.nonce = uint32(searcherCall.metaTx.nonce);
+                // potential inflicted by a hostile solver/builder.
+                solverEscrow.nonce = uint32(solverOp.call.nonce);
             } else {
-                ++searcherEscrow.nonce;
+                ++solverEscrow.nonce;
             }
 
-            if (searcherEscrow.lastAccessed >= uint64(block.number)) {
-                result |= 1 << uint256(SearcherOutcome.PerBlockLimit);
+            if (solverEscrow.lastAccessed >= uint64(block.number)) {
+                result |= 1 << uint256(SolverOutcome.PerBlockLimit);
             } else {
-                searcherEscrow.lastAccessed = uint64(block.number);
+                solverEscrow.lastAccessed = uint64(block.number);
             }
 
-            if (!_verifyBids(searcherCall.metaTx.bidsHash, searcherCall.bids)) {
-                result |= 1 << uint256(SearcherOutcome.InvalidBidsHash);
+            if (!_verifyBids(solverOp.call.bidsHash, solverOp.bids)) {
+                result |= 1 << uint256(SolverOutcome.InvalidBidsHash);
             }
 
             gasLimit = (100)
                 * (
-                    searcherCall.metaTx.gas < EscrowBits.SEARCHER_GAS_LIMIT
-                        ? searcherCall.metaTx.gas
-                        : EscrowBits.SEARCHER_GAS_LIMIT
-                ) / (100 + EscrowBits.SEARCHER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
+                    solverOp.call.gas < EscrowBits.SOLVER_GAS_LIMIT
+                        ? solverOp.call.gas
+                        : EscrowBits.SOLVER_GAS_LIMIT
+                ) / (100 + EscrowBits.SOLVER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
 
-            uint256 gasCost = (tx.gasprice * gasLimit) + (searcherCall.metaTx.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
+            uint256 gasCost = (tx.gasprice * gasLimit) + (solverOp.call.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
 
-            // see if searcher's escrow can afford tx gascost
-            if (gasCost > searcherEscrow.total - _withdrawalData[searcherCall.metaTx.from].escrowed) {
-                // charge searcher for calldata so that we can avoid vampire attacks from searcher onto user
-                result |= 1 << uint256(SearcherOutcome.InsufficientEscrow);
+            // see if solver's escrow can afford tx gascost
+            if (gasCost > solverEscrow.total - _withdrawalData[solverOp.call.from].escrowed) {
+                // charge solver for calldata so that we can avoid vampire attacks from solver onto user
+                result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
             }
 
-            // Verify that we can lend the searcher their tx value
-            if (searcherCall.metaTx.value > address(this).balance - (gasLimit * tx.gasprice)) {
-                result |= 1 << uint256(SearcherOutcome.CallValueTooHigh);
+            // Verify that we can lend the solver their tx value
+            if (solverOp.call.value > address(this).balance - (gasLimit * tx.gasprice)) {
+                result |= 1 << uint256(SolverOutcome.CallValueTooHigh);
             }
 
-            // subtract out the gas buffer since the searcher's metaTx won't use it
+            // subtract out the gas buffer since the solver's metaTx won't use it
             gasLimit -= EscrowBits.FASTLANE_GAS_BUFFER;
         }
     }
@@ -491,7 +490,7 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
     }
 
     // BITWISE STUFF
-    function _searcherCallPreCheck(
+    function _solverOpPreCheck(
         uint256 result,
         uint256 gasWaterMark,
         uint256 txGasPrice,
@@ -499,16 +498,16 @@ contract Escrow is ProtocolVerifier, SafetyLocks, SearcherWrapper {
         bool auctionAlreadyComplete
     ) internal pure returns (uint256) {
         if (auctionAlreadyComplete) {
-            result |= 1 << uint256(SearcherOutcome.LostAuction);
+            result |= 1 << uint256(SolverOutcome.LostAuction);
         }
 
-        if (gasWaterMark < EscrowBits.VALIDATION_GAS_LIMIT + EscrowBits.SEARCHER_GAS_LIMIT) {
-            // Make sure to leave enough gas for protocol validation calls
-            result |= 1 << uint256(SearcherOutcome.UserOutOfGas);
+        if (gasWaterMark < EscrowBits.VALIDATION_GAS_LIMIT + EscrowBits.SOLVER_GAS_LIMIT) {
+            // Make sure to leave enough gas for dApp validation calls
+            result |= 1 << uint256(SolverOutcome.UserOutOfGas);
         }
 
         if (txGasPrice > maxFeePerGas) {
-            result |= 1 << uint256(SearcherOutcome.GasPriceOverCap);
+            result |= 1 << uint256(SolverOutcome.GasPriceOverCap);
         }
 
         return result;

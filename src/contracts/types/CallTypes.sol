@@ -1,13 +1,13 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-struct UserCall {
+struct UserOperation {
     address to; // Atlas
-    UserMetaTx metaTx;
+    UserCall call;
     bytes signature;
 }
 
-struct UserMetaTx {
+struct UserCall {
     address from;
     address to;
     uint256 deadline;
@@ -15,27 +15,27 @@ struct UserMetaTx {
     uint256 nonce;
     uint256 maxFeePerGas;
     uint256 value;
-    address control; // address for staging / validation funcs
+    address control; // address for preOps / validation funcs
     bytes data;
 }
 
-struct SearcherCall {
+struct SolverOperation {
     address to; // Atlas
-    SearcherMetaTx metaTx;
+    SolverCall call;
     bytes signature;
     BidData[] bids;
 }
 
-struct SearcherMetaTx {
+struct SolverCall {
     address from;
     address to;
     uint256 value;
     uint256 gas;
     uint256 nonce;
-    uint256 maxFeePerGas; // maxFeePerGas searcher is willing to pay.  This goes to validator, not protocol or user
-    bytes32 userCallHash; // hash of user EOA and calldata, for verification of user's tx (if not matched, searcher wont be charged for gas)
-    bytes32 controlCodeHash; // ProtocolControl.codehash
-    bytes32 bidsHash; // searcher's backend must keccak256() their BidData array and include that in the signed meta tx, which we then verify on chain.
+    uint256 maxFeePerGas; // maxFeePerGas solver is willing to pay.  This goes to validator, not dApp or user
+    bytes32 userOpHash; // hash of user EOA and calldata, for verification of user's tx (if not matched, solver wont be charged for gas)
+    bytes32 controlCodeHash; // DAppControl.codehash
+    bytes32 bidsHash; // solver's backend must keccak256() their BidData array and include that in the signed meta tx, which we then verify on chain.
     bytes data;
 }
 
@@ -55,41 +55,41 @@ struct PaymentData {
     uint256 payeePercent;
 }
 
-struct ProtocolCall {
+struct DAppConfig {
     address to;
     uint32 callConfig;
 }
 
 struct CallConfig {
     bool sequenced;
-    bool requireStaging;
-    bool trackStagingReturnData;
+    bool requirePreOps;
+    bool trackPreOpsReturnData;
     bool trackUserReturnData;
     bool delegateUser;
     bool localUser;
-    bool searcherStaging;
-    bool searcherFulfillment;
-    bool requireVerification;
-    bool zeroSearchers;
+    bool preSolver;
+    bool postSolver;
+    bool requirePostOps;
+    bool zeroSolvers;
     bool reuseUserOp;
     bool userBundler;
-    bool protocolBundler;
+    bool dAppBundler;
     bool unknownBundler;
 }
 
 enum CallConfigIndex {
     Sequenced,
-    RequireStaging,
-    TrackStagingReturnData,
+    RequirePreOps,
+    TrackPreOpsReturnData,
     TrackUserReturnData,
     DelegateUser,
     LocalUser,
-    SearcherStaging,
-    SearcherFulfillment,
-    RequireVerification,
-    ZeroSearchers,
+    PreSolver,
+    PostSolver,
+    RequirePostOpsCall,
+    ZeroSolvers,
     ReuseUserOp,
     UserBundler,
-    ProtocolBundler,
+    DAppBundler,
     UnknownBundler
 }
