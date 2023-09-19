@@ -69,7 +69,9 @@ contract SwapIntentController is DAppControl {
                 reuseUserOp: true,
                 userBundler: true,
                 dAppBundler: true,
-                unknownBundler: true
+                unknownBundler: true,
+                forwardPreOpsReturnData: false,
+                forwardUserReturnData: false
             })
         )
     {}

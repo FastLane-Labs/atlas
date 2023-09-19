@@ -75,6 +75,8 @@ struct CallConfig {
     bool userBundler;
     bool dAppBundler;
     bool unknownBundler;
+    bool forwardPreOpsReturnData;
+    bool forwardUserReturnData;
 }
 
 enum CallConfigIndex {
@@ -91,5 +93,7 @@ enum CallConfigIndex {
     ReuseUserOp,
     UserBundler,
     DAppBundler,
-    UnknownBundler
+    UnknownBundler,
+    ForwardPreOpsReturnData,
+    ForwardUserReturnData
 }
