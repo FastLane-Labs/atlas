@@ -20,7 +20,7 @@ interface IExecutionEnvironment {
         bytes calldata returnData
     ) external payable;
 
-    function allocateRewards(
+    function allocateValue(
         BidData[] calldata bids, // Converted to memory
         bytes memory returnData
     ) external;

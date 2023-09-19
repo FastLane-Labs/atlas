@@ -186,7 +186,7 @@ contract Atlas is Test, Factory {
     ) internal returns (bool, EscrowKey memory) {
         (auctionWon, key) = _executeSolverOperation(solverOp, returnData, executionEnvironment, key);
         if (auctionWon) {
-            _executePayments(dConfig, solverOp.bids, returnData, executionEnvironment, key.pack());
+            _allocateValue(dConfig, solverOp.bids, returnData, executionEnvironment, key.pack());
             key = key.allocationComplete();
         }
         return (auctionWon, key);

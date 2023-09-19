@@ -85,13 +85,13 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
         return _postSolverCall(data);
     }
 
-    function allocatingCall(bytes calldata data) 
+    function allocateValueCall(bytes calldata data) 
         external 
         onlyAtlasEnvironment
         validControl
         validPhase(ExecutionPhase.HandlingPayments)
     {
-        return _allocatingCall(data);
+        return _allocateValueCall(data);
     }
 
     function postOpsCall(bytes calldata data) 

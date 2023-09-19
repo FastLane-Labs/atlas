@@ -244,7 +244,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
     // (Note that balances are held in the execution environment, meaning
     // that payment failure is typically a result of a flaw in the
     // DAppControl contract)
-    function _executePayments(
+    function _allocateValue(
         DAppConfig calldata dConfig,
         BidData[] calldata winningBids,
         bytes memory returnData,
@@ -253,7 +253,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
     ) internal {
         // process dApp payments
         bool success;
-        bytes memory data = abi.encodeWithSelector(IExecutionEnvironment.allocateRewards.selector, winningBids, returnData);
+        bytes memory data = abi.encodeWithSelector(IExecutionEnvironment.allocateValue.selector, winningBids, returnData);
         data = abi.encodePacked(data, lockBytes);
         (success, ) = environment.call(data);
         if (!success) {

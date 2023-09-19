@@ -93,7 +93,7 @@ abstract contract GovernanceControl {
     //                MEV ALLOCATION                       //
     /////////////////////////////////////////////////////////
     //
-    // _allocatingCall
+    // _allocateValueCall
     // Details:
     //  allocate/delegate =
     //      Inputs: MEV Profits (ERC20 balances) 
@@ -103,7 +103,7 @@ abstract contract GovernanceControl {
     //
     // DApp exposure: Trustless
     // User exposure: Trustless
-    function _allocatingCall(bytes calldata data) internal virtual;
+    function _allocateValueCall(bytes calldata data) internal virtual;
 
     /////////////////////////////////////////////////////////
     //              INTENT FULFILLMENT                     //

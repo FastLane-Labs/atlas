@@ -287,7 +287,7 @@ contract ExecutionEnvironment is Base {
         }
     }
 
-    function allocateRewards(BidData[] calldata bids, bytes memory returnData) 
+    function allocateValue(BidData[] calldata bids, bytes memory returnData) 
         external 
         onlyAtlasEnvironment
         validPhase(ExecutionPhase.HandlingPayments)
@@ -318,7 +318,7 @@ contract ExecutionEnvironment is Base {
             }
         }
 
-        bytes memory allocateData = abi.encodeWithSelector(IDAppControl.allocatingCall.selector, abi.encode(totalEtherReward, bids, returnData));
+        bytes memory allocateData = abi.encodeWithSelector(IDAppControl.allocateValueCall.selector, abi.encode(totalEtherReward, bids, returnData));
 
         (bool success,) = _control().delegatecall(forward(allocateData));
         require(success, "ERR-EC02 DelegateRevert");

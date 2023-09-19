@@ -10,7 +10,7 @@ interface IDAppControl {
 
     function userLocalCall(bytes calldata data) external returns (bytes memory);
 
-    function allocatingCall(bytes calldata data) external;
+    function allocateValueCall(bytes calldata data) external;
 
     function preSolverCall(bytes calldata data) external returns (bool);
 
