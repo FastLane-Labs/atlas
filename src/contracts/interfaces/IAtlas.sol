@@ -39,7 +39,7 @@ interface IAtlas {
 
     function getVerificationPayload(Verification memory verification) external view returns (bytes32 payload);
 
-    function getSolverPayload(SolverCall calldata fCall) external view returns (bytes32 payload);
+    function getSolverPayload(SolverCall calldata sCall) external view returns (bytes32 payload);
 
     function getUserOperationPayload(UserOperation memory userOp) external view returns (bytes32 payload);
 

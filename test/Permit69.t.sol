@@ -50,7 +50,7 @@ contract Permit69Test is BaseTest {
 
     // transferUserERC20 tests
 
-    function testTransferUserERC20RevertsIfCallerNotExecutionEnv() public {
+    function testTransferUserERC20RevertsIsCallerNotExecutionEnv() public {
         vm.prank(solverOneEOA);
         vm.expectRevert(CALLER_IS_NOT_EXECUTION_ENV);
         mockAtlas.transferUserERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, address(0), uint16(0), escrowKey.lockState);
@@ -113,7 +113,7 @@ contract Permit69Test is BaseTest {
 
     // transferDAppERC20 tests
 
-    function testTransferDAppERC20RevertsIfCallerNotExecutionEnv() public {
+    function testTransferDAppERC20RevertsIsCallerNotExecutionEnv() public {
         vm.prank(solverOneEOA);
         vm.expectRevert(CALLER_IS_NOT_EXECUTION_ENV);
         mockAtlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);

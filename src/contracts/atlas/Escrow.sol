@@ -337,7 +337,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
     }
 
     function _update(
-        SolverCall calldata fCall,
+        SolverCall calldata sCall,
         SolverEscrow memory solverEscrow,
         uint256 gasWaterMark,
         uint256 result
@@ -346,9 +346,9 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
             uint256 gasUsed = gasWaterMark - gasleft();
 
             if (result & EscrowBits._FULL_REFUND != 0) {
-                gasRebate = gasUsed + (fCall.data.length * CALLDATA_LENGTH_PREMIUM);
+                gasRebate = gasUsed + (sCall.data.length * CALLDATA_LENGTH_PREMIUM);
             } else if (result & EscrowBits._CALLDATA_REFUND != 0) {
-                gasRebate = (fCall.data.length * CALLDATA_LENGTH_PREMIUM);
+                gasRebate = (sCall.data.length * CALLDATA_LENGTH_PREMIUM);
             } else if (result & EscrowBits._NO_USER_REFUND != 0) {
                 // pass
             } else {
@@ -367,11 +367,11 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
                 gasRebate /= tx.gasprice;
 
                 // save the escrow data back into storage
-                _escrowData[fCall.from] = solverEscrow;
+                _escrowData[sCall.from] = solverEscrow;
             
             // Check if need to save escrowData due to nonce update but not gasRebate
             } else if (result & EscrowBits._NO_NONCE_UPDATE == 0) {
-                _escrowData[fCall.from].nonce = solverEscrow.nonce;
+                _escrowData[sCall.from].nonce = solverEscrow.nonce;
             }
         }
     }
@@ -395,31 +395,31 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
         );
     }
 
-    function _getSolverHash(SolverCall calldata fCall) internal pure returns (bytes32 solverHash) {
+    function _getSolverHash(SolverCall calldata sCall) internal pure returns (bytes32 solverHash) {
         return keccak256(
             abi.encode(
                 SOLVER_TYPE_HASH,
-                fCall.from,
-                fCall.to,
-                fCall.value,
-                fCall.gas,
-                fCall.nonce,
-                fCall.maxFeePerGas,
-                fCall.userOpHash,
-                fCall.controlCodeHash,
-                fCall.bidsHash,
-                keccak256(fCall.data)
+                sCall.from,
+                sCall.to,
+                sCall.value,
+                sCall.gas,
+                sCall.nonce,
+                sCall.maxFeePerGas,
+                sCall.userOpHash,
+                sCall.controlCodeHash,
+                sCall.bidsHash,
+                keccak256(sCall.data)
             )
         );
     }
 
-    function getSolverPayload(SolverCall calldata fCall) public view returns (bytes32 payload) {
-        payload = _hashTypedDataV4(_getSolverHash(fCall));
+    function getSolverPayload(SolverCall calldata sCall) public view returns (bytes32 payload) {
+        payload = _hashTypedDataV4(_getSolverHash(sCall));
     }
 
-    function _verifySignature(SolverCall calldata fCall, bytes calldata signature) internal view returns (bool) {
-        address signer = _hashTypedDataV4(_getSolverHash(fCall)).recover(signature);
-        return signer == fCall.from;
+    function _verifySignature(SolverCall calldata sCall, bytes calldata signature) internal view returns (bool) {
+        address signer = _hashTypedDataV4(_getSolverHash(sCall)).recover(signature);
+        return signer == sCall.from;
     }
 
     function _verifyBids(bytes32 bidsHash, BidData[] calldata bids) internal pure returns (bool validBid) {
