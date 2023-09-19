@@ -161,7 +161,7 @@ contract Permit69Test is BaseTest {
     function testTransferDAppERC20SuccessfullyTransfersTokens() public {
         uint256 wethTransferred = 10e18;
 
-        uint256 protocolWethBefore = WETH.balanceOf(mockDAppControl);
+        uint256 dAppWethBefore = WETH.balanceOf(mockDAppControl);
         uint256 solverWethBefore = WETH.balanceOf(solverOneEOA);
 
         vm.prank(mockDAppControl);
@@ -170,7 +170,7 @@ contract Permit69Test is BaseTest {
         vm.prank(mockExecutionEnvAddress);
         mockAtlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, wethTransferred, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);
     
-        assertEq(WETH.balanceOf(mockDAppControl), protocolWethBefore - wethTransferred, "DApp did not lose WETH");
+        assertEq(WETH.balanceOf(mockDAppControl), dAppWethBefore - wethTransferred, "DApp did not lose WETH");
         assertEq(WETH.balanceOf(solverOneEOA), solverWethBefore + wethTransferred, "Solver did not gain WETH");
     }
 
@@ -218,7 +218,7 @@ contract Permit69Test is BaseTest {
 
     function testConstantValueOfSafeDAppTransfer() public {
         string memory expectedBitMapString = "0000011100100000";
-        // Safe phases for protocol transfers are PreOps, HandlingPayments, UserRefund, and Verification
+        // Safe phases for dApp transfers are PreOps, HandlingPayments, UserRefund, and Verification
         // preOpsPhaseSafe = 0000 0000 0010 0000
         uint16 preOpsPhaseSafe =
             uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.PreOps)));
@@ -266,7 +266,7 @@ contract MockAtlasForPermit69Tests is Permit69 {
     }
 
     function getSafeDAppTransfer() public view returns (uint16) {
-        return _SAFE_PROTOCOL_TRANSFER;
+        return _SAFE_DAPP_TRANSFER;
     }
 
     // Setters for testing

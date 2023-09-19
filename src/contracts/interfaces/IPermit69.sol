@@ -4,7 +4,7 @@ pragma solidity ^0.8.16;
 interface IPermit69 {
     // NOTE: IPermit69 only works inside of the Atlas environment - specifically
     // inside of the custom ExecutionEnvironments that each user deploys when
-    // interacting with Atlas in a manner controlled by the DeFi protocol.
+    // interacting with Atlas in a manner controlled by the dApp.
     
     // The name comes from the reciprocal nature of the token transfers. Both
     // the user and the DAppControl can transfer tokens from the User

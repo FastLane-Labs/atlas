@@ -29,7 +29,7 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
         callConfig = CallBits.encodeCallConfig(_callConfig);
     }
 
-    // Safety and support functions and modifiers that make the relationship between protocol
+    // Safety and support functions and modifiers that make the relationship between dApp
     // and FastLane's backend trustless.
 
     // Modifiers

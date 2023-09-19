@@ -8,7 +8,7 @@ import {EXECUTION_PHASE_OFFSET, SAFETY_LEVEL_OFFSET} from "../libraries/SafetyBi
 
 // NOTE: IPermit69 only works inside of the Atlas environment - specifically
 // inside of the custom ExecutionEnvironments that each user deploys when
-// interacting with Atlas in a manner controlled by the DeFi protocol.
+// interacting with Atlas in a manner controlled by the DeFi dApp.
 
 // The name comes from the reciprocal nature of the token transfers. Both
 // the user and the DAppControl can transfer tokens from the User
@@ -26,8 +26,8 @@ abstract contract Permit69 {
         1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
     );
 
-    // NOTE: No protocol transfers allowed during UserOperation
-    uint16 internal constant _SAFE_PROTOCOL_TRANSFER = uint16(
+    // NOTE: No Dapp transfers allowed during UserOperation
+    uint16 internal constant _SAFE_DAPP_TRANSFER = uint16(
         1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps))
         | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.HandlingPayments))
         | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserRefund))
@@ -84,7 +84,7 @@ abstract contract Permit69 {
         // Verify the lock state
         _verifyLockState({
             lockState: lockState, 
-            safeExecutionPhaseSet: _SAFE_PROTOCOL_TRANSFER
+            safeExecutionPhaseSet: _SAFE_DAPP_TRANSFER
         });
 
         // Transfer token

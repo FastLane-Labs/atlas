@@ -108,6 +108,6 @@ contract BaseTest is Test, TestConstants {
         vm.label(userEOA, "USER");
         vm.label(escrow, "ESCROW");
         vm.label(address(atlas), "ATLAS");
-        vm.label(address(control), "PROTOCOL CONTROL");
+        vm.label(address(control), "DAPP CONTROL");
     }
 }

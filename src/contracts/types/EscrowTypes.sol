@@ -44,7 +44,7 @@ enum SolverOutcome
     PerBlockLimit, // solvers can only send one tx per block
     // if they sent two we wouldn't be able to flag builder censorship
     InvalidFormat,
-    // protocol / external user refund (TODO: keep?)
+    // dApp / external user refund (TODO: keep?)
     LostAuction, // a higher bidding solver was successful
     // call, with full user refund
     UnknownError,

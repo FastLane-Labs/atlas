@@ -105,7 +105,7 @@ contract SwapIntentController is DAppControl {
         require(bytes4(uCall.data) == this.swap.selector, "ERR-PI001 InvalidSelector");
         require(uCall.to == control, "ERR-PI006 InvalidUserTo");
 
-        // This protocol control currently requires all 
+        // This dApp control currently requires all 
         SwapIntent memory swapIntent = abi.decode(uCall.data[4:], (SwapIntent));
 
         // There should never be a balance on this ExecutionEnvironment greater than 1, but check

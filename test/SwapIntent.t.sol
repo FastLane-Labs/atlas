@@ -25,7 +25,7 @@ import {SolverBase} from "../src/contracts/solver/SolverBase.sol";
 // 6. Maybe emit error msg or some other better UX for error if !valid in metacall()
 
 // Doc Ideas:
-// 1. Step by step instructions for building a metacall transaction (for internal testing, and integrating protocols)
+// 1. Step by step instructions for building a metacall transaction (for internal testing, and integrating dApps)
 
 // To Understand Better:
 // 1. The lock system (and look for any gas optimizations / ways to reduce lock actions)

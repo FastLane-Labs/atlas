@@ -102,7 +102,7 @@ contract Sorter {
             return false;
         }
 
-        // Make sure that the solver has the correct codehash for protocol control contract
+        // Make sure that the solver has the correct codehash for dApp control contract
         if (dConfig.to.codehash != solverOp.call.controlCodeHash) {
             return false;
         }

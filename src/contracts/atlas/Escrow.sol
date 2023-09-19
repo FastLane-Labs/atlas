@@ -251,7 +251,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
         address environment,
         bytes32 lockBytes
     ) internal {
-        // process protocol payments
+        // process dApp payments
         bool success;
         bytes memory data = abi.encodeWithSelector(IExecutionEnvironment.allocateRewards.selector, winningBids, returnData);
         data = abi.encodePacked(data, lockBytes);
@@ -502,7 +502,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
         }
 
         if (gasWaterMark < EscrowBits.VALIDATION_GAS_LIMIT + EscrowBits.SOLVER_GAS_LIMIT) {
-            // Make sure to leave enough gas for protocol validation calls
+            // Make sure to leave enough gas for dApp validation calls
             result |= 1 << uint256(SolverOutcome.UserOutOfGas);
         }
 

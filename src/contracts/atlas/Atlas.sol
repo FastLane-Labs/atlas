@@ -35,7 +35,7 @@ contract Atlas is Test, Factory {
 
         uint256 gasMarker = gasleft();
 
-        // Verify that the calldata injection came from the protocol frontend
+        // Verify that the calldata injection came from the dApp frontend
         // and that the signatures are valid. 
         bool valid = true;
         

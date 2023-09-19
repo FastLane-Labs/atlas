@@ -14,8 +14,8 @@ abstract contract GovernanceControl {
     }
 
     string internal constant _NOT_IMPLEMENTED = "NOT IMPLEMENTED";
-    // Virtual functions to be overridden by participating protocol governance
-    // (not FastLane) prior to deploying contract. Note that protocol governance
+    // Virtual functions to be overridden by participating dApp governance
+    // (not FastLane) prior to deploying contract. Note that dApp governance
     // will "own" this contract but that it should be immutable.
 
     /////////////////////////////////////////////////////////

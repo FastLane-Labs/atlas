@@ -32,7 +32,7 @@ struct SolverCall {
     uint256 value;
     uint256 gas;
     uint256 nonce;
-    uint256 maxFeePerGas; // maxFeePerGas solver is willing to pay.  This goes to validator, not protocol or user
+    uint256 maxFeePerGas; // maxFeePerGas solver is willing to pay.  This goes to validator, not dApp or user
     bytes32 userOpHash; // hash of user EOA and calldata, for verification of user's tx (if not matched, solver wont be charged for gas)
     bytes32 controlCodeHash; // DAppControl.codehash
     bytes32 bidsHash; // solver's backend must keccak256() their BidData array and include that in the signed meta tx, which we then verify on chain.
