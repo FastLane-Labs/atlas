@@ -205,36 +205,36 @@ contract MainTest is BaseTest {
     }
     */
 
-    function testTestSearcherCalls() public {
+    function testTestSolverCalls() public {
         uint8 v;
         bytes32 r;
         bytes32 s;
 
         // Test 1, must return true
-        ProtocolCall memory protocolCall = helper.getProtocolCall();
-        UserCall memory userCall = helper.buildUserCall(POOL_ONE, userEOA, TOKEN_ONE);
-        (v, r, s) = vm.sign(userPK, IAtlas(address(atlas)).getUserCallPayload(userCall));
-        userCall.signature = abi.encodePacked(r, s, v);
-        SearcherCall[] memory searcherCalls = new SearcherCall[](1);
-        bytes memory searcherCallData = helper.buildV2SearcherCallData(POOL_TWO, POOL_ONE);
-        searcherCalls[0] = helper.buildSearcherCall(
-            userCall, protocolCall, searcherCallData, searcherOneEOA, address(searcherOne), 2e17
+        DAppConfig memory dConfig = helper.getDAppConfig();
+        UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, userEOA, TOKEN_ONE);
+        (v, r, s) = vm.sign(userPK, IAtlas(address(atlas)).getUserOperationPayload(userOp));
+        userOp.signature = abi.encodePacked(r, s, v);
+        SolverOperation[] memory solverOps = new SolverOperation[](1);
+        bytes memory solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_ONE);
+        solverOps[0] = helper.buildSolverOperation(
+            userOp, dConfig, solverOpData, solverOneEOA, address(solverOne), 2e17
         );
-        (v, r, s) = vm.sign(searcherOnePK, IAtlas(address(atlas)).getSearcherPayload(searcherCalls[0].metaTx));
-        searcherCalls[0].signature = abi.encodePacked(r, s, v);
+        (v, r, s) = vm.sign(solverOnePK, IAtlas(address(atlas)).getSolverPayload(solverOps[0].call));
+        solverOps[0].signature = abi.encodePacked(r, s, v);
         // Verification call
         Verification memory verification =
-            helper.buildVerification(governanceEOA, protocolCall, userCall, searcherCalls);
+            helper.buildVerification(governanceEOA, dConfig, userOp, solverOps);
         (v, r, s) = vm.sign(governancePK, IAtlas(address(atlas)).getVerificationPayload(verification));
         verification.signature = abi.encodePacked(r, s, v);
         vm.startPrank(userEOA);
-        address executionEnvironment = IAtlas(address(atlas)).createExecutionEnvironment(protocolCall);
+        address executionEnvironment = IAtlas(address(atlas)).createExecutionEnvironment(dConfig);
         vm.label(address(executionEnvironment), "EXECUTION ENV");
         ERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
         ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
         (bool success, bytes memory data) = address(atlas).call(
             abi.encodeWithSelector(
-                atlas.testSearcherCalls.selector, protocolCall, userCall, searcherCalls, verification
+                atlas.testSolverCalls.selector, dConfig, userOp, solverOps, verification
             )
         );
         assertTrue(success);
@@ -242,14 +242,14 @@ contract MainTest is BaseTest {
         vm.stopPrank();
 
         // Test2, must return false
-        searcherCallData = helper.buildV2SearcherCallData(POOL_TWO, POOL_TWO); // this will make the searcherTx revert
-        searcherCalls[0] = helper.buildSearcherCall(
-            userCall, protocolCall, searcherCallData, searcherOneEOA, address(searcherOne), 2e17
+        solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_TWO); // this will make the searcherTx revert
+        solverOps[0] = helper.buildSolverOperation(
+            userOp, dConfig, solverOpData, solverOneEOA, address(solverOne), 2e17
         );
-        (v, r, s) = vm.sign(searcherOnePK, IAtlas(address(atlas)).getSearcherPayload(searcherCalls[0].metaTx));
-        searcherCalls[0].signature = abi.encodePacked(r, s, v);
+        (v, r, s) = vm.sign(solverOnePK, IAtlas(address(atlas)).getSolverPayload(solverOps[0].call));
+        solverOps[0].signature = abi.encodePacked(r, s, v);
         // Verification call
-        verification = helper.buildVerification(governanceEOA, protocolCall, userCall, searcherCalls);
+        verification = helper.buildVerification(governanceEOA, dConfig, userOp, solverOps);
         (v, r, s) = vm.sign(governancePK, IAtlas(address(atlas)).getVerificationPayload(verification));
         verification.signature = abi.encodePacked(r, s, v);
         vm.startPrank(userEOA);
@@ -258,7 +258,7 @@ contract MainTest is BaseTest {
         ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
         (success, data) = address(atlas).call(
             abi.encodeWithSelector(
-                atlas.testSearcherCalls.selector, protocolCall, userCall, searcherCalls, verification
+                atlas.testSolverCalls.selector, dConfig, userOp, solverOps, verification
             )
         );
         assertTrue(success);
