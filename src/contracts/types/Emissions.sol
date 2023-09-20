@@ -17,7 +17,7 @@ contract FastLaneErrorsEvents {
     event UserTxResult(address indexed user, uint256 valueReturned, uint256 gasRefunded);
 
     event MEVPaymentFailure(
-        address indexed controller, uint16 callConfig, BidData[] winningBids
+        address indexed controller, uint32 callConfig, BidData[] winningBids
     );
 
 

@@ -16,7 +16,7 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
     address public immutable escrow;
     address public immutable governance;
     address public immutable control;
-    uint16 public immutable callConfig;
+    uint32 public immutable callConfig;
 
     constructor(
         address _escrow,

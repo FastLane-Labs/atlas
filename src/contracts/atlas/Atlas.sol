@@ -17,7 +17,7 @@ import "forge-std/Test.sol";
 
 contract Atlas is Test, Factory {
     using CallVerification for UserCall;
-    using CallBits for uint16;
+    using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
     constructor(uint32 _escrowDuration) Factory(_escrowDuration) {}
@@ -123,7 +123,7 @@ contract Atlas is Test, Factory {
        
         bytes32 userOpHash = uCall.getUserOperationHash();
 
-        uint16 callConfig = CallBits.buildCallConfig(uCall.control);
+        uint32 callConfig = CallBits.buildCallConfig(uCall.control);
 
         // Initialize the locks
         EscrowKey memory key = _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length));
@@ -194,21 +194,21 @@ contract Atlas is Test, Factory {
 
     function testUserOperation(UserCall calldata uCall) external view returns (bool) {
         address control = uCall.control;
-        uint16 callConfig = CallBits.buildCallConfig(control);
+        uint32 callConfig = CallBits.buildCallConfig(control);
         return _testUserOperation(uCall, control, callConfig);
     }
 
     function testUserOperation(UserOperation calldata userOp) external view returns (bool) {
         if (userOp.to != address(this)) {return false;}
         address control = userOp.call.control;
-        uint16 callConfig = CallBits.buildCallConfig(control);
+        uint32 callConfig = CallBits.buildCallConfig(control);
 
         DAppConfig memory dConfig = DAppConfig(userOp.call.control, callConfig);
 
         return _validateUser(dConfig, userOp) && _testUserOperation(userOp.call, control, callConfig);
     }
 
-    function _testUserOperation(UserCall calldata uCall, address control, uint16 callConfig) internal view returns (bool) {
+    function _testUserOperation(UserCall calldata uCall, address control, uint32 callConfig) internal view returns (bool) {
         if (callConfig == 0) {
             return false;
         }

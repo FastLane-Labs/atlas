@@ -43,7 +43,7 @@ contract Mimic {
                 msg.data,
                 address(0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB),
                 address(0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC),
-                uint16(0x2222),
+                uint32(0x22222222),
                 bytes32(uint256(0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee))
             )
         );

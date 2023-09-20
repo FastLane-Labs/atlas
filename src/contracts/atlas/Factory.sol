@@ -22,7 +22,7 @@ contract Factory is Test, Escrow, Permit69 {
         salt = keccak256(abi.encodePacked(block.chainid, atlas, "Atlas 1.0"));
 
         execution =
-            _deployExecutionEnvironmentTemplate(address(this), DAppConfig({to: address(0), callConfig: uint16(0)}));
+            _deployExecutionEnvironmentTemplate(address(this), DAppConfig({to: address(0), callConfig: uint32(0)}));
     }
 
     // GETTERS
@@ -54,7 +54,7 @@ contract Factory is Test, Escrow, Permit69 {
 
     // NOTE: This func is used to generate the address of user ExecutionEnvironments that have
     // been deprecated due to DAppControl changes of callConfig.
-    function _getExecutionEnvironmentCustom(address user, bytes32 controlCodeHash, address controller, uint16 callConfig)
+    function _getExecutionEnvironmentCustom(address user, bytes32 controlCodeHash, address controller, uint32 callConfig)
         internal
         view
         override
@@ -122,7 +122,7 @@ contract Factory is Test, Escrow, Permit69 {
 
     function _getMimicCreationCode(
         address controller,
-        uint16 callConfig,
+        uint32 callConfig,
         address executionLib,
         address user,
         bytes32 controlCodeHash
@@ -134,9 +134,18 @@ contract Factory is Test, Escrow, Permit69 {
             mstore(add(creationCode, 131), add(shl(96, user), 0x73ffffffffffffffffffffff))
             mstore(
                 add(creationCode, 152),
-                add(shl(96, controller), add(add(shl(88, 0x61), shl(72, callConfig)), 0x7f0000000000000000))
+                add(
+                    shl(96, controller), 
+                    add(
+                        add(
+                            shl(88, 0x63), 
+                            shl(56, callConfig)
+                        ), 
+                        0x7f000000000000
+                    )
+                )
             )
-            mstore(add(creationCode, 176), controlCodeHash)
+            mstore(add(creationCode, 178), controlCodeHash)
         }
     }
 }

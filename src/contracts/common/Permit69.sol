@@ -39,7 +39,7 @@ abstract contract Permit69 {
         address user,
         bytes32 controlCodeHash,
         address controller,
-        uint16 callConfig
+        uint32 callConfig
     ) internal view virtual returns (address environment);
 
     function environment() public view virtual returns (address);
@@ -51,7 +51,7 @@ abstract contract Permit69 {
         uint256 amount,
         address user,
         address controller,
-        uint16 callConfig,
+        uint32 callConfig,
         uint16 lockState
     ) external {
         // Verify that the caller is legitimate
@@ -75,7 +75,7 @@ abstract contract Permit69 {
         uint256 amount,
         address user,
         address controller,
-        uint16 callConfig,
+        uint32 callConfig,
         uint16 lockState
     ) external {
         // Verify that the caller is legitimate
@@ -94,7 +94,7 @@ abstract contract Permit69 {
     function _verifyCallerIsExecutionEnv(
         address user,
         address controller,
-        uint16 callConfig
+        uint32 callConfig
     ) internal view {
         require(
             msg.sender == _getExecutionEnvironmentCustom(user, controller.codehash, controller, callConfig),

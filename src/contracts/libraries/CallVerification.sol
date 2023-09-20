@@ -21,7 +21,7 @@ library CallVerification {
     ) internal pure returns (bytes32 callSequenceHash) {
         
         uint256 i;
-        if (dConfig.callConfig & 1 << uint16(CallConfigIndex.RequirePreOps) != 0) {
+        if (dConfig.callConfig & 1 << uint32(CallConfigIndex.RequirePreOps) != 0) {
             // Start with preOps call if preOps is needed
             callSequenceHash = keccak256(
                 abi.encodePacked(

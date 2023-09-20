@@ -18,7 +18,7 @@ interface IPermit69 {
         uint256 amount,
         address user, 
         address controller,
-        uint16 callConfig,
+        uint32 callConfig,
         uint16 lockState
     ) external;
 
@@ -28,7 +28,7 @@ interface IPermit69 {
         uint256 amount,
         address user, 
         address controller,
-        uint16 callConfig,
+        uint32 callConfig,
         uint16 lockState
     ) external;
 }
