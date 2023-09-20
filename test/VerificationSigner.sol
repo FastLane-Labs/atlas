@@ -6,7 +6,7 @@ import {IAtlas} from "../src/contracts/interfaces/IAtlas.sol";
 import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 
-import {ProtocolVerifier} from "../src/contracts/atlas/ProtocolVerification.sol";
+import {DAppVerification} from "../src/contracts/atlas/DAppVerification.sol";
 
 import "../src/contracts/types/VerificationTypes.sol";
 
@@ -16,7 +16,7 @@ import {CallVerification} from "../src/contracts/libraries/CallVerification.sol"
 
 import "forge-std/Test.sol";
 
-contract VerificationSigner is Test, TestConstants, ProtocolVerifier {
+contract VerificationSigner is Test, TestConstants, DAppVerification {
     function signVerification(Verification memory verification, address atlas, uint256 privateKey)
         public
         view

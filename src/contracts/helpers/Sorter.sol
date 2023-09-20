@@ -1,0 +1,198 @@
+//SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.16;
+
+import {IEscrow} from "../interfaces/IEscrow.sol";
+import {IDAppControl} from "../interfaces/IDAppControl.sol";
+
+import "../types/CallTypes.sol";
+
+import {CallVerification} from "../libraries/CallVerification.sol";
+
+import "forge-std/Test.sol";
+
+contract Sorter {
+
+    address immutable public atlas;
+    address immutable public escrow;
+
+    constructor(address _atlas, address _escrow) {
+        atlas = _atlas;
+        escrow = _escrow;
+    }
+
+    struct SortingData {
+        uint256 amount;
+        bool valid;
+    }
+
+    function sortBids(
+        UserOperation calldata userOp, 
+        SolverOperation[] calldata solverOps
+    ) external view returns (SolverOperation[] memory) {
+
+        DAppConfig memory dConfig = IDAppControl(userOp.call.control).getDAppConfig();
+
+        uint256 count = solverOps.length;
+
+        (SortingData[] memory sortingData, uint256 invalid) = _getSortingData(
+            dConfig, userOp, solverOps, count);
+
+        uint256[] memory sorted = _sort(sortingData, count, invalid);
+
+        SolverOperation[] memory solverOpsSorted = new SolverOperation[](count - invalid);
+
+        count -= invalid;
+        uint256 i = 0;
+
+        for (;i<count;) {
+            solverOpsSorted[i] = solverOps[sorted[i]];
+            unchecked { ++i; }
+        }
+
+        return solverOpsSorted;
+    }
+
+    function _verifyBidFormat(
+        BidData[] memory bidFormat, 
+        SolverOperation calldata solverOp
+    ) internal pure returns (bool) {
+        uint256 count = bidFormat.length;
+        if (solverOp.bids.length != count) {
+            return false;
+        }
+
+        uint256 i;
+        for (;i<count;) {
+            if (solverOp.bids[i].token != bidFormat[i].token) {
+                return false;
+            }
+            unchecked{ ++i; }
+        }
+        return true;
+    }
+
+    function _verifySolverEligibility(
+        DAppConfig memory dConfig,
+        UserCall calldata uCall, 
+        SolverOperation calldata solverOp
+    ) internal view returns (bool) {
+        // Verify that the solver submitted the correct callhash
+        bytes32 userOpHash = CallVerification.getUserOperationHash(uCall);
+        if (solverOp.call.userOpHash != userOpHash) {
+            return false;
+        }
+
+        // Make sure the solver has enough funds escrowed
+        // TODO: subtract any pending withdrawals
+        uint256 solverBalance = IEscrow(escrow).solverEscrowBalance(solverOp.call.from);
+        if (solverBalance < solverOp.call.maxFeePerGas * solverOp.call.gas) {
+            return false;
+        }
+
+        // Solvers can only do one tx per block - this prevents double counting escrow balances.
+        // TODO: Add in "targetBlockNumber" as an arg?
+        uint256 solverLastActiveBlock = IEscrow(escrow).solverLastActiveBlock(solverOp.call.from);
+        if (solverLastActiveBlock >= block.number) {
+            return false;
+        }
+
+        // Make sure the solver nonce is accurate
+        uint256 nextSolverNonce = IEscrow(escrow).nextSolverNonce(solverOp.call.from);
+        if (nextSolverNonce != solverOp.call.nonce) {
+            return false;
+        }
+
+        // Make sure that the solver has the correct codehash for dApp control contract
+        if (dConfig.to.codehash != solverOp.call.controlCodeHash) {
+            return false;
+        }
+
+        // Make sure that the solver's maxFeePerGas matches or exceeds the user's
+        if (solverOp.call.maxFeePerGas < uCall.maxFeePerGas) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function _getSortingData(
+        DAppConfig memory dConfig, 
+        UserOperation calldata userOp, 
+        SolverOperation[] calldata solverOps,
+        uint256 count
+    ) internal view returns (SortingData[] memory, uint256){
+
+        BidData[] memory bidFormat = IDAppControl(dConfig.to).getBidFormat(userOp.call);
+
+        SortingData[] memory sortingData = new SortingData[](count);
+
+        uint256 i;
+        uint256 invalid;
+        for (;i<count;) {
+            if (
+                _verifyBidFormat(bidFormat, solverOps[i]) && 
+                _verifySolverEligibility(dConfig, userOp.call, solverOps[i])
+            ) {
+                sortingData[i] = SortingData({
+                    amount: IDAppControl(dConfig.to).getBidValue(solverOps[i]),
+                    valid: true
+                });
+                
+
+            } else {
+                sortingData[i] = SortingData({
+                    amount: 0,
+                    valid: false
+                });
+                unchecked{ ++invalid; }
+            }
+            unchecked{ ++i; }            
+        }
+
+        return (sortingData, invalid);
+    }
+
+    function _sort(
+        SortingData[] memory sortingData,
+        uint256 count,
+        uint256 invalid
+    ) internal pure returns (uint256[] memory) {
+
+        uint256[] memory sorted = new uint256[](count - invalid);
+
+        uint256 n; // outer loop counter
+        uint256 i; // inner loop counter
+
+        uint256 topBid;
+        uint256 bottomBid;
+
+        for (;invalid<count;) {
+
+            // Reset the ceiling / floor
+            topBid = 0;
+            bottomBid = type(uint256).max;
+
+            // Loop through and find the highest and lowest remaining valid bids
+            for(;i<sortingData.length;) {
+                if (sortingData[i].valid) {
+                    if (sortingData[i].amount > topBid) {
+                        sorted[n] = i;
+                    }
+                    if (sortingData[i].amount < bottomBid) {
+                        sorted[count-1-n] = i;
+                    }
+                }
+                unchecked {++i;}
+            }
+
+            // Mark the lowest & highest bids invalid (Used)
+            sortingData[sorted[n]].valid = false;
+            sortingData[sorted[count-1-n]].valid = false;
+
+            unchecked { invalid +=2; }
+            unchecked { ++n; }
+        }
+
+        return sorted;
+    }
+}
