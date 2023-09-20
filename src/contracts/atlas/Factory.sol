@@ -1,12 +1,12 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import {IProtocolControl} from "../interfaces/IProtocolControl.sol";
+import {IDAppControl} from "../interfaces/IDAppControl.sol";
 
 import {Escrow} from "./Escrow.sol";
 import {Mimic} from "./Mimic.sol";
 import {ExecutionEnvironment} from "./ExecutionEnvironment.sol";
-import {Permit69} from "./Permit69.sol";
+import {Permit69} from "../common/Permit69.sol";
 
 import "../types/CallTypes.sol";
 
@@ -22,7 +22,7 @@ contract Factory is Test, Escrow, Permit69 {
         salt = keccak256(abi.encodePacked(block.chainid, atlas, "Atlas 1.0"));
 
         execution =
-            _deployExecutionEnvironmentTemplate(address(this), ProtocolCall({to: address(0), callConfig: uint16(0)}));
+            _deployExecutionEnvironmentTemplate(address(this), DAppConfig({to: address(0), callConfig: uint32(0)}));
     }
 
     // GETTERS
@@ -34,27 +34,27 @@ contract Factory is Test, Escrow, Permit69 {
         escrowAddress = atlas;
     }
 
-    function getExecutionEnvironment(UserCall calldata userCall, address protocolControl)
+    function getExecutionEnvironment(UserOperation calldata userOp, address controller)
         external
         view
         returns (address executionEnvironment)
     {
-        executionEnvironment = _getExecutionEnvironment(userCall.metaTx.from, protocolControl.codehash, protocolControl);
+        executionEnvironment = _getExecutionEnvironment(userOp.call.from, controller.codehash, controller);
     }
 
-    function _getExecutionEnvironment(address user, bytes32 controlCodeHash, address protocolControl)
+    function _getExecutionEnvironment(address user, bytes32 controlCodeHash, address controller)
         internal
         view
         returns (address executionEnvironment)
     {
-        ProtocolCall memory protocolCall = IProtocolControl(protocolControl).getProtocolCall();
+        DAppConfig memory dConfig = IDAppControl(controller).getDAppConfig();
         
-        executionEnvironment = _getExecutionEnvironmentCustom(user, controlCodeHash, protocolCall.to, protocolCall.callConfig);
+        executionEnvironment = _getExecutionEnvironmentCustom(user, controlCodeHash, dConfig.to, dConfig.callConfig);
     }
 
     // NOTE: This func is used to generate the address of user ExecutionEnvironments that have
-    // been deprecated due to ProtocolControl changes of callConfig.
-    function _getExecutionEnvironmentCustom(address user, bytes32 controlCodeHash, address protocolControl, uint16 callConfig)
+    // been deprecated due to DAppControl changes of callConfig.
+    function _getExecutionEnvironmentCustom(address user, bytes32 controlCodeHash, address controller, uint32 callConfig)
         internal
         view
         override
@@ -71,7 +71,7 @@ contract Factory is Test, Escrow, Permit69 {
                             keccak256(
                                 abi.encodePacked(
                                     _getMimicCreationCode(
-                                        protocolControl, callConfig, execution, user, controlCodeHash
+                                        controller, callConfig, execution, user, controlCodeHash
                                     )
                                 )
                             )
@@ -82,12 +82,12 @@ contract Factory is Test, Escrow, Permit69 {
         );
     }
 
-    function _setExecutionEnvironment(ProtocolCall calldata protocolCall, address user, bytes32 controlCodeHash)
+    function _setExecutionEnvironment(DAppConfig calldata dConfig, address user, bytes32 controlCodeHash)
         internal
         returns (address executionEnvironment)
     {
         bytes memory creationCode =
-            _getMimicCreationCode(protocolCall.to, protocolCall.callConfig, execution, user, controlCodeHash);
+            _getMimicCreationCode(dConfig.to, dConfig.callConfig, execution, user, controlCodeHash);
 
         executionEnvironment = address(
             uint160(
@@ -112,7 +112,7 @@ contract Factory is Test, Escrow, Permit69 {
         }
     }
 
-    function _deployExecutionEnvironmentTemplate(address, ProtocolCall memory) internal returns (address executionEnvironment) {
+    function _deployExecutionEnvironmentTemplate(address, DAppConfig memory) internal returns (address executionEnvironment) {
         ExecutionEnvironment _environment = new ExecutionEnvironment{
             salt: salt
         }(atlas);
@@ -121,8 +121,8 @@ contract Factory is Test, Escrow, Permit69 {
     }
 
     function _getMimicCreationCode(
-        address protocolControl,
-        uint16 callConfig,
+        address controller,
+        uint32 callConfig,
         address executionLib,
         address user,
         bytes32 controlCodeHash
@@ -134,9 +134,18 @@ contract Factory is Test, Escrow, Permit69 {
             mstore(add(creationCode, 131), add(shl(96, user), 0x73ffffffffffffffffffffff))
             mstore(
                 add(creationCode, 152),
-                add(shl(96, protocolControl), add(add(shl(88, 0x61), shl(72, callConfig)), 0x7f0000000000000000))
+                add(
+                    shl(96, controller), 
+                    add(
+                        add(
+                            shl(88, 0x63), 
+                            shl(56, callConfig)
+                        ), 
+                        0x7f000000000000
+                    )
+                )
             )
-            mstore(add(creationCode, 176), controlCodeHash)
+            mstore(add(creationCode, 178), controlCodeHash)
         }
     }
 }

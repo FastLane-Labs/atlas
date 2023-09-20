@@ -5,7 +5,7 @@ import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
 
 import {Factory} from "./Factory.sol";
 
-import {FastLaneErrorsEvents} from "./Emissions.sol";
+import {FastLaneErrorsEvents} from "../types/Emissions.sol";
 
 import "../types/CallTypes.sol";
 import "../types/LockTypes.sol";
@@ -18,53 +18,53 @@ import {SafetyBits} from "../libraries/SafetyBits.sol";
 import "forge-std/Test.sol";
 
 contract Atlas is Test, Factory {
-    using CallVerification for UserMetaTx;
-    using CallBits for uint16;
+    using CallVerification for UserCall;
+    using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
     constructor(uint32 _escrowDuration) Factory(_escrowDuration) {}
 
-    function createExecutionEnvironment(ProtocolCall calldata protocolCall) external returns (address executionEnvironment) {
-        executionEnvironment = _setExecutionEnvironment(protocolCall, msg.sender, protocolCall.to.codehash);
+    function createExecutionEnvironment(DAppConfig calldata dConfig) external returns (address executionEnvironment) {
+        executionEnvironment = _setExecutionEnvironment(dConfig, msg.sender, dConfig.to.codehash);
     }
 
     function metacall(
-        ProtocolCall calldata protocolCall, // supplied by frontend
-        UserCall calldata userCall, // set by user
-        SearcherCall[] calldata searcherCalls, // supplied by FastLane via frontend integration
+        DAppConfig calldata dConfig, // supplied by frontend
+        UserOperation calldata userOp, // set by user
+        SolverOperation[] calldata solverOps, // supplied by FastLane via frontend integration
         Verification calldata verification // supplied by front end after it sees the other data
     ) public payable returns (bool auctionWon) {
 
         uint256 gasMarker = gasleft();
 
-        // Verify that the calldata injection came from the protocol frontend
+        // Verify that the calldata injection came from the dApp frontend
         // and that the signatures are valid. 
         bool valid = true;
         
         // Only verify signatures of meta txs if the original signer isn't the bundler
         // TODO: Consider extra reentrancy defense here?
-        if (verification.proof.from != msg.sender && !_verifyProtocol(userCall.metaTx.to, protocolCall, verification)) {
+        if (verification.proof.from != msg.sender && !_verifyDApp(userOp.call.to, dConfig, verification)) {
             valid = false;
         }
         
-        if (userCall.metaTx.from != msg.sender && !_verifyUser(protocolCall, userCall)) { 
+        if (userOp.call.from != msg.sender && !_verifyUser(dConfig, userOp)) { 
             valid = false; 
         }
 
-        // TODO: Add optionality to bypass ProtocolControl signatures if user can fully bundle tx
+        // TODO: Add optionality to bypass DAppControl signatures if user can fully bundle tx
 
         // Get the execution environment
-        address executionEnvironment = _getExecutionEnvironmentCustom(userCall.metaTx.from, verification.proof.controlCodeHash, protocolCall.to, protocolCall.callConfig);
+        address executionEnvironment = _getExecutionEnvironmentCustom(userOp.call.from, verification.proof.controlCodeHash, dConfig.to, dConfig.callConfig);
 
         // Check that the value of the tx is greater than or equal to the value specified
-        if (msg.value < userCall.metaTx.value) { valid = false; }
+        if (msg.value < userOp.call.value) { valid = false; }
         //if (msg.sender != tx.origin) { valid = false; }
-        if (searcherCalls.length >= type(uint8).max - 1) { valid = false; }
-        if (block.number > userCall.metaTx.deadline || block.number > verification.proof.deadline) { valid = false; }
-        if (tx.gasprice > userCall.metaTx.maxFeePerGas) { valid = false; }
+        if (solverOps.length >= type(uint8).max - 1) { valid = false; }
+        if (block.number > userOp.call.deadline || block.number > verification.proof.deadline) { valid = false; }
+        if (tx.gasprice > userOp.call.maxFeePerGas) { valid = false; }
         if (executionEnvironment.codehash == bytes32(0)) { valid = false; }
-        if (!protocolCall.callConfig.allowsZeroSearchers() || protocolCall.callConfig.needsSearcherPostCall()) {
-            if (searcherCalls.length == 0) { valid = false; }
+        if (!dConfig.callConfig.allowsZeroSolvers() || dConfig.callConfig.needsSolverPostCall()) {
+            if (solverOps.length == 0) { valid = false; }
         }
         // TODO: More checks 
 
@@ -77,16 +77,16 @@ contract Atlas is Test, Factory {
         // Initialize the lock
         _initializeEscrowLock(executionEnvironment);
 
-        try this.execute{value: msg.value}(protocolCall, userCall.metaTx, searcherCalls, executionEnvironment, verification.proof.callChainHash) 
+        try this.execute{value: msg.value}(dConfig, userOp.call, solverOps, executionEnvironment, verification.proof.callChainHash) 
             returns (bool _auctionWon, uint256 accruedGasRebate) {
             console.log("accruedGasRebate",accruedGasRebate);
             auctionWon = _auctionWon;
             // Gas Refund to sender only if execution is successful
-            _executeGasRefund(gasMarker, accruedGasRebate, userCall.metaTx.from);
+            _executeGasRefund(gasMarker, accruedGasRebate, userOp.call.from);
 
         } catch {
-            // TODO: This portion needs more nuanced logic to prevent the replay of failed searcher txs
-            if (protocolCall.callConfig.allowsReuseUserOps()) {
+            // TODO: This portion needs more nuanced logic to prevent the replay of failed solver txs
+            if (dConfig.callConfig.allowsReuseUserOps()) {
                 revert("ERR-F07 RevertToReuse");
             }
         }
@@ -98,9 +98,9 @@ contract Atlas is Test, Factory {
     }
 
     function execute(
-        ProtocolCall calldata protocolCall,
-        UserMetaTx calldata userMetaTx,
-        SearcherCall[] calldata searcherCalls,
+        DAppConfig calldata dConfig,
+        UserCall calldata uCall,
+        SolverOperation[] calldata solverOps,
         address executionEnvironment,
         bytes32 callChainHash
     ) external payable returns (bool auctionWon, uint256 accruedGasRebate) {
@@ -109,40 +109,40 @@ contract Atlas is Test, Factory {
         require(msg.sender == address(this), "ERR-F06 InvalidAccess");
         
         // verify the call sequence
-        require(callChainHash == CallVerification.getCallChainHash(protocolCall, userMetaTx, searcherCalls), "ERR-F07 InvalidSequence");
+        require(callChainHash == CallVerification.getCallChainHash(dConfig, uCall, solverOps), "ERR-F07 InvalidSequence");
         }
         // Begin execution
-        (auctionWon, accruedGasRebate) = _execute(protocolCall, userMetaTx, searcherCalls, executionEnvironment);
+        (auctionWon, accruedGasRebate) = _execute(dConfig, uCall, solverOps, executionEnvironment);
     }
 
     function _execute(
-        ProtocolCall calldata protocolCall,
-        UserMetaTx calldata userMetaTx,
-        SearcherCall[] calldata searcherCalls,
+        DAppConfig calldata dConfig,
+        UserCall calldata uCall,
+        SolverOperation[] calldata solverOps,
         address executionEnvironment
     ) internal returns (bool auctionWon, uint256 accruedGasRebate) {
         // Build the CallChainProof.  The penultimate hash will be used
-        // to verify against the hash supplied by ProtocolControl
+        // to verify against the hash supplied by DAppControl
        
-        bytes32 userCallHash = userMetaTx.getUserCallHash();
+        bytes32 userOpHash = uCall.getUserOperationHash();
 
-        uint16 callConfig = CallBits.buildCallConfig(userMetaTx.control);
+        uint32 callConfig = CallBits.buildCallConfig(uCall.control);
 
         // Initialize the locks
-        EscrowKey memory key = _buildEscrowLock(protocolCall, executionEnvironment, uint8(searcherCalls.length));
+        EscrowKey memory key = _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length));
 
-        bytes memory stagingReturnData;
-        if (protocolCall.callConfig.needsStagingCall()) {
-            key = key.holdStagingLock(protocolCall.to);
-            stagingReturnData = _executeStagingCall(userMetaTx, executionEnvironment, key.pack());
+        bytes memory preOpsReturnData;
+        if (dConfig.callConfig.needsPreOpsCall()) {
+            key = key.holdPreOpsLock(dConfig.to);
+            preOpsReturnData = _executePreOpsCall(uCall, executionEnvironment, key.pack());
         }
 
-        key = key.holdUserLock(userMetaTx.to);
-        bytes memory userReturnData = _executeUserCall(userMetaTx, executionEnvironment, key.pack());
+        key = key.holdUserLock(uCall.to);
+        bytes memory userReturnData = _executeUserOperation(uCall, executionEnvironment, key.pack());
 
         bytes memory returnData;
-        if (CallBits.needsStagingReturnData(callConfig)) {
-            returnData = stagingReturnData;
+        if (CallBits.needsPreOpsReturnData(callConfig)) {
+            returnData = preOpsReturnData;
         }
         if (CallBits.needsUserReturnData(callConfig)) {
             returnData = bytes.concat(returnData, userReturnData);
@@ -150,10 +150,10 @@ contract Atlas is Test, Factory {
 
         for (; key.callIndex < key.callMax - 1;) {
 
-            // Only execute searcher meta tx if userCallHash matches 
-            if (!auctionWon && userCallHash == searcherCalls[key.callIndex-2].metaTx.userCallHash) {
-                (auctionWon, key) = _searcherExecutionIteration(
-                        protocolCall, searcherCalls[key.callIndex-2], returnData, auctionWon, executionEnvironment, key
+            // Only execute solver meta tx if userOpHash matches 
+            if (!auctionWon && userOpHash == solverOps[key.callIndex-2].call.userOpHash) {
+                (auctionWon, key) = _solverExecutionIteration(
+                        dConfig, solverOps[key.callIndex-2], returnData, auctionWon, executionEnvironment, key
                     );
             }
 
@@ -162,90 +162,90 @@ contract Atlas is Test, Factory {
             }
         }
 
-        // If no searcher was successful, manually transition the lock
+        // If no solver was successful, manually transition the lock
         if (!auctionWon) {
-            if (protocolCall.callConfig.needsSearcherPostCall()) {
+            if (dConfig.callConfig.needsSolverPostCall()) {
                 revert UserNotFulfilled();
             }
-            key = key.setAllSearchersFailed();
+            key = key.setAllSolversFailed();
         }
 
-        if (protocolCall.callConfig.needsVerificationCall()) {
+        if (dConfig.callConfig.needsPostOpsCall()) {
             key = key.holdVerificationLock(address(this));
-            _executeVerificationCall(returnData, executionEnvironment, key.pack());
+            _executePostOpsCall(returnData, executionEnvironment, key.pack());
         }
         return (auctionWon, uint256(key.gasRefund));
     }
 
-    function _searcherExecutionIteration(
-        ProtocolCall calldata protocolCall,
-        SearcherCall calldata searcherCall,
+    function _solverExecutionIteration(
+        DAppConfig calldata dConfig,
+        SolverOperation calldata solverOp,
         bytes memory returnData,
         bool auctionWon,
         address executionEnvironment,
         EscrowKey memory key
     ) internal returns (bool, EscrowKey memory) {
-        (auctionWon, key) = _executeSearcherCall(searcherCall, returnData, executionEnvironment, key);
+        (auctionWon, key) = _executeSolverOperation(solverOp, returnData, executionEnvironment, key);
         if (auctionWon) {
-            _executePayments(protocolCall, searcherCall.bids, returnData, executionEnvironment, key.pack());
+            _allocateValue(dConfig, solverOp.bids, returnData, executionEnvironment, key.pack());
             key = key.allocationComplete();
         }
         return (auctionWon, key);
     }
 
-    function testUserCall(UserMetaTx calldata userMetaTx) external view returns (bool) {
-        address control = userMetaTx.control;
-        uint16 callConfig = CallBits.buildCallConfig(control);
-        return _testUserCall(userMetaTx, control, callConfig);
+    function testUserOperation(UserCall calldata uCall) external view returns (bool) {
+        address control = uCall.control;
+        uint32 callConfig = CallBits.buildCallConfig(control);
+        return _testUserOperation(uCall, control, callConfig);
     }
 
-    function testUserCall(UserCall calldata userCall) external view returns (bool) {
-        if (userCall.to != address(this)) {return false;}
-        address control = userCall.metaTx.control;
-        uint16 callConfig = CallBits.buildCallConfig(control);
+    function testUserOperation(UserOperation calldata userOp) external view returns (bool) {
+        if (userOp.to != address(this)) {return false;}
+        address control = userOp.call.control;
+        uint32 callConfig = CallBits.buildCallConfig(control);
 
-        ProtocolCall memory protocolCall = ProtocolCall(userCall.metaTx.control, callConfig);
+        DAppConfig memory dConfig = DAppConfig(userOp.call.control, callConfig);
 
-        return _validateUser(protocolCall, userCall) && _testUserCall(userCall.metaTx, control, callConfig);
+        return _validateUser(dConfig, userOp) && _testUserOperation(userOp.call, control, callConfig);
     }
 
-    function _testUserCall(UserMetaTx calldata userMetaTx, address control, uint16 callConfig) internal view returns (bool) {
+    function _testUserOperation(UserCall calldata uCall, address control, uint32 callConfig) internal view returns (bool) {
         if (callConfig == 0) {
             return false;
         }
 
         address executionEnvironment = _getExecutionEnvironmentCustom(
-            userMetaTx.from, control.codehash, control, callConfig);
+            uCall.from, control.codehash, control, callConfig);
 
         if (executionEnvironment.codehash == bytes32(0) || control.codehash == bytes32(0)) {
             return false;
         } 
-        return IExecutionEnvironment(executionEnvironment).validateUserCall(userMetaTx);
+        return IExecutionEnvironment(executionEnvironment).validateUserOperation(uCall);
     }
 
     function metacallSimulation(
-        ProtocolCall calldata protocolCall,
-        UserCall calldata userCall,
-        SearcherCall[] calldata searcherCalls,
+        DAppConfig calldata dConfig,
+        UserOperation calldata userOp,
+        SolverOperation[] calldata solverOps,
         Verification calldata verification
     ) external payable {
-        if (!metacall(protocolCall, userCall, searcherCalls, verification)) {
+        if (!metacall(dConfig, userOp, solverOps, verification)) {
             revert NoAuctionWinner();
         }
         revert SimulationPassed();
     }
 
-    function testSearcherCalls(
-        ProtocolCall calldata protocolCall,
-        UserCall calldata userCall,
-        SearcherCall[] calldata searcherCalls,
+    function testSolverCalls(
+        DAppConfig calldata dConfig,
+        UserOperation calldata userOp,
+        SolverOperation[] calldata solverOps,
         Verification calldata verification
     ) external payable returns (bool auctionWon) {
-        if (searcherCalls.length == 0) {
+        if (solverOps.length == 0) {
             return false;
         }
 
-        try this.metacallSimulation{value: msg.value}(protocolCall, userCall, searcherCalls, verification) {}
+        try this.metacallSimulation{value: msg.value}(dConfig, userOp, solverOps, verification) {}
         catch (bytes memory revertData) {
             bytes4 errorSwitch = bytes4(revertData);
             if (errorSwitch == UserNotFulfilled.selector || errorSwitch == NoAuctionWinner.selector) {

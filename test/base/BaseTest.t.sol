@@ -4,14 +4,14 @@ pragma solidity ^0.8.18;
 import "forge-std/Test.sol";
 
 import {IEscrow} from "../../src/contracts/interfaces/IEscrow.sol";
-import {IProtocolIntegration} from "../../src/contracts/interfaces/IProtocolIntegration.sol";
+import {IDAppIntegration} from "../../src/contracts/interfaces/IDAppIntegration.sol";
 
 import {Atlas} from "../../src/contracts/atlas/Atlas.sol";
-import {Sorter} from "../../src/contracts/atlas/Sorter.sol";
+import {Sorter} from "../../src/contracts/helpers/Sorter.sol";
 
-import {Searcher} from "../searcher/src/TestSearcher.sol";
+import {Solver} from "src/contracts/solver/src/TestSolver.sol";
 
-import {V2ProtocolControl} from "../../src/contracts/v2-example/V2ProtocolControl.sol";
+import {V2DAppControl} from "../../src/contracts/examples/v2-example/V2DAppControl.sol";
 
 import {TestConstants} from "./TestConstants.sol";
 
@@ -25,11 +25,11 @@ contract BaseTest is Test, TestConstants {
     uint256 public governancePK = 11111;
     address public governanceEOA = vm.addr(governancePK);
 
-    uint256 public searcherOnePK = 22222;
-    address public searcherOneEOA = vm.addr(searcherOnePK);
+    uint256 public solverOnePK = 22222;
+    address public solverOneEOA = vm.addr(solverOnePK);
 
-    uint256 public searcherTwoPK = 33333;
-    address public searcherTwoEOA = vm.addr(searcherTwoPK);
+    uint256 public solverTwoPK = 33333;
+    address public solverTwoEOA = vm.addr(solverTwoPK);
 
     uint256 public userPK = 44444;
     address public userEOA = vm.addr(userPK);
@@ -39,10 +39,10 @@ contract BaseTest is Test, TestConstants {
 
     Sorter public sorter;
 
-    Searcher public searcherOne;
-    Searcher public searcherTwo;
+    Solver public solverOne;
+    Solver public solverTwo;
 
-    V2ProtocolControl public control;
+    V2DAppControl public control;
 
     V2Helper public helper;
 
@@ -69,36 +69,36 @@ contract BaseTest is Test, TestConstants {
         vm.stopPrank();
         vm.startPrank(governanceEOA);
 
-        control = new V2ProtocolControl(escrow);
+        control = new V2DAppControl(escrow);
         atlas.initializeGovernance(address(control));
-        atlas.integrateProtocol(address(control), V2_FXS_ETH);
-        atlas.integrateProtocol(address(control), S2_FXS_ETH);
+        atlas.integrateDApp(address(control), V2_FXS_ETH);
+        atlas.integrateDApp(address(control), S2_FXS_ETH);
 
         vm.stopPrank();
 
-        vm.deal(searcherOneEOA, 100e18);
+        vm.deal(solverOneEOA, 100e18);
 
-        vm.startPrank(searcherOneEOA);
+        vm.startPrank(solverOneEOA);
 
-        searcherOne = new Searcher(escrow, searcherOneEOA);
-        IEscrow(escrow).deposit{value: 1e18}(searcherOneEOA);
-
-        vm.stopPrank();
-
-        deal(TOKEN_ZERO, address(searcherOne), 10e24);
-        deal(TOKEN_ONE, address(searcherOne), 10e24);
-
-        vm.deal(searcherTwoEOA, 100e18);
-
-        vm.startPrank(searcherTwoEOA);
-
-        searcherTwo = new Searcher(escrow, searcherTwoEOA);
-        IEscrow(escrow).deposit{value: 1e18}(searcherTwoEOA);
+        solverOne = new Solver(escrow, solverOneEOA);
+        IEscrow(escrow).deposit{value: 1e18}(solverOneEOA);
 
         vm.stopPrank();
 
-        deal(TOKEN_ZERO, address(searcherTwo), 10e24);
-        deal(TOKEN_ONE, address(searcherTwo), 10e24);
+        deal(TOKEN_ZERO, address(solverOne), 10e24);
+        deal(TOKEN_ONE, address(solverOne), 10e24);
+
+        vm.deal(solverTwoEOA, 100e18);
+
+        vm.startPrank(solverTwoEOA);
+
+        solverTwo = new Solver(escrow, solverTwoEOA);
+        IEscrow(escrow).deposit{value: 1e18}(solverTwoEOA);
+
+        vm.stopPrank();
+
+        deal(TOKEN_ZERO, address(solverTwo), 10e24);
+        deal(TOKEN_ONE, address(solverTwo), 10e24);
 
         helper = new V2Helper(address(control), escrow, address(atlas));
 
@@ -108,6 +108,6 @@ contract BaseTest is Test, TestConstants {
         vm.label(userEOA, "USER");
         vm.label(escrow, "ESCROW");
         vm.label(address(atlas), "ATLAS");
-        vm.label(address(control), "PROTOCOL CONTROL");
+        vm.label(address(control), "DAPP CONTROL");
     }
 }
