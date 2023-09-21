@@ -1,16 +1,16 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import {ISearcherContract} from "../interfaces/ISearcherContract.sol";
+import {ISolverContract} from "../interfaces/ISolverContract.sol";
 import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
-import {IProtocolControl} from "../interfaces/IProtocolControl.sol";
+import {IDAppControl} from "../interfaces/IDAppControl.sol";
 
 import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
-import {UserMetaTx, ProtocolCall, SearcherCall, SearcherMetaTx, BidData} from "../types/CallTypes.sol";
+import {UserCall, DAppConfig, SolverOperation, SolverCall, BidData} from "../types/CallTypes.sol";
 import {ExecutionPhase} from "../types/LockTypes.sol";
 
-import {Base} from "../protocol/ExecutionBase.sol";
+import {Base} from "../common/ExecutionBase.sol";
 
 import {CallBits} from "../libraries/CallBits.sol";
 
@@ -18,31 +18,31 @@ import "forge-std/Test.sol";
 
 import {
     FastLaneErrorsEvents
-} from "./Emissions.sol";
+} from "../types/Emissions.sol";
 
 contract ExecutionEnvironment is Base {
-    using CallBits for uint16;
+    using CallBits for uint32;
     
     constructor(address _atlas) Base(_atlas) {}
 
-    modifier validUser(UserMetaTx calldata userMetaTx) {
-        if (userMetaTx.from != _user()) {
+    modifier validUser(UserCall calldata uCall) {
+        if (uCall.from != _user()) {
             revert("ERR-CE02 InvalidUser");
         }
-        if (userMetaTx.to == address(this) || userMetaTx.to == atlas) {
+        if (uCall.to == address(this) || uCall.to == atlas) {
             revert("ERR-EV007 InvalidTo");
         }
         _;
     }
 
-    modifier validSearcher(SearcherMetaTx calldata searcherMetaTx) {
+    modifier validSolver(SolverCall calldata sCall) {
         {
-        address searcherTo = searcherMetaTx.to;
-        if (searcherTo == address(this) || searcherTo == _control() || searcherTo == atlas) {
+        address solverTo = sCall.to;
+        if (solverTo == address(this) || solverTo == _control() || solverTo == atlas) {
             revert("ERR-EV008 InvalidTo");
         }
-        if (searcherTo != _approvedCaller()) {
-            revert("ERR-EV009 WrongSearcher");
+        if (solverTo != _approvedCaller()) {
+            revert("ERR-EV009 WrongSolver");
         }
         }
         _;
@@ -52,82 +52,82 @@ contract ExecutionEnvironment is Base {
     //////////////////////////////////
     ///    CORE CALL FUNCTIONS     ///
     //////////////////////////////////
-    function stagingWrapper(UserMetaTx calldata userMetaTx)
+    function preOpsWrapper(UserCall calldata uCall)
         external
         onlyAtlasEnvironment
-        validUser(userMetaTx)
-        validPhase(ExecutionPhase.Staging)
+        validUser(uCall)
+        validPhase(ExecutionPhase.PreOps)
         returns (bytes memory)
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 
-        require(userMetaTx.to != address(this), "ERR-EV008 InvalidTo");
+        require(uCall.to != address(this), "ERR-EV008 InvalidTo");
 
-        bytes memory stagingData = abi.encodeWithSelector(
-            IProtocolControl.stagingCall.selector, userMetaTx
+        bytes memory preOpsData = abi.encodeWithSelector(
+            IDAppControl.preOpsCall.selector, uCall
         );
 
         bool success;
-        (success, stagingData) = _control().delegatecall(
-            forward(stagingData)
+        (success, preOpsData) = _control().delegatecall(
+            forward(preOpsData)
         );
 
         require(success, "ERR-EC02 DelegateRevert");
 
-        stagingData = abi.decode(stagingData, (bytes));
-        return stagingData;
+        preOpsData = abi.decode(preOpsData, (bytes));
+        return preOpsData;
     }
 
-    function userWrapper(UserMetaTx calldata userMetaTx) 
+    function userWrapper(UserCall calldata uCall) 
         external 
         payable
         onlyAtlasEnvironment
-        validUser(userMetaTx)
+        validUser(uCall)
         onlyActiveEnvironment
-        validPhase(ExecutionPhase.UserCall)
+        validPhase(ExecutionPhase.UserOperation)
         returns (bytes memory userData) 
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 
-        uint16 config = _config();
+        uint32 config = _config();
 
-        require(address(this).balance >= userMetaTx.value, "ERR-CE01 ValueExceedsBalance");
+        require(address(this).balance >= uCall.value, "ERR-CE01 ValueExceedsBalance");
 
         bool success;
 
         if (!config.needsLocalUser()) {
             // regular user call - executed at regular destination and not performed locally
-            (success, userData) = userMetaTx.to.call{value: userMetaTx.value}(
-                forward(userMetaTx.data)
+            (success, userData) = uCall.to.call{value: uCall.value}(
+                forward(uCall.data)
             );
             require(success, "ERR-EC04a CallRevert");
 
         } else if (config.needsDelegateUser()) {
             userData = abi.encodeWithSelector(
-                IProtocolControl.userLocalCall.selector, userMetaTx.data
+                IDAppControl.userLocalCall.selector, uCall.data
             );
 
             (success, userData) = _control().delegatecall(forward(userData));
-
             require(success, "ERR-EC02 DelegateRevert");
+            userData = abi.decode(userData, (bytes));
+
         } else {
-            revert("ERR-P02 UserCallStatic");
+            revert("ERR-P02 UserOperationStatic");
         }
-        userData = abi.decode(userData, (bytes));
     }
 
-    function verificationWrapper(bytes calldata returnData) 
+    function postOpsWrapper(bytes calldata returnData) 
         external 
         onlyAtlasEnvironment
-        validPhase(ExecutionPhase.Verification)
+        validPhase(ExecutionPhase.PostOps)
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 
         bytes memory data = abi.encodeWithSelector(
-            IProtocolControl.verificationCall.selector, returnData);
+            IDAppControl.postOpsCall.selector, returnData);
         
         bool success;
         (success, data) = _control().delegatecall(forward(data));
@@ -136,32 +136,32 @@ contract ExecutionEnvironment is Base {
         require(abi.decode(data, (bool)), "ERR-EC03a DelegateUnsuccessful");
     }
 
-    function searcherMetaTryCatch(
+    function solverMetaTryCatch(
         uint256 gasLimit, 
         uint256 escrowBalance, 
-        SearcherCall calldata searcherCall, 
+        SolverOperation calldata solverOp, 
         bytes calldata returnData
     ) 
         external payable 
         onlyAtlasEnvironment 
-        validSearcher(searcherCall.metaTx)
-        validPhase(ExecutionPhase.SearcherCalls)
+        validSolver(solverOp.call)
+        validPhase(ExecutionPhase.SolverOperations)
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
-        require(address(this).balance == searcherCall.metaTx.value, "ERR-CE05 IncorrectValue");
+        require(address(this).balance == solverOp.call.value, "ERR-CE05 IncorrectValue");
 
         // Track token balances to measure if the bid amount is paid.
-        uint256[] memory tokenBalances = new uint[](searcherCall.bids.length);
+        uint256[] memory tokenBalances = new uint[](solverOp.bids.length);
         uint256 i;
-        for (; i < searcherCall.bids.length;) {
+        for (; i < solverOp.bids.length;) {
             // Ether balance
-            if (searcherCall.bids[i].token == address(0)) {
+            if (solverOp.bids[i].token == address(0)) {
                 tokenBalances[i] = msg.value; // NOTE: this is the meta tx value
 
             // ERC20 balance
             } else {
-                tokenBalances[i] = ERC20(searcherCall.bids[i].token).balanceOf(address(this));
+                tokenBalances[i] = ERC20(solverOp.bids[i].token).balanceOf(address(this));
             }
             unchecked {
                 ++i;
@@ -169,23 +169,23 @@ contract ExecutionEnvironment is Base {
         }
 
         ////////////////////////////
-        // SEARCHER SAFETY CHECKS //
+        // SOLVER SAFETY CHECKS //
         ////////////////////////////
 
-        // Verify that the ProtocolControl contract matches the searcher's expectations
-        if(searcherCall.metaTx.controlCodeHash != _controlCodeHash()) {
+        // Verify that the DAppControl contract matches the solver's expectations
+        if(solverOp.call.controlCodeHash != _controlCodeHash()) {
             revert FastLaneErrorsEvents.AlteredControlHash();
         }
 
         bool success;
 
-        // Handle any searcher staging, if necessary
-        if (_config().needsSearcherStaging()) {
+        // Handle any solver preOps, if necessary
+        if (_config().needsPreSolver()) {
 
-            bytes memory data = abi.encode(searcherCall.metaTx.to, returnData);
+            bytes memory data = abi.encode(solverOp.call.to, returnData);
 
             data = abi.encodeWithSelector(
-                IProtocolControl.searcherPreCall.selector, 
+                IDAppControl.preSolverCall.selector, 
                 data
             );
 
@@ -193,36 +193,36 @@ contract ExecutionEnvironment is Base {
                 forward(data)
             );
             if(!success) {
-                revert FastLaneErrorsEvents.SearcherStagingFailed();
+                revert FastLaneErrorsEvents.PreSolverFailed();
             } 
 
             success = abi.decode(data, (bool));
             if(!success) {
-                revert FastLaneErrorsEvents.SearcherStagingFailed();
+                revert FastLaneErrorsEvents.PreSolverFailed();
             } 
         }
 
-        // Execute the searcher call.
-        (success,) = ISearcherContract(searcherCall.metaTx.to).metaFlashCall{
+        // Execute the solver call.
+        (success,) = ISolverContract(solverOp.call.to).atlasSolverCall{
             gas: gasLimit,
-            value: searcherCall.metaTx.value
-        }(searcherCall.metaTx.from, searcherCall.metaTx.data, searcherCall.bids);
+            value: solverOp.call.value
+        }(solverOp.call.from, solverOp.bids, solverOp.call.data);
 
         // Verify that it was successful
         if(!success) {
-            revert FastLaneErrorsEvents.SearcherCallReverted();
+            revert FastLaneErrorsEvents.SolverOperationReverted();
         } 
 
         // If this was a user intent, handle and verify fulfillment
-        if (_config().needsSearcherPostCall()) {
+        if (_config().needsSolverPostCall()) {
             
             bytes memory data = returnData;
 
-            data = abi.encode(searcherCall.metaTx.to, data);
+            data = abi.encode(solverOp.call.to, data);
 
             data = abi.encodeWithSelector(
-                IProtocolControl.searcherPostCall.selector, 
-                // searcherCall.metaTx.to, 
+                IDAppControl.postSolverCall.selector, 
+                // solverOp.call.to, 
                 data
             );
 
@@ -230,7 +230,7 @@ contract ExecutionEnvironment is Base {
                 forward(data)
             );
             if(!success) {
-                revert FastLaneErrorsEvents.SearcherVerificationFailed();
+                revert FastLaneErrorsEvents.PostSolverFailed();
             } 
 
             success = abi.decode(data, (bool));
@@ -240,31 +240,31 @@ contract ExecutionEnvironment is Base {
         }
 
 
-        // Verify that the searcher paid what they bid
+        // Verify that the solver paid what they bid
         bool etherIsBidToken;
         i = 0;
         uint256 balance;
 
-        for (; i < searcherCall.bids.length;) {
+        for (; i < solverOp.bids.length;) {
             // ERC20 tokens as bid currency
-            if (!(searcherCall.bids[i].token == address(0))) {
-                balance = ERC20(searcherCall.bids[i].token).balanceOf(address(this));
-                if (balance < tokenBalances[i] + searcherCall.bids[i].bidAmount) {
-                    revert FastLaneErrorsEvents.SearcherBidUnpaid();
+            if (!(solverOp.bids[i].token == address(0))) {
+                balance = ERC20(solverOp.bids[i].token).balanceOf(address(this));
+                if (balance < tokenBalances[i] + solverOp.bids[i].bidAmount) {
+                    revert FastLaneErrorsEvents.SolverBidUnpaid();
                 }
 
                 // Native Gas (Ether) as bid currency
             } else {
                 balance = address(this).balance;
-                if (balance < searcherCall.bids[i].bidAmount) { // tokenBalances[i] = 0 for ether
-                    revert FastLaneErrorsEvents.SearcherBidUnpaid();
+                if (balance < solverOp.bids[i].bidAmount) { // tokenBalances[i] = 0 for ether
+                    revert FastLaneErrorsEvents.SolverBidUnpaid();
                 }
         
                 etherIsBidToken = true;
 
-                // Transfer any surplus Ether back to escrow to add to searcher's balance
-                if (balance > searcherCall.bids[i].bidAmount) {
-                    SafeTransferLib.safeTransferETH(atlas, balance - searcherCall.bids[i].bidAmount);
+                // Transfer any surplus Ether back to escrow to add to solver's balance
+                if (balance > solverOp.bids[i].bidAmount) {
+                    SafeTransferLib.safeTransferETH(atlas, balance - solverOp.bids[i].bidAmount);
                 }
             }
             unchecked {
@@ -279,15 +279,15 @@ contract ExecutionEnvironment is Base {
             }
         }
 
-        // Verify that the searcher repaid their msg.value
+        // Verify that the solver repaid their msg.value
         // TODO: Add in a more discerning func that'll silo the 
         // donations to prevent double counting. 
         if (atlas.balance < escrowBalance) {
-            revert FastLaneErrorsEvents.SearcherMsgValueUnpaid();
+            revert FastLaneErrorsEvents.SolverMsgValueUnpaid();
         }
     }
 
-    function allocateRewards(BidData[] calldata bids, bytes memory returnData) 
+    function allocateValue(BidData[] calldata bids, bytes memory returnData) 
         external 
         onlyAtlasEnvironment
         validPhase(ExecutionPhase.HandlingPayments)
@@ -306,7 +306,7 @@ contract ExecutionEnvironment is Base {
 
             if (bids[i].token != address(0)) {
                 SafeTransferLib.safeTransfer(ERC20(bids[i].token), address(0xa71a5), payment);
-                totalEtherReward = bids[i].bidAmount - payment; // NOTE: This is transferred to protocolControl as msg.value
+                totalEtherReward = bids[i].bidAmount - payment; // NOTE: This is transferred to controller as msg.value
             } else {
                 SafeTransferLib.safeTransferETH(address(0xa71a5), payment);
             }
@@ -318,7 +318,7 @@ contract ExecutionEnvironment is Base {
             }
         }
 
-        bytes memory allocateData = abi.encodeWithSelector(IProtocolControl.allocatingCall.selector, abi.encode(totalEtherReward, bids, returnData));
+        bytes memory allocateData = abi.encodeWithSelector(IDAppControl.allocateValueCall.selector, abi.encode(totalEtherReward, bids, returnData));
 
         (bool success,) = _control().delegatecall(forward(allocateData));
         require(success, "ERR-EC02 DelegateRevert");
@@ -328,22 +328,22 @@ contract ExecutionEnvironment is Base {
     //   HELPER / SEQUENCING FUNCTIONS   //
     ///////////////////////////////////////
 
-    function validateUserCall(UserMetaTx calldata userMetaTx)   
+    function validateUserOperation(UserCall calldata uCall)   
         external 
         // view 
         // onlyAtlas
         returns (bool) {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
-        if (userMetaTx.from != _user()) {
+        if (uCall.from != _user()) {
             return false;
         }
 
-        if (userMetaTx.control != _control()) {
+        if (uCall.control != _control()) {
             return false;
         }
 
-        if (userMetaTx.deadline < block.number) {
+        if (uCall.deadline < block.number) {
             return false;
         }
 
@@ -352,7 +352,7 @@ contract ExecutionEnvironment is Base {
         }
 
         bytes memory data = abi.encodeWithSelector(
-            IProtocolControl.validateUserCall.selector, userMetaTx);
+            IDAppControl.validateUserOperation.selector, uCall);
 
         (bool success, bytes memory returnData) = _control().delegatecall(forward(data));
 
@@ -419,7 +419,7 @@ contract ExecutionEnvironment is Base {
         control = _control();
     }
 
-    function getConfig() external pure returns (uint16 config) {
+    function getConfig() external pure returns (uint32 config) {
         config = _config();
     }
 
