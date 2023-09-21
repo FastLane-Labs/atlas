@@ -174,7 +174,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
         bytes memory searcherReturnData,
         address environment,
         EscrowKey memory key
-    ) internal returns (bool, EscrowKey memory) {
+    ) internal returns (bool auctionWon, EscrowKey memory) {
 
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
@@ -185,7 +185,6 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
 
         SolverOutcome outcome;
         uint256 escrowSurplus;
-        bool auctionWon;
 
         // If there are no errors, attempt to execute
         if (result.canExecute()) {
