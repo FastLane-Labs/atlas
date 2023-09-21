@@ -17,7 +17,8 @@ interface IExecutionEnvironment {
         uint256 gasLimit,
         uint256 escrowBalance,
         SolverOperation calldata solverOp,
-        bytes calldata returnData
+        bytes calldata protocolReturnData,
+        bytes calldata searcherReturnData
     ) external payable;
 
     function allocateValue(
