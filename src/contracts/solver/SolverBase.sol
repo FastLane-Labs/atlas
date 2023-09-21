@@ -27,7 +27,7 @@ contract SolverBase {
         _escrow = atlasEscrow;
     }
 
-    function atlasSolverCall(address sender, BidData[] calldata bids, bytes calldata solverOpData)
+    function atlasSolverCall(address sender, BidData[] calldata bids, bytes calldata solverOpData, bytes calldata extraReturnData)
         external
         payable
         safetyFirst(sender)
