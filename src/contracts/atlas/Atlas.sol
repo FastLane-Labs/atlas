@@ -85,7 +85,13 @@ contract Atlas is Test, Factory {
             // Gas Refund to sender only if execution is successful
             _executeGasRefund(gasMarker, accruedGasRebate, userOp.call.from);
 
-        } catch {
+        } catch (bytes memory revertData) {
+            // Bubble up some specific errors
+            bytes4 errorSwitch = bytes4(revertData);
+            if (errorSwitch == UserNotFulfilled.selector) {
+                revert UserNotFulfilled();
+            }
+
             // TODO: This portion needs more nuanced logic to prevent the replay of failed solver txs
             if (dConfig.callConfig.allowsReuseUserOps()) {
                 revert("ERR-F07 RevertToReuse");
@@ -286,7 +292,7 @@ contract Atlas is Test, Factory {
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         Verification calldata verification
-    ) external payable returns (bool auctionWon) {
+    ) external payable returns (bool success) {
         if (solverOps.length == 0) {
             return false;
         }
@@ -295,9 +301,9 @@ contract Atlas is Test, Factory {
         catch (bytes memory revertData) {
             bytes4 errorSwitch = bytes4(revertData);
             if (errorSwitch == UserNotFulfilled.selector || errorSwitch == NoAuctionWinner.selector) {
-                auctionWon = false;
+                success = false;
             } else {
-                auctionWon = true;
+                success = true;
             }
         }
     }

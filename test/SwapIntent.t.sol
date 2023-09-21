@@ -190,12 +190,11 @@ contract SwapIntentTest is BaseTest {
 
         vm.startPrank(userEOA);
         
-        assertFalse(atlas.testUserOperation(userOp), "UserOperation tested true");
+        assertFalse(atlas.testSolverCalls(dConfig, userOp, solverOps, verification), "metacall tested true");
         
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
-        assertTrue(atlas.testUserOperation(userOp), "UserOperation tested true");
-        assertTrue(atlas.testUserOperation(userOp.call), "UserCall tested true");
+        assertTrue(atlas.testSolverCalls(dConfig, userOp, solverOps, verification), "metacall tested false");
 
 
         // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
@@ -314,17 +313,15 @@ contract SwapIntentTest is BaseTest {
         console.log("Solver DAI balance", DAI.balanceOf(address(uniswapSolver)));
 
         vm.startPrank(userEOA);
-        
-        assertFalse(atlas.testUserOperation(userOp), "UserOperation tested true");
+
+        assertFalse(atlas.testSolverCalls(dConfig, userOp, solverOps, verification), "metacall tested true");
         
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
-        assertTrue(atlas.testUserOperation(userOp), "UserOperation tested true");
-        assertTrue(atlas.testUserOperation(userOp.call), "UserCall tested true");
+        assertTrue(atlas.testSolverCalls(dConfig, userOp, solverOps, verification), "metacall tested false");
 
         // Check solver does NOT have DAI - it must use Uniswap to get it during metacall
         assertEq(DAI.balanceOf(address(uniswapSolver)), 0, "Solver has DAI before metacall");
-
 
         // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
         atlas.metacall({
