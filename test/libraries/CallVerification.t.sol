@@ -7,11 +7,11 @@ import {CallVerification} from "../../src/contracts/libraries/CallVerification.s
 import "../../src/contracts/types/CallTypes.sol";
 
 contract CallVerificationTest is Test {
-    using CallVerification for UserMetaTx;
+    using CallVerification for UserCall;
     using CallVerification for BidData[];
 
-    function buildUserMetaTx() internal pure returns (UserMetaTx memory) {
-        return UserMetaTx({
+    function buildUserCall() internal pure returns (UserCall memory) {
+        return UserCall({
             from: address(0x1),
             to: address(0x2),
             deadline: 12,
@@ -24,15 +24,15 @@ contract CallVerificationTest is Test {
         });
     }
 
-    function builderSearcherMetaTx() internal pure returns (SearcherMetaTx memory) {
-        return SearcherMetaTx({
+    function builderSolverCall() internal pure returns (SolverCall memory) {
+        return SolverCall({
             from: address(0x1),
             to: address(0x2),
             value: 12,
             gas: 34,
             nonce: 56,
             maxFeePerGas: 78,
-            userCallHash: "userCallHash",
+            userOpHash: "userCallHash",
             controlCodeHash: "controlCodeHash",
             bidsHash: "bidsHash",
             data: "data"
@@ -48,11 +48,11 @@ contract CallVerificationTest is Test {
     }
 
     function testGetUserCallHash() public {
-        this._testGetUserCallHash(buildUserMetaTx());
+        this._testGetUserCallHash(buildUserCall());
     }
 
-    function _testGetUserCallHash(UserMetaTx calldata userMetaTx) external {
-        assertEq(userMetaTx.getUserCallHash(), keccak256(abi.encode(userMetaTx)));
+    function _testGetUserCallHash(UserCall calldata uCall) external {
+        assertEq(uCall.getUserOperationHash(), keccak256(abi.encode(uCall)));
     }
 
     function testGetBidsHash() public {
@@ -66,31 +66,31 @@ contract CallVerificationTest is Test {
     }
 
     function testGetCallChainHash() public {
-        ProtocolCall memory protocolCall = ProtocolCall({to: address(0x1), callConfig: 1});
-        UserMetaTx memory userMetaTx = buildUserMetaTx();
-        SearcherCall[] memory searcherCalls = new SearcherCall[](2);
-        searcherCalls[0] = SearcherCall({
+        DAppConfig memory dConfig = DAppConfig({to: address(0x1), callConfig: 1});
+        UserCall memory uCall = buildUserCall();
+        SolverOperation[] memory solverOps = new SolverOperation[](2);
+        solverOps[0] = SolverOperation({
             to: address(0x2),
-            metaTx: builderSearcherMetaTx(),
+            call: builderSolverCall(),
             signature: "signature1",
             bids: buildBidData(1)
         });
-        searcherCalls[1] = SearcherCall({
+        solverOps[1] = SolverOperation({
             to: address(0x3),
-            metaTx: builderSearcherMetaTx(),
+            call: builderSolverCall(),
             signature: "signature2",
             bids: buildBidData(2)
         });
-        this._testGetCallChainHash(protocolCall, userMetaTx, searcherCalls);
+        this._testGetCallChainHash(dConfig, uCall, solverOps);
     }
 
     function _testGetCallChainHash(
-        ProtocolCall calldata protocolCall,
-        UserMetaTx calldata userMetaTx,
-        SearcherCall[] calldata searcherCalls
+        DAppConfig calldata dConfig,
+        UserCall calldata uCall,
+        SolverOperation[] calldata solverOps
     ) external {
         bytes32 expectedCallChainHash = 0x69c0833b2f37f7a0cb7d040aaa3f4654d841ebf21e6781b530a9c978d0c8cf09;
-        bytes32 callChainHash = CallVerification.getCallChainHash(protocolCall, userMetaTx, searcherCalls);
+        bytes32 callChainHash = CallVerification.getCallChainHash(dConfig, uCall, solverOps);
         assertEq(callChainHash, expectedCallChainHash);
     }
 }
