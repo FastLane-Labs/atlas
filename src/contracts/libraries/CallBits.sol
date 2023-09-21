@@ -1,143 +1,135 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import {IProtocolControl} from "../interfaces/IProtocolControl.sol";
+import {IDAppControl} from "../interfaces/IDAppControl.sol";
 
 import "../types/CallTypes.sol";
 
 library CallBits {
-    uint16 internal constant _ONE = uint16(1);
+    uint32 internal constant _ONE = uint32(1);
 
-    function buildCallConfig(address protocolControl) internal view returns (uint16 callConfig) {
-        (
-            bool sequenced,
-            bool requireStaging,
-            bool localUser,
-            bool delegateUser,
-            bool searcherStaging,
-            bool searcherFulfillment,
-            bool requireVerification,
-            bool zeroSearchers,
-            bool reuseUserOp,
-            bool userBundler,
-            bool protocolBundler,
-            bool unknownBundler
-        ) = IProtocolControl(protocolControl).getCallConfig();
-
-        // WTB tuple unpacking :*(
-        callConfig = encodeCallConfig(
-             sequenced,
-             requireStaging,
-             localUser,
-             delegateUser,
-             searcherStaging,
-             searcherFulfillment,
-             requireVerification,
-             zeroSearchers,
-             reuseUserOp,
-             userBundler,
-             protocolBundler,
-             unknownBundler
-        );
+    function buildCallConfig(address controller) internal view returns (uint32 callConfig) {
+        CallConfig memory callconfig = IDAppControl(controller).getCallConfig();
+        callConfig = encodeCallConfig(callconfig);
     }
 
-    function encodeCallConfig(
-        bool sequenced,
-        bool requireStaging,
-        bool localUser,
-        bool delegateUser,
-        bool searcherStaging,
-        bool searcherFulfillment,
-        bool requireVerification,
-        bool zeroSearchers,
-        bool reuseUserOp,
-        bool userBundler,
-        bool protocolBundler,
-        bool unknownBundler
-    ) internal pure returns (uint16 callConfig) {
-        if (sequenced) {
-            callConfig ^= _ONE << uint16(CallConfig.Sequenced);
+    function encodeCallConfig(CallConfig memory callConfig) internal pure returns (uint32 encodedCallConfig) {
+        if (callConfig.sequenced) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.Sequenced);
         }
-        if (requireStaging) {
-            callConfig ^= _ONE << uint16(CallConfig.CallStaging);
+        if (callConfig.requirePreOps) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.RequirePreOps);
         }
-        if (localUser) {
-            callConfig ^= _ONE << uint16(CallConfig.LocalUser);
+        if (callConfig.trackPreOpsReturnData) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.TrackPreOpsReturnData);
         }
-        if (delegateUser) {
-            callConfig ^= _ONE << uint16(CallConfig.DelegateUser);
+        if (callConfig.trackUserReturnData) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.TrackUserReturnData);
         }
-        if (searcherStaging) {
-            callConfig ^= _ONE << uint16(CallConfig.SearcherStaging);
+        if (callConfig.delegateUser) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.DelegateUser);
         }
-        if (searcherFulfillment) {
-            callConfig ^= _ONE << uint16(CallConfig.SearcherFulfillment);
+        if (callConfig.localUser) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.LocalUser);
         }
-        if (requireVerification) {
-            callConfig ^= _ONE << uint16(CallConfig.CallVerification);
+        if (callConfig.preSolver) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.PreSolver);
         }
-        if (zeroSearchers) {
-            callConfig ^= _ONE << uint16(CallConfig.ZeroSearchers);
+        if (callConfig.postSolver) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.PostSolver);
         }
-        if (reuseUserOp) {
-            callConfig ^= _ONE << uint16(CallConfig.ReuseUserOp);
+        if (callConfig.requirePostOps) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.RequirePostOpsCall);
         }
-        if (userBundler) {
-            callConfig ^= _ONE << uint16(CallConfig.UserBundler);
+        if (callConfig.zeroSolvers) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.ZeroSolvers);
         }
-        if (protocolBundler) {
-            callConfig ^= _ONE << uint16(CallConfig.ProtocolBundler);
+        if (callConfig.reuseUserOp) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.ReuseUserOp);
         }
-        if (unknownBundler) {
-            callConfig ^= _ONE << uint16(CallConfig.UnknownBundler);
+        if (callConfig.userBundler) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.UserBundler);
+        }
+        if (callConfig.dAppBundler) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.DAppBundler);
+        }
+        if (callConfig.unknownBundler) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.UnknownBundler);
         }
     }
 
-    function needsSequencedNonces(uint16 callConfig) internal pure returns (bool sequenced) {
-        sequenced = (callConfig & 1 << uint16(CallConfig.Sequenced) != 0);
+    function decodeCallConfig(uint32 encodedCallConfig) internal pure returns (CallConfig memory callConfig) {
+        callConfig = CallConfig({
+            sequenced: needsSequencedNonces(encodedCallConfig),
+            requirePreOps: needsPreOpsCall(encodedCallConfig),
+            trackPreOpsReturnData: needsPreOpsReturnData(encodedCallConfig),
+            trackUserReturnData: needsUserReturnData(encodedCallConfig),
+            delegateUser: needsDelegateUser(encodedCallConfig),
+            localUser: needsLocalUser(encodedCallConfig),
+            preSolver: needsPreSolver(encodedCallConfig),
+            postSolver: needsSolverPostCall(encodedCallConfig),
+            requirePostOps: needsPostOpsCall(encodedCallConfig),
+            zeroSolvers: allowsZeroSolvers(encodedCallConfig),
+            reuseUserOp: allowsReuseUserOps(encodedCallConfig),
+            userBundler: allowsUserBundler(encodedCallConfig),
+            dAppBundler: allowsDAppBundler(encodedCallConfig),
+            unknownBundler: allowsUnknownBundler(encodedCallConfig)
+        });
     }
 
-    function needsStagingCall(uint16 callConfig) internal pure returns (bool needsStaging) {
-        needsStaging = (callConfig & 1 << uint16(CallConfig.CallStaging) != 0);
+    function needsSequencedNonces(uint32 callConfig) internal pure returns (bool sequenced) {
+        sequenced = (callConfig & 1 << uint32(CallConfigIndex.Sequenced) != 0);
     }
 
-    function needsLocalUser(uint16 callConfig) internal pure returns (bool localUser) {
-        localUser = (callConfig & 1 << uint16(CallConfig.LocalUser) != 0);
+    function needsPreOpsCall(uint32 callConfig) internal pure returns (bool needsPreOps) {
+        needsPreOps = (callConfig & 1 << uint32(CallConfigIndex.RequirePreOps) != 0);
     }
 
-    function needsDelegateUser(uint16 callConfig) internal pure returns (bool delegateUser) {
-        delegateUser = (callConfig & 1 << uint16(CallConfig.DelegateUser) != 0);
+    function needsPreOpsReturnData(uint32 callConfig) internal pure returns (bool needsReturnData) {
+        needsReturnData = (callConfig & 1 << uint32(CallConfigIndex.TrackPreOpsReturnData) != 0);
     }
 
-    function needsSearcherStaging(uint16 callConfig) internal pure returns (bool searcherStaging) {
-        searcherStaging = (callConfig & 1 << uint16(CallConfig.SearcherStaging) != 0);
+    function needsUserReturnData(uint32 callConfig) internal pure returns (bool needsReturnData) {
+        needsReturnData = (callConfig & 1 << uint32(CallConfigIndex.TrackUserReturnData) != 0);
     }
 
-    function needsSearcherPostCall(uint16 callConfig) internal pure returns (bool searcherFulfillment) {
-        searcherFulfillment = (callConfig & 1 << uint16(CallConfig.SearcherFulfillment) != 0);
+    function needsDelegateUser(uint32 callConfig) internal pure returns (bool delegateUser) {
+        delegateUser = (callConfig & 1 << uint32(CallConfigIndex.DelegateUser) != 0);
     }
 
-    function needsVerificationCall(uint16 callConfig) internal pure returns (bool needsVerification) {
-        needsVerification = (callConfig & 1 << uint16(CallConfig.CallVerification) != 0);
+    function needsLocalUser(uint32 callConfig) internal pure returns (bool localUser) {
+        localUser = (callConfig & 1 << uint32(CallConfigIndex.LocalUser) != 0);
     }
 
-    function allowsZeroSearchers(uint16 callConfig) internal pure returns (bool zeroSearchers) {
-        zeroSearchers = (callConfig & 1 << uint16(CallConfig.ZeroSearchers) != 0);
+    function needsPreSolver(uint32 callConfig) internal pure returns (bool preSolver) {
+        preSolver = (callConfig & 1 << uint32(CallConfigIndex.PreSolver) != 0);
     }
 
-    function allowsReuseUserOps(uint16 callConfig) internal pure returns (bool reuseUserOp) {
-        reuseUserOp = (callConfig & 1 << uint16(CallConfig.ReuseUserOp) != 0);
+    function needsSolverPostCall(uint32 callConfig) internal pure returns (bool postSolver) {
+        postSolver = (callConfig & 1 << uint32(CallConfigIndex.PostSolver) != 0);
     }
 
-    function allowsUserBundler(uint16 callConfig) internal pure returns (bool userBundler) {
-        userBundler = (callConfig & 1 << uint16(CallConfig.UserBundler) != 0);
+    function needsPostOpsCall(uint32 callConfig) internal pure returns (bool needsPostOps) {
+        needsPostOps = (callConfig & 1 << uint32(CallConfigIndex.RequirePostOpsCall) != 0);
     }
 
-    function allowsProtocolBundler(uint16 callConfig) internal pure returns (bool protocolBundler) {
-        protocolBundler = (callConfig & 1 << uint16(CallConfig.ProtocolBundler) != 0);
+    function allowsZeroSolvers(uint32 callConfig) internal pure returns (bool zeroSolvers) {
+        zeroSolvers = (callConfig & 1 << uint32(CallConfigIndex.ZeroSolvers) != 0);
     }
 
-    function allowsUnknownBundler(uint16 callConfig) internal pure returns (bool unknownBundler) {
-        unknownBundler = (callConfig & 1 << uint16(CallConfig.UnknownBundler) != 0);
+    function allowsReuseUserOps(uint32 callConfig) internal pure returns (bool reuseUserOp) {
+        reuseUserOp = (callConfig & 1 << uint32(CallConfigIndex.ReuseUserOp) != 0);
+    }
+
+    function allowsUserBundler(uint32 callConfig) internal pure returns (bool userBundler) {
+        userBundler = (callConfig & 1 << uint32(CallConfigIndex.UserBundler) != 0);
+    }
+
+    function allowsDAppBundler(uint32 callConfig) internal pure returns (bool dAppBundler) {
+        dAppBundler = (callConfig & 1 << uint32(CallConfigIndex.DAppBundler) != 0);
+    }
+
+    function allowsUnknownBundler(uint32 callConfig) internal pure returns (bool unknownBundler) {
+        unknownBundler = (callConfig & 1 << uint32(CallConfigIndex.UnknownBundler) != 0);
     }
 }

@@ -5,14 +5,14 @@ import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
 import {IEscrow} from "../src/contracts/interfaces/IEscrow.sol";
 import {IAtlas} from "../src/contracts/interfaces/IAtlas.sol";
-import {IProtocolIntegration} from "../src/contracts/interfaces/IProtocolIntegration.sol";
+import {IDAppIntegration} from "../src/contracts/interfaces/IDAppIntegration.sol";
 
 import {Atlas} from "../src/contracts/atlas/Atlas.sol";
 import {Mimic} from "../src/contracts/atlas/Mimic.sol";
 
-import {V2ProtocolControl} from "../src/contracts/v2-example/V2ProtocolControl.sol";
+import {V2DAppControl} from "../src/contracts/examples/v2-example/V2DAppControl.sol";
 
-import {Searcher} from "./searcher/src/TestSearcher.sol";
+import {Solver} from "src/contracts/solver/src/TestSolver.sol";
 
 import "../src/contracts/types/CallTypes.sol";
 import "../src/contracts/types/EscrowTypes.sol";
@@ -44,40 +44,40 @@ contract MainTest is BaseTest {
         bytes32 r;
         bytes32 s;
 
-        ProtocolCall memory protocolCall = helper.getProtocolCall();
+        DAppConfig memory dConfig = helper.getDAppConfig();
 
-        UserCall memory userCall = helper.buildUserCall(POOL_ONE, userEOA, TOKEN_ONE);
+        UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, userEOA, TOKEN_ONE);
 
-        (v, r, s) = vm.sign(userPK, IAtlas(address(atlas)).getUserCallPayload(userCall));
-        userCall.signature = abi.encodePacked(r, s, v);
+        (v, r, s) = vm.sign(userPK, IAtlas(address(atlas)).getUserOperationPayload(userOp));
+        userOp.signature = abi.encodePacked(r, s, v);
 
-        SearcherCall[] memory searcherCalls = new SearcherCall[](2);
-        bytes memory searcherCallData;
-        // First SearcherCall
-        searcherCallData = helper.buildV2SearcherCallData(POOL_TWO, POOL_ONE);
-        searcherCalls[1] =
-            helper.buildSearcherCall(userCall, protocolCall, searcherCallData, searcherOneEOA, address(searcherOne), 2e17);
+        SolverOperation[] memory solverOps = new SolverOperation[](2);
+        bytes memory solverOpData;
+        // First SolverOperation
+        solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_ONE);
+        solverOps[1] =
+            helper.buildSolverOperation(userOp, dConfig, solverOpData, solverOneEOA, address(solverOne), 2e17);
 
-        (v, r, s) = vm.sign(searcherOnePK, IAtlas(address(atlas)).getSearcherPayload(searcherCalls[1].metaTx));
-        searcherCalls[1].signature = abi.encodePacked(r, s, v);
-
-        // Second SearcherCall
-        searcherCallData = helper.buildV2SearcherCallData(POOL_ONE, POOL_TWO);
-        searcherCalls[0] =
-            helper.buildSearcherCall(userCall, protocolCall, searcherCallData, searcherTwoEOA, address(searcherTwo), 1e17);
-
-        (v, r, s) = vm.sign(searcherTwoPK, IAtlas(address(atlas)).getSearcherPayload(searcherCalls[0].metaTx));
-        searcherCalls[0].signature = abi.encodePacked(r, s, v);
-
-        console.log("topBid before sorting",searcherCalls[0].bids[0].bidAmount);
+        (v, r, s) = vm.sign(solverOnePK, IAtlas(address(atlas)).getSolverPayload(solverOps[1].call));
+        solverOps[1].signature = abi.encodePacked(r, s, v);
         
-        searcherCalls = sorter.sortBids(userCall, searcherCalls);
+        // Second SolverOperation
+        solverOpData = helper.buildV2SolverOperationData(POOL_ONE, POOL_TWO);
+        solverOps[0] =
+            helper.buildSolverOperation(userOp, dConfig, solverOpData, solverTwoEOA, address(solverTwo), 1e17);
 
-        console.log("topBid after sorting ",searcherCalls[0].bids[0].bidAmount);
+        (v, r, s) = vm.sign(solverTwoPK, IAtlas(address(atlas)).getSolverPayload(solverOps[0].call));
+        solverOps[0].signature = abi.encodePacked(r, s, v);
+
+        console.log("topBid before sorting",solverOps[0].bids[0].bidAmount);
+        
+        solverOps = sorter.sortBids(userOp, solverOps);
+
+        console.log("topBid after sorting ",solverOps[0].bids[0].bidAmount);
 
         // Verification call
         Verification memory verification =
-            helper.buildVerification(governanceEOA, protocolCall, userCall, searcherCalls);
+            helper.buildVerification(governanceEOA, dConfig, userOp, solverOps);
 
         (v, r, s) = vm.sign(governancePK, IAtlas(address(atlas)).getVerificationPayload(verification));
 
@@ -85,7 +85,7 @@ contract MainTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        address executionEnvironment = IAtlas(address(atlas)).createExecutionEnvironment(protocolCall);
+        address executionEnvironment = IAtlas(address(atlas)).createExecutionEnvironment(dConfig);
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
         console.log("userEOA", userEOA);
@@ -101,7 +101,7 @@ contract MainTest is BaseTest {
 
         (bool success,) = address(atlas).call(
             abi.encodeWithSelector(
-                atlas.metacall.selector, protocolCall, userCall, searcherCalls, verification
+                atlas.metacall.selector, dConfig, userOp, solverOps, verification
             )
         );
 
@@ -117,27 +117,27 @@ contract MainTest is BaseTest {
         console.log("-");
 
         // Second attempt
-        protocolCall = helper.getProtocolCall();
+        dConfig = helper.getDAppConfig();
 
-        userCall = helper.buildUserCall(POOL_ONE, userEOA, TOKEN_ONE);
+        userOp = helper.buildUserOperation(POOL_ONE, userEOA, TOKEN_ONE);
 
-        // First SearcherCall
-        searcherCalls[0] =
-            helper.buildSearcherCall(userCall, protocolCall, searcherOneEOA, address(searcherOne), POOL_ONE, POOL_TWO, 2e17);
+        // First SolverOperation
+        solverOps[0] =
+            helper.buildSolverOperation(userOp, dConfig, solverOneEOA, address(solverOne), POOL_ONE, POOL_TWO, 2e17);
 
-        (v, r, s) = vm.sign(searcherOnePK, IAtlas(address(atlas)).getSearcherPayload(searcherCalls[0].metaTx));
-        searcherCalls[0].signature = abi.encodePacked(r, s, v);
+        (v, r, s) = vm.sign(solverOnePK, IAtlas(address(atlas)).getSolverPayload(solverOps[0].call));
+        solverOps[0].signature = abi.encodePacked(r, s, v);
 
-        // Second SearcherCall
-        searcherCalls[1] =
-            helper.buildSearcherCall(userCall, protocolCall, searcherTwoEOA, address(searcherTwo), POOL_TWO, POOL_ONE, 1e17);
+        // Second SolverOperation
+        solverOps[1] =
+            helper.buildSolverOperation(userOp, dConfig, solverTwoEOA, address(solverTwo), POOL_TWO, POOL_ONE, 1e17);
 
-        (v, r, s) = vm.sign(searcherTwoPK, IAtlas(address(atlas)).getSearcherPayload(searcherCalls[1].metaTx));
-        searcherCalls[1].signature = abi.encodePacked(r, s, v);
+        (v, r, s) = vm.sign(solverTwoPK, IAtlas(address(atlas)).getSolverPayload(solverOps[1].call));
+        solverOps[1].signature = abi.encodePacked(r, s, v);
 
         // Verification call
         verification =
-            helper.buildVerification(governanceEOA, protocolCall, userCall, searcherCalls);
+            helper.buildVerification(governanceEOA, dConfig, userOp, solverOps);
 
         (v, r, s) = vm.sign(governancePK, IAtlas(address(atlas)).getVerificationPayload(verification));
 
@@ -145,13 +145,13 @@ contract MainTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        executionEnvironment = IAtlas(address(atlas)).getExecutionEnvironment(userCall, address(control));
+        executionEnvironment = IAtlas(address(atlas)).getExecutionEnvironment(userOp, address(control));
         
         userBalance = userEOA.balance;
 
         (success,) = address(atlas).call(
             abi.encodeWithSelector(
-                atlas.metacall.selector, protocolCall, userCall, searcherCalls, verification
+                atlas.metacall.selector, dConfig, userOp, solverOps, verification
             )
         );
 

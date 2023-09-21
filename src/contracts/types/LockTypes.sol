@@ -11,7 +11,7 @@ struct EscrowKey {
     uint32 gasRefund;
 }
 
-enum SearcherSafety {
+enum SolverSafety {
     Unset,
     Requested,
     Verified
@@ -26,11 +26,11 @@ enum BaseLock {
 
 enum ExecutionPhase {
     Uninitialized,
-    Staging,
-    UserCall,
-    SearcherCalls,
+    PreOps,
+    UserOperation,
+    SolverOperations,
     HandlingPayments,
     UserRefund,
-    Verification,
+    PostOps,
     Releasing
 }

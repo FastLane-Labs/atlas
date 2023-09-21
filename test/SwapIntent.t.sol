@@ -8,11 +8,11 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 import {BaseTest} from "./base/BaseTest.t.sol";
 import {TxBuilder} from "../src/contracts/helpers/TxBuilder.sol";
 
-import {ProtocolCall, UserCall, SearcherCall} from "../src/contracts/types/CallTypes.sol";
+import {DAppConfig, UserOperation, SolverOperation} from "../src/contracts/types/CallTypes.sol";
 import {Verification} from "../src/contracts/types/VerificationTypes.sol";
 
-import {SwapIntentController, SwapIntent, Condition} from "../src/contracts/intents-example/SwapIntent.sol";
-import {SearcherBase} from "../src/contracts/searcher/SearcherBase.sol";
+import {SwapIntentController, SwapIntent, Condition} from "../src/contracts/examples/intents-example/SwapIntent.sol";
+import {SolverBase} from "../src/contracts/solver/SolverBase.sol";
 
 // QUESTIONS:
 
@@ -21,11 +21,11 @@ import {SearcherBase} from "../src/contracts/searcher/SearcherBase.sol";
 // 2. helper is currently a V2Helper and shared from BaseTest. Should only be in Uni V2 related tests
 // 3. Need a more generic helper for BaseTest
 // 4. Gonna be lots of StackTooDeep errors. Maybe need a way to elegantly deal with that in BaseTest
-// 5. Change metaFlashCall structure in SearcherBase - maybe virtual fn to be overridden, which hooks for checks
+// 5. Change atlasSolverCall structure in SolverBase - maybe virtual fn to be overridden, which hooks for checks
 // 6. Maybe emit error msg or some other better UX for error if !valid in metacall()
 
 // Doc Ideas:
-// 1. Step by step instructions for building a metacall transaction (for internal testing, and integrating protocols)
+// 1. Step by step instructions for building a metacall transaction (for internal testing, and integrating dApps)
 
 // To Understand Better:
 // 1. The lock system (and look for any gas optimizations / ways to reduce lock actions)
@@ -66,11 +66,11 @@ contract SwapIntentTest is BaseTest {
         vm.startPrank(governanceEOA);
         swapIntentController = new SwapIntentController(address(escrow));        
         atlas.initializeGovernance(address(swapIntentController));
-        atlas.integrateProtocol(address(swapIntentController), address(swapIntentController));
+        atlas.integrateDApp(address(swapIntentController), address(swapIntentController));
         vm.stopPrank();
 
         txBuilder = new TxBuilder({
-            protocolControl: address(swapIntentController),
+            controller: address(swapIntentController),
             escrowAddress: address(escrow),
             atlasAddress: address(atlas)
         });
@@ -101,73 +101,74 @@ contract SwapIntentTest is BaseTest {
             tokenUserSells: WETH_ADDRESS,
             amountUserSells: 10e18,
             auctionBaseCurrency: address(0),
-            searcherMustReimburseGas: false,
+            solverMustReimburseGas: false,
             conditions: conditions
         });
 
-        // Searcher deploys the RFQ searcher contract (defined at bottom of this file)
-        vm.startPrank(searcherOneEOA);
-        SimpleRFQSearcher rfqSearcher = new SimpleRFQSearcher(address(atlas));
+        // Solver deploys the RFQ solver contract (defined at bottom of this file)
+        vm.startPrank(solverOneEOA);
+        SimpleRFQSolver rfqSolver = new SimpleRFQSolver(address(atlas));
+        atlas.deposit{value: 1e18}(solverOneEOA);
         vm.stopPrank();
 
-        // Give 20 DAI to RFQ searcher contract
-        deal(DAI_ADDRESS, address(rfqSearcher), swapIntent.amountUserBuys);
-        assertEq(DAI.balanceOf(address(rfqSearcher)), swapIntent.amountUserBuys, "Did not give enough DAI to searcher");
+        // Give 20 DAI to RFQ solver contract
+        deal(DAI_ADDRESS, address(rfqSolver), swapIntent.amountUserBuys);
+        assertEq(DAI.balanceOf(address(rfqSolver)), swapIntent.amountUserBuys, "Did not give enough DAI to solver");
 
         // Input params for Atlas.metacall() - will be populated below
-        ProtocolCall memory protocolCall = txBuilder.getProtocolCall();
-        UserCall memory userCall;
-        SearcherCall[] memory searcherCalls = new SearcherCall[](1);
+        DAppConfig memory dConfig = txBuilder.getDAppConfig();
+        UserOperation memory userOp;
+        SolverOperation[] memory solverOps = new SolverOperation[](1);
         Verification memory verification;
 
         vm.startPrank(userEOA);
-        address executionEnvironment = atlas.createExecutionEnvironment(protocolCall);
+        address executionEnvironment = atlas.createExecutionEnvironment(dConfig);
         vm.stopPrank();
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
-        // userCallData is used in delegatecall from exec env to control, calling stagingCall
-        // first 4 bytes are "userSelector" param in stagingCall in ProtocolControl - swap() selector
+        // userOpData is used in delegatecall from exec env to control, calling preOpsCall
+        // first 4 bytes are "userSelector" param in preOpsCall in DAppControl - swap() selector
         // rest of data is "userData" param
         
         // swap(SwapIntent calldata) selector = 0x98434997
-        bytes memory userCallData = abi.encodeWithSelector(SwapIntentController.swap.selector, swapIntent);
+        bytes memory userOpData = abi.encodeWithSelector(SwapIntentController.swap.selector, swapIntent);
 
-        // Builds the metaTx and to parts of userCall, signature still to be set
-        userCall = txBuilder.buildUserCall({
+        // Builds the metaTx and to parts of userOp, signature still to be set
+        userOp = txBuilder.buildUserOperation({
             from: userEOA, // NOTE: Would from ever not be user?
             to: address(swapIntentController),
             maxFeePerGas: tx.gasprice + 1, // TODO update
             value: 0,
-            data: userCallData
+            data: userOpData
         });
 
-        // User signs the userCall
-        (sig.v, sig.r, sig.s) = vm.sign(userPK, atlas.getUserCallPayload(userCall));
-        userCall.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+        // User signs the userOp
+        (sig.v, sig.r, sig.s) = vm.sign(userPK, atlas.getUserOperationPayload(userOp));
+        userOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-        // Build searcher calldata (function selector on searcher contract and its params)
-        bytes memory searcherCallData = abi.encodeWithSelector(
-            SimpleRFQSearcher.fulfillRFQ.selector, 
+        // Build solver calldata (function selector on solver contract and its params)
+        bytes memory solverOpData = abi.encodeWithSelector(
+            SimpleRFQSolver.fulfillRFQ.selector, 
             swapIntent,
             executionEnvironment
         );
 
-        // Builds the SearcherCall
-        searcherCalls[0] = txBuilder.buildSearcherCall({
-            userCall: userCall,
-            protocolCall: protocolCall,
-            searcherCallData: searcherCallData,
-            searcherEOA: searcherOneEOA,
-            searcherContract: address(rfqSearcher),
+        // Builds the SolverOperation
+        solverOps[0] = txBuilder.buildSolverOperation({
+            userOp: userOp,
+            dConfig: dConfig,
+            solverOpData: solverOpData,
+            solverEOA: solverOneEOA,
+            solverContract: address(rfqSolver),
             bidAmount: 1e18
         });
 
-        // Searcher signs the searcherCall
-        (sig.v, sig.r, sig.s) = vm.sign(searcherOnePK, atlas.getSearcherPayload(searcherCalls[0].metaTx));
-        searcherCalls[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
+        // Solver signs the solverOp
+        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlas.getSolverPayload(solverOps[0].call));
+        solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Frontend creates verification calldata after seeing rest of data
-        verification = txBuilder.buildVerification(governanceEOA, protocolCall, userCall, searcherCalls);
+        verification = txBuilder.buildVerification(governanceEOA, dConfig, userOp, solverOps);
 
         // Frontend signs the verification payload
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getVerificationPayload(verification));
@@ -186,25 +187,24 @@ contract SwapIntentTest is BaseTest {
         console.log("\nBEFORE METACALL");
         console.log("User WETH balance", WETH.balanceOf(userEOA));
         console.log("User DAI balance", DAI.balanceOf(userEOA));
-        console.log("Searcher WETH balance", WETH.balanceOf(address(rfqSearcher)));
-        console.log("Searcher DAI balance", DAI.balanceOf(address(rfqSearcher)));
-        console.log(""); // give space for internal logs
+        console.log("Solver WETH balance", WETH.balanceOf(address(rfqSolver)));
+        console.log("Solver DAI balance", DAI.balanceOf(address(rfqSolver)));
 
         vm.startPrank(userEOA);
         
-        assertFalse(atlas.testUserCall(userCall), "UserCall tested true");
+        assertFalse(atlas.testUserOperation(userOp), "UserOperation tested true");
         
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
-        assertTrue(atlas.testUserCall(userCall), "UserCall tested false");
-        assertTrue(atlas.testUserCall(userCall.metaTx), "UserMetaTx tested false");
+        assertTrue(atlas.testUserOperation(userOp), "UserOperation tested true");
+        assertTrue(atlas.testUserOperation(userOp.call), "UserCall tested true");
 
 
         // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
         atlas.metacall({
-            protocolCall: protocolCall,
-            userCall: userCall,
-            searcherCalls: searcherCalls,
+            dConfig: dConfig,
+            userOp: userOp,
+            solverOps: solverOps,
             verification: verification
         });
         vm.stopPrank();
@@ -212,15 +212,15 @@ contract SwapIntentTest is BaseTest {
         console.log("\nAFTER METACALL");
         console.log("User WETH balance", WETH.balanceOf(userEOA));
         console.log("User DAI balance", DAI.balanceOf(userEOA));
-        console.log("Searcher WETH balance", WETH.balanceOf(address(rfqSearcher)));
-        console.log("Searcher DAI balance", DAI.balanceOf(address(rfqSearcher)));
+        console.log("Solver WETH balance", WETH.balanceOf(address(rfqSolver)));
+        console.log("Solver DAI balance", DAI.balanceOf(address(rfqSolver)));
 
         // Check user token balances after
         assertEq(WETH.balanceOf(userEOA), userWethBalanceBefore - swapIntent.amountUserSells, "Did not spend enough WETH");
         assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + swapIntent.amountUserBuys, "Did not receive enough DAI");
     }
 
-    function testAtlasSwapIntentWithUniswapSearcher() public {
+    function testAtlasSwapIntentWithUniswapSolver() public {
         // Swap 10 WETH for 20 DAI
         Condition[] memory conditions;
 
@@ -230,70 +230,70 @@ contract SwapIntentTest is BaseTest {
             tokenUserSells: WETH_ADDRESS,
             amountUserSells: 10e18,
             auctionBaseCurrency: address(0),
-            searcherMustReimburseGas: false,
+            solverMustReimburseGas: false,
             conditions: conditions
         });
 
-        // Searcher deploys the RFQ searcher contract (defined at bottom of this file)
-        vm.startPrank(searcherOneEOA);
-        UniswapIntentSearcher uniswapSearcher = new UniswapIntentSearcher(address(atlas));
-        deal(WETH_ADDRESS, address(uniswapSearcher), 1e18); // 1 WETH to searcher to pay bid
+        // Solver deploys the RFQ solver contract (defined at bottom of this file)
+        vm.startPrank(solverOneEOA);
+        UniswapIntentSolver uniswapSolver = new UniswapIntentSolver(address(atlas));
+        deal(WETH_ADDRESS, address(uniswapSolver), 1e18); // 1 WETH to solver to pay bid
         vm.stopPrank();
 
         // Input params for Atlas.metacall() - will be populated below
-        ProtocolCall memory protocolCall = txBuilder.getProtocolCall();
-        UserCall memory userCall;
-        SearcherCall[] memory searcherCalls = new SearcherCall[](1);
+        DAppConfig memory dConfig = txBuilder.getDAppConfig();
+        UserOperation memory userOp;
+        SolverOperation[] memory solverOps = new SolverOperation[](1);
         Verification memory verification;
 
         vm.startPrank(userEOA);
-        address executionEnvironment = atlas.createExecutionEnvironment(protocolCall);
+        address executionEnvironment = atlas.createExecutionEnvironment(dConfig);
         vm.stopPrank();
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
-        // userCallData is used in delegatecall from exec env to control, calling stagingCall
-        // first 4 bytes are "userSelector" param in stagingCall in ProtocolControl - swap() selector
+        // userOpData is used in delegatecall from exec env to control, calling preOpsCall
+        // first 4 bytes are "userSelector" param in preOpsCall in DAppControl - swap() selector
         // rest of data is "userData" param
         
         // swap(SwapIntent calldata) selector = 0x98434997
-        bytes memory userCallData = abi.encodeWithSelector(SwapIntentController.swap.selector, swapIntent);
+        bytes memory userOpData = abi.encodeWithSelector(SwapIntentController.swap.selector, swapIntent);
 
-        // Builds the metaTx and to parts of userCall, signature still to be set
-        userCall = txBuilder.buildUserCall({
+        // Builds the metaTx and to parts of userOp, signature still to be set
+        userOp = txBuilder.buildUserOperation({
             from: userEOA, // NOTE: Would from ever not be user?
             to: address(swapIntentController),
             maxFeePerGas: tx.gasprice + 1, // TODO update
             value: 0,
-            data: userCallData
+            data: userOpData
         });
 
-        // User signs the userCall
-        (sig.v, sig.r, sig.s) = vm.sign(userPK, atlas.getUserCallPayload(userCall));
-        userCall.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+        // User signs the userOp
+        (sig.v, sig.r, sig.s) = vm.sign(userPK, atlas.getUserOperationPayload(userOp));
+        userOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-        // Build searcher calldata (function selector on searcher contract and its params)
-        bytes memory searcherCallData = abi.encodeWithSelector(
-            UniswapIntentSearcher.fulfillWithSwap.selector, 
+        // Build solver calldata (function selector on solver contract and its params)
+        bytes memory solverOpData = abi.encodeWithSelector(
+            UniswapIntentSolver.fulfillWithSwap.selector, 
             swapIntent,
             executionEnvironment
         );
 
-        // Builds the SearcherCall
-        searcherCalls[0] = txBuilder.buildSearcherCall({
-            userCall: userCall,
-            protocolCall: protocolCall,
-            searcherCallData: searcherCallData,
-            searcherEOA: searcherOneEOA,
-            searcherContract: address(uniswapSearcher),
+        // Builds the SolverOperation
+        solverOps[0] = txBuilder.buildSolverOperation({
+            userOp: userOp,
+            dConfig: dConfig,
+            solverOpData: solverOpData,
+            solverEOA: solverOneEOA,
+            solverContract: address(uniswapSolver),
             bidAmount: 1e18
         });
 
-        // Searcher signs the searcherCall
-        (sig.v, sig.r, sig.s) = vm.sign(searcherOnePK, atlas.getSearcherPayload(searcherCalls[0].metaTx));
-        searcherCalls[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
+        // Solver signs the solverOp
+        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlas.getSolverPayload(solverOps[0].call));
+        solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Frontend creates verification calldata after seeing rest of data
-        verification = txBuilder.buildVerification(governanceEOA, protocolCall, userCall, searcherCalls);
+        verification = txBuilder.buildVerification(governanceEOA, dConfig, userOp, solverOps);
 
         // Frontend signs the verification payload
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getVerificationPayload(verification));
@@ -312,27 +312,27 @@ contract SwapIntentTest is BaseTest {
         console.log("\nBEFORE METACALL");
         console.log("User WETH balance", WETH.balanceOf(userEOA));
         console.log("User DAI balance", DAI.balanceOf(userEOA));
-        console.log("Searcher WETH balance", WETH.balanceOf(address(uniswapSearcher)));
-        console.log("Searcher DAI balance", DAI.balanceOf(address(uniswapSearcher)));
+        console.log("Solver WETH balance", WETH.balanceOf(address(uniswapSolver)));
+        console.log("Solver DAI balance", DAI.balanceOf(address(uniswapSolver)));
 
         vm.startPrank(userEOA);
         
-        assertFalse(atlas.testUserCall(userCall), "UserCall tested true");
+        assertFalse(atlas.testUserOperation(userOp), "UserOperation tested true");
         
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
-        assertTrue(atlas.testUserCall(userCall), "UserCall tested true");
-        assertTrue(atlas.testUserCall(userCall.metaTx), "UserMetaTx tested true");
+        assertTrue(atlas.testUserOperation(userOp), "UserOperation tested true");
+        assertTrue(atlas.testUserOperation(userOp.call), "UserCall tested true");
 
-        // Check searcher does NOT have DAI - it must use Uniswap to get it during metacall
-        assertEq(DAI.balanceOf(address(uniswapSearcher)), 0, "Searcher has DAI before metacall");
+        // Check solver does NOT have DAI - it must use Uniswap to get it during metacall
+        assertEq(DAI.balanceOf(address(uniswapSolver)), 0, "Solver has DAI before metacall");
 
 
         // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
         atlas.metacall({
-            protocolCall: protocolCall,
-            userCall: userCall,
-            searcherCalls: searcherCalls,
+            dConfig: dConfig,
+            userOp: userOp,
+            solverOps: solverOps,
             verification: verification
         });
         vm.stopPrank();
@@ -340,8 +340,8 @@ contract SwapIntentTest is BaseTest {
         console.log("\nAFTER METACALL");
         console.log("User WETH balance", WETH.balanceOf(userEOA));
         console.log("User DAI balance", DAI.balanceOf(userEOA));
-        console.log("Searcher WETH balance", WETH.balanceOf(address(uniswapSearcher)));
-        console.log("Searcher DAI balance", DAI.balanceOf(address(uniswapSearcher)));
+        console.log("Solver WETH balance", WETH.balanceOf(address(uniswapSolver)));
+        console.log("Solver DAI balance", DAI.balanceOf(address(uniswapSolver)));
 
         // Check user token balances after
         assertEq(WETH.balanceOf(userEOA), userWethBalanceBefore - swapIntent.amountUserSells, "Did not spend enough WETH");
@@ -349,10 +349,10 @@ contract SwapIntentTest is BaseTest {
     }
 }
 
-// This searcher magically has the tokens needed to fulfil the user's swap.
+// This solver magically has the tokens needed to fulfil the user's swap.
 // This might involve an offchain RFQ system
-contract SimpleRFQSearcher is SearcherBase {
-    constructor(address atlas) SearcherBase(atlas, msg.sender) {}
+contract SimpleRFQSolver is SolverBase {
+    constructor(address atlas) SolverBase(atlas, msg.sender) {}
 
     function fulfillRFQ(
         SwapIntent calldata swapIntent,
@@ -374,10 +374,10 @@ contract SimpleRFQSearcher is SearcherBase {
     receive() external payable {}
 }
 
-contract UniswapIntentSearcher is SearcherBase {
+contract UniswapIntentSolver is SolverBase {
     IUniV2Router02 router = IUniV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
 
-    constructor(address atlas) SearcherBase(atlas, msg.sender) {}
+    constructor(address atlas) SolverBase(atlas, msg.sender) {}
 
     function fulfillWithSwap(
         SwapIntent calldata swapIntent,
@@ -400,14 +400,14 @@ contract UniswapIntentSearcher is SearcherBase {
             deadline: block.timestamp
         });
 
-        // Send min tokens back to user to fulfill intent, rest are profit for searcher
+        // Send min tokens back to user to fulfill intent, rest are profit for solver
         ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
     }
 
-    // This ensures a function can only be called through metaFlashCall
+    // This ensures a function can only be called through atlasSolverCall
     // which includes security checks to work safely with Atlas
     modifier onlySelf() {
-        require(msg.sender == address(this), "Not called via metaFlashCall");
+        require(msg.sender == address(this), "Not called via atlasSolverCall");
         _;
     }
 
