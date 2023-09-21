@@ -92,7 +92,7 @@ contract CallVerificationTest is Test {
     ) external {
         bytes32 expectedCallChainHash = 0x69c0833b2f37f7a0cb7d040aaa3f4654d841ebf21e6781b530a9c978d0c8cf09;
         bytes32 callChainHash = CallVerification.getCallChainHash(dConfig, uCall, solverOps);
-        assertEq(callChainHash, expectedCallChainHash);
-        assertEq(callChainHash, TestUtils.computeCallChainHash(dConfig, uCall, solverOps));
+        assertEq(callChainHash, expectedCallChainHash, "callChainHash different to pre-computed expected");
+        assertEq(callChainHash, TestUtils.computeCallChainHash(dConfig, uCall, solverOps), "callChainHash different to TestUtils reproduction");
     }
 }
