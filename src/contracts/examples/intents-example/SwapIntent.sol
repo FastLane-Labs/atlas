@@ -358,4 +358,11 @@ contract SwapIntentController is DAppControl {
         }
         return true;
     }
+
+    fallback() external payable {
+        console.log("inside fallback in SwapIntent");
+    }
+    receive() external payable {
+        console.log("inside receive in SwapIntent");
+    }
 }

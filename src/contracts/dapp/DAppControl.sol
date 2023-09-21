@@ -65,7 +65,8 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
     }
 
     function preSolverCall(bytes calldata data) 
-        external 
+        external
+        payable
         onlyAtlasEnvironment
         validControl
         validPhase(ExecutionPhase.SolverOperations)

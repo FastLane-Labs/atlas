@@ -153,6 +153,8 @@ contract ExecutionEnvironment is Base {
         // address(this) = ExecutionEnvironment
         require(address(this).balance == solverOp.call.value, "ERR-CE05 IncorrectValue");
 
+        console.log("solverOp.call.value in solverMetaTryCatch", solverOp.call.value);
+
         // Track token balances to measure if the bid amount is paid.
         uint256[] memory tokenBalances = new uint[](solverOp.bids.length);
         uint256 i;
@@ -196,12 +198,20 @@ contract ExecutionEnvironment is Base {
 
             data = forward(data);
 
+            console.log("control address", _control());
+            console.log("msg.value", msg.value);
+
             console.log("final data just before delegatecall");
             console.logBytes(data);
 
             (success, data) = _control().delegatecall(
                 data
             );
+
+            console.log("did delegatecall work??", success);
+            console.log("data after delegatecall");
+            console.logBytes(data);
+
             if(!success) {
                 revert FastLaneErrorsEvents.PreSolverFailed();
             } 
@@ -437,7 +447,11 @@ contract ExecutionEnvironment is Base {
         escrow = atlas;
     }
 
-    receive() external payable {}
+    receive() external payable {
+        console.log("inside receive in exec env");
+    }
 
-    fallback() external payable {}
+    fallback() external payable {
+        console.log("inside fallback in exec env");
+    }
 }

@@ -12,7 +12,7 @@ interface IDAppControl {
 
     function allocateValueCall(bytes calldata data) external;
 
-    function preSolverCall(bytes calldata data) external returns (bool);
+    function preSolverCall(bytes calldata data) external payable returns (bool);
 
     function postSolverCall(bytes calldata data) external returns (bool);
 
