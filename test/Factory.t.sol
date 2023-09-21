@@ -4,26 +4,26 @@ pragma solidity ^0.8.18;
 import "forge-std/Test.sol";
 import {BaseTest} from "./base/BaseTest.t.sol";
 import "../src/contracts/types/CallTypes.sol";
-import {ProtocolControl} from "../src/contracts/protocol/ProtocolControl.sol";
+import {DAppControl} from "../src/contracts/dapp/DAppControl.sol";
 
-contract DummyProtocolControl is ProtocolControl {
+contract DummyDAppControl is DAppControl {
     constructor(address escrow)
-        ProtocolControl(
+        DAppControl(
             escrow,
             address(0),
             CallConfig(false, false, false, false, false, false, false, false, false, false, false, false, false, false)
         )
     {}
 
-    function _stagingCall(UserMetaTx calldata) internal override returns (bytes memory) {}
-    function _allocatingCall(bytes calldata) internal override {}
+    function _preOpsCall(UserCall calldata) internal override returns (bytes memory) {}
+    function _allocateValueCall(bytes calldata) internal override {}
     function getPayeeData(bytes calldata) external view override returns (PayeeData[] memory) {}
-    function getBidFormat(UserMetaTx calldata) external view override returns (BidData[] memory) {}
-    function getBidValue(SearcherCall calldata) external view override returns (uint256) {}
+    function getBidFormat(UserCall calldata) external view override returns (BidData[] memory) {}
+    function getBidValue(SolverOperation calldata) external view override returns (uint256) {}
 }
 
 contract FactoryTest is BaseTest {
-    DummyProtocolControl public protocolControl;
+    DummyDAppControl public dAppControl;
 
     function setUp() public virtual override {
         BaseTest.setUp();
@@ -31,20 +31,20 @@ contract FactoryTest is BaseTest {
         governancePK = 666;
         governanceEOA = vm.addr(governancePK);
         vm.startPrank(governanceEOA);
-        protocolControl = new DummyProtocolControl(escrow);
+        dAppControl = new DummyDAppControl(escrow);
         vm.stopPrank();
     }
 
     function testExecutionEnvironmentAddress() public {
-        address expectedExecutionEnvironment = 0xf8927cd848a3D1BCA26634E25a89ccE8feb7A65F;
+        address expectedExecutionEnvironment = 0xc7B4e21c1eB2C5Cf0B3D59657851DdCd98aCEa32;
 
         assertEq(
-            atlas.createExecutionEnvironment(protocolControl.getProtocolCall()), 
-            expectedExecutionEnvironment, 
+            atlas.createExecutionEnvironment(dAppControl.getDAppConfig()),
+            expectedExecutionEnvironment,
             "Create exec env address not same as predicted"
         );
 
-        UserMetaTx memory userMetaTx = UserMetaTx({
+        UserCall memory uCall = UserCall({
             from: address(this),
             to: address(0x2),
             deadline: 12,
@@ -55,10 +55,10 @@ contract FactoryTest is BaseTest {
             control: address(0x3),
             data: "data"
         });
-        UserCall memory userCall = UserCall({to: address(0x1), metaTx: userMetaTx, signature: "signature"});
+        UserOperation memory userOp = UserOperation({to: address(0x1), call: uCall, signature: "signature"});
 
         assertEq(
-            atlas.getExecutionEnvironment(userCall, address(protocolControl)), 
+            atlas.getExecutionEnvironment(userOp, address(dAppControl)),
             expectedExecutionEnvironment,
             "atlas.getExecEnv address not same as predicted"
         );
