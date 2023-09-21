@@ -476,7 +476,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
             console.log("SOLVER GAS COST CHECKS IN ESCROW:");
             console.log("gasCost \t\t", gasCost);
             console.log("solverEscrow.total \t", solverEscrow.total);
-            console.log("_withdrawalData[solverOp.metaTx.from].escrowed", _withdrawalData[solverOp.metaTx.from].escrowed);
+            console.log("_withdrawalData[solverOp.call.from].escrowed", _withdrawalData[solverOp.call.from].escrowed);
 
 
             // see if solver's escrow can afford tx gascost
@@ -486,7 +486,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
             }
 
             console.log("SOVLER MSG.VALUE CHECKS IN ESCROW:");
-            console.log("solverOp.metaTx.value \t", solverOp.metaTx.value);
+            console.log("solverOp.call.value \t", solverOp.call.value);
             console.log("Atlas.balance \t\t", address(this).balance);
             console.log("gasLimit X tx.gasprice \t", gasLimit * tx.gasprice);
 

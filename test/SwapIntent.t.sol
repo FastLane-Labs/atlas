@@ -76,8 +76,8 @@ contract SwapIntentTest is BaseTest {
         });
 
         // Deposit ETH from Searcher signer to pay for searcher's gas 
-        vm.prank(searcherOneEOA); 
-        atlas.deposit{value: 1e18}(searcherOneEOA);
+        vm.prank(solverOneEOA); 
+        atlas.deposit{value: 1e18}(solverOneEOA);
     }
 
     function testAtlasSwapIntentWithBasicRFQ() public {
