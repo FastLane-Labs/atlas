@@ -3,8 +3,9 @@ pragma solidity ^0.8.18;
 
 import "forge-std/Test.sol";
 import {BaseTest} from "./base/BaseTest.t.sol";
-import "../src/contracts/types/CallTypes.sol";
 import {DAppControl} from "../src/contracts/dapp/DAppControl.sol";
+import "../src/contracts/types/CallTypes.sol";
+import "./base/TestUtils.sol";
 
 contract DummyDAppControl is DAppControl {
     constructor(address escrow)
@@ -36,14 +37,6 @@ contract FactoryTest is BaseTest {
     }
 
     function testExecutionEnvironmentAddress() public {
-        address expectedExecutionEnvironment = 0xc7B4e21c1eB2C5Cf0B3D59657851DdCd98aCEa32;
-
-        assertEq(
-            atlas.createExecutionEnvironment(dAppControl.getDAppConfig()),
-            expectedExecutionEnvironment,
-            "Create exec env address not same as predicted"
-        );
-
         UserCall memory uCall = UserCall({
             from: address(this),
             to: address(0x2),
@@ -56,6 +49,15 @@ contract FactoryTest is BaseTest {
             data: "data"
         });
         UserOperation memory userOp = UserOperation({to: address(0x1), call: uCall, signature: "signature"});
+
+        address expectedExecutionEnvironment =
+            TestUtils.computeExecutionEnvironment(payable(atlas), userOp, address(dAppControl));
+
+        assertEq(
+            atlas.createExecutionEnvironment(dAppControl.getDAppConfig()),
+            expectedExecutionEnvironment,
+            "Create exec env address not same as predicted"
+        );
 
         assertEq(
             atlas.getExecutionEnvironment(userOp, address(dAppControl)),
