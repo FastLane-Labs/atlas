@@ -97,25 +97,21 @@ contract ExecutionEnvironment is Base {
 
         bool success;
 
-        if (!config.needsLocalUser()) {
+        if (config.needsDelegateUser()) {
+
+            (success, userData) = uCall.to.delegatecall(forward(uCall.data));
+            require(success, "ERR-EC02 DelegateRevert");
+            
+            // userData = abi.decode(userData, (bytes));
+
+        } else {
             // regular user call - executed at regular destination and not performed locally
             (success, userData) = uCall.to.call{value: uCall.value}(
                 forward(uCall.data)
             );
             require(success, "ERR-EC04a CallRevert");
 
-        } else if (config.needsDelegateUser()) {
-            userData = abi.encodeWithSelector(
-                IDAppControl.userLocalCall.selector, uCall.data
-            );
-
-            (success, userData) = _control().delegatecall(forward(userData));
-            require(success, "ERR-EC02 DelegateRevert");
-            userData = abi.decode(userData, (bytes));
-
-        } else {
-            revert("ERR-P02 UserOperationStatic");
-        }
+        } 
     }
 
     function postOpsWrapper(bytes calldata returnData) 
