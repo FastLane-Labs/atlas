@@ -314,7 +314,8 @@ contract SwapIntentTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        assertFalse(atlas.testSolverCalls(dConfig, userOp, solverOps, verification), "metacall tested true");
+        // assertFalse(atlas.testSolverCalls(dConfig, userOp, solverOps, verification), "metacall tested true");
+        assertFalse(atlas.testUserOperation(userOp), "metatestUserOperationcall tested true");
         
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
