@@ -4,7 +4,9 @@ pragma solidity ^0.8.16;
 import {IEscrow} from "../interfaces/IEscrow.sol";
 import {IDAppControl} from "../interfaces/IDAppControl.sol";
 
-import "../types/CallTypes.sol";
+import "../types/SolverCallTypes.sol";
+import "../types/UserCallTypes.sol";
+import "../types/DAppApprovalTypes.sol";
 
 import {CallVerification} from "../libraries/CallVerification.sol";
 

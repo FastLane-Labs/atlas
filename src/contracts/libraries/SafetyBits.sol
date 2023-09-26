@@ -93,7 +93,7 @@ library SafetyBits {
         );
     }
 
-    function holdVerificationLock(EscrowKey memory self, address approvedCaller)
+    function holdDAppOperationLock(EscrowKey memory self, address approvedCaller)
         internal
         pure
         returns (EscrowKey memory)

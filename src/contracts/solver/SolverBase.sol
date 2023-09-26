@@ -5,7 +5,7 @@ import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
 import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
 
-import "../types/CallTypes.sol";
+import "../types/SolverCallTypes.sol";
 
 import "forge-std/Test.sol";
 

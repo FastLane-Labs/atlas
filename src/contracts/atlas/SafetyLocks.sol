@@ -4,7 +4,10 @@ pragma solidity ^0.8.16;
 import {SafetyBits} from "../libraries/SafetyBits.sol";
 import {CallBits} from "../libraries/CallBits.sol";
 
-import {DAppConfig, UserCall} from "../types/CallTypes.sol";
+import "../types/SolverCallTypes.sol";
+import "../types/UserCallTypes.sol";
+import "../types/DAppApprovalTypes.sol";
+
 import "../types/LockTypes.sol";
 
 import "forge-std/Test.sol";

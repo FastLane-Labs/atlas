@@ -8,8 +8,9 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 import {BaseTest} from "./base/BaseTest.t.sol";
 import {TxBuilder} from "../src/contracts/helpers/TxBuilder.sol";
 
-import {DAppConfig, UserOperation, SolverOperation} from "../src/contracts/types/CallTypes.sol";
-import {Verification} from "../src/contracts/types/VerificationTypes.sol";
+import {SolverOperation} from "../src/contracts/types/SolverCallTypes.sol";
+import {UserOperation} from "../src/contracts/types/UserCallTypes.sol";
+import {DAppOperation, DAppConfig} from "../src/contracts/types/DAppApprovalTypes.sol";
 
 import {SwapIntentController, SwapIntent, Condition} from "../src/contracts/examples/intents-example/SwapIntent.sol";
 import {SolverBase} from "../src/contracts/solver/SolverBase.sol";
@@ -69,6 +70,8 @@ contract SwapIntentTest is BaseTest {
         atlas.integrateDApp(address(swapIntentController), address(swapIntentController));
         vm.stopPrank();
 
+        console.log("swapIntentController",address(swapIntentController));
+
         txBuilder = new TxBuilder({
             controller: address(swapIntentController),
             escrowAddress: address(escrow),
@@ -117,7 +120,7 @@ contract SwapIntentTest is BaseTest {
         DAppConfig memory dConfig = txBuilder.getDAppConfig();
         UserOperation memory userOp;
         SolverOperation[] memory solverOps = new SolverOperation[](1);
-        Verification memory verification;
+        DAppOperation memory dAppOp;
 
         vm.startPrank(userEOA);
         address executionEnvironment = atlas.createExecutionEnvironment(dConfig);
@@ -165,12 +168,12 @@ contract SwapIntentTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlas.getSolverPayload(solverOps[0].call));
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-        // Frontend creates verification calldata after seeing rest of data
-        verification = txBuilder.buildVerification(governanceEOA, dConfig, userOp, solverOps);
+        // Frontend creates dAppOp calldata after seeing rest of data
+        dAppOp = txBuilder.buildDAppOperation(governanceEOA, dConfig, userOp, solverOps);
 
-        // Frontend signs the verification payload
-        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getVerificationPayload(verification));
-        verification.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+        // Frontend signs the dAppOp payload
+        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getDAppOperationPayload(dAppOp));
+        dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Check user token balances before
         uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);
@@ -203,7 +206,7 @@ contract SwapIntentTest is BaseTest {
             dConfig: dConfig,
             userOp: userOp,
             solverOps: solverOps,
-            verification: verification
+            dAppOp: dAppOp
         });
         vm.stopPrank();
 
@@ -242,7 +245,7 @@ contract SwapIntentTest is BaseTest {
         DAppConfig memory dConfig = txBuilder.getDAppConfig();
         UserOperation memory userOp;
         SolverOperation[] memory solverOps = new SolverOperation[](1);
-        Verification memory verification;
+        DAppOperation memory dAppOp;
 
         vm.startPrank(userEOA);
         address executionEnvironment = atlas.createExecutionEnvironment(dConfig);
@@ -290,12 +293,12 @@ contract SwapIntentTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlas.getSolverPayload(solverOps[0].call));
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-        // Frontend creates verification calldata after seeing rest of data
-        verification = txBuilder.buildVerification(governanceEOA, dConfig, userOp, solverOps);
+        // Frontend creates dAppOp calldata after seeing rest of data
+        dAppOp = txBuilder.buildDAppOperation(governanceEOA, dConfig, userOp, solverOps);
 
-        // Frontend signs the verification payload
-        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getVerificationPayload(verification));
-        verification.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+        // Frontend signs the dAppOp payload
+        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getDAppOperationPayload(dAppOp));
+        dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Check user token balances before
         uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);
@@ -331,7 +334,7 @@ contract SwapIntentTest is BaseTest {
             dConfig: dConfig,
             userOp: userOp,
             solverOps: solverOps,
-            verification: verification
+            dAppOp: dAppOp
         });
         vm.stopPrank();
 

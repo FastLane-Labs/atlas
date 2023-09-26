@@ -11,7 +11,9 @@ import {SafetyLocks} from "./SafetyLocks.sol";
 import {SolverWrapper} from "./SolverWrapper.sol";
 import {DAppVerification} from "./DAppVerification.sol";
 
-import "../types/CallTypes.sol";
+import "../types/SolverCallTypes.sol";
+import "../types/UserCallTypes.sol";
+import {DAppConfig} from "../types/DAppApprovalTypes.sol";
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
 
@@ -170,7 +172,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
 
     function _executeSolverOperation(
         SolverOperation calldata solverOp,
-        bytes memory DAppReturnData,
+        bytes memory dAppReturnData,
         bytes memory searcherForwardData,
         address environment,
         EscrowKey memory key
@@ -192,7 +194,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
             key = key.holdSolverLock(solverOp.call.to);
 
             // Execute the solver call
-            (outcome, escrowSurplus) = _solverOpWrapper(gasLimit, environment, solverOp, DAppReturnData, searcherForwardData, key.pack());
+            (outcome, escrowSurplus) = _solverOpWrapper(gasLimit, environment, solverOp, dAppReturnData, searcherForwardData, key.pack());
 
             unchecked {
                 solverEscrow.total += uint128(escrowSurplus);
@@ -403,10 +405,11 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
                 sCall.to,
                 sCall.value,
                 sCall.gas,
-                sCall.nonce,
                 sCall.maxFeePerGas,
-                sCall.userOpHash,
+                sCall.nonce,
+                sCall.deadline,
                 sCall.controlCodeHash,
+                sCall.userOpHash,
                 sCall.bidsHash,
                 keccak256(sCall.data)
             )

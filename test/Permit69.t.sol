@@ -190,7 +190,7 @@ contract Permit69Test is BaseTest {
 
     function testConstantValueOfSafeUserTransfer() public {
         string memory expectedBitMapString = "0000010011100000";
-        // Safe phases for user transfers are PreOps, UserOperation, and Verification
+        // Safe phases for user transfers are PreOps, UserOperation, and DAppOperation
         // preOpsPhaseSafe = 0000 0000 0010 0000
         uint16 preOpsPhaseSafe = uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.PreOps)));
         // userOpPhaseSafe = 0000 0000 0100 0000
@@ -218,7 +218,7 @@ contract Permit69Test is BaseTest {
 
     function testConstantValueOfSafeDAppTransfer() public {
         string memory expectedBitMapString = "0000011100100000";
-        // Safe phases for dApp transfers are PreOps, HandlingPayments, UserRefund, and Verification
+        // Safe phases for dApp transfers are PreOps, HandlingPayments, UserRefund, and DAppOperation
         // preOpsPhaseSafe = 0000 0000 0010 0000
         uint16 preOpsPhaseSafe =
             uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.PreOps)));

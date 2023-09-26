@@ -5,9 +5,10 @@ import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
 
 import {Factory} from "./Factory.sol";
 
-import "../types/CallTypes.sol";
+import "../types/SolverCallTypes.sol";
+import "../types/UserCallTypes.sol";
 import "../types/LockTypes.sol";
-import "../types/VerificationTypes.sol";
+import "../types/DAppApprovalTypes.sol";
 
 import {CallVerification} from "../libraries/CallVerification.sol";
 import {CallBits} from "../libraries/CallBits.sol";
@@ -30,7 +31,7 @@ contract Atlas is Test, Factory {
         DAppConfig calldata dConfig, // supplied by frontend
         UserOperation calldata userOp, // set by user
         SolverOperation[] calldata solverOps, // supplied by FastLane via frontend integration
-        Verification calldata verification // supplied by front end after it sees the other data
+        DAppOperation calldata dAppOp // supplied by front end after it sees the other data
     ) external payable {
 
         uint256 gasMarker = gasleft();
@@ -41,7 +42,7 @@ contract Atlas is Test, Factory {
         
         // Only verify signatures of meta txs if the original signer isn't the bundler
         // TODO: Consider extra reentrancy defense here?
-        if (verification.proof.from != msg.sender && !_verifyDApp(userOp.call.to, dConfig, verification)) {
+        if (dAppOp.approval.from != msg.sender && !_verifyDApp(userOp.call.to, dConfig, dAppOp)) {
             valid = false;
         }
         
@@ -52,13 +53,13 @@ contract Atlas is Test, Factory {
         // TODO: Add optionality to bypass DAppControl signatures if user can fully bundle tx
 
         // Get the execution environment
-        address executionEnvironment = _getExecutionEnvironmentCustom(userOp.call.from, verification.proof.controlCodeHash, dConfig.to, dConfig.callConfig);
+        address executionEnvironment = _getExecutionEnvironmentCustom(userOp.call.from, dAppOp.approval.controlCodeHash, dConfig.to, dConfig.callConfig);
 
         // Check that the value of the tx is greater than or equal to the value specified
         if (msg.value < userOp.call.value) { valid = false; }
         //if (msg.sender != tx.origin) { valid = false; }
         if (solverOps.length >= type(uint8).max - 1) { valid = false; }
-        if (block.number > userOp.call.deadline || block.number > verification.proof.deadline) { valid = false; }
+        if (block.number > userOp.call.deadline || block.number > dAppOp.approval.deadline) { valid = false; }
         if (tx.gasprice > userOp.call.maxFeePerGas) { valid = false; }
         if (executionEnvironment.codehash == bytes32(0)) { valid = false; }
         if (!dConfig.callConfig.allowsZeroSolvers() || dConfig.callConfig.needsSolverPostCall()) {
@@ -75,7 +76,7 @@ contract Atlas is Test, Factory {
         // Initialize the lock
         _initializeEscrowLock(executionEnvironment);
 
-        try this.execute{value: msg.value}(dConfig, userOp.call, solverOps, executionEnvironment, verification.proof.callChainHash) 
+        try this.execute{value: msg.value}(dConfig, userOp.call, solverOps, executionEnvironment, dAppOp.approval.callChainHash) 
             returns (uint256 accruedGasRebate) {
             console.log("accruedGasRebate",accruedGasRebate);
             // Gas Refund to sender only if execution is successful
@@ -137,12 +138,12 @@ contract Atlas is Test, Factory {
         key = key.holdUserLock(uCall.to);
         bytes memory userReturnData = _executeUserOperation(uCall, executionEnvironment, key.pack());
 
-        bytes memory DAppReturnData;
+        bytes memory dAppReturnData;
         if (CallBits.needsPreOpsReturnData(callConfig)) {
-            DAppReturnData = preOpsReturnData;
+            dAppReturnData = preOpsReturnData;
         }
         if (CallBits.needsUserReturnData(callConfig)) {
-            DAppReturnData = bytes.concat(DAppReturnData, userReturnData);
+            dAppReturnData = bytes.concat(dAppReturnData, userReturnData);
         }
 
         bytes memory searcherForwardData;
@@ -160,7 +161,7 @@ contract Atlas is Test, Factory {
             // Only execute solver meta tx if userOpHash matches 
             if (!auctionWon && userOpHash == solverOps[key.callIndex-2].call.userOpHash) {
                 (auctionWon, key) = _solverExecutionIteration(
-                        dConfig, solverOps[key.callIndex-2], DAppReturnData, searcherForwardData, auctionWon, executionEnvironment, key
+                        dConfig, solverOps[key.callIndex-2], dAppReturnData, searcherForwardData, auctionWon, executionEnvironment, key
                     );
             }
 
@@ -178,8 +179,8 @@ contract Atlas is Test, Factory {
         }
 
         if (dConfig.callConfig.needsPostOpsCall()) {
-            key = key.holdVerificationLock(address(this));
-            _executePostOpsCall(DAppReturnData, executionEnvironment, key.pack());
+            key = key.holdDAppOperationLock(address(this));
+            _executePostOpsCall(dAppReturnData, executionEnvironment, key.pack());
         }
         return uint256(key.gasRefund);
     }
@@ -187,15 +188,15 @@ contract Atlas is Test, Factory {
     function _solverExecutionIteration(
         DAppConfig calldata dConfig,
         SolverOperation calldata solverOp,
-        bytes memory DAppReturnData,
+        bytes memory dAppReturnData,
         bytes memory searcherForwardData,
         bool auctionWon,
         address executionEnvironment,
         EscrowKey memory key
     ) internal returns (bool, EscrowKey memory) {
-        (auctionWon, key) = _executeSolverOperation(solverOp, DAppReturnData, searcherForwardData, executionEnvironment, key);
+        (auctionWon, key) = _executeSolverOperation(solverOp, dAppReturnData, searcherForwardData, executionEnvironment, key);
         if (auctionWon) {
-            _allocateValue(dConfig, solverOp.bids, DAppReturnData, executionEnvironment, key.pack());
+            _allocateValue(dConfig, solverOp.bids, dAppReturnData, executionEnvironment, key.pack());
             key = key.allocationComplete();
         }
         return (auctionWon, key);

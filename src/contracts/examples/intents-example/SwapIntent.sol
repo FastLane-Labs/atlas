@@ -7,7 +7,10 @@ import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 // Atlas Base Imports
 import {IEscrow} from "../../interfaces/IEscrow.sol";
 
-import "../../types/CallTypes.sol";
+import {CallConfig} from "../../types/DAppApprovalTypes.sol";
+import "../../types/UserCallTypes.sol";
+import "../../types/SolverCallTypes.sol";
+import "../../types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
 import {DAppControl} from "../../dapp/DAppControl.sol";
@@ -252,22 +255,6 @@ contract SwapIntentController is DAppControl {
     ///////////////// GETTERS & HELPERS // //////////////////
     /////////////////////////////////////////////////////////
     // NOTE: These are not delegatecalled
-    function getPayeeData(bytes calldata) external view override returns (PayeeData[] memory) {
-        // This function is called by the backend to get the
-        // payee data, and by the Atlas Factory to generate a
-        // hash to verify the backend.
-
-        bytes memory data; // empty bytes
-
-        PaymentData[] memory payments = new PaymentData[](1);
-
-        payments[0] = PaymentData({payee: control, payeePercent: 100});
-
-        PayeeData[] memory payeeData = new PayeeData[](1);
-
-        payeeData[0] = PayeeData({token: address(0), payments: payments, data: data});
-        return payeeData;
-    }
 
     function getBidFormat(UserCall calldata uCall) external pure override returns (BidData[] memory) {
         // This is a helper function called by solvers

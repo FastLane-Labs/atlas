@@ -8,7 +8,9 @@ import {Mimic} from "./Mimic.sol";
 import {ExecutionEnvironment} from "./ExecutionEnvironment.sol";
 import {Permit69} from "../common/Permit69.sol";
 
-import "../types/CallTypes.sol";
+import "../types/SolverCallTypes.sol";
+import "../types/UserCallTypes.sol";
+import "../types/DAppApprovalTypes.sol";
 
 import "forge-std/Test.sol";
 

@@ -1,7 +1,9 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import "../types/CallTypes.sol";
+import "../types/SolverCallTypes.sol";
+import "../types/UserCallTypes.sol";
+import "../types/DAppApprovalTypes.sol";
 
 import "forge-std/Test.sol";
 
@@ -137,8 +139,6 @@ abstract contract GovernanceControl {
     function _validateUserOperation(UserCall calldata) internal view virtual returns (bool) {
         return true;
     }
-
-    function getPayeeData(bytes calldata data) external view virtual returns (PayeeData[] memory);
 
     function getBidFormat(UserCall calldata uCall) external view virtual returns (BidData[] memory);
 

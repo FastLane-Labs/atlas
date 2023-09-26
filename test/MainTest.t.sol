@@ -14,14 +14,15 @@ import {V2DAppControl} from "../src/contracts/examples/v2-example/V2DAppControl.
 
 import {Solver} from "src/contracts/solver/src/TestSolver.sol";
 
-import "../src/contracts/types/CallTypes.sol";
+import "../src/contracts/types/UserCallTypes.sol";
+import "../src/contracts/types/SolverCallTypes.sol";
 import "../src/contracts/types/EscrowTypes.sol";
 import "../src/contracts/types/LockTypes.sol";
-import "../src/contracts/types/VerificationTypes.sol";
+import "../src/contracts/types/DAppApprovalTypes.sol";
 
 import {BaseTest} from "./base/BaseTest.t.sol";
 import {V2Helper} from "./V2Helper.sol";
-import {VerificationSigner} from "./VerificationSigner.sol";
+import {DAppOperationSigner} from "./DAppOperationSigner.sol";
 
 import "forge-std/Test.sol";
 
@@ -67,11 +68,11 @@ contract MainTest is BaseTest {
 
         console.log("topBid after sorting ",solverOps[0].bids[0].bidAmount);
 
-        // Verification call
-        Verification memory verification =
-            helper.buildVerification(governanceEOA, dConfig, userOp, solverOps);
+        // DAppOperation call
+        DAppOperation memory verification =
+            helper.buildDAppOperation(governanceEOA, dConfig, userOp, solverOps);
 
-        (v, r, s) = vm.sign(governancePK, IAtlas(address(atlas)).getVerificationPayload(verification));
+        (v, r, s) = vm.sign(governancePK, IAtlas(address(atlas)).getDAppOperationPayload(verification));
 
         verification.signature = abi.encodePacked(r, s, v);
 
@@ -127,11 +128,11 @@ contract MainTest is BaseTest {
         (v, r, s) = vm.sign(solverTwoPK, IAtlas(address(atlas)).getSolverPayload(solverOps[1].call));
         solverOps[1].signature = abi.encodePacked(r, s, v);
 
-        // Verification call
+        // DAppOperation call
         verification =
-            helper.buildVerification(governanceEOA, dConfig, userOp, solverOps);
+            helper.buildDAppOperation(governanceEOA, dConfig, userOp, solverOps);
 
-        (v, r, s) = vm.sign(governancePK, IAtlas(address(atlas)).getVerificationPayload(verification));
+        (v, r, s) = vm.sign(governancePK, IAtlas(address(atlas)).getDAppOperationPayload(verification));
 
         verification.signature = abi.encodePacked(r, s, v);
 

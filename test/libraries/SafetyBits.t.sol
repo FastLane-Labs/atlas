@@ -122,9 +122,9 @@ contract SafetyBitsTest is Test {
         assertTrue(key.pack() == want);
     }
 
-    function testHoldVerificationLock() public {
+    function testHoldDAppOperationLock() public {
         EscrowKey memory key = initializeEscrowLock();
-        key = key.holdVerificationLock(address(1));
+        key = key.holdDAppOperationLock(address(1));
         assertTrue(key.lockState == SafetyBits._LOCKED_X_VERIFICATION_X_UNSET);
         assertTrue(key.approvedCaller == address(1));
         assertTrue(key.callIndex == 1);
