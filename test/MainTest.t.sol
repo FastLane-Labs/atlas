@@ -205,32 +205,56 @@ contract MainTest is BaseTest {
     }
     */
 
+    function testTestUserOperation() public {
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+
+        DAppConfig memory dConfig = helper.getDAppConfig();
+        UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, userEOA, TOKEN_ONE);
+        (v, r, s) = vm.sign(userPK, IAtlas(address(atlas)).getUserOperationPayload(userOp));
+        userOp.signature = abi.encodePacked(r, s, v);
+
+        vm.startPrank(userEOA);
+        IAtlas(address(atlas)).createExecutionEnvironment(dConfig);
+
+        // Failure case, user hasn't approved Atlas for TOKEN_ONE, operation must fail
+        assertFalse(IAtlas(address(atlas)).testUserOperation(userOp), "UserOperation tested true");
+        assertFalse(IAtlas(address(atlas)).testUserOperation(userOp.call), "UserCall tested true");
+
+        // Success case
+        ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
+        assertTrue(IAtlas(address(atlas)).testUserOperation(userOp), "UserOperation tested false");
+        assertTrue(IAtlas(address(atlas)).testUserOperation(userOp.call), "UserCall tested false");
+
+        vm.stopPrank();
+    }
+
     function testTestSolverCalls() public {
         uint8 v;
         bytes32 r;
         bytes32 s;
 
-        // Test 1, must return true
         DAppConfig memory dConfig = helper.getDAppConfig();
         UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, userEOA, TOKEN_ONE);
         (v, r, s) = vm.sign(userPK, IAtlas(address(atlas)).getUserOperationPayload(userOp));
         userOp.signature = abi.encodePacked(r, s, v);
+
         SolverOperation[] memory solverOps = new SolverOperation[](1);
+
+        // Success case
         bytes memory solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_ONE);
         solverOps[0] = helper.buildSolverOperation(
             userOp, dConfig, solverOpData, solverOneEOA, address(solverOne), 2e17
         );
         (v, r, s) = vm.sign(solverOnePK, IAtlas(address(atlas)).getSolverPayload(solverOps[0].call));
         solverOps[0].signature = abi.encodePacked(r, s, v);
-        // Verification call
         Verification memory verification =
             helper.buildVerification(governanceEOA, dConfig, userOp, solverOps);
         (v, r, s) = vm.sign(governancePK, IAtlas(address(atlas)).getVerificationPayload(verification));
         verification.signature = abi.encodePacked(r, s, v);
         vm.startPrank(userEOA);
-        address executionEnvironment = IAtlas(address(atlas)).createExecutionEnvironment(dConfig);
-        vm.label(address(executionEnvironment), "EXECUTION ENV");
-        ERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
+        IAtlas(address(atlas)).createExecutionEnvironment(dConfig);
         ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
         (bool success, bytes memory data) = address(atlas).call(
             abi.encodeWithSelector(
@@ -241,21 +265,17 @@ contract MainTest is BaseTest {
         assertTrue(abi.decode(data, (bool)));
         vm.stopPrank();
 
-        // Test2, must return false
-        solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_TWO); // this will make the searcherTx revert
+        // Failure case
+        solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_TWO); // this will make the solver operation revert
         solverOps[0] = helper.buildSolverOperation(
             userOp, dConfig, solverOpData, solverOneEOA, address(solverOne), 2e17
         );
         (v, r, s) = vm.sign(solverOnePK, IAtlas(address(atlas)).getSolverPayload(solverOps[0].call));
         solverOps[0].signature = abi.encodePacked(r, s, v);
-        // Verification call
         verification = helper.buildVerification(governanceEOA, dConfig, userOp, solverOps);
         (v, r, s) = vm.sign(governancePK, IAtlas(address(atlas)).getVerificationPayload(verification));
         verification.signature = abi.encodePacked(r, s, v);
         vm.startPrank(userEOA);
-        vm.label(address(executionEnvironment), "EXECUTION ENV");
-        ERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
-        ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
         (success, data) = address(atlas).call(
             abi.encodeWithSelector(
                 atlas.testSolverCalls.selector, dConfig, userOp, solverOps, verification

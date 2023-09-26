@@ -4,6 +4,7 @@ pragma solidity ^0.8.16;
 import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
 
 import {Factory} from "./Factory.sol";
+import {UserSimulationFailed, UserUnexpectedSuccess, UserSimulationSucceeded} from "../types/Emissions.sol";
 
 import {FastLaneErrorsEvents} from "../types/Emissions.sol";
 
@@ -84,7 +85,13 @@ contract Atlas is Test, Factory {
             // Gas Refund to sender only if execution is successful
             _executeGasRefund(gasMarker, accruedGasRebate, userOp.call.from);
 
-        } catch {
+        } catch (bytes memory revertData) {
+            // Bubble up some specific errors
+            bytes4 errorSwitch = bytes4(revertData);
+            if (errorSwitch == UserNotFulfilled.selector) {
+                revert UserNotFulfilled();
+            }
+
             // TODO: This portion needs more nuanced logic to prevent the replay of failed solver txs
             if (dConfig.callConfig.allowsReuseUserOps()) {
                 revert("ERR-F07 RevertToReuse");
@@ -140,12 +147,20 @@ contract Atlas is Test, Factory {
         key = key.holdUserLock(uCall.to);
         bytes memory userReturnData = _executeUserOperation(uCall, executionEnvironment, key.pack());
 
-        bytes memory returnData;
+        bytes memory DAppReturnData;
         if (CallBits.needsPreOpsReturnData(callConfig)) {
-            returnData = preOpsReturnData;
+            DAppReturnData = preOpsReturnData;
         }
         if (CallBits.needsUserReturnData(callConfig)) {
-            returnData = bytes.concat(returnData, userReturnData);
+            DAppReturnData = bytes.concat(DAppReturnData, userReturnData);
+        }
+
+        bytes memory searcherForwardData;
+        if(CallBits.forwardPreOpsReturnData(callConfig)) {
+            searcherForwardData = preOpsReturnData;
+        }
+        if(CallBits.forwardUserReturnData(callConfig)) {
+            searcherForwardData = bytes.concat(searcherForwardData, userReturnData);
         }
 
         for (; key.callIndex < key.callMax - 1;) {
@@ -153,7 +168,7 @@ contract Atlas is Test, Factory {
             // Only execute solver meta tx if userOpHash matches 
             if (!auctionWon && userOpHash == solverOps[key.callIndex-2].call.userOpHash) {
                 (auctionWon, key) = _solverExecutionIteration(
-                        dConfig, solverOps[key.callIndex-2], returnData, auctionWon, executionEnvironment, key
+                        dConfig, solverOps[key.callIndex-2], DAppReturnData, searcherForwardData, auctionWon, executionEnvironment, key
                     );
             }
 
@@ -172,7 +187,7 @@ contract Atlas is Test, Factory {
 
         if (dConfig.callConfig.needsPostOpsCall()) {
             key = key.holdVerificationLock(address(this));
-            _executePostOpsCall(returnData, executionEnvironment, key.pack());
+            _executePostOpsCall(DAppReturnData, executionEnvironment, key.pack());
         }
         return (auctionWon, uint256(key.gasRefund));
     }
@@ -180,47 +195,93 @@ contract Atlas is Test, Factory {
     function _solverExecutionIteration(
         DAppConfig calldata dConfig,
         SolverOperation calldata solverOp,
-        bytes memory returnData,
+        bytes memory DAppReturnData,
+        bytes memory searcherForwardData,
         bool auctionWon,
         address executionEnvironment,
         EscrowKey memory key
     ) internal returns (bool, EscrowKey memory) {
-        (auctionWon, key) = _executeSolverOperation(solverOp, returnData, executionEnvironment, key);
+        (auctionWon, key) = _executeSolverOperation(solverOp, DAppReturnData, searcherForwardData, executionEnvironment, key);
         if (auctionWon) {
-            _allocateValue(dConfig, solverOp.bids, returnData, executionEnvironment, key.pack());
+            _allocateValue(dConfig, solverOp.bids, DAppReturnData, executionEnvironment, key.pack());
             key = key.allocationComplete();
         }
         return (auctionWon, key);
     }
 
-    function testUserOperation(UserCall calldata uCall) external view returns (bool) {
-        address control = uCall.control;
-        uint32 callConfig = CallBits.buildCallConfig(control);
-        return _testUserOperation(uCall, control, callConfig);
-    }
+    function testUserOperation(UserCall calldata uCall) public returns (bool) {
+        uint32 callConfig = CallBits.buildCallConfig(uCall.control);
 
-    function testUserOperation(UserOperation calldata userOp) external view returns (bool) {
-        if (userOp.to != address(this)) {return false;}
-        address control = userOp.call.control;
-        uint32 callConfig = CallBits.buildCallConfig(control);
+        DAppConfig memory dConfig = DAppConfig(uCall.control, callConfig);
 
-        DAppConfig memory dConfig = DAppConfig(userOp.call.control, callConfig);
+        /*
+        // COMMENTED OUT FOR TESTS
+        bool success;
+        bytes memory data = abi.encodeWithSelector(
+            this.testUserOperationWrapper.selector, 
+            dConfig,
+            uCall
+        );
 
-        return _validateUser(dConfig, userOp) && _testUserOperation(userOp.call, control, callConfig);
-    }
+        (success, data) = address(this).call{value: uCall.value}(data);
+        if (success) {
+            revert UserUnexpectedSuccess();
+        }
 
-    function _testUserOperation(UserCall calldata uCall, address control, uint32 callConfig) internal view returns (bool) {
-        if (callConfig == 0) {
+        bytes4 errorSwitch = bytes4(data);
+        if (errorSwitch == UserSimulationSucceeded.selector) {
+            return true;
+        } else {
             return false;
+        }
+        */
+        try this.testUserOperationWrapper(dConfig, uCall) {
+            revert UserUnexpectedSuccess();
+        
+        } catch (bytes memory data) {
+            bytes4 errorSwitch = bytes4(data);
+            if (errorSwitch == UserSimulationSucceeded.selector) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+    }
+
+    function testUserOperation(UserOperation calldata userOp) external returns (bool) {
+        if (userOp.to != address(this)) {return false;}
+        return testUserOperation(userOp.call);
+    }
+
+    function testUserOperationWrapper(DAppConfig calldata dConfig, UserCall calldata uCall) external {
+        require(msg.sender == address(this), "ERR-SIM001 MustCallSelf");
+
+        if (dConfig.callConfig == 0) {
+            revert UserSimulationFailed();
         }
 
         address executionEnvironment = _getExecutionEnvironmentCustom(
-            uCall.from, control.codehash, control, callConfig);
+            uCall.from, dConfig.to.codehash, dConfig.to, dConfig.callConfig);
 
-        if (executionEnvironment.codehash == bytes32(0) || control.codehash == bytes32(0)) {
-            return false;
+        _initializeEscrowLock(executionEnvironment);
+
+        if (executionEnvironment.codehash == bytes32(0) || dConfig.to.codehash == bytes32(0)) {
+            revert UserSimulationFailed();
         } 
-        return IExecutionEnvironment(executionEnvironment).validateUserOperation(uCall);
+
+        // Initialize the locks
+        EscrowKey memory key = _buildEscrowLock(dConfig, executionEnvironment, uint8(2));
+
+        bytes memory stagingReturnData;
+        if (dConfig.callConfig.needsPreOpsCall()) {
+            key = key.holdPreOpsLock(dConfig.to);
+            stagingReturnData = _executePreOpsCall(uCall, executionEnvironment, key.pack());
+        }
+
+        key = key.holdUserLock(uCall.to);
+        _executeUserOperation(uCall, executionEnvironment, key.pack());
+        
+        revert UserSimulationSucceeded();
     }
 
     function metacallSimulation(
@@ -240,7 +301,7 @@ contract Atlas is Test, Factory {
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         Verification calldata verification
-    ) external payable returns (bool auctionWon) {
+    ) external payable returns (bool success) {
         if (solverOps.length == 0) {
             return false;
         }
@@ -249,9 +310,9 @@ contract Atlas is Test, Factory {
         catch (bytes memory revertData) {
             bytes4 errorSwitch = bytes4(revertData);
             if (errorSwitch == UserNotFulfilled.selector || errorSwitch == NoAuctionWinner.selector) {
-                auctionWon = false;
+                success = false;
             } else {
-                auctionWon = true;
+                success = true;
             }
         }
     }

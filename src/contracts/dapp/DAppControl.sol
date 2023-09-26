@@ -54,16 +54,6 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
         return _preOpsCall(uCall);
     }
 
-    function userLocalCall(bytes calldata data) 
-        external 
-        onlyAtlasEnvironment
-        validControl
-        validPhase(ExecutionPhase.UserOperation)
-        returns (bytes memory) 
-    {
-        return CallBits.needsDelegateUser(callConfig) ? _userLocalDelegateCall(data) : _userLocalStandardCall(data);
-    }
-
     function preSolverCall(bytes calldata data) 
         external 
         onlyAtlasEnvironment
@@ -104,28 +94,9 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
         return _postOpsCall(data);
     }
 
-    function validateUserOperation(UserCall calldata uCall) 
-        external 
-        view
-        onlyAtlasEnvironment
-        validControl
-        returns (bool) 
-    {
-        return _validateUserOperation(uCall);
-    }
-
     // View functions
     function userDelegated() external view returns (bool delegated) {
         delegated = CallBits.needsDelegateUser(callConfig);
-    }
-
-    function userLocal() external view returns (bool local) {
-        local = CallBits.needsLocalUser(callConfig);
-    }
-
-    function userDelegatedLocal() external view returns (bool delegated, bool local) {
-        delegated = CallBits.needsDelegateUser(callConfig);
-        local = CallBits.needsLocalUser(callConfig);
     }
 
     function requireSequencedNonces() external view returns (bool isSequenced) {

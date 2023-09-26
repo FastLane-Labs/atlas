@@ -10,29 +10,30 @@ import {EXECUTION_PHASE_OFFSET, SAFETY_LEVEL_OFFSET} from "../libraries/SafetyBi
 // inside of the custom ExecutionEnvironments that each user deploys when
 // interacting with Atlas in a manner controlled by the DeFi dApp.
 
+// NOTE: No user transfers allowed during UserRefund or HandlingPayments
+uint16 constant SAFE_USER_TRANSFER = uint16(
+    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps)) | 
+    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserOperation)) |
+    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations)) | // TODO: This may be removed later due to security risk
+    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
+);
+
+// NOTE: No Dapp transfers allowed during UserOperation
+uint16 constant SAFE_DAPP_TRANSFER = uint16(
+    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps))
+    | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.HandlingPayments))
+    | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserRefund))
+    | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
+);
+
 // The name comes from the reciprocal nature of the token transfers. Both
 // the user and the DAppControl can transfer tokens from the User
 // and the DAppControl contracts... but only if they each have granted
 // token approval to the Atlas main contract, and only during specific phases
 // of the Atlas execution process.
+
 abstract contract Permit69 {
     using SafeTransferLib for ERC20;
-
-    // NOTE: No user transfers allowed during UserRefund or HandlingPayments
-    uint16 internal constant _SAFE_USER_TRANSFER = uint16(
-        1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps)) | 
-        1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserOperation)) |
-        1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations)) | // TODO: This may be removed later due to security risk
-        1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
-    );
-
-    // NOTE: No Dapp transfers allowed during UserOperation
-    uint16 internal constant _SAFE_DAPP_TRANSFER = uint16(
-        1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps))
-        | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.HandlingPayments))
-        | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserRefund))
-        | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
-    );
 
     // Virtual Functions defined by other Atlas modules
     function _getExecutionEnvironmentCustom(
@@ -62,7 +63,7 @@ abstract contract Permit69 {
         // Verify the lock state
         _verifyLockState({
             lockState: lockState, 
-            safeExecutionPhaseSet: _SAFE_USER_TRANSFER
+            safeExecutionPhaseSet: SAFE_USER_TRANSFER
         });
 
         // Transfer token
@@ -84,7 +85,7 @@ abstract contract Permit69 {
         // Verify the lock state
         _verifyLockState({
             lockState: lockState, 
-            safeExecutionPhaseSet: _SAFE_DAPP_TRANSFER
+            safeExecutionPhaseSet: SAFE_DAPP_TRANSFER
         });
 
         // Transfer token
