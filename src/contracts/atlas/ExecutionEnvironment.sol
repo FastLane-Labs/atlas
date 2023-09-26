@@ -136,7 +136,8 @@ contract ExecutionEnvironment is Base {
         uint256 gasLimit, 
         uint256 escrowBalance, 
         SolverOperation calldata solverOp, 
-        bytes calldata returnData
+        bytes calldata DAppReturnData,
+        bytes calldata searcherForwardData
     ) 
         external payable 
         onlyAtlasEnvironment 
@@ -149,8 +150,7 @@ contract ExecutionEnvironment is Base {
 
         // Track token balances to measure if the bid amount is paid.
         uint256[] memory tokenBalances = new uint[](solverOp.bids.length);
-        uint256 i;
-        for (; i < solverOp.bids.length;) {
+        for (uint i; i < solverOp.bids.length;) {
             // Ether balance
             if (solverOp.bids[i].token == address(0)) {
                 tokenBalances[i] = msg.value; // NOTE: this is the meta tx value
@@ -178,7 +178,7 @@ contract ExecutionEnvironment is Base {
         // Handle any solver preOps, if necessary
         if (_config().needsPreSolver()) {
 
-            bytes memory data = abi.encode(solverOp.call.to, returnData);
+            bytes memory data = abi.encode(solverOp.call.to, DAppReturnData);
 
             data = abi.encodeWithSelector(
                 IDAppControl.preSolverCall.selector, 
@@ -202,7 +202,7 @@ contract ExecutionEnvironment is Base {
         (success,) = ISolverContract(solverOp.call.to).atlasSolverCall{
             gas: gasLimit,
             value: solverOp.call.value
-        }(solverOp.call.from, solverOp.bids, solverOp.call.data);
+        }(solverOp.call.from, solverOp.bids, solverOp.call.data, searcherForwardData);
 
         // Verify that it was successful
         if(!success) {
@@ -212,7 +212,7 @@ contract ExecutionEnvironment is Base {
         // If this was a user intent, handle and verify fulfillment
         if (_config().needsSolverPostCall()) {
             
-            bytes memory data = returnData;
+            bytes memory data = DAppReturnData;
 
             data = abi.encode(solverOp.call.to, data);
 
@@ -238,10 +238,9 @@ contract ExecutionEnvironment is Base {
 
         // Verify that the solver paid what they bid
         bool etherIsBidToken;
-        i = 0;
         uint256 balance;
 
-        for (; i < solverOp.bids.length;) {
+        for (uint i; i < solverOp.bids.length;) {
             // ERC20 tokens as bid currency
             if (!(solverOp.bids[i].token == address(0))) {
                 balance = ERC20(solverOp.bids[i].token).balanceOf(address(this));

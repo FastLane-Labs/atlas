@@ -137,12 +137,20 @@ contract Atlas is Test, Factory {
         key = key.holdUserLock(uCall.to);
         bytes memory userReturnData = _executeUserOperation(uCall, executionEnvironment, key.pack());
 
-        bytes memory returnData;
+        bytes memory DAppReturnData;
         if (CallBits.needsPreOpsReturnData(callConfig)) {
-            returnData = preOpsReturnData;
+            DAppReturnData = preOpsReturnData;
         }
         if (CallBits.needsUserReturnData(callConfig)) {
-            returnData = bytes.concat(returnData, userReturnData);
+            DAppReturnData = bytes.concat(DAppReturnData, userReturnData);
+        }
+
+        bytes memory searcherForwardData;
+        if(CallBits.forwardPreOpsReturnData(callConfig)) {
+            searcherForwardData = preOpsReturnData;
+        }
+        if(CallBits.forwardUserReturnData(callConfig)) {
+            searcherForwardData = bytes.concat(searcherForwardData, userReturnData);
         }
 
         bool auctionWon;
@@ -152,7 +160,7 @@ contract Atlas is Test, Factory {
             // Only execute solver meta tx if userOpHash matches 
             if (!auctionWon && userOpHash == solverOps[key.callIndex-2].call.userOpHash) {
                 (auctionWon, key) = _solverExecutionIteration(
-                        dConfig, solverOps[key.callIndex-2], returnData, auctionWon, executionEnvironment, key
+                        dConfig, solverOps[key.callIndex-2], DAppReturnData, searcherForwardData, auctionWon, executionEnvironment, key
                     );
             }
 
@@ -171,7 +179,7 @@ contract Atlas is Test, Factory {
 
         if (dConfig.callConfig.needsPostOpsCall()) {
             key = key.holdVerificationLock(address(this));
-            _executePostOpsCall(returnData, executionEnvironment, key.pack());
+            _executePostOpsCall(DAppReturnData, executionEnvironment, key.pack());
         }
         return uint256(key.gasRefund);
     }
@@ -179,14 +187,15 @@ contract Atlas is Test, Factory {
     function _solverExecutionIteration(
         DAppConfig calldata dConfig,
         SolverOperation calldata solverOp,
-        bytes memory returnData,
+        bytes memory DAppReturnData,
+        bytes memory searcherForwardData,
         bool auctionWon,
         address executionEnvironment,
         EscrowKey memory key
     ) internal returns (bool, EscrowKey memory) {
-        (auctionWon, key) = _executeSolverOperation(solverOp, returnData, executionEnvironment, key);
+        (auctionWon, key) = _executeSolverOperation(solverOp, DAppReturnData, searcherForwardData, executionEnvironment, key);
         if (auctionWon) {
-            _allocateValue(dConfig, solverOp.bids, returnData, executionEnvironment, key.pack());
+            _allocateValue(dConfig, solverOp.bids, DAppReturnData, executionEnvironment, key.pack());
             key = key.allocationComplete();
         }
         return (auctionWon, key);
