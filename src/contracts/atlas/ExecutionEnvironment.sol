@@ -140,8 +140,8 @@ contract ExecutionEnvironment is Base {
         uint256 gasLimit, 
         uint256 escrowBalance, 
         SolverOperation calldata solverOp, 
-        bytes calldata protocolReturnData,
-        bytes calldata searcherReturnData
+        bytes calldata DAppReturnData,
+        bytes calldata searcherForwardData
     ) 
         external payable 
         onlyAtlasEnvironment 
@@ -182,7 +182,7 @@ contract ExecutionEnvironment is Base {
         // Handle any solver preOps, if necessary
         if (_config().needsPreSolver()) {
 
-            bytes memory data = abi.encode(solverOp.call.to, protocolReturnData);
+            bytes memory data = abi.encode(solverOp.call.to, DAppReturnData);
 
             data = abi.encodeWithSelector(
                 IDAppControl.preSolverCall.selector, 
@@ -206,7 +206,7 @@ contract ExecutionEnvironment is Base {
         (success,) = ISolverContract(solverOp.call.to).atlasSolverCall{
             gas: gasLimit,
             value: solverOp.call.value
-        }(solverOp.call.from, solverOp.bids, solverOp.call.data, searcherReturnData);
+        }(solverOp.call.from, solverOp.bids, solverOp.call.data, searcherForwardData);
 
         // Verify that it was successful
         if(!success) {
@@ -216,7 +216,7 @@ contract ExecutionEnvironment is Base {
         // If this was a user intent, handle and verify fulfillment
         if (_config().needsSolverPostCall()) {
             
-            bytes memory data = protocolReturnData;
+            bytes memory data = DAppReturnData;
 
             data = abi.encode(solverOp.call.to, data);
 

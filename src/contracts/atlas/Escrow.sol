@@ -170,8 +170,8 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
 
     function _executeSolverOperation(
         SolverOperation calldata solverOp,
-        bytes memory protocolReturnData,
-        bytes memory searcherReturnData,
+        bytes memory DAppReturnData,
+        bytes memory searcherForwardData,
         address environment,
         EscrowKey memory key
     ) internal returns (bool auctionWon, EscrowKey memory) {
@@ -192,7 +192,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
             key = key.holdSolverLock(solverOp.call.to);
 
             // Execute the solver call
-            (outcome, escrowSurplus) = _solverOpWrapper(gasLimit, environment, solverOp, protocolReturnData, searcherReturnData, key.pack());
+            (outcome, escrowSurplus) = _solverOpWrapper(gasLimit, environment, solverOp, DAppReturnData, searcherForwardData, key.pack());
 
             unchecked {
                 solverEscrow.total += uint128(escrowSurplus);
