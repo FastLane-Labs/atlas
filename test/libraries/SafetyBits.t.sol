@@ -11,7 +11,7 @@ contract SafetyBitsTest is Test {
     using SafetyBits for EscrowKey;
 
     function initializeEscrowLock() public pure returns (EscrowKey memory key) {
-        key = key.initializeEscrowLock(true, 1, address(0));
+        key = key.initializeEscrowLock(true, 1, address(0), false);
     }
 
     function testConstants() public {

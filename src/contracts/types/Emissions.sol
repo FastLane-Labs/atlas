@@ -3,6 +3,10 @@ pragma solidity ^0.8.16;
 
 import {BidData} from "../types/SolverCallTypes.sol";
 
+error UserSimulationFailed();
+error UserSimulationSucceeded();
+error UserUnexpectedSuccess();
+
 contract FastLaneErrorsEvents {
     // NOTE: nonce is the executed nonce
     event SolverTxResult(
@@ -33,4 +37,14 @@ contract FastLaneErrorsEvents {
     error IntentUnfulfilled();
     error PreSolverFailed();
     error PostSolverFailed();
+
+    error UserNotFulfilled();
+    error NoAuctionWinner();
+
+    error VerificationSimFail();
+    error PreOpsSimFail();
+    error UserOpSimFail();
+    error SolverSimFail();
+    error PostOpsSimFail();
+    error SimulationPassed();
 }

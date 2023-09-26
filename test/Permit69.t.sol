@@ -12,6 +12,7 @@ import {Permit69} from "../src/contracts/common/Permit69.sol";
 import {Mimic} from "../src/contracts/atlas/Mimic.sol";
 
 import {EXECUTION_PHASE_OFFSET, SAFETY_LEVEL_OFFSET} from "../src/contracts/libraries/SafetyBits.sol";
+import {SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER} from "../src/contracts/common/Permit69.sol";
 
 import "../src/contracts/types/LockTypes.sol";
 
@@ -38,7 +39,9 @@ contract Permit69Test is BaseTest {
             callIndex: 0,
             callMax: 0,
             lockState: EXEC_PHASE_PRE_OPS,
-            gasRefund: 0
+            gasRefund: 0,
+            isSimulation: false,
+            callDepth: 0
         });
 
         mockAtlas = new MockAtlasForPermit69Tests();
@@ -262,11 +265,11 @@ contract MockAtlasForPermit69Tests is Permit69 {
     }
 
     function getSafeUserTransfer() public view returns (uint16) {
-        return _SAFE_USER_TRANSFER;
+        return SAFE_USER_TRANSFER;
     }
 
     function getSafeDAppTransfer() public view returns (uint16) {
-        return _SAFE_DAPP_TRANSFER;
+        return SAFE_DAPP_TRANSFER;
     }
 
     // Setters for testing

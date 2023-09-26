@@ -55,7 +55,9 @@ contract DAppVerification is EIP712, DAppIntegration {
     {
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp nonces
-        require(_verifyDAppSignature(dAppOp), "ERR-PV01 InvalidSignature");
+        if (!_verifyDAppSignature(dAppOp)) {
+            return false;
+        }
 
         // NOTE: to avoid replay attacks arising from key management errors,
         // the state changes below must be *saved* even if they render the
@@ -152,6 +154,7 @@ contract DAppVerification is EIP712, DAppIntegration {
     }
 
     function _verifyDAppSignature(DAppOperation calldata dAppOp) internal view returns (bool) {
+        if (dAppOp.signature.length == 0) { return false; }
         address signer = _hashTypedDataV4(_getProofHash(dAppOp.approval)).recover(dAppOp.signature);
 
         return signer == dAppOp.approval.from;
@@ -174,7 +177,9 @@ contract DAppVerification is EIP712, DAppIntegration {
         
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp userNonces
-        require(_verifyUserSignature(userOp), "ERR-UV01 InvalidSignature");
+        if (!_verifyUserSignature(userOp)) {
+            return false;
+        }
 
         if (userOp.call.control != dConfig.to) {
             return (false);
@@ -217,54 +222,6 @@ contract DAppVerification is EIP712, DAppIntegration {
         return (true);
     }
 
-    function _validateUser(DAppConfig memory dConfig, UserOperation calldata userOp)
-        internal
-        view
-        returns (bool)
-    {
-        
-        // Verify the signature before storing any data to avoid
-        // spoof transactions clogging up dapp userNonces
-        if (!_verifyUserSignature(userOp)) {
-            return (false);
-        }
-
-        if (userOp.call.control != dConfig.to) {
-            return (false);
-        }
-
-        if (userOp.call.nonce > type(uint64).max - 1) {
-            return (false);
-        }
-
-        uint256 userNonce = userNonces[userOp.call.from];
-
-        // If the dapp indicated that they only accept sequenced userNonces
-        // (IE for FCFS execution), check and make sure the order is correct
-        // NOTE: allowing only sequenced userNonces could create a scenario in
-        // which builders or validators may be able to profit via censorship.
-        // DApps are encouraged to rely on the deadline parameter
-        // to prevent replay attacks.
-        if (dConfig.callConfig.needsSequencedNonces()) {
-            if (userOp.call.nonce != userNonce + 1) {
-                return (false);
-            }
-
-            // If not sequenced, check to see if this nonce is highest and store
-            // it if so.  This ensures nonce + 1 will always be available.
-        } else {
-            // NOTE: including the callConfig in the asyncNonceKey should prevent
-            // issues occuring when a dapp may switch configs between blocking 
-            // and async, since callConfig can double as another seed. 
-            bytes32 asyncNonceKey = keccak256(abi.encode(userOp.call.from, dConfig.callConfig, userOp.call.nonce + 1));
-            
-            if (asyncNonceFills[asyncNonceKey] != address(0)) {
-                return (false);
-            }
-        }
-        return (true);
-    }
-
     function _getProofHash(UserCall memory uCall) internal pure returns (bytes32 proofHash) {
         proofHash = keccak256(
             abi.encode(
@@ -283,6 +240,7 @@ contract DAppVerification is EIP712, DAppIntegration {
     }
 
     function _verifyUserSignature(UserOperation calldata userOp) internal view returns (bool) {
+        if (userOp.signature.length == 0) { return false; }
         address signer = _hashTypedDataV4(_getProofHash(userOp.call)).recover(userOp.signature);
 
         return signer == userOp.call.from;

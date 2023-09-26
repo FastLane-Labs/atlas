@@ -4,9 +4,13 @@ pragma solidity ^0.8.16;
 import {IPermit69} from "../interfaces/IPermit69.sol";
 import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
 
+import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
+
 import {ExecutionPhase} from "../types/LockTypes.sol";
 
 import {EXECUTION_PHASE_OFFSET} from "../libraries/SafetyBits.sol";
+
+import {SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER} from "./Permit69.sol";
 
 // import "forge-std/Test.sol";
 
@@ -233,5 +237,42 @@ contract ExecutionBase is Base {
         IPermit69(atlas).transferDAppERC20(
             token, destination, amount, _user(), _control(), _config(), _lockState()
         );
+    }
+
+    function _availableFundsERC20(
+        address token,
+        address source,
+        uint256 amount,
+        ExecutionPhase phase
+    ) internal view returns (bool available) {
+    
+        uint256 balance = ERC20(token).balanceOf(source);
+        if (balance < amount) {
+            return false;
+        }
+
+        uint16 shiftedPhase = uint16(1 << (EXECUTION_PHASE_OFFSET + uint16(phase)));
+        address user = _user();
+        address dapp = _control();
+
+        if (source == user) {
+            if (shiftedPhase & SAFE_USER_TRANSFER == 0) {
+                return false;
+            }
+            if (ERC20(token).allowance(user, atlas) < amount) {
+                return false;
+            }
+            return true;
+        
+        } else if (source == dapp) {
+            if (shiftedPhase & SAFE_DAPP_TRANSFER == 0) {
+                return false;
+            }
+            if (ERC20(token).allowance(dapp, atlas) < amount) {
+                return false;
+            }
+            return true;
+        }
+        return false;
     }
 }

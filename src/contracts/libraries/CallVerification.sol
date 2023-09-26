@@ -17,7 +17,7 @@ library CallVerification {
     }
 
     function getCallChainHash(
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         UserCall calldata uCall,
         SolverOperation[] calldata solverOps
     ) internal pure returns (bytes32 callSequenceHash) {

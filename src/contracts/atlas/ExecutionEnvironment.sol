@@ -323,44 +323,6 @@ contract ExecutionEnvironment is Base {
     }
 
     ///////////////////////////////////////
-    //   HELPER / SEQUENCING FUNCTIONS   //
-    ///////////////////////////////////////
-
-    function validateUserOperation(UserCall calldata uCall)   
-        external 
-        // view 
-        // onlyAtlas
-        returns (bool) {
-        // msg.sender = atlas
-        // address(this) = ExecutionEnvironment
-        if (uCall.from != _user()) {
-            return false;
-        }
-
-        if (uCall.control != _control()) {
-            return false;
-        }
-
-        if (uCall.deadline < block.number) {
-            return false;
-        }
-
-        if (_controlCodeHash() != _control().codehash) {
-            return false;
-        }
-
-        bytes memory data = abi.encodeWithSelector(
-            IDAppControl.validateUserOperation.selector, uCall);
-
-        (bool success, bytes memory returnData) = _control().delegatecall(forward(data));
-
-        if (!success) {
-            return false;
-        }
-        return abi.decode(returnData, (bool));
-    }
-
-    ///////////////////////////////////////
     //  USER SUPPORT / ACCESS FUNCTIONS  //
     ///////////////////////////////////////
     function withdrawERC20(address token, uint256 amount) external {

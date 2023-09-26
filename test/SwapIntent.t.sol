@@ -124,6 +124,7 @@ contract SwapIntentTest is BaseTest {
 
         vm.startPrank(userEOA);
         address executionEnvironment = atlas.createExecutionEnvironment(dConfig);
+        console.log("executionEnvironment",executionEnvironment);
         vm.stopPrank();
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
@@ -193,12 +194,13 @@ contract SwapIntentTest is BaseTest {
 
         vm.startPrank(userEOA);
         
-        assertFalse(atlas.testUserOperation(userOp), "UserOperation tested true");
+        assertFalse(simulator.simUserOperation(userOp), "metasimUserOperationcall tested true a");
+        assertFalse(simulator.simUserOperation(userOp.call), "metasimUserOperationcall call tested true b");
         
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
-        assertTrue(atlas.testUserOperation(userOp), "UserOperation tested true");
-        assertTrue(atlas.testUserOperation(userOp.call), "UserCall tested true");
+        assertTrue(simulator.simUserOperation(userOp), "metasimUserOperationcall tested false c");
+        assertTrue(simulator.simUserOperation(userOp.call), "metasimUserOperationcall call tested false d");
 
 
         // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
@@ -249,6 +251,7 @@ contract SwapIntentTest is BaseTest {
 
         vm.startPrank(userEOA);
         address executionEnvironment = atlas.createExecutionEnvironment(dConfig);
+        console.log("executionEnvironment a",executionEnvironment);
         vm.stopPrank();
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
@@ -317,17 +320,17 @@ contract SwapIntentTest is BaseTest {
         console.log("Solver DAI balance", DAI.balanceOf(address(uniswapSolver)));
 
         vm.startPrank(userEOA);
-        
-        assertFalse(atlas.testUserOperation(userOp), "UserOperation tested true");
+
+        assertFalse(simulator.simUserOperation(userOp), "metasimUserOperationcall tested true");
+        assertFalse(simulator.simUserOperation(userOp.call), "metasimUserOperationcall call tested true");
         
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
-        assertTrue(atlas.testUserOperation(userOp), "UserOperation tested true");
-        assertTrue(atlas.testUserOperation(userOp.call), "UserCall tested true");
+        assertTrue(simulator.simUserOperation(userOp), "metasimUserOperationcall tested false");
+        assertTrue(simulator.simUserOperation(userOp.call), "metasimUserOperationcall call tested false");
 
         // Check solver does NOT have DAI - it must use Uniswap to get it during metacall
         assertEq(DAI.balanceOf(address(uniswapSolver)), 0, "Solver has DAI before metacall");
-
 
         // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
         atlas.metacall({

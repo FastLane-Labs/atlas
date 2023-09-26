@@ -101,15 +101,6 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
         return _postOpsCall(data);
     }
 
-    function validateUserOperation(UserCall calldata uCall) 
-        external 
-        view
-        validControl
-        returns (bool) 
-    {
-        return _validateUserOperation(uCall);
-    }
-
     // View functions
     function userDelegated() external view returns (bool delegated) {
         delegated = CallBits.needsDelegateUser(callConfig);

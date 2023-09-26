@@ -9,6 +9,8 @@ struct EscrowKey {
     uint8 callMax;
     uint16 lockState; // bitwise
     uint32 gasRefund;
+    bool isSimulation;
+    uint8 callDepth;
 }
 
 enum SolverSafety {

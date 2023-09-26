@@ -88,7 +88,8 @@ library SafetyBits {
                 self.callMax,
                 self.lockState,
                 self.gasRefund,
-                uint16(0)
+                self.isSimulation,
+                uint8(0) // callDepth
             )
         );
     }
@@ -158,7 +159,7 @@ library SafetyBits {
         return self;
     }
 
-    function initializeEscrowLock(EscrowKey memory self, bool needsPreOps, uint8 solverOpCount, address nextCaller)
+    function initializeEscrowLock(EscrowKey memory self, bool needsPreOps, uint8 solverOpCount, address nextCaller, bool isSimulation)
         internal
         pure
         returns (EscrowKey memory)
@@ -167,6 +168,7 @@ library SafetyBits {
         self.callMax = solverOpCount + 3;
         self.callIndex = needsPreOps ? 0 : 1;
         self.lockState = needsPreOps ? _ACTIVE_X_PRE_OPS_X_UNSET : _ACTIVE_X_USER_X_UNSET;
+        self.isSimulation = isSimulation;
         return self;
     }
 
