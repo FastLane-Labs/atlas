@@ -56,6 +56,12 @@ library CallBits {
         if (callConfig.unknownBundler) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.UnknownBundler);
         }
+        if (callConfig.forwardPreOpsReturnData) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.ForwardPreOpsReturnData);
+        }
+        if (callConfig.forwardUserReturnData) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.ForwardUserReturnData);
+        }
     }
 
     function decodeCallConfig(uint32 encodedCallConfig) internal pure returns (CallConfig memory callConfig) {
@@ -73,7 +79,9 @@ library CallBits {
             reuseUserOp: allowsReuseUserOps(encodedCallConfig),
             userBundler: allowsUserBundler(encodedCallConfig),
             dAppBundler: allowsDAppBundler(encodedCallConfig),
-            unknownBundler: allowsUnknownBundler(encodedCallConfig)
+            unknownBundler: allowsUnknownBundler(encodedCallConfig),
+            forwardPreOpsReturnData: forwardPreOpsReturnData(encodedCallConfig),
+            forwardUserReturnData: forwardUserReturnData(encodedCallConfig)
         });
     }
 
@@ -131,5 +139,13 @@ library CallBits {
 
     function allowsUnknownBundler(uint32 callConfig) internal pure returns (bool unknownBundler) {
         unknownBundler = (callConfig & 1 << uint32(CallConfigIndex.UnknownBundler) != 0);
+    }
+
+    function forwardPreOpsReturnData(uint32 callConfig) internal pure returns (bool) {
+        return (callConfig & 1 << uint32(CallConfigIndex.ForwardPreOpsReturnData) != 0);
+    }
+
+    function forwardUserReturnData(uint32 callConfig) internal pure returns (bool) {
+        return (callConfig & 1 << uint32(CallConfigIndex.ForwardUserReturnData) != 0);
     }
 }
