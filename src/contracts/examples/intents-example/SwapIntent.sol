@@ -57,10 +57,10 @@ contract SwapIntentController is DAppControl {
             msg.sender, 
             CallConfig({
                 sequenced: false,
-                requirePreOps: true,
-                trackPreOpsReturnData: true,
-                trackUserReturnData: false,
-                localUser: true,
+                requirePreOps: false,
+                trackPreOpsReturnData: false,
+                trackUserReturnData: true,
+                localUser: false,
                 delegateUser: true,
                 preSolver: true,
                 postSolver: true,
@@ -69,7 +69,9 @@ contract SwapIntentController is DAppControl {
                 reuseUserOp: true,
                 userBundler: true,
                 dAppBundler: true,
-                unknownBundler: true
+                unknownBundler: true,
+                forwardPreOpsReturnData: false,
+                forwardUserReturnData: false
             })
         )
     {}
@@ -79,34 +81,16 @@ contract SwapIntentController is DAppControl {
     //////////////////////////////////
 
     // swap() selector = 0x98434997
-    function swap(bytes calldata data) public payable {
+    function swap(SwapIntent calldata swapIntent) external payable returns (SwapData memory) {
         require(msg.sender == escrow, "ERR-PI002 InvalidSender");
         require(_approvedCaller() == control, "ERR-PI003 InvalidLockState");
         require(address(this) != control, "ERR-PI004 MustBeDelegated");
+        
+        address user = _user();
 
         // NOTE: To avoid redundant memory buildup, we pass the user's calldata all the way through
         // to the swap function. Because of this, it will still have its function selector. 
-        require(bytes4(data) == this.swap.selector, "ERR-PI005 NoDuplicateSelector");
-
-        SwapIntent memory swapIntent =abi.decode(data[4:], (SwapIntent));
-
-        require(ERC20(swapIntent.tokenUserSells).balanceOf(_user()) >= swapIntent.amountUserSells, "ERR-PI020 InsufficientUserBalance");
-    }
-
-    //////////////////////////////////
-    //   ATLAS OVERRIDE FUNCTIONS   //
-    //////////////////////////////////
-
-    function _preOpsCall(UserCall calldata uCall)
-        internal
-        override
-        returns (bytes memory)
-    {
-        require(bytes4(uCall.data) == this.swap.selector, "ERR-PI001 InvalidSelector");
-        require(uCall.to == control, "ERR-PI006 InvalidUserTo");
-
-        // This dApp control currently requires all 
-        SwapIntent memory swapIntent = abi.decode(uCall.data[4:], (SwapIntent));
+        require(ERC20(swapIntent.tokenUserSells).balanceOf(user) >= swapIntent.amountUserSells, "ERR-PI020 InsufficientUserBalance");
 
         // There should never be a balance on this ExecutionEnvironment greater than 1, but check
         // anyway so that the auction accounting isn't imbalanced by unexpected inventory. 
@@ -117,23 +101,23 @@ contract SwapIntentController is DAppControl {
         // TODO: Could maintain a balance of "1" of each token to allow the user to save gas over multiple uses
         uint256 buyTokenBalance = ERC20(swapIntent.tokenUserBuys).balanceOf(address(this));
         if (buyTokenBalance > 0) { 
-            ERC20(swapIntent.tokenUserBuys).safeTransfer(_user(), buyTokenBalance);
+            ERC20(swapIntent.tokenUserBuys).safeTransfer(user, buyTokenBalance);
         }
 
         uint256 sellTokenBalance = ERC20(swapIntent.tokenUserSells).balanceOf(address(this));
         if (sellTokenBalance > 0) {
-            ERC20(swapIntent.tokenUserSells).safeTransfer(_user(), sellTokenBalance);
+            ERC20(swapIntent.tokenUserSells).safeTransfer(user, sellTokenBalance);
         }
 
         if (swapIntent.auctionBaseCurrency != swapIntent.tokenUserSells || swapIntent.auctionBaseCurrency != swapIntent.tokenUserBuys) {
             if (swapIntent.auctionBaseCurrency == address(0)) {
                 uint256 auctionBaseCurrencyBalance = address(this).balance;
-                SafeTransferLib.safeTransferETH(_user(), auctionBaseCurrencyBalance);
+                SafeTransferLib.safeTransferETH(user, auctionBaseCurrencyBalance);
             
             } else {
                 uint256 auctionBaseCurrencyBalance = ERC20(swapIntent.auctionBaseCurrency).balanceOf(address(this));
                 if (auctionBaseCurrencyBalance > 0) {
-                    ERC20(swapIntent.tokenUserBuys).safeTransfer(_user(), auctionBaseCurrencyBalance);
+                    ERC20(swapIntent.tokenUserBuys).safeTransfer(user, auctionBaseCurrencyBalance);
                 }
             }
         }
@@ -174,16 +158,12 @@ contract SwapIntentController is DAppControl {
             }
         }
 
-        bytes memory preOpsReturnData = abi.encode(swapData);
-        return preOpsReturnData;
+        return swapData;
     }
 
-    function _userLocalDelegateCall(bytes calldata data) internal override returns (bytes memory nullData) {
-        if (bytes4(data) == this.swap.selector) {
-            swap(data);
-        }
-        return nullData;
-    }
+    //////////////////////////////////
+    //   ATLAS OVERRIDE FUNCTIONS   //
+    //////////////////////////////////
 
     function _preSolverCall(bytes calldata data) internal override returns (bool) {
         (address solverTo, bytes memory returnData) = abi.decode(data, (address, bytes));

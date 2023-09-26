@@ -8,8 +8,6 @@ interface IDAppControl {
 
     function preOpsCall(UserCall calldata uCall) external returns (bytes memory);
 
-    function userLocalCall(bytes calldata data) external returns (bytes memory);
-
     function allocateValueCall(bytes calldata data) external;
 
     function preSolverCall(bytes calldata data) external returns (bool);
@@ -35,10 +33,6 @@ interface IDAppControl {
     function preOpsDelegated() external view returns (bool delegated);
 
     function userDelegated() external view returns (bool delegated);
-
-    function userLocal() external view returns (bool local);
-
-    function userDelegatedLocal() external view returns (bool delegated, bool local);
 
     function allocatingDelegated() external view returns (bool delegated);
 

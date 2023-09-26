@@ -62,7 +62,9 @@ contract V4DAppControl is DAppControl {
                 reuseUserOp: false,
                 userBundler: true,
                 dAppBundler: true,
-                unknownBundler: true
+                unknownBundler: true,
+                forwardPreOpsReturnData: false,
+                forwardUserReturnData: false
             })
         )
     {
