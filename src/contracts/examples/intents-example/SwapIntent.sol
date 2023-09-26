@@ -8,6 +8,7 @@ import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 import {IEscrow} from "../../interfaces/IEscrow.sol";
 
 import "../../types/CallTypes.sol";
+import {ExecutionPhase} from "../../types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
 import {DAppControl} from "../../dapp/DAppControl.sol";
@@ -88,10 +89,6 @@ contract SwapIntentController is DAppControl {
         
         address user = _user();
 
-        // NOTE: To avoid redundant memory buildup, we pass the user's calldata all the way through
-        // to the swap function. Because of this, it will still have its function selector. 
-        require(ERC20(swapIntent.tokenUserSells).balanceOf(user) >= swapIntent.amountUserSells, "ERR-PI020 InsufficientUserBalance");
-
         // There should never be a balance on this ExecutionEnvironment greater than 1, but check
         // anyway so that the auction accounting isn't imbalanced by unexpected inventory. 
 
@@ -108,6 +105,11 @@ contract SwapIntentController is DAppControl {
         if (sellTokenBalance > 0) {
             ERC20(swapIntent.tokenUserSells).safeTransfer(user, sellTokenBalance);
         }
+
+        require(
+            _availableFundsERC20(swapIntent.tokenUserSells, user, swapIntent.amountUserSells, ExecutionPhase.SolverOperations),
+            "ERR-PI059 SellFundsUnavailable"
+        );
 
         if (swapIntent.auctionBaseCurrency != swapIntent.tokenUserSells || swapIntent.auctionBaseCurrency != swapIntent.tokenUserBuys) {
             if (swapIntent.auctionBaseCurrency == address(0)) {
