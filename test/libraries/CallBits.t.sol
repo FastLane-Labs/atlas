@@ -28,7 +28,9 @@ contract CallBitsTest is Test {
             reuseUserOp: true,
             userBundler: false,
             dAppBundler: true,
-            unknownBundler: false
+            unknownBundler: false,
+            forwardPreOpsReturnData: true,
+            forwardUserReturnData: false
         });
 
         callConfig2 = CallConfig({
@@ -45,19 +47,21 @@ contract CallBitsTest is Test {
             reuseUserOp: !callConfig1.reuseUserOp,
             userBundler: !callConfig1.userBundler,
             dAppBundler: !callConfig1.dAppBundler,
-            unknownBundler: !callConfig1.unknownBundler
+            unknownBundler: !callConfig1.unknownBundler,
+            forwardPreOpsReturnData: !callConfig1.forwardPreOpsReturnData,
+            forwardUserReturnData: !callConfig1.forwardUserReturnData
         });
     }
 
     function testEncodeCallConfig() public {
-        string memory expectedBitMapString = "00000000000000000001010101010101";
+        string memory expectedBitMapString = "00000000000000000101010101010101";
         assertEq(
             TestUtils.uint32ToBinaryString(CallBits.encodeCallConfig(callConfig1)),
             expectedBitMapString,
             "callConfig1 incorrect"
         );
 
-        expectedBitMapString = "00000000000000000010101010101010";
+        expectedBitMapString = "00000000000000001010101010101010";
         assertEq(
             TestUtils.uint32ToBinaryString(CallBits.encodeCallConfig(callConfig2)),
             expectedBitMapString,
@@ -82,6 +86,8 @@ contract CallBitsTest is Test {
         assertEq(decodedCallConfig.userBundler, false, "userBundler 1 incorrect");
         assertEq(decodedCallConfig.dAppBundler, true, "dAppBundler 1 incorrect");
         assertEq(decodedCallConfig.unknownBundler, false, "unknownBundler 1 incorrect");
+        assertEq(decodedCallConfig.forwardPreOpsReturnData, true, "forwardPreOpsReturnData 1 incorrect");
+        assertEq(decodedCallConfig.forwardUserReturnData, false, "forwardUserReturnData 1 incorrect");
 
         encodedCallConfig = CallBits.encodeCallConfig(callConfig2);
         decodedCallConfig = encodedCallConfig.decodeCallConfig();
@@ -99,6 +105,8 @@ contract CallBitsTest is Test {
         assertEq(decodedCallConfig.userBundler, true, "userBundler 2 incorrect");
         assertEq(decodedCallConfig.dAppBundler, false, "dAppBundler 2 incorrect");
         assertEq(decodedCallConfig.unknownBundler, true, "unknownBundler 2 incorrect");
+        assertEq(decodedCallConfig.forwardPreOpsReturnData, false, "forwardPreOpsReturnData 2 incorrect");
+        assertEq(decodedCallConfig.forwardUserReturnData, true, "forwardUserReturnData 2 incorrect");
     }
 
     function testConfigParameters() public {
@@ -117,6 +125,8 @@ contract CallBitsTest is Test {
         assertEq(encodedCallConfig.allowsUserBundler(), false, "allowsUserBundler 1 incorrect");
         assertEq(encodedCallConfig.allowsDAppBundler(), true, "allowsDAppBundler 1 incorrect");
         assertEq(encodedCallConfig.allowsUnknownBundler(), false, "allowsUnknownBundler 1 incorrect");
+        assertEq(encodedCallConfig.forwardPreOpsReturnData(), true, "forwardPreOpsReturnData 1 incorrect");
+        assertEq(encodedCallConfig.forwardUserReturnData(), false, "forwardUserReturnData 1 incorrect");
 
         encodedCallConfig = CallBits.encodeCallConfig(callConfig2);
         assertEq(encodedCallConfig.needsSequencedNonces(), false, "needsSequencedNonces 2 incorrect");
@@ -133,5 +143,7 @@ contract CallBitsTest is Test {
         assertEq(encodedCallConfig.allowsUserBundler(), true, "allowsUserBundler 2 incorrect");
         assertEq(encodedCallConfig.allowsDAppBundler(), false, "allowsDAppBundler 2 incorrect");
         assertEq(encodedCallConfig.allowsUnknownBundler(), true, "allowsUnknownBundler 2 incorrect");
+        assertEq(encodedCallConfig.forwardPreOpsReturnData(), false, "forwardPreOpsReturnData 2 incorrect");
+        assertEq(encodedCallConfig.forwardUserReturnData(), true, "forwardUserReturnData 2 incorrect");
     }
 }
