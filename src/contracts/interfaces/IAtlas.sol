@@ -14,8 +14,14 @@ interface IAtlas {
 
     function createExecutionEnvironment(DAppConfig calldata dConfig) external returns (address environment);
 
-    function testUserOperation(UserCall calldata uCall) external view returns (bool);
-    function testUserOperation(UserOperation calldata userOp) external view returns (bool);
+    function testUserOperation(UserCall calldata uCall) external returns (bool);
+    function testUserOperation(UserOperation calldata userOp) external returns (bool);
+    function testSolverCalls(
+        DAppConfig calldata dConfig,
+        UserOperation calldata userOp,
+        SolverOperation[] calldata solverOps,
+        Verification calldata verification
+    ) external returns (bool);
 
     function withdrawERC20(address token, uint256 amount, DAppConfig memory dConfig) external;
     function withdrawEther(uint256 amount, DAppConfig memory dConfig) external;

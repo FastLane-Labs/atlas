@@ -134,10 +134,6 @@ abstract contract GovernanceControl {
     // View functions used by the backend to verify bid format
     // and by the factory and DAppVerification to verify the
     // backend.
-    function _validateUserOperation(UserCall calldata) internal view virtual returns (bool) {
-        return true;
-    }
-
     function getPayeeData(bytes calldata data) external view virtual returns (PayeeData[] memory);
 
     function getBidFormat(UserCall calldata uCall) external view virtual returns (BidData[] memory);
