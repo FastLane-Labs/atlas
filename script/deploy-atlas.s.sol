@@ -4,10 +4,12 @@ pragma solidity ^0.8.18;
 import "forge-std/Script.sol";
 import "forge-std/Test.sol";
 
+import {DeployBaseScript} from "script/base/deploy-base.s.sol";
+
 import {Atlas} from "src/contracts/atlas/Atlas.sol";
 import {SwapIntentController} from "src/contracts/examples/intents-example/SwapIntent.sol";
 
-contract DeployAtlasScript is Script {
+contract DeployAtlasScript is DeployBaseScript {
     Atlas public atlas;
 
     function run() external {
@@ -24,12 +26,14 @@ contract DeployAtlasScript is Script {
 
         vm.stopBroadcast();
 
+        _writeAddressToDeploymentsJson(".ATLAS", address(atlas));
+
         console.log("\n");
         console.log("Atlas deployed at: \t\t\t\t", address(atlas));
     }
 }
 
-contract DeployAtlasAndSwapIntentDAppControlScript is Script {
+contract DeployAtlasAndSwapIntentDAppControlScript is DeployBaseScript {
     Atlas public atlas;
     SwapIntentController public swapIntentControl;
 
@@ -54,6 +58,9 @@ contract DeployAtlasAndSwapIntentDAppControlScript is Script {
         atlas.integrateDApp(address(swapIntentControl), address(swapIntentControl));
 
         vm.stopBroadcast();
+
+        _writeAddressToDeploymentsJson(".ATLAS", address(atlas));
+        _writeAddressToDeploymentsJson(".SWAP_INTENT_DAPP_CONTROL", address(swapIntentControl));
 
         console.log("\n");
         console.log("Atlas deployed at: \t\t\t\t", address(atlas));
