@@ -1,13 +1,14 @@
 [submodule "lib/forge-std"]
 	path = lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
-	branch = v1.2.0
+	branch = master
 [submodule "lib/solmate"]
 	path = lib/solmate
 	url = https://github.com/transmissions11/solmate
 [submodule "lib/openzeppelin-contracts"]
 	path = lib/openzeppelin-contracts
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+	branch = release-v4.8
 [submodule "lib/periphery-next"]
 	path = lib/periphery-next
 	url = https://github.com/Uniswap/periphery-next

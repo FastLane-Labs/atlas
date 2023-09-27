@@ -13,9 +13,9 @@
       "ftest": "source .env && forge test --gas-price=1500000000",
       "ftest-fork": "source .env && forge test -vvv --fork-url ${ALCHEMY_APIKEY_MUMBAI} --fork-block-number 26702726 --gas-report",
       "anvil": "anvil",
-      "anvil-mainnet-fork": "source .env && anvil --fork-url ${MAINNET_RPC_URL} --fork-block-number ${MAINNET_FORK_BLOCK_NUMBER}",
+      "anvil-mainnet-fork": "source .env && anvil --fork-url ${MAINNET_RPC_URL} --fork-block-number ${MAINNET_FORK_BLOCK_NUMBER} --code-size-limit ${CODE_SIZE_LIMIT}",
       
-      "deploy-atlas": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --fork-url http://localhost:8545 --broadcast",
+      "deploy-atlas": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --fork-url http://localhost:8545 --broadcast --non-interactive",
       
       "mappings": "forge remappings > remappings.txt",
       "slither": "slither . --compile-force-framework foundry --filter-paths 'test|lib'",
