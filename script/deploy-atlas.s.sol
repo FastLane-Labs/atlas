@@ -21,9 +21,8 @@ contract DeployAtlasScript is Script {
 
         atlas = new Atlas(64);
 
-        console.log("Atlas deployed at: ", address(atlas));
-
         vm.stopBroadcast();
-    }
 
+        console.log("Atlas deployed at: ", address(atlas));
+    }
 }
