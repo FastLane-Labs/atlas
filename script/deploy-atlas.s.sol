@@ -6,12 +6,13 @@ import "forge-std/Test.sol";
 
 import {Atlas} from "src/contracts/atlas/Atlas.sol";
 import {SwapIntentController} from "src/contracts/examples/intents-example/SwapIntent.sol";
-import {SimpleRFQSolver} from "test/SwapIntent.t.sol"; // TODO move to searcher script
 
 contract DeployAtlasScript is Script {
     Atlas public atlas;
 
     function run() external {
+        console.log("\n=== DEPLOYING Atlas ===\n");
+
         uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
 
@@ -23,6 +24,7 @@ contract DeployAtlasScript is Script {
 
         vm.stopBroadcast();
 
+        console.log("\n");
         console.log("Atlas deployed at: \t\t\t\t", address(atlas));
     }
 }
@@ -32,6 +34,8 @@ contract DeployAtlasAndSwapIntentDAppControlScript is Script {
     SwapIntentController public swapIntentControl;
 
     function run() external {
+        console.log("\n=== DEPLOYING Atlas and SwapIntent DAppControl ===\n");
+
         uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
 
@@ -51,6 +55,7 @@ contract DeployAtlasAndSwapIntentDAppControlScript is Script {
 
         vm.stopBroadcast();
 
+        console.log("\n");
         console.log("Atlas deployed at: \t\t\t\t", address(atlas));
         console.log("SwapIntent DAppControl deployed at: \t\t", address(swapIntentControl));
     }

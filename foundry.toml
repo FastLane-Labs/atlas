@@ -3,3 +3,5 @@ bytecode_hash = "none"
 optimizer_runs = 1000000
 
 solc_version = "0.8.19"
+
+fs_permissions = [{ access = "read-write", path = "./"}]

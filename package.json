@@ -17,7 +17,7 @@
       
       "deploy-atlas": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --fork-url http://localhost:8545 --broadcast --non-interactive",
       "deploy-atlas-swap-intent": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasAndSwapIntentDAppControlScript --fork-url http://localhost:8545 --broadcast --non-interactive",
-
+      "deploy-solver": "source .env && forge script script/deploy-solver.s.sol:DeploySimpleRFQSolverScript --fork-url http://localhost:8545 --broadcast --non-interactive",
       
       "mappings": "forge remappings > remappings.txt",
       "slither": "slither . --compile-force-framework foundry --filter-paths 'test|lib'",
