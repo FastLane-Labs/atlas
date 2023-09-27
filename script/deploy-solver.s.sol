@@ -30,6 +30,8 @@ contract DeploySimpleRFQSolverScript is DeployBaseScript {
 
         vm.stopBroadcast();
 
+        _writeAddressToDeploymentsJson(".SIMPLE_RFQ_SOLVER", address(rfqSolver));
+
         console.log("\n");
         console.log("SimpleRFQSolver deployed at: \t\t\t", address(rfqSolver));
     }

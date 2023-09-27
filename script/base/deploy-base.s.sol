@@ -21,15 +21,11 @@ contract DeployBaseScript is Script {
     }
 
     function _writeAddressToDeploymentsJson(string memory key, address addr) internal {
-        // string memory root = vm.projectRoot();
-        // string memory path = string.concat(root, "/deployments.json");
-        // string memory json = vm.readFile(path);
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/deployments.json");
 
-        // // console.log("Writing", key, "to deployments.json");
+        // console.log(string.concat("Writing \t\t'", key), "': '", addr, "'\t\t to deployments.json");
 
-        // json = json.writeAddress(key, addr);
-
-        // vm.writeFile(path, json);
+        vm.writeJson(vm.toString(addr), path, key);
     }
-
 }
