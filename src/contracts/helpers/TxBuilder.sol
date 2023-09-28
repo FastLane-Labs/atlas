@@ -68,7 +68,7 @@ contract TxBuilder {
         userOp.call = UserCall({
             from: from,
             to: to,
-            deadline: deadline,
+            deadline: block.number + 2,
             gas: gas,
             nonce: userNextNonce(from),
             maxFeePerGas: maxFeePerGas,
@@ -116,7 +116,7 @@ contract TxBuilder {
             from: governanceEOA,
             to: control,
             nonce: governanceNextNonce(governanceEOA),
-            deadline: deadline,
+            deadline: block.number + 2,
             userOpHash: userOpHash,
             callChainHash: callChainHash,
             controlCodeHash: dConfig.to.codehash
