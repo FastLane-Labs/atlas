@@ -29,13 +29,9 @@
       "addresses": "npm run atlas-addr --silent && npm run swap-intent-addr --silent && npm run tx-builder-addr --silent && npm run solver-addr --silent",
 
       "give-dai-to": "source .env && cast rpc anvil_impersonateAccount ${DAI_WHALE} && cast send ${DAI} --unlocked --from ${DAI_WHALE} 'transfer(address,uint256)(bool)' ${to} ${amount}",
-      "give-dai-to-solver": "npm run give-dai-to -- --to ${SIMPLE_RFQ_SOLVER} --amount ${DAI_FOR_SOLVER}",
-
-      "give-solver-tokens": "source .env && cast rpc anvil_impersonateAccount ${DAI_WHALE} && cast send ${DAI} --unlocked --from ${DAI_WHALE} 'transfer(address,uint256)(bool)' 0x9ae40d21177F53928da4dFF6389dEA33DF2E4558 ${DAI_FOR_SOLVER}",
-      "give-tokens": "source .env && cast rpc anvil_impersonateAccount ${WETH_WHALE} && cast send ${WETH} --unlocked --from ${WETH_WHALE} 'transfer(address,uint256)(bool)' 0x9ae40d21177F53928da4dFF6389dEA33DF2E4558 1000000000000000000",
+      "give-weth-to": "source .env && cast rpc anvil_impersonateAccount ${WETH_WHALE} && cast send ${WETH} --unlocked --from ${WETH_WHALE} 'transfer(address,uint256)(bool)' ${to} ${amount}",
 
       "log-balances": "source .env && forge script script/log-balances.s.sol:LogDemoBalancesScript --fork-url http://localhost:8545 --broadcast --non-interactive",
-
 
       "mappings": "forge remappings > remappings.txt",
       "slither": "slither . --compile-force-framework foundry --filter-paths 'test|lib'",
