@@ -57,7 +57,3 @@ enum SolverOutcome
     EVMError,
     Success
 }
-
-bytes32 constant SOLVER_TYPE_HASH = keccak256(
-    "SolverCall(address from,address to,uint256 value,uint256 gas,uint256 nonce,bytes32 userOpHash,bytes32 controlCodeHash,uint256 maxFeePerGas,bytes32 bidsHash,bytes data)"
-);

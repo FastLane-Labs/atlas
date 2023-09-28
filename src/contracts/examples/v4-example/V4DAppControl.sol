@@ -8,7 +8,10 @@ import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 import {ISafetyLocks} from "../../interfaces/ISafetyLocks.sol";
 import {SafetyBits} from "../../libraries/SafetyBits.sol";
 
-import "../../types/CallTypes.sol";
+import {CallConfig} from "../../types/DAppApprovalTypes.sol";
+import "../../types/SolverCallTypes.sol";
+import "../../types/UserCallTypes.sol";
+import "../../types/DAppApprovalTypes.sol";
 import "../../types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
@@ -235,25 +238,6 @@ contract V4DAppControl is DAppControl {
     }
 
     ///////////////// GETTERS & HELPERS // //////////////////
-    function getPayeeData(bytes calldata data) external pure override returns (PayeeData[] memory) {
-        // This function is called by the backend to get the
-        // payee data, and by the Atlas Factory to generate a
-        // hash to verify the backend.
-
-        IPoolManager.PoolKey memory key = abi.decode(data, (IPoolManager.PoolKey));
-
-        PaymentData[] memory payments = new PaymentData[](1);
-
-        payments[0] = PaymentData({payee: address(key.hooks), payeePercent: 100});
-
-        PayeeData[] memory payeeData = new PayeeData[](2);
-
-        payeeData[0] = PayeeData({token: IPoolManager.Currency.unwrap(key.currency0), payments: payments, data: data});
-
-        payeeData[1] = PayeeData({token: IPoolManager.Currency.unwrap(key.currency1), payments: payments, data: data});
-
-        return payeeData;
-    }
 
     function getBidFormat(UserCall calldata uCall) external pure override returns (BidData[] memory) {
         // This is a helper function called by solvers

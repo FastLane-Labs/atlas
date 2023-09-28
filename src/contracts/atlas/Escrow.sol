@@ -11,7 +11,9 @@ import {SafetyLocks} from "./SafetyLocks.sol";
 import {SolverWrapper} from "./SolverWrapper.sol";
 import {DAppVerification} from "./DAppVerification.sol";
 
-import "../types/CallTypes.sol";
+import "../types/SolverCallTypes.sol";
+import "../types/UserCallTypes.sol";
+import {DAppConfig} from "../types/DAppApprovalTypes.sol";
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
 
@@ -40,10 +42,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
 
     GasDonation[] internal _donations;
 
-    constructor(
-        uint32 escrowDurationFromFactory //,
-            //address _atlas
-    ) SafetyLocks() {
+    constructor(uint32 escrowDurationFromFactory, address _simulator) SafetyLocks(_simulator) {
         escrowDuration = escrowDurationFromFactory;
     }
 
@@ -141,14 +140,14 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
         bytes32 lockBytes
     ) 
         internal 
-        returns (bytes memory preOpsData) 
+        returns (bool success, bytes memory preOpsData) 
     {
-        bool success;
         preOpsData = abi.encodeWithSelector(IExecutionEnvironment.preOpsWrapper.selector, uCall);
         preOpsData = abi.encodePacked(preOpsData, lockBytes);
         (success, preOpsData) = environment.call{value: msg.value}(preOpsData);
-        require(success, "ERR-E001 PreOpsFail");
-        preOpsData = abi.decode(preOpsData, (bytes));
+        if (success) {
+            preOpsData = abi.decode(preOpsData, (bytes));
+        }
     }
 
     function _executeUserOperation(
@@ -157,20 +156,21 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
         bytes32 lockBytes
     )
         internal
-        returns (bytes memory userData)
+        returns (bool success, bytes memory userData)
     {
-        bool success;
         userData = abi.encodeWithSelector(IExecutionEnvironment.userWrapper.selector, uCall);
         userData = abi.encodePacked(userData, lockBytes);
         // TODO: Handle msg.value quirks
         (success, userData) = environment.call(userData);
-        require(success, "ERR-E002 UserFail");
-        userData = abi.decode(userData, (bytes));
+        // require(success, "ERR-E002 UserFail");
+        if (success) {
+            userData = abi.decode(userData, (bytes));
+        }
     }
 
     function _executeSolverOperation(
         SolverOperation calldata solverOp,
-        bytes memory DAppReturnData,
+        bytes memory dAppReturnData,
         bytes memory searcherForwardData,
         address environment,
         EscrowKey memory key
@@ -192,7 +192,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
             key = key.holdSolverLock(solverOp.call.to);
 
             // Execute the solver call
-            (outcome, escrowSurplus) = _solverOpWrapper(gasLimit, environment, solverOp, DAppReturnData, searcherForwardData, key.pack());
+            (outcome, escrowSurplus) = _solverOpWrapper(gasLimit, environment, solverOp, dAppReturnData, searcherForwardData, key.pack());
 
             unchecked {
                 solverEscrow.total += uint128(escrowSurplus);
@@ -250,9 +250,8 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
         bytes memory returnData,
         address environment,
         bytes32 lockBytes
-    ) internal {
+    ) internal returns (bool success) {
         // process dApp payments
-        bool success;
         bytes memory data = abi.encodeWithSelector(IExecutionEnvironment.allocateValue.selector, winningBids, returnData);
         data = abi.encodePacked(data, lockBytes);
         (success, ) = environment.call(data);
@@ -265,12 +264,10 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
         bytes memory returnData,
         address environment,
         bytes32 lockBytes
-    ) internal {
-        bool success;
+    ) internal returns (bool success) {
         bytes memory postOpsData = abi.encodeWithSelector(IExecutionEnvironment.postOpsWrapper.selector, returnData);
         postOpsData = abi.encodePacked(postOpsData, lockBytes);
         (success,) = environment.call{value: msg.value}(postOpsData);
-        require(success, "ERR-E005 PostOpsFail");
     }
 
     function _executeGasRefund(uint256 gasMarker, uint256 accruedGasRebate, address user) internal {
@@ -403,10 +400,11 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
                 sCall.to,
                 sCall.value,
                 sCall.gas,
-                sCall.nonce,
                 sCall.maxFeePerGas,
-                sCall.userOpHash,
+                sCall.nonce,
+                sCall.deadline,
                 sCall.controlCodeHash,
+                sCall.userOpHash,
                 sCall.bidsHash,
                 keccak256(sCall.data)
             )
