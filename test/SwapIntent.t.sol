@@ -137,6 +137,7 @@ contract SwapIntentTest is BaseTest {
             to: address(swapIntentController),
             maxFeePerGas: tx.gasprice + 1, // TODO update
             value: 0,
+            deadline: block.number + 2,
             data: userOpData
         });
 
@@ -166,7 +167,7 @@ contract SwapIntentTest is BaseTest {
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Frontend creates verification calldata after seeing rest of data
-        verification = txBuilder.buildVerification(governanceEOA, dConfig, userOp, solverOps);
+        verification = txBuilder.buildVerification(governanceEOA, dConfig, userOp, solverOps, block.number + 2);
 
         // Frontend signs the verification payload
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getVerificationPayload(verification));
@@ -263,6 +264,7 @@ contract SwapIntentTest is BaseTest {
             to: address(swapIntentController),
             maxFeePerGas: tx.gasprice + 1, // TODO update
             value: 0,
+            deadline: block.number + 2,
             data: userOpData
         });
 
@@ -292,7 +294,7 @@ contract SwapIntentTest is BaseTest {
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Frontend creates verification calldata after seeing rest of data
-        verification = txBuilder.buildVerification(governanceEOA, dConfig, userOp, solverOps);
+        verification = txBuilder.buildVerification(governanceEOA, dConfig, userOp, solverOps, block.number + 2);
 
         // Frontend signs the verification payload
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getVerificationPayload(verification));

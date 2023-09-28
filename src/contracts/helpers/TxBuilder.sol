@@ -21,14 +21,12 @@ contract TxBuilder {
     address public immutable escrow;
     address public immutable atlas;
 
-    uint256 public immutable deadline;
     uint256 public immutable gas;
 
     constructor(address controller, address escrowAddress, address atlasAddress) {
         control = controller;
         escrow = escrowAddress;
         atlas = atlasAddress;
-        deadline = block.number + 2;
         gas = 1_000_000;
     }
 
@@ -62,13 +60,14 @@ contract TxBuilder {
         address to,
         uint256 maxFeePerGas,
         uint256 value, // TODO check this is actually intended to be the value param. Was unnamed before.
+        uint256 deadline,
         bytes memory data
     ) public view returns (UserOperation memory userOp) {
         userOp.to = atlas;
         userOp.call = UserCall({
             from: from,
             to: to,
-            deadline: block.number + 2,
+            deadline: deadline,
             gas: gas,
             nonce: userNextNonce(from),
             maxFeePerGas: maxFeePerGas,
@@ -106,7 +105,8 @@ contract TxBuilder {
         address governanceEOA,
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
-        SolverOperation[] calldata solverOps
+        SolverOperation[] calldata solverOps,
+        uint256 deadline
     ) public view returns (Verification memory verification) {
         verification.to = atlas;
         bytes32 userOpHash = userOp.call.getUserOperationHash();
@@ -116,7 +116,7 @@ contract TxBuilder {
             from: governanceEOA,
             to: control,
             nonce: governanceNextNonce(governanceEOA),
-            deadline: block.number + 2,
+            deadline: deadline,
             userOpHash: userOpHash,
             callChainHash: callChainHash,
             controlCodeHash: dConfig.to.codehash

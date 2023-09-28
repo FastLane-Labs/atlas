@@ -69,7 +69,7 @@ contract MainTest is BaseTest {
 
         // Verification call
         Verification memory verification =
-            helper.buildVerification(governanceEOA, dConfig, userOp, solverOps);
+            helper.buildVerification(governanceEOA, dConfig, userOp, solverOps, block.number + 2);
 
         (v, r, s) = vm.sign(governancePK, IAtlas(address(atlas)).getVerificationPayload(verification));
 
@@ -250,7 +250,7 @@ contract MainTest is BaseTest {
         (v, r, s) = vm.sign(solverOnePK, IAtlas(address(atlas)).getSolverPayload(solverOps[0].call));
         solverOps[0].signature = abi.encodePacked(r, s, v);
         Verification memory verification =
-            helper.buildVerification(governanceEOA, dConfig, userOp, solverOps);
+            helper.buildVerification(governanceEOA, dConfig, userOp, solverOps, block.number + 2);
         (v, r, s) = vm.sign(governancePK, IAtlas(address(atlas)).getVerificationPayload(verification));
         verification.signature = abi.encodePacked(r, s, v);
         vm.startPrank(userEOA);
@@ -272,7 +272,7 @@ contract MainTest is BaseTest {
         );
         (v, r, s) = vm.sign(solverOnePK, IAtlas(address(atlas)).getSolverPayload(solverOps[0].call));
         solverOps[0].signature = abi.encodePacked(r, s, v);
-        verification = helper.buildVerification(governanceEOA, dConfig, userOp, solverOps);
+        verification = helper.buildVerification(governanceEOA, dConfig, userOp, solverOps, block.number + 2);
         (v, r, s) = vm.sign(governancePK, IAtlas(address(atlas)).getVerificationPayload(verification));
         verification.signature = abi.encodePacked(r, s, v);
         vm.startPrank(userEOA);
