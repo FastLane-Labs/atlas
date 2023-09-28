@@ -13,7 +13,7 @@
       "ftest": "source .env && forge test --gas-price=1500000000",
       "ftest-fork": "source .env && forge test -vvv --fork-url ${ALCHEMY_APIKEY_MUMBAI} --fork-block-number 26702726 --gas-report",
       "anvil": "anvil",
-      "anvil-mainnet-fork": "source .env && anvil --fork-url ${MAINNET_RPC_URL} --fork-block-number ${MAINNET_FORK_BLOCK_NUMBER} --code-size-limit ${CODE_SIZE_LIMIT}",
+      "anvil-mainnet-fork": "source .env && anvil --fork-url ${MAINNET_RPC_URL} --fork-block-number ${MAINNET_FORK_BLOCK_NUMBER} --code-size-limit ${CODE_SIZE_LIMIT} --gas-limit ${GAS_LIMIT}",
       
       "deploy-atlas": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --fork-url http://localhost:8545 --broadcast --non-interactive",
       "deploy-atlas-swap-intent": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasAndSwapIntentDAppControlScript --fork-url http://localhost:8545 --broadcast --non-interactive",
@@ -22,8 +22,17 @@
       
       "deploy-full-demo": "npm run deploy-atlas-swap-intent-tx-builder && npm run deploy-solver",
 
-      "solver": "jq -r '.SIMPLE_RFQ_SOLVER' deployments.json",
-      "give-tokens": "source .env && cast rpc anvil_autoImpersonateAccount true && cast send 0x7D1AfA7B718fb893dB30A3aBc0Cfc608AaCfeBB0 --unlocked --from ${UNISWAP_DAI_WETH_POOL} 'transfer(address,uint256)(bool)' ${DEPLOYER} 1000000000000000000",
+      "atlas-addr": "echo 'ATLAS:' && jq -r '.ATLAS' deployments.json",
+      "swap-intent-addr": "echo 'SWAP INTENT DAPP CONTROL:' && jq -r '.SWAP_INTENT_DAPP_CONTROL' deployments.json",
+      "tx-builder-addr": "echo 'TX BUILDER:' && jq -r '.TX_BUILDER' deployments.json",
+      "solver-addr": "echo 'SOLVER:' && jq -r '.SIMPLE_RFQ_SOLVER' deployments.json",
+      "addresses": "npm run atlas-addr --silent && npm run swap-intent-addr --silent && npm run tx-builder-addr --silent && npm run solver-addr --silent",
+
+      "give-dai-to": "source .env && cast rpc anvil_impersonateAccount ${DAI_WHALE} && cast send ${DAI} --unlocked --from ${DAI_WHALE} 'transfer(address,uint256)(bool)' ${to} ${amount}",
+      "give-dai-to-solver": "npm run give-dai-to -- --to ${SIMPLE_RFQ_SOLVER} --amount ${DAI_FOR_SOLVER}",
+
+      "give-solver-tokens": "source .env && cast rpc anvil_impersonateAccount ${DAI_WHALE} && cast send ${DAI} --unlocked --from ${DAI_WHALE} 'transfer(address,uint256)(bool)' 0x9ae40d21177F53928da4dFF6389dEA33DF2E4558 ${DAI_FOR_SOLVER}",
+      "give-tokens": "source .env && cast rpc anvil_impersonateAccount ${WETH_WHALE} && cast send ${WETH} --unlocked --from ${WETH_WHALE} 'transfer(address,uint256)(bool)' 0x9ae40d21177F53928da4dFF6389dEA33DF2E4558 1000000000000000000",
 
       "log-balances": "source .env && forge script script/log-balances.s.sol:LogDemoBalancesScript --fork-url http://localhost:8545 --broadcast --non-interactive",
 
