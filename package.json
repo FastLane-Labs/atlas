@@ -22,6 +22,12 @@
       
       "deploy-full-demo": "npm run deploy-atlas-swap-intent-tx-builder && npm run deploy-solver",
 
+      "solver": "jq -r '.SIMPLE_RFQ_SOLVER' deployments.json",
+      "give-tokens": "source .env && cast rpc anvil_autoImpersonateAccount true && cast send 0x7D1AfA7B718fb893dB30A3aBc0Cfc608AaCfeBB0 --unlocked --from ${UNISWAP_DAI_WETH_POOL} 'transfer(address,uint256)(bool)' ${DEPLOYER} 1000000000000000000",
+
+      "log-balances": "source .env && forge script script/log-balances.s.sol:LogDemoBalancesScript --fork-url http://localhost:8545 --broadcast --non-interactive",
+
+
       "mappings": "forge remappings > remappings.txt",
       "slither": "slither . --compile-force-framework foundry --filter-paths 'test|lib'",
       "snapshot": "source .env && forge snapshot -vvv --gas-report",

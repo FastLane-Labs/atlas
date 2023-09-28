@@ -17,7 +17,7 @@ contract DeploySimpleRFQSolverScript is DeployBaseScript {
     function run() external {
         console.log("\n=== DEPLOYING SimpleRFQSolver ===\n");
 
-        uint256 deployerPrivateKey = vm.envUint("SEARCHER1_PRIVATE_KEY");
+        uint256 deployerPrivateKey = vm.envUint("SOLVER1_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
         address atlasAddress = _getAddressFromDeploymentsJson(".ATLAS");
 
