@@ -57,4 +57,20 @@ contract FastLaneErrorsEvents {
     error SimulationPassed();
 
     error ValidCalls(ValidCallsResult);
+
+    /*
+    event NewDAppIntegration(
+        address indexed environment,
+        address indexed user,
+        address indexed controller,
+        uint32 callConfig
+    );
+
+    event DAppDisabled(
+        address indexed environment,
+        address indexed user,
+        address indexed controller,
+        uint32 callConfig
+    );
+    */
 }

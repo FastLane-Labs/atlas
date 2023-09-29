@@ -8,6 +8,16 @@ import {CallBits} from "../libraries/CallBits.sol";
 import "../types/GovernanceTypes.sol";
 
 contract DAppIntegration {
+
+    event NewDAppSignatory(
+        address indexed controller,
+        address indexed governance,
+        address indexed signatory,
+        uint32 callConfig
+    );
+
+
+
     using CallBits for uint32;
 
     // NOTE: To prevent builder censorship, dapp nonces can be
@@ -18,25 +28,25 @@ contract DAppIntegration {
     mapping(address => GovernanceData) public governance;
 
     // map for tracking which EOAs are approved for a given dapp
-    //     approver   userOp.to
+    //     signor   ApproverSigningData
     mapping(address => ApproverSigningData) public signatories;
 
     mapping(bytes32 => bytes32) public dapps;
 
     // Permissionlessly integrates a new dapp
     function initializeGovernance(address controller) external {
-        address owner = IDAppControl(controller).getDAppSignatory();
+        address govAddress = IDAppControl(controller).getDAppSignatory();
 
-        require(msg.sender == owner, "ERR-V50 OnlyGovernance");
+        require(msg.sender == govAddress, "ERR-V50 OnlyGovernance");
 
-        require(signatories[owner].governance == address(0), "ERR-V49 OwnerActive");
+        require(signatories[govAddress].governance == address(0), "ERR-V49 OwnerActive");
 
         uint32 callConfig = CallBits.buildCallConfig(controller);
 
         governance[controller] =
-            GovernanceData({governance: owner, callConfig: callConfig, lastUpdate: uint64(block.number)});
+            GovernanceData({governance: govAddress, callConfig: callConfig, lastUpdate: uint64(block.number)});
 
-        signatories[owner] = ApproverSigningData({governance: owner, enabled: true, nonce: 0});
+        signatories[govAddress] = ApproverSigningData({governance: govAddress, enabled: true, nonce: 0});
     }
 
     function addSignatory(address controller, address signatory) external {
@@ -46,7 +56,14 @@ contract DAppIntegration {
 
         require(signatories[signatory].governance == address(0), "ERR-V49 SignatoryActive");
 
-        signatories[signatory] = ApproverSigningData({governance: controller, enabled: true, nonce: 0});
+        signatories[signatory] = ApproverSigningData({governance: govData.governance, enabled: true, nonce: 0});
+    
+        emit NewDAppSignatory(
+            controller,
+            govData.governance,
+            signatory,
+            govData.callConfig
+        );
     }
 
     function removeSignatory(address controller, address signatory) external {
@@ -59,27 +76,46 @@ contract DAppIntegration {
         signatories[signatory].enabled = false;
     }
 
-    function integrateDApp(address controller, address dappControl) external {
-        GovernanceData memory govData = governance[controller];
+    function integrateDApp(address dAppControl) external {
+        GovernanceData memory govData = governance[dAppControl];
 
         require(msg.sender == govData.governance, "ERR-V50 OnlyGovernance");
 
-        bytes32 key = keccak256(abi.encode(controller, dappControl, govData.governance, govData.callConfig));
+        bytes32 key = keccak256(abi.encode(dAppControl, govData.governance, govData.callConfig));
 
-        dapps[key] = controller.codehash;
+        dapps[key] = dAppControl.codehash;
+
+        emit NewDAppSignatory(
+            dAppControl,
+            govData.governance,
+            govData.governance,
+            govData.callConfig
+        );
     }
 
-    function disableDApp(address controller, address dappControl) external {
-        GovernanceData memory govData = governance[controller];
+    function disableDApp(address dAppControl) external {
+        GovernanceData memory govData = governance[dAppControl];
 
         require(msg.sender == govData.governance, "ERR-V50 OnlyGovernance");
 
-        bytes32 key = keccak256(abi.encode(controller, dappControl, govData.governance, govData.callConfig));
+        bytes32 key = keccak256(abi.encode(dAppControl, govData.governance, govData.callConfig));
 
         delete dapps[key];
     }
 
     function nextGovernanceNonce(address governanceSignatory) external view returns (uint256 nextNonce) {
         nextNonce = uint256(signatories[governanceSignatory].nonce) + 1;
+    }
+
+    function getGovFromControl(address dAppControl) external view returns (address governanceAddress) {
+        GovernanceData memory govData = governance[dAppControl];
+        require(govData.lastUpdate != uint64(0), "ERR-V51 DAppNotEnabled");
+        governanceAddress = govData.governance;
+    }
+
+    function getGovFromSignor(address signor) external view returns (address governanceAddress) {
+        ApproverSigningData memory signingData = signatories[signor];
+        require(signingData.enabled, "ERR-V52 SignorNotEnabled");
+        governanceAddress = signingData.governance;
     }
 }

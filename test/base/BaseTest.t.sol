@@ -77,8 +77,7 @@ contract BaseTest is Test, TestConstants {
 
         control = new V2DAppControl(escrow);
         atlas.initializeGovernance(address(control));
-        atlas.integrateDApp(address(control), V2_FXS_ETH);
-        atlas.integrateDApp(address(control), S2_FXS_ETH);
+        atlas.integrateDApp(address(control));
 
         vm.stopPrank();
 

@@ -49,7 +49,7 @@ contract DAppVerification is EIP712, DAppIntegration {
     // the supply chain to submit data.  If any other party
     // (user, solver, FastLane,  or a collusion between
     // all of them) attempts to alter it, this check will fail
-    function _verifyDApp(address userOpTo, DAppConfig calldata dConfig, DAppOperation calldata dAppOp)
+    function _verifyDApp(DAppConfig calldata dConfig, DAppOperation calldata dAppOp)
         internal
         returns (bool)
     {
@@ -83,7 +83,7 @@ contract DAppVerification is EIP712, DAppIntegration {
 
         // Verify that the dapp is onboarded and that the call config is
         // genuine.
-        bytes32 key = keccak256(abi.encode(dConfig.to, userOpTo, signatory.governance, dConfig.callConfig));
+        bytes32 key = keccak256(abi.encode(dConfig.to, signatory.governance, dConfig.callConfig));
 
         // NOTE: This check does not work if DAppControl is a proxy contract.
         // To avoid exposure to social engineering vulnerabilities, disgruntled

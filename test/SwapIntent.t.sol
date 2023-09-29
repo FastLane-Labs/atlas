@@ -67,7 +67,7 @@ contract SwapIntentTest is BaseTest {
         vm.startPrank(governanceEOA);
         swapIntentController = new SwapIntentController(address(escrow));        
         atlas.initializeGovernance(address(swapIntentController));
-        atlas.integrateDApp(address(swapIntentController), address(swapIntentController));
+        atlas.integrateDApp(address(swapIntentController));
         vm.stopPrank();
 
         console.log("swapIntentController",address(swapIntentController));

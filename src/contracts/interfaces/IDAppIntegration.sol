@@ -8,9 +8,13 @@ interface IDAppIntegration {
 
     function removeSignatory(address controller, address signatory) external;
 
-    function integrateDApp(address controller, address dappControl) external;
+    function integrateDApp(address dAppControl) external;
 
-    function disableDApp(address controller, address dappControl) external;
+    function disableDApp(address dAppControl) external;
 
     function nextGovernanceNonce(address governanceSignatory) external view returns (uint256 nextNonce);
+
+    function getGovFromControl(address dAppControl) external view returns (address governanceAddress);
+    function getGovFromSignor(address signor) external view returns (address governanceAddress);
+
 }

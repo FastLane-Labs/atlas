@@ -63,7 +63,7 @@ contract DeployAtlasAndSwapIntentDAppControlScript is DeployBaseScript {
 
         // Integrate SwapIntent with Atlas
         atlas.initializeGovernance(address(swapIntentControl));
-        atlas.integrateDApp(address(swapIntentControl), address(swapIntentControl));
+        atlas.integrateDApp(address(swapIntentControl));
 
         vm.stopBroadcast();
 
@@ -103,7 +103,7 @@ contract DeployAtlasAndSwapIntentDAppControlAndTxBuilderScript is DeployBaseScri
 
         // Integrate SwapIntent with Atlas
         atlas.initializeGovernance(address(swapIntentControl));
-        atlas.integrateDApp(address(swapIntentControl), address(swapIntentControl));
+        atlas.integrateDApp(address(swapIntentControl));
 
         // Deploy the TxBuilder
         txBuilder = new TxBuilder(address(swapIntentControl), address(atlas), address(atlas));

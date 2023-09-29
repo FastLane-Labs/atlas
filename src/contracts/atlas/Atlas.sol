@@ -221,7 +221,7 @@ contract Atlas is Test, Factory {
 
         // Only verify signatures of meta txs if the original signer isn't the bundler
         // TODO: Consider extra reentrancy defense here?
-        if (dAppOp.approval.from != msg.sender && !_verifyDApp(userOp.call.to, dConfig, dAppOp)) {
+        if (dAppOp.approval.from != msg.sender && !_verifyDApp(dConfig, dAppOp)) {
             bool bypass = isSimulation && dAppOp.signature.length == 0;
             if (!bypass) {
                 return ValidCallsResult.DAppSignatureInvalid;
