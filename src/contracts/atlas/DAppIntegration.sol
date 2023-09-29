@@ -104,18 +104,20 @@ contract DAppIntegration {
     }
 
     function nextGovernanceNonce(address governanceSignatory) external view returns (uint256 nextNonce) {
-        nextNonce = uint256(signatories[governanceSignatory].nonce) + 1;
+        ApproverSigningData memory signingData = signatories[governanceSignatory];
+        require(signingData.enabled, "ERR-V51 SignorNotEnabled");
+        nextNonce = uint256(signingData.nonce) + 1;
     }
 
     function getGovFromControl(address dAppControl) external view returns (address governanceAddress) {
         GovernanceData memory govData = governance[dAppControl];
-        require(govData.lastUpdate != uint64(0), "ERR-V51 DAppNotEnabled");
+        require(govData.lastUpdate != uint64(0), "ERR-V52 DAppNotEnabled");
         governanceAddress = govData.governance;
     }
 
     function getGovFromSignor(address signor) external view returns (address governanceAddress) {
         ApproverSigningData memory signingData = signatories[signor];
-        require(signingData.enabled, "ERR-V52 SignorNotEnabled");
+        require(signingData.enabled, "ERR-V53 SignorNotEnabled");
         governanceAddress = signingData.governance;
     }
 }
