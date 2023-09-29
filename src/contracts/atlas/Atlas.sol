@@ -118,7 +118,6 @@ contract Atlas is Test, Factory {
         uint32 callConfig = CallBits.buildCallConfig(uCall.control);
 
         bytes memory returnData;
-        bytes memory searcherForwardData;
 
         if (dConfig.callConfig.needsPreOpsCall()) {
             key = key.holdPreOpsLock(dConfig.to);
@@ -136,13 +135,6 @@ contract Atlas is Test, Factory {
             if (key.isSimulation) { revert UserOpSimFail(); } else { revert("ERR-E002 UserFail"); }
         }
 
-        if(CallBits.forwardPreOpsReturnData(callConfig)) {
-            searcherForwardData = returnData;
-        }
-        if(CallBits.forwardUserReturnData(callConfig)) {
-            searcherForwardData = bytes.concat(searcherForwardData, userReturnData);
-        }
-
         if (CallBits.needsPreOpsReturnData(callConfig)) {
             //returnData = returnData;
             if (CallBits.needsUserReturnData(callConfig)) {
@@ -151,14 +143,13 @@ contract Atlas is Test, Factory {
         } else if (CallBits.needsUserReturnData(callConfig)) {
             returnData = userReturnData;
         } 
-        
 
         for (; key.callIndex < key.callMax - 1;) {
 
             // Only execute solver meta tx if userOpHash matches 
             if (!auctionWon && userOpHash == solverOps[key.callIndex-2].call.userOpHash) {
                 (auctionWon, key) = _solverExecutionIteration(
-                        dConfig, solverOps[key.callIndex-2], returnData, searcherForwardData, auctionWon, executionEnvironment, key
+                        dConfig, solverOps[key.callIndex-2], returnData, auctionWon, executionEnvironment, key
                     );
             }
 
@@ -190,12 +181,11 @@ contract Atlas is Test, Factory {
         DAppConfig calldata dConfig,
         SolverOperation calldata solverOp,
         bytes memory dAppReturnData,
-        bytes memory searcherForwardData,
         bool auctionWon,
         address executionEnvironment,
         EscrowKey memory key
     ) internal returns (bool, EscrowKey memory) {
-        (auctionWon, key) = _executeSolverOperation(solverOp, dAppReturnData, searcherForwardData, executionEnvironment, key);
+        (auctionWon, key) = _executeSolverOperation(solverOp, dAppReturnData, executionEnvironment, key);
         if (auctionWon) {
             _allocateValue(dConfig, solverOp.bids, dAppReturnData, executionEnvironment, key.pack());
             key = key.allocationComplete();
