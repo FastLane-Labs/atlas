@@ -41,7 +41,7 @@ contract Atlas is Test, Factory {
         UserOperation calldata userOp, // set by user
         SolverOperation[] calldata solverOps, // supplied by FastLane via frontend integration
         DAppOperation calldata dAppOp // supplied by front end after it sees the other data
-    ) external payable returns (bool auctionWon) {
+    ) external payable returns (bool auctionWon, uint256 accruedGasRebate) {
 
         uint256 gasMarker = gasleft();
 
@@ -51,7 +51,7 @@ contract Atlas is Test, Factory {
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
         if (!_validCalls(dConfig, userOp, solverOps, dAppOp, executionEnvironment)) {
-            if (msg.sender == simulator) {revert VerificationSimFail();} else { return false;}
+            if (msg.sender == simulator) {revert VerificationSimFail();} else { return (false, 0);}
         }
 
         // Initialize the lock
@@ -59,22 +59,28 @@ contract Atlas is Test, Factory {
 
         try this.execute{value: msg.value}(
             dConfig, userOp.call, solverOps, executionEnvironment, dAppOp.approval.callChainHash, msg.sender == simulator
-        ) returns (bool _auctionWon, uint256 accruedGasRebate) {
+        ) returns (bool _auctionWon, uint256 _accruedGasRebate) {
             
             console.log("accruedGasRebate",accruedGasRebate);
             auctionWon = _auctionWon;
             // Gas Refund to sender only if execution is successful
             _executeGasRefund(gasMarker, accruedGasRebate, userOp.call.from);
 
+            // Release the lock
+            _releaseEscrowLock();
+
+            if (msg.sender == simulator) {
+                revert SimulationPassed(_accruedGasRebate, 0);
+            }
+            return (true, _accruedGasRebate);
+
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
             _handleErrors(bytes4(revertData), dConfig.callConfig);
+
+            // Release the lock
+            _releaseEscrowLock();
         }
-
-        // Release the lock
-        _releaseEscrowLock();
-
-        console.log("total gas used", gasMarker - gasleft());
     }
 
     function execute(
@@ -108,7 +114,7 @@ contract Atlas is Test, Factory {
         SolverOperation[] calldata solverOps,
         address executionEnvironment,
         EscrowKey memory key
-    ) internal returns (bool auctionWon, uint256 accruedGasRebate) {
+    ) internal returns (bool auctionWon, uint256 accruedGasRebate, uint256 solverIndex) {
         // Build the CallChainProof.  The penultimate hash will be used
         // to verify against the hash supplied by DAppControl
        
@@ -158,8 +164,11 @@ contract Atlas is Test, Factory {
             // Only execute solver meta tx if userOpHash matches 
             if (!auctionWon && userOpHash == solverOps[key.callIndex-2].call.userOpHash) {
                 (auctionWon, key) = _solverExecutionIteration(
-                        dConfig, solverOps[key.callIndex-2], returnData, searcherForwardData, auctionWon, executionEnvironment, key
-                    );
+                    dConfig, solverOps[key.callIndex-2], returnData, searcherForwardData, auctionWon, executionEnvironment, key
+                );
+                if (auctionWon) {
+                    solverIndex = key.callIndex;
+                }
             }
 
             unchecked {
@@ -183,7 +192,7 @@ contract Atlas is Test, Factory {
                 if (key.isSimulation) { revert PostOpsSimFail(); } else { revert("ERR-E005 PostOpsFail"); }
             }
         }
-        return (auctionWon, uint256(key.gasRefund));
+        return (auctionWon, uint256(key.gasRefund), 0);
     }
 
     function _solverExecutionIteration(
