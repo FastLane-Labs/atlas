@@ -53,5 +53,5 @@ contract FastLaneErrorsEvents {
     error UserOpSimFail();
     error SolverSimFail();
     error PostOpsSimFail();
-    error SimulationPassed(uint256 gasRebate, uint256 solverIndex);
+    error SimulationPassed();
 }
