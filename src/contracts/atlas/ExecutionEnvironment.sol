@@ -7,7 +7,10 @@ import {IDAppControl} from "../interfaces/IDAppControl.sol";
 
 import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
-import {UserCall, DAppConfig, SolverOperation, SolverCall, BidData} from "../types/CallTypes.sol";
+import "../types/SolverCallTypes.sol";
+import "../types/UserCallTypes.sol";
+import "../types/DAppApprovalTypes.sol";
+
 import {ExecutionPhase} from "../types/LockTypes.sol";
 
 import {Base} from "../common/ExecutionBase.sol";
@@ -97,25 +100,21 @@ contract ExecutionEnvironment is Base {
 
         bool success;
 
-        if (!config.needsLocalUser()) {
+        if (config.needsDelegateUser()) {
+
+            (success, userData) = uCall.to.delegatecall(forward(uCall.data));
+            require(success, "ERR-EC02 DelegateRevert");
+            
+            // userData = abi.decode(userData, (bytes));
+
+        } else {
             // regular user call - executed at regular destination and not performed locally
             (success, userData) = uCall.to.call{value: uCall.value}(
                 forward(uCall.data)
             );
             require(success, "ERR-EC04a CallRevert");
 
-        } else if (config.needsDelegateUser()) {
-            userData = abi.encodeWithSelector(
-                IDAppControl.userLocalCall.selector, uCall.data
-            );
-
-            (success, userData) = _control().delegatecall(forward(userData));
-            require(success, "ERR-EC02 DelegateRevert");
-            userData = abi.decode(userData, (bytes));
-
-        } else {
-            revert("ERR-P02 UserOperationStatic");
-        }
+        } 
     }
 
     function postOpsWrapper(bytes calldata returnData) 
@@ -140,7 +139,8 @@ contract ExecutionEnvironment is Base {
         uint256 gasLimit, 
         uint256 escrowBalance, 
         SolverOperation calldata solverOp, 
-        bytes calldata returnData
+        bytes calldata dAppReturnData,
+        bytes calldata searcherForwardData
     ) 
         external payable 
         onlyAtlasEnvironment 
@@ -153,8 +153,7 @@ contract ExecutionEnvironment is Base {
 
         // Track token balances to measure if the bid amount is paid.
         uint256[] memory tokenBalances = new uint[](solverOp.bids.length);
-        uint256 i;
-        for (; i < solverOp.bids.length;) {
+        for (uint i; i < solverOp.bids.length;) {
             // Ether balance
             if (solverOp.bids[i].token == address(0)) {
                 tokenBalances[i] = msg.value; // NOTE: this is the meta tx value
@@ -182,7 +181,7 @@ contract ExecutionEnvironment is Base {
         // Handle any solver preOps, if necessary
         if (_config().needsPreSolver()) {
 
-            bytes memory data = abi.encode(solverOp.call.to, returnData);
+            bytes memory data = abi.encode(solverOp.call.to, dAppReturnData);
 
             data = abi.encodeWithSelector(
                 IDAppControl.preSolverCall.selector, 
@@ -206,7 +205,7 @@ contract ExecutionEnvironment is Base {
         (success,) = ISolverContract(solverOp.call.to).atlasSolverCall{
             gas: gasLimit,
             value: solverOp.call.value
-        }(solverOp.call.from, solverOp.bids, solverOp.call.data);
+        }(solverOp.call.from, solverOp.bids, solverOp.call.data, searcherForwardData);
 
         // Verify that it was successful
         if(!success) {
@@ -216,7 +215,7 @@ contract ExecutionEnvironment is Base {
         // If this was a user intent, handle and verify fulfillment
         if (_config().needsSolverPostCall()) {
             
-            bytes memory data = returnData;
+            bytes memory data = dAppReturnData;
 
             data = abi.encode(solverOp.call.to, data);
 
@@ -242,10 +241,9 @@ contract ExecutionEnvironment is Base {
 
         // Verify that the solver paid what they bid
         bool etherIsBidToken;
-        i = 0;
         uint256 balance;
 
-        for (; i < solverOp.bids.length;) {
+        for (uint i; i < solverOp.bids.length;) {
             // ERC20 tokens as bid currency
             if (!(solverOp.bids[i].token == address(0))) {
                 balance = ERC20(solverOp.bids[i].token).balanceOf(address(this));
@@ -322,44 +320,6 @@ contract ExecutionEnvironment is Base {
 
         (bool success,) = _control().delegatecall(forward(allocateData));
         require(success, "ERR-EC02 DelegateRevert");
-    }
-
-    ///////////////////////////////////////
-    //   HELPER / SEQUENCING FUNCTIONS   //
-    ///////////////////////////////////////
-
-    function validateUserOperation(UserCall calldata uCall)   
-        external 
-        // view 
-        // onlyAtlas
-        returns (bool) {
-        // msg.sender = atlas
-        // address(this) = ExecutionEnvironment
-        if (uCall.from != _user()) {
-            return false;
-        }
-
-        if (uCall.control != _control()) {
-            return false;
-        }
-
-        if (uCall.deadline < block.number) {
-            return false;
-        }
-
-        if (_controlCodeHash() != _control().codehash) {
-            return false;
-        }
-
-        bytes memory data = abi.encodeWithSelector(
-            IDAppControl.validateUserOperation.selector, uCall);
-
-        (bool success, bytes memory returnData) = _control().delegatecall(forward(data));
-
-        if (!success) {
-            return false;
-        }
-        return abi.decode(returnData, (bool));
     }
 
     ///////////////////////////////////////

@@ -7,7 +7,10 @@ import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 // Atlas Base Imports
 import {IEscrow} from "../../interfaces/IEscrow.sol";
 
-import "../../types/CallTypes.sol";
+import {CallConfig} from "../../types/DAppApprovalTypes.sol";
+import "../../types/UserCallTypes.sol";
+import "../../types/SolverCallTypes.sol";
+import "../../types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
 import {DAppControl} from "../../dapp/DAppControl.sol";
@@ -57,10 +60,10 @@ contract SwapIntentController is DAppControl {
             msg.sender, 
             CallConfig({
                 sequenced: false,
-                requirePreOps: true,
-                trackPreOpsReturnData: true,
-                trackUserReturnData: false,
-                localUser: true,
+                requirePreOps: false,
+                trackPreOpsReturnData: false,
+                trackUserReturnData: true,
+                localUser: false,
                 delegateUser: true,
                 preSolver: true,
                 postSolver: true,
@@ -69,7 +72,9 @@ contract SwapIntentController is DAppControl {
                 reuseUserOp: true,
                 userBundler: true,
                 dAppBundler: true,
-                unknownBundler: true
+                unknownBundler: true,
+                forwardPreOpsReturnData: false,
+                forwardUserReturnData: false
             })
         )
     {}
@@ -79,34 +84,12 @@ contract SwapIntentController is DAppControl {
     //////////////////////////////////
 
     // swap() selector = 0x98434997
-    function swap(bytes calldata data) public payable {
+    function swap(SwapIntent calldata swapIntent) external payable returns (SwapData memory) {
         require(msg.sender == escrow, "ERR-PI002 InvalidSender");
         require(_approvedCaller() == control, "ERR-PI003 InvalidLockState");
         require(address(this) != control, "ERR-PI004 MustBeDelegated");
-
-        // NOTE: To avoid redundant memory buildup, we pass the user's calldata all the way through
-        // to the swap function. Because of this, it will still have its function selector. 
-        require(bytes4(data) == this.swap.selector, "ERR-PI005 NoDuplicateSelector");
-
-        SwapIntent memory swapIntent =abi.decode(data[4:], (SwapIntent));
-
-        require(ERC20(swapIntent.tokenUserSells).balanceOf(_user()) >= swapIntent.amountUserSells, "ERR-PI020 InsufficientUserBalance");
-    }
-
-    //////////////////////////////////
-    //   ATLAS OVERRIDE FUNCTIONS   //
-    //////////////////////////////////
-
-    function _preOpsCall(UserCall calldata uCall)
-        internal
-        override
-        returns (bytes memory)
-    {
-        require(bytes4(uCall.data) == this.swap.selector, "ERR-PI001 InvalidSelector");
-        require(uCall.to == control, "ERR-PI006 InvalidUserTo");
-
-        // This dApp control currently requires all 
-        SwapIntent memory swapIntent = abi.decode(uCall.data[4:], (SwapIntent));
+        
+        address user = _user();
 
         // There should never be a balance on this ExecutionEnvironment greater than 1, but check
         // anyway so that the auction accounting isn't imbalanced by unexpected inventory. 
@@ -117,23 +100,28 @@ contract SwapIntentController is DAppControl {
         // TODO: Could maintain a balance of "1" of each token to allow the user to save gas over multiple uses
         uint256 buyTokenBalance = ERC20(swapIntent.tokenUserBuys).balanceOf(address(this));
         if (buyTokenBalance > 0) { 
-            ERC20(swapIntent.tokenUserBuys).safeTransfer(_user(), buyTokenBalance);
+            ERC20(swapIntent.tokenUserBuys).safeTransfer(user, buyTokenBalance);
         }
 
         uint256 sellTokenBalance = ERC20(swapIntent.tokenUserSells).balanceOf(address(this));
         if (sellTokenBalance > 0) {
-            ERC20(swapIntent.tokenUserSells).safeTransfer(_user(), sellTokenBalance);
+            ERC20(swapIntent.tokenUserSells).safeTransfer(user, sellTokenBalance);
         }
+
+        require(
+            _availableFundsERC20(swapIntent.tokenUserSells, user, swapIntent.amountUserSells, ExecutionPhase.SolverOperations),
+            "ERR-PI059 SellFundsUnavailable"
+        );
 
         if (swapIntent.auctionBaseCurrency != swapIntent.tokenUserSells || swapIntent.auctionBaseCurrency != swapIntent.tokenUserBuys) {
             if (swapIntent.auctionBaseCurrency == address(0)) {
                 uint256 auctionBaseCurrencyBalance = address(this).balance;
-                SafeTransferLib.safeTransferETH(_user(), auctionBaseCurrencyBalance);
+                SafeTransferLib.safeTransferETH(user, auctionBaseCurrencyBalance);
             
             } else {
                 uint256 auctionBaseCurrencyBalance = ERC20(swapIntent.auctionBaseCurrency).balanceOf(address(this));
                 if (auctionBaseCurrencyBalance > 0) {
-                    ERC20(swapIntent.tokenUserBuys).safeTransfer(_user(), auctionBaseCurrencyBalance);
+                    ERC20(swapIntent.tokenUserBuys).safeTransfer(user, auctionBaseCurrencyBalance);
                 }
             }
         }
@@ -174,16 +162,12 @@ contract SwapIntentController is DAppControl {
             }
         }
 
-        bytes memory preOpsReturnData = abi.encode(swapData);
-        return preOpsReturnData;
+        return swapData;
     }
 
-    function _userLocalDelegateCall(bytes calldata data) internal override returns (bytes memory nullData) {
-        if (bytes4(data) == this.swap.selector) {
-            swap(data);
-        }
-        return nullData;
-    }
+    //////////////////////////////////
+    //   ATLAS OVERRIDE FUNCTIONS   //
+    //////////////////////////////////
 
     function _preSolverCall(bytes calldata data) internal override returns (bool) {
         (address solverTo, bytes memory returnData) = abi.decode(data, (address, bytes));
@@ -272,22 +256,6 @@ contract SwapIntentController is DAppControl {
     ///////////////// GETTERS & HELPERS // //////////////////
     /////////////////////////////////////////////////////////
     // NOTE: These are not delegatecalled
-    function getPayeeData(bytes calldata) external view override returns (PayeeData[] memory) {
-        // This function is called by the backend to get the
-        // payee data, and by the Atlas Factory to generate a
-        // hash to verify the backend.
-
-        bytes memory data; // empty bytes
-
-        PaymentData[] memory payments = new PaymentData[](1);
-
-        payments[0] = PaymentData({payee: control, payeePercent: 100});
-
-        PayeeData[] memory payeeData = new PayeeData[](1);
-
-        payeeData[0] = PayeeData({token: address(0), payments: payments, data: data});
-        return payeeData;
-    }
 
     function getBidFormat(UserCall calldata uCall) external pure override returns (BidData[] memory) {
         // This is a helper function called by solvers
@@ -313,49 +281,5 @@ contract SwapIntentController is DAppControl {
         returns (uint256) 
     {
         return solverOp.bids[0].bidAmount;
-    }
-
-    // NOTE: This helper function is still delegatecalled inside of the execution environment
-    function _validateUserOperation(UserCall calldata uCall) internal view override returns (bool) {
-        if (bytes4(uCall.data) != this.swap.selector) {
-            return false;
-        }
-
-        SwapIntent memory swapIntent =abi.decode(uCall.data[4:], (SwapIntent));
-
-        // Check that user has enough tokens
-        if (ERC20(swapIntent.tokenUserSells).balanceOf(_user()) < swapIntent.amountUserSells) {
-            return false;
-        }
-
-        // Check that the correct permit has been granted
-        if (ERC20(swapIntent.tokenUserSells).allowance(_user(), escrow) < swapIntent.amountUserSells) {
-            return false;
-        }
-
-        uint256 maxUserConditions = swapIntent.conditions.length;
-        if (maxUserConditions > MAX_USER_CONDITIONS) {
-            return false;
-        }
-
-        uint256 i;
-        bool valid;
-        bytes memory conditionData;
-
-        for (; i < maxUserConditions; ) {
-            (valid, conditionData) = swapIntent.conditions[i].antecedent.staticcall{gas: USER_CONDITION_GAS_LIMIT}(
-                swapIntent.conditions[i].context
-            );
-            if (!valid) {
-                return false;
-            }
-            valid = abi.decode(conditionData, (bool));
-            if (!valid) {
-                return false;
-            }
-            
-            unchecked{ ++i; }
-        }
-        return true;
     }
 }

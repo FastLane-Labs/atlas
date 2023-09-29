@@ -4,7 +4,10 @@ pragma solidity ^0.8.16;
 import {SafetyBits} from "../libraries/SafetyBits.sol";
 import {CallBits} from "../libraries/CallBits.sol";
 
-import {DAppConfig, UserCall} from "../types/CallTypes.sol";
+import "../types/SolverCallTypes.sol";
+import "../types/UserCallTypes.sol";
+import "../types/DAppApprovalTypes.sol";
+
 import "../types/LockTypes.sol";
 
 import "forge-std/Test.sol";
@@ -14,13 +17,15 @@ contract SafetyLocks is Test {
     using CallBits for uint32;
 
     address public immutable atlas;
+    address public immutable simulator;
 
     address internal constant UNLOCKED = address(1);
 
     address public activeEnvironment = UNLOCKED;
 
-    constructor() {
+    constructor(address _simulator) {
         atlas = address(this);
+        simulator = _simulator;
     }
 
     function solverSafetyCallback(address msgSender) external payable returns (bool isSafe) {
@@ -38,13 +43,14 @@ contract SafetyLocks is Test {
     function _buildEscrowLock(
         DAppConfig calldata dConfig,
         address executionEnvironment,
-        uint8 solverOpCount
+        uint8 solverOpCount,
+        bool isSimulation
     ) internal view returns (EscrowKey memory self) {
 
         require(activeEnvironment == executionEnvironment, "ERR-SL004 NotInitialized");
 
         self = self.initializeEscrowLock(
-            dConfig.callConfig.needsPreOpsCall(), solverOpCount, executionEnvironment
+            dConfig.callConfig.needsPreOpsCall(), solverOpCount, executionEnvironment, isSimulation
         );
     }
 

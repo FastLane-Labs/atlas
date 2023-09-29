@@ -4,7 +4,7 @@ pragma solidity ^0.8.18;
 import "forge-std/Test.sol";
 import {BaseTest} from "./base/BaseTest.t.sol";
 import {DAppControl} from "../src/contracts/dapp/DAppControl.sol";
-import "../src/contracts/types/CallTypes.sol";
+import "../src/contracts/types/UserCallTypes.sol";
 import "./base/TestUtils.sol";
 
 contract DummyDAppControl is DAppControl {
@@ -12,13 +12,30 @@ contract DummyDAppControl is DAppControl {
         DAppControl(
             escrow,
             address(0),
-            CallConfig(false, false, false, false, false, false, false, false, false, false, false, false, false, false)
+            CallConfig(
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+            )
         )
     {}
 
     function _preOpsCall(UserCall calldata) internal override returns (bytes memory) {}
     function _allocateValueCall(bytes calldata) internal override {}
-    function getPayeeData(bytes calldata) external view override returns (PayeeData[] memory) {}
+    // function getPayeeData(bytes calldata) external view override returns (PayeeData[] memory) {}
     function getBidFormat(UserCall calldata) external view override returns (BidData[] memory) {}
     function getBidValue(SolverOperation calldata) external view override returns (uint256) {}
 }

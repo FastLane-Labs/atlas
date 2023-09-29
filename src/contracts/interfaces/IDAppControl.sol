@@ -1,14 +1,14 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import "../types/CallTypes.sol";
+import "../types/UserCallTypes.sol";
+import "../types/SolverCallTypes.sol";
+import "../types/DAppApprovalTypes.sol";
 
 interface IDAppControl {
     function validateUserOperation(UserCall calldata uCall) external view returns (bool);
 
     function preOpsCall(UserCall calldata uCall) external returns (bytes memory);
-
-    function userLocalCall(bytes calldata data) external returns (bytes memory);
 
     function allocateValueCall(bytes calldata data) external;
 
@@ -22,8 +22,6 @@ interface IDAppControl {
 
     function getCallConfig() external view returns (CallConfig memory callConfig);
 
-    function getPayeeData(bytes calldata data) external returns (PayeeData[] memory);
-
     function getBidFormat(UserCall calldata uCall) external view returns (BidData[] memory);
 
     function getBidValue(SolverOperation calldata solverOp) external view returns (uint256);
@@ -35,10 +33,6 @@ interface IDAppControl {
     function preOpsDelegated() external view returns (bool delegated);
 
     function userDelegated() external view returns (bool delegated);
-
-    function userLocal() external view returns (bool local);
-
-    function userDelegatedLocal() external view returns (bool delegated, bool local);
 
     function allocatingDelegated() external view returns (bool delegated);
 

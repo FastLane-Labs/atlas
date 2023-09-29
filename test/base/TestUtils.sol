@@ -5,7 +5,9 @@ import {IDAppControl} from "../../src/contracts/interfaces/IDAppControl.sol";
 import {Factory} from "../../src/contracts/atlas/Factory.sol";
 import {Mimic} from "../../src/contracts/atlas/Mimic.sol";
 
-import "../../src/contracts/types/CallTypes.sol";
+import "../../src/contracts/types/UserCallTypes.sol";
+import "../../src/contracts/types/SolverCallTypes.sol";
+import "../../src/contracts/types/DAppApprovalTypes.sol";
 
 library TestUtils {
     // String <> uint16 binary Converter Utility
@@ -100,6 +102,50 @@ library TestUtils {
                 add(shl(96, controller), add(add(shl(88, 0x63), shl(56, callConfig)), 0x7f000000000000))
             )
             mstore(add(creationCode, 178), controlCodeHash)
+        }
+    }
+
+    function computeCallChainHash(
+        DAppConfig calldata dConfig,
+        UserCall calldata uCall,
+        SolverOperation[] calldata solverOps
+    ) internal pure returns (bytes32 callSequenceHash) {
+        uint256 i;
+        if (dConfig.callConfig & 1 << uint32(CallConfigIndex.RequirePreOps) != 0) {
+            // Start with preOps call if preOps is needed
+            callSequenceHash = keccak256(
+                abi.encodePacked(
+                    callSequenceHash, // initial hash = null
+                    dConfig.to,
+                    abi.encodeWithSelector(IDAppControl.preOpsCall.selector, uCall),
+                    i++
+                )
+            );
+        }
+
+        // then user call
+        callSequenceHash = keccak256(
+            abi.encodePacked(
+                callSequenceHash, // always reference previous hash
+                abi.encode(uCall),
+                i++
+            )
+        );
+
+        // then solver calls
+        uint256 count = solverOps.length;
+        uint256 n;
+        for (; n < count;) {
+            callSequenceHash = keccak256(
+                abi.encodePacked(
+                    callSequenceHash, // reference previous hash
+                    abi.encode(solverOps[n].call), // solver call
+                    i++
+                )
+            );
+            unchecked {
+                ++n;
+            }
         }
     }
 }

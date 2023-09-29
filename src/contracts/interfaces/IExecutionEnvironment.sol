@@ -1,7 +1,9 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import "../types/CallTypes.sol";
+import "../types/SolverCallTypes.sol";
+import "../types/UserCallTypes.sol";
+import "../types/DAppApprovalTypes.sol";
 
 interface IExecutionEnvironment {
     function preOpsWrapper(UserCall calldata userOp)
@@ -17,7 +19,8 @@ interface IExecutionEnvironment {
         uint256 gasLimit,
         uint256 escrowBalance,
         SolverOperation calldata solverOp,
-        bytes calldata returnData
+        bytes calldata dAppReturnData,
+        bytes calldata searcherForwardData
     ) external payable;
 
     function allocateValue(
