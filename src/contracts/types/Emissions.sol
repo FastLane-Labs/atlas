@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import "../types/CallTypes.sol";
+import {BidData} from "../types/SolverCallTypes.sol";
 
 error UserSimulationFailed();
 error UserSimulationSucceeded();
@@ -41,5 +41,10 @@ contract FastLaneErrorsEvents {
     error UserNotFulfilled();
     error NoAuctionWinner();
 
+    error VerificationSimFail();
+    error PreOpsSimFail();
+    error UserOpSimFail();
+    error SolverSimFail();
+    error PostOpsSimFail();
     error SimulationPassed();
 }

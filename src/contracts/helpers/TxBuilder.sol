@@ -6,10 +6,12 @@ import {IDAppIntegration} from "../interfaces/IDAppIntegration.sol";
 import {IEscrow} from "../interfaces/IEscrow.sol";
 import {IAtlas} from "../interfaces/IAtlas.sol";
 
-import "../types/CallTypes.sol";
-import "../types/VerificationTypes.sol";
+import "../types/SolverCallTypes.sol";
+import "../types/UserCallTypes.sol";
+import "../types/DAppApprovalTypes.sol";
 
 import {CallVerification} from "../libraries/CallVerification.sol";
+import {CallBits} from "../libraries/CallBits.sol";
 
 import "forge-std/Test.sol";
 
@@ -28,10 +30,6 @@ contract TxBuilder {
         escrow = escrowAddress;
         atlas = atlasAddress;
         gas = 1_000_000;
-    }
-
-    function getPayeeData(bytes memory data) public returns (PayeeData[] memory) {
-        return IDAppControl(control).getPayeeData(data);
     }
 
     function getDAppConfig() public view returns (DAppConfig memory) {
@@ -67,11 +65,11 @@ contract TxBuilder {
         userOp.call = UserCall({
             from: from,
             to: to,
-            deadline: deadline,
-            gas: gas,
-            nonce: userNextNonce(from),
-            maxFeePerGas: maxFeePerGas,
             value: value,
+            gas: gas,
+            maxFeePerGas: maxFeePerGas,
+            nonce: userNextNonce(from),
+            deadline: block.number + 2,
             control: control,
             data: data
         });
@@ -79,47 +77,63 @@ contract TxBuilder {
 
     function buildSolverOperation(
         UserOperation calldata userOp,
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         bytes calldata solverOpData,
         address solverEOA,
         address solverContract,
         uint256 bidAmount
     ) public view returns (SolverOperation memory solverOp) {
+        if (dConfig.callConfig == 0) {
+            dConfig = DAppConfig({
+                to: userOp.call.control,
+                callConfig: CallBits.buildCallConfig(userOp.call.control)
+            });
+        }
+
         solverOp.to = atlas;
         solverOp.bids = getBidData(userOp.call, bidAmount);
         solverOp.call = SolverCall({
             from: solverEOA,
             to: solverContract,
-            gas: gas,
             value: 0,
-            nonce: solverNextNonce(solverEOA),
+            gas: gas,
             maxFeePerGas: userOp.call.maxFeePerGas,
-            userOpHash: userOp.call.getUserOperationHash(),
+            nonce: solverNextNonce(solverEOA),
+            deadline: userOp.call.deadline,
             controlCodeHash: dConfig.to.codehash,
+            userOpHash: userOp.call.getUserOperationHash(),
             bidsHash: solverOp.bids.getBidsHash(),
             data: solverOpData
         });
     }
 
-    function buildVerification(
+    function buildDAppOperation(
         address governanceEOA,
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         UserOperation calldata userOp,
-        SolverOperation[] calldata solverOps,
-        uint256 deadline
-    ) public view returns (Verification memory verification) {
-        verification.to = atlas;
+        SolverOperation[] calldata solverOps
+    ) public view returns (DAppOperation memory dAppOp) {
+        dAppOp.to = atlas;
+        if (dConfig.callConfig == 0) {
+            dConfig = DAppConfig({
+                to: userOp.call.control,
+                callConfig: CallBits.buildCallConfig(userOp.call.control)
+            });
+        }
         bytes32 userOpHash = userOp.call.getUserOperationHash();
         bytes32 callChainHash = CallVerification.getCallChainHash(dConfig, userOp.call, solverOps);
 
-        verification.proof = DAppProof({
+        dAppOp.approval = DAppApproval({
             from: governanceEOA,
             to: control,
+            value: 0,
+            gas: 2_000_000,
+            maxFeePerGas: userOp.call.maxFeePerGas,
             nonce: governanceNextNonce(governanceEOA),
-            deadline: deadline,
+            deadline: userOp.call.deadline,
+            controlCodeHash: dConfig.to.codehash,
             userOpHash: userOpHash,
-            callChainHash: callChainHash,
-            controlCodeHash: dConfig.to.codehash
+            callChainHash: callChainHash
         });
     }
 }

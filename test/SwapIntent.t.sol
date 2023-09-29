@@ -8,8 +8,9 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 import {BaseTest} from "./base/BaseTest.t.sol";
 import {TxBuilder} from "../src/contracts/helpers/TxBuilder.sol";
 
-import {DAppConfig, UserOperation, SolverOperation} from "../src/contracts/types/CallTypes.sol";
-import {Verification} from "../src/contracts/types/VerificationTypes.sol";
+import {SolverOperation} from "../src/contracts/types/SolverCallTypes.sol";
+import {UserOperation} from "../src/contracts/types/UserCallTypes.sol";
+import {DAppOperation, DAppConfig} from "../src/contracts/types/DAppApprovalTypes.sol";
 
 import {SwapIntentController, SwapIntent, Condition} from "../src/contracts/examples/intents-example/SwapIntent.sol";
 import {SolverBase} from "../src/contracts/solver/SolverBase.sol";
@@ -69,6 +70,8 @@ contract SwapIntentTest is BaseTest {
         atlas.integrateDApp(address(swapIntentController), address(swapIntentController));
         vm.stopPrank();
 
+        console.log("swapIntentController",address(swapIntentController));
+
         txBuilder = new TxBuilder({
             controller: address(swapIntentController),
             escrowAddress: address(escrow),
@@ -117,10 +120,11 @@ contract SwapIntentTest is BaseTest {
         DAppConfig memory dConfig = txBuilder.getDAppConfig();
         UserOperation memory userOp;
         SolverOperation[] memory solverOps = new SolverOperation[](1);
-        Verification memory verification;
+        DAppOperation memory dAppOp;
 
         vm.startPrank(userEOA);
         address executionEnvironment = atlas.createExecutionEnvironment(dConfig);
+        console.log("executionEnvironment",executionEnvironment);
         vm.stopPrank();
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
@@ -166,12 +170,12 @@ contract SwapIntentTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlas.getSolverPayload(solverOps[0].call));
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-        // Frontend creates verification calldata after seeing rest of data
-        verification = txBuilder.buildVerification(governanceEOA, dConfig, userOp, solverOps, block.number + 2);
+        // Frontend creates dAppOp calldata after seeing rest of data
+        dAppOp = txBuilder.buildDAppOperation(governanceEOA, dConfig, userOp, solverOps);
 
-        // Frontend signs the verification payload
-        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getVerificationPayload(verification));
-        verification.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+        // Frontend signs the dAppOp payload
+        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getDAppOperationPayload(dAppOp));
+        dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Check user token balances before
         uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);
@@ -191,13 +195,13 @@ contract SwapIntentTest is BaseTest {
 
         vm.startPrank(userEOA);
         
-        assertFalse(atlas.testUserOperation(userOp), "metatestUserOperationcall tested true");
-        assertFalse(atlas.testUserOperation(userOp.call), "metatestUserOperationcall call tested true");
+        assertFalse(simulator.simUserOperation(userOp), "metasimUserOperationcall tested true a");
+        assertFalse(simulator.simUserOperation(userOp.call), "metasimUserOperationcall call tested true b");
         
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
-        assertTrue(atlas.testUserOperation(userOp), "metatestUserOperationcall tested false");
-        assertTrue(atlas.testUserOperation(userOp.call), "metatestUserOperationcall call tested false");
+        assertTrue(simulator.simUserOperation(userOp), "metasimUserOperationcall tested false c");
+        assertTrue(simulator.simUserOperation(userOp.call), "metasimUserOperationcall call tested false d");
 
 
         // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
@@ -205,7 +209,7 @@ contract SwapIntentTest is BaseTest {
             dConfig: dConfig,
             userOp: userOp,
             solverOps: solverOps,
-            verification: verification
+            dAppOp: dAppOp
         });
         vm.stopPrank();
 
@@ -244,10 +248,11 @@ contract SwapIntentTest is BaseTest {
         DAppConfig memory dConfig = txBuilder.getDAppConfig();
         UserOperation memory userOp;
         SolverOperation[] memory solverOps = new SolverOperation[](1);
-        Verification memory verification;
+        DAppOperation memory dAppOp;
 
         vm.startPrank(userEOA);
         address executionEnvironment = atlas.createExecutionEnvironment(dConfig);
+        console.log("executionEnvironment a",executionEnvironment);
         vm.stopPrank();
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
@@ -293,12 +298,12 @@ contract SwapIntentTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlas.getSolverPayload(solverOps[0].call));
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-        // Frontend creates verification calldata after seeing rest of data
-        verification = txBuilder.buildVerification(governanceEOA, dConfig, userOp, solverOps, block.number + 2);
+        // Frontend creates dAppOp calldata after seeing rest of data
+        dAppOp = txBuilder.buildDAppOperation(governanceEOA, dConfig, userOp, solverOps);
 
-        // Frontend signs the verification payload
-        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getVerificationPayload(verification));
-        verification.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+        // Frontend signs the dAppOp payload
+        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getDAppOperationPayload(dAppOp));
+        dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Check user token balances before
         uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);
@@ -318,13 +323,13 @@ contract SwapIntentTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        assertFalse(atlas.testUserOperation(userOp), "metatestUserOperationcall tested true");
-        assertFalse(atlas.testUserOperation(userOp.call), "metatestUserOperationcall call tested true");
+        assertFalse(simulator.simUserOperation(userOp), "metasimUserOperationcall tested true");
+        assertFalse(simulator.simUserOperation(userOp.call), "metasimUserOperationcall call tested true");
         
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
-        assertTrue(atlas.testUserOperation(userOp), "metatestUserOperationcall tested false");
-        assertTrue(atlas.testUserOperation(userOp.call), "metatestUserOperationcall call tested false");
+        assertTrue(simulator.simUserOperation(userOp), "metasimUserOperationcall tested false");
+        assertTrue(simulator.simUserOperation(userOp.call), "metasimUserOperationcall call tested false");
 
         // Check solver does NOT have DAI - it must use Uniswap to get it during metacall
         assertEq(DAI.balanceOf(address(uniswapSolver)), 0, "Solver has DAI before metacall");
@@ -334,7 +339,7 @@ contract SwapIntentTest is BaseTest {
             dConfig: dConfig,
             userOp: userOp,
             solverOps: solverOps,
-            verification: verification
+            dAppOp: dAppOp
         });
         vm.stopPrank();
 

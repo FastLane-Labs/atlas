@@ -1,7 +1,9 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import "../types/CallTypes.sol";
+import "../types/UserCallTypes.sol";
+import "../types/SolverCallTypes.sol";
+import "../types/DAppApprovalTypes.sol";
 
 interface IDAppControl {
     function validateUserOperation(UserCall calldata uCall) external view returns (bool);
@@ -19,8 +21,6 @@ interface IDAppControl {
     function getDAppConfig() external view returns (DAppConfig memory dConfig);
 
     function getCallConfig() external view returns (CallConfig memory callConfig);
-
-    function getPayeeData(bytes calldata data) external returns (PayeeData[] memory);
 
     function getBidFormat(UserCall calldata uCall) external view returns (BidData[] memory);
 

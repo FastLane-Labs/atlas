@@ -7,10 +7,12 @@ import {IUniswapV2Pair} from "../src/contracts/examples/v2-example/interfaces/IU
 
 import {BlindBackrun} from "src/contracts/solver/src/BlindBackrun.sol";
 
-import "../src/contracts/types/CallTypes.sol";
+import "../src/contracts/types/SolverCallTypes.sol";
+import "../src/contracts/types/UserCallTypes.sol";
+import "../src/contracts/types/DAppApprovalTypes.sol";
 import "../src/contracts/types/EscrowTypes.sol";
 import "../src/contracts/types/LockTypes.sol";
-import "../src/contracts/types/VerificationTypes.sol";
+import "../src/contracts/types/DAppApprovalTypes.sol";
 
 import {TestConstants} from "./base/TestConstants.sol";
 
@@ -24,11 +26,6 @@ contract V2Helper is Test, TestConstants, TxBuilder {
         TxBuilder(controller, escrowAddress, atlasAddress)
     {
         maxFeePerGas = tx.gasprice * 2;
-    }
-
-    function getPayeeData() public returns (PayeeData[] memory) {
-        bytes memory nullData;
-        return TxBuilder.getPayeeData(nullData);
     }
 
     function buildUserOperation(address to, address from, address tokenIn) public view returns (UserOperation memory userOp) {

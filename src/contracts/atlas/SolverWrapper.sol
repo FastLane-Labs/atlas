@@ -5,16 +5,16 @@ import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
 
 import {FastLaneErrorsEvents} from "../types/Emissions.sol";
 
-import "../types/CallTypes.sol";
-
 import {SolverOutcome} from "../types/EscrowTypes.sol";
- 
+
+import {SolverOperation} from "../types/SolverCallTypes.sol";
+
 contract SolverWrapper is FastLaneErrorsEvents {
     function _solverOpWrapper(
         uint256 gasLimit,
         address environment,
         SolverOperation calldata solverOp,
-        bytes memory DAppReturnData,
+        bytes memory dAppReturnData,
         bytes memory searcherForwardData,
         bytes32 lockBytes
     ) internal returns (SolverOutcome, uint256) {
@@ -26,7 +26,7 @@ contract SolverWrapper is FastLaneErrorsEvents {
         bool success;
 
         bytes memory data = abi.encodeWithSelector(
-            IExecutionEnvironment(environment).solverMetaTryCatch.selector, gasLimit, currentBalance, solverOp, DAppReturnData, searcherForwardData);
+            IExecutionEnvironment(environment).solverMetaTryCatch.selector, gasLimit, currentBalance, solverOp, dAppReturnData, searcherForwardData);
         
         data = abi.encodePacked(data, lockBytes);
 

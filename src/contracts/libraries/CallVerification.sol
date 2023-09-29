@@ -3,7 +3,9 @@ pragma solidity ^0.8.16;
 
 import {IDAppControl} from "../interfaces/IDAppControl.sol";
 
-import "../types/CallTypes.sol";
+import "../types/SolverCallTypes.sol";
+import "../types/UserCallTypes.sol";
+import "../types/DAppApprovalTypes.sol";
 
 library CallVerification {
     function getUserOperationHash(UserCall calldata uCall) internal pure returns (bytes32 userOpHash) {
@@ -15,7 +17,7 @@ library CallVerification {
     }
 
     function getCallChainHash(
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         UserCall calldata uCall,
         SolverOperation[] calldata solverOps
     ) internal pure returns (bytes32 callSequenceHash) {
