@@ -25,6 +25,8 @@ interface IAtlas {
         view
         returns (address executionEnvironment);
 
+    function getExecutionEnvironment(address user, address dAppControl) external view returns (address executionEnvironment);
+
     function userDirectVerifyDApp(
         address userOpFrom,
         address userOpTo,
