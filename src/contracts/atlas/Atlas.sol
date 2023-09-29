@@ -130,13 +130,6 @@ contract Atlas is Test, Factory {
             if (key.isSimulation) { revert UserOpSimFail(); } else { revert("ERR-E002 UserFail"); }
         }
 
-        if(CallBits.forwardPreOpsReturnData(callConfig)) {
-            searcherForwardData = returnData;
-        }
-        if(CallBits.forwardUserReturnData(callConfig)) {
-            searcherForwardData = bytes.concat(searcherForwardData, userReturnData);
-        }
-
         if (CallBits.needsPreOpsReturnData(callConfig)) {
             //returnData = returnData;
             if (CallBits.needsUserReturnData(callConfig)) {
@@ -146,6 +139,9 @@ contract Atlas is Test, Factory {
             returnData = userReturnData;
         } 
         
+        if(CallBits.forwardReturnData(callConfig)) {
+            searcherForwardData = returnData;
+        }
 
         for (; key.callIndex < key.callMax - 1;) {
 
