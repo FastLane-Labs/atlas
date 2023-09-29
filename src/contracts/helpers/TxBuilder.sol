@@ -58,6 +58,7 @@ contract TxBuilder {
         address to,
         uint256 maxFeePerGas,
         uint256 value, // TODO check this is actually intended to be the value param. Was unnamed before.
+        uint256 deadline,
         bytes memory data
     ) public view returns (UserOperation memory userOp) {
         userOp.to = atlas;
@@ -68,7 +69,7 @@ contract TxBuilder {
             gas: gas,
             maxFeePerGas: maxFeePerGas,
             nonce: userNextNonce(from),
-            deadline: block.number + 2,
+            deadline: deadline,
             control: control,
             data: data
         });

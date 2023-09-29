@@ -12,6 +12,7 @@ import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
 import "../types/LockTypes.sol";
 import "../types/DAppApprovalTypes.sol";
+import "../types/ValidCallsTypes.sol";
 
 import {CallVerification} from "../libraries/CallVerification.sol";
 import {CallBits} from "../libraries/CallBits.sol";
@@ -50,8 +51,9 @@ contract Atlas is Test, Factory {
 
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
-        if (!_validCalls(dConfig, userOp, solverOps, dAppOp, executionEnvironment)) {
-            if (msg.sender == simulator) {revert VerificationSimFail();} else { return false;}
+        ValidCallsResult validCallsResult = _validCalls(dConfig, userOp, solverOps, dAppOp, executionEnvironment);
+        if (validCallsResult != ValidCallsResult.Valid) {
+            if (msg.sender == simulator) {revert VerificationSimFail();} else { revert ValidCalls(validCallsResult); }
         }
 
         // Initialize the lock
@@ -199,7 +201,7 @@ contract Atlas is Test, Factory {
         SolverOperation[] calldata solverOps, 
         DAppOperation calldata dAppOp,
         address executionEnvironment
-    ) internal returns (bool) {
+    ) internal returns (ValidCallsResult) {
         // Verify that the calldata injection came from the dApp frontend
         // and that the signatures are valid. 
       
@@ -208,12 +210,12 @@ contract Atlas is Test, Factory {
         // Some checks are only needed when call is not a simulation
         if (!isSimulation) {
             if (tx.gasprice > userOp.call.maxFeePerGas) {
-                return false;
+                return ValidCallsResult.GasPriceHigherThanMax;
             }
 
             // Check that the value of the tx is greater than or equal to the value specified
             if (msg.value < userOp.call.value) { 
-                return false;
+                return ValidCallsResult.TxValueLowerThanCallValue;
             }
         }
 
@@ -222,50 +224,45 @@ contract Atlas is Test, Factory {
         if (dAppOp.approval.from != msg.sender && !_verifyDApp(userOp.call.to, dConfig, dAppOp)) {
             bool bypass = isSimulation && dAppOp.signature.length == 0;
             if (!bypass) {
-                return false;
+                return ValidCallsResult.DAppSignatureInvalid;
             }
         }
         
         if (userOp.call.from != msg.sender && !_verifyUser(dConfig, userOp)) { 
             bool bypass = isSimulation && userOp.signature.length == 0;
             if (!bypass) {
-                return false;   
+                return ValidCallsResult.UserSignatureInvalid;   
             }
         }
 
         if (solverOps.length >= type(uint8).max - 1) {
-            console.log("a");
-            return false;
+            return ValidCallsResult.TooManySolverOps;
         }
 
         if (block.number > userOp.call.deadline) {
             bool bypass = isSimulation && userOp.call.deadline == 0;
             if (!bypass) {
-                console.log("b");
-                return false;
+                return ValidCallsResult.UserDeadlineReached;
             }
         }
 
         if (block.number > dAppOp.approval.deadline) {
             bool bypass = isSimulation && dAppOp.approval.deadline == 0;
             if (!bypass) {
-                console.log("c");
-                return false;
+                return ValidCallsResult.DAppDeadlineReached;
             }
         }
 
         if (executionEnvironment.codehash == bytes32(0)) {
-            console.log("d", executionEnvironment);
-            return false;
+            return ValidCallsResult.ExecutionEnvEmpty;
         }
 
         if (!dConfig.callConfig.allowsZeroSolvers() || dConfig.callConfig.needsSolverPostCall()) {
             if (solverOps.length == 0) {
-                console.log("e");
-                return false;
+                return ValidCallsResult.NoSolverOp;
             }
         }
-        return true;
+        return ValidCallsResult.Valid;
     }
 
     function _handleErrors(bytes4 errorSwitch, uint32 callConfig) internal view {

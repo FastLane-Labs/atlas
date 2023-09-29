@@ -13,7 +13,28 @@
       "ftest": "source .env && forge test --gas-price=1500000000",
       "ftest-fork": "source .env && forge test -vvv --fork-url ${ALCHEMY_APIKEY_MUMBAI} --fork-block-number 26702726 --gas-report",
       "anvil": "anvil",
-      "anvil-mainnet-fork": "source .env && anvil --fork-url ${MAINNET_RPC_URL} --fork-block-number ${MAINNET_FORK_BLOCK_NUMBER}",
+      "anvil-mainnet-fork": "source .env && anvil --fork-url ${MAINNET_RPC_URL} --fork-block-number ${MAINNET_FORK_BLOCK_NUMBER} --code-size-limit ${CODE_SIZE_LIMIT}",
+      
+      "deploy-atlas": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --fork-url http://localhost:8545 --broadcast --non-interactive",
+      "deploy-atlas-swap-intent": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasAndSwapIntentDAppControlScript --fork-url http://localhost:8545 --broadcast --non-interactive",
+      "deploy-atlas-swap-intent-tx-builder": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasAndSwapIntentDAppControlAndTxBuilderScript --fork-url http://localhost:8545 --broadcast --non-interactive",
+      "deploy-solver": "source .env && forge script script/deploy-solver.s.sol:DeploySimpleRFQSolverScript --fork-url http://localhost:8545 --broadcast --non-interactive",
+      
+      "solver-deposit": "source .env && forge script script/solver-deposit.s.sol:SolverAtlasDepositScript --fork-url http://localhost:8545 --broadcast --non-interactive",
+
+      "setup-demo": "npm run deploy-atlas-swap-intent-tx-builder && npm run deploy-solver && npm run solver-deposit",
+
+      "atlas-addr": "echo 'ATLAS:' && jq -r '.ATLAS' deployments.json",
+      "swap-intent-addr": "echo 'SWAP INTENT DAPP CONTROL:' && jq -r '.SWAP_INTENT_DAPP_CONTROL' deployments.json",
+      "tx-builder-addr": "echo 'TX BUILDER:' && jq -r '.TX_BUILDER' deployments.json",
+      "solver-addr": "echo 'SOLVER:' && jq -r '.SIMPLE_RFQ_SOLVER' deployments.json",
+      "addresses": "npm run atlas-addr --silent && npm run swap-intent-addr --silent && npm run tx-builder-addr --silent && npm run solver-addr --silent",
+
+      "give-dai-to": "source .env && cast rpc anvil_impersonateAccount ${DAI_WHALE} && cast send ${DAI} --unlocked --from ${DAI_WHALE} 'transfer(address,uint256)(bool)' ${to} ${amount}",
+      "give-weth-to": "source .env && cast rpc anvil_impersonateAccount ${WETH_WHALE} && cast send ${WETH} --unlocked --from ${WETH_WHALE} 'transfer(address,uint256)(bool)' ${to} ${amount}",
+
+      "log-balances": "source .env && forge script script/log-balances.s.sol:LogDemoBalancesScript --fork-url http://localhost:8545 --broadcast --non-interactive",
+
       "mappings": "forge remappings > remappings.txt",
       "slither": "slither . --compile-force-framework foundry --filter-paths 'test|lib'",
       "snapshot": "source .env && forge snapshot -vvv --gas-report",

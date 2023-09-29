@@ -2,6 +2,7 @@
 pragma solidity ^0.8.16;
 
 import {BidData} from "../types/SolverCallTypes.sol";
+import "../types/ValidCallsTypes.sol";
 
 error UserSimulationFailed();
 error UserSimulationSucceeded();
@@ -54,4 +55,6 @@ contract FastLaneErrorsEvents {
     error SolverSimFail();
     error PostOpsSimFail();
     error SimulationPassed();
+
+    error ValidCalls(ValidCallsResult);
 }

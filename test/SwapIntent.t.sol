@@ -141,6 +141,7 @@ contract SwapIntentTest is BaseTest {
             to: address(swapIntentController),
             maxFeePerGas: tx.gasprice + 1, // TODO update
             value: 0,
+            deadline: block.number + 2,
             data: userOpData
         });
 
@@ -268,6 +269,7 @@ contract SwapIntentTest is BaseTest {
             to: address(swapIntentController),
             maxFeePerGas: tx.gasprice + 1, // TODO update
             value: 0,
+            deadline: block.number + 2,
             data: userOpData
         });
 
