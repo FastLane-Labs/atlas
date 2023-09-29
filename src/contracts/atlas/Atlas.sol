@@ -30,7 +30,13 @@ contract Atlas is Test, Factory {
         executionEnvironment = _setExecutionEnvironment(dConfig, msg.sender, dConfig.to.codehash);
     }
 
-    function metacall(
+    function getExecutionEnvironment(address user, address dAppControl) external view returns (address executionEnvironment, uint32 callConfig, bool exists) {
+        callConfig = CallBits.buildCallConfig(dAppControl);
+        executionEnvironment = _getExecutionEnvironmentCustom(user, dAppControl.codehash, dAppControl, callConfig);
+        exists = executionEnvironment.codehash != bytes32(0);
+    }
+
+    function metacall( // <- Entrypoint Function
         DAppConfig calldata dConfig, // supplied by frontend
         UserOperation calldata userOp, // set by user
         SolverOperation[] calldata solverOps, // supplied by FastLane via frontend integration

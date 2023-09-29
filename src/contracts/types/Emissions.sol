@@ -24,6 +24,13 @@ contract FastLaneErrorsEvents {
         address indexed controller, uint32 callConfig, BidData[] winningBids
     );
 
+    event NewExecutionEnvironment(
+        address indexed environment,
+        address indexed user,
+        address indexed controller,
+        uint32 callConfig
+    );
+
 
     error SolverBidUnpaid();
     error SolverFailedCallback();
