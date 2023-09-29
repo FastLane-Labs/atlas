@@ -139,8 +139,7 @@ contract ExecutionEnvironment is Base {
         uint256 gasLimit, 
         uint256 escrowBalance, 
         SolverOperation calldata solverOp, 
-        bytes calldata dAppReturnData,
-        bytes calldata searcherForwardData
+        bytes calldata dAppReturnData
     ) 
         external payable 
         onlyAtlasEnvironment 
@@ -205,7 +204,7 @@ contract ExecutionEnvironment is Base {
         (success,) = ISolverContract(solverOp.call.to).atlasSolverCall{
             gas: gasLimit,
             value: solverOp.call.value
-        }(solverOp.call.from, solverOp.bids, solverOp.call.data, searcherForwardData);
+        }(solverOp.call.from, solverOp.bids, solverOp.call.data, _config().forwardReturnData() ? dAppReturnData : new bytes(0));
 
         // Verify that it was successful
         if(!success) {
