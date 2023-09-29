@@ -69,7 +69,7 @@ contract TxBuilder {
             gas: gas,
             maxFeePerGas: maxFeePerGas,
             nonce: userNextNonce(from),
-            deadline: block.number + 2,
+            deadline: deadline,
             control: control,
             data: data
         });
