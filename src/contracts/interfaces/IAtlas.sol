@@ -6,12 +6,12 @@ import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
 interface IAtlas {
-    function metacall(
-        DAppConfig calldata dConfig,
-        UserOperation calldata userOp,
-        SolverOperation[] calldata solverOps,
-        DAppOperation calldata verification
-    ) external payable returns (bool auctionWon);
+    function metacall( // <- Entrypoint Function
+        DAppConfig calldata dConfig, // supplied by frontend
+        UserOperation calldata userOp, // set by user
+        SolverOperation[] calldata solverOps, // supplied by FastLane via frontend integration
+        DAppOperation calldata dAppOp // supplied by front end after it sees the other data
+    ) external payable returns (bool auctionWon, uint256 accruedGasRebate, uint256 solverIndex);
 
     function createExecutionEnvironment(DAppConfig calldata dConfig) external returns (address environment);
 
@@ -25,7 +25,7 @@ interface IAtlas {
         view
         returns (address executionEnvironment);
 
-    function getExecutionEnvironment(address user, address dAppControl) external view returns (address executionEnvironment);
+    function getExecutionEnvironment(address user, address dAppControl) external view returns (address executionEnvironment, uint32 callConfig, bool exists);
 
     function userDirectVerifyDApp(
         address userOpFrom,

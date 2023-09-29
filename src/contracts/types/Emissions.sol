@@ -48,6 +48,7 @@ contract FastLaneErrorsEvents {
     error UserNotFulfilled();
     error NoAuctionWinner();
 
+    error FailedToFailSimFail();
     error VerificationSimFail();
     error PreOpsSimFail();
     error UserOpSimFail();

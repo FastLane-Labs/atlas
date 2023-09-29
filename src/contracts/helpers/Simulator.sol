@@ -24,6 +24,7 @@ contract Simulator is FastLaneErrorsEvents {
 
     enum Result {
         Unknown,
+        FailedToFailSimFail,
         VerificationSimFail,
         PreOpsSimFail,
         UserOpSimFail,
@@ -56,7 +57,8 @@ contract Simulator is FastLaneErrorsEvents {
         DAppOperation memory dAppOp; 
         dAppOp.approval.controlCodeHash = dConfig.to.codehash;
 
-        success = uint8(_errorCatcher(dConfig, userOp, solverOps, dAppOp)) > uint8(Result.UserOpSimFail);
+        (Result result,,,) = _errorCatcher(dConfig, userOp, solverOps, dAppOp);
+        success = uint8(result) > uint8(Result.UserOpSimFail);
     }
 
     function simUserOperation(UserOperation calldata userOp) external payable returns (bool success) {
@@ -67,7 +69,8 @@ contract Simulator is FastLaneErrorsEvents {
         DAppOperation memory dAppOp; 
         dAppOp.approval.controlCodeHash = dConfig.to.codehash;
 
-        success = uint8(_errorCatcher(dConfig, userOp, solverOps, dAppOp)) > uint8(Result.UserOpSimFail);
+        (Result result,,,) = _errorCatcher(dConfig, userOp, solverOps, dAppOp);
+        success = uint8(result) > uint8(Result.UserOpSimFail);
     }
 
     function simSolverCall(
@@ -75,11 +78,15 @@ contract Simulator is FastLaneErrorsEvents {
         UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         DAppOperation calldata dAppOp 
-    ) external payable returns (bool success) {
+    ) external payable returns (bool success,  uint256 gasUsed, uint256 gasRebated, uint256 solverIndex) {
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         solverOps[0] = solverOp;
         
-        success = _errorCatcher(dConfig, userOp, solverOps, dAppOp) == Result.SimulationPassed;
+        Result result;
+        (result, gasUsed, gasRebated, solverIndex) = _errorCatcher(dConfig, userOp, solverOps, dAppOp);
+        success = result == Result.SimulationPassed;
+        console.log("gasUsed    - ",gasUsed);
+        console.log("gasRebated - ",gasRebated);
     }
 
     function simSolverCalls(
@@ -87,11 +94,15 @@ contract Simulator is FastLaneErrorsEvents {
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         DAppOperation calldata dAppOp 
-    ) external payable returns (bool success) {
+    ) external payable returns (bool success, uint256 gasUsed, uint256 gasRebated, uint256 solverIndex) {
         if (solverOps.length == 0) {
-            return false;
+            return (false, 0, 0, 0);
         }
-        success = _errorCatcher(dConfig, userOp, solverOps, dAppOp) == Result.SimulationPassed;
+        Result result;
+        (result, gasUsed, gasRebated, solverIndex) = _errorCatcher(dConfig, userOp, solverOps, dAppOp);
+        success = result == Result.SimulationPassed;
+        console.log("gasUsed    - ",gasUsed);
+        console.log("gasRebated - ",gasRebated);
     }
 
     function _errorCatcher(
@@ -99,12 +110,17 @@ contract Simulator is FastLaneErrorsEvents {
         UserOperation memory userOp,
         SolverOperation[] memory solverOps,
         DAppOperation memory dAppOp 
-    ) internal returns (Result result) {
+    ) internal returns (Result result, uint256 gasUsed, uint256 gasRebated, uint256 solverIndex) {
+        
+        gasUsed = gasleft();
 
         try this.metacallSimulation{value: msg.value}(dConfig, userOp, solverOps, dAppOp) {
-            revert("unreachable");
+            revert FailedToFailSimFail();
         }
         catch (bytes memory revertData) {
+            
+            gasUsed -= gasleft();
+
             bytes4 errorSwitch = bytes4(revertData);
             if (errorSwitch == PreOpsSimFail.selector) {
                 result = Result.PreOpsSimFail;
@@ -114,10 +130,20 @@ contract Simulator is FastLaneErrorsEvents {
                 result = Result.SolverSimFail;
             } else if (errorSwitch == PostOpsSimFail.selector) {
                 result = Result.PostOpsSimFail;
+            } else if (errorSwitch == FailedToFailSimFail.selector) {
+                result = Result.FailedToFailSimFail;
             } else if (errorSwitch == SimulationPassed.selector) {
                 result = Result.SimulationPassed;
+                uint256 accruedGasRebate;
+                assembly {
+                    accruedGasRebate := mload(add(mload(revertData), 4))
+                    solverIndex := mload(add(mload(revertData), 36))
+                }
+                gasRebated = accruedGasRebate / tx.gasprice;
+                return (Result.SimulationPassed, gasUsed, gasRebated, solverIndex);
+
             } else {
-                result = Result.Unknown;
+                revert FailedToFailSimFail();
             }
         }
     }
@@ -129,10 +155,8 @@ contract Simulator is FastLaneErrorsEvents {
         DAppOperation calldata dAppOp 
     ) external payable {
         require(msg.sender == address(this), "invalid entry func");
-        if (!IAtlas(atlas).metacall(dConfig, userOp, solverOps, dAppOp)) {
-            revert NoAuctionWinner(); // should be unreachable
-        }
-        revert SimulationPassed();
+        IAtlas(atlas).metacall(dConfig, userOp, solverOps, dAppOp);
+        revert FailedToFailSimFail();
     }
 
     receive() external payable {}

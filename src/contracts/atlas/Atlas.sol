@@ -41,7 +41,7 @@ contract Atlas is Test, Factory {
         UserOperation calldata userOp, // set by user
         SolverOperation[] calldata solverOps, // supplied by FastLane via frontend integration
         DAppOperation calldata dAppOp // supplied by front end after it sees the other data
-    ) external payable returns (bool auctionWon, uint256 accruedGasRebate) {
+    ) external payable returns (bool auctionWon, uint256 accruedGasRebate, uint256 solverIndex) {
 
         uint256 gasMarker = gasleft();
 
@@ -51,7 +51,7 @@ contract Atlas is Test, Factory {
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
         if (!_validCalls(dConfig, userOp, solverOps, dAppOp, executionEnvironment)) {
-            if (msg.sender == simulator) {revert VerificationSimFail();} else { return (false, 0);}
+            if (msg.sender == simulator) {revert VerificationSimFail();} else { return (false, 0, 0);}
         }
 
         // Initialize the lock
@@ -59,9 +59,8 @@ contract Atlas is Test, Factory {
 
         try this.execute{value: msg.value}(
             dConfig, userOp.call, solverOps, executionEnvironment, dAppOp.approval.callChainHash, msg.sender == simulator
-        ) returns (bool _auctionWon, uint256 _accruedGasRebate) {
+        ) returns (bool _auctionWon, uint256 _accruedGasRebate, uint256 _solverIndex) {
             
-            console.log("accruedGasRebate",accruedGasRebate);
             auctionWon = _auctionWon;
             // Gas Refund to sender only if execution is successful
             _executeGasRefund(gasMarker, accruedGasRebate, userOp.call.from);
@@ -70,9 +69,9 @@ contract Atlas is Test, Factory {
             _releaseEscrowLock();
 
             if (msg.sender == simulator) {
-                revert SimulationPassed(_accruedGasRebate, 0);
+                revert SimulationPassed(_accruedGasRebate, _solverIndex);
             }
-            return (true, _accruedGasRebate);
+            return (true, _accruedGasRebate, _solverIndex);
 
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
@@ -90,7 +89,7 @@ contract Atlas is Test, Factory {
         address executionEnvironment,
         bytes32 callChainHash,
         bool isSimulation
-    ) external payable returns (bool auctionWon, uint256 accruedGasRebate) {
+    ) external payable returns (bool auctionWon, uint256 accruedGasRebate, uint256 solverIndex) {
         
         // This is a self.call made externally so that it can be used with try/catch
         require(msg.sender == address(this), "ERR-F06 InvalidAccess");
@@ -105,7 +104,7 @@ contract Atlas is Test, Factory {
         EscrowKey memory key = _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), isSimulation);
 
         // Begin execution
-        (auctionWon, accruedGasRebate) = _execute(dConfig, uCall, solverOps, executionEnvironment, key);
+        return _execute(dConfig, uCall, solverOps, executionEnvironment, key);
     }
 
     function _execute(
@@ -124,7 +123,6 @@ contract Atlas is Test, Factory {
         uint32 callConfig = CallBits.buildCallConfig(uCall.control);
 
         bytes memory returnData;
-        bytes memory searcherForwardData;
 
         if (dConfig.callConfig.needsPreOpsCall()) {
             key = key.holdPreOpsLock(dConfig.to);
@@ -142,13 +140,6 @@ contract Atlas is Test, Factory {
             if (key.isSimulation) { revert UserOpSimFail(); } else { revert("ERR-E002 UserFail"); }
         }
 
-        if(CallBits.forwardPreOpsReturnData(callConfig)) {
-            searcherForwardData = returnData;
-        }
-        if(CallBits.forwardUserReturnData(callConfig)) {
-            searcherForwardData = bytes.concat(searcherForwardData, userReturnData);
-        }
-
         if (CallBits.needsPreOpsReturnData(callConfig)) {
             //returnData = returnData;
             if (CallBits.needsUserReturnData(callConfig)) {
@@ -157,14 +148,13 @@ contract Atlas is Test, Factory {
         } else if (CallBits.needsUserReturnData(callConfig)) {
             returnData = userReturnData;
         } 
-        
 
         for (; key.callIndex < key.callMax - 1;) {
 
             // Only execute solver meta tx if userOpHash matches 
             if (!auctionWon && userOpHash == solverOps[key.callIndex-2].call.userOpHash) {
                 (auctionWon, key) = _solverExecutionIteration(
-                    dConfig, solverOps[key.callIndex-2], returnData, searcherForwardData, auctionWon, executionEnvironment, key
+                    dConfig, solverOps[key.callIndex-2], returnData, auctionWon, executionEnvironment, key
                 );
                 if (auctionWon) {
                     solverIndex = key.callIndex;
@@ -192,19 +182,18 @@ contract Atlas is Test, Factory {
                 if (key.isSimulation) { revert PostOpsSimFail(); } else { revert("ERR-E005 PostOpsFail"); }
             }
         }
-        return (auctionWon, uint256(key.gasRefund), 0);
+        return (auctionWon, uint256(key.gasRefund), solverIndex);
     }
 
     function _solverExecutionIteration(
         DAppConfig calldata dConfig,
         SolverOperation calldata solverOp,
         bytes memory dAppReturnData,
-        bytes memory searcherForwardData,
         bool auctionWon,
         address executionEnvironment,
         EscrowKey memory key
     ) internal returns (bool, EscrowKey memory) {
-        (auctionWon, key) = _executeSolverOperation(solverOp, dAppReturnData, searcherForwardData, executionEnvironment, key);
+        (auctionWon, key) = _executeSolverOperation(solverOp, dAppReturnData, executionEnvironment, key);
         if (auctionWon) {
             _allocateValue(dConfig, solverOp.bids, dAppReturnData, executionEnvironment, key.pack());
             key = key.allocationComplete();

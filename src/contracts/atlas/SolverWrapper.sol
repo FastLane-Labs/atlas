@@ -15,7 +15,6 @@ contract SolverWrapper is FastLaneErrorsEvents {
         address environment,
         SolverOperation calldata solverOp,
         bytes memory dAppReturnData,
-        bytes memory searcherForwardData,
         bytes32 lockBytes
     ) internal returns (SolverOutcome, uint256) {
         // address(this) = Atlas/Escrow
@@ -26,7 +25,7 @@ contract SolverWrapper is FastLaneErrorsEvents {
         bool success;
 
         bytes memory data = abi.encodeWithSelector(
-            IExecutionEnvironment(environment).solverMetaTryCatch.selector, gasLimit, currentBalance, solverOp, dAppReturnData, searcherForwardData);
+            IExecutionEnvironment(environment).solverMetaTryCatch.selector, gasLimit, currentBalance, solverOp, dAppReturnData);
         
         data = abi.encodePacked(data, lockBytes);
 
