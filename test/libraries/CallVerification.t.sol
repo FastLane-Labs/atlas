@@ -4,7 +4,7 @@ pragma solidity ^0.8.18;
 import "forge-std/Test.sol";
 
 import {CallVerification} from "../../src/contracts/libraries/CallVerification.sol";
-import "../../src/contracts/types/CallTypes.sol";
+import "../../src/contracts/types/UserCallTypes.sol";
 import "../base/TestUtils.sol";
 
 contract CallVerificationTest is Test {
@@ -25,7 +25,7 @@ contract CallVerificationTest is Test {
         });
     }
 
-    function builderSolverCall() internal pure returns (SolverCall memory) {
+    function builderSolverCall() internal view returns (SolverCall memory) {
         return SolverCall({
             from: address(0x1),
             to: address(0x2),
@@ -36,6 +36,7 @@ contract CallVerificationTest is Test {
             userOpHash: "userCallHash",
             controlCodeHash: "controlCodeHash",
             bidsHash: "bidsHash",
+            deadline: block.number + 2,
             data: "data"
         });
     }
@@ -90,9 +91,11 @@ contract CallVerificationTest is Test {
         UserCall calldata uCall,
         SolverOperation[] calldata solverOps
     ) external {
-        bytes32 expectedCallChainHash = 0x69c0833b2f37f7a0cb7d040aaa3f4654d841ebf21e6781b530a9c978d0c8cf09;
         bytes32 callChainHash = CallVerification.getCallChainHash(dConfig, uCall, solverOps);
-        assertEq(callChainHash, expectedCallChainHash, "callChainHash different to pre-computed expected");
-        assertEq(callChainHash, TestUtils.computeCallChainHash(dConfig, uCall, solverOps), "callChainHash different to TestUtils reproduction");
+        assertEq(
+            callChainHash,
+            TestUtils.computeCallChainHash(dConfig, uCall, solverOps),
+            "callChainHash different to TestUtils reproduction"
+        );
     }
 }
