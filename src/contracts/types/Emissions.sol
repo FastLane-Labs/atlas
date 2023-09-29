@@ -24,6 +24,13 @@ contract FastLaneErrorsEvents {
         address indexed controller, uint32 callConfig, BidData[] winningBids
     );
 
+    event NewExecutionEnvironment(
+        address indexed environment,
+        address indexed user,
+        address indexed controller,
+        uint32 callConfig
+    );
+
 
     error SolverBidUnpaid();
     error SolverFailedCallback();
@@ -46,5 +53,5 @@ contract FastLaneErrorsEvents {
     error UserOpSimFail();
     error SolverSimFail();
     error PostOpsSimFail();
-    error SimulationPassed();
+    error SimulationPassed(uint256 gasRebate, uint256 solverIndex);
 }

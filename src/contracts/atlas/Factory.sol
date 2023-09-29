@@ -125,6 +125,8 @@ contract Factory is Test, Escrow, Permit69 {
             assembly {
                 executionEnvironment := create2(0, add(creationCode, 32), mload(creationCode), memSalt)
             }
+
+            emit NewExecutionEnvironment(executionEnvironment, user, dConfig.to, dConfig.callConfig);
         }
     }
 
