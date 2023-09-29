@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.16;
 
+import {IDAppControl} from "../../src/contracts/interfaces/IDAppControl.sol";
+
+import "../../src/contracts/types/CallTypes.sol";
+
 library TestUtils {
     // String <> uint16 binary Converter Utility
     function uint16ToBinaryString(uint16 n) public pure returns (string memory) {
@@ -42,5 +46,49 @@ library TestUtils {
             n /= 2;
         }
         return string(output);
+    }
+
+    function computeCallChainHash(
+        DAppConfig calldata dConfig,
+        UserCall calldata uCall,
+        SolverOperation[] calldata solverOps
+    ) internal pure returns (bytes32 callSequenceHash) {
+        uint256 i;
+        if (dConfig.callConfig & 1 << uint32(CallConfigIndex.RequirePreOps) != 0) {
+            // Start with preOps call if preOps is needed
+            callSequenceHash = keccak256(
+                abi.encodePacked(
+                    callSequenceHash, // initial hash = null
+                    dConfig.to,
+                    abi.encodeWithSelector(IDAppControl.preOpsCall.selector, uCall),
+                    i++
+                )
+            );
+        }
+
+        // then user call
+        callSequenceHash = keccak256(
+            abi.encodePacked(
+                callSequenceHash, // always reference previous hash
+                abi.encode(uCall),
+                i++
+            )
+        );
+
+        // then solver calls
+        uint256 count = solverOps.length;
+        uint256 n;
+        for (; n < count;) {
+            callSequenceHash = keccak256(
+                abi.encodePacked(
+                    callSequenceHash, // reference previous hash
+                    abi.encode(solverOps[n].call), // solver call
+                    i++
+                )
+            );
+            unchecked {
+                ++n;
+            }
+        }
     }
 }
