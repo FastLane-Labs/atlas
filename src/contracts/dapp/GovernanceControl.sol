@@ -1,7 +1,9 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import "../types/CallTypes.sol";
+import "../types/SolverCallTypes.sol";
+import "../types/UserCallTypes.sol";
+import "../types/DAppApprovalTypes.sol";
 
 import "forge-std/Test.sol";
 
@@ -134,8 +136,6 @@ abstract contract GovernanceControl {
     // View functions used by the backend to verify bid format
     // and by the factory and DAppVerification to verify the
     // backend.
-    function getPayeeData(bytes calldata data) external view virtual returns (PayeeData[] memory);
-
     function getBidFormat(UserCall calldata uCall) external view virtual returns (BidData[] memory);
 
     function getBidValue(SolverOperation calldata solverOp) external view virtual returns (uint256);

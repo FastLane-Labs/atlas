@@ -7,7 +7,10 @@ import {IDAppControl} from "../interfaces/IDAppControl.sol";
 
 import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
-import {UserCall, DAppConfig, SolverOperation, SolverCall, BidData} from "../types/CallTypes.sol";
+import "../types/SolverCallTypes.sol";
+import "../types/UserCallTypes.sol";
+import "../types/DAppApprovalTypes.sol";
+
 import {ExecutionPhase} from "../types/LockTypes.sol";
 
 import {Base} from "../common/ExecutionBase.sol";
@@ -136,7 +139,7 @@ contract ExecutionEnvironment is Base {
         uint256 gasLimit, 
         uint256 escrowBalance, 
         SolverOperation calldata solverOp, 
-        bytes calldata DAppReturnData,
+        bytes calldata dAppReturnData,
         bytes calldata searcherForwardData
     ) 
         external payable 
@@ -178,7 +181,7 @@ contract ExecutionEnvironment is Base {
         // Handle any solver preOps, if necessary
         if (_config().needsPreSolver()) {
 
-            bytes memory data = abi.encode(solverOp.call.to, DAppReturnData);
+            bytes memory data = abi.encode(solverOp.call.to, dAppReturnData);
 
             data = abi.encodeWithSelector(
                 IDAppControl.preSolverCall.selector, 
@@ -212,7 +215,7 @@ contract ExecutionEnvironment is Base {
         // If this was a user intent, handle and verify fulfillment
         if (_config().needsSolverPostCall()) {
             
-            bytes memory data = DAppReturnData;
+            bytes memory data = dAppReturnData;
 
             data = abi.encode(solverOp.call.to, data);
 

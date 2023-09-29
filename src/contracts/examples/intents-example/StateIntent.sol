@@ -11,7 +11,6 @@ import {IEscrow} from "../../interfaces/IEscrow.sol";
 
 import {SafetyBits} from "../../libraries/SafetyBits.sol";
 
-import "../../types/CallTypes.sol";
 import "../../types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
