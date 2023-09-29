@@ -10,8 +10,8 @@ import "../base/TestUtils.sol";
 contract CallBitsTest is Test {
     using CallBits for uint32;
 
-    CallConfig public callConfig1;
-    CallConfig public callConfig2;
+    CallConfig callConfig1;
+    CallConfig callConfig2;
 
     function setUp() public {
         callConfig1 = CallConfig({
