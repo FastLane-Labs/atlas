@@ -232,11 +232,11 @@ contract DAppVerification is EIP712, DAppIntegration {
                 USER_TYPE_HASH,
                 uCall.from,
                 uCall.to,
-                uCall.deadline,
-                uCall.gas,
-                uCall.nonce,
-                uCall.maxFeePerGas,
                 uCall.value,
+                uCall.gas,
+                uCall.maxFeePerGas,
+                uCall.nonce,
+                uCall.deadline,
                 uCall.control,
                 keccak256(uCall.data)
             )
