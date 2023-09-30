@@ -53,6 +53,10 @@ contract TxBuilder {
         return IAtlas(atlas).nextUserNonce(user);
     }
 
+    function getControlCodeHash(address dAppControl) public view returns (bytes32) {
+        return dAppControl.codehash;
+    }
+
     function buildUserOperation(
         address from,
         address to,
