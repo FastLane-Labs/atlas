@@ -8,7 +8,7 @@ import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
 library CallVerification {
-    function getUserOperationHash(UserCall calldata uCall) internal pure returns (bytes32 userOpHash) {
+    function getUserOperationHash(UserCall memory uCall) internal pure returns (bytes32 userOpHash) {
         userOpHash = keccak256(abi.encode(uCall));
     }
 
@@ -18,8 +18,8 @@ library CallVerification {
 
     function getCallChainHash(
         DAppConfig memory dConfig,
-        UserCall calldata uCall,
-        SolverOperation[] calldata solverOps
+        UserCall memory uCall,
+        SolverOperation[] memory solverOps
     ) internal pure returns (bytes32 callSequenceHash) {
         
         uint256 i;

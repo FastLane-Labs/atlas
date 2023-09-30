@@ -165,6 +165,10 @@ contract DAppVerification is EIP712, DAppIntegration {
         payload = _hashTypedDataV4(_getProofHash(dAppOp.approval));
     }
 
+    function getDAppApprovalPayload(DAppApproval memory dAppApproval) external view returns (bytes32 payload) {
+        payload = _hashTypedDataV4(_getProofHash(dAppApproval));
+    }
+
     //
     // USER VERIFICATION
     //
@@ -248,6 +252,10 @@ contract DAppVerification is EIP712, DAppIntegration {
 
     function getUserOperationPayload(UserOperation memory userOp) public view returns (bytes32 payload) {
         payload = _hashTypedDataV4(_getProofHash(userOp.call));
+    }
+
+    function getUserCallPayload(UserCall memory userCall) public view returns (bytes32 payload) {
+        payload = _hashTypedDataV4(_getProofHash(userCall));
     }
 
     function nextUserNonce(address user) external view returns (uint256 nextNonce) {

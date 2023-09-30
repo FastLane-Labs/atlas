@@ -36,7 +36,7 @@ contract TxBuilder {
         return IDAppControl(control).getDAppConfig();
     }
 
-    function getBidData(UserCall calldata uCall, uint256 amount) public view returns (BidData[] memory bids) {
+    function getBidData(UserCall memory uCall, uint256 amount) public view returns (BidData[] memory bids) {
         bids = IDAppControl(control).getBidFormat(uCall);
         bids[0].bidAmount = amount;
     }
@@ -76,9 +76,9 @@ contract TxBuilder {
     }
 
     function buildSolverOperation(
-        UserOperation calldata userOp,
+        UserOperation memory userOp,
         DAppConfig memory dConfig,
-        bytes calldata solverOpData,
+        bytes memory solverOpData,
         address solverEOA,
         address solverContract,
         uint256 bidAmount
@@ -110,8 +110,8 @@ contract TxBuilder {
     function buildDAppOperation(
         address governanceEOA,
         DAppConfig memory dConfig,
-        UserOperation calldata userOp,
-        SolverOperation[] calldata solverOps
+        UserOperation memory userOp,
+        SolverOperation[] memory solverOps
     ) public view returns (DAppOperation memory dAppOp) {
         dAppOp.to = atlas;
         if (dConfig.callConfig == 0) {

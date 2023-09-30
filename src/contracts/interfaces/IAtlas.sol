@@ -38,10 +38,14 @@ interface IAtlas {
     function userDirectReleaseLock(address userOpFrom, bytes32 key, DAppConfig calldata dConfig) external;
 
     function getDAppOperationPayload(DAppOperation memory verification) external view returns (bytes32 payload);
+    
+    function getDAppApprovalPayload(DAppApproval memory dAppApproval) external view returns (bytes32 payload);
 
     function getSolverPayload(SolverCall calldata sCall) external view returns (bytes32 payload);
 
     function getUserOperationPayload(UserOperation memory userOp) external view returns (bytes32 payload);
+
+    function getUserCallPayload(UserCall memory userCall) external view returns (bytes32 payload);
 
     function nextUserNonce(address user) external view returns (uint256 nextNonce);
 }
