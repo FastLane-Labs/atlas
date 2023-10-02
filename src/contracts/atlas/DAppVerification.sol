@@ -23,17 +23,6 @@ contract DAppVerification is EIP712, DAppIntegration {
     using ECDSA for bytes32;
     using CallBits for uint32;
 
-    mapping(address => uint256) public userNonces;
-    
-    struct NonceTracker {
-        uint64 asyncFloor;
-        uint64 asyncCeiling;
-        uint64 blockingLast;
-    }
-
-    //  keccak256(from, callConfig, nonce) => to
-    mapping(bytes32 => address) public asyncNonceFills;
-
     constructor() EIP712("ProtoCallHandler", "0.0.1") {}
 
 
@@ -69,27 +58,26 @@ contract DAppVerification is EIP712, DAppIntegration {
         // users not having to trust the front end at all - a huge
         // improvement over the current experience.
 
-        ApproverSigningData memory signatory = signatories[dAppOp.approval.from];
+        GovernanceData memory govData = governance[dConfig.to];
+
+        // Verify that the dapp is onboarded and that the call config is
+        // genuine.
+        bytes32 dAppKey = keccak256(abi.encode(dConfig.to, govData.governance, dConfig.callConfig));
+
+        // Make sure the signer is currently enabled by dapp owner
+        if (!signatories[keccak256(abi.encode(govData.governance, dAppOp.approval.from))]) {
+            return (false);
+        }
 
         if (dAppOp.approval.to != dConfig.to) {
             return (false);
         }
 
-        // Make sure the signer is currently enabled by dapp owner
-        // NOTE: check must occur after storing signature to prevent replays
-        if (!signatory.enabled) {
-            return (false);
-        }
-
-        // Verify that the dapp is onboarded and that the call config is
-        // genuine.
-        bytes32 key = keccak256(abi.encode(dConfig.to, signatory.governance, dConfig.callConfig));
-
         // NOTE: This check does not work if DAppControl is a proxy contract.
         // To avoid exposure to social engineering vulnerabilities, disgruntled
         // former employees, or beneficiary uncertainty during intra-DAO conflict,
         // governance should refrain from using a proxy contract for DAppControl.
-        if (dConfig.to.codehash == bytes32(0) || dapps[key] != dConfig.to.codehash) {
+        if (dConfig.to.codehash == bytes32(0) || dapps[dAppKey] != dConfig.to.codehash) {
             return (false);
         }
 
@@ -100,39 +88,97 @@ contract DAppVerification is EIP712, DAppIntegration {
             return (false);
         }
 
-        if (dAppOp.approval.nonce > type(uint64).max - 1) {
-            return (false);
-        }
-
         // If the dapp indicated that they only accept sequenced nonces
         // (IE for FCFS execution), check and make sure the order is correct
         // NOTE: allowing only sequenced nonces could create a scenario in
         // which builders or validators may be able to profit via censorship.
-        // DApps are encouraged to rely on the deadline parameter
-        // to prevent replay attacks.
-        if (dConfig.callConfig.needsSequencedNonces()) {
-            if (dAppOp.approval.nonce != signatory.nonce + 1) {
-                return (false);
-            }
-
-            unchecked {++signatories[dAppOp.approval.from].nonce;}
-            
-            // If not sequenced, check to see if this nonce is highest and store
-            // it if so.  This ensures nonce + 1 will always be available.
-        } else {
-            // NOTE: including the callConfig in the asyncNonceKey should prevent
-            // issues occuring when a dapp may switch configs between blocking 
-            // and async, since callConfig can double as another seed. 
-            bytes32 asyncNonceKey = keccak256(abi.encode(dAppOp.approval.from, dConfig.callConfig, dAppOp.approval.nonce + 1));
-            
-            if (asyncNonceFills[asyncNonceKey] != address(0)) {
-                return (false);
-            }
-
-            asyncNonceFills[asyncNonceKey] = dConfig.to;
+        // DApps are encouraged to rely on the deadline parameter.
+        if (!_handleNonces(dAppOp.approval.from, dAppOp.approval.nonce, dConfig.callConfig.needsSequencedNonces())) {
+            return (false);
         }
 
         return (true);
+    }
+
+    function _handleNonces(address account, uint256 nonce, bool async) internal returns (bool validNonce) {
+        if (nonce > type(uint128).max - 1) {
+            return (false);
+        }
+        
+        if (nonce == 0) {
+            return (false);
+        }
+
+        uint256 bitmapIndex = (nonce / 240) + 1; // +1 because highestFullBitmap initializes at 0
+        uint256 bitmapNonce = (nonce % 240) + 1;
+
+        bytes32 bitmapKey = keccak256(abi.encode(account, bitmapIndex));
+        
+        NonceBitmap memory nonceBitmap = asyncNonceBitmap[bitmapKey];
+
+        uint256 bitmap = uint256(nonceBitmap.bitmap);
+        if (bitmap & (1 << bitmapNonce) != 0) {
+            return (false);
+        }
+
+        bitmap |= 1 << bitmapNonce;
+        nonceBitmap.bitmap = uint240(bitmap);
+
+        uint256 highestUsedBitmapNonce = uint256(nonceBitmap.highestUsedNonce);
+        if (bitmapNonce > highestUsedBitmapNonce) {
+            nonceBitmap.highestUsedNonce = uint8(bitmapNonce);
+        }
+
+        // Update the nonceBitmap
+        asyncNonceBitmap[bitmapKey] = nonceBitmap;
+
+        // Update the nonce tracker
+        return _updateNonceTracker(account, highestUsedBitmapNonce, bitmapIndex, bitmapNonce, async);
+    }
+
+    function _updateNonceTracker(
+        address account, uint256 highestUsedBitmapNonce, uint256 bitmapIndex, uint256 bitmapNonce, bool async
+    ) 
+        internal 
+        returns (bool) 
+    {
+        NonceTracker memory nonceTracker = asyncNonceBitIndex[account];
+
+        uint256 highestFullBitmap = uint256(nonceTracker.HighestFullBitmap);
+        uint256 lowestEmptyBitmap = uint256(nonceTracker.LowestEmptyBitmap);
+
+        // Handle non-async nonce logic
+        if (!async) {
+            if (bitmapIndex != highestFullBitmap + 1) {
+                return (false);
+            }
+
+            if (bitmapNonce != highestUsedBitmapNonce +1) {
+                return (false);
+            }
+        }
+
+        if (bitmapNonce > uint256(239) || !async) {
+            bool updateTracker;
+        
+            if (bitmapIndex > highestFullBitmap) {
+                updateTracker = true;
+                highestFullBitmap = bitmapIndex;
+            }
+
+            if (bitmapIndex + 2 > lowestEmptyBitmap) {
+                updateTracker = true;
+                lowestEmptyBitmap = (lowestEmptyBitmap > bitmapIndex ? lowestEmptyBitmap + 1 : bitmapIndex + 2);
+            }
+
+            if (updateTracker) {
+                asyncNonceBitIndex[account] = NonceTracker({
+                    HighestFullBitmap: uint128(highestFullBitmap),
+                    LowestEmptyBitmap: uint128(lowestEmptyBitmap)
+                });
+            } 
+        }
+        return true;
     }
 
     function _getProofHash(DAppApproval memory approval) internal pure returns (bytes32 proofHash) {
@@ -189,38 +235,14 @@ contract DAppVerification is EIP712, DAppIntegration {
             return (false);
         }
 
-        if (userOp.call.nonce > type(uint64).max - 1) {
-            return (false);
-        }
-
-        uint256 userNonce = userNonces[userOp.call.from];
-
         // If the dapp indicated that they only accept sequenced userNonces
         // (IE for FCFS execution), check and make sure the order is correct
         // NOTE: allowing only sequenced userNonces could create a scenario in
         // which builders or validators may be able to profit via censorship.
         // DApps are encouraged to rely on the deadline parameter
         // to prevent replay attacks.
-        if (dConfig.callConfig.needsSequencedNonces()) {
-            if (userOp.call.nonce != userNonce + 1) {
-                return (false);
-            }
-
-            unchecked {++userNonces[userOp.call.from];}
-
-            // If not sequenced, check to see if this nonce is highest and store
-            // it if so.  This ensures nonce + 1 will always be available.
-        } else {
-            // NOTE: including the callConfig in the asyncNonceKey should prevent
-            // issues occuring when a dapp may switch configs between blocking 
-            // and async, since callConfig can double as another seed. 
-            bytes32 asyncNonceKey = keccak256(abi.encode(userOp.call.from, dConfig.callConfig, userOp.call.nonce + 1));
-            
-            if (asyncNonceFills[asyncNonceKey] != address(0)) {
-                return (false);
-            }
-
-            asyncNonceFills[asyncNonceKey] = dConfig.to;
+        if (!_handleNonces(userOp.call.from, userOp.call.nonce, dConfig.callConfig.needsSequencedNonces())) {
+            return (false);
         }
 
         return (true);
@@ -258,7 +280,25 @@ contract DAppVerification is EIP712, DAppIntegration {
         payload = _hashTypedDataV4(_getProofHash(userCall));
     }
 
-    function nextUserNonce(address user) external view returns (uint256 nextNonce) {
-        nextNonce = userNonces[user] + 1;
+    function getNextNonce(address account) external view returns (uint256 nextNonce) {
+        NonceTracker memory nonceTracker = asyncNonceBitIndex[account];
+
+        uint256 nextBitmapIndex = uint256(nonceTracker.HighestFullBitmap) + 1;
+        uint256 lowestEmptyBitmap = uint256(nonceTracker.LowestEmptyBitmap);
+
+        if (lowestEmptyBitmap == 0) {
+            console.log("account:", account, "nonce (a)", nextNonce);
+            return 1; // uninitialized
+        }
+
+        bytes32 bitmapKey = keccak256(abi.encode(account, nextBitmapIndex));
+
+        NonceBitmap memory nonceBitmap = asyncNonceBitmap[bitmapKey];
+
+        uint256 highestUsedNonce = uint256(nonceBitmap.highestUsedNonce); //  has a +1 offset
+
+        nextNonce = ((nextBitmapIndex - 1) * 240) + highestUsedNonce;
+        console.log("account:", account, "  nonce (b)", nextNonce);
+        console.log("highestUsedNonce", uint256(highestUsedNonce));
     }
 }
