@@ -29,6 +29,7 @@ contract Atlas is Test, Factory {
 
     function createExecutionEnvironment(DAppConfig calldata dConfig) external returns (address executionEnvironment) {
         executionEnvironment = _setExecutionEnvironment(dConfig, msg.sender, dConfig.to.codehash);
+        _initializeNonce(msg.sender);
     }
 
     function getExecutionEnvironment(address user, address dAppControl) external view returns (address executionEnvironment, uint32 callConfig, bool exists) {

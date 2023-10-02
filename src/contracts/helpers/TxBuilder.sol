@@ -46,15 +46,19 @@ contract TxBuilder {
     }
 
     function governanceNextNonce(address signatory) public view returns (uint256) {
-        return IDAppIntegration(atlas).nextGovernanceNonce(signatory);
+        return IAtlas(atlas).getNextNonce(signatory);
     }
 
     function userNextNonce(address user) public view returns (uint256) {
-        return IAtlas(atlas).nextUserNonce(user);
+        return IAtlas(atlas).getNextNonce(user);
     }
 
-    function getControlCodeHash(address dAppControl) public view returns (bytes32) {
+    function getControlCodeHash(address dAppControl) external view returns (bytes32) {
         return dAppControl.codehash;
+    }
+
+    function getBlockchainID() external view returns (uint256 chainId) {
+        chainId = block.chainid;
     }
 
     function buildUserOperation(
