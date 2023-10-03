@@ -7,8 +7,9 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 
 import {BaseTest} from "./base/BaseTest.t.sol";
 import {TxBuilder} from "../src/contracts/helpers/TxBuilder.sol";
-import {DAppConfig, UserOperation, SolverOperation} from "../src/contracts/types/CallTypes.sol";
-import {Verification} from "../src/contracts/types/VerificationTypes.sol";
+import {SolverOperation} from "../src/contracts/types/SolverCallTypes.sol";
+import {UserOperation} from "../src/contracts/types/UserCallTypes.sol";
+import {DAppOperation, DAppConfig} from "../src/contracts/types/DAppApprovalTypes.sol";
 
 
 import {SwapIntentController, SwapIntent, Condition} from "../src/contracts/examples/intents-example/SwapIntent.sol";
@@ -44,7 +45,7 @@ contract AccountingTest is BaseTest {
         vm.startPrank(governanceEOA);
         swapIntentController = new SwapIntentController(address(escrow));        
         atlas.initializeGovernance(address(swapIntentController));
-        atlas.integrateDApp(address(swapIntentController), address(swapIntentController));
+        atlas.integrateDApp(address(swapIntentController));
         vm.stopPrank();
 
         txBuilder = new TxBuilder({
@@ -110,7 +111,7 @@ contract AccountingTest is BaseTest {
         DAppConfig memory dConfig = txBuilder.getDAppConfig();
         UserOperation memory userOp;
         SolverOperation[] memory solverOps = new SolverOperation[](1);
-        Verification memory verification;
+        DAppOperation memory dAppOp;
 
         vm.startPrank(userEOA);
         address executionEnvironment = atlas.createExecutionEnvironment(dConfig);
@@ -130,6 +131,7 @@ contract AccountingTest is BaseTest {
             to: address(swapIntentController),
             maxFeePerGas: tx.gasprice + 1,
             value: 0,
+            deadline: block.number + 2,
             data: userCallData
         });
 
@@ -160,12 +162,12 @@ contract AccountingTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlas.getSolverPayload(solverOps[0].call));
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-        // Frontend creates verification calldata after seeing rest of data
-        verification = txBuilder.buildVerification(governanceEOA, dConfig, userOp, solverOps);
+        // Frontend creates dApp Operation calldata after seeing rest of data
+        dAppOp = txBuilder.buildDAppOperation(governanceEOA, dConfig, userOp, solverOps);
 
-        // Frontend signs the verification payload
-        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getVerificationPayload(verification));
-        verification.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+        // Frontend signs the dApp Operation payload
+        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getDAppOperationPayload(dAppOp));
+        dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Check user token balances before
         uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);
@@ -186,21 +188,20 @@ contract AccountingTest is BaseTest {
 
         vm.startPrank(userEOA);
         
-        assertFalse(atlas.testUserOperation(userOp), "userOp tested true");
+        assertFalse(simulator.simUserOperation(userOp), "metasimUserOperationcall tested true a");
+        assertFalse(simulator.simUserOperation(userOp.call), "metasimUserOperationcall call tested true b");
         
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
-        assertTrue(atlas.testUserOperation(userOp), "userOp tested false");
-        assertTrue(atlas.testUserOperation(userOp.call), "userOp.call tested false");
-
-        console.log("user eth balance", address(userEOA).balance);
+        assertTrue(simulator.simUserOperation(userOp), "metasimUserOperationcall tested false c");
+        assertTrue(simulator.simUserOperation(userOp.call), "metasimUserOperationcall call tested false d");
 
         // TODO start here - maybe see if msgValue comes from somewhere else? Focus on solver value 
         atlas.metacall{value: 0}({
             dConfig: dConfig,
             userOp: userOp,
             solverOps: solverOps,
-            verification: verification
+            dAppOp: dAppOp
         });
         vm.stopPrank();
 

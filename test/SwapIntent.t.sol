@@ -70,8 +70,6 @@ contract SwapIntentTest is BaseTest {
         atlas.integrateDApp(address(swapIntentController));
         vm.stopPrank();
 
-        console.log("swapIntentController",address(swapIntentController));
-
         txBuilder = new TxBuilder({
             controller: address(swapIntentController),
             escrowAddress: address(escrow),
@@ -139,9 +137,9 @@ contract SwapIntentTest is BaseTest {
 
         // Builds the metaTx and to parts of userOp, signature still to be set
         userOp = txBuilder.buildUserOperation({
-            from: userEOA, // NOTE: Would from ever not be user?
+            from: userEOA,
             to: address(swapIntentController),
-            maxFeePerGas: tx.gasprice + 1, // TODO update
+            maxFeePerGas: tx.gasprice + 1,
             value: 0,
             deadline: block.number + 2,
             data: userOpData
