@@ -14,6 +14,8 @@ import "../types/DAppApprovalTypes.sol";
 
 import "forge-std/Test.sol";
 
+// TODO: Check payable is appropriate in pre/post ops and solver calls. Needed to send ETH if necessary (even when delegatecalled)
+
 abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
     address public immutable escrow;
     address public immutable governance;
@@ -48,6 +50,7 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
     // Functions
     function preOpsCall(UserCall calldata uCall)
         external
+        payable
         onlyActiveEnvironment
         validControl
         validPhase(ExecutionPhase.PreOps)
@@ -58,7 +61,8 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
     }
 
     function preSolverCall(bytes calldata data) 
-        external 
+        external
+        payable
         onlyActiveEnvironment
         validControl
         validPhase(ExecutionPhase.SolverOperations)
@@ -69,7 +73,8 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
     }
 
     function postSolverCall(bytes calldata data) 
-        external 
+        external
+        payable
         onlyActiveEnvironment
         validControl
         validPhase(ExecutionPhase.SolverOperations)
@@ -91,7 +96,8 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
     }
 
     function postOpsCall(bytes calldata data) 
-        external 
+        external
+        payable
         onlyActiveEnvironment
         validControl
         validPhase(ExecutionPhase.PostOps)
