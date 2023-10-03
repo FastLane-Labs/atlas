@@ -5,7 +5,7 @@ import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
 import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
 
-import "../types/CallTypes.sol";
+import "../types/SolverCallTypes.sol";
 
 import "forge-std/Test.sol";
 
@@ -27,7 +27,7 @@ contract SolverBase {
         _escrow = atlasEscrow;
     }
 
-    function atlasSolverCall(address sender, BidData[] calldata bids, bytes calldata solverOpData)
+    function atlasSolverCall(address sender, BidData[] calldata bids, bytes calldata solverOpData, bytes calldata extraReturnData)
         external
         payable
         safetyFirst(sender)

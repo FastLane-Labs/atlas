@@ -8,7 +8,9 @@ import {CallBits} from "../libraries/CallBits.sol";
 import {GovernanceControl} from "./GovernanceControl.sol";
 import {ExecutionBase} from "../common/ExecutionBase.sol";
 
-import "../types/CallTypes.sol";
+import "../types/SolverCallTypes.sol";
+import "../types/UserCallTypes.sol";
+import "../types/DAppApprovalTypes.sol";
 
 import "forge-std/Test.sol";
 
@@ -46,30 +48,21 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
     // Functions
     function preOpsCall(UserCall calldata uCall)
         external
-        onlyAtlasEnvironment
+        onlyActiveEnvironment
         validControl
         validPhase(ExecutionPhase.PreOps)
+        validDepth(1)
         returns (bytes memory)
     {
         return _preOpsCall(uCall);
     }
 
-    function userLocalCall(bytes calldata data) 
-        external 
-        onlyAtlasEnvironment
-        validControl
-        validPhase(ExecutionPhase.UserOperation)
-        returns (bytes memory) 
-    {
-        return CallBits.needsDelegateUser(callConfig) ? _userLocalDelegateCall(data) : _userLocalStandardCall(data);
-    }
-
     function preSolverCall(bytes calldata data) 
-        external
-        payable
-        onlyAtlasEnvironment
+        external 
+        onlyActiveEnvironment
         validControl
         validPhase(ExecutionPhase.SolverOperations)
+        validDepth(1)
         returns (bool)
     {
         return _preSolverCall(data);
@@ -77,9 +70,10 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
 
     function postSolverCall(bytes calldata data) 
         external 
-        onlyAtlasEnvironment
+        onlyActiveEnvironment
         validControl
         validPhase(ExecutionPhase.SolverOperations)
+        validDepth(1)
         returns (bool)
     {
         
@@ -88,45 +82,28 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
 
     function allocateValueCall(bytes calldata data) 
         external 
-        onlyAtlasEnvironment
+        onlyActiveEnvironment
         validControl
         validPhase(ExecutionPhase.HandlingPayments)
+        validDepth(1)
     {
         return _allocateValueCall(data);
     }
 
     function postOpsCall(bytes calldata data) 
         external 
-        onlyAtlasEnvironment
+        onlyActiveEnvironment
         validControl
         validPhase(ExecutionPhase.PostOps)
+        validDepth(1)
         returns (bool) 
     {
         return _postOpsCall(data);
     }
 
-    function validateUserOperation(UserCall calldata uCall) 
-        external 
-        view
-        onlyAtlasEnvironment
-        validControl
-        returns (bool) 
-    {
-        return _validateUserOperation(uCall);
-    }
-
     // View functions
     function userDelegated() external view returns (bool delegated) {
         delegated = CallBits.needsDelegateUser(callConfig);
-    }
-
-    function userLocal() external view returns (bool local) {
-        local = CallBits.needsLocalUser(callConfig);
-    }
-
-    function userDelegatedLocal() external view returns (bool delegated, bool local) {
-        delegated = CallBits.needsDelegateUser(callConfig);
-        local = CallBits.needsLocalUser(callConfig);
     }
 
     function requireSequencedNonces() external view returns (bool isSequenced) {

@@ -10,6 +10,32 @@ import "../types/GovernanceTypes.sol";
 contract DAppIntegration {
     using CallBits for uint32;
 
+    event NewDAppSignatory(
+        address indexed controller,
+        address indexed governance,
+        address indexed signatory,
+        uint32 callConfig
+    );
+
+    struct NonceBitmap {
+        uint8 highestUsedNonce;
+        uint240 bitmap;
+    }
+
+    struct NonceTracker {
+        uint128 LowestEmptyBitmap;
+        uint128 HighestFullBitmap;
+    }
+
+    //     from         nonceTracker
+    mapping(address => NonceTracker) public asyncNonceBitIndex;
+
+    //  keccak256(from, bitmapNonceIndex) => to
+    mapping(bytes32 => NonceBitmap) public asyncNonceBitmap;
+
+
+    
+
     // NOTE: To prevent builder censorship, dapp nonces can be
     // processed in any order so long as they arent duplicated and
     // as long as the dapp opts in to it
@@ -18,25 +44,30 @@ contract DAppIntegration {
     mapping(address => GovernanceData) public governance;
 
     // map for tracking which EOAs are approved for a given dapp
-    //     approver   userOp.to
-    mapping(address => ApproverSigningData) public signatories;
+    //  keccak256(governance, signor)  => enabled
+    mapping(bytes32 => bool) public signatories;
 
     mapping(bytes32 => bytes32) public dapps;
 
     // Permissionlessly integrates a new dapp
     function initializeGovernance(address controller) external {
-        address owner = IDAppControl(controller).getDAppSignatory();
+        address govAddress = IDAppControl(controller).getDAppSignatory();
 
-        require(msg.sender == owner, "ERR-V50 OnlyGovernance");
+        require(msg.sender == govAddress, "ERR-V50 OnlyGovernance");
 
-        require(signatories[owner].governance == address(0), "ERR-V49 OwnerActive");
+        bytes32 signatoryKey = keccak256(abi.encode(msg.sender, msg.sender));
+
+        require(!signatories[signatoryKey], "ERR-V49 OwnerActive");
 
         uint32 callConfig = CallBits.buildCallConfig(controller);
 
         governance[controller] =
-            GovernanceData({governance: owner, callConfig: callConfig, lastUpdate: uint64(block.number)});
+            GovernanceData({governance: govAddress, callConfig: callConfig, lastUpdate: uint64(block.number)});
 
-        signatories[owner] = ApproverSigningData({governance: owner, enabled: true, nonce: 0});
+        signatories[signatoryKey] = true;
+
+        _initializeNonce(msg.sender);
+        
     }
 
     function addSignatory(address controller, address signatory) external {
@@ -44,9 +75,20 @@ contract DAppIntegration {
 
         require(msg.sender == govData.governance, "ERR-V50 OnlyGovernance");
 
-        require(signatories[signatory].governance == address(0), "ERR-V49 SignatoryActive");
+        bytes32 signatoryKey = keccak256(abi.encode(msg.sender, signatory));
 
-        signatories[signatory] = ApproverSigningData({governance: controller, enabled: true, nonce: 0});
+        require(!signatories[signatoryKey], "ERR-V49 SignatoryActive");
+
+        signatories[signatoryKey] = true;
+    
+        _initializeNonce(signatory);
+
+        emit NewDAppSignatory(
+            controller,
+            govData.governance,
+            signatory,
+            govData.callConfig
+        );
     }
 
     function removeSignatory(address controller, address signatory) external {
@@ -54,32 +96,58 @@ contract DAppIntegration {
 
         require(msg.sender == govData.governance || msg.sender == signatory, "ERR-V51 InvalidCaller");
 
-        require(signatories[signatory].governance == govData.governance, "ERR-V52 InvalidDAppControl");
+        bytes32 signatoryKey = keccak256(abi.encode(msg.sender, signatory));
 
-        signatories[signatory].enabled = false;
+        require(signatories[signatoryKey], "ERR-V52 InvalidDAppControl");
+
+        delete signatories[signatoryKey];
     }
 
-    function integrateDApp(address controller, address dappControl) external {
-        GovernanceData memory govData = governance[controller];
+    function integrateDApp(address dAppControl) external {
+        GovernanceData memory govData = governance[dAppControl];
 
         require(msg.sender == govData.governance, "ERR-V50 OnlyGovernance");
 
-        bytes32 key = keccak256(abi.encode(controller, dappControl, govData.governance, govData.callConfig));
+        bytes32 key = keccak256(abi.encode(dAppControl, govData.governance, govData.callConfig));
 
-        dapps[key] = controller.codehash;
+        dapps[key] = dAppControl.codehash;
+
+        emit NewDAppSignatory(
+            dAppControl,
+            govData.governance,
+            govData.governance,
+            govData.callConfig
+        );
     }
 
-    function disableDApp(address controller, address dappControl) external {
-        GovernanceData memory govData = governance[controller];
+    function disableDApp(address dAppControl) external {
+        GovernanceData memory govData = governance[dAppControl];
 
         require(msg.sender == govData.governance, "ERR-V50 OnlyGovernance");
 
-        bytes32 key = keccak256(abi.encode(controller, dappControl, govData.governance, govData.callConfig));
+        bytes32 key = keccak256(abi.encode(dAppControl, govData.governance, govData.callConfig));
 
         delete dapps[key];
     }
 
-    function nextGovernanceNonce(address governanceSignatory) external view returns (uint256 nextNonce) {
-        nextNonce = uint256(signatories[governanceSignatory].nonce) + 1;
+    function _initializeNonce(address account) internal {
+        if (asyncNonceBitIndex[account].LowestEmptyBitmap == uint128(0)) {
+            unchecked {
+                asyncNonceBitIndex[account].LowestEmptyBitmap = 2;
+            }
+            bytes32 bitmapKey = keccak256(abi.encode(account, 1));
+
+            // to skip the 0 nonce
+            asyncNonceBitmap[bitmapKey] = NonceBitmap({
+                highestUsedNonce: uint8(1),
+                bitmap: 0
+            });
+        }
+    }
+
+    function getGovFromControl(address dAppControl) external view returns (address governanceAddress) {
+        GovernanceData memory govData = governance[dAppControl];
+        require(govData.lastUpdate != uint64(0), "ERR-V52 DAppNotEnabled");
+        governanceAddress = govData.governance;
     }
 }

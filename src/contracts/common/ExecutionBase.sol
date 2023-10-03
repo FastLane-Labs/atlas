@@ -4,9 +4,15 @@ pragma solidity ^0.8.16;
 import {IPermit69} from "../interfaces/IPermit69.sol";
 import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
 
+import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
+
 import {ExecutionPhase} from "../types/LockTypes.sol";
 
 import {EXECUTION_PHASE_OFFSET} from "../libraries/SafetyBits.sol";
+
+import {SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER} from "./Permit69.sol";
+
+import {SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER} from "./Permit69.sol";
 
 import "forge-std/Test.sol";
 
@@ -25,24 +31,6 @@ contract Base {
     // via delegatecall, but can be added to DAppControl as funcs that 
     // can be used during DAppControl's delegated funcs
 
-    // NOTE the validEnvironment modifier is relatively expensive and only needs to be checked once,
-    // (if at all), so do it during the user phase or bypass entirely.
-    modifier onlyActiveEnvironment() {
-        if (address(this) != _activeEnvironment()) {
-            revert("ERR-EV010 WrongEnvironment");
-        }
-        _;
-    }
-
-    modifier validPhase(ExecutionPhase phase) {
-        {
-        if (uint16(1<<(EXECUTION_PHASE_OFFSET + uint16(phase))) & _lockState() == 0) {
-            revert("ERR-EV011 WrongPhase");
-        }
-        }
-        _;
-    }
-
     modifier onlyAtlasEnvironment() {
         console.log("onlyAtlasEnvironment modifier");
         if (address(this) == source) {
@@ -50,6 +38,59 @@ contract Base {
         }
         if (msg.sender != atlas) {
             revert("ERR-CE01 InvalidSender");
+        }
+        _;
+    }
+
+    function _onlyActiveEnvironment() internal view {
+        if (msg.sender != atlas) {
+            if (_depth() < 2) {
+                revert("ERR-EV017 InvalidDepth");
+            }
+
+            address activeEnvironment = _activeEnvironment();
+            if (activeEnvironment != address(this)) {
+                if (address(this) != source || activeEnvironment != msg.sender) {
+                    // Verify that caller is the activeEnvironment and this is the valid DAppControl
+                    revert("ERR-EV010 WrongEnvironment");
+                }
+            }
+
+        // CASE: msg.sender == atlas && _depth() < 2 
+        } else if (_depth() < 2) {
+            if (address(this) == source) {
+                // Calls with a depth of 0 or 1 should be delegated
+                revert("ERR-CE50 NotDelegated");
+            }
+        
+        // CASE: msg.sender == atlas && _depth() >= 2 
+        } else { 
+            address activeEnvironment = _activeEnvironment();
+            if (activeEnvironment != address(this)) {
+                // Verify that one environment isn't attempting to access another
+                revert("ERR-EV011 WrongEnvironment");
+            }
+        }
+    }
+
+    modifier onlyActiveEnvironment() {
+        _onlyActiveEnvironment();
+        _;
+    }
+
+    modifier validPhase(ExecutionPhase phase) {
+        if (uint16(1<<(EXECUTION_PHASE_OFFSET + uint16(phase))) & _lockState() == 0) {
+            revert("ERR-EV011 WrongPhase");
+        }
+        _;
+    }
+
+    modifier validDepth(uint8 depth) {
+        if (depth != _depth()) {
+            revert("ERR-EV012 WrongDepth");
+        }
+        if (depth == 0 && msg.sender != atlas) {
+            revert("ERR-EV013 WrongForSender");
         }
         _;
     }
@@ -72,7 +113,8 @@ contract Base {
             _callMax(),
             _lockState(),
             _gasRefund(),
-            uint16(0) // placeholder
+            _simulation(),
+            _depth()+1
         );
     }
 
@@ -108,6 +150,18 @@ contract Base {
     function _user() internal pure returns (address user) {
         assembly {
             user := shr(96, calldataload(sub(calldatasize(), 76)))
+        }
+    }
+
+    function _depth() internal pure returns (uint8 callDepth) {
+        assembly {
+            callDepth := shr(248, calldataload(sub(calldatasize(), 77)))
+        }
+    }
+
+    function _simulation() internal pure returns (bool simulation) {
+        assembly {
+            simulation := shr(248, calldataload(sub(calldatasize(), 78)))
         }
     }
 
@@ -186,5 +240,42 @@ contract ExecutionBase is Base {
         IPermit69(atlas).transferDAppERC20(
             token, destination, amount, _user(), _control(), _config(), _lockState()
         );
+    }
+
+    function _availableFundsERC20(
+        address token,
+        address source,
+        uint256 amount,
+        ExecutionPhase phase
+    ) internal view returns (bool available) {
+    
+        uint256 balance = ERC20(token).balanceOf(source);
+        if (balance < amount) {
+            return false;
+        }
+
+        uint16 shiftedPhase = uint16(1 << (EXECUTION_PHASE_OFFSET + uint16(phase)));
+        address user = _user();
+        address dapp = _control();
+
+        if (source == user) {
+            if (shiftedPhase & SAFE_USER_TRANSFER == 0) {
+                return false;
+            }
+            if (ERC20(token).allowance(user, atlas) < amount) {
+                return false;
+            }
+            return true;
+        
+        } else if (source == dapp) {
+            if (shiftedPhase & SAFE_DAPP_TRANSFER == 0) {
+                return false;
+            }
+            if (ERC20(token).allowance(dapp, atlas) < amount) {
+                return false;
+            }
+            return true;
+        }
+        return false;
     }
 }

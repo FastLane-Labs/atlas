@@ -8,16 +8,21 @@ import {Mimic} from "./Mimic.sol";
 import {ExecutionEnvironment} from "./ExecutionEnvironment.sol";
 import {Permit69} from "../common/Permit69.sol";
 
-import "../types/CallTypes.sol";
+import "../types/SolverCallTypes.sol";
+import "../types/UserCallTypes.sol";
+import "../types/DAppApprovalTypes.sol";
+
+import {CallBits} from "../libraries/CallBits.sol";
 
 import "forge-std/Test.sol";
 
 contract Factory is Test, Escrow, Permit69 {
     //address immutable public atlas;
+    using CallBits for uint32;
     bytes32 public immutable salt;
     address public immutable execution;
 
-    constructor(uint32 _escrowDuration) Escrow(_escrowDuration) {
+    constructor(uint32 _escrowDuration, address _simulator) Escrow(_escrowDuration, _simulator) {
         //atlas = msg.sender;
         salt = keccak256(abi.encodePacked(block.chainid, atlas, "Atlas 1.0"));
 
@@ -60,6 +65,17 @@ contract Factory is Test, Escrow, Permit69 {
         override
         returns (address executionEnvironment)
     {
+        
+        /*
+        if (controlCodeHash == bytes32(0)) {
+            controlCodeHash = controller.codehash;
+        }
+
+        if (callConfig == 0) {
+            callConfig = CallBits.buildCallConfig(controller);
+        }
+        */
+        
         executionEnvironment = address(
             uint160(
                 uint256(
@@ -109,6 +125,8 @@ contract Factory is Test, Escrow, Permit69 {
             assembly {
                 executionEnvironment := create2(0, add(creationCode, 32), mload(creationCode), memSalt)
             }
+
+            emit NewExecutionEnvironment(executionEnvironment, user, dConfig.to, dConfig.callConfig);
         }
     }
 

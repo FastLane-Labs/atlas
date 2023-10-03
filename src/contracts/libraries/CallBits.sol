@@ -3,7 +3,7 @@ pragma solidity ^0.8.16;
 
 import {IDAppControl} from "../interfaces/IDAppControl.sol";
 
-import "../types/CallTypes.sol";
+import "../types/DAppApprovalTypes.sol";
 
 library CallBits {
     uint32 internal constant _ONE = uint32(1);
@@ -56,6 +56,9 @@ library CallBits {
         if (callConfig.unknownBundler) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.UnknownBundler);
         }
+        if (callConfig.forwardReturnData) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.ForwardReturnData);
+        }
     }
 
     function decodeCallConfig(uint32 encodedCallConfig) internal pure returns (CallConfig memory callConfig) {
@@ -73,7 +76,8 @@ library CallBits {
             reuseUserOp: allowsReuseUserOps(encodedCallConfig),
             userBundler: allowsUserBundler(encodedCallConfig),
             dAppBundler: allowsDAppBundler(encodedCallConfig),
-            unknownBundler: allowsUnknownBundler(encodedCallConfig)
+            unknownBundler: allowsUnknownBundler(encodedCallConfig),
+            forwardReturnData: forwardReturnData(encodedCallConfig)
         });
     }
 
@@ -131,5 +135,9 @@ library CallBits {
 
     function allowsUnknownBundler(uint32 callConfig) internal pure returns (bool unknownBundler) {
         unknownBundler = (callConfig & 1 << uint32(CallConfigIndex.UnknownBundler) != 0);
+    }
+
+    function forwardReturnData(uint32 callConfig) internal pure returns (bool) {
+        return (callConfig & 1 << uint32(CallConfigIndex.ForwardReturnData) != 0);
     }
 }

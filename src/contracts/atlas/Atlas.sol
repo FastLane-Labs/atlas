@@ -4,10 +4,15 @@ pragma solidity ^0.8.16;
 import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
 
 import {Factory} from "./Factory.sol";
+import {UserSimulationFailed, UserUnexpectedSuccess, UserSimulationSucceeded} from "../types/Emissions.sol";
 
-import "../types/CallTypes.sol";
+import {FastLaneErrorsEvents} from "../types/Emissions.sol";
+
+import "../types/SolverCallTypes.sol";
+import "../types/UserCallTypes.sol";
 import "../types/LockTypes.sol";
-import "../types/VerificationTypes.sol";
+import "../types/DAppApprovalTypes.sol";
+import "../types/ValidCallsTypes.sol";
 
 import {CallVerification} from "../libraries/CallVerification.sol";
 import {CallBits} from "../libraries/CallBits.sol";
@@ -20,58 +25,36 @@ contract Atlas is Test, Factory {
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
-    constructor(uint32 _escrowDuration) Factory(_escrowDuration) {}
+    constructor(uint32 _escrowDuration, address _simulator) Factory(_escrowDuration, _simulator) {}
 
     function createExecutionEnvironment(DAppConfig calldata dConfig) external returns (address executionEnvironment) {
         executionEnvironment = _setExecutionEnvironment(dConfig, msg.sender, dConfig.to.codehash);
+        _initializeNonce(msg.sender);
     }
 
-    function metacall(
+    function getExecutionEnvironment(address user, address dAppControl) external view returns (address executionEnvironment, uint32 callConfig, bool exists) {
+        callConfig = CallBits.buildCallConfig(dAppControl);
+        executionEnvironment = _getExecutionEnvironmentCustom(user, dAppControl.codehash, dAppControl, callConfig);
+        exists = executionEnvironment.codehash != bytes32(0);
+    }
+
+    function metacall( // <- Entrypoint Function
         DAppConfig calldata dConfig, // supplied by frontend
         UserOperation calldata userOp, // set by user
         SolverOperation[] calldata solverOps, // supplied by FastLane via frontend integration
-        Verification calldata verification // supplied by front end after it sees the other data
-    ) external payable {
-
-        console.log("started metacall");
+        DAppOperation calldata dAppOp // supplied by front end after it sees the other data
+    ) external payable returns (bool auctionWon) {
 
         uint256 gasMarker = gasleft();
 
-        // Verify that the calldata injection came from the dApp frontend
-        // and that the signatures are valid. 
-        bool valid = true;
-        
-        // Only verify signatures of meta txs if the original signer isn't the bundler
-        // TODO: Consider extra reentrancy defense here?
-        if (verification.proof.from != msg.sender && !_verifyDApp(userOp.call.to, dConfig, verification)) {
-            valid = false;
-        }
-        
-        if (userOp.call.from != msg.sender && !_verifyUser(dConfig, userOp)) { 
-            valid = false; 
-        }
-
-        // TODO: Add optionality to bypass DAppControl signatures if user can fully bundle tx
-
         // Get the execution environment
-        address executionEnvironment = _getExecutionEnvironmentCustom(userOp.call.from, verification.proof.controlCodeHash, dConfig.to, dConfig.callConfig);
-
-        // Check that the value of the tx is greater than or equal to the value specified
-        if (msg.value < userOp.call.value) { valid = false; }
-        //if (msg.sender != tx.origin) { valid = false; }
-        if (solverOps.length >= type(uint8).max - 1) { valid = false; }
-        if (block.number > userOp.call.deadline || block.number > verification.proof.deadline) { valid = false; }
-        if (tx.gasprice > userOp.call.maxFeePerGas) { valid = false; }
-        if (executionEnvironment.codehash == bytes32(0)) { valid = false; }
-        if (!dConfig.callConfig.allowsZeroSolvers() || dConfig.callConfig.needsSolverPostCall()) {
-            if (solverOps.length == 0) { valid = false; }
-        }
-        // TODO: More checks 
+        address executionEnvironment = _getExecutionEnvironmentCustom(userOp.call.from, dAppOp.approval.controlCodeHash, userOp.call.control, dConfig.callConfig);
 
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
-        if (!valid) {
-            return;
+        ValidCallsResult validCallsResult = _validCalls(dConfig, userOp, solverOps, dAppOp, executionEnvironment);
+        if (validCallsResult != ValidCallsResult.Valid) {
+            if (msg.sender == simulator) {revert VerificationSimFail();} else { revert ValidCalls(validCallsResult); }
         }
 
         // Initialize the lock
@@ -79,17 +62,18 @@ contract Atlas is Test, Factory {
 
         console.log("before this.execute in atlas");
 
-        try this.execute{value: msg.value}(dConfig, userOp.call, solverOps, executionEnvironment, verification.proof.callChainHash) 
-            returns (uint256 accruedGasRebate) {
+        try this.execute{value: msg.value}(
+            dConfig, userOp.call, solverOps, executionEnvironment, dAppOp.approval.callChainHash, msg.sender == simulator
+        ) returns (bool _auctionWon, uint256 accruedGasRebate) {
+            
             console.log("accruedGasRebate",accruedGasRebate);
+            auctionWon = _auctionWon;
             // Gas Refund to sender only if execution is successful
             _executeGasRefund(gasMarker, accruedGasRebate, userOp.call.from);
 
-        } catch {
-            // TODO: This portion needs more nuanced logic to prevent the replay of failed solver txs
-            if (dConfig.callConfig.allowsReuseUserOps()) {
-                revert("ERR-F07 RevertToReuse");
-            }
+        } catch (bytes memory revertData) {
+            // Bubble up some specific errors
+            _handleErrors(bytes4(revertData), dConfig.callConfig);
         }
 
         // Release the lock
@@ -103,53 +87,67 @@ contract Atlas is Test, Factory {
         UserCall calldata uCall,
         SolverOperation[] calldata solverOps,
         address executionEnvironment,
-        bytes32 callChainHash
-    ) external payable returns (uint256 accruedGasRebate) {
-        {
+        bytes32 callChainHash,
+        bool isSimulation
+    ) external payable returns (bool auctionWon, uint256 accruedGasRebate) {
+        
         // This is a self.call made externally so that it can be used with try/catch
         require(msg.sender == address(this), "ERR-F06 InvalidAccess");
         
         // verify the call sequence
-        require(callChainHash == CallVerification.getCallChainHash(dConfig, uCall, solverOps), "ERR-F07 InvalidSequence");
-        }
+        require(
+            callChainHash == CallVerification.getCallChainHash(dConfig, uCall, solverOps) || isSimulation, 
+            "ERR-F07 InvalidSequence"
+        );
+        
+        // Build the memory lock
+        EscrowKey memory key = _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), isSimulation);
+
         // Begin execution
-        accruedGasRebate = _execute(dConfig, uCall, solverOps, executionEnvironment);
+        (auctionWon, accruedGasRebate) = _execute(dConfig, uCall, solverOps, executionEnvironment, key);
     }
 
     function _execute(
         DAppConfig calldata dConfig,
         UserCall calldata uCall,
         SolverOperation[] calldata solverOps,
-        address executionEnvironment
-    ) internal returns (uint256 accruedGasRebate) {
+        address executionEnvironment,
+        EscrowKey memory key
+    ) internal returns (bool auctionWon, uint256 accruedGasRebate) {
         // Build the CallChainProof.  The penultimate hash will be used
         // to verify against the hash supplied by DAppControl
        
+        bool callSuccessful;
         bytes32 userOpHash = uCall.getUserOperationHash();
 
         uint32 callConfig = CallBits.buildCallConfig(uCall.control);
 
-        // Initialize the locks
-        EscrowKey memory key = _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length));
+        bytes memory returnData;
 
-        bytes memory preOpsReturnData;
         if (dConfig.callConfig.needsPreOpsCall()) {
             key = key.holdPreOpsLock(dConfig.to);
-            preOpsReturnData = _executePreOpsCall(uCall, executionEnvironment, key.pack());
+            (callSuccessful, returnData) = _executePreOpsCall(uCall, executionEnvironment, key.pack());
+            if (!callSuccessful) {
+                if (key.isSimulation) { revert PreOpsSimFail(); } else { revert("ERR-E001 PreOpsFail"); }
+            }
         }
 
         key = key.holdUserLock(uCall.to);
-        bytes memory userReturnData = _executeUserOperation(uCall, executionEnvironment, key.pack());
+        
+        bytes memory userReturnData;
+        (callSuccessful, userReturnData) = _executeUserOperation(uCall, executionEnvironment, key.pack());
+        if (!callSuccessful) {
+            if (key.isSimulation) { revert UserOpSimFail(); } else { revert("ERR-E002 UserFail"); }
+        }
 
-        bytes memory returnData;
         if (CallBits.needsPreOpsReturnData(callConfig)) {
-            returnData = preOpsReturnData;
-        }
-        if (CallBits.needsUserReturnData(callConfig)) {
-            returnData = bytes.concat(returnData, userReturnData);
-        }
-
-        bool auctionWon;
+            //returnData = returnData;
+            if (CallBits.needsUserReturnData(callConfig)) {
+                returnData = bytes.concat(returnData, userReturnData);
+            }
+        } else if (CallBits.needsUserReturnData(callConfig)) {
+            returnData = userReturnData;
+        } 
 
         for (; key.callIndex < key.callMax - 1;) {
 
@@ -167,62 +165,126 @@ contract Atlas is Test, Factory {
 
         // If no solver was successful, manually transition the lock
         if (!auctionWon) {
+            if (key.isSimulation) { revert SolverSimFail(); }
             if (dConfig.callConfig.needsSolverPostCall()) {
-                revert("ERR-F08 UserNotFulfilled");
+                revert UserNotFulfilled(); // revert("ERR-E003 SolverFulfillmentFailure");
             }
             key = key.setAllSolversFailed();
         }
 
         if (dConfig.callConfig.needsPostOpsCall()) {
-            key = key.holdVerificationLock(address(this));
-            _executePostOpsCall(returnData, executionEnvironment, key.pack());
+            key = key.holdDAppOperationLock(address(this));
+            callSuccessful = _executePostOpsCall(returnData, executionEnvironment, key.pack());
+            if (!callSuccessful) {
+                if (key.isSimulation) { revert PostOpsSimFail(); } else { revert("ERR-E005 PostOpsFail"); }
+            }
         }
-        return uint256(key.gasRefund);
+        return (auctionWon, uint256(key.gasRefund));
     }
 
     function _solverExecutionIteration(
         DAppConfig calldata dConfig,
         SolverOperation calldata solverOp,
-        bytes memory returnData,
+        bytes memory dAppReturnData,
         bool auctionWon,
         address executionEnvironment,
         EscrowKey memory key
     ) internal returns (bool, EscrowKey memory) {
-        (auctionWon, key) = _executeSolverOperation(solverOp, returnData, executionEnvironment, key);
+        (auctionWon, key) = _executeSolverOperation(solverOp, dAppReturnData, executionEnvironment, key);
         if (auctionWon) {
-            _allocateValue(dConfig, solverOp.bids, returnData, executionEnvironment, key.pack());
+            _allocateValue(dConfig, solverOp.bids, dAppReturnData, executionEnvironment, key.pack());
             key = key.allocationComplete();
         }
         return (auctionWon, key);
     }
 
-    function testUserOperation(UserCall calldata uCall) external view returns (bool) {
-        address control = uCall.control;
-        uint32 callConfig = CallBits.buildCallConfig(control);
-        return _testUserOperation(uCall, control, callConfig);
-    }
+    function _validCalls(
+        DAppConfig calldata dConfig, 
+        UserOperation calldata userOp, 
+        SolverOperation[] calldata solverOps, 
+        DAppOperation calldata dAppOp,
+        address executionEnvironment
+    ) internal returns (ValidCallsResult) {
+        // Verify that the calldata injection came from the dApp frontend
+        // and that the signatures are valid. 
+      
+        bool isSimulation = msg.sender == simulator;
 
-    function testUserOperation(UserOperation calldata userOp) external view returns (bool) {
-        if (userOp.to != address(this)) {return false;}
-        address control = userOp.call.control;
-        uint32 callConfig = CallBits.buildCallConfig(control);
+        // Some checks are only needed when call is not a simulation
+        if (!isSimulation) {
+            if (tx.gasprice > userOp.call.maxFeePerGas) {
+                return ValidCallsResult.GasPriceHigherThanMax;
+            }
 
-        DAppConfig memory dConfig = DAppConfig(userOp.call.control, callConfig);
-
-        return _validateUser(dConfig, userOp) && _testUserOperation(userOp.call, control, callConfig);
-    }
-
-    function _testUserOperation(UserCall calldata uCall, address control, uint32 callConfig) internal view returns (bool) {
-        if (callConfig == 0) {
-            return false;
+            // Check that the value of the tx is greater than or equal to the value specified
+            if (msg.value < userOp.call.value) { 
+                return ValidCallsResult.TxValueLowerThanCallValue;
+            }
         }
 
-        address executionEnvironment = _getExecutionEnvironmentCustom(
-            uCall.from, control.codehash, control, callConfig);
+        // Only verify signatures of meta txs if the original signer isn't the bundler
+        // TODO: Consider extra reentrancy defense here?
+        if (dAppOp.approval.from != msg.sender && !_verifyDApp(dConfig, dAppOp)) {
+            bool bypass = isSimulation && dAppOp.signature.length == 0;
+            if (!bypass) {
+                return ValidCallsResult.DAppSignatureInvalid;
+            }
+        }
+        
+        if (userOp.call.from != msg.sender && !_verifyUser(dConfig, userOp)) { 
+            bool bypass = isSimulation && userOp.signature.length == 0;
+            if (!bypass) {
+                return ValidCallsResult.UserSignatureInvalid;   
+            }
+        }
 
-        if (executionEnvironment.codehash == bytes32(0) || control.codehash == bytes32(0)) {
-            return false;
-        } 
-        return IExecutionEnvironment(executionEnvironment).validateUserOperation(uCall);
+        if (solverOps.length >= type(uint8).max - 1) {
+            return ValidCallsResult.TooManySolverOps;
+        }
+
+        if (block.number > userOp.call.deadline) {
+            bool bypass = isSimulation && userOp.call.deadline == 0;
+            if (!bypass) {
+                return ValidCallsResult.UserDeadlineReached;
+            }
+        }
+
+        if (block.number > dAppOp.approval.deadline) {
+            bool bypass = isSimulation && dAppOp.approval.deadline == 0;
+            if (!bypass) {
+                return ValidCallsResult.DAppDeadlineReached;
+            }
+        }
+
+        if (executionEnvironment.codehash == bytes32(0)) {
+            return ValidCallsResult.ExecutionEnvEmpty;
+        }
+
+        if (!dConfig.callConfig.allowsZeroSolvers() || dConfig.callConfig.needsSolverPostCall()) {
+            if (solverOps.length == 0) {
+                return ValidCallsResult.NoSolverOp;
+            }
+        }
+        return ValidCallsResult.Valid;
+    }
+
+    function _handleErrors(bytes4 errorSwitch, uint32 callConfig) internal view {
+        if (msg.sender == simulator) { // Simulation
+            if (errorSwitch == PreOpsSimFail.selector) {
+                revert PreOpsSimFail();
+            } else if (errorSwitch == UserOpSimFail.selector) {
+                revert UserOpSimFail();
+            } else if (errorSwitch == SolverSimFail.selector) {
+                revert SolverSimFail();
+            } else if (errorSwitch == PostOpsSimFail.selector) {
+                revert PostOpsSimFail();
+            } 
+        }
+        if (errorSwitch == UserNotFulfilled.selector) {
+            revert UserNotFulfilled();
+        }
+        if (callConfig.allowsReuseUserOps()) {
+            revert("ERR-F07 RevertToReuse");
+        }
     }
 }

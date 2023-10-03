@@ -14,7 +14,9 @@ import {V4DAppControl} from "./V4DAppControl.sol";
 import {ISafetyLocks} from "../../interfaces/ISafetyLocks.sol";
 import {SafetyBits} from "../../libraries/SafetyBits.sol";
 
-import "../../types/CallTypes.sol";
+import "../../types/SolverCallTypes.sol";
+import "../../types/UserCallTypes.sol";
+import "../../types/DAppApprovalTypes.sol";
 import "../../types/LockTypes.sol";
 
 // NOTE: Uniswap V4 is unique in that it would not require a frontend integration.

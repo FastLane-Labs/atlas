@@ -8,6 +8,7 @@ import {IDAppIntegration} from "../../src/contracts/interfaces/IDAppIntegration.
 
 import {Atlas} from "../../src/contracts/atlas/Atlas.sol";
 import {Sorter} from "../../src/contracts/helpers/Sorter.sol";
+import {Simulator} from "../../src/contracts/helpers/Simulator.sol";
 
 import {Solver} from "src/contracts/solver/src/TestSolver.sol";
 
@@ -20,7 +21,7 @@ import {V2Helper} from "../V2Helper.sol";
 contract BaseTest is Test, TestConstants {
     address public me = address(this);
 
-    address public payee = makeAddr("FastLanePayee");
+    address public payee; // = makeAddr("FastLanePayee");
 
     uint256 public governancePK = 11111;
     address public governanceEOA = vm.addr(governancePK);
@@ -35,9 +36,10 @@ contract BaseTest is Test, TestConstants {
     address public userEOA = vm.addr(userPK);
 
     Atlas public atlas;
-    address public escrow;
-
+    Simulator public simulator;
     Sorter public sorter;
+
+    address public escrow;
 
     Solver public solverOne;
     Solver public solverTwo;
@@ -62,7 +64,11 @@ contract BaseTest is Test, TestConstants {
         // Deploy contracts
         vm.startPrank(payee);
 
-        atlas = new Atlas(64);
+        simulator = new Simulator();
+
+        atlas = new Atlas(64, address(simulator));
+        simulator.setAtlas(address(atlas));
+
         escrow = atlas.getEscrowAddress();
         sorter = new Sorter(address(atlas), escrow);
 
@@ -71,8 +77,7 @@ contract BaseTest is Test, TestConstants {
 
         control = new V2DAppControl(escrow);
         atlas.initializeGovernance(address(control));
-        atlas.integrateDApp(address(control), V2_FXS_ETH);
-        atlas.integrateDApp(address(control), S2_FXS_ETH);
+        atlas.integrateDApp(address(control));
 
         vm.stopPrank();
 

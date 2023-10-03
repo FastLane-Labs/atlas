@@ -1,7 +1,9 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import "../types/CallTypes.sol";
+import "../types/SolverCallTypes.sol";
+import "../types/UserCallTypes.sol";
+import "../types/DAppApprovalTypes.sol";
 
 import "forge-std/Test.sol";
 
@@ -38,56 +40,10 @@ abstract contract GovernanceControl {
     //
     // DApp exposure: Trustless
     // User exposure: Trustless
-    function _preOpsCall(UserCall calldata uCall)
-        internal
-        virtual
-        returns (bytes memory);
+    function _preOpsCall(UserCall calldata) internal virtual returns (bytes memory) {
+            revert(_NOT_IMPLEMENTED);
+        }
 
-
-    /////////////////////////////////////////////////////////
-    //                  USER                               //
-    /////////////////////////////////////////////////////////
-    //
-    // Data should be decoded as:
-    //
-    //    bytes calldata userOpData
-    //
-    // NOTE: preOpsReturnData is the returned data from the preOps transaction
-
-    // _userLocalDelegateCall
-    // Details:
-    //  user/local/delegate =
-    //      Inputs: User's calldata + preOps call's returnData
-    //      Function: Executing the function set by DAppControl
-    //      Container: Inside of the FastLane ExecutionEnvironment
-    //      Access: With storage access (read + write) to the ExecutionEnvironment
-    //
-    // DApp exposure: Trustless
-    // User exposure: Trustless
-    // NOTE: To mitigate the risk of exploit, this is disabled if ProtococolControl has enabled
-    // "recycled storage."  The Trustless assumptions are only as good as the underlying smart contract,
-    // and there's no way for FastLane to certify that DAppControl isn't accidentally accessing
-    // dirty / malicious storage from previous calls. User would be exposed to high smart contract risk,
-    // otherwise.
-    function _userLocalDelegateCall(bytes calldata) internal virtual returns (bytes memory) {
-        revert(_NOT_IMPLEMENTED);
-    }
-
-    // _userLocalStandardCall
-    // Details:
-    //  user/local/standard =
-    //      Inputs: User's calldata + preOps call's returnData
-    //      Function: Executing the function set by DAppControl
-    //      Container: Inside of the DAppControl contract
-    //      Access: Storage access (read+WRITE) to the DAppControl contract
-    //
-    // DApp exposure: Trustless, but high risk of contract exploit by malicious user
-    // User exposure: Trustless
-    // NOTE: There is a timelock on governance's ability to change the DAppControl contract
-    // NOTE: Allowing this is ill-advised unless your reentry / locking system is flawless.
-    function _userLocalStandardCall(bytes calldata) internal virtual returns (bytes memory) {
-        revert(_NOT_IMPLEMENTED);
-    }
 
     /////////////////////////////////////////////////////////
     //                MEV ALLOCATION                       //
@@ -180,12 +136,6 @@ abstract contract GovernanceControl {
     // View functions used by the backend to verify bid format
     // and by the factory and DAppVerification to verify the
     // backend.
-    function _validateUserOperation(UserCall calldata) internal view virtual returns (bool) {
-        return true;
-    }
-
-    function getPayeeData(bytes calldata data) external view virtual returns (PayeeData[] memory);
-
     function getBidFormat(UserCall calldata uCall) external view virtual returns (BidData[] memory);
 
     function getBidValue(SolverOperation calldata solverOp) external view virtual returns (uint256);

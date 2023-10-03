@@ -1,7 +1,12 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import "../types/CallTypes.sol";
+import {BidData} from "../types/SolverCallTypes.sol";
+import "../types/ValidCallsTypes.sol";
+
+error UserSimulationFailed();
+error UserSimulationSucceeded();
+error UserUnexpectedSuccess();
 
 contract FastLaneErrorsEvents {
     // NOTE: nonce is the executed nonce
@@ -20,6 +25,13 @@ contract FastLaneErrorsEvents {
         address indexed controller, uint32 callConfig, BidData[] winningBids
     );
 
+    event NewExecutionEnvironment(
+        address indexed environment,
+        address indexed user,
+        address indexed controller,
+        uint32 callConfig
+    );
+
 
     error SolverBidUnpaid();
     error SolverFailedCallback();
@@ -33,4 +45,32 @@ contract FastLaneErrorsEvents {
     error IntentUnfulfilled();
     error PreSolverFailed();
     error PostSolverFailed();
+
+    error UserNotFulfilled();
+    error NoAuctionWinner();
+
+    error VerificationSimFail();
+    error PreOpsSimFail();
+    error UserOpSimFail();
+    error SolverSimFail();
+    error PostOpsSimFail();
+    error SimulationPassed();
+
+    error ValidCalls(ValidCallsResult);
+
+    /*
+    event NewDAppIntegration(
+        address indexed environment,
+        address indexed user,
+        address indexed controller,
+        uint32 callConfig
+    );
+
+    event DAppDisabled(
+        address indexed environment,
+        address indexed user,
+        address indexed controller,
+        uint32 callConfig
+    );
+    */
 }

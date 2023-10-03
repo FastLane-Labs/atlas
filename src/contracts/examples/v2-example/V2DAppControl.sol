@@ -10,7 +10,9 @@ import {IExecutionEnvironment} from "../../interfaces/IExecutionEnvironment.sol"
 
 import {SafetyBits} from "../../libraries/SafetyBits.sol";
 
-import "../../types/CallTypes.sol";
+import {CallConfig} from "../../types/DAppApprovalTypes.sol";
+import "../../types/UserCallTypes.sol";
+import "../../types/SolverCallTypes.sol";
 import "../../types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
@@ -64,7 +66,8 @@ contract V2DAppControl is DAppControl {
                 reuseUserOp: false,
                 userBundler: true,
                 dAppBundler: true,
-                unknownBundler: true
+                unknownBundler: true,
+                forwardReturnData: false
             })
         )
     {
@@ -174,22 +177,6 @@ contract V2DAppControl is DAppControl {
     }
 
     ///////////////// GETTERS & HELPERS // //////////////////
-    function getPayeeData(bytes calldata) external view override returns (PayeeData[] memory) {
-        // This function is called by the backend to get the
-        // payee data, and by the Atlas Factory to generate a
-        // hash to verify the backend.
-
-        bytes memory data; // empty bytes
-
-        PaymentData[] memory payments = new PaymentData[](1);
-
-        payments[0] = PaymentData({payee: control, payeePercent: 100});
-
-        PayeeData[] memory payeeData = new PayeeData[](1);
-
-        payeeData[0] = PayeeData({token: WETH, payments: payments, data: data});
-        return payeeData;
-    }
 
     function getBidFormat(UserCall calldata) external pure override returns (BidData[] memory) {
         // This is a helper function called by solvers

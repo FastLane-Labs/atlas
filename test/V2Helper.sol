@@ -5,12 +5,14 @@ import {TxBuilder} from "../src/contracts/helpers/TxBuilder.sol";
 
 import {IUniswapV2Pair} from "../src/contracts/examples/v2-example/interfaces/IUniswapV2Pair.sol";
 
-import {BlindBackrun} from "src/contracts/solver/src/blindBackrun.sol";
+import {BlindBackrun} from "src/contracts/solver/src/BlindBackrun.sol";
 
-import "../src/contracts/types/CallTypes.sol";
+import "../src/contracts/types/SolverCallTypes.sol";
+import "../src/contracts/types/UserCallTypes.sol";
+import "../src/contracts/types/DAppApprovalTypes.sol";
 import "../src/contracts/types/EscrowTypes.sol";
 import "../src/contracts/types/LockTypes.sol";
-import "../src/contracts/types/VerificationTypes.sol";
+import "../src/contracts/types/DAppApprovalTypes.sol";
 
 import {TestConstants} from "./base/TestConstants.sol";
 
@@ -26,11 +28,6 @@ contract V2Helper is Test, TestConstants, TxBuilder {
         maxFeePerGas = tx.gasprice * 2;
     }
 
-    function getPayeeData() public returns (PayeeData[] memory) {
-        bytes memory nullData;
-        return TxBuilder.getPayeeData(nullData);
-    }
-
     function buildUserOperation(address to, address from, address tokenIn) public view returns (UserOperation memory userOp) {
         (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(to).getReserves();
 
@@ -41,6 +38,7 @@ contract V2Helper is Test, TestConstants, TxBuilder {
             to,
             maxFeePerGas,
             0,
+            block.number + 2,
             buildV2SwapCalldata(
                 tokenIn == token0 ? 0 : uint256(token0Balance) / 2, tokenIn == token0 ? uint256(token1Balance) / 2 : 0, from
                 )
