@@ -82,6 +82,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
     function donateToBundler(address surplusRecipient) external payable {
         console.log("Donate to bundler called");
         console.log("donateToBundler: msg.value:", msg.value);
+        console.log("donating to addr:", surplusRecipient);
         // NOTE: All donations in excess of 10% greater than cost are forwarded
         // to the surplusReceiver. 
 

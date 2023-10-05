@@ -72,8 +72,9 @@ contract AccountingTest is BaseTest {
 
         // msg.value settings
         uint256 userMsgValue = 2e18;
-        uint256 solverMsgValue = 1e18; // TODO works with 0, breaks with 1e18
-        uint256 gasCostCoverAmount = 1e16; // 0.01 ETH - gas is about 0.00164 ETH
+        uint256 solverMsgValue = 1e18; // Adding payable to DappControl functions allows +ve value
+        // uint256 solverBidAmount = 3e18;
+        // uint256 gasCostCoverAmount = 1e16; // 0.01 ETH - gas is about 0.00164 ETH
         uint256 atlasStartBalance = solverMsgValue * 12 / 10; // Extra in Atlas for call gas cost
 
         deal(userEOA, userMsgValue);
@@ -86,7 +87,6 @@ contract AccountingTest is BaseTest {
         console.log("atlas balalnnce", address(atlas).balance);
 
         // Same as basic SwapIntent test - Swap 10 WETH for 20 DAI
-        Condition[] memory conditions;
         SwapIntent memory swapIntent = SwapIntent({
             tokenUserBuys: DAI_ADDRESS,
             amountUserBuys: 20e18,
@@ -94,17 +94,20 @@ contract AccountingTest is BaseTest {
             amountUserSells: 10e18,
             auctionBaseCurrency: address(0),
             solverMustReimburseGas: false,
-            conditions: conditions
+            conditions: new Condition[](0)
         });
 
         // Solver deploys the RFQ solver contract (defined at bottom of this file)
         vm.startPrank(solverOneEOA);
         SimpleRFQSolver rfqSolver = new SimpleRFQSolver(address(atlas));
-        atlas.deposit{value: gasCostCoverAmount}(solverOneEOA);
+        // atlas.deposit{value: gasCostCoverAmount}(solverOneEOA);
         vm.stopPrank();
 
         // Give 20 DAI to RFQ solver contract
         deal(DAI_ADDRESS, address(rfqSolver), swapIntent.amountUserBuys);
+        // Give solverMsgValue (1e18, reusing var for stacktoodeep) of ETH to solver as well 
+        deal(address(rfqSolver), solverMsgValue);
+
         assertEq(DAI.balanceOf(address(rfqSolver)), swapIntent.amountUserBuys, "Did not give enough DAI to solver");
 
         // Input params for Atlas.metacall() - will be populated below
@@ -153,7 +156,7 @@ contract AccountingTest is BaseTest {
             solverOpData: solverOpData,
             solverEOA: solverOneEOA,
             solverContract: address(rfqSolver),
-            bidAmount: 0
+            bidAmount: 1e18 // solverMsgValue, but stack too deep to use
         });
 
         solverOps[0].call.value = solverMsgValue;
@@ -184,6 +187,7 @@ contract AccountingTest is BaseTest {
         console.log("User DAI balance", DAI.balanceOf(userEOA));
         console.log("Solver WETH balance", WETH.balanceOf(address(rfqSolver)));
         console.log("Solver DAI balance", DAI.balanceOf(address(rfqSolver)));
+        console.log("Solver ETH balance", address(rfqSolver).balance);
         console.log(""); // give space for internal logs
 
         vm.startPrank(userEOA);
@@ -210,10 +214,15 @@ contract AccountingTest is BaseTest {
         console.log("User DAI balance", DAI.balanceOf(userEOA));
         console.log("Solver WETH balance", WETH.balanceOf(address(rfqSolver)));
         console.log("Solver DAI balance", DAI.balanceOf(address(rfqSolver)));
+        console.log("Solver ETH balance", address(rfqSolver).balance);
 
         // Check user token balances after
         assertEq(WETH.balanceOf(userEOA), userWethBalanceBefore - swapIntent.amountUserSells, "Did not spend enough WETH");
         assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + swapIntent.amountUserBuys, "Did not receive enough DAI");
+
+        console.log("SearcherEOA", solverOneEOA);
+        console.log("Searcher contract", address(rfqSolver));
+        console.log("UserEOA", userEOA);
 
     }
 

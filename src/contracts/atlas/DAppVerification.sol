@@ -287,7 +287,6 @@ contract DAppVerification is EIP712, DAppIntegration {
         uint256 lowestEmptyBitmap = uint256(nonceTracker.LowestEmptyBitmap);
 
         if (lowestEmptyBitmap == 0) {
-            console.log("account:", account, "nonce (a)", nextNonce);
             return 1; // uninitialized
         }
 
@@ -298,7 +297,5 @@ contract DAppVerification is EIP712, DAppIntegration {
         uint256 highestUsedNonce = uint256(nonceBitmap.highestUsedNonce); //  has a +1 offset
 
         nextNonce = ((nextBitmapIndex - 1) * 240) + highestUsedNonce;
-        console.log("account:", account, "  nonce (b)", nextNonce);
-        console.log("highestUsedNonce", uint256(highestUsedNonce));
     }
 }

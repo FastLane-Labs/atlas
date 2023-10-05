@@ -65,8 +65,6 @@ contract ExecutionEnvironment is Base {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 
-        console.log("got in staging wrapper in exec env");
-
         require(uCall.to != address(this), "ERR-EV008 InvalidTo");
 
         bytes memory preOpsData = abi.encodeWithSelector(
@@ -191,24 +189,11 @@ contract ExecutionEnvironment is Base {
                 data
             );
 
-            console.log("data before forward wrapper");
-            console.logBytes(data); 
-
             data = forward(data);
-
-            console.log("control address", _control());
-            console.log("msg.value", msg.value);
-
-            console.log("final data just before delegatecall");
-            console.logBytes(data);
 
             (success, data) = _control().delegatecall(
                 data
             );
-
-            console.log("did delegatecall work??", success);
-            console.log("data after delegatecall");
-            console.logBytes(data);
 
             if(!success) {
                 revert FastLaneErrorsEvents.PreSolverFailed();
@@ -335,6 +320,8 @@ contract ExecutionEnvironment is Base {
             }
         }
 
+        console.log("total ether reward", totalEtherReward);
+
         bytes memory allocateData = abi.encodeWithSelector(IDAppControl.allocateValueCall.selector, abi.encode(totalEtherReward, bids, returnData));
 
         (bool success,) = _control().delegatecall(forward(allocateData));
@@ -406,11 +393,7 @@ contract ExecutionEnvironment is Base {
         escrow = atlas;
     }
 
-    receive() external payable {
-        console.log("inside receive in exec env");
-    }
+    receive() external payable {}
 
-    fallback() external payable {
-        console.log("inside fallback in exec env");
-    }
+    fallback() external payable {}
 }

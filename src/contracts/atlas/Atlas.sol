@@ -60,8 +60,6 @@ contract Atlas is Test, Factory {
         // Initialize the lock
         _initializeEscrowLock(executionEnvironment);
 
-        console.log("before this.execute in atlas");
-
         try this.execute{value: msg.value}(
             dConfig, userOp.call, solverOps, executionEnvironment, dAppOp.approval.callChainHash, msg.sender == simulator
         ) returns (bool _auctionWon, uint256 accruedGasRebate) {

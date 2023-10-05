@@ -32,7 +32,6 @@ contract Base {
     // can be used during DAppControl's delegated funcs
 
     modifier onlyAtlasEnvironment() {
-        console.log("onlyAtlasEnvironment modifier");
         if (address(this) == source) {
             revert("ERR-CE00 NotDelegated");
         }
