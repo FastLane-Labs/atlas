@@ -48,4 +48,6 @@ interface IAtlas {
     function getUserCallPayload(UserCall memory userCall) external view returns (bytes32 payload);
 
     function getNextNonce(address account) external view returns (uint256 nextNonce);
+
+    function getDomainSeparator() external view returns (bytes32 domainSeparator);
 }

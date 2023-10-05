@@ -215,6 +215,10 @@ contract DAppVerification is EIP712, DAppIntegration {
         payload = _hashTypedDataV4(_getProofHash(dAppApproval));
     }
 
+    function getDomainSeparator() external view returns (bytes32 domainSeparator) {
+        domainSeparator = _domainSeparatorV4();
+    }
+
     //
     // USER VERIFICATION
     //
