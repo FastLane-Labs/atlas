@@ -47,11 +47,8 @@ library CallBits {
         if (callConfig.reuseUserOp) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.ReuseUserOp);
         }
-        if (callConfig.userBundler) {
-            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.UserBundler);
-        }
-        if (callConfig.dAppBundler) {
-            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.DAppBundler);
+        if (callConfig.solverBundler) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.SolverBundler);
         }
         if (callConfig.unknownBundler) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.UnknownBundler);
@@ -74,8 +71,7 @@ library CallBits {
             requirePostOps: needsPostOpsCall(encodedCallConfig),
             zeroSolvers: allowsZeroSolvers(encodedCallConfig),
             reuseUserOp: allowsReuseUserOps(encodedCallConfig),
-            userBundler: allowsUserBundler(encodedCallConfig),
-            dAppBundler: allowsDAppBundler(encodedCallConfig),
+            solverBundler: allowsSolverBundler(encodedCallConfig),
             unknownBundler: allowsUnknownBundler(encodedCallConfig),
             forwardReturnData: forwardReturnData(encodedCallConfig)
         });
@@ -125,12 +121,8 @@ library CallBits {
         reuseUserOp = (callConfig & 1 << uint32(CallConfigIndex.ReuseUserOp) != 0);
     }
 
-    function allowsUserBundler(uint32 callConfig) internal pure returns (bool userBundler) {
-        userBundler = (callConfig & 1 << uint32(CallConfigIndex.UserBundler) != 0);
-    }
-
-    function allowsDAppBundler(uint32 callConfig) internal pure returns (bool dAppBundler) {
-        dAppBundler = (callConfig & 1 << uint32(CallConfigIndex.DAppBundler) != 0);
+    function allowsSolverBundler(uint32 callConfig) internal pure returns (bool userBundler) {
+        userBundler = (callConfig & 1 << uint32(CallConfigIndex.SolverBundler) != 0);
     }
 
     function allowsUnknownBundler(uint32 callConfig) internal pure returns (bool unknownBundler) {
