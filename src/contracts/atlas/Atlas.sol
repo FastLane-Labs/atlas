@@ -61,7 +61,7 @@ contract Atlas is Test, Factory {
         _initializeEscrowLock(executionEnvironment);
 
         try this.execute{value: msg.value}(
-            dConfig, userOp.call, solverOps, executionEnvironment, dAppOp.approval.callChainHash, msg.sender == simulator
+            dConfig, userOp.call, solverOps, executionEnvironment, msg.sender == simulator
         ) returns (bool _auctionWon, uint256 accruedGasRebate) {
             
             console.log("accruedGasRebate",accruedGasRebate);
@@ -85,18 +85,11 @@ contract Atlas is Test, Factory {
         UserCall calldata uCall,
         SolverOperation[] calldata solverOps,
         address executionEnvironment,
-        bytes32 callChainHash,
         bool isSimulation
     ) external payable returns (bool auctionWon, uint256 accruedGasRebate) {
         
         // This is a self.call made externally so that it can be used with try/catch
         require(msg.sender == address(this), "ERR-F06 InvalidAccess");
-        
-        // verify the call sequence
-        require(
-            callChainHash == CallVerification.getCallChainHash(dConfig, uCall, solverOps) || isSimulation, 
-            "ERR-F07 InvalidSequence"
-        );
         
         // Build the memory lock
         EscrowKey memory key = _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), isSimulation);
@@ -220,19 +213,37 @@ contract Atlas is Test, Factory {
             }
         }
 
-        // Only verify signatures of meta txs if the original signer isn't the bundler
-        // TODO: Consider extra reentrancy defense here?
-        if (dAppOp.approval.from != msg.sender && !_verifyDApp(dConfig, dAppOp)) {
-            bool bypass = isSimulation && dAppOp.signature.length == 0;
-            if (!bypass) {
-                return ValidCallsResult.DAppSignatureInvalid;
+        // bundler checks
+        if(CallBits.allowsSolverBundler(dConfig.callConfig)) {
+            // solver bundler is allowed - make sure only one solverOp is included
+            if (solverOps.length > 1) {
+                return ValidCallsResult.TooManySolverOps;
             }
-        }
-        
-        if (userOp.call.from != msg.sender && !_verifyUser(dConfig, userOp)) { 
-            bool bypass = isSimulation && userOp.signature.length == 0;
-            if (!bypass) {
-                return ValidCallsResult.UserSignatureInvalid;   
+        } else {
+            // all other cases require callchainhash verification
+            require(
+                dAppOp.approval.callChainHash == CallVerification.getCallChainHash(dConfig, userOp.call, solverOps) || isSimulation, 
+                "ERR-F07 InvalidSequence"
+            );
+
+            // Check to make sure dApp and user signatures are valid
+            if(!_verifyDApp(dConfig, dAppOp)) {
+                bool bypass = isSimulation && dAppOp.signature.length == 0;
+                if (!bypass) {
+                    return ValidCallsResult.DAppSignatureInvalid;
+                }
+            }
+
+            if(!_verifyUser(dConfig, userOp)) {
+                bool bypass = isSimulation && userOp.signature.length == 0;
+                if (!bypass) {
+                    return ValidCallsResult.UserSignatureInvalid;   
+                }
+            }
+
+            // sigs are valid, but sender is not one of the default allowed (dapp or user). make sure protocol allows unknown bundlers 
+            if (dAppOp.approval.from != msg.sender && userOp.call.from != msg.sender && !CallBits.allowsUnknownBundler(dConfig.callConfig)) {
+                return ValidCallsResult.UnknownBundlerNotAllowed;
             }
         }
 
