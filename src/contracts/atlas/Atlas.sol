@@ -214,17 +214,24 @@ contract Atlas is Test, Factory {
         }
 
         // bundler checks
-        if(CallBits.allowsSolverBundler(dConfig.callConfig)) {
-            // solver bundler is allowed - make sure only one solverOp is included
-            if (solverOps.length > 1) {
+        if(dAppOp.signature.length == 0 && !isSimulation) {
+            // no dapp signature and not a simulation
+            if(!dConfig.callConfig.allowsSolverBundler()) {
+                return ValidCallsResult.DAppSignatureInvalid;
+            }
+
+            if(solverOps.length > 1) {
                 return ValidCallsResult.TooManySolverOps;
+            }
+
+            if(solverOps[0].call.from != msg.sender) {
+                return ValidCallsResult.UnknownBundlerNotAllowed;
             }
         } else {
             // all other cases require callchainhash verification
-            require(
-                dAppOp.approval.callChainHash == CallVerification.getCallChainHash(dConfig, userOp.call, solverOps) || isSimulation, 
-                "ERR-F07 InvalidSequence"
-            );
+            if(dAppOp.approval.callChainHash != CallVerification.getCallChainHash(dConfig, userOp.call, solverOps) && !isSimulation) {
+                return ValidCallsResult.InvalidSequence;
+            }
 
             // Check to make sure dApp and user signatures are valid
             if(!_verifyDApp(dConfig, dAppOp)) {
@@ -242,7 +249,7 @@ contract Atlas is Test, Factory {
             }
 
             // sigs are valid, but sender is not one of the default allowed (dapp or user). make sure protocol allows unknown bundlers 
-            if (dAppOp.approval.from != msg.sender && userOp.call.from != msg.sender && !CallBits.allowsUnknownBundler(dConfig.callConfig)) {
+            if (dAppOp.approval.from != msg.sender && userOp.call.from != msg.sender && !dConfig.callConfig.allowsUnknownBundler()) {
                 return ValidCallsResult.UnknownBundlerNotAllowed;
             }
         }
