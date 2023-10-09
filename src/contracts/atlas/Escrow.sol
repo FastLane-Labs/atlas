@@ -121,7 +121,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
         // If it's a new recipient, update and push to the storage array
         donation.recipient = surplusRecipient;
         donation.net = gasRebate;
-        donation.cumulative += gasRebate;
+        donation.cumulative = gasRebate;
         _donations.push(donation);
     }
 
