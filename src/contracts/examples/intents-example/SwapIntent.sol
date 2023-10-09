@@ -248,7 +248,7 @@ contract SwapIntentController is DAppControl {
 
         // Donate the ether to the bundler, with the surplus going back to the user
         } else {
-            console.log("donating to bundler");
+            console.log("donating to bundler in SwapIntent");
             IEscrow(escrow).donateToBundler{value: address(this).balance}(_user());
         }
     }

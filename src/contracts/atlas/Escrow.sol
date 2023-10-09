@@ -86,7 +86,13 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
         // NOTE: All donations in excess of 10% greater than cost are forwarded
         // to the surplusReceiver. 
 
-        require(msg.sender != address(0) && msg.sender == activeEnvironment, "ERR-E079 DonateRequiresLock");
+        // TODO: Add separate donations and flash borrow/repay accounting to make this safe
+
+        require(activeEnvironment != address(0), "ERR-E080 DonateRequiresActiveEnv");
+        // TODO: Is this require worth keeping? First half of original lock check
+        require(msg.sender != address(0), "ERR-E079 DonateRequiresLock");
+
+        // TODO: Consider making this a higher donation threshold to avoid ddos attacks
         if (msg.value == 0) {
             return;
         }
@@ -286,6 +292,9 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
         uint256 gasFeesCredit = accruedGasRebate * tx.gasprice;
         uint256 returnFactor = 0; // Out of 100
 
+        console.log("gasFeesSpent:", gasFeesSpent);
+        console.log("gasFeesCredit:", gasFeesCredit);
+
         // CASE: gasFeesCredit fully covers what's been spent.
         // NOTE: Should be impossible to reach
         if (gasFeesCredit > gasFeesSpent) {
@@ -315,9 +324,12 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
 
         // CASE: The bundler receives all of the donations
         } else {
+            console.log("bundler receives all donations");
             SafeTransferLib.safeTransferETH(msg.sender, gasFeesCredit);
             return;
         }
+
+        console.log("returnFactor:", returnFactor);
 
         // Return any surplus donations
         // TODO: de-dust it
