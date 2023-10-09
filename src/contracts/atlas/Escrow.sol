@@ -294,6 +294,8 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
 
         console.log("gasFeesSpent:", gasFeesSpent);
         console.log("gasFeesCredit:", gasFeesCredit);
+        console.log("donations.length:", donations.length);
+        console.log("donations[donations.length-1].cumulative", donations[donations.length-1].cumulative);
 
         // CASE: gasFeesCredit fully covers what's been spent.
         // NOTE: Should be impossible to reach
@@ -314,10 +316,10 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
             return;
 
         // CASE: The donations exceed the liability
-        } else if (donations[donations.length-1].cumulative > gasFeesSpent - gasFeesCredit) {
+        } else if (donations[donations.length-1].cumulative * tx.gasprice > gasFeesSpent - gasFeesCredit) {
             SafeTransferLib.safeTransferETH(msg.sender, gasFeesSpent);
 
-            uint256 totalDonations = donations[donations.length-1].cumulative;
+            uint256 totalDonations = donations[donations.length-1].cumulative * tx.gasprice;
             uint256 excessDonations = totalDonations - (gasFeesSpent - gasFeesCredit);
 
             returnFactor = (100 * excessDonations) / (totalDonations + 1);
@@ -340,7 +342,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
 
             for (;i<donations.length;) {
                 
-                surplus = (donations[i].net * returnFactor) / 100;
+                surplus = (donations[i].net * tx.gasprice * returnFactor) / 100;
                 recipient = donations[i].recipient == address(0) ? user : donations[i].recipient;
 
                 SafeTransferLib.safeTransferETH(recipient, surplus);

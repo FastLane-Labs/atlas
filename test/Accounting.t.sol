@@ -190,6 +190,7 @@ contract AccountingTest is BaseTest {
         console.log("Solver WETH balance", WETH.balanceOf(address(rfqSolver)));
         console.log("Solver DAI balance", DAI.balanceOf(address(rfqSolver)));
         console.log("Solver ETH balance", address(rfqSolver).balance);
+        console.log("Atlas ETH balance", address(atlas).balance);
         console.log(""); // give space for internal logs
 
         vm.startPrank(userEOA);
@@ -217,6 +218,7 @@ contract AccountingTest is BaseTest {
         console.log("Solver WETH balance", WETH.balanceOf(address(rfqSolver)));
         console.log("Solver DAI balance", DAI.balanceOf(address(rfqSolver)));
         console.log("Solver ETH balance", address(rfqSolver).balance);
+        console.log("Atlas ETH balance", address(atlas).balance);
 
         // Check user token balances after
         assertEq(WETH.balanceOf(userEOA), userWethBalanceBefore - swapIntent.amountUserSells, "Did not spend enough WETH");
@@ -267,5 +269,6 @@ contract SimpleRFQSolver is SolverBase {
     }
     receive() external payable {
         console.log("Receive triggered with value:", msg.value);
+        console.log("balance in solver", address(this).balance);
     }
 }
