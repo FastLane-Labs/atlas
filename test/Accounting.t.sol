@@ -253,8 +253,11 @@ contract SimpleRFQSolver is SolverBase {
         require(ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys, "Not enough tokenOut to fulfill");
         ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
 
-        // ATTACK HAPPENS HERE  
-        IEscrow(ATLAS).donateToBundler{value: msg.value}(address(this));
+        // Prev donate/repay double count attack:
+        // IEscrow(ATLAS).donateToBundler{value: msg.value}(address(this));
+
+        // Honest solver would do this:
+        IEscrow(ATLAS).repayBorrowedEth{value: msg.value}(address(this));
     }
 
     // This ensures a function can only be called through metaFlashCall

@@ -534,10 +534,17 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
         
         data = abi.encodePacked(data, lockBytes);
 
+        // Account for ETH borrowed by solver - repay with repayBorrowedEth() below
+        _accData.ethBorrowed[solverOp.call.to] += solverOp.call.value;
+
         (success, data) = environment.call{value: solverOp.call.value}(data);
+        
+        // Check all borrowed ETH was repaid during solver call from Execution Env
+        if(_accData.ethBorrowed[solverOp.call.to] != 0){
+            revert FastLaneErrorsEvents.SolverMsgValueUnpaid();
+        }
+
         if (success) {
-            // Account for ETH borrowed by solver - repaid in donateToBundler
-            _accData.ethBorrowed[solverOp.call.to] += solverOp.call.value;
             return (SolverOutcome.Success, address(this).balance - currentBalance);
         }
         bytes4 errorSwitch = bytes4(data);
@@ -561,6 +568,10 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
         } else {
             return (SolverOutcome.CallReverted, 0);
         }
+    }
+
+    function repayBorrowedEth(address borrower) external payable {
+        _accData.ethBorrowed[borrower] -= msg.value;
     }
 
     receive() external payable {}

@@ -283,13 +283,11 @@ contract ExecutionEnvironment is Base {
 
         // Verify that the solver repaid their msg.value
         // TODO: Add in a more discerning func that'll silo the 
-        // donations to prevent double counting. 
+        // donations to prevent double counting.
+        // TODO: repayment check added to Escrow.sol - do we still need this balance check?
         if (atlas.balance < escrowBalance) {
             revert FastLaneErrorsEvents.SolverMsgValueUnpaid();
         }
-
-        // Updated solver repayment accounting
-        // uint256 donorEthBorrowed = _accData.ethBorrowed[solverOp.call.to];
     }
 
     function allocateValue(BidData[] calldata bids, bytes memory returnData) 
