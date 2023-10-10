@@ -14,8 +14,8 @@ struct SolverOperation {
 }
 
 struct SolverCall {
-    address from;
-    address to;
+    address from; // TODO better names? This is the solverEOA in tests
+    address to;   // TODO better names? This is the solverContract in tests
     uint256 value;
     uint256 gas;
     uint256 maxFeePerGas; // maxFeePerGas solver is willing to pay.  This goes to validator, not dApp or user

@@ -287,6 +287,9 @@ contract ExecutionEnvironment is Base {
         if (atlas.balance < escrowBalance) {
             revert FastLaneErrorsEvents.SolverMsgValueUnpaid();
         }
+
+        // Updated solver repayment accounting
+        // uint256 donorEthBorrowed = _accData.ethBorrowed[solverOp.call.to];
     }
 
     function allocateValue(BidData[] calldata bids, bytes memory returnData) 

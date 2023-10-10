@@ -8,7 +8,6 @@ import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 
 import {SafetyLocks} from "./SafetyLocks.sol";
-import {SolverWrapper} from "./SolverWrapper.sol";
 import {DAppVerification} from "./DAppVerification.sol";
 
 import "../types/SolverCallTypes.sol";
@@ -16,6 +15,7 @@ import "../types/UserCallTypes.sol";
 import {DAppConfig} from "../types/DAppApprovalTypes.sol";
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
+import {FastLaneErrorsEvents} from "../types/Emissions.sol";
 
 import {EscrowBits} from "../libraries/EscrowBits.sol";
 import {CallBits} from "../libraries/CallBits.sol";
@@ -23,7 +23,7 @@ import {SafetyBits} from "../libraries/SafetyBits.sol";
 
 import "forge-std/Test.sol";
 
-contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
+contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
     using ECDSA for bytes32;
     using EscrowBits for uint256;
     using CallBits for uint32;    
@@ -41,6 +41,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
     mapping(address => SolverWithdrawal) internal _withdrawalData;
 
     GasDonation[] internal _donations;
+    AccountingData internal _accData;
 
     constructor(uint32 escrowDurationFromFactory, address _simulator) SafetyLocks(_simulator) {
         escrowDuration = escrowDurationFromFactory;
@@ -79,6 +80,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
     // This attack vector will be addressed explicitly once the gas 
     // reimbursement mechanism is finalized.
 
+    // TODO need to rename this if its also handling borrow repayments from searchers, or split that out into separate fn
     function donateToBundler(address surplusRecipient) external payable {
         console.log("Donate to bundler called");
         console.log("donateToBundler: msg.value:", msg.value);
@@ -88,6 +90,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
 
         // TODO: Add separate donations and flash borrow/repay accounting to make this safe
 
+        // TODO: Maybe remove - smart wallets might want to pre-donate to sponsor user txs
         require(activeEnvironment != address(0), "ERR-E080 DonateRequiresActiveEnv");
         // TODO: Is this require worth keeping? First half of original lock check
         require(msg.sender != address(0), "ERR-E079 DonateRequiresLock");
@@ -509,6 +512,54 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
 
             // subtract out the gas buffer since the solver's metaTx won't use it
             gasLimit -= EscrowBits.FASTLANE_GAS_BUFFER;
+        }
+    }
+
+    function _solverOpWrapper(
+        uint256 gasLimit,
+        address environment,
+        SolverOperation calldata solverOp,
+        bytes memory dAppReturnData,
+        bytes32 lockBytes
+    ) internal returns (SolverOutcome, uint256) {
+        // address(this) = Atlas/Escrow
+        // msg.sender = tx.origin
+
+        // Get current Ether balance
+        uint256 currentBalance = address(this).balance;
+        bool success;
+
+        bytes memory data = abi.encodeWithSelector(
+            IExecutionEnvironment(environment).solverMetaTryCatch.selector, gasLimit, currentBalance, solverOp, dAppReturnData);
+        
+        data = abi.encodePacked(data, lockBytes);
+
+        (success, data) = environment.call{value: solverOp.call.value}(data);
+        if (success) {
+            // Account for ETH borrowed by solver - repaid in donateToBundler
+            _accData.ethBorrowed[solverOp.call.to] += solverOp.call.value;
+            return (SolverOutcome.Success, address(this).balance - currentBalance);
+        }
+        bytes4 errorSwitch = bytes4(data);
+
+        if (errorSwitch == SolverBidUnpaid.selector) {
+            return (SolverOutcome.BidNotPaid, 0);
+        } else if (errorSwitch == SolverMsgValueUnpaid.selector) {
+            return (SolverOutcome.CallValueTooHigh, 0);
+        } else if (errorSwitch == IntentUnfulfilled.selector) {
+            return (SolverOutcome.IntentUnfulfilled, 0);
+        } else if (errorSwitch == SolverOperationReverted.selector) {
+            return (SolverOutcome.CallReverted, 0);
+        } else if (errorSwitch == SolverFailedCallback.selector) {
+            return (SolverOutcome.CallbackFailed, 0);
+        } else if (errorSwitch == AlteredControlHash.selector) {
+            return (SolverOutcome.InvalidControlHash, 0);
+        } else if (errorSwitch == PreSolverFailed.selector) {
+            return (SolverOutcome.PreSolverFailed, 0);
+        } else if (errorSwitch == PostSolverFailed.selector) {
+            return (SolverOutcome.IntentUnfulfilled, 0);
+        } else {
+            return (SolverOutcome.CallReverted, 0);
         }
     }
 
