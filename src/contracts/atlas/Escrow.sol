@@ -541,6 +541,7 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
         
         // Check all borrowed ETH was repaid during solver call from Execution Env
         if(_accData.ethBorrowed[solverOp.call.to] != 0){
+            console.log("Borrowed eth not repaid. Outstanding debt:", _accData.ethBorrowed[solverOp.call.to]);
             revert FastLaneErrorsEvents.SolverMsgValueUnpaid();
         }
 
@@ -571,7 +572,9 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
     }
 
     function repayBorrowedEth(address borrower) external payable {
-        _accData.ethBorrowed[borrower] -= msg.value;
+        uint256 debt = _accData.ethBorrowed[borrower];
+        require(debt > 0, "ERR-E081 NoDebtToRepay");
+        _accData.ethBorrowed[borrower] = debt - msg.value;
     }
 
     receive() external payable {}
