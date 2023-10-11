@@ -4,6 +4,7 @@ pragma solidity ^0.8.16;
 import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
 import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
+import {IEscrow} from "src/contracts/interfaces/IEscrow.sol";
 
 import "../types/SolverCallTypes.sol";
 
@@ -32,6 +33,7 @@ contract SolverBase {
         payable
         safetyFirst(sender)
         payBids(bids)
+        repayBorrowedEth()
         returns (bool success, bytes memory data)
     {
         (success, data) = address(this).call{value: msg.value}(solverOpData);
@@ -103,5 +105,12 @@ contract SolverBase {
             }
         }
         
+    }
+
+    modifier repayBorrowedEth() {
+        _;
+        if(msg.value > 0){
+            IEscrow(_escrow).repayBorrowedEth{value: msg.value}(address(this));
+        }
     }
 }

@@ -256,8 +256,8 @@ contract SimpleRFQSolver is SolverBase {
         // Prev donate/repay double count attack:
         // IEscrow(ATLAS).donateToBundler{value: msg.value}(address(this));
 
-        // Honest solver would do this:
-        IEscrow(ATLAS).repayBorrowedEth{value: msg.value}(address(this));
+        // Honest solver would do this: UPDATE: Moved to SolverBase
+        // IEscrow(ATLAS).repayBorrowedEth{value: msg.value}(address(this));
     }
 
     // This ensures a function can only be called through metaFlashCall
