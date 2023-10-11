@@ -88,12 +88,8 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
         // NOTE: All donations in excess of 10% greater than cost are forwarded
         // to the surplusReceiver. 
 
-        // TODO: Add separate donations and flash borrow/repay accounting to make this safe
-
-        // TODO: Maybe remove - smart wallets might want to pre-donate to sponsor user txs
-        require(activeEnvironment != address(0), "ERR-E080 DonateRequiresActiveEnv");
-        // TODO: Is this require worth keeping? First half of original lock check
-        require(msg.sender != address(0), "ERR-E079 DonateRequiresLock");
+        // TODO check this is compatible with smart wallets and solver donations
+        require(msg.sender == activeEnvironment, "ERR-E079 DonateRequiresLock");
 
         // TODO: Consider making this a higher donation threshold to avoid ddos attacks
         if (msg.value == 0) {
