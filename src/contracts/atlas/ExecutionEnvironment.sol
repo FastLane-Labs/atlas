@@ -4,6 +4,7 @@ pragma solidity ^0.8.16;
 import {ISolverContract} from "../interfaces/ISolverContract.sol";
 import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
 import {IDAppControl} from "../interfaces/IDAppControl.sol";
+import {IEscrow} from "../interfaces/IEscrow.sol";
 
 import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
@@ -327,6 +328,15 @@ contract ExecutionEnvironment is Base {
 
         (bool success,) = _control().delegatecall(forward(allocateData));
         require(success, "ERR-EC02 DelegateRevert");
+    }
+
+
+    function donateToBundler(address surplusRecipient)
+        external
+        payable
+        validPhase(ExecutionPhase.SolverOperations)
+    {
+        IEscrow(atlas).donateToBundler{value: msg.value}(surplusRecipient);
     }
 
     ///////////////////////////////////////

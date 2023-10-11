@@ -79,8 +79,6 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
     // THIS IS EXPLOITABLE - DO NOT USE THIS CONTRACT IN PRODUCTION
     // This attack vector will be addressed explicitly once the gas 
     // reimbursement mechanism is finalized.
-
-    // TODO need to rename this if its also handling borrow repayments from searchers, or split that out into separate fn
     function donateToBundler(address surplusRecipient) external payable {
         console.log("Donate to bundler called");
         console.log("donateToBundler: msg.value:", msg.value);
