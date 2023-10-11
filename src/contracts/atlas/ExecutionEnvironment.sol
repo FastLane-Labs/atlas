@@ -336,6 +336,9 @@ contract ExecutionEnvironment is Base {
         payable
         validPhase(ExecutionPhase.SolverOperations)
     {
+        uint16 lockstate = _lockState();
+        console.log("lockstate", lockstate);
+
         IEscrow(atlas).donateToBundler{value: msg.value}(surplusRecipient);
     }
 

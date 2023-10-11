@@ -11,6 +11,11 @@ import {SolverOperation} from "../src/contracts/types/SolverCallTypes.sol";
 import {UserOperation} from "../src/contracts/types/UserCallTypes.sol";
 import {DAppOperation, DAppConfig} from "../src/contracts/types/DAppApprovalTypes.sol";
 
+import {SafetyBits} from "../src/contracts/libraries/SafetyBits.sol";
+import "../src/contracts/types/LockTypes.sol";
+
+import {TestUtils} from "./base/TestUtils.sol";
+
 
 import {SwapIntentController, SwapIntent, Condition} from "../src/contracts/examples/intents-example/SwapIntent.sol";
 
@@ -58,6 +63,14 @@ contract AccountingTest is BaseTest {
             escrowAddress: address(escrow),
             atlasAddress: address(atlas)
         });
+    }
+
+    function testDELEET() public {
+        uint16 lockState = uint16(61711); // phase 4 - HandlingPayments
+        uint16 phase = SafetyBits.getCurrentExecutionPhase(lockState);
+        console.log(TestUtils.uint16ToBinaryString(61711));
+        console.log("phase", phase);
+        console.log("Exec Phase", uint8(ExecutionPhase.Releasing));
     }
 
 

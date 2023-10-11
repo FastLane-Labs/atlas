@@ -15,7 +15,9 @@ interface IWETH9 {
     function withdraw(uint256 wad) external payable;
 }
 
-// contract SolverBase is Test {
+
+// TODO add donateToBundler helper function for solvers
+
 contract SolverBase {
     address public constant WETH_ADDRESS = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
