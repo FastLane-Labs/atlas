@@ -32,8 +32,8 @@ contract SolverBase {
         external
         payable
         safetyFirst(sender)
-        payBids(bids)
         repayBorrowedEth()
+        payBids(bids)
         returns (bool success, bytes memory data)
     {
         (success, data) = address(this).call{value: msg.value}(solverOpData);
@@ -44,7 +44,7 @@ contract SolverBase {
     modifier safetyFirst(address sender) {
         // Safety checks
         require(sender == _owner, "INVALID CALLER");
-        uint256 msgValueOwed = msg.value;
+        // uint256 msgValueOwed = msg.value;
 
         _;
 
@@ -55,7 +55,8 @@ contract SolverBase {
         // transaction will revert.  It is payable and can be used to repay a msg.value loan from the
         // Atlas Escrow.
         
-        require(ISafetyLocks(_escrow).solverSafetyCallback{value: msgValueOwed}(msg.sender), "INVALID SEQUENCE");
+        // TODO review - this has been replaced by the repayBorrowedEth modifier
+        // require(ISafetyLocks(_escrow).solverSafetyCallback{value: msgValueOwed}(msg.sender), "INVALID SEQUENCE");
     }
 
     modifier payBids(BidData[] calldata bids) {
