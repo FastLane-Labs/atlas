@@ -291,11 +291,6 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
         uint256 gasFeesCredit = accruedGasRebate * tx.gasprice;
         uint256 returnFactor = 0; // Out of 100
 
-        console.log("gasFeesSpent:", gasFeesSpent);
-        console.log("gasFeesCredit:", gasFeesCredit);
-        console.log("donations.length:", donations.length);
-        console.log("donations[donations.length-1].cumulative", donations[donations.length-1].cumulative);
-
         // CASE: gasFeesCredit fully covers what's been spent.
         // NOTE: Should be impossible to reach
         if (gasFeesCredit > gasFeesSpent) {
@@ -325,12 +320,9 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
 
         // CASE: The bundler receives all of the donations
         } else {
-            console.log("bundler receives all donations");
             SafeTransferLib.safeTransferETH(msg.sender, gasFeesCredit);
             return;
         }
-
-        console.log("returnFactor:", returnFactor);
 
         // Return any surplus donations
         // TODO: de-dust it
@@ -484,22 +476,11 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
 
             uint256 gasCost = (tx.gasprice * gasLimit) + (solverOp.call.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
 
-            console.log("SOLVER GAS COST CHECKS IN ESCROW:");
-            console.log("gasCost \t\t", gasCost);
-            console.log("solverEscrow.total \t", solverEscrow.total);
-            console.log("_withdrawalData[solverOp.call.from].escrowed", _withdrawalData[solverOp.call.from].escrowed);
-
-
             // see if solver's escrow can afford tx gascost
             if (gasCost > solverEscrow.total - _withdrawalData[solverOp.call.from].escrowed) {
                 // charge solver for calldata so that we can avoid vampire attacks from solver onto user
                 result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
             }
-
-            console.log("SOVLER MSG.VALUE CHECKS IN ESCROW:");
-            console.log("solverOp.call.value \t", solverOp.call.value);
-            console.log("Atlas.balance \t\t", address(this).balance);
-            console.log("gasLimit X tx.gasprice \t", gasLimit * tx.gasprice);
 
             // Verify that we can lend the solver their tx value
             if (solverOp.call.value > address(this).balance - (gasLimit * tx.gasprice)) {
@@ -537,7 +518,6 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
         
         // Check all borrowed ETH was repaid during solver call from Execution Env
         if(_accData.ethBorrowed[solverOp.call.to] != 0){
-            console.log("Borrowed eth not repaid. Outstanding debt:", _accData.ethBorrowed[solverOp.call.to]);
             revert FastLaneErrorsEvents.SolverMsgValueUnpaid();
         }
 
