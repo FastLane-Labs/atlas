@@ -182,4 +182,31 @@ contract SafetyBitsTest is Test {
         assertTrue(key.lockState == SafetyBits._LOCKED_X_SOLVERS_X_VERIFIED);
         assertTrue(key.approvedCaller == address(1));
     }
+
+    function testGetCurrentExecutionPhase() public {
+        // 1111 0000 0001 1111 = 61471 = Phase 0
+        uint16 lockState = uint16(61471);
+        assertEq(SafetyBits.getCurrentExecutionPhase(lockState), 0, "Did not identify Phase 0");
+        // 1111 0000 0010 1111 = 61487 = Phase 1
+        lockState = uint16(61487);
+        assertEq(SafetyBits.getCurrentExecutionPhase(lockState), 1, "Did not identify Phase 1");
+        // 1111 0000 0100 1111 = 61519 = Phase 2
+        lockState = uint16(61519);
+        assertEq(SafetyBits.getCurrentExecutionPhase(lockState), 2, "Did not identify Phase 2");
+        // 1111 0000 1000 1111 = 61583 = Phase 3
+        lockState = uint16(61583);
+        assertEq(SafetyBits.getCurrentExecutionPhase(lockState), 3, "Did not identify Phase 3");
+        // 1111 0001 0000 1111 = 61711 = Phase 4
+        lockState = uint16(61711);
+        assertEq(SafetyBits.getCurrentExecutionPhase(lockState), 4, "Did not identify Phase 4");
+        // 1111 0010 0000 1111 = 61967 = Phase 5
+        lockState = uint16(61967);
+        assertEq(SafetyBits.getCurrentExecutionPhase(lockState), 5, "Did not identify Phase 5");
+        // 1111 0100 0000 1111 = 62479 = Phase 6
+        lockState = uint16(62479);
+        assertEq(SafetyBits.getCurrentExecutionPhase(lockState), 6, "Did not identify Phase 6");
+        // 1111 1000 0000 1111 = 63503 = Phase 7
+        lockState = uint16(63503);
+        assertEq(SafetyBits.getCurrentExecutionPhase(lockState), 7, "Did not identify Phase 7");
+    }
 }
