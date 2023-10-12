@@ -1,11 +1,9 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import "../types/LockTypes.sol";
+import { UD60x18, ud } from "@prb/math/UD60x18.sol";
 
-// TODO remove
-import {TestUtils} from "../../../test/base/TestUtils.sol";
-import "forge-std/Test.sol";
+import "../types/LockTypes.sol";
 
 // uint16 bit layout: CCCC BBBB BBBB AAAA
 // Where A = BaseLock, B = ExecutionPhase, C = SolverSafety
@@ -14,9 +12,9 @@ uint16 constant EXECUTION_PHASE_OFFSET = uint16(type(BaseLock).max) + 1;
 uint16 constant SAFETY_LEVEL_OFFSET = uint16(type(BaseLock).max) + uint16(type(ExecutionPhase).max) + 2;
 
 uint16 constant ONLY_EXECUTION_PHASE_MASK = uint16(4080); // 0000 1111 1111 0000
+uint256 constant SCALE = 1e18;
 
 library SafetyBits {
-
     uint16 internal constant _LOCKED_X_SOLVERS_X_REQUESTED = uint16(
         1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations))
             | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Requested))
@@ -83,16 +81,13 @@ library SafetyBits {
             | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Unset))
     );
 
-    //TODO change to pure after testing
-    function getCurrentExecutionPhase(uint16 lockState) internal view returns (uint16) {
-        console.log("IN getCurrentExecutionPhase");
+    function getCurrentExecutionPhase(uint16 lockState) internal pure returns (uint16) {
+        // Isolate the middle 8 bits - only the ExecutionPhase bits
         uint16 isolatedPhaseBits = lockState & ONLY_EXECUTION_PHASE_MASK;   
-        console.log("isolatedPhaseBits: %s", TestUtils.uint16ToBinaryString(isolatedPhaseBits));
-        console.log("returning: %s", TestUtils.uint16ToBinaryString(uint16(isolatedPhaseBits >> EXECUTION_PHASE_OFFSET)));
-
-        // TODO Need to take dec number returned below and calculate log_2(dec num) to get the bit number
-
-        return uint16(isolatedPhaseBits >> EXECUTION_PHASE_OFFSET);
+        // Shift those 8 bits to the right, then convert the decimal value of those bits to UD60x18 form
+        UD60x18 phaseBitsInDecToBeLogged = ud((isolatedPhaseBits >> EXECUTION_PHASE_OFFSET) * SCALE);
+        // Calculate log2 of the dec value of phase bits above, scale back down, and convert to uint16
+        return uint16(phaseBitsInDecToBeLogged.log2().intoUint256() / SCALE);
     }
 
     function pack(EscrowKey memory self)
