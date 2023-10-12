@@ -79,7 +79,7 @@ contract V4DAppControl is DAppControl {
     /////////////////////////////////////////////////////////
 
     /////////////// DELEGATED CALLS //////////////////
-    function _preOpsCall(UserCall calldata uCall)
+    function _preOpsCall(UserOperation calldata userOp)
         internal
         override
         returns (bytes memory preOpsData)
@@ -91,9 +91,9 @@ contract V4DAppControl is DAppControl {
 
         require(!_currentKey.initialized, "ERR-H09 AlreadyInitialized");
 
-        require(bytes4(uCall.data) == SWAP, "ERR-H10 InvalidFunction");
+        require(bytes4(userOp.data) == SWAP, "ERR-H10 InvalidFunction");
 
-        require(uCall.to == v4Singleton, "ERR-H11 InvalidTo");
+        require(userOp.dapp == v4Singleton, "ERR-H11 InvalidTo"); // this is wrong
 
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that DAppControl supplied a valid signature
@@ -101,7 +101,7 @@ contract V4DAppControl is DAppControl {
 
 
         (IPoolManager.PoolKey memory key, IPoolManager.SwapParams memory params) =
-            abi.decode(uCall.data[4:], (IPoolManager.PoolKey, IPoolManager.SwapParams));
+            abi.decode(userOp.data[4:], (IPoolManager.PoolKey, IPoolManager.SwapParams));
 
         // Perform more checks and activate the lock
         V4DAppControl(hook).setLock(key);
@@ -131,7 +131,7 @@ contract V4DAppControl is DAppControl {
                 // ERC20(token0).approve(v4Singleton, amountSpecified);
                 SafeTransferLib.safeTransferFrom(
                     ERC20(IPoolManager.Currency.unwrap(key.currency0)),
-                    uCall.from,
+                    userOp.from,
                     v4Singleton, // <- TODO: confirm
                     uint256(params.amountSpecified)
                 );
@@ -152,27 +152,25 @@ contract V4DAppControl is DAppControl {
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(bytes calldata data) internal override {
+    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
 
         require(!_currentKey.initialized, "ERR-H09 AlreadyInitialized");
         
-        // Pull the calldata into memory
-        (, BidData[] memory bids) = abi.decode(data, (uint256, BidData[]));
-
         // NOTE: DAppVerification has verified the BidData[] format
         // BidData[0] = token0
         // BidData[1] = token1
 
-        uint256 token0DonateAmount = bids[0].bidAmount;
-        uint256 token1DonateAmount = bids[1].bidAmount;
+        IPoolManager.PoolKey memory key; // todo: finish
 
-        IPoolManager.PoolKey memory key = _currentKey.key;
-
-        IPoolManager(v4Singleton).donate(key, token0DonateAmount, token1DonateAmount);
-
+        if (bidToken ==IPoolManager.Currency.unwrap(key.currency0)) {
+            IPoolManager(v4Singleton).donate(key, bidAmount, 0);
+        } else {
+            IPoolManager(v4Singleton).donate(key, 0, bidAmount);
+        }
+                   
         // Flag the pool to be open for trading for the remainder of the block
         bytes32 sequenceKey = keccak256(
             abi.encodePacked(
@@ -238,27 +236,16 @@ contract V4DAppControl is DAppControl {
 
     ///////////////// GETTERS & HELPERS // //////////////////
 
-    function getBidFormat(UserCall calldata uCall) external pure override returns (BidData[] memory) {
+    function getBidFormat(UserOperation calldata userOp) public pure override returns (address bidToken) {
         // This is a helper function called by solvers
         // so that they can get the proper format for
         // submitting their bids to the hook.
 
         (IPoolManager.PoolKey memory key,) =
-            abi.decode(uCall.data, (IPoolManager.PoolKey, IPoolManager.SwapParams));
+            abi.decode(userOp.data, (IPoolManager.PoolKey, IPoolManager.SwapParams));
 
-        BidData[] memory bidData = new BidData[](2);
-
-        bidData[0] = BidData({
-            token: IPoolManager.Currency.unwrap(key.currency0),
-            bidAmount: 0 // <- solver must update
-        });
-
-        bidData[1] = BidData({
-            token: IPoolManager.Currency.unwrap(key.currency1),
-            bidAmount: 0 // <- solver must update
-        });
-
-        return bidData;
+        // TODO: need to return whichever token the solvers are trying to buy
+        return IPoolManager.Currency.unwrap(key.currency0);
     }
 
     function getBidValue(SolverOperation calldata solverOp)
@@ -267,6 +254,6 @@ contract V4DAppControl is DAppControl {
         override
         returns (uint256) 
     {
-        return solverOp.bids[0].bidAmount;
+        return solverOp.bidAmount;
     }
 }

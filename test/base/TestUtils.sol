@@ -96,7 +96,7 @@ library TestUtils {
                                         controller,
                                         dConfig.callConfig,
                                         Factory(atlas).execution(),
-                                        userOp.call.from,
+                                        userOp.from,
                                         controller.codehash
                                     )
                                 )
@@ -130,7 +130,7 @@ library TestUtils {
 
     function computeCallChainHash(
         DAppConfig calldata dConfig,
-        UserCall calldata uCall,
+        UserOperation calldata userOp,
         SolverOperation[] calldata solverOps
     ) internal pure returns (bytes32 callSequenceHash) {
         uint256 i;
@@ -140,7 +140,7 @@ library TestUtils {
                 abi.encodePacked(
                     callSequenceHash, // initial hash = null
                     dConfig.to,
-                    abi.encodeWithSelector(IDAppControl.preOpsCall.selector, uCall),
+                    abi.encodeWithSelector(IDAppControl.preOpsCall.selector, userOp),
                     i++
                 )
             );
@@ -150,7 +150,7 @@ library TestUtils {
         callSequenceHash = keccak256(
             abi.encodePacked(
                 callSequenceHash, // always reference previous hash
-                abi.encode(uCall),
+                abi.encode(userOp),
                 i++
             )
         );
@@ -162,7 +162,7 @@ library TestUtils {
             callSequenceHash = keccak256(
                 abi.encodePacked(
                     callSequenceHash, // reference previous hash
-                    abi.encode(solverOps[n].call), // solver call
+                    abi.encode(solverOps[n]), // solver call
                     i++
                 )
             );

@@ -32,6 +32,7 @@ enum SolverOutcome
     UpdateCompleted,
     BlockExecution,
     // no user refund (relay error or hostile user)
+    InvalidTo,
     InvalidSignature,
     InvalidUserHash,
     InvalidControlHash,

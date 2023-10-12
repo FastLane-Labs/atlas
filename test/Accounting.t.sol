@@ -200,10 +200,10 @@ contract AccountingTest is BaseTest {
             bidAmount: solverMsgValue
         });
 
-        solverOps[0].call.value = solverMsgValue;
+        solverOps[0].value = solverMsgValue;
 
         // Solver signs the solverCall
-        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlas.getSolverPayload(solverOps[0].call));
+        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlas.getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Frontend creates dApp Operation calldata after seeing rest of data
@@ -235,7 +235,6 @@ contract AccountingTest is BaseTest {
         vm.startPrank(userEOA);
         
         assertFalse(simulator.simUserOperation(userOp), "metasimUserOperationcall tested true a");
-        assertFalse(simulator.simUserOperation(userOp.call), "metasimUserOperationcall call tested true b");
         
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 

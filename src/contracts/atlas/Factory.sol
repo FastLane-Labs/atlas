@@ -39,12 +39,12 @@ contract Factory is Test, Escrow, Permit69 {
         escrowAddress = atlas;
     }
 
-    function getExecutionEnvironment(UserOperation calldata userOp, address controller)
+    function getExecutionEnvironment(address userAddress, address controller)
         external
         view
         returns (address executionEnvironment)
     {
-        executionEnvironment = _getExecutionEnvironment(userOp.call.from, controller.codehash, controller);
+        executionEnvironment = _getExecutionEnvironment(userAddress, controller.codehash, controller);
     }
 
     function _getExecutionEnvironment(address user, bytes32 controlCodeHash, address controller)
@@ -98,12 +98,14 @@ contract Factory is Test, Escrow, Permit69 {
         );
     }
 
-    function _setExecutionEnvironment(DAppConfig calldata dConfig, address user, bytes32 controlCodeHash)
+    function _setExecutionEnvironment(address dAppControl, address user, bytes32 controlCodeHash)
         internal
         returns (address executionEnvironment)
     {
+        uint32 callConfig = IDAppControl(dAppControl).callConfig();
+
         bytes memory creationCode =
-            _getMimicCreationCode(dConfig.to, dConfig.callConfig, execution, user, controlCodeHash);
+            _getMimicCreationCode(dAppControl, callConfig, execution, user, controlCodeHash);
 
         executionEnvironment = address(
             uint160(
@@ -126,7 +128,7 @@ contract Factory is Test, Escrow, Permit69 {
                 executionEnvironment := create2(0, add(creationCode, 32), mload(creationCode), memSalt)
             }
 
-            emit NewExecutionEnvironment(executionEnvironment, user, dConfig.to, dConfig.callConfig);
+            emit NewExecutionEnvironment(executionEnvironment, user, dAppControl, callConfig);
         }
     }
 

@@ -8,8 +8,8 @@ import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
 library CallVerification {
-    function getUserOperationHash(UserCall memory uCall) internal pure returns (bytes32 userOpHash) {
-        userOpHash = keccak256(abi.encode(uCall));
+    function getUserOperationHash(UserOperation memory userOp) internal pure returns (bytes32 userOpHash) {
+        userOpHash = keccak256(abi.encode(userOp));
     }
 
     function getBidsHash(BidData[] memory bidData) internal pure returns (bytes32 bidsHash) {
@@ -18,7 +18,7 @@ library CallVerification {
 
     function getCallChainHash(
         DAppConfig memory dConfig,
-        UserCall memory uCall,
+        UserOperation memory userOp,
         SolverOperation[] memory solverOps
     ) internal pure returns (bytes32 callSequenceHash) {
         
@@ -31,7 +31,7 @@ library CallVerification {
                     dConfig.to,
                     abi.encodeWithSelector(
                         IDAppControl.preOpsCall.selector,
-                        uCall
+                        userOp
                     ),
                     i++
                 )
@@ -42,7 +42,7 @@ library CallVerification {
         callSequenceHash = keccak256(
             abi.encodePacked(
                 callSequenceHash, // always reference previous hash
-                abi.encode(uCall),
+                abi.encode(userOp),
                 i++
             )
         );
@@ -54,7 +54,7 @@ library CallVerification {
             callSequenceHash = keccak256(
                 abi.encodePacked(
                     callSequenceHash, // reference previous hash
-                    abi.encode(solverOps[n].call), // solver call
+                    abi.encode(solverOps[n]), // solver op
                     i++
                 )
             );

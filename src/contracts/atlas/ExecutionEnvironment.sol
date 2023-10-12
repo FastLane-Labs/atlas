@@ -29,19 +29,19 @@ contract ExecutionEnvironment is Base {
     
     constructor(address _atlas) Base(_atlas) {}
 
-    modifier validUser(UserCall calldata uCall) {
-        if (uCall.from != _user()) {
+    modifier validUser(UserOperation calldata userOp) {
+        if (userOp.from != _user()) {
             revert("ERR-CE02 InvalidUser");
         }
-        if (uCall.to == address(this) || uCall.to == atlas) {
+        if (userOp.to != atlas || userOp.dapp == atlas) {
             revert("ERR-EV007 InvalidTo");
         }
         _;
     }
 
-    modifier validSolver(SolverCall calldata sCall) {
+    modifier validSolver(SolverOperation calldata solverOp) {
         {
-        address solverTo = sCall.to;
+        address solverTo = solverOp.solver;
         if (solverTo == address(this) || solverTo == _control() || solverTo == atlas) {
             revert("ERR-EV008 InvalidTo");
         }
@@ -56,20 +56,18 @@ contract ExecutionEnvironment is Base {
     //////////////////////////////////
     ///    CORE CALL FUNCTIONS     ///
     //////////////////////////////////
-    function preOpsWrapper(UserCall calldata uCall)
+    function preOpsWrapper(UserOperation calldata userOp)
         external
         onlyAtlasEnvironment
-        validUser(uCall)
+        validUser(userOp)
         validPhase(ExecutionPhase.PreOps)
         returns (bytes memory)
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 
-        require(uCall.to != address(this), "ERR-EV008 InvalidTo");
-
         bytes memory preOpsData = abi.encodeWithSelector(
-            IDAppControl.preOpsCall.selector, uCall
+            IDAppControl.preOpsCall.selector, userOp
         );
 
         bool success;
@@ -83,11 +81,11 @@ contract ExecutionEnvironment is Base {
         return preOpsData;
     }
 
-    function userWrapper(UserCall calldata uCall) 
+    function userWrapper(UserOperation calldata userOp) 
         external 
         payable
         onlyAtlasEnvironment
-        validUser(uCall)
+        validUser(userOp)
         onlyActiveEnvironment
         validPhase(ExecutionPhase.UserOperation)
         returns (bytes memory userData) 
@@ -97,21 +95,21 @@ contract ExecutionEnvironment is Base {
 
         uint32 config = _config();
 
-        require(address(this).balance >= uCall.value, "ERR-CE01 ValueExceedsBalance");
+        require(address(this).balance >= userOp.value, "ERR-CE01 ValueExceedsBalance");
 
         bool success;
 
         if (config.needsDelegateUser()) {
 
-            (success, userData) = uCall.to.delegatecall(forward(uCall.data));
+            (success, userData) = userOp.dapp.delegatecall(forward(userOp.data));
             require(success, "ERR-EC02 DelegateRevert");
             
             // userData = abi.decode(userData, (bytes));
 
         } else {
             // regular user call - executed at regular destination and not performed locally
-            (success, userData) = uCall.to.call{value: uCall.value}(
-                forward(uCall.data)
+            (success, userData) = userOp.dapp.call{value: userOp.value}(
+                forward(userOp.data)
             );
             require(success, "ERR-EC04a CallRevert");
 
@@ -144,29 +142,26 @@ contract ExecutionEnvironment is Base {
     ) 
         external payable 
         onlyAtlasEnvironment 
-        validSolver(solverOp.call)
+        validSolver(solverOp)
         validPhase(ExecutionPhase.SolverOperations)
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
-        require(address(this).balance == solverOp.call.value, "ERR-CE05 IncorrectValue");
+        // TODO: Change check to msg.value ?
+        require(address(this).balance == solverOp.value, "ERR-CE05 IncorrectValue");
 
-        console.log("solverOp.call.value in solverMetaTryCatch", solverOp.call.value);
+        console.log("solverOp.value in solverMetaTryCatch", solverOp.value);
 
-        // Track token balances to measure if the bid amount is paid.
-        uint256[] memory tokenBalances = new uint[](solverOp.bids.length);
-        for (uint i; i < solverOp.bids.length;) {
-            // Ether balance
-            if (solverOp.bids[i].token == address(0)) {
-                tokenBalances[i] = msg.value; // NOTE: this is the meta tx value
-
-            // ERC20 balance
-            } else {
-                tokenBalances[i] = ERC20(solverOp.bids[i].token).balanceOf(address(this));
-            }
-            unchecked {
-                ++i;
-            }
+        // Track token balance to measure if the bid amount is paid.
+        bool etherIsBidToken;
+        uint256 bidBalance;
+        // Ether balance
+        if (solverOp.bidToken == address(0)) {
+            bidBalance = address(this).balance; // NOTE: this is the meta tx value
+            etherIsBidToken = true;
+        // ERC20 balance
+        } else {
+            bidBalance = ERC20(solverOp.bidToken).balanceOf(address(this));
         }
 
         ////////////////////////////
@@ -174,7 +169,7 @@ contract ExecutionEnvironment is Base {
         ////////////////////////////
 
         // Verify that the DAppControl contract matches the solver's expectations
-        if(solverOp.call.controlCodeHash != _controlCodeHash()) {
+        if(solverOp.control != _control()) {
             revert FastLaneErrorsEvents.AlteredControlHash();
         }
 
@@ -183,7 +178,7 @@ contract ExecutionEnvironment is Base {
         // Handle any solver preOps, if necessary
         if (_config().needsPreSolver()) {
 
-            bytes memory data = abi.encode(solverOp.call.to, dAppReturnData);
+            bytes memory data = abi.encode(solverOp.solver, dAppReturnData);
 
             data = abi.encodeWithSelector(
                 IDAppControl.preSolverCall.selector, 
@@ -207,10 +202,10 @@ contract ExecutionEnvironment is Base {
         }
 
         // Execute the solver call.
-        (success,) = ISolverContract(solverOp.call.to).atlasSolverCall{
+        (success,) = ISolverContract(solverOp.solver).atlasSolverCall{
             gas: gasLimit,
-            value: solverOp.call.value
-        }(solverOp.call.from, solverOp.bids, solverOp.call.data, _config().forwardReturnData() ? dAppReturnData : new bytes(0));
+            value: solverOp.value
+        }(solverOp.from, solverOp.bidToken, solverOp.bidAmount, solverOp.data, _config().forwardReturnData() ? dAppReturnData : new bytes(0));
 
         // Verify that it was successful
         if(!success) {
@@ -222,11 +217,10 @@ contract ExecutionEnvironment is Base {
             
             bytes memory data = dAppReturnData;
 
-            data = abi.encode(solverOp.call.to, data);
+            data = abi.encode(solverOp.solver, data);
 
             data = abi.encodeWithSelector(
                 IDAppControl.postSolverCall.selector, 
-                // solverOp.call.to, 
                 data
             );
 
@@ -245,41 +239,10 @@ contract ExecutionEnvironment is Base {
 
 
         // Verify that the solver paid what they bid
-        bool etherIsBidToken;
-        uint256 balance;
-
-        for (uint i; i < solverOp.bids.length;) {
-            // ERC20 tokens as bid currency
-            if (!(solverOp.bids[i].token == address(0))) {
-                balance = ERC20(solverOp.bids[i].token).balanceOf(address(this));
-                if (balance < tokenBalances[i] + solverOp.bids[i].bidAmount) {
-                    revert FastLaneErrorsEvents.SolverBidUnpaid();
-                }
-
-                // Native Gas (Ether) as bid currency
-            } else {
-                balance = address(this).balance;
-                if (balance < solverOp.bids[i].bidAmount) { // tokenBalances[i] = 0 for ether
-                    revert FastLaneErrorsEvents.SolverBidUnpaid();
-                }
+        uint256 balance = etherIsBidToken ? address(this).balance : ERC20(solverOp.bidToken).balanceOf(address(this));
         
-                etherIsBidToken = true;
-
-                // Transfer any surplus Ether back to escrow to add to solver's balance
-                if (balance > solverOp.bids[i].bidAmount) {
-                    SafeTransferLib.safeTransferETH(atlas, balance - solverOp.bids[i].bidAmount);
-                }
-            }
-            unchecked {
-                ++i;
-            }
-        }
-
-        if (!etherIsBidToken) {
-            uint256 currentBalance = address(this).balance;
-            if (currentBalance > 0) {
-                SafeTransferLib.safeTransferETH(atlas, currentBalance);
-            }
+        if (balance < bidBalance + solverOp.bidAmount) {
+            revert FastLaneErrorsEvents.SolverBidUnpaid();
         }
 
         // Verify that the solver repaid their msg.value
@@ -291,7 +254,7 @@ contract ExecutionEnvironment is Base {
         }
     }
 
-    function allocateValue(BidData[] calldata bids, bytes memory returnData) 
+    function allocateValue(address bidToken, uint256 bidAmount, bytes memory returnData) 
         external 
         onlyAtlasEnvironment
         validPhase(ExecutionPhase.HandlingPayments)
@@ -299,32 +262,21 @@ contract ExecutionEnvironment is Base {
         // msg.sender = escrow
         // address(this) = ExecutionEnvironment
 
-        uint256 totalEtherReward;
         uint256 payment;
-        uint256 i;
+        uint256 netBidAmount;
+     
+        payment = (bidAmount * 5) / 100;
 
-        BidData[] memory netBids = new BidData[](bids.length);
-
-        for (; i < bids.length;) {
-            payment = (bids[i].bidAmount * 5) / 100;
-
-            if (bids[i].token != address(0)) {
-                SafeTransferLib.safeTransfer(ERC20(bids[i].token), address(0xa71a5), payment);
-                totalEtherReward = bids[i].bidAmount - payment; // NOTE: This is transferred to controller as msg.value
-            } else {
-                SafeTransferLib.safeTransferETH(address(0xa71a5), payment);
-            }
-
-            unchecked {
-                netBids[i].token = bids[i].token;
-                netBids[i].bidAmount = bids[i].bidAmount - payment;
-                ++i;
-            }
+        if (bidToken != address(0)) {
+            SafeTransferLib.safeTransfer(ERC20(bidToken), address(0xa71a5), payment);
+         
+        } else {
+            SafeTransferLib.safeTransferETH(address(0xa71a5), payment);
         }
 
-        console.log("total ether reward", totalEtherReward);
+        uint256 netBidAmount = bidAmount - payment;
 
-        bytes memory allocateData = abi.encodeWithSelector(IDAppControl.allocateValueCall.selector, abi.encode(totalEtherReward, bids, returnData));
+        bytes memory allocateData = abi.encodeWithSelector(IDAppControl.allocateValueCall.selector, bidToken, netBidAmount, returnData);
 
         (bool success,) = _control().delegatecall(forward(allocateData));
         require(success, "ERR-EC02 DelegateRevert");

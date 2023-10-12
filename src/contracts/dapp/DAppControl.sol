@@ -48,7 +48,7 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
     }
 
     // Functions
-    function preOpsCall(UserCall calldata uCall)
+    function preOpsCall(UserOperation calldata userOp)
         external
         payable
         onlyActiveEnvironment
@@ -57,7 +57,7 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
         validDepth(1)
         returns (bytes memory)
     {
-        return _preOpsCall(uCall);
+        return _preOpsCall(userOp);
     }
 
     function preSolverCall(bytes calldata data) 
@@ -85,14 +85,14 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
         return _postSolverCall(data);
     }
 
-    function allocateValueCall(bytes calldata data) 
+    function allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) 
         external 
         onlyActiveEnvironment
         validControl
         validPhase(ExecutionPhase.HandlingPayments)
         validDepth(1)
     {
-        return _allocateValueCall(data);
+        _allocateValueCall(bidToken, bidAmount, data);
     }
 
     function postOpsCall(bytes calldata data) 
@@ -116,10 +116,16 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
         isSequenced = CallBits.needsSequencedNonces(callConfig);
     }
 
-    function getDAppConfig() external view returns (DAppConfig memory dConfig) {
+    function getDAppConfig(UserOperation calldata userOp) 
+        mustBeCalled 
+        external 
+        view  
+        returns (DAppConfig memory dConfig) 
+    {
         dConfig = DAppConfig({
             to: address(this),
-            callConfig: callConfig
+            callConfig: callConfig,
+            bidToken: getBidFormat(userOp)
         });
     }
 

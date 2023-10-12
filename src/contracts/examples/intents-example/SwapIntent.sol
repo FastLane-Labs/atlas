@@ -225,7 +225,7 @@ contract SwapIntentController is DAppControl {
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(bytes calldata data) internal override {
+    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
@@ -233,13 +233,10 @@ contract SwapIntentController is DAppControl {
         // NOTE: donateToBundler caps the donation at 110% of total gas cost.
         // Any remainder is then sent to the specified recipient. 
         // IEscrow(escrow).donateToBundler{value: address(this).balance}();
-        (,,bytes memory returnData) = abi.decode(data, (uint256, BidData[], bytes));
+        SwapData memory swapData = abi.decode(data, (SwapData));
 
-        SwapData memory swapData = abi.decode(returnData, (SwapData));
-
-        if (swapData.auctionBaseCurrency != address(0)) {
-            uint256 auctionTokenBalance = ERC20(swapData.auctionBaseCurrency).balanceOf(address(this));
-            ERC20(swapData.auctionBaseCurrency).safeTransfer(_user(), auctionTokenBalance);
+        if (bidToken != address(0)) {
+            ERC20(bidToken).safeTransfer(_user(), bidAmount);
         
         // If the solver was already required to reimburse the user's gas, don't reallocate
         // Ether surplus to the bundler
@@ -258,21 +255,14 @@ contract SwapIntentController is DAppControl {
     /////////////////////////////////////////////////////////
     // NOTE: These are not delegatecalled
 
-    function getBidFormat(UserCall calldata uCall) external pure override returns (BidData[] memory) {
+    function getBidFormat(UserOperation calldata userOp) public pure override returns (address bidToken) {
         // This is a helper function called by solvers
         // so that they can get the proper format for
         // submitting their bids to the hook.
 
-        (SwapIntent memory swapIntent) = abi.decode(uCall.data[4:], (SwapIntent));
-    
-        BidData[] memory bidData = new BidData[](1);
+        (SwapIntent memory swapIntent) = abi.decode(userOp.data[4:], (SwapIntent));
 
-        bidData[0] = BidData({
-            token: swapIntent.auctionBaseCurrency, 
-            bidAmount: 0 // <- solver must update
-        });
-
-        return bidData;
+        bidToken = swapIntent.auctionBaseCurrency;
     }
 
     function getBidValue(SolverOperation calldata solverOp)
@@ -281,6 +271,6 @@ contract SwapIntentController is DAppControl {
         override
         returns (uint256) 
     {
-        return solverOp.bids[0].bidAmount;
+        return solverOp.bidAmount;
     }
 }

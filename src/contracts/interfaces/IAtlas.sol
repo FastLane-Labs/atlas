@@ -7,7 +7,6 @@ import "../types/DAppApprovalTypes.sol";
 
 interface IAtlas {
     function metacall(
-        DAppConfig calldata dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         DAppOperation calldata verification
@@ -19,11 +18,6 @@ interface IAtlas {
     function withdrawEther(uint256 amount, DAppConfig memory dConfig) external;
 
     function getEscrowAddress() external view returns (address escrowAddress);
-
-    function getExecutionEnvironment(UserOperation calldata userOp, address controller)
-        external
-        view
-        returns (address executionEnvironment);
 
     function getExecutionEnvironment(address user, address dAppControl) external view returns (address executionEnvironment);
 
@@ -39,13 +33,9 @@ interface IAtlas {
 
     function getDAppOperationPayload(DAppOperation memory verification) external view returns (bytes32 payload);
     
-    function getDAppApprovalPayload(DAppApproval memory dAppApproval) external view returns (bytes32 payload);
-
-    function getSolverPayload(SolverCall calldata sCall) external view returns (bytes32 payload);
+    function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload);
 
     function getUserOperationPayload(UserOperation memory userOp) external view returns (bytes32 payload);
-
-    function getUserCallPayload(UserCall memory userCall) external view returns (bytes32 payload);
 
     function getNextNonce(address account) external view returns (uint256 nextNonce);
 
