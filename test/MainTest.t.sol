@@ -30,6 +30,14 @@ contract MainTest is BaseTest {
     /// forge-config: default.gas_price = 15000000000
     function setUp() public virtual override {
         BaseTest.setUp();
+
+        // Deposit ETH from Searcher1 signer to pay for searcher's gas 
+        vm.prank(solverOneEOA); 
+        atlas.deposit{value: 1e18}(solverOneEOA);
+
+        // Deposit ETH from Searcher2 signer to pay for searcher's gas
+        vm.prank(solverTwoEOA);
+        atlas.deposit{value: 1e18}(solverTwoEOA);
     }
 
     function testMain() public {
@@ -231,7 +239,7 @@ contract MainTest is BaseTest {
         vm.stopPrank();
     }
 
-    function testTestSolverCalls() public {
+    function testSolverCalls() public {
         uint8 v;
         bytes32 r;
         bytes32 s;
@@ -262,8 +270,9 @@ contract MainTest is BaseTest {
                 simulator.simSolverCalls.selector, dConfig, userOp, solverOps, dAppOp
             )
         );
-        assertTrue(success);
-        assertTrue(abi.decode(data, (bool)));
+
+        assertTrue(success, "Success case tx reverted unexpectedly");
+        assertTrue(abi.decode(data, (bool)), "Success case tx did not return true");
         vm.stopPrank();
 
         // Failure case
@@ -282,8 +291,9 @@ contract MainTest is BaseTest {
                 simulator.simSolverCalls.selector, dConfig, userOp, solverOps, dAppOp
             )
         );
-        assertTrue(success);
-        assertFalse(abi.decode(data, (bool)));
+
+        assertTrue(success, "Failure case tx reverted unexpectedly");
+        assertFalse(abi.decode(data, (bool)), "Failure case did not return false");
         vm.stopPrank();
     }
 }

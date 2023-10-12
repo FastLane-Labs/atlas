@@ -4,6 +4,7 @@ pragma solidity ^0.8.16;
 import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
 import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
+import {IEscrow} from "src/contracts/interfaces/IEscrow.sol";
 
 import "../types/SolverCallTypes.sol";
 
@@ -14,7 +15,9 @@ interface IWETH9 {
     function withdraw(uint256 wad) external payable;
 }
 
-// contract SolverBase is Test {
+
+// TODO add donateToBundler helper function for solvers
+
 contract SolverBase {
     address public constant WETH_ADDRESS = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
@@ -31,6 +34,7 @@ contract SolverBase {
         external
         payable
         safetyFirst(sender)
+        repayBorrowedEth()
         payBids(bids)
         returns (bool success, bytes memory data)
     {
@@ -42,7 +46,7 @@ contract SolverBase {
     modifier safetyFirst(address sender) {
         // Safety checks
         require(sender == _owner, "INVALID CALLER");
-        uint256 msgValueOwed = msg.value;
+        // uint256 msgValueOwed = msg.value;
 
         _;
 
@@ -53,7 +57,8 @@ contract SolverBase {
         // transaction will revert.  It is payable and can be used to repay a msg.value loan from the
         // Atlas Escrow.
         
-        require(ISafetyLocks(_escrow).solverSafetyCallback{value: msgValueOwed}(msg.sender), "INVALID SEQUENCE");
+        // TODO review - this has been replaced by the repayBorrowedEth modifier
+        // require(ISafetyLocks(_escrow).solverSafetyCallback{value: msgValueOwed}(msg.sender), "INVALID SEQUENCE");
     }
 
     modifier payBids(BidData[] calldata bids) {
@@ -103,5 +108,12 @@ contract SolverBase {
             }
         }
         
+    }
+
+    modifier repayBorrowedEth() {
+        _;
+        if(msg.value > 0){
+            IEscrow(_escrow).repayBorrowedEth{value: msg.value}(address(this));
+        }
     }
 }

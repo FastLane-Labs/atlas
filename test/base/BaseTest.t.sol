@@ -88,7 +88,6 @@ contract BaseTest is Test, TestConstants {
         solverOne = new Solver(escrow, solverOneEOA);
         IEscrow(escrow).deposit{value: 1e18}(solverOneEOA);
 
-        vm.stopPrank();
 
         deal(TOKEN_ZERO, address(solverOne), 10e24);
         deal(TOKEN_ONE, address(solverOne), 10e24);

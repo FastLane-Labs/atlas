@@ -4,6 +4,7 @@ pragma solidity ^0.8.16;
 import {ISolverContract} from "../interfaces/ISolverContract.sol";
 import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
 import {IDAppControl} from "../interfaces/IDAppControl.sol";
+import {IEscrow} from "../interfaces/IEscrow.sol";
 
 import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
@@ -150,6 +151,8 @@ contract ExecutionEnvironment is Base {
         // address(this) = ExecutionEnvironment
         require(address(this).balance == solverOp.call.value, "ERR-CE05 IncorrectValue");
 
+        console.log("solverOp.call.value in solverMetaTryCatch", solverOp.call.value);
+
         // Track token balances to measure if the bid amount is paid.
         uint256[] memory tokenBalances = new uint[](solverOp.bids.length);
         for (uint i; i < solverOp.bids.length;) {
@@ -187,9 +190,12 @@ contract ExecutionEnvironment is Base {
                 data
             );
 
+            data = forward(data);
+
             (success, data) = _control().delegatecall(
-                forward(data)
+                data
             );
+
             if(!success) {
                 revert FastLaneErrorsEvents.PreSolverFailed();
             } 
@@ -278,7 +284,8 @@ contract ExecutionEnvironment is Base {
 
         // Verify that the solver repaid their msg.value
         // TODO: Add in a more discerning func that'll silo the 
-        // donations to prevent double counting. 
+        // donations to prevent double counting.
+        // TODO: repayment check added to Escrow.sol - do we still need this balance check?
         if (atlas.balance < escrowBalance) {
             revert FastLaneErrorsEvents.SolverMsgValueUnpaid();
         }
@@ -315,10 +322,24 @@ contract ExecutionEnvironment is Base {
             }
         }
 
+        console.log("total ether reward", totalEtherReward);
+
         bytes memory allocateData = abi.encodeWithSelector(IDAppControl.allocateValueCall.selector, abi.encode(totalEtherReward, bids, returnData));
 
         (bool success,) = _control().delegatecall(forward(allocateData));
         require(success, "ERR-EC02 DelegateRevert");
+    }
+
+
+    function donateToBundler(address surplusRecipient)
+        external
+        payable
+        validPhase(ExecutionPhase.SolverOperations)
+    {
+        uint16 lockstate = _lockState();
+        console.log("lockstate", lockstate);
+
+        IEscrow(atlas).donateToBundler{value: msg.value}(surplusRecipient);
     }
 
     ///////////////////////////////////////
