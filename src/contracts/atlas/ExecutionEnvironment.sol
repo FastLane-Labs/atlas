@@ -334,11 +334,8 @@ contract ExecutionEnvironment is Base {
     function donateToBundler(address surplusRecipient)
         external
         payable
-        validPhase(ExecutionPhase.SolverOperations)
+        onlyIfFirstDonationInCurrentPhase
     {
-        uint16 lockstate = _lockState();
-        console.log("lockstate", lockstate);
-
         IEscrow(atlas).donateToBundler{value: msg.value}(surplusRecipient);
     }
 

@@ -8,7 +8,7 @@ import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
 import {ExecutionPhase} from "../types/LockTypes.sol";
 
-import {EXECUTION_PHASE_OFFSET} from "../libraries/SafetyBits.sol";
+import {EXECUTION_PHASE_OFFSET, SafetyBits} from "../libraries/SafetyBits.sol";
 
 import {SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER} from "./Permit69.sol";
 
@@ -21,7 +21,7 @@ contract Base {
     address public immutable source;
     bytes32 public immutable salt;
 
-    uint16 internal phasesWithDonations; //TODO remember to clear after call
+    uint16 internal lastPhaseDonated; //TODO remember to clear after call
 
     constructor(address _atlas) {
         atlas = _atlas;
@@ -97,16 +97,11 @@ contract Base {
     }
 
     modifier onlyIfFirstDonationInCurrentPhase() {
-
-        // Get current phase from lockState
-
-        // if(phasesWithDonations & _lockState() == 0)
-
-        // phasesWithDonations |= uint16(1<<(EXECUTION_PHASE_OFFSET + uint16(phase)));
-
-        // if (_makingPayments()) {
-        //     revert("ERR-EV014 NotFirstDonation");
-        // }
+        uint16 currentPhase = SafetyBits.getCurrentExecutionPhase(_lockState());
+        if(lastPhaseDonated >= currentPhase) {
+            revert("ERR-EV014 NotFirstDonation");
+        }
+        lastPhaseDonated = currentPhase;
         _;
     }
     
