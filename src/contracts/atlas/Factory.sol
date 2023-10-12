@@ -19,6 +19,7 @@ import "forge-std/Test.sol";
 contract Factory is Test, Escrow, Permit69 {
     //address immutable public atlas;
     using CallBits for uint32;
+
     bytes32 public immutable salt;
     address public immutable execution;
 
@@ -53,19 +54,18 @@ contract Factory is Test, Escrow, Permit69 {
         returns (address executionEnvironment)
     {
         DAppConfig memory dConfig = IDAppControl(controller).getDAppConfig();
-        
+
         executionEnvironment = _getExecutionEnvironmentCustom(user, controlCodeHash, dConfig.to, dConfig.callConfig);
     }
 
     // NOTE: This func is used to generate the address of user ExecutionEnvironments that have
     // been deprecated due to DAppControl changes of callConfig.
-    function _getExecutionEnvironmentCustom(address user, bytes32 controlCodeHash, address controller, uint32 callConfig)
-        internal
-        view
-        override
-        returns (address executionEnvironment)
-    {
-        
+    function _getExecutionEnvironmentCustom(
+        address user,
+        bytes32 controlCodeHash,
+        address controller,
+        uint32 callConfig
+    ) internal view override returns (address executionEnvironment) {
         /*
         if (controlCodeHash == bytes32(0)) {
             controlCodeHash = controller.codehash;
@@ -75,7 +75,7 @@ contract Factory is Test, Escrow, Permit69 {
             callConfig = CallBits.buildCallConfig(controller);
         }
         */
-        
+
         executionEnvironment = address(
             uint160(
                 uint256(
@@ -86,9 +86,7 @@ contract Factory is Test, Escrow, Permit69 {
                             salt,
                             keccak256(
                                 abi.encodePacked(
-                                    _getMimicCreationCode(
-                                        controller, callConfig, execution, user, controlCodeHash
-                                    )
+                                    _getMimicCreationCode(controller, callConfig, execution, user, controlCodeHash)
                                 )
                             )
                         )
@@ -109,12 +107,7 @@ contract Factory is Test, Escrow, Permit69 {
             uint160(
                 uint256(
                     keccak256(
-                        abi.encodePacked(
-                            bytes1(0xff),
-                            address(this),
-                            salt,
-                            keccak256(abi.encodePacked(creationCode))
-                        )
+                        abi.encodePacked(bytes1(0xff), address(this), salt, keccak256(abi.encodePacked(creationCode)))
                     )
                 )
             )
@@ -130,7 +123,10 @@ contract Factory is Test, Escrow, Permit69 {
         }
     }
 
-    function _deployExecutionEnvironmentTemplate(address, DAppConfig memory) internal returns (address executionEnvironment) {
+    function _deployExecutionEnvironmentTemplate(address, DAppConfig memory)
+        internal
+        returns (address executionEnvironment)
+    {
         ExecutionEnvironment _environment = new ExecutionEnvironment{
             salt: salt
         }(atlas);
@@ -152,16 +148,7 @@ contract Factory is Test, Escrow, Permit69 {
             mstore(add(creationCode, 131), add(shl(96, user), 0x73ffffffffffffffffffffff))
             mstore(
                 add(creationCode, 152),
-                add(
-                    shl(96, controller), 
-                    add(
-                        add(
-                            shl(88, 0x63), 
-                            shl(56, callConfig)
-                        ), 
-                        0x7f000000000000
-                    )
-                )
+                add(shl(96, controller), add(add(shl(88, 0x63), shl(56, callConfig)), 0x7f000000000000))
             )
             mstore(add(creationCode, 178), controlCodeHash)
         }
