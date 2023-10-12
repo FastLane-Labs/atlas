@@ -3,8 +3,17 @@ pragma solidity ^0.8.16;
 
 import "../types/LockTypes.sol";
 
+// TODO remove
+import {TestUtils} from "../../../test/base/TestUtils.sol";
+import "forge-std/Test.sol";
+
+// uint16 bit layout: CCCC BBBB BBBB AAAA
+// Where A = BaseLock, B = ExecutionPhase, C = SolverSafety
+
 uint16 constant EXECUTION_PHASE_OFFSET = uint16(type(BaseLock).max) + 1;
 uint16 constant SAFETY_LEVEL_OFFSET = uint16(type(BaseLock).max) + uint16(type(ExecutionPhase).max) + 2;
+
+uint16 constant ONLY_EXECUTION_PHASE_MASK = uint16(4080); // 0000 1111 1111 0000
 
 library SafetyBits {
 
@@ -73,6 +82,18 @@ library SafetyBits {
         1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
             | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Unset))
     );
+
+    //TODO change to pure after testing
+    function getCurrentExecutionPhase(uint16 lockState) internal view returns (uint16) {
+        console.log("IN getCurrentExecutionPhase");
+        uint16 isolatedPhaseBits = lockState & ONLY_EXECUTION_PHASE_MASK;   
+        console.log("isolatedPhaseBits: %s", TestUtils.uint16ToBinaryString(isolatedPhaseBits));
+        console.log("returning: %s", TestUtils.uint16ToBinaryString(uint16(isolatedPhaseBits >> EXECUTION_PHASE_OFFSET)));
+
+        // TODO Need to take dec number returned below and calculate log_2(dec num) to get the bit number
+
+        return uint16(isolatedPhaseBits >> EXECUTION_PHASE_OFFSET);
+    }
 
     function pack(EscrowKey memory self)
         internal

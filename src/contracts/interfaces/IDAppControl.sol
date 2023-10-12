@@ -8,15 +8,15 @@ import "../types/DAppApprovalTypes.sol";
 interface IDAppControl {
     function validateUserOperation(UserCall calldata uCall) external view returns (bool);
 
-    function preOpsCall(UserCall calldata uCall) external returns (bytes memory);
+    function preOpsCall(UserCall calldata uCall) external payable returns (bytes memory);
+
+    function preSolverCall(bytes calldata data) external payable returns (bool);
+
+    function postSolverCall(bytes calldata data) external payable returns (bool);
+
+    function postOpsCall(bytes calldata data) external payable returns (bytes memory);
 
     function allocateValueCall(bytes calldata data) external;
-
-    function preSolverCall(bytes calldata data) external returns (bool);
-
-    function postSolverCall(bytes calldata data) external returns (bool);
-
-    function postOpsCall(bytes calldata data) external returns (bytes memory);
 
     function getDAppConfig() external view returns (DAppConfig memory dConfig);
 

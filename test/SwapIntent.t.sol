@@ -70,15 +70,15 @@ contract SwapIntentTest is BaseTest {
         atlas.integrateDApp(address(swapIntentController));
         vm.stopPrank();
 
-        console.log("swapIntentController",address(swapIntentController));
-
         txBuilder = new TxBuilder({
             controller: address(swapIntentController),
             escrowAddress: address(escrow),
             atlasAddress: address(atlas)
         });
 
-        
+        // Deposit ETH from Searcher signer to pay for searcher's gas 
+        vm.prank(solverOneEOA); 
+        atlas.deposit{value: 1e18}(solverOneEOA);
     }
 
     function testAtlasSwapIntentWithBasicRFQ() public {
@@ -137,9 +137,9 @@ contract SwapIntentTest is BaseTest {
 
         // Builds the metaTx and to parts of userOp, signature still to be set
         userOp = txBuilder.buildUserOperation({
-            from: userEOA, // NOTE: Would from ever not be user?
+            from: userEOA,
             to: address(swapIntentController),
-            maxFeePerGas: tx.gasprice + 1, // TODO update
+            maxFeePerGas: tx.gasprice + 1,
             value: 0,
             deadline: block.number + 2,
             data: userOpData
@@ -367,6 +367,13 @@ contract SimpleRFQSolver is SolverBase {
         require(ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells, "Did not receive enough tokenIn");
         require(ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys, "Not enough tokenOut to fulfill");
         ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
+    }
+
+    // This ensures a function can only be called through metaFlashCall
+    // which includes security checks to work safely with Atlas
+    modifier onlySelf() {
+        require(msg.sender == address(this), "Not called via metaFlashCall");
+        _;
     }
 
     fallback() external payable {}

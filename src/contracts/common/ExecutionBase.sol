@@ -12,12 +12,16 @@ import {EXECUTION_PHASE_OFFSET} from "../libraries/SafetyBits.sol";
 
 import {SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER} from "./Permit69.sol";
 
-// import "forge-std/Test.sol";
+import {SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER} from "./Permit69.sol";
+
+import "forge-std/Test.sol";
 
 contract Base {
     address public immutable atlas;
     address public immutable source;
     bytes32 public immutable salt;
+
+    uint16 internal phasesWithDonations; //TODO remember to clear after call
 
     constructor(address _atlas) {
         atlas = _atlas;
@@ -89,6 +93,20 @@ contract Base {
         if (depth == 0 && msg.sender != atlas) {
             revert("ERR-EV013 WrongForSender");
         }
+        _;
+    }
+
+    modifier onlyIfFirstDonationInCurrentPhase() {
+
+        // Get current phase from lockState
+
+        // if(phasesWithDonations & _lockState() == 0)
+
+        // phasesWithDonations |= uint16(1<<(EXECUTION_PHASE_OFFSET + uint16(phase)));
+
+        // if (_makingPayments()) {
+        //     revert("ERR-EV014 NotFirstDonation");
+        // }
         _;
     }
     

@@ -8,7 +8,6 @@ import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 
 import {SafetyLocks} from "./SafetyLocks.sol";
-import {SolverWrapper} from "./SolverWrapper.sol";
 import {DAppVerification} from "./DAppVerification.sol";
 
 import "../types/SolverCallTypes.sol";
@@ -16,14 +15,15 @@ import "../types/UserCallTypes.sol";
 import {DAppConfig} from "../types/DAppApprovalTypes.sol";
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
+import {FastLaneErrorsEvents} from "../types/Emissions.sol";
 
 import {EscrowBits} from "../libraries/EscrowBits.sol";
 import {CallBits} from "../libraries/CallBits.sol";
 import {SafetyBits} from "../libraries/SafetyBits.sol";
 
-// import "forge-std/Test.sol";
+import "forge-std/Test.sol";
 
-contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
+contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
     using ECDSA for bytes32;
     using EscrowBits for uint256;
     using CallBits for uint32;    
@@ -41,6 +41,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
     mapping(address => SolverWithdrawal) internal _withdrawalData;
 
     GasDonation[] internal _donations;
+    AccountingData internal _accData;
 
     constructor(uint32 escrowDurationFromFactory, address _simulator) SafetyLocks(_simulator) {
         escrowDuration = escrowDurationFromFactory;
@@ -78,17 +79,25 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
     // THIS IS EXPLOITABLE - DO NOT USE THIS CONTRACT IN PRODUCTION
     // This attack vector will be addressed explicitly once the gas 
     // reimbursement mechanism is finalized.
-
     function donateToBundler(address surplusRecipient) external payable {
+        console.log("Donate to bundler called");
+        console.log("donateToBundler: msg.value:", msg.value);
+        console.log("donating to addr:", surplusRecipient);
         // NOTE: All donations in excess of 10% greater than cost are forwarded
         // to the surplusReceiver. 
 
-        require(msg.sender != address(0) && msg.sender == activeEnvironment, "ERR-E079 DonateRequiresLock");
+        // TODO check this is compatible with smart wallets and solver donations
+        require(msg.sender == activeEnvironment, "ERR-E079 DonateRequiresLock");
+
+        // TODO: Consider making this a higher donation threshold to avoid ddos attacks
         if (msg.value == 0) {
             return;
         }
 
         uint32 gasRebate = uint32(msg.value / tx.gasprice);
+
+        console.log("donateToBundler: tx.gasprice:", tx.gasprice);
+        console.log("donateToBundler: gasRebate:", gasRebate);
 
         uint256 donationCount = _donations.length;
 
@@ -115,7 +124,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
         // If it's a new recipient, update and push to the storage array
         donation.recipient = surplusRecipient;
         donation.net = gasRebate;
-        donation.cumulative += gasRebate;
+        donation.cumulative = gasRebate;
         _donations.push(donation);
     }
 
@@ -299,10 +308,10 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
             return;
 
         // CASE: The donations exceed the liability
-        } else if (donations[donations.length-1].cumulative > gasFeesSpent - gasFeesCredit) {
+        } else if (donations[donations.length-1].cumulative * tx.gasprice > gasFeesSpent - gasFeesCredit) {
             SafeTransferLib.safeTransferETH(msg.sender, gasFeesSpent);
 
-            uint256 totalDonations = donations[donations.length-1].cumulative;
+            uint256 totalDonations = donations[donations.length-1].cumulative * tx.gasprice;
             uint256 excessDonations = totalDonations - (gasFeesSpent - gasFeesCredit);
 
             returnFactor = (100 * excessDonations) / (totalDonations + 1);
@@ -322,7 +331,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
 
             for (;i<donations.length;) {
                 
-                surplus = (donations[i].net * returnFactor) / 100;
+                surplus = (donations[i].net * tx.gasprice * returnFactor) / 100;
                 recipient = donations[i].recipient == address(0) ? user : donations[i].recipient;
 
                 SafeTransferLib.safeTransferETH(recipient, surplus);
@@ -431,6 +440,7 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
     {
         solverEscrow = _escrowData[solverOp.call.from];
 
+        // TODO big unchecked block - audit/review carefully
         unchecked {
 
             if (solverOp.call.nonce <= uint256(solverEscrow.nonce)) {
@@ -478,6 +488,67 @@ contract Escrow is DAppVerification, SafetyLocks, SolverWrapper {
             // subtract out the gas buffer since the solver's metaTx won't use it
             gasLimit -= EscrowBits.FASTLANE_GAS_BUFFER;
         }
+    }
+
+    function _solverOpWrapper(
+        uint256 gasLimit,
+        address environment,
+        SolverOperation calldata solverOp,
+        bytes memory dAppReturnData,
+        bytes32 lockBytes
+    ) internal returns (SolverOutcome, uint256) {
+        // address(this) = Atlas/Escrow
+        // msg.sender = tx.origin
+
+        // Get current Ether balance
+        uint256 currentBalance = address(this).balance;
+        bool success;
+
+        bytes memory data = abi.encodeWithSelector(
+            IExecutionEnvironment(environment).solverMetaTryCatch.selector, gasLimit, currentBalance, solverOp, dAppReturnData);
+        
+        data = abi.encodePacked(data, lockBytes);
+
+        // Account for ETH borrowed by solver - repay with repayBorrowedEth() below
+        _accData.ethBorrowed[solverOp.call.to] += solverOp.call.value;
+
+        (success, data) = environment.call{value: solverOp.call.value}(data);
+        
+        // Check all borrowed ETH was repaid during solver call from Execution Env
+        if(_accData.ethBorrowed[solverOp.call.to] != 0){
+            revert FastLaneErrorsEvents.SolverMsgValueUnpaid();
+        }
+
+        if (success) {
+            return (SolverOutcome.Success, address(this).balance - currentBalance);
+        }
+        bytes4 errorSwitch = bytes4(data);
+
+        if (errorSwitch == SolverBidUnpaid.selector) {
+            return (SolverOutcome.BidNotPaid, 0);
+        } else if (errorSwitch == SolverMsgValueUnpaid.selector) {
+            return (SolverOutcome.CallValueTooHigh, 0);
+        } else if (errorSwitch == IntentUnfulfilled.selector) {
+            return (SolverOutcome.IntentUnfulfilled, 0);
+        } else if (errorSwitch == SolverOperationReverted.selector) {
+            return (SolverOutcome.CallReverted, 0);
+        } else if (errorSwitch == SolverFailedCallback.selector) {
+            return (SolverOutcome.CallbackFailed, 0);
+        } else if (errorSwitch == AlteredControlHash.selector) {
+            return (SolverOutcome.InvalidControlHash, 0);
+        } else if (errorSwitch == PreSolverFailed.selector) {
+            return (SolverOutcome.PreSolverFailed, 0);
+        } else if (errorSwitch == PostSolverFailed.selector) {
+            return (SolverOutcome.IntentUnfulfilled, 0);
+        } else {
+            return (SolverOutcome.CallReverted, 0);
+        }
+    }
+
+    function repayBorrowedEth(address borrower) external payable {
+        uint256 debt = _accData.ethBorrowed[borrower];
+        require(debt > 0, "ERR-E081 NoDebtToRepay");
+        _accData.ethBorrowed[borrower] = debt - msg.value;
     }
 
     receive() external payable {}
