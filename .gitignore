@@ -2,9 +2,6 @@
 /node_modules
 /broadcast
 /out
-/lib
-/lib/uniswap
-/lib/uniswap/*
 .env
 .DS_Store
 /broadcast
