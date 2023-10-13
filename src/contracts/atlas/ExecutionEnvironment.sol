@@ -68,6 +68,9 @@ contract ExecutionEnvironment is Base {
 
         require(uCall.to != address(this), "ERR-EV008 InvalidTo");
 
+        // Reset lastPhaseDonated
+        lastPhaseDonated = 0;
+
         bytes memory preOpsData = abi.encodeWithSelector(
             IDAppControl.preOpsCall.selector, uCall
         );

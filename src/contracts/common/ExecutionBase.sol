@@ -21,7 +21,7 @@ contract Base {
     address public immutable source;
     bytes32 public immutable salt;
 
-    uint16 internal lastPhaseDonated; //TODO remember to clear after call
+    uint16 internal lastPhaseDonated;
 
     constructor(address _atlas) {
         atlas = _atlas;
