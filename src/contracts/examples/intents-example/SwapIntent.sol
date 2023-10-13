@@ -201,7 +201,6 @@ contract SwapIntentController is DAppControl {
             //}
 
             // NOTE: This sends any surplus donations back to the solver
-            console.log("sending surplus donations back to solver...");
             IEscrow(escrow).donateToBundler{value: expectedGasReimbursement}(solverTo);
         }
 
@@ -248,7 +247,6 @@ contract SwapIntentController is DAppControl {
 
         // Donate the ether to the bundler, with the surplus going back to the user
         } else {
-            console.log("donating to bundler in SwapIntent");
             IEscrow(escrow).donateToBundler{value: address(this).balance}(_user());
         }
     }

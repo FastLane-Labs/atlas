@@ -154,8 +154,6 @@ contract ExecutionEnvironment is Base {
         // address(this) = ExecutionEnvironment
         require(address(this).balance == solverOp.call.value, "ERR-CE05 IncorrectValue");
 
-        console.log("solverOp.call.value in solverMetaTryCatch", solverOp.call.value);
-
         // Track token balances to measure if the bid amount is paid.
         uint256[] memory tokenBalances = new uint[](solverOp.bids.length);
         for (uint i; i < solverOp.bids.length;) {
@@ -324,8 +322,6 @@ contract ExecutionEnvironment is Base {
                 ++i;
             }
         }
-
-        console.log("total ether reward", totalEtherReward);
 
         bytes memory allocateData = abi.encodeWithSelector(IDAppControl.allocateValueCall.selector, abi.encode(totalEtherReward, bids, returnData));
 

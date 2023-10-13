@@ -73,23 +73,12 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
     /// EXTERNAL FUNCTIONS FOR BUNDLER INTERACTION  ///
     ///////////////////////////////////////////////////
 
-    // TODO: The balance checks on escrow that verify that the solver
-    // paid back any msg.value that they borrowed are currently not set up 
-    // to handle gas donations to the bundler from the solver.
-    // THIS IS EXPLOITABLE - DO NOT USE THIS CONTRACT IN PRODUCTION
-    // This attack vector will be addressed explicitly once the gas 
-    // reimbursement mechanism is finalized.
     function donateToBundler(address surplusRecipient) external payable {
-        console.log("Donate to bundler called");
-        console.log("donateToBundler: msg.value:", msg.value);
-        console.log("donating to addr:", surplusRecipient);
         // NOTE: All donations in excess of 10% greater than cost are forwarded
         // to the surplusReceiver. 
-
-        // TODO check this is compatible with smart wallets and solver donations
         require(msg.sender == activeEnvironment, "ERR-E079 DonateRequiresLock");
 
-        // TODO: Consider making this a higher donation threshold to avoid ddos attacks
+        // DDoS attacks prevented by only allowing 1 donation per phase in Exec Env
         if (msg.value == 0) {
             return;
         }
