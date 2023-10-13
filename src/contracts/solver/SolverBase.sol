@@ -25,6 +25,7 @@ contract SolverBase {
     // TODO consider making these accessible (internal) for solvers which may want to use them
     address private immutable _owner;
     address private immutable _escrow;
+    address private _executionEnv; // stores the execution environment of the current atlas metacall
 
     constructor(address atlasEscrow, address owner) {
         _owner = owner;
@@ -39,6 +40,9 @@ contract SolverBase {
         payBids(bids)
         returns (bool success, bytes memory data)
     {
+        // stored to allow solvers to call donateToBundler on correct execution environment
+        _executionEnv = msg.sender;
+
         (success, data) = address(this).call{value: msg.value}(solverOpData);
 
         require(success, "CALL UNSUCCESSFUL");
@@ -48,9 +52,7 @@ contract SolverBase {
     // As long as the safetyFirst modifier is used while calling this function,
     // we know that msg.sender is a real Atlas Execution Environment
     function _donateToBundler(uint256 ethToDonate, address surplusRecipient) internal {
-        if (ethToDonate > 0) {
-            IExecutionEnvironment(msg.sender).donateToBundler{value: ethToDonate}(surplusRecipient);
-        }
+        IExecutionEnvironment(_executionEnv).donateToBundler{value: ethToDonate}(surplusRecipient);
     }
 
     modifier safetyFirst(address sender) {
