@@ -23,7 +23,7 @@ import {SafetyBits} from "../libraries/SafetyBits.sol";
 
 import "forge-std/Test.sol";
 
-contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
+contract Escrow is Test, ERC20, DAppVerification, SafetyLocks, FastLaneErrorsEvents {
     using ECDSA for bytes32;
     using EscrowBits for uint256;
     using CallBits for uint32;
@@ -34,6 +34,10 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
 
     uint32 public immutable escrowDuration;
 
+    // Unlocked (non-escrowed) balances are available for withdrawals (redemptions) and transfers.
+    // Subtract unlockedBalanceOf from balanceOf to get the escrowed balance of a user.
+    mapping(address => uint256) public unlockedBalanceOf;
+
     // NOTE: these storage vars / maps should only be accessible by *signed* solver transactions
     // and only once per solver per block (to avoid user-solver collaborative exploits)
     // EOA Address => solver escrow data
@@ -43,18 +47,95 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
     GasDonation[] internal _donations;
     AccountingData internal _accData;
 
-    constructor(uint32 escrowDurationFromFactory, address _simulator) SafetyLocks(_simulator) {
-        escrowDuration = escrowDurationFromFactory;
+    constructor(
+        string memory _tokenName,
+        string memory _tokenSymbol,
+        uint8 _tokenDecimals,
+        uint32 _escrowDuration,
+        address _simulator
+    ) ERC20(_tokenName, _tokenSymbol, _tokenDecimals) SafetyLocks(_simulator) {
+        escrowDuration = _escrowDuration;
+    }
+
+    ///////////////////////////////////////////////////
+    /// ERC20 OVERRIDES                             ///
+    /// Only unlocked balance is transferable       ///
+    ///////////////////////////////////////////////////
+
+    function transfer(address to, uint256 amount) public override returns (bool) {
+        unlockedBalanceOf[msg.sender] -= amount;
+
+        // Cannot overflow because the sum of all user
+        // balances can't exceed the max uint256 value.
+        unchecked {
+            unlockedBalanceOf[to] += amount;
+        }
+
+        emit Transfer(msg.sender, to, amount);
+
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
+        uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
+
+        if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
+
+        unlockedBalanceOf[from] -= amount;
+
+        // Cannot overflow because the sum of all user
+        // balances can't exceed the max uint256 value.
+        unchecked {
+            unlockedBalanceOf[to] += amount;
+        }
+
+        emit Transfer(from, to, amount);
+
+        return true;
     }
 
     ///////////////////////////////////////////////////
     /// EXTERNAL FUNCTIONS FOR SOLVER INTERACTION ///
     ///////////////////////////////////////////////////
-    function deposit(address solverSigner) external payable onlyWhenUnlocked returns (uint256 newBalance) {
-        // NOTE: The escrow accounting system cannot currently handle deposits made mid-transaction.
 
-        _escrowData[solverSigner].total += uint128(msg.value);
-        newBalance = uint256(_escrowData[solverSigner].total);
+    // Deposit ETH and get AETH in return. The minted AETH amount is added to the unlocked balance,
+    // meaning it can be freely transferred or withdrawn, but won't be available for escrow.
+    // After depositing, call lock() to escrow the AETH and begin bidding.
+    function deposit() external payable returns (uint256 newUnlockedBalance, uint256 newBalance) {
+        _mint(msg.sender, msg.value);
+        unlockedBalanceOf[msg.sender] += msg.value;
+        newUnlockedBalance = unlockedBalanceOf[msg.sender];
+        newBalance = balanceOf[msg.sender];
+    }
+
+    // Redeem AETH for ETH. Only unlocked (non-escrowed) AETH can be redeemed.
+    function withdraw(uint256 amount) external returns (uint256 newUnlockedBalance, uint256 newBalance) {
+        require(unlockedBalanceOf[msg.sender] >= amount, "ERR-E078 InsufficientUnlockedBalance");
+        _burn(msg.sender, amount);
+        SafeTransferLib.safeTransferETH(msg.sender, amount);
+        unlockedBalanceOf[msg.sender] -= amount;
+        newUnlockedBalance = unlockedBalanceOf[msg.sender];
+        newBalance = balanceOf[msg.sender];
+    }
+
+    // Lock AETH in escrow.
+    function lock(uint256 amount) external onlyWhenUnlocked returns (uint256 newLockedBalance) {
+        require(unlockedBalanceOf[msg.sender] >= amount, "ERR-E079 InsufficientUnlockedBalance");
+        unlockedBalanceOf[msg.sender] -= amount;
+        _escrowData[msg.sender].total += amount;
+        newLockedBalance = uint256(_escrowData[msg.sender].total);
+    }
+
+    // Unlock AETH from escrow. Only eligible after the escrowDuration from the last solver's
+    // interaction with the contract has elapsed.
+    function unlock(uint256 amount) external onlyWhenUnlocked returns (uint256 newLockedBalance) {
+        require(
+            block.number >= uint256(_escrowData[msg.sender].lastAccessed) + uint256(escrowDuration), "ERR-E080 TooEarly"
+        );
+        require(_escrowData[msg.sender].total >= amount, "ERR-E081 InsufficientLockedBalance");
+        unlockedBalanceOf[msg.sender] += amount;
+        _escrowData[msg.sender].total -= amount;
+        newLockedBalance = uint256(_escrowData[msg.sender].total);
     }
 
     function nextSolverNonce(address solverSigner) external view returns (uint256 nextNonce) {

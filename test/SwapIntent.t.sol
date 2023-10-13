@@ -77,8 +77,8 @@ contract SwapIntentTest is BaseTest {
         });
 
         // Deposit ETH from Searcher signer to pay for searcher's gas 
-        vm.prank(solverOneEOA); 
-        atlas.deposit{value: 1e18}(solverOneEOA);
+        // vm.prank(solverOneEOA); 
+        // atlas.deposit{value: 1e18}();
     }
 
     function testAtlasSwapIntentWithBasicRFQ() public {
@@ -109,7 +109,8 @@ contract SwapIntentTest is BaseTest {
         // Solver deploys the RFQ solver contract (defined at bottom of this file)
         vm.startPrank(solverOneEOA);
         SimpleRFQSolver rfqSolver = new SimpleRFQSolver(address(atlas));
-        atlas.deposit{value: 1e18}(solverOneEOA);
+        atlas.deposit{value: 1e18}();
+        atlas.lock(1e18);
         vm.stopPrank();
 
         // Give 20 DAI to RFQ solver contract
@@ -242,6 +243,8 @@ contract SwapIntentTest is BaseTest {
         vm.startPrank(solverOneEOA);
         UniswapIntentSolver uniswapSolver = new UniswapIntentSolver(address(atlas));
         deal(WETH_ADDRESS, address(uniswapSolver), 1e18); // 1 WETH to solver to pay bid
+        atlas.deposit{value: 1e18}();
+        atlas.lock(1e18);
         vm.stopPrank();
 
         // Input params for Atlas.metacall() - will be populated below

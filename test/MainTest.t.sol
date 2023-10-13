@@ -32,12 +32,16 @@ contract MainTest is BaseTest {
         BaseTest.setUp();
 
         // Deposit ETH from Searcher1 signer to pay for searcher's gas 
-        vm.prank(solverOneEOA); 
-        atlas.deposit{value: 1e18}(solverOneEOA);
+        vm.startPrank(solverOneEOA); 
+        atlas.deposit{value: 1e18}();
+        atlas.lock(1e18);
+        vm.stopPrank();
 
         // Deposit ETH from Searcher2 signer to pay for searcher's gas
-        vm.prank(solverTwoEOA);
-        atlas.deposit{value: 1e18}(solverTwoEOA);
+        vm.startPrank(solverTwoEOA);
+        atlas.deposit{value: 1e18}();
+        atlas.lock(1e18);
+        vm.stopPrank();
     }
 
     function testMain() public {

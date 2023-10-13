@@ -66,7 +66,7 @@ contract BaseTest is Test, TestConstants {
 
         simulator = new Simulator();
 
-        atlas = new Atlas(64, address(simulator));
+        atlas = new Atlas("Atlas ETH", "AETH", 18, 64, address(simulator));
         simulator.setAtlas(address(atlas));
 
         escrow = atlas.getEscrowAddress();
@@ -86,8 +86,8 @@ contract BaseTest is Test, TestConstants {
         vm.startPrank(solverOneEOA);
 
         solverOne = new Solver(escrow, solverOneEOA);
-        IEscrow(escrow).deposit{value: 1e18}(solverOneEOA);
-
+        IEscrow(escrow).deposit{value: 1e18}();
+        IEscrow(escrow).lock(1e18);
 
         deal(TOKEN_ZERO, address(solverOne), 10e24);
         deal(TOKEN_ONE, address(solverOne), 10e24);
@@ -97,7 +97,8 @@ contract BaseTest is Test, TestConstants {
         vm.startPrank(solverTwoEOA);
 
         solverTwo = new Solver(escrow, solverTwoEOA);
-        IEscrow(escrow).deposit{value: 1e18}(solverTwoEOA);
+        IEscrow(escrow).deposit{value: 1e18}();
+        IEscrow(escrow).lock(1e18);
 
         vm.stopPrank();
 

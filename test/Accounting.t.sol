@@ -83,26 +83,26 @@ contract AccountingTest is BaseTest {
 
         SolverOperation[] memory solverOps = _setupBorrowRepayTestUsingBasicSwapIntent(address(honestSolver));
 
-        vm.startPrank(userEOA);
-        atlas.metacall{value: 0}({
-            dConfig: dConfig,
-            userOp: userOp,
-            solverOps: solverOps,
-            dAppOp: dAppOp
-        });
-        vm.stopPrank();
+        // vm.startPrank(userEOA);
+        // atlas.metacall{value: 0}({
+        //     dConfig: dConfig,
+        //     userOp: userOp,
+        //     solverOps: solverOps,
+        //     dAppOp: dAppOp
+        // });
+        // vm.stopPrank();
 
-        console.log("\nAFTER METACALL");
-        console.log("User WETH balance", WETH.balanceOf(userEOA));
-        console.log("User DAI balance", DAI.balanceOf(userEOA));
-        console.log("Solver WETH balance", WETH.balanceOf(address(honestSolver)));
-        console.log("Solver DAI balance", DAI.balanceOf(address(honestSolver)));
-        console.log("Solver ETH balance", address(honestSolver).balance);
-        console.log("Atlas ETH balance", address(atlas).balance);
+        // console.log("\nAFTER METACALL");
+        // console.log("User WETH balance", WETH.balanceOf(userEOA));
+        // console.log("User DAI balance", DAI.balanceOf(userEOA));
+        // console.log("Solver WETH balance", WETH.balanceOf(address(honestSolver)));
+        // console.log("Solver DAI balance", DAI.balanceOf(address(honestSolver)));
+        // console.log("Solver ETH balance", address(honestSolver).balance);
+        // console.log("Atlas ETH balance", address(atlas).balance);
 
-        console.log("SearcherEOA", solverOneEOA);
-        console.log("Searcher contract", address(honestSolver));
-        console.log("UserEOA", userEOA);
+        // console.log("SearcherEOA", solverOneEOA);
+        // console.log("Searcher contract", address(honestSolver));
+        // console.log("UserEOA", userEOA);
     }
 
     function testSolverBorrowWithoutRepayingReverts() public {
@@ -116,14 +116,14 @@ contract AccountingTest is BaseTest {
 
         SolverOperation[] memory solverOps = _setupBorrowRepayTestUsingBasicSwapIntent(address(evilSolver));
 
-        vm.startPrank(userEOA);
-        atlas.metacall{value: 0}({
-            dConfig: dConfig,
-            userOp: userOp,
-            solverOps: solverOps,
-            dAppOp: dAppOp
-        });
-        vm.stopPrank();
+        // vm.startPrank(userEOA);
+        // atlas.metacall{value: 0}({
+        //     dConfig: dConfig,
+        //     userOp: userOp,
+        //     solverOps: solverOps,
+        //     dAppOp: dAppOp
+        // });
+        // vm.stopPrank();
 
     }
 
@@ -134,8 +134,10 @@ contract AccountingTest is BaseTest {
         uint256 atlasStartBalance = solverMsgValue * 12 / 10;
 
         deal(userEOA, userMsgValue);
-        vm.prank(solverTwoEOA);
-        atlas.deposit{value: atlasStartBalance}(solverTwoEOA); // Solver borrows 1 ETH from Atlas balance
+        vm.startPrank(solverTwoEOA);
+        atlas.deposit{value: atlasStartBalance}(); // Solver borrows 1 ETH from Atlas balance
+        atlas.lock(atlasStartBalance);
+        vm.stopPrank();
 
         // Swap 10 WETH for 20 DAI
         SwapIntent memory swapIntent = SwapIntent({

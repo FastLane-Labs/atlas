@@ -25,7 +25,13 @@ contract Atlas is Test, Factory {
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
-    constructor(uint32 _escrowDuration, address _simulator) Factory(_escrowDuration, _simulator) {}
+    constructor(
+        string memory _tokenName,
+        string memory _tokenSymbol,
+        uint8 _tokenDecimals,
+        uint32 _escrowDuration,
+        address _simulator
+    ) Factory(_tokenName, _tokenSymbol, _tokenDecimals, _escrowDuration, _simulator) {}
 
     function createExecutionEnvironment(DAppConfig calldata dConfig) external returns (address executionEnvironment) {
         executionEnvironment = _setExecutionEnvironment(dConfig, msg.sender, dConfig.to.codehash);
