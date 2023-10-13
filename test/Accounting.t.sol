@@ -37,6 +37,12 @@ contract AccountingTest is BaseTest {
     ERC20 DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     address DAI_ADDRESS = address(DAI);
 
+    // Swap 10 WETH for 20 DAI
+    address tokenUserBuys = DAI_ADDRESS;
+    uint256 amountUserBuys = 20e18;
+    address tokenUserSells = WETH_ADDRESS;
+    uint256 amountUserSells = 10e18;
+
     struct Sig {
         uint8 v;
         bytes32 r;
@@ -65,23 +71,19 @@ contract AccountingTest is BaseTest {
         });
     }
 
-    function testDELEET() public {
-        uint16 lockState = uint16(61711); // phase 4 - HandlingPayments
-        uint16 phase = SafetyBits.getCurrentExecutionPhase(lockState);
-        console.log(TestUtils.uint16ToBinaryString(61711));
-        console.log("phase", phase);
-        console.log("Exec Phase", uint8(ExecutionPhase.Releasing));
-    }
-
 
     function testSolverBorrowRepaySuccessfully() public {
-        
         // Solver deploys the RFQ solver contract (defined at bottom of this file)
         vm.startPrank(solverOneEOA);
         HonestRFQSolver honestSolver = new HonestRFQSolver(address(atlas));
         vm.stopPrank();
 
         SolverOperation[] memory solverOps = _setupBorrowRepayTestUsingBasicSwapIntent(address(honestSolver));
+
+        uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);
+        uint256 userDaiBalanceBefore = DAI.balanceOf(userEOA);
+        uint256 solverWethBalanceBefore = WETH.balanceOf(address(honestSolver));
+        uint256 solverDaiBalanceBefore = DAI.balanceOf(address(honestSolver));
 
         vm.startPrank(userEOA);
         atlas.metacall{value: 0}({
@@ -92,26 +94,17 @@ contract AccountingTest is BaseTest {
         });
         vm.stopPrank();
 
-        console.log("\nAFTER METACALL");
-        console.log("User WETH balance", WETH.balanceOf(userEOA));
-        console.log("User DAI balance", DAI.balanceOf(userEOA));
-        console.log("Solver WETH balance", WETH.balanceOf(address(honestSolver)));
-        console.log("Solver DAI balance", DAI.balanceOf(address(honestSolver)));
-        console.log("Solver ETH balance", address(honestSolver).balance);
-        console.log("Atlas ETH balance", address(atlas).balance);
-
-        console.log("SearcherEOA", solverOneEOA);
-        console.log("Searcher contract", address(honestSolver));
-        console.log("UserEOA", userEOA);
+        assertEq(WETH.balanceOf(userEOA), userWethBalanceBefore - amountUserSells, "User did not pay WETH");
+        assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + amountUserBuys, "User did not receive DAI");
+        assertEq(WETH.balanceOf(address(honestSolver)), solverWethBalanceBefore + amountUserSells - 1e18, "Solver did not receive WETH");
+        assertEq(DAI.balanceOf(address(honestSolver)), solverDaiBalanceBefore - amountUserBuys, "Solver did not pay DAI");
     }
 
     function testSolverBorrowWithoutRepayingReverts() public {
 
         // Solver deploys the RFQ solver contract (defined at bottom of this file)
         vm.startPrank(solverOneEOA);
-        // TODO make evil solver
-        HonestRFQSolver evilSolver = new HonestRFQSolver(address(atlas));
-        // atlas.deposit{value: gasCostCoverAmount}(solverOneEOA);
+        EvilRFQSolver evilSolver = new EvilRFQSolver(address(atlas));
         vm.stopPrank();
 
         SolverOperation[] memory solverOps = _setupBorrowRepayTestUsingBasicSwapIntent(address(evilSolver));
@@ -139,10 +132,10 @@ contract AccountingTest is BaseTest {
 
         // Swap 10 WETH for 20 DAI
         SwapIntent memory swapIntent = SwapIntent({
-            tokenUserBuys: DAI_ADDRESS,
-            amountUserBuys: 20e18,
-            tokenUserSells: WETH_ADDRESS,
-            amountUserSells: 10e18,
+            tokenUserBuys: tokenUserBuys,
+            amountUserBuys: amountUserBuys,
+            tokenUserSells: tokenUserSells,
+            amountUserSells: amountUserSells,
             auctionBaseCurrency: address(0),
             solverMustReimburseGas: false,
             conditions: new Condition[](0)
@@ -241,7 +234,6 @@ contract AccountingTest is BaseTest {
 
         vm.stopPrank();
     }
-
 }
 
 
