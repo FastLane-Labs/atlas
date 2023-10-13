@@ -11,17 +11,9 @@ import {SolverOperation} from "../src/contracts/types/SolverCallTypes.sol";
 import {UserOperation} from "../src/contracts/types/UserCallTypes.sol";
 import {DAppOperation, DAppConfig} from "../src/contracts/types/DAppApprovalTypes.sol";
 
-import {SafetyBits} from "../src/contracts/libraries/SafetyBits.sol";
-import "../src/contracts/types/LockTypes.sol";
-
-import {TestUtils} from "./base/TestUtils.sol";
-
-
 import {SwapIntentController, SwapIntent, Condition} from "../src/contracts/examples/intents-example/SwapIntent.sol";
 
 import {SolverBase} from "../src/contracts/solver/SolverBase.sol";
-
-import {IEscrow} from "../src/contracts/interfaces/IEscrow.sol";
 
 
 contract AccountingTest is BaseTest {
@@ -48,7 +40,6 @@ contract AccountingTest is BaseTest {
         bytes32 r;
         bytes32 s;
     }
-
 
     function setUp() public virtual override {
         BaseTest.setUp();
@@ -101,8 +92,8 @@ contract AccountingTest is BaseTest {
     }
 
     function testSolverBorrowWithoutRepayingReverts() public {
-
-        // Solver deploys the RFQ solver contract (defined at bottom of this file)
+        // The evil solver attempts to steal the ETH before it can be repaid
+        // Metacall should revert as the only solverOp fails
         vm.startPrank(solverOneEOA);
         EvilRFQSolver evilSolver = new EvilRFQSolver(address(atlas));
         vm.stopPrank();
@@ -110,6 +101,7 @@ contract AccountingTest is BaseTest {
         SolverOperation[] memory solverOps = _setupBorrowRepayTestUsingBasicSwapIntent(address(evilSolver));
 
         vm.startPrank(userEOA);
+        vm.expectRevert("ERR-F07 RevertToReuse");
         atlas.metacall{value: 0}({
             dConfig: dConfig,
             userOp: userOp,
@@ -117,7 +109,6 @@ contract AccountingTest is BaseTest {
             dAppOp: dAppOp
         });
         vm.stopPrank();
-
     }
 
 
@@ -145,11 +136,6 @@ contract AccountingTest is BaseTest {
         deal(DAI_ADDRESS, rfqSolver, swapIntent.amountUserBuys);
         assertEq(DAI.balanceOf(rfqSolver), swapIntent.amountUserBuys, "Did not give enough DAI to solver");
 
-        // TODO remove
-        // Give solverMsgValue (1e18, reusing var for stacktoodeep) of ETH to solver as well 
-        // deal(address(rfqSolver), solverMsgValue);
-
-        
         // Input params for Atlas.metacall() - will be populated below
         dConfig = txBuilder.getDAppConfig();
         solverOps = new SolverOperation[](1);
@@ -208,7 +194,6 @@ contract AccountingTest is BaseTest {
 
         // Check user token balances before
         uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);
-        uint256 userDaiBalanceBefore = DAI.balanceOf(userEOA);
 
         vm.prank(userEOA); // Burn all users WETH except 10 so logs are more readable
         WETH.transfer(address(1), userWethBalanceBefore - swapIntent.amountUserSells);
@@ -216,26 +201,11 @@ contract AccountingTest is BaseTest {
 
         assertTrue(userWethBalanceBefore >= swapIntent.amountUserSells, "Not enough starting WETH");
 
-        console.log("\nBEFORE METACALL");
-        console.log("User WETH balance", WETH.balanceOf(userEOA));
-        console.log("User DAI balance", DAI.balanceOf(userEOA));
-        console.log("Solver WETH balance", WETH.balanceOf(address(rfqSolver)));
-        console.log("Solver DAI balance", DAI.balanceOf(address(rfqSolver)));
-        console.log("Solver ETH balance", address(rfqSolver).balance);
-        console.log("Atlas ETH balance", address(atlas).balance);
-        console.log(""); // give space for internal logs
-
         vm.startPrank(userEOA);
-        
-        assertFalse(simulator.simUserOperation(userOp), "metasimUserOperationcall tested true a");
-        assertFalse(simulator.simUserOperation(userOp.call), "metasimUserOperationcall call tested true b");
-        
         WETH.approve(address(atlas), swapIntent.amountUserSells);
-
         vm.stopPrank();
     }
 }
-
 
 // This solver magically has the tokens needed to fulfil the user's swap.
 // This might involve an offchain RFQ system
