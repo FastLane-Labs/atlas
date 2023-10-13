@@ -11,19 +11,9 @@ import {SolverOperation} from "../src/contracts/types/SolverCallTypes.sol";
 import {UserOperation} from "../src/contracts/types/UserCallTypes.sol";
 import {DAppOperation, DAppConfig} from "../src/contracts/types/DAppApprovalTypes.sol";
 
-import {SafetyBits} from "../src/contracts/libraries/SafetyBits.sol";
-import "../src/contracts/types/LockTypes.sol";
-
-import {TestUtils} from "./base/TestUtils.sol";
-
-
 import {SwapIntentController, SwapIntent, Condition} from "../src/contracts/examples/intents-example/SwapIntent.sol";
 
 import {SolverBase} from "../src/contracts/solver/SolverBase.sol";
-
-import {IEscrow} from "../src/contracts/interfaces/IEscrow.sol";
-
-// TODO check donate lock is cleared in Exec Env after all phases done
 
 contract DonationsTest is BaseTest {
 
@@ -49,7 +39,6 @@ contract DonationsTest is BaseTest {
         bytes32 r;
         bytes32 s;
     }
-
 
     function setUp() public virtual override {
         BaseTest.setUp();
@@ -85,7 +74,7 @@ contract DonationsTest is BaseTest {
         uint256 solverWethBalanceBefore = WETH.balanceOf(address(solver));
         uint256 solverDaiBalanceBefore = DAI.balanceOf(address(solver));
 
-        console.log("solver ETH before", address(solver).balance);
+        assertEq(address(solver).balance, 0, "Solver has unexpected ETH");
 
         // Deal solver 1 ETH which should get donated and not affect DAI/WETH balances
         deal(address(solver), 1e18);
@@ -99,13 +88,14 @@ contract DonationsTest is BaseTest {
         });
         vm.stopPrank();
 
-        console.log("solver ETH after", address(solver).balance);
-
         assertEq(WETH.balanceOf(userEOA), userWethBalanceBefore - amountUserSells, "User did not pay WETH");
         assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + amountUserBuys, "User did not receive DAI");
         assertEq(WETH.balanceOf(address(solver)), solverWethBalanceBefore + amountUserSells - 1e18, "Solver did not receive WETH");
         assertEq(DAI.balanceOf(address(solver)), solverDaiBalanceBefore - amountUserBuys, "Solver did not pay DAI");
     
+        // Check solver recieved his donation surplus: 1 ETH > x > 0.9 ETH
+        assertTrue(address(solver).balance > 0.9e18, "Solver received too little donation surplus");
+        assertTrue(address(solver).balance < 1e18, "Solver received too much donation surplus");
     }
     function testSolverDonateToBundlerTwicePerPhaseReverts() public {
         // Solver deploys the RFQ solver contract (defined at bottom of this file)
