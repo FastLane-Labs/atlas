@@ -37,6 +37,12 @@ contract DonationsTest is BaseTest {
     ERC20 DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     address DAI_ADDRESS = address(DAI);
 
+    // Swap 10 WETH for 20 DAI
+    address tokenUserBuys = DAI_ADDRESS;
+    uint256 amountUserBuys = 20e18;
+    address tokenUserSells = WETH_ADDRESS;
+    uint256 amountUserSells = 10e18;
+
     struct Sig {
         uint8 v;
         bytes32 r;
@@ -65,47 +71,23 @@ contract DonationsTest is BaseTest {
         });
     }
 
-    function testSolverBorrowRepaySuccessfully() public {
+    function testSolverCanDonateToBundlerOncePerPhase() public {
+        // Solver deploys the RFQ solver contract (defined at bottom of this file)
+        vm.startPrank(solverOneEOA);
+        SingleDonateRFQSolver solver = new SingleDonateRFQSolver(address(atlas));
+        vm.stopPrank();
+
+        SolverOperation[] memory solverOps = _setupBorrowRepayTestUsingBasicSwapIntent(address(solver));
         
-        // Solver deploys the RFQ solver contract (defined at bottom of this file)
-        vm.startPrank(solverOneEOA);
-        HonestRFQSolver honestSolver = new HonestRFQSolver(address(atlas));
-        vm.stopPrank();
+        uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);
+        uint256 userDaiBalanceBefore = DAI.balanceOf(userEOA);
+        uint256 solverWethBalanceBefore = WETH.balanceOf(address(solver));
+        uint256 solverDaiBalanceBefore = DAI.balanceOf(address(solver));
 
-        SolverOperation[] memory solverOps = _setupBorrowRepayTestUsingBasicSwapIntent(address(honestSolver));
+        console.log("solver ETH before", address(solver).balance);
 
-        vm.startPrank(userEOA);
-        atlas.metacall{value: 0}({
-            dConfig: dConfig,
-            userOp: userOp,
-            solverOps: solverOps,
-            dAppOp: dAppOp
-        });
-        vm.stopPrank();
-
-        console.log("\nAFTER METACALL");
-        console.log("User WETH balance", WETH.balanceOf(userEOA));
-        console.log("User DAI balance", DAI.balanceOf(userEOA));
-        console.log("Solver WETH balance", WETH.balanceOf(address(honestSolver)));
-        console.log("Solver DAI balance", DAI.balanceOf(address(honestSolver)));
-        console.log("Solver ETH balance", address(honestSolver).balance);
-        console.log("Atlas ETH balance", address(atlas).balance);
-
-        console.log("SearcherEOA", solverOneEOA);
-        console.log("Searcher contract", address(honestSolver));
-        console.log("UserEOA", userEOA);
-    }
-
-    function testSolverBorrowWithoutRepayingReverts() public {
-
-        // Solver deploys the RFQ solver contract (defined at bottom of this file)
-        vm.startPrank(solverOneEOA);
-        // TODO make evil solver
-        HonestRFQSolver evilSolver = new HonestRFQSolver(address(atlas));
-        // atlas.deposit{value: gasCostCoverAmount}(solverOneEOA);
-        vm.stopPrank();
-
-        SolverOperation[] memory solverOps = _setupBorrowRepayTestUsingBasicSwapIntent(address(evilSolver));
+        // Deal solver 1 ETH which should get donated and not affect DAI/WETH balances
+        deal(address(solver), 1e18);
 
         vm.startPrank(userEOA);
         atlas.metacall{value: 0}({
@@ -116,11 +98,20 @@ contract DonationsTest is BaseTest {
         });
         vm.stopPrank();
 
-    }
+        console.log("solver ETH after", address(solver).balance);
 
+        assertEq(WETH.balanceOf(userEOA), userWethBalanceBefore - amountUserSells, "User did not pay WETH");
+        assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + amountUserBuys, "User did not receive DAI");
+        assertEq(WETH.balanceOf(address(solver)), solverWethBalanceBefore + amountUserSells - 1e18, "Solver did not receive WETH");
+        assertEq(DAI.balanceOf(address(solver)), solverDaiBalanceBefore - amountUserBuys, "Solver did not pay DAI");
+    
+    }
+    function testSolverDonateToBundlerTwicePerPhaseReverts() public {
+        
+    }
 
     function _setupBorrowRepayTestUsingBasicSwapIntent(address rfqSolver) internal returns (SolverOperation[] memory solverOps){
-        uint256 userMsgValue = 2e18;
+       uint256 userMsgValue = 2e18;
         uint256 solverMsgValue = 1e18;
         uint256 atlasStartBalance = solverMsgValue * 12 / 10;
 
@@ -130,10 +121,10 @@ contract DonationsTest is BaseTest {
 
         // Swap 10 WETH for 20 DAI
         SwapIntent memory swapIntent = SwapIntent({
-            tokenUserBuys: DAI_ADDRESS,
-            amountUserBuys: 20e18,
-            tokenUserSells: WETH_ADDRESS,
-            amountUserSells: 10e18,
+            tokenUserBuys: tokenUserBuys,
+            amountUserBuys: amountUserBuys,
+            tokenUserSells: tokenUserSells,
+            amountUserSells: amountUserSells,
             auctionBaseCurrency: address(0),
             solverMustReimburseGas: false,
             conditions: new Condition[](0)
@@ -143,11 +134,6 @@ contract DonationsTest is BaseTest {
         deal(DAI_ADDRESS, rfqSolver, swapIntent.amountUserBuys);
         assertEq(DAI.balanceOf(rfqSolver), swapIntent.amountUserBuys, "Did not give enough DAI to solver");
 
-        // TODO remove
-        // Give solverMsgValue (1e18, reusing var for stacktoodeep) of ETH to solver as well 
-        // deal(address(rfqSolver), solverMsgValue);
-
-        
         // Input params for Atlas.metacall() - will be populated below
         dConfig = txBuilder.getDAppConfig();
         solverOps = new SolverOperation[](1);
@@ -176,7 +162,7 @@ contract DonationsTest is BaseTest {
 
         // Build solver calldata (function selector on solver contract and its params)
         bytes memory solverOpData = abi.encodeWithSelector(
-            HonestRFQSolver.fulfillRFQ.selector, 
+            SingleDonateRFQSolver.fulfillRFQ.selector, 
             swapIntent,
             executionEnvironment
         );
@@ -206,7 +192,6 @@ contract DonationsTest is BaseTest {
 
         // Check user token balances before
         uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);
-        uint256 userDaiBalanceBefore = DAI.balanceOf(userEOA);
 
         vm.prank(userEOA); // Burn all users WETH except 10 so logs are more readable
         WETH.transfer(address(1), userWethBalanceBefore - swapIntent.amountUserSells);
@@ -214,31 +199,17 @@ contract DonationsTest is BaseTest {
 
         assertTrue(userWethBalanceBefore >= swapIntent.amountUserSells, "Not enough starting WETH");
 
-        console.log("\nBEFORE METACALL");
-        console.log("User WETH balance", WETH.balanceOf(userEOA));
-        console.log("User DAI balance", DAI.balanceOf(userEOA));
-        console.log("Solver WETH balance", WETH.balanceOf(address(rfqSolver)));
-        console.log("Solver DAI balance", DAI.balanceOf(address(rfqSolver)));
-        console.log("Solver ETH balance", address(rfqSolver).balance);
-        console.log("Atlas ETH balance", address(atlas).balance);
-        console.log(""); // give space for internal logs
-
         vm.startPrank(userEOA);
-        
-        assertFalse(simulator.simUserOperation(userOp), "metasimUserOperationcall tested true a");
-        assertFalse(simulator.simUserOperation(userOp.call), "metasimUserOperationcall call tested true b");
-        
         WETH.approve(address(atlas), swapIntent.amountUserSells);
-
         vm.stopPrank();
     }
-
 }
 
 
 // This solver magically has the tokens needed to fulfil the user's swap.
 // This might involve an offchain RFQ system
-contract HonestRFQSolver is SolverBase {
+// NOTE: Solver 1 will attempt to donate 1 ETH, solver 2 will attempt to donate 1 ETH twice
+contract SingleDonateRFQSolver is SolverBase {
     address public immutable ATLAS;
     constructor(address atlas) SolverBase(atlas, msg.sender) {
         ATLAS = atlas;
@@ -248,10 +219,12 @@ contract HonestRFQSolver is SolverBase {
         SwapIntent calldata swapIntent,
         address executionEnvironment
     ) public virtual payable {
-        console.log("solver balance", address(this).balance);
         require(ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells, "Did not receive enough tokenIn");
         require(ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys, "Not enough tokenOut to fulfill");
         ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
+        
+        // donates 1 ETH to bundler with surplus going to self
+        _donateToBundler(1e18, address(this));
     }
 
     // This ensures a function can only be called through metaFlashCall
@@ -265,21 +238,21 @@ contract HonestRFQSolver is SolverBase {
     receive() external payable {}
 }
 
-contract EvilRFQSolver is HonestRFQSolver {
+contract DoubleDonateRFQSolver is SingleDonateRFQSolver {
     address deployer;
-    constructor(address atlas) HonestRFQSolver(atlas) {
+    constructor(address atlas) SingleDonateRFQSolver(atlas) {
         deployer = msg.sender;
     }
     function fulfillRFQ(
         SwapIntent calldata swapIntent,
         address executionEnvironment
     ) public payable override {
-        HonestRFQSolver.fulfillRFQ(
+        SingleDonateRFQSolver.fulfillRFQ(
             swapIntent,
             executionEnvironment
         );
         
-        // EvilRFQSolver tries to steal ETH before repaying debt to Atlas
-        deployer.call{value: msg.value}("");
+        // This is the 2nd donation attempt - should cause a revert
+        _donateToBundler(1e18, address(this));
     }
 }

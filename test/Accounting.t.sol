@@ -219,7 +219,6 @@ contract HonestRFQSolver is SolverBase {
         SwapIntent calldata swapIntent,
         address executionEnvironment
     ) public virtual payable {
-        console.log("solver balance", address(this).balance);
         require(ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells, "Did not receive enough tokenIn");
         require(ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys, "Not enough tokenOut to fulfill");
         ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
