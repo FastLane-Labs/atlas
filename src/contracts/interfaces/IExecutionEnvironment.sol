@@ -27,6 +27,8 @@ interface IExecutionEnvironment {
         bytes memory returnData
     ) external;
 
+    function donateToBundler(address surplusRecipient) external payable;
+
     function validateUserOperation(UserCall calldata uCall) external view returns (bool);
 
     function getUser() external pure returns (address user);

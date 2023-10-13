@@ -5,6 +5,7 @@ import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
 import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
 import {IEscrow} from "src/contracts/interfaces/IEscrow.sol";
+import {IExecutionEnvironment} from "src/contracts/interfaces/IExecutionEnvironment.sol";
 
 import "../types/SolverCallTypes.sol";
 
@@ -43,22 +44,25 @@ contract SolverBase {
         require(success, "CALL UNSUCCESSFUL");
     }
 
+    // Helper for solvers to donate ETH to the bundler via the Execution Environment
+    // As long as the safetyFirst modifier is used while calling this function,
+    // we know that msg.sender is a real Atlas Execution Environment
+    function _donateToBundler(uint256 ethToDonate, address surplusRecipient) internal {
+        if (ethToDonate > 0) {
+            IExecutionEnvironment(msg.sender).donateToBundler{value: ethToDonate}(surplusRecipient);
+        }
+    }
+
     modifier safetyFirst(address sender) {
-        // Safety checks
         require(sender == _owner, "INVALID CALLER");
-        // uint256 msgValueOwed = msg.value;
-
         _;
-
         // NOTE: Because this is nested inside of an Atlas meta transaction, if someone is attempting
         // to innappropriately access your smart contract then THEY will have to pay for the gas...
         // so feel free to run the safety checks at the end of the call.
         // NOTE: The solverSafetyCallback is mandatory - if it is not called then the solver
         // transaction will revert.  It is payable and can be used to repay a msg.value loan from the
         // Atlas Escrow.
-        
-        // TODO review - this has been replaced by the repayBorrowedEth modifier
-        // require(ISafetyLocks(_escrow).solverSafetyCallback{value: msgValueOwed}(msg.sender), "INVALID SEQUENCE");
+        require(ISafetyLocks(_escrow).solverSafetyCallback(msg.sender), "SOLVER SAFETY CHECK FAILED");
     }
 
     modifier payBids(BidData[] calldata bids) {

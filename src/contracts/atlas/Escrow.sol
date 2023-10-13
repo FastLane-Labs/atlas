@@ -96,9 +96,6 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
 
         uint32 gasRebate = uint32(msg.value / tx.gasprice);
 
-        console.log("donateToBundler: tx.gasprice:", tx.gasprice);
-        console.log("donateToBundler: gasRebate:", gasRebate);
-
         uint256 donationCount = _donations.length;
 
         if (donationCount == 0) {

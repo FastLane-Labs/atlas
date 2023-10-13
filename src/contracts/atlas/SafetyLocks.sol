@@ -28,11 +28,10 @@ contract SafetyLocks is Test {
         simulator = _simulator;
     }
 
-    // TODO can we remove this? solver value repayment handled in Escrow.sol now
-    function solverSafetyCallback(address msgSender) external payable returns (bool isSafe) {
+    // Important that Solver calls this to verify it is being called by a legit ExecutionEnvironment
+    function solverSafetyCallback(address msgSender) external view returns (bool isSafe) {
         // An external call so that solver contracts can verify
         // that delegatecall isn't being abused.
-
         isSafe = msgSender == activeEnvironment;
     }
 
