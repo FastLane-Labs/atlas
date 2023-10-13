@@ -23,6 +23,7 @@ import {SolverBase} from "../src/contracts/solver/SolverBase.sol";
 
 import {IEscrow} from "../src/contracts/interfaces/IEscrow.sol";
 
+// TODO check donate lock is cleared in Exec Env after all phases done
 
 contract DonationsTest is BaseTest {
 
@@ -107,7 +108,26 @@ contract DonationsTest is BaseTest {
     
     }
     function testSolverDonateToBundlerTwicePerPhaseReverts() public {
-        
+        // Solver deploys the RFQ solver contract (defined at bottom of this file)
+        vm.startPrank(solverOneEOA);
+        DoubleDonateRFQSolver solver = new DoubleDonateRFQSolver(address(atlas));
+        vm.stopPrank();
+
+        SolverOperation[] memory solverOps = _setupBorrowRepayTestUsingBasicSwapIntent(address(solver));
+
+        // Deal solver 2 ETH which should get donated in 2x 1 ETH batches
+        deal(address(solver), 2e18);
+
+        vm.startPrank(userEOA);
+        // Reverts internally with "ERR-EV014 NotFirstDonation"
+        vm.expectRevert("ERR-F07 RevertToReuse");
+        atlas.metacall{value: 0}({
+            dConfig: dConfig,
+            userOp: userOp,
+            solverOps: solverOps,
+            dAppOp: dAppOp
+        });
+        vm.stopPrank();
     }
 
     function _setupBorrowRepayTestUsingBasicSwapIntent(address rfqSolver) internal returns (SolverOperation[] memory solverOps){
