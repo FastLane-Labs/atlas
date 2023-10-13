@@ -38,7 +38,7 @@ contract DAppVerification is EIP712, DAppIntegration {
     // the supply chain to submit data.  If any other party
     // (user, solver, FastLane,  or a collusion between
     // all of them) attempts to alter it, this check will fail
-    function _verifyDApp(DAppConfig calldata dConfig, DAppOperation calldata dAppOp)
+    function _verifyDApp(DAppConfig memory dConfig, DAppOperation calldata dAppOp)
         internal
         returns (bool)
     {
@@ -213,7 +213,7 @@ contract DAppVerification is EIP712, DAppIntegration {
     //
 
     // Verify the user's meta transaction
-    function _verifyUser(DAppConfig calldata dConfig, UserOperation calldata userOp)
+    function _verifyUser(DAppConfig memory dConfig, UserOperation calldata userOp)
         internal
         returns (bool)
     {

@@ -12,10 +12,6 @@ library CallVerification {
         userOpHash = keccak256(abi.encode(userOp));
     }
 
-    function getBidsHash(BidData[] memory bidData) internal pure returns (bytes32 bidsHash) {
-        return keccak256(abi.encode(bidData));
-    }
-
     function getCallChainHash(
         DAppConfig memory dConfig,
         UserOperation memory userOp,

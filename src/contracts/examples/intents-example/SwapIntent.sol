@@ -266,7 +266,7 @@ contract SwapIntentController is DAppControl {
     }
 
     function getBidValue(SolverOperation calldata solverOp)
-        external
+        public
         pure
         override
         returns (uint256) 

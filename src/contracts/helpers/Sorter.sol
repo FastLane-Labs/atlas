@@ -32,7 +32,7 @@ contract Sorter {
         SolverOperation[] calldata solverOps
     ) external view returns (SolverOperation[] memory) {
 
-        DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig();
+        DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
 
         uint256 count = solverOps.length;
 

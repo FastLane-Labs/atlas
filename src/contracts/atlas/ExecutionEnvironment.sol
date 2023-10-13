@@ -262,10 +262,7 @@ contract ExecutionEnvironment is Base {
         // msg.sender = escrow
         // address(this) = ExecutionEnvironment
 
-        uint256 payment;
-        uint256 netBidAmount;
-     
-        payment = (bidAmount * 5) / 100;
+        uint256 payment = (bidAmount * 5) / 100;
 
         if (bidToken != address(0)) {
             SafeTransferLib.safeTransfer(ERC20(bidToken), address(0xa71a5), payment);

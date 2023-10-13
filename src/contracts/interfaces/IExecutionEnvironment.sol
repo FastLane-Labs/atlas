@@ -22,10 +22,8 @@ interface IExecutionEnvironment {
         bytes calldata dAppReturnData
     ) external payable;
 
-    function allocateValue(
-        BidData[] calldata bids, // Converted to memory
-        bytes memory returnData
-    ) external;
+    function allocateValue(address bidToken, uint256 bidAmount, bytes memory returnData) 
+        external;
 
     function getUser() external pure returns (address user);
     function getControl() external pure returns (address control);

@@ -28,17 +28,6 @@ contract Atlas is Test, Factory {
 
     constructor(uint32 _escrowDuration, address _simulator) Factory(_escrowDuration, _simulator) {}
 
-    function createExecutionEnvironment(address dAppControl) external returns (address executionEnvironment) {
-        executionEnvironment = _setExecutionEnvironment(dAppControl, msg.sender, dAppControl.codehash);
-        _initializeNonce(msg.sender);
-    }
-
-    function getExecutionEnvironment(address user, address dAppControl) external view returns (address executionEnvironment, uint32 callConfig, bool exists) {
-        callConfig = IDAppControl(dAppControl).callConfig();
-        executionEnvironment = _getExecutionEnvironmentCustom(user, dAppControl.codehash, dAppControl, callConfig);
-        exists = executionEnvironment.codehash != bytes32(0);
-    }
-
     function metacall( // <- Entrypoint Function
         UserOperation calldata userOp, // set by user
         SolverOperation[] calldata solverOps, // supplied by FastLane via frontend integration

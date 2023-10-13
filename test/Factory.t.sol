@@ -35,8 +35,8 @@ contract DummyDAppControl is DAppControl {
     function _preOpsCall(UserOperation calldata) internal override returns (bytes memory) {}
     function _allocateValueCall(address, uint256, bytes calldata) internal override {}
     // function getPayeeData(bytes calldata) external view override returns (PayeeData[] memory) {}
-    function getBidFormat(UserOperation calldata) external view override returns (address) {}
-    function getBidValue(SolverOperation calldata) external view override returns (uint256) {}
+    function getBidFormat(UserOperation calldata) public view override returns (address) {}
+    function getBidValue(SolverOperation calldata) public view override returns (uint256) {}
 }
 
 contract FactoryTest is BaseTest {
@@ -71,13 +71,14 @@ contract FactoryTest is BaseTest {
             TestUtils.computeExecutionEnvironment(payable(atlas), userOp, address(dAppControl));
 
         assertEq(
-            atlas.createExecutionEnvironment(dAppControl.getDAppConfig()),
+            atlas.createExecutionEnvironment(address(dAppControl)),
             expectedExecutionEnvironment,
             "Create exec env address not same as predicted"
         );
 
+        (address executionEnvironment,,) = atlas.getExecutionEnvironment(userOp.from, address(dAppControl));
         assertEq(
-            atlas.getExecutionEnvironment(userOp.from, address(dAppControl)),
+            executionEnvironment,
             expectedExecutionEnvironment,
             "atlas.getExecEnv address not same as predicted"
         );

@@ -120,9 +120,6 @@ contract V2DAppControl is DAppControl {
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
 
-        // NOTE: DAppVerification has verified the BidData[] format
-        // BidData[0] = address(WETH) <== WETH
-
         address user = _user();
 
         // Refund the user any extra gas costs
@@ -180,7 +177,7 @@ contract V2DAppControl is DAppControl {
     }
 
     function getBidValue(SolverOperation calldata solverOp)
-        external
+        public
         pure
         override
         returns (uint256) 

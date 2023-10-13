@@ -1,7 +1,6 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import {BidData} from "../types/SolverCallTypes.sol";
 import "../types/ValidCallsTypes.sol";
 
 error UserSimulationFailed();

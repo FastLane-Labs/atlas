@@ -2,7 +2,7 @@
 pragma solidity ^0.8.16;
 
 bytes32 constant USER_TYPE_HASH = keccak256(
-    "UserCall(address from,address to,uint256 value,uint256 gas,uint256 maxFeePerGas,uint256 nonce,uint256 deadline,address dapp,address control,bytes32 data)"
+    "UserOperation(address from,address to,uint256 value,uint256 gas,uint256 maxFeePerGas,uint256 nonce,uint256 deadline,address dapp,address control,bytes32 data)"
 );
 
 struct UserOperation {

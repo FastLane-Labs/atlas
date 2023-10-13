@@ -158,10 +158,6 @@ contract V4DAppControl is DAppControl {
         // msg.sender = Escrow
 
         require(!_currentKey.initialized, "ERR-H09 AlreadyInitialized");
-        
-        // NOTE: DAppVerification has verified the BidData[] format
-        // BidData[0] = token0
-        // BidData[1] = token1
 
         IPoolManager.PoolKey memory key; // todo: finish
 
@@ -249,7 +245,7 @@ contract V4DAppControl is DAppControl {
     }
 
     function getBidValue(SolverOperation calldata solverOp)
-        external
+        public
         pure
         override
         returns (uint256) 

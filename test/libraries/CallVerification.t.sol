@@ -9,7 +9,6 @@ import "../base/TestUtils.sol";
 
 contract CallVerificationTest is Test {
     using CallVerification for UserOperation;
-    using CallVerification for BidData[];
 
     function buildUserOperation() internal pure returns (UserOperation memory) {
         return UserOperation({
@@ -46,14 +45,6 @@ contract CallVerificationTest is Test {
         });
     }
 
-    function buildBidData(uint256 n) internal pure returns (BidData[] memory) {
-        BidData[] memory bidData = new BidData[](n);
-        for (uint256 i = 0; i < n; i++) {
-            bidData[i] = BidData({token: address(0x1), bidAmount: i});
-        }
-        return bidData;
-    }
-
     function testGetUserCallHash() public {
         this._testGetUserCallHash(buildUserOperation());
     }
@@ -62,18 +53,9 @@ contract CallVerificationTest is Test {
         assertEq(userOp.getUserOperationHash(), keccak256(abi.encode(userOp)));
     }
 
-    function testGetBidsHash() public {
-        // 1 bid
-        BidData[] memory bidData = buildBidData(1);
-        assertEq(bidData.getBidsHash(), keccak256(abi.encode(bidData)));
-
-        // multiple bids
-        bidData = buildBidData(3);
-        assertEq(bidData.getBidsHash(), keccak256(abi.encode(bidData)));
-    }
 
     function testGetCallChainHash() public {
-        DAppConfig memory dConfig = DAppConfig({to: address(0x1), callConfig: 1});
+        DAppConfig memory dConfig = DAppConfig({to: address(0x1), callConfig: 1, bidToken: address(0)});
         UserOperation memory userOp = buildUserOperation();
         SolverOperation[] memory solverOps = new SolverOperation[](2);
         solverOps[0] = builderSolverOperation();

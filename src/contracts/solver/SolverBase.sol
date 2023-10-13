@@ -30,12 +30,12 @@ contract SolverBase {
         _escrow = atlasEscrow;
     }
 
-    function atlasSolverCall(address sender, BidData[] calldata bids, bytes calldata solverOpData, bytes calldata extraReturnData)
+    function atlasSolverCall(address sender, address bidToken, uint256 bidAmount, bytes calldata solverOpData, bytes calldata extraReturnData)
         external
         payable
         safetyFirst(sender)
         repayBorrowedEth()
-        payBids(bids)
+        payBids(bidToken, bidAmount)
         returns (bool success, bytes memory data)
     {
         (success, data) = address(this).call{value: msg.value}(solverOpData);
@@ -61,53 +61,29 @@ contract SolverBase {
         // require(ISafetyLocks(_escrow).solverSafetyCallback{value: msgValueOwed}(msg.sender), "INVALID SEQUENCE");
     }
 
-    modifier payBids(BidData[] calldata bids) {
+    modifier payBids(address bidToken, uint256 bidAmount) {
         // Track starting balances
-        uint256[] memory balances = new uint256[](bids.length);
-        uint256 i;
-        for (; i < bids.length;) {
-            balances[i] = ERC20(bids[i].token != address(0) ? bids[i].token : WETH_ADDRESS).balanceOf(address(this));
-
-            unchecked {
-                ++i;
-            }
-        }
+    
+        uint256 bidBalance = bidToken == address(0) ? address(this).balance - msg.value : ERC20(bidToken).balanceOf(address(this));
 
         _;
 
-        uint256 newBalance;
-        uint256 balanceDelta;
         // Handle bid payment
-        i = 0;
-        for (; i < bids.length;) {
-            newBalance = ERC20(bids[i].token != address(0) ? bids[i].token : WETH_ADDRESS).balanceOf(address(this));
+        // assumes msg.value balance has already been repaid
+        uint256 newBalance = bidToken == address(0) ? address(this).balance - msg.value : ERC20(bidToken).balanceOf(address(this));
 
-            balanceDelta = newBalance > balances[i] ? newBalance - balances[i] : 0;
+        uint256 balanceDelta = newBalance > bidBalance ? newBalance - bidBalance : 0;
 
-            /*
-            console.log("---SOLVER BID---");
-            console.log("Solver      ",address(this));
-            console.log("BidToken      ",bids[i].token);
-            console.log("BalanceDelta  ",balanceDelta);
-            console.log("BidAmount     ",bids[i].bidAmount);
-            console.log("SolverProfit", balanceDelta > bids[i].bidAmount ? balanceDelta - bids[i].bidAmount : 0);
-            console.log("---============---");
-            */
+            
 
-            // Ether balance
-            if (bids[i].token == address(0)) {
-                IWETH9(WETH_ADDRESS).withdraw(bids[i].bidAmount);
-                SafeTransferLib.safeTransferETH(msg.sender, bids[i].bidAmount);
+        // Ether balance
+        if (bidToken == address(0)) {
+            SafeTransferLib.safeTransferETH(msg.sender, bidAmount);
 
-                // ERC20 balance
-            } else {
-                SafeTransferLib.safeTransfer(ERC20(bids[i].token), msg.sender, bids[i].bidAmount);
-            }
-            unchecked {
-                ++i;
-            }
-        }
-        
+            // ERC20 balance
+        } else {
+            SafeTransferLib.safeTransfer(ERC20(bidToken), msg.sender, bidAmount);
+        }    
     }
 
     modifier repayBorrowedEth() {

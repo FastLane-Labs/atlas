@@ -27,7 +27,7 @@ contract Factory is Test, Escrow, Permit69 {
         salt = keccak256(abi.encodePacked(block.chainid, atlas, "Atlas 1.0"));
 
         execution =
-            _deployExecutionEnvironmentTemplate(address(this), DAppConfig({to: address(0), callConfig: uint32(0)}));
+            _deployExecutionEnvironmentTemplate(address(this), DAppConfig({to: address(0), callConfig: uint32(0), bidToken: address(0)}));
     }
 
     // GETTERS
@@ -39,12 +39,15 @@ contract Factory is Test, Escrow, Permit69 {
         escrowAddress = atlas;
     }
 
-    function getExecutionEnvironment(address userAddress, address controller)
-        external
-        view
-        returns (address executionEnvironment)
-    {
-        executionEnvironment = _getExecutionEnvironment(userAddress, controller.codehash, controller);
+    function createExecutionEnvironment(address dAppControl) external returns (address executionEnvironment) {
+        executionEnvironment = _setExecutionEnvironment(dAppControl, msg.sender, dAppControl.codehash);
+        _initializeNonce(msg.sender);
+    }
+
+    function getExecutionEnvironment(address user, address dAppControl) external view returns (address executionEnvironment, uint32 callConfig, bool exists) {
+        callConfig = IDAppControl(dAppControl).callConfig();
+        executionEnvironment = _getExecutionEnvironmentCustom(user, dAppControl.codehash, dAppControl, callConfig);
+        exists = executionEnvironment.codehash != bytes32(0);
     }
 
     function _getExecutionEnvironment(address user, bytes32 controlCodeHash, address controller)
@@ -52,9 +55,9 @@ contract Factory is Test, Escrow, Permit69 {
         view
         returns (address executionEnvironment)
     {
-        DAppConfig memory dConfig = IDAppControl(controller).getDAppConfig();
+        uint32 callConfig = IDAppControl(controller).callConfig();
         
-        executionEnvironment = _getExecutionEnvironmentCustom(user, controlCodeHash, dConfig.to, dConfig.callConfig);
+        executionEnvironment = _getExecutionEnvironmentCustom(user, controlCodeHash, controller, callConfig);
     }
 
     // NOTE: This func is used to generate the address of user ExecutionEnvironments that have

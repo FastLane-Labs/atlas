@@ -80,7 +80,7 @@ library TestUtils {
         view
         returns (address executionEnvironment)
     {
-        DAppConfig memory dConfig = IDAppControl(controller).getDAppConfig();
+        DAppConfig memory dConfig = IDAppControl(controller).getDAppConfig(userOp);
 
         executionEnvironment = address(
             uint160(

@@ -17,7 +17,6 @@ import "forge-std/Test.sol";
 
 contract TxBuilder {
     using CallVerification for UserOperation;
-    using CallVerification for BidData[];
 
     address public immutable control;
     address public immutable escrow;
@@ -30,10 +29,6 @@ contract TxBuilder {
         escrow = escrowAddress;
         atlas = atlasAddress;
         gas = 1_000_000;
-    }
-
-    function getDAppConfig() public view returns (DAppConfig memory) {
-        return IDAppControl(control).getDAppConfig();
     }
 
     function solverNextNonce(address solverSigner) public view returns (uint256) {
@@ -75,13 +70,13 @@ contract TxBuilder {
             deadline: deadline,
             dapp: to,
             control: control,
-            data: data
+            data: data,
+            signature: new bytes(0)
         });
     }
 
     function buildSolverOperation(
         UserOperation memory userOp,
-        DAppConfig memory,
         bytes memory solverOpData,
         address solverEOA,
         address solverContract,
@@ -108,14 +103,12 @@ contract TxBuilder {
 
     function buildDAppOperation(
         address governanceEOA,
-        DAppConfig memory dConfig,
         UserOperation memory userOp,
         SolverOperation[] memory solverOps
     ) public view returns (DAppOperation memory dAppOp) {
-        dAppOp.to = atlas;
-        if (dConfig.callConfig == 0) {
-            dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
-        }
+       
+        DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
+        
         bytes32 userOpHash = userOp.getUserOperationHash();
         bytes32 callChainHash = CallVerification.getCallChainHash(dConfig, userOp, solverOps);
 
@@ -127,7 +120,7 @@ contract TxBuilder {
             maxFeePerGas: userOp.maxFeePerGas,
             nonce: governanceNextNonce(governanceEOA),
             deadline: userOp.deadline,
-            control: dConfig.to,
+            control: userOp.control,
             userOpHash: userOpHash,
             callChainHash: callChainHash,
             signature: new bytes(0)

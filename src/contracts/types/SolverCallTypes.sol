@@ -23,7 +23,3 @@ struct SolverOperation {
     bytes signature;
 }
 
-struct BidData {
-    address token;
-    uint256 bidAmount;
-}
