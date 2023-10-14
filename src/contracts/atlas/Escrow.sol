@@ -7,8 +7,8 @@ import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
 import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 
-import {SafetyLocks} from "./SafetyLocks.sol";
 import {DAppVerification} from "./DAppVerification.sol";
+import {Permit69} from "../common/Permit69.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
@@ -23,7 +23,7 @@ import {SafetyBits} from "../libraries/SafetyBits.sol";
 
 import "forge-std/Test.sol";
 
-contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
+abstract contract Escrow is Permit69, DAppVerification, FastLaneErrorsEvents {
     using ECDSA for bytes32;
     using EscrowBits for uint256;
     using CallBits for uint32;    
@@ -43,7 +43,7 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
     GasDonation[] internal _donations;
     AccountingData internal _accData;
 
-    constructor(uint32 escrowDurationFromFactory, address _simulator) SafetyLocks(_simulator) {
+    constructor(uint32 escrowDurationFromFactory, address _simulator) Permit69(_simulator) {
         escrowDuration = escrowDurationFromFactory;
     }
 
@@ -86,16 +86,32 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
         // NOTE: All donations in excess of 10% greater than cost are forwarded
         // to the surplusReceiver. 
 
-        // TODO check this is compatible with smart wallets and solver donations
-        require(msg.sender == activeEnvironment, "ERR-E079 DonateRequiresLock");
-
         // TODO: Consider making this a higher donation threshold to avoid ddos attacks
         if (msg.value == 0) {
             return;
         }
 
-        uint32 gasRebate = uint32(msg.value / tx.gasprice);
+        uint32 gasRebate;
 
+        uint256 debt = _accData.ethBorrowed[surplusRecipient];
+        if (debt > 0) {
+            if (debt > msg.value) {
+                _accData.ethBorrowed[surplusRecipient] = debt - msg.value;
+                return;
+            } 
+            
+            if (debt == msg.value) {
+                _accData.ethBorrowed[surplusRecipient] = 0;
+                return;  
+            }
+            
+            gasRebate = uint32((msg.value - debt) / tx.gasprice);
+            
+
+        } else {
+            gasRebate = uint32(msg.value / tx.gasprice);
+        }
+        
         console.log("donateToBundler: tx.gasprice:", tx.gasprice);
         console.log("donateToBundler: gasRebate:", gasRebate);
 
@@ -547,6 +563,37 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
         uint256 debt = _accData.ethBorrowed[borrower];
         require(debt > 0, "ERR-E081 NoDebtToRepay");
         _accData.ethBorrowed[borrower] = debt - msg.value;
+    }
+
+    function getAmountOwed(address borrower) external payable returns (uint256 amountOwed) {
+        // Any msg.value will go towards the debt. 
+        uint256 amountOwed = _accData.ethBorrowed[borrower];
+
+        if (amountOwed == 0) {
+            if (msg.value > 0) {
+                SafeTransferLib.safeTransferETH(msg.sender, msg.value);
+            }
+            return 0;
+        }
+
+        if (msg.value > 0) {
+            if (msg.value > amountOwed) {
+                _accData.ethBorrowed[borrower] = 0;
+                SafeTransferLib.safeTransferETH(msg.sender, msg.value - amountOwed);
+                return 0;
+            }
+
+            if (msg.value == amountOwed) {
+                _accData.ethBorrowed[borrower] = 0;
+                return 0;
+            }
+
+            amountOwed -= msg.value;
+            _accData.ethBorrowed[borrower] = amountOwed;
+            return amountOwed;
+        }
+
+        return amountOwed;
     }
 
     receive() external payable {}

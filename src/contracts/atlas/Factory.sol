@@ -6,7 +6,6 @@ import {IDAppControl} from "../interfaces/IDAppControl.sol";
 import {Escrow} from "./Escrow.sol";
 import {Mimic} from "./Mimic.sol";
 import {ExecutionEnvironment} from "./ExecutionEnvironment.sol";
-import {Permit69} from "../common/Permit69.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
@@ -14,30 +13,29 @@ import "../types/DAppApprovalTypes.sol";
 
 import {CallBits} from "../libraries/CallBits.sol";
 
-import "forge-std/Test.sol";
-
-contract Factory is Test, Escrow, Permit69 {
+contract Factory is Escrow {
     //address immutable public atlas;
     using CallBits for uint32;
+    
     bytes32 public immutable salt;
-    address public immutable execution;
+    address public immutable executionTemplate;
 
     constructor(uint32 _escrowDuration, address _simulator) Escrow(_escrowDuration, _simulator) {
         //atlas = msg.sender;
         salt = keccak256(abi.encodePacked(block.chainid, atlas, "Atlas 1.0"));
 
-        execution =
+        executionTemplate =
             _deployExecutionEnvironmentTemplate(address(this), DAppConfig({to: address(0), callConfig: uint32(0), bidToken: address(0)}));
     }
 
     // GETTERS
-    function environment() public view override returns (address _environment) {
-        _environment = activeEnvironment;
-    }
-
     function getEscrowAddress() external view returns (address escrowAddress) {
         escrowAddress = atlas;
     }
+
+    function execution() external view returns (address) {
+        return executionTemplate;
+    } 
 
     function createExecutionEnvironment(address dAppControl) external returns (address executionEnvironment) {
         executionEnvironment = _setExecutionEnvironment(dAppControl, msg.sender, dAppControl.codehash);
@@ -69,16 +67,6 @@ contract Factory is Test, Escrow, Permit69 {
         returns (address executionEnvironment)
     {
         
-        /*
-        if (controlCodeHash == bytes32(0)) {
-            controlCodeHash = controller.codehash;
-        }
-
-        if (callConfig == 0) {
-            callConfig = CallBits.buildCallConfig(controller);
-        }
-        */
-        
         executionEnvironment = address(
             uint160(
                 uint256(
@@ -90,7 +78,7 @@ contract Factory is Test, Escrow, Permit69 {
                             keccak256(
                                 abi.encodePacked(
                                     _getMimicCreationCode(
-                                        controller, callConfig, execution, user, controlCodeHash
+                                        controller, callConfig, user, controlCodeHash
                                     )
                                 )
                             )
@@ -108,7 +96,7 @@ contract Factory is Test, Escrow, Permit69 {
         uint32 callConfig = IDAppControl(dAppControl).callConfig();
 
         bytes memory creationCode =
-            _getMimicCreationCode(dAppControl, callConfig, execution, user, controlCodeHash);
+            _getMimicCreationCode(dAppControl, callConfig, user, controlCodeHash);
 
         executionEnvironment = address(
             uint160(
@@ -146,10 +134,10 @@ contract Factory is Test, Escrow, Permit69 {
     function _getMimicCreationCode(
         address controller,
         uint32 callConfig,
-        address executionLib,
         address user,
         bytes32 controlCodeHash
-    ) internal pure returns (bytes memory creationCode) {
+    ) internal view returns (bytes memory creationCode) {
+        address executionLib = executionTemplate;
         // NOTE: Changing compiler settings or solidity versions can break this.
         creationCode = type(Mimic).creationCode;
         assembly {

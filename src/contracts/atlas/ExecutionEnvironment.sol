@@ -157,7 +157,7 @@ contract ExecutionEnvironment is Base {
         uint256 bidBalance;
         // Ether balance
         if (solverOp.bidToken == address(0)) {
-            bidBalance = address(this).balance; // NOTE: this is the meta tx value
+            bidBalance = address(this).balance - solverOp.value; // NOTE: this is the meta tx value
             etherIsBidToken = true;
         // ERC20 balance
         } else {
@@ -249,7 +249,7 @@ contract ExecutionEnvironment is Base {
         // TODO: Add in a more discerning func that'll silo the 
         // donations to prevent double counting.
         // TODO: repayment check added to Escrow.sol - do we still need this balance check?
-        if (atlas.balance < escrowBalance) {
+        if (IEscrow(atlas).getAmountOwed(solverOp.from) != 0) {
             revert FastLaneErrorsEvents.SolverMsgValueUnpaid();
         }
     }

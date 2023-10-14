@@ -254,6 +254,8 @@ contract Permit69Test is BaseTest {
 // TODO probably refactor some of this stuff to a shared folder of standard implementations
 // Mock Atlas with standard implementations of Permit69's virtual functions
 contract MockAtlasForPermit69Tests is Permit69 {
+    constructor() Permit69(address(0)) {}
+    
     // Declared in SafetyLocks.sol in the canonical Atlas system
     // The only property relevant to testing Permit69 is _escrowKey.lockState (bitwise uint16)
     EscrowKey internal _escrowKey;
@@ -279,10 +281,6 @@ contract MockAtlasForPermit69Tests is Permit69 {
 
     function setEnvironment(address activeEnvironment) public {
         _environment = activeEnvironment;
-    }
-
-    function environment() public view override returns (address activeEnvironment) {
-        activeEnvironment = _environment;
     }
 
     // Overriding the virtual functions in Permit69

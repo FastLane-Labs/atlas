@@ -18,7 +18,7 @@ interface IWETH9 {
 
 // TODO add donateToBundler helper function for solvers
 
-contract SolverBase {
+contract SolverBase is Test {
     address public constant WETH_ADDRESS = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
     // TODO consider making these accessible (internal) for solvers which may want to use them
@@ -34,7 +34,6 @@ contract SolverBase {
         external
         payable
         safetyFirst(sender)
-        repayBorrowedEth()
         payBids(bidToken, bidAmount)
         returns (bool success, bytes memory data)
     {
@@ -64,30 +63,32 @@ contract SolverBase {
     modifier payBids(address bidToken, uint256 bidAmount) {
         // Track starting balances
     
-        uint256 bidBalance = bidToken == address(0) ? address(this).balance - msg.value : ERC20(bidToken).balanceOf(address(this));
+        uint256 bidBalance = bidToken == address(0) ? 
+            address(this).balance - msg.value : 
+            ERC20(bidToken).balanceOf(address(this));
 
         _;
 
         // Handle bid payment
-        // assumes msg.value balance has already been repaid
-        uint256 newBalance = bidToken == address(0) ? address(this).balance - msg.value : ERC20(bidToken).balanceOf(address(this));
-
-        uint256 balanceDelta = newBalance > bidBalance ? newBalance - bidBalance : 0;
-
-            
 
         // Ether balance
         if (bidToken == address(0)) {
+            uint256 ethOwed = bidAmount + msg.value;
+            if (ethOwed > address(this).balance) {
+                IWETH9(WETH_ADDRESS).withdraw(ethOwed - address(this).balance);
+            }
+
             SafeTransferLib.safeTransferETH(msg.sender, bidAmount);
 
-            // ERC20 balance
+        // ERC20 balance
         } else {
-            SafeTransferLib.safeTransfer(ERC20(bidToken), msg.sender, bidAmount);
-        }    
-    }
+            if (msg.value > address(this).balance) {
+                IWETH9(WETH_ADDRESS).withdraw(msg.value - address(this).balance);
+            }
 
-    modifier repayBorrowedEth() {
-        _;
+            SafeTransferLib.safeTransfer(ERC20(bidToken), msg.sender, bidAmount);
+        }
+
         if(msg.value > 0){
             IEscrow(_escrow).repayBorrowedEth{value: msg.value}(address(this));
         }

@@ -10,9 +10,7 @@ import "../types/DAppApprovalTypes.sol";
 
 import "../types/LockTypes.sol";
 
-import "forge-std/Test.sol";
-
-contract SafetyLocks is Test {
+contract SafetyLocks {
     using SafetyBits for EscrowKey;
     using CallBits for uint32;
 
