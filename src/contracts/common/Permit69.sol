@@ -3,7 +3,7 @@ pragma solidity ^0.8.16;
 
 import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
-import {SafetyLocks} from "../atlas/SafetyLocks.sol";
+import {GasAccounting} from "../atlas/GasAccounting.sol";
 
 import "../types/LockTypes.sol";
 
@@ -20,10 +20,10 @@ import {EXECUTION_PHASE_OFFSET, SAFETY_LEVEL_OFFSET, SAFE_USER_TRANSFER, SAFE_DA
 // token approval to the Atlas main contract, and only during specific phases
 // of the Atlas execution process.
 
-abstract contract Permit69 is SafetyLocks {
+abstract contract Permit69 is GasAccounting {
     using SafeTransferLib for ERC20;
 
-    constructor(address _simulator) SafetyLocks(_simulator) {}
+    constructor(address _simulator) GasAccounting(_simulator) {}
 
     // Virtual Functions defined by other Atlas modules
     function _getExecutionEnvironmentCustom(
