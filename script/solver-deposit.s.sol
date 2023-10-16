@@ -27,8 +27,7 @@ contract SolverAtlasDepositScript is DeployBaseScript {
         vm.startBroadcast(privateKey);
 
         // Solver deposits 1 ETH into Atlas on his own behalf
-        atlas.deposit{value: 1 ether}();
-        uint256 newLockedBalance = atlas.lock(1 ether);
+        (uint256 newLockedBalance,) = atlas.depositAndEscrowBalance{value: 1 ether}();
 
         vm.stopBroadcast();
 

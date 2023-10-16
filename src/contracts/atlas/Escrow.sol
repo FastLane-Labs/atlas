@@ -98,9 +98,9 @@ contract Escrow is Test, ERC20, DAppVerification, SafetyLocks, FastLaneErrorsEve
     /// EXTERNAL FUNCTIONS FOR SOLVER INTERACTION ///
     ///////////////////////////////////////////////////
 
-    // Deposit ETH and get AETH in return. The minted AETH amount is added to the unlocked balance,
+    // Deposit ETH and get atlETH in return. The minted atlETH amount is added to the unlocked balance,
     // meaning it can be freely transferred or withdrawn, but won't be available for escrow.
-    // After depositing, call lock() to escrow the AETH and begin bidding.
+    // After depositing, call lock() to escrow the atlETH and begin bidding.
     function deposit() external payable returns (uint256 newUnlockedBalance, uint256 newBalance) {
         _mint(msg.sender, msg.value);
         unlockedBalanceOf[msg.sender] += msg.value;
@@ -108,7 +108,7 @@ contract Escrow is Test, ERC20, DAppVerification, SafetyLocks, FastLaneErrorsEve
         newBalance = balanceOf[msg.sender];
     }
 
-    // Redeem AETH for ETH. Only unlocked (non-escrowed) AETH can be redeemed.
+    // Redeem atlETH for ETH. Only unlocked (non-escrowed) atlETH can be redeemed.
     function withdraw(uint256 amount) external returns (uint256 newUnlockedBalance, uint256 newBalance) {
         require(unlockedBalanceOf[msg.sender] >= amount, "ERR-E078 InsufficientUnlockedBalance");
         _burn(msg.sender, amount);
@@ -118,17 +118,17 @@ contract Escrow is Test, ERC20, DAppVerification, SafetyLocks, FastLaneErrorsEve
         newBalance = balanceOf[msg.sender];
     }
 
-    // Lock AETH in escrow.
-    function lock(uint256 amount) external onlyWhenUnlocked returns (uint256 newLockedBalance) {
+    // Lock atlETH in escrow.
+    function escrowBalance(uint256 amount) external onlyWhenUnlocked returns (uint256 newLockedBalance) {
         require(unlockedBalanceOf[msg.sender] >= amount, "ERR-E079 InsufficientUnlockedBalance");
         unlockedBalanceOf[msg.sender] -= amount;
         _escrowData[msg.sender].total += amount;
         newLockedBalance = uint256(_escrowData[msg.sender].total);
     }
 
-    // Unlock AETH from escrow. Only eligible after the escrowDuration from the last solver's
+    // Unlock atlETH from escrow. Only eligible after the escrowDuration from the last solver's
     // interaction with the contract has elapsed.
-    function unlock(uint256 amount) external onlyWhenUnlocked returns (uint256 newLockedBalance) {
+    function unescrowBalance(uint256 amount) external onlyWhenUnlocked returns (uint256 newLockedBalance) {
         require(
             block.number >= uint256(_escrowData[msg.sender].lastAccessed) + uint256(escrowDuration), "ERR-E080 TooEarly"
         );
@@ -136,6 +136,34 @@ contract Escrow is Test, ERC20, DAppVerification, SafetyLocks, FastLaneErrorsEve
         unlockedBalanceOf[msg.sender] += amount;
         _escrowData[msg.sender].total -= amount;
         newLockedBalance = uint256(_escrowData[msg.sender].total);
+    }
+
+    function depositAndEscrowBalance()
+        external
+        payable
+        onlyWhenUnlocked
+        returns (uint256 newLockedBalance, uint256 newBalance)
+    {
+        _mint(msg.sender, msg.value);
+        _escrowData[msg.sender].total += msg.value;
+        newLockedBalance = uint256(_escrowData[msg.sender].total);
+        newBalance = balanceOf[msg.sender];
+    }
+
+    function unescrowBalanceAndWithdraw(uint256 amount)
+        external
+        onlyWhenUnlocked
+        returns (uint256 newLockedBalance, uint256 newBalance)
+    {
+        require(
+            block.number >= uint256(_escrowData[msg.sender].lastAccessed) + uint256(escrowDuration), "ERR-E080 TooEarly"
+        );
+        require(_escrowData[msg.sender].total >= amount, "ERR-E081 InsufficientLockedBalance");
+        _escrowData[msg.sender].total -= amount;
+        _burn(msg.sender, amount);
+        SafeTransferLib.safeTransferETH(msg.sender, amount);
+        newLockedBalance = uint256(_escrowData[msg.sender].total);
+        newBalance = balanceOf[msg.sender];
     }
 
     function nextSolverNonce(address solverSigner) external view returns (uint256 nextNonce) {
