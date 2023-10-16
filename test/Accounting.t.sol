@@ -134,9 +134,8 @@ contract AccountingTest is BaseTest {
         uint256 atlasStartBalance = solverMsgValue * 12 / 10;
 
         deal(userEOA, userMsgValue);
-        vm.startPrank(solverTwoEOA);
+        vm.prank(solverTwoEOA);
         atlas.depositAndEscrowBalance{value: atlasStartBalance}(); // Solver borrows 1 ETH from Atlas balance
-        vm.stopPrank();
 
         // Swap 10 WETH for 20 DAI
         SwapIntent memory swapIntent = SwapIntent({
