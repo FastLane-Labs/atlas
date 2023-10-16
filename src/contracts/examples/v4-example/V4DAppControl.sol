@@ -63,6 +63,7 @@ contract V4DAppControl is DAppControl {
                 requirePostOps: false,
                 zeroSolvers: true,
                 reuseUserOp: false,
+                userBundler: true,
                 solverBundler: true,
                 unknownBundler: true,
                 forwardReturnData: false

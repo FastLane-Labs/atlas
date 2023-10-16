@@ -41,6 +41,7 @@ struct CallConfig {
     bool requirePostOps;
     bool zeroSolvers;
     bool reuseUserOp;
+    bool userBundler;
     bool solverBundler;
     bool unknownBundler;
     bool forwardReturnData;
@@ -58,6 +59,7 @@ enum CallConfigIndex {
     RequirePostOpsCall,
     ZeroSolvers,
     ReuseUserOp,
+    UserBundler,
     SolverBundler,
     UnknownBundler,
     ForwardReturnData
