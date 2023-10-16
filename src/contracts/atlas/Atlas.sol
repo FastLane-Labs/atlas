@@ -214,8 +214,12 @@ contract Atlas is Test, Factory {
         }
 
         // bundler checks
-        // user is bundling their own operation - always allowed, check valid dapp signature/callchainhash
+        // user is bundling their own operation - check allowed and valid dapp signature/callchainhash
         if(msg.sender == userOp.call.from) {
+            if(!dConfig.callConfig.allowsUserBundler()) {
+                return ValidCallsResult.UnknownBundlerNotAllowed;
+            }
+
             // user should not include their own signature, they already signed the transaction
             if(userOp.signature.length > 0) {
                 return ValidCallsResult.UserSignatureInvalid;
