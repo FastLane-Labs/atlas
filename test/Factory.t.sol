@@ -32,11 +32,11 @@ contract DummyDAppControl is DAppControl {
         )
     {}
 
-    function _preOpsCall(UserCall calldata) internal override returns (bytes memory) {}
-    function _allocateValueCall(bytes calldata) internal override {}
+    function _preOpsCall(UserOperation calldata) internal override returns (bytes memory) {}
+    function _allocateValueCall(address, uint256, bytes calldata) internal override {}
     // function getPayeeData(bytes calldata) external view override returns (PayeeData[] memory) {}
-    function getBidFormat(UserCall calldata) external view override returns (BidData[] memory) {}
-    function getBidValue(SolverOperation calldata) external view override returns (uint256) {}
+    function getBidFormat(UserOperation calldata) public view override returns (address) {}
+    function getBidValue(SolverOperation calldata) public view override returns (uint256) {}
 }
 
 contract FactoryTest is BaseTest {
@@ -53,30 +53,32 @@ contract FactoryTest is BaseTest {
     }
 
     function testExecutionEnvironmentAddress() public {
-        UserCall memory uCall = UserCall({
+        UserOperation memory userOp = UserOperation({
             from: address(this),
-            to: address(0x2),
+            to: address(atlas),
             deadline: 12,
             gas: 34,
             nonce: 56,
             maxFeePerGas: 78,
             value: 90,
+            dapp: address(0x2),
             control: address(0x3),
-            data: "data"
+            data: "data",
+            signature: "signature"
         });
-        UserOperation memory userOp = UserOperation({to: address(0x1), call: uCall, signature: "signature"});
 
         address expectedExecutionEnvironment =
             TestUtils.computeExecutionEnvironment(payable(atlas), userOp, address(dAppControl));
 
         assertEq(
-            atlas.createExecutionEnvironment(dAppControl.getDAppConfig()),
+            atlas.createExecutionEnvironment(address(dAppControl)),
             expectedExecutionEnvironment,
             "Create exec env address not same as predicted"
         );
 
+        (address executionEnvironment,,) = atlas.getExecutionEnvironment(userOp.from, address(dAppControl));
         assertEq(
-            atlas.getExecutionEnvironment(userOp, address(dAppControl)),
+            executionEnvironment,
             expectedExecutionEnvironment,
             "atlas.getExecEnv address not same as predicted"
         );

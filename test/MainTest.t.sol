@@ -45,8 +45,6 @@ contract MainTest is BaseTest {
         bytes32 r;
         bytes32 s;
 
-        DAppConfig memory dConfig = helper.getDAppConfig();
-
         UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, userEOA, TOKEN_ONE);
 
         (v, r, s) = vm.sign(userPK, IAtlas(address(atlas)).getUserOperationPayload(userOp));
@@ -57,28 +55,28 @@ contract MainTest is BaseTest {
         // First SolverOperation
         solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_ONE);
         solverOps[1] =
-            helper.buildSolverOperation(userOp, dConfig, solverOpData, solverOneEOA, address(solverOne), 2e17);
+            helper.buildSolverOperation(userOp, solverOpData, solverOneEOA, address(solverOne), 2e17);
 
-        (v, r, s) = vm.sign(solverOnePK, IAtlas(address(atlas)).getSolverPayload(solverOps[1].call));
+        (v, r, s) = vm.sign(solverOnePK, IAtlas(address(atlas)).getSolverPayload(solverOps[1]));
         solverOps[1].signature = abi.encodePacked(r, s, v);
         
         // Second SolverOperation
         solverOpData = helper.buildV2SolverOperationData(POOL_ONE, POOL_TWO);
         solverOps[0] =
-            helper.buildSolverOperation(userOp, dConfig, solverOpData, solverTwoEOA, address(solverTwo), 1e17);
+            helper.buildSolverOperation(userOp, solverOpData, solverTwoEOA, address(solverTwo), 1e17);
 
-        (v, r, s) = vm.sign(solverTwoPK, IAtlas(address(atlas)).getSolverPayload(solverOps[0].call));
+        (v, r, s) = vm.sign(solverTwoPK, IAtlas(address(atlas)).getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(r, s, v);
 
-        console.log("topBid before sorting",solverOps[0].bids[0].bidAmount);
+        console.log("topBid before sorting",solverOps[0].bidAmount);
         
         solverOps = sorter.sortBids(userOp, solverOps);
 
-        console.log("topBid after sorting ",solverOps[0].bids[0].bidAmount);
+        console.log("topBid after sorting ",solverOps[0].bidAmount);
 
         // DAppOperation call
         DAppOperation memory dAppOp =
-            helper.buildDAppOperation(governanceEOA, dConfig, userOp, solverOps);
+            helper.buildDAppOperation(governanceEOA, userOp, solverOps);
 
         (v, r, s) = vm.sign(governancePK, IAtlas(address(atlas)).getDAppOperationPayload(dAppOp));
 
@@ -86,7 +84,7 @@ contract MainTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        address executionEnvironment = IAtlas(address(atlas)).createExecutionEnvironment(dConfig);
+        address executionEnvironment = IAtlas(address(atlas)).createExecutionEnvironment(userOp.control);
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
         console.log("userEOA", userEOA);
@@ -102,7 +100,7 @@ contract MainTest is BaseTest {
 
         (bool success,) = address(atlas).call(
             abi.encodeWithSelector(
-                atlas.metacall.selector, dConfig, userOp, solverOps, dAppOp
+                atlas.metacall.selector, userOp, solverOps, dAppOp
             )
         );
 
@@ -118,27 +116,26 @@ contract MainTest is BaseTest {
         console.log("-");
 
         // Second attempt
-        dConfig = helper.getDAppConfig();
 
         userOp = helper.buildUserOperation(POOL_ONE, userEOA, TOKEN_ONE);
 
         // First SolverOperation
         solverOps[0] =
-            helper.buildSolverOperation(userOp, dConfig, solverOneEOA, address(solverOne), POOL_ONE, POOL_TWO, 2e17);
+            helper.buildSolverOperation(userOp, solverOneEOA, address(solverOne), POOL_ONE, POOL_TWO, 2e17);
 
-        (v, r, s) = vm.sign(solverOnePK, IAtlas(address(atlas)).getSolverPayload(solverOps[0].call));
+        (v, r, s) = vm.sign(solverOnePK, IAtlas(address(atlas)).getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(r, s, v);
 
         // Second SolverOperation
         solverOps[1] =
-            helper.buildSolverOperation(userOp, dConfig, solverTwoEOA, address(solverTwo), POOL_TWO, POOL_ONE, 1e17);
+            helper.buildSolverOperation(userOp, solverTwoEOA, address(solverTwo), POOL_TWO, POOL_ONE, 1e17);
 
-        (v, r, s) = vm.sign(solverTwoPK, IAtlas(address(atlas)).getSolverPayload(solverOps[1].call));
+        (v, r, s) = vm.sign(solverTwoPK, IAtlas(address(atlas)).getSolverPayload(solverOps[1]));
         solverOps[1].signature = abi.encodePacked(r, s, v);
 
         // DAppOperation call
         dAppOp =
-            helper.buildDAppOperation(governanceEOA, dConfig, userOp, solverOps);
+            helper.buildDAppOperation(governanceEOA, userOp, solverOps);
 
         (v, r, s) = vm.sign(governancePK, IAtlas(address(atlas)).getDAppOperationPayload(dAppOp));
 
@@ -146,13 +143,13 @@ contract MainTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        executionEnvironment = IAtlas(address(atlas)).getExecutionEnvironment(userOp, address(control));
+        executionEnvironment = IAtlas(address(atlas)).getExecutionEnvironment(userOp.from, address(control));
         
         userBalance = userEOA.balance;
 
         (success,) = address(atlas).call(
             abi.encodeWithSelector(
-                atlas.metacall.selector, dConfig, userOp, solverOps, dAppOp
+                atlas.metacall.selector, userOp, solverOps, dAppOp
             )
         );
 
@@ -219,22 +216,19 @@ contract MainTest is BaseTest {
         bytes32 r;
         bytes32 s;
 
-        DAppConfig memory dConfig = helper.getDAppConfig();
         UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, userEOA, TOKEN_ONE);
         (v, r, s) = vm.sign(userPK, IAtlas(address(atlas)).getUserOperationPayload(userOp));
         userOp.signature = abi.encodePacked(r, s, v);
 
         vm.startPrank(userEOA);
-        IAtlas(address(atlas)).createExecutionEnvironment(dConfig);
+        IAtlas(address(atlas)).createExecutionEnvironment(userOp.control);
 
         // Failure case, user hasn't approved Atlas for TOKEN_ONE, operation must fail
         assertFalse(simulator.simUserOperation(userOp), "UserOperation tested true");
-        assertFalse(simulator.simUserOperation(userOp.call), "UserCall tested true");
 
         // Success case
         ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
         assertTrue(simulator.simUserOperation(userOp), "UserOperation tested false");
-        assertTrue(simulator.simUserOperation(userOp.call), "UserCall tested false");
 
         vm.stopPrank();
     }
@@ -244,7 +238,6 @@ contract MainTest is BaseTest {
         bytes32 r;
         bytes32 s;
 
-        DAppConfig memory dConfig = helper.getDAppConfig();
         UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, userEOA, TOKEN_ONE);
         (v, r, s) = vm.sign(userPK, IAtlas(address(atlas)).getUserOperationPayload(userOp));
         userOp.signature = abi.encodePacked(r, s, v);
@@ -254,20 +247,20 @@ contract MainTest is BaseTest {
         // Success case
         bytes memory solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_ONE);
         solverOps[0] = helper.buildSolverOperation(
-            userOp, dConfig, solverOpData, solverOneEOA, address(solverOne), 2e17
+            userOp, solverOpData, solverOneEOA, address(solverOne), 2e17
         );
-        (v, r, s) = vm.sign(solverOnePK, IAtlas(address(atlas)).getSolverPayload(solverOps[0].call));
+        (v, r, s) = vm.sign(solverOnePK, IAtlas(address(atlas)).getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(r, s, v);
         DAppOperation memory dAppOp =
-            helper.buildDAppOperation(governanceEOA, dConfig, userOp, solverOps);
+            helper.buildDAppOperation(governanceEOA, userOp, solverOps);
         (v, r, s) = vm.sign(governancePK, IAtlas(address(atlas)).getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(r, s, v);
         vm.startPrank(userEOA);
-        IAtlas(address(atlas)).createExecutionEnvironment(dConfig);
+        IAtlas(address(atlas)).createExecutionEnvironment(userOp.control);
         ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
         (bool success, bytes memory data) = address(simulator).call(
             abi.encodeWithSelector(
-                simulator.simSolverCalls.selector, dConfig, userOp, solverOps, dAppOp
+                simulator.simSolverCalls.selector, userOp, solverOps, dAppOp
             )
         );
 
@@ -278,17 +271,17 @@ contract MainTest is BaseTest {
         // Failure case
         solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_TWO); // this will make the solver operation revert
         solverOps[0] = helper.buildSolverOperation(
-            userOp, dConfig, solverOpData, solverOneEOA, address(solverOne), 2e17
+            userOp, solverOpData, solverOneEOA, address(solverOne), 2e17
         );
-        (v, r, s) = vm.sign(solverOnePK, IAtlas(address(atlas)).getSolverPayload(solverOps[0].call));
+        (v, r, s) = vm.sign(solverOnePK, IAtlas(address(atlas)).getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(r, s, v);
-        dAppOp = helper.buildDAppOperation(governanceEOA, dConfig, userOp, solverOps);
+        dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
         (v, r, s) = vm.sign(governancePK, IAtlas(address(atlas)).getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(r, s, v);
         vm.startPrank(userEOA);
         (success, data) = address(simulator).call(
             abi.encodeWithSelector(
-                simulator.simSolverCalls.selector, dConfig, userOp, solverOps, dAppOp
+                simulator.simSolverCalls.selector, userOp, solverOps, dAppOp
             )
         );
 

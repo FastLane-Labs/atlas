@@ -40,7 +40,7 @@ abstract contract GovernanceControl {
     //
     // DApp exposure: Trustless
     // User exposure: Trustless
-    function _preOpsCall(UserCall calldata) internal virtual returns (bytes memory) {
+    function _preOpsCall(UserOperation calldata) internal virtual returns (bytes memory) {
             revert(_NOT_IMPLEMENTED);
         }
 
@@ -59,7 +59,7 @@ abstract contract GovernanceControl {
     //
     // DApp exposure: Trustless
     // User exposure: Trustless
-    function _allocateValueCall(bytes calldata data) internal virtual;
+    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) internal virtual;
 
     /////////////////////////////////////////////////////////
     //              INTENT FULFILLMENT                     //
@@ -136,7 +136,7 @@ abstract contract GovernanceControl {
     // View functions used by the backend to verify bid format
     // and by the factory and DAppVerification to verify the
     // backend.
-    function getBidFormat(UserCall calldata uCall) external view virtual returns (BidData[] memory);
+    function getBidFormat(UserOperation calldata userOp) public view virtual returns (address bidToken);
 
-    function getBidValue(SolverOperation calldata solverOp) external view virtual returns (uint256);
+    function getBidValue(SolverOperation calldata solverOp) public view virtual returns (uint256);
 }

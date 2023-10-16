@@ -6,9 +6,7 @@ import "../types/SolverCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
 interface IDAppControl {
-    function validateUserOperation(UserCall calldata uCall) external view returns (bool);
-
-    function preOpsCall(UserCall calldata uCall) external payable returns (bytes memory);
+    function preOpsCall(UserOperation calldata userOp) external payable returns (bytes memory);
 
     function preSolverCall(bytes calldata data) external payable returns (bool);
 
@@ -16,13 +14,16 @@ interface IDAppControl {
 
     function postOpsCall(bytes calldata data) external payable returns (bytes memory);
 
-    function allocateValueCall(bytes calldata data) external;
+    function allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) external;
 
-    function getDAppConfig() external view returns (DAppConfig memory dConfig);
+    function getDAppConfig(UserOperation calldata userOp) 
+        external 
+        view  
+        returns (DAppConfig memory dConfig);
 
     function getCallConfig() external view returns (CallConfig memory callConfig);
 
-    function getBidFormat(UserCall calldata uCall) external view returns (BidData[] memory);
+    function getBidFormat(UserOperation calldata userOp) external view returns (address bidToken);
 
     function getBidValue(SolverOperation calldata solverOp) external view returns (uint256);
 
@@ -37,4 +38,6 @@ interface IDAppControl {
     function allocatingDelegated() external view returns (bool delegated);
 
     function verificationDelegated() external view returns (bool delegated);
+
+    function callConfig() external view returns (uint32);
 }

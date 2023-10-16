@@ -38,7 +38,7 @@ contract DAppVerification is EIP712, DAppIntegration {
     // the supply chain to submit data.  If any other party
     // (user, solver, FastLane,  or a collusion between
     // all of them) attempts to alter it, this check will fail
-    function _verifyDApp(DAppConfig calldata dConfig, DAppOperation calldata dAppOp)
+    function _verifyDApp(DAppConfig memory dConfig, DAppOperation calldata dAppOp)
         internal
         returns (bool)
     {
@@ -65,11 +65,11 @@ contract DAppVerification is EIP712, DAppIntegration {
         bytes32 dAppKey = keccak256(abi.encode(dConfig.to, govData.governance, dConfig.callConfig));
 
         // Make sure the signer is currently enabled by dapp owner
-        if (!signatories[keccak256(abi.encode(govData.governance, dAppOp.approval.from))]) {
+        if (!signatories[keccak256(abi.encode(govData.governance, dAppOp.from))]) {
             return (false);
         }
 
-        if (dAppOp.approval.to != dConfig.to) {
+        if (dAppOp.control != dConfig.to) {
             return (false);
         }
 
@@ -81,19 +81,12 @@ contract DAppVerification is EIP712, DAppIntegration {
             return (false);
         }
 
-        // Verify that DAppControl hasn't been updated.  
-        // NOTE: Performing this check here allows the solvers' checks 
-        // to be against the dAppOp proof's controlCodeHash to save gas.
-        if (dConfig.to.codehash != dAppOp.approval.controlCodeHash) {
-            return (false);
-        }
-
         // If the dapp indicated that they only accept sequenced nonces
         // (IE for FCFS execution), check and make sure the order is correct
         // NOTE: allowing only sequenced nonces could create a scenario in
         // which builders or validators may be able to profit via censorship.
         // DApps are encouraged to rely on the deadline parameter.
-        if (!_handleNonces(dAppOp.approval.from, dAppOp.approval.nonce, dConfig.callConfig.needsSequencedNonces())) {
+        if (!_handleNonces(dAppOp.from, dAppOp.nonce, dConfig.callConfig.needsSequencedNonces())) {
             return (false);
         }
 
@@ -181,7 +174,7 @@ contract DAppVerification is EIP712, DAppIntegration {
         return true;
     }
 
-    function _getProofHash(DAppApproval memory approval) internal pure returns (bytes32 proofHash) {
+    function _getProofHash(DAppOperation memory approval) internal pure returns (bytes32 proofHash) {
         proofHash = keccak256(
             abi.encode(
                 DAPP_TYPE_HASH,
@@ -192,7 +185,7 @@ contract DAppVerification is EIP712, DAppIntegration {
                 approval.maxFeePerGas,
                 approval.nonce,
                 approval.deadline,
-                approval.controlCodeHash,
+                approval.control,
                 approval.userOpHash,
                 approval.callChainHash
             )
@@ -201,18 +194,14 @@ contract DAppVerification is EIP712, DAppIntegration {
 
     function _verifyDAppSignature(DAppOperation calldata dAppOp) internal view returns (bool) {
         if (dAppOp.signature.length == 0) { return false; }
-        address signer = _hashTypedDataV4(_getProofHash(dAppOp.approval)).recover(dAppOp.signature);
+        address signer = _hashTypedDataV4(_getProofHash(dAppOp)).recover(dAppOp.signature);
 
-        return signer == dAppOp.approval.from;
+        return signer == dAppOp.from;
         // return true;
     }
 
     function getDAppOperationPayload(DAppOperation memory dAppOp) public view returns (bytes32 payload) {
-        payload = _hashTypedDataV4(_getProofHash(dAppOp.approval));
-    }
-
-    function getDAppApprovalPayload(DAppApproval memory dAppApproval) external view returns (bytes32 payload) {
-        payload = _hashTypedDataV4(_getProofHash(dAppApproval));
+        payload = _hashTypedDataV4(_getProofHash(dAppOp));
     }
 
     function getDomainSeparator() external view returns (bytes32 domainSeparator) {
@@ -224,7 +213,7 @@ contract DAppVerification is EIP712, DAppIntegration {
     //
 
     // Verify the user's meta transaction
-    function _verifyUser(DAppConfig calldata dConfig, UserOperation calldata userOp)
+    function _verifyUser(DAppConfig memory dConfig, UserOperation calldata userOp)
         internal
         returns (bool)
     {
@@ -235,7 +224,7 @@ contract DAppVerification is EIP712, DAppIntegration {
             return false;
         }
 
-        if (userOp.call.control != dConfig.to) {
+        if (userOp.control != dConfig.to) {
             return (false);
         }
 
@@ -245,43 +234,40 @@ contract DAppVerification is EIP712, DAppIntegration {
         // which builders or validators may be able to profit via censorship.
         // DApps are encouraged to rely on the deadline parameter
         // to prevent replay attacks.
-        if (!_handleNonces(userOp.call.from, userOp.call.nonce, dConfig.callConfig.needsSequencedNonces())) {
+        if (!_handleNonces(userOp.from, userOp.nonce, dConfig.callConfig.needsSequencedNonces())) {
             return (false);
         }
 
         return (true);
     }
 
-    function _getProofHash(UserCall memory uCall) internal pure returns (bytes32 proofHash) {
+    function _getProofHash(UserOperation memory userOp) internal pure returns (bytes32 proofHash) {
         proofHash = keccak256(
             abi.encode(
                 USER_TYPE_HASH,
-                uCall.from,
-                uCall.to,
-                uCall.value,
-                uCall.gas,
-                uCall.maxFeePerGas,
-                uCall.nonce,
-                uCall.deadline,
-                uCall.control,
-                keccak256(uCall.data)
+                userOp.from,
+                userOp.to,
+                userOp.value,
+                userOp.gas,
+                userOp.maxFeePerGas,
+                userOp.nonce,
+                userOp.deadline,
+                userOp.dapp,
+                userOp.control,
+                keccak256(userOp.data)
             )
         );
     }
 
     function _verifyUserSignature(UserOperation calldata userOp) internal view returns (bool) {
         if (userOp.signature.length == 0) { return false; }
-        address signer = _hashTypedDataV4(_getProofHash(userOp.call)).recover(userOp.signature);
+        address signer = _hashTypedDataV4(_getProofHash(userOp)).recover(userOp.signature);
 
-        return signer == userOp.call.from;
+        return signer == userOp.from;
     }
 
     function getUserOperationPayload(UserOperation memory userOp) public view returns (bytes32 payload) {
-        payload = _hashTypedDataV4(_getProofHash(userOp.call));
-    }
-
-    function getUserCallPayload(UserCall memory userCall) public view returns (bytes32 payload) {
-        payload = _hashTypedDataV4(_getProofHash(userCall));
+        payload = _hashTypedDataV4(_getProofHash(userOp));
     }
 
     function getNextNonce(address account) external view returns (uint256 nextNonce) {
