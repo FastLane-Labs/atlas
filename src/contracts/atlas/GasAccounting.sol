@@ -16,10 +16,241 @@ abstract contract GasAccounting is SafetyLocks {
     uint256 constant public BUNDLER_PREMIUM = 110; // the amount over cost that bundlers get paid
     uint256 constant public BUNDLER_BASE = 100;
 
+    uint256 constant private _ledgerLength = 6; // uint256(type(GasParty).max); // 6
+    Ledger[_ledgerLength] public ledgers;
+    AtlasLedger public atlasLedger;
+
     GasDonation[] internal _donations;
     AccountingData internal _accData;
 
-    constructor(address _simulator) SafetyLocks(_simulator) {}
+    constructor(address _simulator) SafetyLocks(_simulator) {
+        for (uint256 i; i < _ledgerLength; i++) {
+            ledgers[i].status = Status.Inactive; // init the storage vars
+        }
+    }
+
+    function _initialAccounting() internal {
+        // Note: assumes msg.sender == tx.origin
+        if (msg.value > 0) {
+            uint64 bundlerDeposit = uint64(msg.value / tx.gasprice);
+            ledgers[uint256(GasParty.Bundler)] = Ledger({
+                deposited: bundlerDeposit,
+                withdrawn: 0,
+                unfulfilled: 0,
+                status: Status.Surplus
+            });
+
+            atlasLedger = AtlasLedger({
+                totalBorrowed: 0,
+                totalDeposited: 0,
+                totalRequested: 0,
+                totalFulfilled: 0
+            });
+
+        } else {
+            uint64 bundlerDeposit = uint64(msg.value / tx.gasprice);
+            atlasLedger = AtlasLedger({
+                totalBorrowed: 0,
+                totalDeposited: bundlerDeposit,
+                totalRequested: 0,
+                totalFulfilled: bundlerDeposit
+            });
+        }
+    }
+
+    // NOTE: donations are simply deposits that have a different msg.sender than receiving party
+    function _deposit(GasParty party, uint256 amt) internal returns (uint256 balanceOwed) {
+
+        uint64 depositAmount = uint64(amt / tx.gasprice);
+        uint256 partyIndex = uint256(party);
+
+        Ledger memory pLedger = ledgers[partyIndex];
+        AtlasLedger memory aLedger = atlasLedger;
+
+        if (pLedger.unfulfilled != 0) {
+            if (pLedger.unfulfilled > depositAmount) {
+                pLedger.unfulfilled -= depositAmount;
+                aLedger.totalFulfilled += depositAmount;
+            
+            } else {
+                uint64 fulfilled = pLedger.unfulfilled;
+                depositAmount -= fulfilled;
+
+                pLedger.deposited += depositAmount;
+                pLedger.unfulfilled = 0; // -= fulfilled;
+
+                aLedger.totalFulfilled += fulfilled;
+                aLedger.totalDeposited += depositAmount;
+            }
+
+        } else {
+            pLedger.deposited += depositAmount;
+            aLedger.totalDeposited += depositAmount;
+        }
+
+        pLedger.status = _setLedgerStatus(pLedger);
+
+        ledgers[partyIndex] = pLedger;
+        atlasLedger = aLedger;
+
+        if (pLedger.withdrawn >= pLedger.deposited) { // if unfulfilled > 0, deposits must be <= withdraws
+            return (uint256(pLedger.unfulfilled) + uint256(pLedger.withdrawn)) - uint256(pLedger.deposited) * tx.gasprice;
+        } else {
+            return 0;
+        }
+    }
+
+
+    function _borrow(GasParty party, uint256 amt) internal {
+
+        uint64 amount = uint64(amt / tx.gasprice);
+        uint256 partyIndex = uint256(party);
+
+        Ledger memory pLedger = ledgers[partyIndex];
+        pLedger.withdrawn += amount;
+
+        pLedger.status = _setLedgerStatus(pLedger);
+
+        ledgers[partyIndex] = pLedger;
+        atlasLedger.totalBorrowed += amount;
+    }
+
+    function _requestFrom(GasParty donor, GasParty recipient, uint256 amt) internal {
+
+        AtlasLedger memory aLedger = atlasLedger;
+
+        uint64 amount = uint64(amt / tx.gasprice);
+        uint256 donorIndex = uint256(donor);
+        uint256 recipientIndex = uint256(recipient);
+
+        Ledger memory dLedger = ledgers[donorIndex];
+        Ledger memory rLedger = ledgers[recipientIndex];
+
+        if (dLedger.deposited > dLedger.withdrawn) {
+            uint64 netBalance = dLedger.deposited - dLedger.withdrawn;
+            if (netBalance > amount) {
+                dLedger.withdrawn += amount;
+                rLedger.deposited += amount;
+
+                aLedger.totalRequested += amount;
+                aLedger.totalFulfilled += amount;
+            
+            } else {
+                dLedger.withdrawn = dLedger.deposited;
+                dLedger.unfulfilled += amount - netBalance;
+                rLedger.deposited += amount;
+
+                aLedger.totalRequested += amount;
+                aLedger.totalFulfilled += netBalance;
+            }
+
+        } else {
+            dLedger.unfulfilled += amount;
+            rLedger.deposited += amount;
+
+            aLedger.totalRequested += amount;
+        }
+
+        dLedger.status = _setLedgerStatus(dLedger);
+        rLedger.status = _setLedgerStatus(rLedger);
+
+        ledgers[donorIndex] = dLedger;
+        ledgers[recipientIndex] = rLedger;
+        atlasLedger = aLedger;
+    }
+
+    function _depositDeficit(AtlasLedger memory aLedger, GasParty party, address partyAddress, uint256 deposit) internal returns (AtlasLedger memory, uint256 deficit) {
+        uint64 depositAmount = uint64(deposit / tx.gasprice);
+        uint256 partyIndex = uint256(party);
+
+        Ledger memory pLedger = ledgers[partyIndex];
+
+        if (pLedger.unfulfilled != 0) {
+            if (pLedger.unfulfilled > depositAmount) {
+                pLedger.unfulfilled -= depositAmount;
+                aLedger.totalFulfilled += depositAmount;
+            
+            } else {
+                uint64 fulfilled = pLedger.unfulfilled;
+                depositAmount -= fulfilled;
+
+                pLedger.deposited += depositAmount;
+                pLedger.unfulfilled = 0; // -= fulfilled;
+
+                aLedger.totalFulfilled += fulfilled;
+                aLedger.totalDeposited += depositAmount;
+            }
+
+        } else {
+            pLedger.deposited += depositAmount;
+            aLedger.totalDeposited += depositAmount;
+        }
+
+        if (pLedger.withdrawn + pLedger.unfulfilled > pLedger.deposited) { // if unfulfilled > 0, deposits must be <= withdraws
+            deficit = ((uint256(pLedger.unfulfilled) + uint256(pLedger.withdrawn)) - uint256(pLedger.deposited)) * tx.gasprice;
+        
+        } else if (pLedger.deposited > pLedger.withdrawn + pLedger.unfulfilled) {
+            deficit = 0;
+            uint64 surplus = (pLedger.deposited - pLedger.unfulfilled) + pLedger.withdrawn;
+
+            pLedger.deposited -= surplus;
+            aLedger.totalDeposited -= surplus;
+
+            SafeTransferLib.safeTransferETH(partyAddress, uint256(surplus) * tx.gasprice);
+        
+        } else {
+            deficit = 0;
+        }
+
+        pLedger.status = _setLedgerStatus(pLedger);
+        ledgers[partyIndex] = pLedger;
+
+        return (aLedger, deficit);
+    }
+
+    function _validParty(address environment, GasParty party) internal returns (bool valid) {
+        Lock memory mLock = lock;
+        if (mLock.activeEnvironment != environment) {
+            return false;
+        }
+
+        uint256 parties = 1 << uint256(party);
+        uint256 activeParties = uint256(mLock.activeParties);
+
+        if (activeParties & parties != parties) {
+            activeParties |= parties;
+            lock.activeParties = uint64(activeParties);
+        }
+        return true;
+    }
+
+    function _validParties(address environment, GasParty partyOne, GasParty partyTwo) internal returns (bool valid) {
+        Lock memory mLock = lock;
+        if (mLock.activeEnvironment != environment) {
+            return false;
+        }
+
+        uint256 parties = 1 << uint256(partyOne) | 1 << uint256(partyTwo);
+        uint256 activeParties = uint256(mLock.activeParties);
+
+        if (activeParties & parties != parties) {
+            activeParties |= parties;
+            lock.activeParties = uint64(activeParties);
+        }
+        return true;
+    }
+
+    function _setLedgerStatus(Ledger memory pLedger) internal pure returns (Status status) {
+        uint256 deposited = uint256(pLedger.deposited);
+        uint256 debts = uint256(pLedger.withdrawn) + uint256(pLedger.unfulfilled);
+        if (deposited > debts) {
+            status = Status.Surplus;
+        } else if (deposited < debts) {
+            status = Status.Deficit;
+        } else {
+            status = Status.Balanced;
+        }
+    }
 
     // TODO: The balance checks on escrow that verify that the solver
     // paid back any msg.value that they borrowed are currently not set up 
@@ -28,9 +259,6 @@ abstract contract GasAccounting is SafetyLocks {
     // This attack vector will be addressed explicitly once the gas 
     // reimbursement mechanism is finalized.
     function donateToBundler(address surplusRecipient) external payable {
-        console.log("Donate to bundler called");
-        console.log("donateToBundler: msg.value:", msg.value);
-        console.log("donating to addr:", surplusRecipient);
         // NOTE: All donations in excess of 10% greater than cost are forwarded
         // to the surplusReceiver. 
 

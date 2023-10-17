@@ -24,6 +24,37 @@ struct GasDonation {
     uint32 cumulative;
 }
 
+enum GasParty {
+    DApp,
+    User,
+    Solver,
+    Bundler, // tx.origin
+    Builder, // block.coinbase
+    Other
+}
+
+enum Status {
+    Unknown,
+    Inactive,
+    Deficit,
+    Surplus,
+    Balanced
+}
+
+struct Ledger {
+    uint64 deposited;
+    uint64 withdrawn;
+    uint64 unfulfilled; // owed per another party's request
+    Status status;
+}
+
+struct AtlasLedger {
+    uint64 totalBorrowed;
+    uint64 totalDeposited;
+    uint64 totalRequested; // requested of another party 
+    uint64 totalFulfilled; // total fulfilled to another party 
+}
+
 enum SolverOutcome
 // future task tracking
 {

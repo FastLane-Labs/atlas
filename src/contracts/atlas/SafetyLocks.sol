@@ -7,6 +7,7 @@ import {CallBits} from "../libraries/CallBits.sol";
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
+import "../types/EscrowTypes.sol";
 
 import "../types/LockTypes.sol";
 
@@ -19,11 +20,21 @@ contract SafetyLocks {
 
     address internal constant UNLOCKED = address(1);
 
-    address public activeEnvironment = UNLOCKED;
+    struct Lock {
+        address activeEnvironment;
+        uint64 activeParties; // bitmap
+    }
+    
+    Lock public lock;
 
     constructor(address _simulator) {
         atlas = address(this);
         simulator = _simulator;
+
+        lock = Lock({
+            activeEnvironment: UNLOCKED,
+            activeParties: uint64(0)
+        });
     }
 
     // TODO can we remove this? solver value repayment handled in Escrow.sol now
@@ -31,12 +42,23 @@ contract SafetyLocks {
         // An external call so that solver contracts can verify
         // that delegatecall isn't being abused.
 
-        isSafe = msgSender == activeEnvironment;
+        isSafe = msgSender == lock.activeEnvironment;
     }
 
-    function _initializeEscrowLock(address executionEnvironment) onlyWhenUnlocked internal {
+    function _initializeEscrowLock(UserOperation calldata userOp, address executionEnvironment) onlyWhenUnlocked internal {
 
-        activeEnvironment = executionEnvironment;
+        uint256 activeParties;
+        if (msg.value != 0) {
+            activeParties |= 1 << uint256(GasParty.Bundler);
+        }
+        if (userOp.value != 0) {
+            activeParties |= 1 << uint256(GasParty.User);
+        }
+
+        lock = Lock({
+            activeEnvironment: executionEnvironment,
+            activeParties: uint64(activeParties)
+        });
     }
 
     function _buildEscrowLock(
@@ -46,7 +68,7 @@ contract SafetyLocks {
         bool isSimulation
     ) internal view returns (EscrowKey memory self) {
 
-        require(activeEnvironment == executionEnvironment, "ERR-SL004 NotInitialized");
+        require(lock.activeEnvironment == executionEnvironment, "ERR-SL004 NotInitialized");
 
         self = self.initializeEscrowLock(
             dConfig.callConfig.needsPreOpsCall(), solverOpCount, executionEnvironment, isSimulation
@@ -54,11 +76,18 @@ contract SafetyLocks {
     }
 
     function _releaseEscrowLock() internal {
-        activeEnvironment = UNLOCKED;
+        lock = Lock({
+            activeEnvironment: UNLOCKED,
+            activeParties: uint64(0)
+        });
     }
 
     modifier onlyWhenUnlocked() {
-        require(activeEnvironment == UNLOCKED, "ERR-SL003 AlreadyInitialized");
+        require(lock.activeEnvironment == UNLOCKED, "ERR-SL003 AlreadyInitialized");
         _;
+    }
+
+    function activeEnvironment() external view returns (address) {
+        return lock.activeEnvironment;
     }
 }
