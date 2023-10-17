@@ -33,7 +33,7 @@ enum GasParty {
     Other
 }
 
-enum Status {
+enum LedgerStatus {
     Unknown,
     Inactive,
     Deficit,
@@ -45,7 +45,7 @@ struct Ledger {
     uint64 deposited;
     uint64 withdrawn;
     uint64 unfulfilled; // owed per another party's request
-    Status status;
+    LedgerStatus ledgerStatus;
 }
 
 struct AtlasLedger {

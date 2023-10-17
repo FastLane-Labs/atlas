@@ -25,7 +25,7 @@ abstract contract GasAccounting is SafetyLocks {
 
     constructor(address _simulator) SafetyLocks(_simulator) {
         for (uint256 i; i < _ledgerLength; i++) {
-            ledgers[i].status = Status.Inactive; // init the storage vars
+            ledgers[i].ledgerStatus = LedgerStatus.Inactive; // init the storage vars
         }
     }
 
@@ -37,7 +37,7 @@ abstract contract GasAccounting is SafetyLocks {
                 deposited: bundlerDeposit,
                 withdrawn: 0,
                 unfulfilled: 0,
-                status: Status.Surplus
+                ledgerStatus: LedgerStatus.Surplus
             });
 
             atlasLedger = AtlasLedger({
@@ -88,7 +88,7 @@ abstract contract GasAccounting is SafetyLocks {
             aLedger.totalDeposited += depositAmount;
         }
 
-        pLedger.status = _setLedgerStatus(pLedger);
+        pLedger.ledgerStatus = _setLedgerStatus(pLedger);
 
         ledgers[partyIndex] = pLedger;
         atlasLedger = aLedger;
@@ -109,7 +109,7 @@ abstract contract GasAccounting is SafetyLocks {
         Ledger memory pLedger = ledgers[partyIndex];
         pLedger.withdrawn += amount;
 
-        pLedger.status = _setLedgerStatus(pLedger);
+        pLedger.ledgerStatus = _setLedgerStatus(pLedger);
 
         ledgers[partyIndex] = pLedger;
         atlasLedger.totalBorrowed += amount;
@@ -151,8 +151,8 @@ abstract contract GasAccounting is SafetyLocks {
             aLedger.totalRequested += amount;
         }
 
-        dLedger.status = _setLedgerStatus(dLedger);
-        rLedger.status = _setLedgerStatus(rLedger);
+        dLedger.ledgerStatus = _setLedgerStatus(dLedger);
+        rLedger.ledgerStatus = _setLedgerStatus(rLedger);
 
         ledgers[donorIndex] = dLedger;
         ledgers[recipientIndex] = rLedger;
@@ -202,7 +202,7 @@ abstract contract GasAccounting is SafetyLocks {
             deficit = 0;
         }
 
-        pLedger.status = _setLedgerStatus(pLedger);
+        pLedger.ledgerStatus = _setLedgerStatus(pLedger);
         ledgers[partyIndex] = pLedger;
 
         return (aLedger, deficit);
@@ -240,15 +240,15 @@ abstract contract GasAccounting is SafetyLocks {
         return true;
     }
 
-    function _setLedgerStatus(Ledger memory pLedger) internal pure returns (Status status) {
+    function _setLedgerStatus(Ledger memory pLedger) internal pure returns (LedgerStatus status) {
         uint256 deposited = uint256(pLedger.deposited);
         uint256 debts = uint256(pLedger.withdrawn) + uint256(pLedger.unfulfilled);
         if (deposited > debts) {
-            status = Status.Surplus;
+            status = LedgerStatus.Surplus;
         } else if (deposited < debts) {
-            status = Status.Deficit;
+            status = LedgerStatus.Deficit;
         } else {
-            status = Status.Balanced;
+            status = LedgerStatus.Balanced;
         }
     }
 
