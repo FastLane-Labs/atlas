@@ -50,7 +50,7 @@ contract Atlas is Test, Factory {
         }
 
         // Initialize the lock
-        _initializeEscrowLock(executionEnvironment);
+        _initializeEscrowLock(userOp, executionEnvironment);
 
         try this.execute{value: msg.value}(
             dConfig, userOp, solverOps, executionEnvironment, dAppOp.callChainHash, msg.sender == simulator
