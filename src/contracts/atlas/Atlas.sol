@@ -220,11 +220,6 @@ contract Atlas is Test, Factory {
                 return ValidCallsResult.UnknownBundlerNotAllowed;
             }
 
-            // user should not include their own signature, they already signed the transaction
-            if(userOp.signature.length > 0) {
-                return ValidCallsResult.UserSignatureInvalid;
-            }
-
             // check dapp signature
             if(!_verifyDApp(dConfig, dAppOp)) {
                 bool bypass = isSimulation && dAppOp.signature.length == 0;
