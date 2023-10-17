@@ -88,7 +88,7 @@ abstract contract GasAccounting is SafetyLocks {
             aLedger.totalDeposited += depositAmount;
         }
 
-        pLedger.ledgerStatus = _setLedgerStatus(pLedger);
+        pLedger.ledgerStatus = _getLedgerStatus(pLedger);
 
         ledgers[partyIndex] = pLedger;
         atlasLedger = aLedger;
@@ -109,7 +109,7 @@ abstract contract GasAccounting is SafetyLocks {
         Ledger memory pLedger = ledgers[partyIndex];
         pLedger.withdrawn += amount;
 
-        pLedger.ledgerStatus = _setLedgerStatus(pLedger);
+        pLedger.ledgerStatus = _getLedgerStatus(pLedger);
 
         ledgers[partyIndex] = pLedger;
         atlasLedger.totalBorrowed += amount;
@@ -151,8 +151,8 @@ abstract contract GasAccounting is SafetyLocks {
             aLedger.totalRequested += amount;
         }
 
-        dLedger.ledgerStatus = _setLedgerStatus(dLedger);
-        rLedger.ledgerStatus = _setLedgerStatus(rLedger);
+        dLedger.ledgerStatus = _getLedgerStatus(dLedger);
+        rLedger.ledgerStatus = _getLedgerStatus(rLedger);
 
         ledgers[donorIndex] = dLedger;
         ledgers[recipientIndex] = rLedger;
@@ -202,7 +202,7 @@ abstract contract GasAccounting is SafetyLocks {
             deficit = 0;
         }
 
-        pLedger.ledgerStatus = _setLedgerStatus(pLedger);
+        pLedger.ledgerStatus = _getLedgerStatus(pLedger);
         ledgers[partyIndex] = pLedger;
 
         return (aLedger, deficit);
@@ -240,7 +240,7 @@ abstract contract GasAccounting is SafetyLocks {
         return true;
     }
 
-    function _setLedgerStatus(Ledger memory pLedger) internal pure returns (LedgerStatus status) {
+    function _getLedgerStatus(Ledger memory pLedger) internal pure returns (LedgerStatus status) {
         uint256 deposited = uint256(pLedger.deposited);
         uint256 debts = uint256(pLedger.withdrawn) + uint256(pLedger.unfulfilled);
         if (deposited > debts) {
