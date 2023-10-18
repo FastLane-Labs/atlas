@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity >=0.8.0;
+pragma solidity 0.8.19;
 
-// TODO update this to say using Solmate
-/// @notice Modern and gas efficient ERC20 + EIP-2612 implementation.
-/// @author Solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC20.sol)
-/// @author Modified from Uniswap (https://github.com/Uniswap/uniswap-v2-core/blob/master/contracts/UniswapV2ERC20.sol)
+import "../types/EscrowTypes.sol";
+
+// TODO split out events and errors to share with AtlasEscrow
+
+/// @notice Modified Solmate ERC20 with some Atlas-specific modifications.
+/// @author FastLane Labs
+/// @author Modified from Solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC20.sol)
 /// @dev Do not manually set balances without updating totalSupply, as the sum of all user balances must not exceed it.
-contract AtlETH {
+abstract contract AtlETH {
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
@@ -36,14 +39,21 @@ contract AtlETH {
 
     uint256 internal immutable INITIAL_CHAIN_ID;
     bytes32 internal immutable INITIAL_DOMAIN_SEPARATOR;
-
     mapping(address => uint256) public nonces;
+
+    /*//////////////////////////////////////////////////////////////
+                            ATLAS STORAGE
+    //////////////////////////////////////////////////////////////*/
+
+    uint256 public immutable escrowDuration;
+    mapping(address => SolverEscrow) internal _escrowData;
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    constructor() {
+    constructor(uint256 _escrowDuration) {
+        escrowDuration = _escrowDuration;
         INITIAL_CHAIN_ID = block.chainid;
         INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
     }
@@ -62,15 +72,12 @@ contract AtlETH {
 
     function transfer(address to, uint256 amount) public virtual returns (bool) {
         balanceOf[msg.sender] -= amount;
-
         // Cannot overflow because the sum of all user
         // balances can't exceed the max uint256 value.
         unchecked {
             balanceOf[to] += amount;
         }
-
         emit Transfer(msg.sender, to, amount);
-
         return true;
     }
 
@@ -80,19 +87,14 @@ contract AtlETH {
         uint256 amount
     ) public virtual returns (bool) {
         uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
-
         if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
-
         balanceOf[from] -= amount;
-
         // Cannot overflow because the sum of all user
         // balances can't exceed the max uint256 value.
         unchecked {
             balanceOf[to] += amount;
         }
-
         emit Transfer(from, to, amount);
-
         return true;
     }
 
@@ -110,7 +112,6 @@ contract AtlETH {
         bytes32 s
     ) public virtual {
         require(deadline >= block.timestamp, "PERMIT_DEADLINE_EXPIRED");
-
         // Unchecked because the only math done is incrementing
         // the owner's nonce which cannot realistically overflow.
         unchecked {
@@ -137,12 +138,9 @@ contract AtlETH {
                 r,
                 s
             );
-
             require(recoveredAddress != address(0) && recoveredAddress == owner, "INVALID_SIGNER");
-
             allowance[recoveredAddress][spender] = value;
         }
-
         emit Approval(owner, spender, value);
     }
 
@@ -169,25 +167,21 @@ contract AtlETH {
 
     function _mint(address to, uint256 amount) internal virtual {
         totalSupply += amount;
-
         // Cannot overflow because the sum of all user
         // balances can't exceed the max uint256 value.
         unchecked {
             balanceOf[to] += amount;
         }
-
         emit Transfer(address(0), to, amount);
     }
 
     function _burn(address from, uint256 amount) internal virtual {
         balanceOf[from] -= amount;
-
         // Cannot underflow because a user's balance
         // will never be larger than the total supply.
         unchecked {
             totalSupply -= amount;
         }
-
         emit Transfer(from, address(0), amount);
     }
 }
