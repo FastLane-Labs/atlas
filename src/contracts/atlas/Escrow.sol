@@ -29,7 +29,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
-    
+    // TODO remove this and stuct def. Fix logic in here to use AtlETH
     mapping(address => SolverWithdrawal) internal _withdrawalData;
 
     constructor(
@@ -96,9 +96,9 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
             // Execute the solver call
             (outcome, escrowSurplus) = _solverOpWrapper(gasLimit, environment, solverOp, dAppReturnData, key.pack());
 
-            unchecked {
-                solverEscrow.total += uint128(escrowSurplus);
-            }
+            // unchecked {
+            //     solverEscrow.total += uint128(escrowSurplus);
+            // }
 
             result |= 1 << uint256(outcome);
 
@@ -113,7 +113,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
 
             // Update the solver's escrow balances and the accumulated refund
             if (result.updateEscrow()) {
-                key.gasRefund += uint32(_update(solverOp, solverEscrow, gasWaterMark, result));
+                key.gasRefund += uint32(_update(solverOp, solverEscrow, escrowSurplus, gasWaterMark, result));
             }
 
             // emit event
@@ -163,6 +163,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
     function _update(
         SolverOperation calldata solverOp,
         SolverEscrow memory solverEscrow,
+        uint256 escrowSurplus,
         uint256 gasWaterMark,
         uint256 result
     ) internal returns (uint256 gasRebate) {
@@ -179,19 +180,24 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
                 revert("ERR-SE72 UncoveredResult");
             }
 
+            uint256 netSolverBalance = balanceOf[solverOp.solver] + escrowSurplus;
+
             if (gasRebate != 0) {
                 // Calculate what the solver owes
                 gasRebate *= tx.gasprice;
 
-                gasRebate = gasRebate > solverEscrow.total ? solverEscrow.total : gasRebate;
+                gasRebate = gasRebate > netSolverBalance ? netSolverBalance : gasRebate;
 
-                solverEscrow.total -= uint128(gasRebate);
+                netSolverBalance -= gasRebate;
 
                 // NOTE: This will cause an error if you are simulating with a gasPrice of 0
                 gasRebate /= tx.gasprice;
 
-                // save the escrow data back into storage
+                // save the escrow data and AtlETH balance back into storage
                 _escrowData[solverOp.from] = solverEscrow;
+
+                // TODO dont just change balance -> use mint() fn to update safely. Maybe without events for internal mint/burn
+                balanceOf[solverOp.solver] = netSolverBalance;
 
                 // Check if need to save escrowData due to nonce update but not gasRebate
             } else if (result & EscrowBits._NO_NONCE_UPDATE == 0) {
@@ -284,7 +290,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
             uint256 gasCost = (tx.gasprice * gasLimit) + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
 
             // see if solver's escrow can afford tx gascost
-            if (gasCost > solverEscrow.total - _withdrawalData[solverOp.from].escrowed) {
+            if (gasCost > balanceOf[solverOp.solver] - _withdrawalData[solverOp.from].escrowed) {
                 // charge solver for calldata so that we can avoid vampire attacks from solver onto user
                 result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
             }

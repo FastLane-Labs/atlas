@@ -7,6 +7,7 @@ import "../types/EscrowTypes.sol";
 import {Permit69} from "../common/Permit69.sol";
 
 // TODO split out events and errors to share with AtlasEscrow
+// TODO all modifiers should be internal fns for contract size savings
 
 /// @notice Modified Solmate ERC20 with some Atlas-specific modifications.
 /// @author FastLane Labs
@@ -78,10 +79,8 @@ abstract contract AtlETH is Permit69 {
     // TODO adapt these fns to new contract structure
 
     // Deposit ETH and get atlETH in return.
-    function deposit() external payable onlyWhenUnlocked returns (uint256 newBalance) {
+    function deposit() external payable onlyWhenUnlocked{
         _mint(msg.sender, msg.value);
-        _escrowData[msg.sender].total += msg.value;
-        newBalance = _escrowData[msg.sender].total;
     }
 
     // Redeem atlETH for ETH.
@@ -94,16 +93,11 @@ abstract contract AtlETH is Permit69 {
         require(balanceOf[msg.sender] >= amount, "ERR-E078 InsufficientBalance");
         _burn(msg.sender, amount);
         SafeTransferLib.safeTransferETH(msg.sender, amount);
-        _escrowData[msg.sender].total -= amount;
         newBalance = balanceOf[msg.sender];
     }
 
     function nextSolverNonce(address solverSigner) external view returns (uint256 nextNonce) {
         nextNonce = uint256(_escrowData[solverSigner].nonce) + 1;
-    }
-
-    function solverEscrowBalance(address solverSigner) external view returns (uint256 balance) {
-        balance = uint256(_escrowData[solverSigner].total);
     }
 
     function solverLastActiveBlock(address solverSigner) external view returns (uint256 lastBlock) {
