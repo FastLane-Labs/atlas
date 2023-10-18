@@ -58,19 +58,23 @@ abstract contract AtlETH {
         INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
     }
 
+    // Restricts ERC20 actions to after escrow period has passed
+    modifier checkEscrowDuration(address owner) {
+        require(block.number >= uint256(_escrowData[owner].lastAccessed) + uint256(escrowDuration), "ERR-E080 TooEarly");
+        _;
+    }
+
     /*//////////////////////////////////////////////////////////////
                                ERC20 LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function approve(address spender, uint256 amount) public virtual returns (bool) {
+    function approve(address spender, uint256 amount) public returns (bool) {
         allowance[msg.sender][spender] = amount;
-
         emit Approval(msg.sender, spender, amount);
-
         return true;
     }
 
-    function transfer(address to, uint256 amount) public virtual returns (bool) {
+    function transfer(address to, uint256 amount) public checkEscrowDuration(msg.sender) returns (bool) {
         balanceOf[msg.sender] -= amount;
         // Cannot overflow because the sum of all user
         // balances can't exceed the max uint256 value.
@@ -85,7 +89,7 @@ abstract contract AtlETH {
         address from,
         address to,
         uint256 amount
-    ) public virtual returns (bool) {
+    ) public checkEscrowDuration(from) returns (bool) {
         uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
         if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
         balanceOf[from] -= amount;
@@ -98,10 +102,6 @@ abstract contract AtlETH {
         return true;
     }
 
-    /*//////////////////////////////////////////////////////////////
-                             EIP-2612 LOGIC
-    //////////////////////////////////////////////////////////////*/
-
     function permit(
         address owner,
         address spender,
@@ -110,7 +110,7 @@ abstract contract AtlETH {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) public virtual {
+    ) public  {
         require(deadline >= block.timestamp, "PERMIT_DEADLINE_EXPIRED");
         // Unchecked because the only math done is incrementing
         // the owner's nonce which cannot realistically overflow.
@@ -144,11 +144,11 @@ abstract contract AtlETH {
         emit Approval(owner, spender, value);
     }
 
-    function DOMAIN_SEPARATOR() public view virtual returns (bytes32) {
+    function DOMAIN_SEPARATOR() public view  returns (bytes32) {
         return block.chainid == INITIAL_CHAIN_ID ? INITIAL_DOMAIN_SEPARATOR : computeDomainSeparator();
     }
 
-    function computeDomainSeparator() internal view virtual returns (bytes32) {
+    function computeDomainSeparator() internal view  returns (bytes32) {
         return
             keccak256(
                 abi.encode(
@@ -165,7 +165,7 @@ abstract contract AtlETH {
                         INTERNAL MINT/BURN LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _mint(address to, uint256 amount) internal virtual {
+    function _mint(address to, uint256 amount) internal  {
         totalSupply += amount;
         // Cannot overflow because the sum of all user
         // balances can't exceed the max uint256 value.
@@ -175,7 +175,7 @@ abstract contract AtlETH {
         emit Transfer(address(0), to, amount);
     }
 
-    function _burn(address from, uint256 amount) internal virtual {
+    function _burn(address from, uint256 amount) internal  {
         balanceOf[from] -= amount;
         // Cannot underflow because a user's balance
         // will never be larger than the total supply.
