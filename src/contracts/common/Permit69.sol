@@ -3,28 +3,16 @@ pragma solidity ^0.8.16;
 
 import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
+import {GasAccounting} from "../atlas/GasAccounting.sol";
+
 import "../types/LockTypes.sol";
-import {EXECUTION_PHASE_OFFSET, SAFETY_LEVEL_OFFSET} from "../libraries/SafetyBits.sol";
+
+import {EXECUTION_PHASE_OFFSET, SAFETY_LEVEL_OFFSET, SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER} from "../libraries/SafetyBits.sol";
 
 // NOTE: IPermit69 only works inside of the Atlas environment - specifically
 // inside of the custom ExecutionEnvironments that each user deploys when
 // interacting with Atlas in a manner controlled by the DeFi dApp.
 
-// NOTE: No user transfers allowed during UserRefund or HandlingPayments
-uint16 constant SAFE_USER_TRANSFER = uint16(
-    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps)) | 
-    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserOperation)) |
-    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations)) | // TODO: This may be removed later due to security risk
-    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
-);
-
-// NOTE: No Dapp transfers allowed during UserOperation
-uint16 constant SAFE_DAPP_TRANSFER = uint16(
-    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps))
-    | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.HandlingPayments))
-    | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserRefund))
-    | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
-);
 
 // The name comes from the reciprocal nature of the token transfers. Both
 // the user and the DAppControl can transfer tokens from the User
@@ -32,8 +20,10 @@ uint16 constant SAFE_DAPP_TRANSFER = uint16(
 // token approval to the Atlas main contract, and only during specific phases
 // of the Atlas execution process.
 
-abstract contract Permit69 {
+abstract contract Permit69 is GasAccounting {
     using SafeTransferLib for ERC20;
+
+    constructor(address _simulator) GasAccounting(_simulator) {}
 
     // Virtual Functions defined by other Atlas modules
     function _getExecutionEnvironmentCustom(
@@ -42,8 +32,6 @@ abstract contract Permit69 {
         address controller,
         uint32 callConfig
     ) internal view virtual returns (address environment);
-
-    function environment() public view virtual returns (address);
 
     // Transfer functions
     function transferUserERC20(
@@ -103,8 +91,10 @@ abstract contract Permit69 {
         );
     }
 
-    function _verifyLockState(uint16 lockState, uint16 safeExecutionPhaseSet) internal view {
+    function _verifyLockState(uint16 lockState, uint16 safeExecutionPhaseSet) internal pure {
         require(lockState & safeExecutionPhaseSet != 0, "ERR-T002 InvalidLockState");
-        require(msg.sender == environment(), "ERR-T003 EnvironmentNotActive");
+        // TODO: Do we need the below require? 
+        // Intuition is that we'd need to block all reentry into EE to bypass this check 
+        // require(msg.sender == activeEnvironment, "ERR-T003 EnvironmentNotActive");
     }
 }

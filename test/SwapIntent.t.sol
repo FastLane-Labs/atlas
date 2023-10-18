@@ -117,13 +117,12 @@ contract SwapIntentTest is BaseTest {
         assertEq(DAI.balanceOf(address(rfqSolver)), swapIntent.amountUserBuys, "Did not give enough DAI to solver");
 
         // Input params for Atlas.metacall() - will be populated below
-        DAppConfig memory dConfig = txBuilder.getDAppConfig();
         UserOperation memory userOp;
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         DAppOperation memory dAppOp;
 
         vm.startPrank(userEOA);
-        address executionEnvironment = atlas.createExecutionEnvironment(dConfig);
+        address executionEnvironment = atlas.createExecutionEnvironment(txBuilder.control());
         console.log("executionEnvironment",executionEnvironment);
         vm.stopPrank();
         vm.label(address(executionEnvironment), "EXECUTION ENV");
@@ -159,7 +158,6 @@ contract SwapIntentTest is BaseTest {
         // Builds the SolverOperation
         solverOps[0] = txBuilder.buildSolverOperation({
             userOp: userOp,
-            dConfig: dConfig,
             solverOpData: solverOpData,
             solverEOA: solverOneEOA,
             solverContract: address(rfqSolver),
@@ -167,11 +165,11 @@ contract SwapIntentTest is BaseTest {
         });
 
         // Solver signs the solverOp
-        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlas.getSolverPayload(solverOps[0].call));
+        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlas.getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Frontend creates dAppOp calldata after seeing rest of data
-        dAppOp = txBuilder.buildDAppOperation(governanceEOA, dConfig, userOp, solverOps);
+        dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
 
         // Frontend signs the dAppOp payload
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getDAppOperationPayload(dAppOp));
@@ -196,17 +194,14 @@ contract SwapIntentTest is BaseTest {
         vm.startPrank(userEOA);
         
         assertFalse(simulator.simUserOperation(userOp), "metasimUserOperationcall tested true a");
-        assertFalse(simulator.simUserOperation(userOp.call), "metasimUserOperationcall call tested true b");
         
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
         assertTrue(simulator.simUserOperation(userOp), "metasimUserOperationcall tested false c");
-        assertTrue(simulator.simUserOperation(userOp.call), "metasimUserOperationcall call tested false d");
 
 
         // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
         atlas.metacall({
-            dConfig: dConfig,
             userOp: userOp,
             solverOps: solverOps,
             dAppOp: dAppOp
@@ -246,13 +241,12 @@ contract SwapIntentTest is BaseTest {
         vm.stopPrank();
 
         // Input params for Atlas.metacall() - will be populated below
-        DAppConfig memory dConfig = txBuilder.getDAppConfig();
         UserOperation memory userOp;
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         DAppOperation memory dAppOp;
 
         vm.startPrank(userEOA);
-        address executionEnvironment = atlas.createExecutionEnvironment(dConfig);
+        address executionEnvironment = atlas.createExecutionEnvironment(txBuilder.control());
         console.log("executionEnvironment a",executionEnvironment);
         vm.stopPrank();
         vm.label(address(executionEnvironment), "EXECUTION ENV");
@@ -288,7 +282,6 @@ contract SwapIntentTest is BaseTest {
         // Builds the SolverOperation
         solverOps[0] = txBuilder.buildSolverOperation({
             userOp: userOp,
-            dConfig: dConfig,
             solverOpData: solverOpData,
             solverEOA: solverOneEOA,
             solverContract: address(uniswapSolver),
@@ -296,11 +289,11 @@ contract SwapIntentTest is BaseTest {
         });
 
         // Solver signs the solverOp
-        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlas.getSolverPayload(solverOps[0].call));
+        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlas.getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Frontend creates dAppOp calldata after seeing rest of data
-        dAppOp = txBuilder.buildDAppOperation(governanceEOA, dConfig, userOp, solverOps);
+        dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
 
         // Frontend signs the dAppOp payload
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getDAppOperationPayload(dAppOp));
@@ -325,19 +318,16 @@ contract SwapIntentTest is BaseTest {
         vm.startPrank(userEOA);
 
         assertFalse(simulator.simUserOperation(userOp), "metasimUserOperationcall tested true");
-        assertFalse(simulator.simUserOperation(userOp.call), "metasimUserOperationcall call tested true");
         
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
         assertTrue(simulator.simUserOperation(userOp), "metasimUserOperationcall tested false");
-        assertTrue(simulator.simUserOperation(userOp.call), "metasimUserOperationcall call tested false");
 
         // Check solver does NOT have DAI - it must use Uniswap to get it during metacall
         assertEq(DAI.balanceOf(address(uniswapSolver)), 0, "Solver has DAI before metacall");
 
         // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
         atlas.metacall({
-            dConfig: dConfig,
             userOp: userOp,
             solverOps: solverOps,
             dAppOp: dAppOp

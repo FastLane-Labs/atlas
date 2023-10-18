@@ -4,7 +4,7 @@ pragma solidity ^0.8.16;
 import "../types/LockTypes.sol";
 
 // TODO remove
-import {TestUtils} from "../../../test/base/TestUtils.sol";
+//import {TestUtils} from "../../../test/base/TestUtils.sol";
 import "forge-std/Test.sol";
 
 // uint16 bit layout: CCCC BBBB BBBB AAAA
@@ -14,6 +14,22 @@ uint16 constant EXECUTION_PHASE_OFFSET = uint16(type(BaseLock).max) + 1;
 uint16 constant SAFETY_LEVEL_OFFSET = uint16(type(BaseLock).max) + uint16(type(ExecutionPhase).max) + 2;
 
 uint16 constant ONLY_EXECUTION_PHASE_MASK = uint16(4080); // 0000 1111 1111 0000
+
+// NOTE: No user transfers allowed during UserRefund or HandlingPayments
+uint16 constant SAFE_USER_TRANSFER = uint16(
+    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps)) | 
+    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserOperation)) |
+    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations)) | // TODO: This may be removed later due to security risk
+    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
+);
+
+// NOTE: No Dapp transfers allowed during UserOperation
+uint16 constant SAFE_DAPP_TRANSFER = uint16(
+    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps))
+    | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.HandlingPayments))
+    | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserRefund))
+    | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
+);
 
 library SafetyBits {
 
@@ -87,8 +103,8 @@ library SafetyBits {
     function getCurrentExecutionPhase(uint16 lockState) internal view returns (uint16) {
         console.log("IN getCurrentExecutionPhase");
         uint16 isolatedPhaseBits = lockState & ONLY_EXECUTION_PHASE_MASK;   
-        console.log("isolatedPhaseBits: %s", TestUtils.uint16ToBinaryString(isolatedPhaseBits));
-        console.log("returning: %s", TestUtils.uint16ToBinaryString(uint16(isolatedPhaseBits >> EXECUTION_PHASE_OFFSET)));
+        //console.log("isolatedPhaseBits: %s", TestUtils.uint16ToBinaryString(isolatedPhaseBits));
+        //console.log("returning: %s", TestUtils.uint16ToBinaryString(uint16(isolatedPhaseBits >> EXECUTION_PHASE_OFFSET)));
 
         // TODO Need to take dec number returned below and calculate log_2(dec num) to get the bit number
 

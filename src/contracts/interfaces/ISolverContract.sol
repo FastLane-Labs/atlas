@@ -4,7 +4,7 @@ pragma solidity ^0.8.16;
 import "../types/SolverCallTypes.sol";
 
 interface ISolverContract {
-    function atlasSolverCall(address sender, BidData[] calldata bids, bytes calldata solverOpData, bytes calldata extraReturnData)
+    function atlasSolverCall(address sender, address bidToken, uint256 bidAmount, bytes calldata solverOpData, bytes calldata extraReturnData)
         external
         payable
         returns (bool, bytes memory);

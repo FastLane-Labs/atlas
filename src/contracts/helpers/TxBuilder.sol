@@ -16,8 +16,7 @@ import {CallBits} from "../libraries/CallBits.sol";
 import "forge-std/Test.sol";
 
 contract TxBuilder {
-    using CallVerification for UserCall;
-    using CallVerification for BidData[];
+    using CallVerification for UserOperation;
 
     address public immutable control;
     address public immutable escrow;
@@ -30,15 +29,6 @@ contract TxBuilder {
         escrow = escrowAddress;
         atlas = atlasAddress;
         gas = 1_000_000;
-    }
-
-    function getDAppConfig() public view returns (DAppConfig memory) {
-        return IDAppControl(control).getDAppConfig();
-    }
-
-    function getBidData(UserCall memory uCall, uint256 amount) public view returns (BidData[] memory bids) {
-        bids = IDAppControl(control).getBidFormat(uCall);
-        bids[0].bidAmount = amount;
     }
 
     function solverNextNonce(address solverSigner) public view returns (uint256) {
@@ -70,78 +60,70 @@ contract TxBuilder {
         bytes memory data
     ) public view returns (UserOperation memory userOp) {
         userOp.to = atlas;
-        userOp.call = UserCall({
+        userOp = UserOperation({
             from: from,
-            to: to,
+            to: atlas,
             value: value,
             gas: gas,
             maxFeePerGas: maxFeePerGas,
             nonce: userNextNonce(from),
             deadline: deadline,
+            dapp: to,
             control: control,
-            data: data
+            data: data,
+            signature: new bytes(0)
         });
     }
 
     function buildSolverOperation(
         UserOperation memory userOp,
-        DAppConfig memory dConfig,
         bytes memory solverOpData,
         address solverEOA,
         address solverContract,
         uint256 bidAmount
     ) public view returns (SolverOperation memory solverOp) {
-        if (dConfig.callConfig == 0) {
-            dConfig = DAppConfig({
-                to: userOp.call.control,
-                callConfig: CallBits.buildCallConfig(userOp.call.control)
-            });
-        }
-
-        solverOp.to = atlas;
-        solverOp.bids = getBidData(userOp.call, bidAmount);
-        solverOp.call = SolverCall({
+        
+        solverOp = SolverOperation({
             from: solverEOA,
-            to: solverContract,
+            to: atlas,
             value: 0,
             gas: gas,
-            maxFeePerGas: userOp.call.maxFeePerGas,
+            maxFeePerGas: userOp.maxFeePerGas,
             nonce: solverNextNonce(solverEOA),
-            deadline: userOp.call.deadline,
-            controlCodeHash: dConfig.to.codehash,
-            userOpHash: userOp.call.getUserOperationHash(),
-            bidsHash: solverOp.bids.getBidsHash(),
-            data: solverOpData
+            deadline: userOp.deadline,
+            solver: solverContract,
+            control: userOp.control,
+            userOpHash: userOp.getUserOperationHash(),
+            bidToken: IDAppControl(control).getBidFormat(userOp),
+            bidAmount: bidAmount,
+            data: solverOpData,
+            signature: new bytes(0)
         });
     }
 
     function buildDAppOperation(
         address governanceEOA,
-        DAppConfig memory dConfig,
         UserOperation memory userOp,
         SolverOperation[] memory solverOps
     ) public view returns (DAppOperation memory dAppOp) {
-        dAppOp.to = atlas;
-        if (dConfig.callConfig == 0) {
-            dConfig = DAppConfig({
-                to: userOp.call.control,
-                callConfig: CallBits.buildCallConfig(userOp.call.control)
-            });
-        }
-        bytes32 userOpHash = userOp.call.getUserOperationHash();
-        bytes32 callChainHash = CallVerification.getCallChainHash(dConfig, userOp.call, solverOps);
+       
+        DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
+        
+        bytes32 userOpHash = userOp.getUserOperationHash();
+        bytes32 callChainHash = CallVerification.getCallChainHash(dConfig, userOp, solverOps);
 
-        dAppOp.approval = DAppApproval({
+        dAppOp = DAppOperation({
             from: governanceEOA,
-            to: control,
+            to: atlas,
             value: 0,
             gas: 2_000_000,
-            maxFeePerGas: userOp.call.maxFeePerGas,
+            maxFeePerGas: userOp.maxFeePerGas,
             nonce: governanceNextNonce(governanceEOA),
-            deadline: userOp.call.deadline,
-            controlCodeHash: dConfig.to.codehash,
+            deadline: userOp.deadline,
+            control: userOp.control,
             userOpHash: userOpHash,
-            callChainHash: callChainHash
+            callChainHash: callChainHash,
+            signature: new bytes(0)
         });
     }
 }

@@ -1,7 +1,6 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import {BidData} from "../types/SolverCallTypes.sol";
 import "../types/ValidCallsTypes.sol";
 
 error UserSimulationFailed();
@@ -22,7 +21,7 @@ contract FastLaneErrorsEvents {
     event UserTxResult(address indexed user, uint256 valueReturned, uint256 gasRefunded);
 
     event MEVPaymentFailure(
-        address indexed controller, uint32 callConfig, BidData[] winningBids
+        address indexed controller, uint32 callConfig, address bidToken, uint256 bidAmount
     );
 
     event NewExecutionEnvironment(
