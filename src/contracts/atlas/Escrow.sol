@@ -31,10 +31,6 @@ abstract contract Escrow is ERC20, Permit69, DAppVerification, FastLaneErrorsEve
 
     uint32 public immutable escrowDuration;
 
-    // Unlocked (non-escrowed) balances are available for withdrawals (redemptions) and transfers.
-    // Subtract unlockedBalanceOf from balanceOf to get the escrowed balance of a user.
-    mapping(address => uint256) public unlockedBalanceOf;
-
     // NOTE: these storage vars / maps should only be accessible by *signed* solver transactions
     // and only once per solver per block (to avoid user-solver collaborative exploits)
     // EOA Address => solver escrow data
@@ -51,37 +47,52 @@ abstract contract Escrow is ERC20, Permit69, DAppVerification, FastLaneErrorsEve
         escrowDuration = _escrowDuration;
     }
 
+    modifier checkEscrowDuration(address owner) {
+        require(block.number >= uint256(_escrowData[owner].lastAccessed) + uint256(escrowDuration), "ERR-E080 TooEarly");
+        _;
+    }
+
     ///////////////////////////////////////////////////
     /// ERC20 OVERRIDES                             ///
-    /// Only unlocked balance is transferable       ///
     ///////////////////////////////////////////////////
 
-    function transfer(address to, uint256 amount) public override returns (bool) {
-        unlockedBalanceOf[msg.sender] -= amount;
+    function transfer(address to, uint256 amount) public override checkEscrowDuration(msg.sender) returns (bool) {
+        balanceOf[msg.sender] -= amount;
 
         // Cannot overflow because the sum of all user
         // balances can't exceed the max uint256 value.
         unchecked {
-            unlockedBalanceOf[to] += amount;
+            balanceOf[to] += amount;
         }
+
+        _escrowData[msg.sender].total -= amount;
+        _escrowData[to].total += amount;
 
         emit Transfer(msg.sender, to, amount);
 
         return true;
     }
 
-    function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
+    function transferFrom(address from, address to, uint256 amount)
+        public
+        override
+        checkEscrowDuration(from)
+        returns (bool)
+    {
         uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
 
         if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
 
-        unlockedBalanceOf[from] -= amount;
+        balanceOf[from] -= amount;
 
         // Cannot overflow because the sum of all user
         // balances can't exceed the max uint256 value.
         unchecked {
-            unlockedBalanceOf[to] += amount;
+            balanceOf[to] += amount;
         }
+
+        _escrowData[from].total -= amount;
+        _escrowData[to].total += amount;
 
         emit Transfer(from, to, amount);
 
@@ -92,71 +103,24 @@ abstract contract Escrow is ERC20, Permit69, DAppVerification, FastLaneErrorsEve
     /// EXTERNAL FUNCTIONS FOR SOLVER INTERACTION ///
     ///////////////////////////////////////////////////
 
-    // Deposit ETH and get atlETH in return. The minted atlETH amount is added to the unlocked balance,
-    // meaning it can be freely transferred or withdrawn, but won't be available for escrow.
-    // After depositing, call lock() to escrow the atlETH and begin bidding.
-    function deposit() external payable returns (uint256 newUnlockedBalance, uint256 newBalance) {
-        _mint(msg.sender, msg.value);
-        unlockedBalanceOf[msg.sender] += msg.value;
-        newUnlockedBalance = unlockedBalanceOf[msg.sender];
-        newBalance = balanceOf[msg.sender];
-    }
-
-    // Redeem atlETH for ETH. Only unlocked (non-escrowed) atlETH can be redeemed.
-    function withdraw(uint256 amount) external returns (uint256 newUnlockedBalance, uint256 newBalance) {
-        require(unlockedBalanceOf[msg.sender] >= amount, "ERR-E078 InsufficientUnlockedBalance");
-        _burn(msg.sender, amount);
-        SafeTransferLib.safeTransferETH(msg.sender, amount);
-        unlockedBalanceOf[msg.sender] -= amount;
-        newUnlockedBalance = unlockedBalanceOf[msg.sender];
-        newBalance = balanceOf[msg.sender];
-    }
-
-    // Lock atlETH in escrow.
-    function escrowBalance(uint256 amount) external onlyWhenUnlocked returns (uint256 newLockedBalance) {
-        require(unlockedBalanceOf[msg.sender] >= amount, "ERR-E079 InsufficientUnlockedBalance");
-        unlockedBalanceOf[msg.sender] -= amount;
-        _escrowData[msg.sender].total += amount;
-        newLockedBalance = uint256(_escrowData[msg.sender].total);
-    }
-
-    // Unlock atlETH from escrow. Only eligible after the escrowDuration from the last solver's
-    // interaction with the contract has elapsed.
-    function unescrowBalance(uint256 amount) external onlyWhenUnlocked returns (uint256 newLockedBalance) {
-        require(
-            block.number >= uint256(_escrowData[msg.sender].lastAccessed) + uint256(escrowDuration), "ERR-E080 TooEarly"
-        );
-        require(_escrowData[msg.sender].total >= amount, "ERR-E081 InsufficientLockedBalance");
-        unlockedBalanceOf[msg.sender] += amount;
-        _escrowData[msg.sender].total -= amount;
-        newLockedBalance = uint256(_escrowData[msg.sender].total);
-    }
-
-    function depositAndEscrowBalance()
-        external
-        payable
-        onlyWhenUnlocked
-        returns (uint256 newLockedBalance, uint256 newBalance)
-    {
+    // Deposit ETH and get atlETH in return.
+    function deposit() external payable onlyWhenUnlocked returns (uint256 newBalance) {
         _mint(msg.sender, msg.value);
         _escrowData[msg.sender].total += msg.value;
-        newLockedBalance = uint256(_escrowData[msg.sender].total);
-        newBalance = balanceOf[msg.sender];
+        newBalance = _escrowData[msg.sender].total;
     }
 
-    function unescrowBalanceAndWithdraw(uint256 amount)
+    // Redeem atlETH for ETH.
+    function withdraw(uint256 amount)
         external
         onlyWhenUnlocked
-        returns (uint256 newLockedBalance, uint256 newBalance)
+        checkEscrowDuration(msg.sender)
+        returns (uint256 newBalance)
     {
-        require(
-            block.number >= uint256(_escrowData[msg.sender].lastAccessed) + uint256(escrowDuration), "ERR-E080 TooEarly"
-        );
-        require(_escrowData[msg.sender].total >= amount, "ERR-E081 InsufficientLockedBalance");
-        _escrowData[msg.sender].total -= amount;
+        require(balanceOf[msg.sender] >= amount, "ERR-E078 InsufficientBalance");
         _burn(msg.sender, amount);
         SafeTransferLib.safeTransferETH(msg.sender, amount);
-        newLockedBalance = uint256(_escrowData[msg.sender].total);
+        _escrowData[msg.sender].total -= amount;
         newBalance = balanceOf[msg.sender];
     }
 

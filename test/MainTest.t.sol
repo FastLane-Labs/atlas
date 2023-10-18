@@ -33,11 +33,11 @@ contract MainTest is BaseTest {
 
         // Deposit ETH from Searcher1 signer to pay for searcher's gas 
         vm.prank(solverOneEOA); 
-        atlas.depositAndEscrowBalance{value: 1e18}();
+        atlas.deposit{value: 1e18}();
 
         // Deposit ETH from Searcher2 signer to pay for searcher's gas
         vm.prank(solverTwoEOA);
-        atlas.depositAndEscrowBalance{value: 1e18}();
+        atlas.deposit{value: 1e18}();
     }
 
     function testMain() public {

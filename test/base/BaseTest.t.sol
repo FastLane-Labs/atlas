@@ -86,7 +86,7 @@ contract BaseTest is Test, TestConstants {
         vm.startPrank(solverOneEOA);
 
         solverOne = new Solver(escrow, solverOneEOA);
-        IEscrow(escrow).depositAndEscrowBalance{value: 1e18}();
+        IEscrow(escrow).deposit{value: 1e18}();
 
         deal(TOKEN_ZERO, address(solverOne), 10e24);
         deal(TOKEN_ONE, address(solverOne), 10e24);
@@ -96,7 +96,7 @@ contract BaseTest is Test, TestConstants {
         vm.startPrank(solverTwoEOA);
 
         solverTwo = new Solver(escrow, solverTwoEOA);
-        IEscrow(escrow).depositAndEscrowBalance{value: 1e18}();
+        IEscrow(escrow).deposit{value: 1e18}();
 
         vm.stopPrank();
 
