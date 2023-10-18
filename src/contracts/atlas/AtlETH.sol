@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.19;
 
+import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
+
 import "../types/EscrowTypes.sol";
+import {Permit69} from "../common/Permit69.sol";
 
 // TODO split out events and errors to share with AtlasEscrow
 
@@ -9,7 +12,7 @@ import "../types/EscrowTypes.sol";
 /// @author FastLane Labs
 /// @author Modified from Solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC20.sol)
 /// @dev Do not manually set balances without updating totalSupply, as the sum of all user balances must not exceed it.
-abstract contract AtlETH {
+abstract contract AtlETH is Permit69 {
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
@@ -48,20 +51,63 @@ abstract contract AtlETH {
     uint256 public immutable escrowDuration;
     mapping(address => SolverEscrow) internal _escrowData;
 
+    // NOTE: these storage vars / maps should only be accessible by *signed* solver transactions
+    // and only once per solver per block (to avoid user-solver collaborative exploits)
+    // EOA Address => solver escrow data
+
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    constructor(uint256 _escrowDuration) {
+    constructor(uint256 _escrowDuration, address _simulator) Permit69(_simulator)  {
         escrowDuration = _escrowDuration;
         INITIAL_CHAIN_ID = block.chainid;
         INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
     }
 
+    /*//////////////////////////////////////////////////////////////
+                                ATLETH
+    //////////////////////////////////////////////////////////////*/
+
     // Restricts ERC20 actions to after escrow period has passed
     modifier checkEscrowDuration(address owner) {
         require(block.number >= uint256(_escrowData[owner].lastAccessed) + uint256(escrowDuration), "ERR-E080 TooEarly");
         _;
+    }
+
+    // TODO adapt these fns to new contract structure
+
+    // Deposit ETH and get atlETH in return.
+    function deposit() external payable onlyWhenUnlocked returns (uint256 newBalance) {
+        _mint(msg.sender, msg.value);
+        _escrowData[msg.sender].total += msg.value;
+        newBalance = _escrowData[msg.sender].total;
+    }
+
+    // Redeem atlETH for ETH.
+    function withdraw(uint256 amount)
+        external
+        onlyWhenUnlocked
+        checkEscrowDuration(msg.sender)
+        returns (uint256 newBalance)
+    {
+        require(balanceOf[msg.sender] >= amount, "ERR-E078 InsufficientBalance");
+        _burn(msg.sender, amount);
+        SafeTransferLib.safeTransferETH(msg.sender, amount);
+        _escrowData[msg.sender].total -= amount;
+        newBalance = balanceOf[msg.sender];
+    }
+
+    function nextSolverNonce(address solverSigner) external view returns (uint256 nextNonce) {
+        nextNonce = uint256(_escrowData[solverSigner].nonce) + 1;
+    }
+
+    function solverEscrowBalance(address solverSigner) external view returns (uint256 balance) {
+        balance = uint256(_escrowData[solverSigner].total);
+    }
+
+    function solverLastActiveBlock(address solverSigner) external view returns (uint256 lastBlock) {
+        lastBlock = uint256(_escrowData[solverSigner].lastAccessed);
     }
 
     /*//////////////////////////////////////////////////////////////
