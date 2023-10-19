@@ -8,7 +8,7 @@ struct AccountingData {
 }
 
 struct EscrowAccountData {
-    uint256 balance;
+    uint128 balance;
     uint32 nonce; // EOA nonce
     uint64 lastAccessed; // block.number
 }

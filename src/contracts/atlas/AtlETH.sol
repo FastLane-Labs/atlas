@@ -111,11 +111,11 @@ abstract contract AtlETH is Permit69 {
     }
 
     function transfer(address to, uint256 amount) public tokenTransferChecks(msg.sender) returns (bool) {
-        _escrowAccountData[msg.sender].balance -= amount;
+        _escrowAccountData[msg.sender].balance -= uint128(amount);
         // Cannot overflow because the sum of all user
         // balances can't exceed the max uint256 value.
         unchecked {
-            _escrowAccountData[to].balance += amount;
+            _escrowAccountData[to].balance += uint128(amount);
         }
         emit Transfer(msg.sender, to, amount);
         return true;
@@ -124,11 +124,11 @@ abstract contract AtlETH is Permit69 {
     function transferFrom(address from, address to, uint256 amount) public tokenTransferChecks(from) returns (bool) {
         uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
         if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
-        _escrowAccountData[from].balance -= amount;
+        _escrowAccountData[from].balance -= uint128(amount);
         // Cannot overflow because the sum of all user
         // balances can't exceed the max uint256 value.
         unchecked {
-            _escrowAccountData[to].balance += amount;
+            _escrowAccountData[to].balance += uint128(amount);
         }
         emit Transfer(from, to, amount);
         return true;
@@ -195,13 +195,13 @@ abstract contract AtlETH is Permit69 {
         // Cannot overflow because the sum of all user
         // balances can't exceed the max uint256 value.
         unchecked {
-            _escrowAccountData[to].balance += amount;
+            _escrowAccountData[to].balance += uint128(amount);
         }
         emit Transfer(address(0), to, amount);
     }
 
     function _burn(address from, uint256 amount) internal {
-        _escrowAccountData[from].balance -= amount;
+        _escrowAccountData[from].balance -= uint128(amount);
         // Cannot underflow because a user's balance
         // will never be larger than the total supply.
         unchecked {

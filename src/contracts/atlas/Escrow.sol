@@ -88,9 +88,9 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
             // Execute the solver call
             (outcome, escrowSurplus) = _solverOpWrapper(gasLimit, environment, solverOp, dAppReturnData, key.pack());
 
-            // unchecked {
-            //     solverEscrow.total += uint128(escrowSurplus);
-            // }
+            unchecked {
+                solverEscrow.balance += uint128(escrowSurplus);
+            }
 
             result |= 1 << uint256(outcome);
 
@@ -105,7 +105,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
 
             // Update the solver's escrow balances and the accumulated refund
             if (result.updateEscrow()) {
-                key.gasRefund += uint32(_update(solverOp, solverEscrow, escrowSurplus, gasWaterMark, result));
+                key.gasRefund += uint32(_update(solverOp, solverEscrow, gasWaterMark, result));
             }
 
             // emit event
@@ -155,7 +155,6 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
     function _update(
         SolverOperation calldata solverOp,
         EscrowAccountData memory solverEscrow,
-        uint256 escrowSurplus,
         uint256 gasWaterMark,
         uint256 result
     ) internal returns (uint256 gasRebate) {
@@ -172,15 +171,13 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
                 revert("ERR-SE72 UncoveredResult");
             }
 
-            uint256 netSolverBalance = solverEscrow.balance + escrowSurplus;
-
             if (gasRebate != 0) {
                 // Calculate what the solver owes
                 gasRebate *= tx.gasprice;
 
-                gasRebate = gasRebate > netSolverBalance ? netSolverBalance : gasRebate;
+                gasRebate = gasRebate > solverEscrow.balance ? solverEscrow.balance : gasRebate;
 
-                solverEscrow.balance = netSolverBalance - gasRebate;
+                solverEscrow.balance -= uint128(gasRebate);
 
                 // NOTE: This will cause an error if you are simulating with a gasPrice of 0
                 gasRebate /= tx.gasprice;
