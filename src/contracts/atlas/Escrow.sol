@@ -29,17 +29,38 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
+    uint256 public immutable escrowDuration;
+    mapping(address => SolverEscrow) internal _escrowData;
+
     constructor(
         string memory _tokenName,
         string memory _tokenSymbol,
         uint8 _tokenDecimals,
         uint32 _escrowDuration,
         address _simulator
-    ) AtlETH(_escrowDuration, _simulator) {}
+    ) AtlETH(_simulator) {
+        escrowDuration = _escrowDuration;
+    }
+
+    // Custom checks for atlETH transfer functions.
+    // Interactions (transfers, withdrawals) are allowed only after the owner last interaction
+    // with Atlas was at least `escrowDuration` blocks ago.
+    modifier tokenTransferChecks(address owner) override {
+        require(_escrowData[owner].lastAccessed + escrowDuration < block.number, "ERR-E080 EscrowActive");
+        _;
+    }
 
     ///////////////////////////////////////////////////
     /// EXTERNAL FUNCTIONS FOR BUNDLER INTERACTION  ///
     ///////////////////////////////////////////////////
+
+    function nextSolverNonce(address solverSigner) external view returns (uint256 nextNonce) {
+        nextNonce = uint256(_escrowData[solverSigner].nonce) + 1;
+    }
+
+    function solverLastActiveBlock(address solverSigner) external view returns (uint256 lastBlock) {
+        lastBlock = uint256(_escrowData[solverSigner].lastAccessed);
+    }
 
     ///////////////////////////////////////////////////
     ///             INTERNAL FUNCTIONS              ///
