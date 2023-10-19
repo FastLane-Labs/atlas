@@ -26,13 +26,7 @@ contract Atlas is Test, Factory {
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
-    constructor(
-        string memory _tokenName,
-        string memory _tokenSymbol,
-        uint8 _tokenDecimals,
-        uint32 _escrowDuration,
-        address _simulator
-    ) Factory(_tokenName, _tokenSymbol, _tokenDecimals, _escrowDuration, _simulator) {}
+    constructor(uint32 _escrowDuration, address _simulator) Factory(_escrowDuration, _simulator) {}
 
     function metacall( // <- Entrypoint Function
         UserOperation calldata userOp, // set by user

@@ -32,13 +32,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
     uint256 public immutable escrowDuration;
     mapping(address => SolverEscrow) internal _escrowData;
 
-    constructor(
-        string memory _tokenName,
-        string memory _tokenSymbol,
-        uint8 _tokenDecimals,
-        uint32 _escrowDuration,
-        address _simulator
-    ) AtlETH(_simulator) {
+    constructor(uint32 _escrowDuration, address _simulator) AtlETH(_simulator) {
         escrowDuration = _escrowDuration;
     }
 
@@ -198,7 +192,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
                 revert("ERR-SE72 UncoveredResult");
             }
 
-            uint256 netSolverBalance = balanceOf[solverOp.solver] + escrowSurplus;
+            uint256 netSolverBalance = balanceOf[solverOp.from] + escrowSurplus;
 
             if (gasRebate != 0) {
                 // Calculate what the solver owes
@@ -215,7 +209,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
                 _escrowData[solverOp.from] = solverEscrow;
 
                 // TODO dont just change balance -> use mint() fn to update safely. Maybe without events for internal mint/burn
-                balanceOf[solverOp.solver] = netSolverBalance;
+                balanceOf[solverOp.from] = netSolverBalance;
 
                 // Check if need to save escrowData due to nonce update but not gasRebate
             } else if (result & EscrowBits._NO_NONCE_UPDATE == 0) {
@@ -308,7 +302,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
             uint256 gasCost = (tx.gasprice * gasLimit) + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
 
             // see if solver's escrow can afford tx gascost
-            if (gasCost > balanceOf[solverOp.solver]) {
+            if (gasCost > balanceOf[solverOp.from]) {
                 // charge solver for calldata so that we can avoid vampire attacks from solver onto user
                 result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
             }

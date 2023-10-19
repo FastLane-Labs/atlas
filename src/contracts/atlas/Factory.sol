@@ -20,13 +20,7 @@ contract Factory is Escrow {
     bytes32 public immutable salt;
     address public immutable executionTemplate;
 
-    constructor(
-        string memory _tokenName,
-        string memory _tokenSymbol,
-        uint8 _tokenDecimals,
-        uint32 _escrowDuration,
-        address _simulator
-    ) Escrow(_tokenName, _tokenSymbol, _tokenDecimals, _escrowDuration, _simulator) {
+    constructor(uint32 _escrowDuration, address _simulator) Escrow(_escrowDuration, _simulator) {
         //atlas = msg.sender;
         salt = keccak256(abi.encodePacked(block.chainid, atlas, "Atlas 1.0"));
 
