@@ -273,6 +273,13 @@ contract Atlas is Test, Factory {
                     return ValidCallsResult.UserSignatureInvalid;   
                 }
             }
+
+            // verify the callchainhash if required by protocol
+            if(dConfig.callConfig.verifySolverBundlerCallChainHash()) {
+                if(dAppOp.approval.callChainHash != CallVerification.getCallChainHash(dConfig, userOp.call, solverOps) && !isSimulation) {
+                    return ValidCallsResult.InvalidSequence;
+                }
+            }
         } // check if protocol allows unknown bundlers, and verify all signatures if they do
         else if(dConfig.callConfig.allowsUnknownBundler()) {
             // check dapp signature
