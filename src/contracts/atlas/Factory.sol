@@ -16,7 +16,7 @@ import {CallBits} from "../libraries/CallBits.sol";
 contract Factory is Escrow {
     //address immutable public atlas;
     using CallBits for uint32;
-    
+
     bytes32 public immutable salt;
     address public immutable executionTemplate;
 
@@ -24,8 +24,9 @@ contract Factory is Escrow {
         //atlas = msg.sender;
         salt = keccak256(abi.encodePacked(block.chainid, atlas, "Atlas 1.0"));
 
-        executionTemplate =
-            _deployExecutionEnvironmentTemplate(address(this), DAppConfig({to: address(0), callConfig: uint32(0), bidToken: address(0)}));
+        executionTemplate = _deployExecutionEnvironmentTemplate(
+            address(this), DAppConfig({to: address(0), callConfig: uint32(0), bidToken: address(0)})
+        );
     }
 
     // GETTERS
@@ -35,14 +36,18 @@ contract Factory is Escrow {
 
     function execution() external view returns (address) {
         return executionTemplate;
-    } 
+    }
 
     function createExecutionEnvironment(address dAppControl) external returns (address executionEnvironment) {
         executionEnvironment = _setExecutionEnvironment(dAppControl, msg.sender, dAppControl.codehash);
         _initializeNonce(msg.sender);
     }
 
-    function getExecutionEnvironment(address user, address dAppControl) external view returns (address executionEnvironment, uint32 callConfig, bool exists) {
+    function getExecutionEnvironment(address user, address dAppControl)
+        external
+        view
+        returns (address executionEnvironment, uint32 callConfig, bool exists)
+    {
         callConfig = IDAppControl(dAppControl).callConfig();
         executionEnvironment = _getExecutionEnvironmentCustom(user, dAppControl.codehash, dAppControl, callConfig);
         exists = executionEnvironment.codehash != bytes32(0);
@@ -54,19 +59,18 @@ contract Factory is Escrow {
         returns (address executionEnvironment)
     {
         uint32 callConfig = IDAppControl(controller).callConfig();
-        
+
         executionEnvironment = _getExecutionEnvironmentCustom(user, controlCodeHash, controller, callConfig);
     }
 
     // NOTE: This func is used to generate the address of user ExecutionEnvironments that have
     // been deprecated due to DAppControl changes of callConfig.
-    function _getExecutionEnvironmentCustom(address user, bytes32 controlCodeHash, address controller, uint32 callConfig)
-        internal
-        view
-        override
-        returns (address executionEnvironment)
-    {
-        
+    function _getExecutionEnvironmentCustom(
+        address user,
+        bytes32 controlCodeHash,
+        address controller,
+        uint32 callConfig
+    ) internal view override returns (address executionEnvironment) {
         executionEnvironment = address(
             uint160(
                 uint256(
@@ -76,11 +80,7 @@ contract Factory is Escrow {
                             address(this),
                             salt,
                             keccak256(
-                                abi.encodePacked(
-                                    _getMimicCreationCode(
-                                        controller, callConfig, user, controlCodeHash
-                                    )
-                                )
+                                abi.encodePacked(_getMimicCreationCode(controller, callConfig, user, controlCodeHash))
                             )
                         )
                     )
@@ -95,19 +95,13 @@ contract Factory is Escrow {
     {
         uint32 callConfig = IDAppControl(dAppControl).callConfig();
 
-        bytes memory creationCode =
-            _getMimicCreationCode(dAppControl, callConfig, user, controlCodeHash);
+        bytes memory creationCode = _getMimicCreationCode(dAppControl, callConfig, user, controlCodeHash);
 
         executionEnvironment = address(
             uint160(
                 uint256(
                     keccak256(
-                        abi.encodePacked(
-                            bytes1(0xff),
-                            address(this),
-                            salt,
-                            keccak256(abi.encodePacked(creationCode))
-                        )
+                        abi.encodePacked(bytes1(0xff), address(this), salt, keccak256(abi.encodePacked(creationCode)))
                     )
                 )
             )
@@ -123,7 +117,10 @@ contract Factory is Escrow {
         }
     }
 
-    function _deployExecutionEnvironmentTemplate(address, DAppConfig memory) internal returns (address executionEnvironment) {
+    function _deployExecutionEnvironmentTemplate(address, DAppConfig memory)
+        internal
+        returns (address executionEnvironment)
+    {
         ExecutionEnvironment _environment = new ExecutionEnvironment{
             salt: salt
         }(atlas);
@@ -131,12 +128,11 @@ contract Factory is Escrow {
         executionEnvironment = address(_environment);
     }
 
-    function _getMimicCreationCode(
-        address controller,
-        uint32 callConfig,
-        address user,
-        bytes32 controlCodeHash
-    ) internal view returns (bytes memory creationCode) {
+    function _getMimicCreationCode(address controller, uint32 callConfig, address user, bytes32 controlCodeHash)
+        internal
+        view
+        returns (bytes memory creationCode)
+    {
         address executionLib = executionTemplate;
         // NOTE: Changing compiler settings or solidity versions can break this.
         creationCode = type(Mimic).creationCode;
@@ -145,16 +141,7 @@ contract Factory is Escrow {
             mstore(add(creationCode, 131), add(shl(96, user), 0x73ffffffffffffffffffffff))
             mstore(
                 add(creationCode, 152),
-                add(
-                    shl(96, controller), 
-                    add(
-                        add(
-                            shl(88, 0x63), 
-                            shl(56, callConfig)
-                        ), 
-                        0x7f000000000000
-                    )
-                )
+                add(shl(96, controller), add(add(shl(88, 0x63), shl(56, callConfig)), 0x7f000000000000))
             )
             mstore(add(creationCode, 178), controlCodeHash)
         }

@@ -7,15 +7,10 @@ struct AccountingData {
     mapping(address borrower => uint256 amount) ethBorrowed; // TODO worth allowing ERC20s to be borrowed?
 }
 
-struct SolverEscrow {
-    uint128 total;
-    uint32 nonce; // EOA nonce.
+struct EscrowAccountData {
+    uint128 balance;
+    uint32 nonce; // EOA nonce
     uint64 lastAccessed; // block.number
-}
-
-struct SolverWithdrawal {
-    uint128 escrowed;
-    uint64 availableOn; // block.number when funds are available.
 }
 
 struct GasDonation {
