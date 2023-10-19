@@ -78,20 +78,20 @@ contract Sorter {
 
         // Make sure the solver has enough funds escrowed
         // TODO: subtract any pending withdrawals
-        uint256 solverBalance = IAtlETH(atlas).balanceOf(solverOp.from);
+        uint256 solverBalance = IAtlETH(escrow).balanceOf(solverOp.from);
         if (solverBalance < solverOp.maxFeePerGas * solverOp.gas) {
             return false;
         }
 
         // Solvers can only do one tx per block - this prevents double counting escrow balances.
         // TODO: Add in "targetBlockNumber" as an arg?
-        uint256 solverLastActiveBlock = IAtlETH(atlas).accountLastActiveBlock(solverOp.from);
+        uint256 solverLastActiveBlock = IAtlETH(escrow).accountLastActiveBlock(solverOp.from);
         if (solverLastActiveBlock >= block.number) {
             return false;
         }
 
         // Make sure the solver nonce is accurate
-        uint256 nextSolverNonce = IAtlETH(atlas).nextAccountNonce(solverOp.from);
+        uint256 nextSolverNonce = IAtlETH(escrow).nextAccountNonce(solverOp.from);
         if (nextSolverNonce != solverOp.nonce) {
             return false;
         }
