@@ -220,6 +220,10 @@ contract Atlas is Test, Factory {
                 return ValidCallsResult.UnknownBundlerNotAllowed;
             }
 
+            if(userOp.signature.length > 0) {
+                return ValidCallsResult.UserSignatureInvalid;
+            }
+
             // check dapp signature
             if(!_verifyDApp(dConfig, dAppOp)) {
                 bool bypass = isSimulation && dAppOp.signature.length == 0;
