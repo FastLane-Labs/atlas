@@ -3,8 +3,8 @@ pragma solidity ^0.8.18;
 
 import {IDAppControl} from "../interfaces/IDAppControl.sol";
 import {IDAppIntegration} from "../interfaces/IDAppIntegration.sol";
-import {IEscrow} from "../interfaces/IEscrow.sol";
 import {IAtlas} from "../interfaces/IAtlas.sol";
+import {IAtlETH} from "../interfaces/IAtlETH.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
@@ -32,7 +32,7 @@ contract TxBuilder {
     }
 
     function solverNextNonce(address solverSigner) public view returns (uint256) {
-        return IEscrow(escrow).nextSolverNonce(solverSigner);
+        return IAtlETH(escrow).nextAccountNonce(solverSigner);
     }
 
     function governanceNextNonce(address signatory) public view returns (uint256) {
@@ -82,7 +82,6 @@ contract TxBuilder {
         address solverContract,
         uint256 bidAmount
     ) public view returns (SolverOperation memory solverOp) {
-        
         solverOp = SolverOperation({
             from: solverEOA,
             to: atlas,
@@ -101,14 +100,13 @@ contract TxBuilder {
         });
     }
 
-    function buildDAppOperation(
-        address governanceEOA,
-        UserOperation memory userOp,
-        SolverOperation[] memory solverOps
-    ) public view returns (DAppOperation memory dAppOp) {
-       
+    function buildDAppOperation(address governanceEOA, UserOperation memory userOp, SolverOperation[] memory solverOps)
+        public
+        view
+        returns (DAppOperation memory dAppOp)
+    {
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
-        
+
         bytes32 userOpHash = userOp.getUserOperationHash();
         bytes32 callChainHash = CallVerification.getCallChainHash(dConfig, userOp, solverOps);
 

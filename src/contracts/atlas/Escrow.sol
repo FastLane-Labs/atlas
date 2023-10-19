@@ -8,7 +8,7 @@ import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 
 import {DAppVerification} from "./DAppVerification.sol";
-import {Permit69} from "../common/Permit69.sol";
+import {AtlETH} from "./AtlETH.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
@@ -23,118 +23,13 @@ import {SafetyBits} from "../libraries/SafetyBits.sol";
 
 import "forge-std/Test.sol";
 
-abstract contract Escrow is ERC20, Permit69, DAppVerification, FastLaneErrorsEvents {
+abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
     using ECDSA for bytes32;
     using EscrowBits for uint256;
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
-    uint32 public immutable escrowDuration;
-
-    // NOTE: these storage vars / maps should only be accessible by *signed* solver transactions
-    // and only once per solver per block (to avoid user-solver collaborative exploits)
-    // EOA Address => solver escrow data
-    mapping(address => SolverEscrow) internal _escrowData;
-    mapping(address => SolverWithdrawal) internal _withdrawalData;
-
-    constructor(
-        string memory _tokenName,
-        string memory _tokenSymbol,
-        uint8 _tokenDecimals,
-        uint32 _escrowDuration,
-        address _simulator
-    ) ERC20(_tokenName, _tokenSymbol, _tokenDecimals) Permit69(_simulator) {
-        escrowDuration = _escrowDuration;
-    }
-
-    modifier checkEscrowDuration(address owner) {
-        require(block.number >= uint256(_escrowData[owner].lastAccessed) + uint256(escrowDuration), "ERR-E080 TooEarly");
-        _;
-    }
-
-    ///////////////////////////////////////////////////
-    /// ERC20 OVERRIDES                             ///
-    ///////////////////////////////////////////////////
-
-    function transfer(address to, uint256 amount) public override checkEscrowDuration(msg.sender) returns (bool) {
-        balanceOf[msg.sender] -= amount;
-
-        // Cannot overflow because the sum of all user
-        // balances can't exceed the max uint256 value.
-        unchecked {
-            balanceOf[to] += amount;
-        }
-
-        _escrowData[msg.sender].total -= amount;
-        _escrowData[to].total += amount;
-
-        emit Transfer(msg.sender, to, amount);
-
-        return true;
-    }
-
-    function transferFrom(address from, address to, uint256 amount)
-        public
-        override
-        checkEscrowDuration(from)
-        returns (bool)
-    {
-        uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
-
-        if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
-
-        balanceOf[from] -= amount;
-
-        // Cannot overflow because the sum of all user
-        // balances can't exceed the max uint256 value.
-        unchecked {
-            balanceOf[to] += amount;
-        }
-
-        _escrowData[from].total -= amount;
-        _escrowData[to].total += amount;
-
-        emit Transfer(from, to, amount);
-
-        return true;
-    }
-
-    ///////////////////////////////////////////////////
-    /// EXTERNAL FUNCTIONS FOR SOLVER INTERACTION ///
-    ///////////////////////////////////////////////////
-
-    // Deposit ETH and get atlETH in return.
-    function deposit() external payable onlyWhenUnlocked returns (uint256 newBalance) {
-        _mint(msg.sender, msg.value);
-        _escrowData[msg.sender].total += msg.value;
-        newBalance = _escrowData[msg.sender].total;
-    }
-
-    // Redeem atlETH for ETH.
-    function withdraw(uint256 amount)
-        external
-        onlyWhenUnlocked
-        checkEscrowDuration(msg.sender)
-        returns (uint256 newBalance)
-    {
-        require(balanceOf[msg.sender] >= amount, "ERR-E078 InsufficientBalance");
-        _burn(msg.sender, amount);
-        SafeTransferLib.safeTransferETH(msg.sender, amount);
-        _escrowData[msg.sender].total -= amount;
-        newBalance = balanceOf[msg.sender];
-    }
-
-    function nextSolverNonce(address solverSigner) external view returns (uint256 nextNonce) {
-        nextNonce = uint256(_escrowData[solverSigner].nonce) + 1;
-    }
-
-    function solverEscrowBalance(address solverSigner) external view returns (uint256 balance) {
-        balance = uint256(_escrowData[solverSigner].total);
-    }
-
-    function solverLastActiveBlock(address solverSigner) external view returns (uint256 lastBlock) {
-        lastBlock = uint256(_escrowData[solverSigner].lastAccessed);
-    }
+    constructor(uint32 _escrowDuration, address _simulator) AtlETH(_escrowDuration, _simulator) {}
 
     ///////////////////////////////////////////////////
     /// EXTERNAL FUNCTIONS FOR BUNDLER INTERACTION  ///
@@ -179,7 +74,8 @@ abstract contract Escrow is ERC20, Permit69, DAppVerification, FastLaneErrorsEve
         uint256 gasWaterMark = gasleft();
 
         // Verify the transaction.
-        (uint256 result, uint256 gasLimit, SolverEscrow memory solverEscrow) = _verify(solverOp, gasWaterMark, false);
+        (uint256 result, uint256 gasLimit, EscrowAccountData memory solverEscrow) =
+            _verify(solverOp, gasWaterMark, false);
 
         SolverOutcome outcome;
         uint256 escrowSurplus;
@@ -192,9 +88,9 @@ abstract contract Escrow is ERC20, Permit69, DAppVerification, FastLaneErrorsEve
             // Execute the solver call
             (outcome, escrowSurplus) = _solverOpWrapper(gasLimit, environment, solverOp, dAppReturnData, key.pack());
 
-            unchecked {
-                solverEscrow.total += uint128(escrowSurplus);
-            }
+            // unchecked {
+            //     solverEscrow.total += uint128(escrowSurplus);
+            // }
 
             result |= 1 << uint256(outcome);
 
@@ -209,7 +105,7 @@ abstract contract Escrow is ERC20, Permit69, DAppVerification, FastLaneErrorsEve
 
             // Update the solver's escrow balances and the accumulated refund
             if (result.updateEscrow()) {
-                key.gasRefund += uint32(_update(solverOp, solverEscrow, gasWaterMark, result));
+                key.gasRefund += uint32(_update(solverOp, solverEscrow, escrowSurplus, gasWaterMark, result));
             }
 
             // emit event
@@ -258,7 +154,8 @@ abstract contract Escrow is ERC20, Permit69, DAppVerification, FastLaneErrorsEve
 
     function _update(
         SolverOperation calldata solverOp,
-        SolverEscrow memory solverEscrow,
+        EscrowAccountData memory solverEscrow,
+        uint256 escrowSurplus,
         uint256 gasWaterMark,
         uint256 result
     ) internal returns (uint256 gasRebate) {
@@ -275,23 +172,25 @@ abstract contract Escrow is ERC20, Permit69, DAppVerification, FastLaneErrorsEve
                 revert("ERR-SE72 UncoveredResult");
             }
 
+            uint256 netSolverBalance = solverEscrow.balance + escrowSurplus;
+
             if (gasRebate != 0) {
                 // Calculate what the solver owes
                 gasRebate *= tx.gasprice;
 
-                gasRebate = gasRebate > solverEscrow.total ? solverEscrow.total : gasRebate;
+                gasRebate = gasRebate > netSolverBalance ? netSolverBalance : gasRebate;
 
-                solverEscrow.total -= uint128(gasRebate);
+                solverEscrow.balance = netSolverBalance - gasRebate;
 
                 // NOTE: This will cause an error if you are simulating with a gasPrice of 0
                 gasRebate /= tx.gasprice;
 
-                // save the escrow data back into storage
-                _escrowData[solverOp.from] = solverEscrow;
+                // Save the escrow data back into storage
+                _escrowAccountData[solverOp.from] = solverEscrow;
 
                 // Check if need to save escrowData due to nonce update but not gasRebate
             } else if (result & EscrowBits._NO_NONCE_UPDATE == 0) {
-                _escrowData[solverOp.from].nonce = solverEscrow.nonce;
+                _escrowAccountData[solverOp.from].nonce = solverEscrow.nonce;
             }
         }
     }
@@ -299,7 +198,7 @@ abstract contract Escrow is ERC20, Permit69, DAppVerification, FastLaneErrorsEve
     function _verify(SolverOperation calldata solverOp, uint256 gasWaterMark, bool auctionAlreadyComplete)
         internal
         view
-        returns (uint256 result, uint256 gasLimit, SolverEscrow memory solverEscrow)
+        returns (uint256 result, uint256 gasLimit, EscrowAccountData memory solverEscrow)
     {
         // verify solver's signature
         if (_verifySignature(solverOp)) {
@@ -346,9 +245,9 @@ abstract contract Escrow is ERC20, Permit69, DAppVerification, FastLaneErrorsEve
     function _verifySolverOperation(SolverOperation calldata solverOp)
         internal
         view
-        returns (uint256 result, uint256 gasLimit, SolverEscrow memory solverEscrow)
+        returns (uint256 result, uint256 gasLimit, EscrowAccountData memory solverEscrow)
     {
-        solverEscrow = _escrowData[solverOp.from];
+        solverEscrow = _escrowAccountData[solverOp.from];
 
         // TODO big unchecked block - audit/review carefully
         unchecked {
@@ -380,7 +279,7 @@ abstract contract Escrow is ERC20, Permit69, DAppVerification, FastLaneErrorsEve
             uint256 gasCost = (tx.gasprice * gasLimit) + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
 
             // see if solver's escrow can afford tx gascost
-            if (gasCost > solverEscrow.total - _withdrawalData[solverOp.from].escrowed) {
+            if (gasCost > _escrowAccountData[solverOp.from].balance) {
                 // charge solver for calldata so that we can avoid vampire attacks from solver onto user
                 result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
             }

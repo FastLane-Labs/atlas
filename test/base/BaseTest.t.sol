@@ -3,7 +3,6 @@ pragma solidity ^0.8.18;
 
 import "forge-std/Test.sol";
 
-import {IEscrow} from "../../src/contracts/interfaces/IEscrow.sol";
 import {IDAppIntegration} from "../../src/contracts/interfaces/IDAppIntegration.sol";
 
 import {Atlas} from "../../src/contracts/atlas/Atlas.sol";
@@ -66,7 +65,7 @@ contract BaseTest is Test, TestConstants {
 
         simulator = new Simulator();
 
-        atlas = new Atlas("Atlas ETH", "atlETH", 18, 64, address(simulator));
+        atlas = new Atlas(64, address(simulator));
         simulator.setAtlas(address(atlas));
 
         escrow = atlas.getEscrowAddress();
@@ -86,7 +85,7 @@ contract BaseTest is Test, TestConstants {
         vm.startPrank(solverOneEOA);
 
         solverOne = new Solver(escrow, solverOneEOA);
-        IEscrow(escrow).deposit{value: 1e18}();
+        atlas.deposit{value: 1e18}();
 
         deal(TOKEN_ZERO, address(solverOne), 10e24);
         deal(TOKEN_ONE, address(solverOne), 10e24);
@@ -96,7 +95,7 @@ contract BaseTest is Test, TestConstants {
         vm.startPrank(solverTwoEOA);
 
         solverTwo = new Solver(escrow, solverTwoEOA);
-        IEscrow(escrow).deposit{value: 1e18}();
+        atlas.deposit{value: 1e18}();
 
         vm.stopPrank();
 
