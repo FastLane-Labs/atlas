@@ -8,7 +8,7 @@ import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 
 import {DAppVerification} from "./DAppVerification.sol";
-import {Permit69} from "../common/Permit69.sol";
+import {AtlETH} from "./AtlETH.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
@@ -23,62 +23,24 @@ import {SafetyBits} from "../libraries/SafetyBits.sol";
 
 import "forge-std/Test.sol";
 
-abstract contract Escrow is Permit69, DAppVerification, FastLaneErrorsEvents {
+abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
     using ECDSA for bytes32;
     using EscrowBits for uint256;
-    using CallBits for uint32;    
+    using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
-    uint32 public immutable escrowDuration;
-
-    // NOTE: these storage vars / maps should only be accessible by *signed* solver transactions
-    // and only once per solver per block (to avoid user-solver collaborative exploits)
-    // EOA Address => solver escrow data
-    mapping(address => SolverEscrow) internal _escrowData;
-    mapping(address => SolverWithdrawal) internal _withdrawalData;
-
-    constructor(uint32 escrowDurationFromFactory, address _simulator) Permit69(_simulator) {
-        escrowDuration = escrowDurationFromFactory;
-    }
-
-    ///////////////////////////////////////////////////
-    /// EXTERNAL FUNCTIONS FOR SOLVER INTERACTION ///
-    ///////////////////////////////////////////////////
-    function deposit(address solverSigner) onlyWhenUnlocked external payable returns (uint256 newBalance) {
-        // NOTE: The escrow accounting system cannot currently handle deposits made mid-transaction.
-
-        _escrowData[solverSigner].total += uint128(msg.value);
-        newBalance = uint256(_escrowData[solverSigner].total);
-    }
-
-    function nextSolverNonce(address solverSigner) external view returns (uint256 nextNonce) {
-        nextNonce = uint256(_escrowData[solverSigner].nonce) + 1;
-    }
-
-    function solverEscrowBalance(address solverSigner) external view returns (uint256 balance) {
-        balance = uint256(_escrowData[solverSigner].total);
-    }
-
-    function solverLastActiveBlock(address solverSigner) external view returns (uint256 lastBlock) {
-        lastBlock = uint256(_escrowData[solverSigner].lastAccessed);
-    }
+    constructor(uint32 _escrowDuration, address _simulator) AtlETH(_escrowDuration, _simulator) {}
 
     ///////////////////////////////////////////////////
     /// EXTERNAL FUNCTIONS FOR BUNDLER INTERACTION  ///
     ///////////////////////////////////////////////////
 
-    
-
     ///////////////////////////////////////////////////
     ///             INTERNAL FUNCTIONS              ///
     ///////////////////////////////////////////////////
-    function _executePreOpsCall(
-        UserOperation calldata userOp,
-        address environment,
-        bytes32 lockBytes
-    ) 
-        internal 
-        returns (bool success, bytes memory preOpsData) 
+    function _executePreOpsCall(UserOperation calldata userOp, address environment, bytes32 lockBytes)
+        internal
+        returns (bool success, bytes memory preOpsData)
     {
         preOpsData = abi.encodeWithSelector(IExecutionEnvironment.preOpsWrapper.selector, userOp);
         preOpsData = abi.encodePacked(preOpsData, lockBytes);
@@ -88,11 +50,7 @@ abstract contract Escrow is Permit69, DAppVerification, FastLaneErrorsEvents {
         }
     }
 
-    function _executeUserOperation(
-        UserOperation calldata userOp, 
-        address environment,
-        bytes32 lockBytes
-    )
+    function _executeUserOperation(UserOperation calldata userOp, address environment, bytes32 lockBytes)
         internal
         returns (bool success, bytes memory userData)
     {
@@ -112,12 +70,11 @@ abstract contract Escrow is Permit69, DAppVerification, FastLaneErrorsEvents {
         address environment,
         EscrowKey memory key
     ) internal returns (bool auctionWon, EscrowKey memory) {
-
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
 
         // Verify the transaction.
-        (uint256 result, uint256 gasLimit, SolverEscrow memory solverEscrow) =
+        (uint256 result, uint256 gasLimit, EscrowAccountData memory solverEscrow) =
             _verify(solverOp, gasWaterMark, false);
 
         SolverOutcome outcome;
@@ -132,7 +89,7 @@ abstract contract Escrow is Permit69, DAppVerification, FastLaneErrorsEvents {
             (outcome, escrowSurplus) = _solverOpWrapper(gasLimit, environment, solverOp, dAppReturnData, key.pack());
 
             unchecked {
-                solverEscrow.total += uint128(escrowSurplus);
+                solverEscrow.balance += uint128(escrowSurplus);
             }
 
             result |= 1 << uint256(outcome);
@@ -153,24 +110,11 @@ abstract contract Escrow is Permit69, DAppVerification, FastLaneErrorsEvents {
 
             // emit event
             emit SolverTxResult(
-                solverOp.solver,
-                solverOp.from,
-                true,
-                outcome == SolverOutcome.Success,
-                solverEscrow.nonce,
-                result
+                solverOp.solver, solverOp.from, true, outcome == SolverOutcome.Success, solverEscrow.nonce, result
             );
-
         } else {
             // emit event
-            emit SolverTxResult(
-                solverOp.solver,
-                solverOp.from,
-                false,
-                false,
-                solverEscrow.nonce,
-                result
-            );
+            emit SolverTxResult(solverOp.solver, solverOp.from, false, false, solverEscrow.nonce, result);
         }
 
         return (auctionWon, key);
@@ -189,29 +133,28 @@ abstract contract Escrow is Permit69, DAppVerification, FastLaneErrorsEvents {
         bytes32 lockBytes
     ) internal returns (bool success) {
         // process dApp payments
-        bytes memory data = abi.encodeWithSelector(IExecutionEnvironment.allocateValue.selector, dConfig.bidToken, winningBidAmount, returnData);
+        bytes memory data = abi.encodeWithSelector(
+            IExecutionEnvironment.allocateValue.selector, dConfig.bidToken, winningBidAmount, returnData
+        );
         data = abi.encodePacked(data, lockBytes);
-        (success, ) = environment.call(data);
+        (success,) = environment.call(data);
         if (!success) {
             emit MEVPaymentFailure(dConfig.to, dConfig.callConfig, dConfig.bidToken, winningBidAmount);
         }
     }
 
-    function _executePostOpsCall(
-        bytes memory returnData,
-        address environment,
-        bytes32 lockBytes
-    ) internal returns (bool success) {
+    function _executePostOpsCall(bytes memory returnData, address environment, bytes32 lockBytes)
+        internal
+        returns (bool success)
+    {
         bytes memory postOpsData = abi.encodeWithSelector(IExecutionEnvironment.postOpsWrapper.selector, returnData);
         postOpsData = abi.encodePacked(postOpsData, lockBytes);
         (success,) = environment.call{value: msg.value}(postOpsData);
     }
 
-    
-
     function _update(
         SolverOperation calldata solverOp,
-        SolverEscrow memory solverEscrow,
+        EscrowAccountData memory solverEscrow,
         uint256 gasWaterMark,
         uint256 result
     ) internal returns (uint256 gasRebate) {
@@ -232,19 +175,19 @@ abstract contract Escrow is Permit69, DAppVerification, FastLaneErrorsEvents {
                 // Calculate what the solver owes
                 gasRebate *= tx.gasprice;
 
-                gasRebate = gasRebate > solverEscrow.total ? solverEscrow.total : gasRebate;
+                gasRebate = gasRebate > solverEscrow.balance ? solverEscrow.balance : gasRebate;
 
-                solverEscrow.total -= uint128(gasRebate);
+                solverEscrow.balance -= uint128(gasRebate);
 
                 // NOTE: This will cause an error if you are simulating with a gasPrice of 0
                 gasRebate /= tx.gasprice;
 
-                // save the escrow data back into storage
-                _escrowData[solverOp.from] = solverEscrow;
-            
-            // Check if need to save escrowData due to nonce update but not gasRebate
+                // Save the escrow data back into storage
+                _escrowAccountData[solverOp.from] = solverEscrow;
+
+                // Check if need to save escrowData due to nonce update but not gasRebate
             } else if (result & EscrowBits._NO_NONCE_UPDATE == 0) {
-                _escrowData[solverOp.from].nonce = solverEscrow.nonce;
+                _escrowAccountData[solverOp.from].nonce = solverEscrow.nonce;
             }
         }
     }
@@ -252,7 +195,7 @@ abstract contract Escrow is Permit69, DAppVerification, FastLaneErrorsEvents {
     function _verify(SolverOperation calldata solverOp, uint256 gasWaterMark, bool auctionAlreadyComplete)
         internal
         view
-        returns (uint256 result, uint256 gasLimit, SolverEscrow memory solverEscrow)
+        returns (uint256 result, uint256 gasLimit, EscrowAccountData memory solverEscrow)
     {
         // verify solver's signature
         if (_verifySignature(solverOp)) {
@@ -263,9 +206,7 @@ abstract contract Escrow is Permit69, DAppVerification, FastLaneErrorsEvents {
             // solverEscrow returns null
         }
 
-        result = _solverOpPreCheck(
-            result, gasWaterMark, tx.gasprice, solverOp.maxFeePerGas, auctionAlreadyComplete
-        );
+        result = _solverOpPreCheck(result, gasWaterMark, tx.gasprice, solverOp.maxFeePerGas, auctionAlreadyComplete);
     }
 
     function _getSolverHash(SolverOperation calldata solverOp) internal pure returns (bytes32 solverHash) {
@@ -301,20 +242,18 @@ abstract contract Escrow is Permit69, DAppVerification, FastLaneErrorsEvents {
     function _verifySolverOperation(SolverOperation calldata solverOp)
         internal
         view
-        returns (uint256 result, uint256 gasLimit, SolverEscrow memory solverEscrow)
+        returns (uint256 result, uint256 gasLimit, EscrowAccountData memory solverEscrow)
     {
-        solverEscrow = _escrowData[solverOp.from];
+        solverEscrow = _escrowAccountData[solverOp.from];
 
         // TODO big unchecked block - audit/review carefully
         unchecked {
-
             if (solverOp.to != address(this)) {
                 result |= 1 << uint256(SolverOutcome.InvalidTo);
             }
 
             if (solverOp.nonce <= uint256(solverEscrow.nonce)) {
                 result |= 1 << uint256(SolverOutcome.InvalidNonceUnder);
-
             } else if (solverOp.nonce > uint256(solverEscrow.nonce) + 1) {
                 result |= 1 << uint256(SolverOutcome.InvalidNonceOver);
 
@@ -331,17 +270,13 @@ abstract contract Escrow is Permit69, DAppVerification, FastLaneErrorsEvents {
                 solverEscrow.lastAccessed = uint64(block.number);
             }
 
-            gasLimit = (100)
-                * (
-                    solverOp.gas < EscrowBits.SOLVER_GAS_LIMIT
-                        ? solverOp.gas
-                        : EscrowBits.SOLVER_GAS_LIMIT
-                ) / (100 + EscrowBits.SOLVER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
+            gasLimit = (100) * (solverOp.gas < EscrowBits.SOLVER_GAS_LIMIT ? solverOp.gas : EscrowBits.SOLVER_GAS_LIMIT)
+                / (100 + EscrowBits.SOLVER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
 
             uint256 gasCost = (tx.gasprice * gasLimit) + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
 
             // see if solver's escrow can afford tx gascost
-            if (gasCost > solverEscrow.total - _withdrawalData[solverOp.from].escrowed) {
+            if (gasCost > _escrowAccountData[solverOp.from].balance) {
                 // charge solver for calldata so that we can avoid vampire attacks from solver onto user
                 result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
             }
@@ -371,17 +306,22 @@ abstract contract Escrow is Permit69, DAppVerification, FastLaneErrorsEvents {
         bool success;
 
         bytes memory data = abi.encodeWithSelector(
-            IExecutionEnvironment(environment).solverMetaTryCatch.selector, gasLimit, currentBalance, solverOp, dAppReturnData);
-        
+            IExecutionEnvironment(environment).solverMetaTryCatch.selector,
+            gasLimit,
+            currentBalance,
+            solverOp,
+            dAppReturnData
+        );
+
         data = abi.encodePacked(data, lockBytes);
 
         // Account for ETH borrowed by solver - repay with repayBorrowedEth() below
         _accData.ethBorrowed[solverOp.solver] += solverOp.value;
 
         (success, data) = environment.call{value: solverOp.value}(data);
-        
+
         // Check all borrowed ETH was repaid during solver call from Execution Env
-        if(_accData.ethBorrowed[solverOp.solver] != 0){
+        if (_accData.ethBorrowed[solverOp.solver] != 0) {
             revert FastLaneErrorsEvents.SolverMsgValueUnpaid();
         }
 
@@ -410,7 +350,6 @@ abstract contract Escrow is Permit69, DAppVerification, FastLaneErrorsEvents {
             return (SolverOutcome.CallReverted, 0);
         }
     }
-
 
     receive() external payable {}
 
