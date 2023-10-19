@@ -205,11 +205,13 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
                 // NOTE: This will cause an error if you are simulating with a gasPrice of 0
                 gasRebate /= tx.gasprice;
 
-                // save the escrow data and AtlETH balance back into storage
+                // Save the escrow data back into storage
                 _escrowData[solverOp.from] = solverEscrow;
 
-                // TODO dont just change balance -> use mint() fn to update safely. Maybe without events for internal mint/burn
-                balanceOf[solverOp.from] = netSolverBalance;
+                // Adjust the solver's balance
+                if (netSolverBalance > balanceOf[solverOp.from]) {
+                    _mint(solverOp.from, netSolverBalance - balanceOf[solverOp.from]);
+                }
 
                 // Check if need to save escrowData due to nonce update but not gasRebate
             } else if (result & EscrowBits._NO_NONCE_UPDATE == 0) {
