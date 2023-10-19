@@ -19,7 +19,7 @@ import {SafetyBits} from "../libraries/SafetyBits.sol";
 import "forge-std/Test.sol";
 
 contract Simulator is FastLaneErrorsEvents {
-    using CallVerification for UserCall;
+    using CallVerification for UserOperation;
     using CallBits for uint32;
 
     enum Result {
@@ -44,34 +44,17 @@ contract Simulator is FastLaneErrorsEvents {
         atlas = _atlas;
     }
 
-    function simUserOperation(UserCall calldata uCall) external payable returns (bool success) {
-        UserOperation memory userOp;
-        userOp.call = uCall;
-        userOp.to = atlas;
-       
-        DAppConfig memory dConfig = DAppConfig(uCall.control, CallBits.buildCallConfig(uCall.control));
-        SolverOperation memory solverOp;
-        SolverOperation[] memory solverOps = new SolverOperation[](1);
-        solverOps[0] = solverOp;
-        DAppOperation memory dAppOp; 
-        dAppOp.approval.controlCodeHash = dConfig.to.codehash;
-
-        success = uint8(_errorCatcher(dConfig, userOp, solverOps, dAppOp)) > uint8(Result.UserOpSimFail);
-    }
-
     function simUserOperation(UserOperation calldata userOp) external payable returns (bool success) {
-        DAppConfig memory dConfig = DAppConfig(userOp.call.control, CallBits.buildCallConfig(userOp.call.control));
         // SolverOperation memory solverOp;
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         // solverOps[0] = solverOp;
         DAppOperation memory dAppOp; 
-        dAppOp.approval.controlCodeHash = dConfig.to.codehash;
+        dAppOp.control = userOp.control;
 
-        success = uint8(_errorCatcher(dConfig, userOp, solverOps, dAppOp)) > uint8(Result.UserOpSimFail);
+        success = uint8(_errorCatcher(userOp, solverOps, dAppOp)) > uint8(Result.UserOpSimFail);
     }
 
     function simSolverCall(
-        DAppConfig calldata dConfig,
         UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         DAppOperation calldata dAppOp 
@@ -79,11 +62,10 @@ contract Simulator is FastLaneErrorsEvents {
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         solverOps[0] = solverOp;
         
-        success = _errorCatcher(dConfig, userOp, solverOps, dAppOp) == Result.SimulationPassed;
+        success = _errorCatcher(userOp, solverOps, dAppOp) == Result.SimulationPassed;
     }
 
     function simSolverCalls(
-        DAppConfig calldata dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         DAppOperation calldata dAppOp 
@@ -91,17 +73,16 @@ contract Simulator is FastLaneErrorsEvents {
         if (solverOps.length == 0) {
             return false;
         }
-        success = _errorCatcher(dConfig, userOp, solverOps, dAppOp) == Result.SimulationPassed;
+        success = _errorCatcher(userOp, solverOps, dAppOp) == Result.SimulationPassed;
     }
 
     function _errorCatcher(
-        DAppConfig memory dConfig,
         UserOperation memory userOp,
         SolverOperation[] memory solverOps,
         DAppOperation memory dAppOp 
     ) internal returns (Result result) {
 
-        try this.metacallSimulation{value: msg.value}(dConfig, userOp, solverOps, dAppOp) {
+        try this.metacallSimulation{value: msg.value}(userOp, solverOps, dAppOp) {
             revert("unreachable");
         }
         catch (bytes memory revertData) {
@@ -123,13 +104,12 @@ contract Simulator is FastLaneErrorsEvents {
     }
 
     function metacallSimulation(
-        DAppConfig calldata dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         DAppOperation calldata dAppOp 
     ) external payable {
         require(msg.sender == address(this), "invalid entry func");
-        if (!IAtlas(atlas).metacall(dConfig, userOp, solverOps, dAppOp)) {
+        if (!IAtlas(atlas).metacall(userOp, solverOps, dAppOp)) {
             revert NoAuctionWinner(); // should be unreachable
         }
         revert SimulationPassed();

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.16;
 
 import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
+import {IDAppControl} from "../interfaces/IDAppControl.sol";
 
 import {Factory} from "./Factory.sol";
 import {UserSimulationFailed, UserUnexpectedSuccess, UserSimulationSucceeded} from "../types/Emissions.sol";
@@ -21,25 +22,13 @@ import {SafetyBits} from "../libraries/SafetyBits.sol";
 import "forge-std/Test.sol";
 
 contract Atlas is Test, Factory {
-    using CallVerification for UserCall;
+    using CallVerification for UserOperation;
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
     constructor(uint32 _escrowDuration, address _simulator) Factory(_escrowDuration, _simulator) {}
 
-    function createExecutionEnvironment(DAppConfig calldata dConfig) external returns (address executionEnvironment) {
-        executionEnvironment = _setExecutionEnvironment(dConfig, msg.sender, dConfig.to.codehash);
-        _initializeNonce(msg.sender);
-    }
-
-    function getExecutionEnvironment(address user, address dAppControl) external view returns (address executionEnvironment, uint32 callConfig, bool exists) {
-        callConfig = CallBits.buildCallConfig(dAppControl);
-        executionEnvironment = _getExecutionEnvironmentCustom(user, dAppControl.codehash, dAppControl, callConfig);
-        exists = executionEnvironment.codehash != bytes32(0);
-    }
-
     function metacall( // <- Entrypoint Function
-        DAppConfig calldata dConfig, // supplied by frontend
         UserOperation calldata userOp, // set by user
         SolverOperation[] calldata solverOps, // supplied by FastLane via frontend integration
         DAppOperation calldata dAppOp // supplied by front end after it sees the other data
@@ -47,8 +36,11 @@ contract Atlas is Test, Factory {
 
         uint256 gasMarker = gasleft();
 
+        // TODO: Combine this w/ call to get executionEnvironment
+        DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
+
         // Get the execution environment
-        address executionEnvironment = _getExecutionEnvironmentCustom(userOp.call.from, dAppOp.approval.controlCodeHash, userOp.call.control, dConfig.callConfig);
+        address executionEnvironment = _getExecutionEnvironmentCustom(userOp.from, dAppOp.control.codehash, userOp.control, dConfig.callConfig);
 
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
@@ -61,13 +53,13 @@ contract Atlas is Test, Factory {
         _initializeEscrowLock(executionEnvironment);
 
         try this.execute{value: msg.value}(
-            dConfig, userOp.call, solverOps, executionEnvironment, msg.sender == simulator
+            dConfig, userOp, solverOps, executionEnvironment, msg.sender == simulator
         ) returns (bool _auctionWon, uint256 accruedGasRebate) {
             
             console.log("accruedGasRebate",accruedGasRebate);
             auctionWon = _auctionWon;
             // Gas Refund to sender only if execution is successful
-            _executeGasRefund(gasMarker, accruedGasRebate, userOp.call.from);
+            _executeGasRefund(gasMarker, accruedGasRebate, userOp.from);
 
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
@@ -82,7 +74,7 @@ contract Atlas is Test, Factory {
 
     function execute(
         DAppConfig calldata dConfig,
-        UserCall calldata uCall,
+        UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         address executionEnvironment,
         bool isSimulation
@@ -95,12 +87,12 @@ contract Atlas is Test, Factory {
         EscrowKey memory key = _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), isSimulation);
 
         // Begin execution
-        (auctionWon, accruedGasRebate) = _execute(dConfig, uCall, solverOps, executionEnvironment, key);
+        (auctionWon, accruedGasRebate) = _execute(dConfig, userOp, solverOps, executionEnvironment, key);
     }
 
     function _execute(
         DAppConfig calldata dConfig,
-        UserCall calldata uCall,
+        UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         address executionEnvironment,
         EscrowKey memory key
@@ -109,24 +101,23 @@ contract Atlas is Test, Factory {
         // to verify against the hash supplied by DAppControl
        
         bool callSuccessful;
-        bytes32 userOpHash = uCall.getUserOperationHash();
-
-        uint32 callConfig = CallBits.buildCallConfig(uCall.control);
+        bytes32 userOpHash = userOp.getUserOperationHash();
+        uint32 callConfig = dConfig.callConfig;
 
         bytes memory returnData;
 
         if (dConfig.callConfig.needsPreOpsCall()) {
             key = key.holdPreOpsLock(dConfig.to);
-            (callSuccessful, returnData) = _executePreOpsCall(uCall, executionEnvironment, key.pack());
+            (callSuccessful, returnData) = _executePreOpsCall(userOp, executionEnvironment, key.pack());
             if (!callSuccessful) {
                 if (key.isSimulation) { revert PreOpsSimFail(); } else { revert("ERR-E001 PreOpsFail"); }
             }
         }
 
-        key = key.holdUserLock(uCall.to);
+        key = key.holdUserLock(userOp.dapp);
         
         bytes memory userReturnData;
-        (callSuccessful, userReturnData) = _executeUserOperation(uCall, executionEnvironment, key.pack());
+        (callSuccessful, userReturnData) = _executeUserOperation(userOp, executionEnvironment, key.pack());
         if (!callSuccessful) {
             if (key.isSimulation) { revert UserOpSimFail(); } else { revert("ERR-E002 UserFail"); }
         }
@@ -143,7 +134,7 @@ contract Atlas is Test, Factory {
         for (; key.callIndex < key.callMax - 1;) {
 
             // Only execute solver meta tx if userOpHash matches 
-            if (!auctionWon && userOpHash == solverOps[key.callIndex-2].call.userOpHash) {
+            if (!auctionWon && userOpHash == solverOps[key.callIndex-2].userOpHash) {
                 (auctionWon, key) = _solverExecutionIteration(
                         dConfig, solverOps[key.callIndex-2], returnData, auctionWon, executionEnvironment, key
                     );
@@ -183,14 +174,14 @@ contract Atlas is Test, Factory {
     ) internal returns (bool, EscrowKey memory) {
         (auctionWon, key) = _executeSolverOperation(solverOp, dAppReturnData, executionEnvironment, key);
         if (auctionWon) {
-            _allocateValue(dConfig, solverOp.bids, dAppReturnData, executionEnvironment, key.pack());
+            _allocateValue(dConfig, solverOp.bidAmount, dAppReturnData, executionEnvironment, key.pack());
             key = key.allocationComplete();
         }
         return (auctionWon, key);
     }
 
     function _validCalls(
-        DAppConfig calldata dConfig, 
+        DAppConfig memory dConfig, 
         UserOperation calldata userOp, 
         SolverOperation[] calldata solverOps, 
         DAppOperation calldata dAppOp,
@@ -203,19 +194,19 @@ contract Atlas is Test, Factory {
 
         // Some checks are only needed when call is not a simulation
         if (!isSimulation) {
-            if (tx.gasprice > userOp.call.maxFeePerGas) {
+            if (tx.gasprice > userOp.maxFeePerGas) {
                 return ValidCallsResult.GasPriceHigherThanMax;
             }
 
             // Check that the value of the tx is greater than or equal to the value specified
-            if (msg.value < userOp.call.value) { 
+            if (msg.value < userOp.value) { 
                 return ValidCallsResult.TxValueLowerThanCallValue;
             }
         }
 
         // bundler checks
         // user is bundling their own operation - check allowed and valid dapp signature/callchainhash
-        if(msg.sender == userOp.call.from) {
+        if(msg.sender == userOp.from) {
             if(!dConfig.callConfig.allowsUserBundler()) {
                 return ValidCallsResult.UnknownBundlerNotAllowed;
             }
@@ -234,11 +225,11 @@ contract Atlas is Test, Factory {
             }
 
             // check callchainhash
-            if(dAppOp.approval.callChainHash != CallVerification.getCallChainHash(dConfig, userOp.call, solverOps) && !isSimulation) {
+            if(dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps) && !isSimulation) {
                 return ValidCallsResult.InvalidSequence;
             }
         } // dapp is bundling - always allowed, check valid user/dapp signature and callchainhash
-        else if(msg.sender == dAppOp.approval.from) {
+        else if(msg.sender == dAppOp.from) {
             // check dapp signature
             if(!_verifyDApp(dConfig, dAppOp)) {
                 bool bypass = isSimulation && dAppOp.signature.length == 0;
@@ -256,11 +247,11 @@ contract Atlas is Test, Factory {
             }
 
             // check callchainhash
-            if(dAppOp.approval.callChainHash != CallVerification.getCallChainHash(dConfig, userOp.call, solverOps) && !isSimulation) {
+            if(dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps) && !isSimulation) {
                 return ValidCallsResult.InvalidSequence;
             }
         } // potentially the winning solver is bundling - check that its allowed and only need to verify user signature
-        else if(msg.sender == solverOps[0].call.from && solverOps.length == 1) {
+        else if(msg.sender == solverOps[0].from && solverOps.length == 1) {
             // check if protocol allows it
             if(!dConfig.callConfig.allowsSolverBundler()) {
                 return ValidCallsResult.DAppSignatureInvalid;
@@ -276,7 +267,7 @@ contract Atlas is Test, Factory {
 
             // verify the callchainhash if required by protocol
             if(dConfig.callConfig.verifySolverBundlerCallChainHash()) {
-                if(dAppOp.approval.callChainHash != CallVerification.getCallChainHash(dConfig, userOp.call, solverOps) && !isSimulation) {
+                if(dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps) && !isSimulation) {
                     return ValidCallsResult.InvalidSequence;
                 }
             }
@@ -299,7 +290,7 @@ contract Atlas is Test, Factory {
             }
 
             // check callchainhash
-            if(dAppOp.approval.callChainHash != CallVerification.getCallChainHash(dConfig, userOp.call, solverOps) && !isSimulation) {
+            if(dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps) && !isSimulation) {
                 return ValidCallsResult.InvalidSequence;
             }
         }
@@ -311,15 +302,15 @@ contract Atlas is Test, Factory {
             return ValidCallsResult.TooManySolverOps;
         }
 
-        if (block.number > userOp.call.deadline) {
-            bool bypass = isSimulation && userOp.call.deadline == 0;
+        if (block.number > userOp.deadline) {
+            bool bypass = isSimulation && userOp.deadline == 0;
             if (!bypass) {
                 return ValidCallsResult.UserDeadlineReached;
             }
         }
 
-        if (block.number > dAppOp.approval.deadline) {
-            bool bypass = isSimulation && dAppOp.approval.deadline == 0;
+        if (block.number > dAppOp.deadline) {
+            bool bypass = isSimulation && dAppOp.deadline == 0;
             if (!bypass) {
                 return ValidCallsResult.DAppDeadlineReached;
             }

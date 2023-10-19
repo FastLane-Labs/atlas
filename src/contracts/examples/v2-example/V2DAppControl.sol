@@ -80,21 +80,21 @@ contract V2DAppControl is DAppControl {
         }
     }
 
-    function _preOpsCall(UserCall calldata uCall)
+    function _preOpsCall(UserOperation calldata userOp)
         internal
         override
         returns (bytes memory)
     {
-        require(bytes4(uCall.data) == SWAP, "ERR-H10 InvalidFunction");
+        require(bytes4(userOp.data) == SWAP, "ERR-H10 InvalidFunction");
 
         (
             uint256 amount0Out,
             uint256 amount1Out,
             , // address recipient // Unused
                 // bytes memory swapData // Unused
-        ) = abi.decode(uCall.data[4:], (uint256, uint256, address, bytes));
+        ) = abi.decode(userOp.data[4:], (uint256, uint256, address, bytes));
 
-        (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(uCall.to).getReserves();
+        (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(userOp.dapp).getReserves();
 
         uint256 amount0In =
             amount1Out == 0 ? 0 : SwapMath.getAmountIn(amount1Out, uint256(token0Balance), uint256(token1Balance));
@@ -105,8 +105,8 @@ contract V2DAppControl is DAppControl {
         // This is a V2 swap, so optimistically transfer the tokens
         // NOTE: The user should have approved the ExecutionEnvironment for token transfers
         _transferUserERC20(
-            amount0Out > amount1Out ? IUniswapV2Pair(uCall.to).token1() : IUniswapV2Pair(uCall.to).token0(),
-            uCall.to, 
+            amount0Out > amount1Out ? IUniswapV2Pair(userOp.dapp).token1() : IUniswapV2Pair(userOp.dapp).token0(),
+            userOp.dapp, 
             amount0In > amount1In ? amount0In : amount1In
         );
 
@@ -116,51 +116,42 @@ contract V2DAppControl is DAppControl {
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(bytes calldata) internal override {
+    function _allocateValueCall(address, uint256 bidAmount, bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
 
-        // NOTE: DAppVerification has verified the BidData[] format
-        // BidData[0] = address(WETH) <== WETH
-
         address user = _user();
-
-        // MEV Rewards were collected in WETH
-        uint256 balance = ERC20(WETH).balanceOf(address(this));
-
-        // TODO: remove this to allow graceful return?
-        require(balance > 0, "ERR-AC01 NoBalance");
 
         // Refund the user any extra gas costs
         uint256 userGasOverage = tx.gasprice * CONTROL_GAS_USAGE;
         
         // CASE: gas costs exceed MEV
-        if (balance <= userGasOverage) {
-            IWETH(WETH).withdraw(balance); // should null out the balance
-            SafeTransferLib.safeTransferETH(user, balance);
+        if (bidAmount <= userGasOverage) {
+            IWETH(WETH).withdraw(bidAmount); // should null out the balance
+            SafeTransferLib.safeTransferETH(user, bidAmount);
             return;
         
         // CASE: MEV exceeds gas costs
         } else {
             IWETH(WETH).withdraw(userGasOverage); // should null out the balance
             SafeTransferLib.safeTransferETH(user, userGasOverage);
-            balance -= userGasOverage;
+            bidAmount -= userGasOverage;
         }
 
         (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).getReserves();
 
-        ERC20(WETH).transfer(WETH_X_GOVERNANCE_POOL, balance);
+        ERC20(WETH).transfer(WETH_X_GOVERNANCE_POOL, bidAmount);
 
         uint256 amount0Out;
         uint256 amount1Out;
 
         if (govIsTok0) {
-            amount0Out = ((997_000 * balance) * uint256(token0Balance))
-                / ((uint256(token1Balance) * 1_000_000) + (997_000 * balance));
+            amount0Out = ((997_000 * bidAmount) * uint256(token0Balance))
+                / ((uint256(token1Balance) * 1_000_000) + (997_000 * bidAmount));
         } else {
-            amount1Out = ((997_000 * balance) * uint256(token1Balance))
-                / (((uint256(token0Balance) * 1_000_000) + (997_000 * balance)));
+            amount1Out = ((997_000 * bidAmount) * uint256(token1Balance))
+                / (((uint256(token0Balance) * 1_000_000) + (997_000 * bidAmount)));
         }
 
         bytes memory nullBytes;
@@ -179,28 +170,20 @@ contract V2DAppControl is DAppControl {
 
     ///////////////// GETTERS & HELPERS // //////////////////
 
-    function getBidFormat(UserCall calldata) external pure override returns (BidData[] memory) {
+    function getBidFormat(UserOperation calldata) public pure override returns (address bidToken) {
         // This is a helper function called by solvers
         // so that they can get the proper format for
         // submitting their bids to the hook.
-
-        BidData[] memory bidData = new BidData[](1);
-
-        bidData[0] = BidData({
-            token: WETH,
-            bidAmount: 0 // <- solver must update
-        });
-
-        return bidData;
+        return WETH;
     }
 
     function getBidValue(SolverOperation calldata solverOp)
-        external
+        public
         pure
         override
         returns (uint256) 
     {
-        return solverOp.bids[0].bidAmount;
+        return solverOp.bidAmount;
     }
 
 

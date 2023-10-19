@@ -8,11 +8,7 @@ import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
 import {ExecutionPhase} from "../types/LockTypes.sol";
 
-import {EXECUTION_PHASE_OFFSET} from "../libraries/SafetyBits.sol";
-
-import {SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER} from "./Permit69.sol";
-
-import {SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER} from "./Permit69.sol";
+import {EXECUTION_PHASE_OFFSET, SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER} from "../libraries/SafetyBits.sol";
 
 import "forge-std/Test.sol";
 

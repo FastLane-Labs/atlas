@@ -32,7 +32,7 @@ contract Sorter {
         SolverOperation[] calldata solverOps
     ) external view returns (SolverOperation[] memory) {
 
-        DAppConfig memory dConfig = IDAppControl(userOp.call.control).getDAppConfig();
+        DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
 
         uint256 count = solverOps.length;
 
@@ -55,62 +55,54 @@ contract Sorter {
     }
 
     function _verifyBidFormat(
-        BidData[] memory bidFormat, 
+        address bidToken, 
         SolverOperation calldata solverOp
     ) internal pure returns (bool) {
-        uint256 count = bidFormat.length;
-        if (solverOp.bids.length != count) {
+        if (solverOp.bidToken != bidToken) {
             return false;
         }
-
-        uint256 i;
-        for (;i<count;) {
-            if (solverOp.bids[i].token != bidFormat[i].token) {
-                return false;
-            }
-            unchecked{ ++i; }
-        }
+            
         return true;
     }
 
     function _verifySolverEligibility(
         DAppConfig memory dConfig,
-        UserCall calldata uCall, 
+        UserOperation calldata userOp, 
         SolverOperation calldata solverOp
     ) internal view returns (bool) {
         // Verify that the solver submitted the correct callhash
-        bytes32 userOpHash = CallVerification.getUserOperationHash(uCall);
-        if (solverOp.call.userOpHash != userOpHash) {
+        bytes32 userOpHash = CallVerification.getUserOperationHash(userOp);
+        if (solverOp.userOpHash != userOpHash) {
             return false;
         }
 
         // Make sure the solver has enough funds escrowed
         // TODO: subtract any pending withdrawals
-        uint256 solverBalance = IEscrow(escrow).solverEscrowBalance(solverOp.call.from);
-        if (solverBalance < solverOp.call.maxFeePerGas * solverOp.call.gas) {
+        uint256 solverBalance = IEscrow(escrow).solverEscrowBalance(solverOp.from);
+        if (solverBalance < solverOp.maxFeePerGas * solverOp.gas) {
             return false;
         }
 
         // Solvers can only do one tx per block - this prevents double counting escrow balances.
         // TODO: Add in "targetBlockNumber" as an arg?
-        uint256 solverLastActiveBlock = IEscrow(escrow).solverLastActiveBlock(solverOp.call.from);
+        uint256 solverLastActiveBlock = IEscrow(escrow).solverLastActiveBlock(solverOp.from);
         if (solverLastActiveBlock >= block.number) {
             return false;
         }
 
         // Make sure the solver nonce is accurate
-        uint256 nextSolverNonce = IEscrow(escrow).nextSolverNonce(solverOp.call.from);
-        if (nextSolverNonce != solverOp.call.nonce) {
+        uint256 nextSolverNonce = IEscrow(escrow).nextSolverNonce(solverOp.from);
+        if (nextSolverNonce != solverOp.nonce) {
             return false;
         }
 
         // Make sure that the solver has the correct codehash for dApp control contract
-        if (dConfig.to.codehash != solverOp.call.controlCodeHash) {
+        if (dConfig.to != solverOp.control) {
             return false;
         }
 
         // Make sure that the solver's maxFeePerGas matches or exceeds the user's
-        if (solverOp.call.maxFeePerGas < uCall.maxFeePerGas) {
+        if (solverOp.maxFeePerGas < userOp.maxFeePerGas) {
             return false;
         }
 
@@ -124,7 +116,7 @@ contract Sorter {
         uint256 count
     ) internal view returns (SortingData[] memory, uint256){
 
-        BidData[] memory bidFormat = IDAppControl(dConfig.to).getBidFormat(userOp.call);
+        address bidToken = IDAppControl(dConfig.to).getBidFormat(userOp);
 
         SortingData[] memory sortingData = new SortingData[](count);
 
@@ -132,8 +124,8 @@ contract Sorter {
         uint256 invalid;
         for (;i<count;) {
             if (
-                _verifyBidFormat(bidFormat, solverOps[i]) && 
-                _verifySolverEligibility(dConfig, userOp.call, solverOps[i])
+                _verifyBidFormat(bidToken, solverOps[i]) && 
+                _verifySolverEligibility(dConfig, userOp, solverOps[i])
             ) {
                 sortingData[i] = SortingData({
                     amount: IDAppControl(dConfig.to).getBidValue(solverOps[i]),

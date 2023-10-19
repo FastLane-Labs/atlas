@@ -7,8 +7,8 @@ import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
 import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 
-import {SafetyLocks} from "./SafetyLocks.sol";
 import {DAppVerification} from "./DAppVerification.sol";
+import {Permit69} from "../common/Permit69.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
@@ -23,14 +23,11 @@ import {SafetyBits} from "../libraries/SafetyBits.sol";
 
 import "forge-std/Test.sol";
 
-contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
+abstract contract Escrow is Permit69, DAppVerification, FastLaneErrorsEvents {
     using ECDSA for bytes32;
     using EscrowBits for uint256;
     using CallBits for uint32;    
     using SafetyBits for EscrowKey;
-
-    uint256 constant public BUNDLER_PREMIUM = 110; // the amount over cost that bundlers get paid
-    uint256 constant public BUNDLER_BASE = 100;
 
     uint32 public immutable escrowDuration;
 
@@ -40,10 +37,7 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
     mapping(address => SolverEscrow) internal _escrowData;
     mapping(address => SolverWithdrawal) internal _withdrawalData;
 
-    GasDonation[] internal _donations;
-    AccountingData internal _accData;
-
-    constructor(uint32 escrowDurationFromFactory, address _simulator) SafetyLocks(_simulator) {
+    constructor(uint32 escrowDurationFromFactory, address _simulator) Permit69(_simulator) {
         escrowDuration = escrowDurationFromFactory;
     }
 
@@ -73,85 +67,20 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
     /// EXTERNAL FUNCTIONS FOR BUNDLER INTERACTION  ///
     ///////////////////////////////////////////////////
 
-    // TODO: The balance checks on escrow that verify that the solver
-    // paid back any msg.value that they borrowed are currently not set up 
-    // to handle gas donations to the bundler from the solver.
-    // THIS IS EXPLOITABLE - DO NOT USE THIS CONTRACT IN PRODUCTION
-    // This attack vector will be addressed explicitly once the gas 
-    // reimbursement mechanism is finalized.
-    function donateToBundler(address surplusRecipient) external payable {
-        console.log("Donate to bundler called");
-        console.log("donateToBundler: msg.value:", msg.value);
-        console.log("donating to addr:", surplusRecipient);
-        // NOTE: All donations in excess of 10% greater than cost are forwarded
-        // to the surplusReceiver. 
-
-        // TODO check this is compatible with smart wallets and solver donations
-        require(msg.sender == activeEnvironment, "ERR-E079 DonateRequiresLock");
-
-        // TODO: Consider making this a higher donation threshold to avoid ddos attacks
-        if (msg.value == 0) {
-            return;
-        }
-
-        uint32 gasRebate = uint32(msg.value / tx.gasprice);
-
-        console.log("donateToBundler: tx.gasprice:", tx.gasprice);
-        console.log("donateToBundler: gasRebate:", gasRebate);
-
-        uint256 donationCount = _donations.length;
-
-        if (donationCount == 0) {
-            _donations.push(GasDonation({
-                recipient: surplusRecipient,
-                net: gasRebate,
-                cumulative: gasRebate
-            }));
-            return;
-        }
-
-        GasDonation memory donation = _donations[donationCount-1];
-
-        // If the recipient is the same as the last one, just 
-        // increment the values and reuse the slot 
-        if (donation.recipient == surplusRecipient) {
-            donation.net += gasRebate;
-            donation.cumulative += gasRebate;
-            _donations[donationCount-1] = donation;
-            return;
-        }
-
-        // If it's a new recipient, update and push to the storage array
-        donation.recipient = surplusRecipient;
-        donation.net = gasRebate;
-        donation.cumulative = gasRebate;
-        _donations.push(donation);
-    }
-
-    function cumulativeDonations() external view returns (uint256) {
-        uint256 donationCount = _donations.length;
-
-        if (donationCount == 0) {
-            return 0;
-        }
-
-        uint32 gasRebate = _donations[donationCount-1].cumulative;
-        return uint256(gasRebate) * tx.gasprice;
-
-    }
+    
 
     ///////////////////////////////////////////////////
     ///             INTERNAL FUNCTIONS              ///
     ///////////////////////////////////////////////////
     function _executePreOpsCall(
-        UserCall calldata uCall,
+        UserOperation calldata userOp,
         address environment,
         bytes32 lockBytes
     ) 
         internal 
         returns (bool success, bytes memory preOpsData) 
     {
-        preOpsData = abi.encodeWithSelector(IExecutionEnvironment.preOpsWrapper.selector, uCall);
+        preOpsData = abi.encodeWithSelector(IExecutionEnvironment.preOpsWrapper.selector, userOp);
         preOpsData = abi.encodePacked(preOpsData, lockBytes);
         (success, preOpsData) = environment.call{value: msg.value}(preOpsData);
         if (success) {
@@ -160,14 +89,14 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
     }
 
     function _executeUserOperation(
-        UserCall calldata uCall, 
+        UserOperation calldata userOp, 
         address environment,
         bytes32 lockBytes
     )
         internal
         returns (bool success, bytes memory userData)
     {
-        userData = abi.encodeWithSelector(IExecutionEnvironment.userWrapper.selector, uCall);
+        userData = abi.encodeWithSelector(IExecutionEnvironment.userWrapper.selector, userOp);
         userData = abi.encodePacked(userData, lockBytes);
         // TODO: Handle msg.value quirks
         (success, userData) = environment.call(userData);
@@ -197,7 +126,7 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
         // If there are no errors, attempt to execute
         if (result.canExecute()) {
             // Open the solver lock
-            key = key.holdSolverLock(solverOp.call.to);
+            key = key.holdSolverLock(solverOp.solver);
 
             // Execute the solver call
             (outcome, escrowSurplus) = _solverOpWrapper(gasLimit, environment, solverOp, dAppReturnData, key.pack());
@@ -219,13 +148,13 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
 
             // Update the solver's escrow balances and the accumulated refund
             if (result.updateEscrow()) {
-                key.gasRefund += uint32(_update(solverOp.call, solverEscrow, gasWaterMark, result));
+                key.gasRefund += uint32(_update(solverOp, solverEscrow, gasWaterMark, result));
             }
 
             // emit event
             emit SolverTxResult(
-                solverOp.call.to,
-                solverOp.call.from,
+                solverOp.solver,
+                solverOp.from,
                 true,
                 outcome == SolverOutcome.Success,
                 solverEscrow.nonce,
@@ -235,8 +164,8 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
         } else {
             // emit event
             emit SolverTxResult(
-                solverOp.call.to,
-                solverOp.call.from,
+                solverOp.solver,
+                solverOp.from,
                 false,
                 false,
                 solverEscrow.nonce,
@@ -254,17 +183,17 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
     // DAppControl contract)
     function _allocateValue(
         DAppConfig calldata dConfig,
-        BidData[] calldata winningBids,
+        uint256 winningBidAmount,
         bytes memory returnData,
         address environment,
         bytes32 lockBytes
     ) internal returns (bool success) {
         // process dApp payments
-        bytes memory data = abi.encodeWithSelector(IExecutionEnvironment.allocateValue.selector, winningBids, returnData);
+        bytes memory data = abi.encodeWithSelector(IExecutionEnvironment.allocateValue.selector, dConfig.bidToken, winningBidAmount, returnData);
         data = abi.encodePacked(data, lockBytes);
         (success, ) = environment.call(data);
         if (!success) {
-            emit MEVPaymentFailure(dConfig.to, dConfig.callConfig, winningBids);
+            emit MEVPaymentFailure(dConfig.to, dConfig.callConfig, dConfig.bidToken, winningBidAmount);
         }
     }
 
@@ -278,71 +207,10 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
         (success,) = environment.call{value: msg.value}(postOpsData);
     }
 
-    function _executeGasRefund(uint256 gasMarker, uint256 accruedGasRebate, address user) internal {
-        // TODO: Consider tipping validator / builder here to incentivize a non-adversarial environment?
-        
-        GasDonation[] memory donations = _donations;
-        
-        delete _donations;
-
-        uint256 gasFeesSpent = ((gasMarker + 41_000 - gasleft()) * tx.gasprice * BUNDLER_PREMIUM) / BUNDLER_BASE;
-        uint256 gasFeesCredit = accruedGasRebate * tx.gasprice;
-        uint256 returnFactor = 0; // Out of 100
-
-        // CASE: gasFeesCredit fully covers what's been spent.
-        // NOTE: Should be impossible to reach
-        if (gasFeesCredit > gasFeesSpent) {
-            SafeTransferLib.safeTransferETH(msg.sender, gasFeesSpent);
-            SafeTransferLib.safeTransferETH(user, gasFeesCredit - gasFeesSpent);
-            
-            returnFactor = 100;
-
-        // CASE: There are no donations, so just refund the solver credits
-        } else if (donations.length == 0) {
-            SafeTransferLib.safeTransferETH(msg.sender, gasFeesCredit);
-            return;
-
-        // CASE: There are no donations, so just refund the solver credits and return
-        } else if (donations[donations.length-1].cumulative == 0) {
-            SafeTransferLib.safeTransferETH(msg.sender, gasFeesCredit);
-            return;
-
-        // CASE: The donations exceed the liability
-        } else if (donations[donations.length-1].cumulative * tx.gasprice > gasFeesSpent - gasFeesCredit) {
-            SafeTransferLib.safeTransferETH(msg.sender, gasFeesSpent);
-
-            uint256 totalDonations = donations[donations.length-1].cumulative * tx.gasprice;
-            uint256 excessDonations = totalDonations - (gasFeesSpent - gasFeesCredit);
-
-            returnFactor = (100 * excessDonations) / (totalDonations + 1);
-
-        // CASE: The bundler receives all of the donations
-        } else {
-            SafeTransferLib.safeTransferETH(msg.sender, gasFeesCredit);
-            return;
-        }
-
-        // Return any surplus donations
-        // TODO: de-dust it
-        if (returnFactor > 0) {
-            uint256 i;
-            uint256 surplus;
-            address recipient;
-
-            for (;i<donations.length;) {
-                
-                surplus = (donations[i].net * tx.gasprice * returnFactor) / 100;
-                recipient = donations[i].recipient == address(0) ? user : donations[i].recipient;
-
-                SafeTransferLib.safeTransferETH(recipient, surplus);
-
-                unchecked{++i;}
-            }
-        }
-    }
+    
 
     function _update(
-        SolverCall calldata sCall,
+        SolverOperation calldata solverOp,
         SolverEscrow memory solverEscrow,
         uint256 gasWaterMark,
         uint256 result
@@ -351,9 +219,9 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
             uint256 gasUsed = gasWaterMark - gasleft();
 
             if (result & EscrowBits._FULL_REFUND != 0) {
-                gasRebate = gasUsed + (sCall.data.length * CALLDATA_LENGTH_PREMIUM);
+                gasRebate = gasUsed + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM);
             } else if (result & EscrowBits._CALLDATA_REFUND != 0) {
-                gasRebate = (sCall.data.length * CALLDATA_LENGTH_PREMIUM);
+                gasRebate = (solverOp.data.length * CALLDATA_LENGTH_PREMIUM);
             } else if (result & EscrowBits._NO_USER_REFUND != 0) {
                 // pass
             } else {
@@ -372,11 +240,11 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
                 gasRebate /= tx.gasprice;
 
                 // save the escrow data back into storage
-                _escrowData[sCall.from] = solverEscrow;
+                _escrowData[solverOp.from] = solverEscrow;
             
             // Check if need to save escrowData due to nonce update but not gasRebate
             } else if (result & EscrowBits._NO_NONCE_UPDATE == 0) {
-                _escrowData[sCall.from].nonce = solverEscrow.nonce;
+                _escrowData[solverOp.from].nonce = solverEscrow.nonce;
             }
         }
     }
@@ -387,7 +255,7 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
         returns (uint256 result, uint256 gasLimit, SolverEscrow memory solverEscrow)
     {
         // verify solver's signature
-        if (_verifySignature(solverOp.call, solverOp.signature)) {
+        if (_verifySignature(solverOp)) {
             // verify the solver has correct usercalldata and the solver escrow checks
             (result, gasLimit, solverEscrow) = _verifySolverOperation(solverOp);
         } else {
@@ -396,41 +264,38 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
         }
 
         result = _solverOpPreCheck(
-            result, gasWaterMark, tx.gasprice, solverOp.call.maxFeePerGas, auctionAlreadyComplete
+            result, gasWaterMark, tx.gasprice, solverOp.maxFeePerGas, auctionAlreadyComplete
         );
     }
 
-    function _getSolverHash(SolverCall calldata sCall) internal pure returns (bytes32 solverHash) {
+    function _getSolverHash(SolverOperation calldata solverOp) internal pure returns (bytes32 solverHash) {
         return keccak256(
             abi.encode(
                 SOLVER_TYPE_HASH,
-                sCall.from,
-                sCall.to,
-                sCall.value,
-                sCall.gas,
-                sCall.maxFeePerGas,
-                sCall.nonce,
-                sCall.deadline,
-                sCall.controlCodeHash,
-                sCall.userOpHash,
-                sCall.bidsHash,
-                keccak256(sCall.data)
+                solverOp.from,
+                solverOp.to,
+                solverOp.value,
+                solverOp.gas,
+                solverOp.maxFeePerGas,
+                solverOp.nonce,
+                solverOp.deadline,
+                solverOp.solver,
+                solverOp.control,
+                solverOp.userOpHash,
+                solverOp.bidToken,
+                solverOp.bidAmount,
+                keccak256(solverOp.data)
             )
         );
     }
 
-    function getSolverPayload(SolverCall calldata sCall) public view returns (bytes32 payload) {
-        payload = _hashTypedDataV4(_getSolverHash(sCall));
+    function getSolverPayload(SolverOperation calldata solverOp) public view returns (bytes32 payload) {
+        payload = _hashTypedDataV4(_getSolverHash(solverOp));
     }
 
-    function _verifySignature(SolverCall calldata sCall, bytes calldata signature) internal view returns (bool) {
-        address signer = _hashTypedDataV4(_getSolverHash(sCall)).recover(signature);
-        return signer == sCall.from;
-    }
-
-    function _verifyBids(bytes32 bidsHash, BidData[] calldata bids) internal pure returns (bool validBid) {
-        // NOTE: this should only occur after the solver's signature on the bidsHash is verified
-        validBid = keccak256(abi.encode(bids)) == bidsHash;
+    function _verifySignature(SolverOperation calldata solverOp) internal view returns (bool) {
+        address signer = _hashTypedDataV4(_getSolverHash(solverOp)).recover(solverOp.signature);
+        return signer == solverOp.from;
     }
 
     function _verifySolverOperation(SolverOperation calldata solverOp)
@@ -438,19 +303,24 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
         view
         returns (uint256 result, uint256 gasLimit, SolverEscrow memory solverEscrow)
     {
-        solverEscrow = _escrowData[solverOp.call.from];
+        solverEscrow = _escrowData[solverOp.from];
 
         // TODO big unchecked block - audit/review carefully
         unchecked {
 
-            if (solverOp.call.nonce <= uint256(solverEscrow.nonce)) {
+            if (solverOp.to != address(this)) {
+                result |= 1 << uint256(SolverOutcome.InvalidTo);
+            }
+
+            if (solverOp.nonce <= uint256(solverEscrow.nonce)) {
                 result |= 1 << uint256(SolverOutcome.InvalidNonceUnder);
-            } else if (solverOp.call.nonce > uint256(solverEscrow.nonce) + 1) {
+
+            } else if (solverOp.nonce > uint256(solverEscrow.nonce) + 1) {
                 result |= 1 << uint256(SolverOutcome.InvalidNonceOver);
 
                 // TODO: reconsider the jump up for gapped nonces? Intent is to mitigate dmg
                 // potential inflicted by a hostile solver/builder.
-                solverEscrow.nonce = uint32(solverOp.call.nonce);
+                solverEscrow.nonce = uint32(solverOp.nonce);
             } else {
                 ++solverEscrow.nonce;
             }
@@ -461,27 +331,23 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
                 solverEscrow.lastAccessed = uint64(block.number);
             }
 
-            if (!_verifyBids(solverOp.call.bidsHash, solverOp.bids)) {
-                result |= 1 << uint256(SolverOutcome.InvalidBidsHash);
-            }
-
             gasLimit = (100)
                 * (
-                    solverOp.call.gas < EscrowBits.SOLVER_GAS_LIMIT
-                        ? solverOp.call.gas
+                    solverOp.gas < EscrowBits.SOLVER_GAS_LIMIT
+                        ? solverOp.gas
                         : EscrowBits.SOLVER_GAS_LIMIT
                 ) / (100 + EscrowBits.SOLVER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
 
-            uint256 gasCost = (tx.gasprice * gasLimit) + (solverOp.call.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
+            uint256 gasCost = (tx.gasprice * gasLimit) + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
 
             // see if solver's escrow can afford tx gascost
-            if (gasCost > solverEscrow.total - _withdrawalData[solverOp.call.from].escrowed) {
+            if (gasCost > solverEscrow.total - _withdrawalData[solverOp.from].escrowed) {
                 // charge solver for calldata so that we can avoid vampire attacks from solver onto user
                 result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
             }
 
             // Verify that we can lend the solver their tx value
-            if (solverOp.call.value > address(this).balance - (gasLimit * tx.gasprice)) {
+            if (solverOp.value > address(this).balance - (gasLimit * tx.gasprice)) {
                 result |= 1 << uint256(SolverOutcome.CallValueTooHigh);
             }
 
@@ -510,12 +376,12 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
         data = abi.encodePacked(data, lockBytes);
 
         // Account for ETH borrowed by solver - repay with repayBorrowedEth() below
-        _accData.ethBorrowed[solverOp.call.to] += solverOp.call.value;
+        _accData.ethBorrowed[solverOp.solver] += solverOp.value;
 
-        (success, data) = environment.call{value: solverOp.call.value}(data);
+        (success, data) = environment.call{value: solverOp.value}(data);
         
         // Check all borrowed ETH was repaid during solver call from Execution Env
-        if(_accData.ethBorrowed[solverOp.call.to] != 0){
+        if(_accData.ethBorrowed[solverOp.solver] != 0){
             revert FastLaneErrorsEvents.SolverMsgValueUnpaid();
         }
 
@@ -545,11 +411,6 @@ contract Escrow is DAppVerification, SafetyLocks, FastLaneErrorsEvents {
         }
     }
 
-    function repayBorrowedEth(address borrower) external payable {
-        uint256 debt = _accData.ethBorrowed[borrower];
-        require(debt > 0, "ERR-E081 NoDebtToRepay");
-        _accData.ethBorrowed[borrower] = debt - msg.value;
-    }
 
     receive() external payable {}
 

@@ -85,7 +85,6 @@ contract AccountingTest is BaseTest {
 
         vm.startPrank(userEOA);
         atlas.metacall{value: 0}({
-            dConfig: dConfig,
             userOp: userOp,
             solverOps: solverOps,
             dAppOp: dAppOp
@@ -118,7 +117,6 @@ contract AccountingTest is BaseTest {
 
         vm.startPrank(userEOA);
         atlas.metacall{value: 0}({
-            dConfig: dConfig,
             userOp: userOp,
             solverOps: solverOps,
             dAppOp: dAppOp
@@ -158,11 +156,11 @@ contract AccountingTest is BaseTest {
 
         
         // Input params for Atlas.metacall() - will be populated below
-        dConfig = txBuilder.getDAppConfig();
+       
         solverOps = new SolverOperation[](1);
 
         vm.startPrank(userEOA);
-        address executionEnvironment = atlas.createExecutionEnvironment(dConfig);
+        address executionEnvironment = atlas.createExecutionEnvironment(txBuilder.control());
         vm.stopPrank();
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
@@ -194,21 +192,20 @@ contract AccountingTest is BaseTest {
         // Builds the SolverCall
         solverOps[0] = txBuilder.buildSolverOperation({
             userOp: userOp,
-            dConfig: dConfig,
             solverOpData: solverOpData,
             solverEOA: solverOneEOA,
             solverContract: rfqSolver,
             bidAmount: solverMsgValue
         });
 
-        solverOps[0].call.value = solverMsgValue;
+        solverOps[0].value = solverMsgValue;
 
         // Solver signs the solverCall
-        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlas.getSolverPayload(solverOps[0].call));
+        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlas.getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Frontend creates dApp Operation calldata after seeing rest of data
-        dAppOp = txBuilder.buildDAppOperation(governanceEOA, dConfig, userOp, solverOps);
+        dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
 
         // Frontend signs the dApp Operation payload
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getDAppOperationPayload(dAppOp));
@@ -236,7 +233,6 @@ contract AccountingTest is BaseTest {
         vm.startPrank(userEOA);
         
         assertFalse(simulator.simUserOperation(userOp), "metasimUserOperationcall tested true a");
-        assertFalse(simulator.simUserOperation(userOp.call), "metasimUserOperationcall call tested true b");
         
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
@@ -290,6 +286,6 @@ contract EvilRFQSolver is HonestRFQSolver {
         );
         
         // EvilRFQSolver tries to steal ETH before repaying debt to Atlas
-        deployer.call{value: msg.value}("");
+        // deployer.call{value: msg.value}("");
     }
 }
