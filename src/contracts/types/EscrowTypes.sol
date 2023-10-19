@@ -8,14 +8,8 @@ struct AccountingData {
 }
 
 struct SolverEscrow {
-    // uint256 total;
     uint32 nonce; // EOA nonce.
     uint64 lastAccessed; // block.number
-}
-
-struct SolverWithdrawal {
-    uint128 escrowed;
-    uint64 availableOn; // block.number when funds are available.
 }
 
 struct GasDonation {

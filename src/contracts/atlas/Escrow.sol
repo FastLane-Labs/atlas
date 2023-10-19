@@ -29,9 +29,6 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
-    // TODO remove this and stuct def. Fix logic in here to use AtlETH
-    mapping(address => SolverWithdrawal) internal _withdrawalData;
-
     constructor(
         string memory _tokenName,
         string memory _tokenSymbol,
@@ -290,7 +287,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
             uint256 gasCost = (tx.gasprice * gasLimit) + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
 
             // see if solver's escrow can afford tx gascost
-            if (gasCost > balanceOf[solverOp.solver] - _withdrawalData[solverOp.from].escrowed) {
+            if (gasCost > balanceOf[solverOp.solver]) {
                 // charge solver for calldata so that we can avoid vampire attacks from solver onto user
                 result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
             }
