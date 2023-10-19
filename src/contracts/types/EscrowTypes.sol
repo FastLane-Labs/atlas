@@ -38,7 +38,8 @@ enum LedgerStatus {
     Inactive,
     Deficit,
     Surplus,
-    Balanced
+    Balanced,
+    Finalized
 }
 
 struct Ledger {
