@@ -47,8 +47,9 @@ contract MainTest is BaseTest {
 
         UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, userEOA, TOKEN_ONE);
 
-        (v, r, s) = vm.sign(userPK, IAtlas(address(atlas)).getUserOperationPayload(userOp));
-        userOp.signature = abi.encodePacked(r, s, v);
+        // user does not sign their own operation when bundling
+        // (v, r, s) = vm.sign(userPK, IAtlas(address(atlas)).getUserOperationPayload(userOp));
+        // userOp.signature = abi.encodePacked(r, s, v);
 
         SolverOperation[] memory solverOps = new SolverOperation[](2);
         bytes memory solverOpData;

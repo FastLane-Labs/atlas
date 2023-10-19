@@ -64,7 +64,8 @@ contract V4DAppControl is DAppControl {
                 zeroSolvers: true,
                 reuseUserOp: false,
                 userBundler: true,
-                dAppBundler: true,
+                solverBundler: true,
+                verifySolverBundlerCallChainHash: true,
                 unknownBundler: true,
                 forwardReturnData: false
             })

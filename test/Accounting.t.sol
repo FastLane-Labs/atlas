@@ -178,8 +178,9 @@ contract AccountingTest is BaseTest {
         });
 
         // User signs the userCall
-        (sig.v, sig.r, sig.s) = vm.sign(userPK, atlas.getUserOperationPayload(userOp));
-        userOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+        // user doees NOT sign the userOp when they are bundling
+        // (sig.v, sig.r, sig.s) = vm.sign(userPK, atlas.getUserOperationPayload(userOp));
+        // userOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Build solver calldata (function selector on solver contract and its params)
         bytes memory solverOpData = abi.encodeWithSelector(
