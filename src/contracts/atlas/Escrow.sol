@@ -211,6 +211,8 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
                 // Adjust the solver's balance
                 if (netSolverBalance > balanceOf[solverOp.from]) {
                     _mint(solverOp.from, netSolverBalance - balanceOf[solverOp.from]);
+                } else {
+                    _burn(solverOp.from, balanceOf[solverOp.from] - netSolverBalance);
                 }
 
                 // Check if need to save escrowData due to nonce update but not gasRebate
