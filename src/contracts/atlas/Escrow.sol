@@ -29,32 +29,11 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
-    uint256 public immutable escrowDuration;
-    mapping(address => SolverEscrow) internal _escrowData;
-
-    constructor(uint32 _escrowDuration, address _simulator) AtlETH(_simulator) {
-        escrowDuration = _escrowDuration;
-    }
-
-    // Custom checks for atlETH transfer functions.
-    // Interactions (transfers, withdrawals) are allowed only after the owner last interaction
-    // with Atlas was at least `escrowDuration` blocks ago.
-    modifier tokenTransferChecks(address owner) override {
-        require(_escrowData[owner].lastAccessed + escrowDuration < block.number, "ERR-E080 EscrowActive");
-        _;
-    }
+    constructor(uint32 _escrowDuration, address _simulator) AtlETH(_escrowDuration, _simulator) {}
 
     ///////////////////////////////////////////////////
     /// EXTERNAL FUNCTIONS FOR BUNDLER INTERACTION  ///
     ///////////////////////////////////////////////////
-
-    function nextSolverNonce(address solverSigner) external view returns (uint256 nextNonce) {
-        nextNonce = uint256(_escrowData[solverSigner].nonce) + 1;
-    }
-
-    function solverLastActiveBlock(address solverSigner) external view returns (uint256 lastBlock) {
-        lastBlock = uint256(_escrowData[solverSigner].lastAccessed);
-    }
 
     ///////////////////////////////////////////////////
     ///             INTERNAL FUNCTIONS              ///
@@ -95,7 +74,8 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
         uint256 gasWaterMark = gasleft();
 
         // Verify the transaction.
-        (uint256 result, uint256 gasLimit, SolverEscrow memory solverEscrow) = _verify(solverOp, gasWaterMark, false);
+        (uint256 result, uint256 gasLimit, EscrowAccountData memory solverEscrow) =
+            _verify(solverOp, gasWaterMark, false);
 
         SolverOutcome outcome;
         uint256 escrowSurplus;
@@ -174,7 +154,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
 
     function _update(
         SolverOperation calldata solverOp,
-        SolverEscrow memory solverEscrow,
+        EscrowAccountData memory solverEscrow,
         uint256 escrowSurplus,
         uint256 gasWaterMark,
         uint256 result
@@ -192,7 +172,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
                 revert("ERR-SE72 UncoveredResult");
             }
 
-            uint256 netSolverBalance = balanceOf[solverOp.from] + escrowSurplus;
+            uint256 netSolverBalance = solverEscrow.balance + escrowSurplus;
 
             if (gasRebate != 0) {
                 // Calculate what the solver owes
@@ -200,24 +180,17 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
 
                 gasRebate = gasRebate > netSolverBalance ? netSolverBalance : gasRebate;
 
-                netSolverBalance -= gasRebate;
+                solverEscrow.balance = netSolverBalance - gasRebate;
 
                 // NOTE: This will cause an error if you are simulating with a gasPrice of 0
                 gasRebate /= tx.gasprice;
 
                 // Save the escrow data back into storage
-                _escrowData[solverOp.from] = solverEscrow;
-
-                // Adjust the solver's balance
-                if (netSolverBalance > balanceOf[solverOp.from]) {
-                    _mint(solverOp.from, netSolverBalance - balanceOf[solverOp.from]);
-                } else {
-                    _burn(solverOp.from, balanceOf[solverOp.from] - netSolverBalance);
-                }
+                _escrowAccountData[solverOp.from] = solverEscrow;
 
                 // Check if need to save escrowData due to nonce update but not gasRebate
             } else if (result & EscrowBits._NO_NONCE_UPDATE == 0) {
-                _escrowData[solverOp.from].nonce = solverEscrow.nonce;
+                _escrowAccountData[solverOp.from].nonce = solverEscrow.nonce;
             }
         }
     }
@@ -225,7 +198,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
     function _verify(SolverOperation calldata solverOp, uint256 gasWaterMark, bool auctionAlreadyComplete)
         internal
         view
-        returns (uint256 result, uint256 gasLimit, SolverEscrow memory solverEscrow)
+        returns (uint256 result, uint256 gasLimit, EscrowAccountData memory solverEscrow)
     {
         // verify solver's signature
         if (_verifySignature(solverOp)) {
@@ -272,9 +245,9 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
     function _verifySolverOperation(SolverOperation calldata solverOp)
         internal
         view
-        returns (uint256 result, uint256 gasLimit, SolverEscrow memory solverEscrow)
+        returns (uint256 result, uint256 gasLimit, EscrowAccountData memory solverEscrow)
     {
-        solverEscrow = _escrowData[solverOp.from];
+        solverEscrow = _escrowAccountData[solverOp.from];
 
         // TODO big unchecked block - audit/review carefully
         unchecked {
@@ -306,7 +279,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
             uint256 gasCost = (tx.gasprice * gasLimit) + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
 
             // see if solver's escrow can afford tx gascost
-            if (gasCost > balanceOf[solverOp.from]) {
+            if (gasCost > _escrowAccountData[solverOp.from].balance) {
                 // charge solver for calldata so that we can avoid vampire attacks from solver onto user
                 result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
             }

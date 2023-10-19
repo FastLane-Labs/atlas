@@ -1,7 +1,6 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import {IEscrow} from "../interfaces/IEscrow.sol";
 import {IDAppControl} from "../interfaces/IDAppControl.sol";
 import {IAtlETH} from "../interfaces/IAtlETH.sol";
 
@@ -86,13 +85,13 @@ contract Sorter {
 
         // Solvers can only do one tx per block - this prevents double counting escrow balances.
         // TODO: Add in "targetBlockNumber" as an arg?
-        uint256 solverLastActiveBlock = IEscrow(escrow).solverLastActiveBlock(solverOp.from);
+        uint256 solverLastActiveBlock = IAtlETH(atlas).accountLastActiveBlock(solverOp.from);
         if (solverLastActiveBlock >= block.number) {
             return false;
         }
 
         // Make sure the solver nonce is accurate
-        uint256 nextSolverNonce = IEscrow(escrow).nextSolverNonce(solverOp.from);
+        uint256 nextSolverNonce = IAtlETH(atlas).nextAccountNonce(solverOp.from);
         if (nextSolverNonce != solverOp.nonce) {
             return false;
         }

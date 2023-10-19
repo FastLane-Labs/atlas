@@ -34,7 +34,6 @@ abstract contract AtlETH is Permit69 {
     //////////////////////////////////////////////////////////////*/
 
     uint256 public totalSupply;
-    mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
 
     /*//////////////////////////////////////////////////////////////
@@ -51,27 +50,43 @@ abstract contract AtlETH is Permit69 {
 
     // NOTE: these storage vars / maps should only be accessible by *signed* solver transactions
     // and only once per solver per block (to avoid user-solver collaborative exploits)
-    // EOA Address => solver escrow data
+    uint256 public immutable escrowDuration;
+    mapping(address => EscrowAccountData) internal _escrowAccountData;
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    constructor(address _simulator) Permit69(_simulator) {
+    constructor(uint32 _escrowDuration, address _simulator) Permit69(_simulator) {
         INITIAL_CHAIN_ID = block.chainid;
         INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
+
+        escrowDuration = _escrowDuration;
     }
 
     /*//////////////////////////////////////////////////////////////
                                 ATLETH
     //////////////////////////////////////////////////////////////*/
 
-    // Override in inheriting contracts to add custom checks on transfer functions.
-    modifier tokenTransferChecks(address owner) virtual {
+    // Custom checks for atlETH transfer functions.
+    // Interactions (transfers, withdrawals) are allowed only after the owner last interaction
+    // with Atlas was at least `escrowDuration` blocks ago.
+    modifier tokenTransferChecks(address account) {
+        require(_escrowAccountData[account].lastAccessed + escrowDuration < block.number, "EscrowActive");
         _;
     }
 
-    // TODO adapt these fns to new contract structure
+    function balanceOf(address account) public view returns (uint256) {
+        return _escrowAccountData[account].balance;
+    }
+
+    function nextAccountNonce(address account) external view returns (uint256 nextNonce) {
+        nextNonce = uint256(_escrowAccountData[account].nonce) + 1;
+    }
+
+    function accountLastActiveBlock(address account) external view returns (uint256 lastBlock) {
+        lastBlock = uint256(_escrowAccountData[account].lastAccessed);
+    }
 
     // Deposit ETH and get atlETH in return.
     function deposit() external payable onlyWhenUnlocked {
@@ -79,16 +94,10 @@ abstract contract AtlETH is Permit69 {
     }
 
     // Redeem atlETH for ETH.
-    function withdraw(uint256 amount)
-        external
-        onlyWhenUnlocked
-        tokenTransferChecks(msg.sender)
-        returns (uint256 newBalance)
-    {
-        require(balanceOf[msg.sender] >= amount, "ERR-E078 InsufficientBalance");
+    function withdraw(uint256 amount) external onlyWhenUnlocked tokenTransferChecks(msg.sender) {
+        require(_escrowAccountData[msg.sender].balance >= amount, "ERR-E078 InsufficientBalance");
         _burn(msg.sender, amount);
         SafeTransferLib.safeTransferETH(msg.sender, amount);
-        newBalance = balanceOf[msg.sender];
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -102,11 +111,11 @@ abstract contract AtlETH is Permit69 {
     }
 
     function transfer(address to, uint256 amount) public tokenTransferChecks(msg.sender) returns (bool) {
-        balanceOf[msg.sender] -= amount;
+        _escrowAccountData[msg.sender].balance -= amount;
         // Cannot overflow because the sum of all user
         // balances can't exceed the max uint256 value.
         unchecked {
-            balanceOf[to] += amount;
+            _escrowAccountData[to].balance += amount;
         }
         emit Transfer(msg.sender, to, amount);
         return true;
@@ -115,11 +124,11 @@ abstract contract AtlETH is Permit69 {
     function transferFrom(address from, address to, uint256 amount) public tokenTransferChecks(from) returns (bool) {
         uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
         if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
-        balanceOf[from] -= amount;
+        _escrowAccountData[from].balance -= amount;
         // Cannot overflow because the sum of all user
         // balances can't exceed the max uint256 value.
         unchecked {
-            balanceOf[to] += amount;
+            _escrowAccountData[to].balance += amount;
         }
         emit Transfer(from, to, amount);
         return true;
@@ -186,13 +195,13 @@ abstract contract AtlETH is Permit69 {
         // Cannot overflow because the sum of all user
         // balances can't exceed the max uint256 value.
         unchecked {
-            balanceOf[to] += amount;
+            _escrowAccountData[to].balance += amount;
         }
         emit Transfer(address(0), to, amount);
     }
 
     function _burn(address from, uint256 amount) internal {
-        balanceOf[from] -= amount;
+        _escrowAccountData[from].balance -= amount;
         // Cannot underflow because a user's balance
         // will never be larger than the total supply.
         unchecked {
