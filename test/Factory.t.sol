@@ -27,6 +27,7 @@ contract DummyDAppControl is DAppControl {
                 false,
                 false,
                 false,
+                false,
                 false
             )
         )

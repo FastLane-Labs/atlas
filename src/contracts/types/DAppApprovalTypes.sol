@@ -43,6 +43,7 @@ struct CallConfig {
     bool reuseUserOp;
     bool userBundler;
     bool solverBundler;
+    bool verifySolverBundlerCallChainHash;
     bool unknownBundler;
     bool forwardReturnData;
 }
@@ -61,6 +62,7 @@ enum CallConfigIndex {
     ReuseUserOp,
     UserBundler,
     SolverBundler,
+    VerifySolverBundlerCallChainHash,
     UnknownBundler,
     ForwardReturnData
 }

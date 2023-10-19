@@ -220,6 +220,7 @@ contract Atlas is Test, Factory {
                 return ValidCallsResult.UnknownBundlerNotAllowed;
             }
 
+            // user should not sign their own operation and transaction together
             if(userOp.signature.length > 0) {
                 return ValidCallsResult.UserSignatureInvalid;
             }

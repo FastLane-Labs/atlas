@@ -53,6 +53,9 @@ library CallBits {
         if (callConfig.solverBundler) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.SolverBundler);
         }
+        if(callConfig.verifySolverBundlerCallChainHash) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.VerifySolverBundlerCallChainHash);
+        }
         if (callConfig.unknownBundler) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.UnknownBundler);
         }
@@ -76,6 +79,7 @@ library CallBits {
             reuseUserOp: allowsReuseUserOps(encodedCallConfig),
             userBundler: allowsUserBundler(encodedCallConfig),
             solverBundler: allowsSolverBundler(encodedCallConfig),
+            verifySolverBundlerCallChainHash: verifySolverBundlerCallChainHash(encodedCallConfig),
             unknownBundler: allowsUnknownBundler(encodedCallConfig),
             forwardReturnData: forwardReturnData(encodedCallConfig)
         });
@@ -131,6 +135,10 @@ library CallBits {
 
     function allowsSolverBundler(uint32 callConfig) internal pure returns (bool userBundler) {
         userBundler = (callConfig & 1 << uint32(CallConfigIndex.SolverBundler) != 0);
+    }
+
+    function verifySolverBundlerCallChainHash(uint32 callConfig) internal pure returns (bool verify) {
+        verify = (callConfig & 1 << uint32(CallConfigIndex.VerifySolverBundlerCallChainHash) != 0);
     }
 
     function allowsUnknownBundler(uint32 callConfig) internal pure returns (bool unknownBundler) {
