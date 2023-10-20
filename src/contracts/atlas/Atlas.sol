@@ -59,7 +59,12 @@ contract Atlas is Test, Factory {
             console.log("accruedGasRebate",accruedGasRebate);
             auctionWon = _auctionWon;
             // Gas Refund to sender only if execution is successful
-            _balance(accruedGasRebate, userOp.from, userOp.control, solverOps[winningSolverIndex].from);
+            _balance({
+                accruedGasRebate: accruedGasRebate,
+                user: userOp.from,
+                dapp: userOp.control,
+                winningSolver: solverOps[winningSolverIndex].from
+            });
 
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
