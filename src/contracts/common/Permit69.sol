@@ -6,8 +6,9 @@ import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 import {GasAccounting} from "../atlas/GasAccounting.sol";
 
 import "../types/LockTypes.sol";
+import "../types/EscrowTypes.sol";
 
-import {EXECUTION_PHASE_OFFSET, SAFETY_LEVEL_OFFSET, SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER} from "../libraries/SafetyBits.sol";
+import {EXECUTION_PHASE_OFFSET, SAFETY_LEVEL_OFFSET, SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER, SAFE_GAS_TRANSFER} from "../libraries/SafetyBits.sol";
 
 // NOTE: IPermit69 only works inside of the Atlas environment - specifically
 // inside of the custom ExecutionEnvironments that each user deploys when
@@ -78,6 +79,32 @@ abstract contract Permit69 is GasAccounting {
 
         // Transfer token
         ERC20(token).safeTransferFrom(controller, destination, amount);
+    }
+
+    function requestGasFrom(GasParty donor, GasParty recipient, uint256 amt, uint16 lockState) external {
+        // Verify the parties
+        require(_validParties(msg.sender, donor, recipient), "ERR-T003 InvalidEnvironment");
+
+        // Verify the lock state
+        _verifyLockState({
+            lockState: lockState, 
+            safeExecutionPhaseSet: SAFE_GAS_TRANSFER
+        });
+
+        _requestFrom(donor, recipient, amt);
+    }
+
+    function contributeGasTo(GasParty donor, GasParty recipient, uint256 amt, uint16 lockState) external {
+        // Verify the parties
+        require(_validParties(msg.sender, donor, recipient), "ERR-T004 InvalidEnvironment");
+
+        // Verify the lock state
+        _verifyLockState({
+            lockState: lockState, 
+            safeExecutionPhaseSet: SAFE_GAS_TRANSFER
+        });
+
+        _contributeTo(donor, recipient, amt);
     }
 
     function _verifyCallerIsExecutionEnv(

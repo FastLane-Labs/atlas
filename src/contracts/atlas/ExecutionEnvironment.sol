@@ -136,7 +136,6 @@ contract ExecutionEnvironment is Base {
 
     function solverMetaTryCatch(
         uint256 gasLimit, 
-        uint256 escrowBalance, 
         SolverOperation calldata solverOp, 
         bytes calldata dAppReturnData
     ) 
@@ -246,10 +245,7 @@ contract ExecutionEnvironment is Base {
         }
 
         // Verify that the solver repaid their msg.value
-        // TODO: Add in a more discerning func that'll silo the 
-        // donations to prevent double counting.
-        // TODO: repayment check added to Escrow.sol - do we still need this balance check?
-        if (IEscrow(atlas).getAmountOwed(solverOp.from) != 0) {
+        if (!IEscrow(atlas).validateBalances()) {
             revert FastLaneErrorsEvents.SolverMsgValueUnpaid();
         }
     }
@@ -279,17 +275,6 @@ contract ExecutionEnvironment is Base {
         require(success, "ERR-EC02 DelegateRevert");
     }
 
-
-    function donateToBundler(address surplusRecipient)
-        external
-        payable
-        validPhase(ExecutionPhase.SolverOperations)
-    {
-        uint16 lockstate = _lockState();
-        console.log("lockstate", lockstate);
-
-        IEscrow(atlas).donateToBundler{value: msg.value}(surplusRecipient);
-    }
 
     ///////////////////////////////////////
     //  USER SUPPORT / ACCESS FUNCTIONS  //

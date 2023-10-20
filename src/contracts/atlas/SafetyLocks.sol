@@ -22,10 +22,14 @@ contract SafetyLocks {
 
     struct Lock {
         address activeEnvironment;
-        uint64 activeParties; // bitmap
+        uint16 activeParties; // bitmap
+        uint64 startingBalance;
     }
     
     Lock public lock;
+
+    uint256 constant internal _ledgerLength = 6; // uint256(type(GasParty).max); // 6
+    Ledger[_ledgerLength] public ledgers;
 
     constructor(address _simulator) {
         atlas = address(this);
@@ -33,8 +37,13 @@ contract SafetyLocks {
 
         lock = Lock({
             activeEnvironment: UNLOCKED,
-            activeParties: uint64(0)
+            activeParties: uint16(0),
+            startingBalance: uint64(0)
         });
+
+        for (uint256 i; i < _ledgerLength; i++) {
+            ledgers[i].status = LedgerStatus.Inactive; // init the storage vars
+        }
     }
 
     // TODO can we remove this? solver value repayment handled in Escrow.sol now
@@ -45,19 +54,45 @@ contract SafetyLocks {
         isSafe = msgSender == lock.activeEnvironment;
     }
 
-    function _initializeEscrowLock(UserOperation calldata userOp, address executionEnvironment) onlyWhenUnlocked internal {
+    function _initializeEscrowLock(UserOperation calldata userOp, address executionEnvironment, uint256 gasLimit) onlyWhenUnlocked internal {
 
-        uint256 activeParties;
+        uint256 activeParties = 1 << uint256(GasParty.Solver);
+
+        int64 iGasLimit = int64(uint64(gasLimit));
+
         if (msg.value != 0) {
             activeParties |= 1 << uint256(GasParty.Bundler);
+            int64 bundlerDeposit = int64(uint64(msg.value / tx.gasprice));
+            ledgers[uint256(GasParty.Bundler)] = Ledger({
+                balance: 0,
+                contributed: bundlerDeposit,
+                requested: 0 - bundlerDeposit - iGasLimit,
+                status: LedgerStatus.Active
+            });
+        } else {
+            ledgers[uint256(GasParty.Bundler)] = Ledger({
+                balance: 0,
+                contributed: 0,
+                requested: 0 - iGasLimit,
+                status: LedgerStatus.Active
+            });
         }
+
         if (userOp.value != 0) {
             activeParties |= 1 << uint256(GasParty.User);
+            int64 userRequest = int64(uint64(userOp.value / tx.gasprice));
+            ledgers[uint256(GasParty.Bundler)] = Ledger({
+                balance: 0,
+                contributed: 0,
+                requested: userRequest,
+                status: LedgerStatus.Active
+            });
         }
 
         lock = Lock({
             activeEnvironment: executionEnvironment,
-            activeParties: uint64(activeParties)
+            activeParties: uint16(activeParties),
+            startingBalance: uint64(address(this).balance / tx.gasprice)
         });
     }
 
@@ -78,7 +113,8 @@ contract SafetyLocks {
     function _releaseEscrowLock() internal {
         lock = Lock({
             activeEnvironment: UNLOCKED,
-            activeParties: uint64(0)
+            activeParties: uint16(0),
+            startingBalance: uint64(0)
         });
     }
 

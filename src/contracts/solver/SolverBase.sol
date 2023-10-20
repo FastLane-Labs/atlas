@@ -15,9 +15,6 @@ interface IWETH9 {
     function withdraw(uint256 wad) external payable;
 }
 
-
-// TODO add donateToBundler helper function for solvers
-
 contract SolverBase is Test {
     address public constant WETH_ADDRESS = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
@@ -49,15 +46,7 @@ contract SolverBase is Test {
 
         _;
 
-        // NOTE: Because this is nested inside of an Atlas meta transaction, if someone is attempting
-        // to innappropriately access your smart contract then THEY will have to pay for the gas...
-        // so feel free to run the safety checks at the end of the call.
-        // NOTE: The solverSafetyCallback is mandatory - if it is not called then the solver
-        // transaction will revert.  It is payable and can be used to repay a msg.value loan from the
-        // Atlas Escrow.
-        
-        // TODO review - this has been replaced by the repayBorrowedEth modifier
-        // require(ISafetyLocks(_escrow).solverSafetyCallback{value: msgValueOwed}(msg.sender), "INVALID SEQUENCE");
+        IEscrow(_escrow).reconcile{value: msg.value}(msg.sender, sender, type(uint256).max);
     }
 
     modifier payBids(address bidToken, uint256 bidAmount) {
@@ -87,10 +76,6 @@ contract SolverBase is Test {
             }
 
             SafeTransferLib.safeTransfer(ERC20(bidToken), msg.sender, bidAmount);
-        }
-
-        if(msg.value > 0){
-            IEscrow(_escrow).repayBorrowedEth{value: msg.value}(address(this));
         }
     }
 }

@@ -31,6 +31,13 @@ uint16 constant SAFE_DAPP_TRANSFER = uint16(
     | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
 );
 
+// NOTE: No Dapp transfers allowed during UserOperation
+uint16 constant SAFE_GAS_TRANSFER = uint16(
+    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps))
+    | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserOperation))
+    | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations))
+);
+
 library SafetyBits {
 
     uint16 internal constant _LOCKED_X_SOLVERS_X_REQUESTED = uint16(

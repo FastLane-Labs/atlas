@@ -2,8 +2,6 @@
 pragma solidity ^0.8.16;
 
 interface IEscrow {
-    function donateToBundler(address surplusRecipient) external payable;
-    function repayBorrowedEth(address borrower) external payable;
-    function getAmountOwed(address borrower) external payable returns (uint256 amountOwed);
-    function cumulativeDonations() external view returns (uint256);
+    function validateBalances() external view returns (bool valid);
+    function reconcile(address environment, address searcherFrom, uint256 maxApprovedGasSpend) external payable returns (bool);
 }

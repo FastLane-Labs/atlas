@@ -77,31 +77,29 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
         (uint256 result, uint256 gasLimit, EscrowAccountData memory solverEscrow) =
             _verify(solverOp, gasWaterMark, false);
 
-        SolverOutcome outcome;
-        uint256 escrowSurplus;
-
         // If there are no errors, attempt to execute
         if (result.canExecute()) {
             // Open the solver lock
             key = key.holdSolverLock(solverOp.solver);
 
+            if (solverOp.value != 0) {
+                _borrow(GasParty.Solver, solverOp.value);
+            }
+
             // Execute the solver call
-            (outcome, escrowSurplus) = _solverOpWrapper(gasLimit, environment, solverOp, dAppReturnData, key.pack());
+            result |= 1 << _solverOpWrapper(gasLimit, environment, solverOp, dAppReturnData, key.pack());
 
-            unchecked {
-                solverEscrow.balance += uint128(escrowSurplus);
-            }
-
-            result |= 1 << uint256(outcome);
-
-            if (result.executedWithError()) {
-                result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
-            } else if (result.executionSuccessful()) {
+            if (result.executionSuccessful()) {
                 // first successful solver call that paid what it bid
-                auctionWon = true; // cannot be reached if bool is already true
                 result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
-                key = key.turnSolverLockPayments(environment);
+                emit SolverTxResult(
+                    solverOp.solver, solverOp.from, true, true, solverEscrow.nonce, result
+                );
+                // winning solver's gas is implicitly paid for by their allowance
+                return (true, key.turnSolverLockPayments(environment));
             }
+
+            result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
 
             // Update the solver's escrow balances and the accumulated refund
             if (result.updateEscrow()) {
@@ -110,7 +108,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
 
             // emit event
             emit SolverTxResult(
-                solverOp.solver, solverOp.from, true, outcome == SolverOutcome.Success, solverEscrow.nonce, result
+                solverOp.solver, solverOp.from, true, false, solverEscrow.nonce, result
             );
         } else {
             // emit event
@@ -297,57 +295,46 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
         SolverOperation calldata solverOp,
         bytes memory dAppReturnData,
         bytes32 lockBytes
-    ) internal returns (SolverOutcome, uint256) {
+    ) internal returns (uint256) {
         // address(this) = Atlas/Escrow
         // msg.sender = tx.origin
 
-        // Get current Ether balance
-        uint256 currentBalance = address(this).balance;
         bool success;
 
         bytes memory data = abi.encodeWithSelector(
             IExecutionEnvironment(environment).solverMetaTryCatch.selector,
             gasLimit,
-            currentBalance,
             solverOp,
             dAppReturnData
         );
 
         data = abi.encodePacked(data, lockBytes);
 
-        // Account for ETH borrowed by solver - repay with repayBorrowedEth() below
-        _accData.ethBorrowed[solverOp.solver] += solverOp.value;
-
         (success, data) = environment.call{value: solverOp.value}(data);
 
-        // Check all borrowed ETH was repaid during solver call from Execution Env
-        if (_accData.ethBorrowed[solverOp.solver] != 0) {
-            revert FastLaneErrorsEvents.SolverMsgValueUnpaid();
-        }
-
         if (success) {
-            return (SolverOutcome.Success, address(this).balance - currentBalance);
+            return uint256(SolverOutcome.Success);
         }
         bytes4 errorSwitch = bytes4(data);
 
         if (errorSwitch == SolverBidUnpaid.selector) {
-            return (SolverOutcome.BidNotPaid, 0);
+            return uint256(SolverOutcome.BidNotPaid);
         } else if (errorSwitch == SolverMsgValueUnpaid.selector) {
-            return (SolverOutcome.CallValueTooHigh, 0);
+            return uint256(SolverOutcome.CallValueTooHigh);
         } else if (errorSwitch == IntentUnfulfilled.selector) {
-            return (SolverOutcome.IntentUnfulfilled, 0);
+            return uint256(SolverOutcome.IntentUnfulfilled);
         } else if (errorSwitch == SolverOperationReverted.selector) {
-            return (SolverOutcome.CallReverted, 0);
+            return uint256(SolverOutcome.CallReverted);
         } else if (errorSwitch == SolverFailedCallback.selector) {
-            return (SolverOutcome.CallbackFailed, 0);
+            return uint256(SolverOutcome.CallbackFailed);
         } else if (errorSwitch == AlteredControlHash.selector) {
-            return (SolverOutcome.InvalidControlHash, 0);
+            return uint256(SolverOutcome.InvalidControlHash);
         } else if (errorSwitch == PreSolverFailed.selector) {
-            return (SolverOutcome.PreSolverFailed, 0);
+            return uint256(SolverOutcome.PreSolverFailed);
         } else if (errorSwitch == PostSolverFailed.selector) {
-            return (SolverOutcome.IntentUnfulfilled, 0);
+            return uint256(SolverOutcome.IntentUnfulfilled);
         } else {
-            return (SolverOutcome.CallReverted, 0);
+            return uint256(SolverOutcome.CallReverted);
         }
     }
 

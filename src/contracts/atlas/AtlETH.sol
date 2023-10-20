@@ -51,7 +51,6 @@ abstract contract AtlETH is Permit69 {
     // NOTE: these storage vars / maps should only be accessible by *signed* solver transactions
     // and only once per solver per block (to avoid user-solver collaborative exploits)
     uint256 public immutable escrowDuration;
-    mapping(address => EscrowAccountData) internal _escrowAccountData;
 
     /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR

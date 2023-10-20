@@ -31,24 +31,15 @@ enum GasParty {
 enum LedgerStatus {
     Unknown,
     Inactive,
-    Deficit,
-    Surplus,
-    Balanced,
+    Active,
     Finalized
 }
 
 struct Ledger {
-    uint64 deposited;
-    uint64 withdrawn;
-    uint64 unfulfilled; // owed per another party's request
-    LedgerStatus ledgerStatus;
-}
-
-struct AtlasLedger {
-    uint64 totalBorrowed;
-    uint64 totalDeposited;
-    uint64 totalRequested; // requested of another party 
-    uint64 totalFulfilled; // total fulfilled to another party 
+    int64 balance; // net balance for deposits / withdrawals / loans
+    int64 contributed; // requested by others, filled by this party
+    int64 requested; // requested by this party, filled by others
+    LedgerStatus status;
 }
 
 enum SolverOutcome

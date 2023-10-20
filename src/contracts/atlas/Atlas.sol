@@ -50,16 +50,16 @@ contract Atlas is Test, Factory {
         }
 
         // Initialize the lock
-        _initializeEscrowLock(userOp, executionEnvironment);
+        _initializeEscrowLock(userOp, executionEnvironment, gasMarker);
 
         try this.execute{value: msg.value}(
             dConfig, userOp, solverOps, executionEnvironment, dAppOp.callChainHash, msg.sender == simulator
-        ) returns (bool _auctionWon, uint256 accruedGasRebate) {
+        ) returns (bool _auctionWon, uint256 accruedGasRebate, uint256 winningSolverIndex) {
             
             console.log("accruedGasRebate",accruedGasRebate);
             auctionWon = _auctionWon;
             // Gas Refund to sender only if execution is successful
-            _executeGasRefund(gasMarker, accruedGasRebate, userOp.from);
+            _balance(accruedGasRebate, userOp.from, userOp.control, solverOps[winningSolverIndex].from);
 
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
@@ -79,7 +79,7 @@ contract Atlas is Test, Factory {
         address executionEnvironment,
         bytes32 callChainHash,
         bool isSimulation
-    ) external payable returns (bool auctionWon, uint256 accruedGasRebate) {
+    ) external payable returns (bool auctionWon, uint256 accruedGasRebate, uint256 winningSearcherIndex) {
         
         // This is a self.call made externally so that it can be used with try/catch
         require(msg.sender == address(this), "ERR-F06 InvalidAccess");
@@ -94,7 +94,7 @@ contract Atlas is Test, Factory {
         EscrowKey memory key = _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), isSimulation);
 
         // Begin execution
-        (auctionWon, accruedGasRebate) = _execute(dConfig, userOp, solverOps, executionEnvironment, key);
+        (auctionWon, accruedGasRebate, winningSearcherIndex) = _execute(dConfig, userOp, solverOps, executionEnvironment, key);
     }
 
     function _execute(
@@ -103,7 +103,7 @@ contract Atlas is Test, Factory {
         SolverOperation[] calldata solverOps,
         address executionEnvironment,
         EscrowKey memory key
-    ) internal returns (bool auctionWon, uint256 accruedGasRebate) {
+    ) internal returns (bool auctionWon, uint256 accruedGasRebate, uint256 winningSearcherIndex) {
         // Build the CallChainProof.  The penultimate hash will be used
         // to verify against the hash supplied by DAppControl
        
@@ -138,18 +138,17 @@ contract Atlas is Test, Factory {
             returnData = userReturnData;
         } 
 
-        for (; key.callIndex < key.callMax - 1;) {
+        for (; winningSearcherIndex < solverOps.length;) {
 
             // Only execute solver meta tx if userOpHash matches 
             if (!auctionWon && userOpHash == solverOps[key.callIndex-2].userOpHash) {
                 (auctionWon, key) = _solverExecutionIteration(
-                        dConfig, solverOps[key.callIndex-2], returnData, auctionWon, executionEnvironment, key
-                    );
+                    dConfig, solverOps[key.callIndex-2], returnData, auctionWon, executionEnvironment, key
+                );
+                if (auctionWon) break;
             }
 
-            unchecked {
-                ++key.callIndex;
-            }
+            unchecked { ++winningSearcherIndex; }
         }
 
         // If no solver was successful, manually transition the lock
@@ -168,7 +167,7 @@ contract Atlas is Test, Factory {
                 if (key.isSimulation) { revert PostOpsSimFail(); } else { revert("ERR-E005 PostOpsFail"); }
             }
         }
-        return (auctionWon, uint256(key.gasRefund));
+        return (auctionWon, uint256(key.gasRefund), winningSearcherIndex);
     }
 
     function _solverExecutionIteration(
@@ -180,6 +179,10 @@ contract Atlas is Test, Factory {
         EscrowKey memory key
     ) internal returns (bool, EscrowKey memory) {
         (auctionWon, key) = _executeSolverOperation(solverOp, dAppReturnData, executionEnvironment, key);
+        unchecked {
+                ++key.callIndex;
+            }
+
         if (auctionWon) {
             _allocateValue(dConfig, solverOp.bidAmount, dAppReturnData, executionEnvironment, key.pack());
             key = key.allocationComplete();

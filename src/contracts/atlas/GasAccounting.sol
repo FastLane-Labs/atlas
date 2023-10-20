@@ -8,204 +8,221 @@ import {SafetyLocks} from "../atlas/SafetyLocks.sol";
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
 
+
+import {EscrowBits} from "../libraries/EscrowBits.sol";
+
 import "forge-std/Test.sol";
 
 abstract contract GasAccounting is SafetyLocks {
     using SafeTransferLib for ERC20;
 
-    uint256 constant public BUNDLER_PREMIUM = 110; // the amount over cost that bundlers get paid
+    uint256 constant public BUNDLER_PREMIUM = 105; // the amount over cost that bundlers get paid
     uint256 constant public BUNDLER_BASE = 100;
 
-    uint256 constant private _ledgerLength = 6; // uint256(type(GasParty).max); // 6
-    Ledger[_ledgerLength] public ledgers;
-    AtlasLedger public atlasLedger;
+    mapping(address => EscrowAccountData) internal _escrowAccountData;
 
     GasDonation[] internal _donations;
     AccountingData internal _accData;
 
-    constructor(address _simulator) SafetyLocks(_simulator) {
-        for (uint256 i; i < _ledgerLength; i++) {
-            ledgers[i].ledgerStatus = LedgerStatus.Inactive; // init the storage vars
-        }
-    }
-
-    function _initialAccounting() internal {
-        // Note: assumes msg.sender == tx.origin
-        if (msg.value > 0) {
-            uint64 bundlerDeposit = uint64(msg.value / tx.gasprice);
-            ledgers[uint256(GasParty.Bundler)] = Ledger({
-                deposited: bundlerDeposit,
-                withdrawn: 0,
-                unfulfilled: 0,
-                ledgerStatus: LedgerStatus.Surplus
-            });
-
-            atlasLedger = AtlasLedger({
-                totalBorrowed: 0,
-                totalDeposited: 0,
-                totalRequested: 0,
-                totalFulfilled: 0
-            });
-
-        } else {
-            uint64 bundlerDeposit = uint64(msg.value / tx.gasprice);
-            atlasLedger = AtlasLedger({
-                totalBorrowed: 0,
-                totalDeposited: bundlerDeposit,
-                totalRequested: 0,
-                totalFulfilled: bundlerDeposit
-            });
-        }
-    }
+    constructor(address _simulator) SafetyLocks(_simulator) {}
 
     // NOTE: donations are simply deposits that have a different msg.sender than receiving party
     function _deposit(GasParty party, uint256 amt) internal returns (uint256 balanceOwed) {
 
-        uint64 depositAmount = uint64(amt / tx.gasprice);
+        int64 depositAmount = int64(uint64(amt / tx.gasprice));
         uint256 partyIndex = uint256(party);
 
         Ledger memory pLedger = ledgers[partyIndex];
-        AtlasLedger memory aLedger = atlasLedger;
+        require(pLedger.status != LedgerStatus.Finalized, "ERR-GA002, LedgerFinalized");
 
-        if (pLedger.unfulfilled != 0) {
-            if (pLedger.unfulfilled > depositAmount) {
-                pLedger.unfulfilled -= depositAmount;
-                aLedger.totalFulfilled += depositAmount;
-            
-            } else {
-                uint64 fulfilled = pLedger.unfulfilled;
-                depositAmount -= fulfilled;
+        if (pLedger.status == LedgerStatus.Unknown) pLedger.status = LedgerStatus.Active;
 
-                pLedger.deposited += depositAmount;
-                pLedger.unfulfilled = 0; // -= fulfilled;
-
-                aLedger.totalFulfilled += fulfilled;
-                aLedger.totalDeposited += depositAmount;
-            }
-
-        } else {
-            pLedger.deposited += depositAmount;
-            aLedger.totalDeposited += depositAmount;
-        }
-
-        pLedger.ledgerStatus = _getLedgerStatus(pLedger);
+        pLedger.balance += depositAmount;
+        
+        balanceOwed = pLedger.balance < 0 ? uint256(uint64(-1 * pLedger.balance)) : 0;
 
         ledgers[partyIndex] = pLedger;
-        atlasLedger = aLedger;
-
-        if (pLedger.withdrawn >= pLedger.deposited) { // if unfulfilled > 0, deposits must be <= withdraws
-            return (uint256(pLedger.unfulfilled) + uint256(pLedger.withdrawn)) - uint256(pLedger.deposited) * tx.gasprice;
-        } else {
-            return 0;
-        }
     }
 
 
     function _borrow(GasParty party, uint256 amt) internal {
 
-        uint64 amount = uint64(amt / tx.gasprice);
+        int64 borrowAmount = int64(uint64(amt / tx.gasprice));
         uint256 partyIndex = uint256(party);
 
         Ledger memory pLedger = ledgers[partyIndex];
-        pLedger.withdrawn += amount;
+        require(pLedger.status != LedgerStatus.Finalized, "ERR-GA003, LedgerFinalized");
+        if (pLedger.status == LedgerStatus.Unknown) pLedger.status = LedgerStatus.Active;
 
-        pLedger.ledgerStatus = _getLedgerStatus(pLedger);
-
+        pLedger.balance -= borrowAmount;
+        
         ledgers[partyIndex] = pLedger;
-        atlasLedger.totalBorrowed += amount;
     }
 
     function _requestFrom(GasParty donor, GasParty recipient, uint256 amt) internal {
 
-        AtlasLedger memory aLedger = atlasLedger;
+        int64 amount = int64(uint64(amt / tx.gasprice));
 
-        uint64 amount = uint64(amt / tx.gasprice);
         uint256 donorIndex = uint256(donor);
         uint256 recipientIndex = uint256(recipient);
 
         Ledger memory dLedger = ledgers[donorIndex];
         Ledger memory rLedger = ledgers[recipientIndex];
 
-        if (dLedger.deposited > dLedger.withdrawn) {
-            uint64 netBalance = dLedger.deposited - dLedger.withdrawn;
-            if (netBalance > amount) {
-                dLedger.withdrawn += amount;
-                rLedger.deposited += amount;
+        require(dLedger.status != LedgerStatus.Finalized, "ERR-GA004, LedgerFinalized");
+        if (dLedger.status == LedgerStatus.Unknown) dLedger.status = LedgerStatus.Active;
 
-                aLedger.totalRequested += amount;
-                aLedger.totalFulfilled += amount;
-            
-            } else {
-                dLedger.withdrawn = dLedger.deposited;
-                dLedger.unfulfilled += amount - netBalance;
-                rLedger.deposited += amount;
+        require(rLedger.status != LedgerStatus.Finalized, "ERR-GA005, LedgerFinalized");
+        if (rLedger.status == LedgerStatus.Unknown) rLedger.status = LedgerStatus.Active;
 
-                aLedger.totalRequested += amount;
-                aLedger.totalFulfilled += netBalance;
-            }
-
-        } else {
-            dLedger.unfulfilled += amount;
-            rLedger.deposited += amount;
-
-            aLedger.totalRequested += amount;
-        }
-
-        dLedger.ledgerStatus = _getLedgerStatus(dLedger);
-        rLedger.ledgerStatus = _getLedgerStatus(rLedger);
+        dLedger.contributed -= amount;
+        rLedger.requested += amount;
 
         ledgers[donorIndex] = dLedger;
         ledgers[recipientIndex] = rLedger;
-        atlasLedger = aLedger;
     }
 
-    function _depositDeficit(AtlasLedger memory aLedger, GasParty party, address partyAddress, uint256 deposit) internal returns (AtlasLedger memory, uint256 deficit) {
-        uint64 depositAmount = uint64(deposit / tx.gasprice);
-        uint256 partyIndex = uint256(party);
+    function _contributeTo(GasParty donor, GasParty recipient, uint256 amt) internal {
 
-        Ledger memory pLedger = ledgers[partyIndex];
+        int64 amount = int64(uint64(amt / tx.gasprice));
 
-        if (pLedger.unfulfilled != 0) {
-            if (pLedger.unfulfilled > depositAmount) {
-                pLedger.unfulfilled -= depositAmount;
-                aLedger.totalFulfilled += depositAmount;
-            
+        uint256 donorIndex = uint256(donor);
+        uint256 recipientIndex = uint256(recipient);
+
+        Ledger memory dLedger = ledgers[donorIndex];
+        Ledger memory rLedger = ledgers[recipientIndex];
+
+        require(dLedger.status != LedgerStatus.Finalized, "ERR-GA006, LedgerFinalized");
+        if (dLedger.status == LedgerStatus.Unknown) dLedger.status = LedgerStatus.Active;
+
+        require(rLedger.status != LedgerStatus.Finalized, "ERR-GA007, LedgerFinalized");
+        if (rLedger.status == LedgerStatus.Unknown) rLedger.status = LedgerStatus.Active;
+
+        dLedger.contributed += amount;
+        rLedger.requested -= amount;
+
+        ledgers[donorIndex] = dLedger;
+        ledgers[recipientIndex] = rLedger;
+    }
+
+    function validateBalances() external view returns (bool valid) {
+        valid = ledgers[uint256(GasParty.Solver)].status == LedgerStatus.Finalized && _isInSurplus(msg.sender);
+    }
+
+    function _isInSurplus(address environment) internal view returns (bool) {
+        Lock memory mLock = lock;
+        if (mLock.activeEnvironment != environment) return false;
+
+        int64 atlasBalanceDelta = int64(mLock.startingBalance) - int64(uint64(address(this).balance / tx.gasprice));
+
+        int64 balanceDelta;
+        int64 totalRequests;
+        int64 totalContributions;
+
+        uint256 activeParties = uint256(mLock.activeParties);
+        Ledger memory pLedger;
+        for (uint256 i; i < _ledgerLength;) {
+            // If party has not been touched, skip it
+            if (activeParties & 1<<i == 0) continue;
+
+            pLedger = ledgers[i];
+
+            balanceDelta += pLedger.balance;
+            totalRequests += pLedger.requested;
+            totalContributions += pLedger.contributed;
+
+            unchecked{++i;}
+        }
+
+        // If atlas balance is lower than expected, return false
+        if (atlasBalanceDelta < balanceDelta) return false;
+
+        // If the requests have not yet been met, return false
+        if (totalRequests > totalContributions) return false;
+
+        // Otherwise return true
+        return true;
+    }
+
+    function _balance(uint256 accruedGasRebate, address user, address dapp, address winningSolver) internal {
+        Lock memory mLock = lock;
+
+        int64 totalRequests;
+        int64 totalContributions;
+
+        uint256 activeParties = uint256(mLock.activeParties);
+
+        Ledger[] memory mLedgers = new Ledger[](_ledgerLength);
+        Ledger memory pLedger;
+        for (uint256 i; i < _ledgerLength;) {
+            // If party has not been touched, skip it
+            if (activeParties & 1<<i == 0) continue;
+
+            pLedger = ledgers[i];
+
+            totalRequests += pLedger.requested;
+            totalContributions += pLedger.contributed;
+
+            mLedgers[i] = pLedger;
+
+            ledgers[i] = Ledger({
+                balance: 0,
+                contributed: 0,
+                requested: 0,
+                status: LedgerStatus.Inactive
+            });
+
+            unchecked{++i;}
+        }
+
+        int64 gasRemainder = int64(uint64(gasleft() + accruedGasRebate + 20_000));
+
+        // Reduce the bundler's gas request by the unused gas
+        mLedgers[uint256(GasParty.Bundler)].requested += gasRemainder;
+        totalRequests += gasRemainder;
+
+        int64 surplus = totalRequests + totalContributions;
+        require(surplus > 0, "ERR-GA014, MissingFunds");
+
+        for (uint256 i; i < _ledgerLength;) {
+            // If party has not been touched, skip it
+            if (activeParties & 1<<i == 0) continue;
+
+            address partyAddress = _partyAddress(i, user, dapp, winningSolver);
+
+            pLedger = mLedgers[i];
+
+            EscrowAccountData memory escrowData = _escrowAccountData[partyAddress];
+
+            int64 partyBalanceDelta = pLedger.balance + pLedger.contributed - pLedger.requested; 
+            if (partyBalanceDelta < 0) {
+                escrowData.balance -= (uint128(uint64(partyBalanceDelta * -1)) * uint128(tx.gasprice));
             } else {
-                uint64 fulfilled = pLedger.unfulfilled;
-                depositAmount -= fulfilled;
-
-                pLedger.deposited += depositAmount;
-                pLedger.unfulfilled = 0; // -= fulfilled;
-
-                aLedger.totalFulfilled += fulfilled;
-                aLedger.totalDeposited += depositAmount;
+                escrowData.balance += (uint128(uint64(partyBalanceDelta)) * uint128(tx.gasprice));
             }
 
-        } else {
-            pLedger.deposited += depositAmount;
-            aLedger.totalDeposited += depositAmount;
+            if (i == uint256(GasParty.Solver)) {
+                ++escrowData.nonce;
+            }
+
+            escrowData.lastAccessed = uint64(block.number);
+
+            _escrowAccountData[partyAddress] = escrowData;
+
+            unchecked{++i;}
         }
+    }
 
-        if (pLedger.withdrawn + pLedger.unfulfilled > pLedger.deposited) { // if unfulfilled > 0, deposits must be <= withdraws
-            deficit = ((uint256(pLedger.unfulfilled) + uint256(pLedger.withdrawn)) - uint256(pLedger.deposited)) * tx.gasprice;
+    // TODO: Unroll this - just doing it for now to improve readability
+    function _partyAddress(uint256 index, address user, address dapp, address winningSolver) internal view returns (address) {
+        GasParty party = GasParty(index);
+        if (party == GasParty.DApp) return dapp;
+        if (party == GasParty.User) return user;
+        if (party == GasParty.Solver) return winningSolver;
+        if (party == GasParty.Bundler) return tx.origin; // <3
+        if (party == GasParty.Builder) return block.coinbase;
+        return address(this);
         
-        } else if (pLedger.deposited > pLedger.withdrawn + pLedger.unfulfilled) {
-            deficit = 0;
-            uint64 surplus = (pLedger.deposited - pLedger.unfulfilled) + pLedger.withdrawn;
-
-            pLedger.deposited -= surplus;
-            aLedger.totalDeposited -= surplus;
-
-            SafeTransferLib.safeTransferETH(partyAddress, uint256(surplus) * tx.gasprice);
-        
-        } else {
-            deficit = 0;
-        }
-
-        pLedger.ledgerStatus = _getLedgerStatus(pLedger);
-        ledgers[partyIndex] = pLedger;
-
-        return (aLedger, deficit);
     }
 
     function _validParty(address environment, GasParty party) internal returns (bool valid) {
@@ -219,7 +236,7 @@ abstract contract GasAccounting is SafetyLocks {
 
         if (activeParties & parties != parties) {
             activeParties |= parties;
-            lock.activeParties = uint64(activeParties);
+            lock.activeParties = uint16(activeParties);
         }
         return true;
     }
@@ -235,200 +252,56 @@ abstract contract GasAccounting is SafetyLocks {
 
         if (activeParties & parties != parties) {
             activeParties |= parties;
-            lock.activeParties = uint64(activeParties);
+            lock.activeParties = uint16(activeParties);
         }
         return true;
     }
 
-    function _getLedgerStatus(Ledger memory pLedger) internal pure returns (LedgerStatus status) {
-        uint256 deposited = uint256(pLedger.deposited);
-        uint256 debts = uint256(pLedger.withdrawn) + uint256(pLedger.unfulfilled);
-        if (deposited > debts) {
-            status = LedgerStatus.Surplus;
-        } else if (deposited < debts) {
-            status = LedgerStatus.Deficit;
-        } else {
-            status = LedgerStatus.Balanced;
-        }
-    }
-
-    // TODO: The balance checks on escrow that verify that the solver
-    // paid back any msg.value that they borrowed are currently not set up 
-    // to handle gas donations to the bundler from the solver.
-    // THIS IS EXPLOITABLE - DO NOT USE THIS CONTRACT IN PRODUCTION
-    // This attack vector will be addressed explicitly once the gas 
-    // reimbursement mechanism is finalized.
-    function donateToBundler(address surplusRecipient) external payable {
-        // NOTE: All donations in excess of 10% greater than cost are forwarded
-        // to the surplusReceiver. 
-
-        // TODO: Consider making this a higher donation threshold to avoid ddos attacks
-        if (msg.value == 0) {
-            return;
+    function reconcile(address environment, address searcherFrom, uint256 maxApprovedGasSpend) external payable returns (bool) {
+        // NOTE: approvedAmount is the amount of the solver's atlETH that the solver is allowing
+        // to be used to cover what they owe.  This will be subtracted later - tx will revert here if there isn't enough. 
+        if (!_validParty(environment, GasParty.Solver)) {
+            return false;
         }
 
-        uint32 gasRebate;
+        uint256 partyIndex = uint256(GasParty.Solver);
 
-        uint256 debt = _accData.ethBorrowed[surplusRecipient];
-        if (debt > 0) {
-            if (debt > msg.value) {
-                _accData.ethBorrowed[surplusRecipient] = debt - msg.value;
-                return;
-            } 
-            
-            if (debt == msg.value) {
-                _accData.ethBorrowed[surplusRecipient] = 0;
-                return;  
+        Ledger memory pLedger = ledgers[partyIndex];
+        if (pLedger.status == LedgerStatus.Finalized) {
+            return false;
+        }
+
+        if (pLedger.status == LedgerStatus.Unknown) pLedger.status = LedgerStatus.Active;
+
+        if (msg.value != 0) {
+            int64 amount = int64(uint64((msg.value) / tx.gasprice));
+            pLedger.balance += amount;
+        }
+
+        if (maxApprovedGasSpend != 0) {
+            uint256 solverSurplusBalance = uint256(_escrowAccountData[searcherFrom].balance) - (EscrowBits.SOLVER_GAS_LIMIT * tx.gasprice + 1);
+            maxApprovedGasSpend = maxApprovedGasSpend > solverSurplusBalance ? solverSurplusBalance : maxApprovedGasSpend;
+        
+
+            int64 gasAllowance = int64(uint64(maxApprovedGasSpend / tx.gasprice));
+
+            if (pLedger.balance < 0) {
+                if (gasAllowance < pLedger.balance) {
+                    return false;
+                }
+                gasAllowance += pLedger.balance; // note that .balance is a negative number so this is a subtraction
             }
-            
-            gasRebate = uint32((msg.value - debt) / tx.gasprice);
-            
 
-        } else {
-            gasRebate = uint32(msg.value / tx.gasprice);
+            pLedger.contributed += gasAllowance; // note that surplus .contributed is refunded to the party
+            pLedger.balance -= gasAllowance;
+        }
+
+        if (pLedger.contributed < 0) {
+            return false;
         }
         
-        console.log("donateToBundler: tx.gasprice:", tx.gasprice);
-        console.log("donateToBundler: gasRebate:", gasRebate);
-
-        uint256 donationCount = _donations.length;
-
-        if (donationCount == 0) {
-            _donations.push(GasDonation({
-                recipient: surplusRecipient,
-                net: gasRebate,
-                cumulative: gasRebate
-            }));
-            return;
-        }
-
-        GasDonation memory donation = _donations[donationCount-1];
-
-        // If the recipient is the same as the last one, just 
-        // increment the values and reuse the slot 
-        if (donation.recipient == surplusRecipient) {
-            donation.net += gasRebate;
-            donation.cumulative += gasRebate;
-            _donations[donationCount-1] = donation;
-            return;
-        }
-
-        // If it's a new recipient, update and push to the storage array
-        donation.recipient = surplusRecipient;
-        donation.net = gasRebate;
-        donation.cumulative = gasRebate;
-        _donations.push(donation);
-    }
-
-    function cumulativeDonations() external view returns (uint256) {
-        uint256 donationCount = _donations.length;
-
-        if (donationCount == 0) {
-            return 0;
-        }
-
-        uint32 gasRebate = _donations[donationCount-1].cumulative;
-        return uint256(gasRebate) * tx.gasprice;
-
-    }
-
-    function _executeGasRefund(uint256 gasMarker, uint256 accruedGasRebate, address user) internal {
-        // TODO: Consider tipping validator / builder here to incentivize a non-adversarial environment?
-        
-        GasDonation[] memory donations = _donations;
-        
-        delete _donations;
-
-        uint256 gasFeesSpent = ((gasMarker + 41_000 - gasleft()) * tx.gasprice * BUNDLER_PREMIUM) / BUNDLER_BASE;
-        uint256 gasFeesCredit = accruedGasRebate * tx.gasprice;
-        uint256 returnFactor = 0; // Out of 100
-
-        // CASE: gasFeesCredit fully covers what's been spent.
-        // NOTE: Should be impossible to reach
-        if (gasFeesCredit > gasFeesSpent) {
-            SafeTransferLib.safeTransferETH(msg.sender, gasFeesSpent);
-            SafeTransferLib.safeTransferETH(user, gasFeesCredit - gasFeesSpent);
-            
-            returnFactor = 100;
-
-        // CASE: There are no donations, so just refund the solver credits
-        } else if (donations.length == 0) {
-            SafeTransferLib.safeTransferETH(msg.sender, gasFeesCredit);
-            return;
-
-        // CASE: There are no donations, so just refund the solver credits and return
-        } else if (donations[donations.length-1].cumulative == 0) {
-            SafeTransferLib.safeTransferETH(msg.sender, gasFeesCredit);
-            return;
-
-        // CASE: The donations exceed the liability
-        } else if (donations[donations.length-1].cumulative * tx.gasprice > gasFeesSpent - gasFeesCredit) {
-            SafeTransferLib.safeTransferETH(msg.sender, gasFeesSpent);
-
-            uint256 totalDonations = donations[donations.length-1].cumulative * tx.gasprice;
-            uint256 excessDonations = totalDonations - (gasFeesSpent - gasFeesCredit);
-
-            returnFactor = (100 * excessDonations) / (totalDonations + 1);
-
-        // CASE: The bundler receives all of the donations
-        } else {
-            SafeTransferLib.safeTransferETH(msg.sender, gasFeesCredit);
-            return;
-        }
-
-        // Return any surplus donations
-        // TODO: de-dust it
-        if (returnFactor > 0) {
-            uint256 i;
-            uint256 surplus;
-            address recipient;
-
-            for (;i<donations.length;) {
-                
-                surplus = (donations[i].net * tx.gasprice * returnFactor) / 100;
-                recipient = donations[i].recipient == address(0) ? user : donations[i].recipient;
-
-                SafeTransferLib.safeTransferETH(recipient, surplus);
-
-                unchecked{++i;}
-            }
-        }
-    }
-
-    function repayBorrowedEth(address borrower) external payable {
-        uint256 debt = _accData.ethBorrowed[borrower];
-        require(debt > 0, "ERR-E081 NoDebtToRepay");
-        _accData.ethBorrowed[borrower] = debt - msg.value;
-    }
-
-    function getAmountOwed(address borrower) external payable returns (uint256 amountOwed) {
-        // Any msg.value will go towards the debt. 
-        amountOwed = _accData.ethBorrowed[borrower];
-
-        if (amountOwed == 0) {
-            if (msg.value > 0) {
-                SafeTransferLib.safeTransferETH(msg.sender, msg.value);
-            }
-            return 0;
-        }
-
-        if (msg.value > 0) {
-            if (msg.value > amountOwed) {
-                _accData.ethBorrowed[borrower] = 0;
-                SafeTransferLib.safeTransferETH(msg.sender, msg.value - amountOwed);
-                return 0;
-            }
-
-            if (msg.value == amountOwed) {
-                _accData.ethBorrowed[borrower] = 0;
-                return 0;
-            }
-
-            amountOwed -= msg.value;
-            _accData.ethBorrowed[borrower] = amountOwed;
-            return amountOwed;
-        }
-
-        return amountOwed;
+        pLedger.status = LedgerStatus.Finalized; // no additional requests can be made to this party
+        ledgers[partyIndex] = pLedger;
+        return true;
     }
 }
