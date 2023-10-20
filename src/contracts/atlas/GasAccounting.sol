@@ -123,7 +123,10 @@ abstract contract GasAccounting is SafetyLocks {
         Ledger memory pLedger;
         for (uint256 i; i < _ledgerLength;) {
             // If party has not been touched, skip it
-            if (activeParties & 1<<i == 0) continue;
+            if (activeParties & 1<<i == 0){
+                unchecked{++i;}
+                continue;
+            }
 
             pLedger = ledgers[i];
 
