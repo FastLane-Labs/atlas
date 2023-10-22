@@ -10,19 +10,19 @@ import "../types/LockTypes.sol";
 
 
 import {EscrowBits} from "../libraries/EscrowBits.sol";
+import {GasPartyMath} from "../libraries/GasParties.sol";
 
 import "forge-std/Test.sol";
 
 abstract contract GasAccounting is SafetyLocks {
     using SafeTransferLib for ERC20;
+    using GasPartyMath for GasParty;
+    using GasPartyMath for uint256;
 
     uint256 constant public BUNDLER_PREMIUM = 105; // the amount over cost that bundlers get paid
     uint256 constant public BUNDLER_BASE = 100;
 
     mapping(address => EscrowAccountData) internal _escrowAccountData;
-
-    GasDonation[] internal _donations;
-    AccountingData internal _accData;
 
     constructor(address _simulator) SafetyLocks(_simulator) {}
 
@@ -47,7 +47,7 @@ abstract contract GasAccounting is SafetyLocks {
 
     function _borrow(GasParty party, uint256 amt) internal {
 
-        int64 borrowAmount = int64(uint64(amt / tx.gasprice));
+        int64 borrowAmount = int64(uint64(amt / tx.gasprice))+1;
         uint256 partyIndex = uint256(party);
 
         Ledger memory pLedger = ledgers[partyIndex];
@@ -57,6 +57,62 @@ abstract contract GasAccounting is SafetyLocks {
         pLedger.balance -= borrowAmount;
         
         ledgers[partyIndex] = pLedger;
+    }
+
+    function _use(GasParty party, address partyAddress, uint256 amt) internal {
+        
+        int64 amount = int64(uint64(amt / tx.gasprice))+1;
+        uint256 partyIndex = uint256(party);
+
+        Ledger memory pLedger = ledgers[partyIndex];
+
+        require(pLedger.status != LedgerStatus.Finalized, "ERR-GA003, LedgerFinalized");
+        if (pLedger.status == LedgerStatus.Unknown) pLedger.status = LedgerStatus.Active;
+        
+        if (pLedger.requested > 0) {
+            if (amount > pLedger.requested) {
+                amount -= pLedger.requested;
+                pLedger.requested = 0;
+            } else {
+                pLedger.requested -= amount;
+                ledgers[partyIndex] = pLedger;
+                return;
+            }
+        }
+
+        if (pLedger.contributed > 0) {
+            if (amount > pLedger.contributed) {
+                amount -= pLedger.contributed;
+                pLedger.contributed = 0;
+            } else {
+                pLedger.contributed -= amount;
+                ledgers[partyIndex] = pLedger;
+                return;
+            }
+        }
+
+        // Avoid the storage read for as long as possible
+        if (pLedger.balance > 0) {
+            if (amount > pLedger.balance) {
+                amount -= pLedger.balance;
+                pLedger.balance = 0;
+            } else {
+                pLedger.balance -= amount;
+                ledgers[partyIndex] = pLedger;
+                return;
+            }
+        }
+
+        amt = uint256(uint64(amount+1)) * tx.gasprice;
+        uint256 balance = uint256(_escrowAccountData[partyAddress].balance);
+
+        if (balance > amt) {
+            pLedger.balance -= amount;
+            ledgers[partyIndex] = pLedger;
+            return;
+        }
+
+        revert("ERR-GA022 InsufficientFunds");
     }
 
     function _requestFrom(GasParty donor, GasParty recipient, uint256 amt) internal {
@@ -123,7 +179,7 @@ abstract contract GasAccounting is SafetyLocks {
         Ledger memory pLedger;
         for (uint256 i; i < _ledgerLength;) {
             // If party has not been touched, skip it
-            if (activeParties & 1<<i == 0){
+            if (activeParties & 1<<(i+1) == 0){
                 unchecked{++i;}
                 continue;
             }
@@ -147,7 +203,7 @@ abstract contract GasAccounting is SafetyLocks {
         return true;
     }
 
-    function _balance(uint256 accruedGasRebate, address user, address dapp, address winningSolver) internal {
+    function _balance(uint256 accruedGasRebate, address user, address dapp, address winningSolver, address bundler) internal {
         Lock memory mLock = lock;
 
         int64 totalRequests;
@@ -159,12 +215,16 @@ abstract contract GasAccounting is SafetyLocks {
         Ledger memory pLedger;
         for (uint256 i; i < _ledgerLength;) {
             // If party has not been touched, skip it
-            if (activeParties & 1<<i == 0){
+            if (activeParties.isInactive(i)) {
                 unchecked{++i;}
                 continue;
             }
 
             pLedger = ledgers[i];
+
+            if (i == uint256(GasParty.Bundler)) {
+                pLedger.balance += int64(uint64(accruedGasRebate));
+            }
 
             totalRequests += pLedger.requested;
             totalContributions += pLedger.contributed;
@@ -190,22 +250,74 @@ abstract contract GasAccounting is SafetyLocks {
         int64 surplus = totalRequests + totalContributions;
         require(surplus > 0, "ERR-GA014, MissingFunds");
 
+        
+        console.log("");
+        console.log("--");
+        console.log("gasRebate  :", accruedGasRebate);
+        _logInt64("surplus      :", surplus);
+        _logInt64("gasRemainder :", gasRemainder);
+        _logInt64("totalRequests:", totalRequests);
+        _logInt64("contributions:", totalContributions);
+        console.log("--");
+        console.log("balances");
+        
+        
         for (uint256 i; i < _ledgerLength;) {
             // If party has not been touched, skip it
-            if (activeParties & 1<<i == 0) {
+            if (activeParties.isInactive(i)) {
                 unchecked{++i;}
                 continue;
             }
-
-            address partyAddress = _partyAddress(i, user, dapp, winningSolver);
+    
+            address partyAddress = _partyAddress(i, user, dapp, winningSolver, bundler);
 
             pLedger = mLedgers[i];
 
             EscrowAccountData memory escrowData = _escrowAccountData[partyAddress];
 
-            int64 partyBalanceDelta = pLedger.balance + pLedger.contributed - pLedger.requested; 
+            
+            console.log("");
+            console.log("Party:", _partyName(i));
+            console.log("-");
+            _logInt64("netBalance  :", pLedger.balance);
+            _logInt64("requested   :", pLedger.requested);
+            _logInt64("contributed :", pLedger.contributed);
+            
+
+            // CASE: Some Requests still in Deficit
+            if (totalRequests < 0 && pLedger.contributed > 0) {
+                if (totalRequests + pLedger.contributed > 0) {
+                    pLedger.contributed += totalRequests; // a subtraction since totalRequests is negative
+                    totalRequests = 0;
+                } else {
+                    totalRequests += pLedger.contributed;
+                    pLedger.contributed = 0;
+                }
+            }
+
+            // CASE: Some Contributions still in Deficit (means surplus in Requests)
+            if (totalContributions < 0 && pLedger.requested > 0) {
+                if (pLedger.requested > totalContributions) {
+                    pLedger.requested -= totalContributions;
+                    totalContributions = 0;
+                } else {
+                    totalContributions -= pLedger.requested;
+                    pLedger.requested = 0;
+                }
+            }
+
+
+            int64 partyBalanceDelta = pLedger.balance + pLedger.contributed - pLedger.requested;
+
+            
+            _logInt64("pDelta      :", partyBalanceDelta);
+            console.log("-");
+            console.log("Starting Bal:", escrowData.balance);
+            
+
             if (partyBalanceDelta < 0) {
                 escrowData.balance -= (uint128(uint64(partyBalanceDelta * -1)) * uint128(tx.gasprice));
+            
             } else {
                 escrowData.balance += (uint128(uint64(partyBalanceDelta)) * uint128(tx.gasprice));
             }
@@ -215,24 +327,45 @@ abstract contract GasAccounting is SafetyLocks {
             }
 
             escrowData.lastAccessed = uint64(block.number);
-
             _escrowAccountData[partyAddress] = escrowData;
+
+            
+            console.log("Ending Bal  :", escrowData.balance);
+            console.log("-");
+            
 
             unchecked{++i;}
         }
     }
 
     // TODO: Unroll this - just doing it for now to improve readability
-    function _partyAddress(uint256 index, address user, address dapp, address winningSolver) internal view returns (address) {
+    function _partyAddress(uint256 index, address user, address dapp, address winningSolver, address bundler) internal view returns (address) {
         GasParty party = GasParty(index);
         if (party == GasParty.DApp) return dapp;
         if (party == GasParty.User) return user;
         if (party == GasParty.Solver) return winningSolver;
-        if (party == GasParty.Bundler) return tx.origin; // <3
+        if (party == GasParty.Bundler) return bundler; // <3
         if (party == GasParty.Builder) return block.coinbase;
         return address(this);
-        
     }
+
+    
+    // for testing purposes
+    function _partyName(uint256 index) internal pure returns (string memory) {
+        GasParty party = GasParty(index);
+        if (party == GasParty.DApp) return "dApp";
+        if (party == GasParty.User) return "user";
+        if (party == GasParty.Solver) return "solver";
+        if (party == GasParty.Bundler) return "bundler"; 
+        if (party == GasParty.Builder) return "builder";
+        return "unknown";
+    }
+
+    function _logInt64(string memory pretext, int64 i) internal view {
+        if (i < 0) console.log(string.concat(pretext, " -"), uint64(-1 * i));
+        else console.log(string.concat(pretext, " +"), uint64(i));
+    }
+    
 
     function _validParty(address environment, GasParty party) internal returns (bool valid) {
         Lock memory mLock = lock;
@@ -240,11 +373,10 @@ abstract contract GasAccounting is SafetyLocks {
             return false;
         }
 
-        uint256 parties = 1 << uint256(party);
         uint256 activeParties = uint256(mLock.activeParties);
 
-        if (activeParties & parties != parties) {
-            activeParties |= parties;
+        if (activeParties.isInactive(party)) {
+            activeParties = activeParties.markActive(party);
             lock.activeParties = uint16(activeParties);
         }
         return true;
@@ -256,7 +388,7 @@ abstract contract GasAccounting is SafetyLocks {
             return false;
         }
 
-        uint256 parties = 1 << uint256(partyOne) | 1 << uint256(partyTwo);
+        uint256 parties = partyOne.toBit() | partyTwo.toBit();
         uint256 activeParties = uint256(mLock.activeParties);
 
         if (activeParties & parties != parties) {
@@ -264,6 +396,18 @@ abstract contract GasAccounting is SafetyLocks {
             lock.activeParties = uint16(activeParties);
         }
         return true;
+    }
+
+    function contribute(GasParty party) external payable {
+        require(_validParty(msg.sender, party), "ERR-GA020 InvalidEnvironment"); 
+        int64 amount = int64(uint64((msg.value) / tx.gasprice));
+        ledgers[uint256(party)].contributed += amount;
+    }
+
+    function deposit(GasParty party) external payable {
+        require(_validParty(msg.sender, party), "ERR-GA020 InvalidEnvironment"); 
+        int64 amount = int64(uint64((msg.value) / tx.gasprice));
+        ledgers[uint256(party)].balance += amount;
     }
 
     function reconcile(address environment, address searcherFrom, uint256 maxApprovedGasSpend) external payable returns (bool) {

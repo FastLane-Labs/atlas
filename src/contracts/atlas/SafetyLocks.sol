@@ -3,6 +3,7 @@ pragma solidity ^0.8.16;
 
 import {SafetyBits} from "../libraries/SafetyBits.sol";
 import {CallBits} from "../libraries/CallBits.sol";
+import {GasPartyMath} from "../libraries/GasParties.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
@@ -11,24 +12,22 @@ import "../types/EscrowTypes.sol";
 
 import "../types/LockTypes.sol";
 
+import "forge-std/Test.sol";
+
 contract SafetyLocks {
     using SafetyBits for EscrowKey;
     using CallBits for uint32;
+    using GasPartyMath for GasParty;
+    using GasPartyMath for uint256;
 
     address public immutable atlas;
     address public immutable simulator;
 
     address internal constant UNLOCKED = address(1);
-
-    struct Lock {
-        address activeEnvironment;
-        uint16 activeParties; // bitmap
-        uint64 startingBalance;
-    }
     
     Lock public lock;
 
-    uint256 constant internal _ledgerLength = 6; // uint256(type(GasParty).max); // 6
+    uint256 constant internal _ledgerLength = 5; // uint256(type(GasParty).max); // 6
     Ledger[_ledgerLength] public ledgers;
 
     constructor(address _simulator) {
@@ -46,22 +45,15 @@ contract SafetyLocks {
         }
     }
 
-    // TODO can we remove this? solver value repayment handled in Escrow.sol now
-    function solverSafetyCallback(address msgSender) external payable returns (bool isSafe) {
-        // An external call so that solver contracts can verify
-        // that delegatecall isn't being abused.
-
-        isSafe = msgSender == lock.activeEnvironment;
-    }
-
     function _initializeEscrowLock(UserOperation calldata userOp, address executionEnvironment, uint256 gasLimit) onlyWhenUnlocked internal {
 
-        uint256 activeParties = 1 << uint256(GasParty.Solver);
+        uint256 activeParties;
+        activeParties = activeParties.markActive(GasParty.Bundler);
+        activeParties = activeParties.markActive(GasParty.Solver);
 
         int64 iGasLimit = int64(uint64(gasLimit));
 
         if (msg.value != 0) {
-            activeParties |= 1 << uint256(GasParty.Bundler);
             int64 bundlerDeposit = int64(uint64(msg.value / tx.gasprice));
             ledgers[uint256(GasParty.Bundler)] = Ledger({
                 balance: 0,
@@ -79,7 +71,7 @@ contract SafetyLocks {
         }
 
         if (userOp.value != 0) {
-            activeParties |= 1 << uint256(GasParty.User);
+            activeParties = activeParties.markActive(GasParty.User);
             int64 userRequest = int64(uint64(userOp.value / tx.gasprice));
             ledgers[uint256(GasParty.Bundler)] = Ledger({
                 balance: 0,
@@ -92,7 +84,7 @@ contract SafetyLocks {
         lock = Lock({
             activeEnvironment: executionEnvironment,
             activeParties: uint16(activeParties),
-            startingBalance: uint64(address(this).balance / tx.gasprice)
+            startingBalance: uint64((address(this).balance - msg.value) / tx.gasprice)
         });
     }
 

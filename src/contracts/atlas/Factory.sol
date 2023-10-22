@@ -168,7 +168,6 @@ contract Factory is Escrow {
                     shl(96, user)
                 )
             )    
-            // add(shl(96, user), 0x73ffffffffffffffffffffff))
             
             mstore(
                 add(creationCode, 139),
@@ -179,7 +178,6 @@ contract Factory is Escrow {
                     ),
                     add(shl(96, controller), add(shl(88, 0x63), shl(56, callConfig)))
                 )
-                //add(shl(96, controller), add(add(shl(88, 0x63), shl(56, callConfig)), 0x7f000000000000))
             )
 
             mstore(add(creationCode, 165), controlCodeHash)

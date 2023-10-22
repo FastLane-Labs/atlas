@@ -62,7 +62,8 @@ contract Atlas is Test, Factory {
                 accruedGasRebate: accruedGasRebate,
                 user: userOp.from,
                 dapp: userOp.control,
-                winningSolver: solverOps[winningSolverIndex].from
+                winningSolver: solverOps[winningSolverIndex].from,
+                bundler: msg.sender
             });
 
         } catch (bytes memory revertData) {

@@ -19,13 +19,14 @@ struct GasDonation {
     uint32 cumulative;
 }
 
+// NOTE: The order is very important here for balance reconciliation. 
+// We _MUST_ net the balances in order from LastLook to FirstLook
 enum GasParty {
-    DApp,
-    User,
-    Solver,
-    Bundler, // tx.origin
     Builder, // block.coinbase
-    Other
+    Bundler, // tx.origin
+    Solver,
+    User,
+    DApp
 }
 
 enum LedgerStatus {

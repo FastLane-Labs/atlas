@@ -56,8 +56,13 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
     {
         userData = abi.encodeWithSelector(IExecutionEnvironment.userWrapper.selector, userOp);
         userData = abi.encodePacked(userData, lockBytes);
-        // TODO: Handle msg.value quirks
-        (success, userData) = environment.call(userData);
+
+        if (userOp.value > 0) {
+            _use(GasParty.User, userOp.from, userOp.value);
+            (success, userData) = environment.call{value: userOp.value}(userData);
+        } else {
+            (success, userData) = environment.call(userData);
+        }
         // require(success, "ERR-E002 UserFail");
         if (success) {
             userData = abi.decode(userData, (bytes));
@@ -72,6 +77,9 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
     ) internal returns (bool auctionWon, EscrowKey memory) {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
+
+        console.log("");
+        console.log("solver",solverOp.from);
 
         // Verify the transaction.
         (uint256 result, uint256 gasLimit, EscrowAccountData memory solverEscrow) =
@@ -103,6 +111,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
 
             // Update the solver's escrow balances and the accumulated refund
             if (result.updateEscrow()) {
+                console.log("updating escrow");
                 key.gasRefund += uint32(_update(solverOp, solverEscrow, gasWaterMark, result));
             }
 

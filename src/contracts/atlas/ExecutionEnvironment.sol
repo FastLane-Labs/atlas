@@ -13,6 +13,7 @@ import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
 import {ExecutionPhase} from "../types/LockTypes.sol";
+import {GasParty} from "../types/EscrowTypes.sol";
 
 import {Base} from "../common/ExecutionBase.sol";
 
@@ -41,6 +42,23 @@ contract ExecutionEnvironment is Base {
         _;
     }
 
+    modifier validControlHash() {
+        if (_control().codehash != _controlCodeHash()) {
+            revert("ERR-EV008 InvalidCodeHash");
+        }
+        _;
+    }
+
+    modifier contributeSurplus(GasParty party) {
+        _;
+        {
+        uint256 balance = address(this).balance;
+        if (balance > 0) {
+            IEscrow(atlas).contribute{value: balance}(party);
+        }
+        }
+    }
+
     modifier validSolver(SolverOperation calldata solverOp) {
         address solverTo = solverOp.solver;
         if (solverTo == address(this) || solverTo == _control() || solverTo == atlas) {
@@ -60,6 +78,7 @@ contract ExecutionEnvironment is Base {
         external
         validUser(userOp)
         onlyAtlasEnvironment(ExecutionPhase.PreOps, _ENVIRONMENT_DEPTH)
+        contributeSurplus(GasParty.DApp)
         returns (bytes memory)
     {
         // msg.sender = atlas
@@ -85,11 +104,13 @@ contract ExecutionEnvironment is Base {
         payable
         validUser(userOp)
         onlyAtlasEnvironment(ExecutionPhase.UserOperation, _ENVIRONMENT_DEPTH)
+        contributeSurplus(GasParty.User)
+        validControlHash
         returns (bytes memory userData) 
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
-      
+
         uint32 config = _config();
 
         require(address(this).balance >= userOp.value, "ERR-CE01 ValueExceedsBalance");
@@ -116,6 +137,7 @@ contract ExecutionEnvironment is Base {
     function postOpsWrapper(bytes calldata returnData) 
         external
         onlyAtlasEnvironment(ExecutionPhase.PostOps, _ENVIRONMENT_DEPTH)
+        contributeSurplus(GasParty.DApp)
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
@@ -137,6 +159,7 @@ contract ExecutionEnvironment is Base {
     ) 
         external payable 
         onlyAtlasEnvironment(ExecutionPhase.SolverOperations, _ENVIRONMENT_DEPTH)
+        // No donate surplus here - donate after value xfer
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
@@ -247,6 +270,7 @@ contract ExecutionEnvironment is Base {
     function allocateValue(address bidToken, uint256 bidAmount, bytes memory returnData) 
         external 
         onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _ENVIRONMENT_DEPTH)
+        contributeSurplus(GasParty.Solver)
     {
         // msg.sender = escrow
         // address(this) = ExecutionEnvironment

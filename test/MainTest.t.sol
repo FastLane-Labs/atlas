@@ -57,7 +57,7 @@ contract MainTest is BaseTest {
         // First SolverOperation
         solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_ONE);
         solverOps[1] =
-            helper.buildSolverOperation(userOp, solverOpData, solverOneEOA, address(solverOne), 2e17);
+            helper.buildSolverOperation(userOp, solverOpData, solverOneEOA, address(solverOne), WETH.balanceOf(address(solverOneEOA)) * 2);
 
         (v, r, s) = vm.sign(solverOnePK, IAtlas(address(atlas)).getSolverPayload(solverOps[1]));
         solverOps[1].signature = abi.encodePacked(r, s, v);
@@ -65,7 +65,7 @@ contract MainTest is BaseTest {
         // Second SolverOperation
         solverOpData = helper.buildV2SolverOperationData(POOL_ONE, POOL_TWO);
         solverOps[0] =
-            helper.buildSolverOperation(userOp, solverOpData, solverTwoEOA, address(solverTwo), 1e17);
+            helper.buildSolverOperation(userOp, solverOpData, solverTwoEOA, address(solverTwo), WETH.balanceOf(address(solverTwoEOA)) / 2);
 
         (v, r, s) = vm.sign(solverTwoPK, IAtlas(address(atlas)).getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(r, s, v);
@@ -98,7 +98,22 @@ contract MainTest is BaseTest {
         ERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
         ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
 
-        uint256 userBalance = userEOA.balance;
+        vm.stopPrank();
+
+        // address bundler = userEOA;
+        vm.startPrank(userEOA);
+
+        uint256 userEOABalance = userEOA.balance;
+        uint256 userAtlEthBalance = atlas.balanceOf(userEOA);
+
+        // uint256 bundlerEOABalance = bundler.balance;
+        // uint256 bundlerAtlEthBalance = atlas.balanceOf(bundler);
+
+        uint256 solverOneEOABalance = solverOneEOA.balance;
+        uint256 solverOneAtlEthBalance = atlas.balanceOf(solverOneEOA);
+
+        uint256 solverTwoEOABalance = solverTwoEOA.balance;
+        uint256 solverTwoAtlEthBalance = atlas.balanceOf(solverTwoEOA);
 
         (bool success,) = address(atlas).call(
             abi.encodeWithSelector(
@@ -107,10 +122,107 @@ contract MainTest is BaseTest {
         );
 
         assertTrue(success);
-        console.log("user gas refund received",userEOA.balance - userBalance);
-        console.log("user refund equivalent gas usage", (userEOA.balance - userBalance)/tx.gasprice);
-        
+
         vm.stopPrank();
+
+        /*
+        console.log("--");
+        console.log("BUNDLER:");
+
+        uint256 newBundlerBalance = bundler.balance + atlas.balanceOf(bundler);
+        uint256 bundlerTotalBalance = bundlerEOABalance + bundlerAtlEthBalance;
+
+        if (bundler.balance >= bundlerEOABalance) {
+            console.log("bundler eoa balance delta: +", bundler.balance - bundlerEOABalance);
+        } else {
+            console.log("bundler eoa balance delta: -", bundlerEOABalance - bundler.balance);
+        }
+
+        if (atlas.balanceOf(bundler) >= bundlerAtlEthBalance) {
+            console.log("bundler atlETH balance delta: +", atlas.balanceOf(bundler) - bundlerAtlEthBalance);
+        } else {
+            console.log("bundler atlETH balance delta: -", bundlerAtlEthBalance - atlas.balanceOf(bundler));
+        }
+
+        if (newBundlerBalance >= bundlerTotalBalance) {
+            console.log("combined bundler balance delta: +", newBundlerBalance - bundlerTotalBalance);
+        } else {
+            console.log("combined balance delta: -", bundlerTotalBalance - newBundlerBalance);
+        }
+        */
+
+        console.log("--");
+        console.log("USER:");
+
+        uint256 newUserBalance = userEOA.balance + atlas.balanceOf(userEOA);
+        uint256 userTotalBalance = userEOABalance + userAtlEthBalance;
+
+        if (userEOA.balance >= userEOABalance) {
+            console.log("user eoa balance delta   : +", userEOA.balance - userEOABalance);
+        } else {
+            console.log("user eoa balance delta   : -", userEOABalance - userEOA.balance);
+        }
+
+        if (atlas.balanceOf(userEOA) >= userAtlEthBalance) {
+            console.log("user atlETH balance delta: +", atlas.balanceOf(userEOA) - userAtlEthBalance);
+        } else {
+            console.log("user atlETH balance delta: -", userAtlEthBalance - atlas.balanceOf(userEOA));
+        }
+
+        if (newUserBalance >= userTotalBalance) {
+            console.log("user total balance delta : +", newUserBalance - userTotalBalance);
+        } else {
+            console.log("user total balance delta : -", userTotalBalance - newUserBalance);
+        }
+
+        console.log("--");
+        console.log("SOLVER ONE:");
+
+        uint256 newSolverOneBalance = solverOneEOA.balance + atlas.balanceOf(solverOneEOA);
+        uint256 solverOneTotalBalance = solverOneEOABalance + solverOneAtlEthBalance;
+
+        if (solverOneEOA.balance >= solverOneEOABalance) {
+            console.log("solverOne eoa balance delta   : +", solverOneEOA.balance - solverOneEOABalance);
+        } else {
+            console.log("solverOne eoa balance delta   : -", solverOneEOABalance - solverOneEOA.balance);
+        }
+
+        if (atlas.balanceOf(solverOneEOA) >= solverOneAtlEthBalance) {
+            console.log("solverOne atlETH balance delta: +", atlas.balanceOf(solverOneEOA) - solverOneAtlEthBalance);
+        } else {
+            console.log("solverOne atlETH balance delta: -", solverOneAtlEthBalance - atlas.balanceOf(solverOneEOA));
+        }
+
+        if (newSolverOneBalance >= solverOneTotalBalance) {
+            console.log("solverOne total balance delta : +", newSolverOneBalance - solverOneTotalBalance);
+        } else {
+            console.log("solverOne total balance delta : -", solverOneTotalBalance - newSolverOneBalance);
+        }
+
+        console.log("--");
+        console.log("SOLVER TWO:");
+
+        uint256 newSolverTwoBalance = solverTwoEOA.balance + atlas.balanceOf(solverTwoEOA);
+        uint256 solverTwoTotalBalance = solverTwoEOABalance + solverTwoAtlEthBalance;
+
+        if (solverTwoEOA.balance >= solverTwoEOABalance) {
+            console.log("solverTwo eoa balance delta   : +", solverTwoEOA.balance - solverTwoEOABalance);
+        } else {
+            console.log("solverTwo eoa balance delta   : -", solverTwoEOABalance - solverTwoEOA.balance);
+        }
+
+        if (atlas.balanceOf(solverTwoEOA) >= solverTwoAtlEthBalance) {
+            console.log("solverTwo atlETH balance delta: +", atlas.balanceOf(solverTwoEOA) - solverTwoAtlEthBalance);
+        } else {
+            console.log("solverTwo atlETH balance delta: -", solverTwoAtlEthBalance - atlas.balanceOf(solverTwoEOA));
+        }
+
+        if (newSolverTwoBalance >= solverTwoTotalBalance) {
+            console.log("solverTwo total balance delta : +", newSolverTwoBalance - solverTwoTotalBalance);
+        } else {
+            console.log("solverTwo total balance delta : -", solverTwoTotalBalance - newSolverTwoBalance);
+        }
+
 
         /*
         console.log("");

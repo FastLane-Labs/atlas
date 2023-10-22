@@ -1,6 +1,12 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
+struct Lock {
+    address activeEnvironment;
+    uint16 activeParties; // bitmap
+    uint64 startingBalance;
+}
+
 struct EscrowKey {
     address approvedCaller;
     bool makingPayments;
