@@ -56,7 +56,6 @@ contract Atlas is Test, Factory {
             dConfig, userOp, solverOps, executionEnvironment, msg.sender == simulator
         ) returns (bool _auctionWon, uint256 accruedGasRebate, uint256 winningSolverIndex) {
             
-            console.log("accruedGasRebate",accruedGasRebate);
             auctionWon = _auctionWon;
             // Gas Refund to sender only if execution is successful
             _balance({

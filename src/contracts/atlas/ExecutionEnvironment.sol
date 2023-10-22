@@ -32,26 +32,22 @@ contract ExecutionEnvironment is Base {
     constructor(address _atlas) Base(_atlas) {}
 
     modifier validUser(UserOperation calldata userOp) {
-        {
         if (userOp.from != _user()) {
             revert("ERR-CE02 InvalidUser");
         }
         if (userOp.to != atlas || userOp.dapp == atlas) {
             revert("ERR-EV007 InvalidTo");
         }
-        }
         _;
     }
 
     modifier validSolver(SolverOperation calldata solverOp) {
-        {
         address solverTo = solverOp.solver;
         if (solverTo == address(this) || solverTo == _control() || solverTo == atlas) {
             revert("ERR-EV008 InvalidTo");
         }
         if (solverTo != _approvedCaller()) {
             revert("ERR-EV009 WrongSolver");
-        }
         }
         _;
     }
@@ -93,7 +89,7 @@ contract ExecutionEnvironment is Base {
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
-
+      
         uint32 config = _config();
 
         require(address(this).balance >= userOp.value, "ERR-CE01 ValueExceedsBalance");
