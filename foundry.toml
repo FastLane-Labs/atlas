@@ -6,6 +6,6 @@ block_gas_limit = 300000000
 gas_limit = 3000000000
 gas_price = 1500000000
 
-solc_version = "0.8.19"
+solc_version = "0.8.18"
 
 fs_permissions = [{ access = "read-write", path = "./"}]
