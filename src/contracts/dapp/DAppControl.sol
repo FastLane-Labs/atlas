@@ -5,7 +5,7 @@ import {ExecutionPhase} from "../types/LockTypes.sol";
 
 import {CallBits} from "../libraries/CallBits.sol";
 
-import {GovernanceControl} from "./GovernanceControl.sol";
+import {DAppControlTemplate} from "./ControlTemplate.sol";
 import {ExecutionBase} from "../common/ExecutionBase.sol";
 
 import {EXECUTION_PHASE_OFFSET} from "../libraries/SafetyBits.sol";
@@ -18,7 +18,7 @@ import "forge-std/Test.sol";
 
 // TODO: Check payable is appropriate in pre/post ops and solver calls. Needed to send ETH if necessary (even when delegatecalled)
 
-abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
+abstract contract DAppControl is Test, DAppControlTemplate, ExecutionBase {
     address public immutable escrow;
     address public immutable governance;
     address public immutable control;
