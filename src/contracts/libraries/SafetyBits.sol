@@ -133,7 +133,7 @@ library SafetyBits {
                 self.lockState,
                 self.gasRefund,
                 self.isSimulation,
-                uint8(0) // callDepth
+                uint8(1) // callDepth
             )
         );
     }

@@ -7,7 +7,7 @@ import "../types/DAppApprovalTypes.sol";
 
 import "forge-std/Test.sol";
 
-abstract contract GovernanceControl {
+abstract contract DAppControlTemplate {
 
     address internal immutable _executionBase;
 

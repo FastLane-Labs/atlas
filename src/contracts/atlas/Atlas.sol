@@ -53,7 +53,7 @@ contract Atlas is Test, Factory {
         _initializeEscrowLock(userOp, executionEnvironment, gasMarker);
 
         try this.execute{value: msg.value}(
-            dConfig, userOp, solverOps, executionEnvironment, dAppOp.callChainHash, msg.sender == simulator
+            dConfig, userOp, solverOps, executionEnvironment, msg.sender == simulator
         ) returns (bool _auctionWon, uint256 accruedGasRebate, uint256 winningSolverIndex) {
             
             console.log("accruedGasRebate",accruedGasRebate);
@@ -82,18 +82,11 @@ contract Atlas is Test, Factory {
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         address executionEnvironment,
-        bytes32 callChainHash,
         bool isSimulation
     ) external payable returns (bool auctionWon, uint256 accruedGasRebate, uint256 winningSearcherIndex) {
         
         // This is a self.call made externally so that it can be used with try/catch
         require(msg.sender == address(this), "ERR-F06 InvalidAccess");
-        
-        // verify the call sequence
-        require(
-            callChainHash == CallVerification.getCallChainHash(dConfig, userOp, solverOps) || isSimulation, 
-            "ERR-F07 InvalidSequence"
-        );
         
         // Build the memory lock
         EscrowKey memory key = _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), isSimulation);
@@ -219,20 +212,98 @@ contract Atlas is Test, Factory {
             }
         }
 
-        // Only verify signatures of meta txs if the original signer isn't the bundler
-        // TODO: Consider extra reentrancy defense here?
-        if (dAppOp.from != msg.sender && !_verifyDApp(dConfig, dAppOp)) {
-            bool bypass = isSimulation && dAppOp.signature.length == 0;
-            if (!bypass) {
+        // bundler checks
+        // user is bundling their own operation - check allowed and valid dapp signature/callchainhash
+        if(msg.sender == userOp.from) {
+            if(!dConfig.callConfig.allowsUserBundler()) {
+                return ValidCallsResult.UnknownBundlerNotAllowed;
+            }
+
+            // user should not sign their own operation and transaction together
+            if(userOp.signature.length > 0) {
+                return ValidCallsResult.UserSignatureInvalid;
+            }
+
+            // check dapp signature
+            if(!_verifyDApp(dConfig, dAppOp)) {
+                bool bypass = isSimulation && dAppOp.signature.length == 0;
+                if (!bypass) {
+                    return ValidCallsResult.DAppSignatureInvalid;
+                }
+            }
+
+            // check callchainhash
+            if(dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps) && !isSimulation) {
+                return ValidCallsResult.InvalidSequence;
+            }
+        } // dapp is bundling - always allowed, check valid user/dapp signature and callchainhash
+        else if(msg.sender == dAppOp.from) {
+            // check dapp signature
+            if(!_verifyDApp(dConfig, dAppOp)) {
+                bool bypass = isSimulation && dAppOp.signature.length == 0;
+                if (!bypass) {
+                    return ValidCallsResult.DAppSignatureInvalid;
+                }
+            }
+
+            // check user signature
+            if(!_verifyUser(dConfig, userOp)) {
+                bool bypass = isSimulation && userOp.signature.length == 0;
+                if (!bypass) {
+                    return ValidCallsResult.UserSignatureInvalid;   
+                }
+            }
+
+            // check callchainhash
+            if(dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps) && !isSimulation) {
+                return ValidCallsResult.InvalidSequence;
+            }
+        } // potentially the winning solver is bundling - check that its allowed and only need to verify user signature
+        else if(msg.sender == solverOps[0].from && solverOps.length == 1) {
+            // check if protocol allows it
+            if(!dConfig.callConfig.allowsSolverBundler()) {
                 return ValidCallsResult.DAppSignatureInvalid;
             }
-        }
-        
-        if (userOp.from != msg.sender && !_verifyUser(dConfig, userOp)) { 
-            bool bypass = isSimulation && userOp.signature.length == 0;
-            if (!bypass) {
-                return ValidCallsResult.UserSignatureInvalid;   
+
+            // verify user signature
+            if(!_verifyUser(dConfig, userOp)) {
+                bool bypass = isSimulation && userOp.signature.length == 0;
+                if (!bypass) {
+                    return ValidCallsResult.UserSignatureInvalid;   
+                }
             }
+
+            // verify the callchainhash if required by protocol
+            if(dConfig.callConfig.verifySolverBundlerCallChainHash()) {
+                if(dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps) && !isSimulation) {
+                    return ValidCallsResult.InvalidSequence;
+                }
+            }
+        } // check if protocol allows unknown bundlers, and verify all signatures if they do
+        else if(dConfig.callConfig.allowsUnknownBundler()) {
+            // check dapp signature
+            if(!_verifyDApp(dConfig, dAppOp)) {
+                bool bypass = isSimulation && dAppOp.signature.length == 0;
+                if (!bypass) {
+                    return ValidCallsResult.DAppSignatureInvalid;
+                }
+            }
+
+            // check user signature
+            if(!_verifyUser(dConfig, userOp)) {
+                bool bypass = isSimulation && userOp.signature.length == 0;
+                if (!bypass) {
+                    return ValidCallsResult.UserSignatureInvalid;   
+                }
+            }
+
+            // check callchainhash
+            if(dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps) && !isSimulation) {
+                return ValidCallsResult.InvalidSequence;
+            }
+        }
+        else {
+            return ValidCallsResult.UnknownBundlerNotAllowed;
         }
 
         if (solverOps.length >= type(uint8).max - 1) {
