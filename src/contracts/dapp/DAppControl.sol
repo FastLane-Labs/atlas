@@ -8,6 +8,8 @@ import {CallBits} from "../libraries/CallBits.sol";
 import {GovernanceControl} from "./GovernanceControl.sol";
 import {ExecutionBase} from "../common/ExecutionBase.sol";
 
+import {EXECUTION_PHASE_OFFSET} from "../libraries/SafetyBits.sol";
+
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
@@ -21,6 +23,8 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
     address public immutable governance;
     address public immutable control;
     uint32 public immutable callConfig;
+
+    uint8 private constant _CONTROL_DEPTH = 1 << 2;
 
     constructor(
         address _escrow,
@@ -51,10 +55,8 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
     function preOpsCall(UserOperation calldata userOp)
         external
         payable
-        onlyActiveEnvironment
         validControl
-        validPhase(ExecutionPhase.PreOps)
-        validDepth(1)
+        onlyAtlasEnvironment(ExecutionPhase.PreOps, _CONTROL_DEPTH)
         returns (bytes memory)
     {
         return _preOpsCall(userOp);
@@ -63,10 +65,8 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
     function preSolverCall(bytes calldata data) 
         external
         payable
-        onlyActiveEnvironment
         validControl
-        validPhase(ExecutionPhase.SolverOperations)
-        validDepth(1)
+        onlyAtlasEnvironment(ExecutionPhase.SolverOperations, _CONTROL_DEPTH)
         returns (bool)
     {
         return _preSolverCall(data);
@@ -75,10 +75,8 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
     function postSolverCall(bytes calldata data) 
         external
         payable
-        onlyActiveEnvironment
         validControl
-        validPhase(ExecutionPhase.SolverOperations)
-        validDepth(1)
+        onlyAtlasEnvironment(ExecutionPhase.SolverOperations, _CONTROL_DEPTH)
         returns (bool)
     {
         
@@ -87,10 +85,8 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
 
     function allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) 
         external 
-        onlyActiveEnvironment
         validControl
-        validPhase(ExecutionPhase.HandlingPayments)
-        validDepth(1)
+        onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _CONTROL_DEPTH)
     {
         _allocateValueCall(bidToken, bidAmount, data);
     }
@@ -98,10 +94,8 @@ abstract contract DAppControl is Test, GovernanceControl, ExecutionBase {
     function postOpsCall(bytes calldata data) 
         external
         payable
-        onlyActiveEnvironment
         validControl
-        validPhase(ExecutionPhase.PostOps)
-        validDepth(1)
+        onlyAtlasEnvironment(ExecutionPhase.PostOps, _CONTROL_DEPTH)
         returns (bool) 
     {
         return _postOpsCall(data);

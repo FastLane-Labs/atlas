@@ -27,14 +27,18 @@ import {
 contract ExecutionEnvironment is Base {
     using CallBits for uint32;
     
+    uint8 private constant _ENVIRONMENT_DEPTH = 1 << 1;
+
     constructor(address _atlas) Base(_atlas) {}
 
     modifier validUser(UserOperation calldata userOp) {
+        {
         if (userOp.from != _user()) {
             revert("ERR-CE02 InvalidUser");
         }
         if (userOp.to != atlas || userOp.dapp == atlas) {
             revert("ERR-EV007 InvalidTo");
+        }
         }
         _;
     }
@@ -58,9 +62,8 @@ contract ExecutionEnvironment is Base {
     //////////////////////////////////
     function preOpsWrapper(UserOperation calldata userOp)
         external
-        onlyAtlasEnvironment
         validUser(userOp)
-        validPhase(ExecutionPhase.PreOps)
+        onlyAtlasEnvironment(ExecutionPhase.PreOps, _ENVIRONMENT_DEPTH)
         returns (bytes memory)
     {
         // msg.sender = atlas
@@ -84,10 +87,8 @@ contract ExecutionEnvironment is Base {
     function userWrapper(UserOperation calldata userOp) 
         external 
         payable
-        onlyAtlasEnvironment
         validUser(userOp)
-        onlyActiveEnvironment
-        validPhase(ExecutionPhase.UserOperation)
+        onlyAtlasEnvironment(ExecutionPhase.UserOperation, _ENVIRONMENT_DEPTH)
         returns (bytes memory userData) 
     {
         // msg.sender = atlas
@@ -117,9 +118,8 @@ contract ExecutionEnvironment is Base {
     }
 
     function postOpsWrapper(bytes calldata returnData) 
-        external 
-        onlyAtlasEnvironment
-        validPhase(ExecutionPhase.PostOps)
+        external
+        onlyAtlasEnvironment(ExecutionPhase.PostOps, _ENVIRONMENT_DEPTH)
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
@@ -141,9 +141,7 @@ contract ExecutionEnvironment is Base {
         bytes calldata dAppReturnData
     ) 
         external payable 
-        onlyAtlasEnvironment 
-        validSolver(solverOp)
-        validPhase(ExecutionPhase.SolverOperations)
+        onlyAtlasEnvironment(ExecutionPhase.SolverOperations, _ENVIRONMENT_DEPTH)
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
@@ -256,8 +254,7 @@ contract ExecutionEnvironment is Base {
 
     function allocateValue(address bidToken, uint256 bidAmount, bytes memory returnData) 
         external 
-        onlyAtlasEnvironment
-        validPhase(ExecutionPhase.HandlingPayments)
+        onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _ENVIRONMENT_DEPTH)
     {
         // msg.sender = escrow
         // address(this) = ExecutionEnvironment
@@ -283,7 +280,7 @@ contract ExecutionEnvironment is Base {
     function donateToBundler(address surplusRecipient)
         external
         payable
-        validPhase(ExecutionPhase.SolverOperations)
+        onlyAtlasEnvironment(ExecutionPhase.SolverOperations, _ENVIRONMENT_DEPTH)
     {
         uint16 lockstate = _lockState();
         console.log("lockstate", lockstate);
