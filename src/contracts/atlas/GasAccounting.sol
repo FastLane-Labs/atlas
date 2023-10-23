@@ -35,7 +35,7 @@ abstract contract GasAccounting is SafetyLocks {
         Ledger memory pLedger = ledgers[partyIndex];
         require(pLedger.status != LedgerStatus.Finalized, "ERR-GA002, LedgerFinalized");
 
-        if (pLedger.status == LedgerStatus.Unknown) pLedger.status = LedgerStatus.Active;
+        if (pLedger.status == LedgerStatus.Inactive) pLedger.status = LedgerStatus.Active;
 
         pLedger.balance += depositAmount;
         
@@ -53,7 +53,7 @@ abstract contract GasAccounting is SafetyLocks {
 
         Ledger memory pLedger = ledgers[partyIndex];
         require(uint256(pLedger.status) < uint256(LedgerStatus.Balancing), "ERR-GA003, LedgerFinalized");
-        if (pLedger.status == LedgerStatus.Unknown) pLedger.status = LedgerStatus.Active;
+        if (pLedger.status == LedgerStatus.Inactive) pLedger.status = LedgerStatus.Active;
 
         pLedger.balance -= borrowAmount;
         
@@ -68,7 +68,7 @@ abstract contract GasAccounting is SafetyLocks {
         Ledger memory pLedger = ledgers[partyIndex];
 
         require(uint256(pLedger.status) < uint256(LedgerStatus.Balancing), "ERR-GA004, LedgerBalancing");
-        if (pLedger.status == LedgerStatus.Unknown) pLedger.status = LedgerStatus.Active;
+        if (pLedger.status == LedgerStatus.Inactive) pLedger.status = LedgerStatus.Active;
         
         if (pLedger.requested > 0) {
             if (amount > pLedger.requested) {
@@ -129,10 +129,10 @@ abstract contract GasAccounting is SafetyLocks {
         Ledger memory rLedger = ledgers[recipientIndex];
 
         require(uint256(dLedger.status) < uint256(LedgerStatus.Balancing), "ERR-GA004, LedgerBalancing");
-        if (dLedger.status == LedgerStatus.Unknown) dLedger.status = LedgerStatus.Active;
+        if (dLedger.status == LedgerStatus.Inactive) dLedger.status = LedgerStatus.Active;
 
         require(rLedger.status != LedgerStatus.Finalized, "ERR-GA005, LedgerFinalized");
-        if (rLedger.status == LedgerStatus.Unknown) rLedger.status = LedgerStatus.Active;
+        if (rLedger.status == LedgerStatus.Inactive) rLedger.status = LedgerStatus.Active;
 
         dLedger.contributed -= amount;
         rLedger.requested -= amount;
@@ -152,10 +152,10 @@ abstract contract GasAccounting is SafetyLocks {
         Ledger memory rLedger = ledgers[recipientIndex];
 
         require(dLedger.status != LedgerStatus.Finalized, "ERR-GA006, LedgerFinalized");
-        if (dLedger.status == LedgerStatus.Unknown) dLedger.status = LedgerStatus.Active;
+        if (dLedger.status == LedgerStatus.Inactive) dLedger.status = LedgerStatus.Active;
 
         require(rLedger.status != LedgerStatus.Finalized, "ERR-GA007, LedgerFinalized");
-        if (rLedger.status == LedgerStatus.Unknown) rLedger.status = LedgerStatus.Active;
+        if (rLedger.status == LedgerStatus.Inactive) rLedger.status = LedgerStatus.Active;
 
         dLedger.balance -= amount;
         dLedger.contributed += amount;
@@ -213,11 +213,11 @@ abstract contract GasAccounting is SafetyLocks {
 
         int64 totalRequests;
         int64 totalContributions;
+        int64 totalBalanceDelta;
 
         uint256 activeParties = uint256(mLock.activeParties);
 
         Ledger[] memory mLedgers = new Ledger[](_ledgerLength);
-        Ledger memory pLedger;
         for (uint256 i; i < _ledgerLength;) {
             // If party has not been touched, skip it
             if (activeParties.isInactive(i)) {
@@ -225,12 +225,13 @@ abstract contract GasAccounting is SafetyLocks {
                 continue;
             }
 
-            pLedger = ledgers[i];
+            Ledger memory pLedger = ledgers[i];
 
             if (i == uint256(GasParty.Bundler)) {
                 pLedger.balance += int64(uint64(accruedGasRebate));
             }
 
+            totalBalanceDelta += pLedger.balance;
             totalRequests += pLedger.requested;
             totalContributions += pLedger.contributed;
 
@@ -252,10 +253,14 @@ abstract contract GasAccounting is SafetyLocks {
         mLedgers[uint256(GasParty.Bundler)].requested += gasRemainder;
         totalRequests += gasRemainder;
 
+        {
         int64 surplus = totalRequests + totalContributions;
-        require(surplus > 0, "ERR-GA014, MissingFunds");
+        require(surplus > 0, "ERR-GA014a, MissingFunds");
 
-        
+        // TODO: Adjust to accomodate the direction of rounding errors. 
+        int64 atlasBalanceDelta = int64(uint64((address(this).balance - msg.value) / tx.gasprice)) - int64(mLock.startingBalance);
+        require(atlasBalanceDelta >= surplus + totalBalanceDelta);
+
         console.log("");
         console.log("--");
         console.log("gasRebate  :", accruedGasRebate);
@@ -265,6 +270,7 @@ abstract contract GasAccounting is SafetyLocks {
         _logInt64("contributions:", totalContributions);
         console.log("--");
         console.log("balances");
+        }
         
         
         for (uint256 i; i < _ledgerLength;) {
@@ -276,7 +282,7 @@ abstract contract GasAccounting is SafetyLocks {
     
             address partyAddress = _partyAddress(i, user, dapp, winningSolver, bundler);
 
-            pLedger = mLedgers[i];
+            Ledger memory pLedger = mLedgers[i];
 
             EscrowAccountData memory escrowData = _escrowAccountData[partyAddress];
 
@@ -403,16 +409,83 @@ abstract contract GasAccounting is SafetyLocks {
         return true;
     }
 
-    function contribute(GasParty party) external payable {
-        require(_validParty(msg.sender, party), "ERR-GA020 InvalidEnvironment"); 
+    function contribute(GasParty recipient) external payable {
+        require(_validParty(msg.sender, recipient), "ERR-GA020 InvalidEnvironment"); 
+
         int64 amount = int64(uint64((msg.value) / tx.gasprice));
-        ledgers[uint256(party)].contributed += amount;
+
+        uint256 pIndex = uint256(recipient);
+        Ledger memory pLedger = ledgers[pIndex];
+
+        require(pLedger.status != LedgerStatus.Finalized, "ERR-GA021, LedgerFinalized");
+        if (pLedger.status == LedgerStatus.Inactive) pLedger.status = LedgerStatus.Active;
+
+        if (pLedger.requested < 0) {
+            // CASE: still in deficit
+            if (pLedger.requested + amount < 0) {
+                pLedger.requested += amount;
+                amount = 0;
+            
+            // CASE: surplus
+            } else {
+                amount += pLedger.requested;
+                pLedger.requested = 0;
+            }
+        }
+
+        if (amount != 0) pLedger.contributed += amount;
+        
+        ledgers[pIndex] = pLedger;
     }
 
     function deposit(GasParty party) external payable {
-        require(_validParty(msg.sender, party), "ERR-GA020 InvalidEnvironment"); 
+        require(_validParty(msg.sender, party), "ERR-GA022 InvalidEnvironment");
+
         int64 amount = int64(uint64((msg.value) / tx.gasprice));
-        ledgers[uint256(party)].balance += amount;
+
+        uint256 pIndex = uint256(party);
+        Ledger memory pLedger = ledgers[pIndex];
+
+        require(pLedger.status != LedgerStatus.Finalized, "ERR-GA023 LedgerFinalized");
+        if (pLedger.status == LedgerStatus.Inactive) pLedger.status = LedgerStatus.Active;
+
+        pLedger.balance += amount;
+        
+        ledgers[pIndex] = pLedger;
+    }
+
+    // NOTE: DAPPs can gain malicious access to these funcs if they want to, but attacks beyond
+    // the approved amounts will only lead to a revert.  
+    // Bundlers must make sure the DApp hasn't maliciously upgraded their contract to avoid wasting gas. 
+    function contributeTo(GasParty donor, GasParty recipient, uint256 amt) external {
+        require(_validParties(msg.sender, donor, recipient), "ERR-GA021 InvalidEnvironment");
+        _contributeTo(donor, recipient, amt);
+    }
+
+    function requestFrom(GasParty donor, GasParty recipient, uint256 amt) external {
+        require(_validParties(msg.sender, donor, recipient), "ERR-GA022 InvalidEnvironment"); 
+        _requestFrom(donor, recipient, amt);
+    }
+
+    function finalize(GasParty party, address partyAddress) external returns (bool) {
+        require(_validParty(msg.sender, party), "ERR-GA024 InvalidEnvironment");
+        require(party != GasParty.Solver, "ERR-GA025 SolverMustReconcile");
+
+        uint256 pIndex = uint256(party);
+        Ledger memory pLedger = ledgers[pIndex];
+
+        if (pLedger.status == LedgerStatus.Finalized) return false;
+        
+        if (pLedger.contributed + pLedger.requested < 0) return false;
+
+        uint256 grossBalance = uint256(_escrowAccountData[partyAddress].balance);
+
+        if (int64(uint64(grossBalance / tx.gasprice)) + pLedger.balance - 1 < 0) return false;
+        
+        pLedger.status = LedgerStatus.Finalized;
+        ledgers[pIndex] = pLedger;
+
+        return true;
     }
 
     function reconcile(address environment, address searcherFrom, uint256 maxApprovedGasSpend) external payable returns (bool) {
@@ -428,8 +501,6 @@ abstract contract GasAccounting is SafetyLocks {
         if (pLedger.status == LedgerStatus.Finalized) {
             return false;
         }
-
-        if (pLedger.status == LedgerStatus.Unknown) pLedger.status = LedgerStatus.Active;
 
         if (msg.value != 0) {
             int64 amount = int64(uint64((msg.value) / tx.gasprice));

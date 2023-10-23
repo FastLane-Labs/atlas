@@ -19,12 +19,6 @@ struct EscrowKey {
     uint8 callDepth;
 }
 
-enum SolverSafety {
-    Unset,
-    Requested,
-    Verified
-}
-
 enum BaseLock {
     Unlocked,
     Pending,
@@ -36,9 +30,10 @@ enum ExecutionPhase {
     Uninitialized,
     PreOps,
     UserOperation,
+    PreSolver,
     SolverOperations,
+    PostSolver,
     HandlingPayments,
-    UserRefund,
     PostOps,
     Releasing
 }

@@ -3,12 +3,15 @@ pragma solidity ^0.8.16;
 
 import {IPermit69} from "../interfaces/IPermit69.sol";
 import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
+import {IEscrow} from "../interfaces/IEscrow.sol";
 
 import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
-import {ExecutionPhase} from "../types/LockTypes.sol";
+import {ExecutionPhase, BaseLock} from "../types/LockTypes.sol";
+import {GasParty} from "../types/EscrowTypes.sol";
 
 import {EXECUTION_PHASE_OFFSET, SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER} from "../libraries/SafetyBits.sol";
+import {GasPartyMath} from "../libraries/GasParties.sol";
 
 import "forge-std/Test.sol";
 
@@ -58,6 +61,7 @@ contract Base {
         );
     }
 
+
     function _firstSet() internal pure returns (bytes memory data) {
         data = abi.encodePacked(
             _approvedCaller(),
@@ -78,6 +82,38 @@ contract Base {
             _control(),
             _config(),
             _controlCodeHash()
+        );
+    }
+
+    function forwardSpecial(bytes memory data, ExecutionPhase phase) internal pure returns (bytes memory) {
+        // TODO: simplify this into just the bytes
+        return bytes.concat(
+            data,
+            _firstSetSpecial(phase),
+            _secondSet()
+        );
+    }
+
+    function _firstSetSpecial(ExecutionPhase phase) internal pure returns (bytes memory data) {
+        uint8 depth = _depth();
+        uint16 lockState = _lockState();
+
+        if (depth == 1 && lockState & 1<< (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations)) != 0) {
+            if (phase == ExecutionPhase.PreSolver || phase == ExecutionPhase.PostSolver) {
+                lockState =  uint16(1) << uint16(BaseLock.Active) | uint16(1) << (EXECUTION_PHASE_OFFSET + uint16(phase));
+            }
+        }
+
+        data = abi.encodePacked(
+            _approvedCaller(),
+            _makingPayments(),
+            _paymentsComplete(),
+            _callIndex(),
+            _callMax(),
+            lockState,
+            _gasRefund(),
+            _simulation(),
+            depth+1
         );
     }
 
@@ -164,11 +200,88 @@ contract Base {
     function _activeEnvironment() internal view returns (address activeEnvironment) {
         activeEnvironment = ISafetyLocks(atlas).activeEnvironment();
     }
+
+    function _partyAddress(GasParty party) internal view returns (address partyAddress) {
+        uint256 pIndex = uint256(party);
+        // MEDIAN INDEX
+        if (pIndex < uint256(GasParty.Solver)) {
+            // CASE: BUILDER
+            if (party == GasParty.Builder) {
+                return block.coinbase;
+
+            // CASE: BUNDLER
+            } else {
+                return tx.origin; // TODO: This may be unreliable for smart wallet integrations.
+            }
+        } else if (pIndex > uint256(GasParty.Solver)) {
+            // CASE: USER
+            if (party == GasParty.User) {
+                return _user();
+            
+            // CASE: DAPP
+            } else {
+                return _control();
+            }
+        
+        // CASE: SOLVER
+        // NOTE: Currently unimplemented 
+        // TODO: check if this is a SolverOp phase and use assembly to grab the solverOp.from from calldata
+        } else {
+            revert("ERR-EB090 SolverPartyUnimplemented");
+        }
+    }
 }
 
 contract ExecutionBase is Base {
+    using GasPartyMath for GasParty;
 
     constructor(address _atlas) Base(_atlas) {}
+
+    // Contribute local funds to be used by the recipient 
+    function _contribute(GasParty recipient, uint256 amt) internal {
+        if(msg.sender != atlas) revert("ERR-EB001 InvalidSender");
+        if (amt > address(this).balance) revert("ERR-EB002 InsufficientLocalBalance");
+
+        IEscrow(atlas).contribute{value: amt}(recipient);
+    }
+
+    // Deposit local funds to the recipient's balance
+    function _deposit(GasParty recipient, uint256 amt) internal {
+        if(msg.sender != atlas) revert("ERR-EB001 InvalidSender");
+        if (amt > address(this).balance) revert("ERR-EB002 InsufficientLocalBalance");
+
+        IEscrow(atlas).deposit{value: amt}(recipient);
+    }
+
+    // Contribute nonlocal funds on behalf of the donor to be used by the recipient
+    // Any unused funds are returned to the donor
+    function _contributeTo(GasParty donor, GasParty recipient, uint256 amt) internal {
+        if(msg.sender != atlas) revert("ERR-EB001 InvalidSender");
+        if (!donor.validContribution(_lockState())) revert("ERR-EB002 InvalidPhase");
+
+        IEscrow(atlas).contributeTo(donor, recipient, amt);
+    }
+
+    // Recipient requests a contribution from the donor.
+    // NOTE: Can be fulfilled by any party. 
+    function _requestFrom(GasParty donor, GasParty recipient, uint256 amt) internal {
+        if(msg.sender != atlas) revert("ERR-EB001 InvalidSender");
+        if (!donor.validRequest(_lockState())) revert("ERR-EB002 InvalidPhase");
+
+        IEscrow(atlas).requestFrom(donor, recipient, amt);
+    }
+
+    // Finalize the gas ledger of the party, which will block all future requests and contributions.
+    // This will throw a revert if there is an unfulfilled request (either outbound or inbound).
+    // NOTE: The Solver party cannot be finalized in this manner - it must call the "reconcile" function. 
+    function _finalize(GasParty party) internal {
+        if(msg.sender != atlas) revert("ERR-EB001 InvalidSender");
+
+        bool finalized = IEscrow(atlas).finalize(party, _partyAddress(party));
+
+        if (!finalized) revert("ERR-EB003 UnableToFinalize");
+    }
+
 
     function _transferUserERC20(
         address token,
@@ -214,6 +327,8 @@ contract ExecutionBase is Base {
 
         if (source == user) {
             if (shiftedPhase & SAFE_USER_TRANSFER == 0) {
+                console.log("SAFE_USER_TRANSFER err");
+                console.log("phase",uint256(phase));
                 return false;
             }
             if (ERC20(token).allowance(user, atlas) < amount) {

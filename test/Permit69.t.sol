@@ -11,7 +11,7 @@ import "./base/TestUtils.sol";
 import {Permit69} from "../src/contracts/common/Permit69.sol";
 import {Mimic} from "../src/contracts/atlas/Mimic.sol";
 
-import {EXECUTION_PHASE_OFFSET, SAFETY_LEVEL_OFFSET} from "../src/contracts/libraries/SafetyBits.sol";
+import {EXECUTION_PHASE_OFFSET} from "../src/contracts/libraries/SafetyBits.sol";
 import {SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER} from "../src/contracts/common/Permit69.sol";
 
 import "../src/contracts/types/LockTypes.sol";
@@ -74,14 +74,6 @@ contract Permit69Test is BaseTest {
         // HandlingPayments
         escrowKey.lockState = uint16(
             1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.HandlingPayments))
-        );
-        mockAtlas.setEscrowKey(escrowKey);
-        vm.expectRevert(LOCK_STATE_NOT_VALID);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);
-
-        // UserRefund
-        escrowKey.lockState = uint16(
-            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.UserRefund))
         );
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(LOCK_STATE_NOT_VALID);
@@ -192,20 +184,22 @@ contract Permit69Test is BaseTest {
     }
 
     function testConstantValueOfSafeUserTransfer() public {
-        string memory expectedBitMapString = "0000010011100000";
+        string memory expectedBitMapString = "0000101011100000";
         // Safe phases for user transfers are PreOps, UserOperation, and DAppOperation
         // preOpsPhaseSafe = 0000 0000 0010 0000
         uint16 preOpsPhaseSafe = uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.PreOps)));
         // userOpPhaseSafe = 0000 0000 0100 0000
         uint16 userOpPhaseSafe = uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.UserOperation)));
-        // solverOpsPhaseSafe = 0000 0000 1000 0000
-        uint16 solverOpsPhaseSafe =
-            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.SolverOperations)));
+        
+        uint16 preSolverOpsPhaseSafe =
+            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.PreSolver)));
+        uint16 postSolverOpsPhaseSafe =
+            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.PostSolver)));
         // verificationPhaseSafe = 0000 0100 0000 0000
         uint16 verificationPhaseSafe =
             uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.PostOps)));
 
-        uint16 expectedSafeUserTransferBitMap = preOpsPhaseSafe | userOpPhaseSafe | solverOpsPhaseSafe | verificationPhaseSafe;
+        uint16 expectedSafeUserTransferBitMap = preOpsPhaseSafe | userOpPhaseSafe | preSolverOpsPhaseSafe | postSolverOpsPhaseSafe | verificationPhaseSafe;
 
         assertEq(
             mockAtlas.getSafeUserTransfer(),
@@ -220,23 +214,24 @@ contract Permit69Test is BaseTest {
     }
 
     function testConstantValueOfSafeDAppTransfer() public {
-        string memory expectedBitMapString = "0000011100100000";
-        // Safe phases for dApp transfers are PreOps, HandlingPayments, UserRefund, and DAppOperation
+        string memory expectedBitMapString = "0000110010100000";
+        // Safe phases for dApp transfers are PreOps, HandlingPayments, and DAppOperation
         // preOpsPhaseSafe = 0000 0000 0010 0000
         uint16 preOpsPhaseSafe =
             uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.PreOps)));
         // handlingPaymentsPhaseSafe = 0000 0001 0000 0000
         uint16 handlingPaymentsPhaseSafe =
             uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.HandlingPayments)));
-        // userRefundPhaseSafe = 0000 0010 0000 0000
-        uint16 userRefundPhaseSafe =
-            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.UserRefund)));
+
+        uint16 preSolverPhaseSafe =
+            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.PreSolver)));
+        
         // verificationPhaseSafe = 0000 0100 0000 0000
         uint16 verificationPhaseSafe =
             uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.PostOps)));
 
         uint16 expectedSafeDAppTransferBitMap =
-            preOpsPhaseSafe | handlingPaymentsPhaseSafe | userRefundPhaseSafe | verificationPhaseSafe;
+            preOpsPhaseSafe | preSolverPhaseSafe|  handlingPaymentsPhaseSafe | verificationPhaseSafe;
 
         assertEq(
             mockAtlas.getSafeDAppTransfer(),

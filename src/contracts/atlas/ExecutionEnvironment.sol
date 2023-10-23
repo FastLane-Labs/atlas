@@ -201,10 +201,8 @@ contract ExecutionEnvironment is Base {
                 data
             );
 
-            data = forward(data);
-
             (success, data) = _control().delegatecall(
-                data
+                forwardSpecial(data, ExecutionPhase.PreSolver)
             );
 
             if(!success) {
@@ -241,8 +239,9 @@ contract ExecutionEnvironment is Base {
             );
 
             (success, data) = _control().delegatecall(
-                forward(data)
+                forwardSpecial(data, ExecutionPhase.PostSolver)
             );
+
             if(!success) {
                 revert FastLaneErrorsEvents.PostSolverFailed();
             } 

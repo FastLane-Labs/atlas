@@ -108,7 +108,7 @@ contract SwapIntentController is DAppControl {
         }
 
         require(
-            _availableFundsERC20(swapIntent.tokenUserSells, user, swapIntent.amountUserSells, ExecutionPhase.SolverOperations),
+            _availableFundsERC20(swapIntent.tokenUserSells, user, swapIntent.amountUserSells, ExecutionPhase.PreSolver),
             "ERR-PI059 SellFundsUnavailable"
         );
 
