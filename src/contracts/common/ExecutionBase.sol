@@ -29,81 +29,24 @@ contract Base {
     // via delegatecall, but can be added to DAppControl as funcs that 
     // can be used during DAppControl's delegated funcs
 
-    modifier onlyAtlasEnvironment() {
+    modifier onlyAtlasEnvironment(ExecutionPhase phase, uint8 acceptableDepths) {
+        _onlyAtlasEnvironment(phase, acceptableDepths);
+        _;
+    }
+
+    function _onlyAtlasEnvironment(ExecutionPhase phase, uint8 acceptableDepths) internal view {
         if (address(this) == source) {
-            revert("ERR-CE00 NotDelegated");
+            revert("ERR-EB00 NotDelegated");
         }
         if (msg.sender != atlas) {
-            revert("ERR-CE01 InvalidSender");
+            revert("ERR-EB01 InvalidSender");
         }
-        _;
-    }
-
-    function _onlyActiveEnvironment() internal view {
-        if (msg.sender != atlas) {
-            if (_depth() < 2) {
-                revert("ERR-EV017 InvalidDepth");
-            }
-
-            address activeEnvironment = _activeEnvironment();
-            if (activeEnvironment != address(this)) {
-                if (address(this) != source || activeEnvironment != msg.sender) {
-                    // Verify that caller is the activeEnvironment and this is the valid DAppControl
-                    revert("ERR-EV010 WrongEnvironment");
-                }
-            }
-
-        // CASE: msg.sender == atlas && _depth() < 2 
-        } else if (_depth() < 2) {
-            if (address(this) == source) {
-                // Calls with a depth of 0 or 1 should be delegated
-                revert("ERR-CE50 NotDelegated");
-            }
-        
-        // CASE: msg.sender == atlas && _depth() >= 2 
-        } else { 
-            address activeEnvironment = _activeEnvironment();
-            if (activeEnvironment != address(this)) {
-                // Verify that one environment isn't attempting to access another
-                revert("ERR-EV011 WrongEnvironment");
-            }
-        }
-    }
-
-    modifier onlyActiveEnvironment() {
-        _onlyActiveEnvironment();
-        _;
-    }
-
-    modifier validPhase(ExecutionPhase phase) {
         if (uint16(1<<(EXECUTION_PHASE_OFFSET + uint16(phase))) & _lockState() == 0) {
-            revert("ERR-EV011 WrongPhase");
+            revert("ERR-EB02 WrongPhase");
         }
-        _;
-    }
-
-    modifier validDepth(uint8 depth) {
-        if (depth != _depth()) {
-            revert("ERR-EV012 WrongDepth");
+        if (1 << _depth() & acceptableDepths == 0) {
+            revert("ERR-EB03 WrongDepth");
         }
-        if (depth == 0 && msg.sender != atlas) {
-            revert("ERR-EV013 WrongForSender");
-        }
-        _;
-    }
-
-    modifier onlyIfFirstDonationInCurrentPhase() {
-
-        // Get current phase from lockState
-
-        // if(phasesWithDonations & _lockState() == 0)
-
-        // phasesWithDonations |= uint16(1<<(EXECUTION_PHASE_OFFSET + uint16(phase)));
-
-        // if (_makingPayments()) {
-        //     revert("ERR-EV014 NotFirstDonation");
-        // }
-        _;
     }
     
     function forward(bytes memory data) internal pure returns (bytes memory) {

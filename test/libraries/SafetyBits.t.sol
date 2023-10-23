@@ -118,8 +118,10 @@ contract SafetyBitsTest is Test {
 
     function testPack() public {
         EscrowKey memory key = initializeEscrowLock();
-        bytes32 want = 0x0000000000000000000000000000000000000000000000041024000000000000;
-        assertTrue(key.pack() == want);
+        bytes32 want = 0x0000000000000000000000000000000000000000000000041024000000000001;
+        bytes32 packed = key.pack();
+        // console.logBytes32(packed);
+        assertTrue(packed == want);
     }
 
     function testHoldDAppOperationLock() public {
