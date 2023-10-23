@@ -46,12 +46,13 @@ abstract contract GasAccounting is SafetyLocks {
 
 
     function _borrow(GasParty party, uint256 amt) internal {
+        // Note that for Solver borrows, the repayment check happens *inside* the try/catch. 
 
         int64 borrowAmount = int64(uint64(amt / tx.gasprice))+1;
         uint256 partyIndex = uint256(party);
 
         Ledger memory pLedger = ledgers[partyIndex];
-        require(pLedger.status != LedgerStatus.Finalized, "ERR-GA003, LedgerFinalized");
+        require(uint256(pLedger.status) < uint256(LedgerStatus.Balancing), "ERR-GA003, LedgerFinalized");
         if (pLedger.status == LedgerStatus.Unknown) pLedger.status = LedgerStatus.Active;
 
         pLedger.balance -= borrowAmount;
@@ -66,7 +67,7 @@ abstract contract GasAccounting is SafetyLocks {
 
         Ledger memory pLedger = ledgers[partyIndex];
 
-        require(pLedger.status != LedgerStatus.Finalized, "ERR-GA003, LedgerFinalized");
+        require(uint256(pLedger.status) < uint256(LedgerStatus.Balancing), "ERR-GA004, LedgerBalancing");
         if (pLedger.status == LedgerStatus.Unknown) pLedger.status = LedgerStatus.Active;
         
         if (pLedger.requested > 0) {
@@ -116,6 +117,8 @@ abstract contract GasAccounting is SafetyLocks {
     }
 
     function _requestFrom(GasParty donor, GasParty recipient, uint256 amt) internal {
+        // TODO: different parties will be ineligible to request funds from once their phase is over.
+        // We need to add a phase check to verify this. 
 
         int64 amount = int64(uint64(amt / tx.gasprice));
 
@@ -125,14 +128,14 @@ abstract contract GasAccounting is SafetyLocks {
         Ledger memory dLedger = ledgers[donorIndex];
         Ledger memory rLedger = ledgers[recipientIndex];
 
-        require(dLedger.status != LedgerStatus.Finalized, "ERR-GA004, LedgerFinalized");
+        require(uint256(dLedger.status) < uint256(LedgerStatus.Balancing), "ERR-GA004, LedgerBalancing");
         if (dLedger.status == LedgerStatus.Unknown) dLedger.status = LedgerStatus.Active;
 
         require(rLedger.status != LedgerStatus.Finalized, "ERR-GA005, LedgerFinalized");
         if (rLedger.status == LedgerStatus.Unknown) rLedger.status = LedgerStatus.Active;
 
         dLedger.contributed -= amount;
-        rLedger.requested += amount;
+        rLedger.requested -= amount;
 
         ledgers[donorIndex] = dLedger;
         ledgers[recipientIndex] = rLedger;
@@ -154,12 +157,14 @@ abstract contract GasAccounting is SafetyLocks {
         require(rLedger.status != LedgerStatus.Finalized, "ERR-GA007, LedgerFinalized");
         if (rLedger.status == LedgerStatus.Unknown) rLedger.status = LedgerStatus.Active;
 
+        dLedger.balance -= amount;
         dLedger.contributed += amount;
-        rLedger.requested -= amount;
+        rLedger.requested += amount;
 
         ledgers[donorIndex] = dLedger;
         ledgers[recipientIndex] = rLedger;
     }
+
 
     function validateBalances() external view returns (bool valid) {
         valid = ledgers[uint256(GasParty.Solver)].status == LedgerStatus.Finalized && _isInSurplus(msg.sender);

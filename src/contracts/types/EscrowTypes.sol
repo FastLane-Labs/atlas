@@ -33,6 +33,7 @@ enum LedgerStatus {
     Unknown,
     Inactive,
     Active,
+    Balancing, // no more requests, but contributions allowed
     Finalized
 }
 
