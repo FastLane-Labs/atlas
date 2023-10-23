@@ -21,7 +21,7 @@ struct GasDonation {
 
 // NOTE: The order is very important here for balance reconciliation. 
 // We _MUST_ net the balances in order from LastLook to FirstLook
-enum GasParty {
+enum Party {
     Builder, // block.coinbase
     Bundler, // tx.origin
     Solver,

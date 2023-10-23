@@ -1,22 +1,22 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import {GasParty} from "../types/EscrowTypes.sol";
+import {Party} from "../types/EscrowTypes.sol";
 import {Lock, BaseLock, ExecutionPhase} from "../types/LockTypes.sol";
 
 
 
-library GasPartyMath {
+library PartyMath {
 
-    function toBit(GasParty party) internal pure returns (uint256 partyBit) {
+    function toBit(Party party) internal pure returns (uint256 partyBit) {
         partyBit = 1 << ((uint256(party) + 1));
     }
 
-    function markActive(uint256 activeParties, GasParty party) internal pure returns (uint256) {
+    function markActive(uint256 activeParties, Party party) internal pure returns (uint256) {
         return activeParties | 1 << ((uint256(party) + 1));
     }
 
-    function isActive(uint256 activeParties, GasParty party) internal pure returns (bool) {
+    function isActive(uint256 activeParties, Party party) internal pure returns (bool) {
         return activeParties & 1 << ((uint256(party) + 1)) != 0;
     }
 
@@ -24,7 +24,7 @@ library GasPartyMath {
         return activeParties & 1 << (party + 1) != 0;
     }
 
-    function isInactive(uint256 activeParties, GasParty party) internal pure returns (bool) {
+    function isInactive(uint256 activeParties, Party party) internal pure returns (bool) {
         return activeParties & 1 << (uint256(party) + 1) == 0;
     }
 
@@ -85,14 +85,14 @@ library GasPartyMath {
         1 << (_OFFSET + uint256(ExecutionPhase.HandlingPayments)) |
         1 << (_OFFSET + uint256(ExecutionPhase.PostOps));
         
-    function validContribution(GasParty party, uint16 lockState) internal pure returns (bool) {
+    function validContribution(Party party, uint16 lockState) internal pure returns (bool) {
         uint256 pIndex = uint256(party);
         uint256 lock = uint256(lockState);
 
         // median index party = Solver
-        if (pIndex > uint256(GasParty.Solver)) {
+        if (pIndex > uint256(Party.Solver)) {
             // CASE: DAPP
-            if (pIndex == uint256(GasParty.DApp)) {
+            if (pIndex == uint256(Party.DApp)) {
                 return lock & VALID_PHASES_DAPP_CONTRIBUTION != 0;
             
             // CASE: USER
@@ -101,11 +101,11 @@ library GasPartyMath {
             }
         
         // CASE: SOLVER
-        } else if (pIndex == uint256(GasParty.Solver)) {
+        } else if (pIndex == uint256(Party.Solver)) {
             return lock & VALID_PHASES_SOLVER_CONTRIBUTION != 0;
         
         // CASE: BUNDLER
-        } else if (pIndex == uint256(GasParty.Bundler)) {
+        } else if (pIndex == uint256(Party.Bundler)) {
             return lock & VALID_PHASES_BUNDLER_CONTRIBUTION != 0;
             
         // CASE: BUILDER
@@ -114,14 +114,14 @@ library GasPartyMath {
         }
     }
 
-    function validRequest(GasParty party, uint16 lockState) internal pure returns (bool) {
+    function validRequest(Party party, uint16 lockState) internal pure returns (bool) {
         uint256 pIndex = uint256(party);
         uint256 lock = uint256(lockState);
 
         // median index party = Solver
-        if (pIndex > uint256(GasParty.Solver)) {
+        if (pIndex > uint256(Party.Solver)) {
             // CASE: DAPP
-            if (pIndex == uint256(GasParty.DApp)) {
+            if (pIndex == uint256(Party.DApp)) {
                 return lock & VALID_PHASES_DAPP_REQUEST != 0;
             
             // CASE: USER
@@ -130,11 +130,11 @@ library GasPartyMath {
             }
         
         // CASE: SOLVER
-        } else if (pIndex == uint256(GasParty.Solver)) {
+        } else if (pIndex == uint256(Party.Solver)) {
             return lock & VALID_PHASES_SOLVER_REQUEST != 0;
         
         // CASE: BUNDLER
-        } else if (pIndex == uint256(GasParty.Bundler)) {
+        } else if (pIndex == uint256(Party.Bundler)) {
             return lock & VALID_PHASES_BUNDLER_REQUEST != 0;
             
         // CASE: BUILDER

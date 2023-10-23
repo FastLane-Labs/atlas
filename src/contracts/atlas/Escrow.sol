@@ -58,7 +58,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
         userData = abi.encodePacked(userData, lockBytes);
 
         if (userOp.value > 0) {
-            _use(GasParty.User, userOp.from, userOp.value);
+            _use(Party.User, userOp.from, userOp.value);
             (success, userData) = environment.call{value: userOp.value}(userData);
         } else {
             (success, userData) = environment.call(userData);
@@ -91,7 +91,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
             key = key.holdSolverLock(solverOp.solver);
 
             if (solverOp.value != 0) {
-                _borrow(GasParty.Solver, solverOp.value);
+                _borrow(Party.Solver, solverOp.value);
             }
 
             // Execute the solver call

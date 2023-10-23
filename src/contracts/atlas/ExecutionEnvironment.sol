@@ -13,7 +13,7 @@ import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
 import {ExecutionPhase} from "../types/LockTypes.sol";
-import {GasParty} from "../types/EscrowTypes.sol";
+import {Party} from "../types/EscrowTypes.sol";
 
 import {Base} from "../common/ExecutionBase.sol";
 
@@ -49,7 +49,7 @@ contract ExecutionEnvironment is Base {
         _;
     }
 
-    modifier contributeSurplus(GasParty party) {
+    modifier contributeSurplus(Party party) {
         _;
         {
         uint256 balance = address(this).balance;
@@ -78,7 +78,7 @@ contract ExecutionEnvironment is Base {
         external
         validUser(userOp)
         onlyAtlasEnvironment(ExecutionPhase.PreOps, _ENVIRONMENT_DEPTH)
-        contributeSurplus(GasParty.DApp)
+        contributeSurplus(Party.DApp)
         returns (bytes memory)
     {
         // msg.sender = atlas
@@ -104,7 +104,7 @@ contract ExecutionEnvironment is Base {
         payable
         validUser(userOp)
         onlyAtlasEnvironment(ExecutionPhase.UserOperation, _ENVIRONMENT_DEPTH)
-        contributeSurplus(GasParty.User)
+        contributeSurplus(Party.User)
         validControlHash
         returns (bytes memory userData) 
     {
@@ -137,7 +137,7 @@ contract ExecutionEnvironment is Base {
     function postOpsWrapper(bytes calldata returnData) 
         external
         onlyAtlasEnvironment(ExecutionPhase.PostOps, _ENVIRONMENT_DEPTH)
-        contributeSurplus(GasParty.DApp)
+        contributeSurplus(Party.DApp)
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
@@ -269,7 +269,7 @@ contract ExecutionEnvironment is Base {
     function allocateValue(address bidToken, uint256 bidAmount, bytes memory returnData) 
         external 
         onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _ENVIRONMENT_DEPTH)
-        contributeSurplus(GasParty.Solver)
+        contributeSurplus(Party.Solver)
     {
         // msg.sender = escrow
         // address(this) = ExecutionEnvironment

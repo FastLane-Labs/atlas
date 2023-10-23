@@ -81,7 +81,7 @@ abstract contract Permit69 is GasAccounting {
         ERC20(token).safeTransferFrom(controller, destination, amount);
     }
 
-    function requestGasFrom(GasParty donor, GasParty recipient, uint256 amt, uint16 lockState) external {
+    function requestGasFrom(Party donor, Party recipient, uint256 amt, uint16 lockState) external {
         // Verify the parties
         require(_validParties(msg.sender, donor, recipient), "ERR-T003 InvalidEnvironment");
 
@@ -94,7 +94,7 @@ abstract contract Permit69 is GasAccounting {
         _requestFrom(donor, recipient, amt);
     }
 
-    function contributeGasTo(GasParty donor, GasParty recipient, uint256 amt, uint16 lockState) external {
+    function contributeGasTo(Party donor, Party recipient, uint256 amt, uint16 lockState) external {
         // Verify the parties
         require(_validParties(msg.sender, donor, recipient), "ERR-T004 InvalidEnvironment");
 

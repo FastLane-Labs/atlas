@@ -10,14 +10,14 @@ import "../types/LockTypes.sol";
 
 
 import {EscrowBits} from "../libraries/EscrowBits.sol";
-import {GasPartyMath} from "../libraries/GasParties.sol";
+import {PartyMath} from "../libraries/GasParties.sol";
 
 import "forge-std/Test.sol";
 
 abstract contract GasAccounting is SafetyLocks {
     using SafeTransferLib for ERC20;
-    using GasPartyMath for GasParty;
-    using GasPartyMath for uint256;
+    using PartyMath for Party;
+    using PartyMath for uint256;
 
     uint256 constant public BUNDLER_PREMIUM = 105; // the amount over cost that bundlers get paid
     uint256 constant public BUNDLER_BASE = 100;
@@ -27,7 +27,7 @@ abstract contract GasAccounting is SafetyLocks {
     constructor(address _simulator) SafetyLocks(_simulator) {}
 
     // NOTE: donations are simply deposits that have a different msg.sender than receiving party
-    function _deposit(GasParty party, uint256 amt) internal returns (uint256 balanceOwed) {
+    function _deposit(Party party, uint256 amt) internal returns (uint256 balanceOwed) {
 
         int64 depositAmount = int64(uint64(amt / tx.gasprice));
         uint256 partyIndex = uint256(party);
@@ -45,7 +45,7 @@ abstract contract GasAccounting is SafetyLocks {
     }
 
 
-    function _borrow(GasParty party, uint256 amt) internal {
+    function _borrow(Party party, uint256 amt) internal {
         // Note that for Solver borrows, the repayment check happens *inside* the try/catch. 
 
         int64 borrowAmount = int64(uint64(amt / tx.gasprice))+1;
@@ -60,7 +60,7 @@ abstract contract GasAccounting is SafetyLocks {
         ledgers[partyIndex] = pLedger;
     }
 
-    function _use(GasParty party, address partyAddress, uint256 amt) internal {
+    function _use(Party party, address partyAddress, uint256 amt) internal {
         
         int64 amount = int64(uint64(amt / tx.gasprice))+1;
         uint256 partyIndex = uint256(party);
@@ -116,7 +116,7 @@ abstract contract GasAccounting is SafetyLocks {
         revert("ERR-GA022 InsufficientFunds");
     }
 
-    function _requestFrom(GasParty donor, GasParty recipient, uint256 amt) internal {
+    function _requestFrom(Party donor, Party recipient, uint256 amt) internal {
         // TODO: different parties will be ineligible to request funds from once their phase is over.
         // We need to add a phase check to verify this. 
 
@@ -141,7 +141,7 @@ abstract contract GasAccounting is SafetyLocks {
         ledgers[recipientIndex] = rLedger;
     }
 
-    function _contributeTo(GasParty donor, GasParty recipient, uint256 amt) internal {
+    function _contributeTo(Party donor, Party recipient, uint256 amt) internal {
 
         int64 amount = int64(uint64(amt / tx.gasprice));
 
@@ -167,7 +167,7 @@ abstract contract GasAccounting is SafetyLocks {
 
 
     function validateBalances() external view returns (bool valid) {
-        valid = ledgers[uint256(GasParty.Solver)].status == LedgerStatus.Finalized && _isInSurplus(msg.sender);
+        valid = ledgers[uint256(Party.Solver)].status == LedgerStatus.Finalized && _isInSurplus(msg.sender);
     }
 
     function _isInSurplus(address environment) internal view returns (bool) {
@@ -227,7 +227,7 @@ abstract contract GasAccounting is SafetyLocks {
 
             Ledger memory pLedger = ledgers[i];
 
-            if (i == uint256(GasParty.Bundler)) {
+            if (i == uint256(Party.Bundler)) {
                 pLedger.balance += int64(uint64(accruedGasRebate));
             }
 
@@ -250,7 +250,7 @@ abstract contract GasAccounting is SafetyLocks {
         int64 gasRemainder = int64(uint64(gasleft() + accruedGasRebate + 20_000));
 
         // Reduce the bundler's gas request by the unused gas
-        mLedgers[uint256(GasParty.Bundler)].requested += gasRemainder;
+        mLedgers[uint256(Party.Bundler)].requested += gasRemainder;
         totalRequests += gasRemainder;
 
         {
@@ -333,7 +333,7 @@ abstract contract GasAccounting is SafetyLocks {
                 escrowData.balance += (uint128(uint64(partyBalanceDelta)) * uint128(tx.gasprice));
             }
 
-            if (i == uint256(GasParty.Solver)) {
+            if (i == uint256(Party.Solver)) {
                 ++escrowData.nonce;
             }
 
@@ -351,24 +351,24 @@ abstract contract GasAccounting is SafetyLocks {
 
     // TODO: Unroll this - just doing it for now to improve readability
     function _partyAddress(uint256 index, address user, address dapp, address winningSolver, address bundler) internal view returns (address) {
-        GasParty party = GasParty(index);
-        if (party == GasParty.DApp) return dapp;
-        if (party == GasParty.User) return user;
-        if (party == GasParty.Solver) return winningSolver;
-        if (party == GasParty.Bundler) return bundler; // <3
-        if (party == GasParty.Builder) return block.coinbase;
+        Party party = Party(index);
+        if (party == Party.DApp) return dapp;
+        if (party == Party.User) return user;
+        if (party == Party.Solver) return winningSolver;
+        if (party == Party.Bundler) return bundler; // <3
+        if (party == Party.Builder) return block.coinbase;
         return address(this);
     }
 
     
     // for testing purposes
     function _partyName(uint256 index) internal pure returns (string memory) {
-        GasParty party = GasParty(index);
-        if (party == GasParty.DApp) return "dApp";
-        if (party == GasParty.User) return "user";
-        if (party == GasParty.Solver) return "solver";
-        if (party == GasParty.Bundler) return "bundler"; 
-        if (party == GasParty.Builder) return "builder";
+        Party party = Party(index);
+        if (party == Party.DApp) return "dApp";
+        if (party == Party.User) return "user";
+        if (party == Party.Solver) return "solver";
+        if (party == Party.Bundler) return "bundler"; 
+        if (party == Party.Builder) return "builder";
         return "unknown";
     }
 
@@ -378,7 +378,7 @@ abstract contract GasAccounting is SafetyLocks {
     }
     
 
-    function _validParty(address environment, GasParty party) internal returns (bool valid) {
+    function _validParty(address environment, Party party) internal returns (bool valid) {
         Lock memory mLock = lock;
         if (mLock.activeEnvironment != environment) {
             return false;
@@ -393,7 +393,7 @@ abstract contract GasAccounting is SafetyLocks {
         return true;
     }
 
-    function _validParties(address environment, GasParty partyOne, GasParty partyTwo) internal returns (bool valid) {
+    function _validParties(address environment, Party partyOne, Party partyTwo) internal returns (bool valid) {
         Lock memory mLock = lock;
         if (mLock.activeEnvironment != environment) {
             return false;
@@ -409,7 +409,7 @@ abstract contract GasAccounting is SafetyLocks {
         return true;
     }
 
-    function contribute(GasParty recipient) external payable {
+    function contribute(Party recipient) external payable {
         require(_validParty(msg.sender, recipient), "ERR-GA020 InvalidEnvironment"); 
 
         int64 amount = int64(uint64((msg.value) / tx.gasprice));
@@ -438,7 +438,7 @@ abstract contract GasAccounting is SafetyLocks {
         ledgers[pIndex] = pLedger;
     }
 
-    function deposit(GasParty party) external payable {
+    function deposit(Party party) external payable {
         require(_validParty(msg.sender, party), "ERR-GA022 InvalidEnvironment");
 
         int64 amount = int64(uint64((msg.value) / tx.gasprice));
@@ -457,19 +457,19 @@ abstract contract GasAccounting is SafetyLocks {
     // NOTE: DAPPs can gain malicious access to these funcs if they want to, but attacks beyond
     // the approved amounts will only lead to a revert.  
     // Bundlers must make sure the DApp hasn't maliciously upgraded their contract to avoid wasting gas. 
-    function contributeTo(GasParty donor, GasParty recipient, uint256 amt) external {
+    function contributeTo(Party donor, Party recipient, uint256 amt) external {
         require(_validParties(msg.sender, donor, recipient), "ERR-GA021 InvalidEnvironment");
         _contributeTo(donor, recipient, amt);
     }
 
-    function requestFrom(GasParty donor, GasParty recipient, uint256 amt) external {
+    function requestFrom(Party donor, Party recipient, uint256 amt) external {
         require(_validParties(msg.sender, donor, recipient), "ERR-GA022 InvalidEnvironment"); 
         _requestFrom(donor, recipient, amt);
     }
 
-    function finalize(GasParty party, address partyAddress) external returns (bool) {
+    function finalize(Party party, address partyAddress) external returns (bool) {
         require(_validParty(msg.sender, party), "ERR-GA024 InvalidEnvironment");
-        require(party != GasParty.Solver, "ERR-GA025 SolverMustReconcile");
+        require(party != Party.Solver, "ERR-GA025 SolverMustReconcile");
 
         uint256 pIndex = uint256(party);
         Ledger memory pLedger = ledgers[pIndex];
@@ -491,11 +491,11 @@ abstract contract GasAccounting is SafetyLocks {
     function reconcile(address environment, address searcherFrom, uint256 maxApprovedGasSpend) external payable returns (bool) {
         // NOTE: approvedAmount is the amount of the solver's atlETH that the solver is allowing
         // to be used to cover what they owe.  This will be subtracted later - tx will revert here if there isn't enough. 
-        if (!_validParty(environment, GasParty.Solver)) {
+        if (!_validParty(environment, Party.Solver)) {
             return false;
         }
 
-        uint256 partyIndex = uint256(GasParty.Solver);
+        uint256 partyIndex = uint256(Party.Solver);
 
         Ledger memory pLedger = ledgers[partyIndex];
         if (pLedger.status == LedgerStatus.Finalized) {
