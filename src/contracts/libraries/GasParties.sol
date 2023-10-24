@@ -4,8 +4,6 @@ pragma solidity ^0.8.16;
 import {Party} from "../types/EscrowTypes.sol";
 import {Lock, BaseLock, ExecutionPhase} from "../types/LockTypes.sol";
 
-
-
 library PartyMath {
 
     function toBit(Party party) internal pure returns (uint256 partyBit) {
@@ -14,6 +12,10 @@ library PartyMath {
 
     function markActive(uint256 activeParties, Party party) internal pure returns (uint256) {
         return activeParties | 1 << ((uint256(party) + 1));
+    }
+
+    function markInactive(uint256 activeParties, Party party) internal pure returns (uint256) {
+        return activeParties & ~(1 << ((uint256(party) + 1)));
     }
 
     function isActive(uint256 activeParties, Party party) internal pure returns (bool) {

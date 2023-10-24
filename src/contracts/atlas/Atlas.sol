@@ -50,10 +50,10 @@ contract Atlas is Test, Factory {
         }
 
         // Initialize the lock
-        _initializeEscrowLock(userOp, executionEnvironment, gasMarker);
+        _initializeEscrowLock(userOp, executionEnvironment, msg.sender, gasMarker);
 
         try this.execute{value: msg.value}(
-            dConfig, userOp, solverOps, executionEnvironment, msg.sender == simulator
+            dConfig, userOp, solverOps, executionEnvironment, msg.sender
         ) returns (bool _auctionWon, uint256 accruedGasRebate, uint256 winningSolverIndex) {
             
             auctionWon = _auctionWon;
@@ -82,17 +82,17 @@ contract Atlas is Test, Factory {
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         address executionEnvironment,
-        bool isSimulation
+        address bundler
     ) external payable returns (bool auctionWon, uint256 accruedGasRebate, uint256 winningSearcherIndex) {
         
         // This is a self.call made externally so that it can be used with try/catch
         require(msg.sender == address(this), "ERR-F06 InvalidAccess");
         
         // Build the memory lock
-        EscrowKey memory key = _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), isSimulation);
+        EscrowKey memory key = _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), bundler == simulator);
 
         // Begin execution
-        (auctionWon, accruedGasRebate, winningSearcherIndex) = _execute(dConfig, userOp, solverOps, executionEnvironment, key);
+        (auctionWon, accruedGasRebate, winningSearcherIndex) = _execute(dConfig, userOp, solverOps, executionEnvironment, bundler, key);
     }
 
     function _execute(
@@ -100,6 +100,7 @@ contract Atlas is Test, Factory {
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         address executionEnvironment,
+        address bundler,
         EscrowKey memory key
     ) internal returns (bool auctionWon, uint256 accruedGasRebate, uint256 winningSearcherIndex) {
         // Build the CallChainProof.  The penultimate hash will be used
@@ -107,7 +108,6 @@ contract Atlas is Test, Factory {
        
         bool callSuccessful;
         bytes32 userOpHash = userOp.getUserOperationHash();
-        uint32 callConfig = dConfig.callConfig;
 
         bytes memory returnData;
 
@@ -127,21 +127,21 @@ contract Atlas is Test, Factory {
             if (key.isSimulation) { revert UserOpSimFail(); } else { revert("ERR-E002 UserFail"); }
         }
 
-        if (CallBits.needsPreOpsReturnData(callConfig)) {
+        if (CallBits.needsPreOpsReturnData(dConfig.callConfig)) {
             //returnData = returnData;
-            if (CallBits.needsUserReturnData(callConfig)) {
+            if (CallBits.needsUserReturnData(dConfig.callConfig)) {
                 returnData = bytes.concat(returnData, userReturnData);
             }
-        } else if (CallBits.needsUserReturnData(callConfig)) {
+        } else if (CallBits.needsUserReturnData(dConfig.callConfig)) {
             returnData = userReturnData;
         } 
 
         for (; winningSearcherIndex < solverOps.length;) {
 
             // Only execute solver meta tx if userOpHash matches 
-            if (!auctionWon && userOpHash == solverOps[key.callIndex-2].userOpHash) {
+            if (!auctionWon && userOpHash == solverOps[winningSearcherIndex].userOpHash) {
                 (auctionWon, key) = _solverExecutionIteration(
-                    dConfig, solverOps[key.callIndex-2], returnData, auctionWon, executionEnvironment, key
+                    dConfig, solverOps[winningSearcherIndex], returnData, auctionWon, executionEnvironment, bundler, key
                 );
                 if (auctionWon) break;
             }
@@ -174,9 +174,10 @@ contract Atlas is Test, Factory {
         bytes memory dAppReturnData,
         bool auctionWon,
         address executionEnvironment,
+        address bundler,
         EscrowKey memory key
     ) internal returns (bool, EscrowKey memory) {
-        (auctionWon, key) = _executeSolverOperation(solverOp, dAppReturnData, executionEnvironment, key);
+        (auctionWon, key) = _executeSolverOperation(solverOp, dAppReturnData, executionEnvironment, bundler, key);
         unchecked {
                 ++key.callIndex;
             }

@@ -185,12 +185,12 @@ library SafetyBits {
         return self;
     }
 
-    function initializeEscrowLock(EscrowKey memory self, bool needsPreOps, uint8 solverOpCount, address nextCaller, bool isSimulation)
+    function initializeEscrowLock(EscrowKey memory self, bool needsPreOps, uint8 solverOpCount, address firstApprovedAddress, bool isSimulation)
         internal
         pure
         returns (EscrowKey memory)
     {
-        self.approvedCaller = nextCaller;
+        self.approvedCaller = firstApprovedAddress;
         self.callMax = solverOpCount + 3;
         self.callIndex = needsPreOps ? 0 : 1;
         self.lockState = needsPreOps ? _ACTIVE_X_PRE_OPS_X_UNSET : _ACTIVE_X_USER_X_UNSET;

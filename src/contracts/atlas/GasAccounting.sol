@@ -29,13 +29,11 @@ abstract contract GasAccounting is SafetyLocks {
     // NOTE: donations are simply deposits that have a different msg.sender than receiving party
     function _deposit(Party party, uint256 amt) internal returns (uint256 balanceOwed) {
 
-        int64 depositAmount = int64(uint64(amt / tx.gasprice));
-        uint256 partyIndex = uint256(party);
+        (Ledger memory pLedger, uint256 partyIndex) = _getLedger(party);
 
-        Ledger memory pLedger = ledgers[partyIndex];
         require(pLedger.status != LedgerStatus.Finalized, "ERR-GA002, LedgerFinalized");
 
-        if (pLedger.status == LedgerStatus.Inactive) pLedger.status = LedgerStatus.Active;
+        int64 depositAmount = int64(uint64(amt / tx.gasprice));
 
         pLedger.balance += depositAmount;
         
@@ -47,29 +45,41 @@ abstract contract GasAccounting is SafetyLocks {
 
     function _borrow(Party party, uint256 amt) internal {
         // Note that for Solver borrows, the repayment check happens *inside* the try/catch. 
+       
+        (Ledger memory pLedger, uint256 partyIndex) = _getLedger(party);
 
+        require(uint256(pLedger.status) < uint256(LedgerStatus.Balancing), "ERR-GA003a, LedgerFinalized");
+       
         int64 borrowAmount = int64(uint64(amt / tx.gasprice))+1;
-        uint256 partyIndex = uint256(party);
-
-        Ledger memory pLedger = ledgers[partyIndex];
-        require(uint256(pLedger.status) < uint256(LedgerStatus.Balancing), "ERR-GA003, LedgerFinalized");
-        if (pLedger.status == LedgerStatus.Inactive) pLedger.status = LedgerStatus.Active;
-
         pLedger.balance -= borrowAmount;
+        pLedger.status = LedgerStatus.Borrowing;
+        
+        ledgers[partyIndex] = pLedger;
+    }
+
+    function _tradeCorrection(Party party, uint256 amt) internal {
+        // Note that for Solver borrows, the repayment check happens *inside* the try/catch.
+        // This function is to mark off a solver borrow from a failed tx 
+       
+        (Ledger memory pLedger, uint256 partyIndex) = _getLedger(party);
+
+        require(pLedger.status == LedgerStatus.Borrowing, "ERR-GA003b, LedgerFinalized");
+       
+        int64 borrowAmount = int64(uint64(amt / tx.gasprice))+1;
+        pLedger.balance += borrowAmount;
+        pLedger.status = LedgerStatus.Active;
         
         ledgers[partyIndex] = pLedger;
     }
 
     function _use(Party party, address partyAddress, uint256 amt) internal {
         
-        int64 amount = int64(uint64(amt / tx.gasprice))+1;
-        uint256 partyIndex = uint256(party);
-
-        Ledger memory pLedger = ledgers[partyIndex];
+        (Ledger memory pLedger, uint256 partyIndex) = _getLedger(party);
 
         require(uint256(pLedger.status) < uint256(LedgerStatus.Balancing), "ERR-GA004, LedgerBalancing");
-        if (pLedger.status == LedgerStatus.Inactive) pLedger.status = LedgerStatus.Active;
         
+        int64 amount = int64(uint64(amt / tx.gasprice))+1;
+
         if (pLedger.requested > 0) {
             if (amount > pLedger.requested) {
                 amount -= pLedger.requested;
@@ -120,19 +130,13 @@ abstract contract GasAccounting is SafetyLocks {
         // TODO: different parties will be ineligible to request funds from once their phase is over.
         // We need to add a phase check to verify this. 
 
-        int64 amount = int64(uint64(amt / tx.gasprice));
-
-        uint256 donorIndex = uint256(donor);
-        uint256 recipientIndex = uint256(recipient);
-
-        Ledger memory dLedger = ledgers[donorIndex];
-        Ledger memory rLedger = ledgers[recipientIndex];
-
+        (Ledger memory dLedger, uint256 donorIndex) = _getLedger(donor);
         require(uint256(dLedger.status) < uint256(LedgerStatus.Balancing), "ERR-GA004, LedgerBalancing");
-        if (dLedger.status == LedgerStatus.Inactive) dLedger.status = LedgerStatus.Active;
 
+        (Ledger memory rLedger, uint256 recipientIndex) = _getLedger(recipient);
         require(rLedger.status != LedgerStatus.Finalized, "ERR-GA005, LedgerFinalized");
-        if (rLedger.status == LedgerStatus.Inactive) rLedger.status = LedgerStatus.Active;
+
+        int64 amount = int64(uint64(amt / tx.gasprice));
 
         dLedger.contributed -= amount;
         rLedger.requested -= amount;
@@ -143,19 +147,13 @@ abstract contract GasAccounting is SafetyLocks {
 
     function _contributeTo(Party donor, Party recipient, uint256 amt) internal {
 
-        int64 amount = int64(uint64(amt / tx.gasprice));
-
-        uint256 donorIndex = uint256(donor);
-        uint256 recipientIndex = uint256(recipient);
-
-        Ledger memory dLedger = ledgers[donorIndex];
-        Ledger memory rLedger = ledgers[recipientIndex];
-
+        (Ledger memory dLedger, uint256 donorIndex) = _getLedger(donor);
         require(dLedger.status != LedgerStatus.Finalized, "ERR-GA006, LedgerFinalized");
-        if (dLedger.status == LedgerStatus.Inactive) dLedger.status = LedgerStatus.Active;
 
+        (Ledger memory rLedger, uint256 recipientIndex) = _getLedger(recipient);
         require(rLedger.status != LedgerStatus.Finalized, "ERR-GA007, LedgerFinalized");
-        if (rLedger.status == LedgerStatus.Inactive) rLedger.status = LedgerStatus.Active;
+
+        int64 amount = int64(uint64(amt / tx.gasprice));
 
         dLedger.balance -= amount;
         dLedger.contributed += amount;
@@ -174,14 +172,11 @@ abstract contract GasAccounting is SafetyLocks {
         Lock memory mLock = lock;
         if (mLock.activeEnvironment != environment) return false;
 
-        int64 atlasBalanceDelta = int64(mLock.startingBalance) - int64(uint64(address(this).balance / tx.gasprice));
-
-        int64 balanceDelta;
+        int64 totalBalanceDelta;
         int64 totalRequests;
         int64 totalContributions;
 
         uint256 activeParties = uint256(mLock.activeParties);
-        Ledger memory pLedger;
         for (uint256 i; i < _ledgerLength;) {
             // If party has not been touched, skip it
             if (activeParties & 1<<(i+1) == 0){
@@ -189,26 +184,33 @@ abstract contract GasAccounting is SafetyLocks {
                 continue;
             }
 
-            pLedger = ledgers[i];
+            Ledger memory pLedger = ledgers[i];
+            if (uint256(pLedger.proxy) != i) {
+                unchecked{++i;}
+                continue;
+            }
 
-            balanceDelta += pLedger.balance;
+            totalBalanceDelta += pLedger.balance;
             totalRequests += pLedger.requested;
             totalContributions += pLedger.contributed;
 
             unchecked{++i;}
         }
 
+        int64 atlasBalanceDelta = int64(uint64((address(this).balance) / tx.gasprice)) - int64(mLock.startingBalance);
+
         // If atlas balance is lower than expected, return false
-        if (atlasBalanceDelta < balanceDelta) return false;
+        if (atlasBalanceDelta < totalRequests + totalContributions + totalBalanceDelta) return false;
 
         // If the requests have not yet been met, return false
-        if (totalRequests > totalContributions) return false;
+        if (totalRequests + totalContributions < 0) return false;
 
         // Otherwise return true
         return true;
     }
 
     function _balance(uint256 accruedGasRebate, address user, address dapp, address winningSolver, address bundler) internal {
+        
         Lock memory mLock = lock;
 
         int64 totalRequests;
@@ -221,27 +223,52 @@ abstract contract GasAccounting is SafetyLocks {
         for (uint256 i; i < _ledgerLength;) {
             // If party has not been touched, skip it
             if (activeParties.isInactive(i)) {
+                console.log("");
+                console.log("Party:", _partyName(i));
+                console.log("inactive");
+                console.log("-");
                 unchecked{++i;}
                 continue;
             }
 
             Ledger memory pLedger = ledgers[i];
 
-            if (i == uint256(Party.Bundler)) {
-                pLedger.balance += int64(uint64(accruedGasRebate));
-            }
+            require(pLedger.contributed >= 0, "ERR-GA099 NoDeficitsAllowed");
 
-            totalBalanceDelta += pLedger.balance;
-            totalRequests += pLedger.requested;
-            totalContributions += pLedger.contributed;
+            // Only tally totals from non-proxies
+            if (uint256(pLedger.proxy) == i) {
+            
+                console.log("");
+                console.log("Party:", _partyName(i));
+                console.log("ACTIVE");
+                console.log("-");
+
+                if (i == uint256(Party.Bundler)) {
+                    pLedger.balance += int64(uint64(accruedGasRebate));
+                }
+
+                totalBalanceDelta += pLedger.balance;
+                totalRequests += pLedger.requested;
+                totalContributions += pLedger.contributed;
+            
+            // Mark inactive if proxy
+            } else {
+                console.log("");
+                console.log("Party:", _partyName(i));
+                console.log("proxy");
+                console.log("-");
+                activeParties = activeParties.markInactive(Party(i));
+            }
 
             mLedgers[i] = pLedger;
 
+            // Clear the storage
             ledgers[i] = Ledger({
                 balance: 0,
                 contributed: 0,
                 requested: 0,
-                status: LedgerStatus.Inactive
+                status: LedgerStatus.Inactive,
+                proxy: Party(i)
             });
 
             unchecked{++i;}
@@ -250,35 +277,48 @@ abstract contract GasAccounting is SafetyLocks {
         int64 gasRemainder = int64(uint64(gasleft() + accruedGasRebate + 20_000));
 
         // Reduce the bundler's gas request by the unused gas
-        mLedgers[uint256(Party.Bundler)].requested += gasRemainder;
+        (, uint256 i) = _getLedger(Party.Bundler);
+        mLedgers[i].requested += gasRemainder;
+
         totalRequests += gasRemainder;
 
         {
-        int64 surplus = totalRequests + totalContributions;
-        require(surplus > 0, "ERR-GA014a, MissingFunds");
+        require(totalRequests + totalContributions >= 0, "ERR-GA014a MissingFunds");
 
         // TODO: Adjust to accomodate the direction of rounding errors. 
-        int64 atlasBalanceDelta = int64(uint64((address(this).balance - msg.value) / tx.gasprice)) - int64(mLock.startingBalance);
-        require(atlasBalanceDelta >= surplus + totalBalanceDelta);
+        int64 atlasBalanceDelta = int64(uint64(address(this).balance / tx.gasprice)) - int64(mLock.startingBalance);
 
         console.log("");
         console.log("--");
-        console.log("gasRebate  :", accruedGasRebate);
-        _logInt64("surplus      :", surplus);
         _logInt64("gasRemainder :", gasRemainder);
+        console.log("gasRebate    : +", accruedGasRebate);
+        console.log("-");
+        _logInt64("balanceDelta :", atlasBalanceDelta);
+        _logInt64("surplus      :", totalRequests + totalContributions);
         _logInt64("totalRequests:", totalRequests);
         _logInt64("contributions:", totalContributions);
         console.log("--");
-        console.log("balances");
+
+        if (atlasBalanceDelta < totalBalanceDelta + totalContributions - totalRequests) {
+            revert("ERR-GA014b MissingFunds");
         }
-        
-        
-        for (uint256 i; i < _ledgerLength;) {
+        }
+
+        for (i=0; i < _ledgerLength;) {
+            console.log("hi4");
             // If party has not been touched, skip it
             if (activeParties.isInactive(i)) {
+                console.log("");
+                console.log("Party:", _partyName(i));
+                console.log("confirmed - inactive");
+                console.log("-");
                 unchecked{++i;}
                 continue;
             }
+            console.log("");
+            console.log("Party:", _partyName(i));
+            console.log("confirmed - ACTIVE");
+            console.log("-");
     
             address partyAddress = _partyAddress(i, user, dapp, winningSolver, bundler);
 
@@ -286,7 +326,6 @@ abstract contract GasAccounting is SafetyLocks {
 
             EscrowAccountData memory escrowData = _escrowAccountData[partyAddress];
 
-            
             console.log("");
             console.log("Party:", _partyName(i));
             console.log("-");
@@ -294,7 +333,6 @@ abstract contract GasAccounting is SafetyLocks {
             _logInt64("requested   :", pLedger.requested);
             _logInt64("contributed :", pLedger.contributed);
             
-
             // CASE: Some Requests still in Deficit
             if (totalRequests < 0 && pLedger.contributed > 0) {
                 if (totalRequests + pLedger.contributed > 0) {
@@ -317,10 +355,9 @@ abstract contract GasAccounting is SafetyLocks {
                 }
             }
 
-
             int64 partyBalanceDelta = pLedger.balance + pLedger.contributed - pLedger.requested;
 
-            
+
             _logInt64("pDelta      :", partyBalanceDelta);
             console.log("-");
             console.log("Starting Bal:", escrowData.balance);
@@ -409,13 +446,186 @@ abstract contract GasAccounting is SafetyLocks {
         return true;
     }
 
+    function _getLedger(Party party) internal view returns (Ledger memory pLedger, uint256 index) {
+        uint256 partyIndex;
+
+        do {
+            partyIndex = uint256(party);
+            pLedger = ledgers[partyIndex];
+            party = pLedger.proxy;
+            index = uint256(party);
+            
+        } while (partyIndex != index);
+
+        if (pLedger.status == LedgerStatus.Inactive) pLedger.status = LedgerStatus.Active;
+    }
+
+    function _checkSolverProxy(address solverFrom, address bundler) internal returns (bool validSolver) {
+        // Note that the Solver can't be the User or the DApp - those combinations are blocked in the ExecutionEnvironment. 
+
+        if (solverFrom == block.coinbase) {
+            uint256 builderIndex = uint256(Party.Builder);
+            Ledger memory pLedger = ledgers[builderIndex];
+
+            // CASE: Invalid combination (solver = coinbase = user | dapp)
+            if (uint256(pLedger.proxy) > uint256(Party.Solver)) {
+                console.log("inv-a");
+                return false;
+            }
+
+            // CASE: ledger is finalized or balancing
+            if (uint256(pLedger.status) > uint256(LedgerStatus.Borrowing)) {
+                console.log("inv-b");
+                return false;
+            }
+
+            // CASE: proxy is solver or builder
+            // Pass, and check builder proxy next
+
+            // CASE: no proxy yet, so make one
+            if (uint256(pLedger.proxy) == builderIndex) {
+                uint256 activeParties = _getActiveParties();
+                if (activeParties.isInactive(Party.Builder)) {
+                    _saveActiveParties(activeParties.markActive(Party.Builder));
+                }
+
+                pLedger.status = LedgerStatus.Proxy;
+                pLedger.proxy = Party.Solver;
+                // Note: don't overwrite the stored values - we may need to undo the proxy if solver fails
+                ledgers[builderIndex] = pLedger; 
+
+                // Solver inherits the requests and contributions of their alter ego
+                uint256 solverIndex = uint256(Party.Solver);
+                Ledger memory sLedger = ledgers[solverIndex];
+
+                sLedger.balance += pLedger.balance;
+                sLedger.contributed += pLedger.contributed;
+                sLedger.requested += pLedger.requested;
+
+                ledgers[solverIndex] = sLedger;
+            }
+        } 
+        
+
+        if (solverFrom == bundler) {
+            uint256 bundlerIndex = uint256(Party.Bundler);
+            Ledger memory pLedger = ledgers[bundlerIndex];
+
+            // CASE: Invalid combination (solver = bundler = user | dapp)
+            if (uint256(pLedger.proxy) > uint256(Party.Solver)) {
+                console.log("inv-c");
+                return false;
+            }
+
+            // CASE: ledger is finalized or balancing
+            if (uint256(pLedger.status) > uint256(LedgerStatus.Borrowing)) {
+                console.log("inv-d");
+                return false;
+            }
+
+            // CASE: proxy is solver or builder
+            // Pass, and check builder proxy next
+
+            // CASE: no proxy
+            if (uint256(pLedger.proxy) == bundlerIndex) {
+                // Bundler is always active, so no need to mark. 
+
+                pLedger.status = LedgerStatus.Proxy;
+                pLedger.proxy = Party.Solver;
+                // Note: don't overwrite the stored values - we may need to undo the proxy if solver fails
+                ledgers[bundlerIndex] = pLedger; 
+
+                // Solver inherits the requests and contributions of their alter ego
+                uint256 solverIndex = uint256(Party.Solver);
+                Ledger memory sLedger = ledgers[solverIndex];
+
+                sLedger.balance += pLedger.balance;
+                sLedger.contributed += pLedger.contributed;
+                sLedger.requested += pLedger.requested;
+
+                ledgers[solverIndex] = sLedger;
+            }
+        }
+   
+        return true;
+    }
+
+    function _updateSolverProxy(address solverFrom, address bundler, bool solverSuccessful) internal {
+        // Note that the Solver can't be the User or the DApp - those combinations are blocked in the ExecutionEnvironment. 
+        
+        if (solverFrom == block.coinbase && block.coinbase != bundler) {
+
+            uint256 builderIndex = uint256(Party.Builder);
+            uint256 solverIndex = uint256(Party.Solver);
+
+            // Solver inherited the requests and contributions of their alter ego
+            Ledger memory pLedger = ledgers[builderIndex];
+            Ledger memory sLedger = ledgers[solverIndex];
+            
+            if (solverSuccessful) {
+            // CASE: Delete the balances on the older ledger
+            // TODO: Pretty sure we can skip this since it gets ignored and deleted later
+                pLedger.balance = 0;
+                pLedger.contributed = 0;
+                pLedger.requested = 0;
+
+                ledgers[builderIndex] = pLedger; // Proxy status stays
+                
+            } else {
+            // CASE: Undo the balance adjustments for the next solver
+                sLedger.balance -= pLedger.balance;
+                sLedger.contributed -= pLedger.contributed;
+                sLedger.requested -= pLedger.requested;
+
+                ledgers[solverIndex] = sLedger;
+
+                pLedger.proxy = Party.Builder;
+                pLedger.status = LedgerStatus.Active;
+
+                ledgers[builderIndex] = pLedger;
+            }
+        }
+
+        if (solverFrom == bundler) {
+           
+            uint256 bundlerIndex = uint256(Party.Bundler);
+            uint256 solverIndex = uint256(Party.Solver);
+
+            // Solver inherited the requests and contributions of their alter ego
+            Ledger memory pLedger = ledgers[bundlerIndex];
+            Ledger memory sLedger = ledgers[solverIndex];
+            
+            if (solverSuccessful) {
+            // CASE: Delete the balances on the older ledger
+            // TODO: Pretty sure we can skip this since it gets ignored and deleted later
+                pLedger.balance = 0;
+                pLedger.contributed = 0;
+                pLedger.requested = 0;
+
+                ledgers[bundlerIndex] = pLedger; // Proxy status stays
+                
+            } else {
+            // CASE: Undo the balance adjustments for the next solver
+                sLedger.balance -= pLedger.balance;
+                sLedger.contributed -= pLedger.contributed;
+                sLedger.requested -= pLedger.requested;
+
+                ledgers[solverIndex] = sLedger;
+
+                pLedger.proxy = Party.Bundler;
+                pLedger.status = LedgerStatus.Active;
+                
+                ledgers[bundlerIndex] = pLedger;
+            }
+        }
+    }
+
     function contribute(Party recipient) external payable {
         require(_validParty(msg.sender, recipient), "ERR-GA020 InvalidEnvironment"); 
 
         int64 amount = int64(uint64((msg.value) / tx.gasprice));
 
-        uint256 pIndex = uint256(recipient);
-        Ledger memory pLedger = ledgers[pIndex];
+        (Ledger memory pLedger, uint256 pIndex) = _getLedger(recipient);
 
         require(pLedger.status != LedgerStatus.Finalized, "ERR-GA021, LedgerFinalized");
         if (pLedger.status == LedgerStatus.Inactive) pLedger.status = LedgerStatus.Active;

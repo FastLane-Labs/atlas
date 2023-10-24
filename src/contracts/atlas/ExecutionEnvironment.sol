@@ -60,12 +60,20 @@ contract ExecutionEnvironment is Base {
     }
 
     modifier validSolver(SolverOperation calldata solverOp) {
+        {
         address solverTo = solverOp.solver;
-        if (solverTo == address(this) || solverTo == _control() || solverTo == atlas) {
+        address solverFrom = solverOp.from;
+        address control = _control();
+
+        if (solverTo == address(this) || solverTo == control || solverTo == atlas) {
             revert("ERR-EV008 InvalidTo");
         }
         if (solverTo != _approvedCaller()) {
             revert("ERR-EV009 WrongSolver");
+        }
+        if (solverFrom == _user() || solverFrom == solverTo || solverFrom == control) {
+            revert("ERR-EV009 InvalidFrom");
+        }
         }
         _;
     }

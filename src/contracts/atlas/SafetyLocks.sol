@@ -27,7 +27,7 @@ contract SafetyLocks {
     
     Lock public lock;
 
-    uint256 constant internal _ledgerLength = 5; // uint256(type(Party).max); // 6
+    uint256 constant internal _ledgerLength = 5; // uint256(type(Party).max); // 5
     Ledger[_ledgerLength] public ledgers;
 
     constructor(address _simulator) {
@@ -41,46 +41,85 @@ contract SafetyLocks {
         });
 
         for (uint256 i; i < _ledgerLength; i++) {
-            ledgers[i].status = LedgerStatus.Inactive; // init the storage vars
+            // init the storage vars
+            ledgers[i] = Ledger({
+                balance: 0,
+                contributed: 0,
+                requested: 0,
+                status: LedgerStatus.Inactive,
+                proxy: Party(i)
+            }); 
         }
     }
 
-    function _initializeEscrowLock(UserOperation calldata userOp, address executionEnvironment, uint256 gasLimit) onlyWhenUnlocked internal {
+    function _initializeEscrowLock(UserOperation calldata userOp, address executionEnvironment, address bundler, uint256 gasLimit) onlyWhenUnlocked internal {
 
         uint256 activeParties;
         activeParties = activeParties.markActive(Party.Bundler);
         activeParties = activeParties.markActive(Party.Solver);
 
+        uint256 bundlerIndex = uint256(Party.Bundler);
+
+        // Check for proxies 
+        // NOTE: Order is important here so that we can loop through these later without having to go backwards to find final proxy
+        // Builder proxy
+        if (block.coinbase == bundler) {
+            activeParties = activeParties.markActive(Party.Builder);
+            ledgers[uint256(Party.Builder)] = Ledger({
+                balance: 0,
+                contributed: 0,
+                requested: 0,
+                status: LedgerStatus.Proxy,
+                proxy: Party.Bundler
+            });
+
+        } else if (block.coinbase == userOp.from) {
+            activeParties = activeParties.markActive(Party.Builder);
+            ledgers[uint256(Party.Builder)] = Ledger({
+                balance: 0,
+                contributed: 0,
+                requested: 0,
+                status: LedgerStatus.Proxy,
+                proxy: Party.User
+            });
+        }
+
+        // Bundler proxy
+        if (bundler == userOp.from) {
+            // Bundler already marked active
+            ledgers[uint256(Party.Bundler)] = Ledger({
+                balance: 0,
+                contributed: 0,
+                requested: 0,
+                status: LedgerStatus.Proxy,
+                proxy: Party.User
+            });
+            bundlerIndex = uint256(Party.User);
+        }
+
+        // Initialize Ledger
         int64 iGasLimit = int64(uint64(gasLimit));
 
         if (msg.value != 0) {
             int64 bundlerDeposit = int64(uint64(msg.value / tx.gasprice));
-            ledgers[uint256(Party.Bundler)] = Ledger({
+            ledgers[bundlerIndex] = Ledger({
                 balance: 0,
                 contributed: bundlerDeposit,
                 requested: 0 - bundlerDeposit - iGasLimit,
-                status: LedgerStatus.Active
+                status: LedgerStatus.Active,
+                proxy: Party(bundlerIndex)
             });
         } else {
-            ledgers[uint256(Party.Bundler)] = Ledger({
+            ledgers[bundlerIndex] = Ledger({
                 balance: 0,
                 contributed: 0,
                 requested: 0 - iGasLimit,
-                status: LedgerStatus.Active
+                status: LedgerStatus.Active,
+                proxy: Party(bundlerIndex)
             });
         }
 
-        if (userOp.value != 0) {
-            activeParties = activeParties.markActive(Party.User);
-            int64 userRequest = int64(uint64(userOp.value / tx.gasprice));
-            ledgers[uint256(Party.Bundler)] = Ledger({
-                balance: 0,
-                contributed: 0,
-                requested: userRequest,
-                status: LedgerStatus.Active
-            });
-        }
-
+        // Initialize the Lock
         lock = Lock({
             activeEnvironment: executionEnvironment,
             activeParties: uint16(activeParties),
@@ -95,6 +134,7 @@ contract SafetyLocks {
         bool isSimulation
     ) internal view returns (EscrowKey memory self) {
 
+        // TODO: can we bypass this check?
         require(lock.activeEnvironment == executionEnvironment, "ERR-SL004 NotInitialized");
 
         self = self.initializeEscrowLock(
@@ -108,6 +148,15 @@ contract SafetyLocks {
             activeParties: uint16(0),
             startingBalance: uint64(0)
         });
+    }
+
+    function _getActiveParties() internal view returns (uint256 activeParties) {
+        Lock memory mLock = lock;
+        activeParties = uint256(mLock.activeParties);
+    }
+
+    function _saveActiveParties(uint256 activeParties) internal {
+        lock.activeParties = uint16(activeParties);
     }
 
     modifier onlyWhenUnlocked() {

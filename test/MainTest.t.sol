@@ -54,18 +54,23 @@ contract MainTest is BaseTest {
 
         SolverOperation[] memory solverOps = new SolverOperation[](2);
         bytes memory solverOpData;
+
+        console.log("solverOneEOA WETH:", WETH.balanceOf(address(solverOneEOA)));
+        console.log("solverOne    WETH:", WETH.balanceOf(address(solverOne)));
         // First SolverOperation
         solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_ONE);
         solverOps[1] =
-            helper.buildSolverOperation(userOp, solverOpData, solverOneEOA, address(solverOne), WETH.balanceOf(address(solverOneEOA)) * 2);
+            helper.buildSolverOperation(userOp, solverOpData, solverOneEOA, address(solverOne), WETH.balanceOf(address(solverOne)) / 20);
 
         (v, r, s) = vm.sign(solverOnePK, IAtlas(address(atlas)).getSolverPayload(solverOps[1]));
         solverOps[1].signature = abi.encodePacked(r, s, v);
         
+        console.log("solverTwoEOA WETH:", WETH.balanceOf(address(solverTwoEOA)));
+        console.log("solverTwo    WETH:", WETH.balanceOf(address(solverTwo)));
         // Second SolverOperation
         solverOpData = helper.buildV2SolverOperationData(POOL_ONE, POOL_TWO);
         solverOps[0] =
-            helper.buildSolverOperation(userOp, solverOpData, solverTwoEOA, address(solverTwo), WETH.balanceOf(address(solverTwoEOA)) / 2);
+            helper.buildSolverOperation(userOp, solverOpData, solverTwoEOA, address(solverTwo), WETH.balanceOf(address(solverTwo)) / 3000);
 
         (v, r, s) = vm.sign(solverTwoPK, IAtlas(address(atlas)).getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(r, s, v);
@@ -120,6 +125,12 @@ contract MainTest is BaseTest {
                 atlas.metacall.selector, userOp, solverOps, dAppOp
             )
         );
+
+        if (success) {
+            console.log("success!");
+        } else {
+            console.log("failure");
+        }
 
         assertTrue(success);
 
