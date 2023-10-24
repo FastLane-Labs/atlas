@@ -78,9 +78,6 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
 
-        console.log("");
-        console.log("solver",solverOp.from);
-
         // Verify the transaction.
         (uint256 result, uint256 gasLimit, EscrowAccountData memory solverEscrow) =
             _verify(solverOp, gasWaterMark, false);
@@ -95,6 +92,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
             }
 
             // Execute the solver call
+            // _solverOpsWrapper returns a SolverOutcome enum value
             result |= 1 << _solverOpWrapper(gasLimit, environment, solverOp, dAppReturnData, key.pack());
 
             if (result.executionSuccessful()) {
@@ -111,7 +109,6 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
 
             // Update the solver's escrow balances and the accumulated refund
             if (result.updateEscrow()) {
-                console.log("updating escrow");
                 key.gasRefund += uint32(_update(solverOp, solverEscrow, gasWaterMark, result));
             }
 
@@ -298,6 +295,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
         }
     }
 
+    // Returns a SolverOutcome enum value
     function _solverOpWrapper(
         uint256 gasLimit,
         address environment,

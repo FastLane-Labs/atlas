@@ -32,16 +32,16 @@ abstract contract GasAccounting is SafetyLocks {
         int64 depositAmount = int64(uint64(amt / tx.gasprice));
         uint256 partyIndex = uint256(party);
 
-        Ledger memory pLedger = ledgers[partyIndex];
-        require(pLedger.status != LedgerStatus.Finalized, "ERR-GA002, LedgerFinalized");
+        Ledger memory partyLedger = ledgers[partyIndex];
+        require(partyLedger.status != LedgerStatus.Finalized, "ERR-GA002, LedgerFinalized");
 
-        if (pLedger.status == LedgerStatus.Inactive) pLedger.status = LedgerStatus.Active;
+        if (partyLedger.status == LedgerStatus.Inactive) partyLedger.status = LedgerStatus.Active;
 
-        pLedger.balance += depositAmount;
+        partyLedger.balance += depositAmount;
         
-        balanceOwed = pLedger.balance < 0 ? uint256(uint64(-1 * pLedger.balance)) : 0;
+        balanceOwed = partyLedger.balance < 0 ? uint256(uint64(-1 * partyLedger.balance)) : 0;
 
-        ledgers[partyIndex] = pLedger;
+        ledgers[partyIndex] = partyLedger;
     }
 
 
@@ -51,13 +51,13 @@ abstract contract GasAccounting is SafetyLocks {
         int64 borrowAmount = int64(uint64(amt / tx.gasprice))+1;
         uint256 partyIndex = uint256(party);
 
-        Ledger memory pLedger = ledgers[partyIndex];
-        require(uint256(pLedger.status) < uint256(LedgerStatus.Balancing), "ERR-GA003, LedgerFinalized");
-        if (pLedger.status == LedgerStatus.Inactive) pLedger.status = LedgerStatus.Active;
+        Ledger memory partyLedger = ledgers[partyIndex];
+        require(uint256(partyLedger.status) < uint256(LedgerStatus.Balancing), "ERR-GA003, LedgerFinalized");
+        if (partyLedger.status == LedgerStatus.Inactive) partyLedger.status = LedgerStatus.Active;
 
-        pLedger.balance -= borrowAmount;
+        partyLedger.balance -= borrowAmount;
         
-        ledgers[partyIndex] = pLedger;
+        ledgers[partyIndex] = partyLedger;
     }
 
     function _use(Party party, address partyAddress, uint256 amt) internal {
@@ -65,41 +65,41 @@ abstract contract GasAccounting is SafetyLocks {
         int64 amount = int64(uint64(amt / tx.gasprice))+1;
         uint256 partyIndex = uint256(party);
 
-        Ledger memory pLedger = ledgers[partyIndex];
+        Ledger memory partyLedger = ledgers[partyIndex];
 
-        require(uint256(pLedger.status) < uint256(LedgerStatus.Balancing), "ERR-GA004, LedgerBalancing");
-        if (pLedger.status == LedgerStatus.Inactive) pLedger.status = LedgerStatus.Active;
+        require(uint256(partyLedger.status) < uint256(LedgerStatus.Balancing), "ERR-GA004, LedgerBalancing");
+        if (partyLedger.status == LedgerStatus.Inactive) partyLedger.status = LedgerStatus.Active;
         
-        if (pLedger.requested > 0) {
-            if (amount > pLedger.requested) {
-                amount -= pLedger.requested;
-                pLedger.requested = 0;
+        if (partyLedger.requested > 0) {
+            if (amount > partyLedger.requested) {
+                amount -= partyLedger.requested;
+                partyLedger.requested = 0;
             } else {
-                pLedger.requested -= amount;
-                ledgers[partyIndex] = pLedger;
+                partyLedger.requested -= amount;
+                ledgers[partyIndex] = partyLedger;
                 return;
             }
         }
 
-        if (pLedger.contributed > 0) {
-            if (amount > pLedger.contributed) {
-                amount -= pLedger.contributed;
-                pLedger.contributed = 0;
+        if (partyLedger.contributed > 0) {
+            if (amount > partyLedger.contributed) {
+                amount -= partyLedger.contributed;
+                partyLedger.contributed = 0;
             } else {
-                pLedger.contributed -= amount;
-                ledgers[partyIndex] = pLedger;
+                partyLedger.contributed -= amount;
+                ledgers[partyIndex] = partyLedger;
                 return;
             }
         }
 
         // Avoid the storage read for as long as possible
-        if (pLedger.balance > 0) {
-            if (amount > pLedger.balance) {
-                amount -= pLedger.balance;
-                pLedger.balance = 0;
+        if (partyLedger.balance > 0) {
+            if (amount > partyLedger.balance) {
+                amount -= partyLedger.balance;
+                partyLedger.balance = 0;
             } else {
-                pLedger.balance -= amount;
-                ledgers[partyIndex] = pLedger;
+                partyLedger.balance -= amount;
+                ledgers[partyIndex] = partyLedger;
                 return;
             }
         }
@@ -108,8 +108,8 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 balance = uint256(_escrowAccountData[partyAddress].balance);
 
         if (balance > amt) {
-            pLedger.balance -= amount;
-            ledgers[partyIndex] = pLedger;
+            partyLedger.balance -= amount;
+            ledgers[partyIndex] = partyLedger;
             return;
         }
 
@@ -125,20 +125,20 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 donorIndex = uint256(donor);
         uint256 recipientIndex = uint256(recipient);
 
-        Ledger memory dLedger = ledgers[donorIndex];
-        Ledger memory rLedger = ledgers[recipientIndex];
+        Ledger memory donorLedger = ledgers[donorIndex];
+        Ledger memory recipientLedger = ledgers[recipientIndex];
 
-        require(uint256(dLedger.status) < uint256(LedgerStatus.Balancing), "ERR-GA004, LedgerBalancing");
-        if (dLedger.status == LedgerStatus.Inactive) dLedger.status = LedgerStatus.Active;
+        require(uint256(donorLedger.status) < uint256(LedgerStatus.Balancing), "ERR-GA004, LedgerBalancing");
+        if (donorLedger.status == LedgerStatus.Inactive) donorLedger.status = LedgerStatus.Active;
 
-        require(rLedger.status != LedgerStatus.Finalized, "ERR-GA005, LedgerFinalized");
-        if (rLedger.status == LedgerStatus.Inactive) rLedger.status = LedgerStatus.Active;
+        require(recipientLedger.status != LedgerStatus.Finalized, "ERR-GA005, LedgerFinalized");
+        if (recipientLedger.status == LedgerStatus.Inactive) recipientLedger.status = LedgerStatus.Active;
 
-        dLedger.contributed -= amount;
-        rLedger.requested -= amount;
+        donorLedger.contributed -= amount;
+        recipientLedger.requested -= amount;
 
-        ledgers[donorIndex] = dLedger;
-        ledgers[recipientIndex] = rLedger;
+        ledgers[donorIndex] = donorLedger;
+        ledgers[recipientIndex] = recipientLedger;
     }
 
     function _contributeTo(Party donor, Party recipient, uint256 amt) internal {
@@ -148,24 +148,24 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 donorIndex = uint256(donor);
         uint256 recipientIndex = uint256(recipient);
 
-        Ledger memory dLedger = ledgers[donorIndex];
-        Ledger memory rLedger = ledgers[recipientIndex];
+        Ledger memory donorLedger = ledgers[donorIndex];
+        Ledger memory recipientLedger = ledgers[recipientIndex];
 
-        require(dLedger.status != LedgerStatus.Finalized, "ERR-GA006, LedgerFinalized");
-        if (dLedger.status == LedgerStatus.Inactive) dLedger.status = LedgerStatus.Active;
+        require(donorLedger.status != LedgerStatus.Finalized, "ERR-GA006, LedgerFinalized");
+        if (donorLedger.status == LedgerStatus.Inactive) donorLedger.status = LedgerStatus.Active;
 
-        require(rLedger.status != LedgerStatus.Finalized, "ERR-GA007, LedgerFinalized");
-        if (rLedger.status == LedgerStatus.Inactive) rLedger.status = LedgerStatus.Active;
+        require(recipientLedger.status != LedgerStatus.Finalized, "ERR-GA007, LedgerFinalized");
+        if (recipientLedger.status == LedgerStatus.Inactive) recipientLedger.status = LedgerStatus.Active;
 
-        dLedger.balance -= amount;
-        dLedger.contributed += amount;
-        rLedger.requested += amount;
+        donorLedger.balance -= amount;
+        donorLedger.contributed += amount;
+        recipientLedger.requested += amount;
 
-        ledgers[donorIndex] = dLedger;
-        ledgers[recipientIndex] = rLedger;
+        ledgers[donorIndex] = donorLedger;
+        ledgers[recipientIndex] = recipientLedger;
     }
 
-
+    // Returns true if Solver status is Finalized and the caller (Execution Environment) is in surplus
     function validateBalances() external view returns (bool valid) {
         valid = ledgers[uint256(Party.Solver)].status == LedgerStatus.Finalized && _isInSurplus(msg.sender);
     }
@@ -181,7 +181,7 @@ abstract contract GasAccounting is SafetyLocks {
         int64 totalContributions;
 
         uint256 activeParties = uint256(mLock.activeParties);
-        Ledger memory pLedger;
+        Ledger memory partyLedger;
         for (uint256 i; i < _ledgerLength;) {
             // If party has not been touched, skip it
             if (activeParties & 1<<(i+1) == 0){
@@ -189,11 +189,11 @@ abstract contract GasAccounting is SafetyLocks {
                 continue;
             }
 
-            pLedger = ledgers[i];
+            partyLedger = ledgers[i];
 
-            balanceDelta += pLedger.balance;
-            totalRequests += pLedger.requested;
-            totalContributions += pLedger.contributed;
+            balanceDelta += partyLedger.balance;
+            totalRequests += partyLedger.requested;
+            totalContributions += partyLedger.contributed;
 
             unchecked{++i;}
         }
@@ -225,17 +225,17 @@ abstract contract GasAccounting is SafetyLocks {
                 continue;
             }
 
-            Ledger memory pLedger = ledgers[i];
+            Ledger memory partyLedger = ledgers[i];
 
             if (i == uint256(Party.Bundler)) {
-                pLedger.balance += int64(uint64(accruedGasRebate));
+                partyLedger.balance += int64(uint64(accruedGasRebate));
             }
 
-            totalBalanceDelta += pLedger.balance;
-            totalRequests += pLedger.requested;
-            totalContributions += pLedger.contributed;
+            totalBalanceDelta += partyLedger.balance;
+            totalRequests += partyLedger.requested;
+            totalContributions += partyLedger.contributed;
 
-            mLedgers[i] = pLedger;
+            mLedgers[i] = partyLedger;
 
             ledgers[i] = Ledger({
                 balance: 0,
@@ -282,7 +282,7 @@ abstract contract GasAccounting is SafetyLocks {
     
             address partyAddress = _partyAddress(i, user, dapp, winningSolver, bundler);
 
-            Ledger memory pLedger = mLedgers[i];
+            Ledger memory partyLedger = mLedgers[i];
 
             EscrowAccountData memory escrowData = _escrowAccountData[partyAddress];
 
@@ -290,35 +290,35 @@ abstract contract GasAccounting is SafetyLocks {
             console.log("");
             console.log("Party:", _partyName(i));
             console.log("-");
-            _logInt64("netBalance  :", pLedger.balance);
-            _logInt64("requested   :", pLedger.requested);
-            _logInt64("contributed :", pLedger.contributed);
+            _logInt64("netBalance  :", partyLedger.balance);
+            _logInt64("requested   :", partyLedger.requested);
+            _logInt64("contributed :", partyLedger.contributed);
             
 
             // CASE: Some Requests still in Deficit
-            if (totalRequests < 0 && pLedger.contributed > 0) {
-                if (totalRequests + pLedger.contributed > 0) {
-                    pLedger.contributed += totalRequests; // a subtraction since totalRequests is negative
+            if (totalRequests < 0 && partyLedger.contributed > 0) {
+                if (totalRequests + partyLedger.contributed > 0) {
+                    partyLedger.contributed += totalRequests; // a subtraction since totalRequests is negative
                     totalRequests = 0;
                 } else {
-                    totalRequests += pLedger.contributed;
-                    pLedger.contributed = 0;
+                    totalRequests += partyLedger.contributed;
+                    partyLedger.contributed = 0;
                 }
             }
 
             // CASE: Some Contributions still in Deficit (means surplus in Requests)
-            if (totalContributions < 0 && pLedger.requested > 0) {
-                if (pLedger.requested > totalContributions) {
-                    pLedger.requested -= totalContributions;
+            if (totalContributions < 0 && partyLedger.requested > 0) {
+                if (partyLedger.requested > totalContributions) {
+                    partyLedger.requested -= totalContributions;
                     totalContributions = 0;
                 } else {
-                    totalContributions -= pLedger.requested;
-                    pLedger.requested = 0;
+                    totalContributions -= partyLedger.requested;
+                    partyLedger.requested = 0;
                 }
             }
 
 
-            int64 partyBalanceDelta = pLedger.balance + pLedger.contributed - pLedger.requested;
+            int64 partyBalanceDelta = partyLedger.balance + partyLedger.contributed - partyLedger.requested;
 
             
             _logInt64("pDelta      :", partyBalanceDelta);
@@ -415,27 +415,27 @@ abstract contract GasAccounting is SafetyLocks {
         int64 amount = int64(uint64((msg.value) / tx.gasprice));
 
         uint256 pIndex = uint256(recipient);
-        Ledger memory pLedger = ledgers[pIndex];
+        Ledger memory partyLedger = ledgers[pIndex];
 
-        require(pLedger.status != LedgerStatus.Finalized, "ERR-GA021, LedgerFinalized");
-        if (pLedger.status == LedgerStatus.Inactive) pLedger.status = LedgerStatus.Active;
+        require(partyLedger.status != LedgerStatus.Finalized, "ERR-GA021, LedgerFinalized");
+        if (partyLedger.status == LedgerStatus.Inactive) partyLedger.status = LedgerStatus.Active;
 
-        if (pLedger.requested < 0) {
+        if (partyLedger.requested < 0) {
             // CASE: still in deficit
-            if (pLedger.requested + amount < 0) {
-                pLedger.requested += amount;
+            if (partyLedger.requested + amount < 0) {
+                partyLedger.requested += amount;
                 amount = 0;
             
             // CASE: surplus
             } else {
-                amount += pLedger.requested;
-                pLedger.requested = 0;
+                amount += partyLedger.requested;
+                partyLedger.requested = 0;
             }
         }
 
-        if (amount != 0) pLedger.contributed += amount;
+        if (amount != 0) partyLedger.contributed += amount;
         
-        ledgers[pIndex] = pLedger;
+        ledgers[pIndex] = partyLedger;
     }
 
     function deposit(Party party) external payable {
@@ -444,14 +444,14 @@ abstract contract GasAccounting is SafetyLocks {
         int64 amount = int64(uint64((msg.value) / tx.gasprice));
 
         uint256 pIndex = uint256(party);
-        Ledger memory pLedger = ledgers[pIndex];
+        Ledger memory partyLedger = ledgers[pIndex];
 
-        require(pLedger.status != LedgerStatus.Finalized, "ERR-GA023 LedgerFinalized");
-        if (pLedger.status == LedgerStatus.Inactive) pLedger.status = LedgerStatus.Active;
+        require(partyLedger.status != LedgerStatus.Finalized, "ERR-GA023 LedgerFinalized");
+        if (partyLedger.status == LedgerStatus.Inactive) partyLedger.status = LedgerStatus.Active;
 
-        pLedger.balance += amount;
+        partyLedger.balance += amount;
         
-        ledgers[pIndex] = pLedger;
+        ledgers[pIndex] = partyLedger;
     }
 
     // NOTE: DAPPs can gain malicious access to these funcs if they want to, but attacks beyond
@@ -472,18 +472,18 @@ abstract contract GasAccounting is SafetyLocks {
         require(party != Party.Solver, "ERR-GA025 SolverMustReconcile");
 
         uint256 pIndex = uint256(party);
-        Ledger memory pLedger = ledgers[pIndex];
+        Ledger memory partyLedger = ledgers[pIndex];
 
-        if (pLedger.status == LedgerStatus.Finalized) return false;
+        if (partyLedger.status == LedgerStatus.Finalized) return false;
         
-        if (pLedger.contributed + pLedger.requested < 0) return false;
+        if (partyLedger.contributed + partyLedger.requested < 0) return false;
 
         uint256 grossBalance = uint256(_escrowAccountData[partyAddress].balance);
 
-        if (int64(uint64(grossBalance / tx.gasprice)) + pLedger.balance - 1 < 0) return false;
+        if (int64(uint64(grossBalance / tx.gasprice)) + partyLedger.balance - 1 < 0) return false;
         
-        pLedger.status = LedgerStatus.Finalized;
-        ledgers[pIndex] = pLedger;
+        partyLedger.status = LedgerStatus.Finalized;
+        ledgers[pIndex] = partyLedger;
 
         return true;
     }
@@ -497,14 +497,14 @@ abstract contract GasAccounting is SafetyLocks {
 
         uint256 partyIndex = uint256(Party.Solver);
 
-        Ledger memory pLedger = ledgers[partyIndex];
-        if (pLedger.status == LedgerStatus.Finalized) {
+        Ledger memory partyLedger = ledgers[partyIndex];
+        if (partyLedger.status == LedgerStatus.Finalized) {
             return false;
         }
 
         if (msg.value != 0) {
             int64 amount = int64(uint64((msg.value) / tx.gasprice));
-            pLedger.balance += amount;
+            partyLedger.balance += amount;
         }
 
         if (maxApprovedGasSpend != 0) {
@@ -514,23 +514,23 @@ abstract contract GasAccounting is SafetyLocks {
 
             int64 gasAllowance = int64(uint64(maxApprovedGasSpend / tx.gasprice));
 
-            if (pLedger.balance < 0) {
-                if (gasAllowance < pLedger.balance) {
+            if (partyLedger.balance < 0) {
+                if (gasAllowance < partyLedger.balance) {
                     return false;
                 }
-                gasAllowance += pLedger.balance; // note that .balance is a negative number so this is a subtraction
+                gasAllowance += partyLedger.balance; // note that .balance is a negative number so this is a subtraction
             }
 
-            pLedger.contributed += gasAllowance; // note that surplus .contributed is refunded to the party
-            pLedger.balance -= gasAllowance;
+            partyLedger.contributed += gasAllowance; // note that surplus .contributed is refunded to the party
+            partyLedger.balance -= gasAllowance;
         }
 
-        if (pLedger.contributed < 0) {
+        if (partyLedger.contributed < 0) {
             return false;
         }
         
-        pLedger.status = LedgerStatus.Finalized; // no additional requests can be made to this party
-        ledgers[partyIndex] = pLedger;
+        partyLedger.status = LedgerStatus.Finalized; // no additional requests can be made to this party
+        ledgers[partyIndex] = partyLedger;
         return true;
     }
 }
