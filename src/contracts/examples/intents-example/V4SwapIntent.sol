@@ -72,6 +72,48 @@ contract V4SwapIntentController is DAppControl {
     // CONTRACT-SPECIFIC FUNCTIONS  //
     //////////////////////////////////
 
+    modifier verifyCall(address tokenIn, address tokenOut) {
+        require(msg.sender == escrow, "ERR-PI002 InvalidSender");
+        require(_approvedCaller() == control, "ERR-PI003 InvalidLockState");
+        require(address(this) != control, "ERR-PI004 MustBeDelegated");
+
+        address user = _user();
+
+        // TODO: Could maintain a balance of "1" of each token to allow the user to save gas over multiple uses
+        uint256 tokenInBalance = ERC20(tokenIn).balanceOf(address(this));
+        if (tokenInBalance > 0) { 
+            ERC20(tokenIn).safeTransfer(user, tokenInBalance);
+        }
+
+        uint256 tokenOutBalance = ERC20(tokenOut).balanceOf(address(this));
+        if (tokenOutBalance > 0) {
+            ERC20(tokenOut).safeTransfer(user, tokenOutBalance);
+        }
+        _;
+    }
+
+    function exactInputSingle(
+        address tokenIn,
+        address tokenOut,
+        uint256 maxFee,
+        address recipient, 
+        uint256 amountIn,
+        uint256 amountOutMinimum,
+        uint256 sqrtPriceLimitX96
+    ) external payable verifyCall(tokenIn, tokenOut) returns (SwapData memory) {
+    } 
+
+    function exactOutputSingle(
+        address tokenIn,
+        address tokenOut,
+        uint256 maxFee,
+        address recipient,
+        uint256 amountInMaximum,
+        uint256 amountOut,
+        uint256 sqrtPriceLimitX96
+    ) external payable verifyCall(tokenIn, tokenOut) returns (SwapData memory) {
+    }
+
     // swap() selector = 0x98434997
     function swap(SwapIntent calldata swapIntent) external payable returns (SwapData memory) {
         require(msg.sender == escrow, "ERR-PI002 InvalidSender");
