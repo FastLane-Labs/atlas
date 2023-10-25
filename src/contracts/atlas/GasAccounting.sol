@@ -218,7 +218,7 @@ abstract contract GasAccounting is SafetyLocks {
 
         Ledger[LEDGER_LENGTH] memory parties;
 
-        (parties, activeParties, totalRequests, totalContributions, totalBalanceDelta) = _loadonorLedgers(activeParties);
+        (parties, activeParties, totalRequests, totalContributions, totalBalanceDelta) = _loadLedgers(activeParties);
 
         (parties, totalRequests, totalContributions, totalBalanceDelta) = _allocateGasRebate(
             parties, mLock.startingBalance, accruedGasRebate, totalRequests, totalContributions, totalBalanceDelta);
@@ -257,7 +257,7 @@ abstract contract GasAccounting is SafetyLocks {
         _assignBalanceDeltas(parties, activeParties, user, dapp, winningSolver, bundler);
     }
 
-    function _loadonorLedgers(uint256 activeParties) 
+    function _loadLedgers(uint256 activeParties) 
         internal
         view
         returns (Ledger[LEDGER_LENGTH] memory, uint256, int64, int64, int64) 
@@ -302,7 +302,8 @@ abstract contract GasAccounting is SafetyLocks {
     function _allocateGasRebate(
         Ledger[LEDGER_LENGTH] memory parties, uint64 startingGasBal,
         uint256 accruedGasRebate, int64 totalRequests, int64 totalContributions, int64 totalBalanceDelta) 
-        internal 
+        internal
+        view
         returns (Ledger[LEDGER_LENGTH] memory, int64, int64, int64)
     {
         int64 gasRemainder = int64(uint64(gasleft() + 20_000));
@@ -349,6 +350,7 @@ abstract contract GasAccounting is SafetyLocks {
     function _balanceAgainstSelf(
         Ledger[LEDGER_LENGTH] memory parties, uint256 activeParties, int64 totalRequests, int64 totalContributions) 
         internal 
+        pure
         returns (Ledger[LEDGER_LENGTH] memory, int64, int64) 
     {
         // NOTE:
@@ -400,6 +402,7 @@ abstract contract GasAccounting is SafetyLocks {
     function _removeSurplusRequests(
         Ledger[LEDGER_LENGTH] memory parties, uint256 activeParties, int64 totalRequests, int64 totalContributions) 
         internal 
+        pure
         returns (Ledger[LEDGER_LENGTH] memory, int64, int64) 
     {
         // NOTE: A check to verify totalRequests > 0 will happen prior to calling this
@@ -442,6 +445,7 @@ abstract contract GasAccounting is SafetyLocks {
     function _allocateSurplusContributions(
         Ledger[LEDGER_LENGTH] memory parties, uint256 activeParties, int64 totalRequests, int64 totalContributions) 
         internal 
+        pure
         returns (Ledger[LEDGER_LENGTH] memory, int64, int64) 
     {
         // NOTE: A check to verify totalRequests + totalContributions > 0 will happen prior to calling this
@@ -652,13 +656,11 @@ abstract contract GasAccounting is SafetyLocks {
 
             // CASE: Invalid combination (solver = coinbase = user | dapp)
             if (uint256(partyLedger.proxy) > uint256(Party.Solver)) {
-                console.log("inv-a");
                 return false;
             }
 
             // CASE: ledger is finalized or balancing
             if (uint256(partyLedger.status) > uint256(LedgerStatus.Borrowing)) {
-                console.log("inv-b");
                 return false;
             }
 
@@ -696,13 +698,11 @@ abstract contract GasAccounting is SafetyLocks {
 
             // CASE: Invalid combination (solver = bundler = user | dapp)
             if (uint256(partyLedger.proxy) > uint256(Party.Solver)) {
-                console.log("inv-c");
                 return false;
             }
 
             // CASE: ledger is finalized or balancing
             if (uint256(partyLedger.status) > uint256(LedgerStatus.Borrowing)) {
-                console.log("inv-d");
                 return false;
             }
 
@@ -903,7 +903,6 @@ abstract contract GasAccounting is SafetyLocks {
         if (maxApprovedGasSpend != 0) {
             uint256 solverSurplusBalance = uint256(_escrowAccountData[searcherFrom].balance) - (EscrowBits.SOLVER_GAS_LIMIT * tx.gasprice + 1);
             maxApprovedGasSpend = maxApprovedGasSpend > solverSurplusBalance ? solverSurplusBalance : maxApprovedGasSpend;
-        
 
             int64 gasAllowance = int64(uint64(maxApprovedGasSpend / tx.gasprice));
 
