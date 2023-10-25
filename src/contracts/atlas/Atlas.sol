@@ -180,9 +180,7 @@ contract Atlas is Test, Factory {
         EscrowKey memory key
     ) internal returns (bool, EscrowKey memory) {
         (auctionWon, key) = _executeSolverOperation(solverOp, dAppReturnData, executionEnvironment, bundler, key);
-        unchecked {
-                ++key.callIndex;
-            }
+        unchecked {++key.callIndex;}
 
         if (auctionWon) {
             _allocateValue(dConfig, solverOp.bidAmount, dAppReturnData, executionEnvironment, key.pack());

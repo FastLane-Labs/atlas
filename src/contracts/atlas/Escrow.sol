@@ -94,6 +94,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
             }
 
             // Execute the solver call
+            // _solverOpsWrapper returns a SolverOutcome enum value
             result |= 1 << _solverOpWrapper(gasLimit, environment, solverOp, dAppReturnData, key.pack());
 
             if (result.executionSuccessful()) {
@@ -304,6 +305,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
         }
     }
 
+    // Returns a SolverOutcome enum value
     function _solverOpWrapper(
         uint256 gasLimit,
         address environment,

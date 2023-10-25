@@ -36,13 +36,13 @@ library PartyMath {
         return activeParties & 1 << (party + 1) == 0;
     }
 
-    function _getLedgerFromMemory(Ledger[LEDGER_LENGTH] memory memLedgers, Party party) internal pure returns (Ledger memory pLedger, uint256 index) {
+    function _getLedgerFromMemory(Ledger[LEDGER_LENGTH] memory meparties, Party party) internal pure returns (Ledger memory partyLedger, uint256 index) {
         uint256 partyIndex;
 
         do {
             partyIndex = uint256(party);
-            pLedger = memLedgers[partyIndex];
-            party = pLedger.proxy;
+            partyLedger = meparties[partyIndex];
+            party = partyLedger.proxy;
             index = uint256(party);
             
         } while (partyIndex != index);
