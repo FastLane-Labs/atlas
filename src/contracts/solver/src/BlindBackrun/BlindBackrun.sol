@@ -16,6 +16,8 @@ interface IUniswapV2Pair {
     function token1() external view returns (address);
 }
 
+import "forge-std/Test.sol";
+
 contract BlindBackrun is Ownable {
     using SafeMath for uint256;
 
@@ -70,10 +72,20 @@ contract BlindBackrun is Ownable {
 
             firstPair.swap(0, firstPairAmountOut, secondPairAddress, "");
             secondPair.swap(finalAmountOut, 0, address(this), "");
+
         } else {
             firstPairAmountOut = getAmountOut(amountIn, firstPairData.reserve1, firstPairData.reserve0);
             finalAmountOut = getAmountOut(firstPairAmountOut, secondPairData.reserve0, secondPairData.reserve1);
 
+            /*
+            console.log("-");
+            console.log("SOLVER:");
+            console.log("firstPairAmountOut",firstPairAmountOut);
+            console.log("finalAmountOut    ",finalAmountOut);
+            console.log("startingAmountIn  ",amountIn);
+            console.log("-");
+            */
+            
             firstPair.swap(firstPairAmountOut, 0, secondPairAddress, "");
             secondPair.swap(0, finalAmountOut, address(this), "");
         }

@@ -73,8 +73,10 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
         SolverOperation calldata solverOp,
         bytes memory dAppReturnData,
         address environment,
+        address bundler,
         EscrowKey memory key
     ) internal returns (bool auctionWon, EscrowKey memory) {
+        
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
 
@@ -83,7 +85,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
             _verify(solverOp, gasWaterMark, false);
 
         // If there are no errors, attempt to execute
-        if (result.canExecute()) {
+        if (result.canExecute() && _checkSolverProxy(solverOp.from, bundler)) {
             // Open the solver lock
             key = key.holdSolverLock(solverOp.solver);
 
@@ -101,10 +103,19 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
                 emit SolverTxResult(
                     solverOp.solver, solverOp.from, true, true, solverEscrow.nonce, result
                 );
+
+                _updateSolverProxy(solverOp.from, bundler, true);
+
                 // winning solver's gas is implicitly paid for by their allowance
                 return (true, key.turnSolverLockPayments(environment));
+            
+            } else if (solverOp.value != 0) {
+                _tradeCorrection(Party.Solver, solverOp.value);
             }
 
+            
+
+            _updateSolverProxy(solverOp.from, bundler, false);
             result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
 
             // Update the solver's escrow balances and the accumulated refund
@@ -120,7 +131,6 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
             // emit event
             emit SolverTxResult(solverOp.solver, solverOp.from, false, false, solverEscrow.nonce, result);
         }
-
         return (auctionWon, key);
     }
 

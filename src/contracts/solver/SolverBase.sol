@@ -43,7 +43,7 @@ contract SolverBase is Test {
         // Safety checks
         require(sender == _owner, "INVALID CALLER");
         // uint256 msgValueOwed = msg.value;
-
+        
         _;
 
         IEscrow(_escrow).reconcile{value: msg.value}(msg.sender, sender, type(uint256).max);
@@ -62,9 +62,12 @@ contract SolverBase is Test {
 
         // Ether balance
         if (bidToken == address(0)) {
+
             uint256 ethOwed = bidAmount + msg.value;
+
             if (ethOwed > address(this).balance) {
                 IWETH9(WETH_ADDRESS).withdraw(ethOwed - address(this).balance);
+
             }
 
             SafeTransferLib.safeTransferETH(msg.sender, bidAmount);

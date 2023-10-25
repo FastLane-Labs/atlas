@@ -327,8 +327,6 @@ contract ExecutionBase is Base {
 
         if (source == user) {
             if (shiftedPhase & SAFE_USER_TRANSFER == 0) {
-                console.log("SAFE_USER_TRANSFER err");
-                console.log("phase",uint256(phase));
                 return false;
             }
             if (ERC20(token).allowance(user, atlas) < amount) {
