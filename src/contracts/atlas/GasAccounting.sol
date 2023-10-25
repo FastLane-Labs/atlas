@@ -10,7 +10,7 @@ import "../types/LockTypes.sol";
 
 
 import {EscrowBits} from "../libraries/EscrowBits.sol";
-import {PartyMath} from "../libraries/GasParties.sol";
+import {PartyMath, LEDGER_LENGTH} from "../libraries/GasParties.sol";
 
 import "forge-std/Test.sol";
 
@@ -18,9 +18,7 @@ abstract contract GasAccounting is SafetyLocks {
     using SafeTransferLib for ERC20;
     using PartyMath for Party;
     using PartyMath for uint256;
-
-    uint256 constant public BUNDLER_PREMIUM = 105; // the amount over cost that bundlers get paid
-    uint256 constant public BUNDLER_BASE = 100;
+    using PartyMath for Ledger[LEDGER_LENGTH];
 
     mapping(address => EscrowAccountData) internal _escrowAccountData;
 
@@ -177,7 +175,7 @@ abstract contract GasAccounting is SafetyLocks {
         int64 totalContributions;
 
         uint256 activeParties = uint256(mLock.activeParties);
-        for (uint256 i; i < _ledgerLength;) {
+        for (uint256 i; i < LEDGER_LENGTH;) {
             // If party has not been touched, skip it
             if (activeParties & 1<<(i+1) == 0){
                 unchecked{++i;}
@@ -212,177 +210,362 @@ abstract contract GasAccounting is SafetyLocks {
     function _balance(uint256 accruedGasRebate, address user, address dapp, address winningSolver, address bundler) internal {
         
         Lock memory mLock = lock;
+        uint256 activeParties = uint256(mLock.activeParties);
 
         int64 totalRequests;
         int64 totalContributions;
         int64 totalBalanceDelta;
 
-        uint256 activeParties = uint256(mLock.activeParties);
+        Ledger[LEDGER_LENGTH] memory mLedgers;
 
-        Ledger[] memory mLedgers = new Ledger[](_ledgerLength);
-        for (uint256 i; i < _ledgerLength;) {
+        (mLedgers, activeParties, totalRequests, totalContributions, totalBalanceDelta) = _loadLedgers(activeParties);
+
+        (mLedgers, totalRequests, totalContributions, totalBalanceDelta) = _allocateGasRebate(
+            mLedgers, mLock.startingBalance, accruedGasRebate, totalRequests, totalContributions, totalBalanceDelta);
+
+        console.log("");
+        console.log("* * * * * ");
+        console.log("INITIAL:");
+        _consolePrint(mLedgers, activeParties);
+        console.log("_______");
+        console.log("* * * * * ");
+        console.log("");
+        
+        // First, remove overfilled requests (refunding to general pool)
+        if (totalRequests > 0) {
+            (mLedgers, totalRequests, totalContributions) = _removeSurplusRequests(
+                mLedgers, activeParties, totalRequests, totalContributions);
+        }
+
+        // Next, balance each party's surplus contributions against their own deficit requests
+        (mLedgers, totalRequests, totalContributions) = _balanceAgainstSelf(
+            mLedgers, activeParties, totalRequests, totalContributions);
+
+        // Then allocate surplus contributions back to the correct parties
+        if (totalRequests + totalContributions > 0) {
+            (mLedgers, totalRequests, totalContributions) = _allocateSurplusContributions(
+                mLedgers, activeParties, totalRequests, totalContributions);
+        }
+
+        console.log("* * * * * ");
+        console.log("FINAL:");
+        _consolePrint(mLedgers, activeParties);
+        console.log("_______");
+        console.log("* * * * * ");
+
+        // Finally, assign the balance deltas to the parties
+        _assignBalanceDeltas(mLedgers, activeParties, user, dapp, winningSolver, bundler);
+    }
+
+    function _loadLedgers(uint256 activeParties) 
+        internal
+        view
+        returns (Ledger[LEDGER_LENGTH] memory, uint256, int64, int64, int64) 
+    {
+        Ledger[LEDGER_LENGTH] memory mLedgers;
+
+        int64 totalRequests;
+        int64 totalContributions;
+        int64 totalBalanceDelta;
+
+        for (uint256 i; i < LEDGER_LENGTH;) {
             // If party has not been touched, skip it
             if (activeParties.isInactive(i)) {
-                console.log("");
-                console.log("Party:", _partyName(i));
-                console.log("inactive");
-                console.log("-");
                 unchecked{++i;}
                 continue;
             }
 
             Ledger memory pLedger = ledgers[i];
 
-            require(pLedger.contributed >= 0, "ERR-GA099 NoDeficitsAllowed");
+            require(pLedger.contributed >= 0, "ERR-GA099 NoUnfilledRequests");
 
             // Only tally totals from non-proxies
             if (uint256(pLedger.proxy) == i) {
             
-                console.log("");
-                console.log("Party:", _partyName(i));
-                console.log("ACTIVE");
-                console.log("-");
-
-                if (i == uint256(Party.Bundler)) {
-                    pLedger.balance += int64(uint64(accruedGasRebate));
-                }
-
                 totalBalanceDelta += pLedger.balance;
                 totalRequests += pLedger.requested;
                 totalContributions += pLedger.contributed;
             
             // Mark inactive if proxy
             } else {
-                console.log("");
-                console.log("Party:", _partyName(i));
-                console.log("proxy");
-                console.log("-");
                 activeParties = activeParties.markInactive(Party(i));
             }
 
             mLedgers[i] = pLedger;
 
-            // Clear the storage
-            ledgers[i] = Ledger({
-                balance: 0,
-                contributed: 0,
-                requested: 0,
-                status: LedgerStatus.Inactive,
-                proxy: Party(i)
-            });
-
             unchecked{++i;}
         }
 
-        int64 gasRemainder = int64(uint64(gasleft() + accruedGasRebate + 20_000));
+        return (mLedgers, activeParties, totalRequests, totalContributions, totalBalanceDelta);
+    }
+
+    function _allocateGasRebate(
+        Ledger[LEDGER_LENGTH] memory mLedgers, uint64 startingGasBal,
+        uint256 accruedGasRebate, int64 totalRequests, int64 totalContributions, int64 totalBalanceDelta) 
+        internal 
+        returns (Ledger[LEDGER_LENGTH] memory, int64, int64, int64)
+    {
+        int64 gasRemainder = int64(uint64(gasleft() + 20_000));
 
         // Reduce the bundler's gas request by the unused gas
-        (, uint256 i) = _getLedger(Party.Bundler);
+        (, uint256 i) = mLedgers._getLedgerFromMemory(Party.Bundler);
+
+        int64 gasRebate = int64(uint64(accruedGasRebate));
+
         mLedgers[i].requested += gasRemainder;
+        mLedgers[i].balance += gasRebate;
 
         totalRequests += gasRemainder;
+        totalContributions -= gasRemainder;
+        totalBalanceDelta += gasRebate;
 
-        {
         require(totalRequests + totalContributions >= 0, "ERR-GA014a MissingFunds");
 
         // TODO: Adjust to accomodate the direction of rounding errors. 
-        int64 atlasBalanceDelta = int64(uint64(address(this).balance / tx.gasprice)) - int64(mLock.startingBalance);
+        int64 atlasBalanceDelta = int64(uint64(address(this).balance / tx.gasprice)) - int64(startingGasBal);
 
-        console.log("");
-        console.log("--");
-        _logInt64("gasRemainder :", gasRemainder);
-        console.log("gasRebate    : +", accruedGasRebate);
-        console.log("-");
-        _logInt64("balanceDelta :", atlasBalanceDelta);
-        _logInt64("surplus      :", totalRequests + totalContributions);
-        _logInt64("totalRequests:", totalRequests);
-        _logInt64("contributions:", totalContributions);
-        console.log("--");
+        {
+            console.log("");
+            console.log("--");
+            _logInt64("gasRemainder :", gasRemainder);
+            console.log("gasRebate    : +", accruedGasRebate);
+            console.log("-");
+            _logInt64("observedDelta:", atlasBalanceDelta);
+            _logInt64("actualDelta  :", totalBalanceDelta);
+            console.log("-");
+            _logInt64("surplus      :", totalRequests + totalContributions);
+            _logInt64("totalRequests:", totalRequests);
+            _logInt64("contributions:", totalContributions);
+            console.log("--");
+        }
 
-        if (atlasBalanceDelta < totalBalanceDelta + totalContributions - totalRequests) {
+        if (atlasBalanceDelta < totalBalanceDelta + totalContributions + totalRequests) {            
             revert("ERR-GA014b MissingFunds");
         }
-        }
 
-        for (i=0; i < _ledgerLength;) {
-            console.log("hi4");
+        return (mLedgers, totalRequests, totalContributions, totalBalanceDelta);
+    }
+        
+    function _balanceAgainstSelf(
+        Ledger[LEDGER_LENGTH] memory mLedgers, uint256 activeParties, int64 totalRequests, int64 totalContributions) 
+        internal 
+        returns (Ledger[LEDGER_LENGTH] memory, int64, int64) 
+    {
+        // NOTE:
+        // ORDER is:
+        // 1:  FirstToAct (DApp) 
+        // ...
+        // Last: LastToAct (builder)
+
+        uint256 i = LEDGER_LENGTH;
+
+        do {
+            --i;
+
             // If party has not been touched, skip it
             if (activeParties.isInactive(i)) {
-                console.log("");
-                console.log("Party:", _partyName(i));
-                console.log("confirmed - inactive");
-                console.log("-");
+                continue;
+            }
+    
+            Ledger memory pLedger = mLedgers[i];
+            
+            // CASE: Some Requests still in Deficit
+            if (pLedger.requested < 0 && pLedger.contributed > 0) {
+
+                // CASE: Contributions > Requests
+                if (pLedger.contributed + pLedger.requested > 0) {
+                    totalRequests -= pLedger.requested; // subtracting a negative
+                    totalContributions += pLedger.requested; // adding a negative
+
+                    pLedger.contributed += pLedger.requested; // adding a negative
+                    pLedger.requested = 0;
+                
+                // CASE: Requests >= Contributions
+                } else {
+                    totalRequests += pLedger.contributed; // adding a positive
+                    totalContributions -= pLedger.contributed; // subtracting a positive
+
+                    pLedger.requested += pLedger.contributed; // adding a positive
+                    pLedger.contributed = 0;
+                }
+
+                mLedgers[i] = pLedger;
+            }
+
+        } while (i != 0);
+
+        return (mLedgers, totalRequests, totalContributions);
+    }
+
+    function _removeSurplusRequests(
+        Ledger[LEDGER_LENGTH] memory mLedgers, uint256 activeParties, int64 totalRequests, int64 totalContributions) 
+        internal 
+        returns (Ledger[LEDGER_LENGTH] memory, int64, int64) 
+    {
+        // NOTE: A check to verify totalRequests > 0 will happen prior to calling this
+
+        // NOTE:
+        // ORDER is:
+        // 1: LastToAct (builder)
+        // ...
+        // Last: FirstToAct (DApp)
+
+        for (uint256 i; i <LEDGER_LENGTH && totalRequests > 0; ) {
+            // If party has not been touched, skip it
+            if (activeParties.isInactive(i)) {
                 unchecked{++i;}
                 continue;
             }
-            console.log("");
-            console.log("Party:", _partyName(i));
-            console.log("confirmed - ACTIVE");
-            console.log("-");
     
-            address partyAddress = _partyAddress(i, user, dapp, winningSolver, bundler);
+            Ledger memory pLedger = mLedgers[i];
+            
+            if (pLedger.requested > 0) {
+                if (totalRequests > pLedger.requested) {
+                    totalRequests -= pLedger.requested;
+                    totalContributions += pLedger.requested;
+                    pLedger.requested = 0;
+
+                } else {
+                    pLedger.requested -= totalRequests;
+                    totalContributions += totalRequests;
+                    totalRequests = 0;
+                }
+
+                mLedgers[i] = pLedger;
+            }
+            unchecked{++i;}
+        } 
+
+        return (mLedgers, totalRequests, totalContributions);
+    }
+
+    function _allocateSurplusContributions(
+        Ledger[LEDGER_LENGTH] memory mLedgers, uint256 activeParties, int64 totalRequests, int64 totalContributions) 
+        internal 
+        returns (Ledger[LEDGER_LENGTH] memory, int64, int64) 
+    {
+        // NOTE: A check to verify totalRequests + totalContributions > 0 will happen prior to calling this
+        
+        // NOTE:
+        // ORDER is:
+        // 1:  FirstToAct (DApp) 
+        // ...
+        // Last: LastToAct (builder)
+
+        int64 netBalance = totalRequests + totalContributions;
+        
+        uint256 i = LEDGER_LENGTH;
+
+        do {
+            --i;
+
+            // If party has not been touched, skip it
+            if (activeParties.isInactive(i)) {
+                continue;
+            }
+    
+            Ledger memory pLedger = mLedgers[i];
+            
+            if (pLedger.contributed > 0) {
+                if (netBalance > pLedger.contributed) {
+                    totalContributions -= pLedger.contributed;
+                    pLedger.balance += pLedger.contributed;
+                    pLedger.contributed = 0;
+
+                } else {
+                    pLedger.contributed -= netBalance;
+                    pLedger.balance += netBalance;
+                    totalContributions -= netBalance;
+                }
+
+                mLedgers[i] = pLedger;
+
+                netBalance = totalRequests + totalContributions;
+            }
+
+        } while (i != 0 && netBalance > 0);
+
+        return (mLedgers, totalRequests, totalContributions);
+    }
+
+    function _assignBalanceDeltas(
+        Ledger[LEDGER_LENGTH] memory mLedgers, 
+        uint256 activeParties, address user, address dapp, address winningSolver, address bundler) 
+        internal 
+    {
+        for (uint256 i=0; i < LEDGER_LENGTH;) {
+            // If party has not been touched, skip it
+            if (activeParties.isInactive(i)) {
+                unchecked{++i;}
+                continue;
+            }
 
             Ledger memory pLedger = mLedgers[i];
 
+            address partyAddress = _partyAddress(i, user, dapp, winningSolver, bundler);
             EscrowAccountData memory escrowData = _escrowAccountData[partyAddress];
 
-            console.log("");
-            console.log("Party:", _partyName(i));
-            console.log("-");
-            _logInt64("netBalance  :", pLedger.balance);
-            _logInt64("requested   :", pLedger.requested);
-            _logInt64("contributed :", pLedger.contributed);
-            
-            // CASE: Some Requests still in Deficit
-            if (totalRequests < 0 && pLedger.contributed > 0) {
-                if (totalRequests + pLedger.contributed > 0) {
-                    pLedger.contributed += totalRequests; // a subtraction since totalRequests is negative
-                    totalRequests = 0;
-                } else {
-                    totalRequests += pLedger.contributed;
-                    pLedger.contributed = 0;
-                }
-            }
 
-            // CASE: Some Contributions still in Deficit (means surplus in Requests)
-            if (totalContributions < 0 && pLedger.requested > 0) {
-                if (pLedger.requested > totalContributions) {
-                    pLedger.requested -= totalContributions;
-                    totalContributions = 0;
-                } else {
-                    totalContributions -= pLedger.requested;
-                    pLedger.requested = 0;
-                }
-            }
-
-            int64 partyBalanceDelta = pLedger.balance + pLedger.contributed - pLedger.requested;
-
-
-            _logInt64("pDelta      :", partyBalanceDelta);
             console.log("-");
             console.log("Starting Bal:", escrowData.balance);
-            
 
-            if (partyBalanceDelta < 0) {
-                escrowData.balance -= (uint128(uint64(partyBalanceDelta * -1)) * uint128(tx.gasprice));
             
-            } else {
-                escrowData.balance += (uint128(uint64(partyBalanceDelta)) * uint128(tx.gasprice));
+            bool requiresUpdate;
+            if (pLedger.balance < 0) {
+                escrowData.balance -= (uint128(uint64(pLedger.balance * -1)) * uint128(tx.gasprice));
+                requiresUpdate = true;
+            
+            } else if (pLedger.balance > 0) {
+                escrowData.balance += (uint128(uint64(pLedger.balance)) * uint128(tx.gasprice));
+                requiresUpdate = true;
             }
 
             if (i == uint256(Party.Solver)) {
                 ++escrowData.nonce;
+                requiresUpdate = true;
             }
 
-            escrowData.lastAccessed = uint64(block.number);
-            _escrowAccountData[partyAddress] = escrowData;
-
+            // Track lastAccessed for all parties, although only check against it for solver parties
+            if (requiresUpdate) {
+                escrowData.lastAccessed = uint64(block.number);
+                _escrowAccountData[partyAddress] = escrowData;
+            }
             
             console.log("Ending Bal  :", escrowData.balance);
             console.log("-");
             
 
             unchecked{++i;}
+        }
+    }
+
+    function _consolePrint(Ledger[LEDGER_LENGTH] memory mLedgers, uint256 activeParties) internal view {
+        for (uint256 i=0; i < LEDGER_LENGTH; i++) {
+            if (activeParties.isInactive(i)) {
+                console.log("");
+                console.log("Party:", _partyName(i));
+                console.log("confirmed - inactive");
+                console.log("-");
+                continue;
+            }
+    
+            Ledger memory pLedger = mLedgers[i];
+
+            if (pLedger.status == LedgerStatus.Proxy) {
+                console.log("");
+                console.log("Party:", _partyName(i));
+                console.log("confirmed - proxy");
+                console.log("-");
+                continue;
+            }
+
+            console.log("");
+            console.log("Party:", _partyName(i));
+            console.log("confirmed - ACTIVE");
+            console.log("-");          
+            _logInt64("netBalance  :", pLedger.balance);
+            _logInt64("requested   :", pLedger.requested);
+            _logInt64("contributed :", pLedger.contributed);
         }
     }
 

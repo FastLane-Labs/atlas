@@ -46,7 +46,7 @@ contract MainTest is BaseTest {
         bytes32 r;
         bytes32 s;
 
-        UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, userEOA, TOKEN_ONE);
+        UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
 
         // user does not sign their own operation when bundling
         // (v, r, s) = vm.sign(userPK, IAtlas(address(atlas)).getUserOperationPayload(userOp));
@@ -242,7 +242,7 @@ contract MainTest is BaseTest {
 
         // Second attempt
 
-        userOp = helper.buildUserOperation(POOL_ONE, userEOA, TOKEN_ONE);
+        userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
 
         // First SolverOperation
         solverOps[0] =
@@ -338,7 +338,7 @@ contract MainTest is BaseTest {
         bytes32 r;
         bytes32 s;
 
-        UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, userEOA, TOKEN_ONE);
+        UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
         (v, r, s) = vm.sign(userPK, IAtlas(address(atlas)).getUserOperationPayload(userOp));
         userOp.signature = abi.encodePacked(r, s, v);
 
@@ -360,7 +360,9 @@ contract MainTest is BaseTest {
         bytes32 r;
         bytes32 s;
 
-        UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, userEOA, TOKEN_ONE);
+        console.log("TOKEN_ONE",TOKEN_ONE);
+
+        UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
         (v, r, s) = vm.sign(userPK, IAtlas(address(atlas)).getUserOperationPayload(userOp));
         userOp.signature = abi.encodePacked(r, s, v);
 

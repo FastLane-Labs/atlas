@@ -3,7 +3,7 @@ pragma solidity ^0.8.16;
 
 import {SafetyBits} from "../libraries/SafetyBits.sol";
 import {CallBits} from "../libraries/CallBits.sol";
-import {PartyMath} from "../libraries/GasParties.sol";
+import {PartyMath, LEDGER_LENGTH} from "../libraries/GasParties.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
@@ -27,8 +27,7 @@ contract SafetyLocks {
     
     Lock public lock;
 
-    uint256 constant internal _ledgerLength = 5; // uint256(type(Party).max); // 5
-    Ledger[_ledgerLength] public ledgers;
+    Ledger[LEDGER_LENGTH] public ledgers;
 
     constructor(address _simulator) {
         atlas = address(this);
@@ -40,7 +39,7 @@ contract SafetyLocks {
             startingBalance: uint64(0)
         });
 
-        for (uint256 i; i < _ledgerLength; i++) {
+        for (uint256 i; i < LEDGER_LENGTH; i++) {
             // init the storage vars
             ledgers[i] = Ledger({
                 balance: 0,
@@ -148,6 +147,17 @@ contract SafetyLocks {
             activeParties: uint16(0),
             startingBalance: uint64(0)
         });
+
+        for (uint256 i; i < LEDGER_LENGTH; i++) {
+            // init the storage vars
+            ledgers[i] = Ledger({
+                balance: 0,
+                contributed: 0,
+                requested: 0,
+                status: LedgerStatus.Inactive,
+                proxy: Party(i)
+            }); 
+        }
     }
 
     function _getActiveParties() internal view returns (uint256 activeParties) {
