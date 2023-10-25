@@ -5,7 +5,7 @@ import {TxBuilder} from "../src/contracts/helpers/TxBuilder.sol";
 
 import {IUniswapV2Pair} from "../src/contracts/examples/v2-example/interfaces/IUniswapV2Pair.sol";
 
-import {BlindBackrun} from "src/contracts/solver/src/BlindBackrun.sol";
+import {BlindBackrun} from "src/contracts/solver/src/BlindBackrun/BlindBackrun.sol";
 
 import "../src/contracts/types/SolverCallTypes.sol";
 import "../src/contracts/types/UserCallTypes.sol";
@@ -28,20 +28,39 @@ contract V2Helper is Test, TestConstants, TxBuilder {
         maxFeePerGas = tx.gasprice * 2;
     }
 
-    function buildUserOperation(address to, address from, address tokenIn) public view returns (UserOperation memory userOp) {
-        (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(to).getReserves();
+    function _getTradeAmtAndDirection(address firstPool, address secondPool, address tokenIn) internal view returns (uint256 token0Balance, uint256 token1Balance) {
+        address token0 = IUniswapV2Pair(firstPool).token0();
 
-        address token0 = IUniswapV2Pair(to).token0();
+        (uint112 token0Balance_a, uint112 token1Balance_a,) = IUniswapV2Pair(firstPool).getReserves();
+        (uint112 token0Balance_b, uint112 token1Balance_b,) = IUniswapV2Pair(secondPool).getReserves();
+
+        if (token0 != IUniswapV2Pair(secondPool).token0()) {
+            (token1Balance_b, token0Balance_b,) = IUniswapV2Pair(secondPool).getReserves();
+        }
+
+        // get the smaller one 
+        bool flip = token0 == tokenIn;
+        token0Balance = flip ? 0 : uint256(token0Balance_a > token0Balance_b ? token0Balance_b : token0Balance_a) / 4;
+        token1Balance = flip ? uint256(token1Balance_a > token1Balance_b ? token1Balance_b : token1Balance_a) / 4 : 0;
+    }
+
+    function buildUserOperation(address firstPool, address secondPool, address from, address tokenIn) public view returns (UserOperation memory userOp) {
+        
+        (uint256 token0Balance, uint256 token1Balance) = _getTradeAmtAndDirection(firstPool, secondPool, tokenIn);
+
+        console.log("-");
+        console.log("sell token",tokenIn);
+        console.log("token0 in ", token0Balance);
+        console.log("token1 in ", token1Balance);
+        console.log("-");
 
         return TxBuilder.buildUserOperation(
             from,
-            to,
+            firstPool,
             maxFeePerGas,
             0,
             block.number + 2,
-            buildV2SwapCalldata(
-                tokenIn == token0 ? 0 : uint256(token0Balance) / 2, tokenIn == token0 ? uint256(token1Balance) / 2 : 0, from
-                )
+            buildV2SwapCalldata(token0Balance, token1Balance, from)
         );
     }
 

@@ -40,7 +40,6 @@ struct SwapData {
     address tokenUserSells;
     uint256 amountUserSells;
     address auctionBaseCurrency; // NOTE: Typically will be address(0) / ETH for gas refund
-    uint256 solverGasLiability; // the amount of user gas that the solver must refund
 }
 
 
@@ -109,7 +108,7 @@ contract SwapIntentController is DAppControl {
         }
 
         require(
-            _availableFundsERC20(swapIntent.tokenUserSells, user, swapIntent.amountUserSells, ExecutionPhase.SolverOperations),
+            _availableFundsERC20(swapIntent.tokenUserSells, user, swapIntent.amountUserSells, ExecutionPhase.PreSolver),
             "ERR-PI059 SellFundsUnavailable"
         );
 
@@ -132,16 +131,13 @@ contract SwapIntentController is DAppControl {
             amountUserBuys: swapIntent.amountUserBuys,
             tokenUserSells: swapIntent.tokenUserSells,
             amountUserSells: swapIntent.amountUserSells,
-            auctionBaseCurrency: swapIntent.auctionBaseCurrency,
-            solverGasLiability: swapIntent.solverMustReimburseGas ? EXPECTED_GAS_USAGE_EX_SOLVER : 0
+            auctionBaseCurrency: swapIntent.auctionBaseCurrency
         });
 
 
         // If the user added any swap conditions, verify them here:
         if (swapIntent.conditions.length > 0) {
             // Track the excess gas that the user spends with their checks
-            uint256 gasMarker = gasleft();
-
             require(swapIntent.conditions.length <= MAX_USER_CONDITIONS, "ERR-PI019 TooManyConditions");
 
             uint256 i;
@@ -156,9 +152,6 @@ contract SwapIntentController is DAppControl {
                 require(valid && abi.decode(conditionData, (bool)), "ERR-PI021 ConditionUnsound");
                 
                 unchecked{ ++i; }
-            }
-            if (swapIntent.solverMustReimburseGas) {
-                swapData.solverGasLiability += (gasMarker - gasleft());
             }
         }
 
@@ -188,23 +181,9 @@ contract SwapIntentController is DAppControl {
     // Checking intent was fulfilled, and user has received their tokens, happens here
     function _postSolverCall(bytes calldata data) internal override returns (bool) {
        
-        (address solverTo, bytes memory returnData) = abi.decode(data, (address, bytes));
+        (, bytes memory returnData) = abi.decode(data, (address, bytes));
 
         SwapData memory swapData = abi.decode(returnData, (SwapData));
-
-        if (swapData.solverGasLiability > 0) {
-            // NOTE: Winning solver does not have to reimburse for other solvers
-            uint256 expectedGasReimbursement = swapData.solverGasLiability * tx.gasprice;
-
-            // Is this check unnecessary since it'll just throw inside the try/catch?
-            // if (address(this).balance < expectedGasReimbursement) {
-            //    return false;
-            //}
-
-            // NOTE: This sends any surplus donations back to the solver
-            console.log("sending surplus donations back to solver...");
-            IEscrow(escrow).donateToBundler{value: expectedGasReimbursement}(solverTo);
-        }
 
         uint256 buyTokenBalance = ERC20(swapData.tokenUserBuys).balanceOf(address(this));
         
@@ -226,28 +205,15 @@ contract SwapIntentController is DAppControl {
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) internal override {
+    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
-
-        // NOTE: donateToBundler caps the donation at 110% of total gas cost.
-        // Any remainder is then sent to the specified recipient. 
-        // IEscrow(escrow).donateToBundler{value: address(this).balance}();
-        SwapData memory swapData = abi.decode(data, (SwapData));
-
         if (bidToken != address(0)) {
             ERC20(bidToken).safeTransfer(_user(), bidAmount);
         
-        // If the solver was already required to reimburse the user's gas, don't reallocate
-        // Ether surplus to the bundler
-        } else if (swapData.solverGasLiability > 0) {
-            SafeTransferLib.safeTransferETH(_user(), address(this).balance);
-
-        // Donate the ether to the bundler, with the surplus going back to the user
         } else {
-            console.log("donating to bundler in SwapIntent");
-            IEscrow(escrow).donateToBundler{value: address(this).balance}(_user());
+            SafeTransferLib.safeTransferETH(_user(), address(this).balance);
         }
     }
 

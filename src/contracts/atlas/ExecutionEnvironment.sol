@@ -13,6 +13,7 @@ import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
 import {ExecutionPhase} from "../types/LockTypes.sol";
+import {Party} from "../types/EscrowTypes.sol";
 
 import {Base} from "../common/ExecutionBase.sol";
 
@@ -32,25 +33,46 @@ contract ExecutionEnvironment is Base {
     constructor(address _atlas) Base(_atlas) {}
 
     modifier validUser(UserOperation calldata userOp) {
-        {
         if (userOp.from != _user()) {
             revert("ERR-CE02 InvalidUser");
         }
         if (userOp.to != atlas || userOp.dapp == atlas) {
             revert("ERR-EV007 InvalidTo");
         }
+        _;
+    }
+
+    modifier validControlHash() {
+        if (_control().codehash != _controlCodeHash()) {
+            revert("ERR-EV008 InvalidCodeHash");
         }
         _;
+    }
+
+    modifier contributeSurplus(Party party) {
+        _;
+        {
+        uint256 balance = address(this).balance;
+        if (balance > 0) {
+            IEscrow(atlas).contribute{value: balance}(party);
+        }
+        }
     }
 
     modifier validSolver(SolverOperation calldata solverOp) {
         {
         address solverTo = solverOp.solver;
-        if (solverTo == address(this) || solverTo == _control() || solverTo == atlas) {
+        address solverFrom = solverOp.from;
+        address control = _control();
+
+        if (solverTo == address(this) || solverTo == control || solverTo == atlas) {
             revert("ERR-EV008 InvalidTo");
         }
         if (solverTo != _approvedCaller()) {
             revert("ERR-EV009 WrongSolver");
+        }
+        if (solverFrom == _user() || solverFrom == solverTo || solverFrom == control) {
+            revert("ERR-EV009 InvalidFrom");
         }
         }
         _;
@@ -64,6 +86,7 @@ contract ExecutionEnvironment is Base {
         external
         validUser(userOp)
         onlyAtlasEnvironment(ExecutionPhase.PreOps, _ENVIRONMENT_DEPTH)
+        contributeSurplus(Party.DApp)
         returns (bytes memory)
     {
         // msg.sender = atlas
@@ -89,6 +112,8 @@ contract ExecutionEnvironment is Base {
         payable
         validUser(userOp)
         onlyAtlasEnvironment(ExecutionPhase.UserOperation, _ENVIRONMENT_DEPTH)
+        contributeSurplus(Party.User)
+        validControlHash
         returns (bytes memory userData) 
     {
         // msg.sender = atlas
@@ -120,6 +145,7 @@ contract ExecutionEnvironment is Base {
     function postOpsWrapper(bytes calldata returnData) 
         external
         onlyAtlasEnvironment(ExecutionPhase.PostOps, _ENVIRONMENT_DEPTH)
+        contributeSurplus(Party.DApp)
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
@@ -136,12 +162,12 @@ contract ExecutionEnvironment is Base {
 
     function solverMetaTryCatch(
         uint256 gasLimit, 
-        uint256 escrowBalance, 
         SolverOperation calldata solverOp, 
         bytes calldata dAppReturnData
     ) 
         external payable 
         onlyAtlasEnvironment(ExecutionPhase.SolverOperations, _ENVIRONMENT_DEPTH)
+        // No donate surplus here - donate after value xfer
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
@@ -183,10 +209,8 @@ contract ExecutionEnvironment is Base {
                 data
             );
 
-            data = forward(data);
-
             (success, data) = _control().delegatecall(
-                data
+                forwardSpecial(data, ExecutionPhase.PreSolver)
             );
 
             if(!success) {
@@ -223,8 +247,9 @@ contract ExecutionEnvironment is Base {
             );
 
             (success, data) = _control().delegatecall(
-                forward(data)
+                forwardSpecial(data, ExecutionPhase.PostSolver)
             );
+
             if(!success) {
                 revert FastLaneErrorsEvents.PostSolverFailed();
             } 
@@ -244,10 +269,7 @@ contract ExecutionEnvironment is Base {
         }
 
         // Verify that the solver repaid their msg.value
-        // TODO: Add in a more discerning func that'll silo the 
-        // donations to prevent double counting.
-        // TODO: repayment check added to Escrow.sol - do we still need this balance check?
-        if (IEscrow(atlas).getAmountOwed(solverOp.from) != 0) {
+        if (!IEscrow(atlas).validateBalances()) {
             revert FastLaneErrorsEvents.SolverMsgValueUnpaid();
         }
     }
@@ -255,6 +277,7 @@ contract ExecutionEnvironment is Base {
     function allocateValue(address bidToken, uint256 bidAmount, bytes memory returnData) 
         external 
         onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _ENVIRONMENT_DEPTH)
+        contributeSurplus(Party.Solver)
     {
         // msg.sender = escrow
         // address(this) = ExecutionEnvironment
@@ -276,17 +299,6 @@ contract ExecutionEnvironment is Base {
         require(success, "ERR-EC02 DelegateRevert");
     }
 
-
-    function donateToBundler(address surplusRecipient)
-        external
-        payable
-        onlyAtlasEnvironment(ExecutionPhase.SolverOperations, _ENVIRONMENT_DEPTH)
-    {
-        uint16 lockstate = _lockState();
-        console.log("lockstate", lockstate);
-
-        IEscrow(atlas).donateToBundler{value: msg.value}(surplusRecipient);
-    }
 
     ///////////////////////////////////////
     //  USER SUPPORT / ACCESS FUNCTIONS  //

@@ -66,7 +66,7 @@ abstract contract DAppControl is Test, DAppControlTemplate, ExecutionBase {
         external
         payable
         validControl
-        onlyAtlasEnvironment(ExecutionPhase.SolverOperations, _CONTROL_DEPTH)
+        onlyAtlasEnvironment(ExecutionPhase.PreSolver, _CONTROL_DEPTH)
         returns (bool)
     {
         return _preSolverCall(data);
@@ -76,7 +76,7 @@ abstract contract DAppControl is Test, DAppControlTemplate, ExecutionBase {
         external
         payable
         validControl
-        onlyAtlasEnvironment(ExecutionPhase.SolverOperations, _CONTROL_DEPTH)
+        onlyAtlasEnvironment(ExecutionPhase.PostSolver, _CONTROL_DEPTH)
         returns (bool)
     {
         

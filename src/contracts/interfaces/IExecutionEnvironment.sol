@@ -17,7 +17,6 @@ interface IExecutionEnvironment {
 
     function solverMetaTryCatch(
         uint256 gasLimit,
-        uint256 escrowBalance,
         SolverOperation calldata solverOp,
         bytes calldata dAppReturnData
     ) external payable;

@@ -7,96 +7,85 @@ import "../types/LockTypes.sol";
 //import {TestUtils} from "../../../test/base/TestUtils.sol";
 import "forge-std/Test.sol";
 
-// uint16 bit layout: CCCC BBBB BBBB AAAA
-// Where A = BaseLock, B = ExecutionPhase, C = SolverSafety
+// uint16 bit layout:  BBBB BBBB AAAA
+// Where A = BaseLock, B = ExecutionPhase, 
 
 uint16 constant EXECUTION_PHASE_OFFSET = uint16(type(BaseLock).max) + 1;
-uint16 constant SAFETY_LEVEL_OFFSET = uint16(type(BaseLock).max) + uint16(type(ExecutionPhase).max) + 2;
 
 uint16 constant ONLY_EXECUTION_PHASE_MASK = uint16(4080); // 0000 1111 1111 0000
 
-// NOTE: No user transfers allowed during UserRefund or HandlingPayments
+// NOTE: No user transfers allowed during HandlingPayments
 uint16 constant SAFE_USER_TRANSFER = uint16(
     1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps)) | 
     1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserOperation)) |
-    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations)) | // TODO: This may be removed later due to security risk
+    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreSolver)) | 
+    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostSolver)) |
     1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
 );
 
 // NOTE: No Dapp transfers allowed during UserOperation
 uint16 constant SAFE_DAPP_TRANSFER = uint16(
     1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps))
+    | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreSolver))
     | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.HandlingPayments))
-    | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserRefund))
     | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
+);
+
+uint16 constant SAFE_GAS_TRANSFER = uint16(
+    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps))
+    | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserOperation))
+    | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreSolver))
 );
 
 library SafetyBits {
 
     uint16 internal constant _LOCKED_X_SOLVERS_X_REQUESTED = uint16(
         1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations))
-            | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Requested))
     );
 
     uint16 internal constant _LOCKED_X_SOLVERS_X_VERIFIED = uint16(
         1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations))
-            | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Verified))
     );
 
     uint16 internal constant _ACTIVE_X_PRE_OPS_X_UNSET = uint16(
         1 << uint16(BaseLock.Active) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps))
-            | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Unset))
     );
 
     uint16 internal constant _PENDING_X_RELEASING_X_UNSET = uint16(
         1 << uint16(BaseLock.Pending) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Releasing))
-            | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Unset))
     );
 
     uint16 internal constant _LOCKED_X_PRE_OPS_X_UNSET = uint16(
         1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps))
-            | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Unset))
     );
 
     uint16 internal constant _ACTIVE_X_USER_X_UNSET = uint16(
         1 << uint16(BaseLock.Active) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserOperation))
-            | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Unset))
     );
 
     uint16 internal constant _LOCKED_X_USER_X_UNSET = uint16(
         1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserOperation))
-            | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Unset))
     );
 
     uint16 internal constant _PENDING_X_SOLVER_X_UNSET = uint16(
         1 << uint16(BaseLock.Pending) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations))
-            | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Unset))
     );
 
     uint16 internal constant _ACTIVE_X_SOLVER_X_UNSET = uint16(
         1 << uint16(BaseLock.Pending) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations))
-            | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Unset))
     );
 
     uint16 internal constant _LOCK_PAYMENTS = uint16(
         1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.HandlingPayments))
-            | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Unset))
     );
 
     uint16 internal constant _NO_SOLVER_SUCCESS = uint16(
         1 << uint16(BaseLock.Active) | 
-        1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps)) |
-        1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Unset))
-    );
-
-    uint16 internal constant _ACTIVE_X_REFUND_X_UNSET = uint16(
-        1 << uint16(BaseLock.Pending) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserRefund))
-            | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Unset))
+        1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps)) 
     );
 
     uint16 internal constant _LOCKED_X_VERIFICATION_X_UNSET = uint16(
         1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
-            | 1 << (SAFETY_LEVEL_OFFSET + uint16(SolverSafety.Unset))
     );
 
     //TODO change to pure after testing
@@ -196,12 +185,12 @@ library SafetyBits {
         return self;
     }
 
-    function initializeEscrowLock(EscrowKey memory self, bool needsPreOps, uint8 solverOpCount, address nextCaller, bool isSimulation)
+    function initializeEscrowLock(EscrowKey memory self, bool needsPreOps, uint8 solverOpCount, address firstApprovedAddress, bool isSimulation)
         internal
         pure
         returns (EscrowKey memory)
     {
-        self.approvedCaller = nextCaller;
+        self.approvedCaller = firstApprovedAddress;
         self.callMax = solverOpCount + 3;
         self.callIndex = needsPreOps ? 0 : 1;
         self.lockState = needsPreOps ? _ACTIVE_X_PRE_OPS_X_UNSET : _ACTIVE_X_USER_X_UNSET;
