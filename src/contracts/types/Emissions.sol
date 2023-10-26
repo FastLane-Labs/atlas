@@ -71,6 +71,14 @@ contract FastLaneErrorsEvents {
 
     // NEW - AtlETH
     error InsufficientBalance();
+
+    // NEW - DAppIntegration
+    error OnlyGovernance();
+    error OwnerActive();
+    error SignatoryActive();
+    error InvalidCaller();
+    error InvalidDAppControl();
+    error DAppNotEnabled();
     
 
     /*
