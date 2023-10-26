@@ -83,7 +83,7 @@ abstract contract Permit69 is GasAccounting {
 
     function requestGasFrom(Party donor, Party recipient, uint256 amt, uint16 lockState) external {
         // Verify the parties
-        require(_validParties(msg.sender, donor, recipient), "ERR-T003 InvalidEnvironment");
+        if(!_validParties(msg.sender, donor, recipient)) revert InvalidEnvironment();
 
         // Verify the lock state
         _verifyLockState({
@@ -96,7 +96,7 @@ abstract contract Permit69 is GasAccounting {
 
     function contributeGasTo(Party donor, Party recipient, uint256 amt, uint16 lockState) external {
         // Verify the parties
-        require(_validParties(msg.sender, donor, recipient), "ERR-T004 InvalidEnvironment");
+        if(!_validParties(msg.sender, donor, recipient)) revert InvalidEnvironment();
 
         // Verify the lock state
         _verifyLockState({
@@ -112,14 +112,15 @@ abstract contract Permit69 is GasAccounting {
         address controller,
         uint32 callConfig
     ) internal view {
-        require(
-            msg.sender == _getExecutionEnvironmentCustom(user, controller.codehash, controller, callConfig),
-            "ERR-T001 EnvironmentMismatch"
-        );
+        if(msg.sender != _getExecutionEnvironmentCustom(user, controller.codehash, controller, callConfig)){
+            revert EnvironmentMismatch();
+        }
     }
 
     function _verifyLockState(uint16 lockState, uint16 safeExecutionPhaseSet) internal pure {
-        require(lockState & safeExecutionPhaseSet != 0, "ERR-T002 InvalidLockState");
+        if(lockState & safeExecutionPhaseSet == 0){
+            revert InvalidLockState();
+        }
         // TODO: Do we need the below require? 
         // Intuition is that we'd need to block all reentry into EE to bypass this check 
         // require(msg.sender == activeEnvironment, "ERR-T003 EnvironmentNotActive");

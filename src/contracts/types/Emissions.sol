@@ -82,6 +82,11 @@ contract FastLaneErrorsEvents {
     error InvalidCaller();
     error InvalidDAppControl();
     error DAppNotEnabled();
+
+    // NEW - Permit69
+    error InvalidEnvironment();
+    error EnvironmentMismatch();
+    error InvalidLockState();
     
 
     /*
