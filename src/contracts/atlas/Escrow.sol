@@ -15,7 +15,6 @@ import "../types/UserCallTypes.sol";
 import {DAppConfig} from "../types/DAppApprovalTypes.sol";
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
-import {FastLaneErrorsEvents} from "../types/Emissions.sol";
 
 import {EscrowBits} from "../libraries/EscrowBits.sol";
 import {CallBits} from "../libraries/CallBits.sol";
@@ -23,7 +22,7 @@ import {SafetyBits} from "../libraries/SafetyBits.sol";
 
 import "forge-std/Test.sol";
 
-abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
+abstract contract Escrow is AtlETH, DAppVerification {
     using ECDSA for bytes32;
     using EscrowBits for uint256;
     using CallBits for uint32;
@@ -182,7 +181,7 @@ abstract contract Escrow is AtlETH, DAppVerification, FastLaneErrorsEvents {
             } else if (result & EscrowBits._NO_USER_REFUND != 0) {
                 // pass
             } else {
-                revert("ERR-SE72 UncoveredResult");
+                revert UncoveredResult();
             }
 
             if (gasRebate != 0) {

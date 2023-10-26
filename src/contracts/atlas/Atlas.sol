@@ -117,7 +117,7 @@ contract Atlas is Test, Factory {
             key = key.holdPreOpsLock(dConfig.to);
             (callSuccessful, returnData) = _executePreOpsCall(userOp, executionEnvironment, key.pack());
             if (!callSuccessful) {
-                if (key.isSimulation) { revert PreOpsSimFail(); } else { revert("ERR-E001 PreOpsFail"); }
+                if (key.isSimulation) { revert PreOpsSimFail(); } else { revert PreOpsFail(); }
             }
         }
 
@@ -126,7 +126,7 @@ contract Atlas is Test, Factory {
         bytes memory userReturnData;
         (callSuccessful, userReturnData) = _executeUserOperation(userOp, executionEnvironment, key.pack());
         if (!callSuccessful) {
-            if (key.isSimulation) { revert UserOpSimFail(); } else { revert("ERR-E002 UserFail"); }
+            if (key.isSimulation) { revert UserOpSimFail(); } else { revert UserOpFail(); }
         }
 
         if (CallBits.needsPreOpsReturnData(dConfig.callConfig)) {
@@ -164,7 +164,7 @@ contract Atlas is Test, Factory {
             key = key.holdDAppOperationLock(address(this));
             callSuccessful = _executePostOpsCall(returnData, executionEnvironment, key.pack());
             if (!callSuccessful) {
-                if (key.isSimulation) { revert PostOpsSimFail(); } else { revert("ERR-E005 PostOpsFail"); }
+                if (key.isSimulation) { revert PostOpsSimFail(); } else { revert PostOpsFail(); }
             }
         }
         return (auctionWon, uint256(key.gasRefund), winningSearcherIndex);
@@ -353,7 +353,7 @@ contract Atlas is Test, Factory {
             revert UserNotFulfilled();
         }
         if (callConfig.allowsReuseUserOps()) {
-            revert("ERR-F07 RevertToReuse");
+            revert RevertToReuse();
         }
     }
 }

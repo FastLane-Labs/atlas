@@ -94,7 +94,10 @@ abstract contract AtlETH is Permit69 {
 
     // Redeem atlETH for ETH.
     function withdraw(uint256 amount) external onlyWhenUnlocked tokenTransferChecks(msg.sender) {
-        require(_escrowAccountData[msg.sender].balance >= amount, "ERR-E078 InsufficientBalance");
+        if (_escrowAccountData[msg.sender].balance < amount){
+            revert InsufficientBalance();
+        }
+
         _burn(msg.sender, amount);
         SafeTransferLib.safeTransferETH(msg.sender, amount);
     }

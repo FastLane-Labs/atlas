@@ -57,6 +57,22 @@ contract FastLaneErrorsEvents {
 
     error ValidCalls(ValidCallsResult);
 
+    // NEW Custom Errors to replace string errors
+
+    // NEW - Atlas
+    error PreOpsFail();
+    error UserOpFail();
+    // error SolverFail(); // Only sim version of err is used
+    error PostOpsFail();
+    error RevertToReuse();
+
+    // NEW - Escrow
+    error UncoveredResult();
+
+    // NEW - AtlETH
+    error InsufficientBalance();
+    
+
     /*
     event NewDAppIntegration(
         address indexed environment,

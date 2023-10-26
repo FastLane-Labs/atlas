@@ -12,9 +12,11 @@ import "../types/EscrowTypes.sol";
 
 import "../types/LockTypes.sol";
 
+import {FastLaneErrorsEvents} from "../types/Emissions.sol";
+
 import "forge-std/Test.sol";
 
-contract SafetyLocks {
+contract SafetyLocks is FastLaneErrorsEvents {
     using SafetyBits for EscrowKey;
     using CallBits for uint32;
     using PartyMath for Party;
