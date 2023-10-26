@@ -71,6 +71,9 @@ contract FastLaneErrorsEvents {
 
     // NEW - AtlETH
     error InsufficientBalance();
+    error PermitDeadlineExpired();
+    error InvalidSigner();
+    error EscrowLockActive();
 
     // NEW - DAppIntegration
     error OnlyGovernance();

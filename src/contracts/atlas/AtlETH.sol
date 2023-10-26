@@ -71,7 +71,9 @@ abstract contract AtlETH is Permit69 {
     // Interactions (transfers, withdrawals) are allowed only after the owner last interaction
     // with Atlas was at least `escrowDuration` blocks ago.
     modifier tokenTransferChecks(address account) {
-        require(_escrowAccountData[account].lastAccessed + escrowDuration < block.number, "EscrowActive");
+        if(block.number <= _escrowAccountData[account].lastAccessed + escrowDuration) {
+            revert EscrowLockActive();
+        }
         _;
     }
 
@@ -94,10 +96,7 @@ abstract contract AtlETH is Permit69 {
 
     // Redeem atlETH for ETH.
     function withdraw(uint256 amount) external onlyWhenUnlocked tokenTransferChecks(msg.sender) {
-        if (_escrowAccountData[msg.sender].balance < amount){
-            revert InsufficientBalance();
-        }
-
+        if (_escrowAccountData[msg.sender].balance < amount) revert InsufficientBalance();
         _burn(msg.sender, amount);
         SafeTransferLib.safeTransferETH(msg.sender, amount);
     }
@@ -139,7 +138,7 @@ abstract contract AtlETH is Permit69 {
     function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
         public
     {
-        require(deadline >= block.timestamp, "PERMIT_DEADLINE_EXPIRED");
+        if(deadline < block.timestamp) revert PermitDeadlineExpired();
         // Unchecked because the only math done is incrementing
         // the owner's nonce which cannot realistically overflow.
         unchecked {
@@ -166,7 +165,7 @@ abstract contract AtlETH is Permit69 {
                 r,
                 s
             );
-            require(recoveredAddress != address(0) && recoveredAddress == owner, "INVALID_SIGNER");
+            if(recoveredAddress == address(0) || recoveredAddress != owner) revert InvalidSigner();
             allowance[recoveredAddress][spender] = value;
         }
         emit Approval(owner, spender, value);
