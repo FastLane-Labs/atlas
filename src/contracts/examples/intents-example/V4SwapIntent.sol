@@ -29,11 +29,10 @@ struct SwapIntent {
 
 // This struct is for passing around data internally
 struct SwapData {
-    address tokenUserBuys;
-    uint256 amountUserBuys;
-    address tokenUserSells;
-    uint256 amountUserSells;
-    address auctionBaseCurrency; // NOTE: Typically will be address(0) / ETH for gas refund
+    address tokenIn;
+    address tokenOut;
+    int256 requestedAmount; // positive for exact in, negative for exact out
+    uint256 limitAmount; // if exact in, min amount out. if exact out, max amount in
     uint256 solverGasLiability; // the amount of user gas that the solver must refund
 }
 
@@ -72,7 +71,7 @@ contract V4SwapIntentController is DAppControl {
     // CONTRACT-SPECIFIC FUNCTIONS  //
     //////////////////////////////////
 
-    modifier verifyCall(address tokenIn, address tokenOut) {
+    modifier verifyCall(address tokenIn, address tokenOut, uint256 amount) {
         require(msg.sender == escrow, "ERR-PI002 InvalidSender");
         require(_approvedCaller() == control, "ERR-PI003 InvalidLockState");
         require(address(this) != control, "ERR-PI004 MustBeDelegated");
@@ -89,6 +88,11 @@ contract V4SwapIntentController is DAppControl {
         if (tokenOutBalance > 0) {
             ERC20(tokenOut).safeTransfer(user, tokenOutBalance);
         }
+
+        require(
+            _availableFundsERC20(tokenIn, user, amount, ExecutionPhase.SolverOperations),
+            "ERR-PI059 SellFundsUnavailable"
+        );
         _;
     }
 
@@ -100,7 +104,16 @@ contract V4SwapIntentController is DAppControl {
         uint256 amountIn,
         uint256 amountOutMinimum,
         uint256 sqrtPriceLimitX96
-    ) external payable verifyCall(tokenIn, tokenOut) returns (SwapData memory) {
+    ) external payable verifyCall(tokenIn, tokenOut, amountIn) returns (SwapData memory) {
+        SwapData memory swapData = SwapData({
+            tokenIn: tokenIn,
+            tokenOut: tokenOut,
+            requestedAmount: int256(amountIn),
+            limitAmount: amountOutMinimum,
+            solverGasLiability: EXPECTED_GAS_USAGE_EX_SOLVER
+        });
+
+        return swapData;
     } 
 
     function exactOutputSingle(
@@ -111,60 +124,13 @@ contract V4SwapIntentController is DAppControl {
         uint256 amountInMaximum,
         uint256 amountOut,
         uint256 sqrtPriceLimitX96
-    ) external payable verifyCall(tokenIn, tokenOut) returns (SwapData memory) {
-    }
-
-    // swap() selector = 0x98434997
-    function swap(SwapIntent calldata swapIntent) external payable returns (SwapData memory) {
-        require(msg.sender == escrow, "ERR-PI002 InvalidSender");
-        require(_approvedCaller() == control, "ERR-PI003 InvalidLockState");
-        require(address(this) != control, "ERR-PI004 MustBeDelegated");
-        
-        address user = _user();
-
-        // There should never be a balance on this ExecutionEnvironment greater than 1, but check
-        // anyway so that the auction accounting isn't imbalanced by unexpected inventory. 
-
-        require(swapIntent.tokenUserSells != swapIntent.auctionBaseCurrency, "ERR-PI008 SellIsSurplus");
-        // TODO: If user is Selling Eth, convert it to WETH rather than rejecting. 
-
-        // TODO: Could maintain a balance of "1" of each token to allow the user to save gas over multiple uses
-        uint256 buyTokenBalance = ERC20(swapIntent.tokenUserBuys).balanceOf(address(this));
-        if (buyTokenBalance > 0) { 
-            ERC20(swapIntent.tokenUserBuys).safeTransfer(user, buyTokenBalance);
-        }
-
-        uint256 sellTokenBalance = ERC20(swapIntent.tokenUserSells).balanceOf(address(this));
-        if (sellTokenBalance > 0) {
-            ERC20(swapIntent.tokenUserSells).safeTransfer(user, sellTokenBalance);
-        }
-
-        require(
-            _availableFundsERC20(swapIntent.tokenUserSells, user, swapIntent.amountUserSells, ExecutionPhase.SolverOperations),
-            "ERR-PI059 SellFundsUnavailable"
-        );
-
-        if (swapIntent.auctionBaseCurrency != swapIntent.tokenUserSells || swapIntent.auctionBaseCurrency != swapIntent.tokenUserBuys) {
-            if (swapIntent.auctionBaseCurrency == address(0)) {
-                uint256 auctionBaseCurrencyBalance = address(this).balance;
-                SafeTransferLib.safeTransferETH(user, auctionBaseCurrencyBalance);
-            
-            } else {
-                uint256 auctionBaseCurrencyBalance = ERC20(swapIntent.auctionBaseCurrency).balanceOf(address(this));
-                if (auctionBaseCurrencyBalance > 0) {
-                    ERC20(swapIntent.tokenUserBuys).safeTransfer(user, auctionBaseCurrencyBalance);
-                }
-            }
-        }
-
-        // Make a SwapData memory struct so that we don't have to pass around the full intent anymore
+    ) external payable verifyCall(tokenIn, tokenOut, amountInMaximum) returns (SwapData memory) {
         SwapData memory swapData = SwapData({
-            tokenUserBuys: swapIntent.tokenUserBuys,
-            amountUserBuys: swapIntent.amountUserBuys,
-            tokenUserSells: swapIntent.tokenUserSells,
-            amountUserSells: swapIntent.amountUserSells,
-            auctionBaseCurrency: swapIntent.auctionBaseCurrency,
-            solverGasLiability: swapIntent.solverMustReimburseGas ? EXPECTED_GAS_USAGE_EX_SOLVER : 0
+            tokenIn: tokenIn,
+            tokenOut: tokenOut,
+            requestedAmount: -int256(amountOut),
+            limitAmount: amountInMaximum,
+            solverGasLiability: EXPECTED_GAS_USAGE_EX_SOLVER
         });
 
         return swapData;
@@ -183,7 +149,7 @@ contract V4SwapIntentController is DAppControl {
         SwapData memory swapData = abi.decode(returnData, (SwapData));
 
         // Optimistically transfer the solver contract the tokens that the user is selling
-        _transferUserERC20(swapData.tokenUserSells, solverTo, swapData.amountUserSells);
+        _transferUserERC20(swapData.tokenIn, solverTo, swapData.requestedAmount > 0 ? uint256(swapData.requestedAmount) : swapData.limitAmount);
         
         // TODO: Permit69 is currently enabled during solver phase, but there is low conviction that this
         // does not enable an attack vector. Consider enabling to save gas on a transfer?
@@ -211,16 +177,19 @@ contract V4SwapIntentController is DAppControl {
             IEscrow(escrow).donateToBundler{value: expectedGasReimbursement}(solverTo);
         }
 
-        uint256 buyTokenBalance = ERC20(swapData.tokenUserBuys).balanceOf(address(this));
+        uint256 buyTokenBalance = ERC20(swapData.tokenOut).balanceOf(address(this));
+        uint256 amountUserBuys = swapData.requestedAmount > 0 ? swapData.limitAmount : uint256(-swapData.requestedAmount);
         
-        if (buyTokenBalance >= swapData.amountUserBuys) {
+        if (buyTokenBalance >= amountUserBuys) {
 
             // Make sure not to transfer any extra 'auctionBaseCurrency' token, since that will be used
             // for the auction measurements
-            if (swapData.tokenUserBuys != swapData.auctionBaseCurrency) {
-                ERC20(swapData.tokenUserBuys).safeTransfer(_user(), buyTokenBalance);
+            address auctionBaseCurrency = swapData.requestedAmount > 0 ? swapData.tokenOut : swapData.tokenIn;
+
+            if (swapData.tokenOut != auctionBaseCurrency) {
+                ERC20(swapData.tokenOut).safeTransfer(_user(), buyTokenBalance);
             } else {
-                ERC20(swapData.tokenUserBuys).safeTransfer(_user(), swapData.amountUserBuys);
+                ERC20(swapData.tokenOut).safeTransfer(_user(), amountUserBuys);
             }
             return true;
         
