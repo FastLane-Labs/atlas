@@ -136,7 +136,7 @@ contract SafetyLocks is FastLaneErrorsEvents {
     ) internal view returns (EscrowKey memory self) {
 
         // TODO: can we bypass this check?
-        require(lock.activeEnvironment == executionEnvironment, "ERR-SL004 NotInitialized");
+        if(lock.activeEnvironment != executionEnvironment) revert NotInitialized();
 
         self = self.initializeEscrowLock(
             dConfig.callConfig.needsPreOpsCall(), solverOpCount, executionEnvironment, isSimulation
@@ -172,7 +172,7 @@ contract SafetyLocks is FastLaneErrorsEvents {
     }
 
     modifier onlyWhenUnlocked() {
-        require(lock.activeEnvironment == UNLOCKED, "ERR-SL003 AlreadyInitialized");
+        if(lock.activeEnvironment != UNLOCKED) revert AlreadyInitialized();
         _;
     }
 

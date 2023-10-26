@@ -87,6 +87,14 @@ contract FastLaneErrorsEvents {
     error InvalidEnvironment();
     error EnvironmentMismatch();
     error InvalidLockState();
+
+    // NEW - GasAccounting
+    // TODO check with thogard if we need unique IDs for each LedgerFinalized revert
+
+    // NEW - SafetyLocks
+    error NotInitialized();
+    error AlreadyInitialized();
+
     
 
     /*
