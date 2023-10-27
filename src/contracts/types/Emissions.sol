@@ -89,8 +89,13 @@ contract FastLaneErrorsEvents {
     error InvalidLockState();
 
     // NEW - GasAccounting
-    // TODO check with thogard if we need unique IDs for each LedgerFinalized revert
-
+    error LedgerFinalized(uint8 id);
+    error LedgerBalancing(uint8 id);
+    error MissingFunds(uint8 id);
+    error InsufficientFunds();
+    error NoUnfilledRequests();
+    error SolverMustReconcile();
+    
     // NEW - SafetyLocks
     error NotInitialized();
     error AlreadyInitialized();
