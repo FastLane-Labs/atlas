@@ -1,8 +1,6 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
-import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
-
 import {SafetyLocks} from "../atlas/SafetyLocks.sol";
 
 import "../types/EscrowTypes.sol";
@@ -15,7 +13,6 @@ import {PartyMath, LEDGER_LENGTH} from "../libraries/GasParties.sol";
 import "forge-std/Test.sol";
 
 abstract contract GasAccounting is SafetyLocks {
-    using SafeTransferLib for ERC20;
     using PartyMath for Party;
     using PartyMath for uint256;
     using PartyMath for Ledger[LEDGER_LENGTH];
