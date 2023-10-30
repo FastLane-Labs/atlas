@@ -3,6 +3,8 @@ pragma solidity ^0.8.18;
 
 import {IDAppControl} from "../interfaces/IDAppControl.sol";
 import {Mimic} from "./Mimic.sol";
+import {DAppConfig} from "src/contracts/types/DAppApprovalTypes.sol";
+import {ExecutionEnvironment} from "./ExecutionEnvironment.sol";
 
 // NOTE: Experimental - Splitting contracts into [AtlETH, Atlas, AtlasFactory]
 
@@ -20,10 +22,13 @@ contract AtlasFactory {
 
     bytes32 public immutable salt;
     address public immutable executionTemplate;
+    address public immutable atlas;
 
-    constructor(address _executionTemplate) {
+    constructor(address _executionTemplate, address _atlas) {
         salt = keccak256(abi.encodePacked(block.chainid, address(this), "AtlasFactory 1.0"));
-        executionTemplate = _executionTemplate;
+        atlas = _atlas;
+
+        executionTemplate = _deployExecutionEnvironmentTemplate(_atlas);
     }
 
     // ------------------ //
@@ -46,6 +51,17 @@ contract AtlasFactory {
     // ------------------ //
     // INTERNAL FUNCTIONS //
     // ------------------ //
+
+    function _deployExecutionEnvironmentTemplate(address _atlas)
+        internal
+        returns (address executionEnvironment)
+    {
+        ExecutionEnvironment _environment = new ExecutionEnvironment{
+            salt: salt
+        }(_atlas);
+
+        executionEnvironment = address(_environment);
+    }
 
     function _setExecutionEnvironment(address dAppControl, address user, bytes32 controlCodeHash)
         internal

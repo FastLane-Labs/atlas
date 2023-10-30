@@ -3,15 +3,17 @@ pragma solidity ^0.8.18;
 
 import "forge-std/Test.sol";
 
-import {IDAppIntegration} from "../../src/contracts/interfaces/IDAppIntegration.sol";
+import {IDAppIntegration} from "src/contracts/interfaces/IDAppIntegration.sol";
 
-import {Atlas} from "../../src/contracts/atlas/Atlas.sol";
-import {Sorter} from "../../src/contracts/helpers/Sorter.sol";
-import {Simulator} from "../../src/contracts/helpers/Simulator.sol";
+import {Atlas} from "src/contracts/atlas/Atlas.sol";
+import {AtlasFactory} from "src/contracts/atlas/AtlasFactory.sol";
+
+import {Sorter} from "src/contracts/helpers/Sorter.sol";
+import {Simulator} from "src/contracts/helpers/Simulator.sol";
 
 import {Solver} from "src/contracts/solver/src/TestSolver.sol";
 
-import {V2DAppControl} from "../../src/contracts/examples/v2-example/V2DAppControl.sol";
+import {V2DAppControl} from "src/contracts/examples/v2-example/V2DAppControl.sol";
 
 import {TestConstants} from "./TestConstants.sol";
 
@@ -35,6 +37,8 @@ contract BaseTest is Test, TestConstants {
     address public userEOA = vm.addr(userPK);
 
     Atlas public atlas;
+    AtlasFactory public atlasFactory;
+
     Simulator public simulator;
     Sorter public sorter;
 
