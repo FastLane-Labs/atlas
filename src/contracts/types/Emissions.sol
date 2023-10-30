@@ -24,6 +24,7 @@ contract FastLaneErrorsEvents {
         address indexed controller, uint32 callConfig, address bidToken, uint256 bidAmount
     );
 
+    // TODO remove after AtlasFactory split-out
     event NewExecutionEnvironment(
         address indexed environment,
         address indexed user,
