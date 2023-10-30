@@ -42,6 +42,16 @@ contract AtlasFactory {
         // _initializeNonce(msg.sender); // NOTE: called separately by Atlas after calling createExecEnv
     }
 
+    function getExecutionEnvironment(address user, address dAppControl)
+        external
+        view
+        returns (address executionEnvironment, uint32 callConfig, bool exists)
+    {
+        callConfig = IDAppControl(dAppControl).callConfig();
+        executionEnvironment = _getExecutionEnvironmentCustom(user, dAppControl.codehash, dAppControl, callConfig);
+        exists = executionEnvironment.codehash != bytes32(0);
+    }
+
     function getMimicCreationCode(address controller, uint32 callConfig, address user, bytes32 controlCodeHash)
         external
         view
@@ -91,6 +101,41 @@ contract AtlasFactory {
 
             emit NewExecutionEnvironment(executionEnvironment, user, dAppControl, callConfig);
         }
+    }
+
+    function _getExecutionEnvironment(address user, bytes32 controlCodeHash, address controller)
+        internal
+        view
+        returns (address executionEnvironment)
+    {
+        uint32 callConfig = IDAppControl(controller).callConfig();
+        executionEnvironment = _getExecutionEnvironmentCustom(user, controlCodeHash, controller, callConfig);
+    }
+
+    // NOTE: This func is used to generate the address of user ExecutionEnvironments that have
+    // been deprecated due to DAppControl changes of callConfig.
+    function _getExecutionEnvironmentCustom(
+        address user,
+        bytes32 controlCodeHash,
+        address controller,
+        uint32 callConfig
+    ) internal view returns (address executionEnvironment) {
+        executionEnvironment = address(
+            uint160(
+                uint256(
+                    keccak256(
+                        abi.encodePacked(
+                            bytes1(0xff),
+                            address(this),
+                            salt,
+                            keccak256(
+                                abi.encodePacked(_getMimicCreationCode(controller, callConfig, user, controlCodeHash))
+                            )
+                        )
+                    )
+                )
+            )
+        );
     }
 
 
