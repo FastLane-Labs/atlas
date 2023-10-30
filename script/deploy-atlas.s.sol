@@ -26,7 +26,7 @@ contract DeployAtlasScript is DeployBaseScript {
         vm.startBroadcast(deployerPrivateKey);
 
         simulator = new Simulator();
-        atlas = new Atlas(64, address(simulator));
+        atlas = new Atlas(64, address(simulator), address(0)); //TODO update to Factory addr arg
 
         vm.stopBroadcast();
 
@@ -56,7 +56,7 @@ contract DeployAtlasAndSwapIntentDAppControlScript is DeployBaseScript {
 
         // Deploy the Atlas contract
         simulator = new Simulator();
-        atlas = new Atlas(64, address(simulator));
+        atlas = new Atlas(64, address(simulator), address(0)); //TODO update to Factory addr arg
 
         // Deploy the SwapIntent DAppControl contract
         swapIntentControl = new SwapIntentController(address(atlas));
@@ -96,7 +96,7 @@ contract DeployAtlasAndSwapIntentDAppControlAndTxBuilderScript is DeployBaseScri
 
         // Deploy the Atlas contract
         simulator = new Simulator();
-        atlas = new Atlas(64, address(simulator));
+        atlas = new Atlas(64, address(simulator), address(0)); //TODO update to Factory addr arg
 
         // Deploy the SwapIntent DAppControl contract
         swapIntentControl = new SwapIntentController(address(atlas));

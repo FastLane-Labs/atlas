@@ -69,7 +69,15 @@ contract BaseTest is Test, TestConstants {
 
         simulator = new Simulator();
 
-        atlas = new Atlas(64, address(simulator));
+        // Computes the address at which AtlasFactory will be deployed
+        address expectedAtlasFactoryAddr = computeCreateAddress(
+            payee,
+            vm.getNonce(payee) + 1
+        );
+
+        atlas = new Atlas(64, address(simulator), expectedAtlasFactoryAddr);
+        atlasFactory = new AtlasFactory(address(atlas));
+
         simulator.setAtlas(address(atlas));
 
         escrow = atlas.getEscrowAddress();

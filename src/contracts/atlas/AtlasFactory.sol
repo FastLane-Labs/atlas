@@ -12,6 +12,8 @@ import {ExecutionEnvironment} from "./ExecutionEnvironment.sol";
 // Factory - everything for creating new Execution Environments
 // Exec Env template deployed separately, no internal deploy functions
 
+// TODO make sure no cases of address(this) when Atlas address is intended
+
 contract AtlasFactory {
     event NewExecutionEnvironment(
         address indexed environment,
@@ -24,7 +26,7 @@ contract AtlasFactory {
     address public immutable executionTemplate;
     address public immutable atlas;
 
-    constructor(address _executionTemplate, address _atlas) {
+    constructor(address _atlas) {
         salt = keccak256(abi.encodePacked(block.chainid, address(this), "AtlasFactory 1.0"));
         atlas = _atlas;
 

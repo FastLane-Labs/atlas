@@ -27,8 +27,11 @@ contract Atlas is Test, Factory {
     using SafetyBits for EscrowKey;
 
     uint256 private constant _MAX_GAS = 1_500_000;
+    address public immutable FACTORY;
 
-    constructor(uint32 _escrowDuration, address _simulator) Factory(_escrowDuration, _simulator) {}
+    constructor(uint32 _escrowDuration, address _simulator, address _factory) Factory(_escrowDuration, _simulator) {
+        FACTORY = _factory;
+    }
 
     function metacall( // <- Entrypoint Function
         UserOperation calldata userOp, // set by user
