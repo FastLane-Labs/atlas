@@ -12,14 +12,10 @@ interface IAtlas {
         DAppOperation calldata verification
     ) external payable returns (bool auctionWon);
 
-    function createExecutionEnvironment(address control) external returns (address environment);
-
     function withdrawERC20(address token, uint256 amount, DAppConfig memory dConfig) external;
     function withdrawEther(uint256 amount, DAppConfig memory dConfig) external;
 
     function getEscrowAddress() external view returns (address escrowAddress);
-
-    function getExecutionEnvironment(address user, address dAppControl) external view returns (address executionEnvironment);
 
     function userDirectVerifyDApp(
         address userOpFrom,
