@@ -27,12 +27,11 @@ abstract contract Permit69 is GasAccounting {
     constructor(address _simulator) GasAccounting(_simulator) {}
 
     // Virtual Functions defined by other Atlas modules
-    function _getExecutionEnvironmentCustom(
+    function _verifyCallerIsExecutionEnv(
         address user,
-        bytes32 controlCodeHash,
         address controller,
         uint32 callConfig
-    ) internal view virtual returns (address environment);
+    ) internal virtual {}
 
     // Transfer functions
     function transferUserERC20(
@@ -105,16 +104,6 @@ abstract contract Permit69 is GasAccounting {
         });
 
         _contributeTo(donor, recipient, amt);
-    }
-
-    function _verifyCallerIsExecutionEnv(
-        address user,
-        address controller,
-        uint32 callConfig
-    ) internal view {
-        if(msg.sender != _getExecutionEnvironmentCustom(user, controller.codehash, controller, callConfig)){
-            revert EnvironmentMismatch();
-        }
     }
 
     function _verifyLockState(uint16 lockState, uint16 safeExecutionPhaseSet) internal pure {

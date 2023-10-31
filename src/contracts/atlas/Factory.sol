@@ -70,7 +70,7 @@ contract Factory is Escrow {
         bytes32 controlCodeHash,
         address controller,
         uint32 callConfig
-    ) internal view override returns (address executionEnvironment) {
+    ) internal view returns (address executionEnvironment) {
         executionEnvironment = address(
             uint160(
                 uint256(

@@ -279,13 +279,14 @@ contract MockAtlasForPermit69Tests is Permit69 {
     }
 
     // Overriding the virtual functions in Permit69
-    function _getExecutionEnvironmentCustom(
+    function _verifyCallerIsExecutionEnv(
         address user,
-        bytes32 controlCodeHash,
         address controller,
         uint32 callConfig
-    ) internal view virtual override returns (address activeEnvironment) {
-        activeEnvironment = _environment;
+    ) internal override {
+        if(msg.sender != _environment) {
+            revert("ERR-T001 EnvironmentMismatch");
+        }
     }
 
     // Implemented in Factory.sol in the canonical Atlas system

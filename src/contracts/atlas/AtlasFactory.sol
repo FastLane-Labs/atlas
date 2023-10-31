@@ -52,6 +52,15 @@ contract AtlasFactory {
         exists = executionEnvironment.codehash != bytes32(0);
     }
 
+    function getExecutionEnvironmentCustom(
+        address user,
+        bytes32 controlCodeHash,
+        address controller,
+        uint32 callConfig
+    ) external view returns (address executionEnvironment) {
+        executionEnvironment = _getExecutionEnvironmentCustom(user, controlCodeHash, controller, callConfig);
+    }
+
     function getMimicCreationCode(address controller, uint32 callConfig, address user, bytes32 controlCodeHash)
         external
         view

@@ -3,8 +3,10 @@ pragma solidity ^0.8.16;
 
 import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
 import {IDAppControl} from "../interfaces/IDAppControl.sol";
+import {IAtlasFactory} from "../interfaces/IAtlasFactory.sol";
 
-import {Factory} from "./Factory.sol";
+import {Escrow} from "./Escrow.sol";
+
 import {UserSimulationFailed, UserUnexpectedSuccess, UserSimulationSucceeded} from "../types/Emissions.sol";
 
 import {FastLaneErrorsEvents} from "../types/Emissions.sol";
@@ -21,7 +23,7 @@ import {SafetyBits} from "../libraries/SafetyBits.sol";
 
 import "forge-std/Test.sol";
 
-contract Atlas is Test, Factory {
+contract Atlas is Escrow {
     using CallVerification for UserOperation;
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
@@ -29,7 +31,7 @@ contract Atlas is Test, Factory {
     uint256 private constant _MAX_GAS = 1_500_000;
     address public immutable FACTORY;
 
-    constructor(uint32 _escrowDuration, address _simulator, address _factory) Factory(_escrowDuration, _simulator) {
+    constructor(uint32 _escrowDuration, address _simulator, address _factory) Escrow(_escrowDuration, _simulator) {
         FACTORY = _factory;
     }
 
@@ -45,7 +47,7 @@ contract Atlas is Test, Factory {
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
 
         // Get the execution environment
-        address executionEnvironment = _getExecutionEnvironmentCustom(userOp.from, dAppOp.control.codehash, userOp.control, dConfig.callConfig);
+        address executionEnvironment = IAtlasFactory(FACTORY).getExecutionEnvironmentCustom(userOp.from, dAppOp.control.codehash, userOp.control, dConfig.callConfig);
 
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
@@ -357,6 +359,16 @@ contract Atlas is Test, Factory {
         }
         if (callConfig.allowsReuseUserOps()) {
             revert RevertToReuse();
+        }
+    }
+
+    function _verifyCallerIsExecutionEnv(
+        address user,
+        address controller,
+        uint32 callConfig
+    ) internal override {
+        if(msg.sender != IAtlasFactory(FACTORY).getExecutionEnvironmentCustom(user, controller.codehash, controller, callConfig)){
+            revert EnvironmentMismatch();
         }
     }
 }

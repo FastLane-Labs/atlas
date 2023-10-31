@@ -80,7 +80,7 @@ contract BaseTest is Test, TestConstants {
 
         simulator.setAtlas(address(atlas));
 
-        escrow = atlas.getEscrowAddress();
+        escrow = address(atlas);
         sorter = new Sorter(address(atlas), escrow);
 
         vm.stopPrank();
