@@ -172,8 +172,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
     // the supply chain to submit data.  If any other party
     // (user, solver, FastLane,  or a collusion between
     // all of them) attempts to alter it, this check will fail
-    function _verifyDApp(DAppConfig memory dConfig, DAppOperation calldata dAppOp)
-        internal
+    function verifyDApp(DAppConfig memory dConfig, DAppOperation calldata dAppOp)
+        external
         returns (bool)
     {
         // Verify the signature before storing any data to avoid
@@ -347,8 +347,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
     //
 
     // Verify the user's meta transaction
-    function _verifyUser(DAppConfig memory dConfig, UserOperation calldata userOp)
-        internal
+    function verifyUser(DAppConfig memory dConfig, UserOperation calldata userOp)
+        external
         returns (bool)
     {
         

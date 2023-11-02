@@ -4,6 +4,7 @@ pragma solidity ^0.8.16;
 import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
 import {IDAppControl} from "../interfaces/IDAppControl.sol";
 import {IAtlasFactory} from "../interfaces/IAtlasFactory.sol";
+import {IAtlasVerification} from "../interfaces/IAtlasVerification.sol";
 
 import {Escrow} from "./Escrow.sol";
 
@@ -231,7 +232,7 @@ contract Atlas is Escrow {
             }
 
             // check dapp signature
-            if(!_verifyDApp(dConfig, dAppOp)) {
+            if(!IAtlasVerification(VERIFICATION).verifyDApp(dConfig, dAppOp)) {
                 bool bypass = isSimulation && dAppOp.signature.length == 0;
                 if (!bypass) {
                     return ValidCallsResult.DAppSignatureInvalid;
@@ -245,7 +246,7 @@ contract Atlas is Escrow {
         } // dapp is bundling - always allowed, check valid user/dapp signature and callchainhash
         else if(msg.sender == dAppOp.from) {
             // check dapp signature
-            if(!_verifyDApp(dConfig, dAppOp)) {
+            if(!IAtlasVerification(VERIFICATION).verifyDApp(dConfig, dAppOp)) {
                 bool bypass = isSimulation && dAppOp.signature.length == 0;
                 if (!bypass) {
                     return ValidCallsResult.DAppSignatureInvalid;
@@ -253,7 +254,7 @@ contract Atlas is Escrow {
             }
 
             // check user signature
-            if(!_verifyUser(dConfig, userOp)) {
+            if(!IAtlasVerification(VERIFICATION).verifyUser(dConfig, userOp)) {
                 bool bypass = isSimulation && userOp.signature.length == 0;
                 if (!bypass) {
                     return ValidCallsResult.UserSignatureInvalid;   
@@ -272,7 +273,7 @@ contract Atlas is Escrow {
             }
 
             // verify user signature
-            if(!_verifyUser(dConfig, userOp)) {
+            if(!IAtlasVerification(VERIFICATION).verifyUser(dConfig, userOp)) {
                 bool bypass = isSimulation && userOp.signature.length == 0;
                 if (!bypass) {
                     return ValidCallsResult.UserSignatureInvalid;   
@@ -288,7 +289,7 @@ contract Atlas is Escrow {
         } // check if protocol allows unknown bundlers, and verify all signatures if they do
         else if(dConfig.callConfig.allowsUnknownBundler()) {
             // check dapp signature
-            if(!_verifyDApp(dConfig, dAppOp)) {
+            if(!IAtlasVerification(VERIFICATION).verifyDApp(dConfig, dAppOp)) {
                 bool bypass = isSimulation && dAppOp.signature.length == 0;
                 if (!bypass) {
                     return ValidCallsResult.DAppSignatureInvalid;
@@ -296,7 +297,7 @@ contract Atlas is Escrow {
             }
 
             // check user signature
-            if(!_verifyUser(dConfig, userOp)) {
+            if(!IAtlasVerification(VERIFICATION).verifyUser(dConfig, userOp)) {
                 bool bypass = isSimulation && userOp.signature.length == 0;
                 if (!bypass) {
                     return ValidCallsResult.UserSignatureInvalid;   
