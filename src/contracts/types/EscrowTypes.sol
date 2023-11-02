@@ -19,6 +19,34 @@ struct GasDonation {
     uint32 cumulative;
 }
 
+// NOTE: The order is very important here for balance reconciliation. 
+// We _MUST_ net the balances in order from LastLook to FirstLook
+enum Party {
+    Builder, // block.coinbase
+    Bundler, // tx.origin
+    Solver,
+    User,
+    DApp
+}
+
+enum LedgerStatus {
+    Unknown,
+    Inactive,
+    Proxy,
+    Active,
+    Borrowing,
+    Balancing, // no more requests, but contributions allowed
+    Finalized
+}
+
+struct Ledger {
+    int64 balance; // net balance for deposits / withdrawals / loans
+    int64 contributed; // requested by others - | + filled by this party
+    int64 requested; // requested by this party  - | + filled by others
+    LedgerStatus status;
+    Party proxy; // if the address has more than one role
+}
+
 enum SolverOutcome
 // future task tracking
 {

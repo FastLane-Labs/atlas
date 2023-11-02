@@ -1,6 +1,12 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.16;
 
+struct Lock {
+    address activeEnvironment;
+    uint16 activeParties; // bitmap
+    uint64 startingBalance;
+}
+
 struct EscrowKey {
     address approvedCaller;
     bool makingPayments;
@@ -11,12 +17,6 @@ struct EscrowKey {
     uint32 gasRefund;
     bool isSimulation;
     uint8 callDepth;
-}
-
-enum SolverSafety {
-    Unset,
-    Requested,
-    Verified
 }
 
 enum BaseLock {
@@ -30,9 +30,10 @@ enum ExecutionPhase {
     Uninitialized,
     PreOps,
     UserOperation,
+    PreSolver,
     SolverOperations,
+    PostSolver,
     HandlingPayments,
-    UserRefund,
     PostOps,
     Releasing
 }

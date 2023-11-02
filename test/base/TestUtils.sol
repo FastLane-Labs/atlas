@@ -117,14 +117,43 @@ library TestUtils {
     ) internal pure returns (bytes memory creationCode) {
         // NOTE: Changing compiler settings or solidity versions can break this.
         creationCode = type(Mimic).creationCode;
+
+        // TODO: unpack the SHL and reorient 
         assembly {
-            mstore(add(creationCode, 85), add(shl(96, executionLib), 0x73ffffffffffffffffffffff))
-            mstore(add(creationCode, 131), add(shl(96, user), 0x73ffffffffffffffffffffff))
             mstore(
-                add(creationCode, 152),
-                add(shl(96, controller), add(add(shl(88, 0x63), shl(56, callConfig)), 0x7f000000000000))
+                add(creationCode, 85), 
+                or(
+                    and(
+                        mload(add(creationCode, 85)),
+                        not(shl(96, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF))
+                    ),
+                    shl(96, executionLib)
+                )
+            )           
+            
+            mstore(
+                add(creationCode, 118), 
+                or(
+                    and(
+                        mload(add(creationCode, 118)),
+                        not(shl(96, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF))
+                    ),
+                    shl(96, user)
+                )
+            )    
+            
+            mstore(
+                add(creationCode, 139),
+                or(
+                    and(
+                        mload(add(creationCode, 139)),
+                        not(shl(56, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00FFFFFFFF))
+                    ),
+                    add(shl(96, controller), add(shl(88, 0x63), shl(56, callConfig)))
+                )
             )
-            mstore(add(creationCode, 178), controlCodeHash)
+
+            mstore(add(creationCode, 165), controlCodeHash)
         }
     }
 

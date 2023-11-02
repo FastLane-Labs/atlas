@@ -123,22 +123,6 @@ contract V2DAppControl is DAppControl {
 
         address user = _user();
 
-        // Refund the user any extra gas costs
-        uint256 userGasOverage = tx.gasprice * CONTROL_GAS_USAGE;
-        
-        // CASE: gas costs exceed MEV
-        if (bidAmount <= userGasOverage) {
-            IWETH(WETH).withdraw(bidAmount); // should null out the balance
-            SafeTransferLib.safeTransferETH(user, bidAmount);
-            return;
-        
-        // CASE: MEV exceeds gas costs
-        } else {
-            IWETH(WETH).withdraw(userGasOverage); // should null out the balance
-            SafeTransferLib.safeTransferETH(user, userGasOverage);
-            bidAmount -= userGasOverage;
-        }
-
         (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).getReserves();
 
         ERC20(WETH).transfer(WETH_X_GOVERNANCE_POOL, bidAmount);
