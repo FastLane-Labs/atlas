@@ -25,7 +25,7 @@ Atlas is infrastructure-agnostic; each DApp may choose how the DApp-designated b
 
 Each DApp may choose a party to act as a trusted auctioneer.  **It is strongly recommended that the auction beneficiary act as the auctioneer.**  The auctioneer is tasked with signing a **DAppOperation** that includes a **CallChainHash**.  This hash guarantees that the bundler cannot tamper with the execution order of the **SolverOperation**s.  Any party can easily generate this hash by making a view call to the *getCallChainHash(SolverOperations[])* function. Note that infrastructure networks with programmable guarantees such as SUAVE will not require this as it can be handled trustlessly in-network. 
 
-#Auctioneer Example:
+***Auctioneer Example***:
 1. User connects to a DApp frontend and receives a session key from a FastLane x DApp backend.
 2. User signs their UserOperation, which is propagated over the bloXroute BDN to solvers.
 3. The frontend receives SolverOperations via the BDN.
