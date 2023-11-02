@@ -193,11 +193,11 @@ contract V4SwapIntentController is DAppControl {
         uint256 amountUserBuys = swapData.requestedAmount > 0 ? swapData.limitAmount : uint256(-swapData.requestedAmount);
         
         if(swapData.requestedAmount > 0) {
-            uint256 buyTokenBalance = ERC20(swapData.tokenOut).balanceOf(address(this));
             if(buyTokenBalance < swapData.limitAmount) {
-                return false // insufficient amount out
-            } 
+                return false; // insufficient amount out
+            }
         }
+        // no need to check for exact output, since the max is whatever the user transferred
 
         if (buyTokenBalance >= amountUserBuys) {
 
