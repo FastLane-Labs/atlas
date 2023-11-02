@@ -21,6 +21,22 @@ Atlas is infrastructure-agnostic; each DApp may choose how the DApp-designated b
 3. **BloXroute**: When Atlas is launched, BloXroute's BDN will support the aggregation of User and Solver Operations for rapid bundling. 
 4. **SUAVE**: Once live, Operations can be sent to the SUAVE network, bundled into a transaction by the SUAVE Atlas implementation, and then made available for use by builders. 
 
+### Auctioneer Overview
+
+Each DApp may choose a party to act as a trusted auctioneer.  **It is strongly recommended that the auction beneficiary act as the auctioneer.**  The auctioneer is tasked with signing a **DAppOperation** that includes a **CallChainHash**.  This hash guarantees that the bundler cannot tamper with the execution order of the **SolverOperation**s.  Any party can easily generate this hash by making a view call to the *getCallChainHash(SolverOperations[])* function. Note that infrastructure networks with programmable guarantees such as SUAVE will not require this as it can be handled trustlessly in-network. 
+
+#Auctioneer Example:
+1. User connects to a DApp frontend and receives a session key from a FastLane x DApp backend.
+2. User signs their UserOperation, which is propagated over the bloXroute BDN to solvers.
+3. The frontend receives SolverOperations via the BDN.
+4. After a set period of time, the frontend calls the *getCallChainHash()* view function via the User's RPC.
+5. The frontend then uses the session key from step 1 to sign the **DAppOperation**, which includes the **CallChainHash**.
+6. The frontend then propagates the DAppOperation over the BDN to bundlers.
+7. Any bundler who tampers with the order of the SolverOperations will cause their transaction to revert, thereby blocking any gas reimbursement from Atlas.
+
+Note that input from the User is only required for step 2; all other steps have no impact on UX. 
+
+
 ### Atlas Transaction Structure
 
 ![AtlasTransaction](./AtlasTransactionOverview.jpg)
