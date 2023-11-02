@@ -77,7 +77,7 @@ The DAppControl contract has the option to define functions that execute at the 
 
 - Due to the unique nature of the Execution Environment - a smart account that Atlas creates to facilitate a trustless environment for Users, Solvers, and DApps  - Users have an extra layer of protection against allowance-based exploits.
 
-- DApp Governance has the option to subsidize a User's gas cost. Note that unlike traditional Account Abstraction protocols, Atlas empowers DApp Governance to subsidize the User's gas costs *conditionally* based on the *result* of the User's (or Solver's) execution. 
+- DApp Governance has the option to subsidize a User's gas cost. Note that unlike traditional Account Abstraction protocols, Atlas empowers DApp Governance to subsidize the User's gas costs *conditionally* based on the *result* of the User's (or Solver's) execution. We expect that most DApps will require Solvers to subsidize all gas costs not attributed to other Solvers. 
 
 - By putting control of any User-created value in the hands of each DApp's Governance team, and by retaining the MEV before any RPCs or private relays see the transaction, Atlas has the potential to nullify the value of private orderflow, thereby acting as a counterforce to one of the strongest centralization risks in the Ethereum ecosystem. 
 
