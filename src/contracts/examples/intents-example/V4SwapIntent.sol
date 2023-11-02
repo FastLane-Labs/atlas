@@ -33,6 +33,7 @@ struct SwapData {
     address tokenOut;
     int256 requestedAmount; // positive for exact in, negative for exact out
     uint256 limitAmount; // if exact in, min amount out. if exact out, max amount in
+    address recipient;
     uint256 solverGasLiability; // the amount of user gas that the solver must refund
 }
 
@@ -41,6 +42,9 @@ contract V4SwapIntentController is DAppControl {
     using SafeTransferLib for ERC20;
 
     uint256 constant public EXPECTED_GAS_USAGE_EX_SOLVER = 200_000;
+    address constant V4_POOL = address(0);
+
+    uint256 startingBalance; // Balance tracked for the v4 pool
 
     constructor(address _escrow)
         DAppControl(
@@ -110,6 +114,7 @@ contract V4SwapIntentController is DAppControl {
             tokenOut: tokenOut,
             requestedAmount: int256(amountIn),
             limitAmount: amountOutMinimum,
+            recipient: recipient,
             solverGasLiability: EXPECTED_GAS_USAGE_EX_SOLVER
         });
 
@@ -130,6 +135,7 @@ contract V4SwapIntentController is DAppControl {
             tokenOut: tokenOut,
             requestedAmount: -int256(amountOut),
             limitAmount: amountInMaximum,
+            recipient: recipient,
             solverGasLiability: EXPECTED_GAS_USAGE_EX_SOLVER
         });
 
@@ -148,8 +154,14 @@ contract V4SwapIntentController is DAppControl {
 
         SwapData memory swapData = abi.decode(returnData, (SwapData));
 
-        // Optimistically transfer the solver contract the tokens that the user is selling
-        _transferUserERC20(swapData.tokenIn, solverTo, swapData.requestedAmount > 0 ? uint256(swapData.requestedAmount) : swapData.limitAmount);
+        // Record balance and transfer to the solver
+        if(swapData.requestedAmount > 0) {
+            startingBalance = ERC20(swapData.tokenIn).balanceOf(V4_POOL);
+            _transferUserERC20(swapData.tokenIn, solverTo, uint256(swapData.requestedAmount));
+        } else {
+            startingBalance = ERC20(swapData.tokenOut).balanceOf(V4_POOL);
+            _transferUserERC20(swapData.tokenIn, solverTo, swapData.limitAmount);
+        }
         
         // TODO: Permit69 is currently enabled during solver phase, but there is low conviction that this
         // does not enable an attack vector. Consider enabling to save gas on a transfer?
@@ -180,6 +192,13 @@ contract V4SwapIntentController is DAppControl {
         uint256 buyTokenBalance = ERC20(swapData.tokenOut).balanceOf(address(this));
         uint256 amountUserBuys = swapData.requestedAmount > 0 ? swapData.limitAmount : uint256(-swapData.requestedAmount);
         
+        if(swapData.requestedAmount > 0) {
+            uint256 buyTokenBalance = ERC20(swapData.tokenOut).balanceOf(address(this));
+            if(buyTokenBalance < swapData.limitAmount) {
+                return false // insufficient amount out
+            } 
+        }
+
         if (buyTokenBalance >= amountUserBuys) {
 
             // Make sure not to transfer any extra 'auctionBaseCurrency' token, since that will be used
@@ -187,9 +206,9 @@ contract V4SwapIntentController is DAppControl {
             address auctionBaseCurrency = swapData.requestedAmount > 0 ? swapData.tokenOut : swapData.tokenIn;
 
             if (swapData.tokenOut != auctionBaseCurrency) {
-                ERC20(swapData.tokenOut).safeTransfer(_user(), buyTokenBalance);
+                ERC20(swapData.tokenOut).safeTransfer(swapData.recipient, buyTokenBalance);
             } else {
-                ERC20(swapData.tokenOut).safeTransfer(_user(), amountUserBuys);
+                ERC20(swapData.tokenOut).safeTransfer(swapData.recipient, amountUserBuys);
             }
             return true;
         
