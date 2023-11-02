@@ -2,8 +2,13 @@
 pragma solidity ^0.8.18;
 
 import "../types/SolverCallTypes.sol";
+import "../types/EscrowTypes.sol";
 
 interface IAtlasVerification {
-    function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload);
-    function verifySignature(SolverOperation calldata solverOp) external view returns (bool);
+
+    
+    function verifySolverOp(SolverOperation calldata solverOp, EscrowAccountData memory solverEscrow, uint256 gasWaterMark, bool auctionAlreadyComplete)
+        external
+        view
+        returns (uint256 result, uint256 gasLimit, EscrowAccountData memory);
 }

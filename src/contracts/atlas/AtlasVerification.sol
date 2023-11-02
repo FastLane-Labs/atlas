@@ -34,7 +34,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
     // PORTED FROM ESCROW - TODO reorder
 
-    function verify(SolverOperation calldata solverOp, EscrowAccountData memory solverEscrow, uint256 gasWaterMark, bool auctionAlreadyComplete)
+    function verifySolverOp(SolverOperation calldata solverOp, EscrowAccountData memory solverEscrow, uint256 gasWaterMark, bool auctionAlreadyComplete)
         external
         view
         returns (uint256 result, uint256 gasLimit, EscrowAccountData memory)
