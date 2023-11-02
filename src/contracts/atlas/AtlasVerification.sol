@@ -1,14 +1,18 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.16;
+pragma solidity ^0.8.18;
 
 import "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 
 import {CallBits} from "../libraries/CallBits.sol";
 
+import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
 import "../types/GovernanceTypes.sol";
 
 import "../types/DAppApprovalTypes.sol";
+import "../types/EscrowTypes.sol";
+
+import {EscrowBits} from "../libraries/EscrowBits.sol";
 
 import {DAppIntegration} from "./DAppIntegration.sol";
 
@@ -27,6 +31,133 @@ contract AtlasVerification is EIP712, DAppIntegration {
     using CallBits for uint32;
 
     constructor() EIP712("ProtoCallHandler", "0.0.1") {}
+
+    // PORTED FROM ESCROW - TODO reorder
+
+    function verify(SolverOperation calldata solverOp, EscrowAccountData memory solverEscrow, uint256 gasWaterMark, bool auctionAlreadyComplete)
+        external
+        view
+        returns (uint256 result, uint256 gasLimit, EscrowAccountData memory)
+    {
+        // verify solver's signature
+        if (_verifySignature(solverOp)) {
+            // verify the solver has correct usercalldata and the solver escrow checks
+            (result, gasLimit, solverEscrow) = _verifySolverOperation(solverOp, solverEscrow);
+        } else {
+            (result, gasLimit) = (1 << uint256(SolverOutcome.InvalidSignature), 0);
+            // solverEscrow returns null
+        }
+
+        result = _solverOpPreCheck(result, gasWaterMark, tx.gasprice, solverOp.maxFeePerGas, auctionAlreadyComplete);
+        return (result, gasLimit, solverEscrow);
+    }
+
+    function _getSolverPayload(SolverOperation calldata solverOp) internal view returns (bytes32 payload) {
+        payload = _hashTypedDataV4(_getSolverHash(solverOp));
+    }
+
+    function _verifySignature(SolverOperation calldata solverOp) internal view returns (bool) {
+        address signer = _hashTypedDataV4(_getSolverHash(solverOp)).recover(solverOp.signature);
+        return signer == solverOp.from;
+    }
+
+    // TODO Revisit the EscrowAccountData memory solverEscrow arg. Needs to be passed through from Atlas, through callstack
+    function _verifySolverOperation(SolverOperation calldata solverOp, EscrowAccountData memory solverEscrow)
+        internal
+        view
+        returns (uint256 result, uint256 gasLimit, EscrowAccountData memory)
+    {
+        // TODO big unchecked block - audit/review carefully
+        unchecked {
+            if (solverOp.to != address(this)) {
+                result |= 1 << uint256(SolverOutcome.InvalidTo);
+            }
+
+            if (solverOp.nonce <= uint256(solverEscrow.nonce)) {
+                result |= 1 << uint256(SolverOutcome.InvalidNonceUnder);
+            } else if (solverOp.nonce > uint256(solverEscrow.nonce) + 1) {
+                result |= 1 << uint256(SolverOutcome.InvalidNonceOver);
+
+                // TODO: reconsider the jump up for gapped nonces? Intent is to mitigate dmg
+                // potential inflicted by a hostile solver/builder.
+                solverEscrow.nonce = uint32(solverOp.nonce);
+            } else {
+                ++solverEscrow.nonce;
+            }
+
+            if (solverEscrow.lastAccessed >= uint64(block.number)) {
+                result |= 1 << uint256(SolverOutcome.PerBlockLimit);
+            } else {
+                solverEscrow.lastAccessed = uint64(block.number);
+            }
+
+            gasLimit = (100) * (solverOp.gas < EscrowBits.SOLVER_GAS_LIMIT ? solverOp.gas : EscrowBits.SOLVER_GAS_LIMIT)
+                / (100 + EscrowBits.SOLVER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
+
+            uint256 gasCost = (tx.gasprice * gasLimit) + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
+
+            // see if solver's escrow can afford tx gascost
+            if (gasCost > solverEscrow.balance) {
+                // charge solver for calldata so that we can avoid vampire attacks from solver onto user
+                result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
+            }
+
+            // Verify that we can lend the solver their tx value
+            if (solverOp.value > address(this).balance - (gasLimit * tx.gasprice)) {
+                result |= 1 << uint256(SolverOutcome.CallValueTooHigh);
+            }
+
+            // subtract out the gas buffer since the solver's metaTx won't use it
+            gasLimit -= EscrowBits.FASTLANE_GAS_BUFFER;
+        }
+
+        return (result, gasLimit, solverEscrow);
+    }
+
+    function _getSolverHash(SolverOperation calldata solverOp) internal pure returns (bytes32 solverHash) {
+        return keccak256(
+            abi.encode(
+                SOLVER_TYPE_HASH,
+                solverOp.from,
+                solverOp.to,
+                solverOp.value,
+                solverOp.gas,
+                solverOp.maxFeePerGas,
+                solverOp.nonce,
+                solverOp.deadline,
+                solverOp.solver,
+                solverOp.control,
+                solverOp.userOpHash,
+                solverOp.bidToken,
+                solverOp.bidAmount,
+                keccak256(solverOp.data)
+            )
+        );
+    }
+
+    // BITWISE STUFF
+    function _solverOpPreCheck(
+        uint256 result,
+        uint256 gasWaterMark,
+        uint256 txGasPrice,
+        uint256 maxFeePerGas,
+        bool auctionAlreadyComplete
+    ) internal pure returns (uint256) {
+        if (auctionAlreadyComplete) {
+            result |= 1 << uint256(SolverOutcome.LostAuction);
+        }
+
+        if (gasWaterMark < EscrowBits.VALIDATION_GAS_LIMIT + EscrowBits.SOLVER_GAS_LIMIT) {
+            // Make sure to leave enough gas for dApp validation calls
+            result |= 1 << uint256(SolverOutcome.UserOutOfGas);
+        }
+
+        if (txGasPrice > maxFeePerGas) {
+            result |= 1 << uint256(SolverOutcome.GasPriceOverCap);
+        }
+
+        return result;
+    }
 
 
     // 
