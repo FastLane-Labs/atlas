@@ -147,7 +147,7 @@ contract V4SwapIntentController is DAppControl {
     //////////////////////////////////
 
     function _preSolverCall(bytes calldata data) internal override returns (bool) {
-        (address solverTo, bytes memory returnData) = abi.decode(data, (address, bytes));
+        (address solverTo, uint256 solverBid, bytes memory returnData) = abi.decode(data, (address, uint256, bytes));
         if (solverTo == address(this) || solverTo == _control() || solverTo == escrow) {
             return false;
         }
@@ -155,12 +155,15 @@ contract V4SwapIntentController is DAppControl {
         SwapData memory swapData = abi.decode(returnData, (SwapData));
 
         // Record balance and transfer to the solver
-        if(swapData.requestedAmount > 0) {
+        if(swapData.requestedAmount > 0) { // exact input
             startingBalance = ERC20(swapData.tokenIn).balanceOf(V4_POOL);
             _transferUserERC20(swapData.tokenIn, solverTo, uint256(swapData.requestedAmount));
-        } else {
+        } else { // exact output
             startingBalance = ERC20(swapData.tokenOut).balanceOf(V4_POOL);
-            _transferUserERC20(swapData.tokenIn, solverTo, swapData.limitAmount);
+            _transferUserERC20(swapData.tokenIn, solverTo, swapData.limitAmount - solverBid);
+            // For exact output swaps, the solver solvers compete and bid on how much tokens they can
+            // return to the user in excess of their specified limit input. We only transfer what they
+            // require to make the swap in this step.
         }
         
         // TODO: Permit69 is currently enabled during solver phase, but there is low conviction that this

@@ -163,7 +163,7 @@ contract SwapIntentController is DAppControl {
     //////////////////////////////////
 
     function _preSolverCall(bytes calldata data) internal override returns (bool) {
-        (address solverTo, bytes memory returnData) = abi.decode(data, (address, bytes));
+        (address solverTo,, bytes memory returnData) = abi.decode(data, (address, uint256, bytes));
         if (solverTo == address(this) || solverTo == _control() || solverTo == escrow) {
             return false;
         }

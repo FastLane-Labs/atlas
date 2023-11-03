@@ -202,7 +202,7 @@ contract ExecutionEnvironment is Base {
         // Handle any solver preOps, if necessary
         if (_config().needsPreSolver()) {
 
-            bytes memory data = abi.encode(solverOp.solver, dAppReturnData);
+            bytes memory data = abi.encode(solverOp.solver, solverOp.bidAmount, dAppReturnData);
 
             data = abi.encodeWithSelector(
                 IDAppControl.preSolverCall.selector, 
