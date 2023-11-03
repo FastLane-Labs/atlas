@@ -15,6 +15,7 @@ interface IAtlas {
     function withdrawERC20(address token, uint256 amount, DAppConfig memory dConfig) external;
     function withdrawEther(uint256 amount, DAppConfig memory dConfig) external;
 
+    // TODO remove this and inside Atlas - escrow addr is Atlas addr
     function getEscrowAddress() external view returns (address escrowAddress);
 
     function userDirectVerifyDApp(
@@ -26,14 +27,4 @@ interface IAtlas {
     ) external returns (bool);
 
     function userDirectReleaseLock(address userOpFrom, bytes32 key, DAppConfig calldata dConfig) external;
-
-    function getDAppOperationPayload(DAppOperation memory verification) external view returns (bytes32 payload);
-    
-    function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload);
-
-    function getUserOperationPayload(UserOperation memory userOp) external view returns (bytes32 payload);
-
-    function getNextNonce(address account) external view returns (uint256 nextNonce);
-
-    function getDomainSeparator() external view returns (bytes32 domainSeparator);
 }

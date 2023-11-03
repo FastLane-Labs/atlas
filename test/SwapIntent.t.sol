@@ -72,8 +72,8 @@ contract SwapIntentTest is BaseTest {
 
         txBuilder = new TxBuilder({
             controller: address(swapIntentController),
-            escrowAddress: address(escrow),
-            atlasAddress: address(atlas)
+            atlasAddress: address(atlas),
+            _verification: address(atlasVerification)
         });
 
         // Deposit ETH from Searcher signer to pay for searcher's gas 

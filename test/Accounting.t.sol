@@ -60,19 +60,10 @@ contract AccountingTest is BaseTest {
 
         txBuilder = new TxBuilder({
             controller: address(swapIntentController),
-            escrowAddress: address(escrow),
-            atlasAddress: address(atlas)
+            atlasAddress: address(atlas),
+            _verification: address(atlasVerification)
         });
     }
-
-    function testDELEET() public {
-        uint16 lockState = uint16(61711); // phase 4 - HandlingPayments
-        uint16 phase = SafetyBits.getCurrentExecutionPhase(lockState);
-        console.log(TestUtils.uint16ToBinaryString(61711));
-        console.log("phase", phase);
-        console.log("Exec Phase", uint8(ExecutionPhase.Releasing));
-    }
-
 
     function testSolverBorrowRepaySuccessfully() public {
         
