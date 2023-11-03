@@ -239,7 +239,7 @@ contract ExecutionEnvironment is Base {
             
             bytes memory data = dAppReturnData;
 
-            data = abi.encode(solverOp.solver, data);
+            data = abi.encode(solverOp.solver, solverOp.bidAmount, data);
 
             data = abi.encodeWithSelector(
                 IDAppControl.postSolverCall.selector, 

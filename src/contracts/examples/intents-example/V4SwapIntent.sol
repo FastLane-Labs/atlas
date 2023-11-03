@@ -100,6 +100,7 @@ contract V4SwapIntentController is DAppControl {
         _;
     }
 
+    // selector 0x04e45aaf
     function exactInputSingle(
         address tokenIn,
         address tokenOut,
@@ -121,6 +122,7 @@ contract V4SwapIntentController is DAppControl {
         return swapData;
     } 
 
+    // selector 0x5023b4df
     function exactOutputSingle(
         address tokenIn,
         address tokenOut,
@@ -174,7 +176,7 @@ contract V4SwapIntentController is DAppControl {
     // Checking intent was fulfilled, and user has received their tokens, happens here
     function _postSolverCall(bytes calldata data) internal override returns (bool) {
        
-        (address solverTo, bytes memory returnData) = abi.decode(data, (address, bytes));
+        (address solverTo, uint256 solverBid, bytes memory returnData) = abi.decode(data, (address, uint256, bytes));
 
         SwapData memory swapData = abi.decode(returnData, (SwapData));
 
@@ -195,9 +197,15 @@ contract V4SwapIntentController is DAppControl {
         uint256 buyTokenBalance = ERC20(swapData.tokenOut).balanceOf(address(this));
         uint256 amountUserBuys = swapData.requestedAmount > 0 ? swapData.limitAmount : uint256(-swapData.requestedAmount);
         
+        // If it was an exact input swap, we need to verify that 
+        // a) We have enough tokens to meet the user's minimum amount out
+        // b) THe output amount matches (or is greater than) the solver's bid
         if(swapData.requestedAmount > 0) {
             if(buyTokenBalance < swapData.limitAmount) {
                 return false; // insufficient amount out
+            }
+            if(buyTokenBalance < solverBid) {
+                return false; // does not meet solver bid
             }
         }
         // no need to check for exact output, since the max is whatever the user transferred
