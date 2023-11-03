@@ -86,8 +86,4 @@ contract FactoryTest is BaseTest {
     //         "atlas.getExecEnv address not same as predicted"
     //     );
     // }
-
-    // function testGetEscrowAddress() public {
-    //     assertEq(atlas.getEscrowAddress(), address(atlas));
-    // }
 }

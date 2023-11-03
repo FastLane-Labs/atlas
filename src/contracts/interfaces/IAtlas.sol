@@ -15,9 +15,6 @@ interface IAtlas {
     function withdrawERC20(address token, uint256 amount, DAppConfig memory dConfig) external;
     function withdrawEther(uint256 amount, DAppConfig memory dConfig) external;
 
-    // TODO remove this and inside Atlas - escrow addr is Atlas addr
-    function getEscrowAddress() external view returns (address escrowAddress);
-
     function userDirectVerifyDApp(
         address userOpFrom,
         address userOpTo,
