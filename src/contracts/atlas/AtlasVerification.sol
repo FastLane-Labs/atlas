@@ -52,7 +52,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         return (result, gasLimit, solverEscrow);
     }
 
-    function _getSolverPayload(SolverOperation calldata solverOp) internal view returns (bytes32 payload) {
+    function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload) {
         payload = _hashTypedDataV4(_getSolverHash(solverOp));
     }
 

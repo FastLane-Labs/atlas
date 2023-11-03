@@ -6,12 +6,6 @@ import {Mimic} from "./Mimic.sol";
 import {DAppConfig} from "src/contracts/types/DAppApprovalTypes.sol";
 import {ExecutionEnvironment} from "./ExecutionEnvironment.sol";
 
-// NOTE: Experimental - Splitting contracts into [AtlETH, Atlas, AtlasFactory]
-
-// AtlasFactory needs:
-// Factory - everything for creating new Execution Environments
-// Exec Env template deployed separately, no internal deploy functions
-
 // TODO make sure no cases of address(this) when Atlas address is intended
 
 contract AtlasFactory {

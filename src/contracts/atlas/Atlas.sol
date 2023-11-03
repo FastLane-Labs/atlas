@@ -32,7 +32,7 @@ contract Atlas is Escrow {
     uint256 private constant _MAX_GAS = 1_500_000;
     address public immutable FACTORY;
 
-    constructor(uint32 _escrowDuration, address _simulator, address _factory) Escrow(_escrowDuration, _simulator) {
+    constructor(uint32 _escrowDuration, address _simulator, address _factory, address _verification) Escrow(_escrowDuration, _simulator, _verification) {
         FACTORY = _factory;
     }
 

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.16;
 
 import {IDAppControl} from "../../src/contracts/interfaces/IDAppControl.sol";
-import {Factory} from "../../src/contracts/atlas/Factory.sol";
 import {Mimic} from "../../src/contracts/atlas/Mimic.sol";
 
 import "../../src/contracts/types/UserCallTypes.sol";
@@ -75,38 +74,39 @@ library TestUtils {
         return string(output);
     }
 
-    function computeExecutionEnvironment(address payable atlas, UserOperation calldata userOp, address controller)
-        public
-        view
-        returns (address executionEnvironment)
-    {
-        DAppConfig memory dConfig = IDAppControl(controller).getDAppConfig(userOp);
+    // TODO fix this utility fn - after AtlasFactory split
+    // function computeExecutionEnvironment(address payable atlas, UserOperation calldata userOp, address controller)
+    //     public
+    //     view
+    //     returns (address executionEnvironment)
+    // {
+    //     DAppConfig memory dConfig = IDAppControl(controller).getDAppConfig(userOp);
 
-        executionEnvironment = address(
-            uint160(
-                uint256(
-                    keccak256(
-                        abi.encodePacked(
-                            bytes1(0xff),
-                            atlas,
-                            Factory(atlas).salt(),
-                            keccak256(
-                                abi.encodePacked(
-                                    _getMimicCreationCode(
-                                        controller,
-                                        dConfig.callConfig,
-                                        Factory(atlas).execution(),
-                                        userOp.from,
-                                        controller.codehash
-                                    )
-                                )
-                            )
-                        )
-                    )
-                )
-            )
-        );
-    }
+    //     executionEnvironment = address(
+    //         uint160(
+    //             uint256(
+    //                 keccak256(
+    //                     abi.encodePacked(
+    //                         bytes1(0xff),
+    //                         atlas,
+    //                         atlasFactory.salt(),
+    //                         keccak256(
+    //                             abi.encodePacked(
+    //                                 _getMimicCreationCode(
+    //                                     controller,
+    //                                     dConfig.callConfig,
+    //                                     atlasFactory.execution(),
+    //                                     userOp.from,
+    //                                     controller.codehash
+    //                                 )
+    //                             )
+    //                         )
+    //                     )
+    //                 )
+    //             )
+    //         )
+    //     );
+    // }
 
     function _getMimicCreationCode(
         address controller,

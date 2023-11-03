@@ -7,12 +7,17 @@ import "forge-std/Test.sol";
 import {DeployBaseScript} from "script/base/deploy-base.s.sol";
 
 import {Atlas} from "src/contracts/atlas/Atlas.sol";
+import {AtlasFactory} from "src/contracts/atlas/AtlasFactory.sol";
+import {AtlasVerification} from "src/contracts/atlas/AtlasVerification.sol";
 import {SwapIntentController} from "src/contracts/examples/intents-example/SwapIntent.sol";
 import {TxBuilder} from "src/contracts/helpers/TxBuilder.sol";
 import {Simulator} from "src/contracts/helpers/Simulator.sol";
 
 contract DeployAtlasScript is DeployBaseScript {
+    // TODO move commons vars like these to base deploy script
     Atlas public atlas;
+    AtlasFactory public atlasFactory;
+    AtlasVerification public atlasVerification;
     Simulator public simulator;
 
     function run() external {
@@ -26,7 +31,9 @@ contract DeployAtlasScript is DeployBaseScript {
         vm.startBroadcast(deployerPrivateKey);
 
         simulator = new Simulator();
-        atlas = new Atlas(64, address(simulator), address(0)); //TODO update to Factory addr arg
+        atlas = new Atlas(64, address(simulator), address(0), address(0)); //TODO update to Factory and Verification addr arg
+        atlasFactory = new AtlasFactory(address(atlas));
+        atlasVerification = new AtlasVerification();
 
         vm.stopBroadcast();
 
@@ -41,6 +48,8 @@ contract DeployAtlasScript is DeployBaseScript {
 
 contract DeployAtlasAndSwapIntentDAppControlScript is DeployBaseScript {
     Atlas public atlas;
+    AtlasFactory public atlasFactory;
+    AtlasVerification public atlasVerification;
     Simulator public simulator;
     SwapIntentController public swapIntentControl;
 
@@ -56,14 +65,16 @@ contract DeployAtlasAndSwapIntentDAppControlScript is DeployBaseScript {
 
         // Deploy the Atlas contract
         simulator = new Simulator();
-        atlas = new Atlas(64, address(simulator), address(0)); //TODO update to Factory addr arg
+        atlas = new Atlas(64, address(simulator), address(0), address(0)); //TODO update to Factory and Verification addr arg
+        atlasFactory = new AtlasFactory(address(atlas));
+        atlasVerification = new AtlasVerification();
 
         // Deploy the SwapIntent DAppControl contract
         swapIntentControl = new SwapIntentController(address(atlas));
 
         // Integrate SwapIntent with Atlas
-        atlas.initializeGovernance(address(swapIntentControl));
-        atlas.integrateDApp(address(swapIntentControl));
+        atlasVerification.initializeGovernance(address(swapIntentControl));
+        atlasVerification.integrateDApp(address(swapIntentControl));
 
         vm.stopBroadcast();
 
@@ -80,6 +91,8 @@ contract DeployAtlasAndSwapIntentDAppControlScript is DeployBaseScript {
 
 contract DeployAtlasAndSwapIntentDAppControlAndTxBuilderScript is DeployBaseScript {
     Atlas public atlas;
+    AtlasFactory public atlasFactory;
+    AtlasVerification public atlasVerification;
     Simulator public simulator;
     SwapIntentController public swapIntentControl;
     TxBuilder public txBuilder;
@@ -96,14 +109,16 @@ contract DeployAtlasAndSwapIntentDAppControlAndTxBuilderScript is DeployBaseScri
 
         // Deploy the Atlas contract
         simulator = new Simulator();
-        atlas = new Atlas(64, address(simulator), address(0)); //TODO update to Factory addr arg
+        atlas = new Atlas(64, address(simulator), address(0), address(0)); //TODO update to Factory and Verification addr arg
+        atlasFactory = new AtlasFactory(address(atlas));
+        atlasVerification = new AtlasVerification();
 
         // Deploy the SwapIntent DAppControl contract
         swapIntentControl = new SwapIntentController(address(atlas));
 
         // Integrate SwapIntent with Atlas
-        atlas.initializeGovernance(address(swapIntentControl));
-        atlas.integrateDApp(address(swapIntentControl));
+        atlasVerification.initializeGovernance(address(swapIntentControl));
+        atlasVerification.integrateDApp(address(swapIntentControl));
 
         // Deploy the TxBuilder
         txBuilder = new TxBuilder(address(swapIntentControl), address(atlas), address(atlas));

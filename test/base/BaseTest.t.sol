@@ -7,6 +7,7 @@ import {IDAppIntegration} from "src/contracts/interfaces/IDAppIntegration.sol";
 
 import {Atlas} from "src/contracts/atlas/Atlas.sol";
 import {AtlasFactory} from "src/contracts/atlas/AtlasFactory.sol";
+import {AtlasVerification} from "src/contracts/atlas/AtlasVerification.sol";
 
 import {Sorter} from "src/contracts/helpers/Sorter.sol";
 import {Simulator} from "src/contracts/helpers/Simulator.sol";
@@ -38,6 +39,7 @@ contract BaseTest is Test, TestConstants {
 
     Atlas public atlas;
     AtlasFactory public atlasFactory;
+    AtlasVerification public atlasVerification;
 
     Simulator public simulator;
     Sorter public sorter;
@@ -69,14 +71,19 @@ contract BaseTest is Test, TestConstants {
 
         simulator = new Simulator();
 
-        // Computes the address at which AtlasFactory will be deployed
+        // Computes the addresses at which AtlasFactory and AtlasVerification will be deployed
         address expectedAtlasFactoryAddr = computeCreateAddress(
             payee,
             vm.getNonce(payee) + 1
         );
+        address expectedAtlasVerificationAddr = computeCreateAddress(
+            payee,
+            vm.getNonce(payee) + 2
+        );
 
-        atlas = new Atlas(64, address(simulator), expectedAtlasFactoryAddr);
+        atlas = new Atlas(64, address(simulator), expectedAtlasFactoryAddr, expectedAtlasVerificationAddr);
         atlasFactory = new AtlasFactory(address(atlas));
+        atlasVerification = new AtlasVerification();
 
         simulator.setAtlas(address(atlas));
 
@@ -87,8 +94,8 @@ contract BaseTest is Test, TestConstants {
         vm.startPrank(governanceEOA);
 
         control = new V2DAppControl(escrow);
-        atlas.initializeGovernance(address(control));
-        atlas.integrateDApp(address(control));
+        atlasVerification.initializeGovernance(address(control));
+        atlasVerification.integrateDApp(address(control));
 
         vm.stopPrank();
 
