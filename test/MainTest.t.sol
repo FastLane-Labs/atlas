@@ -3,8 +3,6 @@ pragma solidity ^0.8.18;
 
 import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
 
-import {IEscrow} from "../src/contracts/interfaces/IEscrow.sol";
-import {IAtlas} from "../src/contracts/interfaces/IAtlas.sol";
 import {IDAppIntegration} from "../src/contracts/interfaces/IDAppIntegration.sol";
 import {IExecutionEnvironment} from "../src/contracts/interfaces/IExecutionEnvironment.sol";
 

@@ -22,8 +22,8 @@ contract V2Helper is Test, TestConstants, TxBuilder {
    
     uint256 public immutable maxFeePerGas;
 
-    constructor(address controller, address escrowAddress, address atlasAddress) 
-        TxBuilder(controller, escrowAddress, atlasAddress)
+    constructor(address controller, address atlasAddress, address verification) 
+        TxBuilder(controller, atlasAddress, verification)
     {
         maxFeePerGas = tx.gasprice * 2;
     }

@@ -121,7 +121,7 @@ contract BaseTest is Test, TestConstants {
         deal(TOKEN_ZERO, address(solverTwo), 10e24);
         deal(TOKEN_ONE, address(solverTwo), 10e24);
 
-        helper = new V2Helper(address(control), escrow, address(atlas));
+        helper = new V2Helper(address(control), address(atlas), address(atlasVerification));
 
         deal(TOKEN_ZERO, address(atlas), 1);
         deal(TOKEN_ONE, address(atlas), 1);
