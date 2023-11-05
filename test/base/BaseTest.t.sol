@@ -83,7 +83,7 @@ contract BaseTest is Test, TestConstants {
 
         atlas = new Atlas(64, address(simulator), expectedAtlasFactoryAddr, expectedAtlasVerificationAddr);
         atlasFactory = new AtlasFactory(address(atlas));
-        atlasVerification = new AtlasVerification();
+        atlasVerification = new AtlasVerification(address(atlas));
 
         simulator.setAtlas(address(atlas));
 

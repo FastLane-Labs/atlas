@@ -30,7 +30,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     using ECDSA for bytes32;
     using CallBits for uint32;
 
-    constructor() EIP712("ProtoCallHandler", "0.0.1") {}
+    constructor(address _atlas) EIP712("ProtoCallHandler", "0.0.1") DAppIntegration(_atlas) {}
 
     // PORTED FROM ESCROW - TODO reorder
 
@@ -69,7 +69,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     {
         // TODO big unchecked block - audit/review carefully
         unchecked {
-            if (solverOp.to != address(this)) {
+            if (solverOp.to != ATLAS) {
                 result |= 1 << uint256(SolverOutcome.InvalidTo);
             }
 
@@ -103,7 +103,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
             }
 
             // Verify that we can lend the solver their tx value
-            if (solverOp.value > address(this).balance - (gasLimit * tx.gasprice)) {
+            if (solverOp.value > ATLAS.balance - (gasLimit * tx.gasprice)) {
                 result |= 1 << uint256(SolverOutcome.CallValueTooHigh);
             }
 

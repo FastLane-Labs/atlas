@@ -29,14 +29,13 @@ contract DAppIntegration {
         uint128 HighestFullBitmap;
     }
 
+    address public immutable ATLAS;
+
     //     from         nonceTracker
     mapping(address => NonceTracker) public asyncNonceBitIndex;
 
     //  keccak256(from, bitmapNonceIndex) => to
     mapping(bytes32 => NonceBitmap) public asyncNonceBitmap;
-
-
-    
 
     // NOTE: To prevent builder censorship, dapp nonces can be
     // processed in any order so long as they arent duplicated and
@@ -50,6 +49,10 @@ contract DAppIntegration {
     mapping(bytes32 => bool) public signatories;
 
     mapping(bytes32 => bytes32) public dapps;
+
+    constructor(address _atlas) {
+        ATLAS = _atlas;
+    }
 
     // Permissionlessly integrates a new dapp
     function initializeGovernance(address controller) external {
