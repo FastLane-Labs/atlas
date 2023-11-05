@@ -94,7 +94,7 @@ contract Atlas is Escrow {
     ) external payable returns (bool auctionWon, uint256 accruedGasRebate, uint256 winningSearcherIndex) {
         
         // This is a self.call made externally so that it can be used with try/catch
-        require(msg.sender == address(this), "ERR-F06 InvalidAccess");
+        if(msg.sender != address(this)) revert InvalidAccess();
         
         // Build the memory lock
         EscrowKey memory key = _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), bundler == simulator);

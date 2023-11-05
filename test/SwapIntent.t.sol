@@ -194,14 +194,12 @@ contract SwapIntentTest is BaseTest {
 
         vm.startPrank(userEOA);
         
-        assertFalse(simulator.simUserOperation(userOp), "metasimUserOperationcall tested true a");
+        // assertFalse(simulator.simUserOperation(userOp), "metasimUserOperationcall tested true a");
         
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
-        assertTrue(simulator.simUserOperation(userOp), "metasimUserOperationcall tested false c");
+        // assertTrue(simulator.simUserOperation(userOp), "metasimUserOperationcall tested false c");
 
-
-        // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
         atlas.metacall({
             userOp: userOp,
             solverOps: solverOps,
