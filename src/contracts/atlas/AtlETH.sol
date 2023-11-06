@@ -22,46 +22,15 @@ abstract contract AtlETH is Permit69 {
     event Approval(address indexed owner, address indexed spender, uint256 amount);
 
     /*//////////////////////////////////////////////////////////////
-                            METADATA STORAGE
-    //////////////////////////////////////////////////////////////*/
-
-    string public constant name = "Atlas ETH";
-    string public constant symbol = "atlETH";
-    uint8 public constant decimals = 18;
-
-    /*//////////////////////////////////////////////////////////////
-                              ERC20 STORAGE
-    //////////////////////////////////////////////////////////////*/
-
-    uint256 public totalSupply;
-    mapping(address => mapping(address => uint256)) public allowance;
-
-    /*//////////////////////////////////////////////////////////////
-                            EIP-2612 STORAGE
-    //////////////////////////////////////////////////////////////*/
-
-    uint256 internal immutable INITIAL_CHAIN_ID;
-    bytes32 internal immutable INITIAL_DOMAIN_SEPARATOR;
-    mapping(address => uint256) public nonces;
-
-    /*//////////////////////////////////////////////////////////////
-                            ATLAS STORAGE
-    //////////////////////////////////////////////////////////////*/
-
-    // NOTE: these storage vars / maps should only be accessible by *signed* solver transactions
-    // and only once per solver per block (to avoid user-solver collaborative exploits)
-    uint256 public immutable escrowDuration;
-
-    /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    constructor(uint32 _escrowDuration, address _simulator) Permit69(_simulator) {
-        INITIAL_CHAIN_ID = block.chainid;
-        INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
-
-        escrowDuration = _escrowDuration;
-    }
+    constructor(
+        uint256 _escrowDuration,
+        address _factory,
+        address _verification,
+        address _simulator
+    ) Permit69(_escrowDuration, _factory, _verification, _simulator) {}
 
     /*//////////////////////////////////////////////////////////////
                                 ATLETH
@@ -71,7 +40,7 @@ abstract contract AtlETH is Permit69 {
     // Interactions (transfers, withdrawals) are allowed only after the owner last interaction
     // with Atlas was at least `escrowDuration` blocks ago.
     modifier tokenTransferChecks(address account) {
-        if(block.number <= _escrowAccountData[account].lastAccessed + escrowDuration) {
+        if(block.number <= _escrowAccountData[account].lastAccessed + ESCROW_DURATION) {
             revert EscrowLockActive();
         }
         _;
@@ -172,10 +141,10 @@ abstract contract AtlETH is Permit69 {
     }
 
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
-        return block.chainid == INITIAL_CHAIN_ID ? INITIAL_DOMAIN_SEPARATOR : computeDomainSeparator();
+        return block.chainid == INITIAL_CHAIN_ID ? INITIAL_DOMAIN_SEPARATOR : _computeDomainSeparator();
     }
 
-    function computeDomainSeparator() internal view returns (bytes32) {
+    function _computeDomainSeparator() internal view override returns (bytes32) {
         return keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),

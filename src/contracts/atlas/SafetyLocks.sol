@@ -12,46 +12,23 @@ import "../types/EscrowTypes.sol";
 
 import "../types/LockTypes.sol";
 
+import {Storage} from "./Storage.sol";
 import {FastLaneErrorsEvents} from "../types/Emissions.sol";
 
 import "forge-std/Test.sol";
 
-contract SafetyLocks is FastLaneErrorsEvents {
+abstract contract SafetyLocks is Storage, FastLaneErrorsEvents {
     using SafetyBits for EscrowKey;
     using CallBits for uint32;
     using PartyMath for Party;
     using PartyMath for uint256;
 
-    address public immutable atlas;
-    address public immutable simulator;
-
-    address internal constant UNLOCKED = address(1);
-    
-    Lock public lock;
-
-    Ledger[LEDGER_LENGTH] public ledgers;
-
-    constructor(address _simulator) {
-        atlas = address(this);
-        simulator = _simulator;
-
-        lock = Lock({
-            activeEnvironment: UNLOCKED,
-            activeParties: uint16(0),
-            startingBalance: uint64(0)
-        });
-
-        for (uint256 i; i < LEDGER_LENGTH; i++) {
-            // init the storage vars
-            ledgers[i] = Ledger({
-                balance: 0,
-                contributed: 0,
-                requested: 0,
-                status: LedgerStatus.Inactive,
-                proxy: Party(i)
-            }); 
-        }
-    }
+    constructor(
+        uint256 _escrowDuration,
+        address _factory,
+        address _verification,
+        address _simulator
+    ) Storage(_escrowDuration, _factory, _verification, _simulator) {}
 
     function _initializeEscrowLock(UserOperation calldata userOp, address executionEnvironment, address bundler, uint256 gasLimit) onlyWhenUnlocked internal {
 

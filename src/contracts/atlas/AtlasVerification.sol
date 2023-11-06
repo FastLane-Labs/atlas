@@ -229,11 +229,11 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
     function _handleNonces(address account, uint256 nonce, bool async) internal returns (bool validNonce) {
         if (nonce > type(uint128).max - 1) {
-            return (false);
+            return false;
         }
         
         if (nonce == 0) {
-            return (false);
+            return false;
         }
 
         uint256 bitmapIndex = (nonce / 240) + 1; // +1 because highestFullBitmap initializes at 0
@@ -245,7 +245,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         uint256 bitmap = uint256(nonceBitmap.bitmap);
         if (bitmap & (1 << bitmapNonce) != 0) {
-            return (false);
+            return false;
         }
 
         bitmap |= 1 << bitmapNonce;
@@ -277,11 +277,11 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // Handle non-async nonce logic
         if (!async) {
             if (bitmapIndex != highestFullBitmap + 1) {
-                return (false);
+                return false;
             }
 
             if (bitmapNonce != highestUsedBitmapNonce +1) {
-                return (false);
+                return false;
             }
         }
 
@@ -355,11 +355,13 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp userNonces
         if (!_verifyUserSignature(userOp)) {
+            console.log("invalid user sig");
             return false;
         }
 
         if (userOp.control != dConfig.to) {
-            return (false);
+            console.log("invalid control");
+            return false;
         }
 
         // If the dapp indicated that they only accept sequenced userNonces
@@ -369,10 +371,11 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // DApps are encouraged to rely on the deadline parameter
         // to prevent replay attacks.
         if (!_handleNonces(userOp.from, userOp.nonce, dConfig.callConfig.needsSequencedNonces())) {
-            return (false);
+            console.log("invalid nonce");
+            return false;
         }
 
-        return (true);
+        return true;
     }
 
     function _getProofHash(UserOperation memory userOp) internal pure returns (bytes32 proofHash) {

@@ -29,11 +29,12 @@ abstract contract Escrow is AtlETH {
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
-    address public immutable VERIFICATION;
-
-    constructor(uint32 _escrowDuration, address _simulator, address _verification) AtlETH(_escrowDuration, _simulator) {
-        VERIFICATION = _verification;
-    }
+    constructor(
+        uint256 _escrowDuration,
+        address _factory,
+        address _verification,
+        address _simulator
+    ) AtlETH(_escrowDuration, _factory, _verification, _simulator) {}
 
     ///////////////////////////////////////////////////
     /// EXTERNAL FUNCTIONS FOR BUNDLER INTERACTION  ///

@@ -17,9 +17,12 @@ abstract contract GasAccounting is SafetyLocks {
     using PartyMath for uint256;
     using PartyMath for Ledger[LEDGER_LENGTH];
 
-    mapping(address => EscrowAccountData) internal _escrowAccountData;
-
-    constructor(address _simulator) SafetyLocks(_simulator) {}
+    constructor(
+        uint256 _escrowDuration,
+        address _factory,
+        address _verification,
+        address _simulator
+    ) SafetyLocks(_escrowDuration, _factory, _verification, _simulator) {}
 
     // NOTE: donations are simply deposits that have a different msg.sender than receiving party
     function _deposit(Party party, uint256 amt) internal returns (uint256 balanceOwed) {

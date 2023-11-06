@@ -24,7 +24,12 @@ import {EXECUTION_PHASE_OFFSET, SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER, SAFE_GAS
 abstract contract Permit69 is GasAccounting {
     using SafeTransferLib for ERC20;
 
-    constructor(address _simulator) GasAccounting(_simulator) {}
+    constructor(
+        uint256 _escrowDuration,
+        address _factory,
+        address _verification,
+        address _simulator
+    ) GasAccounting(_escrowDuration, _factory, _verification, _simulator) {}
 
     // Virtual Functions defined by other Atlas modules
     function _verifyCallerIsExecutionEnv(

@@ -9,7 +9,7 @@ contract Storage {
     uint256 internal constant _MAX_GAS = 1_500_000;
     uint256 internal constant LEDGER_LENGTH = 5;      // type(Party).max = 5
     address internal constant UNLOCKED = address(1);
-    
+
     uint256 public immutable ESCROW_DURATION;
     address public immutable FACTORY;
     address public immutable VERIFICATION;
@@ -30,6 +30,9 @@ contract Storage {
     mapping(address => uint256) public nonces;
 
     // Atlas GasAccounting storage
+    // NOTE: these storage vars / maps should only be accessible by *signed* solver transactions
+    // and only once per solver per block (to avoid user-solver collaborative exploits)
+    // uint256 public immutable escrowDuration;
     mapping(address => EscrowAccountData) internal _escrowAccountData;
 
     // Atlas SafetyLocks storage
@@ -37,7 +40,7 @@ contract Storage {
     Ledger[LEDGER_LENGTH] public ledgers;
 
     constructor(
-        uint32 _escrowDuration,
+        uint256 _escrowDuration,
         address _factory,
         address _verification,
         address _simulator

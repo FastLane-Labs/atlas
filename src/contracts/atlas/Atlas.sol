@@ -29,12 +29,12 @@ contract Atlas is Escrow {
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
-    uint256 private constant _MAX_GAS = 1_500_000;
-    address public immutable FACTORY;
-
-    constructor(uint32 _escrowDuration, address _simulator, address _factory, address _verification) Escrow(_escrowDuration, _simulator, _verification) {
-        FACTORY = _factory;
-    }
+    constructor(
+        uint256 _escrowDuration,
+        address _factory,
+        address _verification,
+        address _simulator
+    ) Escrow(_escrowDuration, _factory, _verification, _simulator) {}
 
     function metacall( // <- Entrypoint Function
         UserOperation calldata userOp, // set by user
@@ -54,7 +54,7 @@ contract Atlas is Escrow {
         // replay attacks.
         ValidCallsResult validCallsResult = _validCalls(dConfig, userOp, solverOps, dAppOp, executionEnvironment);
         if (validCallsResult != ValidCallsResult.Valid) {
-            if (msg.sender == simulator) {revert VerificationSimFail();} else { revert ValidCalls(validCallsResult); }
+            if (msg.sender == SIMULATOR) {revert VerificationSimFail();} else { revert ValidCalls(validCallsResult); }
         }
 
         // Initialize the lock
@@ -97,7 +97,7 @@ contract Atlas is Escrow {
         if(msg.sender != address(this)) revert InvalidAccess();
         
         // Build the memory lock
-        EscrowKey memory key = _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), bundler == simulator);
+        EscrowKey memory key = _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), bundler == SIMULATOR);
 
         // Begin execution
         (auctionWon, accruedGasRebate, winningSearcherIndex) = _execute(dConfig, userOp, solverOps, executionEnvironment, bundler, key);
@@ -205,7 +205,7 @@ contract Atlas is Escrow {
         // Verify that the calldata injection came from the dApp frontend
         // and that the signatures are valid. 
       
-        bool isSimulation = msg.sender == simulator;
+        bool isSimulation = msg.sender == SIMULATOR;
 
         // Some checks are only needed when call is not a simulation
         if (!isSimulation) {
@@ -344,7 +344,7 @@ contract Atlas is Escrow {
     }
 
     function _handleErrors(bytes4 errorSwitch, uint32 callConfig) internal view {
-        if (msg.sender == simulator) { // Simulation
+        if (msg.sender == SIMULATOR) { // Simulation
             if (errorSwitch == PreOpsSimFail.selector) {
                 revert PreOpsSimFail();
             } else if (errorSwitch == UserOpSimFail.selector) {
