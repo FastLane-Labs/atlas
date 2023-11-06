@@ -34,15 +34,13 @@ struct SwapData {
     int256 requestedAmount; // positive for exact in, negative for exact out
     uint256 limitAmount; // if exact in, min amount out. if exact out, max amount in
     address recipient;
-    uint256 solverGasLiability; // the amount of user gas that the solver must refund
 }
 
 
 contract V4SwapIntentController is DAppControl {
     using SafeTransferLib for ERC20;
 
-    uint256 constant public EXPECTED_GAS_USAGE_EX_SOLVER = 200_000;
-    address constant V4_POOL = address(0);
+    address constant V4_POOL = address(0); // TODO: set for test v4 pool
 
     uint256 startingBalance; // Balance tracked for the v4 pool
 
@@ -115,8 +113,7 @@ contract V4SwapIntentController is DAppControl {
             tokenOut: tokenOut,
             requestedAmount: int256(amountIn),
             limitAmount: amountOutMinimum,
-            recipient: recipient,
-            solverGasLiability: EXPECTED_GAS_USAGE_EX_SOLVER
+            recipient: recipient
         });
 
         return swapData;
@@ -137,8 +134,7 @@ contract V4SwapIntentController is DAppControl {
             tokenOut: tokenOut,
             requestedAmount: -int256(amountOut),
             limitAmount: amountInMaximum,
-            recipient: recipient,
-            solverGasLiability: EXPECTED_GAS_USAGE_EX_SOLVER
+            recipient: recipient
         });
 
         return swapData;
@@ -176,36 +172,32 @@ contract V4SwapIntentController is DAppControl {
     // Checking intent was fulfilled, and user has received their tokens, happens here
     function _postSolverCall(bytes calldata data) internal override returns (bool) {
        
-        (address solverTo, uint256 solverBid, bytes memory returnData) = abi.decode(data, (address, uint256, bytes));
+        (, uint256 solverBid, bytes memory returnData) = abi.decode(data, (address, uint256, bytes));
 
         SwapData memory swapData = abi.decode(returnData, (SwapData));
-
-        if (swapData.solverGasLiability > 0) {
-            // NOTE: Winning solver does not have to reimburse for other solvers
-            uint256 expectedGasReimbursement = swapData.solverGasLiability * tx.gasprice;
-
-            // Is this check unnecessary since it'll just throw inside the try/catch?
-            // if (address(this).balance < expectedGasReimbursement) {
-            //    return false;
-            //}
-
-            // NOTE: This sends any surplus donations back to the solver
-            console.log("sending surplus donations back to solver...");
-            IEscrow(escrow).donateToBundler{value: expectedGasReimbursement}(solverTo);
-        }
 
         uint256 buyTokenBalance = ERC20(swapData.tokenOut).balanceOf(address(this));
         uint256 amountUserBuys = swapData.requestedAmount > 0 ? swapData.limitAmount : uint256(-swapData.requestedAmount);
         
         // If it was an exact input swap, we need to verify that 
         // a) We have enough tokens to meet the user's minimum amount out
-        // b) THe output amount matches (or is greater than) the solver's bid
+        // b) The output amount matches (or is greater than) the solver's bid
+        // c) PoolManager's balances increased by the provided input amount
         if(swapData.requestedAmount > 0) {
             if(buyTokenBalance < swapData.limitAmount) {
                 return false; // insufficient amount out
             }
             if(buyTokenBalance < solverBid) {
                 return false; // does not meet solver bid
+            }
+            uint256 endingBalance = ERC20(swapData.tokenIn).balanceOf(V4_POOL);
+            if((endingBalance - startingBalance) < uint256(swapData.requestedAmount)) {
+                return false; // pool manager balances did not increase by the provided input amount
+            }
+        } else { // Exact output swap - check the output amount was transferred out by pool
+            uint256 endingBalance = ERC20(swapData.tokenOut).balanceOf(V4_POOL);
+            if((startingBalance - endingBalance) < amountUserBuys) {
+                return false; // pool manager balances did not decrease by the provided output amount
             }
         }
         // no need to check for exact output, since the max is whatever the user transferred
@@ -230,28 +222,15 @@ contract V4SwapIntentController is DAppControl {
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) internal override {
+    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
-
-        // NOTE: donateToBundler caps the donation at 110% of total gas cost.
-        // Any remainder is then sent to the specified recipient. 
-        // IEscrow(escrow).donateToBundler{value: address(this).balance}();
-        SwapData memory swapData = abi.decode(data, (SwapData));
-
         if (bidToken != address(0)) {
             ERC20(bidToken).safeTransfer(_user(), bidAmount);
         
-        // If the solver was already required to reimburse the user's gas, don't reallocate
-        // Ether surplus to the bundler
-        } else if (swapData.solverGasLiability > 0) {
-            SafeTransferLib.safeTransferETH(_user(), address(this).balance);
-
-        // Donate the ether to the bundler, with the surplus going back to the user
         } else {
-            console.log("donating to bundler in SwapIntent");
-            IEscrow(escrow).donateToBundler{value: address(this).balance}(_user());
+            SafeTransferLib.safeTransferETH(_user(), address(this).balance);
         }
     }
 
