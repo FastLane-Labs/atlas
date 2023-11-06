@@ -25,13 +25,27 @@ contract DeployAtlasScript is DeployBaseScript {
 
         uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
+        // Computes the addresses at which AtlasFactory and AtlasVerification will be deployed
+        address expectedAtlasFactoryAddr = computeCreateAddress(
+            deployer,
+            vm.getNonce(deployer) + 1
+        );
+        address expectedAtlasVerificationAddr = computeCreateAddress(
+            deployer,
+            vm.getNonce(deployer) + 2
+        );
 
         console.log("Deployer address: \t\t\t\t", deployer);
 
         vm.startBroadcast(deployerPrivateKey);
 
         simulator = new Simulator();
-        atlas = new Atlas(64, address(simulator), address(0), address(0)); //TODO update to Factory and Verification addr arg
+        atlas = new Atlas({
+            _escrowDuration: 64,
+            _factory: expectedAtlasFactoryAddr,
+            _verification: expectedAtlasVerificationAddr,
+            _simulator: address(simulator)
+        });
         atlasFactory = new AtlasFactory(address(atlas));
         atlasVerification = new AtlasVerification(address(atlas));
 
@@ -58,6 +72,15 @@ contract DeployAtlasAndSwapIntentDAppControlScript is DeployBaseScript {
 
         uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
+        // Computes the addresses at which AtlasFactory and AtlasVerification will be deployed
+        address expectedAtlasFactoryAddr = computeCreateAddress(
+            deployer,
+            vm.getNonce(deployer) + 1
+        );
+        address expectedAtlasVerificationAddr = computeCreateAddress(
+            deployer,
+            vm.getNonce(deployer) + 2
+        );
 
         console.log("Deployer address: \t\t\t\t", deployer);
 
@@ -65,7 +88,12 @@ contract DeployAtlasAndSwapIntentDAppControlScript is DeployBaseScript {
 
         // Deploy the Atlas contract
         simulator = new Simulator();
-        atlas = new Atlas(64, address(simulator), address(0), address(0)); //TODO update to Factory and Verification addr arg
+        atlas = new Atlas({
+            _escrowDuration: 64,
+            _factory: expectedAtlasFactoryAddr,
+            _verification: expectedAtlasVerificationAddr,
+            _simulator: address(simulator)
+        });
         atlasFactory = new AtlasFactory(address(atlas));
         atlasVerification = new AtlasVerification(address(atlas));
 
@@ -102,6 +130,15 @@ contract DeployAtlasAndSwapIntentDAppControlAndTxBuilderScript is DeployBaseScri
 
         uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
+        // Computes the addresses at which AtlasFactory and AtlasVerification will be deployed
+        address expectedAtlasFactoryAddr = computeCreateAddress(
+            deployer,
+            vm.getNonce(deployer) + 1
+        );
+        address expectedAtlasVerificationAddr = computeCreateAddress(
+            deployer,
+            vm.getNonce(deployer) + 2
+        );
 
         console.log("Deployer address: \t\t\t\t", deployer);
 
@@ -109,7 +146,12 @@ contract DeployAtlasAndSwapIntentDAppControlAndTxBuilderScript is DeployBaseScri
 
         // Deploy the Atlas contract
         simulator = new Simulator();
-        atlas = new Atlas(64, address(simulator), address(0), address(0)); //TODO update to Factory and Verification addr arg
+        atlas = new Atlas({
+            _escrowDuration: 64,
+            _factory: expectedAtlasFactoryAddr,
+            _verification: expectedAtlasVerificationAddr,
+            _simulator: address(simulator)
+        });
         atlasFactory = new AtlasFactory(address(atlas));
         atlasVerification = new AtlasVerification(address(atlas));
 

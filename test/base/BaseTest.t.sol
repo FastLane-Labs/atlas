@@ -81,7 +81,12 @@ contract BaseTest is Test, TestConstants {
             vm.getNonce(payee) + 2
         );
 
-        atlas = new Atlas(64, address(simulator), expectedAtlasFactoryAddr, expectedAtlasVerificationAddr);
+        atlas = new Atlas({
+            _escrowDuration: 64,
+            _factory: expectedAtlasFactoryAddr,
+            _verification: expectedAtlasVerificationAddr,
+            _simulator: address(simulator)
+        });
         atlasFactory = new AtlasFactory(address(atlas));
         atlasVerification = new AtlasVerification(address(atlas));
 
