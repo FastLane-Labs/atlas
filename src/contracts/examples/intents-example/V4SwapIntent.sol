@@ -17,16 +17,6 @@ import {DAppControl} from "../../dapp/DAppControl.sol";
 
 import "forge-std/Test.sol";
 
-// This is the SwapIntent that the user inputs
-struct SwapIntent {
-    address tokenUserBuys;
-    uint256 amountUserBuys;
-    address tokenUserSells;
-    uint256 amountUserSells;
-    address auctionBaseCurrency; // NOTE: Typically will be address(0) / ETH for gas refund
-    bool solverMustReimburseGas; // If true, the solver must reimburse the bundler for the user's and control's gas cost
-}
-
 // This struct is for passing around data internally
 struct SwapData {
     address tokenIn;
@@ -35,7 +25,6 @@ struct SwapData {
     uint256 limitAmount; // if exact in, min amount out. if exact out, max amount in
     address recipient;
 }
-
 
 contract V4SwapIntentController is DAppControl {
     using SafeTransferLib for ERC20;
@@ -244,9 +233,15 @@ contract V4SwapIntentController is DAppControl {
         // so that they can get the proper format for
         // submitting their bids to the hook.
 
-        (SwapIntent memory swapIntent) = abi.decode(userOp.data[4:], (SwapIntent));
+        if(bytes4(userOp.data[:4]) == this.exactInputSingle.selector) {
+            // exact input swap, the bidding is done in output token
+            (, bidToken) = abi.decode(userOp.data[4:], (address, address));
+        } else if (bytes4(userOp.data[:4]) == this.exactOutputSingle.selector) {
+            // exact output, bidding done in input token
+            bidToken = abi.decode(userOp.data[4:], (address));
+        }
 
-        bidToken = swapIntent.auctionBaseCurrency;
+        // should we return an error here if the function is wrong?
     }
 
     function getBidValue(SolverOperation calldata solverOp)
