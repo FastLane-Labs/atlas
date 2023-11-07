@@ -15,6 +15,8 @@ import {DAppOperation, DAppConfig} from "../src/contracts/types/DAppApprovalType
 import {V4SwapIntentController} from "../src/contracts/examples/intents-example/V4SwapIntent.sol";
 import {SolverBase} from "../src/contracts/solver/SolverBase.sol";
 
+import {PoolManager} from "v4-core/PoolManager.sol";
+
 contract V4SwapIntentTest is BaseTest {
     SwapIntentController public swapIntentController;
     TxBuilder public txBuilder;
