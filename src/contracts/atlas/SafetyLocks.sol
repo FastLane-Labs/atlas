@@ -3,7 +3,7 @@ pragma solidity ^0.8.16;
 
 import {SafetyBits} from "../libraries/SafetyBits.sol";
 import {CallBits} from "../libraries/CallBits.sol";
-import {PartyMath, LEDGER_LENGTH} from "../libraries/GasParties.sol";
+import {PartyMath} from "../libraries/GasParties.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";

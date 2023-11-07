@@ -4,7 +4,7 @@ pragma solidity ^0.8.16;
 import {Party, Ledger} from "../types/EscrowTypes.sol";
 import {Lock, BaseLock, ExecutionPhase} from "../types/LockTypes.sol";
 
-uint256 constant LEDGER_LENGTH = 5; // uint256(type(Party).max); // 5
+uint256 constant LEDGER_LENGTH = 5;      // type(Party).max = 5
 
 library PartyMath {
 
