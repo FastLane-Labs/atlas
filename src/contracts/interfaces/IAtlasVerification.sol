@@ -29,4 +29,6 @@ interface IAtlasVerification {
     function removeSignatory(address controller, address signatory) external;
     function integrateDApp(address dAppControl) external;
     function disableDApp(address dAppControl) external;
+
+    function initializeNonce(address account) external;
 }

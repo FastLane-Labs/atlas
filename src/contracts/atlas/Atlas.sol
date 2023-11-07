@@ -5,7 +5,6 @@ import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
 import {IDAppControl} from "../interfaces/IDAppControl.sol";
 import {IAtlasFactory} from "../interfaces/IAtlasFactory.sol";
 import {IAtlasVerification} from "../interfaces/IAtlasVerification.sol";
-import {IDAppIntegration} from "../interfaces/IDAppIntegration.sol";
 
 import {Escrow} from "./Escrow.sol";
 
@@ -39,7 +38,7 @@ contract Atlas is Escrow {
 
     function createExecutionEnvironment(address dAppControl) external returns (address executionEnvironment) {
         executionEnvironment = IAtlasFactory(FACTORY).createExecutionEnvironment(msg.sender, dAppControl);
-        IDAppIntegration(VERIFICATION).initializeNonce(msg.sender);
+        IAtlasVerification(VERIFICATION).initializeNonce(msg.sender);
     }
 
     function metacall( // <- Entrypoint Function
