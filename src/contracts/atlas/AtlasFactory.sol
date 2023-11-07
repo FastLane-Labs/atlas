@@ -31,9 +31,10 @@ contract AtlasFactory {
     // EXTERNAL FUNCTIONS //
     // ------------------ //
 
-    function createExecutionEnvironment(address dAppControl) external returns (address executionEnvironment) {
-        executionEnvironment = _setExecutionEnvironment(dAppControl, msg.sender, dAppControl.codehash);
-        // _initializeNonce(msg.sender); // NOTE: called separately by Atlas after calling createExecEnv
+    function createExecutionEnvironment(address account, address dAppControl) external returns (address executionEnvironment) {
+        // Must call createExecutionEnvironment on Atlas contract to properly initialize nonce tracking
+        require(msg.sender == atlas, "AtlasFactory: Only Atlas can create execution environments");
+        executionEnvironment = _setExecutionEnvironment(dAppControl, account, dAppControl.codehash);
     }
 
     function getExecutionEnvironment(address user, address dAppControl)

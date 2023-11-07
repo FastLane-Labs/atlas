@@ -71,7 +71,7 @@ contract DAppIntegration {
 
         signatories[signatoryKey] = true;
 
-        _initializeNonce(msg.sender);
+        initializeNonce(msg.sender);
         
     }
 
@@ -88,7 +88,7 @@ contract DAppIntegration {
 
         signatories[signatoryKey] = true;
     
-        _initializeNonce(signatory);
+        initializeNonce(signatory);
 
         emit NewDAppSignatory(
             controller,
@@ -139,7 +139,7 @@ contract DAppIntegration {
         delete dapps[key];
     }
 
-    function _initializeNonce(address account) internal {
+    function initializeNonce(address account) public {
         if (asyncNonceBitIndex[account].LowestEmptyBitmap == uint128(0)) {
             unchecked {
                 asyncNonceBitIndex[account].LowestEmptyBitmap = 2;

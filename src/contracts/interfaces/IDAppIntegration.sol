@@ -12,6 +12,8 @@ interface IDAppIntegration {
 
     function disableDApp(address dAppControl) external;
 
+    function initializeNonce(address account) external;
+
     function nextGovernanceNonce(address governanceSignatory) external view returns (uint256 nextNonce);
 
     function getGovFromControl(address dAppControl) external view returns (address governanceAddress);

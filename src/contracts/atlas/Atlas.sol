@@ -5,6 +5,7 @@ import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
 import {IDAppControl} from "../interfaces/IDAppControl.sol";
 import {IAtlasFactory} from "../interfaces/IAtlasFactory.sol";
 import {IAtlasVerification} from "../interfaces/IAtlasVerification.sol";
+import {IDAppIntegration} from "../interfaces/IDAppIntegration.sol";
 
 import {Escrow} from "./Escrow.sol";
 
@@ -35,6 +36,11 @@ contract Atlas is Escrow {
         address _verification,
         address _simulator
     ) Escrow(_escrowDuration, _factory, _verification, _simulator) {}
+
+    function createExecutionEnvironment(address dAppControl) external returns (address executionEnvironment) {
+        executionEnvironment = IAtlasFactory(FACTORY).createExecutionEnvironment(msg.sender, dAppControl);
+        IDAppIntegration(VERIFICATION).initializeNonce(msg.sender);
+    }
 
     function metacall( // <- Entrypoint Function
         UserOperation calldata userOp, // set by user
@@ -367,7 +373,7 @@ contract Atlas is Escrow {
         address user,
         address controller,
         uint32 callConfig
-    ) internal override {
+    ) internal view override {
         if(msg.sender != IAtlasFactory(FACTORY).getExecutionEnvironmentCustom(user, controller.codehash, controller, callConfig)){
             revert EnvironmentMismatch();
         }

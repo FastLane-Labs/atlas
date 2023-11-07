@@ -6,6 +6,7 @@ import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
 interface IAtlas {
+    function createExecutionEnvironment(address dAppControl) external returns (address executionEnvironment);
     function metacall(
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
