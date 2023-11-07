@@ -2,7 +2,7 @@
 pragma solidity ^0.8.18;
 
 interface IAtlasFactory {
-    function createExecutionEnvironment(address dAppControl) external returns (address executionEnvironment);
+    function createExecutionEnvironment(address account, address dAppControl) external returns (address executionEnvironment);
 
     function getExecutionEnvironment(address user, address dAppControl)
         external
