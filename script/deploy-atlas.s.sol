@@ -9,6 +9,7 @@ import {DeployBaseScript} from "script/base/deploy-base.s.sol";
 import {Atlas} from "src/contracts/atlas/Atlas.sol";
 import {AtlasFactory} from "src/contracts/atlas/AtlasFactory.sol";
 import {AtlasVerification} from "src/contracts/atlas/AtlasVerification.sol";
+import {GasAccountingLib} from "src/contracts/atlas/GasAccountingLib.sol";
 import {SwapIntentController} from "src/contracts/examples/intents-example/SwapIntent.sol";
 import {TxBuilder} from "src/contracts/helpers/TxBuilder.sol";
 import {Simulator} from "src/contracts/helpers/Simulator.sol";
@@ -18,6 +19,7 @@ contract DeployAtlasScript is DeployBaseScript {
     Atlas public atlas;
     AtlasFactory public atlasFactory;
     AtlasVerification public atlasVerification;
+    GasAccountingLib public gasAccountingLib;
     Simulator public simulator;
 
     function run() external {
@@ -34,6 +36,10 @@ contract DeployAtlasScript is DeployBaseScript {
             deployer,
             vm.getNonce(deployer) + 2
         );
+        address expectedGasAccountingLibAddr = computeCreateAddress(
+            deployer,
+            vm.getNonce(deployer) + 3
+        );
 
         console.log("Deployer address: \t\t\t\t", deployer);
 
@@ -44,10 +50,17 @@ contract DeployAtlasScript is DeployBaseScript {
             _escrowDuration: 64,
             _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
+            _gasAccLib: expectedGasAccountingLibAddr,
             _simulator: address(simulator)
         });
         atlasFactory = new AtlasFactory(address(atlas));
         atlasVerification = new AtlasVerification(address(atlas));
+        gasAccountingLib = new GasAccountingLib({
+            _escrowDuration: 64,
+            _factory: expectedAtlasFactoryAddr,
+            _verification: expectedAtlasVerificationAddr,
+            _simulator: address(simulator)
+        });
 
         vm.stopBroadcast();
 
@@ -64,6 +77,7 @@ contract DeployAtlasAndSwapIntentDAppControlScript is DeployBaseScript {
     Atlas public atlas;
     AtlasFactory public atlasFactory;
     AtlasVerification public atlasVerification;
+    GasAccountingLib public gasAccountingLib;
     Simulator public simulator;
     SwapIntentController public swapIntentControl;
 
@@ -81,21 +95,31 @@ contract DeployAtlasAndSwapIntentDAppControlScript is DeployBaseScript {
             deployer,
             vm.getNonce(deployer) + 2
         );
+        address expectedGasAccountingLibAddr = computeCreateAddress(
+            deployer,
+            vm.getNonce(deployer) + 3
+        );
 
         console.log("Deployer address: \t\t\t\t", deployer);
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // Deploy the Atlas contract
         simulator = new Simulator();
         atlas = new Atlas({
             _escrowDuration: 64,
             _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
+            _gasAccLib: expectedGasAccountingLibAddr,
             _simulator: address(simulator)
         });
         atlasFactory = new AtlasFactory(address(atlas));
         atlasVerification = new AtlasVerification(address(atlas));
+        gasAccountingLib = new GasAccountingLib({
+            _escrowDuration: 64,
+            _factory: expectedAtlasFactoryAddr,
+            _verification: expectedAtlasVerificationAddr,
+            _simulator: address(simulator)
+        });
 
         // Deploy the SwapIntent DAppControl contract
         swapIntentControl = new SwapIntentController(address(atlas));
@@ -121,6 +145,7 @@ contract DeployAtlasAndSwapIntentDAppControlAndTxBuilderScript is DeployBaseScri
     Atlas public atlas;
     AtlasFactory public atlasFactory;
     AtlasVerification public atlasVerification;
+    GasAccountingLib public gasAccountingLib;
     Simulator public simulator;
     SwapIntentController public swapIntentControl;
     TxBuilder public txBuilder;
@@ -139,21 +164,31 @@ contract DeployAtlasAndSwapIntentDAppControlAndTxBuilderScript is DeployBaseScri
             deployer,
             vm.getNonce(deployer) + 2
         );
+        address expectedGasAccountingLibAddr = computeCreateAddress(
+            deployer,
+            vm.getNonce(deployer) + 3
+        );
 
         console.log("Deployer address: \t\t\t\t", deployer);
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // Deploy the Atlas contract
         simulator = new Simulator();
         atlas = new Atlas({
             _escrowDuration: 64,
             _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
+            _gasAccLib: expectedGasAccountingLibAddr,
             _simulator: address(simulator)
         });
         atlasFactory = new AtlasFactory(address(atlas));
         atlasVerification = new AtlasVerification(address(atlas));
+        gasAccountingLib = new GasAccountingLib({
+            _escrowDuration: 64,
+            _factory: expectedAtlasFactoryAddr,
+            _verification: expectedAtlasVerificationAddr,
+            _simulator: address(simulator)
+        });
 
         // Deploy the SwapIntent DAppControl contract
         swapIntentControl = new SwapIntentController(address(atlas));

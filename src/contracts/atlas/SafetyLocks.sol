@@ -27,8 +27,9 @@ abstract contract SafetyLocks is Storage, FastLaneErrorsEvents {
         uint256 _escrowDuration,
         address _factory,
         address _verification,
+        address _gasAccLib,
         address _simulator
-    ) Storage(_escrowDuration, _factory, _verification, _simulator) {}
+    ) Storage(_escrowDuration, _factory, _verification, _gasAccLib, _simulator) {}
 
     function _initializeEscrowLock(UserOperation calldata userOp, address executionEnvironment, address bundler, uint256 gasLimit) onlyWhenUnlocked internal {
 

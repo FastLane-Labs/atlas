@@ -33,8 +33,9 @@ abstract contract Escrow is AtlETH {
         uint256 _escrowDuration,
         address _factory,
         address _verification,
+        address _gasAccLib,
         address _simulator
-    ) AtlETH(_escrowDuration, _factory, _verification, _simulator) {}
+    ) AtlETH(_escrowDuration, _factory, _verification, _gasAccLib, _simulator) {}
 
     ///////////////////////////////////////////////////
     /// EXTERNAL FUNCTIONS FOR BUNDLER INTERACTION  ///

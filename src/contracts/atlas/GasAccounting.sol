@@ -10,7 +10,7 @@ import "../types/LockTypes.sol";
 import {EscrowBits} from "../libraries/EscrowBits.sol";
 import {PartyMath} from "../libraries/GasParties.sol";
 
-import "forge-std/Test.sol";
+import "forge-std/Test.sol"; //TODO remove
 
 abstract contract GasAccounting is SafetyLocks {
     using PartyMath for Party;
@@ -21,8 +21,9 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 _escrowDuration,
         address _factory,
         address _verification,
+        address _gasAccLib,
         address _simulator
-    ) SafetyLocks(_escrowDuration, _factory, _verification, _simulator) {}
+    ) SafetyLocks(_escrowDuration, _factory, _verification, _gasAccLib, _simulator) {}
 
     // NOTE: donations are simply deposits that have a different msg.sender than receiving party
     function _deposit(Party party, uint256 amt) internal returns (uint256 balanceOwed) {

@@ -28,8 +28,9 @@ abstract contract Permit69 is GasAccounting {
         uint256 _escrowDuration,
         address _factory,
         address _verification,
+        address _gasAccLib,
         address _simulator
-    ) GasAccounting(_escrowDuration, _factory, _verification, _simulator) {}
+    ) GasAccounting(_escrowDuration, _factory, _verification, _gasAccLib, _simulator) {}
 
     // Virtual Functions defined by other Atlas modules
     function _verifyCallerIsExecutionEnv(

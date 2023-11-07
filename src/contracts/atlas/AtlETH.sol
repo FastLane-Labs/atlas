@@ -29,8 +29,9 @@ abstract contract AtlETH is Permit69 {
         uint256 _escrowDuration,
         address _factory,
         address _verification,
+        address _gasAccLib,
         address _simulator
-    ) Permit69(_escrowDuration, _factory, _verification, _simulator) {}
+    ) Permit69(_escrowDuration, _factory, _verification, _gasAccLib, _simulator) {}
 
     /*//////////////////////////////////////////////////////////////
                                 ATLETH
