@@ -97,6 +97,7 @@ contract FastLaneErrorsEvents {
     error InsufficientFunds();
     error NoUnfilledRequests();
     error SolverMustReconcile();
+    error GasAccountingLibError();
     
     // NEW - SafetyLocks
     error NotInitialized();
