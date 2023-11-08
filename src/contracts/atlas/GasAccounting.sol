@@ -7,16 +7,11 @@ import {GasAccountingLib} from "./GasAccountingLib.sol";
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
 
-import {EscrowBits} from "../libraries/EscrowBits.sol";
-import {PartyMath} from "../libraries/GasParties.sol";
+// import {EscrowBits} from "../libraries/EscrowBits.sol";
 
 import "forge-std/Test.sol"; //TODO remove
 
 abstract contract GasAccounting is SafetyLocks {
-    using PartyMath for Party;
-    using PartyMath for uint256;
-    using PartyMath for Ledger[LEDGER_LENGTH];
-
     constructor(
         uint256 _escrowDuration,
         address _factory,

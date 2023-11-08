@@ -3,10 +3,6 @@ pragma solidity ^0.8.16;
 
 uint256 constant CALLDATA_LENGTH_PREMIUM = 32; // 16 (default) * 2
 
-struct AccountingData {
-    mapping(address borrower => uint256 amount) ethBorrowed; // TODO worth allowing ERC20s to be borrowed?
-}
-
 struct EscrowAccountData {
     uint128 balance;
     uint32 nonce; // EOA nonce
