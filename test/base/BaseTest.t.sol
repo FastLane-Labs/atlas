@@ -100,7 +100,8 @@ contract BaseTest is Test, TestConstants {
             _escrowDuration: 64,
             _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
-            _simulator: address(simulator)
+            _simulator: address(simulator),
+            _atlas: address(atlas)
         });
 
         simulator.setAtlas(address(atlas));

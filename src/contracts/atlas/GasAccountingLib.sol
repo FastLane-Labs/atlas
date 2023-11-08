@@ -18,12 +18,21 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
     using PartyMath for uint256;
     using PartyMath for Ledger[LEDGER_LENGTH];
 
+    address public immutable ATLAS;
+
     constructor(
         uint256 _escrowDuration,
         address _factory,
         address _verification,
-        address _simulator
-    ) Storage(_escrowDuration, _factory, _verification, address(this), _simulator) {}
+        address _simulator,
+        address _atlas
+    ) Storage(_escrowDuration, _factory, _verification, address(this), _simulator) {
+        ATLAS = _atlas;
+    }
+
+    // ---------------------------------------
+    //            EXTERNAL FUNCTIONS
+    // ---------------------------------------
 
     function deposit(Party party) external payable {
         if(!_validParty(msg.sender, party)) revert InvalidEnvironment();
@@ -42,47 +51,17 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
         ledgers[pIndex] = partyLedger;
     }
 
-    // NOTE: donations are simply deposits that have a different msg.sender than receiving party
-    function _deposit(Party party, uint256 amt) internal returns (uint256 balanceOwed) {
-
-        (Ledger memory partyLedger, uint256 partyIndex) = _getLedger(party);
-
-        if (partyLedger.status == LedgerStatus.Finalized) revert LedgerFinalized(1);
-
-        int64 depositAmount = int64(uint64(amt / tx.gasprice));
-
-        partyLedger.balance += depositAmount;
-        
-        balanceOwed = partyLedger.balance < 0 ? uint256(uint64(-1 * partyLedger.balance)) : 0;
-
-        ledgers[partyIndex] = partyLedger;
-    }
-
     // NOTE: DAPPs can gain malicious access to these funcs if they want to, but attacks beyond
     // the approved amounts will only lead to a revert.  
-    // Bundlers must make sure the DApp hasn't maliciously upgraded their contract to avoid wasting gas. 
-    function contributeTo(Party donor, Party recipient, uint256 amt) external {
-        if(!_validParties(msg.sender, donor, recipient)) revert InvalidEnvironment();
+    // Bundlers must make sure the DApp hasn't maliciously upgraded their contract to avoid wasting gas.
+
+    // callingEnv should be either internal Atlas call (from Permit69) or from an ExecEnv via Atlas to this contract
+    function contributeTo(address callingEnv, Party donor, Party recipient, uint256 amt) external {
+        if(!_validParties(callingEnv, donor, recipient)) revert InvalidEnvironment();
         _contributeTo(donor, recipient, amt);
     }
 
-    function _contributeTo(Party donor, Party recipient, uint256 amt) internal {
-
-        (Ledger memory donorLedger, uint256 donorIndex) = _getLedger(donor);
-        if(donorLedger.status == LedgerStatus.Finalized) revert LedgerFinalized(5);
-
-        (Ledger memory recipientLedger, uint256 recipientIndex) = _getLedger(recipient);
-        if(recipientLedger.status == LedgerStatus.Finalized) revert LedgerFinalized(6);
-
-        int64 amount = int64(uint64(amt / tx.gasprice));
-
-        donorLedger.balance -= amount;
-        donorLedger.contributed += amount;
-        recipientLedger.requested += amount;
-
-        ledgers[donorIndex] = donorLedger;
-        ledgers[recipientIndex] = recipientLedger;
-    }
+    
 
 
     function contribute(Party recipient) external payable {
@@ -114,28 +93,10 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
         ledgers[pIndex] = partyLedger;
     }
 
-    function requestFrom(Party donor, Party recipient, uint256 amt) external {
-        if(!_validParties(msg.sender, donor, recipient)) revert InvalidEnvironment();
+    // callingEnv should be either internal Atlas call (from Permit69) or from an ExecEnv via Atlas to this contract
+    function requestFrom(address callingEnv, Party donor, Party recipient, uint256 amt) external {
+        if(!_validParties(callingEnv, donor, recipient)) revert InvalidEnvironment();
         _requestFrom(donor, recipient, amt);
-    }
-
-    function _requestFrom(Party donor, Party recipient, uint256 amt) internal {
-        // TODO: different parties will be ineligible to request funds from once their phase is over.
-        // We need to add a phase check to verify this. 
-
-        (Ledger memory donorLedger, uint256 donorIndex) = _getLedger(donor);
-        if(donorLedger.status >= LedgerStatus.Balancing) revert LedgerBalancing(2);
-
-        (Ledger memory recipientLedger, uint256 recipientIndex) = _getLedger(recipient);
-        if(recipientLedger.status == LedgerStatus.Finalized) revert LedgerFinalized(4);
-
-        int64 amount = int64(uint64(amt / tx.gasprice));
-
-        donorLedger.contributed -= amount;
-        recipientLedger.requested -= amount;
-
-        ledgers[donorIndex] = donorLedger;
-        ledgers[recipientIndex] = recipientLedger;
     }
 
     function borrow(Party party, uint256 amt) external {
@@ -153,7 +114,7 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
     }
 
 
-    function _tradeCorrection(Party party, uint256 amt) internal {
+    function tradeCorrection(Party party, uint256 amt) external {
         // Note that for Solver borrows, the repayment check happens *inside* the try/catch.
         // This function is to mark off a solver borrow from a failed tx 
        
@@ -168,7 +129,7 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
         ledgers[partyIndex] = partyLedger;
     }
 
-    function _use(Party party, address partyAddress, uint256 amt) internal {
+    function use(Party party, address partyAddress, uint256 amt) external {
         
         (Ledger memory partyLedger, uint256 partyIndex) = _getLedger(party);
 
@@ -223,15 +184,7 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
     }
 
 
-
-    
-
-    // Returns true if Solver status is Finalized and the caller (Execution Environment) is in surplus
-    function validateBalances() external view returns (bool valid) {
-        valid = ledgers[uint256(Party.Solver)].status == LedgerStatus.Finalized && _isInSurplus(msg.sender);
-    }
-
-    function _isInSurplus(address environment) internal view returns (bool) {
+    function isInSurplus(address environment) external view returns (bool) {
         Lock memory mLock = lock;
         if (mLock.activeEnvironment != environment) return false;
 
@@ -260,7 +213,7 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
             unchecked{++i;}
         }
 
-        int64 atlasBalanceDelta = int64(uint64((address(this).balance) / tx.gasprice)) - int64(mLock.startingBalance);
+        int64 atlasBalanceDelta = int64(uint64((ATLAS.balance) / tx.gasprice)) - int64(mLock.startingBalance);
 
         // If atlas balance is lower than expected, return false
         if (atlasBalanceDelta < totalRequests + totalContributions + totalBalanceDelta) return false;
@@ -272,7 +225,7 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
         return true;
     }
 
-    function _balance(uint256 accruedGasRebate, address user, address dapp, address winningSolver, address bundler) internal {
+    function balance(uint256 accruedGasRebate, address user, address dapp, address winningSolver, address bundler) external {
         
         Lock memory mLock = lock;
         uint256 activeParties = uint256(mLock.activeParties);
@@ -320,6 +273,273 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
 
         // Finally, assign the balance deltas to the parties
         _assignBalanceDeltas(parties, activeParties, user, dapp, winningSolver, bundler);
+    }
+
+    function validParties(address environment, Party partyOne, Party partyTwo) external returns (bool valid) {
+        return _validParties(environment, partyOne, partyTwo);
+    }
+
+    function checkSolverProxy(address solverFrom, address bundler) external returns (bool validSolver) {
+        // Note that the Solver can't be the User or the DApp - those combinations are blocked in the ExecutionEnvironment. 
+
+        if (solverFrom == block.coinbase) {
+            uint256 builderIndex = uint256(Party.Builder);
+            Ledger memory partyLedger = ledgers[builderIndex];
+
+            // CASE: Invalid combination (solver = coinbase = user | dapp)
+            if (uint256(partyLedger.proxy) > uint256(Party.Solver)) {
+                return false;
+            }
+
+            // CASE: ledger is finalized or balancing
+            if (uint256(partyLedger.status) > uint256(LedgerStatus.Borrowing)) {
+                return false;
+            }
+
+            // CASE: proxy is solver or builder
+            // Pass, and check builder proxy next
+
+            // CASE: no proxy yet, so make one
+            if (uint256(partyLedger.proxy) == builderIndex) {
+                uint256 activeParties = _getActiveParties();
+                if (activeParties.isInactive(Party.Builder)) {
+                    _saveActiveParties(activeParties.markActive(Party.Builder));
+                }
+
+                partyLedger.status = LedgerStatus.Proxy;
+                partyLedger.proxy = Party.Solver;
+                // Note: don't overwrite the stored values - we may need to undo the proxy if solver fails
+                ledgers[builderIndex] = partyLedger; 
+
+                // Solver inherits the requests and contributions of their alter ego
+                uint256 solverIndex = uint256(Party.Solver);
+                Ledger memory sLedger = ledgers[solverIndex];
+
+                sLedger.balance += partyLedger.balance;
+                sLedger.contributed += partyLedger.contributed;
+                sLedger.requested += partyLedger.requested;
+
+                ledgers[solverIndex] = sLedger;
+            }
+        } 
+        
+
+        if (solverFrom == bundler) {
+            uint256 bundlerIndex = uint256(Party.Bundler);
+            Ledger memory partyLedger = ledgers[bundlerIndex];
+
+            // CASE: Invalid combination (solver = bundler = user | dapp)
+            if (uint256(partyLedger.proxy) > uint256(Party.Solver)) {
+                return false;
+            }
+
+            // CASE: ledger is finalized or balancing
+            if (uint256(partyLedger.status) > uint256(LedgerStatus.Borrowing)) {
+                return false;
+            }
+
+            // CASE: proxy is solver or builder
+            // Pass, and check builder proxy next
+
+            // CASE: no proxy
+            if (uint256(partyLedger.proxy) == bundlerIndex) {
+                // Bundler is always active, so no need to mark. 
+
+                partyLedger.status = LedgerStatus.Proxy;
+                partyLedger.proxy = Party.Solver;
+                // Note: don't overwrite the stored values - we may need to undo the proxy if solver fails
+                ledgers[bundlerIndex] = partyLedger; 
+
+                // Solver inherits the requests and contributions of their alter ego
+                uint256 solverIndex = uint256(Party.Solver);
+                Ledger memory sLedger = ledgers[solverIndex];
+
+                sLedger.balance += partyLedger.balance;
+                sLedger.contributed += partyLedger.contributed;
+                sLedger.requested += partyLedger.requested;
+
+                ledgers[solverIndex] = sLedger;
+            }
+        }
+   
+        return true;
+    }
+
+    function updateSolverProxy(address solverFrom, address bundler, bool solverSuccessful) external {
+        // Note that the Solver can't be the User or the DApp - those combinations are blocked in the ExecutionEnvironment. 
+        
+        if (solverFrom == block.coinbase && block.coinbase != bundler) {
+
+            uint256 builderIndex = uint256(Party.Builder);
+            uint256 solverIndex = uint256(Party.Solver);
+
+            // Solver inherited the requests and contributions of their alter ego
+            Ledger memory partyLedger = ledgers[builderIndex];
+            Ledger memory sLedger = ledgers[solverIndex];
+            
+            if (solverSuccessful) {
+            // CASE: Delete the balances on the older ledger
+            // TODO: Pretty sure we can skip this since it gets ignored and deleted later
+                partyLedger.balance = 0;
+                partyLedger.contributed = 0;
+                partyLedger.requested = 0;
+
+                ledgers[builderIndex] = partyLedger; // Proxy status stays
+                
+            } else {
+            // CASE: Undo the balance adjustments for the next solver
+                sLedger.balance -= partyLedger.balance;
+                sLedger.contributed -= partyLedger.contributed;
+                sLedger.requested -= partyLedger.requested;
+
+                ledgers[solverIndex] = sLedger;
+
+                partyLedger.proxy = Party.Builder;
+                partyLedger.status = LedgerStatus.Active;
+
+                ledgers[builderIndex] = partyLedger;
+            }
+        }
+
+        if (solverFrom == bundler) {
+           
+            uint256 bundlerIndex = uint256(Party.Bundler);
+            uint256 solverIndex = uint256(Party.Solver);
+
+            // Solver inherited the requests and contributions of their alter ego
+            Ledger memory partyLedger = ledgers[bundlerIndex];
+            Ledger memory sLedger = ledgers[solverIndex];
+            
+            if (solverSuccessful) {
+            // CASE: Delete the balances on the older ledger
+            // TODO: Pretty sure we can skip this since it gets ignored and deleted later
+                partyLedger.balance = 0;
+                partyLedger.contributed = 0;
+                partyLedger.requested = 0;
+
+                ledgers[bundlerIndex] = partyLedger; // Proxy status stays
+                
+            } else {
+            // CASE: Undo the balance adjustments for the next solver
+                sLedger.balance -= partyLedger.balance;
+                sLedger.contributed -= partyLedger.contributed;
+                sLedger.requested -= partyLedger.requested;
+
+                ledgers[solverIndex] = sLedger;
+
+                partyLedger.proxy = Party.Bundler;
+                partyLedger.status = LedgerStatus.Active;
+                
+                ledgers[bundlerIndex] = partyLedger;
+            }
+        }
+    }
+
+    function finalize(Party party, address partyAddress) external returns (bool) {
+        if(!_validParty(msg.sender, party)) revert InvalidEnvironment();
+        if(party == Party.Solver) revert SolverMustReconcile();
+
+        uint256 pIndex = uint256(party);
+        Ledger memory partyLedger = ledgers[pIndex];
+
+        if (partyLedger.status == LedgerStatus.Finalized) return false;
+        
+        if (partyLedger.contributed + partyLedger.requested < 0) return false;
+
+        uint256 grossBalance = uint256(_escrowAccountData[partyAddress].balance);
+
+        if (int64(uint64(grossBalance / tx.gasprice)) + partyLedger.balance - 1 < 0) return false;
+        
+        partyLedger.status = LedgerStatus.Finalized;
+        ledgers[pIndex] = partyLedger;
+
+        return true;
+    }
+
+    function reconcile(address environment, address searcherFrom, uint256 maxApprovedGasSpend) external payable returns (bool) {
+        // NOTE: approvedAmount is the amount of the solver's atlETH that the solver is allowing
+        // to be used to cover what they owe.  This will be subtracted later - tx will revert here if there isn't enough. 
+        if (!_validParty(environment, Party.Solver)) {
+            return false;
+        }
+
+        uint256 partyIndex = uint256(Party.Solver);
+
+        Ledger memory partyLedger = ledgers[partyIndex];
+        if (partyLedger.status == LedgerStatus.Finalized) {
+            return false;
+        }
+
+        if (msg.value != 0) {
+            int64 amount = int64(uint64((msg.value) / tx.gasprice));
+            partyLedger.balance += amount;
+        }
+
+        if (maxApprovedGasSpend != 0) {
+            uint256 solverSurplusBalance = uint256(_escrowAccountData[searcherFrom].balance) - (EscrowBits.SOLVER_GAS_LIMIT * tx.gasprice + 1);
+            maxApprovedGasSpend = maxApprovedGasSpend > solverSurplusBalance ? solverSurplusBalance : maxApprovedGasSpend;
+
+            int64 gasAllowance = int64(uint64(maxApprovedGasSpend / tx.gasprice));
+
+            if (partyLedger.balance < 0) {
+                if (gasAllowance < partyLedger.balance) {
+                    return false;
+                }
+                gasAllowance += partyLedger.balance; // note that .balance is a negative number so this is a subtraction
+            }
+
+            partyLedger.contributed += gasAllowance; // note that surplus .contributed is refunded to the party
+            partyLedger.balance -= gasAllowance;
+        }
+
+        if (partyLedger.contributed < 0) {
+            return false;
+        }
+        
+        partyLedger.status = LedgerStatus.Finalized; // no additional requests can be made to this party
+        ledgers[partyIndex] = partyLedger;
+        return true;
+    }
+
+    // ---------------------------------------
+    //              INTERNAL HELPERS
+    // ---------------------------------------
+
+    function _contributeTo(Party donor, Party recipient, uint256 amt) internal {
+
+        (Ledger memory donorLedger, uint256 donorIndex) = _getLedger(donor);
+        if(donorLedger.status == LedgerStatus.Finalized) revert LedgerFinalized(5);
+
+        (Ledger memory recipientLedger, uint256 recipientIndex) = _getLedger(recipient);
+        if(recipientLedger.status == LedgerStatus.Finalized) revert LedgerFinalized(6);
+
+        int64 amount = int64(uint64(amt / tx.gasprice));
+
+        donorLedger.balance -= amount;
+        donorLedger.contributed += amount;
+        recipientLedger.requested += amount;
+
+        ledgers[donorIndex] = donorLedger;
+        ledgers[recipientIndex] = recipientLedger;
+    }
+
+    function _requestFrom(Party donor, Party recipient, uint256 amt) internal {
+        // TODO: different parties will be ineligible to request funds from once their phase is over.
+        // We need to add a phase check to verify this. 
+
+        (Ledger memory donorLedger, uint256 donorIndex) = _getLedger(donor);
+        if(donorLedger.status >= LedgerStatus.Balancing) revert LedgerBalancing(2);
+
+        (Ledger memory recipientLedger, uint256 recipientIndex) = _getLedger(recipient);
+        if(recipientLedger.status == LedgerStatus.Finalized) revert LedgerFinalized(4);
+
+        int64 amount = int64(uint64(amt / tx.gasprice));
+
+        donorLedger.contributed -= amount;
+        recipientLedger.requested -= amount;
+
+        ledgers[donorIndex] = donorLedger;
+        ledgers[recipientIndex] = recipientLedger;
     }
 
     function _loadLedgers(uint256 activeParties) 
@@ -682,6 +902,8 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
         return true;
     }
 
+    
+
     function _validParties(address environment, Party partyOne, Party partyTwo) internal returns (bool valid) {
         Lock memory mLock = lock;
         if (mLock.activeEnvironment != environment) {
@@ -711,231 +933,10 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
 
         if (partyLedger.status == LedgerStatus.Inactive) partyLedger.status = LedgerStatus.Active;
     }
-
-    function checkSolverProxy(address solverFrom, address bundler) external returns (bool validSolver) {
-        // Note that the Solver can't be the User or the DApp - those combinations are blocked in the ExecutionEnvironment. 
-
-        if (solverFrom == block.coinbase) {
-            uint256 builderIndex = uint256(Party.Builder);
-            Ledger memory partyLedger = ledgers[builderIndex];
-
-            // CASE: Invalid combination (solver = coinbase = user | dapp)
-            if (uint256(partyLedger.proxy) > uint256(Party.Solver)) {
-                return false;
-            }
-
-            // CASE: ledger is finalized or balancing
-            if (uint256(partyLedger.status) > uint256(LedgerStatus.Borrowing)) {
-                return false;
-            }
-
-            // CASE: proxy is solver or builder
-            // Pass, and check builder proxy next
-
-            // CASE: no proxy yet, so make one
-            if (uint256(partyLedger.proxy) == builderIndex) {
-                uint256 activeParties = _getActiveParties();
-                if (activeParties.isInactive(Party.Builder)) {
-                    _saveActiveParties(activeParties.markActive(Party.Builder));
-                }
-
-                partyLedger.status = LedgerStatus.Proxy;
-                partyLedger.proxy = Party.Solver;
-                // Note: don't overwrite the stored values - we may need to undo the proxy if solver fails
-                ledgers[builderIndex] = partyLedger; 
-
-                // Solver inherits the requests and contributions of their alter ego
-                uint256 solverIndex = uint256(Party.Solver);
-                Ledger memory sLedger = ledgers[solverIndex];
-
-                sLedger.balance += partyLedger.balance;
-                sLedger.contributed += partyLedger.contributed;
-                sLedger.requested += partyLedger.requested;
-
-                ledgers[solverIndex] = sLedger;
-            }
-        } 
-        
-
-        if (solverFrom == bundler) {
-            uint256 bundlerIndex = uint256(Party.Bundler);
-            Ledger memory partyLedger = ledgers[bundlerIndex];
-
-            // CASE: Invalid combination (solver = bundler = user | dapp)
-            if (uint256(partyLedger.proxy) > uint256(Party.Solver)) {
-                return false;
-            }
-
-            // CASE: ledger is finalized or balancing
-            if (uint256(partyLedger.status) > uint256(LedgerStatus.Borrowing)) {
-                return false;
-            }
-
-            // CASE: proxy is solver or builder
-            // Pass, and check builder proxy next
-
-            // CASE: no proxy
-            if (uint256(partyLedger.proxy) == bundlerIndex) {
-                // Bundler is always active, so no need to mark. 
-
-                partyLedger.status = LedgerStatus.Proxy;
-                partyLedger.proxy = Party.Solver;
-                // Note: don't overwrite the stored values - we may need to undo the proxy if solver fails
-                ledgers[bundlerIndex] = partyLedger; 
-
-                // Solver inherits the requests and contributions of their alter ego
-                uint256 solverIndex = uint256(Party.Solver);
-                Ledger memory sLedger = ledgers[solverIndex];
-
-                sLedger.balance += partyLedger.balance;
-                sLedger.contributed += partyLedger.contributed;
-                sLedger.requested += partyLedger.requested;
-
-                ledgers[solverIndex] = sLedger;
-            }
-        }
-   
-        return true;
-    }
-
-    function updateSolverProxy(address solverFrom, address bundler, bool solverSuccessful) external {
-        // Note that the Solver can't be the User or the DApp - those combinations are blocked in the ExecutionEnvironment. 
-        
-        if (solverFrom == block.coinbase && block.coinbase != bundler) {
-
-            uint256 builderIndex = uint256(Party.Builder);
-            uint256 solverIndex = uint256(Party.Solver);
-
-            // Solver inherited the requests and contributions of their alter ego
-            Ledger memory partyLedger = ledgers[builderIndex];
-            Ledger memory sLedger = ledgers[solverIndex];
-            
-            if (solverSuccessful) {
-            // CASE: Delete the balances on the older ledger
-            // TODO: Pretty sure we can skip this since it gets ignored and deleted later
-                partyLedger.balance = 0;
-                partyLedger.contributed = 0;
-                partyLedger.requested = 0;
-
-                ledgers[builderIndex] = partyLedger; // Proxy status stays
-                
-            } else {
-            // CASE: Undo the balance adjustments for the next solver
-                sLedger.balance -= partyLedger.balance;
-                sLedger.contributed -= partyLedger.contributed;
-                sLedger.requested -= partyLedger.requested;
-
-                ledgers[solverIndex] = sLedger;
-
-                partyLedger.proxy = Party.Builder;
-                partyLedger.status = LedgerStatus.Active;
-
-                ledgers[builderIndex] = partyLedger;
-            }
-        }
-
-        if (solverFrom == bundler) {
-           
-            uint256 bundlerIndex = uint256(Party.Bundler);
-            uint256 solverIndex = uint256(Party.Solver);
-
-            // Solver inherited the requests and contributions of their alter ego
-            Ledger memory partyLedger = ledgers[bundlerIndex];
-            Ledger memory sLedger = ledgers[solverIndex];
-            
-            if (solverSuccessful) {
-            // CASE: Delete the balances on the older ledger
-            // TODO: Pretty sure we can skip this since it gets ignored and deleted later
-                partyLedger.balance = 0;
-                partyLedger.contributed = 0;
-                partyLedger.requested = 0;
-
-                ledgers[bundlerIndex] = partyLedger; // Proxy status stays
-                
-            } else {
-            // CASE: Undo the balance adjustments for the next solver
-                sLedger.balance -= partyLedger.balance;
-                sLedger.contributed -= partyLedger.contributed;
-                sLedger.requested -= partyLedger.requested;
-
-                ledgers[solverIndex] = sLedger;
-
-                partyLedger.proxy = Party.Bundler;
-                partyLedger.status = LedgerStatus.Active;
-                
-                ledgers[bundlerIndex] = partyLedger;
-            }
-        }
-    }
-
-    function finalize(Party party, address partyAddress) external returns (bool) {
-        if(!_validParty(msg.sender, party)) revert InvalidEnvironment();
-        if(party == Party.Solver) revert SolverMustReconcile();
-
-        uint256 pIndex = uint256(party);
-        Ledger memory partyLedger = ledgers[pIndex];
-
-        if (partyLedger.status == LedgerStatus.Finalized) return false;
-        
-        if (partyLedger.contributed + partyLedger.requested < 0) return false;
-
-        uint256 grossBalance = uint256(_escrowAccountData[partyAddress].balance);
-
-        if (int64(uint64(grossBalance / tx.gasprice)) + partyLedger.balance - 1 < 0) return false;
-        
-        partyLedger.status = LedgerStatus.Finalized;
-        ledgers[pIndex] = partyLedger;
-
-        return true;
-    }
-
-    function reconcile(address environment, address searcherFrom, uint256 maxApprovedGasSpend) external payable returns (bool) {
-        // NOTE: approvedAmount is the amount of the solver's atlETH that the solver is allowing
-        // to be used to cover what they owe.  This will be subtracted later - tx will revert here if there isn't enough. 
-        if (!_validParty(environment, Party.Solver)) {
-            return false;
-        }
-
-        uint256 partyIndex = uint256(Party.Solver);
-
-        Ledger memory partyLedger = ledgers[partyIndex];
-        if (partyLedger.status == LedgerStatus.Finalized) {
-            return false;
-        }
-
-        if (msg.value != 0) {
-            int64 amount = int64(uint64((msg.value) / tx.gasprice));
-            partyLedger.balance += amount;
-        }
-
-        if (maxApprovedGasSpend != 0) {
-            uint256 solverSurplusBalance = uint256(_escrowAccountData[searcherFrom].balance) - (EscrowBits.SOLVER_GAS_LIMIT * tx.gasprice + 1);
-            maxApprovedGasSpend = maxApprovedGasSpend > solverSurplusBalance ? solverSurplusBalance : maxApprovedGasSpend;
-
-            int64 gasAllowance = int64(uint64(maxApprovedGasSpend / tx.gasprice));
-
-            if (partyLedger.balance < 0) {
-                if (gasAllowance < partyLedger.balance) {
-                    return false;
-                }
-                gasAllowance += partyLedger.balance; // note that .balance is a negative number so this is a subtraction
-            }
-
-            partyLedger.contributed += gasAllowance; // note that surplus .contributed is refunded to the party
-            partyLedger.balance -= gasAllowance;
-        }
-
-        if (partyLedger.contributed < 0) {
-            return false;
-        }
-        
-        partyLedger.status = LedgerStatus.Finalized; // no additional requests can be made to this party
-        ledgers[partyIndex] = partyLedger;
-        return true;
-    }
-
-
-    // Requirements ported from SafetyLocks:
+    
+    // ---------------------------------------
+    //            MISC DEPENDENCIES
+    // ---------------------------------------
 
     function _getActiveParties() internal view returns (uint256 activeParties) {
         Lock memory mLock = lock;

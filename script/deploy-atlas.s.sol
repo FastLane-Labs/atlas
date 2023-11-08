@@ -59,7 +59,8 @@ contract DeployAtlasScript is DeployBaseScript {
             _escrowDuration: 64,
             _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
-            _simulator: address(simulator)
+            _simulator: address(simulator),
+            _atlas: address(atlas)
         });
 
         vm.stopBroadcast();
@@ -118,7 +119,8 @@ contract DeployAtlasAndSwapIntentDAppControlScript is DeployBaseScript {
             _escrowDuration: 64,
             _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
-            _simulator: address(simulator)
+            _simulator: address(simulator),
+            _atlas: address(atlas)
         });
 
         // Deploy the SwapIntent DAppControl contract
@@ -187,7 +189,8 @@ contract DeployAtlasAndSwapIntentDAppControlAndTxBuilderScript is DeployBaseScri
             _escrowDuration: 64,
             _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
-            _simulator: address(simulator)
+            _simulator: address(simulator),
+            _atlas: address(atlas)
         });
 
         // Deploy the SwapIntent DAppControl contract
