@@ -11,6 +11,8 @@ import "../types/LockTypes.sol";
 
 import "forge-std/Test.sol"; //TODO remove
 
+// TODO check for address(this) or other assumptions from when inside Atlas inheritance
+
 contract GasAccountingLib is Storage, FastLaneErrorsEvents {
     using PartyMath for Party;
     using PartyMath for uint256;
@@ -23,6 +25,22 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
         address _simulator
     ) Storage(_escrowDuration, _factory, _verification, address(this), _simulator) {}
 
+    function deposit(Party party) external payable {
+        if(!_validParty(msg.sender, party)) revert InvalidEnvironment();
+
+        int64 amount = int64(uint64((msg.value) / tx.gasprice));
+
+        uint256 pIndex = uint256(party);
+        Ledger memory partyLedger = ledgers[pIndex];
+
+        if(partyLedger.status == LedgerStatus.Finalized) revert LedgerFinalized(8);
+
+        if (partyLedger.status == LedgerStatus.Inactive) partyLedger.status = LedgerStatus.Active;
+
+        partyLedger.balance += amount;
+        
+        ledgers[pIndex] = partyLedger;
+    }
 
     // NOTE: donations are simply deposits that have a different msg.sender than receiving party
     function _deposit(Party party, uint256 amt) internal returns (uint256 balanceOwed) {
@@ -40,8 +58,87 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
         ledgers[partyIndex] = partyLedger;
     }
 
+    // NOTE: DAPPs can gain malicious access to these funcs if they want to, but attacks beyond
+    // the approved amounts will only lead to a revert.  
+    // Bundlers must make sure the DApp hasn't maliciously upgraded their contract to avoid wasting gas. 
+    function contributeTo(Party donor, Party recipient, uint256 amt) external {
+        if(!_validParties(msg.sender, donor, recipient)) revert InvalidEnvironment();
+        _contributeTo(donor, recipient, amt);
+    }
 
-    function _borrow(Party party, uint256 amt) internal {
+    function _contributeTo(Party donor, Party recipient, uint256 amt) internal {
+
+        (Ledger memory donorLedger, uint256 donorIndex) = _getLedger(donor);
+        if(donorLedger.status == LedgerStatus.Finalized) revert LedgerFinalized(5);
+
+        (Ledger memory recipientLedger, uint256 recipientIndex) = _getLedger(recipient);
+        if(recipientLedger.status == LedgerStatus.Finalized) revert LedgerFinalized(6);
+
+        int64 amount = int64(uint64(amt / tx.gasprice));
+
+        donorLedger.balance -= amount;
+        donorLedger.contributed += amount;
+        recipientLedger.requested += amount;
+
+        ledgers[donorIndex] = donorLedger;
+        ledgers[recipientIndex] = recipientLedger;
+    }
+
+
+    function contribute(Party recipient) external payable {
+        if(!_validParty(msg.sender, recipient)) revert InvalidEnvironment();
+
+        int64 amount = int64(uint64((msg.value) / tx.gasprice));
+
+        (Ledger memory partyLedger, uint256 pIndex) = _getLedger(recipient);
+
+        if(partyLedger.status == LedgerStatus.Finalized) revert LedgerFinalized(7);
+
+        if (partyLedger.status == LedgerStatus.Inactive) partyLedger.status = LedgerStatus.Active;
+
+        if (partyLedger.requested < 0) {
+            // CASE: still in deficit
+            if (partyLedger.requested + amount < 0) {
+                partyLedger.requested += amount;
+                amount = 0;
+            
+            // CASE: surplus
+            } else {
+                amount += partyLedger.requested;
+                partyLedger.requested = 0;
+            }
+        }
+
+        if (amount != 0) partyLedger.contributed += amount;
+        
+        ledgers[pIndex] = partyLedger;
+    }
+
+    function requestFrom(Party donor, Party recipient, uint256 amt) external {
+        if(!_validParties(msg.sender, donor, recipient)) revert InvalidEnvironment();
+        _requestFrom(donor, recipient, amt);
+    }
+
+    function _requestFrom(Party donor, Party recipient, uint256 amt) internal {
+        // TODO: different parties will be ineligible to request funds from once their phase is over.
+        // We need to add a phase check to verify this. 
+
+        (Ledger memory donorLedger, uint256 donorIndex) = _getLedger(donor);
+        if(donorLedger.status >= LedgerStatus.Balancing) revert LedgerBalancing(2);
+
+        (Ledger memory recipientLedger, uint256 recipientIndex) = _getLedger(recipient);
+        if(recipientLedger.status == LedgerStatus.Finalized) revert LedgerFinalized(4);
+
+        int64 amount = int64(uint64(amt / tx.gasprice));
+
+        donorLedger.contributed -= amount;
+        recipientLedger.requested -= amount;
+
+        ledgers[donorIndex] = donorLedger;
+        ledgers[recipientIndex] = recipientLedger;
+    }
+
+    function borrow(Party party, uint256 amt) external {
         // Note that for Solver borrows, the repayment check happens *inside* the try/catch. 
        
         (Ledger memory partyLedger, uint256 partyIndex) = _getLedger(party);
@@ -54,6 +151,7 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
         
         ledgers[partyIndex] = partyLedger;
     }
+
 
     function _tradeCorrection(Party party, uint256 amt) internal {
         // Note that for Solver borrows, the repayment check happens *inside* the try/catch.
@@ -124,42 +222,9 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
         revert InsufficientFunds();
     }
 
-    function _requestFrom(Party donor, Party recipient, uint256 amt) internal {
-        // TODO: different parties will be ineligible to request funds from once their phase is over.
-        // We need to add a phase check to verify this. 
 
-        (Ledger memory donorLedger, uint256 donorIndex) = _getLedger(donor);
-        if(donorLedger.status >= LedgerStatus.Balancing) revert LedgerBalancing(2);
 
-        (Ledger memory recipientLedger, uint256 recipientIndex) = _getLedger(recipient);
-        if(recipientLedger.status == LedgerStatus.Finalized) revert LedgerFinalized(4);
-
-        int64 amount = int64(uint64(amt / tx.gasprice));
-
-        donorLedger.contributed -= amount;
-        recipientLedger.requested -= amount;
-
-        ledgers[donorIndex] = donorLedger;
-        ledgers[recipientIndex] = recipientLedger;
-    }
-
-    function _contributeTo(Party donor, Party recipient, uint256 amt) internal {
-
-        (Ledger memory donorLedger, uint256 donorIndex) = _getLedger(donor);
-        if(donorLedger.status == LedgerStatus.Finalized) revert LedgerFinalized(5);
-
-        (Ledger memory recipientLedger, uint256 recipientIndex) = _getLedger(recipient);
-        if(recipientLedger.status == LedgerStatus.Finalized) revert LedgerFinalized(6);
-
-        int64 amount = int64(uint64(amt / tx.gasprice));
-
-        donorLedger.balance -= amount;
-        donorLedger.contributed += amount;
-        recipientLedger.requested += amount;
-
-        ledgers[donorIndex] = donorLedger;
-        ledgers[recipientIndex] = recipientLedger;
-    }
+    
 
     // Returns true if Solver status is Finalized and the caller (Execution Environment) is in surplus
     function validateBalances() external view returns (bool valid) {
@@ -647,7 +712,7 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
         if (partyLedger.status == LedgerStatus.Inactive) partyLedger.status = LedgerStatus.Active;
     }
 
-    function _checkSolverProxy(address solverFrom, address bundler) internal returns (bool validSolver) {
+    function checkSolverProxy(address solverFrom, address bundler) external returns (bool validSolver) {
         // Note that the Solver can't be the User or the DApp - those combinations are blocked in the ExecutionEnvironment. 
 
         if (solverFrom == block.coinbase) {
@@ -733,7 +798,7 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
         return true;
     }
 
-    function _updateSolverProxy(address solverFrom, address bundler, bool solverSuccessful) internal {
+    function updateSolverProxy(address solverFrom, address bundler, bool solverSuccessful) external {
         // Note that the Solver can't be the User or the DApp - those combinations are blocked in the ExecutionEnvironment. 
         
         if (solverFrom == block.coinbase && block.coinbase != bundler) {
@@ -801,65 +866,6 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
                 ledgers[bundlerIndex] = partyLedger;
             }
         }
-    }
-
-    function contribute(Party recipient) external payable {
-        if(!_validParty(msg.sender, recipient)) revert InvalidEnvironment();
-
-        int64 amount = int64(uint64((msg.value) / tx.gasprice));
-
-        (Ledger memory partyLedger, uint256 pIndex) = _getLedger(recipient);
-
-        if(partyLedger.status == LedgerStatus.Finalized) revert LedgerFinalized(7);
-
-        if (partyLedger.status == LedgerStatus.Inactive) partyLedger.status = LedgerStatus.Active;
-
-        if (partyLedger.requested < 0) {
-            // CASE: still in deficit
-            if (partyLedger.requested + amount < 0) {
-                partyLedger.requested += amount;
-                amount = 0;
-            
-            // CASE: surplus
-            } else {
-                amount += partyLedger.requested;
-                partyLedger.requested = 0;
-            }
-        }
-
-        if (amount != 0) partyLedger.contributed += amount;
-        
-        ledgers[pIndex] = partyLedger;
-    }
-
-    function deposit(Party party) external payable {
-        if(!_validParty(msg.sender, party)) revert InvalidEnvironment();
-
-        int64 amount = int64(uint64((msg.value) / tx.gasprice));
-
-        uint256 pIndex = uint256(party);
-        Ledger memory partyLedger = ledgers[pIndex];
-
-        if(partyLedger.status == LedgerStatus.Finalized) revert LedgerFinalized(8);
-
-        if (partyLedger.status == LedgerStatus.Inactive) partyLedger.status = LedgerStatus.Active;
-
-        partyLedger.balance += amount;
-        
-        ledgers[pIndex] = partyLedger;
-    }
-
-    // NOTE: DAPPs can gain malicious access to these funcs if they want to, but attacks beyond
-    // the approved amounts will only lead to a revert.  
-    // Bundlers must make sure the DApp hasn't maliciously upgraded their contract to avoid wasting gas. 
-    function contributeTo(Party donor, Party recipient, uint256 amt) external {
-        if(!_validParties(msg.sender, donor, recipient)) revert InvalidEnvironment();
-        _contributeTo(donor, recipient, amt);
-    }
-
-    function requestFrom(Party donor, Party recipient, uint256 amt) external {
-        if(!_validParties(msg.sender, donor, recipient)) revert InvalidEnvironment();
-        _requestFrom(donor, recipient, amt);
     }
 
     function finalize(Party party, address partyAddress) external returns (bool) {
