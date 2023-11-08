@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.18;
+pragma solidity 0.8.21;
 
 interface IAtlasFactory {
     function createExecutionEnvironment(address account, address dAppControl) external returns (address executionEnvironment);
