@@ -7,7 +7,6 @@ import "../types/EscrowTypes.sol";
 import {Permit69} from "../common/Permit69.sol";
 
 // TODO split out events and errors to share with AtlasEscrow
-// TODO all modifiers should be internal fns for contract size savings
 
 /// @notice Modified Solmate ERC20 with some Atlas-specific modifications.
 /// @author FastLane Labs
@@ -37,15 +36,7 @@ abstract contract AtlETH is Permit69 {
                                 ATLETH
     //////////////////////////////////////////////////////////////*/
 
-    // Custom checks for atlETH transfer functions.
-    // Interactions (transfers, withdrawals) are allowed only after the owner last interaction
-    // with Atlas was at least `escrowDuration` blocks ago.
-    modifier tokenTransferChecks(address account) {
-        if(block.number <= _escrowAccountData[account].lastAccessed + ESCROW_DURATION) {
-            revert EscrowLockActive();
-        }
-        _;
-    }
+
 
     function balanceOf(address account) public view returns (uint256) {
         return _escrowAccountData[account].balance;
@@ -60,12 +51,16 @@ abstract contract AtlETH is Permit69 {
     }
 
     // Deposit ETH and get atlETH in return.
-    function deposit() external payable onlyWhenUnlocked {
+    function deposit() external payable {
+        _checkIfUnlocked();
         _mint(msg.sender, msg.value);
     }
 
     // Redeem atlETH for ETH.
-    function withdraw(uint256 amount) external onlyWhenUnlocked tokenTransferChecks(msg.sender) {
+    function withdraw(uint256 amount) external {
+        _checkIfUnlocked();
+        _checkTransfersAllowed(msg.sender);
+
         if (_escrowAccountData[msg.sender].balance < amount) revert InsufficientBalance();
         _burn(msg.sender, amount);
         SafeTransferLib.safeTransferETH(msg.sender, amount);
@@ -81,7 +76,9 @@ abstract contract AtlETH is Permit69 {
         return true;
     }
 
-    function transfer(address to, uint256 amount) public tokenTransferChecks(msg.sender) returns (bool) {
+    function transfer(address to, uint256 amount) public returns (bool) {
+        _checkTransfersAllowed(msg.sender);
+
         _escrowAccountData[msg.sender].balance -= uint128(amount);
         // Cannot overflow because the sum of all user
         // balances can't exceed the max uint256 value.
@@ -92,7 +89,9 @@ abstract contract AtlETH is Permit69 {
         return true;
     }
 
-    function transferFrom(address from, address to, uint256 amount) public tokenTransferChecks(from) returns (bool) {
+    function transferFrom(address from, address to, uint256 amount) public returns (bool) {
+        _checkTransfersAllowed(from);
+
         uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
         if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
         _escrowAccountData[from].balance -= uint128(amount);
@@ -155,6 +154,15 @@ abstract contract AtlETH is Permit69 {
                 address(this)
             )
         );
+    }
+
+    // Custom checks for atlETH transfer functions.
+    // Interactions (transfers, withdrawals) are allowed only after the owner last interaction
+    // with Atlas was at least `escrowDuration` blocks ago.
+    function _checkTransfersAllowed(address account) internal view {
+        if(block.number <= _escrowAccountData[account].lastAccessed + ESCROW_DURATION) {
+            revert EscrowLockActive();
+        }
     }
 
     /*//////////////////////////////////////////////////////////////

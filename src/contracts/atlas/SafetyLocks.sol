@@ -31,7 +31,8 @@ abstract contract SafetyLocks is Storage, FastLaneErrorsEvents {
         address _simulator
     ) Storage(_escrowDuration, _factory, _verification, _gasAccLib, _simulator) {}
 
-    function _initializeEscrowLock(UserOperation calldata userOp, address executionEnvironment, address bundler, uint256 gasLimit) onlyWhenUnlocked internal {
+    function _initializeEscrowLock(UserOperation calldata userOp, address executionEnvironment, address bundler, uint256 gasLimit) internal {
+        _checkIfUnlocked();
 
         uint256 activeParties;
         activeParties = activeParties.markActive(Party.Bundler);
@@ -149,9 +150,8 @@ abstract contract SafetyLocks is Storage, FastLaneErrorsEvents {
         lock.activeParties = uint16(activeParties);
     }
 
-    modifier onlyWhenUnlocked() {
+    function _checkIfUnlocked() internal view {
         if(lock.activeEnvironment != UNLOCKED) revert AlreadyInitialized();
-        _;
     }
 
     function activeEnvironment() external view returns (address) {
