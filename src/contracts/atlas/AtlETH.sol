@@ -29,8 +29,9 @@ abstract contract AtlETH is Permit69 {
         address _factory,
         address _verification,
         address _gasAccLib,
+        address _safetyLocksLib,
         address _simulator
-    ) Permit69(_escrowDuration, _factory, _verification, _gasAccLib, _simulator) {}
+    ) Permit69(_escrowDuration, _factory, _verification, _gasAccLib, _safetyLocksLib, _simulator) {}
 
     /*//////////////////////////////////////////////////////////////
                                 ATLETH
@@ -42,12 +43,12 @@ abstract contract AtlETH is Permit69 {
         return _escrowAccountData[account].balance;
     }
 
-    function nextAccountNonce(address account) external view returns (uint256 nextNonce) {
-        nextNonce = uint256(_escrowAccountData[account].nonce) + 1;
+    function nextAccountNonce(address account) external view returns (uint256) {
+        return uint256(_escrowAccountData[account].nonce) + 1;
     }
 
-    function accountLastActiveBlock(address account) external view returns (uint256 lastBlock) {
-        lastBlock = uint256(_escrowAccountData[account].lastAccessed);
+    function accountLastActiveBlock(address account) external view returns (uint256) {
+        return uint256(_escrowAccountData[account].lastAccessed);
     }
 
     // Deposit ETH and get atlETH in return.

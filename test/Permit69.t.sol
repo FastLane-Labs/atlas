@@ -42,7 +42,7 @@ contract Permit69Test is BaseTest {
             callDepth: 0
         });
 
-        mockAtlas = new MockAtlasForPermit69Tests(10,address(0),address(0), address(0), address(0));
+        mockAtlas = new MockAtlasForPermit69Tests(10,address(0),address(0), address(0), address(0), address(0));
         mockAtlas.setEscrowKey(escrowKey);
         mockAtlas.setEnvironment(mockExecutionEnvAddress);
 
@@ -252,8 +252,9 @@ contract MockAtlasForPermit69Tests is Permit69 {
         address _factory,
         address _verification,
         address _gasAccLib,
+        address _safetyLocksLib,
         address _simulator
-    ) Permit69(_escrowDuration, _factory, _verification, _gasAccLib, _simulator) {}
+    ) Permit69(_escrowDuration, _factory, _verification, _gasAccLib, _safetyLocksLib, _simulator) {}
     
     // Declared in SafetyLocks.sol in the canonical Atlas system
     // The only property relevant to testing Permit69 is _escrowKey.lockState (bitwise uint16)

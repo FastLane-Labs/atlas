@@ -17,8 +17,9 @@ abstract contract GasAccounting is SafetyLocks {
         address _factory,
         address _verification,
         address _gasAccLib,
+        address _safetyLocksLib,
         address _simulator
-    ) SafetyLocks(_escrowDuration, _factory, _verification, _gasAccLib, _simulator) {}
+    ) SafetyLocks(_escrowDuration, _factory, _verification, _gasAccLib, _safetyLocksLib, _simulator) {}
 
     // ---------------------------------------
     //          EXTERNAL FUNCTIONS

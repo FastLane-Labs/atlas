@@ -10,6 +10,7 @@ import {Atlas} from "src/contracts/atlas/Atlas.sol";
 import {AtlasFactory} from "src/contracts/atlas/AtlasFactory.sol";
 import {AtlasVerification} from "src/contracts/atlas/AtlasVerification.sol";
 import {GasAccountingLib} from "src/contracts/atlas/GasAccountingLib.sol";
+import {SafetyLocksLib} from "src/contracts/atlas/SafetyLocksLib.sol";
 import {SwapIntentController} from "src/contracts/examples/intents-example/SwapIntent.sol";
 import {TxBuilder} from "src/contracts/helpers/TxBuilder.sol";
 import {Simulator} from "src/contracts/helpers/Simulator.sol";
@@ -20,6 +21,7 @@ contract DeployAtlasScript is DeployBaseScript {
     AtlasFactory public atlasFactory;
     AtlasVerification public atlasVerification;
     GasAccountingLib public gasAccountingLib;
+    SafetyLocksLib public safetyLocksLib;
     Simulator public simulator;
 
     function run() external {
@@ -40,6 +42,10 @@ contract DeployAtlasScript is DeployBaseScript {
             deployer,
             vm.getNonce(deployer) + 3
         );
+        address expectedSafetyLocksLibAddr = computeCreateAddress(
+            deployer,
+            vm.getNonce(deployer) + 4
+        );
 
         console.log("Deployer address: \t\t\t\t", deployer);
 
@@ -51,6 +57,7 @@ contract DeployAtlasScript is DeployBaseScript {
             _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
             _gasAccLib: expectedGasAccountingLibAddr,
+            _safetyLocksLib: expectedSafetyLocksLibAddr,
             _simulator: address(simulator)
         });
         atlasFactory = new AtlasFactory(address(atlas));
@@ -59,6 +66,15 @@ contract DeployAtlasScript is DeployBaseScript {
             _escrowDuration: 64,
             _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
+            _safetyLocksLib: expectedSafetyLocksLibAddr,
+            _simulator: address(simulator),
+            _atlas: address(atlas)
+        });
+        safetyLocksLib = new SafetyLocksLib({
+            _escrowDuration: 64,
+            _factory: expectedAtlasFactoryAddr,
+            _verification: expectedAtlasVerificationAddr,
+            _gasAccLib: expectedGasAccountingLibAddr,
             _simulator: address(simulator),
             _atlas: address(atlas)
         });
@@ -79,6 +95,7 @@ contract DeployAtlasAndSwapIntentDAppControlScript is DeployBaseScript {
     AtlasFactory public atlasFactory;
     AtlasVerification public atlasVerification;
     GasAccountingLib public gasAccountingLib;
+    SafetyLocksLib public safetyLocksLib;
     Simulator public simulator;
     SwapIntentController public swapIntentControl;
 
@@ -100,6 +117,10 @@ contract DeployAtlasAndSwapIntentDAppControlScript is DeployBaseScript {
             deployer,
             vm.getNonce(deployer) + 3
         );
+        address expectedSafetyLocksLibAddr = computeCreateAddress(
+            deployer,
+            vm.getNonce(deployer) + 4
+        );
 
         console.log("Deployer address: \t\t\t\t", deployer);
 
@@ -111,6 +132,7 @@ contract DeployAtlasAndSwapIntentDAppControlScript is DeployBaseScript {
             _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
             _gasAccLib: expectedGasAccountingLibAddr,
+            _safetyLocksLib: expectedSafetyLocksLibAddr,
             _simulator: address(simulator)
         });
         atlasFactory = new AtlasFactory(address(atlas));
@@ -119,6 +141,15 @@ contract DeployAtlasAndSwapIntentDAppControlScript is DeployBaseScript {
             _escrowDuration: 64,
             _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
+            _safetyLocksLib: expectedSafetyLocksLibAddr,
+            _simulator: address(simulator),
+            _atlas: address(atlas)
+        });
+        safetyLocksLib = new SafetyLocksLib({
+            _escrowDuration: 64,
+            _factory: expectedAtlasFactoryAddr,
+            _verification: expectedAtlasVerificationAddr,
+            _gasAccLib: expectedGasAccountingLibAddr,
             _simulator: address(simulator),
             _atlas: address(atlas)
         });
@@ -148,6 +179,7 @@ contract DeployAtlasAndSwapIntentDAppControlAndTxBuilderScript is DeployBaseScri
     AtlasFactory public atlasFactory;
     AtlasVerification public atlasVerification;
     GasAccountingLib public gasAccountingLib;
+    SafetyLocksLib public safetyLocksLib;
     Simulator public simulator;
     SwapIntentController public swapIntentControl;
     TxBuilder public txBuilder;
@@ -170,6 +202,10 @@ contract DeployAtlasAndSwapIntentDAppControlAndTxBuilderScript is DeployBaseScri
             deployer,
             vm.getNonce(deployer) + 3
         );
+        address expectedSafetyLocksLibAddr = computeCreateAddress(
+            deployer,
+            vm.getNonce(deployer) + 4
+        );
 
         console.log("Deployer address: \t\t\t\t", deployer);
 
@@ -181,6 +217,7 @@ contract DeployAtlasAndSwapIntentDAppControlAndTxBuilderScript is DeployBaseScri
             _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
             _gasAccLib: expectedGasAccountingLibAddr,
+            _safetyLocksLib: expectedSafetyLocksLibAddr,
             _simulator: address(simulator)
         });
         atlasFactory = new AtlasFactory(address(atlas));
@@ -189,6 +226,15 @@ contract DeployAtlasAndSwapIntentDAppControlAndTxBuilderScript is DeployBaseScri
             _escrowDuration: 64,
             _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
+            _safetyLocksLib: expectedSafetyLocksLibAddr,
+            _simulator: address(simulator),
+            _atlas: address(atlas)
+        });
+        safetyLocksLib = new SafetyLocksLib({
+            _escrowDuration: 64,
+            _factory: expectedAtlasFactoryAddr,
+            _verification: expectedAtlasVerificationAddr,
+            _gasAccLib: expectedGasAccountingLibAddr,
             _simulator: address(simulator),
             _atlas: address(atlas)
         });
