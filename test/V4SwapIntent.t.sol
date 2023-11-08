@@ -15,7 +15,7 @@ import {DAppOperation, DAppConfig} from "../src/contracts/types/DAppApprovalType
 import {V4SwapIntentController} from "../src/contracts/examples/intents-example/V4SwapIntent.sol";
 import {SolverBase} from "../src/contracts/solver/SolverBase.sol";
 
-import {PoolManager} from "v4-core/PoolManager.sol";
+import {PoolManager, IPoolManager, PoolKey, Currency, IHooks} from "v4-core/PoolManager.sol";
 
 contract V4SwapIntentTest is BaseTest {
     V4SwapIntentController public swapIntentController;
@@ -54,9 +54,21 @@ contract V4SwapIntentTest is BaseTest {
         // Deploy new poolamanger and create a DAI/WETH pool with no hooks
         poolManager = new PoolManager(30000000);
 
+        poolManager.initialize(PoolKey({
+            currency0: Currency.wrap(address(DAI)),
+            currency1: Currency.wrap(address(WETH)),
+            fee: 3000,
+            tickSpacing: 60,
+            hooks: IHooks(address(0))
+        }), 1823965582028705631020492031, new bytes(0));
+
         // Deposit ETH from Searcher signer to pay for searcher's gas 
         // vm.prank(solverOneEOA); 
         // atlas.deposit{value: 1e18}();
+    }
+
+    function testAtlasV4SwapIntentWithUniswapSolver() public {
+
     }
 
     // function testAtlasV4SwapIntentWithUniswapSolver() public {
@@ -177,34 +189,36 @@ contract V4SwapIntentTest is BaseTest {
 }
 
 contract UniswapV4IntentSolver is SolverBase {
-    IUniV2Router02 router = IUniV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
+    IPoolManager immutable poolManager;
 
-    constructor(address atlas) SolverBase(atlas, msg.sender) {}
-
-    function fulfillWithSwap(
-        SwapIntent calldata swapIntent,
-        address executionEnvironment
-    ) public onlySelf {
-        // Checks recieved expected tokens from Atlas on behalf of user to swap
-        require(ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells, "Did not receive enough tokenIn");
-
-        address[] memory path = new address[](2);
-        path[0] = swapIntent.tokenUserSells;
-        path[1] = swapIntent.tokenUserBuys;
-
-        // Attempt to sell all tokens for as many as possible of tokenUserBuys
-        ERC20(swapIntent.tokenUserSells).approve(address(router), swapIntent.amountUserSells);
-        router.swapExactTokensForTokens({
-            amountIn: swapIntent.amountUserSells,
-            amountOutMin: swapIntent.amountUserBuys, // will revert here if not enough to fulfill intent
-            path: path,
-            to: address(this),
-            deadline: block.timestamp
-        });
-
-        // Send min tokens back to user to fulfill intent, rest are profit for solver
-        ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
+    constructor(address atlas, IPoolManager manager) SolverBase(atlas, msg.sender) {
+        poolManager = manager;
     }
+
+    // function fulfillWithSwap(
+    //     SwapIntent calldata swapIntent,
+    //     address executionEnvironment
+    // ) public onlySelf {
+    //     // Checks recieved expected tokens from Atlas on behalf of user to swap
+    //     require(ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells, "Did not receive enough tokenIn");
+
+    //     address[] memory path = new address[](2);
+    //     path[0] = swapIntent.tokenUserSells;
+    //     path[1] = swapIntent.tokenUserBuys;
+
+    //     // Attempt to sell all tokens for as many as possible of tokenUserBuys
+    //     ERC20(swapIntent.tokenUserSells).approve(address(router), swapIntent.amountUserSells);
+    //     router.swapExactTokensForTokens({
+    //         amountIn: swapIntent.amountUserSells,
+    //         amountOutMin: swapIntent.amountUserBuys, // will revert here if not enough to fulfill intent
+    //         path: path,
+    //         to: address(this),
+    //         deadline: block.timestamp
+    //     });
+
+    //     // Send min tokens back to user to fulfill intent, rest are profit for solver
+    //     ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
+    // }
 
     // This ensures a function can only be called through atlasSolverCall
     // which includes security checks to work safely with Atlas
