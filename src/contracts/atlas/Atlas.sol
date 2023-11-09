@@ -34,8 +34,9 @@ contract Atlas is Escrow {
         address _factory,
         address _verification,
         address _gasAccLib,
+        address _safetyLocksLib,
         address _simulator
-    ) Escrow(_escrowDuration, _factory, _verification, _gasAccLib, _simulator) {}
+    ) Escrow(_escrowDuration, _factory, _verification, _gasAccLib, _safetyLocksLib, _simulator) {}
 
     function createExecutionEnvironment(address dAppControl) external returns (address executionEnvironment) {
         executionEnvironment = IAtlasFactory(FACTORY).createExecutionEnvironment(msg.sender, dAppControl);

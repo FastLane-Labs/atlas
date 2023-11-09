@@ -14,6 +14,7 @@ contract Storage {
     address public immutable FACTORY;
     address public immutable VERIFICATION;
     address public immutable GAS_ACC_LIB;
+    address public immutable SAFETY_LOCKS_LIB;
     address public immutable SIMULATOR;
 
     // AtlETH ERC-20 constants
@@ -45,12 +46,14 @@ contract Storage {
         address _factory,
         address _verification,
         address _gasAccLib,
+        address _safetyLocksLib,
         address _simulator
     ) {
         ESCROW_DURATION = _escrowDuration;
         FACTORY = _factory;
         VERIFICATION = _verification;
         GAS_ACC_LIB = _gasAccLib;
+        SAFETY_LOCKS_LIB = _safetyLocksLib;
         SIMULATOR = _simulator;
         INITIAL_CHAIN_ID = block.chainid;
         INITIAL_DOMAIN_SEPARATOR = _computeDomainSeparator();

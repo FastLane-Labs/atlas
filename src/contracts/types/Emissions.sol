@@ -102,6 +102,7 @@ contract FastLaneErrorsEvents {
     // NEW - SafetyLocks
     error NotInitialized();
     error AlreadyInitialized();
+    error SafetyLocksLibError();
 
     
 
