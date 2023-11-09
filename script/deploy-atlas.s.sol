@@ -84,11 +84,21 @@ contract DeployAtlasScript is DeployBaseScript {
         vm.stopBroadcast();
 
         _writeAddressToDeploymentsJson("ATLAS", address(atlas));
+        _writeAddressToDeploymentsJson("ATLAS_FACTORY", address(atlasFactory));
+        _writeAddressToDeploymentsJson("ATLAS_VERIFICATION", address(atlasVerification));
+        _writeAddressToDeploymentsJson("GAS_ACCOUNTING_LIB", address(gasAccountingLib));
+        _writeAddressToDeploymentsJson("SAFETY_LOCKS_LIB", address(safetyLocksLib));
         _writeAddressToDeploymentsJson("SIMULATOR", address(simulator));
 
         console.log("\n");
         console.log("Atlas deployed at: \t\t\t\t", address(atlas));
+        console.log("AtlasFactory deployed at: \t\t\t", address(atlasFactory));
+        console.log("AtlasVerification deployed at: \t\t", address(atlasVerification));
+        console.log("GasAccountingLib deployed at: \t\t", address(gasAccountingLib));
+        console.log("SafetyLocksLib deployed at: \t\t\t", address(safetyLocksLib));
         console.log("Simulator deployed at: \t\t\t", address(simulator));
+        console.log("\n");
+        console.log("You can find a list of contract addresses from the latest deployment in deployments.json");
     }
 }
 

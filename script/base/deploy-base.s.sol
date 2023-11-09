@@ -7,8 +7,6 @@ import "forge-std/StdJson.sol";
 
 import {ERC20} from "solmate/tokens/ERC20.sol";
 
-
-
 contract DeployBaseScript is Script {
     using stdJson for string;
 
