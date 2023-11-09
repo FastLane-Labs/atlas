@@ -29,5 +29,7 @@ contract DeploySimpleRFQSolverScript is DeployBaseScript {
 
         console.log("\n");
         console.log("SimpleRFQSolver deployed at: \t\t\t", address(rfqSolver));
+        console.log("\n");
+        console.log("You can find a list of contract addresses from the latest deployment in deployments.json");
     }
 }

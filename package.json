@@ -15,13 +15,11 @@
       "anvil": "anvil",
       "anvil-mainnet-fork": "source .env && anvil --fork-url ${MAINNET_RPC_URL} --fork-block-number ${MAINNET_FORK_BLOCK_NUMBER} --code-size-limit ${CODE_SIZE_LIMIT}",
       
-      "deploy-atlas-sepolia": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast",
+      "deploy-atlas-sepolia": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
       "deploy-atlas-local": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --fork-url http://localhost:8545 --broadcast",
 
-      "deploy-swap-intent-sepolia": "source .env && forge script script/deploy-swap-intent-control.s.sol:DeploySwapIntentControlScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast",
+      "deploy-swap-intent-sepolia": "source .env && forge script script/deploy-swap-intent-control.s.sol:DeploySwapIntentControlScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
       "deploy-swap-intent-local": "source .env && forge script script/deploy-swap-intent-control.s.sol:DeploySwapIntentControlScript --fork-url http://localhost:8545 --broadcast",
-
-      
 
       "deploy-atlas-demo": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --fork-url http://localhost:8545 --broadcast --non-interactive",
       "deploy-atlas-swap-intent": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasAndSwapIntentDAppControlScript --fork-url http://localhost:8545 --broadcast --non-interactive",
