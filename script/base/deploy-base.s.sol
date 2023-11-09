@@ -15,6 +15,20 @@ contract DeployBaseScript is Script {
     ERC20 WETH = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
     ERC20 DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
 
+    function _getDeployChain() internal view returns (string memory) {
+        // OPTIONS: LOCAL, SEPOLIA, MAINNET
+        string memory deployChain = vm.envString("DEPLOY_TO");
+        if (
+            keccak256(bytes(deployChain)) == keccak256(bytes("SEPOLIA")) ||
+            keccak256(bytes(deployChain)) == keccak256(bytes("MAINNET")) ||
+            keccak256(bytes(deployChain)) == keccak256(bytes("LOCAL"))
+        ) {
+            return deployChain;
+        } else {
+            revert("Error: Set DEPLOY_TO in .env to LOCAL, SEPOLIA, or MAINNET");
+        }
+    }
+
     function _getAddressFromDeploymentsJson(string memory key) internal view returns (address) {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/deployments.json");
