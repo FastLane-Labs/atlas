@@ -9,9 +9,6 @@ import {DeployBaseScript} from "script/base/deploy-base.s.sol";
 import {SimpleRFQSolver} from "test/SwapIntent.t.sol";
 
 contract DeploySimpleRFQSolverScript is DeployBaseScript {
-    SimpleRFQSolver public rfqSolver;
-
-
     function run() external {
         console.log("\n=== DEPLOYING SimpleRFQSolver ===\n");
 
