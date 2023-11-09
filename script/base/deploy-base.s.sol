@@ -7,7 +7,7 @@ import "forge-std/StdJson.sol";
 
 import {ERC20} from "solmate/tokens/ERC20.sol";
 
-// NOTE: When handling JSON with StdJson, prefix keys with '.' e.g. '.ATLAS'
+
 
 contract DeployBaseScript is Script {
     using stdJson for string;
@@ -29,23 +29,34 @@ contract DeployBaseScript is Script {
         }
     }
 
+    // NOTE: When handling JSON with StdJson, prefix keys with '.' e.g. '.ATLAS'
+    // These 2 functions abstract away the '.' thing though.
+    // Just pass in a key like 'ATLAS' and set DEPLOY_TO in .env to LOCAL, SEPOLIA, or MAINNET
     function _getAddressFromDeploymentsJson(string memory key) internal view returns (address) {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/deployments.json");
         string memory json = vm.readFile(path);
 
-        // console.log("Getting", key, "from deployments.json");
+        // Read target chain from DEPLOY_TO in .env and use to form full key
+        string memory fullKey = string.concat(".", _getDeployChain(), ".", key);
 
-        return json.readAddress(key);
+        console.log("Getting", fullKey, "from deployments.json");
+
+        // NOTE: Use fullKey method above for safety
+        return json.readAddress(fullKey);
     }
 
     function _writeAddressToDeploymentsJson(string memory key, address addr) internal {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/deployments.json");
 
-        // console.log(string.concat("Writing \t\t'", key), "': '", addr, "'\t\t to deployments.json");
+        // Read target chain from DEPLOY_TO in .env and use to form full key
+        string memory fullKey = string.concat(".", _getDeployChain(), ".", key);
 
-        vm.writeJson(vm.toString(addr), path, key);
+        console.log(string.concat("Writing \t\t'", fullKey), "': '", addr, "'\t\t to deployments.json");
+
+        // NOTE: Use fullKey method above for safety
+        vm.writeJson(vm.toString(addr), path, fullKey);
     }
 
     function _logTokenBalances(address account, string memory accountLabel) internal view {

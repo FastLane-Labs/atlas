@@ -8,8 +8,6 @@ import "forge-std/StdJson.sol";
 import {DeployBaseScript} from "script/base/deploy-base.s.sol";
 import {SimpleRFQSolver} from "test/SwapIntent.t.sol";
 
-// NOTE: When handling JSON with StdJson, prefix keys with '.' e.g. '.ATLAS'
-
 contract DeploySimpleRFQSolverScript is DeployBaseScript {
     SimpleRFQSolver public rfqSolver;
 
@@ -19,7 +17,7 @@ contract DeploySimpleRFQSolverScript is DeployBaseScript {
 
         uint256 deployerPrivateKey = vm.envUint("SOLVER1_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
-        address atlasAddress = _getAddressFromDeploymentsJson(".ATLAS");
+        address atlasAddress = _getAddressFromDeploymentsJson("ATLAS");
 
         console.log("Deployer address: \t\t\t\t", deployer);
         console.log("Using Atlas address: \t\t\t\t", atlasAddress);
@@ -30,7 +28,7 @@ contract DeploySimpleRFQSolverScript is DeployBaseScript {
 
         vm.stopBroadcast();
 
-        _writeAddressToDeploymentsJson(".SIMPLE_RFQ_SOLVER", address(rfqSolver));
+        _writeAddressToDeploymentsJson("SIMPLE_RFQ_SOLVER", address(rfqSolver));
 
         console.log("\n");
         console.log("SimpleRFQSolver deployed at: \t\t\t", address(rfqSolver));

@@ -7,8 +7,6 @@ import "forge-std/StdJson.sol";
 
 import {DeployBaseScript} from "script/base/deploy-base.s.sol";
 
-// NOTE: When handling JSON with StdJson, prefix keys with '.' e.g. '.ATLAS'
-
 contract LogDemoBalancesScript is DeployBaseScript {
     function run() external {
 
@@ -25,11 +23,11 @@ contract LogDemoBalancesScript is DeployBaseScript {
         _logTokenBalances(account, "Solver 1");
 
         // Atlas contract
-        account = _getAddressFromDeploymentsJson(".ATLAS");
+        account = _getAddressFromDeploymentsJson("ATLAS");
         _logTokenBalances(account, "Atlas");
 
         // Simple RFQ Solver contract
-        account = _getAddressFromDeploymentsJson(".SIMPLE_RFQ_SOLVER");
+        account = _getAddressFromDeploymentsJson("SIMPLE_RFQ_SOLVER");
         _logTokenBalances(account, "Simple RFQ Solver");
     }
 }

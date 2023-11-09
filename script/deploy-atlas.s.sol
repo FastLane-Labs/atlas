@@ -29,66 +29,66 @@ contract DeployAtlasScript is DeployBaseScript {
 
         console.log("Deploying to chain: ", _getDeployChain());
 
-        // uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
-        // address deployer = vm.addr(deployerPrivateKey);
-        // // Computes the addresses at which AtlasFactory and AtlasVerification will be deployed
-        // address expectedAtlasFactoryAddr = computeCreateAddress(
-        //     deployer,
-        //     vm.getNonce(deployer) + 1
-        // );
-        // address expectedAtlasVerificationAddr = computeCreateAddress(
-        //     deployer,
-        //     vm.getNonce(deployer) + 2
-        // );
-        // address expectedGasAccountingLibAddr = computeCreateAddress(
-        //     deployer,
-        //     vm.getNonce(deployer) + 3
-        // );
-        // address expectedSafetyLocksLibAddr = computeCreateAddress(
-        //     deployer,
-        //     vm.getNonce(deployer) + 4
-        // );
+        uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
+        address deployer = vm.addr(deployerPrivateKey);
+        // Computes the addresses at which AtlasFactory and AtlasVerification will be deployed
+        address expectedAtlasFactoryAddr = computeCreateAddress(
+            deployer,
+            vm.getNonce(deployer) + 1
+        );
+        address expectedAtlasVerificationAddr = computeCreateAddress(
+            deployer,
+            vm.getNonce(deployer) + 2
+        );
+        address expectedGasAccountingLibAddr = computeCreateAddress(
+            deployer,
+            vm.getNonce(deployer) + 3
+        );
+        address expectedSafetyLocksLibAddr = computeCreateAddress(
+            deployer,
+            vm.getNonce(deployer) + 4
+        );
 
-        // console.log("Deployer address: \t\t\t\t", deployer);
+        console.log("Deployer address: \t\t\t\t", deployer);
 
-        // vm.startBroadcast(deployerPrivateKey);
+        vm.startBroadcast(deployerPrivateKey);
 
-        // simulator = new Simulator();
-        // atlas = new Atlas({
-        //     _escrowDuration: 64,
-        //     _factory: expectedAtlasFactoryAddr,
-        //     _verification: expectedAtlasVerificationAddr,
-        //     _gasAccLib: expectedGasAccountingLibAddr,
-        //     _safetyLocksLib: expectedSafetyLocksLibAddr,
-        //     _simulator: address(simulator)
-        // });
-        // atlasFactory = new AtlasFactory(address(atlas));
-        // atlasVerification = new AtlasVerification(address(atlas));
-        // gasAccountingLib = new GasAccountingLib({
-        //     _escrowDuration: 64,
-        //     _factory: expectedAtlasFactoryAddr,
-        //     _verification: expectedAtlasVerificationAddr,
-        //     _safetyLocksLib: expectedSafetyLocksLibAddr,
-        //     _simulator: address(simulator),
-        //     _atlas: address(atlas)
-        // });
-        // safetyLocksLib = new SafetyLocksLib({
-        //     _escrowDuration: 64,
-        //     _factory: expectedAtlasFactoryAddr,
-        //     _verification: expectedAtlasVerificationAddr,
-        //     _gasAccLib: expectedGasAccountingLibAddr,
-        //     _simulator: address(simulator),
-        //     _atlas: address(atlas)
-        // });
+        simulator = new Simulator();
+        atlas = new Atlas({
+            _escrowDuration: 64,
+            _factory: expectedAtlasFactoryAddr,
+            _verification: expectedAtlasVerificationAddr,
+            _gasAccLib: expectedGasAccountingLibAddr,
+            _safetyLocksLib: expectedSafetyLocksLibAddr,
+            _simulator: address(simulator)
+        });
+        atlasFactory = new AtlasFactory(address(atlas));
+        atlasVerification = new AtlasVerification(address(atlas));
+        gasAccountingLib = new GasAccountingLib({
+            _escrowDuration: 64,
+            _factory: expectedAtlasFactoryAddr,
+            _verification: expectedAtlasVerificationAddr,
+            _safetyLocksLib: expectedSafetyLocksLibAddr,
+            _simulator: address(simulator),
+            _atlas: address(atlas)
+        });
+        safetyLocksLib = new SafetyLocksLib({
+            _escrowDuration: 64,
+            _factory: expectedAtlasFactoryAddr,
+            _verification: expectedAtlasVerificationAddr,
+            _gasAccLib: expectedGasAccountingLibAddr,
+            _simulator: address(simulator),
+            _atlas: address(atlas)
+        });
 
-        // vm.stopBroadcast();
+        vm.stopBroadcast();
 
-        // _writeAddressToDeploymentsJson(".ATLAS", address(atlas));
-        // _writeAddressToDeploymentsJson(".SIMULATOR", address(simulator));
+        _writeAddressToDeploymentsJson("ATLAS", address(atlas));
+        _writeAddressToDeploymentsJson("SIMULATOR", address(simulator));
 
-        // console.log("\n");
-        // console.log("Atlas deployed at: \t\t\t\t", address(atlas));
-        // console.log("Simulator deployed at: \t\t\t", address(simulator));
+        console.log("\n");
+        console.log("Atlas deployed at: \t\t\t\t", address(atlas));
+        console.log("Simulator deployed at: \t\t\t", address(simulator));
     }
 }
 
@@ -165,9 +165,9 @@ contract DeployAtlasAndSwapIntentDAppControlScript is DeployBaseScript {
 
         vm.stopBroadcast();
 
-        _writeAddressToDeploymentsJson(".ATLAS", address(atlas));
-        _writeAddressToDeploymentsJson(".SIMULATOR", address(simulator));
-        _writeAddressToDeploymentsJson(".SWAP_INTENT_DAPP_CONTROL", address(swapIntentControl));
+        _writeAddressToDeploymentsJson("ATLAS", address(atlas));
+        _writeAddressToDeploymentsJson("SIMULATOR", address(simulator));
+        _writeAddressToDeploymentsJson("SWAP_INTENT_DAPP_CONTROL", address(swapIntentControl));
 
         console.log("\n");
         console.log("Atlas deployed at: \t\t\t\t", address(atlas));
@@ -253,10 +253,10 @@ contract DeployAtlasAndSwapIntentDAppControlAndTxBuilderScript is DeployBaseScri
 
         vm.stopBroadcast();
 
-        _writeAddressToDeploymentsJson(".ATLAS", address(atlas));
-        _writeAddressToDeploymentsJson(".SIMULATOR", address(simulator));
-        _writeAddressToDeploymentsJson(".SWAP_INTENT_DAPP_CONTROL", address(swapIntentControl));
-        _writeAddressToDeploymentsJson(".TX_BUILDER", address(txBuilder));
+        _writeAddressToDeploymentsJson("ATLAS", address(atlas));
+        _writeAddressToDeploymentsJson("SIMULATOR", address(simulator));
+        _writeAddressToDeploymentsJson("SWAP_INTENT_DAPP_CONTROL", address(swapIntentControl));
+        _writeAddressToDeploymentsJson("TX_BUILDER", address(txBuilder));
 
         console.log("\n");
         console.log("Atlas deployed at: \t\t\t\t", address(atlas));
