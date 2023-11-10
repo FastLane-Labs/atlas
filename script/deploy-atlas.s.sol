@@ -81,7 +81,21 @@ contract DeployAtlasScript is DeployBaseScript {
 
         vm.stopBroadcast();
 
-        // TODO add address checks with alert logs if wrong
+        if(address(atlasFactory) != expectedAtlasFactoryAddr) {
+            console.log("ERROR: AtlasFactory address does not match expected address");
+        }
+        if(address(atlasVerification) != expectedAtlasVerificationAddr) {
+            console.log("ERROR: AtlasVerification address does not match expected address");
+        }
+        if(address(gasAccountingLib) != expectedGasAccountingLibAddr) {
+            console.log("ERROR: GasAccountingLib address does not match expected address");
+        }
+        if(address(safetyLocksLib) != expectedSafetyLocksLibAddr) {
+            console.log("ERROR: SafetyLocksLib address does not match expected address");
+        }
+        if(address(simulator) != expectedSimulatorAddr) {
+            console.log("ERROR: Simulator address does not match expected address");
+        }
 
         _writeAddressToDeploymentsJson("ATLAS", address(atlas));
         _writeAddressToDeploymentsJson("ATLAS_FACTORY", address(atlasFactory));
