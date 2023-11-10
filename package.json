@@ -21,6 +21,12 @@
       "deploy-swap-intent-sepolia": "source .env && forge script script/deploy-swap-intent-control.s.sol:DeploySwapIntentControlScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
       "deploy-swap-intent-local": "source .env && forge script script/deploy-swap-intent-control.s.sol:DeploySwapIntentControlScript --fork-url http://localhost:8545 --broadcast",
 
+      "deploy-tx-builder-sepolia": "source .env && forge script script/deploy-tx-builder.s.sol:DeployTxBuilderScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
+      "deploy-tx-builder-local": "source .env && forge script script/deploy-tx-builder.s.sol:DeployTxBuilderScript --fork-url http://localhost:8545 --broadcast",
+
+      "deploy-solver-sepolia": "source .env && forge script script/deploy-solver.s.sol:DeploySimpleRFQSolverScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
+      "deploy-solver-local": "source .env && forge script script/deploy-solver.s.sol:DeploySimpleRFQSolverScript --fork-url http://localhost:8545 --broadcast",
+
       "deploy-atlas-demo": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --fork-url http://localhost:8545 --broadcast --non-interactive",
       "deploy-atlas-swap-intent": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasAndSwapIntentDAppControlScript --fork-url http://localhost:8545 --broadcast --non-interactive",
       "deploy-atlas-swap-intent-tx-builder": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasAndSwapIntentDAppControlAndTxBuilderScript --fork-url http://localhost:8545 --broadcast --non-interactive",
