@@ -24,26 +24,11 @@ contract DeployAtlasScript is DeployBaseScript {
         uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
         // Computes the addresses at which AtlasFactory and AtlasVerification will be deployed
-        address expectedAtlasFactoryAddr = computeCreateAddress(
-            deployer,
-            vm.getNonce(deployer) + 1
-        );
-        address expectedAtlasVerificationAddr = computeCreateAddress(
-            deployer,
-            vm.getNonce(deployer) + 2
-        );
-        address expectedGasAccountingLibAddr = computeCreateAddress(
-            deployer,
-            vm.getNonce(deployer) + 3
-        );
-        address expectedSafetyLocksLibAddr = computeCreateAddress(
-            deployer,
-            vm.getNonce(deployer) + 4
-        ); 
-        address expectedSimulatorAddr = computeCreateAddress(
-            deployer,
-            vm.getNonce(deployer) + 5
-        );
+        address expectedAtlasFactoryAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
+        address expectedAtlasVerificationAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
+        address expectedGasAccountingLibAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
+        address expectedSafetyLocksLibAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 4);
+        address expectedSimulatorAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 5);
 
         console.log("Deployer address: \t\t\t\t", deployer);
 
@@ -81,20 +66,28 @@ contract DeployAtlasScript is DeployBaseScript {
 
         vm.stopBroadcast();
 
-        if(address(atlasFactory) != expectedAtlasFactoryAddr) {
-            console.log("ERROR: AtlasFactory address does not match expected address");
+        if (
+            address(atlas) != simulator.atlas() || address(atlas) != atlasVerification.ATLAS()
+                || address(atlas) != gasAccountingLib.ATLAS() || address(atlas) != safetyLocksLib.ATLAS()
+        ) {
+            console.log(
+                "ERROR: Atlas address not set correctly in Simulator, AtlasVerification, GasAccountingLib, or SafetyLocksLib"
+            );
         }
-        if(address(atlasVerification) != expectedAtlasVerificationAddr) {
-            console.log("ERROR: AtlasVerification address does not match expected address");
+        if (address(atlasFactory) != atlas.FACTORY()) {
+            console.log("ERROR: AtlasFactory address not set correctly in Atlas");
         }
-        if(address(gasAccountingLib) != expectedGasAccountingLibAddr) {
-            console.log("ERROR: GasAccountingLib address does not match expected address");
+        if (address(atlasVerification) != atlas.VERIFICATION()) {
+            console.log("ERROR: AtlasVerification address not set correctly in Atlas");
         }
-        if(address(safetyLocksLib) != expectedSafetyLocksLibAddr) {
-            console.log("ERROR: SafetyLocksLib address does not match expected address");
+        if (address(gasAccountingLib) != atlas.GAS_ACC_LIB()) {
+            console.log("ERROR: GasAccountingLib address not set correctly in Atlas");
         }
-        if(address(simulator) != expectedSimulatorAddr) {
-            console.log("ERROR: Simulator address does not match expected address");
+        if (address(safetyLocksLib) != atlas.SAFETY_LOCKS_LIB()) {
+            console.log("ERROR: SafetyLocksLib address not set correctly in Atlas");
+        }
+        if (address(simulator) != atlas.SIMULATOR()) {
+            console.log("ERROR: Simulator address not set correctly in Atlas");
         }
 
         _writeAddressToDeploymentsJson("ATLAS", address(atlas));
