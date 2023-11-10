@@ -39,20 +39,23 @@ contract DeployAtlasScript is DeployBaseScript {
         address expectedSafetyLocksLibAddr = computeCreateAddress(
             deployer,
             vm.getNonce(deployer) + 4
+        ); 
+        address expectedSimulatorAddr = computeCreateAddress(
+            deployer,
+            vm.getNonce(deployer) + 5
         );
 
         console.log("Deployer address: \t\t\t\t", deployer);
 
         vm.startBroadcast(deployerPrivateKey);
 
-        simulator = new Simulator();
         atlas = new Atlas({
             _escrowDuration: 64,
             _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
             _gasAccLib: expectedGasAccountingLibAddr,
             _safetyLocksLib: expectedSafetyLocksLibAddr,
-            _simulator: address(simulator)
+            _simulator: expectedSimulatorAddr
         });
         atlasFactory = new AtlasFactory(address(atlas));
         atlasVerification = new AtlasVerification(address(atlas));
@@ -61,7 +64,7 @@ contract DeployAtlasScript is DeployBaseScript {
             _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
             _safetyLocksLib: expectedSafetyLocksLibAddr,
-            _simulator: address(simulator),
+            _simulator: expectedSimulatorAddr,
             _atlas: address(atlas)
         });
         safetyLocksLib = new SafetyLocksLib({
@@ -69,12 +72,16 @@ contract DeployAtlasScript is DeployBaseScript {
             _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
             _gasAccLib: expectedGasAccountingLibAddr,
-            _simulator: address(simulator),
+            _simulator: expectedSimulatorAddr,
             _atlas: address(atlas)
         });
+
+        simulator = new Simulator();
         simulator.setAtlas(address(atlas));
 
         vm.stopBroadcast();
+
+        // TODO add address checks with alert logs if wrong
 
         _writeAddressToDeploymentsJson("ATLAS", address(atlas));
         _writeAddressToDeploymentsJson("ATLAS_FACTORY", address(atlasFactory));
