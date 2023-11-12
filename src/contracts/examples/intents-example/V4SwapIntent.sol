@@ -26,6 +26,26 @@ struct SwapData {
     address recipient;
 }
 
+struct ExactInputSingleParams {
+    address tokenIn;
+    address tokenOut;
+    uint256 maxFee;
+    address recipient;
+    uint256 amountIn;
+    uint256 amountOutMinimum;
+    uint256 sqrtPriceLimitX96;
+}
+
+struct ExactOutputSingleParams {
+    address tokenIn;
+    address tokenOut;
+    uint256 maxFee;
+    address recipient;
+    uint256 amountInMaximum;
+    uint256 amountOut;
+    uint256 sqrtPriceLimitX96;
+}
+
 contract V4SwapIntentController is DAppControl {
     using SafeTransferLib for ERC20;
 
@@ -88,42 +108,26 @@ contract V4SwapIntentController is DAppControl {
     }
 
     // selector 0x04e45aaf
-    function exactInputSingle(
-        address tokenIn,
-        address tokenOut,
-        uint256 maxFee,
-        address recipient, 
-        uint256 amountIn,
-        uint256 amountOutMinimum,
-        uint256 sqrtPriceLimitX96
-    ) external payable verifyCall(tokenIn, tokenOut, amountIn) returns (SwapData memory) {
+    function exactInputSingle(ExactInputSingleParams calldata params) external payable verifyCall(params.tokenIn, params.tokenOut, params.amountIn) returns (SwapData memory) {
         SwapData memory swapData = SwapData({
-            tokenIn: tokenIn,
-            tokenOut: tokenOut,
-            requestedAmount: int256(amountIn),
-            limitAmount: amountOutMinimum,
-            recipient: recipient
+            tokenIn: params.tokenIn,
+            tokenOut: params.tokenOut,
+            requestedAmount: int256(params.amountIn),
+            limitAmount: params.amountOutMinimum,
+            recipient: params.recipient
         });
 
         return swapData;
     } 
 
     // selector 0x5023b4df
-    function exactOutputSingle(
-        address tokenIn,
-        address tokenOut,
-        uint256 maxFee,
-        address recipient,
-        uint256 amountInMaximum,
-        uint256 amountOut,
-        uint256 sqrtPriceLimitX96
-    ) external payable verifyCall(tokenIn, tokenOut, amountInMaximum) returns (SwapData memory) {
+    function exactOutputSingle(ExactOutputSingleParams calldata params) external payable verifyCall(params.tokenIn, params.tokenOut, params.amountInMaximum) returns (SwapData memory) {
         SwapData memory swapData = SwapData({
-            tokenIn: tokenIn,
-            tokenOut: tokenOut,
-            requestedAmount: -int256(amountOut),
-            limitAmount: amountInMaximum,
-            recipient: recipient
+            tokenIn: params.tokenIn,
+            tokenOut: params.tokenOut,
+            requestedAmount: -int256(params.amountOut),
+            limitAmount: params.amountInMaximum,
+            recipient: params.recipient
         });
 
         return swapData;
