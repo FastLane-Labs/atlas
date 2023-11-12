@@ -54,13 +54,21 @@ contract V4SwapIntentTest is BaseTest {
         // Deploy new poolamanger and create a DAI/WETH pool with no hooks
         poolManager = new PoolManager(30000000);
 
-        poolManager.initialize(PoolKey({
+        PoolKey memory pool = PoolKey({
             currency0: Currency.wrap(address(DAI)),
             currency1: Currency.wrap(address(WETH)),
             fee: 3000,
             tickSpacing: 60,
             hooks: IHooks(address(0))
-        }), 1823965582028705631020492031, new bytes(0));
+        });
+
+        poolManager.initialize(pool, 1823965582028705631020492031, new bytes(0));
+
+        poolManager.modifyPosition(pool, IPoolManager.ModifyPositionParams({
+            tickLower: -887220,
+            tickUpper: 887220,
+            liquidityDelta: 1000000
+        }), new bytes(0));
 
         // Deposit ETH from Searcher signer to pay for searcher's gas 
         // vm.prank(solverOneEOA); 
