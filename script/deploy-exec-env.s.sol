@@ -6,7 +6,11 @@ import "forge-std/Test.sol";
 
 import {DeployBaseScript} from "script/base/deploy-base.s.sol";
 
+import {ExecutionEnvironment} from "src/contracts/atlas/ExecutionEnvironment.sol";
+
 contract DeployExecEnvScript is DeployBaseScript {
+    ExecutionEnvironment public execEnv;
+
     function run() external {
         console.log("\n=== DEPLOYING Execution Environment ===\n");
 
@@ -18,14 +22,13 @@ contract DeployExecEnvScript is DeployBaseScript {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        // TODO 
+        address atlasAddress = _getAddressFromDeploymentsJson("ATLAS");
+        execEnv = new ExecutionEnvironment(atlasAddress);
 
         vm.stopBroadcast();
 
-        // _writeAddressToDeploymentsJson("EXECUTION_ENV", address(simulator)); // TODO
-
         console.log("\n");
-        // console.log("Execution Environment deployed at: \t\t\t\t", address(atlas)); // TODO
+        console.log("Execution Environment deployed at: \t\t\t\t", address(execEnv));
         console.log("\n");
         console.log("You can find a list of contract addresses from the latest deployment in deployments.json");
     }
