@@ -108,7 +108,7 @@ contract SwapIntentTest is BaseTest {
 
         // Solver deploys the RFQ solver contract (defined at bottom of this file)
         vm.startPrank(solverOneEOA);
-        SimpleRFQSolver rfqSolver = new SimpleRFQSolver(address(atlas));
+        SimpleRFQSolver rfqSolver = new SimpleRFQSolver(WETH_ADDRESS, address(atlas));
         atlas.deposit{value: 1e18}();
         vm.stopPrank();
 
@@ -234,7 +234,7 @@ contract SwapIntentTest is BaseTest {
 
         // Solver deploys the RFQ solver contract (defined at bottom of this file)
         vm.startPrank(solverOneEOA);
-        UniswapIntentSolver uniswapSolver = new UniswapIntentSolver(address(atlas));
+        UniswapIntentSolver uniswapSolver = new UniswapIntentSolver(WETH_ADDRESS, address(atlas));
         deal(WETH_ADDRESS, address(uniswapSolver), 1e18); // 1 WETH to solver to pay bid
         atlas.deposit{value: 1e18}();
         vm.stopPrank();
@@ -349,7 +349,7 @@ contract SwapIntentTest is BaseTest {
 // This solver magically has the tokens needed to fulfil the user's swap.
 // This might involve an offchain RFQ system
 contract SimpleRFQSolver is SolverBase {
-    constructor(address atlas) SolverBase(atlas, msg.sender) {}
+    constructor(address weth9, address atlas) SolverBase(weth9, atlas, msg.sender) {}
 
     function fulfillRFQ(
         SwapIntent calldata swapIntent,
@@ -374,7 +374,7 @@ contract SimpleRFQSolver is SolverBase {
 contract UniswapIntentSolver is SolverBase {
     IUniV2Router02 router = IUniV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
 
-    constructor(address atlas) SolverBase(atlas, msg.sender) {}
+    constructor(address weth9, address atlas) SolverBase(weth9, atlas, msg.sender) {}
 
     function fulfillWithSwap(
         SwapIntent calldata swapIntent,

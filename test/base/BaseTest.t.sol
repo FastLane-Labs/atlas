@@ -139,7 +139,7 @@ contract BaseTest is Test, TestConstants {
 
         vm.startPrank(solverOneEOA);
 
-        solverOne = new Solver(escrow, solverOneEOA);
+        solverOne = new Solver(WETH_ADDRESS, escrow, solverOneEOA);
         atlas.deposit{value: 1e18}();
 
         deal(TOKEN_ZERO, address(solverOne), 10e24);
@@ -149,7 +149,7 @@ contract BaseTest is Test, TestConstants {
 
         vm.startPrank(solverTwoEOA);
 
-        solverTwo = new Solver(escrow, solverTwoEOA);
+        solverTwo = new Solver(WETH_ADDRESS, escrow, solverTwoEOA);
         atlas.deposit{value: 1e18}();
 
         vm.stopPrank();

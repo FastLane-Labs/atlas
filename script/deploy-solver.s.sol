@@ -21,7 +21,7 @@ contract DeploySimpleRFQSolverScript is DeployBaseScript {
 
         vm.startBroadcast(deployerPrivateKey);
 
-        rfqSolver = new SimpleRFQSolver(atlasAddress);
+        rfqSolver = new SimpleRFQSolver(vm.envAddress("WETH"), atlasAddress);
 
         vm.stopBroadcast();
 
