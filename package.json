@@ -29,13 +29,13 @@
 
       "deploy-all-sepolia": "npm run deploy-atlas-sepolia && npm run deploy-swap-intent-sepolia && npm run deploy-tx-builder-sepolia && npm run deploy-solver-sepolia",
 
+      "verify-exec-env": "",
+
       "deploy-atlas-demo": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --fork-url http://localhost:8545 --broadcast --non-interactive",
       "deploy-atlas-swap-intent": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasAndSwapIntentDAppControlScript --fork-url http://localhost:8545 --broadcast --non-interactive",
       "deploy-atlas-swap-intent-tx-builder": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasAndSwapIntentDAppControlAndTxBuilderScript --fork-url http://localhost:8545 --broadcast --non-interactive",
       "deploy-solver": "source .env && forge script script/deploy-solver.s.sol:DeploySimpleRFQSolverScript --fork-url http://localhost:8545 --broadcast --non-interactive",
-      
       "solver-deposit": "source .env && forge script script/solver-deposit.s.sol:SolverAtlasDepositScript --fork-url http://localhost:8545 --broadcast --non-interactive",
-
       "setup-demo": "npm run deploy-atlas-swap-intent-tx-builder && npm run deploy-solver && npm run solver-deposit",
 
       "atlas-addr": "echo 'ATLAS:' && jq -r '.ATLAS' deployments.json",
