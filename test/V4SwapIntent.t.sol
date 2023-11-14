@@ -17,6 +17,8 @@ import {SolverBase} from "../src/contracts/solver/SolverBase.sol";
 
 import {PoolManager, IPoolManager, PoolKey, Currency, IHooks} from "v4-core/PoolManager.sol";
 
+import {PoolModifyPositionTest} from "v4-core/test/PoolModifyPositionTest.sol";
+
 contract V4SwapIntentTest is BaseTest {
     V4SwapIntentController public swapIntentController;
     PoolManager public poolManager;
@@ -62,13 +64,28 @@ contract V4SwapIntentTest is BaseTest {
             hooks: IHooks(address(0))
         });
 
-        poolManager.initialize(pool, 1823965582028705631020492031, new bytes(0));
+        // Original: 1823965582028705631020492031
+        // SQRT_RATIO_1_1: 79228162514264337593543950336
 
-        poolManager.modifyPosition(pool, IPoolManager.ModifyPositionParams({
+        poolManager.initialize(pool, 79228162514264337593543950336, new bytes(0));
+
+        // New stuff
+        PoolModifyPositionTest modifyPositionRouter = new PoolModifyPositionTest(IPoolManager(address(poolManager)));
+
+        deal(address(DAI), governanceEOA, 1000e18);
+        deal(address(WETH), governanceEOA, 1000e18);
+        
+        vm.startPrank(governanceEOA);
+        DAI.approve(address(modifyPositionRouter), 1000e18);
+        WETH.approve(address(modifyPositionRouter), 1000e18);
+
+        modifyPositionRouter.modifyPosition(pool, IPoolManager.ModifyPositionParams({
             tickLower: -887220,
             tickUpper: 887220,
             liquidityDelta: 1000000
         }), new bytes(0));
+
+        vm.stopPrank();
 
         // Deposit ETH from Searcher signer to pay for searcher's gas 
         // vm.prank(solverOneEOA); 
