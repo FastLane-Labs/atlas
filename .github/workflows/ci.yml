@@ -1,0 +1,79 @@
+name: CI
+
+env:
+  FOUNDRY_PROFILE: "ci"
+
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Check formatting
+        run: forge fmt --check
+
+      - name: "Add lint summary"
+        run: |
+          echo "## Lint result" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install dependencies
+        run: forge install
+
+      - name: Compile contracts
+        run: forge build
+
+      - name: Check contract sizes
+        run: |
+          forge build --sizes && \
+          for file in out/*.sol/*.json; do
+              if [[ "$file" == *".t.sol"* || "$file" == *".s.sol"* ]]; then
+                  continue
+              fi
+              size=$(cat "$file" | jq '.deployedBytecode.object' | wc -c | awk '{print int(($1-2)/2)}')
+              if [ $size -gt 24576 ]; then
+                  echo "Contract in $file exceeds max size of 24576 bytes (Size: $size bytes)"
+                  exit 1
+              fi
+          done
+
+      - name: "Add build summary"
+        run: |
+          echo "## Build result" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
+
+  tests:
+    needs: ["lint", "build"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install dependencies
+        run: forge install
+
+      - name: Compile contracts
+        run: forge build
+
+      - name: Run tests
+        run: forge test
+      
+      - name: Add test summary
+        run: |
+          echo "## Tests result" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
