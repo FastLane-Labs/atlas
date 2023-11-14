@@ -8,14 +8,30 @@ import {IUniswapV2Pair} from "../../src/contracts/examples/v2-example/interfaces
 contract TestConstants {
     uint256 public constant BLOCK_START = 17441786;
 
-    // MAINNET
-    ChainVars public mainnet = ChainVars({rpcUrlKey: "MAINNET_RPC_URL", forkBlock: BLOCK_START});
-
     // Structs
     struct ChainVars {
         string rpcUrlKey;
         uint256 forkBlock;
+        address weth;
+        address dai;
     }
+
+    // MAINNET
+    ChainVars public mainnet = ChainVars({
+        rpcUrlKey: "MAINNET_RPC_URL",
+        forkBlock: BLOCK_START,
+        weth: address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2),
+        dai: address(0x6B175474E89094C44Da98b954EedeAC495271d0F)
+    });
+
+    // SEPOLIA
+    ChainVars public sepolia = ChainVars({
+        rpcUrlKey: "SEPOLIA_RPC_URL",
+        forkBlock: BLOCK_START,
+        weth: address(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14), // Uniswap's Sepolia WETH
+        dai: address(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa) //TODO find Sepolia DAI addrs
+    });
+    
 
     // Constants
     address public constant FXS_ADDRESS = address(0x3432B6A60D23Ca0dFCa7761B7ab56459D9C964D0);
