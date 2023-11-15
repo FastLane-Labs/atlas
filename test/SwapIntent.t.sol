@@ -15,22 +15,6 @@ import {DAppOperation, DAppConfig} from "../src/contracts/types/DAppApprovalType
 import {SwapIntentController, SwapIntent, Condition} from "../src/contracts/examples/intents-example/SwapIntent.sol";
 import {SolverBase} from "../src/contracts/solver/SolverBase.sol";
 
-// QUESTIONS:
-
-// Refactor Ideas:
-// 1. Lots of bitwise operations explicitly coded in contracts - could be a helper lib thats more readable
-// 2. helper is currently a V2Helper and shared from BaseTest. Should only be in Uni V2 related tests
-// 3. Need a more generic helper for BaseTest
-// 4. Gonna be lots of StackTooDeep errors. Maybe need a way to elegantly deal with that in BaseTest
-// 5. Change atlasSolverCall structure in SolverBase - maybe virtual fn to be overridden, which hooks for checks
-// 6. Maybe emit error msg or some other better UX for error if !valid in metacall()
-
-// Doc Ideas:
-// 1. Step by step instructions for building a metacall transaction (for internal testing, and integrating dApps)
-
-// To Understand Better:
-// 1. The lock system (and look for any gas optimizations / ways to reduce lock actions)
-
 
 interface IUniV2Router02 {
     function swapExactTokensForTokens(
@@ -83,7 +67,6 @@ contract SwapIntentTest is BaseTest {
 
     function testAtlasSwapIntentWithBasicRFQ() public {
         // Swap 10 WETH for 20 DAI
-
         UserCondition userCondition = new UserCondition();
 
         Condition[] memory conditions = new Condition[](2);

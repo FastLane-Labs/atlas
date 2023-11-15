@@ -22,6 +22,8 @@ import {TestConstants} from "./TestConstants.sol";
 
 import {V2Helper} from "../V2Helper.sol";
 
+import {Utilities} from "src/contracts/helpers/Utilities.sol";
+
 contract BaseTest is Test, TestConstants {
     address public me = address(this);
 
@@ -56,6 +58,8 @@ contract BaseTest is Test, TestConstants {
     V2DAppControl public control;
 
     V2Helper public helper;
+
+    Utilities public u;
 
     // Fork stuff
     ChainVars public chain = mainnet;
@@ -158,6 +162,7 @@ contract BaseTest is Test, TestConstants {
         deal(TOKEN_ONE, address(solverTwo), 10e24);
 
         helper = new V2Helper(address(control), address(atlas), address(atlasVerification));
+        u = new Utilities();
 
         deal(TOKEN_ZERO, address(atlas), 1);
         deal(TOKEN_ONE, address(atlas), 1);
