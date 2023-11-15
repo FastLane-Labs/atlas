@@ -17,6 +17,8 @@ import {TxBuilder} from "src/contracts/helpers/TxBuilder.sol";
 import {Simulator} from "src/contracts/helpers/Simulator.sol";
 import {SimpleRFQSolver} from "test/SwapIntent.t.sol";
 
+import {Utilities} from "src/contracts/helpers/Utilities.sol";
+
 contract DeployBaseScript is Script {
     using stdJson for string;
 
@@ -32,6 +34,8 @@ contract DeployBaseScript is Script {
     SwapIntentController public swapIntentControl;
     TxBuilder public txBuilder;
     SimpleRFQSolver public rfqSolver;
+
+    Utilities public u;
 
     function _getDeployChain() internal view returns (string memory) {
         // OPTIONS: LOCAL, SEPOLIA, MAINNET
