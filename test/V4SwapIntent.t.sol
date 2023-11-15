@@ -22,6 +22,7 @@ import {PoolModifyPositionTest} from "v4-core/test/PoolModifyPositionTest.sol";
 contract V4SwapIntentTest is BaseTest {
     V4SwapIntentController public swapIntentController;
     PoolManager public poolManager;
+    PoolKey public poolKey;
     TxBuilder public txBuilder;
     Sig public sig;
 
@@ -56,7 +57,7 @@ contract V4SwapIntentTest is BaseTest {
         // Deploy new poolamanger and create a DAI/WETH pool with no hooks
         poolManager = new PoolManager(30000000);
 
-        PoolKey memory pool = PoolKey({
+        poolKey = PoolKey({
             currency0: Currency.wrap(address(DAI)),
             currency1: Currency.wrap(address(WETH)),
             fee: 3000,
@@ -86,14 +87,17 @@ contract V4SwapIntentTest is BaseTest {
         }), new bytes(0));
 
         vm.stopPrank();
-
-        // Deposit ETH from Searcher signer to pay for searcher's gas 
-        // vm.prank(solverOneEOA); 
-        // atlas.deposit{value: 1e18}();
     }
 
     function testAtlasV4SwapIntentWithUniswapSolver() public {
+        // Try to swap 10 weth
 
+        // Deploy the solver contract
+        vm.startPrank(solverOneEOA);
+        UniswapV4IntentSolver solver = new UniswapV4IntentSolver(address(atlas), poolManager);
+        deal(WETH_ADDRESS, address(solver), 1e18); // 1 WETH to solver to pay bid
+        atlas.deposit{value: 1e18}();
+        vm.stopPrank();
     }
 
     // function testAtlasV4SwapIntentWithUniswapSolver() public {
