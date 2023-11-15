@@ -23,14 +23,6 @@ contract TestConstants {
         weth: address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2),
         dai: address(0x6B175474E89094C44Da98b954EedeAC495271d0F)
     });
-
-    // SEPOLIA
-    ChainVars public sepolia = ChainVars({
-        rpcUrlKey: "SEPOLIA_RPC_URL",
-        forkBlock: BLOCK_START,
-        weth: address(0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14), // Uniswap's Sepolia WETH
-        dai: address(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa) //TODO find Sepolia DAI addrs
-    });
     
 
     // Constants
