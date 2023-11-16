@@ -11,7 +11,8 @@ interface ISafetyLocks {
         DAppConfig calldata dConfig,
         bytes memory preOpsData,
         bytes memory userReturnData
-    ) external;
+    )
+        external;
 
     function activeEnvironment() external view returns (address);
 

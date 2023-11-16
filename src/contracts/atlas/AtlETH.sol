@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity 0.8.21;
 
-import {SafeTransferLib} from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 
 import "../types/EscrowTypes.sol";
-import {Permit69} from "../common/Permit69.sol";
+import { Permit69 } from "../common/Permit69.sol";
 
 // TODO split out events and errors to share with AtlasEscrow
 
@@ -31,13 +31,13 @@ abstract contract AtlETH is Permit69 {
         address _gasAccLib,
         address _safetyLocksLib,
         address _simulator
-    ) Permit69(_escrowDuration, _factory, _verification, _gasAccLib, _safetyLocksLib, _simulator) {}
+    )
+        Permit69(_escrowDuration, _factory, _verification, _gasAccLib, _safetyLocksLib, _simulator)
+    { }
 
     /*//////////////////////////////////////////////////////////////
                                 ATLETH
     //////////////////////////////////////////////////////////////*/
-
-
 
     function balanceOf(address account) public view returns (uint256) {
         return _escrowAccountData[account].balance;
@@ -105,10 +105,18 @@ abstract contract AtlETH is Permit69 {
         return true;
     }
 
-    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
+    function permit(
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    )
         public
     {
-        if(deadline < block.timestamp) revert PermitDeadlineExpired();
+        if (deadline < block.timestamp) revert PermitDeadlineExpired();
         // Unchecked because the only math done is incrementing
         // the owner's nonce which cannot realistically overflow.
         unchecked {
@@ -135,7 +143,7 @@ abstract contract AtlETH is Permit69 {
                 r,
                 s
             );
-            if(recoveredAddress == address(0) || recoveredAddress != owner) revert InvalidSigner();
+            if (recoveredAddress == address(0) || recoveredAddress != owner) revert InvalidSigner();
             allowance[recoveredAddress][spender] = value;
         }
         emit Approval(owner, spender, value);
@@ -161,7 +169,7 @@ abstract contract AtlETH is Permit69 {
     // Interactions (transfers, withdrawals) are allowed only after the owner last interaction
     // with Atlas was at least `escrowDuration` blocks ago.
     function _checkTransfersAllowed(address account) internal view {
-        if(block.number <= _escrowAccountData[account].lastAccessed + ESCROW_DURATION) {
+        if (block.number <= _escrowAccountData[account].lastAccessed + ESCROW_DURATION) {
             revert EscrowLockActive();
         }
     }

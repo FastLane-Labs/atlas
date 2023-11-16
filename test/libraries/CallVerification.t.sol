@@ -3,7 +3,7 @@ pragma solidity 0.8.21;
 
 import "forge-std/Test.sol";
 
-import {CallVerification} from "../../src/contracts/libraries/CallVerification.sol";
+import { CallVerification } from "../../src/contracts/libraries/CallVerification.sol";
 import "../../src/contracts/types/UserCallTypes.sol";
 import "../base/TestUtils.sol";
 
@@ -53,9 +53,8 @@ contract CallVerificationTest is Test {
         assertEq(userOp.getUserOperationHash(), keccak256(abi.encode(userOp)));
     }
 
-
     function testGetCallChainHash() public {
-        DAppConfig memory dConfig = DAppConfig({to: address(0x1), callConfig: 1, bidToken: address(0)});
+        DAppConfig memory dConfig = DAppConfig({ to: address(0x1), callConfig: 1, bidToken: address(0) });
         UserOperation memory userOp = buildUserOperation();
         SolverOperation[] memory solverOps = new SolverOperation[](2);
         solverOps[0] = builderSolverOperation();
@@ -67,7 +66,9 @@ contract CallVerificationTest is Test {
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps
-    ) external {
+    )
+        external
+    {
         bytes32 callChainHash = CallVerification.getCallChainHash(dConfig, userOp, solverOps);
         assertEq(
             callChainHash,

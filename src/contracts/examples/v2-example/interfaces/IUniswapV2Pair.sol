@@ -18,7 +18,15 @@ interface IUniswapV2Pair {
 
     function nonces(address owner) external view returns (uint256);
 
-    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
+    function permit(
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    )
         external;
 
     event Mint(address indexed sender, uint256 amount0, uint256 amount1);

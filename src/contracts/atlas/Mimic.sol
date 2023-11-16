@@ -35,7 +35,7 @@ contract Mimic {
         }
     */
 
-    receive() external payable {}
+    receive() external payable { }
 
     fallback(bytes calldata) external payable returns (bytes memory) {
         (bool success, bytes memory output) = address(0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa).delegatecall(

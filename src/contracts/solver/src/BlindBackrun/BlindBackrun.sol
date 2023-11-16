@@ -36,7 +36,7 @@ contract BlindBackrun is Ownable {
         WETH_ADDRESS = _wethAddress;
     }
     */
-    constructor() {}
+    constructor() { }
 
     /// @notice Executes an arbitrage transaction between two Uniswap V2 pairs.
     /// @notice Pair addresses need to be computed off-chain.
@@ -47,7 +47,9 @@ contract BlindBackrun is Ownable {
         address firstPairAddress,
         address secondPairAddress //,
             //uint percentageToPayToCoinbase
-    ) external {
+    )
+        external
+    {
         //onlyOwner {
         require(msg.sender == address(this), "INVALID CALLER"); // Atlas meta-tx integration
 
@@ -72,7 +74,6 @@ contract BlindBackrun is Ownable {
 
             firstPair.swap(0, firstPairAmountOut, secondPairAddress, "");
             secondPair.swap(finalAmountOut, 0, address(this), "");
-
         } else {
             firstPairAmountOut = getAmountOut(amountIn, firstPairData.reserve1, firstPairData.reserve0);
             finalAmountOut = getAmountOut(firstPairAmountOut, secondPairData.reserve0, secondPairData.reserve1);
@@ -85,7 +86,7 @@ contract BlindBackrun is Ownable {
             console.log("startingAmountIn  ",amountIn);
             console.log("-");
             */
-            
+
             firstPair.swap(firstPairAmountOut, 0, secondPairAddress, "");
             secondPair.swap(0, finalAmountOut, address(this), "");
         }
@@ -103,7 +104,10 @@ contract BlindBackrun is Ownable {
     /// @param firstPairData Struct containing data about the first Uniswap V2 pair.
     /// @param secondPairData Struct containing data about the second Uniswap V2 pair.
     /// @return amountIn, the optimal amount to trade to arbitrage two v2 pairs.
-    function getAmountIn(PairReserves memory firstPairData, PairReserves memory secondPairData)
+    function getAmountIn(
+        PairReserves memory firstPairData,
+        PairReserves memory secondPairData
+    )
         internal
         pure
         returns (uint256)
@@ -156,7 +160,11 @@ contract BlindBackrun is Ownable {
     /// @param reserveIn The reserve of the input token.
     /// @param reserveOut The reserve of the output token.
     /// @return amountOut The output amount.
-    function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut)
+    function getAmountOut(
+        uint256 amountIn,
+        uint256 reserveIn,
+        uint256 reserveOut
+    )
         internal
         pure
         returns (uint256 amountOut)
@@ -189,10 +197,10 @@ contract BlindBackrun is Ownable {
     /// @param _value The amount of Ether to send with the call.
     /// @param _data The calldata to send with the call.
     function call(address payable _to, uint256 _value, bytes memory _data) external onlyOwner {
-        (bool success,) = _to.call{value: _value}(_data);
+        (bool success,) = _to.call{ value: _value }(_data);
         require(success, "External call failed");
     }
 
     /// @notice Fallback function that allows the contract to receive Ether.
-    receive() external payable {}
+    receive() external payable { }
 }

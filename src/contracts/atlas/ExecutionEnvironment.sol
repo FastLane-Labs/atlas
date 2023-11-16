@@ -1,36 +1,34 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.21;
 
-import {ISolverContract} from "../interfaces/ISolverContract.sol";
-import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
-import {IDAppControl} from "../interfaces/IDAppControl.sol";
-import {IEscrow} from "../interfaces/IEscrow.sol";
+import { ISolverContract } from "../interfaces/ISolverContract.sol";
+import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
+import { IDAppControl } from "../interfaces/IDAppControl.sol";
+import { IEscrow } from "../interfaces/IEscrow.sol";
 
-import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
-import {ExecutionPhase} from "../types/LockTypes.sol";
-import {Party} from "../types/EscrowTypes.sol";
+import { ExecutionPhase } from "../types/LockTypes.sol";
+import { Party } from "../types/EscrowTypes.sol";
 
-import {Base} from "../common/ExecutionBase.sol";
+import { Base } from "../common/ExecutionBase.sol";
 
-import {CallBits} from "../libraries/CallBits.sol";
+import { CallBits } from "../libraries/CallBits.sol";
 
 import "forge-std/Test.sol";
 
-import {
-    FastLaneErrorsEvents
-} from "../types/Emissions.sol";
+import { FastLaneErrorsEvents } from "../types/Emissions.sol";
 
 contract ExecutionEnvironment is Base {
     using CallBits for uint32;
-    
+
     uint8 private constant _ENVIRONMENT_DEPTH = 1 << 1;
 
-    constructor(address _atlas) Base(_atlas) {}
+    constructor(address _atlas) Base(_atlas) { }
 
     modifier validUser(UserOperation calldata userOp) {
         if (userOp.from != _user()) {
@@ -52,32 +50,31 @@ contract ExecutionEnvironment is Base {
     modifier contributeSurplus(Party party) {
         _;
         {
-        uint256 balance = address(this).balance;
-        if (balance > 0) {
-            IEscrow(atlas).contribute{value: balance}(party);
-        }
+            uint256 balance = address(this).balance;
+            if (balance > 0) {
+                IEscrow(atlas).contribute{ value: balance }(party);
+            }
         }
     }
 
     modifier validSolver(SolverOperation calldata solverOp) {
         {
-        address solverTo = solverOp.solver;
-        address solverFrom = solverOp.from;
-        address control = _control();
+            address solverTo = solverOp.solver;
+            address solverFrom = solverOp.from;
+            address control = _control();
 
-        if (solverTo == address(this) || solverTo == control || solverTo == atlas) {
-            revert("ERR-EV008 InvalidTo");
-        }
-        if (solverTo != _approvedCaller()) {
-            revert("ERR-EV009 WrongSolver");
-        }
-        if (solverFrom == _user() || solverFrom == solverTo || solverFrom == control) {
-            revert("ERR-EV009 InvalidFrom");
-        }
+            if (solverTo == address(this) || solverTo == control || solverTo == atlas) {
+                revert("ERR-EV008 InvalidTo");
+            }
+            if (solverTo != _approvedCaller()) {
+                revert("ERR-EV009 WrongSolver");
+            }
+            if (solverFrom == _user() || solverFrom == solverTo || solverFrom == control) {
+                revert("ERR-EV009 InvalidFrom");
+            }
         }
         _;
     }
-
 
     //////////////////////////////////
     ///    CORE CALL FUNCTIONS     ///
@@ -92,14 +89,10 @@ contract ExecutionEnvironment is Base {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 
-        bytes memory preOpsData = abi.encodeWithSelector(
-            IDAppControl.preOpsCall.selector, userOp
-        );
+        bytes memory preOpsData = abi.encodeWithSelector(IDAppControl.preOpsCall.selector, userOp);
 
         bool success;
-        (success, preOpsData) = _control().delegatecall(
-            forward(preOpsData)
-        );
+        (success, preOpsData) = _control().delegatecall(forward(preOpsData));
 
         require(success, "ERR-EC02 DelegateRevert");
 
@@ -107,14 +100,14 @@ contract ExecutionEnvironment is Base {
         return preOpsData;
     }
 
-    function userWrapper(UserOperation calldata userOp) 
-        external 
+    function userWrapper(UserOperation calldata userOp)
+        external
         payable
         validUser(userOp)
         onlyAtlasEnvironment(ExecutionPhase.UserOperation, _ENVIRONMENT_DEPTH)
         contributeSurplus(Party.User)
         validControlHash
-        returns (bytes memory userData) 
+        returns (bytes memory userData)
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
@@ -126,23 +119,18 @@ contract ExecutionEnvironment is Base {
         bool success;
 
         if (config.needsDelegateUser()) {
-
             (success, userData) = userOp.dapp.delegatecall(forward(userOp.data));
             require(success, "ERR-EC02 DelegateRevert");
-            
-            // userData = abi.decode(userData, (bytes));
 
+            // userData = abi.decode(userData, (bytes));
         } else {
             // regular user call - executed at regular destination and not performed locally
-            (success, userData) = userOp.dapp.call{value: userOp.value}(
-                forward(userOp.data)
-            );
+            (success, userData) = userOp.dapp.call{ value: userOp.value }(forward(userOp.data));
             require(success, "ERR-EC04a CallRevert");
-
-        } 
+        }
     }
 
-    function postOpsWrapper(bytes calldata returnData) 
+    function postOpsWrapper(bytes calldata returnData)
         external
         onlyAtlasEnvironment(ExecutionPhase.PostOps, _ENVIRONMENT_DEPTH)
         contributeSurplus(Party.DApp)
@@ -150,9 +138,8 @@ contract ExecutionEnvironment is Base {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 
-        bytes memory data = abi.encodeWithSelector(
-            IDAppControl.postOpsCall.selector, returnData);
-        
+        bytes memory data = abi.encodeWithSelector(IDAppControl.postOpsCall.selector, returnData);
+
         bool success;
         (success, data) = _control().delegatecall(forward(data));
 
@@ -161,13 +148,14 @@ contract ExecutionEnvironment is Base {
     }
 
     function solverMetaTryCatch(
-        uint256 gasLimit, 
-        SolverOperation calldata solverOp, 
+        uint256 gasLimit,
+        SolverOperation calldata solverOp,
         bytes calldata dAppReturnData
-    ) 
-        external payable 
+    )
+        external
+        payable
         onlyAtlasEnvironment(ExecutionPhase.SolverOperations, _ENVIRONMENT_DEPTH)
-        // No donate surplus here - donate after value xfer
+    // No donate surplus here - donate after value xfer
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
@@ -183,7 +171,7 @@ contract ExecutionEnvironment is Base {
         if (solverOp.bidToken == address(0)) {
             bidBalance = address(this).balance - solverOp.value; // NOTE: this is the meta tx value
             etherIsBidToken = true;
-        // ERC20 balance
+            // ERC20 balance
         } else {
             bidBalance = ERC20(solverOp.bidToken).balanceOf(address(this));
         }
@@ -193,7 +181,7 @@ contract ExecutionEnvironment is Base {
         ////////////////////////////
 
         // Verify that the DAppControl contract matches the solver's expectations
-        if(solverOp.control != _control()) {
+        if (solverOp.control != _control()) {
             revert FastLaneErrorsEvents.AlteredControlHash();
         }
 
@@ -201,69 +189,59 @@ contract ExecutionEnvironment is Base {
 
         // Handle any solver preOps, if necessary
         if (_config().needsPreSolver()) {
-
             bytes memory data = abi.encode(solverOp.solver, dAppReturnData);
 
-            data = abi.encodeWithSelector(
-                IDAppControl.preSolverCall.selector, 
-                data
-            );
+            data = abi.encodeWithSelector(IDAppControl.preSolverCall.selector, data);
 
-            (success, data) = _control().delegatecall(
-                forwardSpecial(data, ExecutionPhase.PreSolver)
-            );
+            (success, data) = _control().delegatecall(forwardSpecial(data, ExecutionPhase.PreSolver));
 
-            if(!success) {
+            if (!success) {
                 revert FastLaneErrorsEvents.PreSolverFailed();
-            } 
+            }
 
             success = abi.decode(data, (bool));
-            if(!success) {
+            if (!success) {
                 revert FastLaneErrorsEvents.PreSolverFailed();
-            } 
+            }
         }
 
         // Execute the solver call.
-        (success,) = ISolverContract(solverOp.solver).atlasSolverCall{
-            gas: gasLimit,
-            value: solverOp.value
-        }(solverOp.from, solverOp.bidToken, solverOp.bidAmount, solverOp.data, _config().forwardReturnData() ? dAppReturnData : new bytes(0));
+        (success,) = ISolverContract(solverOp.solver).atlasSolverCall{ gas: gasLimit, value: solverOp.value }(
+            solverOp.from,
+            solverOp.bidToken,
+            solverOp.bidAmount,
+            solverOp.data,
+            _config().forwardReturnData() ? dAppReturnData : new bytes(0)
+        );
 
         // Verify that it was successful
-        if(!success) {
+        if (!success) {
             revert FastLaneErrorsEvents.SolverOperationReverted();
-        } 
+        }
 
         // If this was a user intent, handle and verify fulfillment
         if (_config().needsSolverPostCall()) {
-            
             bytes memory data = dAppReturnData;
 
             data = abi.encode(solverOp.solver, data);
 
-            data = abi.encodeWithSelector(
-                IDAppControl.postSolverCall.selector, 
-                data
-            );
+            data = abi.encodeWithSelector(IDAppControl.postSolverCall.selector, data);
 
-            (success, data) = _control().delegatecall(
-                forwardSpecial(data, ExecutionPhase.PostSolver)
-            );
+            (success, data) = _control().delegatecall(forwardSpecial(data, ExecutionPhase.PostSolver));
 
-            if(!success) {
+            if (!success) {
                 revert FastLaneErrorsEvents.PostSolverFailed();
-            } 
+            }
 
             success = abi.decode(data, (bool));
-            if(!success) {
+            if (!success) {
                 revert FastLaneErrorsEvents.IntentUnfulfilled();
             }
         }
 
-
         // Verify that the solver paid what they bid
         uint256 balance = etherIsBidToken ? address(this).balance : ERC20(solverOp.bidToken).balanceOf(address(this));
-        
+
         if (balance < bidBalance + solverOp.bidAmount) {
             revert FastLaneErrorsEvents.SolverBidUnpaid();
         }
@@ -274,8 +252,12 @@ contract ExecutionEnvironment is Base {
         }
     }
 
-    function allocateValue(address bidToken, uint256 bidAmount, bytes memory returnData) 
-        external 
+    function allocateValue(
+        address bidToken,
+        uint256 bidAmount,
+        bytes memory returnData
+    )
+        external
         onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _ENVIRONMENT_DEPTH)
         contributeSurplus(Party.Solver)
     {
@@ -286,19 +268,18 @@ contract ExecutionEnvironment is Base {
 
         if (bidToken != address(0)) {
             SafeTransferLib.safeTransfer(ERC20(bidToken), address(0xa71a5), payment);
-         
         } else {
             SafeTransferLib.safeTransferETH(address(0xa71a5), payment);
         }
 
         uint256 netBidAmount = bidAmount - payment;
 
-        bytes memory allocateData = abi.encodeWithSelector(IDAppControl.allocateValueCall.selector, bidToken, netBidAmount, returnData);
+        bytes memory allocateData =
+            abi.encodeWithSelector(IDAppControl.allocateValueCall.selector, bidToken, netBidAmount, returnData);
 
         (bool success,) = _control().delegatecall(forward(allocateData));
         require(success, "ERR-EC02 DelegateRevert");
     }
-
 
     ///////////////////////////////////////
     //  USER SUPPORT / ACCESS FUNCTIONS  //
@@ -365,7 +346,7 @@ contract ExecutionEnvironment is Base {
         escrow = atlas;
     }
 
-    receive() external payable {}
+    receive() external payable { }
 
-    fallback() external payable {}
+    fallback() external payable { }
 }

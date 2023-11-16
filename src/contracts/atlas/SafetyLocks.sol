@@ -1,9 +1,9 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.21;
 
-import {SafetyBits} from "../libraries/SafetyBits.sol";
-import {CallBits} from "../libraries/CallBits.sol";
-import {PartyMath} from "../libraries/GasParties.sol";
+import { SafetyBits } from "../libraries/SafetyBits.sol";
+import { CallBits } from "../libraries/CallBits.sol";
+import { PartyMath } from "../libraries/GasParties.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
@@ -12,9 +12,9 @@ import "../types/EscrowTypes.sol";
 
 import "../types/LockTypes.sol";
 
-import {Storage} from "./Storage.sol";
-import {FastLaneErrorsEvents} from "../types/Emissions.sol";
-import {SafetyLocksLib} from "./SafetyLocksLib.sol";
+import { Storage } from "./Storage.sol";
+import { FastLaneErrorsEvents } from "../types/Emissions.sol";
+import { SafetyLocksLib } from "./SafetyLocksLib.sol";
 
 import "forge-std/Test.sol";
 
@@ -31,14 +31,28 @@ abstract contract SafetyLocks is Storage, FastLaneErrorsEvents {
         address _gasAccLib,
         address _safetyLocksLib,
         address _simulator
-    ) Storage(_escrowDuration, _factory, _verification, _gasAccLib, _safetyLocksLib, _simulator) {}
+    )
+        Storage(_escrowDuration, _factory, _verification, _gasAccLib, _safetyLocksLib, _simulator)
+    { }
 
-    function _initializeEscrowLock(UserOperation calldata userOp, address executionEnvironment, address bundler, uint256 gasLimit) internal {
-        (bool success,) = SAFETY_LOCKS_LIB.delegatecall(abi.encodeWithSelector(SafetyLocksLib.initializeEscrowLock.selector, userOp, executionEnvironment, bundler, gasLimit)); 
-        if(!success) revert SafetyLocksLibError();
+    function _initializeEscrowLock(
+        UserOperation calldata userOp,
+        address executionEnvironment,
+        address bundler,
+        uint256 gasLimit
+    )
+        internal
+    {
+        (bool success,) = SAFETY_LOCKS_LIB.delegatecall(
+            abi.encodeWithSelector(
+                SafetyLocksLib.initializeEscrowLock.selector, userOp, executionEnvironment, bundler, gasLimit
+            )
+        );
+        if (!success) revert SafetyLocksLibError();
     }
 
-    // function _initializeEscrowLock(UserOperation calldata userOp, address executionEnvironment, address bundler, uint256 gasLimit) internal {
+    // function _initializeEscrowLock(UserOperation calldata userOp, address executionEnvironment, address bundler,
+    // uint256 gasLimit) internal {
     //     _checkIfUnlocked();
 
     //     uint256 activeParties;
@@ -47,8 +61,9 @@ abstract contract SafetyLocks is Storage, FastLaneErrorsEvents {
 
     //     uint256 bundlerIndex = uint256(Party.Bundler);
 
-    //     // Check for proxies 
-    //     // NOTE: Order is important here so that we can loop through these later without having to go backwards to find final proxy
+    //     // Check for proxies
+    //     // NOTE: Order is important here so that we can loop through these later without having to go backwards to
+    // find final proxy
     //     // Builder proxy
     //     if (block.coinbase == bundler) {
     //         activeParties = activeParties.markActive(Party.Builder);
@@ -119,10 +134,13 @@ abstract contract SafetyLocks is Storage, FastLaneErrorsEvents {
         address executionEnvironment,
         uint8 solverOpCount,
         bool isSimulation
-    ) internal view returns (EscrowKey memory self) {
-
+    )
+        internal
+        view
+        returns (EscrowKey memory self)
+    {
         // TODO: can we bypass this check?
-        if(lock.activeEnvironment != executionEnvironment) revert NotInitialized();
+        if (lock.activeEnvironment != executionEnvironment) revert NotInitialized();
 
         self = self.initializeEscrowLock(
             dConfig.callConfig.needsPreOpsCall(), solverOpCount, executionEnvironment, isSimulation
@@ -130,21 +148,12 @@ abstract contract SafetyLocks is Storage, FastLaneErrorsEvents {
     }
 
     function _releaseEscrowLock() internal {
-        lock = Lock({
-            activeEnvironment: UNLOCKED,
-            activeParties: uint16(0),
-            startingBalance: uint64(0)
-        });
+        lock = Lock({ activeEnvironment: UNLOCKED, activeParties: uint16(0), startingBalance: uint64(0) });
 
         for (uint256 i; i < LEDGER_LENGTH; i++) {
             // init the storage vars
-            ledgers[i] = Ledger({
-                balance: 0,
-                contributed: 0,
-                requested: 0,
-                status: LedgerStatus.Inactive,
-                proxy: Party(i)
-            }); 
+            ledgers[i] =
+                Ledger({ balance: 0, contributed: 0, requested: 0, status: LedgerStatus.Inactive, proxy: Party(i) });
         }
     }
 
@@ -158,7 +167,7 @@ abstract contract SafetyLocks is Storage, FastLaneErrorsEvents {
     }
 
     function _checkIfUnlocked() internal view {
-        if(lock.activeEnvironment != UNLOCKED) revert AlreadyInitialized();
+        if (lock.activeEnvironment != UNLOCKED) revert AlreadyInitialized();
     }
 
     function activeEnvironment() external view returns (address) {

@@ -1,20 +1,20 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.21;
 
-import {IAtlas} from "../interfaces/IAtlas.sol";
+import { IAtlas } from "../interfaces/IAtlas.sol";
 
-import {UserSimulationFailed, UserUnexpectedSuccess, UserSimulationSucceeded} from "../types/Emissions.sol";
+import { UserSimulationFailed, UserUnexpectedSuccess, UserSimulationSucceeded } from "../types/Emissions.sol";
 
-import {FastLaneErrorsEvents} from "../types/Emissions.sol";
+import { FastLaneErrorsEvents } from "../types/Emissions.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
 import "../types/LockTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
-import {CallVerification} from "../libraries/CallVerification.sol";
-import {CallBits} from "../libraries/CallBits.sol";
-import {SafetyBits} from "../libraries/SafetyBits.sol";
+import { CallVerification } from "../libraries/CallVerification.sol";
+import { CallBits } from "../libraries/CallBits.sol";
+import { SafetyBits } from "../libraries/SafetyBits.sol";
 
 import "forge-std/Test.sol";
 
@@ -32,7 +32,7 @@ contract Simulator is FastLaneErrorsEvents {
         SimulationPassed
     }
 
-    address public immutable deployer; 
+    address public immutable deployer;
     address public atlas;
 
     constructor() {
@@ -48,7 +48,7 @@ contract Simulator is FastLaneErrorsEvents {
         // SolverOperation memory solverOp;
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         // solverOps[0] = solverOp;
-        DAppOperation memory dAppOp; 
+        DAppOperation memory dAppOp;
         dAppOp.control = userOp.control;
 
         success = uint8(_errorCatcher(userOp, solverOps, dAppOp)) > uint8(Result.UserOpSimFail);
@@ -57,19 +57,27 @@ contract Simulator is FastLaneErrorsEvents {
     function simSolverCall(
         UserOperation calldata userOp,
         SolverOperation calldata solverOp,
-        DAppOperation calldata dAppOp 
-    ) external payable returns (bool success) {
+        DAppOperation calldata dAppOp
+    )
+        external
+        payable
+        returns (bool success)
+    {
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         solverOps[0] = solverOp;
-        
+
         success = _errorCatcher(userOp, solverOps, dAppOp) == Result.SimulationPassed;
     }
 
     function simSolverCalls(
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
-        DAppOperation calldata dAppOp 
-    ) external payable returns (bool success) {
+        DAppOperation calldata dAppOp
+    )
+        external
+        payable
+        returns (bool success)
+    {
         if (solverOps.length == 0) {
             return false;
         }
@@ -79,13 +87,14 @@ contract Simulator is FastLaneErrorsEvents {
     function _errorCatcher(
         UserOperation memory userOp,
         SolverOperation[] memory solverOps,
-        DAppOperation memory dAppOp 
-    ) internal returns (Result result) {
-
-        try this.metacallSimulation{value: msg.value}(userOp, solverOps, dAppOp) {
+        DAppOperation memory dAppOp
+    )
+        internal
+        returns (Result result)
+    {
+        try this.metacallSimulation{ value: msg.value }(userOp, solverOps, dAppOp) {
             revert("unreachable");
-        }
-        catch (bytes memory revertData) {
+        } catch (bytes memory revertData) {
             bytes4 errorSwitch = bytes4(revertData);
             if (errorSwitch == PreOpsSimFail.selector) {
                 result = Result.PreOpsSimFail;
@@ -106,8 +115,11 @@ contract Simulator is FastLaneErrorsEvents {
     function metacallSimulation(
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
-        DAppOperation calldata dAppOp 
-    ) external payable {
+        DAppOperation calldata dAppOp
+    )
+        external
+        payable
+    {
         require(msg.sender == address(this), "invalid entry func");
         if (!IAtlas(atlas).metacall(userOp, solverOps, dAppOp)) {
             revert NoAuctionWinner(); // should be unreachable
@@ -115,7 +127,7 @@ contract Simulator is FastLaneErrorsEvents {
         revert SimulationPassed();
     }
 
-    receive() external payable {}
+    receive() external payable { }
 
-    fallback() external payable {}
+    fallback() external payable { }
 }

@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.21;
 
-import {IDAppControl} from "../interfaces/IDAppControl.sol";
+import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
@@ -16,8 +16,11 @@ library CallVerification {
         DAppConfig memory dConfig,
         UserOperation memory userOp,
         SolverOperation[] memory solverOps
-    ) internal pure returns (bytes32 callSequenceHash) {
-        
+    )
+        internal
+        pure
+        returns (bytes32 callSequenceHash)
+    {
         uint256 i;
         if (dConfig.callConfig & 1 << uint32(CallConfigIndex.RequirePreOps) != 0) {
             // Start with preOps call if preOps is needed
@@ -25,10 +28,7 @@ library CallVerification {
                 abi.encodePacked(
                     callSequenceHash, // initial hash = null
                     dConfig.to,
-                    abi.encodeWithSelector(
-                        IDAppControl.preOpsCall.selector,
-                        userOp
-                    ),
+                    abi.encodeWithSelector(IDAppControl.preOpsCall.selector, userOp),
                     i++
                 )
             );
@@ -46,7 +46,7 @@ library CallVerification {
         // then solver calls
         uint256 count = solverOps.length;
         uint256 n;
-        for (; n<count;) {
+        for (; n < count;) {
             callSequenceHash = keccak256(
                 abi.encodePacked(
                     callSequenceHash, // reference previous hash
@@ -54,7 +54,9 @@ library CallVerification {
                     i++
                 )
             );
-            unchecked {++n;}
+            unchecked {
+                ++n;
+            }
         }
     }
 }

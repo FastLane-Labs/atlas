@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.21;
 
-import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
-import {IDAppIntegration} from "../src/contracts/interfaces/IDAppIntegration.sol";
-import {IExecutionEnvironment} from "../src/contracts/interfaces/IExecutionEnvironment.sol";
+import { IDAppIntegration } from "../src/contracts/interfaces/IDAppIntegration.sol";
+import { IExecutionEnvironment } from "../src/contracts/interfaces/IExecutionEnvironment.sol";
 
-import {Atlas} from "../src/contracts/atlas/Atlas.sol";
-import {Mimic} from "../src/contracts/atlas/Mimic.sol";
+import { Atlas } from "../src/contracts/atlas/Atlas.sol";
+import { Mimic } from "../src/contracts/atlas/Mimic.sol";
 
-import {V2DAppControl} from "../src/contracts/examples/v2-example/V2DAppControl.sol";
+import { V2DAppControl } from "../src/contracts/examples/v2-example/V2DAppControl.sol";
 
-import {Solver} from "src/contracts/solver/src/TestSolver.sol";
+import { Solver } from "src/contracts/solver/src/TestSolver.sol";
 
 import "../src/contracts/types/UserCallTypes.sol";
 import "../src/contracts/types/SolverCallTypes.sol";
@@ -19,8 +19,8 @@ import "../src/contracts/types/EscrowTypes.sol";
 import "../src/contracts/types/LockTypes.sol";
 import "../src/contracts/types/DAppApprovalTypes.sol";
 
-import {BaseTest} from "./base/BaseTest.t.sol";
-import {V2Helper} from "./V2Helper.sol";
+import { BaseTest } from "./base/BaseTest.t.sol";
+import { V2Helper } from "./V2Helper.sol";
 
 import "forge-std/Test.sol";
 
@@ -29,13 +29,13 @@ contract MainTest is BaseTest {
     function setUp() public virtual override {
         BaseTest.setUp();
 
-        // Deposit ETH from Searcher1 signer to pay for searcher's gas 
-        vm.prank(solverOneEOA); 
-        atlas.deposit{value: 1e18}();
+        // Deposit ETH from Searcher1 signer to pay for searcher's gas
+        vm.prank(solverOneEOA);
+        atlas.deposit{ value: 1e18 }();
 
         // Deposit ETH from Searcher2 signer to pay for searcher's gas
         vm.prank(solverTwoEOA);
-        atlas.deposit{value: 1e18}();
+        atlas.deposit{ value: 1e18 }();
     }
 
     function testMain() public {
@@ -56,31 +56,32 @@ contract MainTest is BaseTest {
         console.log("solverOne    WETH:", WETH.balanceOf(address(solverOne)));
         // First SolverOperation
         solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_ONE);
-        solverOps[1] =
-            helper.buildSolverOperation(userOp, solverOpData, solverOneEOA, address(solverOne), WETH.balanceOf(address(solverOne)) / 20);
+        solverOps[1] = helper.buildSolverOperation(
+            userOp, solverOpData, solverOneEOA, address(solverOne), WETH.balanceOf(address(solverOne)) / 20
+        );
 
         (v, r, s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[1]));
         solverOps[1].signature = abi.encodePacked(r, s, v);
-        
+
         console.log("solverTwoEOA WETH:", WETH.balanceOf(address(solverTwoEOA)));
         console.log("solverTwo    WETH:", WETH.balanceOf(address(solverTwo)));
         // Second SolverOperation
         solverOpData = helper.buildV2SolverOperationData(POOL_ONE, POOL_TWO);
-        solverOps[0] =
-            helper.buildSolverOperation(userOp, solverOpData, solverTwoEOA, address(solverTwo), WETH.balanceOf(address(solverTwo)) / 3000);
+        solverOps[0] = helper.buildSolverOperation(
+            userOp, solverOpData, solverTwoEOA, address(solverTwo), WETH.balanceOf(address(solverTwo)) / 3000
+        );
 
         (v, r, s) = vm.sign(solverTwoPK, atlasVerification.getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(r, s, v);
 
-        console.log("topBid before sorting",solverOps[0].bidAmount);
-        
+        console.log("topBid before sorting", solverOps[0].bidAmount);
+
         solverOps = sorter.sortBids(userOp, solverOps);
 
-        console.log("topBid after sorting ",solverOps[0].bidAmount);
+        console.log("topBid after sorting ", solverOps[0].bidAmount);
 
         // DAppOperation call
-        DAppOperation memory dAppOp =
-            helper.buildDAppOperation(governanceEOA, userOp, solverOps);
+        DAppOperation memory dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
 
         (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
 
@@ -117,11 +118,8 @@ contract MainTest is BaseTest {
         uint256 solverTwoEOABalance = solverTwoEOA.balance;
         uint256 solverTwoAtlEthBalance = atlas.balanceOf(solverTwoEOA);
 
-        (bool success,) = address(atlas).call(
-            abi.encodeWithSelector(
-                atlas.metacall.selector, userOp, solverOps, dAppOp
-            )
-        );
+        (bool success,) =
+            address(atlas).call(abi.encodeWithSelector(atlas.metacall.selector, userOp, solverOps, dAppOp));
 
         if (success) {
             console.log("success!");
@@ -231,7 +229,6 @@ contract MainTest is BaseTest {
             console.log("solverTwo total balance delta : -", solverTwoTotalBalance - newSolverTwoBalance);
         }
 
-
         /*
         console.log("");
         console.log("-");
@@ -283,9 +280,7 @@ contract MainTest is BaseTest {
         */
     }
 
-    
     function testMimic() public {
-        
         // uncomment to debug if this test is broken
         /*
         address aaaaa = atlas.executionTemplate();
@@ -316,7 +311,6 @@ contract MainTest is BaseTest {
         console.logBytes(creationCode);
         console.log("----");
         */
-        
 
         vm.startPrank(userEOA);
         atlas.createExecutionEnvironment(address(control));
@@ -324,11 +318,18 @@ contract MainTest is BaseTest {
         vm.stopPrank();
 
         assertTrue(IExecutionEnvironment(newEnvironment).getUser() == userEOA, "Mimic Error - User Mismatch");
-        assertTrue(IExecutionEnvironment(newEnvironment).getControl() == address(control), "Mimic Error - Control Mismatch");
-        assertTrue(IExecutionEnvironment(newEnvironment).getConfig() == control.callConfig(), "Mimic Error - CallConfig Mismatch");
-        assertTrue(IExecutionEnvironment(newEnvironment).getEscrow() == address(atlas), "Mimic Error - Escrow/Atlas Address Mismatch");
+        assertTrue(
+            IExecutionEnvironment(newEnvironment).getControl() == address(control), "Mimic Error - Control Mismatch"
+        );
+        assertTrue(
+            IExecutionEnvironment(newEnvironment).getConfig() == control.callConfig(),
+            "Mimic Error - CallConfig Mismatch"
+        );
+        assertTrue(
+            IExecutionEnvironment(newEnvironment).getEscrow() == address(atlas),
+            "Mimic Error - Escrow/Atlas Address Mismatch"
+        );
     }
-    
 
     function testTestUserOperation() public {
         uint8 v;
@@ -357,7 +358,7 @@ contract MainTest is BaseTest {
         bytes32 r;
         bytes32 s;
 
-        console.log("TOKEN_ONE",TOKEN_ONE);
+        console.log("TOKEN_ONE", TOKEN_ONE);
 
         UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
         (v, r, s) = vm.sign(userPK, atlasVerification.getUserOperationPayload(userOp));
@@ -367,22 +368,17 @@ contract MainTest is BaseTest {
 
         // Success case
         bytes memory solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_ONE);
-        solverOps[0] = helper.buildSolverOperation(
-            userOp, solverOpData, solverOneEOA, address(solverOne), 2e17
-        );
+        solverOps[0] = helper.buildSolverOperation(userOp, solverOpData, solverOneEOA, address(solverOne), 2e17);
         (v, r, s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(r, s, v);
-        DAppOperation memory dAppOp =
-            helper.buildDAppOperation(governanceEOA, userOp, solverOps);
+        DAppOperation memory dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
         (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(r, s, v);
         vm.startPrank(userEOA);
         atlas.createExecutionEnvironment(userOp.control);
         ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
         (bool success, bytes memory data) = address(simulator).call(
-            abi.encodeWithSelector(
-                simulator.simSolverCalls.selector, userOp, solverOps, dAppOp
-            )
+            abi.encodeWithSelector(simulator.simSolverCalls.selector, userOp, solverOps, dAppOp)
         );
 
         assertTrue(success, "Success case tx reverted unexpectedly");
@@ -390,10 +386,9 @@ contract MainTest is BaseTest {
         vm.stopPrank();
 
         // Failure case
-        solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_TWO); // this will make the solver operation revert
-        solverOps[0] = helper.buildSolverOperation(
-            userOp, solverOpData, solverOneEOA, address(solverOne), 2e17
-        );
+        solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_TWO); // this will make the solver operation
+            // revert
+        solverOps[0] = helper.buildSolverOperation(userOp, solverOpData, solverOneEOA, address(solverOne), 2e17);
         (v, r, s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(r, s, v);
         dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
@@ -401,9 +396,7 @@ contract MainTest is BaseTest {
         dAppOp.signature = abi.encodePacked(r, s, v);
         vm.startPrank(userEOA);
         (success, data) = address(simulator).call(
-            abi.encodeWithSelector(
-                simulator.simSolverCalls.selector, userOp, solverOps, dAppOp
-            )
+            abi.encodeWithSelector(simulator.simSolverCalls.selector, userOp, solverOps, dAppOp)
         );
 
         assertTrue(success, "Failure case tx reverted unexpectedly");

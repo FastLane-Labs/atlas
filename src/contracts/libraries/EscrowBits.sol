@@ -26,15 +26,16 @@ library EscrowBits {
         1 << uint256(SolverOutcome.CallReverted) | 1 << uint256(SolverOutcome.BidNotPaid)
             | 1 << uint256(SolverOutcome.CallValueTooHigh) | 1 << uint256(SolverOutcome.UnknownError)
             | 1 << uint256(SolverOutcome.CallbackFailed) | 1 << uint256(SolverOutcome.IntentUnfulfilled)
-            | 1 << uint256(SolverOutcome.PreSolverFailed) | 1 << uint256(SolverOutcome.EVMError) 
+            | 1 << uint256(SolverOutcome.PreSolverFailed) | 1 << uint256(SolverOutcome.EVMError)
     );
 
     uint256 internal constant _EXECUTED_SUCCESSFULLY = (1 << uint256(SolverOutcome.Success));
 
     uint256 internal constant _NO_USER_REFUND = (
-        1 << uint256(SolverOutcome.InvalidTo) |1 << uint256(SolverOutcome.InvalidSignature) | 1 << uint256(SolverOutcome.InvalidUserHash)
-            | 1 << uint256(SolverOutcome.InvalidBidsHash) | 1 << uint256(SolverOutcome.GasPriceOverCap)
-            | 1 << uint256(SolverOutcome.InvalidSequencing) | 1 << uint256(SolverOutcome.InvalidControlHash)
+        1 << uint256(SolverOutcome.InvalidTo) | 1 << uint256(SolverOutcome.InvalidSignature)
+            | 1 << uint256(SolverOutcome.InvalidUserHash) | 1 << uint256(SolverOutcome.InvalidBidsHash)
+            | 1 << uint256(SolverOutcome.GasPriceOverCap) | 1 << uint256(SolverOutcome.InvalidSequencing)
+            | 1 << uint256(SolverOutcome.InvalidControlHash)
     );
 
     uint256 internal constant _CALLDATA_REFUND = (
@@ -43,9 +44,8 @@ library EscrowBits {
     );
 
     uint256 internal constant _FULL_REFUND = (
-        _EXECUTION_REFUND | 1 << uint256(SolverOutcome.AlreadyExecuted)
-            | 1 << uint256(SolverOutcome.InvalidNonceUnder) | 1 << uint256(SolverOutcome.PerBlockLimit)
-            | 1 << uint256(SolverOutcome.InvalidFormat)
+        _EXECUTION_REFUND | 1 << uint256(SolverOutcome.AlreadyExecuted) | 1 << uint256(SolverOutcome.InvalidNonceUnder)
+            | 1 << uint256(SolverOutcome.PerBlockLimit) | 1 << uint256(SolverOutcome.InvalidFormat)
     );
 
     function canExecute(uint256 result) internal pure returns (bool) {

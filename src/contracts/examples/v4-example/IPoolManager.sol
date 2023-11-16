@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity 0.8.21;
 
-import {IHooks} from "./IHooks.sol";
+import { IHooks } from "./IHooks.sol";
 
 interface IPoolManager {
     type Currency is address;
