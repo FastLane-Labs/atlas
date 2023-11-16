@@ -22,8 +22,8 @@ contract SolverBase is Test {
     address private immutable _owner;
     address private immutable _escrow;
 
-    constructor(address weth9, address atlasEscrow, address owner) {
-        WETH_ADDRESS = weth9;
+    constructor(address weth, address atlasEscrow, address owner) {
+        WETH_ADDRESS = weth;
         _owner = owner;
         _escrow = atlasEscrow;
     }

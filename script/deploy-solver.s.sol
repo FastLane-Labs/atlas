@@ -15,13 +15,17 @@ contract DeploySimpleRFQSolverScript is DeployBaseScript {
         uint256 deployerPrivateKey = vm.envUint("SOLVER1_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
         address atlasAddress = _getAddressFromDeploymentsJson("ATLAS");
+        address wethAddress = u.getUsefulContractAddress(vm.envString("DEPLOY_TO"), "WETH");
 
         console.log("Deployer address: \t\t\t\t", deployer);
         console.log("Using Atlas address: \t\t\t\t", atlasAddress);
 
         vm.startBroadcast(deployerPrivateKey);
 
-        rfqSolver = new SimpleRFQSolver(vm.envAddress("WETH"), atlasAddress);
+        rfqSolver = new SimpleRFQSolver({
+            weth: wethAddress,
+            atlas: atlasAddress
+        });
 
         vm.stopBroadcast();
 
