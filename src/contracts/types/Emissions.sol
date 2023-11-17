@@ -24,6 +24,7 @@ contract FastLaneErrorsEvents {
         address indexed controller, uint32 callConfig, address bidToken, uint256 bidAmount
     );
 
+    // TODO remove after AtlasFactory split-out
     event NewExecutionEnvironment(
         address indexed environment,
         address indexed user,
@@ -56,6 +57,54 @@ contract FastLaneErrorsEvents {
     error SimulationPassed();
 
     error ValidCalls(ValidCallsResult);
+
+    // NEW Custom Errors to replace string errors
+
+    // NEW - Atlas
+    error PreOpsFail();
+    error UserOpFail();
+    // error SolverFail(); // Only sim version of err is used
+    error PostOpsFail();
+    error RevertToReuse();
+    error InvalidAccess();
+
+    // NEW - Escrow
+    error UncoveredResult();
+
+    // NEW - AtlETH
+    error InsufficientBalance();
+    error PermitDeadlineExpired();
+    error InvalidSigner();
+    error EscrowLockActive();
+
+    // NEW - DAppIntegration
+    error OnlyGovernance();
+    error OwnerActive();
+    error SignatoryActive();
+    error InvalidCaller();
+    error InvalidDAppControl();
+    error DAppNotEnabled();
+
+    // NEW - Permit69
+    error InvalidEnvironment();
+    error EnvironmentMismatch();
+    error InvalidLockState();
+
+    // NEW - GasAccounting
+    error LedgerFinalized(uint8 id);
+    error LedgerBalancing(uint8 id);
+    error MissingFunds(uint8 id);
+    error InsufficientFunds();
+    error NoUnfilledRequests();
+    error SolverMustReconcile();
+    error GasAccountingLibError();
+    
+    // NEW - SafetyLocks
+    error NotInitialized();
+    error AlreadyInitialized();
+    error SafetyLocksLibError();
+
+    
 
     /*
     event NewDAppIntegration(

@@ -1,46 +1,40 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.16;
+pragma solidity ^0.8.18;
 
 import {IDAppControl} from "../interfaces/IDAppControl.sol";
-import {Escrow} from "./Escrow.sol";
-
 import {Mimic} from "./Mimic.sol";
+import {DAppConfig} from "src/contracts/types/DAppApprovalTypes.sol";
 import {ExecutionEnvironment} from "./ExecutionEnvironment.sol";
 
-import "../types/SolverCallTypes.sol";
-import "../types/UserCallTypes.sol";
-import "../types/DAppApprovalTypes.sol";
+// TODO make sure no cases of address(this) when Atlas address is intended
 
-import {CallBits} from "../libraries/CallBits.sol";
-
-contract Factory is Escrow {
-    //address immutable public atlas;
-    using CallBits for uint32;
+contract AtlasFactory {
+    event NewExecutionEnvironment(
+        address indexed environment,
+        address indexed user,
+        address indexed controller,
+        uint32 callConfig
+    );
 
     bytes32 public immutable salt;
     address public immutable executionTemplate;
+    address public immutable atlas;
 
-    constructor(uint32 _escrowDuration, address _simulator) Escrow(_escrowDuration, _simulator) {
-        //atlas = msg.sender;
-        salt = keccak256(abi.encodePacked(block.chainid, atlas, "Atlas 1.0"));
+    constructor(address _atlas) {
+        salt = keccak256(abi.encodePacked(block.chainid, address(this), "AtlasFactory 1.0"));
+        atlas = _atlas;
 
-        executionTemplate = _deployExecutionEnvironmentTemplate(
-            address(this), DAppConfig({to: address(0), callConfig: uint32(0), bidToken: address(0)})
-        );
+        executionTemplate = _deployExecutionEnvironmentTemplate(_atlas);
     }
 
-    // GETTERS
-    function getEscrowAddress() external view returns (address escrowAddress) {
-        escrowAddress = atlas;
-    }
+    // ------------------ //
+    // EXTERNAL FUNCTIONS //
+    // ------------------ //
 
-    function execution() external view returns (address) {
-        return executionTemplate;
-    }
-
-    function createExecutionEnvironment(address dAppControl) external returns (address executionEnvironment) {
-        executionEnvironment = _setExecutionEnvironment(dAppControl, msg.sender, dAppControl.codehash);
-        _initializeNonce(msg.sender);
+    function createExecutionEnvironment(address account, address dAppControl) external returns (address executionEnvironment) {
+        // Must call createExecutionEnvironment on Atlas contract to properly initialize nonce tracking
+        require(msg.sender == atlas, "AtlasFactory: Only Atlas can create execution environments");
+        executionEnvironment = _setExecutionEnvironment(dAppControl, account, dAppControl.codehash);
     }
 
     function getExecutionEnvironment(address user, address dAppControl)
@@ -53,40 +47,36 @@ contract Factory is Escrow {
         exists = executionEnvironment.codehash != bytes32(0);
     }
 
-    function _getExecutionEnvironment(address user, bytes32 controlCodeHash, address controller)
-        internal
-        view
-        returns (address executionEnvironment)
-    {
-        uint32 callConfig = IDAppControl(controller).callConfig();
-
-        executionEnvironment = _getExecutionEnvironmentCustom(user, controlCodeHash, controller, callConfig);
-    }
-
-    // NOTE: This func is used to generate the address of user ExecutionEnvironments that have
-    // been deprecated due to DAppControl changes of callConfig.
-    function _getExecutionEnvironmentCustom(
+    function getExecutionEnvironmentCustom(
         address user,
         bytes32 controlCodeHash,
         address controller,
         uint32 callConfig
-    ) internal view override returns (address executionEnvironment) {
-        executionEnvironment = address(
-            uint160(
-                uint256(
-                    keccak256(
-                        abi.encodePacked(
-                            bytes1(0xff),
-                            address(this),
-                            salt,
-                            keccak256(
-                                abi.encodePacked(_getMimicCreationCode(controller, callConfig, user, controlCodeHash))
-                            )
-                        )
-                    )
-                )
-            )
-        );
+    ) external view returns (address executionEnvironment) {
+        executionEnvironment = _getExecutionEnvironmentCustom(user, controlCodeHash, controller, callConfig);
+    }
+
+    function getMimicCreationCode(address controller, uint32 callConfig, address user, bytes32 controlCodeHash)
+        external
+        view
+        returns (bytes memory creationCode)
+    {
+        creationCode = _getMimicCreationCode(controller, callConfig, user, controlCodeHash);
+    }
+
+    // ------------------ //
+    // INTERNAL FUNCTIONS //
+    // ------------------ //
+
+    function _deployExecutionEnvironmentTemplate(address _atlas)
+        internal
+        returns (address executionEnvironment)
+    {
+        ExecutionEnvironment _environment = new ExecutionEnvironment{
+            salt: salt
+        }(_atlas);
+
+        executionEnvironment = address(_environment);
     }
 
     function _setExecutionEnvironment(address dAppControl, address user, bytes32 controlCodeHash)
@@ -117,24 +107,41 @@ contract Factory is Escrow {
         }
     }
 
-    function _deployExecutionEnvironmentTemplate(address, DAppConfig memory)
+    function _getExecutionEnvironment(address user, bytes32 controlCodeHash, address controller)
         internal
+        view
         returns (address executionEnvironment)
     {
-        ExecutionEnvironment _environment = new ExecutionEnvironment{
-            salt: salt
-        }(atlas);
-
-        executionEnvironment = address(_environment);
+        uint32 callConfig = IDAppControl(controller).callConfig();
+        executionEnvironment = _getExecutionEnvironmentCustom(user, controlCodeHash, controller, callConfig);
     }
 
-    /*
-    add(
-                                shl(96, executionLib), 
-                                0xFFFFFFFFFFFFFFFFFFFFFFFFF
+    // NOTE: This func is used to generate the address of user ExecutionEnvironments that have
+    // been deprecated due to DAppControl changes of callConfig.
+    function _getExecutionEnvironmentCustom(
+        address user,
+        bytes32 controlCodeHash,
+        address controller,
+        uint32 callConfig
+    ) internal view returns (address executionEnvironment) {
+        executionEnvironment = address(
+            uint160(
+                uint256(
+                    keccak256(
+                        abi.encodePacked(
+                            bytes1(0xff),
+                            address(this),
+                            salt,
+                            keccak256(
+                                abi.encodePacked(_getMimicCreationCode(controller, callConfig, user, controlCodeHash))
+                            )
+                        )
+                    )
                 )
             )
-            */
+        );
+    }
+
 
     function _getMimicCreationCode(address controller, uint32 callConfig, address user, bytes32 controlCodeHash)
         internal
@@ -184,11 +191,4 @@ contract Factory is Escrow {
         }
     }
 
-    function getMimicCreationCode(address controller, uint32 callConfig, address user, bytes32 controlCodeHash)
-        external
-        view
-        returns (bytes memory creationCode)
-    {
-        creationCode = _getMimicCreationCode(controller, callConfig, user, controlCodeHash);
-    }
 }

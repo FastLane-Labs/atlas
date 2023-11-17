@@ -24,15 +24,21 @@ import {EXECUTION_PHASE_OFFSET, SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER, SAFE_GAS
 abstract contract Permit69 is GasAccounting {
     using SafeTransferLib for ERC20;
 
-    constructor(address _simulator) GasAccounting(_simulator) {}
+    constructor(
+        uint256 _escrowDuration,
+        address _factory,
+        address _verification,
+        address _gasAccLib,
+        address _safetyLocksLib,
+        address _simulator
+    ) GasAccounting(_escrowDuration, _factory, _verification, _gasAccLib, _safetyLocksLib, _simulator) {}
 
     // Virtual Functions defined by other Atlas modules
-    function _getExecutionEnvironmentCustom(
+    function _verifyCallerIsExecutionEnv(
         address user,
-        bytes32 controlCodeHash,
         address controller,
         uint32 callConfig
-    ) internal view virtual returns (address environment);
+    ) internal virtual {}
 
     // Transfer functions
     function transferUserERC20(
@@ -83,7 +89,7 @@ abstract contract Permit69 is GasAccounting {
 
     function requestGasFrom(Party donor, Party recipient, uint256 amt, uint16 lockState) external {
         // Verify the parties
-        require(_validParties(msg.sender, donor, recipient), "ERR-T003 InvalidEnvironment");
+        if(!_validParties(msg.sender, donor, recipient)) revert InvalidEnvironment();
 
         // Verify the lock state
         _verifyLockState({
@@ -96,7 +102,7 @@ abstract contract Permit69 is GasAccounting {
 
     function contributeGasTo(Party donor, Party recipient, uint256 amt, uint16 lockState) external {
         // Verify the parties
-        require(_validParties(msg.sender, donor, recipient), "ERR-T004 InvalidEnvironment");
+        if(!_validParties(msg.sender, donor, recipient)) revert InvalidEnvironment();
 
         // Verify the lock state
         _verifyLockState({
@@ -107,19 +113,10 @@ abstract contract Permit69 is GasAccounting {
         _contributeTo(donor, recipient, amt);
     }
 
-    function _verifyCallerIsExecutionEnv(
-        address user,
-        address controller,
-        uint32 callConfig
-    ) internal view {
-        require(
-            msg.sender == _getExecutionEnvironmentCustom(user, controller.codehash, controller, callConfig),
-            "ERR-T001 EnvironmentMismatch"
-        );
-    }
-
     function _verifyLockState(uint16 lockState, uint16 safeExecutionPhaseSet) internal pure {
-        require(lockState & safeExecutionPhaseSet != 0, "ERR-T002 InvalidLockState");
+        if(lockState & safeExecutionPhaseSet == 0){
+            revert InvalidLockState();
+        }
         // TODO: Do we need the below require? 
         // Intuition is that we'd need to block all reentry into EE to bypass this check 
         // require(msg.sender == activeEnvironment, "ERR-T003 EnvironmentNotActive");

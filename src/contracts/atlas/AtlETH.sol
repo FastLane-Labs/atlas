@@ -7,7 +7,6 @@ import "../types/EscrowTypes.sol";
 import {Permit69} from "../common/Permit69.sol";
 
 // TODO split out events and errors to share with AtlasEscrow
-// TODO all modifiers should be internal fns for contract size savings
 
 /// @notice Modified Solmate ERC20 with some Atlas-specific modifications.
 /// @author FastLane Labs
@@ -22,79 +21,48 @@ abstract contract AtlETH is Permit69 {
     event Approval(address indexed owner, address indexed spender, uint256 amount);
 
     /*//////////////////////////////////////////////////////////////
-                            METADATA STORAGE
-    //////////////////////////////////////////////////////////////*/
-
-    string public constant name = "Atlas ETH";
-    string public constant symbol = "atlETH";
-    uint8 public constant decimals = 18;
-
-    /*//////////////////////////////////////////////////////////////
-                              ERC20 STORAGE
-    //////////////////////////////////////////////////////////////*/
-
-    uint256 public totalSupply;
-    mapping(address => mapping(address => uint256)) public allowance;
-
-    /*//////////////////////////////////////////////////////////////
-                            EIP-2612 STORAGE
-    //////////////////////////////////////////////////////////////*/
-
-    uint256 internal immutable INITIAL_CHAIN_ID;
-    bytes32 internal immutable INITIAL_DOMAIN_SEPARATOR;
-    mapping(address => uint256) public nonces;
-
-    /*//////////////////////////////////////////////////////////////
-                            ATLAS STORAGE
-    //////////////////////////////////////////////////////////////*/
-
-    // NOTE: these storage vars / maps should only be accessible by *signed* solver transactions
-    // and only once per solver per block (to avoid user-solver collaborative exploits)
-    uint256 public immutable escrowDuration;
-
-    /*//////////////////////////////////////////////////////////////
                                CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    constructor(uint32 _escrowDuration, address _simulator) Permit69(_simulator) {
-        INITIAL_CHAIN_ID = block.chainid;
-        INITIAL_DOMAIN_SEPARATOR = computeDomainSeparator();
-
-        escrowDuration = _escrowDuration;
-    }
+    constructor(
+        uint256 _escrowDuration,
+        address _factory,
+        address _verification,
+        address _gasAccLib,
+        address _safetyLocksLib,
+        address _simulator
+    ) Permit69(_escrowDuration, _factory, _verification, _gasAccLib, _safetyLocksLib, _simulator) {}
 
     /*//////////////////////////////////////////////////////////////
                                 ATLETH
     //////////////////////////////////////////////////////////////*/
 
-    // Custom checks for atlETH transfer functions.
-    // Interactions (transfers, withdrawals) are allowed only after the owner last interaction
-    // with Atlas was at least `escrowDuration` blocks ago.
-    modifier tokenTransferChecks(address account) {
-        require(_escrowAccountData[account].lastAccessed + escrowDuration < block.number, "EscrowActive");
-        _;
-    }
+
 
     function balanceOf(address account) public view returns (uint256) {
         return _escrowAccountData[account].balance;
     }
 
-    function nextAccountNonce(address account) external view returns (uint256 nextNonce) {
-        nextNonce = uint256(_escrowAccountData[account].nonce) + 1;
+    function nextAccountNonce(address account) external view returns (uint256) {
+        return uint256(_escrowAccountData[account].nonce) + 1;
     }
 
-    function accountLastActiveBlock(address account) external view returns (uint256 lastBlock) {
-        lastBlock = uint256(_escrowAccountData[account].lastAccessed);
+    function accountLastActiveBlock(address account) external view returns (uint256) {
+        return uint256(_escrowAccountData[account].lastAccessed);
     }
 
     // Deposit ETH and get atlETH in return.
-    function deposit() external payable onlyWhenUnlocked {
+    function deposit() external payable {
+        _checkIfUnlocked();
         _mint(msg.sender, msg.value);
     }
 
     // Redeem atlETH for ETH.
-    function withdraw(uint256 amount) external onlyWhenUnlocked tokenTransferChecks(msg.sender) {
-        require(_escrowAccountData[msg.sender].balance >= amount, "ERR-E078 InsufficientBalance");
+    function withdraw(uint256 amount) external {
+        _checkIfUnlocked();
+        _checkTransfersAllowed(msg.sender);
+
+        if (_escrowAccountData[msg.sender].balance < amount) revert InsufficientBalance();
         _burn(msg.sender, amount);
         SafeTransferLib.safeTransferETH(msg.sender, amount);
     }
@@ -109,7 +77,9 @@ abstract contract AtlETH is Permit69 {
         return true;
     }
 
-    function transfer(address to, uint256 amount) public tokenTransferChecks(msg.sender) returns (bool) {
+    function transfer(address to, uint256 amount) public returns (bool) {
+        _checkTransfersAllowed(msg.sender);
+
         _escrowAccountData[msg.sender].balance -= uint128(amount);
         // Cannot overflow because the sum of all user
         // balances can't exceed the max uint256 value.
@@ -120,7 +90,9 @@ abstract contract AtlETH is Permit69 {
         return true;
     }
 
-    function transferFrom(address from, address to, uint256 amount) public tokenTransferChecks(from) returns (bool) {
+    function transferFrom(address from, address to, uint256 amount) public returns (bool) {
+        _checkTransfersAllowed(from);
+
         uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
         if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
         _escrowAccountData[from].balance -= uint128(amount);
@@ -136,7 +108,7 @@ abstract contract AtlETH is Permit69 {
     function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
         public
     {
-        require(deadline >= block.timestamp, "PERMIT_DEADLINE_EXPIRED");
+        if(deadline < block.timestamp) revert PermitDeadlineExpired();
         // Unchecked because the only math done is incrementing
         // the owner's nonce which cannot realistically overflow.
         unchecked {
@@ -163,17 +135,17 @@ abstract contract AtlETH is Permit69 {
                 r,
                 s
             );
-            require(recoveredAddress != address(0) && recoveredAddress == owner, "INVALID_SIGNER");
+            if(recoveredAddress == address(0) || recoveredAddress != owner) revert InvalidSigner();
             allowance[recoveredAddress][spender] = value;
         }
         emit Approval(owner, spender, value);
     }
 
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
-        return block.chainid == INITIAL_CHAIN_ID ? INITIAL_DOMAIN_SEPARATOR : computeDomainSeparator();
+        return block.chainid == INITIAL_CHAIN_ID ? INITIAL_DOMAIN_SEPARATOR : _computeDomainSeparator();
     }
 
-    function computeDomainSeparator() internal view returns (bytes32) {
+    function _computeDomainSeparator() internal view override returns (bytes32) {
         return keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
@@ -183,6 +155,15 @@ abstract contract AtlETH is Permit69 {
                 address(this)
             )
         );
+    }
+
+    // Custom checks for atlETH transfer functions.
+    // Interactions (transfers, withdrawals) are allowed only after the owner last interaction
+    // with Atlas was at least `escrowDuration` blocks ago.
+    function _checkTransfersAllowed(address account) internal view {
+        if(block.number <= _escrowAccountData[account].lastAccessed + ESCROW_DURATION) {
+            revert EscrowLockActive();
+        }
     }
 
     /*//////////////////////////////////////////////////////////////

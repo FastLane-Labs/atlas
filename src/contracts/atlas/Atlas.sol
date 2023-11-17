@@ -3,8 +3,11 @@ pragma solidity ^0.8.16;
 
 import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
 import {IDAppControl} from "../interfaces/IDAppControl.sol";
+import {IAtlasFactory} from "../interfaces/IAtlasFactory.sol";
+import {IAtlasVerification} from "../interfaces/IAtlasVerification.sol";
 
-import {Factory} from "./Factory.sol";
+import {Escrow} from "./Escrow.sol";
+
 import {UserSimulationFailed, UserUnexpectedSuccess, UserSimulationSucceeded} from "../types/Emissions.sol";
 
 import {FastLaneErrorsEvents} from "../types/Emissions.sol";
@@ -21,14 +24,24 @@ import {SafetyBits} from "../libraries/SafetyBits.sol";
 
 import "forge-std/Test.sol";
 
-contract Atlas is Test, Factory {
+contract Atlas is Escrow {
     using CallVerification for UserOperation;
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
-    uint256 private constant _MAX_GAS = 1_500_000;
+    constructor(
+        uint256 _escrowDuration,
+        address _factory,
+        address _verification,
+        address _gasAccLib,
+        address _safetyLocksLib,
+        address _simulator
+    ) Escrow(_escrowDuration, _factory, _verification, _gasAccLib, _safetyLocksLib, _simulator) {}
 
-    constructor(uint32 _escrowDuration, address _simulator) Factory(_escrowDuration, _simulator) {}
+    function createExecutionEnvironment(address dAppControl) external returns (address executionEnvironment) {
+        executionEnvironment = IAtlasFactory(FACTORY).createExecutionEnvironment(msg.sender, dAppControl);
+        IAtlasVerification(VERIFICATION).initializeNonce(msg.sender);
+    }
 
     function metacall( // <- Entrypoint Function
         UserOperation calldata userOp, // set by user
@@ -42,13 +55,13 @@ contract Atlas is Test, Factory {
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
 
         // Get the execution environment
-        address executionEnvironment = _getExecutionEnvironmentCustom(userOp.from, dAppOp.control.codehash, userOp.control, dConfig.callConfig);
+        address executionEnvironment = IAtlasFactory(FACTORY).getExecutionEnvironmentCustom(userOp.from, dAppOp.control.codehash, userOp.control, dConfig.callConfig);
 
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
         ValidCallsResult validCallsResult = _validCalls(dConfig, userOp, solverOps, dAppOp, executionEnvironment);
         if (validCallsResult != ValidCallsResult.Valid) {
-            if (msg.sender == simulator) {revert VerificationSimFail();} else { revert ValidCalls(validCallsResult); }
+            if (msg.sender == SIMULATOR) {revert VerificationSimFail();} else { revert ValidCalls(validCallsResult); }
         }
 
         // Initialize the lock
@@ -88,10 +101,10 @@ contract Atlas is Test, Factory {
     ) external payable returns (bool auctionWon, uint256 accruedGasRebate, uint256 winningSearcherIndex) {
         
         // This is a self.call made externally so that it can be used with try/catch
-        require(msg.sender == address(this), "ERR-F06 InvalidAccess");
+        if(msg.sender != address(this)) revert InvalidAccess();
         
         // Build the memory lock
-        EscrowKey memory key = _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), bundler == simulator);
+        EscrowKey memory key = _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), bundler == SIMULATOR);
 
         // Begin execution
         (auctionWon, accruedGasRebate, winningSearcherIndex) = _execute(dConfig, userOp, solverOps, executionEnvironment, bundler, key);
@@ -117,7 +130,7 @@ contract Atlas is Test, Factory {
             key = key.holdPreOpsLock(dConfig.to);
             (callSuccessful, returnData) = _executePreOpsCall(userOp, executionEnvironment, key.pack());
             if (!callSuccessful) {
-                if (key.isSimulation) { revert PreOpsSimFail(); } else { revert("ERR-E001 PreOpsFail"); }
+                if (key.isSimulation) { revert PreOpsSimFail(); } else { revert PreOpsFail(); }
             }
         }
 
@@ -126,7 +139,7 @@ contract Atlas is Test, Factory {
         bytes memory userReturnData;
         (callSuccessful, userReturnData) = _executeUserOperation(userOp, executionEnvironment, key.pack());
         if (!callSuccessful) {
-            if (key.isSimulation) { revert UserOpSimFail(); } else { revert("ERR-E002 UserFail"); }
+            if (key.isSimulation) { revert UserOpSimFail(); } else { revert UserOpFail(); }
         }
 
         if (CallBits.needsPreOpsReturnData(dConfig.callConfig)) {
@@ -164,7 +177,7 @@ contract Atlas is Test, Factory {
             key = key.holdDAppOperationLock(address(this));
             callSuccessful = _executePostOpsCall(returnData, executionEnvironment, key.pack());
             if (!callSuccessful) {
-                if (key.isSimulation) { revert PostOpsSimFail(); } else { revert("ERR-E005 PostOpsFail"); }
+                if (key.isSimulation) { revert PostOpsSimFail(); } else { revert PostOpsFail(); }
             }
         }
         return (auctionWon, uint256(key.gasRefund), winningSearcherIndex);
@@ -199,7 +212,7 @@ contract Atlas is Test, Factory {
         // Verify that the calldata injection came from the dApp frontend
         // and that the signatures are valid. 
       
-        bool isSimulation = msg.sender == simulator;
+        bool isSimulation = msg.sender == SIMULATOR;
 
         // Some checks are only needed when call is not a simulation
         if (!isSimulation) {
@@ -226,7 +239,7 @@ contract Atlas is Test, Factory {
             }
 
             // check dapp signature
-            if(!_verifyDApp(dConfig, dAppOp)) {
+            if(!IAtlasVerification(VERIFICATION).verifyDApp(dConfig, dAppOp)) {
                 bool bypass = isSimulation && dAppOp.signature.length == 0;
                 if (!bypass) {
                     return ValidCallsResult.DAppSignatureInvalid;
@@ -240,7 +253,7 @@ contract Atlas is Test, Factory {
         } // dapp is bundling - always allowed, check valid user/dapp signature and callchainhash
         else if(msg.sender == dAppOp.from) {
             // check dapp signature
-            if(!_verifyDApp(dConfig, dAppOp)) {
+            if(!IAtlasVerification(VERIFICATION).verifyDApp(dConfig, dAppOp)) {
                 bool bypass = isSimulation && dAppOp.signature.length == 0;
                 if (!bypass) {
                     return ValidCallsResult.DAppSignatureInvalid;
@@ -248,7 +261,7 @@ contract Atlas is Test, Factory {
             }
 
             // check user signature
-            if(!_verifyUser(dConfig, userOp)) {
+            if(!IAtlasVerification(VERIFICATION).verifyUser(dConfig, userOp)) {
                 bool bypass = isSimulation && userOp.signature.length == 0;
                 if (!bypass) {
                     return ValidCallsResult.UserSignatureInvalid;   
@@ -267,7 +280,7 @@ contract Atlas is Test, Factory {
             }
 
             // verify user signature
-            if(!_verifyUser(dConfig, userOp)) {
+            if(!IAtlasVerification(VERIFICATION).verifyUser(dConfig, userOp)) {
                 bool bypass = isSimulation && userOp.signature.length == 0;
                 if (!bypass) {
                     return ValidCallsResult.UserSignatureInvalid;   
@@ -283,7 +296,7 @@ contract Atlas is Test, Factory {
         } // check if protocol allows unknown bundlers, and verify all signatures if they do
         else if(dConfig.callConfig.allowsUnknownBundler()) {
             // check dapp signature
-            if(!_verifyDApp(dConfig, dAppOp)) {
+            if(!IAtlasVerification(VERIFICATION).verifyDApp(dConfig, dAppOp)) {
                 bool bypass = isSimulation && dAppOp.signature.length == 0;
                 if (!bypass) {
                     return ValidCallsResult.DAppSignatureInvalid;
@@ -291,7 +304,7 @@ contract Atlas is Test, Factory {
             }
 
             // check user signature
-            if(!_verifyUser(dConfig, userOp)) {
+            if(!IAtlasVerification(VERIFICATION).verifyUser(dConfig, userOp)) {
                 bool bypass = isSimulation && userOp.signature.length == 0;
                 if (!bypass) {
                     return ValidCallsResult.UserSignatureInvalid;   
@@ -338,7 +351,7 @@ contract Atlas is Test, Factory {
     }
 
     function _handleErrors(bytes4 errorSwitch, uint32 callConfig) internal view {
-        if (msg.sender == simulator) { // Simulation
+        if (msg.sender == SIMULATOR) { // Simulation
             if (errorSwitch == PreOpsSimFail.selector) {
                 revert PreOpsSimFail();
             } else if (errorSwitch == UserOpSimFail.selector) {
@@ -353,7 +366,17 @@ contract Atlas is Test, Factory {
             revert UserNotFulfilled();
         }
         if (callConfig.allowsReuseUserOps()) {
-            revert("ERR-F07 RevertToReuse");
+            revert RevertToReuse();
+        }
+    }
+
+    function _verifyCallerIsExecutionEnv(
+        address user,
+        address controller,
+        uint32 callConfig
+    ) internal view override {
+        if(msg.sender != IAtlasFactory(FACTORY).getExecutionEnvironmentCustom(user, controller.codehash, controller, callConfig)){
+            revert EnvironmentMismatch();
         }
     }
 }

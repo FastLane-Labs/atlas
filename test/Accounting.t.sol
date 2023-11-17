@@ -54,25 +54,16 @@ contract AccountingTest is BaseTest {
         // Deploy new SwapIntent Controller from new gov and initialize in Atlas
         vm.startPrank(governanceEOA);
         swapIntentController = new SwapIntentController(address(escrow));        
-        atlas.initializeGovernance(address(swapIntentController));
-        atlas.integrateDApp(address(swapIntentController));
+        atlasVerification.initializeGovernance(address(swapIntentController));
+        atlasVerification.integrateDApp(address(swapIntentController));
         vm.stopPrank();
 
         txBuilder = new TxBuilder({
             controller: address(swapIntentController),
-            escrowAddress: address(escrow),
-            atlasAddress: address(atlas)
+            atlasAddress: address(atlas),
+            _verification: address(atlasVerification)
         });
     }
-
-    function testDELEET() public {
-        uint16 lockState = uint16(61711); // phase 4 - HandlingPayments
-        uint16 phase = SafetyBits.getCurrentExecutionPhase(lockState);
-        console.log(TestUtils.uint16ToBinaryString(61711));
-        console.log("phase", phase);
-        console.log("Exec Phase", uint8(ExecutionPhase.Releasing));
-    }
-
 
     function testSolverBorrowRepaySuccessfully() public {
         
@@ -201,14 +192,14 @@ contract AccountingTest is BaseTest {
         solverOps[0].value = solverMsgValue;
 
         // Solver signs the solverCall
-        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlas.getSolverPayload(solverOps[0]));
+        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Frontend creates dApp Operation calldata after seeing rest of data
         dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
 
         // Frontend signs the dApp Operation payload
-        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getDAppOperationPayload(dAppOp));
+        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Check user token balances before

@@ -5,6 +5,7 @@ import {IDAppControl} from "../interfaces/IDAppControl.sol";
 import {IDAppIntegration} from "../interfaces/IDAppIntegration.sol";
 import {IAtlas} from "../interfaces/IAtlas.sol";
 import {IAtlETH} from "../interfaces/IAtlETH.sol";
+import {IAtlasVerification} from "../interfaces/IAtlasVerification.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
@@ -19,28 +20,28 @@ contract TxBuilder {
     using CallVerification for UserOperation;
 
     address public immutable control;
-    address public immutable escrow;
     address public immutable atlas;
+    address public immutable verification;
 
     uint256 public immutable gas;
 
-    constructor(address controller, address escrowAddress, address atlasAddress) {
+    constructor(address controller, address atlasAddress, address _verification) {
         control = controller;
-        escrow = escrowAddress;
         atlas = atlasAddress;
+        verification = _verification;
         gas = 1_000_000;
     }
 
     function solverNextNonce(address solverSigner) public view returns (uint256) {
-        return IAtlETH(escrow).nextAccountNonce(solverSigner);
+        return IAtlETH(atlas).nextAccountNonce(solverSigner);
     }
 
     function governanceNextNonce(address signatory) public view returns (uint256) {
-        return IAtlas(atlas).getNextNonce(signatory);
+        return IAtlasVerification(verification).getNextNonce(signatory);
     }
 
     function userNextNonce(address user) public view returns (uint256) {
-        return IAtlas(atlas).getNextNonce(user);
+        return IAtlasVerification(verification).getNextNonce(user);
     }
 
     function getControlCodeHash(address dAppControl) external view returns (bytes32) {
