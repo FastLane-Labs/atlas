@@ -105,25 +105,21 @@ library PartyMath {
 
         // median index party = Solver
         if (pIndex > uint256(Party.Solver)) {
-            // CASE: DAPP
             if (pIndex == uint256(Party.DApp)) {
+                // CASE: DAPP
                 return lock & VALID_PHASES_DAPP_CONTRIBUTION != 0;
-
-                // CASE: USER
             } else {
+                // CASE: USER
                 return lock & VALID_PHASES_USER_CONTRIBUTION != 0;
             }
-
-            // CASE: SOLVER
         } else if (pIndex == uint256(Party.Solver)) {
+            // CASE: SOLVER
             return lock & VALID_PHASES_SOLVER_CONTRIBUTION != 0;
-
-            // CASE: BUNDLER
         } else if (pIndex == uint256(Party.Bundler)) {
+            // CASE: BUNDLER
             return lock & VALID_PHASES_BUNDLER_CONTRIBUTION != 0;
-
-            // CASE: BUILDER
         } else {
+            // CASE: BUILDER
             return lock & VALID_PHASES_BUILDER_CONTRIBUTION != 0;
         }
     }
@@ -134,25 +130,21 @@ library PartyMath {
 
         // median index party = Solver
         if (pIndex > uint256(Party.Solver)) {
-            // CASE: DAPP
             if (pIndex == uint256(Party.DApp)) {
+                // CASE: DAPP
                 return lock & VALID_PHASES_DAPP_REQUEST != 0;
-
-                // CASE: USER
             } else {
+                // CASE: USER
                 return lock & VALID_PHASES_USER_REQUEST != 0;
             }
-
-            // CASE: SOLVER
         } else if (pIndex == uint256(Party.Solver)) {
+            // CASE: SOLVER
             return lock & VALID_PHASES_SOLVER_REQUEST != 0;
-
-            // CASE: BUNDLER
         } else if (pIndex == uint256(Party.Bundler)) {
+            // CASE: BUNDLER
             return lock & VALID_PHASES_BUNDLER_REQUEST != 0;
-
-            // CASE: BUILDER
         } else {
+            // CASE: BUILDER
             return lock & VALID_PHASES_BUILDER_REQUEST != 0;
         }
     }

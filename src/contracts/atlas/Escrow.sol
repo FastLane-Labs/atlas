@@ -224,9 +224,8 @@ abstract contract Escrow is AtlETH {
 
                 // Save the escrow data back into storage
                 _escrowAccountData[solverOp.from] = solverEscrow;
-
-                // Check if need to save escrowData due to nonce update but not gasRebate
             } else if (result & EscrowBits._NO_NONCE_UPDATE == 0) {
+                // Need to save escrowData due to nonce update but not gasRebate
                 _escrowAccountData[solverOp.from].nonce = solverEscrow.nonce;
             }
         }

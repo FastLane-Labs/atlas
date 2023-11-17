@@ -253,8 +253,9 @@ contract Atlas is Escrow {
         }
 
         // bundler checks
-        // user is bundling their own operation - check allowed and valid dapp signature/callchainhash
         if (msg.sender == userOp.from) {
+            // user is bundling their own operation - check allowed and valid dapp signature/callchainhash
+
             if (!dConfig.callConfig.allowsUserBundler()) {
                 return ValidCallsResult.UnknownBundlerNotAllowed;
             }
@@ -277,8 +278,9 @@ contract Atlas is Escrow {
             {
                 return ValidCallsResult.InvalidSequence;
             }
-        } // dapp is bundling - always allowed, check valid user/dapp signature and callchainhash
-        else if (msg.sender == dAppOp.from) {
+        } else if (msg.sender == dAppOp.from) {
+            // dapp is bundling - always allowed, check valid user/dapp signature and callchainhash
+
             // check dapp signature
             if (!IAtlasVerification(VERIFICATION).verifyDApp(dConfig, dAppOp)) {
                 bool bypass = isSimulation && dAppOp.signature.length == 0;
@@ -300,8 +302,10 @@ contract Atlas is Escrow {
             {
                 return ValidCallsResult.InvalidSequence;
             }
-        } // potentially the winning solver is bundling - check that its allowed and only need to verify user signature
-        else if (msg.sender == solverOps[0].from && solverOps.length == 1) {
+        } else if (msg.sender == solverOps[0].from && solverOps.length == 1) {
+            // potentially the winning solver is bundling - check that its allowed and only need to verify user
+            // signature
+
             // check if protocol allows it
             if (!dConfig.callConfig.allowsSolverBundler()) {
                 return ValidCallsResult.DAppSignatureInvalid;
@@ -324,8 +328,9 @@ contract Atlas is Escrow {
                     return ValidCallsResult.InvalidSequence;
                 }
             }
-        } // check if protocol allows unknown bundlers, and verify all signatures if they do
-        else if (dConfig.callConfig.allowsUnknownBundler()) {
+        } else if (dConfig.callConfig.allowsUnknownBundler()) {
+            // check if protocol allows unknown bundlers, and verify all signatures if they do
+
             // check dapp signature
             if (!IAtlasVerification(VERIFICATION).verifyDApp(dConfig, dAppOp)) {
                 bool bypass = isSimulation && dAppOp.signature.length == 0;

@@ -77,13 +77,14 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
         if (partyLedger.status == LedgerStatus.Inactive) partyLedger.status = LedgerStatus.Active;
 
         if (partyLedger.requested < 0) {
-            // CASE: still in deficit
             if (partyLedger.requested + amount < 0) {
+                // CASE: still in deficit
+
                 partyLedger.requested += amount;
                 amount = 0;
-
-                // CASE: surplus
             } else {
+                // CASE: surplus
+
                 amount += partyLedger.requested;
                 partyLedger.requested = 0;
             }
@@ -391,6 +392,7 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
 
             if (solverSuccessful) {
                 // CASE: Delete the balances on the older ledger
+
                 // TODO: Pretty sure we can skip this since it gets ignored and deleted later
                 partyLedger.balance = 0;
                 partyLedger.contributed = 0;
@@ -399,6 +401,7 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
                 ledgers[builderIndex] = partyLedger; // Proxy status stays
             } else {
                 // CASE: Undo the balance adjustments for the next solver
+
                 sLedger.balance -= partyLedger.balance;
                 sLedger.contributed -= partyLedger.contributed;
                 sLedger.requested -= partyLedger.requested;
@@ -422,6 +425,7 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
 
             if (solverSuccessful) {
                 // CASE: Delete the balances on the older ledger
+
                 // TODO: Pretty sure we can skip this since it gets ignored and deleted later
                 partyLedger.balance = 0;
                 partyLedger.contributed = 0;
@@ -430,6 +434,7 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
                 ledgers[bundlerIndex] = partyLedger; // Proxy status stays
             } else {
                 // CASE: Undo the balance adjustments for the next solver
+
                 sLedger.balance -= partyLedger.balance;
                 sLedger.contributed -= partyLedger.contributed;
                 sLedger.requested -= partyLedger.requested;
@@ -585,14 +590,13 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
 
             if (partyLedger.contributed < 0) revert NoUnfilledRequests();
 
-            // Only tally totals from non-proxies
             if (uint256(partyLedger.proxy) == i) {
+                // Only tally totals from non-proxies
                 totalBalanceDelta += partyLedger.balance;
                 totalRequests += partyLedger.requested;
                 totalContributions += partyLedger.contributed;
-
-                // Mark inactive if proxy
             } else {
+                // Mark inactive if proxy
                 activeParties = activeParties.markInactive(Party(i));
             }
 
@@ -687,18 +691,20 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
 
             Ledger memory partyLedger = parties[i];
 
-            // CASE: Some Requests still in Deficit
             if (partyLedger.requested < 0 && partyLedger.contributed > 0) {
-                // CASE: Contributions > Requests
+                // CASE: Some Requests still in Deficit
+
                 if (partyLedger.contributed + partyLedger.requested > 0) {
+                    // CASE: Contributions > Requests
+
                     totalRequests -= partyLedger.requested; // subtracting a negative
                     totalContributions += partyLedger.requested; // adding a negative
 
                     partyLedger.contributed += partyLedger.requested; // adding a negative
                     partyLedger.requested = 0;
-
-                    // CASE: Requests >= Contributions
                 } else {
+                    // CASE: Requests >= Contributions
+
                     totalRequests += partyLedger.contributed; // adding a positive
                     totalContributions -= partyLedger.contributed; // subtracting a positive
 
