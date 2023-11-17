@@ -64,7 +64,7 @@ contract AccountingTest is BaseTest {
     function testSolverBorrowRepaySuccessfully() public {
         // Solver deploys the RFQ solver contract (defined at bottom of this file)
         vm.startPrank(solverOneEOA);
-        HonestRFQSolver honestSolver = new HonestRFQSolver(address(atlas));
+        HonestRFQSolver honestSolver = new HonestRFQSolver(WETH_ADDRESS, address(atlas));
         vm.stopPrank();
 
         SolverOperation[] memory solverOps = _setupBorrowRepayTestUsingBasicSwapIntent(address(honestSolver));
@@ -90,7 +90,7 @@ contract AccountingTest is BaseTest {
         // Solver deploys the RFQ solver contract (defined at bottom of this file)
         vm.startPrank(solverOneEOA);
         // TODO make evil solver
-        HonestRFQSolver evilSolver = new HonestRFQSolver(address(atlas));
+        HonestRFQSolver evilSolver = new HonestRFQSolver(WETH_ADDRESS, address(atlas));
         // atlas.deposit{value: gasCostCoverAmount}(solverOneEOA);
         vm.stopPrank();
 
@@ -219,7 +219,7 @@ contract AccountingTest is BaseTest {
 contract HonestRFQSolver is SolverBase {
     address public immutable ATLAS;
 
-    constructor(address atlas) SolverBase(atlas, msg.sender) {
+    constructor(address weth, address atlas) SolverBase(weth, atlas, msg.sender) {
         ATLAS = atlas;
     }
 
@@ -250,7 +250,7 @@ contract HonestRFQSolver is SolverBase {
 contract EvilRFQSolver is HonestRFQSolver {
     address deployer;
 
-    constructor(address atlas) HonestRFQSolver(atlas) {
+    constructor(address weth, address atlas) HonestRFQSolver(weth, atlas) {
         deployer = msg.sender;
     }
 

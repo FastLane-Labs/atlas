@@ -16,13 +16,14 @@ interface IWETH9 {
 }
 
 contract SolverBase is Test {
-    address public constant WETH_ADDRESS = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    address public immutable WETH_ADDRESS;
 
     // TODO consider making these accessible (internal) for solvers which may want to use them
     address private immutable _owner;
     address private immutable _escrow;
 
-    constructor(address atlasEscrow, address owner) {
+    constructor(address weth, address atlasEscrow, address owner) {
+        WETH_ADDRESS = weth;
         _owner = owner;
         _escrow = atlasEscrow;
     }

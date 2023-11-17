@@ -7,5 +7,5 @@ import { SolverBase } from "../SolverBase.sol";
 import { BlindBackrun } from "./BlindBackrun/BlindBackrun.sol";
 
 contract Solver is SolverBase, BlindBackrun {
-    constructor(address atlasEscrow, address owner) SolverBase(atlasEscrow, owner) { }
+    constructor(address weth, address atlasEscrow, address owner) SolverBase(weth, atlasEscrow, owner) { }
 }
