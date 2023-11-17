@@ -96,80 +96,85 @@ contract V4SwapIntentTest is BaseTest {
         // Deploy the solver contract
         vm.startPrank(solverOneEOA);
         UniswapV4IntentSolver solver = new UniswapV4IntentSolver(address(atlas), poolManager);
-        deal(WETH_ADDRESS, address(solver), 1e18); // 1 WETH to solver to pay bid
-        atlas.deposit{value: 1e18}();
         vm.stopPrank();
+
+        // Input params for Atlas.metacall() - will be populated below
+        UserOperation memory userOp;
+        SolverOperation[] memory solverOps = new SolverOperation[](1);
+        DAppOperation memory dAppOp;
+
+        vm.startPrank(userEOA);
+        address executionEnvironment = atlas.createExecutionEnvironment(txBuilder.control());
+        console.log("executionEnvironment a",executionEnvironment);
+        vm.stopPrank();
+        vm.label(address(executionEnvironment), "EXECUTION ENV");
+
+        // userOpData is used in delegatecall from exec env to control, calling preOpsCall
+        // first 4 bytes are "userSelector" param in preOpsCall in DAppControl - swap() selector
+        // rest of data is "userData" param
+        
+        // swap(SwapIntent calldata) selector = 0x98434997
+        bytes memory userOpData = abi.encodeWithSelector(
+            V4SwapIntentController.exactInputSingle.selector, 
+            V4SwapIntentController.ExactInputSingleParams({
+                tokenIn: address(WETH),
+                tokenOut: address(DAI),
+                maxFee: 3000,
+                recipient: address(userEOA),
+                amountIn: 10e18,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: address(WETH) < address(DAI) ? 4295128740 : 1461446703485210103287273052203988822378723970341
+            })
+        );
+
+        // Builds the metaTx and to parts of userOp, signature still to be set
+        userOp = txBuilder.buildUserOperation({
+            from: userEOA, // NOTE: Would from ever not be user?
+            to: address(swapIntentController),
+            maxFeePerGas: tx.gasprice + 1, // TODO update
+            value: 0,
+            deadline: block.number + 2,
+            data: userOpData
+        });
+
+        // Build solver calldata (function selector on solver contract and its params)
+        bytes memory solverOpData = abi.encodeWithSelector(
+            UniswapV4IntentSolver.fulfillWithSwap.selector, 
+            poolKey,
+            SwapData({
+                tokenIn: address(WETH),
+                tokenOut: address(DAI),
+                requestedAmount: 10e18,
+                limitAmount: 0,
+                recipient: address(userEOA)
+            }),
+            executionEnvironment,
+            1e18
+        );
+
+        // Builds the SolverOperation
+        solverOps[0] = txBuilder.buildSolverOperation({
+            userOp: userOp,
+            solverOpData: solverOpData,
+            solverEOA: solverOneEOA,
+            solverContract: address(solver),
+            bidAmount: 1e18
+        });
+
+        // Solver signs the solverOp
+        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlas.getSolverPayload(solverOps[0]));
+        solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        // Frontend creates dAppOp calldata after seeing rest of data
+        dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
+
+        // Frontend signs the dAppOp payload
+        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getDAppOperationPayload(dAppOp));
+        dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
     }
 
     // function testAtlasV4SwapIntentWithUniswapSolver() public {
     //     // Swap 10 WETH to 100 DAI
-
-    //     // Solver deploys the RFQ solver contract (defined at bottom of this file)
-    //     vm.startPrank(solverOneEOA);
-    //     UniswapIntentSolver uniswapSolver = new UniswapIntentSolver(address(atlas));
-    //     deal(WETH_ADDRESS, address(uniswapSolver), 1e18); // 1 WETH to solver to pay bid
-    //     atlas.deposit{value: 1e18}();
-    //     vm.stopPrank();
-
-    //     // Input params for Atlas.metacall() - will be populated below
-    //     UserOperation memory userOp;
-    //     SolverOperation[] memory solverOps = new SolverOperation[](1);
-    //     DAppOperation memory dAppOp;
-
-    //     vm.startPrank(userEOA);
-    //     address executionEnvironment = atlas.createExecutionEnvironment(txBuilder.control());
-    //     console.log("executionEnvironment a",executionEnvironment);
-    //     vm.stopPrank();
-    //     vm.label(address(executionEnvironment), "EXECUTION ENV");
-
-    //     // userOpData is used in delegatecall from exec env to control, calling preOpsCall
-    //     // first 4 bytes are "userSelector" param in preOpsCall in DAppControl - swap() selector
-    //     // rest of data is "userData" param
-        
-    //     // swap(SwapIntent calldata) selector = 0x98434997
-    //     bytes memory userOpData = abi.encodeWithSelector(SwapIntentController.swap.selector, swapIntent);
-
-    //     // Builds the metaTx and to parts of userOp, signature still to be set
-    //     userOp = txBuilder.buildUserOperation({
-    //         from: userEOA, // NOTE: Would from ever not be user?
-    //         to: address(swapIntentController),
-    //         maxFeePerGas: tx.gasprice + 1, // TODO update
-    //         value: 0,
-    //         deadline: block.number + 2,
-    //         data: userOpData
-    //     });
-
-    //     // User signs the userOp
-    //     // user doees NOT sign the userOp when they are bundling
-    //     // (sig.v, sig.r, sig.s) = vm.sign(userPK, atlas.getUserOperationPayload(userOp));
-    //     // userOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
-
-    //     // Build solver calldata (function selector on solver contract and its params)
-    //     bytes memory solverOpData = abi.encodeWithSelector(
-    //         UniswapIntentSolver.fulfillWithSwap.selector, 
-    //         swapIntent,
-    //         executionEnvironment
-    //     );
-
-    //     // Builds the SolverOperation
-    //     solverOps[0] = txBuilder.buildSolverOperation({
-    //         userOp: userOp,
-    //         solverOpData: solverOpData,
-    //         solverEOA: solverOneEOA,
-    //         solverContract: address(uniswapSolver),
-    //         bidAmount: 1e18
-    //     });
-
-    //     // Solver signs the solverOp
-    //     (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlas.getSolverPayload(solverOps[0]));
-    //     solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
-
-    //     // Frontend creates dAppOp calldata after seeing rest of data
-    //     dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
-
-    //     // Frontend signs the dAppOp payload
-    //     (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getDAppOperationPayload(dAppOp));
-    //     dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
     //     // Check user token balances before
     //     uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);

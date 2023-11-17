@@ -26,26 +26,6 @@ struct SwapData {
     address recipient;
 }
 
-struct ExactInputSingleParams {
-    address tokenIn;
-    address tokenOut;
-    uint256 maxFee;
-    address recipient;
-    uint256 amountIn;
-    uint256 amountOutMinimum;
-    uint256 sqrtPriceLimitX96;
-}
-
-struct ExactOutputSingleParams {
-    address tokenIn;
-    address tokenOut;
-    uint256 maxFee;
-    address recipient;
-    uint256 amountInMaximum;
-    uint256 amountOut;
-    uint256 sqrtPriceLimitX96;
-}
-
 contract V4SwapIntentController is DAppControl {
     using SafeTransferLib for ERC20;
 
@@ -107,6 +87,16 @@ contract V4SwapIntentController is DAppControl {
         _;
     }
 
+    struct ExactInputSingleParams {
+        address tokenIn;
+        address tokenOut;
+        uint256 maxFee;
+        address recipient;
+        uint256 amountIn;
+        uint256 amountOutMinimum;
+        uint256 sqrtPriceLimitX96;
+    }
+
     // selector 0x04e45aaf
     function exactInputSingle(ExactInputSingleParams calldata params) external payable verifyCall(params.tokenIn, params.tokenOut, params.amountIn) returns (SwapData memory) {
         SwapData memory swapData = SwapData({
@@ -119,6 +109,16 @@ contract V4SwapIntentController is DAppControl {
 
         return swapData;
     } 
+
+    struct ExactOutputSingleParams {
+        address tokenIn;
+        address tokenOut;
+        uint256 maxFee;
+        address recipient;
+        uint256 amountInMaximum;
+        uint256 amountOut;
+        uint256 sqrtPriceLimitX96;
+    }
 
     // selector 0x5023b4df
     function exactOutputSingle(ExactOutputSingleParams calldata params) external payable verifyCall(params.tokenIn, params.tokenOut, params.amountInMaximum) returns (SwapData memory) {
