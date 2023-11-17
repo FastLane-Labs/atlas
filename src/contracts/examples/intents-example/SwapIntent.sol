@@ -2,18 +2,18 @@
 pragma solidity 0.8.21;
 
 // Base Imports
-import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
 // Atlas Base Imports
-import {IEscrow} from "../../interfaces/IEscrow.sol";
+import { IEscrow } from "../../interfaces/IEscrow.sol";
 
-import {CallConfig} from "../../types/DAppApprovalTypes.sol";
+import { CallConfig } from "../../types/DAppApprovalTypes.sol";
 import "../../types/UserCallTypes.sol";
 import "../../types/SolverCallTypes.sol";
 import "../../types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
-import {DAppControl} from "../../dapp/DAppControl.sol";
+import { DAppControl } from "../../dapp/DAppControl.sol";
 
 import "forge-std/Test.sol";
 
@@ -29,8 +29,9 @@ struct SwapIntent {
     address tokenUserSells;
     uint256 amountUserSells;
     address auctionBaseCurrency; // NOTE: Typically will be address(0) / ETH for gas refund
-    bool solverMustReimburseGas; // If true, the solver must reimburse the bundler for the user's and control's gas cost 
-    Condition[] conditions; // Optional. Address and calldata that the user can staticcall to verify arbitrary conditions on chain
+    bool solverMustReimburseGas; // If true, the solver must reimburse the bundler for the user's and control's gas cost
+    Condition[] conditions; // Optional. Address and calldata that the user can staticcall to verify arbitrary
+        // conditions on chain
 }
 
 // This struct is for passing around data internally
@@ -42,21 +43,20 @@ struct SwapData {
     address auctionBaseCurrency; // NOTE: Typically will be address(0) / ETH for gas refund
 }
 
-
 contract SwapIntentController is DAppControl {
     using SafeTransferLib for ERC20;
 
-    uint256 constant public USER_CONDITION_GAS_LIMIT = 20_000; 
-    uint256 constant public MAX_USER_CONDITIONS = 5;
-    // NOTE: Conditionals will only be static called to prevent the user from arbitrarily altering state prior to 
-    // the execution of the Solvers' calls. 
+    uint256 public constant USER_CONDITION_GAS_LIMIT = 20_000;
+    uint256 public constant MAX_USER_CONDITIONS = 5;
+    // NOTE: Conditionals will only be static called to prevent the user from arbitrarily altering state prior to
+    // the execution of the Solvers' calls.
 
-    uint256 constant public EXPECTED_GAS_USAGE_EX_SOLVER = 200_000;
+    uint256 public constant EXPECTED_GAS_USAGE_EX_SOLVER = 200_000;
 
     constructor(address _escrow)
         DAppControl(
-            _escrow, 
-            msg.sender, 
+            _escrow,
+            msg.sender,
             CallConfig({
                 sequenced: false,
                 requirePreOps: false,
@@ -76,7 +76,7 @@ contract SwapIntentController is DAppControl {
                 forwardReturnData: false
             })
         )
-    {}
+    { }
 
     //////////////////////////////////
     // CONTRACT-SPECIFIC FUNCTIONS  //
@@ -87,18 +87,18 @@ contract SwapIntentController is DAppControl {
         require(msg.sender == escrow, "ERR-PI002 InvalidSender");
         require(_approvedCaller() == control, "ERR-PI003 InvalidLockState");
         require(address(this) != control, "ERR-PI004 MustBeDelegated");
-        
+
         address user = _user();
 
         // There should never be a balance on this ExecutionEnvironment greater than 1, but check
-        // anyway so that the auction accounting isn't imbalanced by unexpected inventory. 
+        // anyway so that the auction accounting isn't imbalanced by unexpected inventory.
 
         require(swapIntent.tokenUserSells != swapIntent.auctionBaseCurrency, "ERR-PI008 SellIsSurplus");
-        // TODO: If user is Selling Eth, convert it to WETH rather than rejecting. 
+        // TODO: If user is Selling Eth, convert it to WETH rather than rejecting.
 
         // TODO: Could maintain a balance of "1" of each token to allow the user to save gas over multiple uses
         uint256 buyTokenBalance = ERC20(swapIntent.tokenUserBuys).balanceOf(address(this));
-        if (buyTokenBalance > 0) { 
+        if (buyTokenBalance > 0) {
             ERC20(swapIntent.tokenUserBuys).safeTransfer(user, buyTokenBalance);
         }
 
@@ -112,11 +112,13 @@ contract SwapIntentController is DAppControl {
             "ERR-PI059 SellFundsUnavailable"
         );
 
-        if (swapIntent.auctionBaseCurrency != swapIntent.tokenUserSells || swapIntent.auctionBaseCurrency != swapIntent.tokenUserBuys) {
+        if (
+            swapIntent.auctionBaseCurrency != swapIntent.tokenUserSells
+                || swapIntent.auctionBaseCurrency != swapIntent.tokenUserBuys
+        ) {
             if (swapIntent.auctionBaseCurrency == address(0)) {
                 uint256 auctionBaseCurrencyBalance = address(this).balance;
                 SafeTransferLib.safeTransferETH(user, auctionBaseCurrencyBalance);
-            
             } else {
                 uint256 auctionBaseCurrencyBalance = ERC20(swapIntent.auctionBaseCurrency).balanceOf(address(this));
                 if (auctionBaseCurrencyBalance > 0) {
@@ -134,7 +136,6 @@ contract SwapIntentController is DAppControl {
             auctionBaseCurrency: swapIntent.auctionBaseCurrency
         });
 
-
         // If the user added any swap conditions, verify them here:
         if (swapIntent.conditions.length > 0) {
             // Track the excess gas that the user spends with their checks
@@ -145,13 +146,15 @@ contract SwapIntentController is DAppControl {
             uint256 maxUserConditions = swapIntent.conditions.length;
             bytes memory conditionData;
 
-            for (; i < maxUserConditions; ) {
-                (valid, conditionData) = swapIntent.conditions[i].antecedent.staticcall{gas: USER_CONDITION_GAS_LIMIT}(
+            for (; i < maxUserConditions;) {
+                (valid, conditionData) = swapIntent.conditions[i].antecedent.staticcall{ gas: USER_CONDITION_GAS_LIMIT }(
                     swapIntent.conditions[i].context
                 );
                 require(valid && abi.decode(conditionData, (bool)), "ERR-PI021 ConditionUnsound");
-                
-                unchecked{ ++i; }
+
+                unchecked {
+                    ++i;
+                }
             }
         }
 
@@ -172,7 +175,7 @@ contract SwapIntentController is DAppControl {
 
         // Optimistically transfer the solver contract the tokens that the user is selling
         _transferUserERC20(swapData.tokenUserSells, solverTo, swapData.amountUserSells);
-        
+
         // TODO: Permit69 is currently enabled during solver phase, but there is low conviction that this
         // does not enable an attack vector. Consider enabling to save gas on a transfer?
         return true;
@@ -180,15 +183,13 @@ contract SwapIntentController is DAppControl {
 
     // Checking intent was fulfilled, and user has received their tokens, happens here
     function _postSolverCall(bytes calldata data) internal override returns (bool) {
-       
         (, bytes memory returnData) = abi.decode(data, (address, bytes));
 
         SwapData memory swapData = abi.decode(returnData, (SwapData));
 
         uint256 buyTokenBalance = ERC20(swapData.tokenUserBuys).balanceOf(address(this));
-        
-        if (buyTokenBalance >= swapData.amountUserBuys) {
 
+        if (buyTokenBalance >= swapData.amountUserBuys) {
             // Make sure not to transfer any extra 'auctionBaseCurrency' token, since that will be used
             // for the auction measurements
             if (swapData.tokenUserBuys != swapData.auctionBaseCurrency) {
@@ -197,7 +198,6 @@ contract SwapIntentController is DAppControl {
                 ERC20(swapData.tokenUserBuys).safeTransfer(_user(), swapData.amountUserBuys);
             }
             return true;
-        
         } else {
             return false;
         }
@@ -211,7 +211,6 @@ contract SwapIntentController is DAppControl {
         // msg.sender = Escrow
         if (bidToken != address(0)) {
             ERC20(bidToken).safeTransfer(_user(), bidAmount);
-        
         } else {
             SafeTransferLib.safeTransferETH(_user(), address(this).balance);
         }
@@ -232,12 +231,7 @@ contract SwapIntentController is DAppControl {
         bidToken = swapIntent.auctionBaseCurrency;
     }
 
-    function getBidValue(SolverOperation calldata solverOp)
-        public
-        pure
-        override
-        returns (uint256) 
-    {
+    function getBidValue(SolverOperation calldata solverOp) public pure override returns (uint256) {
         return solverOp.bidAmount;
     }
 }

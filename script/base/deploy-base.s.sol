@@ -5,19 +5,19 @@ import "forge-std/Script.sol";
 import "forge-std/Test.sol";
 import "forge-std/StdJson.sol";
 
-import {ERC20} from "solmate/tokens/ERC20.sol";
+import { ERC20 } from "solmate/tokens/ERC20.sol";
 
-import {Atlas} from "src/contracts/atlas/Atlas.sol";
-import {AtlasFactory} from "src/contracts/atlas/AtlasFactory.sol";
-import {AtlasVerification} from "src/contracts/atlas/AtlasVerification.sol";
-import {GasAccountingLib} from "src/contracts/atlas/GasAccountingLib.sol";
-import {SafetyLocksLib} from "src/contracts/atlas/SafetyLocksLib.sol";
-import {SwapIntentController} from "src/contracts/examples/intents-example/SwapIntent.sol";
-import {TxBuilder} from "src/contracts/helpers/TxBuilder.sol";
-import {Simulator} from "src/contracts/helpers/Simulator.sol";
-import {SimpleRFQSolver} from "test/SwapIntent.t.sol";
+import { Atlas } from "src/contracts/atlas/Atlas.sol";
+import { AtlasFactory } from "src/contracts/atlas/AtlasFactory.sol";
+import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
+import { GasAccountingLib } from "src/contracts/atlas/GasAccountingLib.sol";
+import { SafetyLocksLib } from "src/contracts/atlas/SafetyLocksLib.sol";
+import { SwapIntentController } from "src/contracts/examples/intents-example/SwapIntent.sol";
+import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
+import { Simulator } from "src/contracts/helpers/Simulator.sol";
+import { SimpleRFQSolver } from "test/SwapIntent.t.sol";
 
-import {Utilities} from "src/contracts/helpers/Utilities.sol";
+import { Utilities } from "src/contracts/helpers/Utilities.sol";
 
 contract DeployBaseScript is Script {
     using stdJson for string;
@@ -41,9 +41,9 @@ contract DeployBaseScript is Script {
         // OPTIONS: LOCAL, SEPOLIA, MAINNET
         string memory deployChain = vm.envString("DEPLOY_TO");
         if (
-            keccak256(bytes(deployChain)) == keccak256(bytes("SEPOLIA")) ||
-            keccak256(bytes(deployChain)) == keccak256(bytes("MAINNET")) ||
-            keccak256(bytes(deployChain)) == keccak256(bytes("LOCAL"))
+            keccak256(bytes(deployChain)) == keccak256(bytes("SEPOLIA"))
+                || keccak256(bytes(deployChain)) == keccak256(bytes("MAINNET"))
+                || keccak256(bytes(deployChain)) == keccak256(bytes("LOCAL"))
         ) {
             return deployChain;
         } else {
@@ -82,7 +82,7 @@ contract DeployBaseScript is Script {
     }
 
     function _logTokenBalances(address account, string memory accountLabel) internal view {
-        console.log("Balances for", accountLabel); 
+        console.log("Balances for", accountLabel);
         console.log("WETH balance: \t\t\t\t", WETH.balanceOf(account));
         console.log("DAI balance: \t\t\t\t\t", DAI.balanceOf(account));
         console.log("\n");

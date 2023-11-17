@@ -5,7 +5,7 @@ import "forge-std/Script.sol";
 import "forge-std/Test.sol";
 import "forge-std/StdJson.sol";
 
-contract Utilities is Script{
+contract Utilities is Script {
     using stdJson for string;
 
     function getUsefulContractAddress(string memory chain, string memory key) public view returns (address) {

@@ -5,11 +5,10 @@ import "forge-std/Script.sol";
 import "forge-std/Test.sol";
 import "forge-std/StdJson.sol";
 
-import {DeployBaseScript} from "script/base/deploy-base.s.sol";
+import { DeployBaseScript } from "script/base/deploy-base.s.sol";
 
 contract LogDemoBalancesScript is DeployBaseScript {
     function run() external {
-
         //TODO take input for User address and print balances
 
         // Governance

@@ -1,10 +1,10 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.21;
 
-import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
-import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
-import {IEscrow} from "src/contracts/interfaces/IEscrow.sol";
+import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
+import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
 
 import "../types/SolverCallTypes.sol";
 
@@ -34,8 +34,14 @@ contract SolverBase is Test {
         uint256 bidAmount,
         bytes calldata solverOpData,
         bytes calldata extraReturnData
-    ) external payable safetyFirst(sender) payBids(bidToken, bidAmount) returns (bool success, bytes memory data) {
-        (success, data) = address(this).call{value: msg.value}(solverOpData);
+    )
+        external
+        payable
+        safetyFirst(sender)
+        payBids(bidToken, bidAmount)
+        returns (bool success, bytes memory data)
+    {
+        (success, data) = address(this).call{ value: msg.value }(solverOpData);
 
         require(success, "CALL UNSUCCESSFUL");
     }
@@ -47,7 +53,7 @@ contract SolverBase is Test {
 
         _;
 
-        IEscrow(_escrow).reconcile{value: msg.value}(msg.sender, sender, type(uint256).max);
+        IEscrow(_escrow).reconcile{ value: msg.value }(msg.sender, sender, type(uint256).max);
     }
 
     modifier payBids(address bidToken, uint256 bidAmount) {

@@ -6,4 +6,3 @@ struct GovernanceData {
     uint32 callConfig; // bitwise
     uint64 lastUpdate;
 }
-

@@ -7,16 +7,20 @@ import "../types/DAppApprovalTypes.sol";
 
 interface ISimulator {
     function simUserOperation(UserOperation calldata userOp) external returns (bool);
-    
+
     function simSolverCall(
         UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         DAppOperation calldata verification
-    ) external returns (bool);
+    )
+        external
+        returns (bool);
 
     function simSolverCalls(
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         DAppOperation calldata verification
-    ) external returns (bool);
+    )
+        external
+        returns (bool);
 }

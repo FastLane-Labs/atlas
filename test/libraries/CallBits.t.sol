@@ -3,7 +3,7 @@ pragma solidity 0.8.21;
 
 import "forge-std/Test.sol";
 
-import {CallBits} from "../../src/contracts/libraries/CallBits.sol";
+import { CallBits } from "../../src/contracts/libraries/CallBits.sol";
 import "../../src/contracts/types/UserCallTypes.sol";
 import "../base/TestUtils.sol";
 
@@ -85,7 +85,9 @@ contract CallBitsTest is Test {
         assertEq(decodedCallConfig.reuseUserOp, true, "reuseUserOp 1 incorrect");
         assertEq(decodedCallConfig.userBundler, false, "userBundler 1 incorrect");
         assertEq(decodedCallConfig.solverBundler, true, "solverBundler 1 incorrect");
-        assertEq(decodedCallConfig.verifySolverBundlerCallChainHash, false, "verifySolverBundlerCallChainHash 1 incorrect");
+        assertEq(
+            decodedCallConfig.verifySolverBundlerCallChainHash, false, "verifySolverBundlerCallChainHash 1 incorrect"
+        );
         assertEq(decodedCallConfig.unknownBundler, true, "unknownBundler 1 incorrect");
         assertEq(decodedCallConfig.forwardReturnData, false, "forwardPreOpsReturnData 1 incorrect");
 
@@ -104,7 +106,9 @@ contract CallBitsTest is Test {
         assertEq(decodedCallConfig.reuseUserOp, false, "reuseUserOp 2 incorrect");
         assertEq(decodedCallConfig.userBundler, true, "userBundler 2 incorrect");
         assertEq(decodedCallConfig.solverBundler, false, "solverBundler 2 incorrect");
-        assertEq(decodedCallConfig.verifySolverBundlerCallChainHash, true, "verifySolverBundlerCallChainHash 2 incorrect");
+        assertEq(
+            decodedCallConfig.verifySolverBundlerCallChainHash, true, "verifySolverBundlerCallChainHash 2 incorrect"
+        );
         assertEq(decodedCallConfig.unknownBundler, false, "unknownBundler 2 incorrect");
         assertEq(decodedCallConfig.forwardReturnData, true, "forwardPreOpsReturnData 2 incorrect");
     }
@@ -124,7 +128,9 @@ contract CallBitsTest is Test {
         assertEq(encodedCallConfig.allowsReuseUserOps(), true, "allowsReuseUserOps 1 incorrect");
         assertEq(encodedCallConfig.allowsUserBundler(), false, "allowsUserBundler 1 incorrect");
         assertEq(encodedCallConfig.allowsSolverBundler(), true, "allowsSolverBundler 1 incorrect");
-        assertEq(encodedCallConfig.verifySolverBundlerCallChainHash(), false, "verifySolverBundlerCallChainHash 1 incorrect");
+        assertEq(
+            encodedCallConfig.verifySolverBundlerCallChainHash(), false, "verifySolverBundlerCallChainHash 1 incorrect"
+        );
         assertEq(encodedCallConfig.allowsUnknownBundler(), true, "allowsUnknownBundler 1 incorrect");
         assertEq(encodedCallConfig.forwardReturnData(), false, "forwardPreOpsReturnData 1 incorrect");
         encodedCallConfig = CallBits.encodeCallConfig(callConfig2);
@@ -141,7 +147,9 @@ contract CallBitsTest is Test {
         assertEq(encodedCallConfig.allowsReuseUserOps(), false, "allowsReuseUserOps 2 incorrect");
         assertEq(encodedCallConfig.allowsUserBundler(), true, "allowsUserBundler 2 incorrect");
         assertEq(encodedCallConfig.allowsSolverBundler(), false, "allowsSolverBundler 2 incorrect");
-        assertEq(encodedCallConfig.verifySolverBundlerCallChainHash(), true, "verifySolverBundlerCallChainHash 2 incorrect");
+        assertEq(
+            encodedCallConfig.verifySolverBundlerCallChainHash(), true, "verifySolverBundlerCallChainHash 2 incorrect"
+        );
         assertEq(encodedCallConfig.allowsUnknownBundler(), false, "allowsUnknownBundler 2 incorrect");
         assertEq(encodedCallConfig.forwardReturnData(), true, "forwardPreOpsReturnData 2 incorrect");
     }

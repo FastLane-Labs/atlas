@@ -10,28 +10,17 @@ error UserUnexpectedSuccess();
 contract FastLaneErrorsEvents {
     // NOTE: nonce is the executed nonce
     event SolverTxResult(
-        address indexed solverTo,
-        address indexed solverFrom,
-        bool executed,
-        bool success,
-        uint256 nonce,
-        uint256 result
+        address indexed solverTo, address indexed solverFrom, bool executed, bool success, uint256 nonce, uint256 result
     );
 
     event UserTxResult(address indexed user, uint256 valueReturned, uint256 gasRefunded);
 
-    event MEVPaymentFailure(
-        address indexed controller, uint32 callConfig, address bidToken, uint256 bidAmount
-    );
+    event MEVPaymentFailure(address indexed controller, uint32 callConfig, address bidToken, uint256 bidAmount);
 
     // TODO remove after AtlasFactory split-out
     event NewExecutionEnvironment(
-        address indexed environment,
-        address indexed user,
-        address indexed controller,
-        uint32 callConfig
+        address indexed environment, address indexed user, address indexed controller, uint32 callConfig
     );
-
 
     error SolverBidUnpaid();
     error SolverFailedCallback();
@@ -98,13 +87,11 @@ contract FastLaneErrorsEvents {
     error NoUnfilledRequests();
     error SolverMustReconcile();
     error GasAccountingLibError();
-    
+
     // NEW - SafetyLocks
     error NotInitialized();
     error AlreadyInitialized();
     error SafetyLocksLibError();
-
-    
 
     /*
     event NewDAppIntegration(

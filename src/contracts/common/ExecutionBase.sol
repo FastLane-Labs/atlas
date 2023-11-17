@@ -1,17 +1,17 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.21;
 
-import {IPermit69} from "../interfaces/IPermit69.sol";
-import {ISafetyLocks} from "../interfaces/ISafetyLocks.sol";
-import {IEscrow} from "../interfaces/IEscrow.sol";
+import { IPermit69 } from "../interfaces/IPermit69.sol";
+import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
+import { IEscrow } from "../interfaces/IEscrow.sol";
 
-import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
-import {ExecutionPhase, BaseLock} from "../types/LockTypes.sol";
-import {Party} from "../types/EscrowTypes.sol";
+import { ExecutionPhase, BaseLock } from "../types/LockTypes.sol";
+import { Party } from "../types/EscrowTypes.sol";
 
-import {EXECUTION_PHASE_OFFSET, SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER} from "../libraries/SafetyBits.sol";
-import {PartyMath} from "../libraries/GasParties.sol";
+import { EXECUTION_PHASE_OFFSET, SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "../libraries/SafetyBits.sol";
+import { PartyMath } from "../libraries/GasParties.sol";
 
 import "forge-std/Test.sol";
 
@@ -29,7 +29,7 @@ contract Base {
     }
 
     // These functions only work inside of the ExecutionEnvironment (mimic)
-    // via delegatecall, but can be added to DAppControl as funcs that 
+    // via delegatecall, but can be added to DAppControl as funcs that
     // can be used during DAppControl's delegated funcs
 
     modifier onlyAtlasEnvironment(ExecutionPhase phase, uint8 acceptableDepths) {
@@ -44,23 +44,18 @@ contract Base {
         if (msg.sender != atlas) {
             revert("ERR-EB01 InvalidSender");
         }
-        if (uint16(1<<(EXECUTION_PHASE_OFFSET + uint16(phase))) & _lockState() == 0) {
+        if (uint16(1 << (EXECUTION_PHASE_OFFSET + uint16(phase))) & _lockState() == 0) {
             revert("ERR-EB02 WrongPhase");
         }
         if (1 << _depth() & acceptableDepths == 0) {
             revert("ERR-EB03 WrongDepth");
         }
     }
-    
+
     function forward(bytes memory data) internal pure returns (bytes memory) {
         // TODO: simplify this into just the bytes
-        return bytes.concat(
-            data,
-            _firstSet(),
-            _secondSet()
-        );
+        return bytes.concat(data, _firstSet(), _secondSet());
     }
-
 
     function _firstSet() internal pure returns (bytes memory data) {
         data = abi.encodePacked(
@@ -72,35 +67,26 @@ contract Base {
             _lockState(),
             _gasRefund(),
             _simulation(),
-            _depth()+1
+            _depth() + 1
         );
     }
 
     function _secondSet() internal pure returns (bytes memory data) {
-        data = abi.encodePacked(
-            _user(),
-            _control(),
-            _config(),
-            _controlCodeHash()
-        );
+        data = abi.encodePacked(_user(), _control(), _config(), _controlCodeHash());
     }
 
     function forwardSpecial(bytes memory data, ExecutionPhase phase) internal pure returns (bytes memory) {
         // TODO: simplify this into just the bytes
-        return bytes.concat(
-            data,
-            _firstSetSpecial(phase),
-            _secondSet()
-        );
+        return bytes.concat(data, _firstSetSpecial(phase), _secondSet());
     }
 
     function _firstSetSpecial(ExecutionPhase phase) internal pure returns (bytes memory data) {
         uint8 depth = _depth();
         uint16 lockState = _lockState();
 
-        if (depth == 1 && lockState & 1<< (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations)) != 0) {
+        if (depth == 1 && lockState & 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations)) != 0) {
             if (phase == ExecutionPhase.PreSolver || phase == ExecutionPhase.PostSolver) {
-                lockState =  uint16(1) << uint16(BaseLock.Active) | uint16(1) << (EXECUTION_PHASE_OFFSET + uint16(phase));
+                lockState = uint16(1) << uint16(BaseLock.Active) | uint16(1) << (EXECUTION_PHASE_OFFSET + uint16(phase));
             }
         }
 
@@ -113,7 +99,7 @@ contract Base {
             lockState,
             _gasRefund(),
             _simulation(),
-            depth+1
+            depth + 1
         );
     }
 
@@ -209,7 +195,7 @@ contract Base {
             if (party == Party.Builder) {
                 return block.coinbase;
 
-            // CASE: BUNDLER
+                // CASE: BUNDLER
             } else {
                 return tx.origin; // TODO: This may be unreliable for smart wallet integrations.
             }
@@ -217,15 +203,15 @@ contract Base {
             // CASE: USER
             if (party == Party.User) {
                 return _user();
-            
-            // CASE: DAPP
+
+                // CASE: DAPP
             } else {
                 return _control();
             }
-        
-        // CASE: SOLVER
-        // NOTE: Currently unimplemented 
-        // TODO: check if this is a SolverOp phase and use assembly to grab the solverOp.from from calldata
+
+            // CASE: SOLVER
+            // NOTE: Currently unimplemented
+            // TODO: check if this is a SolverOp phase and use assembly to grab the solverOp.from from calldata
         } else {
             revert("ERR-EB090 SolverPartyUnimplemented");
         }
@@ -235,37 +221,37 @@ contract Base {
 contract ExecutionBase is Base {
     using PartyMath for Party;
 
-    constructor(address _atlas) Base(_atlas) {}
+    constructor(address _atlas) Base(_atlas) { }
 
-    // Contribute local funds to be used by the recipient 
+    // Contribute local funds to be used by the recipient
     function _contribute(Party recipient, uint256 amt) internal {
-        if(msg.sender != atlas) revert("ERR-EB001 InvalidSender");
+        if (msg.sender != atlas) revert("ERR-EB001 InvalidSender");
         if (amt > address(this).balance) revert("ERR-EB002 InsufficientLocalBalance");
 
-        IEscrow(atlas).contribute{value: amt}(recipient);
+        IEscrow(atlas).contribute{ value: amt }(recipient);
     }
 
     // Deposit local funds to the recipient's balance
     function _deposit(Party recipient, uint256 amt) internal {
-        if(msg.sender != atlas) revert("ERR-EB001 InvalidSender");
+        if (msg.sender != atlas) revert("ERR-EB001 InvalidSender");
         if (amt > address(this).balance) revert("ERR-EB002 InsufficientLocalBalance");
 
-        IEscrow(atlas).deposit{value: amt}(recipient);
+        IEscrow(atlas).deposit{ value: amt }(recipient);
     }
 
     // Contribute nonlocal funds on behalf of the donor to be used by the recipient
     // Any unused funds are returned to the donor
     function _contributeTo(Party donor, Party recipient, uint256 amt) internal {
-        if(msg.sender != atlas) revert("ERR-EB001 InvalidSender");
+        if (msg.sender != atlas) revert("ERR-EB001 InvalidSender");
         if (!donor.validContribution(_lockState())) revert("ERR-EB002 InvalidPhase");
 
         IEscrow(atlas).contributeTo(donor, recipient, amt);
     }
 
     // Recipient requests a contribution from the donor.
-    // NOTE: Can be fulfilled by any party. 
+    // NOTE: Can be fulfilled by any party.
     function _requestFrom(Party donor, Party recipient, uint256 amt) internal {
-        if(msg.sender != atlas) revert("ERR-EB001 InvalidSender");
+        if (msg.sender != atlas) revert("ERR-EB001 InvalidSender");
         if (!donor.validRequest(_lockState())) revert("ERR-EB002 InvalidPhase");
 
         IEscrow(atlas).requestFrom(donor, recipient, amt);
@@ -273,40 +259,27 @@ contract ExecutionBase is Base {
 
     // Finalize the gas ledger of the party, which will block all future requests and contributions.
     // This will throw a revert if there is an unfulfilled request (either outbound or inbound).
-    // NOTE: The Solver party cannot be finalized in this manner - it must call the "reconcile" function. 
+    // NOTE: The Solver party cannot be finalized in this manner - it must call the "reconcile" function.
     function _finalize(Party party) internal {
-        if(msg.sender != atlas) revert("ERR-EB001 InvalidSender");
+        if (msg.sender != atlas) revert("ERR-EB001 InvalidSender");
 
         bool finalized = IEscrow(atlas).finalize(party, _partyAddress(party));
 
         if (!finalized) revert("ERR-EB003 UnableToFinalize");
     }
 
-
-    function _transferUserERC20(
-        address token,
-        address destination,
-        uint256 amount
-    ) internal {
-        if(msg.sender != atlas) { 
+    function _transferUserERC20(address token, address destination, uint256 amount) internal {
+        if (msg.sender != atlas) {
             revert("ERR-EB001 InvalidSender");
         }
-        IPermit69(atlas).transferUserERC20(
-            token, destination, amount, _user(), _control(), _config(), _lockState()
-        );
+        IPermit69(atlas).transferUserERC20(token, destination, amount, _user(), _control(), _config(), _lockState());
     }
 
-    function _transferDAppERC20(
-        address token,
-        address destination,
-        uint256 amount
-    ) internal {
-        if(msg.sender != atlas) { 
+    function _transferDAppERC20(address token, address destination, uint256 amount) internal {
+        if (msg.sender != atlas) {
             revert("ERR-EB001 InvalidSender");
         }
-        IPermit69(atlas).transferDAppERC20(
-            token, destination, amount, _user(), _control(), _config(), _lockState()
-        );
+        IPermit69(atlas).transferDAppERC20(token, destination, amount, _user(), _control(), _config(), _lockState());
     }
 
     function _availableFundsERC20(
@@ -314,8 +287,11 @@ contract ExecutionBase is Base {
         address source,
         uint256 amount,
         ExecutionPhase phase
-    ) internal view returns (bool available) {
-    
+    )
+        internal
+        view
+        returns (bool available)
+    {
         uint256 balance = ERC20(token).balanceOf(source);
         if (balance < amount) {
             return false;
@@ -333,7 +309,6 @@ contract ExecutionBase is Base {
                 return false;
             }
             return true;
-        
         } else if (source == dapp) {
             if (shiftedPhase & SAFE_DAPP_TRANSFER == 0) {
                 return false;

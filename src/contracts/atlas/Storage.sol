@@ -7,7 +7,7 @@ import "../types/LockTypes.sol";
 contract Storage {
     // Atlas constants
     uint256 internal constant _MAX_GAS = 1_500_000;
-    uint256 internal constant LEDGER_LENGTH = 5;      // type(Party).max = 5
+    uint256 internal constant LEDGER_LENGTH = 5; // type(Party).max = 5
     address internal constant UNLOCKED = address(1);
 
     uint256 public immutable ESCROW_DURATION;
@@ -57,23 +57,14 @@ contract Storage {
         SIMULATOR = _simulator;
         INITIAL_CHAIN_ID = block.chainid;
         INITIAL_DOMAIN_SEPARATOR = _computeDomainSeparator();
-        lock = Lock({
-            activeEnvironment: UNLOCKED,
-            activeParties: uint16(0),
-            startingBalance: uint64(0)
-        });
+        lock = Lock({ activeEnvironment: UNLOCKED, activeParties: uint16(0), startingBalance: uint64(0) });
 
         for (uint256 i; i < LEDGER_LENGTH; i++) {
             // init the storage vars
-            ledgers[i] = Ledger({
-                balance: 0,
-                contributed: 0,
-                requested: 0,
-                status: LedgerStatus.Inactive,
-                proxy: Party(i)
-            });
+            ledgers[i] =
+                Ledger({ balance: 0, contributed: 0, requested: 0, status: LedgerStatus.Inactive, proxy: Party(i) });
         }
     }
-    
-    function _computeDomainSeparator() internal virtual view returns (bytes32) {}
+
+    function _computeDomainSeparator() internal view virtual returns (bytes32) { }
 }
