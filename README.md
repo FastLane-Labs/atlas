@@ -9,9 +9,9 @@ Atlas is a permissionless and modular smart contract framework that provides DAp
 
 A DApp wishing to participate can integrate with Atlas by completing three steps:
 
-1. Embed the Atlas Plugin into their frontend or API.
+1. Embed the Atlas API or SDK into their frontend or API.
 2. Create and publish a DAppControl contract.
-3. Interact with the Atlas contract to initialize the DAppControl contract and link it to the Atlas Plugin on their frontend or API.
+3. Interact with the Atlas contract to initialize the DAppControl contract and link it to the Atlas API on their frontend or API.
 
 ### Network Overview
 
