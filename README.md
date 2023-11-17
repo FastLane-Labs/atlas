@@ -68,6 +68,10 @@ The DAppControl contract has the option to define functions that execute at the 
 
 *These functions are executed by the Execution Environment via "delegatecall."
 
+### Atlas Frontend / Infrastructure Flow
+
+![AtlasFlow](./AtlasFlow.jpeg)
+
 ### Advantages:
 - Atlas Solvers have first access to any value created by the User Operation.  This exclusive access supercedes that of any wallets, RPCs, relays, builders, validators, and sequencers.  
 
