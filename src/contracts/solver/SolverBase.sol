@@ -16,24 +16,25 @@ interface IWETH9 {
 }
 
 contract SolverBase is Test {
-    address public constant WETH_ADDRESS = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+    address public immutable WETH_ADDRESS;
 
     // TODO consider making these accessible (internal) for solvers which may want to use them
     address private immutable _owner;
     address private immutable _escrow;
 
-    constructor(address atlasEscrow, address owner) {
+    constructor(address weth, address atlasEscrow, address owner) {
+        WETH_ADDRESS = weth;
         _owner = owner;
         _escrow = atlasEscrow;
     }
 
-    function atlasSolverCall(address sender, address bidToken, uint256 bidAmount, bytes calldata solverOpData, bytes calldata extraReturnData)
-        external
-        payable
-        safetyFirst(sender)
-        payBids(bidToken, bidAmount)
-        returns (bool success, bytes memory data)
-    {
+    function atlasSolverCall(
+        address sender,
+        address bidToken,
+        uint256 bidAmount,
+        bytes calldata solverOpData,
+        bytes calldata extraReturnData
+    ) external payable safetyFirst(sender) payBids(bidToken, bidAmount) returns (bool success, bytes memory data) {
         (success, data) = address(this).call{value: msg.value}(solverOpData);
 
         require(success, "CALL UNSUCCESSFUL");
@@ -43,7 +44,7 @@ contract SolverBase is Test {
         // Safety checks
         require(sender == _owner, "INVALID CALLER");
         // uint256 msgValueOwed = msg.value;
-        
+
         _;
 
         IEscrow(_escrow).reconcile{value: msg.value}(msg.sender, sender, type(uint256).max);
@@ -51,10 +52,9 @@ contract SolverBase is Test {
 
     modifier payBids(address bidToken, uint256 bidAmount) {
         // Track starting balances
-    
-        uint256 bidBalance = bidToken == address(0) ? 
-            address(this).balance - msg.value : 
-            ERC20(bidToken).balanceOf(address(this));
+
+        uint256 bidBalance =
+            bidToken == address(0) ? address(this).balance - msg.value : ERC20(bidToken).balanceOf(address(this));
 
         _;
 
@@ -62,17 +62,15 @@ contract SolverBase is Test {
 
         // Ether balance
         if (bidToken == address(0)) {
-
             uint256 ethOwed = bidAmount + msg.value;
 
             if (ethOwed > address(this).balance) {
                 IWETH9(WETH_ADDRESS).withdraw(ethOwed - address(this).balance);
-
             }
 
             SafeTransferLib.safeTransferETH(msg.sender, bidAmount);
 
-        // ERC20 balance
+            // ERC20 balance
         } else {
             if (msg.value > address(this).balance) {
                 IWETH9(WETH_ADDRESS).withdraw(msg.value - address(this).balance);

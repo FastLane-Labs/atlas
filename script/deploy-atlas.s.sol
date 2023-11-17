@@ -16,49 +16,31 @@ import {TxBuilder} from "src/contracts/helpers/TxBuilder.sol";
 import {Simulator} from "src/contracts/helpers/Simulator.sol";
 
 contract DeployAtlasScript is DeployBaseScript {
-    // TODO move commons vars like these to base deploy script
-    Atlas public atlas;
-    AtlasFactory public atlasFactory;
-    AtlasVerification public atlasVerification;
-    GasAccountingLib public gasAccountingLib;
-    SafetyLocksLib public safetyLocksLib;
-    Simulator public simulator;
-
     function run() external {
         console.log("\n=== DEPLOYING Atlas ===\n");
 
+        console.log("Deploying to chain: ", _getDeployChain());
+
         uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
         // Computes the addresses at which AtlasFactory and AtlasVerification will be deployed
-        address expectedAtlasFactoryAddr = computeCreateAddress(
-            deployer,
-            vm.getNonce(deployer) + 1
-        );
-        address expectedAtlasVerificationAddr = computeCreateAddress(
-            deployer,
-            vm.getNonce(deployer) + 2
-        );
-        address expectedGasAccountingLibAddr = computeCreateAddress(
-            deployer,
-            vm.getNonce(deployer) + 3
-        );
-        address expectedSafetyLocksLibAddr = computeCreateAddress(
-            deployer,
-            vm.getNonce(deployer) + 4
-        );
+        address expectedAtlasFactoryAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
+        address expectedAtlasVerificationAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
+        address expectedGasAccountingLibAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
+        address expectedSafetyLocksLibAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 4);
+        address expectedSimulatorAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 5);
 
         console.log("Deployer address: \t\t\t\t", deployer);
 
         vm.startBroadcast(deployerPrivateKey);
 
-        simulator = new Simulator();
         atlas = new Atlas({
             _escrowDuration: 64,
             _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
             _gasAccLib: expectedGasAccountingLibAddr,
             _safetyLocksLib: expectedSafetyLocksLibAddr,
-            _simulator: address(simulator)
+            _simulator: expectedSimulatorAddr
         });
         atlasFactory = new AtlasFactory(address(atlas));
         atlasVerification = new AtlasVerification(address(atlas));
@@ -67,7 +49,7 @@ contract DeployAtlasScript is DeployBaseScript {
             _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
             _safetyLocksLib: expectedSafetyLocksLibAddr,
-            _simulator: address(simulator),
+            _simulator: expectedSimulatorAddr,
             _atlas: address(atlas)
         });
         safetyLocksLib = new SafetyLocksLib({
@@ -75,191 +57,54 @@ contract DeployAtlasScript is DeployBaseScript {
             _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
             _gasAccLib: expectedGasAccountingLibAddr,
-            _simulator: address(simulator),
+            _simulator: expectedSimulatorAddr,
             _atlas: address(atlas)
         });
-
-        vm.stopBroadcast();
-
-        _writeAddressToDeploymentsJson(".ATLAS", address(atlas));
-        _writeAddressToDeploymentsJson(".SIMULATOR", address(simulator));
-
-        console.log("\n");
-        console.log("Atlas deployed at: \t\t\t\t", address(atlas));
-        console.log("Simulator deployed at: \t\t\t", address(simulator));
-    }
-}
-
-contract DeployAtlasAndSwapIntentDAppControlScript is DeployBaseScript {
-    Atlas public atlas;
-    AtlasFactory public atlasFactory;
-    AtlasVerification public atlasVerification;
-    GasAccountingLib public gasAccountingLib;
-    SafetyLocksLib public safetyLocksLib;
-    Simulator public simulator;
-    SwapIntentController public swapIntentControl;
-
-    function run() external {
-        console.log("\n=== DEPLOYING Atlas and SwapIntent DAppControl ===\n");
-
-        uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
-        address deployer = vm.addr(deployerPrivateKey);
-        // Computes the addresses at which AtlasFactory and AtlasVerification will be deployed
-        address expectedAtlasFactoryAddr = computeCreateAddress(
-            deployer,
-            vm.getNonce(deployer) + 1
-        );
-        address expectedAtlasVerificationAddr = computeCreateAddress(
-            deployer,
-            vm.getNonce(deployer) + 2
-        );
-        address expectedGasAccountingLibAddr = computeCreateAddress(
-            deployer,
-            vm.getNonce(deployer) + 3
-        );
-        address expectedSafetyLocksLibAddr = computeCreateAddress(
-            deployer,
-            vm.getNonce(deployer) + 4
-        );
-
-        console.log("Deployer address: \t\t\t\t", deployer);
-
-        vm.startBroadcast(deployerPrivateKey);
 
         simulator = new Simulator();
-        atlas = new Atlas({
-            _escrowDuration: 64,
-            _factory: expectedAtlasFactoryAddr,
-            _verification: expectedAtlasVerificationAddr,
-            _gasAccLib: expectedGasAccountingLibAddr,
-            _safetyLocksLib: expectedSafetyLocksLibAddr,
-            _simulator: address(simulator)
-        });
-        atlasFactory = new AtlasFactory(address(atlas));
-        atlasVerification = new AtlasVerification(address(atlas));
-        gasAccountingLib = new GasAccountingLib({
-            _escrowDuration: 64,
-            _factory: expectedAtlasFactoryAddr,
-            _verification: expectedAtlasVerificationAddr,
-            _safetyLocksLib: expectedSafetyLocksLibAddr,
-            _simulator: address(simulator),
-            _atlas: address(atlas)
-        });
-        safetyLocksLib = new SafetyLocksLib({
-            _escrowDuration: 64,
-            _factory: expectedAtlasFactoryAddr,
-            _verification: expectedAtlasVerificationAddr,
-            _gasAccLib: expectedGasAccountingLibAddr,
-            _simulator: address(simulator),
-            _atlas: address(atlas)
-        });
-
-        // Deploy the SwapIntent DAppControl contract
-        swapIntentControl = new SwapIntentController(address(atlas));
-
-        // Integrate SwapIntent with Atlas
-        atlasVerification.initializeGovernance(address(swapIntentControl));
-        atlasVerification.integrateDApp(address(swapIntentControl));
+        simulator.setAtlas(address(atlas));
 
         vm.stopBroadcast();
 
-        _writeAddressToDeploymentsJson(".ATLAS", address(atlas));
-        _writeAddressToDeploymentsJson(".SIMULATOR", address(simulator));
-        _writeAddressToDeploymentsJson(".SWAP_INTENT_DAPP_CONTROL", address(swapIntentControl));
+        if (
+            address(atlas) != simulator.atlas() || address(atlas) != atlasVerification.ATLAS()
+                || address(atlas) != gasAccountingLib.ATLAS() || address(atlas) != safetyLocksLib.ATLAS()
+        ) {
+            console.log(
+                "ERROR: Atlas address not set correctly in Simulator, AtlasVerification, GasAccountingLib, or SafetyLocksLib"
+            );
+        }
+        if (address(atlasFactory) != atlas.FACTORY()) {
+            console.log("ERROR: AtlasFactory address not set correctly in Atlas");
+        }
+        if (address(atlasVerification) != atlas.VERIFICATION()) {
+            console.log("ERROR: AtlasVerification address not set correctly in Atlas");
+        }
+        if (address(gasAccountingLib) != atlas.GAS_ACC_LIB()) {
+            console.log("ERROR: GasAccountingLib address not set correctly in Atlas");
+        }
+        if (address(safetyLocksLib) != atlas.SAFETY_LOCKS_LIB()) {
+            console.log("ERROR: SafetyLocksLib address not set correctly in Atlas");
+        }
+        if (address(simulator) != atlas.SIMULATOR()) {
+            console.log("ERROR: Simulator address not set correctly in Atlas");
+        }
+
+        _writeAddressToDeploymentsJson("ATLAS", address(atlas));
+        _writeAddressToDeploymentsJson("ATLAS_FACTORY", address(atlasFactory));
+        _writeAddressToDeploymentsJson("ATLAS_VERIFICATION", address(atlasVerification));
+        _writeAddressToDeploymentsJson("GAS_ACCOUNTING_LIB", address(gasAccountingLib));
+        _writeAddressToDeploymentsJson("SAFETY_LOCKS_LIB", address(safetyLocksLib));
+        _writeAddressToDeploymentsJson("SIMULATOR", address(simulator));
 
         console.log("\n");
         console.log("Atlas deployed at: \t\t\t\t", address(atlas));
+        console.log("AtlasFactory deployed at: \t\t\t", address(atlasFactory));
+        console.log("AtlasVerification deployed at: \t\t", address(atlasVerification));
+        console.log("GasAccountingLib deployed at: \t\t", address(gasAccountingLib));
+        console.log("SafetyLocksLib deployed at: \t\t\t", address(safetyLocksLib));
         console.log("Simulator deployed at: \t\t\t", address(simulator));
-        console.log("SwapIntent DAppControl deployed at: \t\t", address(swapIntentControl));
-    }
-}
-
-contract DeployAtlasAndSwapIntentDAppControlAndTxBuilderScript is DeployBaseScript {
-    Atlas public atlas;
-    AtlasFactory public atlasFactory;
-    AtlasVerification public atlasVerification;
-    GasAccountingLib public gasAccountingLib;
-    SafetyLocksLib public safetyLocksLib;
-    Simulator public simulator;
-    SwapIntentController public swapIntentControl;
-    TxBuilder public txBuilder;
-
-    function run() external {
-        console.log("\n=== DEPLOYING Atlas and SwapIntent DAppControl and TxBuilder ===\n");
-
-        uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
-        address deployer = vm.addr(deployerPrivateKey);
-        // Computes the addresses at which AtlasFactory and AtlasVerification will be deployed
-        address expectedAtlasFactoryAddr = computeCreateAddress(
-            deployer,
-            vm.getNonce(deployer) + 1
-        );
-        address expectedAtlasVerificationAddr = computeCreateAddress(
-            deployer,
-            vm.getNonce(deployer) + 2
-        );
-        address expectedGasAccountingLibAddr = computeCreateAddress(
-            deployer,
-            vm.getNonce(deployer) + 3
-        );
-        address expectedSafetyLocksLibAddr = computeCreateAddress(
-            deployer,
-            vm.getNonce(deployer) + 4
-        );
-
-        console.log("Deployer address: \t\t\t\t", deployer);
-
-        vm.startBroadcast(deployerPrivateKey);
-
-        simulator = new Simulator();
-        atlas = new Atlas({
-            _escrowDuration: 64,
-            _factory: expectedAtlasFactoryAddr,
-            _verification: expectedAtlasVerificationAddr,
-            _gasAccLib: expectedGasAccountingLibAddr,
-            _safetyLocksLib: expectedSafetyLocksLibAddr,
-            _simulator: address(simulator)
-        });
-        atlasFactory = new AtlasFactory(address(atlas));
-        atlasVerification = new AtlasVerification(address(atlas));
-        gasAccountingLib = new GasAccountingLib({
-            _escrowDuration: 64,
-            _factory: expectedAtlasFactoryAddr,
-            _verification: expectedAtlasVerificationAddr,
-            _safetyLocksLib: expectedSafetyLocksLibAddr,
-            _simulator: address(simulator),
-            _atlas: address(atlas)
-        });
-        safetyLocksLib = new SafetyLocksLib({
-            _escrowDuration: 64,
-            _factory: expectedAtlasFactoryAddr,
-            _verification: expectedAtlasVerificationAddr,
-            _gasAccLib: expectedGasAccountingLibAddr,
-            _simulator: address(simulator),
-            _atlas: address(atlas)
-        });
-
-        // Deploy the SwapIntent DAppControl contract
-        swapIntentControl = new SwapIntentController(address(atlas));
-
-        // Integrate SwapIntent with Atlas
-        atlasVerification.initializeGovernance(address(swapIntentControl));
-        atlasVerification.integrateDApp(address(swapIntentControl));
-
-        // Deploy the TxBuilder
-        txBuilder = new TxBuilder(address(swapIntentControl), address(atlas), address(atlas));
-
-        vm.stopBroadcast();
-
-        _writeAddressToDeploymentsJson(".ATLAS", address(atlas));
-        _writeAddressToDeploymentsJson(".SIMULATOR", address(simulator));
-        _writeAddressToDeploymentsJson(".SWAP_INTENT_DAPP_CONTROL", address(swapIntentControl));
-        _writeAddressToDeploymentsJson(".TX_BUILDER", address(txBuilder));
-
         console.log("\n");
-        console.log("Atlas deployed at: \t\t\t\t", address(atlas));
-        console.log("Simulator deployed at: \t\t\t", address(simulator));
-        console.log("SwapIntent DAppControl deployed at: \t\t", address(swapIntentControl));
-        console.log("TxBuilder deployed at: \t\t\t", address(txBuilder));
+        console.log("You can find a list of contract addresses from the latest deployment in deployments.json");
     }
 }

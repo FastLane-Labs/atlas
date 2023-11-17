@@ -22,6 +22,8 @@ import {TestConstants} from "./TestConstants.sol";
 
 import {V2Helper} from "../V2Helper.sol";
 
+import {Utilities} from "src/contracts/helpers/Utilities.sol";
+
 contract BaseTest is Test, TestConstants {
     address public me = address(this);
 
@@ -56,6 +58,8 @@ contract BaseTest is Test, TestConstants {
     V2DAppControl public control;
 
     V2Helper public helper;
+
+    Utilities public u;
 
     // Fork stuff
     ChainVars public chain = mainnet;
@@ -139,7 +143,7 @@ contract BaseTest is Test, TestConstants {
 
         vm.startPrank(solverOneEOA);
 
-        solverOne = new Solver(escrow, solverOneEOA);
+        solverOne = new Solver(WETH_ADDRESS, escrow, solverOneEOA);
         atlas.deposit{value: 1e18}();
 
         deal(TOKEN_ZERO, address(solverOne), 10e24);
@@ -149,7 +153,7 @@ contract BaseTest is Test, TestConstants {
 
         vm.startPrank(solverTwoEOA);
 
-        solverTwo = new Solver(escrow, solverTwoEOA);
+        solverTwo = new Solver(WETH_ADDRESS, escrow, solverTwoEOA);
         atlas.deposit{value: 1e18}();
 
         vm.stopPrank();
@@ -158,6 +162,7 @@ contract BaseTest is Test, TestConstants {
         deal(TOKEN_ONE, address(solverTwo), 10e24);
 
         helper = new V2Helper(address(control), address(atlas), address(atlasVerification));
+        u = new Utilities();
 
         deal(TOKEN_ZERO, address(atlas), 1);
         deal(TOKEN_ONE, address(atlas), 1);
