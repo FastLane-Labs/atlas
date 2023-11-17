@@ -219,7 +219,7 @@ contract AccountingTest is BaseTest {
 contract HonestRFQSolver is SolverBase {
     address public immutable ATLAS;
 
-    constructor(address weth9, address atlas) SolverBase(weth9, atlas, msg.sender) {
+    constructor(address weth, address atlas) SolverBase(weth, atlas, msg.sender) {
         ATLAS = atlas;
     }
 
@@ -250,7 +250,7 @@ contract HonestRFQSolver is SolverBase {
 contract EvilRFQSolver is HonestRFQSolver {
     address deployer;
 
-    constructor(address weth9, address atlas) HonestRFQSolver(weth9, atlas) {
+    constructor(address weth, address atlas) HonestRFQSolver(weth, atlas) {
         deployer = msg.sender;
     }
 
