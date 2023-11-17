@@ -1,25 +1,25 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.21;
 
-import {IExecutionEnvironment} from "../interfaces/IExecutionEnvironment.sol";
-import {IAtlasVerification} from "../interfaces/IAtlasVerification.sol";
+import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
+import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
 
-import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
 import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 
-import {AtlasVerification} from "./AtlasVerification.sol";
-import {AtlETH} from "./AtlETH.sol";
+import { AtlasVerification } from "./AtlasVerification.sol";
+import { AtlETH } from "./AtlETH.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
-import {DAppConfig} from "../types/DAppApprovalTypes.sol";
+import { DAppConfig } from "../types/DAppApprovalTypes.sol";
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
 
-import {EscrowBits} from "../libraries/EscrowBits.sol";
-import {CallBits} from "../libraries/CallBits.sol";
-import {SafetyBits} from "../libraries/SafetyBits.sol";
+import { EscrowBits } from "../libraries/EscrowBits.sol";
+import { CallBits } from "../libraries/CallBits.sol";
+import { SafetyBits } from "../libraries/SafetyBits.sol";
 
 import "forge-std/Test.sol";
 
@@ -36,7 +36,9 @@ abstract contract Escrow is AtlETH {
         address _gasAccLib,
         address _safetyLocksLib,
         address _simulator
-    ) AtlETH(_escrowDuration, _factory, _verification, _gasAccLib, _safetyLocksLib, _simulator) {}
+    )
+        AtlETH(_escrowDuration, _factory, _verification, _gasAccLib, _safetyLocksLib, _simulator)
+    { }
 
     ///////////////////////////////////////////////////
     /// EXTERNAL FUNCTIONS FOR BUNDLER INTERACTION  ///
@@ -45,19 +47,27 @@ abstract contract Escrow is AtlETH {
     ///////////////////////////////////////////////////
     ///             INTERNAL FUNCTIONS              ///
     ///////////////////////////////////////////////////
-    function _executePreOpsCall(UserOperation calldata userOp, address environment, bytes32 lockBytes)
+    function _executePreOpsCall(
+        UserOperation calldata userOp,
+        address environment,
+        bytes32 lockBytes
+    )
         internal
         returns (bool success, bytes memory preOpsData)
     {
         preOpsData = abi.encodeWithSelector(IExecutionEnvironment.preOpsWrapper.selector, userOp);
         preOpsData = abi.encodePacked(preOpsData, lockBytes);
-        (success, preOpsData) = environment.call{value: msg.value}(preOpsData);
+        (success, preOpsData) = environment.call{ value: msg.value }(preOpsData);
         if (success) {
             preOpsData = abi.decode(preOpsData, (bytes));
         }
     }
 
-    function _executeUserOperation(UserOperation calldata userOp, address environment, bytes32 lockBytes)
+    function _executeUserOperation(
+        UserOperation calldata userOp,
+        address environment,
+        bytes32 lockBytes
+    )
         internal
         returns (bool success, bytes memory userData)
     {
@@ -66,7 +76,7 @@ abstract contract Escrow is AtlETH {
 
         if (userOp.value > 0) {
             _use(Party.User, userOp.from, userOp.value);
-            (success, userData) = environment.call{value: userOp.value}(userData);
+            (success, userData) = environment.call{ value: userOp.value }(userData);
         } else {
             (success, userData) = environment.call(userData);
         }
@@ -82,8 +92,10 @@ abstract contract Escrow is AtlETH {
         address environment,
         address bundler,
         EscrowKey memory key
-    ) internal returns (bool auctionWon, EscrowKey memory) {
-        
+    )
+        internal
+        returns (bool auctionWon, EscrowKey memory)
+    {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
 
@@ -111,20 +123,15 @@ abstract contract Escrow is AtlETH {
             if (result.executionSuccessful()) {
                 // first successful solver call that paid what it bid
                 result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
-                emit SolverTxResult(
-                    solverOp.solver, solverOp.from, true, true, solverEscrow.nonce, result
-                );
+                emit SolverTxResult(solverOp.solver, solverOp.from, true, true, solverEscrow.nonce, result);
 
                 _updateSolverProxy(solverOp.from, bundler, true);
 
                 // winning solver's gas is implicitly paid for by their allowance
                 return (true, key.turnSolverLockPayments(environment));
-            
             } else if (solverOp.value != 0) {
                 _tradeCorrection(Party.Solver, solverOp.value);
             }
-
-            
 
             _updateSolverProxy(solverOp.from, bundler, false);
             result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
@@ -135,9 +142,7 @@ abstract contract Escrow is AtlETH {
             }
 
             // emit event
-            emit SolverTxResult(
-                solverOp.solver, solverOp.from, true, false, solverEscrow.nonce, result
-            );
+            emit SolverTxResult(solverOp.solver, solverOp.from, true, false, solverEscrow.nonce, result);
         } else {
             // emit event
             emit SolverTxResult(solverOp.solver, solverOp.from, false, false, solverEscrow.nonce, result);
@@ -156,7 +161,10 @@ abstract contract Escrow is AtlETH {
         bytes memory returnData,
         address environment,
         bytes32 lockBytes
-    ) internal returns (bool success) {
+    )
+        internal
+        returns (bool success)
+    {
         // process dApp payments
         bytes memory data = abi.encodeWithSelector(
             IExecutionEnvironment.allocateValue.selector, dConfig.bidToken, winningBidAmount, returnData
@@ -168,13 +176,17 @@ abstract contract Escrow is AtlETH {
         }
     }
 
-    function _executePostOpsCall(bytes memory returnData, address environment, bytes32 lockBytes)
+    function _executePostOpsCall(
+        bytes memory returnData,
+        address environment,
+        bytes32 lockBytes
+    )
         internal
         returns (bool success)
     {
         bytes memory postOpsData = abi.encodeWithSelector(IExecutionEnvironment.postOpsWrapper.selector, returnData);
         postOpsData = abi.encodePacked(postOpsData, lockBytes);
-        (success,) = environment.call{value: msg.value}(postOpsData);
+        (success,) = environment.call{ value: msg.value }(postOpsData);
     }
 
     function _update(
@@ -182,7 +194,10 @@ abstract contract Escrow is AtlETH {
         EscrowAccountData memory solverEscrow,
         uint256 gasWaterMark,
         uint256 result
-    ) internal returns (uint256 gasRebate) {
+    )
+        internal
+        returns (uint256 gasRebate)
+    {
         unchecked {
             uint256 gasUsed = gasWaterMark - gasleft();
 
@@ -224,22 +239,22 @@ abstract contract Escrow is AtlETH {
         SolverOperation calldata solverOp,
         bytes memory dAppReturnData,
         bytes32 lockBytes
-    ) internal returns (uint256) {
+    )
+        internal
+        returns (uint256)
+    {
         // address(this) = Atlas/Escrow
         // msg.sender = tx.origin
 
         bool success;
 
         bytes memory data = abi.encodeWithSelector(
-            IExecutionEnvironment(environment).solverMetaTryCatch.selector,
-            gasLimit,
-            solverOp,
-            dAppReturnData
+            IExecutionEnvironment(environment).solverMetaTryCatch.selector, gasLimit, solverOp, dAppReturnData
         );
 
         data = abi.encodePacked(data, lockBytes);
 
-        (success, data) = environment.call{value: solverOp.value}(data);
+        (success, data) = environment.call{ value: solverOp.value }(data);
 
         if (success) {
             return uint256(SolverOutcome.Success);
@@ -267,7 +282,7 @@ abstract contract Escrow is AtlETH {
         }
     }
 
-    receive() external payable {}
+    receive() external payable { }
 
     fallback() external payable {
         revert(); // no untracked balance transfers plz. (not that this fully stops it)

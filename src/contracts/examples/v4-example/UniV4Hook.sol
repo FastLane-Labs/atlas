@@ -2,17 +2,17 @@
 pragma solidity 0.8.21;
 
 // Base Imports
-import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
 // V4 Imports
-import {IPoolManager} from "./IPoolManager.sol";
-import {IHooks} from "./IHooks.sol";
+import { IPoolManager } from "./IPoolManager.sol";
+import { IHooks } from "./IHooks.sol";
 
 // Atlas Imports
-import {V4DAppControl} from "./V4DAppControl.sol";
+import { V4DAppControl } from "./V4DAppControl.sol";
 
-import {ISafetyLocks} from "../../interfaces/ISafetyLocks.sol";
-import {SafetyBits} from "../../libraries/SafetyBits.sol";
+import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
+import { SafetyBits } from "../../libraries/SafetyBits.sol";
 
 import "../../types/SolverCallTypes.sol";
 import "../../types/UserCallTypes.sol";
@@ -24,15 +24,13 @@ import "../../types/LockTypes.sol";
 // sent wherever the hook creators wish.  In this example, the MEV auction proceeds
 // are donated back to the pool.
 
-
-    /////////////////////////////////////////////////////////
-    //                      V4 HOOK                        //
-    /////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////
+//                      V4 HOOK                        //
+/////////////////////////////////////////////////////////
 
 contract UniV4Hook is V4DAppControl {
+    constructor(address _escrow, address _v4Singleton) V4DAppControl(_escrow, _v4Singleton) { }
 
-    constructor(address _escrow, address _v4Singleton) V4DAppControl(_escrow, _v4Singleton) {}
-    
     function getHooksCalls() public pure returns (IHooks.Calls memory) {
         // override
         return IHooks.Calls({
@@ -47,16 +45,24 @@ contract UniV4Hook is V4DAppControl {
         });
     }
 
-    function beforeModifyPosition(address, PoolKey calldata, IPoolManager.ModifyPositionParams calldata)
+    function beforeModifyPosition(
+        address,
+        PoolKey calldata,
+        IPoolManager.ModifyPositionParams calldata
+    )
         external
         virtual
         returns (bytes4)
     {
-        // TODO: Hook must own ALL liquidity.  
+        // TODO: Hook must own ALL liquidity.
         // Users can withdraw liquidity through Hook rather than through the pool itself
     }
 
-    function beforeSwap(address sender, IPoolManager.PoolKey calldata key, IPoolManager.SwapParams calldata)
+    function beforeSwap(
+        address sender,
+        IPoolManager.PoolKey calldata key,
+        IPoolManager.SwapParams calldata
+    )
         external
         view
         returns (bytes4)

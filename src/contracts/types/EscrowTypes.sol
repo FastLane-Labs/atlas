@@ -15,7 +15,7 @@ struct GasDonation {
     uint32 cumulative;
 }
 
-// NOTE: The order is very important here for balance reconciliation. 
+// NOTE: The order is very important here for balance reconciliation.
 // We _MUST_ net the balances in order from LastLook to FirstLook
 enum Party {
     Builder, // block.coinbase

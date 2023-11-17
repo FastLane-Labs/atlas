@@ -1,19 +1,16 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.21;
 
-import {IDAppControl} from "../interfaces/IDAppControl.sol";
-import {Mimic} from "./Mimic.sol";
-import {DAppConfig} from "src/contracts/types/DAppApprovalTypes.sol";
-import {ExecutionEnvironment} from "./ExecutionEnvironment.sol";
+import { IDAppControl } from "../interfaces/IDAppControl.sol";
+import { Mimic } from "./Mimic.sol";
+import { DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
+import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
 
 // TODO make sure no cases of address(this) when Atlas address is intended
 
 contract AtlasFactory {
     event NewExecutionEnvironment(
-        address indexed environment,
-        address indexed user,
-        address indexed controller,
-        uint32 callConfig
+        address indexed environment, address indexed user, address indexed controller, uint32 callConfig
     );
 
     bytes32 public immutable salt;
@@ -31,13 +28,22 @@ contract AtlasFactory {
     // EXTERNAL FUNCTIONS //
     // ------------------ //
 
-    function createExecutionEnvironment(address account, address dAppControl) external returns (address executionEnvironment) {
+    function createExecutionEnvironment(
+        address account,
+        address dAppControl
+    )
+        external
+        returns (address executionEnvironment)
+    {
         // Must call createExecutionEnvironment on Atlas contract to properly initialize nonce tracking
         require(msg.sender == atlas, "AtlasFactory: Only Atlas can create execution environments");
         executionEnvironment = _setExecutionEnvironment(dAppControl, account, dAppControl.codehash);
     }
 
-    function getExecutionEnvironment(address user, address dAppControl)
+    function getExecutionEnvironment(
+        address user,
+        address dAppControl
+    )
         external
         view
         returns (address executionEnvironment, uint32 callConfig, bool exists)
@@ -52,11 +58,20 @@ contract AtlasFactory {
         bytes32 controlCodeHash,
         address controller,
         uint32 callConfig
-    ) external view returns (address executionEnvironment) {
+    )
+        external
+        view
+        returns (address executionEnvironment)
+    {
         executionEnvironment = _getExecutionEnvironmentCustom(user, controlCodeHash, controller, callConfig);
     }
 
-    function getMimicCreationCode(address controller, uint32 callConfig, address user, bytes32 controlCodeHash)
+    function getMimicCreationCode(
+        address controller,
+        uint32 callConfig,
+        address user,
+        bytes32 controlCodeHash
+    )
         external
         view
         returns (bytes memory creationCode)
@@ -68,10 +83,7 @@ contract AtlasFactory {
     // INTERNAL FUNCTIONS //
     // ------------------ //
 
-    function _deployExecutionEnvironmentTemplate(address _atlas)
-        internal
-        returns (address executionEnvironment)
-    {
+    function _deployExecutionEnvironmentTemplate(address _atlas) internal returns (address executionEnvironment) {
         ExecutionEnvironment _environment = new ExecutionEnvironment{
             salt: salt
         }(_atlas);
@@ -79,7 +91,11 @@ contract AtlasFactory {
         executionEnvironment = address(_environment);
     }
 
-    function _setExecutionEnvironment(address dAppControl, address user, bytes32 controlCodeHash)
+    function _setExecutionEnvironment(
+        address dAppControl,
+        address user,
+        bytes32 controlCodeHash
+    )
         internal
         returns (address executionEnvironment)
     {
@@ -107,7 +123,11 @@ contract AtlasFactory {
         }
     }
 
-    function _getExecutionEnvironment(address user, bytes32 controlCodeHash, address controller)
+    function _getExecutionEnvironment(
+        address user,
+        bytes32 controlCodeHash,
+        address controller
+    )
         internal
         view
         returns (address executionEnvironment)
@@ -123,7 +143,11 @@ contract AtlasFactory {
         bytes32 controlCodeHash,
         address controller,
         uint32 callConfig
-    ) internal view returns (address executionEnvironment) {
+    )
+        internal
+        view
+        returns (address executionEnvironment)
+    {
         executionEnvironment = address(
             uint160(
                 uint256(
@@ -142,8 +166,12 @@ contract AtlasFactory {
         );
     }
 
-
-    function _getMimicCreationCode(address controller, uint32 callConfig, address user, bytes32 controlCodeHash)
+    function _getMimicCreationCode(
+        address controller,
+        uint32 callConfig,
+        address user,
+        bytes32 controlCodeHash
+    )
         internal
         view
         returns (bytes memory creationCode)
@@ -152,30 +180,24 @@ contract AtlasFactory {
         // NOTE: Changing compiler settings or solidity versions can break this.
         creationCode = type(Mimic).creationCode;
 
-        // TODO: unpack the SHL and reorient 
+        // TODO: unpack the SHL and reorient
         assembly {
             mstore(
-                add(creationCode, 85), 
+                add(creationCode, 85),
                 or(
-                    and(
-                        mload(add(creationCode, 85)),
-                        not(shl(96, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF))
-                    ),
+                    and(mload(add(creationCode, 85)), not(shl(96, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF))),
                     shl(96, executionLib)
                 )
-            )           
-            
+            )
+
             mstore(
-                add(creationCode, 118), 
+                add(creationCode, 118),
                 or(
-                    and(
-                        mload(add(creationCode, 118)),
-                        not(shl(96, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF))
-                    ),
+                    and(mload(add(creationCode, 118)), not(shl(96, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF))),
                     shl(96, user)
                 )
-            )    
-            
+            )
+
             mstore(
                 add(creationCode, 139),
                 or(
@@ -190,5 +212,4 @@ contract AtlasFactory {
             mstore(add(creationCode, 165), controlCodeHash)
         }
     }
-
 }

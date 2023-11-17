@@ -3,7 +3,7 @@ pragma solidity 0.8.21;
 
 import "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 
-import {CallBits} from "../libraries/CallBits.sol";
+import { CallBits } from "../libraries/CallBits.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
@@ -12,9 +12,9 @@ import "../types/GovernanceTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 import "../types/EscrowTypes.sol";
 
-import {EscrowBits} from "../libraries/EscrowBits.sol";
+import { EscrowBits } from "../libraries/EscrowBits.sol";
 
-import {DAppIntegration} from "./DAppIntegration.sol";
+import { DAppIntegration } from "./DAppIntegration.sol";
 
 import "forge-std/Test.sol"; // TODO remove
 
@@ -30,11 +30,16 @@ contract AtlasVerification is EIP712, DAppIntegration {
     using ECDSA for bytes32;
     using CallBits for uint32;
 
-    constructor(address _atlas) EIP712("ProtoCallHandler", "0.0.1") DAppIntegration(_atlas) {}
+    constructor(address _atlas) EIP712("ProtoCallHandler", "0.0.1") DAppIntegration(_atlas) { }
 
     // PORTED FROM ESCROW - TODO reorder
 
-    function verifySolverOp(SolverOperation calldata solverOp, EscrowAccountData memory solverEscrow, uint256 gasWaterMark, bool auctionAlreadyComplete)
+    function verifySolverOp(
+        SolverOperation calldata solverOp,
+        EscrowAccountData memory solverEscrow,
+        uint256 gasWaterMark,
+        bool auctionAlreadyComplete
+    )
         external
         view
         returns (uint256 result, uint256 gasLimit, EscrowAccountData memory)
@@ -61,8 +66,12 @@ contract AtlasVerification is EIP712, DAppIntegration {
         return signer == solverOp.from;
     }
 
-    // TODO Revisit the EscrowAccountData memory solverEscrow arg. Needs to be passed through from Atlas, through callstack
-    function _verifySolverOperation(SolverOperation calldata solverOp, EscrowAccountData memory solverEscrow)
+    // TODO Revisit the EscrowAccountData memory solverEscrow arg. Needs to be passed through from Atlas, through
+    // callstack
+    function _verifySolverOperation(
+        SolverOperation calldata solverOp,
+        EscrowAccountData memory solverEscrow
+    )
         internal
         view
         returns (uint256 result, uint256 gasLimit, EscrowAccountData memory)
@@ -142,7 +151,11 @@ contract AtlasVerification is EIP712, DAppIntegration {
         uint256 txGasPrice,
         uint256 maxFeePerGas,
         bool auctionAlreadyComplete
-    ) internal pure returns (uint256) {
+    )
+        internal
+        pure
+        returns (uint256)
+    {
         if (auctionAlreadyComplete) {
             result |= 1 << uint256(SolverOutcome.LostAuction);
         }
@@ -159,8 +172,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         return result;
     }
 
-
-    // 
+    //
     // DAPP VERIFICATION
     //
 
@@ -172,10 +184,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     // the supply chain to submit data.  If any other party
     // (user, solver, FastLane,  or a collusion between
     // all of them) attempts to alter it, this check will fail
-    function verifyDApp(DAppConfig memory dConfig, DAppOperation calldata dAppOp)
-        external
-        returns (bool)
-    {
+    function verifyDApp(DAppConfig memory dConfig, DAppOperation calldata dAppOp) external returns (bool) {
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp nonces
         if (!_verifyDAppSignature(dAppOp)) {
@@ -231,7 +240,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         if (nonce > type(uint128).max - 1) {
             return false;
         }
-        
+
         if (nonce == 0) {
             return false;
         }
@@ -240,7 +249,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         uint256 bitmapNonce = (nonce % 240) + 1;
 
         bytes32 bitmapKey = keccak256(abi.encode(account, bitmapIndex));
-        
+
         NonceBitmap memory nonceBitmap = asyncNonceBitmap[bitmapKey];
 
         uint256 bitmap = uint256(nonceBitmap.bitmap);
@@ -264,10 +273,14 @@ contract AtlasVerification is EIP712, DAppIntegration {
     }
 
     function _updateNonceTracker(
-        address account, uint256 highestUsedBitmapNonce, uint256 bitmapIndex, uint256 bitmapNonce, bool async
-    ) 
-        internal 
-        returns (bool) 
+        address account,
+        uint256 highestUsedBitmapNonce,
+        uint256 bitmapIndex,
+        uint256 bitmapNonce,
+        bool async
+    )
+        internal
+        returns (bool)
     {
         NonceTracker memory nonceTracker = asyncNonceBitIndex[account];
 
@@ -280,14 +293,14 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 return false;
             }
 
-            if (bitmapNonce != highestUsedBitmapNonce +1) {
+            if (bitmapNonce != highestUsedBitmapNonce + 1) {
                 return false;
             }
         }
 
         if (bitmapNonce > uint256(239) || !async) {
             bool updateTracker;
-        
+
             if (bitmapIndex > highestFullBitmap) {
                 updateTracker = true;
                 highestFullBitmap = bitmapIndex;
@@ -303,7 +316,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
                     HighestFullBitmap: uint128(highestFullBitmap),
                     LowestEmptyBitmap: uint128(lowestEmptyBitmap)
                 });
-            } 
+            }
         }
         return true;
     }
@@ -327,7 +340,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     }
 
     function _verifyDAppSignature(DAppOperation calldata dAppOp) internal view returns (bool) {
-        if (dAppOp.signature.length == 0) { return false; }
+        if (dAppOp.signature.length == 0) return false;
         address signer = _hashTypedDataV4(_getProofHash(dAppOp)).recover(dAppOp.signature);
 
         return signer == dAppOp.from;
@@ -347,11 +360,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     //
 
     // Verify the user's meta transaction
-    function verifyUser(DAppConfig memory dConfig, UserOperation calldata userOp)
-        external
-        returns (bool)
-    {
-        
+    function verifyUser(DAppConfig memory dConfig, UserOperation calldata userOp) external returns (bool) {
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp userNonces
         if (!_verifyUserSignature(userOp)) {
@@ -397,7 +406,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     }
 
     function _verifyUserSignature(UserOperation calldata userOp) internal view returns (bool) {
-        if (userOp.signature.length == 0) { return false; }
+        if (userOp.signature.length == 0) return false;
         address signer = _hashTypedDataV4(_getProofHash(userOp)).recover(userOp.signature);
 
         return signer == userOp.from;

@@ -2,8 +2,8 @@
 pragma solidity 0.8.21;
 
 import "forge-std/Test.sol";
-import {BaseTest} from "./base/BaseTest.t.sol";
-import {DAppControl} from "../src/contracts/dapp/DAppControl.sol";
+import { BaseTest } from "./base/BaseTest.t.sol";
+import { DAppControl } from "../src/contracts/dapp/DAppControl.sol";
 import "../src/contracts/types/UserCallTypes.sol";
 import "./base/TestUtils.sol";
 
@@ -31,20 +31,20 @@ contract DummyDAppControl is DAppControl {
                 false
             )
         )
-    {}
+    { }
 
-    function _preOpsCall(UserOperation calldata) internal override returns (bytes memory) {}
-    function _allocateValueCall(address, uint256, bytes calldata) internal override {}
+    function _preOpsCall(UserOperation calldata) internal override returns (bytes memory) { }
+    function _allocateValueCall(address, uint256, bytes calldata) internal override { }
     // function getPayeeData(bytes calldata) external view override returns (PayeeData[] memory) {}
-    function getBidFormat(UserOperation calldata) public view override returns (address) {}
-    function getBidValue(SolverOperation calldata) public view override returns (uint256) {}
+    function getBidFormat(UserOperation calldata) public view override returns (address) { }
+    function getBidValue(SolverOperation calldata) public view override returns (uint256) { }
 }
 
 contract FactoryTest is BaseTest {
     DummyDAppControl public dAppControl;
 
     // TODO fix this to test AtlasFactory instead
-    
+
     // function setUp() public virtual override {
     //     BaseTest.setUp();
 

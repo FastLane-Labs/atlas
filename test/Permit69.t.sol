@@ -3,18 +3,18 @@ pragma solidity 0.8.21;
 
 import "forge-std/Test.sol";
 
-import {ERC20} from "solmate/tokens/ERC20.sol";
+import { ERC20 } from "solmate/tokens/ERC20.sol";
 
-import {BaseTest} from "./base/BaseTest.t.sol";
+import { BaseTest } from "./base/BaseTest.t.sol";
 import "./base/TestUtils.sol";
 
-import {Permit69} from "../src/contracts/common/Permit69.sol";
-import {Mimic} from "../src/contracts/atlas/Mimic.sol";
+import { Permit69 } from "../src/contracts/common/Permit69.sol";
+import { Mimic } from "../src/contracts/atlas/Mimic.sol";
 
-import {EXECUTION_PHASE_OFFSET} from "../src/contracts/libraries/SafetyBits.sol";
-import {SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER} from "../src/contracts/common/Permit69.sol";
+import { EXECUTION_PHASE_OFFSET } from "../src/contracts/libraries/SafetyBits.sol";
+import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "../src/contracts/common/Permit69.sol";
 
-import {FastLaneErrorsEvents} from "../src/contracts/types/Emissions.sol"; 
+import { FastLaneErrorsEvents } from "../src/contracts/types/Emissions.sol";
 
 import "../src/contracts/types/LockTypes.sol";
 
@@ -54,7 +54,9 @@ contract Permit69Test is BaseTest {
     function testTransferUserERC20RevertsIsCallerNotExecutionEnv() public {
         vm.prank(solverOneEOA);
         vm.expectRevert(FastLaneErrorsEvents.EnvironmentMismatch.selector);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, address(0), uint16(0), escrowKey.lockState);
+        mockAtlas.transferUserERC20(
+            WETH_ADDRESS, solverOneEOA, 10e18, userEOA, address(0), uint16(0), escrowKey.lockState
+        );
     }
 
     function testTransferUserERC20RevertsIfLockStateNotValid() public {
@@ -62,28 +64,29 @@ contract Permit69Test is BaseTest {
         vm.startPrank(mockExecutionEnvAddress);
 
         // Uninitialized
-        escrowKey.lockState = uint16(
-            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Uninitialized))
-        );
+        escrowKey.lockState = uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Uninitialized)));
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(FastLaneErrorsEvents.InvalidLockState.selector);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);
+        mockAtlas.transferUserERC20(
+            WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState
+        );
 
         // HandlingPayments
-        escrowKey.lockState = uint16(
-            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.HandlingPayments))
-        );
+        escrowKey.lockState =
+            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.HandlingPayments)));
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(FastLaneErrorsEvents.InvalidLockState.selector);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);
+        mockAtlas.transferUserERC20(
+            WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState
+        );
 
         // Releasing
-        escrowKey.lockState = uint16(
-            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Releasing))
-        );
+        escrowKey.lockState = uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Releasing)));
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(FastLaneErrorsEvents.InvalidLockState.selector);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);
+        mockAtlas.transferUserERC20(
+            WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState
+        );
 
         vm.stopPrank();
     }
@@ -98,8 +101,10 @@ contract Permit69Test is BaseTest {
         WETH.approve(address(mockAtlas), wethTransferred);
 
         vm.prank(mockExecutionEnvAddress);
-        mockAtlas.transferUserERC20(WETH_ADDRESS, solverOneEOA, wethTransferred, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);
-    
+        mockAtlas.transferUserERC20(
+            WETH_ADDRESS, solverOneEOA, wethTransferred, userEOA, mockDAppControl, uint16(0), escrowKey.lockState
+        );
+
         assertEq(WETH.balanceOf(userEOA), userWethBefore - wethTransferred, "User did not lose WETH");
         assertEq(WETH.balanceOf(solverOneEOA), solverWethBefore + wethTransferred, "Solver did not gain WETH");
     }
@@ -109,7 +114,9 @@ contract Permit69Test is BaseTest {
     function testTransferDAppERC20RevertsIsCallerNotExecutionEnv() public {
         vm.prank(solverOneEOA);
         vm.expectRevert(FastLaneErrorsEvents.EnvironmentMismatch.selector);
-        mockAtlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);
+        mockAtlas.transferDAppERC20(
+            WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState
+        );
     }
 
     function testTransferDAppERC20RevertsIfLockStateNotValid() public {
@@ -117,36 +124,37 @@ contract Permit69Test is BaseTest {
         vm.startPrank(mockExecutionEnvAddress);
 
         // Uninitialized
-        escrowKey.lockState = uint16(
-            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Uninitialized))
-        );
+        escrowKey.lockState = uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Uninitialized)));
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(FastLaneErrorsEvents.InvalidLockState.selector);
-        mockAtlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);
+        mockAtlas.transferDAppERC20(
+            WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState
+        );
 
         // UserOperation
-        escrowKey.lockState = uint16(
-            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.UserOperation))
-        );
+        escrowKey.lockState = uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.UserOperation)));
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(FastLaneErrorsEvents.InvalidLockState.selector);
-        mockAtlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);
+        mockAtlas.transferDAppERC20(
+            WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState
+        );
 
         // SolverOperations
-        escrowKey.lockState = uint16(
-            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.SolverOperations))
-        );
+        escrowKey.lockState =
+            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.SolverOperations)));
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(FastLaneErrorsEvents.InvalidLockState.selector);
-        mockAtlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);
+        mockAtlas.transferDAppERC20(
+            WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState
+        );
 
         // Releasing
-        escrowKey.lockState = uint16(
-            1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Releasing))
-        );
+        escrowKey.lockState = uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.Releasing)));
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(FastLaneErrorsEvents.InvalidLockState.selector);
-        mockAtlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);        
+        mockAtlas.transferDAppERC20(
+            WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState
+        );
 
         vm.stopPrank();
     }
@@ -161,8 +169,10 @@ contract Permit69Test is BaseTest {
         WETH.approve(address(mockAtlas), wethTransferred);
 
         vm.prank(mockExecutionEnvAddress);
-        mockAtlas.transferDAppERC20(WETH_ADDRESS, solverOneEOA, wethTransferred, userEOA, mockDAppControl, uint16(0), escrowKey.lockState);
-    
+        mockAtlas.transferDAppERC20(
+            WETH_ADDRESS, solverOneEOA, wethTransferred, userEOA, mockDAppControl, uint16(0), escrowKey.lockState
+        );
+
         assertEq(WETH.balanceOf(mockDAppControl), dAppWethBefore - wethTransferred, "DApp did not lose WETH");
         assertEq(WETH.balanceOf(solverOneEOA), solverWethBefore + wethTransferred, "Solver did not gain WETH");
     }
@@ -187,8 +197,9 @@ contract Permit69Test is BaseTest {
         // preOpsPhaseSafe = 0000 0000 0010 0000
         uint16 preOpsPhaseSafe = uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.PreOps)));
         // userOpPhaseSafe = 0000 0000 0100 0000
-        uint16 userOpPhaseSafe = uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.UserOperation)));
-        
+        uint16 userOpPhaseSafe =
+            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.UserOperation)));
+
         uint16 preSolverOpsPhaseSafe =
             uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.PreSolver)));
         uint16 postSolverOpsPhaseSafe =
@@ -197,7 +208,8 @@ contract Permit69Test is BaseTest {
         uint16 verificationPhaseSafe =
             uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.PostOps)));
 
-        uint16 expectedSafeUserTransferBitMap = preOpsPhaseSafe | userOpPhaseSafe | preSolverOpsPhaseSafe | postSolverOpsPhaseSafe | verificationPhaseSafe;
+        uint16 expectedSafeUserTransferBitMap =
+            preOpsPhaseSafe | userOpPhaseSafe | preSolverOpsPhaseSafe | postSolverOpsPhaseSafe | verificationPhaseSafe;
 
         assertEq(
             mockAtlas.getSafeUserTransfer(),
@@ -215,21 +227,20 @@ contract Permit69Test is BaseTest {
         string memory expectedBitMapString = "0000110010100000";
         // Safe phases for dApp transfers are PreOps, HandlingPayments, and DAppOperation
         // preOpsPhaseSafe = 0000 0000 0010 0000
-        uint16 preOpsPhaseSafe =
-            uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.PreOps)));
+        uint16 preOpsPhaseSafe = uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.PreOps)));
         // handlingPaymentsPhaseSafe = 0000 0001 0000 0000
         uint16 handlingPaymentsPhaseSafe =
             uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.HandlingPayments)));
 
         uint16 preSolverPhaseSafe =
             uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.PreSolver)));
-        
+
         // verificationPhaseSafe = 0000 0100 0000 0000
         uint16 verificationPhaseSafe =
             uint16(1 << (mockAtlas.getExecutionPhaseOffset() + uint16(ExecutionPhase.PostOps)));
 
         uint16 expectedSafeDAppTransferBitMap =
-            preOpsPhaseSafe | preSolverPhaseSafe|  handlingPaymentsPhaseSafe | verificationPhaseSafe;
+            preOpsPhaseSafe | preSolverPhaseSafe | handlingPaymentsPhaseSafe | verificationPhaseSafe;
 
         assertEq(
             mockAtlas.getSafeDAppTransfer(),
@@ -254,8 +265,10 @@ contract MockAtlasForPermit69Tests is Permit69 {
         address _gasAccLib,
         address _safetyLocksLib,
         address _simulator
-    ) Permit69(_escrowDuration, _factory, _verification, _gasAccLib, _safetyLocksLib, _simulator) {}
-    
+    )
+        Permit69(_escrowDuration, _factory, _verification, _gasAccLib, _safetyLocksLib, _simulator)
+    { }
+
     // Declared in SafetyLocks.sol in the canonical Atlas system
     // The only property relevant to testing Permit69 is _escrowKey.lockState (bitwise uint16)
     EscrowKey internal _escrowKey;
@@ -284,12 +297,8 @@ contract MockAtlasForPermit69Tests is Permit69 {
     }
 
     // Overriding the virtual functions in Permit69
-    function _verifyCallerIsExecutionEnv(
-        address,
-        address,
-        uint32
-    ) internal view override {
-        if(msg.sender != _environment) {
+    function _verifyCallerIsExecutionEnv(address, address, uint32) internal view override {
+        if (msg.sender != _environment) {
             revert FastLaneErrorsEvents.EnvironmentMismatch();
         }
     }

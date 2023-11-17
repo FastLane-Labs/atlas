@@ -5,8 +5,8 @@ import "forge-std/Script.sol";
 import "forge-std/Test.sol";
 import "forge-std/StdJson.sol";
 
-import {DeployBaseScript} from "script/base/deploy-base.s.sol";
-import {SimpleRFQSolver} from "test/SwapIntent.t.sol";
+import { DeployBaseScript } from "script/base/deploy-base.s.sol";
+import { SimpleRFQSolver } from "test/SwapIntent.t.sol";
 
 contract DeploySimpleRFQSolverScript is DeployBaseScript {
     function run() external {

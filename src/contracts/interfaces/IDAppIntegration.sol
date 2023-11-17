@@ -17,5 +17,4 @@ interface IDAppIntegration {
     function nextGovernanceNonce(address governanceSignatory) external view returns (uint256 nextNonce);
 
     function getGovFromControl(address dAppControl) external view returns (address governanceAddress);
-
 }

@@ -2,24 +2,24 @@
 pragma solidity 0.8.21;
 
 // Base Imports
-import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
 // Atlas Base Imports
-import {ISafetyLocks} from "../../interfaces/ISafetyLocks.sol";
-import {SafetyBits} from "../../libraries/SafetyBits.sol";
+import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
+import { SafetyBits } from "../../libraries/SafetyBits.sol";
 
-import {CallConfig} from "../../types/DAppApprovalTypes.sol";
+import { CallConfig } from "../../types/DAppApprovalTypes.sol";
 import "../../types/SolverCallTypes.sol";
 import "../../types/UserCallTypes.sol";
 import "../../types/DAppApprovalTypes.sol";
 import "../../types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
-import {DAppControl} from "../../dapp/DAppControl.sol";
+import { DAppControl } from "../../dapp/DAppControl.sol";
 
 // V4 Imports
-import {IPoolManager} from "./IPoolManager.sol";
-import {IHooks} from "./IHooks.sol";
+import { IPoolManager } from "./IPoolManager.sol";
+import { IHooks } from "./IHooks.sol";
 
 contract V4DAppControl is DAppControl {
     struct PreOpsReturn {
@@ -47,10 +47,13 @@ contract V4DAppControl is DAppControl {
 
     PoolKey internal _currentKey; // TODO: Transient storage <-
 
-    constructor(address _escrow, address _v4Singleton)
+    constructor(
+        address _escrow,
+        address _v4Singleton
+    )
         DAppControl(
-            _escrow, 
-            msg.sender, 
+            _escrow,
+            msg.sender,
             CallConfig({
                 sequenced: false,
                 requirePreOps: true,
@@ -80,15 +83,10 @@ contract V4DAppControl is DAppControl {
     /////////////////////////////////////////////////////////
 
     /////////////// DELEGATED CALLS //////////////////
-    function _preOpsCall(UserOperation calldata userOp)
-        internal
-        override
-        returns (bytes memory preOpsData)
-    {
+    function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory preOpsData) {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Atlas Escrow
-
 
         require(!_currentKey.initialized, "ERR-H09 AlreadyInitialized");
 
@@ -99,7 +97,6 @@ contract V4DAppControl is DAppControl {
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that DAppControl supplied a valid signature
         require(msg.sender == escrow, "ERR-H00 InvalidCaller");
-
 
         (IPoolManager.PoolKey memory key, IPoolManager.SwapParams memory params) =
             abi.decode(userOp.data[4:], (IPoolManager.PoolKey, IPoolManager.SwapParams));
@@ -162,12 +159,12 @@ contract V4DAppControl is DAppControl {
 
         IPoolManager.PoolKey memory key; // todo: finish
 
-        if (bidToken ==IPoolManager.Currency.unwrap(key.currency0)) {
+        if (bidToken == IPoolManager.Currency.unwrap(key.currency0)) {
             IPoolManager(v4Singleton).donate(key, bidAmount, 0);
         } else {
             IPoolManager(v4Singleton).donate(key, 0, bidAmount);
         }
-                   
+
         // Flag the pool to be open for trading for the remainder of the block
         bytes32 sequenceKey = keccak256(
             abi.encodePacked(
@@ -238,19 +235,13 @@ contract V4DAppControl is DAppControl {
         // so that they can get the proper format for
         // submitting their bids to the hook.
 
-        (IPoolManager.PoolKey memory key,) =
-            abi.decode(userOp.data, (IPoolManager.PoolKey, IPoolManager.SwapParams));
+        (IPoolManager.PoolKey memory key,) = abi.decode(userOp.data, (IPoolManager.PoolKey, IPoolManager.SwapParams));
 
         // TODO: need to return whichever token the solvers are trying to buy
         return IPoolManager.Currency.unwrap(key.currency0);
     }
 
-    function getBidValue(SolverOperation calldata solverOp)
-        public
-        pure
-        override
-        returns (uint256) 
-    {
+    function getBidValue(SolverOperation calldata solverOp) public pure override returns (uint256) {
         return solverOp.bidAmount;
     }
 }

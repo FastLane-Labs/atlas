@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.21;
 
-import {IDAppControl} from "../interfaces/IDAppControl.sol";
-import {IDAppIntegration} from "../interfaces/IDAppIntegration.sol";
-import {IAtlas} from "../interfaces/IAtlas.sol";
-import {IAtlETH} from "../interfaces/IAtlETH.sol";
-import {IAtlasVerification} from "../interfaces/IAtlasVerification.sol";
+import { IDAppControl } from "../interfaces/IDAppControl.sol";
+import { IDAppIntegration } from "../interfaces/IDAppIntegration.sol";
+import { IAtlas } from "../interfaces/IAtlas.sol";
+import { IAtlETH } from "../interfaces/IAtlETH.sol";
+import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
-import {CallVerification} from "../libraries/CallVerification.sol";
-import {CallBits} from "../libraries/CallBits.sol";
+import { CallVerification } from "../libraries/CallVerification.sol";
+import { CallBits } from "../libraries/CallBits.sol";
 
 import "forge-std/Test.sol";
 
@@ -59,7 +59,11 @@ contract TxBuilder {
         uint256 value, // TODO check this is actually intended to be the value param. Was unnamed before.
         uint256 deadline,
         bytes memory data
-    ) public view returns (UserOperation memory userOp) {
+    )
+        public
+        view
+        returns (UserOperation memory userOp)
+    {
         userOp.to = atlas;
         userOp = UserOperation({
             from: from,
@@ -82,7 +86,11 @@ contract TxBuilder {
         address solverEOA,
         address solverContract,
         uint256 bidAmount
-    ) public view returns (SolverOperation memory solverOp) {
+    )
+        public
+        view
+        returns (SolverOperation memory solverOp)
+    {
         solverOp = SolverOperation({
             from: solverEOA,
             to: atlas,
@@ -101,7 +109,11 @@ contract TxBuilder {
         });
     }
 
-    function buildDAppOperation(address governanceEOA, UserOperation memory userOp, SolverOperation[] memory solverOps)
+    function buildDAppOperation(
+        address governanceEOA,
+        UserOperation memory userOp,
+        SolverOperation[] memory solverOps
+    )
         public
         view
         returns (DAppOperation memory dAppOp)

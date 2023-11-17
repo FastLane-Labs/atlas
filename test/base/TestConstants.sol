@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.21;
 
-import {ERC20} from "solmate/tokens/ERC20.sol";
+import { ERC20 } from "solmate/tokens/ERC20.sol";
 
-import {IUniswapV2Pair} from "../../src/contracts/examples/v2-example/interfaces/IUniswapV2Pair.sol";
+import { IUniswapV2Pair } from "../../src/contracts/examples/v2-example/interfaces/IUniswapV2Pair.sol";
 
 contract TestConstants {
-    uint256 public constant BLOCK_START = 17441786;
+    uint256 public constant BLOCK_START = 17_441_786;
 
     // MAINNET
-    ChainVars public mainnet = ChainVars({rpcUrlKey: "MAINNET_RPC_URL", forkBlock: BLOCK_START});
+    ChainVars public mainnet = ChainVars({ rpcUrlKey: "MAINNET_RPC_URL", forkBlock: BLOCK_START });
 
     // Structs
     struct ChainVars {

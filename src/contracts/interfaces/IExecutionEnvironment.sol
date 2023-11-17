@@ -6,10 +6,7 @@ import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
 interface IExecutionEnvironment {
-    function preOpsWrapper(UserOperation calldata userOp)
-        external
-        payable
-        returns (bytes memory preOpsData);
+    function preOpsWrapper(UserOperation calldata userOp) external payable returns (bytes memory preOpsData);
 
     function userWrapper(UserOperation calldata userOp) external payable returns (bytes memory userReturnData);
 
@@ -19,10 +16,11 @@ interface IExecutionEnvironment {
         uint256 gasLimit,
         SolverOperation calldata solverOp,
         bytes calldata dAppReturnData
-    ) external payable;
+    )
+        external
+        payable;
 
-    function allocateValue(address bidToken, uint256 bidAmount, bytes memory returnData) 
-        external;
+    function allocateValue(address bidToken, uint256 bidAmount, bytes memory returnData) external;
 
     function getUser() external pure returns (address user);
     function getControl() external pure returns (address control);
