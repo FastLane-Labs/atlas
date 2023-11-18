@@ -191,28 +191,25 @@ contract Base {
         uint256 pIndex = uint256(party);
         // MEDIAN INDEX
         if (pIndex < uint256(Party.Solver)) {
-            // CASE: BUILDER
             if (party == Party.Builder) {
+                // CASE: BUILDER
                 return block.coinbase;
-
-                // CASE: BUNDLER
             } else {
+                // CASE: BUNDLER
                 return tx.origin; // TODO: This may be unreliable for smart wallet integrations.
             }
         } else if (pIndex > uint256(Party.Solver)) {
-            // CASE: USER
             if (party == Party.User) {
+                // CASE: USER
                 return _user();
-
-                // CASE: DAPP
             } else {
+                // CASE: DAPP
                 return _control();
             }
-
+        } else {
             // CASE: SOLVER
             // NOTE: Currently unimplemented
             // TODO: check if this is a SolverOp phase and use assembly to grab the solverOp.from from calldata
-        } else {
             revert("ERR-EB090 SolverPartyUnimplemented");
         }
     }

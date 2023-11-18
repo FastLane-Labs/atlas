@@ -65,9 +65,9 @@ contract SolverBase is Test {
         _;
 
         // Handle bid payment
-
-        // Ether balance
         if (bidToken == address(0)) {
+            // Ether balance
+
             uint256 ethOwed = bidAmount + msg.value;
 
             if (ethOwed > address(this).balance) {
@@ -75,9 +75,9 @@ contract SolverBase is Test {
             }
 
             SafeTransferLib.safeTransferETH(msg.sender, bidAmount);
-
-            // ERC20 balance
         } else {
+            // ERC20 balance
+
             if (msg.value > address(this).balance) {
                 IWETH9(WETH_ADDRESS).withdraw(msg.value - address(this).balance);
             }

@@ -78,17 +78,14 @@ contract UniV4Hook is V4DAppControl {
 
         EscrowKey memory escrowKey = ISafetyLocks(escrow).getLockState();
 
-        // Case:
-        // User call
         if (escrowKey.lockState == SafetyBits._LOCKED_X_USER_X_UNSET) {
+            // Case: User call
             // Sender = ExecutionEnvironment
 
             // Verify that the pool is valid for the user to trade in.
             require(keccak256(abi.encode(key, sender)) == hashLock, "ERR-H02 InvalidSwapper");
-
-            // Case:
-            // Solver call
         } else if (escrowKey.lockState == SafetyBits._LOCKED_X_SOLVERS_X_VERIFIED) {
+            // Case: Solver call
             // Sender = Solver contract
             // NOTE: This lockState verifies that the user's transaction has already
             // been executed.
@@ -98,10 +95,8 @@ contract UniV4Hook is V4DAppControl {
 
             // Verify that the pool is valid for a solver to trade in.
             require(hashLock == keccak256(abi.encode(key, escrowKey.approvedCaller)), "ERR-H04 InvalidPoolKey");
-
-            // Case:
-            // Other call
         } else {
+            // Case: Other call
             // Determine if the sequenced order was processed earlier in the block
             bytes32 sequenceKey = keccak256(
                 abi.encodePacked(
