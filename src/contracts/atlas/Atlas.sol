@@ -18,14 +18,12 @@ import "../types/LockTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 import "../types/ValidCallsTypes.sol";
 
-import { CallVerification } from "../libraries/CallVerification.sol";
 import { CallBits } from "../libraries/CallBits.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
 
 // import "forge-std/Test.sol";
 
 contract Atlas is Escrow {
-    using CallVerification for UserOperation;
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
@@ -47,7 +45,7 @@ contract Atlas is Escrow {
 
     function metacall( // <- Entrypoint Function
         UserOperation calldata userOp, // set by user
-        SolverOperation[] calldata solverOps, // supplied by FastLane via frontend integration
+        SolverOperation[] memory solverOps, // supplied by FastLane via frontend integration
         DAppOperation calldata dAppOp // supplied by front end after it sees the other data
     )
         external
@@ -66,7 +64,8 @@ contract Atlas is Escrow {
 
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
-        (SolverOperation[] memory validSolverOps, ValidCallsResult validCallsResult) = IAtlasVerification(VERIFICATION).validCalls(
+        ValidCallsResult validCallsResult;
+        (solverOps, validCallsResult) = IAtlasVerification(VERIFICATION).validCalls(
             dConfig, userOp, solverOps, dAppOp, executionEnvironment, msg.value, msg.sender, msg.sender == SIMULATOR);
         if (validCallsResult != ValidCallsResult.Valid) {
             if (msg.sender == SIMULATOR) revert VerificationSimFail();
@@ -76,7 +75,7 @@ contract Atlas is Escrow {
         // Initialize the lock
         _initializeEscrowLock(userOp, executionEnvironment, msg.sender, gasMarker);
 
-        try this.execute{ value: msg.value }(dConfig, userOp, validSolverOps, executionEnvironment, msg.sender) returns (
+        try this.execute{ value: msg.value }(dConfig, userOp, solverOps, executionEnvironment, msg.sender) returns (
             bool _auctionWon, uint256 accruedGasRebate, uint256 winningSolverIndex
         ) {
             auctionWon = _auctionWon;
