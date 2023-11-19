@@ -33,6 +33,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
     using CallBits for uint32;
     using CallVerification for UserOperation;
 
+    error InvalidCaller();
+
     constructor(address _atlas) EIP712("ProtoCallHandler", "0.0.1") DAppIntegration(_atlas) { }
 
     function validCalls(
@@ -50,6 +52,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
     {
         // Verify that the calldata injection came from the dApp frontend
         // and that the signatures are valid.
+
+        if (msg.sender != ATLAS) revert InvalidCaller();
 
         uint256 solverOpCount = solverOps.length;
         SolverOperation[] memory prunedSolverOps = new SolverOperation[](solverOpCount);
@@ -198,6 +202,14 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 }
 
                 if (solverOp.from == userOp.from) {
+                    continue;
+                }
+
+                if (solverOp.to != ATLAS) {
+                    continue;
+                }
+
+                if (solverOp.solver == ATLAS || solverOp.solver == address(this)) {
                     continue;
                 }
 
