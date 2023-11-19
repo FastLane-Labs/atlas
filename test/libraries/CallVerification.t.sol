@@ -33,7 +33,6 @@ contract CallVerificationTest is Test {
             value: 12,
             gas: 34,
             maxFeePerGas: 78,
-            nonce: 56,
             deadline: block.number + 2,
             solver: address(0x2),
             control: address(0x3),

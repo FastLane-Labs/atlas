@@ -43,10 +43,6 @@ abstract contract AtlETH is Permit69 {
         return _escrowAccountData[account].balance;
     }
 
-    function nextAccountNonce(address account) external view returns (uint256) {
-        return uint256(_escrowAccountData[account].nonce) + 1;
-    }
-
     function accountLastActiveBlock(address account) external view returns (uint256) {
         return uint256(_escrowAccountData[account].lastAccessed);
     }

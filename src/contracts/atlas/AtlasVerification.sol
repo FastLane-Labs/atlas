@@ -18,7 +18,7 @@ import { CallVerification } from "../libraries/CallVerification.sol";
 
 import { DAppIntegration } from "./DAppIntegration.sol";
 
-import "forge-std/Test.sol"; // TODO remove
+// import "forge-std/Test.sol"; // TODO remove
 
 // NOTE: AtlasVerification is the separate contract version of the DappVerification/DAppIntegration
 // inheritance slice of the original Atlas design
@@ -172,11 +172,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
             return (solverOps, ValidCallsResult.ExecutionEnvEmpty);
         }
 
-        if (!dConfig.callConfig.allowsZeroSolvers() || dConfig.callConfig.needsSolverPostCall()) {
-            if (solverOps.length == 0) {
-                return (solverOps, ValidCallsResult.NoSolverOp);
-            }
-        }
 
         if (isSimulation) {
             // Add all solver ops if simulation
@@ -185,6 +180,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         // Otherwise, prune invalid solver ops
         uint256 solverOpCount = solverOps.length;
+        uint256 validSolverCount;
         SolverOperation[] memory prunedSolverOps = new SolverOperation[](solverOpCount);
 
         for (uint256 i = 0; i < solverOpCount; i++) {
@@ -209,6 +205,13 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
                 // If all initial checks succeed, add solver op to new array
                 prunedSolverOps[i] = solverOp;
+                unchecked{ ++validSolverCount; }
+            }
+        }
+
+        if (!dConfig.callConfig.allowsZeroSolvers() || dConfig.callConfig.needsSolverPostCall()) {
+            if (validSolverCount == 0) {
+                return (solverOps, ValidCallsResult.NoSolverOp);
             }
         }
 
@@ -235,7 +238,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 solverOp.value,
                 solverOp.gas,
                 solverOp.maxFeePerGas,
-                solverOp.nonce,
                 solverOp.deadline,
                 solverOp.solver,
                 solverOp.control,
@@ -288,7 +290,11 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         // Make sure the signer is currently enabled by dapp owner
         if (!signatories[keccak256(abi.encode(govData.governance, dAppOp.from))]) {
-            return (false);
+
+            bool bypassSignatoryCheck = isSimulation && dAppOp.from == address(0);
+            if (!bypassSignatoryCheck) {
+                return (false);
+            }
         }
 
         if (dAppOp.control != dConfig.to) {
@@ -320,7 +326,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
             return false;
         }
 
-        if (nonce == 0) {
+        if (nonce == 0 && !isSimulation) {
+            // Allow 0 nonce for simulations to avoid unnecessary init txs
             return false;
         }
 
@@ -451,12 +458,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
         bool bypassSignature = msgSender == userOp.from || (isSimulation && userOp.signature.length == 0);
 
         if (!bypassSignature && !_verifyUserSignature(userOp)) {
-            console.log("invalid user sig");
             return false;
         }
 
         if (userOp.control != dConfig.to) {
-            console.log("invalid control");
             return false;
         }
 
@@ -467,7 +472,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // DApps are encouraged to rely on the deadline parameter
         // to prevent replay attacks.
         if (!_handleNonces(userOp.from, userOp.nonce, dConfig.callConfig.needsSequencedNonces(), isSimulation)) {
-            console.log("invalid nonce");
             return false;
         }
 

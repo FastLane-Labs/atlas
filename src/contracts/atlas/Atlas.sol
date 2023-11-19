@@ -22,7 +22,7 @@ import { CallVerification } from "../libraries/CallVerification.sol";
 import { CallBits } from "../libraries/CallBits.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
 
-import "forge-std/Test.sol";
+// import "forge-std/Test.sol";
 
 contract Atlas is Escrow {
     using CallVerification for UserOperation;
@@ -54,9 +54,6 @@ contract Atlas is Escrow {
         payable
         returns (bool auctionWon)
     {
-        console.log("SIMULATOR",SIMULATOR);
-        console.log("msg.sender",msg.sender);
-        
         uint256 gasMarker = gasleft();
 
         // TODO: Combine this w/ call to get executionEnvironment
@@ -99,7 +96,7 @@ contract Atlas is Escrow {
         // Release the lock
         _releaseEscrowLock();
 
-        console.log("total gas used", gasMarker - gasleft());
+        // console.log("total gas used", gasMarker - gasleft());
     }
 
     function execute(

@@ -96,7 +96,10 @@ contract Simulator is FastLaneErrorsEvents {
             revert("unreachable");
         } catch (bytes memory revertData) {
             bytes4 errorSwitch = bytes4(revertData);
-            if (errorSwitch == PreOpsSimFail.selector) {
+            if (errorSwitch == VerificationSimFail.selector) {
+                result = Result.VerificationSimFail;
+                console.log("Result.VerificationSimFail");
+            } else if (errorSwitch == PreOpsSimFail.selector) {
                 result = Result.PreOpsSimFail;
                 console.log("Result.PreOpsSimFail");
             } else if (errorSwitch == UserOpSimFail.selector) {
