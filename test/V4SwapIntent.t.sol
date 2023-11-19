@@ -137,19 +137,23 @@ contract V4SwapIntentTest is BaseTest {
             data: userOpData
         });
 
+        SwapData memory swapData = SwapData({
+            tokenIn: address(WETH),
+            tokenOut: address(DAI),
+            requestedAmount: 10e18,
+            limitAmount: 0,
+            recipient: address(userEOA)
+        });
+
+        uint256 solverBid = 1e18;
+
         // Build solver calldata (function selector on solver contract and its params)
         bytes memory solverOpData = abi.encodeWithSelector(
             UniswapV4IntentSolver.fulfillWithSwap.selector, 
             poolKey,
-            SwapData({
-                tokenIn: address(WETH),
-                tokenOut: address(DAI),
-                requestedAmount: 10e18,
-                limitAmount: 0,
-                recipient: address(userEOA)
-            }),
+            swapData,
             executionEnvironment,
-            1e18
+            solverBid
         );
 
         // Builds the SolverOperation
@@ -171,56 +175,52 @@ contract V4SwapIntentTest is BaseTest {
         // Frontend signs the dAppOp payload
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
-    }
 
-    // function testAtlasV4SwapIntentWithUniswapSolver() public {
-    //     // Swap 10 WETH to 100 DAI
+        // Check user token balances before
+        uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);
+        uint256 userDaiBalanceBefore = DAI.balanceOf(userEOA);
 
-    //     // Check user token balances before
-    //     uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);
-    //     uint256 userDaiBalanceBefore = DAI.balanceOf(userEOA);
+        vm.prank(userEOA); // Burn all users WETH except 10 so logs are more readable
+        WETH.transfer(address(1), userWethBalanceBefore - uint256(swapData.requestedAmount));
+        userWethBalanceBefore = WETH.balanceOf(userEOA);
 
-    //     vm.prank(userEOA); // Burn all users WETH except 10 so logs are more readable
-    //     WETH.transfer(address(1), userWethBalanceBefore - swapIntent.amountUserSells);
-    //     userWethBalanceBefore = WETH.balanceOf(userEOA);
+        assertTrue(userWethBalanceBefore >= uint256(swapData.requestedAmount), "Not enough starting WETH");
 
-    //     assertTrue(userWethBalanceBefore >= swapIntent.amountUserSells, "Not enough starting WETH");
+        console.log("\nBEFORE METACALL");
+        console.log("User WETH balance", WETH.balanceOf(userEOA));
+        console.log("User DAI balance", DAI.balanceOf(userEOA));
+        console.log("Solver WETH balance", WETH.balanceOf(address(solver)));
+        console.log("Solver DAI balance", DAI.balanceOf(address(solver)));
 
-    //     console.log("\nBEFORE METACALL");
-    //     console.log("User WETH balance", WETH.balanceOf(userEOA));
-    //     console.log("User DAI balance", DAI.balanceOf(userEOA));
-    //     console.log("Solver WETH balance", WETH.balanceOf(address(uniswapSolver)));
-    //     console.log("Solver DAI balance", DAI.balanceOf(address(uniswapSolver)));
+        vm.startPrank(userEOA);
 
-    //     vm.startPrank(userEOA);
-
-    //     assertFalse(simulator.simUserOperation(userOp), "metasimUserOperationcall tested true");
+        assertFalse(simulator.simUserOperation(userOp), "metasimUserOperationcall tested true");
         
-    //     WETH.approve(address(atlas), swapIntent.amountUserSells);
+        WETH.approve(address(atlas), uint256(swapData.requestedAmount));
 
-    //     assertTrue(simulator.simUserOperation(userOp), "metasimUserOperationcall tested false");
+        assertTrue(simulator.simUserOperation(userOp), "metasimUserOperationcall tested false");
 
-    //     // Check solver does NOT have DAI - it must use Uniswap to get it during metacall
-    //     assertEq(DAI.balanceOf(address(uniswapSolver)), 0, "Solver has DAI before metacall");
+        // Check solver does NOT have DAI - it must use Uniswap to get it during metacall
+        assertEq(DAI.balanceOf(address(solver)), 0, "Solver has DAI before metacall");
 
-    //     // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
-    //     atlas.metacall({
-    //         userOp: userOp,
-    //         solverOps: solverOps,
-    //         dAppOp: dAppOp
-    //     });
-    //     vm.stopPrank();
+        // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
+        atlas.metacall({
+            userOp: userOp,
+            solverOps: solverOps,
+            dAppOp: dAppOp
+        });
+        vm.stopPrank();
 
-    //     console.log("\nAFTER METACALL");
-    //     console.log("User WETH balance", WETH.balanceOf(userEOA));
-    //     console.log("User DAI balance", DAI.balanceOf(userEOA));
-    //     console.log("Solver WETH balance", WETH.balanceOf(address(uniswapSolver)));
-    //     console.log("Solver DAI balance", DAI.balanceOf(address(uniswapSolver)));
+        console.log("\nAFTER METACALL");
+        console.log("User WETH balance", WETH.balanceOf(userEOA));
+        console.log("User DAI balance", DAI.balanceOf(userEOA));
+        console.log("Solver WETH balance", WETH.balanceOf(address(solver)));
+        console.log("Solver DAI balance", DAI.balanceOf(address(solver)));
 
-    //     // Check user token balances after
-    //     assertEq(WETH.balanceOf(userEOA), userWethBalanceBefore - swapIntent.amountUserSells, "Did not spend enough WETH");
-    //     assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + swapIntent.amountUserBuys, "Did not receive enough DAI");
-    // }
+        // Check user token balances after
+        assertEq(WETH.balanceOf(userEOA), userWethBalanceBefore - uint256(swapData.requestedAmount), "Did not spend enough WETH");
+        assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + solverBid, "Did not receive enough DAI");
+    }
 }
 
 struct SwapParams {
