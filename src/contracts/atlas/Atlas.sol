@@ -54,6 +54,9 @@ contract Atlas is Escrow {
         payable
         returns (bool auctionWon)
     {
+        console.log("SIMULATOR",SIMULATOR);
+        console.log("msg.sender",msg.sender);
+        
         uint256 gasMarker = gasleft();
 
         // TODO: Combine this w/ call to get executionEnvironment
@@ -66,7 +69,8 @@ contract Atlas is Escrow {
 
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
-        ValidCallsResult validCallsResult = _validCalls(dConfig, userOp, solverOps, dAppOp, executionEnvironment);
+        (SolverOperation[] memory validSolverOps, ValidCallsResult validCallsResult) = IAtlasVerification(VERIFICATION).validCalls(
+            dConfig, userOp, solverOps, dAppOp, executionEnvironment, msg.value, msg.sender, msg.sender == SIMULATOR);
         if (validCallsResult != ValidCallsResult.Valid) {
             if (msg.sender == SIMULATOR) revert VerificationSimFail();
             else revert ValidCalls(validCallsResult);
@@ -75,7 +79,7 @@ contract Atlas is Escrow {
         // Initialize the lock
         _initializeEscrowLock(userOp, executionEnvironment, msg.sender, gasMarker);
 
-        try this.execute{ value: msg.value }(dConfig, userOp, solverOps, executionEnvironment, msg.sender) returns (
+        try this.execute{ value: msg.value }(dConfig, userOp, validSolverOps, executionEnvironment, msg.sender) returns (
             bool _auctionWon, uint256 accruedGasRebate, uint256 winningSolverIndex
         ) {
             auctionWon = _auctionWon;
@@ -223,167 +227,6 @@ contract Atlas is Escrow {
             key = key.allocationComplete();
         }
         return (auctionWon, key);
-    }
-
-    function _validCalls(
-        DAppConfig memory dConfig,
-        UserOperation calldata userOp,
-        SolverOperation[] calldata solverOps,
-        DAppOperation calldata dAppOp,
-        address executionEnvironment
-    )
-        internal
-        returns (ValidCallsResult)
-    {
-        // Verify that the calldata injection came from the dApp frontend
-        // and that the signatures are valid.
-
-        bool isSimulation = msg.sender == SIMULATOR;
-
-        // Some checks are only needed when call is not a simulation
-        if (!isSimulation) {
-            if (tx.gasprice > userOp.maxFeePerGas) {
-                return ValidCallsResult.GasPriceHigherThanMax;
-            }
-
-            // Check that the value of the tx is greater than or equal to the value specified
-            if (msg.value < userOp.value) {
-                return ValidCallsResult.TxValueLowerThanCallValue;
-            }
-        }
-
-        // bundler checks
-        if (msg.sender == userOp.from) {
-            // user is bundling their own operation - check allowed and valid dapp signature/callchainhash
-
-            if (!dConfig.callConfig.allowsUserBundler()) {
-                return ValidCallsResult.UnknownBundlerNotAllowed;
-            }
-
-            // user should not sign their own operation and transaction together
-            if (userOp.signature.length > 0) {
-                return ValidCallsResult.UserSignatureInvalid;
-            }
-
-            // check dapp signature
-            if (!IAtlasVerification(VERIFICATION).verifyDApp(dConfig, dAppOp)) {
-                bool bypass = isSimulation && dAppOp.signature.length == 0;
-                if (!bypass) {
-                    return ValidCallsResult.DAppSignatureInvalid;
-                }
-            }
-
-            // check callchainhash
-            if (dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps) && !isSimulation)
-            {
-                return ValidCallsResult.InvalidSequence;
-            }
-        } else if (msg.sender == dAppOp.from) {
-            // dapp is bundling - always allowed, check valid user/dapp signature and callchainhash
-
-            // check dapp signature
-            if (!IAtlasVerification(VERIFICATION).verifyDApp(dConfig, dAppOp)) {
-                bool bypass = isSimulation && dAppOp.signature.length == 0;
-                if (!bypass) {
-                    return ValidCallsResult.DAppSignatureInvalid;
-                }
-            }
-
-            // check user signature
-            if (!IAtlasVerification(VERIFICATION).verifyUser(dConfig, userOp)) {
-                bool bypass = isSimulation && userOp.signature.length == 0;
-                if (!bypass) {
-                    return ValidCallsResult.UserSignatureInvalid;
-                }
-            }
-
-            // check callchainhash
-            if (dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps) && !isSimulation)
-            {
-                return ValidCallsResult.InvalidSequence;
-            }
-        } else if (msg.sender == solverOps[0].from && solverOps.length == 1) {
-            // potentially the winning solver is bundling - check that its allowed and only need to verify user
-            // signature
-
-            // check if protocol allows it
-            if (!dConfig.callConfig.allowsSolverBundler()) {
-                return ValidCallsResult.DAppSignatureInvalid;
-            }
-
-            // verify user signature
-            if (!IAtlasVerification(VERIFICATION).verifyUser(dConfig, userOp)) {
-                bool bypass = isSimulation && userOp.signature.length == 0;
-                if (!bypass) {
-                    return ValidCallsResult.UserSignatureInvalid;
-                }
-            }
-
-            // verify the callchainhash if required by protocol
-            if (dConfig.callConfig.verifySolverBundlerCallChainHash()) {
-                if (
-                    dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps)
-                        && !isSimulation
-                ) {
-                    return ValidCallsResult.InvalidSequence;
-                }
-            }
-        } else if (dConfig.callConfig.allowsUnknownBundler()) {
-            // check if protocol allows unknown bundlers, and verify all signatures if they do
-
-            // check dapp signature
-            if (!IAtlasVerification(VERIFICATION).verifyDApp(dConfig, dAppOp)) {
-                bool bypass = isSimulation && dAppOp.signature.length == 0;
-                if (!bypass) {
-                    return ValidCallsResult.DAppSignatureInvalid;
-                }
-            }
-
-            // check user signature
-            if (!IAtlasVerification(VERIFICATION).verifyUser(dConfig, userOp)) {
-                bool bypass = isSimulation && userOp.signature.length == 0;
-                if (!bypass) {
-                    return ValidCallsResult.UserSignatureInvalid;
-                }
-            }
-
-            // check callchainhash
-            if (dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps) && !isSimulation)
-            {
-                return ValidCallsResult.InvalidSequence;
-            }
-        } else {
-            return ValidCallsResult.UnknownBundlerNotAllowed;
-        }
-
-        if (solverOps.length >= type(uint8).max - 1) {
-            return ValidCallsResult.TooManySolverOps;
-        }
-
-        if (block.number > userOp.deadline) {
-            bool bypass = isSimulation && userOp.deadline == 0;
-            if (!bypass) {
-                return ValidCallsResult.UserDeadlineReached;
-            }
-        }
-
-        if (block.number > dAppOp.deadline) {
-            bool bypass = isSimulation && dAppOp.deadline == 0;
-            if (!bypass) {
-                return ValidCallsResult.DAppDeadlineReached;
-            }
-        }
-
-        if (executionEnvironment.codehash == bytes32(0)) {
-            return ValidCallsResult.ExecutionEnvEmpty;
-        }
-
-        if (!dConfig.callConfig.allowsZeroSolvers() || dConfig.callConfig.needsSolverPostCall()) {
-            if (solverOps.length == 0) {
-                return ValidCallsResult.NoSolverOp;
-            }
-        }
-        return ValidCallsResult.Valid;
     }
 
     function _handleErrors(bytes4 errorSwitch, uint32 callConfig) internal view {

@@ -10,7 +10,7 @@ error UserUnexpectedSuccess();
 contract FastLaneErrorsEvents {
     // NOTE: nonce is the executed nonce
     event SolverTxResult(
-        address indexed solverTo, address indexed solverFrom, bool executed, bool success, uint256 nonce, uint256 result
+        address indexed solverTo, address indexed solverFrom, bool executed, bool success, uint256 result
     );
 
     event UserTxResult(address indexed user, uint256 valueReturned, uint256 gasRefunded);

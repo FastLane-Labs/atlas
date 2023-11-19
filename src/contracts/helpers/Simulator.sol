@@ -98,16 +98,22 @@ contract Simulator is FastLaneErrorsEvents {
             bytes4 errorSwitch = bytes4(revertData);
             if (errorSwitch == PreOpsSimFail.selector) {
                 result = Result.PreOpsSimFail;
+                console.log("Result.PreOpsSimFail");
             } else if (errorSwitch == UserOpSimFail.selector) {
                 result = Result.UserOpSimFail;
+                console.log("Result.UserOpSimFail");
             } else if (errorSwitch == SolverSimFail.selector) {
                 result = Result.SolverSimFail;
+                console.log("Result.SolverSimFail");
             } else if (errorSwitch == PostOpsSimFail.selector) {
                 result = Result.PostOpsSimFail;
+                console.log("Result.PostOpsSimFail");
             } else if (errorSwitch == SimulationPassed.selector) {
                 result = Result.SimulationPassed;
+                console.log("Result.SimulationPassed");
             } else {
                 result = Result.Unknown;
+                console.log("Result.Unknown");
             }
         }
     }

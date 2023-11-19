@@ -2,7 +2,6 @@
 pragma solidity 0.8.21;
 
 import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
-import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
 
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
@@ -104,8 +103,7 @@ abstract contract Escrow is AtlETH {
         uint256 gasLimit;
 
         // Verify the transaction.
-        (result, gasLimit, solverEscrow) =
-            IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, solverEscrow, gasWaterMark, false);
+        (result, gasLimit, solverEscrow) = _validateSolverOperation(solverOp, false);
 
         // If there are no errors, attempt to execute
         if (result.canExecute() && _checkSolverProxy(solverOp.from, bundler)) {
@@ -123,7 +121,7 @@ abstract contract Escrow is AtlETH {
             if (result.executionSuccessful()) {
                 // first successful solver call that paid what it bid
                 result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
-                emit SolverTxResult(solverOp.solver, solverOp.from, true, true, solverEscrow.nonce, result);
+                emit SolverTxResult(solverOp.solver, solverOp.from, true, true, result);
 
                 _updateSolverProxy(solverOp.from, bundler, true);
 
@@ -142,10 +140,10 @@ abstract contract Escrow is AtlETH {
             }
 
             // emit event
-            emit SolverTxResult(solverOp.solver, solverOp.from, true, false, solverEscrow.nonce, result);
+            emit SolverTxResult(solverOp.solver, solverOp.from, true, false, result);
         } else {
             // emit event
-            emit SolverTxResult(solverOp.solver, solverOp.from, false, false, solverEscrow.nonce, result);
+            emit SolverTxResult(solverOp.solver, solverOp.from, false, false, result);
         }
         return (auctionWon, key);
     }
@@ -189,6 +187,65 @@ abstract contract Escrow is AtlETH {
         (success,) = environment.call{ value: msg.value }(postOpsData);
     }
 
+    // TODO Revisit the EscrowAccountData memory solverEscrow arg. Needs to be passed through from Atlas, through
+    // callstack
+    function _validateSolverOperation(
+        SolverOperation calldata solverOp,
+        bool auctionAlreadyComplete
+    )
+        internal
+        view
+        returns (uint256 result, uint256 gasLimit, EscrowAccountData memory solverEscrow)
+    {
+        // Set the gas baseline
+        uint256 gasWaterMark = gasleft();
+
+        solverEscrow = _escrowAccountData[solverOp.from];
+
+        // TODO big unchecked block - audit/review carefully
+        unchecked {
+            if (solverOp.to != address(this)) {
+                result |= 1 << uint256(SolverOutcome.InvalidTo);
+            }
+
+            if (solverEscrow.lastAccessed >= uint64(block.number)) {
+                result |= 1 << uint256(SolverOutcome.PerBlockLimit);
+            } else {
+                solverEscrow.lastAccessed = uint64(block.number);
+            }
+
+            gasLimit = (100) * (solverOp.gas < EscrowBits.SOLVER_GAS_LIMIT ? solverOp.gas : EscrowBits.SOLVER_GAS_LIMIT)
+                / (100 + EscrowBits.SOLVER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
+
+            uint256 gasCost = (tx.gasprice * gasLimit) + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
+
+            // see if solver's escrow can afford tx gascost
+            if (gasCost > solverEscrow.balance) {
+                // charge solver for calldata so that we can avoid vampire attacks from solver onto user
+                result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
+            }
+
+            // Verify that we can lend the solver their tx value
+            if (solverOp.value > address(this).balance - (gasLimit * tx.gasprice)) {
+                result |= 1 << uint256(SolverOutcome.CallValueTooHigh);
+            }
+
+            // subtract out the gas buffer since the solver's metaTx won't use it
+            gasLimit -= EscrowBits.FASTLANE_GAS_BUFFER;
+
+            if (auctionAlreadyComplete) {
+                result |= 1 << uint256(SolverOutcome.LostAuction);
+            }
+
+            if (gasWaterMark < EscrowBits.VALIDATION_GAS_LIMIT + EscrowBits.SOLVER_GAS_LIMIT) {
+                // Make sure to leave enough gas for dApp validation calls
+                result |= 1 << uint256(SolverOutcome.UserOutOfGas);
+            }
+        }
+
+        return (result, gasLimit, solverEscrow);
+    }
+
     function _update(
         SolverOperation calldata solverOp,
         EscrowAccountData memory solverEscrow,
@@ -224,9 +281,6 @@ abstract contract Escrow is AtlETH {
 
                 // Save the escrow data back into storage
                 _escrowAccountData[solverOp.from] = solverEscrow;
-            } else if (result & EscrowBits._NO_NONCE_UPDATE == 0) {
-                // Need to save escrowData due to nonce update but not gasRebate
-                _escrowAccountData[solverOp.from].nonce = solverEscrow.nonce;
             }
         }
     }

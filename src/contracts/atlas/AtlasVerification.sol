@@ -11,8 +11,10 @@ import "../types/GovernanceTypes.sol";
 
 import "../types/DAppApprovalTypes.sol";
 import "../types/EscrowTypes.sol";
+import "../types/ValidCallsTypes.sol";
 
 import { EscrowBits } from "../libraries/EscrowBits.sol";
+import { CallVerification } from "../libraries/CallVerification.sol";
 
 import { DAppIntegration } from "./DAppIntegration.sol";
 
@@ -29,33 +31,191 @@ import "forge-std/Test.sol"; // TODO remove
 contract AtlasVerification is EIP712, DAppIntegration {
     using ECDSA for bytes32;
     using CallBits for uint32;
+    using CallVerification for UserOperation;
 
     constructor(address _atlas) EIP712("ProtoCallHandler", "0.0.1") DAppIntegration(_atlas) { }
 
-    // PORTED FROM ESCROW - TODO reorder
-
-    function verifySolverOp(
-        SolverOperation calldata solverOp,
-        EscrowAccountData memory solverEscrow,
-        uint256 gasWaterMark,
-        bool auctionAlreadyComplete
+    function validCalls(
+        DAppConfig calldata dConfig,
+        UserOperation calldata userOp,
+        SolverOperation[] calldata solverOps,
+        DAppOperation calldata dAppOp,
+        address executionEnvironment,
+        uint256 msgValue,
+        address msgSender,
+        bool isSimulation
     )
         external
-        view
-        returns (uint256 result, uint256 gasLimit, EscrowAccountData memory)
+        returns (SolverOperation[] memory, ValidCallsResult)
     {
-        // verify solver's signature
-        if (_verifySignature(solverOp)) {
-            // verify the solver has correct usercalldata and the solver escrow checks
-            (result, gasLimit, solverEscrow) = _verifySolverOperation(solverOp, solverEscrow);
-        } else {
-            (result, gasLimit) = (1 << uint256(SolverOutcome.InvalidSignature), 0);
-            // solverEscrow returns null
+        // Verify that the calldata injection came from the dApp frontend
+        // and that the signatures are valid.
+
+        // Some checks are only needed when call is not a simulation
+        if (!isSimulation) {
+            if (tx.gasprice > userOp.maxFeePerGas) {
+                return (solverOps, ValidCallsResult.GasPriceHigherThanMax);
+            }
+
+            // Check that the value of the tx is greater than or equal to the value specified
+            if (msgValue < userOp.value) {
+                return (solverOps, ValidCallsResult.TxValueLowerThanCallValue);
+            }
         }
 
-        result = _solverOpPreCheck(result, gasWaterMark, tx.gasprice, solverOp.maxFeePerGas, auctionAlreadyComplete);
-        return (result, gasLimit, solverEscrow);
+        // bundler checks
+        if (msgSender == userOp.from) {
+            // user is bundling their own operation - check allowed and valid dapp signature/callchainhash
+
+            if (!dConfig.callConfig.allowsUserBundler()) {
+                return (solverOps, ValidCallsResult.UnknownBundlerNotAllowed);
+            }
+
+            // user should not sign their own operation and transaction together
+            if (userOp.signature.length > 0) {
+                return (solverOps, ValidCallsResult.UserSignatureInvalid);
+            }
+
+            // check dapp signature
+            if (!_verifyDApp(dConfig, dAppOp, msgSender, isSimulation)) {
+                return (solverOps, ValidCallsResult.DAppSignatureInvalid);
+            }
+
+            // check callchainhash
+            if (dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps) && !isSimulation)
+            {
+                return (solverOps, ValidCallsResult.InvalidSequence);
+            }
+        } else if (msgSender == dAppOp.from) {
+            // dapp is bundling - always allowed, check valid user/dapp signature and callchainhash
+
+            // check dapp signature
+            if (!_verifyDApp(dConfig, dAppOp, msgSender, isSimulation)) {
+                return (solverOps, ValidCallsResult.DAppSignatureInvalid);
+            }
+
+            // check user signature
+            if (!_verifyUser(dConfig, userOp, msgSender, isSimulation)) {
+                return (solverOps, ValidCallsResult.UserSignatureInvalid);
+            }
+
+            // check callchainhash
+            if (dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps) && !isSimulation)
+            {
+                return (solverOps, ValidCallsResult.InvalidSequence);
+            }
+        } else if (msgSender == solverOps[0].from && solverOps.length == 1) {
+            // potentially the winning solver is bundling - check that its allowed and only need to verify user
+            // signature
+
+            // check if protocol allows it
+            if (!dConfig.callConfig.allowsSolverBundler()) {
+                return (solverOps, ValidCallsResult.DAppSignatureInvalid);
+            }
+
+            // verify user signature
+            if (!_verifyUser(dConfig, userOp, msgSender, isSimulation)) {
+                return (solverOps, ValidCallsResult.UserSignatureInvalid); 
+            }
+
+            // verify the callchainhash if required by protocol
+            if (dConfig.callConfig.verifySolverBundlerCallChainHash()) {
+                if (
+                    dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps)
+                        && !isSimulation
+                ) {
+                    return (solverOps, ValidCallsResult.InvalidSequence);
+                }
+            }
+        } else if (dConfig.callConfig.allowsUnknownBundler()) {
+            // check if protocol allows unknown bundlers, and verify all signatures if they do
+
+            // check dapp signature
+            if (!_verifyDApp(dConfig, dAppOp, msgSender, isSimulation)) {
+                return (solverOps, ValidCallsResult.DAppSignatureInvalid);
+                
+            }
+
+            // check user signature
+            if (!_verifyUser(dConfig, userOp, msgSender, isSimulation)) {
+                return (solverOps, ValidCallsResult.UserSignatureInvalid);
+            }
+
+            // check callchainhash
+            if (dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps) && !isSimulation)
+            {
+                return (solverOps, ValidCallsResult.InvalidSequence);
+            }
+        } else {
+            return (solverOps, ValidCallsResult.UnknownBundlerNotAllowed);
+        }
+
+        if (solverOps.length > type(uint8).max - 2) {
+            return (solverOps, ValidCallsResult.TooManySolverOps);
+        }
+
+        if (block.number > userOp.deadline) {
+            bool bypass = isSimulation && userOp.deadline == 0;
+            if (!bypass) {
+                return (solverOps, ValidCallsResult.UserDeadlineReached);
+            }
+        }
+
+        if (block.number > dAppOp.deadline) {
+            bool bypass = isSimulation && dAppOp.deadline == 0;
+            if (!bypass) {
+                return (solverOps, ValidCallsResult.DAppDeadlineReached);
+            }
+        }
+
+        if (executionEnvironment.codehash == bytes32(0)) {
+            return (solverOps, ValidCallsResult.ExecutionEnvEmpty);
+        }
+
+        if (!dConfig.callConfig.allowsZeroSolvers() || dConfig.callConfig.needsSolverPostCall()) {
+            if (solverOps.length == 0) {
+                return (solverOps, ValidCallsResult.NoSolverOp);
+            }
+        }
+
+        if (isSimulation) {
+            // Add all solver ops if simulation
+            return (solverOps, ValidCallsResult.Valid);
+        }
+
+        // Otherwise, prune invalid solver ops
+        uint256 solverOpCount = solverOps.length;
+        SolverOperation[] memory prunedSolverOps = new SolverOperation[](solverOpCount);
+
+        for (uint256 i = 0; i < solverOpCount; i++) {
+            if (msgSender == solverOps[i].from || _verifySignature(solverOps[i])) {
+                // Validate solver signature
+
+                SolverOperation memory solverOp = solverOps[i];
+
+                if (tx.gasprice > solverOp.maxFeePerGas) {
+                    // Verify solver max gas price
+                    continue;
+                }
+
+                if (block.number > solverOp.deadline) {
+                    // Verify solver deadline
+                    continue;
+                }
+
+                if (solverOp.from == userOp.from) {
+                    continue;
+                }
+
+                // If all initial checks succeed, add solver op to new array
+                prunedSolverOps[i] = solverOp;
+            }
+        }
+
+        return (prunedSolverOps, ValidCallsResult.Valid);
     }
+
+    // PORTED FROM ESCROW - TODO reorder
 
     function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload) {
         payload = _hashTypedDataV4(_getSolverHash(solverOp));
@@ -64,63 +224,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
     function _verifySignature(SolverOperation calldata solverOp) internal view returns (bool) {
         address signer = _hashTypedDataV4(_getSolverHash(solverOp)).recover(solverOp.signature);
         return signer == solverOp.from;
-    }
-
-    // TODO Revisit the EscrowAccountData memory solverEscrow arg. Needs to be passed through from Atlas, through
-    // callstack
-    function _verifySolverOperation(
-        SolverOperation calldata solverOp,
-        EscrowAccountData memory solverEscrow
-    )
-        internal
-        view
-        returns (uint256 result, uint256 gasLimit, EscrowAccountData memory)
-    {
-        // TODO big unchecked block - audit/review carefully
-        unchecked {
-            if (solverOp.to != ATLAS) {
-                result |= 1 << uint256(SolverOutcome.InvalidTo);
-            }
-
-            if (solverOp.nonce <= uint256(solverEscrow.nonce)) {
-                result |= 1 << uint256(SolverOutcome.InvalidNonceUnder);
-            } else if (solverOp.nonce > uint256(solverEscrow.nonce) + 1) {
-                result |= 1 << uint256(SolverOutcome.InvalidNonceOver);
-
-                // TODO: reconsider the jump up for gapped nonces? Intent is to mitigate dmg
-                // potential inflicted by a hostile solver/builder.
-                solverEscrow.nonce = uint32(solverOp.nonce);
-            } else {
-                ++solverEscrow.nonce;
-            }
-
-            if (solverEscrow.lastAccessed >= uint64(block.number)) {
-                result |= 1 << uint256(SolverOutcome.PerBlockLimit);
-            } else {
-                solverEscrow.lastAccessed = uint64(block.number);
-            }
-
-            gasLimit = (100) * (solverOp.gas < EscrowBits.SOLVER_GAS_LIMIT ? solverOp.gas : EscrowBits.SOLVER_GAS_LIMIT)
-                / (100 + EscrowBits.SOLVER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
-
-            uint256 gasCost = (tx.gasprice * gasLimit) + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
-
-            // see if solver's escrow can afford tx gascost
-            if (gasCost > solverEscrow.balance) {
-                // charge solver for calldata so that we can avoid vampire attacks from solver onto user
-                result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
-            }
-
-            // Verify that we can lend the solver their tx value
-            if (solverOp.value > ATLAS.balance - (gasLimit * tx.gasprice)) {
-                result |= 1 << uint256(SolverOutcome.CallValueTooHigh);
-            }
-
-            // subtract out the gas buffer since the solver's metaTx won't use it
-            gasLimit -= EscrowBits.FASTLANE_GAS_BUFFER;
-        }
-
-        return (result, gasLimit, solverEscrow);
     }
 
     function _getSolverHash(SolverOperation calldata solverOp) internal pure returns (bytes32 solverHash) {
@@ -144,33 +247,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
         );
     }
 
-    // BITWISE STUFF
-    function _solverOpPreCheck(
-        uint256 result,
-        uint256 gasWaterMark,
-        uint256 txGasPrice,
-        uint256 maxFeePerGas,
-        bool auctionAlreadyComplete
-    )
-        internal
-        pure
-        returns (uint256)
-    {
-        if (auctionAlreadyComplete) {
-            result |= 1 << uint256(SolverOutcome.LostAuction);
-        }
-
-        if (gasWaterMark < EscrowBits.VALIDATION_GAS_LIMIT + EscrowBits.SOLVER_GAS_LIMIT) {
-            // Make sure to leave enough gas for dApp validation calls
-            result |= 1 << uint256(SolverOutcome.UserOutOfGas);
-        }
-
-        if (txGasPrice > maxFeePerGas) {
-            result |= 1 << uint256(SolverOutcome.GasPriceOverCap);
-        }
-
-        return result;
-    }
 
     //
     // DAPP VERIFICATION
@@ -184,10 +260,13 @@ contract AtlasVerification is EIP712, DAppIntegration {
     // the supply chain to submit data.  If any other party
     // (user, solver, FastLane,  or a collusion between
     // all of them) attempts to alter it, this check will fail
-    function verifyDApp(DAppConfig memory dConfig, DAppOperation calldata dAppOp) external returns (bool) {
+    function _verifyDApp(DAppConfig memory dConfig, DAppOperation calldata dAppOp, address msgSender, bool isSimulation) internal returns (bool) {
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp nonces
-        if (!_verifyDAppSignature(dAppOp)) {
+
+        bool bypassSignature = msgSender == dAppOp.from || (isSimulation && dAppOp.signature.length == 0);
+
+        if (!bypassSignature && !_verifyDAppSignature(dAppOp)) {
             return false;
         }
 
@@ -229,14 +308,14 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // NOTE: allowing only sequenced nonces could create a scenario in
         // which builders or validators may be able to profit via censorship.
         // DApps are encouraged to rely on the deadline parameter.
-        if (!_handleNonces(dAppOp.from, dAppOp.nonce, dConfig.callConfig.needsSequencedNonces())) {
+        if (!_handleNonces(dAppOp.from, dAppOp.nonce, dConfig.callConfig.needsSequencedNonces(), isSimulation)) {
             return (false);
         }
 
         return (true);
     }
 
-    function _handleNonces(address account, uint256 nonce, bool async) internal returns (bool validNonce) {
+    function _handleNonces(address account, uint256 nonce, bool async, bool isSimulation) internal returns (bool validNonce) {
         if (nonce > type(uint128).max - 1) {
             return false;
         }
@@ -255,6 +334,11 @@ contract AtlasVerification is EIP712, DAppIntegration {
         uint256 bitmap = uint256(nonceBitmap.bitmap);
         if (bitmap & (1 << bitmapNonce) != 0) {
             return false;
+        }
+        
+        if (isSimulation) {
+            // return early if simulation to avoid storing nonce updates
+            return true;
         }
 
         bitmap |= 1 << bitmapNonce;
@@ -360,10 +444,13 @@ contract AtlasVerification is EIP712, DAppIntegration {
     //
 
     // Verify the user's meta transaction
-    function verifyUser(DAppConfig memory dConfig, UserOperation calldata userOp) external returns (bool) {
+    function _verifyUser(DAppConfig memory dConfig, UserOperation calldata userOp, address msgSender, bool isSimulation) internal returns (bool) {
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp userNonces
-        if (!_verifyUserSignature(userOp)) {
+
+        bool bypassSignature = msgSender == userOp.from || (isSimulation && userOp.signature.length == 0);
+
+        if (!bypassSignature && !_verifyUserSignature(userOp)) {
             console.log("invalid user sig");
             return false;
         }
@@ -379,7 +466,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // which builders or validators may be able to profit via censorship.
         // DApps are encouraged to rely on the deadline parameter
         // to prevent replay attacks.
-        if (!_handleNonces(userOp.from, userOp.nonce, dConfig.callConfig.needsSequencedNonces())) {
+        if (!_handleNonces(userOp.from, userOp.nonce, dConfig.callConfig.needsSequencedNonces(), isSimulation)) {
             console.log("invalid nonce");
             return false;
         }
