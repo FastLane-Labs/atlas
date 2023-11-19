@@ -66,7 +66,8 @@ contract Atlas is Escrow {
         // replay attacks.
         ValidCallsResult validCallsResult;
         (solverOps, validCallsResult) = IAtlasVerification(VERIFICATION).validCalls(
-            dConfig, userOp, solverOps, dAppOp, executionEnvironment, msg.value, msg.sender, msg.sender == SIMULATOR);
+            dConfig, userOp, solverOps, dAppOp, executionEnvironment, msg.value, msg.sender, msg.sender == SIMULATOR
+        );
         if (validCallsResult != ValidCallsResult.Valid) {
             if (msg.sender == SIMULATOR) revert VerificationSimFail();
             else revert ValidCalls(validCallsResult);

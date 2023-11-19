@@ -106,7 +106,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
             // verify user signature
             if (!_verifyUser(dConfig, userOp, msgSender, isSimulation)) {
-                return (prunedSolverOps, ValidCallsResult.UserSignatureInvalid); 
+                return (prunedSolverOps, ValidCallsResult.UserSignatureInvalid);
             }
 
             // verify the callchainhash if required by protocol
@@ -124,7 +124,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
             // check dapp signature
             if (!_verifyDApp(dConfig, dAppOp, msgSender, isSimulation)) {
                 return (prunedSolverOps, ValidCallsResult.DAppSignatureInvalid);
-                
             }
 
             // check user signature
@@ -208,7 +207,9 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
                 // If all initial checks succeed, add solver op to new array
                 prunedSolverOps[i] = solverOp;
-                unchecked{ ++validSolverCount; }
+                unchecked {
+                    ++validSolverCount;
+                }
             }
         }
 
@@ -254,7 +255,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
         );
     }
 
-
     //
     // DAPP VERIFICATION
     //
@@ -267,7 +267,15 @@ contract AtlasVerification is EIP712, DAppIntegration {
     // the supply chain to submit data.  If any other party
     // (user, solver, FastLane,  or a collusion between
     // all of them) attempts to alter it, this check will fail
-    function _verifyDApp(DAppConfig memory dConfig, DAppOperation calldata dAppOp, address msgSender, bool isSimulation) internal returns (bool) {
+    function _verifyDApp(
+        DAppConfig memory dConfig,
+        DAppOperation calldata dAppOp,
+        address msgSender,
+        bool isSimulation
+    )
+        internal
+        returns (bool)
+    {
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp nonces
 
@@ -295,7 +303,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         // Make sure the signer is currently enabled by dapp owner
         if (!signatories[keccak256(abi.encode(govData.governance, dAppOp.from))]) {
-
             bool bypassSignatoryCheck = isSimulation && dAppOp.from == address(0);
             if (!bypassSignatoryCheck) {
                 return (false);
@@ -326,7 +333,15 @@ contract AtlasVerification is EIP712, DAppIntegration {
         return (true);
     }
 
-    function _handleNonces(address account, uint256 nonce, bool async, bool isSimulation) internal returns (bool validNonce) {
+    function _handleNonces(
+        address account,
+        uint256 nonce,
+        bool async,
+        bool isSimulation
+    )
+        internal
+        returns (bool validNonce)
+    {
         if (nonce > type(uint128).max - 1) {
             return false;
         }
@@ -347,7 +362,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         if (bitmap & (1 << bitmapNonce) != 0) {
             return false;
         }
-        
+
         if (isSimulation) {
             // return early if simulation to avoid storing nonce updates
             return true;
@@ -456,7 +471,15 @@ contract AtlasVerification is EIP712, DAppIntegration {
     //
 
     // Verify the user's meta transaction
-    function _verifyUser(DAppConfig memory dConfig, UserOperation calldata userOp, address msgSender, bool isSimulation) internal returns (bool) {
+    function _verifyUser(
+        DAppConfig memory dConfig,
+        UserOperation calldata userOp,
+        address msgSender,
+        bool isSimulation
+    )
+        internal
+        returns (bool)
+    {
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp userNonces
 

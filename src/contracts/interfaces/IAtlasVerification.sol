@@ -8,7 +8,6 @@ import "../types/EscrowTypes.sol";
 import "../types/ValidCallsTypes.sol";
 
 interface IAtlasVerification {
-
     function validCalls(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
