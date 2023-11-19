@@ -168,19 +168,20 @@ contract AtlasVerification is EIP712, DAppIntegration {
             }
         }
 
-        if (executionEnvironment.codehash == bytes32(0)) {
-            return (solverOps, ValidCallsResult.ExecutionEnvEmpty);
-        }
-
-
         if (isSimulation) {
             // Add all solver ops if simulation
             return (solverOps, ValidCallsResult.Valid);
         }
 
+        if (executionEnvironment.codehash == bytes32(0)) {
+            return (solverOps, ValidCallsResult.ExecutionEnvEmpty);
+        }
+
         // Otherwise, prune invalid solver ops
         uint256 solverOpCount = solverOps.length;
         uint256 validSolverCount;
+        bytes32 userOpHash = userOp.getUserOperationHash();
+
         SolverOperation[] memory prunedSolverOps = new SolverOperation[](solverOpCount);
 
         for (uint256 i = 0; i < solverOpCount; i++) {
@@ -203,16 +204,22 @@ contract AtlasVerification is EIP712, DAppIntegration {
                     continue;
                 }
 
+                if (solverOp.userOpHash != userOpHash) {
+                    continue;
+                }
+
                 // If all initial checks succeed, add solver op to new array
                 prunedSolverOps[i] = solverOp;
                 unchecked{ ++validSolverCount; }
             }
         }
 
-        if (!dConfig.callConfig.allowsZeroSolvers() || dConfig.callConfig.needsSolverPostCall()) {
-            if (validSolverCount == 0) {
-                return (solverOps, ValidCallsResult.NoSolverOp);
-            }
+        if (!dConfig.callConfig.allowsZeroSolvers() && validSolverCount == 0) {
+            return (solverOps, ValidCallsResult.NoSolverOp);
+        }
+
+        if (dConfig.callConfig.needsFulfillment() && validSolverCount == 0) {
+            return (solverOps, ValidCallsResult.NoSolverOp);
         }
 
         return (prunedSolverOps, ValidCallsResult.Valid);

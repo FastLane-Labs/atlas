@@ -137,7 +137,6 @@ contract Atlas is Escrow {
         // to verify against the hash supplied by DAppControl
 
         bool callSuccessful;
-        bytes32 userOpHash = userOp.getUserOperationHash();
 
         bytes memory returnData;
 
@@ -170,7 +169,7 @@ contract Atlas is Escrow {
 
         for (; winningSearcherIndex < solverOps.length;) {
             // Only execute solver meta tx if userOpHash matches
-            if (!auctionWon && userOpHash == solverOps[winningSearcherIndex].userOpHash) {
+            if (!auctionWon && solverOps[winningSearcherIndex].from != address(0)) {
                 (auctionWon, key) = _solverExecutionIteration(
                     dConfig, solverOps[winningSearcherIndex], returnData, auctionWon, executionEnvironment, bundler, key
                 );
@@ -185,7 +184,7 @@ contract Atlas is Escrow {
         // If no solver was successful, manually transition the lock
         if (!auctionWon) {
             if (key.isSimulation) revert SolverSimFail();
-            if (dConfig.callConfig.needsSolverPostCall()) {
+            if (dConfig.callConfig.needsFulfillment()) {
                 revert UserNotFulfilled(); // revert("ERR-E003 SolverFulfillmentFailure");
             }
             key = key.setAllSolversFailed();
