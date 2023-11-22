@@ -38,13 +38,16 @@ contract V4SwapIntentTest is BaseTest {
     function setUp() public virtual override {
         BaseTest.setUp();
 
+        // deploy new pool manager
+        poolManager = new PoolManager(30000000);
+
         // Creating new gov address (ERR-V49 OwnerActive if already registered with controller) 
         governancePK = 11112;
         governanceEOA = vm.addr(governancePK);
 
         // Deploy new SwapIntent Controller from new gov and initialize in Atlas
         vm.startPrank(governanceEOA);
-        swapIntentController = new V4SwapIntentController(address(escrow));        
+        swapIntentController = new V4SwapIntentController(address(escrow), address(poolManager));        
         atlas.initializeGovernance(address(swapIntentController));
         atlas.integrateDApp(address(swapIntentController));
         vm.stopPrank();
@@ -55,9 +58,7 @@ contract V4SwapIntentTest is BaseTest {
             atlasAddress: address(atlas)
         });
 
-        // Deploy new poolamanger and create a DAI/WETH pool with no hooks
-        poolManager = new PoolManager(30000000);
-
+        // Create a DAI/WETH pool with no hooks
         poolKey = PoolKey({
             currency0: Currency.wrap(address(DAI)),
             currency1: Currency.wrap(address(WETH)),
@@ -66,10 +67,7 @@ contract V4SwapIntentTest is BaseTest {
             hooks: IHooks(address(0))
         });
 
-        // Original: 1823965582028705631020492031
-        // SQRT_RATIO_1_1: 79228162514264337593543950336
-
-        poolManager.initialize(poolKey, 79228162514264337593543950336, new bytes(0));
+        poolManager.initialize(poolKey, 1797734745375579914506781200, new bytes(0));
 
         // New stuff
         PoolModifyPositionTest modifyPositionRouter = new PoolModifyPositionTest(IPoolManager(address(poolManager)));
@@ -84,7 +82,7 @@ contract V4SwapIntentTest is BaseTest {
         modifyPositionRouter.modifyPosition(poolKey, IPoolManager.ModifyPositionParams({
             tickLower: -887220,
             tickUpper: 887220,
-            liquidityDelta: 1000000
+            liquidityDelta: 100000000000000000
         }), new bytes(0));
 
         vm.stopPrank();
@@ -248,6 +246,7 @@ contract UniswapV4IntentSolver is SolverBase {
         require(ERC20(swap.tokenIn).balanceOf(address(this)) >= (swap.requestedAmount > 0 ? uint256(swap.requestedAmount) : swap.limitAmount - bid), "Did not receive enough tokenIn");
 
         // Make swap on the v4 pool
+        ERC20(swap.tokenIn).approve(address(swapHelper), swap.requestedAmount > 0 ? uint256(swap.requestedAmount) : swap.limitAmount - bid);
         swapHelper.swap(poolKey, IPoolManager.SwapParams({
             zeroForOne: swap.tokenIn < swap.tokenOut,
             amountSpecified: swap.requestedAmount,
@@ -258,6 +257,7 @@ contract UniswapV4IntentSolver is SolverBase {
         }), new bytes(0));
 
         // Send min tokens back to user to fulfill intent, rest are profit for solver
+        address(0).staticcall(abi.encode(bid));
         ERC20(swap.tokenOut).transfer(executionEnvironment, swap.requestedAmount > 0 ? bid : uint256(-swap.requestedAmount));
     }
 

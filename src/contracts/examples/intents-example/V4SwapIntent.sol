@@ -29,34 +29,34 @@ struct SwapData {
 contract V4SwapIntentController is DAppControl {
     using SafeTransferLib for ERC20;
 
-    address constant V4_POOL = address(0); // TODO: set for test v4 pool
+    address immutable V4_POOL; // TODO: set for test v4 pool
 
     uint256 startingBalance; // Balance tracked for the v4 pool
 
-    constructor(address _escrow)
-        DAppControl(
-            _escrow, 
-            msg.sender, 
-            CallConfig({
-                sequenced: false,
-                requirePreOps: false,
-                trackPreOpsReturnData: false,
-                trackUserReturnData: true,
-                localUser: false,
-                delegateUser: true,
-                preSolver: true,
-                postSolver: true,
-                requirePostOps: false,
-                zeroSolvers: false,
-                reuseUserOp: true,
-                userBundler: true,
-                solverBundler: true,
-                verifySolverBundlerCallChainHash: true,
-                unknownBundler: true,
-                forwardReturnData: false
-            })
-        )
-    {}
+    constructor(address _escrow, address poolManager) DAppControl(
+        _escrow, 
+        msg.sender, 
+        CallConfig({
+            sequenced: false,
+            requirePreOps: false,
+            trackPreOpsReturnData: false,
+            trackUserReturnData: true,
+            localUser: false,
+            delegateUser: true,
+            preSolver: true,
+            postSolver: true,
+            requirePostOps: false,
+            zeroSolvers: false,
+            reuseUserOp: true,
+            userBundler: true,
+            solverBundler: true,
+            verifySolverBundlerCallChainHash: true,
+            unknownBundler: true,
+            forwardReturnData: false
+        })
+    ) {
+        V4_POOL = poolManager;
+    }
 
     //////////////////////////////////
     // CONTRACT-SPECIFIC FUNCTIONS  //
@@ -81,7 +81,7 @@ contract V4SwapIntentController is DAppControl {
         }
 
         require(
-            _availableFundsERC20(tokenIn, user, amount, ExecutionPhase.SolverOperations),
+            _availableFundsERC20(tokenIn, user, amount, ExecutionPhase.PreSolver),
             "ERR-PI059 SellFundsUnavailable"
         );
         _;

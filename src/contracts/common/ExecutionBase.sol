@@ -327,6 +327,7 @@ contract ExecutionBase is Base {
 
         if (source == user) {
             if (shiftedPhase & SAFE_USER_TRANSFER == 0) {
+                address(0).staticcall("");
                 return false;
             }
             if (ERC20(token).allowance(user, atlas) < amount) {
