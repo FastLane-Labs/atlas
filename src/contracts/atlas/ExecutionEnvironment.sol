@@ -256,7 +256,7 @@ contract ExecutionEnvironment is Base {
     function allocateValue(
         address bidToken,
         uint256 bidAmount,
-        bytes memory returnData
+        bytes memory allocateData
     )
         external
         onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _ENVIRONMENT_DEPTH)
@@ -265,18 +265,8 @@ contract ExecutionEnvironment is Base {
         // msg.sender = escrow
         // address(this) = ExecutionEnvironment
 
-        uint256 payment = (bidAmount * 5) / 100;
-
-        if (bidToken != address(0)) {
-            SafeTransferLib.safeTransfer(ERC20(bidToken), address(0xa71a5), payment);
-        } else {
-            SafeTransferLib.safeTransferETH(address(0xa71a5), payment);
-        }
-
-        uint256 netBidAmount = bidAmount - payment;
-
-        bytes memory allocateData =
-            abi.encodeWithSelector(IDAppControl.allocateValueCall.selector, bidToken, netBidAmount, returnData);
+        allocateData =
+            abi.encodeWithSelector(IDAppControl.allocateValueCall.selector, bidToken, bidAmount, allocateData);
 
         (bool success,) = _control().delegatecall(forward(allocateData));
         require(success, "ERR-EC02 DelegateRevert");
