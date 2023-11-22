@@ -183,7 +183,6 @@ contract SwapIntentController is DAppControl {
 
     // Checking intent was fulfilled, and user has received their tokens, happens here
     function _postSolverCall(bytes calldata data) internal override returns (bool) {
-       
         (,, bytes memory returnData) = abi.decode(data, (address, uint256, bytes));
 
         SwapData memory swapData = abi.decode(returnData, (SwapData));

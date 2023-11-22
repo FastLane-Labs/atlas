@@ -2,18 +2,18 @@
 pragma solidity ^0.8.16;
 
 // Base Imports
-import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
 // Atlas Base Imports
-import {IEscrow} from "../../interfaces/IEscrow.sol";
+import { IEscrow } from "../../interfaces/IEscrow.sol";
 
-import {CallConfig} from "../../types/DAppApprovalTypes.sol";
+import { CallConfig } from "../../types/DAppApprovalTypes.sol";
 import "../../types/UserCallTypes.sol";
 import "../../types/SolverCallTypes.sol";
 import "../../types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
-import {DAppControl} from "../../dapp/DAppControl.sol";
+import { DAppControl } from "../../dapp/DAppControl.sol";
 
 import "forge-std/Test.sol";
 
@@ -33,28 +33,33 @@ contract V4SwapIntentController is DAppControl {
 
     uint256 startingBalance; // Balance tracked for the v4 pool
 
-    constructor(address _escrow, address poolManager) DAppControl(
-        _escrow, 
-        msg.sender, 
-        CallConfig({
-            sequenced: false,
-            requirePreOps: false,
-            trackPreOpsReturnData: false,
-            trackUserReturnData: true,
-            localUser: false,
-            delegateUser: true,
-            preSolver: true,
-            postSolver: true,
-            requirePostOps: false,
-            zeroSolvers: false,
-            reuseUserOp: true,
-            userBundler: true,
-            solverBundler: true,
-            verifySolverBundlerCallChainHash: true,
-            unknownBundler: true,
-            forwardReturnData: false
-        })
-    ) {
+    constructor(
+        address _escrow,
+        address poolManager
+    )
+        DAppControl(
+            _escrow,
+            msg.sender,
+            CallConfig({
+                sequenced: false,
+                requirePreOps: false,
+                trackPreOpsReturnData: false,
+                trackUserReturnData: true,
+                localUser: false,
+                delegateUser: true,
+                preSolver: true,
+                postSolver: true,
+                requirePostOps: false,
+                zeroSolvers: false,
+                reuseUserOp: true,
+                userBundler: true,
+                solverBundler: true,
+                verifySolverBundlerCallChainHash: true,
+                unknownBundler: true,
+                forwardReturnData: false
+            })
+        )
+    {
         V4_POOL = poolManager;
     }
 
@@ -71,7 +76,7 @@ contract V4SwapIntentController is DAppControl {
 
         // TODO: Could maintain a balance of "1" of each token to allow the user to save gas over multiple uses
         uint256 tokenInBalance = ERC20(tokenIn).balanceOf(address(this));
-        if (tokenInBalance > 0) { 
+        if (tokenInBalance > 0) {
             ERC20(tokenIn).safeTransfer(user, tokenInBalance);
         }
 
@@ -80,10 +85,7 @@ contract V4SwapIntentController is DAppControl {
             ERC20(tokenOut).safeTransfer(user, tokenOutBalance);
         }
 
-        require(
-            _availableFundsERC20(tokenIn, user, amount, ExecutionPhase.PreSolver),
-            "ERR-PI059 SellFundsUnavailable"
-        );
+        require(_availableFundsERC20(tokenIn, user, amount, ExecutionPhase.PreSolver), "ERR-PI059 SellFundsUnavailable");
         _;
     }
 
@@ -98,7 +100,12 @@ contract V4SwapIntentController is DAppControl {
     }
 
     // selector 0x04e45aaf
-    function exactInputSingle(ExactInputSingleParams calldata params) external payable verifyCall(params.tokenIn, params.tokenOut, params.amountIn) returns (SwapData memory) {
+    function exactInputSingle(ExactInputSingleParams calldata params)
+        external
+        payable
+        verifyCall(params.tokenIn, params.tokenOut, params.amountIn)
+        returns (SwapData memory)
+    {
         SwapData memory swapData = SwapData({
             tokenIn: params.tokenIn,
             tokenOut: params.tokenOut,
@@ -108,7 +115,7 @@ contract V4SwapIntentController is DAppControl {
         });
 
         return swapData;
-    } 
+    }
 
     struct ExactOutputSingleParams {
         address tokenIn;
@@ -121,7 +128,12 @@ contract V4SwapIntentController is DAppControl {
     }
 
     // selector 0x5023b4df
-    function exactOutputSingle(ExactOutputSingleParams calldata params) external payable verifyCall(params.tokenIn, params.tokenOut, params.amountInMaximum) returns (SwapData memory) {
+    function exactOutputSingle(ExactOutputSingleParams calldata params)
+        external
+        payable
+        verifyCall(params.tokenIn, params.tokenOut, params.amountInMaximum)
+        returns (SwapData memory)
+    {
         SwapData memory swapData = SwapData({
             tokenIn: params.tokenIn,
             tokenOut: params.tokenOut,
@@ -146,17 +158,19 @@ contract V4SwapIntentController is DAppControl {
         SwapData memory swapData = abi.decode(returnData, (SwapData));
 
         // Record balance and transfer to the solver
-        if(swapData.requestedAmount > 0) { // exact input
+        if (swapData.requestedAmount > 0) {
+            // exact input
             startingBalance = ERC20(swapData.tokenIn).balanceOf(V4_POOL);
             _transferUserERC20(swapData.tokenIn, solverTo, uint256(swapData.requestedAmount));
-        } else { // exact output
+        } else {
+            // exact output
             startingBalance = ERC20(swapData.tokenOut).balanceOf(V4_POOL);
             _transferUserERC20(swapData.tokenIn, solverTo, swapData.limitAmount - solverBid);
             // For exact output swaps, the solver solvers compete and bid on how much tokens they can
             // return to the user in excess of their specified limit input. We only transfer what they
             // require to make the swap in this step.
         }
-        
+
         // TODO: Permit69 is currently enabled during solver phase, but there is low conviction that this
         // does not enable an attack vector. Consider enabling to save gas on a transfer?
         return true;
@@ -164,39 +178,39 @@ contract V4SwapIntentController is DAppControl {
 
     // Checking intent was fulfilled, and user has received their tokens, happens here
     function _postSolverCall(bytes calldata data) internal override returns (bool) {
-       
         (, uint256 solverBid, bytes memory returnData) = abi.decode(data, (address, uint256, bytes));
 
         SwapData memory swapData = abi.decode(returnData, (SwapData));
 
         uint256 buyTokenBalance = ERC20(swapData.tokenOut).balanceOf(address(this));
-        uint256 amountUserBuys = swapData.requestedAmount > 0 ? swapData.limitAmount : uint256(-swapData.requestedAmount);
-        
-        // If it was an exact input swap, we need to verify that 
+        uint256 amountUserBuys =
+            swapData.requestedAmount > 0 ? swapData.limitAmount : uint256(-swapData.requestedAmount);
+
+        // If it was an exact input swap, we need to verify that
         // a) We have enough tokens to meet the user's minimum amount out
         // b) The output amount matches (or is greater than) the solver's bid
         // c) PoolManager's balances increased by the provided input amount
-        if(swapData.requestedAmount > 0) {
-            if(buyTokenBalance < swapData.limitAmount) {
+        if (swapData.requestedAmount > 0) {
+            if (buyTokenBalance < swapData.limitAmount) {
                 return false; // insufficient amount out
             }
-            if(buyTokenBalance < solverBid) {
+            if (buyTokenBalance < solverBid) {
                 return false; // does not meet solver bid
             }
             uint256 endingBalance = ERC20(swapData.tokenIn).balanceOf(V4_POOL);
-            if((endingBalance - startingBalance) < uint256(swapData.requestedAmount)) {
+            if ((endingBalance - startingBalance) < uint256(swapData.requestedAmount)) {
                 return false; // pool manager balances did not increase by the provided input amount
             }
-        } else { // Exact output swap - check the output amount was transferred out by pool
+        } else {
+            // Exact output swap - check the output amount was transferred out by pool
             uint256 endingBalance = ERC20(swapData.tokenOut).balanceOf(V4_POOL);
-            if((startingBalance - endingBalance) < amountUserBuys) {
+            if ((startingBalance - endingBalance) < amountUserBuys) {
                 return false; // pool manager balances did not decrease by the provided output amount
             }
         }
         // no need to check for exact output, since the max is whatever the user transferred
 
         if (buyTokenBalance >= amountUserBuys) {
-
             // Make sure not to transfer any extra 'auctionBaseCurrency' token, since that will be used
             // for the auction measurements
             address auctionBaseCurrency = swapData.requestedAmount > 0 ? swapData.tokenOut : swapData.tokenIn;
@@ -207,7 +221,6 @@ contract V4SwapIntentController is DAppControl {
                 ERC20(swapData.tokenOut).safeTransfer(swapData.recipient, amountUserBuys);
             }
             return true;
-        
         } else {
             return false;
         }
@@ -221,7 +234,6 @@ contract V4SwapIntentController is DAppControl {
         // msg.sender = Escrow
         if (bidToken != address(0)) {
             ERC20(bidToken).safeTransfer(_user(), bidAmount);
-        
         } else {
             SafeTransferLib.safeTransferETH(_user(), address(this).balance);
         }
@@ -237,7 +249,7 @@ contract V4SwapIntentController is DAppControl {
         // so that they can get the proper format for
         // submitting their bids to the hook.
 
-        if(bytes4(userOp.data[:4]) == this.exactInputSingle.selector) {
+        if (bytes4(userOp.data[:4]) == this.exactInputSingle.selector) {
             // exact input swap, the bidding is done in output token
             (, bidToken) = abi.decode(userOp.data[4:], (address, address));
         } else if (bytes4(userOp.data[:4]) == this.exactOutputSingle.selector) {
@@ -248,12 +260,7 @@ contract V4SwapIntentController is DAppControl {
         // should we return an error here if the function is wrong?
     }
 
-    function getBidValue(SolverOperation calldata solverOp)
-        public
-        pure
-        override
-        returns (uint256) 
-    {
+    function getBidValue(SolverOperation calldata solverOp) public pure override returns (uint256) {
         return solverOp.bidAmount;
     }
 }
