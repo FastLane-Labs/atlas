@@ -1,21 +1,28 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.16;
+pragma solidity 0.8.21;
 
-import {ERC20} from "solmate/tokens/ERC20.sol";
+import { ERC20 } from "solmate/tokens/ERC20.sol";
 
-import {IUniswapV2Pair} from "../../src/contracts/examples/v2-example/interfaces/IUniswapV2Pair.sol";
+import { IUniswapV2Pair } from "../../src/contracts/examples/v2-example/interfaces/IUniswapV2Pair.sol";
 
 contract TestConstants {
-    uint256 public constant BLOCK_START = 17441786;
-
-    // MAINNET
-    ChainVars public mainnet = ChainVars({rpcUrlKey: "MAINNET_RPC_URL", forkBlock: BLOCK_START});
+    uint256 public constant BLOCK_START = 17_441_786;
 
     // Structs
     struct ChainVars {
         string rpcUrlKey;
         uint256 forkBlock;
+        address weth;
+        address dai;
     }
+
+    // MAINNET
+    ChainVars public mainnet = ChainVars({
+        rpcUrlKey: "MAINNET_RPC_URL",
+        forkBlock: BLOCK_START,
+        weth: address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2),
+        dai: address(0x6B175474E89094C44Da98b954EedeAC495271d0F)
+    });
 
     // Constants
     address public constant FXS_ADDRESS = address(0x3432B6A60D23Ca0dFCa7761B7ab56459D9C964D0);

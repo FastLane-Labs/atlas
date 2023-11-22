@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.16;
+pragma solidity 0.8.21;
 
 contract Mimic {
     /*
@@ -35,7 +35,7 @@ contract Mimic {
         }
     */
 
-    receive() external payable {}
+    receive() external payable { }
 
     fallback(bytes calldata) external payable returns (bytes memory) {
         (bool success, bytes memory output) = address(0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa).delegatecall(

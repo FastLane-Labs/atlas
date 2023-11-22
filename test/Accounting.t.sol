@@ -1,31 +1,28 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.18;
+pragma solidity 0.8.21;
 
 import "forge-std/Test.sol";
 
-import {ERC20} from "solmate/tokens/ERC20.sol";
+import { ERC20 } from "solmate/tokens/ERC20.sol";
 
-import {BaseTest} from "./base/BaseTest.t.sol";
-import {TxBuilder} from "../src/contracts/helpers/TxBuilder.sol";
-import {SolverOperation} from "../src/contracts/types/SolverCallTypes.sol";
-import {UserOperation} from "../src/contracts/types/UserCallTypes.sol";
-import {DAppOperation, DAppConfig} from "../src/contracts/types/DAppApprovalTypes.sol";
+import { BaseTest } from "./base/BaseTest.t.sol";
+import { TxBuilder } from "../src/contracts/helpers/TxBuilder.sol";
+import { SolverOperation } from "../src/contracts/types/SolverCallTypes.sol";
+import { UserOperation } from "../src/contracts/types/UserCallTypes.sol";
+import { DAppOperation, DAppConfig } from "../src/contracts/types/DAppApprovalTypes.sol";
 
-import {SafetyBits} from "../src/contracts/libraries/SafetyBits.sol";
+import { SafetyBits } from "../src/contracts/libraries/SafetyBits.sol";
 import "../src/contracts/types/LockTypes.sol";
 
-import {TestUtils} from "./base/TestUtils.sol";
+import { TestUtils } from "./base/TestUtils.sol";
 
+import { SwapIntentController, SwapIntent, Condition } from "../src/contracts/examples/intents-example/SwapIntent.sol";
 
-import {SwapIntentController, SwapIntent, Condition} from "../src/contracts/examples/intents-example/SwapIntent.sol";
+import { SolverBase } from "../src/contracts/solver/SolverBase.sol";
 
-import {SolverBase} from "../src/contracts/solver/SolverBase.sol";
-
-import {IEscrow} from "../src/contracts/interfaces/IEscrow.sol";
-
+import { IEscrow } from "../src/contracts/interfaces/IEscrow.sol";
 
 contract AccountingTest is BaseTest {
-
     SwapIntentController public swapIntentController;
     TxBuilder public txBuilder;
     Sig public sig;
@@ -43,52 +40,37 @@ contract AccountingTest is BaseTest {
         bytes32 s;
     }
 
-
     function setUp() public virtual override {
         BaseTest.setUp();
 
-        // Creating new gov address (ERR-V49 OwnerActive if already registered with controller) 
-        governancePK = 11112;
+        // Creating new gov address (ERR-V49 OwnerActive if already registered with controller)
+        governancePK = 11_112;
         governanceEOA = vm.addr(governancePK);
 
         // Deploy new SwapIntent Controller from new gov and initialize in Atlas
         vm.startPrank(governanceEOA);
-        swapIntentController = new SwapIntentController(address(escrow));        
-        atlas.initializeGovernance(address(swapIntentController));
-        atlas.integrateDApp(address(swapIntentController));
+        swapIntentController = new SwapIntentController(address(escrow));
+        atlasVerification.initializeGovernance(address(swapIntentController));
+        atlasVerification.integrateDApp(address(swapIntentController));
         vm.stopPrank();
 
         txBuilder = new TxBuilder({
             controller: address(swapIntentController),
-            escrowAddress: address(escrow),
-            atlasAddress: address(atlas)
+            atlasAddress: address(atlas),
+            _verification: address(atlasVerification)
         });
     }
 
-    function testDELEET() public {
-        uint16 lockState = uint16(61711); // phase 4 - HandlingPayments
-        uint16 phase = SafetyBits.getCurrentExecutionPhase(lockState);
-        console.log(TestUtils.uint16ToBinaryString(61711));
-        console.log("phase", phase);
-        console.log("Exec Phase", uint8(ExecutionPhase.Releasing));
-    }
-
-
     function testSolverBorrowRepaySuccessfully() public {
-        
         // Solver deploys the RFQ solver contract (defined at bottom of this file)
         vm.startPrank(solverOneEOA);
-        HonestRFQSolver honestSolver = new HonestRFQSolver(address(atlas));
+        HonestRFQSolver honestSolver = new HonestRFQSolver(WETH_ADDRESS, address(atlas));
         vm.stopPrank();
 
         SolverOperation[] memory solverOps = _setupBorrowRepayTestUsingBasicSwapIntent(address(honestSolver));
 
         vm.startPrank(userEOA);
-        atlas.metacall{value: 0}({
-            userOp: userOp,
-            solverOps: solverOps,
-            dAppOp: dAppOp
-        });
+        atlas.metacall{ value: 0 }({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
 
         // console.log("\nAFTER METACALL");
@@ -105,35 +87,31 @@ contract AccountingTest is BaseTest {
     }
 
     function testSolverBorrowWithoutRepayingReverts() public {
-
         // Solver deploys the RFQ solver contract (defined at bottom of this file)
         vm.startPrank(solverOneEOA);
         // TODO make evil solver
-        HonestRFQSolver evilSolver = new HonestRFQSolver(address(atlas));
+        HonestRFQSolver evilSolver = new HonestRFQSolver(WETH_ADDRESS, address(atlas));
         // atlas.deposit{value: gasCostCoverAmount}(solverOneEOA);
         vm.stopPrank();
 
         SolverOperation[] memory solverOps = _setupBorrowRepayTestUsingBasicSwapIntent(address(evilSolver));
 
         vm.startPrank(userEOA);
-        atlas.metacall{value: 0}({
-            userOp: userOp,
-            solverOps: solverOps,
-            dAppOp: dAppOp
-        });
+        atlas.metacall{ value: 0 }({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
-
     }
 
-
-    function _setupBorrowRepayTestUsingBasicSwapIntent(address rfqSolver) internal returns (SolverOperation[] memory solverOps){
+    function _setupBorrowRepayTestUsingBasicSwapIntent(address rfqSolver)
+        internal
+        returns (SolverOperation[] memory solverOps)
+    {
         uint256 userMsgValue = 2e18;
         uint256 solverMsgValue = 1e18;
         uint256 atlasStartBalance = solverMsgValue * 12 / 10;
 
         deal(userEOA, userMsgValue);
         vm.prank(solverTwoEOA);
-        atlas.deposit{value: atlasStartBalance}(); // Solver borrows 1 ETH from Atlas balance
+        atlas.deposit{ value: atlasStartBalance }(); // Solver borrows 1 ETH from Atlas balance
 
         // Swap 10 WETH for 20 DAI
         SwapIntent memory swapIntent = SwapIntent({
@@ -151,12 +129,11 @@ contract AccountingTest is BaseTest {
         assertEq(DAI.balanceOf(rfqSolver), swapIntent.amountUserBuys, "Did not give enough DAI to solver");
 
         // TODO remove
-        // Give solverMsgValue (1e18, reusing var for stacktoodeep) of ETH to solver as well 
+        // Give solverMsgValue (1e18, reusing var for stacktoodeep) of ETH to solver as well
         // deal(address(rfqSolver), solverMsgValue);
 
-        
         // Input params for Atlas.metacall() - will be populated below
-       
+
         solverOps = new SolverOperation[](1);
 
         vm.startPrank(userEOA);
@@ -183,11 +160,8 @@ contract AccountingTest is BaseTest {
         // userOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Build solver calldata (function selector on solver contract and its params)
-        bytes memory solverOpData = abi.encodeWithSelector(
-            HonestRFQSolver.fulfillRFQ.selector, 
-            swapIntent,
-            executionEnvironment
-        );
+        bytes memory solverOpData =
+            abi.encodeWithSelector(HonestRFQSolver.fulfillRFQ.selector, swapIntent, executionEnvironment);
 
         // Builds the SolverCall
         solverOps[0] = txBuilder.buildSolverOperation({
@@ -201,14 +175,14 @@ contract AccountingTest is BaseTest {
         solverOps[0].value = solverMsgValue;
 
         // Solver signs the solverCall
-        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlas.getSolverPayload(solverOps[0]));
+        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Frontend creates dApp Operation calldata after seeing rest of data
         dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
 
         // Frontend signs the dApp Operation payload
-        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getDAppOperationPayload(dAppOp));
+        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Check user token balances before
@@ -231,32 +205,34 @@ contract AccountingTest is BaseTest {
         console.log(""); // give space for internal logs
 
         vm.startPrank(userEOA);
-        
+
         assertFalse(simulator.simUserOperation(userOp), "metasimUserOperationcall tested true a");
-        
+
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
         vm.stopPrank();
     }
-
 }
-
 
 // This solver magically has the tokens needed to fulfil the user's swap.
 // This might involve an offchain RFQ system
 contract HonestRFQSolver is SolverBase {
     address public immutable ATLAS;
-    constructor(address atlas) SolverBase(atlas, msg.sender) {
+
+    constructor(address weth, address atlas) SolverBase(weth, atlas, msg.sender) {
         ATLAS = atlas;
     }
 
-    function fulfillRFQ(
-        SwapIntent calldata swapIntent,
-        address executionEnvironment
-    ) public virtual payable {
+    function fulfillRFQ(SwapIntent calldata swapIntent, address executionEnvironment) public payable virtual {
         console.log("solver balance", address(this).balance);
-        require(ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells, "Did not receive enough tokenIn");
-        require(ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys, "Not enough tokenOut to fulfill");
+        require(
+            ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells,
+            "Did not receive enough tokenIn"
+        );
+        require(
+            ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys,
+            "Not enough tokenOut to fulfill"
+        );
         ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
     }
 
@@ -267,24 +243,20 @@ contract HonestRFQSolver is SolverBase {
         _;
     }
 
-    fallback() external payable {}
-    receive() external payable {}
+    fallback() external payable { }
+    receive() external payable { }
 }
 
 contract EvilRFQSolver is HonestRFQSolver {
     address deployer;
-    constructor(address atlas) HonestRFQSolver(atlas) {
+
+    constructor(address weth, address atlas) HonestRFQSolver(weth, atlas) {
         deployer = msg.sender;
     }
-    function fulfillRFQ(
-        SwapIntent calldata swapIntent,
-        address executionEnvironment
-    ) public payable override {
-        HonestRFQSolver.fulfillRFQ(
-            swapIntent,
-            executionEnvironment
-        );
-        
+
+    function fulfillRFQ(SwapIntent calldata swapIntent, address executionEnvironment) public payable override {
+        HonestRFQSolver.fulfillRFQ(swapIntent, executionEnvironment);
+
         // EvilRFQSolver tries to steal ETH before repaying debt to Atlas
         // deployer.call{value: msg.value}("");
     }

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.18;
+pragma solidity 0.8.21;
 
 import "forge-std/Test.sol";
 
-import {BaseTest} from "./base/BaseTest.t.sol";
+import { BaseTest } from "./base/BaseTest.t.sol";
 
 contract AtlETHTest is BaseTest {
     function testBasicFunctionalities() public {

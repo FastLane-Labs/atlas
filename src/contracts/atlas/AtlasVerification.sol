@@ -1,32 +1,178 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.16;
+pragma solidity 0.8.21;
 
 import "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 
-import {CallBits} from "../libraries/CallBits.sol";
+import { CallBits } from "../libraries/CallBits.sol";
 
+import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
 import "../types/GovernanceTypes.sol";
 
 import "../types/DAppApprovalTypes.sol";
+import "../types/EscrowTypes.sol";
 
-import {DAppIntegration} from "./DAppIntegration.sol";
+import { EscrowBits } from "../libraries/EscrowBits.sol";
+
+import { DAppIntegration } from "./DAppIntegration.sol";
 
 import "forge-std/Test.sol"; // TODO remove
+
+// NOTE: AtlasVerification is the separate contract version of the DappVerification/DAppIntegration
+// inheritance slice of the original Atlas design
 
 // This contract exists so that dapp frontends can sign and confirm the
 // calldata for users.  Users already trust the frontends to build and verify
 // their calldata.  This allows users to know that any CallData sourced via
 // an external relay (such as FastLane) has been verified by the already-trusted
 // frontend
-contract DAppVerification is EIP712, DAppIntegration {
+contract AtlasVerification is EIP712, DAppIntegration {
     using ECDSA for bytes32;
     using CallBits for uint32;
 
-    constructor() EIP712("ProtoCallHandler", "0.0.1") {}
+    constructor(address _atlas) EIP712("ProtoCallHandler", "0.0.1") DAppIntegration(_atlas) { }
 
+    // PORTED FROM ESCROW - TODO reorder
 
-    // 
+    function verifySolverOp(
+        SolverOperation calldata solverOp,
+        EscrowAccountData memory solverEscrow,
+        uint256 gasWaterMark,
+        bool auctionAlreadyComplete
+    )
+        external
+        view
+        returns (uint256 result, uint256 gasLimit, EscrowAccountData memory)
+    {
+        // verify solver's signature
+        if (_verifySignature(solverOp)) {
+            // verify the solver has correct usercalldata and the solver escrow checks
+            (result, gasLimit, solverEscrow) = _verifySolverOperation(solverOp, solverEscrow);
+        } else {
+            (result, gasLimit) = (1 << uint256(SolverOutcome.InvalidSignature), 0);
+            // solverEscrow returns null
+        }
+
+        result = _solverOpPreCheck(result, gasWaterMark, tx.gasprice, solverOp.maxFeePerGas, auctionAlreadyComplete);
+        return (result, gasLimit, solverEscrow);
+    }
+
+    function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload) {
+        payload = _hashTypedDataV4(_getSolverHash(solverOp));
+    }
+
+    function _verifySignature(SolverOperation calldata solverOp) internal view returns (bool) {
+        address signer = _hashTypedDataV4(_getSolverHash(solverOp)).recover(solverOp.signature);
+        return signer == solverOp.from;
+    }
+
+    // TODO Revisit the EscrowAccountData memory solverEscrow arg. Needs to be passed through from Atlas, through
+    // callstack
+    function _verifySolverOperation(
+        SolverOperation calldata solverOp,
+        EscrowAccountData memory solverEscrow
+    )
+        internal
+        view
+        returns (uint256 result, uint256 gasLimit, EscrowAccountData memory)
+    {
+        // TODO big unchecked block - audit/review carefully
+        unchecked {
+            if (solverOp.to != ATLAS) {
+                result |= 1 << uint256(SolverOutcome.InvalidTo);
+            }
+
+            if (solverOp.nonce <= uint256(solverEscrow.nonce)) {
+                result |= 1 << uint256(SolverOutcome.InvalidNonceUnder);
+            } else if (solverOp.nonce > uint256(solverEscrow.nonce) + 1) {
+                result |= 1 << uint256(SolverOutcome.InvalidNonceOver);
+
+                // TODO: reconsider the jump up for gapped nonces? Intent is to mitigate dmg
+                // potential inflicted by a hostile solver/builder.
+                solverEscrow.nonce = uint32(solverOp.nonce);
+            } else {
+                ++solverEscrow.nonce;
+            }
+
+            if (solverEscrow.lastAccessed >= uint64(block.number)) {
+                result |= 1 << uint256(SolverOutcome.PerBlockLimit);
+            } else {
+                solverEscrow.lastAccessed = uint64(block.number);
+            }
+
+            gasLimit = (100) * (solverOp.gas < EscrowBits.SOLVER_GAS_LIMIT ? solverOp.gas : EscrowBits.SOLVER_GAS_LIMIT)
+                / (100 + EscrowBits.SOLVER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
+
+            uint256 gasCost = (tx.gasprice * gasLimit) + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
+
+            // see if solver's escrow can afford tx gascost
+            if (gasCost > solverEscrow.balance) {
+                // charge solver for calldata so that we can avoid vampire attacks from solver onto user
+                result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
+            }
+
+            // Verify that we can lend the solver their tx value
+            if (solverOp.value > ATLAS.balance - (gasLimit * tx.gasprice)) {
+                result |= 1 << uint256(SolverOutcome.CallValueTooHigh);
+            }
+
+            // subtract out the gas buffer since the solver's metaTx won't use it
+            gasLimit -= EscrowBits.FASTLANE_GAS_BUFFER;
+        }
+
+        return (result, gasLimit, solverEscrow);
+    }
+
+    function _getSolverHash(SolverOperation calldata solverOp) internal pure returns (bytes32 solverHash) {
+        return keccak256(
+            abi.encode(
+                SOLVER_TYPE_HASH,
+                solverOp.from,
+                solverOp.to,
+                solverOp.value,
+                solverOp.gas,
+                solverOp.maxFeePerGas,
+                solverOp.nonce,
+                solverOp.deadline,
+                solverOp.solver,
+                solverOp.control,
+                solverOp.userOpHash,
+                solverOp.bidToken,
+                solverOp.bidAmount,
+                keccak256(solverOp.data)
+            )
+        );
+    }
+
+    // BITWISE STUFF
+    function _solverOpPreCheck(
+        uint256 result,
+        uint256 gasWaterMark,
+        uint256 txGasPrice,
+        uint256 maxFeePerGas,
+        bool auctionAlreadyComplete
+    )
+        internal
+        pure
+        returns (uint256)
+    {
+        if (auctionAlreadyComplete) {
+            result |= 1 << uint256(SolverOutcome.LostAuction);
+        }
+
+        if (gasWaterMark < EscrowBits.VALIDATION_GAS_LIMIT + EscrowBits.SOLVER_GAS_LIMIT) {
+            // Make sure to leave enough gas for dApp validation calls
+            result |= 1 << uint256(SolverOutcome.UserOutOfGas);
+        }
+
+        if (txGasPrice > maxFeePerGas) {
+            result |= 1 << uint256(SolverOutcome.GasPriceOverCap);
+        }
+
+        return result;
+    }
+
+    //
     // DAPP VERIFICATION
     //
 
@@ -38,10 +184,7 @@ contract DAppVerification is EIP712, DAppIntegration {
     // the supply chain to submit data.  If any other party
     // (user, solver, FastLane,  or a collusion between
     // all of them) attempts to alter it, this check will fail
-    function _verifyDApp(DAppConfig memory dConfig, DAppOperation calldata dAppOp)
-        internal
-        returns (bool)
-    {
+    function verifyDApp(DAppConfig memory dConfig, DAppOperation calldata dAppOp) external returns (bool) {
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp nonces
         if (!_verifyDAppSignature(dAppOp)) {
@@ -95,23 +238,23 @@ contract DAppVerification is EIP712, DAppIntegration {
 
     function _handleNonces(address account, uint256 nonce, bool async) internal returns (bool validNonce) {
         if (nonce > type(uint128).max - 1) {
-            return (false);
+            return false;
         }
-        
+
         if (nonce == 0) {
-            return (false);
+            return false;
         }
 
         uint256 bitmapIndex = (nonce / 240) + 1; // +1 because highestFullBitmap initializes at 0
         uint256 bitmapNonce = (nonce % 240) + 1;
 
         bytes32 bitmapKey = keccak256(abi.encode(account, bitmapIndex));
-        
+
         NonceBitmap memory nonceBitmap = asyncNonceBitmap[bitmapKey];
 
         uint256 bitmap = uint256(nonceBitmap.bitmap);
         if (bitmap & (1 << bitmapNonce) != 0) {
-            return (false);
+            return false;
         }
 
         bitmap |= 1 << bitmapNonce;
@@ -130,10 +273,14 @@ contract DAppVerification is EIP712, DAppIntegration {
     }
 
     function _updateNonceTracker(
-        address account, uint256 highestUsedBitmapNonce, uint256 bitmapIndex, uint256 bitmapNonce, bool async
-    ) 
-        internal 
-        returns (bool) 
+        address account,
+        uint256 highestUsedBitmapNonce,
+        uint256 bitmapIndex,
+        uint256 bitmapNonce,
+        bool async
+    )
+        internal
+        returns (bool)
     {
         NonceTracker memory nonceTracker = asyncNonceBitIndex[account];
 
@@ -143,17 +290,17 @@ contract DAppVerification is EIP712, DAppIntegration {
         // Handle non-async nonce logic
         if (!async) {
             if (bitmapIndex != highestFullBitmap + 1) {
-                return (false);
+                return false;
             }
 
-            if (bitmapNonce != highestUsedBitmapNonce +1) {
-                return (false);
+            if (bitmapNonce != highestUsedBitmapNonce + 1) {
+                return false;
             }
         }
 
         if (bitmapNonce > uint256(239) || !async) {
             bool updateTracker;
-        
+
             if (bitmapIndex > highestFullBitmap) {
                 updateTracker = true;
                 highestFullBitmap = bitmapIndex;
@@ -169,7 +316,7 @@ contract DAppVerification is EIP712, DAppIntegration {
                     HighestFullBitmap: uint128(highestFullBitmap),
                     LowestEmptyBitmap: uint128(lowestEmptyBitmap)
                 });
-            } 
+            }
         }
         return true;
     }
@@ -193,7 +340,7 @@ contract DAppVerification is EIP712, DAppIntegration {
     }
 
     function _verifyDAppSignature(DAppOperation calldata dAppOp) internal view returns (bool) {
-        if (dAppOp.signature.length == 0) { return false; }
+        if (dAppOp.signature.length == 0) return false;
         address signer = _hashTypedDataV4(_getProofHash(dAppOp)).recover(dAppOp.signature);
 
         return signer == dAppOp.from;
@@ -213,19 +360,17 @@ contract DAppVerification is EIP712, DAppIntegration {
     //
 
     // Verify the user's meta transaction
-    function _verifyUser(DAppConfig memory dConfig, UserOperation calldata userOp)
-        internal
-        returns (bool)
-    {
-        
+    function verifyUser(DAppConfig memory dConfig, UserOperation calldata userOp) external returns (bool) {
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp userNonces
         if (!_verifyUserSignature(userOp)) {
+            console.log("invalid user sig");
             return false;
         }
 
         if (userOp.control != dConfig.to) {
-            return (false);
+            console.log("invalid control");
+            return false;
         }
 
         // If the dapp indicated that they only accept sequenced userNonces
@@ -235,10 +380,11 @@ contract DAppVerification is EIP712, DAppIntegration {
         // DApps are encouraged to rely on the deadline parameter
         // to prevent replay attacks.
         if (!_handleNonces(userOp.from, userOp.nonce, dConfig.callConfig.needsSequencedNonces())) {
-            return (false);
+            console.log("invalid nonce");
+            return false;
         }
 
-        return (true);
+        return true;
     }
 
     function _getProofHash(UserOperation memory userOp) internal pure returns (bytes32 proofHash) {
@@ -260,7 +406,7 @@ contract DAppVerification is EIP712, DAppIntegration {
     }
 
     function _verifyUserSignature(UserOperation calldata userOp) internal view returns (bool) {
-        if (userOp.signature.length == 0) { return false; }
+        if (userOp.signature.length == 0) return false;
         address signer = _hashTypedDataV4(_getProofHash(userOp)).recover(userOp.signature);
 
         return signer == userOp.from;

@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.16;
+pragma solidity 0.8.21;
 
-import {IDAppControl} from "../interfaces/IDAppControl.sol";
+import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
 import "../types/DAppApprovalTypes.sol";
 
@@ -47,13 +47,13 @@ library CallBits {
         if (callConfig.reuseUserOp) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.ReuseUserOp);
         }
-        if(callConfig.userBundler) {
+        if (callConfig.userBundler) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.UserBundler);
         }
         if (callConfig.solverBundler) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.SolverBundler);
         }
-        if(callConfig.verifySolverBundlerCallChainHash) {
+        if (callConfig.verifySolverBundlerCallChainHash) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.VerifySolverBundlerCallChainHash);
         }
         if (callConfig.unknownBundler) {

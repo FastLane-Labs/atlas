@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.18;
+pragma solidity 0.8.21;
 
 import "forge-std/Test.sol";
 
-import {SafetyBits} from "../../src/contracts/libraries/SafetyBits.sol";
+import { SafetyBits } from "../../src/contracts/libraries/SafetyBits.sol";
 import "../../src/contracts/types/LockTypes.sol";
 import "../base/TestUtils.sol";
 
@@ -14,7 +14,7 @@ contract SafetyBitsTest is Test {
         key = key.initializeEscrowLock(true, 1, address(0), false);
     }
 
-    // TODO Let's fix the constants test last. 
+    // TODO Let's fix the constants test last.
     /*
     function testConstants() public {
         string memory expectedBitMapString = "0010000010001000";
@@ -82,7 +82,7 @@ contract SafetyBitsTest is Test {
 
         expectedBitMapString = "0001000100001000";
         assertEq(
-            TestUtils.uint16ToBinaryString(SafetyBits._LOCK_PAYMENTS), expectedBitMapString, "_LOCK_PAYMENTS incorrect"
+    TestUtils.uint16ToBinaryString(SafetyBits._LOCK_PAYMENTS), expectedBitMapString, "_LOCK_PAYMENTS incorrect"
         );
 
         expectedBitMapString = "0001010000000100";

@@ -1,14 +1,14 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.16;
+pragma solidity 0.8.21;
 
-import {ExecutionPhase} from "../types/LockTypes.sol";
+import { ExecutionPhase } from "../types/LockTypes.sol";
 
-import {CallBits} from "../libraries/CallBits.sol";
+import { CallBits } from "../libraries/CallBits.sol";
 
-import {DAppControlTemplate} from "./ControlTemplate.sol";
-import {ExecutionBase} from "../common/ExecutionBase.sol";
+import { DAppControlTemplate } from "./ControlTemplate.sol";
+import { ExecutionBase } from "../common/ExecutionBase.sol";
 
-import {EXECUTION_PHASE_OFFSET} from "../libraries/SafetyBits.sol";
+import { EXECUTION_PHASE_OFFSET } from "../libraries/SafetyBits.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
@@ -16,7 +16,8 @@ import "../types/DAppApprovalTypes.sol";
 
 import "forge-std/Test.sol";
 
-// TODO: Check payable is appropriate in pre/post ops and solver calls. Needed to send ETH if necessary (even when delegatecalled)
+// TODO: Check payable is appropriate in pre/post ops and solver calls. Needed to send ETH if necessary (even when
+// delegatecalled)
 
 abstract contract DAppControl is Test, DAppControlTemplate, ExecutionBase {
     address public immutable escrow;
@@ -26,11 +27,7 @@ abstract contract DAppControl is Test, DAppControlTemplate, ExecutionBase {
 
     uint8 private constant _CONTROL_DEPTH = 1 << 2;
 
-    constructor(
-        address _escrow,
-        address _governance,
-        CallConfig memory _callConfig
-    ) ExecutionBase(_escrow) {
+    constructor(address _escrow, address _governance, CallConfig memory _callConfig) ExecutionBase(_escrow) {
         control = address(this);
         escrow = _escrow;
         governance = _governance;
@@ -62,7 +59,7 @@ abstract contract DAppControl is Test, DAppControlTemplate, ExecutionBase {
         return _preOpsCall(userOp);
     }
 
-    function preSolverCall(bytes calldata data) 
+    function preSolverCall(bytes calldata data)
         external
         payable
         validControl
@@ -72,31 +69,34 @@ abstract contract DAppControl is Test, DAppControlTemplate, ExecutionBase {
         return _preSolverCall(data);
     }
 
-    function postSolverCall(bytes calldata data) 
+    function postSolverCall(bytes calldata data)
         external
         payable
         validControl
         onlyAtlasEnvironment(ExecutionPhase.PostSolver, _CONTROL_DEPTH)
         returns (bool)
     {
-        
         return _postSolverCall(data);
     }
 
-    function allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) 
-        external 
+    function allocateValueCall(
+        address bidToken,
+        uint256 bidAmount,
+        bytes calldata data
+    )
+        external
         validControl
         onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _CONTROL_DEPTH)
     {
         _allocateValueCall(bidToken, bidAmount, data);
     }
 
-    function postOpsCall(bytes calldata data) 
+    function postOpsCall(bytes calldata data)
         external
         payable
         validControl
         onlyAtlasEnvironment(ExecutionPhase.PostOps, _CONTROL_DEPTH)
-        returns (bool) 
+        returns (bool)
     {
         return _postOpsCall(data);
     }
@@ -110,17 +110,13 @@ abstract contract DAppControl is Test, DAppControlTemplate, ExecutionBase {
         isSequenced = CallBits.needsSequencedNonces(callConfig);
     }
 
-    function getDAppConfig(UserOperation calldata userOp) 
-        mustBeCalled 
-        external 
-        view  
-        returns (DAppConfig memory dConfig) 
+    function getDAppConfig(UserOperation calldata userOp)
+        external
+        view
+        mustBeCalled
+        returns (DAppConfig memory dConfig)
     {
-        dConfig = DAppConfig({
-            to: address(this),
-            callConfig: callConfig,
-            bidToken: getBidFormat(userOp)
-        });
+        dConfig = DAppConfig({ to: address(this), callConfig: callConfig, bidToken: getBidFormat(userOp) });
     }
 
     function _getCallConfig() internal view returns (CallConfig memory) {

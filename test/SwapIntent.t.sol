@@ -1,45 +1,30 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.18;
+pragma solidity 0.8.21;
 
 import "forge-std/Test.sol";
 
-import {ERC20} from "solmate/tokens/ERC20.sol";
+import { ERC20 } from "solmate/tokens/ERC20.sol";
 
-import {BaseTest} from "./base/BaseTest.t.sol";
-import {TxBuilder} from "../src/contracts/helpers/TxBuilder.sol";
+import { BaseTest } from "./base/BaseTest.t.sol";
+import { TxBuilder } from "../src/contracts/helpers/TxBuilder.sol";
 
-import {SolverOperation} from "../src/contracts/types/SolverCallTypes.sol";
-import {UserOperation} from "../src/contracts/types/UserCallTypes.sol";
-import {DAppOperation, DAppConfig} from "../src/contracts/types/DAppApprovalTypes.sol";
+import { SolverOperation } from "../src/contracts/types/SolverCallTypes.sol";
+import { UserOperation } from "../src/contracts/types/UserCallTypes.sol";
+import { DAppOperation, DAppConfig } from "../src/contracts/types/DAppApprovalTypes.sol";
 
-import {SwapIntentController, SwapIntent, Condition} from "../src/contracts/examples/intents-example/SwapIntent.sol";
-import {SolverBase} from "../src/contracts/solver/SolverBase.sol";
-
-// QUESTIONS:
-
-// Refactor Ideas:
-// 1. Lots of bitwise operations explicitly coded in contracts - could be a helper lib thats more readable
-// 2. helper is currently a V2Helper and shared from BaseTest. Should only be in Uni V2 related tests
-// 3. Need a more generic helper for BaseTest
-// 4. Gonna be lots of StackTooDeep errors. Maybe need a way to elegantly deal with that in BaseTest
-// 5. Change atlasSolverCall structure in SolverBase - maybe virtual fn to be overridden, which hooks for checks
-// 6. Maybe emit error msg or some other better UX for error if !valid in metacall()
-
-// Doc Ideas:
-// 1. Step by step instructions for building a metacall transaction (for internal testing, and integrating dApps)
-
-// To Understand Better:
-// 1. The lock system (and look for any gas optimizations / ways to reduce lock actions)
-
+import { SwapIntentController, SwapIntent, Condition } from "../src/contracts/examples/intents-example/SwapIntent.sol";
+import { SolverBase } from "../src/contracts/solver/SolverBase.sol";
 
 interface IUniV2Router02 {
     function swapExactTokensForTokens(
-        uint amountIn,
-        uint amountOutMin,
+        uint256 amountIn,
+        uint256 amountOutMin,
         address[] calldata path,
         address to,
-        uint deadline
-    ) external returns (uint[] memory amounts);
+        uint256 deadline
+    )
+        external
+        returns (uint256[] memory amounts);
 }
 
 contract SwapIntentTest is BaseTest {
@@ -59,31 +44,30 @@ contract SwapIntentTest is BaseTest {
     function setUp() public virtual override {
         BaseTest.setUp();
 
-        // Creating new gov address (ERR-V49 OwnerActive if already registered with controller) 
-        governancePK = 11112;
+        // Creating new gov address (ERR-V49 OwnerActive if already registered with controller)
+        governancePK = 11_112;
         governanceEOA = vm.addr(governancePK);
 
         // Deploy new SwapIntent Controller from new gov and initialize in Atlas
         vm.startPrank(governanceEOA);
-        swapIntentController = new SwapIntentController(address(escrow));        
-        atlas.initializeGovernance(address(swapIntentController));
-        atlas.integrateDApp(address(swapIntentController));
+        swapIntentController = new SwapIntentController(address(escrow));
+        atlasVerification.initializeGovernance(address(swapIntentController));
+        atlasVerification.integrateDApp(address(swapIntentController));
         vm.stopPrank();
 
         txBuilder = new TxBuilder({
             controller: address(swapIntentController),
-            escrowAddress: address(escrow),
-            atlasAddress: address(atlas)
+            atlasAddress: address(atlas),
+            _verification: address(atlasVerification)
         });
 
-        // Deposit ETH from Searcher signer to pay for searcher's gas 
-        // vm.prank(solverOneEOA); 
+        // Deposit ETH from Searcher signer to pay for searcher's gas
+        // vm.prank(solverOneEOA);
         // atlas.deposit{value: 1e18}();
     }
 
     function testAtlasSwapIntentWithBasicRFQ() public {
         // Swap 10 WETH for 20 DAI
-
         UserCondition userCondition = new UserCondition();
 
         Condition[] memory conditions = new Condition[](2);
@@ -108,8 +92,8 @@ contract SwapIntentTest is BaseTest {
 
         // Solver deploys the RFQ solver contract (defined at bottom of this file)
         vm.startPrank(solverOneEOA);
-        SimpleRFQSolver rfqSolver = new SimpleRFQSolver(address(atlas));
-        atlas.deposit{value: 1e18}();
+        SimpleRFQSolver rfqSolver = new SimpleRFQSolver(WETH_ADDRESS, address(atlas));
+        atlas.deposit{ value: 1e18 }();
         vm.stopPrank();
 
         // Give 20 DAI to RFQ solver contract
@@ -123,14 +107,14 @@ contract SwapIntentTest is BaseTest {
 
         vm.startPrank(userEOA);
         address executionEnvironment = atlas.createExecutionEnvironment(txBuilder.control());
-        console.log("executionEnvironment",executionEnvironment);
+        console.log("executionEnvironment", executionEnvironment);
         vm.stopPrank();
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
         // userOpData is used in delegatecall from exec env to control, calling preOpsCall
         // first 4 bytes are "userSelector" param in preOpsCall in DAppControl - swap() selector
         // rest of data is "userData" param
-        
+
         // swap(SwapIntent calldata) selector = 0x98434997
         bytes memory userOpData = abi.encodeWithSelector(SwapIntentController.swap.selector, swapIntent);
 
@@ -150,11 +134,8 @@ contract SwapIntentTest is BaseTest {
         // userOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Build solver calldata (function selector on solver contract and its params)
-        bytes memory solverOpData = abi.encodeWithSelector(
-            SimpleRFQSolver.fulfillRFQ.selector, 
-            swapIntent,
-            executionEnvironment
-        );
+        bytes memory solverOpData =
+            abi.encodeWithSelector(SimpleRFQSolver.fulfillRFQ.selector, swapIntent, executionEnvironment);
 
         // Builds the SolverOperation
         solverOps[0] = txBuilder.buildSolverOperation({
@@ -166,14 +147,14 @@ contract SwapIntentTest is BaseTest {
         });
 
         // Solver signs the solverOp
-        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlas.getSolverPayload(solverOps[0]));
+        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Frontend creates dAppOp calldata after seeing rest of data
         dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
 
         // Frontend signs the dAppOp payload
-        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getDAppOperationPayload(dAppOp));
+        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Check user token balances before
@@ -193,20 +174,14 @@ contract SwapIntentTest is BaseTest {
         console.log("Solver DAI balance", DAI.balanceOf(address(rfqSolver)));
 
         vm.startPrank(userEOA);
-        
+
         assertFalse(simulator.simUserOperation(userOp), "metasimUserOperationcall tested true a");
-        
+
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
         assertTrue(simulator.simUserOperation(userOp), "metasimUserOperationcall tested false c");
 
-
-        // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
-        atlas.metacall({
-            userOp: userOp,
-            solverOps: solverOps,
-            dAppOp: dAppOp
-        });
+        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
 
         console.log("\nAFTER METACALL");
@@ -216,7 +191,9 @@ contract SwapIntentTest is BaseTest {
         console.log("Solver DAI balance", DAI.balanceOf(address(rfqSolver)));
 
         // Check user token balances after
-        assertEq(WETH.balanceOf(userEOA), userWethBalanceBefore - swapIntent.amountUserSells, "Did not spend enough WETH");
+        assertEq(
+            WETH.balanceOf(userEOA), userWethBalanceBefore - swapIntent.amountUserSells, "Did not spend enough WETH"
+        );
         assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + swapIntent.amountUserBuys, "Did not receive enough DAI");
     }
 
@@ -236,9 +213,9 @@ contract SwapIntentTest is BaseTest {
 
         // Solver deploys the RFQ solver contract (defined at bottom of this file)
         vm.startPrank(solverOneEOA);
-        UniswapIntentSolver uniswapSolver = new UniswapIntentSolver(address(atlas));
+        UniswapIntentSolver uniswapSolver = new UniswapIntentSolver(WETH_ADDRESS, address(atlas));
         deal(WETH_ADDRESS, address(uniswapSolver), 1e18); // 1 WETH to solver to pay bid
-        atlas.deposit{value: 1e18}();
+        atlas.deposit{ value: 1e18 }();
         vm.stopPrank();
 
         // Input params for Atlas.metacall() - will be populated below
@@ -248,14 +225,14 @@ contract SwapIntentTest is BaseTest {
 
         vm.startPrank(userEOA);
         address executionEnvironment = atlas.createExecutionEnvironment(txBuilder.control());
-        console.log("executionEnvironment a",executionEnvironment);
+        console.log("executionEnvironment a", executionEnvironment);
         vm.stopPrank();
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
         // userOpData is used in delegatecall from exec env to control, calling preOpsCall
         // first 4 bytes are "userSelector" param in preOpsCall in DAppControl - swap() selector
         // rest of data is "userData" param
-        
+
         // swap(SwapIntent calldata) selector = 0x98434997
         bytes memory userOpData = abi.encodeWithSelector(SwapIntentController.swap.selector, swapIntent);
 
@@ -275,11 +252,8 @@ contract SwapIntentTest is BaseTest {
         // userOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Build solver calldata (function selector on solver contract and its params)
-        bytes memory solverOpData = abi.encodeWithSelector(
-            UniswapIntentSolver.fulfillWithSwap.selector, 
-            swapIntent,
-            executionEnvironment
-        );
+        bytes memory solverOpData =
+            abi.encodeWithSelector(UniswapIntentSolver.fulfillWithSwap.selector, swapIntent, executionEnvironment);
 
         // Builds the SolverOperation
         solverOps[0] = txBuilder.buildSolverOperation({
@@ -291,14 +265,14 @@ contract SwapIntentTest is BaseTest {
         });
 
         // Solver signs the solverOp
-        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlas.getSolverPayload(solverOps[0]));
+        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Frontend creates dAppOp calldata after seeing rest of data
         dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
 
         // Frontend signs the dAppOp payload
-        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getDAppOperationPayload(dAppOp));
+        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Check user token balances before
@@ -320,7 +294,7 @@ contract SwapIntentTest is BaseTest {
         vm.startPrank(userEOA);
 
         assertFalse(simulator.simUserOperation(userOp), "metasimUserOperationcall tested true");
-        
+
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
         assertTrue(simulator.simUserOperation(userOp), "metasimUserOperationcall tested false");
@@ -329,11 +303,7 @@ contract SwapIntentTest is BaseTest {
         assertEq(DAI.balanceOf(address(uniswapSolver)), 0, "Solver has DAI before metacall");
 
         // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
-        atlas.metacall({
-            userOp: userOp,
-            solverOps: solverOps,
-            dAppOp: dAppOp
-        });
+        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
 
         console.log("\nAFTER METACALL");
@@ -343,7 +313,9 @@ contract SwapIntentTest is BaseTest {
         console.log("Solver DAI balance", DAI.balanceOf(address(uniswapSolver)));
 
         // Check user token balances after
-        assertEq(WETH.balanceOf(userEOA), userWethBalanceBefore - swapIntent.amountUserSells, "Did not spend enough WETH");
+        assertEq(
+            WETH.balanceOf(userEOA), userWethBalanceBefore - swapIntent.amountUserSells, "Did not spend enough WETH"
+        );
         assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + swapIntent.amountUserBuys, "Did not receive enough DAI");
     }
 }
@@ -351,14 +323,17 @@ contract SwapIntentTest is BaseTest {
 // This solver magically has the tokens needed to fulfil the user's swap.
 // This might involve an offchain RFQ system
 contract SimpleRFQSolver is SolverBase {
-    constructor(address atlas) SolverBase(atlas, msg.sender) {}
+    constructor(address weth, address atlas) SolverBase(weth, atlas, msg.sender) { }
 
-    function fulfillRFQ(
-        SwapIntent calldata swapIntent,
-        address executionEnvironment
-    ) public {
-        require(ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells, "Did not receive enough tokenIn");
-        require(ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys, "Not enough tokenOut to fulfill");
+    function fulfillRFQ(SwapIntent calldata swapIntent, address executionEnvironment) public {
+        require(
+            ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells,
+            "Did not receive enough tokenIn"
+        );
+        require(
+            ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys,
+            "Not enough tokenOut to fulfill"
+        );
         ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
     }
 
@@ -369,21 +344,21 @@ contract SimpleRFQSolver is SolverBase {
         _;
     }
 
-    fallback() external payable {}
-    receive() external payable {}
+    fallback() external payable { }
+    receive() external payable { }
 }
 
 contract UniswapIntentSolver is SolverBase {
     IUniV2Router02 router = IUniV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
 
-    constructor(address atlas) SolverBase(atlas, msg.sender) {}
+    constructor(address weth, address atlas) SolverBase(weth, atlas, msg.sender) { }
 
-    function fulfillWithSwap(
-        SwapIntent calldata swapIntent,
-        address executionEnvironment
-    ) public onlySelf {
+    function fulfillWithSwap(SwapIntent calldata swapIntent, address executionEnvironment) public onlySelf {
         // Checks recieved expected tokens from Atlas on behalf of user to swap
-        require(ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells, "Did not receive enough tokenIn");
+        require(
+            ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells,
+            "Did not receive enough tokenIn"
+        );
 
         address[] memory path = new address[](2);
         path[0] = swapIntent.tokenUserSells;
@@ -410,8 +385,8 @@ contract UniswapIntentSolver is SolverBase {
         _;
     }
 
-    fallback() external payable {}
-    receive() external payable {}
+    fallback() external payable { }
+    receive() external payable { }
 }
 
 contract UserCondition {

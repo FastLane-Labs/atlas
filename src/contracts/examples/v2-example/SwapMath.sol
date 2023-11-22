@@ -6,7 +6,11 @@ import "openzeppelin-contracts/contracts/utils/math/SafeMath.sol";
 library SwapMath {
     using SafeMath for uint256;
 
-    function getAmountIn(uint256 amountOut, uint256 reservesIn, uint256 reservesOut)
+    function getAmountIn(
+        uint256 amountOut,
+        uint256 reservesIn,
+        uint256 reservesOut
+    )
         internal
         pure
         returns (uint256 amountIn)

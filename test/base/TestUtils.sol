@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.16;
+pragma solidity 0.8.21;
 
-import {IDAppControl} from "../../src/contracts/interfaces/IDAppControl.sol";
-import {Factory} from "../../src/contracts/atlas/Factory.sol";
-import {Mimic} from "../../src/contracts/atlas/Mimic.sol";
+import { IDAppControl } from "../../src/contracts/interfaces/IDAppControl.sol";
+import { Mimic } from "../../src/contracts/atlas/Mimic.sol";
 
 import "../../src/contracts/types/UserCallTypes.sol";
 import "../../src/contracts/types/SolverCallTypes.sol";
@@ -14,7 +13,7 @@ library TestUtils {
     function uint16ToBinaryString(uint16 n) public pure returns (string memory) {
         uint256 newN = uint256(n);
         // revert on out of range input
-        require(newN < 65536, "n too large");
+        require(newN < 65_536, "n too large");
 
         bytes memory output = new bytes(16);
 
@@ -37,7 +36,7 @@ library TestUtils {
     function uint32ToBinaryString(uint32 n) public pure returns (string memory) {
         uint256 newN = uint256(n);
         // revert on out of range input
-        require(newN < 4294967296, "n too large");
+        require(newN < 4_294_967_296, "n too large");
 
         bytes memory output = new bytes(32);
 
@@ -75,38 +74,39 @@ library TestUtils {
         return string(output);
     }
 
-    function computeExecutionEnvironment(address payable atlas, UserOperation calldata userOp, address controller)
-        public
-        view
-        returns (address executionEnvironment)
-    {
-        DAppConfig memory dConfig = IDAppControl(controller).getDAppConfig(userOp);
+    // TODO fix this utility fn - after AtlasFactory split
+    // function computeExecutionEnvironment(address payable atlas, UserOperation calldata userOp, address controller)
+    //     public
+    //     view
+    //     returns (address executionEnvironment)
+    // {
+    //     DAppConfig memory dConfig = IDAppControl(controller).getDAppConfig(userOp);
 
-        executionEnvironment = address(
-            uint160(
-                uint256(
-                    keccak256(
-                        abi.encodePacked(
-                            bytes1(0xff),
-                            atlas,
-                            Factory(atlas).salt(),
-                            keccak256(
-                                abi.encodePacked(
-                                    _getMimicCreationCode(
-                                        controller,
-                                        dConfig.callConfig,
-                                        Factory(atlas).execution(),
-                                        userOp.from,
-                                        controller.codehash
-                                    )
-                                )
-                            )
-                        )
-                    )
-                )
-            )
-        );
-    }
+    //     executionEnvironment = address(
+    //         uint160(
+    //             uint256(
+    //                 keccak256(
+    //                     abi.encodePacked(
+    //                         bytes1(0xff),
+    //                         atlas,
+    //                         atlasFactory.salt(),
+    //                         keccak256(
+    //                             abi.encodePacked(
+    //                                 _getMimicCreationCode(
+    //                                     controller,
+    //                                     dConfig.callConfig,
+    //                                     atlasFactory.execution(),
+    //                                     userOp.from,
+    //                                     controller.codehash
+    //                                 )
+    //                             )
+    //                         )
+    //                     )
+    //                 )
+    //             )
+    //         )
+    //     );
+    // }
 
     function _getMimicCreationCode(
         address controller,
@@ -114,34 +114,32 @@ library TestUtils {
         address executionLib,
         address user,
         bytes32 controlCodeHash
-    ) internal pure returns (bytes memory creationCode) {
+    )
+        internal
+        pure
+        returns (bytes memory creationCode)
+    {
         // NOTE: Changing compiler settings or solidity versions can break this.
         creationCode = type(Mimic).creationCode;
 
-        // TODO: unpack the SHL and reorient 
+        // TODO: unpack the SHL and reorient
         assembly {
             mstore(
-                add(creationCode, 85), 
+                add(creationCode, 85),
                 or(
-                    and(
-                        mload(add(creationCode, 85)),
-                        not(shl(96, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF))
-                    ),
+                    and(mload(add(creationCode, 85)), not(shl(96, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF))),
                     shl(96, executionLib)
                 )
-            )           
-            
+            )
+
             mstore(
-                add(creationCode, 118), 
+                add(creationCode, 118),
                 or(
-                    and(
-                        mload(add(creationCode, 118)),
-                        not(shl(96, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF))
-                    ),
+                    and(mload(add(creationCode, 118)), not(shl(96, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF))),
                     shl(96, user)
                 )
-            )    
-            
+            )
+
             mstore(
                 add(creationCode, 139),
                 or(
@@ -161,7 +159,11 @@ library TestUtils {
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps
-    ) internal pure returns (bytes32 callSequenceHash) {
+    )
+        internal
+        pure
+        returns (bytes32 callSequenceHash)
+    {
         uint256 i;
         if (dConfig.callConfig & 1 << uint32(CallConfigIndex.RequirePreOps) != 0) {
             // Start with preOps call if preOps is needed

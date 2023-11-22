@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.16;
+pragma solidity 0.8.21;
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
@@ -11,7 +11,8 @@ interface ISafetyLocks {
         DAppConfig calldata dConfig,
         bytes memory preOpsData,
         bytes memory userReturnData
-    ) external;
+    )
+        external;
 
     function activeEnvironment() external view returns (address);
 

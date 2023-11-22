@@ -9,9 +9,9 @@ Atlas is a permissionless and modular smart contract framework that provides DAp
 
 A DApp wishing to participate can integrate with Atlas by completing three steps:
 
-1. Embed the Atlas Plugin into their frontend or API.
+1. Embed the Atlas API or SDK into their frontend or API.
 2. Create and publish a DAppControl contract.
-3. Interact with the Atlas contract to initialize the DAppControl contract and link it to the Atlas Plugin on their frontend or API.
+3. Interact with the Atlas contract to initialize the DAppControl contract and link it to the Atlas API on their frontend or API.
 
 ### Network Overview
 
@@ -67,6 +67,10 @@ The DAppControl contract has the option to define functions that execute at the 
 4. **PostOps***: This function is executed after the successful execution of a Solver's operation and the allocation of their solution's value. If this function reverts, the User's operation will also be reverted. 
 
 *These functions are executed by the Execution Environment via "delegatecall."
+
+### Atlas Frontend / Infrastructure Flow
+
+![AtlasFlow](./AtlasFlow.jpeg)
 
 ### Advantages:
 - Atlas Solvers have first access to any value created by the User Operation.  This exclusive access supercedes that of any wallets, RPCs, relays, builders, validators, and sequencers.  

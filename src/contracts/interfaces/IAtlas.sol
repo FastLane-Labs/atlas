@@ -1,25 +1,23 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.16;
+pragma solidity 0.8.21;
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
 interface IAtlas {
+    function createExecutionEnvironment(address dAppControl) external returns (address executionEnvironment);
     function metacall(
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         DAppOperation calldata verification
-    ) external payable returns (bool auctionWon);
-
-    function createExecutionEnvironment(address control) external returns (address environment);
+    )
+        external
+        payable
+        returns (bool auctionWon);
 
     function withdrawERC20(address token, uint256 amount, DAppConfig memory dConfig) external;
     function withdrawEther(uint256 amount, DAppConfig memory dConfig) external;
-
-    function getEscrowAddress() external view returns (address escrowAddress);
-
-    function getExecutionEnvironment(address user, address dAppControl) external view returns (address executionEnvironment);
 
     function userDirectVerifyDApp(
         address userOpFrom,
@@ -27,17 +25,9 @@ interface IAtlas {
         uint256 solverOpsLength,
         DAppConfig calldata dConfig,
         DAppOperation calldata verification
-    ) external returns (bool);
+    )
+        external
+        returns (bool);
 
     function userDirectReleaseLock(address userOpFrom, bytes32 key, DAppConfig calldata dConfig) external;
-
-    function getDAppOperationPayload(DAppOperation memory verification) external view returns (bytes32 payload);
-    
-    function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload);
-
-    function getUserOperationPayload(UserOperation memory userOp) external view returns (bytes32 payload);
-
-    function getNextNonce(address account) external view returns (uint256 nextNonce);
-
-    function getDomainSeparator() external view returns (bytes32 domainSeparator);
 }

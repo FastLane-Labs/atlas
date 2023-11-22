@@ -1,28 +1,28 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.16;
+pragma solidity 0.8.21;
 
 // Base Imports
-import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
 // Atlas Base Imports
-import {ISafetyLocks} from "../../interfaces/ISafetyLocks.sol";
-import {IExecutionEnvironment} from "../../interfaces/IExecutionEnvironment.sol";
+import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
+import { IExecutionEnvironment } from "../../interfaces/IExecutionEnvironment.sol";
 
-import {SafetyBits} from "../../libraries/SafetyBits.sol";
+import { SafetyBits } from "../../libraries/SafetyBits.sol";
 
-import {CallConfig} from "../../types/DAppApprovalTypes.sol";
+import { CallConfig } from "../../types/DAppApprovalTypes.sol";
 import "../../types/UserCallTypes.sol";
 import "../../types/SolverCallTypes.sol";
 import "../../types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
-import {DAppControl} from "../../dapp/DAppControl.sol";
+import { DAppControl } from "../../dapp/DAppControl.sol";
 
 // Uni V2 Imports
-import {IUniswapV2Pair} from "./interfaces/IUniswapV2Pair.sol";
+import { IUniswapV2Pair } from "./interfaces/IUniswapV2Pair.sol";
 
 // Misc
-import {SwapMath} from "./SwapMath.sol";
+import { SwapMath } from "./SwapMath.sol";
 
 // import "forge-std/Test.sol";
 
@@ -32,7 +32,6 @@ interface IWETH {
 }
 
 contract V2DAppControl is DAppControl {
-
     uint256 public constant CONTROL_GAS_USAGE = 250_000;
 
     address public constant WETH = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
@@ -50,8 +49,8 @@ contract V2DAppControl is DAppControl {
 
     constructor(address _escrow)
         DAppControl(
-            _escrow, 
-            msg.sender, 
+            _escrow,
+            msg.sender,
             CallConfig({
                 sequenced: false,
                 requirePreOps: true,
@@ -80,11 +79,7 @@ contract V2DAppControl is DAppControl {
         }
     }
 
-    function _preOpsCall(UserOperation calldata userOp)
-        internal
-        override
-        returns (bytes memory)
-    {
+    function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory) {
         require(bytes4(userOp.data) == SWAP, "ERR-H10 InvalidFunction");
 
         (
@@ -101,12 +96,11 @@ contract V2DAppControl is DAppControl {
         uint256 amount1In =
             amount0Out == 0 ? 0 : SwapMath.getAmountIn(amount0Out, uint256(token1Balance), uint256(token0Balance));
 
-
         // This is a V2 swap, so optimistically transfer the tokens
         // NOTE: The user should have approved the ExecutionEnvironment for token transfers
         _transferUserERC20(
             amount0Out > amount1Out ? IUniswapV2Pair(userOp.dapp).token1() : IUniswapV2Pair(userOp.dapp).token0(),
-            userOp.dapp, 
+            userOp.dapp,
             amount0In > amount1In ? amount0In : amount1In
         );
 
@@ -161,14 +155,7 @@ contract V2DAppControl is DAppControl {
         return WETH;
     }
 
-    function getBidValue(SolverOperation calldata solverOp)
-        public
-        pure
-        override
-        returns (uint256) 
-    {
+    function getBidValue(SolverOperation calldata solverOp) public pure override returns (uint256) {
         return solverOp.bidAmount;
     }
-
-
 }

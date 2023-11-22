@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.18;
+pragma solidity 0.8.21;
 
 import "forge-std/Script.sol";
 import "forge-std/Test.sol";
 import "forge-std/StdJson.sol";
 
-import {DeployBaseScript} from "script/base/deploy-base.s.sol";
+import { DeployBaseScript } from "script/base/deploy-base.s.sol";
 
-import {Atlas} from "src/contracts/atlas/Atlas.sol";
+import { Atlas } from "src/contracts/atlas/Atlas.sol";
 
 // NOTE: When handling JSON with StdJson, prefix keys with '.' e.g. '.ATLAS'
 
@@ -27,7 +27,7 @@ contract SolverAtlasDepositScript is DeployBaseScript {
         vm.startBroadcast(privateKey);
 
         // Solver deposits 1 ETH into Atlas on his own behalf
-        atlas.deposit{value: 1 ether}();
+        atlas.deposit{ value: 1 ether }();
 
         vm.stopBroadcast();
 

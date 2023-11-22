@@ -1,11 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.16;
+pragma solidity 0.8.21;
 
 uint256 constant CALLDATA_LENGTH_PREMIUM = 32; // 16 (default) * 2
-
-struct AccountingData {
-    mapping(address borrower => uint256 amount) ethBorrowed; // TODO worth allowing ERC20s to be borrowed?
-}
 
 struct EscrowAccountData {
     uint128 balance;
@@ -19,7 +15,7 @@ struct GasDonation {
     uint32 cumulative;
 }
 
-// NOTE: The order is very important here for balance reconciliation. 
+// NOTE: The order is very important here for balance reconciliation.
 // We _MUST_ net the balances in order from LastLook to FirstLook
 enum Party {
     Builder, // block.coinbase

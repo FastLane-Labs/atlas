@@ -1,18 +1,18 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.16;
+pragma solidity 0.8.21;
 
 // Base Imports
-import {SafeTransferLib, ERC20} from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
 // V4 Imports
-import {IPoolManager} from "./IPoolManager.sol";
-import {IHooks} from "./IHooks.sol";
+import { IPoolManager } from "./IPoolManager.sol";
+import { IHooks } from "./IHooks.sol";
 
 // Atlas Imports
-import {V4DAppControl} from "./V4DAppControl.sol";
+import { V4DAppControl } from "./V4DAppControl.sol";
 
-import {ISafetyLocks} from "../../interfaces/ISafetyLocks.sol";
-import {SafetyBits} from "../../libraries/SafetyBits.sol";
+import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
+import { SafetyBits } from "../../libraries/SafetyBits.sol";
 
 import "../../types/SolverCallTypes.sol";
 import "../../types/UserCallTypes.sol";
@@ -24,15 +24,13 @@ import "../../types/LockTypes.sol";
 // sent wherever the hook creators wish.  In this example, the MEV auction proceeds
 // are donated back to the pool.
 
-
-    /////////////////////////////////////////////////////////
-    //                      V4 HOOK                        //
-    /////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////
+//                      V4 HOOK                        //
+/////////////////////////////////////////////////////////
 
 contract UniV4Hook is V4DAppControl {
+    constructor(address _escrow, address _v4Singleton) V4DAppControl(_escrow, _v4Singleton) { }
 
-    constructor(address _escrow, address _v4Singleton) V4DAppControl(_escrow, _v4Singleton) {}
-    
     function getHooksCalls() public pure returns (IHooks.Calls memory) {
         // override
         return IHooks.Calls({
@@ -47,16 +45,24 @@ contract UniV4Hook is V4DAppControl {
         });
     }
 
-    function beforeModifyPosition(address, PoolKey calldata, IPoolManager.ModifyPositionParams calldata)
+    function beforeModifyPosition(
+        address,
+        PoolKey calldata,
+        IPoolManager.ModifyPositionParams calldata
+    )
         external
         virtual
         returns (bytes4)
     {
-        // TODO: Hook must own ALL liquidity.  
+        // TODO: Hook must own ALL liquidity.
         // Users can withdraw liquidity through Hook rather than through the pool itself
     }
 
-    function beforeSwap(address sender, IPoolManager.PoolKey calldata key, IPoolManager.SwapParams calldata)
+    function beforeSwap(
+        address sender,
+        IPoolManager.PoolKey calldata key,
+        IPoolManager.SwapParams calldata
+    )
         external
         view
         returns (bytes4)
@@ -72,17 +78,14 @@ contract UniV4Hook is V4DAppControl {
 
         EscrowKey memory escrowKey = ISafetyLocks(escrow).getLockState();
 
-        // Case:
-        // User call
         if (escrowKey.lockState == SafetyBits._LOCKED_X_USER_X_UNSET) {
+            // Case: User call
             // Sender = ExecutionEnvironment
 
             // Verify that the pool is valid for the user to trade in.
             require(keccak256(abi.encode(key, sender)) == hashLock, "ERR-H02 InvalidSwapper");
-
-            // Case:
-            // Solver call
         } else if (escrowKey.lockState == SafetyBits._LOCKED_X_SOLVERS_X_VERIFIED) {
+            // Case: Solver call
             // Sender = Solver contract
             // NOTE: This lockState verifies that the user's transaction has already
             // been executed.
@@ -92,10 +95,8 @@ contract UniV4Hook is V4DAppControl {
 
             // Verify that the pool is valid for a solver to trade in.
             require(hashLock == keccak256(abi.encode(key, escrowKey.approvedCaller)), "ERR-H04 InvalidPoolKey");
-
-            // Case:
-            // Other call
         } else {
+            // Case: Other call
             // Determine if the sequenced order was processed earlier in the block
             bytes32 sequenceKey = keccak256(
                 abi.encodePacked(

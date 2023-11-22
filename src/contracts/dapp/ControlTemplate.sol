@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity ^0.8.16;
+pragma solidity 0.8.21;
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
@@ -8,10 +8,9 @@ import "../types/DAppApprovalTypes.sol";
 import "forge-std/Test.sol";
 
 abstract contract DAppControlTemplate {
-
     address internal immutable _executionBase;
 
-    constructor () {
+    constructor() {
         _executionBase = address(this);
     }
 
@@ -41,9 +40,8 @@ abstract contract DAppControlTemplate {
     // DApp exposure: Trustless
     // User exposure: Trustless
     function _preOpsCall(UserOperation calldata) internal virtual returns (bytes memory) {
-            revert(_NOT_IMPLEMENTED);
-        }
-
+        revert(_NOT_IMPLEMENTED);
+    }
 
     /////////////////////////////////////////////////////////
     //                MEV ALLOCATION                       //
@@ -52,7 +50,7 @@ abstract contract DAppControlTemplate {
     // _allocateValueCall
     // Details:
     //  allocate/delegate =
-    //      Inputs: MEV Profits (ERC20 balances) 
+    //      Inputs: MEV Profits (ERC20 balances)
     //      Function: Executing the function set by DAppControl / MEVAllocator
     //      Container: Inside of the FastLane ExecutionEnvironment
     //      Access: With storage access (read + write) only to the ExecutionEnvironment
@@ -85,7 +83,6 @@ abstract contract DAppControlTemplate {
     function _preSolverCall(bytes calldata) internal virtual returns (bool) {
         revert(_NOT_IMPLEMENTED);
     }
-
 
     // _postSolverCall
     //
