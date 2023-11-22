@@ -48,14 +48,14 @@ contract V4SwapIntentTest is BaseTest {
         // Deploy new SwapIntent Controller from new gov and initialize in Atlas
         vm.startPrank(governanceEOA);
         swapIntentController = new V4SwapIntentController(address(escrow), address(poolManager));        
-        atlas.initializeGovernance(address(swapIntentController));
-        atlas.integrateDApp(address(swapIntentController));
+        atlasVerification.initializeGovernance(address(swapIntentController));
+        atlasVerification.integrateDApp(address(swapIntentController));
         vm.stopPrank();
 
         txBuilder = new TxBuilder({
             controller: address(swapIntentController),
-            escrowAddress: address(escrow),
-            atlasAddress: address(atlas)
+            atlasAddress: address(atlas),
+            _verification: address(atlasVerification)
         });
 
         // Create a DAI/WETH pool with no hooks
@@ -93,7 +93,7 @@ contract V4SwapIntentTest is BaseTest {
 
         // Deploy the solver contract
         vm.startPrank(solverOneEOA);
-        UniswapV4IntentSolver solver = new UniswapV4IntentSolver(address(atlas), poolManager);
+        UniswapV4IntentSolver solver = new UniswapV4IntentSolver(WETH_ADDRESS, address(atlas), poolManager);
         vm.stopPrank();
 
         // Input params for Atlas.metacall() - will be populated below
@@ -164,14 +164,14 @@ contract V4SwapIntentTest is BaseTest {
         });
 
         // Solver signs the solverOp
-        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlas.getSolverPayload(solverOps[0]));
+        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Frontend creates dAppOp calldata after seeing rest of data
         dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
 
         // Frontend signs the dAppOp payload
-        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlas.getDAppOperationPayload(dAppOp));
+        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Check user token balances before
@@ -231,7 +231,7 @@ contract UniswapV4IntentSolver is SolverBase {
     IPoolManager immutable poolManager;
     PoolSwapTest immutable swapHelper;
 
-    constructor(address atlas, IPoolManager manager) SolverBase(atlas, msg.sender) {
+    constructor(address weth, address atlas, IPoolManager manager) SolverBase(weth, atlas, msg.sender) {
         poolManager = manager;
         swapHelper = new PoolSwapTest(manager);
     }
