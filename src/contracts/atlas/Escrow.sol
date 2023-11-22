@@ -73,12 +73,8 @@ abstract contract Escrow is AtlETH {
         userData = abi.encodeWithSelector(IExecutionEnvironment.userWrapper.selector, userOp);
         userData = abi.encodePacked(userData, lockBytes);
 
-        if (userOp.value > 0) {
-            _use(Party.User, userOp.from, userOp.value);
-            (success, userData) = environment.call{ value: userOp.value }(userData);
-        } else {
-            (success, userData) = environment.call(userData);
-        }
+        (success, userData) = environment.call{ value: userOp.value }(userData);
+        
         // require(success, "ERR-E002 UserFail");
         if (success) {
             userData = abi.decode(userData, (bytes));
@@ -98,21 +94,15 @@ abstract contract Escrow is AtlETH {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
 
-        EscrowAccountData memory solverEscrow = _escrowAccountData[solverOp.from];
-        uint256 result;
-        uint256 gasLimit;
-
         // Verify the transaction.
-        (result, gasLimit, solverEscrow) = _validateSolverOperation(solverOp, false);
+        (uint256 result, uint256 gasLimit) = _validateSolverOperation(solverOp, false);
 
         // If there are no errors, attempt to execute
-        if (result.canExecute() && _checkSolverProxy(solverOp.from, bundler)) {
+        if (result.canExecute()) {
             // Open the solver lock
             key = key.holdSolverLock(solverOp.solver);
 
-            if (solverOp.value != 0) {
-                _borrow(Party.Solver, solverOp.value);
-            }
+            _setSolverLedger(solverOp.from, solverOp.value);
 
             // Execute the solver call
             // _solverOpsWrapper returns a SolverOutcome enum value
@@ -123,21 +113,13 @@ abstract contract Escrow is AtlETH {
                 result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
                 emit SolverTxResult(solverOp.solver, solverOp.from, true, true, result);
 
-                _updateSolverProxy(solverOp.from, bundler, true);
-
                 // winning solver's gas is implicitly paid for by their allowance
                 return (true, key.turnSolverLockPayments(environment));
-            } else if (solverOp.value != 0) {
-                _tradeCorrection(Party.Solver, solverOp.value);
-            }
-
-            _updateSolverProxy(solverOp.from, bundler, false);
+            } 
+            
             result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
 
-            // Update the solver's escrow balances and the accumulated refund
-            if (result.updateEscrow()) {
-                key.gasRefund += uint32(_update(solverOp, solverEscrow, gasWaterMark, result));
-            }
+            _releaseSolverLedger(solverOp, gasWaterMark, result);
 
             // emit event
             emit SolverTxResult(solverOp.solver, solverOp.from, true, false, result);
@@ -195,12 +177,12 @@ abstract contract Escrow is AtlETH {
     )
         internal
         view
-        returns (uint256 result, uint256 gasLimit, EscrowAccountData memory solverEscrow)
+        returns (uint256 result, uint256 gasLimit)
     {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
 
-        solverEscrow = _escrowAccountData[solverOp.from];
+        uint256 solverBalance = balanceOf[solverOp.from];
 
         // TODO big unchecked block - audit/review carefully
         unchecked {
@@ -208,11 +190,13 @@ abstract contract Escrow is AtlETH {
                 result |= 1 << uint256(SolverOutcome.InvalidTo);
             }
 
+            /*
             if (solverEscrow.lastAccessed >= uint64(block.number)) {
                 result |= 1 << uint256(SolverOutcome.PerBlockLimit);
             } else {
                 solverEscrow.lastAccessed = uint64(block.number);
             }
+            */
 
             gasLimit = (100) * (solverOp.gas < EscrowBits.SOLVER_GAS_LIMIT ? solverOp.gas : EscrowBits.SOLVER_GAS_LIMIT)
                 / (100 + EscrowBits.SOLVER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
@@ -220,7 +204,7 @@ abstract contract Escrow is AtlETH {
             uint256 gasCost = (tx.gasprice * gasLimit) + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
 
             // see if solver's escrow can afford tx gascost
-            if (gasCost > solverEscrow.balance) {
+            if (gasCost > solverBalance) {
                 // charge solver for calldata so that we can avoid vampire attacks from solver onto user
                 result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
             }
@@ -243,47 +227,9 @@ abstract contract Escrow is AtlETH {
             }
         }
 
-        return (result, gasLimit, solverEscrow);
+        return (result, gasLimit);
     }
 
-    function _update(
-        SolverOperation calldata solverOp,
-        EscrowAccountData memory solverEscrow,
-        uint256 gasWaterMark,
-        uint256 result
-    )
-        internal
-        returns (uint256 gasRebate)
-    {
-        unchecked {
-            uint256 gasUsed = gasWaterMark - gasleft();
-
-            if (result & EscrowBits._FULL_REFUND != 0) {
-                gasRebate = gasUsed + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM);
-            } else if (result & EscrowBits._CALLDATA_REFUND != 0) {
-                gasRebate = (solverOp.data.length * CALLDATA_LENGTH_PREMIUM);
-            } else if (result & EscrowBits._NO_USER_REFUND != 0) {
-                // pass
-            } else {
-                revert UncoveredResult();
-            }
-
-            if (gasRebate != 0) {
-                // Calculate what the solver owes
-                gasRebate *= tx.gasprice;
-
-                gasRebate = gasRebate > solverEscrow.balance ? solverEscrow.balance : gasRebate;
-
-                solverEscrow.balance -= uint128(gasRebate);
-
-                // NOTE: This will cause an error if you are simulating with a gasPrice of 0
-                gasRebate /= tx.gasprice;
-
-                // Save the escrow data back into storage
-                _escrowAccountData[solverOp.from] = solverEscrow;
-            }
-        }
-    }
 
     // Returns a SolverOutcome enum value
     function _solverOpWrapper(

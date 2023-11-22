@@ -220,13 +220,6 @@ contract ExecutionBase is Base {
 
     constructor(address _atlas) Base(_atlas) { }
 
-    // Contribute local funds to be used by the recipient
-    function _contribute(Party recipient, uint256 amt) internal {
-        if (msg.sender != atlas) revert("ERR-EB001 InvalidSender");
-        if (amt > address(this).balance) revert("ERR-EB002 InsufficientLocalBalance");
-
-        IEscrow(atlas).contribute{ value: amt }(recipient);
-    }
 
     // Deposit local funds to the recipient's balance
     function _deposit(Party recipient, uint256 amt) internal {
@@ -236,13 +229,14 @@ contract ExecutionBase is Base {
         IEscrow(atlas).deposit{ value: amt }(recipient);
     }
 
-    // Contribute nonlocal funds on behalf of the donor to be used by the recipient
+    // Contribute funds on behalf of the donor to be used by the recipient
     // Any unused funds are returned to the donor
-    function _contributeTo(Party donor, Party recipient, uint256 amt) internal {
+    function _contributeTo(Party donor, Party recipient, uint256 amountLocalValue, uint256 amountBalanceOf) internal {
         if (msg.sender != atlas) revert("ERR-EB001 InvalidSender");
         if (!donor.validContribution(_lockState())) revert("ERR-EB002 InvalidPhase");
+        if (amountLocalValue > address(this).balance) revert("ERR-EB003 InsufficientLocalBalance");
 
-        IEscrow(atlas).contributeTo(donor, recipient, amt);
+        IEscrow(atlas).contributeTo{value: amountLocalValue}(donor, recipient, amountBalanceOf);
     }
 
     // Recipient requests a contribution from the donor.
@@ -254,16 +248,6 @@ contract ExecutionBase is Base {
         IEscrow(atlas).requestFrom(donor, recipient, amt);
     }
 
-    // Finalize the gas ledger of the party, which will block all future requests and contributions.
-    // This will throw a revert if there is an unfulfilled request (either outbound or inbound).
-    // NOTE: The Solver party cannot be finalized in this manner - it must call the "reconcile" function.
-    function _finalize(Party party) internal {
-        if (msg.sender != atlas) revert("ERR-EB001 InvalidSender");
-
-        bool finalized = IEscrow(atlas).finalize(party, _partyAddress(party));
-
-        if (!finalized) revert("ERR-EB003 UnableToFinalize");
-    }
 
     function _transferUserERC20(address token, address destination, uint256 amount) internal {
         if (msg.sender != atlas) {

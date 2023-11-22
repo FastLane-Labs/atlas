@@ -39,12 +39,13 @@ abstract contract AtlETH is Permit69 {
                                 ATLETH
     //////////////////////////////////////////////////////////////*/
 
-    function balanceOf(address account) public view returns (uint256) {
-        return _escrowAccountData[account].balance;
-    }
 
     function accountLastActiveBlock(address account) external view returns (uint256) {
-        return uint256(_escrowAccountData[account].lastAccessed);
+        return uint256(nonces[account].lastAccessed);
+    }
+
+    function balanceOf(address account) public view returns (uint256) {
+        return balanceOf[account] + (ledgers[account].balance * tx.gasprice);
     }
 
     // Deposit ETH and get atlETH in return.

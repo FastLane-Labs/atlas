@@ -40,6 +40,7 @@ contract SafetyLocksLib is Storage, FastLaneErrorsEvents {
         UserOperation calldata userOp,
         address executionEnvironment,
         address bundler,
+        address sequencer,
         uint256 gasLimit
     )
         external
@@ -51,51 +52,53 @@ contract SafetyLocksLib is Storage, FastLaneErrorsEvents {
         activeParties = activeParties.markActive(Party.Bundler);
         activeParties = activeParties.markActive(Party.Solver);
 
-        uint256 bundlerIndex = uint256(Party.Bundler);
-
-        // Check for proxies
-        // NOTE: Order is important here so that we can loop through these later without having to go backwards to find
-        // final proxy
-        // Builder proxy
-        if (block.coinbase == bundler) {
-            activeParties = activeParties.markActive(Party.Builder);
-            ledgers[uint256(Party.Builder)] =
-                Ledger({ balance: 0, contributed: 0, requested: 0, status: LedgerStatus.Proxy, proxy: Party.Bundler });
-        } else if (block.coinbase == userOp.from) {
-            activeParties = activeParties.markActive(Party.Builder);
-            ledgers[uint256(Party.Builder)] =
-                Ledger({ balance: 0, contributed: 0, requested: 0, status: LedgerStatus.Proxy, proxy: Party.User });
-        }
-
-        // Bundler proxy
-        if (bundler == userOp.from) {
-            // Bundler already marked active
-            ledgers[uint256(Party.Bundler)] =
-                Ledger({ balance: 0, contributed: 0, requested: 0, status: LedgerStatus.Proxy, proxy: Party.User });
-            bundlerIndex = uint256(Party.User);
-        }
+        parties[uint256(Party.Bundler)]  = bundler;
+        if (sequencer != INACTIVE) parties[uint256(Party.Sequencer)]  = sequencer;
+        parties[uint256(Party.Solver)]  = SOLVER_PROXY;
+        parties[uint256(Party.User)]  = userOp.from;
+        parties[uint256(Party.DApp)]  = userOp.control;
 
         // Initialize Ledger
-        int64 iGasLimit = int64(uint64(gasLimit));
+        int64 bundlerDeposit;
+        int64 solverRequest = -int64(uint64(gasLimit));
 
         if (msg.value != 0) {
-            int64 bundlerDeposit = int64(uint64(msg.value / tx.gasprice));
-            ledgers[bundlerIndex] = Ledger({
-                balance: 0,
-                contributed: bundlerDeposit,
-                requested: 0 - bundlerDeposit - iGasLimit,
-                status: LedgerStatus.Active,
-                proxy: Party(bundlerIndex)
-            });
-        } else {
-            ledgers[bundlerIndex] = Ledger({
-                balance: 0,
-                contributed: 0,
-                requested: 0 - iGasLimit,
-                status: LedgerStatus.Active,
-                proxy: Party(bundlerIndex)
-            });
+            bundlerDeposit = int64(uint64(msg.value / tx.gasprice));
+            solverRequest -= bundlerDeposit;
+        } 
+
+        activeParties = activeParties.markActive(Party.Bundler);
+        ledgers[bundler] = Ledger({
+            balance: 0,
+            contributed: bundlerDeposit,
+            requested: solverRequest,
+            status: LedgerStatus.Active
+        });
+
+        if (userOp.value != 0) {
+            int64 userValue = int64(uint64(userOp.value / tx.gasprice));
+            solverRequest -= userValue;
+
+            if (userOp.from == bundler) {
+                ledgers[userOp.from].requested -= userValue;
+            } else {
+                activeParties = activeParties.markActive(Party.User);
+                ledgers[userOp.from] = Ledger({
+                    balance: 0,
+                    contributed: 0,
+                    requested: 0 - userValue,
+                    status: LedgerStatus.Active
+                });
+            }
         }
+
+        activeParties = activeParties.markActive(Party.Solver);
+        ledgers[SOLVER_PROXY] = Ledger({
+            balance: 0,
+            contributed: solverRequest,
+            requested: 0,
+            status: LedgerStatus.Active
+        });
 
         // Initialize the Lock
         lock = Lock({

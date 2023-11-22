@@ -5,21 +5,22 @@ uint256 constant CALLDATA_LENGTH_PREMIUM = 32; // 16 (default) * 2
 
 struct EscrowAccountData {
     uint128 balance;
-    uint32 nonce; // EOA nonce
-    uint64 lastAccessed; // block.number
+    uint128 holds;
 }
 
-struct GasDonation {
-    address recipient;
-    uint32 net;
-    uint32 cumulative;
+struct EscrowNonce {
+    uint64 nonce;
+    uint64 blockRequested;
+    uint128 withdrawalAmount; 
 }
 
 // NOTE: The order is very important here for balance reconciliation.
 // We _MUST_ net the balances in order from LastLook to FirstLook
+// TODO: add 'dAppSignatory' option
 enum Party {
     Builder, // block.coinbase
     Bundler, // tx.origin
+    Sequencer, // dApp signatory
     Solver,
     User,
     DApp
@@ -40,7 +41,6 @@ struct Ledger {
     int64 contributed; // requested by others - | + filled by this party
     int64 requested; // requested by this party  - | + filled by others
     LedgerStatus status;
-    Party proxy; // if the address has more than one role
 }
 
 enum SolverOutcome

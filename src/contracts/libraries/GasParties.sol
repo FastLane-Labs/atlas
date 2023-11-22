@@ -4,7 +4,7 @@ pragma solidity 0.8.21;
 import { Party, Ledger } from "../types/EscrowTypes.sol";
 import { Lock, BaseLock, ExecutionPhase } from "../types/LockTypes.sol";
 
-uint256 constant LEDGER_LENGTH = 5; // type(Party).max = 5
+uint256 constant LEDGER_LENGTH = 6; // type(Party).max = 6
 
 library PartyMath {
     function toBit(Party party) internal pure returns (uint256 partyBit) {
@@ -33,24 +33,6 @@ library PartyMath {
 
     function isInactive(uint256 activeParties, uint256 party) internal pure returns (bool) {
         return activeParties & 1 << (party + 1) == 0;
-    }
-
-    function _getLedgerFromMemory(
-        Ledger[LEDGER_LENGTH] memory meparties,
-        Party party
-    )
-        internal
-        pure
-        returns (Ledger memory partyLedger, uint256 index)
-    {
-        uint256 partyIndex;
-
-        do {
-            partyIndex = uint256(party);
-            partyLedger = meparties[partyIndex];
-            party = partyLedger.proxy;
-            index = uint256(party);
-        } while (partyIndex != index);
     }
 
     uint256 internal constant _OFFSET = uint256(type(BaseLock).max) + 1;

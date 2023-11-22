@@ -7,7 +7,7 @@ import "../types/LockTypes.sol";
 contract Storage {
     // Atlas constants
     uint256 internal constant _MAX_GAS = 1_500_000;
-    uint256 internal constant LEDGER_LENGTH = 5; // type(Party).max = 5
+    uint256 internal constant LEDGER_LENGTH = 6; // type(Party).max = 6
     address internal constant UNLOCKED = address(1);
 
     uint256 public immutable ESCROW_DURATION;
@@ -29,17 +29,22 @@ contract Storage {
     // AtlETH ERC-20 storage
     uint256 public totalSupply;
     mapping(address => mapping(address => uint256)) public allowance;
-    mapping(address => uint256) public nonces;
+    mapping(address => EscrowNonce) public nonces;
 
     // Atlas GasAccounting storage
     // NOTE: these storage vars / maps should only be accessible by *signed* solver transactions
     // and only once per solver per block (to avoid user-solver collaborative exploits)
     // uint256 public immutable escrowDuration;
-    mapping(address => EscrowAccountData) internal _escrowAccountData;
+    mapping(address => uint256) public balanceOf;
+    // mapping(address => uint256) internal _escrowAccountData;
+
+    address public constant INACTIVE = address(1);
+    address public constant SOLVER_PROXY = address(2);
 
     // Atlas SafetyLocks storage
-    Lock public lock;
-    Ledger[LEDGER_LENGTH] public ledgers;
+    Lock public lock; // transient storage
+    mapping(address => Ledger) public ledgers; // transient storage
+    address[LEDGER_LENGTH] public parties; // transient storage
 
     constructor(
         uint256 _escrowDuration,
@@ -61,8 +66,7 @@ contract Storage {
 
         for (uint256 i; i < LEDGER_LENGTH; i++) {
             // init the storage vars
-            ledgers[i] =
-                Ledger({ balance: 0, contributed: 0, requested: 0, status: LedgerStatus.Inactive, proxy: Party(i) });
+            ledgers[i] = INACTIVE;
         }
     }
 

@@ -13,9 +13,7 @@ interface IEscrow {
         external
         payable
         returns (bool);
-    function contribute(Party party) external payable;
     function deposit(Party party) external payable;
-    function contributeTo(Party donor, Party recipient, uint256 amt) external;
+    function contributeTo(Party donor, Party recipient, uint256 amt) external payable;
     function requestFrom(Party donor, Party recipient, uint256 amt) external;
-    function finalize(Party party, address partyAddress) external returns (bool);
 }

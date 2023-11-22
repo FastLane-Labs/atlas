@@ -47,15 +47,6 @@ contract ExecutionEnvironment is Base {
         _;
     }
 
-    modifier contributeSurplus(Party party) {
-        _;
-        {
-            uint256 balance = address(this).balance;
-            if (balance > 0) {
-                IEscrow(atlas).contribute{ value: balance }(party);
-            }
-        }
-    }
 
     modifier validSolver(SolverOperation calldata solverOp) {
         {
@@ -83,7 +74,6 @@ contract ExecutionEnvironment is Base {
         external
         validUser(userOp)
         onlyAtlasEnvironment(ExecutionPhase.PreOps, _ENVIRONMENT_DEPTH)
-        contributeSurplus(Party.DApp)
         returns (bytes memory)
     {
         // msg.sender = atlas
@@ -105,7 +95,6 @@ contract ExecutionEnvironment is Base {
         payable
         validUser(userOp)
         onlyAtlasEnvironment(ExecutionPhase.UserOperation, _ENVIRONMENT_DEPTH)
-        contributeSurplus(Party.User)
         validControlHash
         returns (bytes memory userData)
     {
@@ -133,7 +122,6 @@ contract ExecutionEnvironment is Base {
     function postOpsWrapper(bytes calldata returnData)
         external
         onlyAtlasEnvironment(ExecutionPhase.PostOps, _ENVIRONMENT_DEPTH)
-        contributeSurplus(Party.DApp)
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
@@ -255,27 +243,15 @@ contract ExecutionEnvironment is Base {
     function allocateValue(
         address bidToken,
         uint256 bidAmount,
-        bytes memory returnData
+        bytes memory allocateData
     )
         external
         onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _ENVIRONMENT_DEPTH)
-        contributeSurplus(Party.Solver)
     {
         // msg.sender = escrow
         // address(this) = ExecutionEnvironment
 
-        uint256 payment = (bidAmount * 5) / 100;
-
-        if (bidToken != address(0)) {
-            SafeTransferLib.safeTransfer(ERC20(bidToken), address(0xa71a5), payment);
-        } else {
-            SafeTransferLib.safeTransferETH(address(0xa71a5), payment);
-        }
-
-        uint256 netBidAmount = bidAmount - payment;
-
-        bytes memory allocateData =
-            abi.encodeWithSelector(IDAppControl.allocateValueCall.selector, bidToken, netBidAmount, returnData);
+        allocateData = abi.encodeWithSelector(IDAppControl.allocateValueCall.selector, bidToken, bidAmount, allocateData);
 
         (bool success,) = _control().delegatecall(forward(allocateData));
         require(success, "ERR-EC02 DelegateRevert");

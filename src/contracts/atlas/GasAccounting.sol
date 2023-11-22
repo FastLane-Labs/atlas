@@ -38,13 +38,7 @@ abstract contract GasAccounting is SafetyLocks {
         if (!success) revert GasAccountingLibError();
     }
 
-    function contribute(Party recipient) external payable {
-        (bool success,) =
-            GAS_ACC_LIB.delegatecall(abi.encodeWithSelector(GasAccountingLib.contribute.selector, recipient));
-        if (!success) revert GasAccountingLibError();
-    }
-
-    function contributeTo(Party donor, Party recipient, uint256 amt) external {
+    function contributeTo(Party donor, Party recipient, uint256 amt) external payable {
         (bool success,) = GAS_ACC_LIB.delegatecall(
             abi.encodeWithSelector(GasAccountingLib.contributeTo.selector, msg.sender, donor, recipient, amt)
         );
@@ -55,12 +49,6 @@ abstract contract GasAccounting is SafetyLocks {
         (bool success,) = GAS_ACC_LIB.delegatecall(
             abi.encodeWithSelector(GasAccountingLib.requestFrom.selector, msg.sender, donor, recipient, amt)
         );
-        if (!success) revert GasAccountingLibError();
-    }
-
-    function finalize(Party party, address partyAddress) external {
-        (bool success,) =
-            GAS_ACC_LIB.delegatecall(abi.encodeWithSelector(GasAccountingLib.finalize.selector, party, partyAddress));
         if (!success) revert GasAccountingLibError();
     }
 
@@ -84,35 +72,13 @@ abstract contract GasAccounting is SafetyLocks {
     //          INTERNAL FUNCTIONS
     // ---------------------------------------
 
-    function _updateSolverProxy(address solverFrom, address bundler, bool solverSuccessful) internal {
-        (bool success,) = GAS_ACC_LIB.delegatecall(
-            abi.encodeWithSelector(GasAccountingLib.updateSolverProxy.selector, solverFrom, bundler, solverSuccessful)
-        );
+    function _setSolverLedger(address solverFrom, uint256 solverOpValue) internal {
+        (bool success,) = GAS_ACC_LIB.delegatecall(abi.encodeWithSelector(GasAccountingLib.setSolverLedger.selector, solverFrom, solverOpValue));
         if (!success) revert GasAccountingLibError();
     }
 
-    function _checkSolverProxy(address solverFrom, address bundler) internal returns (bool validSolver) {
-        (bool success, bytes memory data) = GAS_ACC_LIB.delegatecall(
-            abi.encodeWithSelector(GasAccountingLib.checkSolverProxy.selector, solverFrom, bundler)
-        );
-        if (!success) revert GasAccountingLibError();
-        return abi.decode(data, (bool));
-    }
-
-    function _borrow(Party party, uint256 amt) internal {
-        (bool success,) = GAS_ACC_LIB.delegatecall(abi.encodeWithSelector(GasAccountingLib.borrow.selector, party, amt));
-        if (!success) revert GasAccountingLibError();
-    }
-
-    function _tradeCorrection(Party party, uint256 amt) internal {
-        (bool success,) =
-            GAS_ACC_LIB.delegatecall(abi.encodeWithSelector(GasAccountingLib.tradeCorrection.selector, party, amt));
-        if (!success) revert GasAccountingLibError();
-    }
-
-    function _use(Party party, address partyAddress, uint256 amt) internal {
-        (bool success,) =
-            GAS_ACC_LIB.delegatecall(abi.encodeWithSelector(GasAccountingLib.use.selector, party, partyAddress, amt));
+    function _releaseSolverLedger(SolverOperation calldata solverOp, uint256 gasWaterMark, uint256 result) internal {
+        (bool success,) = GAS_ACC_LIB.delegatecall(abi.encodeWithSelector(GasAccountingLib.releaseSolverLedger.selector, solverOp, gasWaterMark, result));
         if (!success) revert GasAccountingLibError();
     }
 
