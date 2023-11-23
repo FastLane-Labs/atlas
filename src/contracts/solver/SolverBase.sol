@@ -53,7 +53,12 @@ contract SolverBase is Test {
 
         _;
 
-        IEscrow(_escrow).reconcile{ value: msg.value }(msg.sender, sender, type(uint256).max);
+        uint256 shortfall = IEscrow(_escrow).shortfall();
+
+        if (shortfall < msg.value) shortfall = 0; 
+        else shortfall -= msg.value;
+
+        IEscrow(_escrow).reconcile{ value: msg.value }(msg.sender, sender, shortfall);
     }
 
     modifier payBids(address bidToken, uint256 bidAmount) {

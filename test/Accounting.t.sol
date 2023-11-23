@@ -107,7 +107,9 @@ contract AccountingTest is BaseTest {
     {
         uint256 userMsgValue = 2e18;
         uint256 solverMsgValue = 1e18;
-        uint256 atlasStartBalance = solverMsgValue * 12 / 10;
+
+        // NOTE: the solver also has to pay the gas cost
+        uint256 atlasStartBalance = solverMsgValue * 15 / 10;
 
         deal(userEOA, userMsgValue);
         vm.prank(solverTwoEOA);

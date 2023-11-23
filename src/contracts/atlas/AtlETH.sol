@@ -28,40 +28,86 @@ abstract contract AtlETH is Permit69 {
         uint256 _escrowDuration,
         address _factory,
         address _verification,
-        address _gasAccLib,
-        address _safetyLocksLib,
         address _simulator
     )
-        Permit69(_escrowDuration, _factory, _verification, _gasAccLib, _safetyLocksLib, _simulator)
+        Permit69(_escrowDuration, _factory, _verification, _simulator)
     { }
 
     /*//////////////////////////////////////////////////////////////
                                 ATLETH
     //////////////////////////////////////////////////////////////*/
 
+    error InsufficientRedeemedBalance(uint256 balance, uint256 requested);
+    error InsufficientAvailableBalance(uint256 balance, uint256 requested);
 
     function accountLastActiveBlock(address account) external view returns (uint256) {
         return uint256(nonces[account].lastAccessed);
     }
 
     function balanceOf(address account) public view returns (uint256) {
-        return balanceOf[account] + (ledgers[account].balance * tx.gasprice);
+        EscrowAccountData memory accountData = _balanceOf[account];
+        return uint256(accountData.balance - accountData.holds);
     }
 
     // Deposit ETH and get atlETH in return.
     function deposit() external payable {
-        _checkIfUnlocked();
+        // _checkIfUnlocked();
         _mint(msg.sender, msg.value);
     }
 
     // Redeem atlETH for ETH.
+    function redeem(uint256 amount) external {
+        _checkIfUnlocked();
+        _checkTransfersAllowed(msg.sender);
+
+        EscrowAccountData memory accountData = _balanceOf[msg.sender];
+
+        uint128 _amount = uint128(amount);
+
+        if (accountData.balance - accountData.holds < _amount) revert InsufficientBalance();
+
+        EscrowNonce memory nonceData = nonces[msg.sender];
+
+        nonceData.lastAccessed = uint64(block.number);
+        nonceData.withdrawalAmount += _amount;
+        accountData.holds += _amount;
+
+        nonces[msg.sender] = nonceData;
+        _balanceOf[msg.sender] = accountData;
+    
+    }
+
     function withdraw(uint256 amount) external {
         _checkIfUnlocked();
         _checkTransfersAllowed(msg.sender);
 
-        if (_escrowAccountData[msg.sender].balance < amount) revert InsufficientBalance();
-        _burn(msg.sender, amount);
+        _withdrawAccounting(amount, msg.sender);
+
+        emit Transfer(msg.sender, address(0), amount);
         SafeTransferLib.safeTransferETH(msg.sender, amount);
+    }
+
+    function _withdrawAccounting(uint256 amount, address spender) internal {
+        EscrowNonce memory nonceData = nonces[spender];
+        EscrowAccountData memory accountData = _balanceOf[spender];
+
+        uint128 _amount = uint128(amount);
+
+        if (nonceData.withdrawalAmount < _amount) revert InsufficientRedeemedBalance(uint256(nonceData.withdrawalAmount), amount);
+        if (accountData.balance < _amount) revert InsufficientAvailableBalance(uint256(accountData.balance), amount);
+
+        nonceData.lastAccessed = uint64(block.number);
+        nonceData.withdrawalAmount -= _amount;
+
+        accountData.balance -= _amount;
+        accountData.holds = _amount > accountData.holds ? 0 : accountData.holds - _amount;
+
+        nonces[spender] = nonceData;
+        _balanceOf[spender] = accountData;
+
+        unchecked {
+            totalSupply -= amount;
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -74,15 +120,16 @@ abstract contract AtlETH is Permit69 {
         return true;
     }
 
+    // NOTE: This transfer func would be problematic if it pulled from a withdraw rather than a redeem 
+    // E.G.  start the withdrawal in advance. This would prevent searchers from xfering their escrowed gas in the same 
+    // block, but in front of their own searcher ops. 
     function transfer(address to, uint256 amount) public returns (bool) {
         _checkTransfersAllowed(msg.sender);
 
-        _escrowAccountData[msg.sender].balance -= uint128(amount);
-        // Cannot overflow because the sum of all user
-        // balances can't exceed the max uint256 value.
-        unchecked {
-            _escrowAccountData[to].balance += uint128(amount);
-        }
+        _withdrawAccounting(amount, msg.sender);
+
+        _balanceOf[to].balance += uint128(amount);
+        
         emit Transfer(msg.sender, to, amount);
         return true;
     }
@@ -92,16 +139,17 @@ abstract contract AtlETH is Permit69 {
 
         uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
         if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
-        _escrowAccountData[from].balance -= uint128(amount);
-        // Cannot overflow because the sum of all user
-        // balances can't exceed the max uint256 value.
-        unchecked {
-            _escrowAccountData[to].balance += uint128(amount);
-        }
+        
+        _withdrawAccounting(amount, from);
+
+        _balanceOf[to].balance += uint128(amount);
+        
         emit Transfer(from, to, amount);
         return true;
     }
 
+    /*
+    // TODO: Readd permit but w/ custom safety checks. 
     function permit(
         address owner,
         address spender,
@@ -161,12 +209,13 @@ abstract contract AtlETH is Permit69 {
             )
         );
     }
+    */
 
     // Custom checks for atlETH transfer functions.
     // Interactions (transfers, withdrawals) are allowed only after the owner last interaction
     // with Atlas was at least `escrowDuration` blocks ago.
     function _checkTransfersAllowed(address account) internal view {
-        if (block.number <= _escrowAccountData[account].lastAccessed + ESCROW_DURATION) {
+        if (block.number < nonces[account].lastAccessed + ESCROW_DURATION) {
             revert EscrowLockActive();
         }
     }
@@ -177,16 +226,14 @@ abstract contract AtlETH is Permit69 {
 
     function _mint(address to, uint256 amount) internal {
         totalSupply += amount;
-        // Cannot overflow because the sum of all user
-        // balances can't exceed the max uint256 value.
-        unchecked {
-            _escrowAccountData[to].balance += uint128(amount);
-        }
+        
+        _balanceOf[to].balance += uint128(amount);
+        
         emit Transfer(address(0), to, amount);
     }
 
     function _burn(address from, uint256 amount) internal {
-        _escrowAccountData[from].balance -= uint128(amount);
+        _balanceOf[from].balance -= uint128(amount);
         // Cannot underflow because a user's balance
         // will never be larger than the total supply.
         unchecked {

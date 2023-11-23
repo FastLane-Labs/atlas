@@ -67,6 +67,16 @@ contract ExecutionEnvironment is Base {
         _;
     }
 
+    modifier contributeSurplus() {
+        _;
+        {
+        uint256 balance = address(this).balance;
+        if (balance > 0) {
+            IEscrow(atlas).contribute{value: balance}();
+        }
+        }
+    }
+
     //////////////////////////////////
     ///    CORE CALL FUNCTIONS     ///
     //////////////////////////////////
@@ -74,6 +84,7 @@ contract ExecutionEnvironment is Base {
         external
         validUser(userOp)
         onlyAtlasEnvironment(ExecutionPhase.PreOps, _ENVIRONMENT_DEPTH)
+        contributeSurplus
         returns (bytes memory)
     {
         // msg.sender = atlas
@@ -96,6 +107,7 @@ contract ExecutionEnvironment is Base {
         validUser(userOp)
         onlyAtlasEnvironment(ExecutionPhase.UserOperation, _ENVIRONMENT_DEPTH)
         validControlHash
+        contributeSurplus
         returns (bytes memory userData)
     {
         // msg.sender = atlas
@@ -122,6 +134,7 @@ contract ExecutionEnvironment is Base {
     function postOpsWrapper(bytes calldata returnData)
         external
         onlyAtlasEnvironment(ExecutionPhase.PostOps, _ENVIRONMENT_DEPTH)
+        contributeSurplus
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
@@ -247,6 +260,7 @@ contract ExecutionEnvironment is Base {
     )
         external
         onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _ENVIRONMENT_DEPTH)
+        contributeSurplus
     {
         // msg.sender = escrow
         // address(this) = ExecutionEnvironment

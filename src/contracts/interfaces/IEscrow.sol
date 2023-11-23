@@ -7,13 +7,13 @@ interface IEscrow {
     function validateBalances() external view returns (bool valid);
     function reconcile(
         address environment,
-        address searcherFrom,
+        address solverFrom,
         uint256 maxApprovedGasSpend
     )
         external
         payable
         returns (bool);
-    function deposit(Party party) external payable;
-    function contributeTo(Party donor, Party recipient, uint256 amt) external payable;
-    function requestFrom(Party donor, Party recipient, uint256 amt) external;
+    function contribute() external payable;
+    function borrow(uint256 amount) external payable;
+    function shortfall() external view returns (uint256);
 }

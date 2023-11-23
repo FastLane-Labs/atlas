@@ -86,12 +86,10 @@ contract FastLaneErrorsEvents {
     error InsufficientFunds();
     error NoUnfilledRequests();
     error SolverMustReconcile();
-    error GasAccountingLibError();
 
     // NEW - SafetyLocks
     error NotInitialized();
     error AlreadyInitialized();
-    error SafetyLocksLibError();
 
     /*
     event NewDAppIntegration(

@@ -9,8 +9,6 @@ import { DeployBaseScript } from "script/base/deploy-base.s.sol";
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
 import { AtlasFactory } from "src/contracts/atlas/AtlasFactory.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
-import { GasAccountingLib } from "src/contracts/atlas/GasAccountingLib.sol";
-import { SafetyLocksLib } from "src/contracts/atlas/SafetyLocksLib.sol";
 import { SwapIntentController } from "src/contracts/examples/intents-example/SwapIntent.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 import { Simulator } from "src/contracts/helpers/Simulator.sol";

@@ -10,8 +10,6 @@ import { ERC20 } from "solmate/tokens/ERC20.sol";
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
 import { AtlasFactory } from "src/contracts/atlas/AtlasFactory.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
-import { GasAccountingLib } from "src/contracts/atlas/GasAccountingLib.sol";
-import { SafetyLocksLib } from "src/contracts/atlas/SafetyLocksLib.sol";
 import { SwapIntentController } from "src/contracts/examples/intents-example/SwapIntent.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 import { Simulator } from "src/contracts/helpers/Simulator.sol";
@@ -28,8 +26,6 @@ contract DeployBaseScript is Script {
     Atlas public atlas;
     AtlasFactory public atlasFactory;
     AtlasVerification public atlasVerification;
-    GasAccountingLib public gasAccountingLib;
-    SafetyLocksLib public safetyLocksLib;
     Simulator public simulator;
     SwapIntentController public swapIntentControl;
     TxBuilder public txBuilder;

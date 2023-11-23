@@ -2,25 +2,32 @@
 pragma solidity 0.8.21;
 
 import { SafetyLocks } from "../atlas/SafetyLocks.sol";
-import { GasAccountingLib } from "./GasAccountingLib.sol";
+
+import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
+import {SolverOperation } from "../types/SolverCallTypes.sol";
 
-// import {EscrowBits} from "../libraries/EscrowBits.sol";
+import {EscrowBits} from "../libraries/EscrowBits.sol";
 
 // import "forge-std/Test.sol"; //TODO remove
 
 abstract contract GasAccounting is SafetyLocks {
+    error InvalidExecutionEnvironment(address correctEnvironment);
+    error InvalidSolverFrom(address solverFrom);
+    error InsufficientSolverBalance(uint256 actual, uint256 msgValue, uint256 holds, uint256 needed);
+    error InsufficientAtlETHBalance(uint256 actual, uint256 needed);
+    error InsufficientTotalBalance(uint256 shortfall);
+    error UnbalancedAccounting();
+
     constructor(
         uint256 _escrowDuration,
         address _factory,
         address _verification,
-        address _gasAccLib,
-        address _safetyLocksLib,
         address _simulator
     )
-        SafetyLocks(_escrowDuration, _factory, _verification, _gasAccLib, _safetyLocksLib, _simulator)
+        SafetyLocks(_escrowDuration, _factory, _verification, _simulator)
     { }
 
     // ---------------------------------------
@@ -28,103 +35,162 @@ abstract contract GasAccounting is SafetyLocks {
     // ---------------------------------------
 
     // Returns true if Solver status is Finalized and the caller (Execution Environment) is in surplus
-    // NOTE: This was a view function until logic got moved to delegatecalled contract - still should only be view
-    function validateBalances() external returns (bool valid) {
-        valid = ledgers[uint256(Party.Solver)].status == LedgerStatus.Finalized && _isInSurplus(msg.sender);
+    function validateBalances() external view returns (bool valid) {
+        return solver == SOLVER_FULFILLED;
     }
 
-    function deposit(Party party) external payable {
-        (bool success,) = GAS_ACC_LIB.delegatecall(abi.encodeWithSelector(GasAccountingLib.deposit.selector, party));
-        if (!success) revert GasAccountingLibError();
+    function contribute() external payable {
+        if (lock != msg.sender) revert InvalidExecutionEnvironment(lock);
+        _contribute();
     }
 
-    function contributeTo(Party donor, Party recipient, uint256 amt) external payable {
-        (bool success,) = GAS_ACC_LIB.delegatecall(
-            abi.encodeWithSelector(GasAccountingLib.contributeTo.selector, msg.sender, donor, recipient, amt)
-        );
-        if (!success) revert GasAccountingLibError();
+    function borrow(uint256 amount) external payable {
+        if (lock != msg.sender) revert InvalidExecutionEnvironment(lock);
+        if (_borrow(amount)) {
+            SafeTransferLib.safeTransferETH(msg.sender, amount);
+        } else {
+            revert InsufficientAtlETHBalance(address(this).balance, amount);
+        }
     }
 
-    function requestFrom(Party donor, Party recipient, uint256 amt) external {
-        (bool success,) = GAS_ACC_LIB.delegatecall(
-            abi.encodeWithSelector(GasAccountingLib.requestFrom.selector, msg.sender, donor, recipient, amt)
-        );
-        if (!success) revert GasAccountingLibError();
+    function shortfall() external view returns (uint256) {
+        uint256 deficit = claims + withdrawals;
+        uint256 _deposits = deposits;
+        return (deficit > _deposits ? deficit - _deposits : 0) + 1;
     }
 
     function reconcile(
         address environment,
-        address searcherFrom,
+        address solverFrom,
         uint256 maxApprovedGasSpend
     )
         external
         payable
         returns (bool)
     {
-        (bool success, bytes memory data) = GAS_ACC_LIB.delegatecall(
-            abi.encodeWithSelector(GasAccountingLib.reconcile.selector, environment, searcherFrom, maxApprovedGasSpend)
-        );
-        if (!success) revert GasAccountingLibError();
-        return abi.decode(data, (bool));
+        // NOTE: approvedAmount is the amount of the solver's atlETH that the solver is allowing
+        // to be used to cover what they owe.  This will be subtracted later - tx will revert here if there isn't
+        // enough.
+
+        EscrowAccountData memory solverEscrow = _balanceOf[solverFrom];
+
+        if (lock != environment) revert InvalidExecutionEnvironment(lock);
+        if (solverFrom != solver) revert InvalidSolverFrom(solver);
+        if (uint256(solverEscrow.balance) - uint256(solverEscrow.holds) < maxApprovedGasSpend) revert InsufficientSolverBalance(
+            uint256(_balanceOf[solverFrom].balance), msg.value, uint256(_balanceOf[solverFrom].holds), maxApprovedGasSpend);
+
+        uint256 _deposits = deposits;
+
+        uint256 deficit = claims + withdrawals;
+        uint256 surplus = _deposits + msg.value + maxApprovedGasSpend;
+
+        if (deficit > surplus) revert InsufficientTotalBalance(deficit - surplus);
+
+        deposits = surplus;
+
+        solverEscrow.holds += uint128(maxApprovedGasSpend);
+
+        _balanceOf[solverFrom] = solverEscrow;
+        solver = SOLVER_FULFILLED;
+
+        return true;
     }
 
-    // ---------------------------------------
-    //          INTERNAL FUNCTIONS
-    // ---------------------------------------
-
-    function _setSolverLedger(address solverFrom, uint256 solverOpValue) internal {
-        (bool success,) = GAS_ACC_LIB.delegatecall(abi.encodeWithSelector(GasAccountingLib.setSolverLedger.selector, solverFrom, solverOpValue));
-        if (!success) revert GasAccountingLibError();
+    function _contribute() internal {
+        if (msg.value != 0) deposits += msg.value;
     }
 
-    function _releaseSolverLedger(SolverOperation calldata solverOp, uint256 gasWaterMark, uint256 result) internal {
-        (bool success,) = GAS_ACC_LIB.delegatecall(abi.encodeWithSelector(GasAccountingLib.releaseSolverLedger.selector, solverOp, gasWaterMark, result));
-        if (!success) revert GasAccountingLibError();
+    function _borrow(uint256 amount) internal returns (bool valid) {
+        if (amount == 0) return true;
+        if (address(this).balance < amount) return false;
+        withdrawals += amount;
+        return true;
     }
 
-    function _requestFrom(Party donor, Party recipient, uint256 amt) internal {
-        (bool success,) = GAS_ACC_LIB.delegatecall(
-            abi.encodeWithSelector(GasAccountingLib.requestFrom.selector, address(this), donor, recipient, amt)
-        );
-        if (!success) revert GasAccountingLibError();
+    function _trySolverLock(SolverOperation calldata solverOp) internal returns (bool valid) {
+        if (_borrow(solverOp.value)) {
+            address solverFrom = solverOp.from;
+            nonces[solverFrom].lastAccessed = uint64(block.number);
+            solver = solverFrom;
+            return true;
+        } else {
+            return false;
+        }
     }
 
-    function _contributeTo(Party donor, Party recipient, uint256 amt) internal {
-        (bool success,) = GAS_ACC_LIB.delegatecall(
-            abi.encodeWithSelector(GasAccountingLib.contributeTo.selector, address(this), donor, recipient, amt)
-        );
-        if (!success) revert GasAccountingLibError();
+    function _releaseSolverLock(SolverOperation calldata solverOp, uint256 gasWaterMark, uint256 result) internal {
+        // Calculate what the solver owes if they failed
+        // NOTE: This will cause an error if you are simulating with a gasPrice of 0
+        address solverFrom = solverOp.from;
+        uint256 solverBalance = (_balanceOf[solverFrom].balance);
+
+        uint256 gasUsed = gasWaterMark - gasleft() + 5_000;
+        if (result & EscrowBits._FULL_REFUND != 0) {
+            gasUsed = gasUsed + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM) + 1;
+        } else if (result & EscrowBits._CALLDATA_REFUND != 0) {
+            gasUsed = (solverOp.data.length * CALLDATA_LENGTH_PREMIUM) + 1;
+        } else if (result & EscrowBits._NO_USER_REFUND != 0) {
+            return;
+        } else {
+            revert UncoveredResult();
+        }
+
+        gasUsed = (gasUsed + ((gasUsed * SURCHARGE) / SURCHARGE_BASE)) * tx.gasprice;
+
+        gasUsed = gasUsed > solverBalance ? solverBalance : gasUsed;
+
+        _balanceOf[solverFrom].balance -= uint128(gasUsed);
+        totalSupply -= gasUsed; // This is readded at the end if it isnt sent out to bundler
+        
+        deposits += gasUsed;      
     }
 
-    function _isInSurplus(address environment) internal returns (bool) {
-        (bool success, bytes memory data) =
-            GAS_ACC_LIB.delegatecall(abi.encodeWithSelector(GasAccountingLib.isInSurplus.selector, environment));
-        if (!success) revert GasAccountingLibError();
-        return abi.decode(data, (bool));
-    }
+    function _settle(address winningSolver, address bundler) internal {
+        // NOTE: If there is no winningSolver but the dApp config allows unfulfilled 'successes,' the bundler
+        // is treated as the Solver.
 
-    function _balance(
-        uint256 accruedGasRebate,
-        address user,
-        address dapp,
-        address winningSolver,
-        address bundler
-    )
-        internal
-    {
-        (bool success,) = GAS_ACC_LIB.delegatecall(
-            abi.encodeWithSelector(
-                GasAccountingLib.balance.selector, accruedGasRebate, user, dapp, winningSolver, bundler
-            )
-        );
-        if (!success) revert GasAccountingLibError();
-    }
+        // Load what we can from storage so that it shows up in the gasleft() calc
+        uint256 _surcharge = surcharge;
+        uint256 _claims = claims;
+        uint256 _withdrawals = withdrawals;
+        uint256 _deposits = deposits;
+        uint256 _supply = totalSupply;
+        
+        EscrowAccountData memory solverEscrow = _balanceOf[winningSolver];
+        uint256 _solverHold = solverEscrow.holds;
 
-    function _validParties(address environment, Party partyOne, Party partyTwo) internal returns (bool) {
-        (bool success, bytes memory data) = GAS_ACC_LIB.delegatecall(
-            abi.encodeWithSelector(GasAccountingLib.validParties.selector, environment, partyOne, partyTwo)
-        );
-        if (!success) revert GasAccountingLibError();
-        return abi.decode(data, (bool));
+        // Remove any remaining gas from the bundler's claim. 
+        uint256 gasRemainder = (gasleft() * tx.gasprice); 
+        gasRemainder += ((gasRemainder * SURCHARGE) / SURCHARGE_BASE);
+        _claims -= gasRemainder;
+
+        if (_deposits < _claims + _withdrawals) revert InsufficientTotalBalance((_claims + _withdrawals) - _deposits);
+
+        uint256 surplus = _deposits - _claims - _withdrawals;
+
+        // Remove the hold
+        // NOTE that holds can also be applied from withdrawals, so make sure we don't remove any non-transitory holds
+        if (surplus > _solverHold) {
+            surplus -= _solverHold;
+            solverEscrow.holds = 0;
+            solverEscrow.balance += uint128(surplus);
+        } else {
+            solverEscrow.holds -= uint128(surplus);
+            surplus = 0;
+        }
+
+        uint256 netGasSurcharge = (_claims * SURCHARGE) / SURCHARGE_BASE;
+
+        _claims -= netGasSurcharge;
+        _withdrawals += _claims;
+
+        _balanceOf[winningSolver] = solverEscrow;
+
+        surcharge = _surcharge + netGasSurcharge;
+        totalSupply = _supply + _deposits - _withdrawals;
+
+        SafeTransferLib.safeTransferETH(bundler, _claims);
+
+        if (_supply + _deposits - _withdrawals != address(this).balance) revert UnbalancedAccounting();
     }
 }

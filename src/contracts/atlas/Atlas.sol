@@ -18,10 +18,12 @@ import "../types/LockTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 import "../types/ValidCallsTypes.sol";
 
+import {CALLDATA_LENGTH_PREMIUM} from "../types/EscrowTypes.sol";
+
 import { CallBits } from "../libraries/CallBits.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
 
-// import "forge-std/Test.sol";
+import "forge-std/Test.sol";
 
 contract Atlas is Escrow {
     using CallBits for uint32;
@@ -31,11 +33,9 @@ contract Atlas is Escrow {
         uint256 _escrowDuration,
         address _factory,
         address _verification,
-        address _gasAccLib,
-        address _safetyLocksLib,
         address _simulator
     )
-        Escrow(_escrowDuration, _factory, _verification, _gasAccLib, _safetyLocksLib, _simulator)
+        Escrow(_escrowDuration, _factory, _verification, _simulator)
     { }
 
     function createExecutionEnvironment(address dAppControl) external returns (address executionEnvironment) {
@@ -52,7 +52,7 @@ contract Atlas is Escrow {
         payable
         returns (bool auctionWon)
     {
-        uint256 gasMarker = gasleft();
+        uint256 gasMarker = gasleft(); // + 21_000 + (msg.data.length * CALLDATA_LENGTH_PREMIUM);
 
         // TODO: Combine this w/ call to get executionEnvironment
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
@@ -64,6 +64,7 @@ contract Atlas is Escrow {
 
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
+        // NOTE: Currently reverting instead of graceful return to help w/ testing. 
         ValidCallsResult validCallsResult;
         (solverOps, validCallsResult) = IAtlasVerification(VERIFICATION).validCalls(
             dConfig, userOp, solverOps, dAppOp, executionEnvironment, msg.value, msg.sender, msg.sender == SIMULATOR
@@ -74,18 +75,15 @@ contract Atlas is Escrow {
         }
 
         // Initialize the lock
-        _initializeEscrowLock(userOp, executionEnvironment, msg.sender, gasMarker);
+        _initializeEscrowLock(executionEnvironment, gasMarker, userOp.value);
 
         try this.execute{ value: msg.value }(dConfig, userOp, solverOps, executionEnvironment, msg.sender) returns (
-            bool _auctionWon, uint256 accruedGasRebate, uint256 winningSolverIndex
+            bool _auctionWon, uint256 winningSolverIndex
         ) {
             auctionWon = _auctionWon;
             // Gas Refund to sender only if execution is successful
-            _balance({
-                accruedGasRebate: accruedGasRebate,
-                user: userOp.from,
-                dapp: userOp.control,
-                winningSolver: solverOps[winningSolverIndex].from,
+            _settle({
+                winningSolver: auctionWon ? solverOps[winningSolverIndex].from : msg.sender,
                 bundler: msg.sender
             });
         } catch (bytes memory revertData) {
@@ -96,7 +94,7 @@ contract Atlas is Escrow {
         // Release the lock
         _releaseEscrowLock();
 
-        // console.log("total gas used", gasMarker - gasleft());
+        console.log("total gas used", gasMarker - gasleft());
     }
 
     function execute(
@@ -108,7 +106,7 @@ contract Atlas is Escrow {
     )
         external
         payable
-        returns (bool auctionWon, uint256 accruedGasRebate, uint256 winningSearcherIndex)
+        returns (bool auctionWon, uint256 winningSearcherIndex)
     {
         // This is a self.call made externally so that it can be used with try/catch
         if (msg.sender != address(this)) revert InvalidAccess();
@@ -118,7 +116,7 @@ contract Atlas is Escrow {
             _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), bundler == SIMULATOR);
 
         // Begin execution
-        (auctionWon, accruedGasRebate, winningSearcherIndex) =
+        (auctionWon, winningSearcherIndex) =
             _execute(dConfig, userOp, solverOps, executionEnvironment, bundler, key);
     }
 
@@ -131,7 +129,7 @@ contract Atlas is Escrow {
         EscrowKey memory key
     )
         internal
-        returns (bool auctionWon, uint256 accruedGasRebate, uint256 winningSearcherIndex)
+        returns (bool auctionWon, uint256 winningSearcherIndex)
     {
         // Build the CallChainProof.  The penultimate hash will be used
         // to verify against the hash supplied by DAppControl
@@ -198,7 +196,7 @@ contract Atlas is Escrow {
                 else revert PostOpsFail();
             }
         }
-        return (auctionWon, uint256(key.gasRefund), winningSearcherIndex);
+        return (auctionWon, winningSearcherIndex);
     }
 
     function _solverExecutionIteration(

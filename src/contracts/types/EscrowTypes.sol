@@ -10,7 +10,7 @@ struct EscrowAccountData {
 
 struct EscrowNonce {
     uint64 nonce;
-    uint64 blockRequested;
+    uint64 lastAccessed;
     uint128 withdrawalAmount; 
 }
 
@@ -24,23 +24,6 @@ enum Party {
     Solver,
     User,
     DApp
-}
-
-enum LedgerStatus {
-    Unknown,
-    Inactive,
-    Proxy,
-    Active,
-    Borrowing,
-    Balancing, // no more requests, but contributions allowed
-    Finalized
-}
-
-struct Ledger {
-    int64 balance; // net balance for deposits / withdrawals / loans
-    int64 contributed; // requested by others - | + filled by this party
-    int64 requested; // requested by this party  - | + filled by others
-    LedgerStatus status;
 }
 
 enum SolverOutcome
