@@ -42,7 +42,7 @@ contract Permit69Test is BaseTest {
             callDepth: 0
         });
 
-        mockAtlas = new MockAtlasForPermit69Tests(10,address(0),address(0), address(0), address(0), address(0));
+        mockAtlas = new MockAtlasForPermit69Tests(10, address(0), address(0), address(0), address(0), address(0));
         mockAtlas.setEscrowKey(escrowKey);
         mockAtlas.setEnvironment(mockExecutionEnvAddress);
 
