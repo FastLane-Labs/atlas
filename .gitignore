@@ -2,6 +2,7 @@
 /node_modules
 /broadcast
 /out
+/report
 /lib
 /lib/uniswap
 /lib/uniswap/*
