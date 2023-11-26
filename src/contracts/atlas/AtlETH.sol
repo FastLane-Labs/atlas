@@ -39,6 +39,7 @@ abstract contract AtlETH is Permit69 {
 
     error InsufficientRedeemedBalance(uint256 balance, uint256 requested);
     error InsufficientAvailableBalance(uint256 balance, uint256 requested);
+    error InsufficientSurchargeBalance(uint256 balance, uint256 requested);
 
     function accountLastActiveBlock(address account) external view returns (uint256) {
         return uint256(nonces[account].lastAccessed);
@@ -85,6 +86,17 @@ abstract contract AtlETH is Permit69 {
 
         emit Transfer(msg.sender, address(0), amount);
         SafeTransferLib.safeTransferETH(msg.sender, amount);
+    }
+
+    function withdrawSurcharge(uint256 amount) external {
+        _checkIfUnlocked();
+        
+        if (surcharge < amount) revert InsufficientSurchargeBalance(surcharge, amount);
+
+        unchecked{ surcharge -= amount; }
+
+        // NOTE: Surcharges are not deducted from totalSupply. 
+        _balanceOf[address(0xa7145)].balance += uint128(amount);
     }
 
     function _withdrawAccounting(uint256 amount, address spender) internal {

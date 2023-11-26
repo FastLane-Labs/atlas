@@ -140,7 +140,6 @@ abstract contract GasAccounting is SafetyLocks {
         gasUsed = gasUsed > solverBalance ? solverBalance : gasUsed;
 
         _balanceOf[solverFrom].balance -= uint128(gasUsed);
-        totalSupply -= gasUsed; // This is readded at the end if it isnt sent out to bundler
         
         deposits += gasUsed;      
     }
@@ -187,10 +186,7 @@ abstract contract GasAccounting is SafetyLocks {
         _balanceOf[winningSolver] = solverEscrow;
 
         surcharge = _surcharge + netGasSurcharge;
-        totalSupply = _supply + _deposits - _withdrawals;
 
         SafeTransferLib.safeTransferETH(bundler, _claims);
-
-        if (_supply + _deposits - _withdrawals != address(this).balance) revert UnbalancedAccounting();
     }
 }
