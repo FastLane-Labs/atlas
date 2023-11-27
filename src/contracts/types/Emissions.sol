@@ -89,6 +89,12 @@ contract FastLaneErrorsEvents {
     error InsufficientFunds();
     error NoUnfilledRequests();
     error SolverMustReconcile();
+    error InvalidExecutionEnvironment(address correctEnvironment);
+    error InvalidSolverFrom(address solverFrom);
+    error InsufficientSolverBalance(uint256 actual, uint256 msgValue, uint256 holds, uint256 needed);
+    error InsufficientAtlETHBalance(uint256 actual, uint256 needed);
+    error InsufficientTotalBalance(uint256 shortfall);
+    error UnbalancedAccounting();
 
     // NEW - SafetyLocks
     error NotInitialized();

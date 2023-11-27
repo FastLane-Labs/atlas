@@ -14,13 +14,6 @@ import {EscrowBits} from "../libraries/EscrowBits.sol";
 // import "forge-std/Test.sol"; //TODO remove
 
 abstract contract GasAccounting is SafetyLocks {
-    error InvalidExecutionEnvironment(address correctEnvironment);
-    error InvalidSolverFrom(address solverFrom);
-    error InsufficientSolverBalance(uint256 actual, uint256 msgValue, uint256 holds, uint256 needed);
-    error InsufficientAtlETHBalance(uint256 actual, uint256 needed);
-    error InsufficientTotalBalance(uint256 shortfall);
-    error UnbalancedAccounting();
-
     constructor(
         uint256 _escrowDuration,
         address _factory,
