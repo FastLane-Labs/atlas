@@ -84,10 +84,7 @@ contract AtlasFactory {
     // ------------------ //
 
     function _deployExecutionEnvironmentTemplate(address _atlas) internal returns (address executionEnvironment) {
-        ExecutionEnvironment _environment = new ExecutionEnvironment{
-            salt: salt
-        }(_atlas);
-
+        ExecutionEnvironment _environment = new ExecutionEnvironment{ salt: salt }(_atlas);
         executionEnvironment = address(_environment);
     }
 

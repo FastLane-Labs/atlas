@@ -8,7 +8,7 @@
       "source": "source .env",
       "allexport": "set -o allexport; source .env; set +o allexport",
       "reinstall": "rm -rf node_modules && rm -f yarn.lock && yarn clean && yarn",
-      "coverage": "forge coverage --report lcov && genhtml lcov.info -o report --branch-coverage && open report/index.html",
+      "coverage": "forge coverage --ir-minimum --report lcov && node filter_lcov.js && genhtml lcov_filtered.info --output-directory report --branch-coverage && open report/index.html",
       "gas": "forge test -vv --gas-report",
       "ftest": "source .env && forge test --gas-price=1500000000",
       "ftest-fork": "source .env && forge test -vvv --fork-url ${ALCHEMY_APIKEY_MUMBAI} --fork-block-number 26702726 --gas-report",
