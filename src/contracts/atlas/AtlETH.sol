@@ -37,10 +37,6 @@ abstract contract AtlETH is Permit69 {
                                 ATLETH
     //////////////////////////////////////////////////////////////*/
 
-    error InsufficientRedeemedBalance(uint256 balance, uint256 requested);
-    error InsufficientAvailableBalance(uint256 balance, uint256 requested);
-    error InsufficientSurchargeBalance(uint256 balance, uint256 requested);
-
     function accountLastActiveBlock(address account) external view returns (uint256) {
         return uint256(nonces[account].lastAccessed);
     }

@@ -65,6 +65,9 @@ contract FastLaneErrorsEvents {
     error PermitDeadlineExpired();
     error InvalidSigner();
     error EscrowLockActive();
+    error InsufficientRedeemedBalance(uint256 balance, uint256 requested);
+    error InsufficientAvailableBalance(uint256 balance, uint256 requested);
+    error InsufficientSurchargeBalance(uint256 balance, uint256 requested);
 
     // NEW - DAppIntegration
     error OnlyGovernance();
