@@ -176,7 +176,6 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 netGasSurcharge = (_claims * SURCHARGE) / SURCHARGE_BASE;
 
         _claims -= netGasSurcharge;
-        _withdrawals += _claims;
 
         _balanceOf[winningSolver] = solverEscrow;
 
