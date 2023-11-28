@@ -79,11 +79,13 @@ abstract contract GasAccounting is SafetyLocks {
 
         if (deficit > surplus) revert InsufficientTotalBalance(deficit - surplus);
 
-        deposits = surplus;
-
+        // Increase solver holds by the approved amount - which will decrease solver's balance to pay for gas used
         solverEscrow.holds += uint128(maxApprovedGasSpend);
-
         _balanceOf[solverFrom] = solverEscrow;
+
+        // Add (msg.value + maxApprovedGasSpend) to solver's deposits
+        deposits = surplus;
+        
         solver = SOLVER_FULFILLED;
 
         return true;

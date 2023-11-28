@@ -183,7 +183,6 @@ abstract contract Escrow is AtlETH {
 
         uint256 solverBalance = uint256(solverEscrow.balance - solverEscrow.holds);
 
-        // TODO big unchecked block - audit/review carefully
         if (solverOp.to != address(this)) {
             result |= 1 << uint256(SolverOutcome.InvalidTo);
         }
