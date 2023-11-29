@@ -62,6 +62,9 @@ library CallBits {
         if (callConfig.forwardReturnData) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.ForwardReturnData);
         }
+        if (callConfig.requireFulfillment) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.RequireFulfillment);
+        }
     }
 
     function decodeCallConfig(uint32 encodedCallConfig) internal pure returns (CallConfig memory callConfig) {
@@ -81,7 +84,8 @@ library CallBits {
             solverBundler: allowsSolverBundler(encodedCallConfig),
             verifySolverBundlerCallChainHash: verifySolverBundlerCallChainHash(encodedCallConfig),
             unknownBundler: allowsUnknownBundler(encodedCallConfig),
-            forwardReturnData: forwardReturnData(encodedCallConfig)
+            forwardReturnData: forwardReturnData(encodedCallConfig),
+            requireFulfillment: needsFulfillment(encodedCallConfig)
         });
     }
 
@@ -147,5 +151,9 @@ library CallBits {
 
     function forwardReturnData(uint32 callConfig) internal pure returns (bool) {
         return (callConfig & 1 << uint32(CallConfigIndex.ForwardReturnData) != 0);
+    }
+
+    function needsFulfillment(uint32 callConfig) internal pure returns (bool) {
+        return (callConfig & 1 << uint32(CallConfigIndex.RequireFulfillment) != 0);
     }
 }

@@ -70,7 +70,8 @@ contract V4DAppControl is DAppControl {
                 solverBundler: true,
                 verifySolverBundlerCallChainHash: true,
                 unknownBundler: true,
-                forwardReturnData: false
+                forwardReturnData: false,
+                requireFulfillment: true
             })
         )
     {
