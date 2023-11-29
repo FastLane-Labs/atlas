@@ -39,7 +39,7 @@ contract V4SwapIntentTest is BaseTest {
         BaseTest.setUp();
 
         // deploy new pool manager
-        poolManager = new PoolManager(30000000);
+        poolManager = new PoolManager(30_000_000);
 
         // Creating new gov address (ERR-V49 OwnerActive if already registered with controller)
         governancePK = 11_112;
