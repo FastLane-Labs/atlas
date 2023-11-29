@@ -265,7 +265,8 @@ contract ExecutionEnvironment is Base {
         // msg.sender = escrow
         // address(this) = ExecutionEnvironment
 
-        allocateData = abi.encodeWithSelector(IDAppControl.allocateValueCall.selector, bidToken, bidAmount, allocateData);
+        allocateData =
+            abi.encodeWithSelector(IDAppControl.allocateValueCall.selector, bidToken, bidAmount, allocateData);
 
         (bool success,) = _control().delegatecall(forward(allocateData));
         require(success, "ERR-EC02 DelegateRevert");
