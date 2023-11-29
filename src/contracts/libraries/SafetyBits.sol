@@ -5,7 +5,7 @@ import "../types/LockTypes.sol";
 
 // TODO remove
 //import {TestUtils} from "../../../test/base/TestUtils.sol";
-import "forge-std/Test.sol";
+// import "forge-std/Test.sol";
 
 // uint16 bit layout:  BBBB BBBB AAAA
 // Where A = BaseLock, B = ExecutionPhase,
@@ -76,7 +76,7 @@ library SafetyBits {
 
     //TODO change to pure after testing
     function getCurrentExecutionPhase(uint16 lockState) internal view returns (uint16) {
-        console.log("IN getCurrentExecutionPhase");
+        // console.log("IN getCurrentExecutionPhase");
         uint16 isolatedPhaseBits = lockState & ONLY_EXECUTION_PHASE_MASK;
         //console.log("isolatedPhaseBits: %s", TestUtils.uint16ToBinaryString(isolatedPhaseBits));
         //console.log("returning: %s", TestUtils.uint16ToBinaryString(uint16(isolatedPhaseBits >>

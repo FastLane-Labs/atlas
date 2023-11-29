@@ -42,6 +42,7 @@ struct CallConfig {
     bool verifySolverBundlerCallChainHash;
     bool unknownBundler;
     bool forwardReturnData;
+    bool requireFulfillment;
 }
 
 enum CallConfigIndex {
@@ -60,5 +61,6 @@ enum CallConfigIndex {
     SolverBundler,
     VerifySolverBundlerCallChainHash,
     UnknownBundler,
-    ForwardReturnData
+    ForwardReturnData,
+    RequireFulfillment
 }

@@ -5,11 +5,21 @@ import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 import "../types/SolverCallTypes.sol";
 import "../types/EscrowTypes.sol";
+import "../types/ValidCallsTypes.sol";
 
 interface IAtlasVerification {
-    function verifyUser(DAppConfig memory dConfig, UserOperation calldata userOp) external returns (bool);
-
-    function verifyDApp(DAppConfig memory dConfig, DAppOperation calldata dAppOp) external returns (bool);
+    function validCalls(
+        DAppConfig calldata dConfig,
+        UserOperation calldata userOp,
+        SolverOperation[] calldata solverOps,
+        DAppOperation calldata dAppOp,
+        address executionEnvironment,
+        uint256 msgValue,
+        address msgSender,
+        bool isSimulation
+    )
+        external
+        returns (SolverOperation[] memory, ValidCallsResult);
 
     function verifySolverOp(
         SolverOperation calldata solverOp,
