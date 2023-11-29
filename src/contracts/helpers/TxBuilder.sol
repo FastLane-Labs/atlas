@@ -32,10 +32,6 @@ contract TxBuilder {
         gas = 1_000_000;
     }
 
-    function solverNextNonce(address solverSigner) public view returns (uint256) {
-        return IAtlETH(atlas).nextAccountNonce(solverSigner);
-    }
-
     function governanceNextNonce(address signatory) public view returns (uint256) {
         return IAtlasVerification(verification).getNextNonce(signatory);
     }
@@ -97,7 +93,6 @@ contract TxBuilder {
             value: 0,
             gas: gas,
             maxFeePerGas: userOp.maxFeePerGas,
-            nonce: solverNextNonce(solverEOA),
             deadline: userOp.deadline,
             solver: solverContract,
             control: userOp.control,
