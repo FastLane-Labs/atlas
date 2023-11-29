@@ -53,12 +53,7 @@ contract Storage {
 
     mapping(address => uint256) public holds; // transient storage
 
-    constructor(
-        uint256 _escrowDuration,
-        address _factory,
-        address _verification,
-        address _simulator
-    ) payable {
+    constructor(uint256 _escrowDuration, address _factory, address _verification, address _simulator) payable {
         ESCROW_DURATION = _escrowDuration;
         FACTORY = _factory;
         VERIFICATION = _verification;

@@ -18,7 +18,7 @@ import "../types/LockTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 import "../types/ValidCallsTypes.sol";
 
-import {CALLDATA_LENGTH_PREMIUM} from "../types/EscrowTypes.sol";
+import { CALLDATA_LENGTH_PREMIUM } from "../types/EscrowTypes.sol";
 
 import { CallBits } from "../libraries/CallBits.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
@@ -64,7 +64,7 @@ contract Atlas is Escrow {
 
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
-        // NOTE: Currently reverting instead of graceful return to help w/ testing. 
+        // NOTE: Currently reverting instead of graceful return to help w/ testing.
         ValidCallsResult validCallsResult;
         (solverOps, validCallsResult) = IAtlasVerification(VERIFICATION).validCalls(
             dConfig, userOp, solverOps, dAppOp, executionEnvironment, msg.value, msg.sender, msg.sender == SIMULATOR
@@ -82,10 +82,7 @@ contract Atlas is Escrow {
         ) {
             auctionWon = _auctionWon;
             // Gas Refund to sender only if execution is successful
-            _settle({
-                winningSolver: auctionWon ? solverOps[winningSolverIndex].from : msg.sender,
-                bundler: msg.sender
-            });
+            _settle({ winningSolver: auctionWon ? solverOps[winningSolverIndex].from : msg.sender, bundler: msg.sender });
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
             _handleErrors(bytes4(revertData), dConfig.callConfig);
@@ -116,8 +113,7 @@ contract Atlas is Escrow {
             _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), bundler == SIMULATOR);
 
         // Begin execution
-        (auctionWon, winningSearcherIndex) =
-            _execute(dConfig, userOp, solverOps, executionEnvironment, bundler, key);
+        (auctionWon, winningSearcherIndex) = _execute(dConfig, userOp, solverOps, executionEnvironment, bundler, key);
     }
 
     function _execute(

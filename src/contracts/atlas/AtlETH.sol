@@ -71,7 +71,6 @@ abstract contract AtlETH is Permit69 {
 
         nonces[msg.sender] = nonceData;
         _balanceOf[msg.sender] = accountData;
-    
     }
 
     function withdraw(uint256 amount) external {
@@ -86,12 +85,14 @@ abstract contract AtlETH is Permit69 {
 
     function withdrawSurcharge(uint256 amount) external {
         _checkIfUnlocked();
-        
+
         if (surcharge < amount) revert InsufficientSurchargeBalance(surcharge, amount);
 
-        unchecked{ surcharge -= amount; }
+        unchecked {
+            surcharge -= amount;
+        }
 
-        // NOTE: Surcharges are not deducted from totalSupply. 
+        // NOTE: Surcharges are not deducted from totalSupply.
         _balanceOf[address(0xa7145)].balance += uint128(amount);
     }
 
@@ -101,7 +102,9 @@ abstract contract AtlETH is Permit69 {
 
         uint128 _amount = uint128(amount);
 
-        if (nonceData.withdrawalAmount < _amount) revert InsufficientRedeemedBalance(uint256(nonceData.withdrawalAmount), amount);
+        if (nonceData.withdrawalAmount < _amount) {
+            revert InsufficientRedeemedBalance(uint256(nonceData.withdrawalAmount), amount);
+        }
         if (accountData.balance < _amount) revert InsufficientAvailableBalance(uint256(accountData.balance), amount);
 
         nonceData.lastAccessed = uint64(block.number);
@@ -128,16 +131,16 @@ abstract contract AtlETH is Permit69 {
         return true;
     }
 
-    // NOTE: This transfer func would be problematic if it pulled from a withdraw rather than a redeem 
-    // E.G.  start the withdrawal in advance. This would prevent searchers from xfering their escrowed gas in the same 
-    // block, but in front of their own searcher ops. 
+    // NOTE: This transfer func would be problematic if it pulled from a withdraw rather than a redeem
+    // E.G.  start the withdrawal in advance. This would prevent searchers from xfering their escrowed gas in the same
+    // block, but in front of their own searcher ops.
     function transfer(address to, uint256 amount) public returns (bool) {
         _checkTransfersAllowed(msg.sender);
 
         _withdrawAccounting(amount, msg.sender);
 
         _balanceOf[to].balance += uint128(amount);
-        
+
         emit Transfer(msg.sender, to, amount);
         return true;
     }
@@ -147,11 +150,11 @@ abstract contract AtlETH is Permit69 {
 
         uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
         if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
-        
+
         _withdrawAccounting(amount, from);
 
         _balanceOf[to].balance += uint128(amount);
-        
+
         emit Transfer(from, to, amount);
         return true;
     }
@@ -181,7 +184,7 @@ abstract contract AtlETH is Permit69 {
                         keccak256(
                             abi.encode(
                                 keccak256(
-                                    "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+    "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
                                 ),
                                 owner,
                                 spender,
@@ -234,9 +237,9 @@ abstract contract AtlETH is Permit69 {
 
     function _mint(address to, uint256 amount) internal {
         totalSupply += amount;
-        
+
         _balanceOf[to].balance += uint128(amount);
-        
+
         emit Transfer(address(0), to, amount);
     }
 

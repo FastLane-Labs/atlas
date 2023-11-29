@@ -14,7 +14,7 @@ contract AtlETHTest is BaseTest {
         vm.startPrank(solverOneEOA);
         // Initiate the redeem for atlETH for ETH
         atlas.redeem(1 ether);
-        
+
         vm.stopPrank();
 
         uint256 activeFork = vm.activeFork();
@@ -24,7 +24,7 @@ contract AtlETHTest is BaseTest {
 
         vm.startPrank(solverOneEOA);
 
-        // Handle the withdrawal. 
+        // Handle the withdrawal.
         atlas.withdraw(1 ether);
         uint256 ethBalanceAfter = address(solverOneEOA).balance;
 

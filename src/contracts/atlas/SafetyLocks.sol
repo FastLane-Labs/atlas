@@ -29,14 +29,8 @@ abstract contract SafetyLocks is Storage, FastLaneErrorsEvents {
         Storage(_escrowDuration, _factory, _verification, _simulator)
     { }
 
-    function _initializeEscrowLock(
-        address executionEnvironment,
-        uint256 gasMarker,
-        uint256 userOpValue
-    )
-        internal
-    {
-         _checkIfUnlocked();
+    function _initializeEscrowLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) internal {
+        _checkIfUnlocked();
         // Initialize the Lock
         lock = executionEnvironment;
 
@@ -55,7 +49,6 @@ abstract contract SafetyLocks is Storage, FastLaneErrorsEvents {
         if (withdrawals != type(uint256).max) revert AlreadyInitialized();
         if (deposits != type(uint256).max) revert AlreadyInitialized();
     }
-
 
     function _buildEscrowLock(
         DAppConfig calldata dConfig,

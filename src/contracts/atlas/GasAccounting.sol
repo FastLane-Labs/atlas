@@ -7,9 +7,9 @@ import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
-import {SolverOperation } from "../types/SolverCallTypes.sol";
+import { SolverOperation } from "../types/SolverCallTypes.sol";
 
-import {EscrowBits} from "../libraries/EscrowBits.sol";
+import { EscrowBits } from "../libraries/EscrowBits.sol";
 
 // import "forge-std/Test.sol"; //TODO remove
 
@@ -69,8 +69,14 @@ abstract contract GasAccounting is SafetyLocks {
 
         if (lock != environment) revert InvalidExecutionEnvironment(lock);
         if (solverFrom != solver) revert InvalidSolverFrom(solver);
-        if (uint256(solverEscrow.balance) - uint256(solverEscrow.holds) < maxApprovedGasSpend) revert InsufficientSolverBalance(
-            uint256(_balanceOf[solverFrom].balance), msg.value, uint256(_balanceOf[solverFrom].holds), maxApprovedGasSpend);
+        if (uint256(solverEscrow.balance) - uint256(solverEscrow.holds) < maxApprovedGasSpend) {
+            revert InsufficientSolverBalance(
+                uint256(_balanceOf[solverFrom].balance),
+                msg.value,
+                uint256(_balanceOf[solverFrom].holds),
+                maxApprovedGasSpend
+            );
+        }
 
         uint256 _deposits = deposits;
 
@@ -85,7 +91,7 @@ abstract contract GasAccounting is SafetyLocks {
 
         // Add (msg.value + maxApprovedGasSpend) to solver's deposits
         deposits = surplus;
-        
+
         solver = SOLVER_FULFILLED;
 
         return true;
@@ -119,7 +125,7 @@ abstract contract GasAccounting is SafetyLocks {
         address solverFrom = solverOp.from;
         uint256 solverBalance = (_balanceOf[solverFrom].balance);
 
-        uint256 gasUsed = gasWaterMark - gasleft() + 5_000;
+        uint256 gasUsed = gasWaterMark - gasleft() + 5000;
         if (result & EscrowBits._FULL_REFUND != 0) {
             gasUsed = gasUsed + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM) + 1;
         } else if (result & EscrowBits._CALLDATA_REFUND != 0) {
@@ -135,8 +141,8 @@ abstract contract GasAccounting is SafetyLocks {
         gasUsed = gasUsed > solverBalance ? solverBalance : gasUsed;
 
         _balanceOf[solverFrom].balance -= uint128(gasUsed);
-        
-        deposits += gasUsed;      
+
+        deposits += gasUsed;
     }
 
     function _settle(address winningSolver, address bundler) internal {
@@ -149,12 +155,12 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 _withdrawals = withdrawals;
         uint256 _deposits = deposits;
         uint256 _supply = totalSupply;
-        
+
         EscrowAccountData memory solverEscrow = _balanceOf[winningSolver];
         uint256 _solverHold = solverEscrow.holds;
 
-        // Remove any remaining gas from the bundler's claim. 
-        uint256 gasRemainder = (gasleft() * tx.gasprice); 
+        // Remove any remaining gas from the bundler's claim.
+        uint256 gasRemainder = (gasleft() * tx.gasprice);
         gasRemainder += ((gasRemainder * SURCHARGE) / SURCHARGE_BASE);
         _claims -= gasRemainder;
 

@@ -187,9 +187,7 @@ contract Base {
 }
 
 contract ExecutionBase is Base {
-
     constructor(address _atlas) Base(_atlas) { }
-
 
     // Deposit local funds to the transient Atlas balance
     // NOTE that this will go towards the Bundler, with the surplus going to the Solver.

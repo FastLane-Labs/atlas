@@ -55,7 +55,7 @@ contract SolverBase is Test {
 
         uint256 shortfall = IEscrow(_escrow).shortfall();
 
-        if (shortfall < msg.value) shortfall = 0; 
+        if (shortfall < msg.value) shortfall = 0;
         else shortfall -= msg.value;
 
         IEscrow(_escrow).reconcile{ value: msg.value }(msg.sender, sender, shortfall);

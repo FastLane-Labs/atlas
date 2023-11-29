@@ -72,7 +72,7 @@ abstract contract Escrow is AtlETH {
         userData = abi.encodePacked(userData, lockBytes);
 
         (success, userData) = environment.call{ value: userOp.value }(userData);
-        
+
         // require(success, "ERR-E002 UserFail");
         if (success) {
             userData = abi.decode(userData, (bytes));
@@ -111,15 +111,13 @@ abstract contract Escrow is AtlETH {
 
                 // winning solver's gas is implicitly paid for by their allowance
                 return (true, key.turnSolverLockPayments(environment));
-            
             } else {
                 _releaseSolverLock(solverOp, gasWaterMark, result);
                 result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
 
                 // emit event
                 emit SolverTxResult(solverOp.solver, solverOp.from, true, false, result);
-            } 
-            
+            }
         } else {
             // emit event
             emit SolverTxResult(solverOp.solver, solverOp.from, false, false, result);
@@ -186,7 +184,7 @@ abstract contract Escrow is AtlETH {
         if (solverOp.to != address(this)) {
             result |= 1 << uint256(SolverOutcome.InvalidTo);
         }
-        
+
         if (nonces[solverOp.from].lastAccessed >= uint64(block.number)) {
             result |= 1 << uint256(SolverOutcome.PerBlockLimit);
         }
@@ -218,11 +216,9 @@ abstract contract Escrow is AtlETH {
             // Make sure to leave enough gas for dApp validation calls
             result |= 1 << uint256(SolverOutcome.UserOutOfGas);
         }
-        
 
         return (result, gasLimit);
     }
-
 
     // Returns a SolverOutcome enum value
     function _solverOpWrapper(

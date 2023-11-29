@@ -47,7 +47,6 @@ contract ExecutionEnvironment is Base {
         _;
     }
 
-
     modifier validSolver(SolverOperation calldata solverOp) {
         {
             address solverTo = solverOp.solver;
@@ -70,10 +69,10 @@ contract ExecutionEnvironment is Base {
     modifier contributeSurplus() {
         _;
         {
-        uint256 balance = address(this).balance;
-        if (balance > 0) {
-            IEscrow(atlas).contribute{value: balance}();
-        }
+            uint256 balance = address(this).balance;
+            if (balance > 0) {
+                IEscrow(atlas).contribute{ value: balance }();
+            }
         }
     }
 

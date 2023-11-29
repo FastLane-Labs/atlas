@@ -11,7 +11,7 @@ struct EscrowAccountData {
 struct EscrowNonce {
     uint64 nonce;
     uint64 lastAccessed;
-    uint128 withdrawalAmount; 
+    uint128 withdrawalAmount;
 }
 
 // NOTE: The order is very important here for balance reconciliation.
