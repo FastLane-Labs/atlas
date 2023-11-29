@@ -30,7 +30,8 @@ contract CallBitsTest is Test {
             solverBundler: true,
             verifySolverBundlerCallChainHash: false,
             unknownBundler: true,
-            forwardReturnData: false
+            forwardReturnData: false,
+            requireFulfillment: true
         });
 
         callConfig2 = CallConfig({
@@ -49,12 +50,13 @@ contract CallBitsTest is Test {
             solverBundler: !callConfig1.solverBundler,
             verifySolverBundlerCallChainHash: !callConfig1.verifySolverBundlerCallChainHash,
             unknownBundler: !callConfig1.unknownBundler,
-            forwardReturnData: !callConfig1.forwardReturnData
+            forwardReturnData: !callConfig1.forwardReturnData,
+            requireFulfillment: !callConfig1.requireFulfillment
         });
     }
 
     function testEncodeCallConfig() public {
-        string memory expectedBitMapString = "00000000000000000101010101010101";
+        string memory expectedBitMapString = "00000000000000010101010101010101";
         assertEq(
             TestUtils.uint32ToBinaryString(CallBits.encodeCallConfig(callConfig1)),
             expectedBitMapString,
@@ -90,6 +92,7 @@ contract CallBitsTest is Test {
         );
         assertEq(decodedCallConfig.unknownBundler, true, "unknownBundler 1 incorrect");
         assertEq(decodedCallConfig.forwardReturnData, false, "forwardPreOpsReturnData 1 incorrect");
+        assertEq(decodedCallConfig.requireFulfillment, true, "requireFulfillment 1 incorrect");
 
         encodedCallConfig = CallBits.encodeCallConfig(callConfig2);
         decodedCallConfig = encodedCallConfig.decodeCallConfig();
@@ -111,6 +114,7 @@ contract CallBitsTest is Test {
         );
         assertEq(decodedCallConfig.unknownBundler, false, "unknownBundler 2 incorrect");
         assertEq(decodedCallConfig.forwardReturnData, true, "forwardPreOpsReturnData 2 incorrect");
+        assertEq(decodedCallConfig.requireFulfillment, false, "requireFulfillment 2 incorrect");
     }
 
     function testConfigParameters() public {
@@ -133,6 +137,7 @@ contract CallBitsTest is Test {
         );
         assertEq(encodedCallConfig.allowsUnknownBundler(), true, "allowsUnknownBundler 1 incorrect");
         assertEq(encodedCallConfig.forwardReturnData(), false, "forwardPreOpsReturnData 1 incorrect");
+        assertEq(encodedCallConfig.needsFulfillment(), true, "needsFulfillment 1 incorrect");
         encodedCallConfig = CallBits.encodeCallConfig(callConfig2);
         assertEq(encodedCallConfig.needsSequencedNonces(), false, "needsSequencedNonces 2 incorrect");
         assertEq(encodedCallConfig.needsPreOpsCall(), true, "needsPreOpsCall 2 incorrect");
@@ -152,5 +157,6 @@ contract CallBitsTest is Test {
         );
         assertEq(encodedCallConfig.allowsUnknownBundler(), false, "allowsUnknownBundler 2 incorrect");
         assertEq(encodedCallConfig.forwardReturnData(), true, "forwardPreOpsReturnData 2 incorrect");
+        assertEq(encodedCallConfig.needsFulfillment(), false, "needsFulfillment 2 incorrect");
     }
 }

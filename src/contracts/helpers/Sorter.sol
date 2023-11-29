@@ -94,12 +94,6 @@ contract Sorter {
             return false;
         }
 
-        // Make sure the solver nonce is accurate
-        uint256 nextSolverNonce = IAtlETH(escrow).nextAccountNonce(solverOp.from);
-        if (nextSolverNonce != solverOp.nonce) {
-            return false;
-        }
-
         // Make sure that the solver has the correct codehash for dApp control contract
         if (dConfig.to != solverOp.control) {
             return false;
