@@ -14,12 +14,11 @@ import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
-import "forge-std/Test.sol";
 
 // TODO: Check payable is appropriate in pre/post ops and solver calls. Needed to send ETH if necessary (even when
 // delegatecalled)
 
-abstract contract DAppControl is Test, DAppControlTemplate, ExecutionBase {
+abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     address public immutable escrow;
     address public immutable governance;
     address public immutable control;
