@@ -9,9 +9,9 @@ import { ERC20 } from "solmate/tokens/ERC20.sol";
 
 contract ArbitrageTest is BaseTest {
     // Uniswap
-    IUniswapV2Router02 public constant v2Router = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
+    address public constant v2Router = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
     // Sushiswap
-    IUniswapV2Router02 public constant s2Router = IUniswapV2Router02(0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F);
+    address public constant s2Router = 0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F;
 
     address public swapper;
 
@@ -24,11 +24,11 @@ contract ArbitrageTest is BaseTest {
         // Increase DAI reserve and decrease WETH reserve on Uniswap LP
         // Increase WETH reserve and decrease DAI reserve on Sushiswap LP
         // This should create an arbitrage opportunity
-        setUpArbitragePools(chain.weth, chain.dai, 50e18, 100_000e18, v2Router, s2Router);
+        setUpArbitragePools(chain.weth, chain.dai, 50e18, 100_000e18, address(v2Router), address(s2Router));
 
         // Arbitrage is fulfilled by swapping WETH for DAI on Uniswap, then DAI for WETH on Sushiswap
         (uint256 revenue, uint256 optimalAmountIn) =
-            ternarySearch(chain.weth, chain.dai, v2Router, s2Router, 1, 50e18, 0, 20);
+            ternarySearch(chain.weth, chain.dai, address(v2Router), address(s2Router), 1, 50e18, 0, 20);
 
         assertTrue(revenue - optimalAmountIn > 0, "No arbitrage opportunity");
 
@@ -40,16 +40,17 @@ contract ArbitrageTest is BaseTest {
         path[1] = chain.dai;
 
         vm.startPrank(swapper);
-        ERC20(chain.weth).approve(address(v2Router), optimalAmountIn);
-        uint256 daiOut = v2Router.swapExactTokensForTokens(optimalAmountIn, 0, path, swapper, block.timestamp)[1];
+        ERC20(chain.weth).approve(v2Router, optimalAmountIn);
+        uint256 daiOut =
+            IUniswapV2Router02(v2Router).swapExactTokensForTokens(optimalAmountIn, 0, path, swapper, block.timestamp)[1];
         vm.stopPrank();
 
         path[0] = chain.dai;
         path[1] = chain.weth;
 
         vm.startPrank(swapper);
-        ERC20(chain.dai).approve(address(s2Router), daiOut);
-        s2Router.swapExactTokensForTokens(daiOut, 0, path, swapper, block.timestamp);
+        ERC20(chain.dai).approve(s2Router, daiOut);
+        IUniswapV2Router02(s2Router).swapExactTokensForTokens(daiOut, 0, path, swapper, block.timestamp);
         vm.stopPrank();
 
         uint256 balanceAfter = ERC20(chain.weth).balanceOf(swapper);
@@ -65,8 +66,8 @@ contract ArbitrageTest is BaseTest {
         address tokenB,
         uint256 amountA,
         uint256 amountB,
-        IUniswapV2Router02 routerA,
-        IUniswapV2Router02 routerB
+        address routerA,
+        address routerB
     )
         public
     {
@@ -78,16 +79,16 @@ contract ArbitrageTest is BaseTest {
         path[1] = tokenA;
 
         vm.startPrank(swapper);
-        ERC20(tokenB).approve(address(routerA), amountB);
-        routerA.swapExactTokensForTokens(amountB, 0, path, swapper, block.timestamp);
+        ERC20(tokenB).approve(routerA, amountB);
+        IUniswapV2Router02(routerA).swapExactTokensForTokens(amountB, 0, path, swapper, block.timestamp);
         vm.stopPrank();
 
         path[0] = tokenA;
         path[1] = tokenB;
 
         vm.startPrank(swapper);
-        ERC20(tokenA).approve(address(routerB), amountA);
-        routerB.swapExactTokensForTokens(amountA, 0, path, swapper, block.timestamp);
+        ERC20(tokenA).approve(routerB, amountA);
+        IUniswapV2Router02(routerB).swapExactTokensForTokens(amountA, 0, path, swapper, block.timestamp);
         vm.stopPrank();
     }
 
@@ -95,8 +96,8 @@ contract ArbitrageTest is BaseTest {
         address tokenIn,
         address tokenOut,
         uint256 amountIn,
-        IUniswapV2Router02 routerIn,
-        IUniswapV2Router02 routerOut
+        address routerIn,
+        address routerOut
     )
         public
         view
@@ -108,19 +109,19 @@ contract ArbitrageTest is BaseTest {
         path[0] = tokenIn;
         path[1] = tokenOut;
 
-        amountOut = routerIn.getAmountsOut(amountIn, path)[1];
+        amountOut = IUniswapV2Router02(routerIn).getAmountsOut(amountIn, path)[1];
 
         path[0] = tokenOut;
         path[1] = tokenIn;
 
-        amountOut = routerOut.getAmountsOut(amountOut, path)[1];
+        amountOut = IUniswapV2Router02(routerOut).getAmountsOut(amountOut, path)[1];
     }
 
     function ternarySearch(
         address tokenIn,
         address tokenOut,
-        IUniswapV2Router02 routerIn,
-        IUniswapV2Router02 routerOut,
+        address routerIn,
+        address routerOut,
         uint256 left,
         uint256 right,
         uint24 c,
