@@ -49,7 +49,7 @@ abstract contract GasAccounting is SafetyLocks {
     function shortfall() external view returns (uint256) {
         uint256 deficit = claims + withdrawals;
         uint256 _deposits = deposits;
-        return (deficit > _deposits ? deficit - _deposits : 0) + 1;
+        return (deficit > _deposits) ? (deficit - _deposits) : 0;
     }
 
     function reconcile(
