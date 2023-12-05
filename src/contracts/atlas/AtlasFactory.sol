@@ -29,7 +29,7 @@ contract AtlasFactory {
     // ------------------ //
 
     function createExecutionEnvironment(
-        address account,
+        address user,
         address dAppControl
     )
         external
@@ -37,7 +37,24 @@ contract AtlasFactory {
     {
         // Must call createExecutionEnvironment on Atlas contract to properly initialize nonce tracking
         require(msg.sender == atlas, "AtlasFactory: Only Atlas can create execution environments");
-        executionEnvironment = _setExecutionEnvironment(dAppControl, account, dAppControl.codehash);
+        executionEnvironment = _setExecutionEnvironment(dAppControl, user, dAppControl.codehash);
+    }
+
+    function getOrCreateExecutionEnvironment(
+        address user,
+        address dAppControl
+    )
+        external
+        returns (address executionEnvironment, uint32 callConfig, bool created)
+    {
+        // Must call getOrCreateExecutionEnvironment on Atlas contract to properly initialize nonce tracking
+        require(msg.sender == atlas, "AtlasFactory: Only Atlas can create execution environments");
+        callConfig = IDAppControl(dAppControl).callConfig();
+        executionEnvironment = _getExecutionEnvironmentCustom(user, dAppControl.codehash, dAppControl, callConfig);
+        if (executionEnvironment.codehash == bytes32(0)) {
+            executionEnvironment = _setExecutionEnvironment(dAppControl, user, dAppControl.codehash);
+            created = true;
+        }
     }
 
     function getExecutionEnvironment(

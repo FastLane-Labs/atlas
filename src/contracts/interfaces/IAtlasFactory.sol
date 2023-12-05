@@ -9,6 +9,13 @@ interface IAtlasFactory {
         external
         returns (address executionEnvironment);
 
+    function getOrCreateExecutionEnvironment(
+        address account,
+        address dAppControl
+    )
+        external
+        returns (address executionEnvironment, uint32 callConfig, bool created);
+
     function getExecutionEnvironment(
         address user,
         address dAppControl
