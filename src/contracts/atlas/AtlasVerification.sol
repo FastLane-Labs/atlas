@@ -358,9 +358,14 @@ contract AtlasVerification is EIP712, DAppIntegration {
             return false;
         }
 
-        if (nonce == 0 && !isSimulation) {
-            // Allow 0 nonce for simulations to avoid unnecessary init txs
-            return false;
+        if (!isSimulation) {
+            if (nonce == 0) {
+                // Allow 0 nonce for simulations to avoid unnecessary init txs
+                return false;
+            } else if (nonce == 1) {
+                // Check if nonce needs to be initialized - do so if necessary. 
+                _initializeNonce(account);
+            }
         }
 
         uint256 bitmapIndex = (nonce / 240) + 1; // +1 because highestFullBitmap initializes at 0

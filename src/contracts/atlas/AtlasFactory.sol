@@ -5,6 +5,7 @@ import { IDAppControl } from "../interfaces/IDAppControl.sol";
 import { Mimic } from "./Mimic.sol";
 import { DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
+import { UserOperation } from "../types/UserCallTypes.sol"; 
 
 // TODO make sure no cases of address(this) when Atlas address is intended
 
@@ -37,24 +38,23 @@ contract AtlasFactory {
     {
         // Must call createExecutionEnvironment on Atlas contract to properly initialize nonce tracking
         require(msg.sender == atlas, "AtlasFactory: Only Atlas can create execution environments");
-        executionEnvironment = _setExecutionEnvironment(dAppControl, user, dAppControl.codehash);
+        uint32 callConfig = IDAppControl(dAppControl).callConfig();
+        executionEnvironment = _setExecutionEnvironment(dAppControl, user, callConfig, dAppControl.codehash);
     }
 
-    function getOrCreateExecutionEnvironment(
-        address user,
-        address dAppControl
-    )
+    function getOrCreateExecutionEnvironment(UserOperation calldata userOp)
         external
-        returns (address executionEnvironment, uint32 callConfig, bool created)
+        returns (address executionEnvironment, DAppConfig memory dConfig)
     {
         // Must call getOrCreateExecutionEnvironment on Atlas contract to properly initialize nonce tracking
         require(msg.sender == atlas, "AtlasFactory: Only Atlas can create execution environments");
-        callConfig = IDAppControl(dAppControl).callConfig();
-        executionEnvironment = _getExecutionEnvironmentCustom(user, dAppControl.codehash, dAppControl, callConfig);
-        if (executionEnvironment.codehash == bytes32(0)) {
-            executionEnvironment = _setExecutionEnvironment(dAppControl, user, dAppControl.codehash);
-            created = true;
-        }
+
+        address control = userOp.control;
+
+        dConfig = IDAppControl(control).getDAppConfig(userOp);
+
+        executionEnvironment = _setExecutionEnvironment(
+            control, userOp.from, dConfig.callConfig, control.codehash);
     }
 
     function getExecutionEnvironment(
@@ -108,13 +108,12 @@ contract AtlasFactory {
     function _setExecutionEnvironment(
         address dAppControl,
         address user,
+        uint32 callConfig,
         bytes32 controlCodeHash
     )
         internal
         returns (address executionEnvironment)
     {
-        uint32 callConfig = IDAppControl(dAppControl).callConfig();
-
         bytes memory creationCode = _getMimicCreationCode(dAppControl, callConfig, user, controlCodeHash);
 
         executionEnvironment = address(
@@ -133,7 +132,7 @@ contract AtlasFactory {
                 executionEnvironment := create2(0, add(creationCode, 32), mload(creationCode), memSalt)
             }
 
-            emit NewExecutionEnvironment(executionEnvironment, user, dAppControl, callConfig);
+            // emit NewExecutionEnvironment(executionEnvironment, user, dAppControl, callConfig);
         }
     }
 

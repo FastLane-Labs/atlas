@@ -54,16 +54,10 @@ contract Atlas is Escrow {
     {
         uint256 gasMarker = gasleft();
 
-        // TODO: Combine this w/ call to get executionEnvironment
-        DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
-
         // Get or create the execution environment
-        (address executionEnvironment,, bool created) =
-            IAtlasFactory(FACTORY).getOrCreateExecutionEnvironment(userOp.from, userOp.control);
-
-        if (created) {
-            IAtlasVerification(VERIFICATION).initializeNonce(userOp.from);
-        }
+        address executionEnvironment;
+        DAppConfig memory dConfig;
+        (executionEnvironment, dConfig) = IAtlasFactory(FACTORY).getOrCreateExecutionEnvironment(userOp);
 
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
