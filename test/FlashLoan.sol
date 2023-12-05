@@ -42,6 +42,40 @@ contract FlashLoanTest is BaseTest {
     }
 
     function testFlashLoanArbitrage() public {
+        // Pools should already be setup for arbitrage. First try arbitraging without paying eth back to pool
+
+        vm.startPrank(solverOneEOA);
+        SimpleArbitrageSolver solver = new SimpleArbitrageSolver(WETH_ADDRESS, address(atlas));
+        vm.stopPrank();
+
+        // Input params for Atlas.metacall() - will be populated below
+        DAppOperation memory dAppOp;
+
+        vm.startPrank(userEOA);
+        address executionEnvironment = atlas.createExecutionEnvironment(txBuilder.control());
+        console.log("executionEnvironment a", executionEnvironment);
+        vm.stopPrank();
+        vm.label(address(executionEnvironment), "EXECUTION ENV");
+
+        UserOperation memory userOp = txBuilder.buildUserOperation({
+            from: userEOA, // NOTE: Would from ever not be user?
+            to: address(DummyController),
+            maxFeePerGas: tx.gasprice + 1, // TODO update
+            value: 0,
+            deadline: block.number + 2,
+            data: new bytes(0)
+        });
+
+        // SolverOperation[] memory solverOps = new SolverOperation[](1);
+        // solverOps[0] = txBuilder.buildSolverOperation({
+        //     userOp: userOp,
+        //     solverOpData: solverOpData,
+        //     solverEOA: solverOneEOA,
+        //     solverContract: address(solver),
+        //     bidAmount: 1e18
+        // });
+
+
 
     } 
 
@@ -84,8 +118,18 @@ contract DummyController is DAppControl {
     function getBidValue(SolverOperation calldata solverOp) public pure override returns (uint256) {
         return solverOp.bidAmount;
     }
+
+    fallback() external {}
 }
 
 contract SimpleArbitrageSolver is SolverBase {
     constructor(address weth, address atlas) SolverBase(weth, atlas, msg.sender) { }
+
+    function arbitrateNoPayback(address poolA, address poolB, uint256[3] calldata amounts) public payable {
+
+    }
+
+    function arbitrageWithPayback() external payable {
+
+    }
 }
