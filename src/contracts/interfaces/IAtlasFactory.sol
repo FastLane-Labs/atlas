@@ -2,7 +2,7 @@
 pragma solidity 0.8.21;
 
 import { DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
-import { UserOperation } from "../types/UserCallTypes.sol"; 
+import { UserOperation } from "../types/UserCallTypes.sol";
 
 interface IAtlasFactory {
     function createExecutionEnvironment(
@@ -12,9 +12,7 @@ interface IAtlasFactory {
         external
         returns (address executionEnvironment);
 
-    function getOrCreateExecutionEnvironment(
-        UserOperation calldata userOp
-    )
+    function getOrCreateExecutionEnvironment(UserOperation calldata userOp)
         external
         returns (address executionEnvironment, DAppConfig memory dConfig);
 

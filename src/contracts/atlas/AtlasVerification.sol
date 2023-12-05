@@ -363,7 +363,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 // Allow 0 nonce for simulations to avoid unnecessary init txs
                 return false;
             } else if (nonce == 1) {
-                // Check if nonce needs to be initialized - do so if necessary. 
+                // Check if nonce needs to be initialized - do so if necessary.
                 _initializeNonce(account);
             }
         }

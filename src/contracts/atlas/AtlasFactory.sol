@@ -5,7 +5,7 @@ import { IDAppControl } from "../interfaces/IDAppControl.sol";
 import { Mimic } from "./Mimic.sol";
 import { DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
-import { UserOperation } from "../types/UserCallTypes.sol"; 
+import { UserOperation } from "../types/UserCallTypes.sol";
 
 // TODO make sure no cases of address(this) when Atlas address is intended
 
@@ -53,8 +53,7 @@ contract AtlasFactory {
 
         dConfig = IDAppControl(control).getDAppConfig(userOp);
 
-        executionEnvironment = _setExecutionEnvironment(
-            control, userOp.from, dConfig.callConfig, control.codehash);
+        executionEnvironment = _setExecutionEnvironment(control, userOp.from, dConfig.callConfig, control.codehash);
     }
 
     function getExecutionEnvironment(
