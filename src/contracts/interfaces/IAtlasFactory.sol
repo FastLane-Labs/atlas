@@ -1,6 +1,9 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.21;
 
+import { DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
+import { UserOperation } from "../types/UserCallTypes.sol";
+
 interface IAtlasFactory {
     function createExecutionEnvironment(
         address account,
@@ -9,12 +12,9 @@ interface IAtlasFactory {
         external
         returns (address executionEnvironment);
 
-    function getOrCreateExecutionEnvironment(
-        address account,
-        address dAppControl
-    )
+    function getOrCreateExecutionEnvironment(UserOperation calldata userOp)
         external
-        returns (address executionEnvironment, uint32 callConfig, bool created);
+        returns (address executionEnvironment, DAppConfig memory dConfig);
 
     function getExecutionEnvironment(
         address user,
