@@ -39,8 +39,18 @@ contract Atlas is Escrow {
     { }
 
     function createExecutionEnvironment(address dAppControl) external returns (address executionEnvironment) {
-        executionEnvironment = IAtlasFactory(FACTORY).createExecutionEnvironment(msg.sender, dAppControl);
-        IAtlasVerification(VERIFICATION).initializeNonce(msg.sender);
+        executionEnvironment = createExecutionEnvironment(msg.sender, dAppControl);
+    }
+
+    function createExecutionEnvironment(
+        address user,
+        address dAppControl
+    )
+        internal
+        returns (address executionEnvironment)
+    {
+        executionEnvironment = IAtlasFactory(FACTORY).createExecutionEnvironment(user, dAppControl);
+        IAtlasVerification(VERIFICATION).initializeNonce(user);
     }
 
     function metacall( // <- Entrypoint Function
@@ -57,10 +67,13 @@ contract Atlas is Escrow {
         // TODO: Combine this w/ call to get executionEnvironment
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
 
-        // Get the execution environment
-        address executionEnvironment = IAtlasFactory(FACTORY).getExecutionEnvironmentCustom(
-            userOp.from, dAppOp.control.codehash, userOp.control, dConfig.callConfig
-        );
+        // Get or create the execution environment
+        (address executionEnvironment,, bool exists) =
+            IAtlasFactory(FACTORY).getExecutionEnvironment(userOp.from, userOp.control);
+
+        if (!exists) {
+            executionEnvironment = createExecutionEnvironment(userOp.from, userOp.control);
+        }
 
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
