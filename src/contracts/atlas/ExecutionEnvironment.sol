@@ -81,10 +81,8 @@ contract ExecutionEnvironment is Base {
     //////////////////////////////////
     function preOpsWrapper(UserOperation calldata userOp)
         external
-        payable
         validUser(userOp)
         onlyAtlasEnvironment(ExecutionPhase.PreOps, _ENVIRONMENT_DEPTH)
-        contributeSurplus
         returns (bytes memory)
     {
         // msg.sender = atlas
@@ -133,9 +131,7 @@ contract ExecutionEnvironment is Base {
 
     function postOpsWrapper(bytes calldata returnData)
         external
-        payable
         onlyAtlasEnvironment(ExecutionPhase.PostOps, _ENVIRONMENT_DEPTH)
-        contributeSurplus
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment

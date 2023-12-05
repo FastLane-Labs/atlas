@@ -54,7 +54,7 @@ abstract contract Escrow is AtlETH {
     {
         preOpsData = abi.encodeWithSelector(IExecutionEnvironment.preOpsWrapper.selector, userOp);
         preOpsData = abi.encodePacked(preOpsData, lockBytes);
-        (success, preOpsData) = environment.call{ value: msg.value }(preOpsData);
+        (success, preOpsData) = environment.call(preOpsData);
         if (success) {
             preOpsData = abi.decode(preOpsData, (bytes));
         }
@@ -161,7 +161,7 @@ abstract contract Escrow is AtlETH {
     {
         bytes memory postOpsData = abi.encodeWithSelector(IExecutionEnvironment.postOpsWrapper.selector, returnData);
         postOpsData = abi.encodePacked(postOpsData, lockBytes);
-        (success,) = environment.call{ value: msg.value }(postOpsData);
+        (success,) = environment.call(postOpsData);
     }
 
     // TODO Revisit the EscrowAccountData memory solverEscrow arg. Needs to be passed through from Atlas, through
