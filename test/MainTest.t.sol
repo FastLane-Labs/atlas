@@ -57,7 +57,7 @@ contract MainTest is BaseTest {
         // First SolverOperation
         solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_ONE);
         solverOps[1] = helper.buildSolverOperation(
-            userOp, solverOpData, solverOneEOA, address(solverOne), WETH.balanceOf(address(solverOne)) / 20
+            userOp, solverOpData, solverOneEOA, address(solverOne), WETH.balanceOf(address(solverOne)) / 20, 0
         );
 
         (v, r, s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[1]));
@@ -68,7 +68,7 @@ contract MainTest is BaseTest {
         // Second SolverOperation
         solverOpData = helper.buildV2SolverOperationData(POOL_ONE, POOL_TWO);
         solverOps[0] = helper.buildSolverOperation(
-            userOp, solverOpData, solverTwoEOA, address(solverTwo), WETH.balanceOf(address(solverTwo)) / 3000
+            userOp, solverOpData, solverTwoEOA, address(solverTwo), WETH.balanceOf(address(solverTwo)) / 3000, 0
         );
 
         (v, r, s) = vm.sign(solverTwoPK, atlasVerification.getSolverPayload(solverOps[0]));
@@ -368,7 +368,7 @@ contract MainTest is BaseTest {
 
         // Success case
         bytes memory solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_ONE);
-        solverOps[0] = helper.buildSolverOperation(userOp, solverOpData, solverOneEOA, address(solverOne), 2e17);
+        solverOps[0] = helper.buildSolverOperation(userOp, solverOpData, solverOneEOA, address(solverOne), 2e17, 0);
         (v, r, s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(r, s, v);
         DAppOperation memory dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
@@ -388,7 +388,7 @@ contract MainTest is BaseTest {
         // Failure case
         solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_TWO); // this will make the solver operation
             // revert
-        solverOps[0] = helper.buildSolverOperation(userOp, solverOpData, solverOneEOA, address(solverOne), 2e17);
+        solverOps[0] = helper.buildSolverOperation(userOp, solverOpData, solverOneEOA, address(solverOne), 2e17, 0);
         (v, r, s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(r, s, v);
         dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);

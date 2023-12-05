@@ -143,7 +143,8 @@ contract SwapIntentTest is BaseTest {
             solverOpData: solverOpData,
             solverEOA: solverOneEOA,
             solverContract: address(rfqSolver),
-            bidAmount: 1e18
+            bidAmount: 1e18,
+            value: 0
         });
 
         // Solver signs the solverOp
@@ -261,7 +262,8 @@ contract SwapIntentTest is BaseTest {
             solverOpData: solverOpData,
             solverEOA: solverOneEOA,
             solverContract: address(uniswapSolver),
-            bidAmount: 1e18
+            bidAmount: 1e18,
+            value: 0
         });
 
         // Solver signs the solverOp

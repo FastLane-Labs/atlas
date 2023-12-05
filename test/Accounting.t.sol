@@ -171,7 +171,8 @@ contract AccountingTest is BaseTest {
             solverOpData: solverOpData,
             solverEOA: solverOneEOA,
             solverContract: rfqSolver,
-            bidAmount: solverMsgValue
+            bidAmount: solverMsgValue,
+            value: 0
         });
 
         solverOps[0].value = solverMsgValue;

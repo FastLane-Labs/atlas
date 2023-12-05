@@ -49,7 +49,6 @@ contract FlashLoanTest is BaseTest {
         vm.stopPrank();
 
         // Input params for Atlas.metacall() - will be populated below
-        DAppOperation memory dAppOp;
 
         vm.startPrank(userEOA);
         address executionEnvironment = atlas.createExecutionEnvironment(txBuilder.control());
@@ -59,7 +58,7 @@ contract FlashLoanTest is BaseTest {
 
         UserOperation memory userOp = txBuilder.buildUserOperation({
             from: userEOA, // NOTE: Would from ever not be user?
-            to: address(DummyController),
+            to: address(controller),
             maxFeePerGas: tx.gasprice + 1, // TODO update
             value: 0,
             deadline: block.number + 2,
