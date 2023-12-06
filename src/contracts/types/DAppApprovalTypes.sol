@@ -40,8 +40,8 @@ struct CallConfig {
     bool reuseUserOp;
     bool userAuctioneer;
     bool solverAuctioneer;
+    bool unknownAuctioneer;
     bool verifyCallChainHash;
-    bool unknownBundler;
     bool forwardReturnData;
     bool requireFulfillment;
 }

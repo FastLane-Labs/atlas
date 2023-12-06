@@ -53,11 +53,11 @@ library CallBits {
         if (callConfig.solverAuctioneer) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.SolverAuctioneer);
         }
+        if (callConfig.unknownAuctioneer) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.UnknownAuctioneer);
+        }
         if (callConfig.verifyCallChainHash) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.VerifyCallChainHash);
-        }
-        if (callConfig.unknownBundler) {
-            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.UnknownAuctioneer);
         }
         if (callConfig.forwardReturnData) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.ForwardReturnData);
@@ -82,8 +82,8 @@ library CallBits {
             reuseUserOp: allowsReuseUserOps(encodedCallConfig),
             userAuctioneer: allowsUserAuctioneer(encodedCallConfig),
             solverAuctioneer: allowsSolverAuctioneer(encodedCallConfig),
+            unknownAuctioneer: allowsUnknownAuctioneer(encodedCallConfig),
             verifyCallChainHash: verifyCallChainHash(encodedCallConfig),
-            unknownBundler: allowsUnknownAuctioneer(encodedCallConfig),
             forwardReturnData: forwardReturnData(encodedCallConfig),
             requireFulfillment: needsFulfillment(encodedCallConfig)
         });
@@ -141,12 +141,12 @@ library CallBits {
         userAuctioneer = (callConfig & 1 << uint32(CallConfigIndex.SolverAuctioneer) != 0);
     }
 
-    function verifyCallChainHash(uint32 callConfig) internal pure returns (bool verify) {
-        verify = (callConfig & 1 << uint32(CallConfigIndex.VerifyCallChainHash) != 0);
+    function allowsUnknownAuctioneer(uint32 callConfig) internal pure returns (bool unknownAuctioneer) {
+        unknownAuctioneer = (callConfig & 1 << uint32(CallConfigIndex.UnknownAuctioneer) != 0);
     }
 
-    function allowsUnknownAuctioneer(uint32 callConfig) internal pure returns (bool unknownBundler) {
-        unknownBundler = (callConfig & 1 << uint32(CallConfigIndex.UnknownAuctioneer) != 0);
+    function verifyCallChainHash(uint32 callConfig) internal pure returns (bool verify) {
+        verify = (callConfig & 1 << uint32(CallConfigIndex.VerifyCallChainHash) != 0);
     }
 
     function forwardReturnData(uint32 callConfig) internal pure returns (bool) {

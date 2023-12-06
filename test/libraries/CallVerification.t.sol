@@ -21,6 +21,7 @@ contract CallVerificationTest is Test {
             value: 90,
             dapp: address(0x2),
             control: address(0x3),
+            sessionKey: address(0),
             data: "data",
             signature: "signature"
         });
