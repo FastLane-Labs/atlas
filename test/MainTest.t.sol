@@ -350,7 +350,7 @@ contract MainTest is BaseTest {
         dAppOp.signature = abi.encodePacked(r, s, v);
 
         // Execution environment should not exist yet
-        (,, bool exists) = atlasFactory.getExecutionEnvironment(userEOA, address(control));
+        (,, bool exists) = atlas.getExecutionEnvironment(userEOA, address(control));
         assertFalse(exists, "ExecutionEnvironment already exists");
 
         vm.startPrank(userEOA);
@@ -359,7 +359,7 @@ contract MainTest is BaseTest {
         vm.stopPrank();
 
         // Execution environment should exist now
-        (,, exists) = atlasFactory.getExecutionEnvironment(userEOA, address(control));
+        (,, exists) = atlas.getExecutionEnvironment(userEOA, address(control));
         assertTrue(exists, "ExecutionEnvironment wasn't created");
     }
 

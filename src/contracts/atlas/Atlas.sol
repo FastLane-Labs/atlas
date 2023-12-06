@@ -3,10 +3,10 @@ pragma solidity 0.8.21;
 
 import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
-import { IAtlasFactory } from "../interfaces/IAtlasFactory.sol";
 import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
 
 import { Escrow } from "./Escrow.sol";
+import { Factory } from "./Factory.sol";
 
 import { UserSimulationFailed, UserUnexpectedSuccess, UserSimulationSucceeded } from "../types/Emissions.sol";
 
@@ -23,25 +23,19 @@ import { SafetyBits } from "../libraries/SafetyBits.sol";
 
 // import "forge-std/Test.sol";
 
-contract Atlas is Escrow {
+contract Atlas is Escrow, Factory {
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
     constructor(
         uint256 _escrowDuration,
-        address _factory,
         address _verification,
         address _gasAccLib,
         address _safetyLocksLib,
         address _simulator
     )
-        Escrow(_escrowDuration, _factory, _verification, _gasAccLib, _safetyLocksLib, _simulator)
+        Escrow(_escrowDuration, _verification, _gasAccLib, _safetyLocksLib, _simulator)
     { }
-
-    function createExecutionEnvironment(address dAppControl) external returns (address executionEnvironment) {
-        executionEnvironment = IAtlasFactory(FACTORY).createExecutionEnvironment(msg.sender, dAppControl);
-        IAtlasVerification(VERIFICATION).initializeNonce(msg.sender);
-    }
 
     function metacall( // <- Entrypoint Function
         UserOperation calldata userOp, // set by user
@@ -57,7 +51,7 @@ contract Atlas is Escrow {
         // Get or create the execution environment
         address executionEnvironment;
         DAppConfig memory dConfig;
-        (executionEnvironment, dConfig) = IAtlasFactory(FACTORY).getOrCreateExecutionEnvironment(userOp);
+        (executionEnvironment, dConfig) = _getOrCreateExecutionEnvironment(userOp);
 
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
@@ -244,10 +238,7 @@ contract Atlas is Escrow {
     }
 
     function _verifyCallerIsExecutionEnv(address user, address controller, uint32 callConfig) internal view override {
-        if (
-            msg.sender
-                != IAtlasFactory(FACTORY).getExecutionEnvironmentCustom(user, controller.codehash, controller, callConfig)
-        ) {
+        if (msg.sender != _getExecutionEnvironmentCustom(user, controller.codehash, controller, callConfig)) {
             revert EnvironmentMismatch();
         }
     }

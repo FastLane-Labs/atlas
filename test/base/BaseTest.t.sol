@@ -6,7 +6,6 @@ import "forge-std/Test.sol";
 import { IDAppIntegration } from "src/contracts/interfaces/IDAppIntegration.sol";
 
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
-import { AtlasFactory } from "src/contracts/atlas/AtlasFactory.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import { GasAccountingLib } from "src/contracts/atlas/GasAccountingLib.sol";
 import { SafetyLocksLib } from "src/contracts/atlas/SafetyLocksLib.sol";
@@ -42,7 +41,6 @@ contract BaseTest is Test, TestConstants {
     address public userEOA = vm.addr(userPK);
 
     Atlas public atlas;
-    AtlasFactory public atlasFactory;
     AtlasVerification public atlasVerification;
     GasAccountingLib public gasAccountingLib;
     SafetyLocksLib public safetyLocksLib;
@@ -79,25 +77,21 @@ contract BaseTest is Test, TestConstants {
 
         simulator = new Simulator();
 
-        // Computes the addresses at which AtlasFactory and AtlasVerification will be deployed
-        address expectedAtlasFactoryAddr = computeCreateAddress(payee, vm.getNonce(payee) + 1);
-        address expectedAtlasVerificationAddr = computeCreateAddress(payee, vm.getNonce(payee) + 2);
-        address expectedGasAccountingLibAddr = computeCreateAddress(payee, vm.getNonce(payee) + 3);
-        address expectedSafetyLocksLibAddr = computeCreateAddress(payee, vm.getNonce(payee) + 4);
+        // Computes the addresses at which AtlasVerification will be deployed
+        address expectedAtlasVerificationAddr = computeCreateAddress(payee, vm.getNonce(payee) + 1);
+        address expectedGasAccountingLibAddr = computeCreateAddress(payee, vm.getNonce(payee) + 2);
+        address expectedSafetyLocksLibAddr = computeCreateAddress(payee, vm.getNonce(payee) + 3);
 
         atlas = new Atlas({
             _escrowDuration: 64,
-            _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
             _gasAccLib: expectedGasAccountingLibAddr,
             _safetyLocksLib: expectedSafetyLocksLibAddr,
             _simulator: address(simulator)
         });
-        atlasFactory = new AtlasFactory(address(atlas));
         atlasVerification = new AtlasVerification(address(atlas));
         gasAccountingLib = new GasAccountingLib({
             _escrowDuration: 64,
-            _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
             _safetyLocksLib: expectedSafetyLocksLibAddr,
             _simulator: address(simulator),
@@ -105,7 +99,6 @@ contract BaseTest is Test, TestConstants {
         });
         safetyLocksLib = new SafetyLocksLib({
             _escrowDuration: 64,
-            _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
             _gasAccLib: expectedGasAccountingLibAddr,
             _simulator: address(simulator),
