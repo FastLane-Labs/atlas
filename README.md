@@ -68,6 +68,9 @@ The DAppControl contract has the option to define functions that execute at the 
 
 *These functions are executed by the Execution Environment via "delegatecall."
 
+#### Permit69
+A user must have an Execution Environment (EE) instance for each DApp they would like to use, and the user address is used as a salt for the create2 deterministic deployment of it. If one is not already available, EEs can be deployed during execution of a user order since their address is known beforehand, this gas cost is covered by the solver so UX is never impacted. The EE performs ops via delegateCalls, so it needs to be able to initiate token transfers from the user. Users only have to approve the Atlas contract once because Permit69 allows Atlas to transfer funds from the user if the request is from a valid EE for that user (checked by verifying the user address is one of the salts for the EE address). Permit69 is also used by DApps, but instead transfers tokens that have accumulated in the DAppControl contract, this function performs the same verification of the EE. 
+
 ### Atlas Frontend / Infrastructure Flow
 
 ![AtlasFlow](./AtlasFlow.jpeg)
