@@ -33,6 +33,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
     using CallBits for uint32;
     using CallVerification for UserOperation;
 
+    uint8 internal constant MAX_SOLVERS = type(uint8).max - 2;
+
     error InvalidCaller();
 
     constructor(address _atlas) EIP712("ProtoCallHandler", "0.0.1") DAppIntegration(_atlas) { }
@@ -78,19 +80,20 @@ contract AtlasVerification is EIP712, DAppIntegration {
             }
 
             // run misc checks
-            if (solverOps.length > type(uint8).max - 2) {
+            if (solverOpCount > MAX_SOLVERS) {
                 return (prunedSolverOps, ValidCallsResult.TooManySolverOps);
             }
 
+            // check if past user's deadline
             if (block.number > userOp.deadline) {
-                bool bypass = isSimulation && userOp.deadline == 0;
-                if (!bypass) {
+                if (userOp.deadline != 0 && !isSimulation) {
                     return (prunedSolverOps, ValidCallsResult.UserDeadlineReached);
                 }
             }
 
-            if (block.number > dAppOp.deadline && dAppOp.deadline != 0) {
-                if (!isSimulation) {
+            // check if past dapp's deadline
+            if (block.number > dAppOp.deadline) {
+                if (dAppOp.deadline != 0 && !isSimulation) {
                     return (prunedSolverOps, ValidCallsResult.DAppDeadlineReached);
                 }
             }
