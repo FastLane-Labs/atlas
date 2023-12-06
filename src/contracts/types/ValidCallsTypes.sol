@@ -12,6 +12,8 @@ enum ValidCallsResult {
     DAppDeadlineReached,
     ExecutionEnvEmpty,
     NoSolverOp,
-    UnknownBundlerNotAllowed,
-    InvalidSequence
+    UnknownAuctioneerNotAllowed,
+    InvalidSequence,
+    InvalidAuctioneer,
+    InvalidBundler
 }

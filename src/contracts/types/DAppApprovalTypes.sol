@@ -2,7 +2,7 @@
 pragma solidity 0.8.21;
 
 bytes32 constant DAPP_TYPE_HASH = keccak256(
-    "DAppApproval(address from,address to,uint256 value,uint256 gas,uint256 maxFeePerGas,uint256 nonce,uint256 deadline,address control,bytes32 userOpHash,bytes32 callChainHash)"
+    "DAppApproval(address from,address to,uint256 value,uint256 gas,uint256 maxFeePerGas,uint256 nonce,uint256 deadline,address control,address bundler,bytes32 userOpHash,bytes32 callChainHash)"
 );
 
 struct DAppOperation {
@@ -14,6 +14,7 @@ struct DAppOperation {
     uint256 nonce;
     uint256 deadline;
     address control; // control
+    address bundler; // msg.sender
     bytes32 userOpHash; // keccak256 of userOp.to, userOp.data
     bytes32 callChainHash; // keccak256 of the solvers' txs
     bytes signature;
@@ -37,9 +38,9 @@ struct CallConfig {
     bool requirePostOps;
     bool zeroSolvers;
     bool reuseUserOp;
-    bool userBundler;
-    bool solverBundler;
-    bool verifySolverBundlerCallChainHash;
+    bool userAuctioneer;
+    bool solverAuctioneer;
+    bool verifyCallChainHash;
     bool unknownBundler;
     bool forwardReturnData;
     bool requireFulfillment;
@@ -57,10 +58,11 @@ enum CallConfigIndex {
     RequirePostOpsCall,
     ZeroSolvers,
     ReuseUserOp,
-    UserBundler,
-    SolverBundler,
-    VerifySolverBundlerCallChainHash,
-    UnknownBundler,
+    UserAuctioneer,
+    SolverAuctioneer,
+    UnknownAuctioneer,
+    // Default = DAppAuctioneer
+    VerifyCallChainHash,
     ForwardReturnData,
     RequireFulfillment
 }

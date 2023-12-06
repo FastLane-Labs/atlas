@@ -58,92 +58,24 @@ contract AtlasVerification is EIP712, DAppIntegration {
         uint256 solverOpCount = solverOps.length;
         SolverOperation[] memory prunedSolverOps = new SolverOperation[](solverOpCount);
 
-        // bundler checks
-        if (msgSender == userOp.from) {
-            // user is bundling their own operation - check allowed and valid dapp signature/callchainhash
+        (bool validAuctioneer, bool bypassSignatoryApproval) = _verifyAuctioneer(
+            dConfig, userOp, solverOps, dAppOp);
 
-            if (!dConfig.callConfig.allowsUserBundler()) {
-                return (prunedSolverOps, ValidCallsResult.UnknownBundlerNotAllowed);
-            }
-
-            // user should not sign their own operation and transaction together
-            if (userOp.signature.length > 0) {
-                return (prunedSolverOps, ValidCallsResult.UserSignatureInvalid);
-            }
-
-            // check dapp signature
-            if (!_verifyDApp(dConfig, dAppOp, msgSender, isSimulation)) {
-                return (prunedSolverOps, ValidCallsResult.DAppSignatureInvalid);
-            }
-
-            // check callchainhash
-            if (dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps) && !isSimulation)
-            {
-                return (prunedSolverOps, ValidCallsResult.InvalidSequence);
-            }
-        } else if (msgSender == dAppOp.from) {
-            // dapp is bundling - always allowed, check valid user/dapp signature and callchainhash
-
-            // check dapp signature
-            if (!_verifyDApp(dConfig, dAppOp, msgSender, isSimulation)) {
-                return (prunedSolverOps, ValidCallsResult.DAppSignatureInvalid);
-            }
-
-            // check user signature
-            if (!_verifyUser(dConfig, userOp, msgSender, isSimulation)) {
-                return (prunedSolverOps, ValidCallsResult.UserSignatureInvalid);
-            }
-
-            // check callchainhash
-            if (dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps) && !isSimulation)
-            {
-                return (prunedSolverOps, ValidCallsResult.InvalidSequence);
-            }
-        } else if (msgSender == solverOps[0].from && solverOps.length == 1) {
-            // potentially the winning solver is bundling - check that its allowed and only need to verify user
-            // signature
-
-            // check if protocol allows it
-            if (!dConfig.callConfig.allowsSolverBundler()) {
-                return (prunedSolverOps, ValidCallsResult.DAppSignatureInvalid);
-            }
-
-            // verify user signature
-            if (!_verifyUser(dConfig, userOp, msgSender, isSimulation)) {
-                return (prunedSolverOps, ValidCallsResult.UserSignatureInvalid);
-            }
-
-            // verify the callchainhash if required by protocol
-            if (dConfig.callConfig.verifySolverBundlerCallChainHash()) {
-                if (
-                    dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps)
-                        && !isSimulation
-                ) {
-                    return (prunedSolverOps, ValidCallsResult.InvalidSequence);
-                }
-            }
-        } else if (dConfig.callConfig.allowsUnknownBundler()) {
-            // check if protocol allows unknown bundlers, and verify all signatures if they do
-
-            // check dapp signature
-            if (!_verifyDApp(dConfig, dAppOp, msgSender, isSimulation)) {
-                return (prunedSolverOps, ValidCallsResult.DAppSignatureInvalid);
-            }
-
-            // check user signature
-            if (!_verifyUser(dConfig, userOp, msgSender, isSimulation)) {
-                return (prunedSolverOps, ValidCallsResult.UserSignatureInvalid);
-            }
-
-            // check callchainhash
-            if (dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps) && !isSimulation)
-            {
-                return (prunedSolverOps, ValidCallsResult.InvalidSequence);
-            }
-        } else {
-            return (prunedSolverOps, ValidCallsResult.UnknownBundlerNotAllowed);
+        if (!validAuctioneer) {
+            return (prunedSolverOps, ValidCallsResult.InvalidAuctioneer);
         }
 
+        // check dapp signature
+        if (!_verifyDApp(dConfig, dAppOp, msgSender, bypassSignatoryApproval, isSimulation)) {
+            return (prunedSolverOps, ValidCallsResult.DAppSignatureInvalid);
+        }
+
+        // check user signature
+        if (!_verifyUser(dConfig, userOp, msgSender, isSimulation)) {
+            return (prunedSolverOps, ValidCallsResult.UserSignatureInvalid);
+        }
+
+        // run misc checks
         if (solverOps.length > type(uint8).max - 2) {
             return (prunedSolverOps, ValidCallsResult.TooManySolverOps);
         }
@@ -155,9 +87,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
             }
         }
 
-        if (block.number > dAppOp.deadline) {
-            bool bypass = isSimulation && dAppOp.deadline == 0;
-            if (!bypass) {
+        if (block.number > dAppOp.deadline && dAppOp.deadline != 0) {
+            if (!isSimulation) {
                 return (prunedSolverOps, ValidCallsResult.DAppDeadlineReached);
             }
         }
@@ -166,6 +97,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
         if (isSimulation) {
             // Add all solver ops if simulation
             return (solverOps, ValidCallsResult.Valid);
+        }
+
+        if (msgSender != dAppOp.bundler) {
+            return (prunedSolverOps, ValidCallsResult.InvalidBundler);
         }
 
         if (tx.gasprice > userOp.maxFeePerGas) {
@@ -191,31 +126,17 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
                 SolverOperation memory solverOp = solverOps[i];
 
-                if (tx.gasprice > solverOp.maxFeePerGas) {
-                    // Verify solver max gas price
-                    continue;
-                }
+                if (tx.gasprice > solverOp.maxFeePerGas) continue;
+                
+                if (block.number > solverOp.deadline) continue;
 
-                if (block.number > solverOp.deadline) {
-                    // Verify solver deadline
-                    continue;
-                }
+                if (solverOp.from == userOp.from) continue;
 
-                if (solverOp.from == userOp.from) {
-                    continue;
-                }
+                if (solverOp.to != ATLAS) continue;
 
-                if (solverOp.to != ATLAS) {
-                    continue;
-                }
+                if (solverOp.solver == ATLAS || solverOp.solver == address(this)) continue;
 
-                if (solverOp.solver == ATLAS || solverOp.solver == address(this)) {
-                    continue;
-                }
-
-                if (solverOp.userOpHash != userOpHash) {
-                    continue;
-                }
+                if (solverOp.userOpHash != userOpHash) continue;
 
                 // If all initial checks succeed, add solver op to new array
                 prunedSolverOps[i] = solverOp;
@@ -225,18 +146,40 @@ contract AtlasVerification is EIP712, DAppIntegration {
             }
         }
 
-        if (!dConfig.callConfig.allowsZeroSolvers() && validSolverCount == 0) {
-            return (prunedSolverOps, ValidCallsResult.NoSolverOp);
-        }
+        // Verify a solver was successfully verified. 
+        if (validSolverCount == 0) {
+            if (!dConfig.callConfig.allowsZeroSolvers()) {
+                return (prunedSolverOps, ValidCallsResult.NoSolverOp);
+            }
 
-        if (dConfig.callConfig.needsFulfillment() && validSolverCount == 0) {
-            return (prunedSolverOps, ValidCallsResult.NoSolverOp);
+            if (dConfig.callConfig.needsFulfillment()) {
+                return (prunedSolverOps, ValidCallsResult.NoSolverOp);
+            }
         }
 
         return (prunedSolverOps, ValidCallsResult.Valid);
     }
 
-    // PORTED FROM ESCROW - TODO reorder
+    function _verifyAuctioneer(
+        DAppConfig calldata dConfig,
+        UserOperation calldata userOp,
+        SolverOperation[] calldata solverOps,
+        DAppOperation calldata dAppOp
+    ) internal pure returns (bool valid, bool bypassSignatoryApproval) {
+
+        bool validCallChainHash = !dConfig.callConfig.verifyCallChainHash() || 
+            dAppOp.callChainHash == CallVerification.getCallChainHash(dConfig, userOp, solverOps);
+        
+        if (!validCallChainHash) return (false, false);
+
+        if (dConfig.callConfig.allowsUserAuctioneer() && dAppOp.from == userOp.sessionKey) return (true, true);
+    
+        if (dConfig.callConfig.allowsSolverAuctioneer() && dAppOp.from == solverOps[0].from) return (true, true);
+
+        if (dConfig.callConfig.allowsUnknownAuctioneer()) return (true, true);
+
+        return (true, false);
+    }
 
     function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload) {
         payload = _hashTypedDataV4(_getSolverHash(solverOp));
@@ -283,6 +226,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         DAppConfig memory dConfig,
         DAppOperation calldata dAppOp,
         address msgSender,
+        bool bypassSignatoryApproval,
         bool isSimulation
     )
         internal
@@ -296,6 +240,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
         if (!bypassSignature && !_verifyDAppSignature(dAppOp)) {
             return false;
         }
+
+        if (bypassSignatoryApproval) return true; // If bypass, return true after signature verification
 
         // NOTE: to avoid replay attacks arising from key management errors,
         // the state changes below must be *saved* even if they render the

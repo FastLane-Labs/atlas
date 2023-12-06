@@ -26,9 +26,9 @@ contract CallBitsTest is Test {
             requirePostOps: true,
             zeroSolvers: false,
             reuseUserOp: true,
-            userBundler: false,
-            solverBundler: true,
-            verifySolverBundlerCallChainHash: false,
+            userAuctioneer: false,
+            solverAuctioneer: true,
+            verifyCallChainHash: false,
             unknownBundler: true,
             forwardReturnData: false,
             requireFulfillment: true
@@ -46,9 +46,9 @@ contract CallBitsTest is Test {
             requirePostOps: !callConfig1.requirePostOps,
             zeroSolvers: !callConfig1.zeroSolvers,
             reuseUserOp: !callConfig1.reuseUserOp,
-            userBundler: !callConfig1.userBundler,
-            solverBundler: !callConfig1.solverBundler,
-            verifySolverBundlerCallChainHash: !callConfig1.verifySolverBundlerCallChainHash,
+            userAuctioneer: !callConfig1.userAuctioneer,
+            solverAuctioneer: !callConfig1.solverAuctioneer,
+            verifyCallChainHash: !callConfig1.verifyCallChainHash,
             unknownBundler: !callConfig1.unknownBundler,
             forwardReturnData: !callConfig1.forwardReturnData,
             requireFulfillment: !callConfig1.requireFulfillment
@@ -85,10 +85,10 @@ contract CallBitsTest is Test {
         assertEq(decodedCallConfig.requirePostOps, true, "requirePostOps 1 incorrect");
         assertEq(decodedCallConfig.zeroSolvers, false, "zeroSolvers 1 incorrect");
         assertEq(decodedCallConfig.reuseUserOp, true, "reuseUserOp 1 incorrect");
-        assertEq(decodedCallConfig.userBundler, false, "userBundler 1 incorrect");
-        assertEq(decodedCallConfig.solverBundler, true, "solverBundler 1 incorrect");
+        assertEq(decodedCallConfig.userAuctioneer, false, "userAuctioneer 1 incorrect");
+        assertEq(decodedCallConfig.solverAuctioneer, true, "solverAuctioneer 1 incorrect");
         assertEq(
-            decodedCallConfig.verifySolverBundlerCallChainHash, false, "verifySolverBundlerCallChainHash 1 incorrect"
+            decodedCallConfig.verifyCallChainHash, false, "verifyCallChainHash 1 incorrect"
         );
         assertEq(decodedCallConfig.unknownBundler, true, "unknownBundler 1 incorrect");
         assertEq(decodedCallConfig.forwardReturnData, false, "forwardPreOpsReturnData 1 incorrect");
@@ -107,10 +107,10 @@ contract CallBitsTest is Test {
         assertEq(decodedCallConfig.requirePostOps, false, "requirePostOps 2 incorrect");
         assertEq(decodedCallConfig.zeroSolvers, true, "zeroSolvers 2 incorrect");
         assertEq(decodedCallConfig.reuseUserOp, false, "reuseUserOp 2 incorrect");
-        assertEq(decodedCallConfig.userBundler, true, "userBundler 2 incorrect");
-        assertEq(decodedCallConfig.solverBundler, false, "solverBundler 2 incorrect");
+        assertEq(decodedCallConfig.userAuctioneer, true, "userAuctioneer 2 incorrect");
+        assertEq(decodedCallConfig.solverAuctioneer, false, "solverAuctioneer 2 incorrect");
         assertEq(
-            decodedCallConfig.verifySolverBundlerCallChainHash, true, "verifySolverBundlerCallChainHash 2 incorrect"
+            decodedCallConfig.verifyCallChainHash, true, "verifyCallChainHash 2 incorrect"
         );
         assertEq(decodedCallConfig.unknownBundler, false, "unknownBundler 2 incorrect");
         assertEq(decodedCallConfig.forwardReturnData, true, "forwardPreOpsReturnData 2 incorrect");
@@ -130,12 +130,12 @@ contract CallBitsTest is Test {
         assertEq(encodedCallConfig.needsPostOpsCall(), true, "needsPostOpsCall 1 incorrect");
         assertEq(encodedCallConfig.allowsZeroSolvers(), false, "allowsZeroSolvers 1 incorrect");
         assertEq(encodedCallConfig.allowsReuseUserOps(), true, "allowsReuseUserOps 1 incorrect");
-        assertEq(encodedCallConfig.allowsUserBundler(), false, "allowsUserBundler 1 incorrect");
-        assertEq(encodedCallConfig.allowsSolverBundler(), true, "allowsSolverBundler 1 incorrect");
+        assertEq(encodedCallConfig.allowsUserAuctioneer(), false, "allowsUserAuctioneer 1 incorrect");
+        assertEq(encodedCallConfig.allowsSolverAuctioneer(), true, "allowsSolverAuctioneer 1 incorrect");
         assertEq(
-            encodedCallConfig.verifySolverBundlerCallChainHash(), false, "verifySolverBundlerCallChainHash 1 incorrect"
+            encodedCallConfig.verifyCallChainHash(), false, "verifyCallChainHash 1 incorrect"
         );
-        assertEq(encodedCallConfig.allowsUnknownBundler(), true, "allowsUnknownBundler 1 incorrect");
+        assertEq(encodedCallConfig.allowsUnknownAuctioneer(), true, "allowsUnknownAuctioneer 1 incorrect");
         assertEq(encodedCallConfig.forwardReturnData(), false, "forwardPreOpsReturnData 1 incorrect");
         assertEq(encodedCallConfig.needsFulfillment(), true, "needsFulfillment 1 incorrect");
         encodedCallConfig = CallBits.encodeCallConfig(callConfig2);
@@ -150,12 +150,12 @@ contract CallBitsTest is Test {
         assertEq(encodedCallConfig.needsPostOpsCall(), false, "needsPostOpsCall 2 incorrect");
         assertEq(encodedCallConfig.allowsZeroSolvers(), true, "allowsZeroSolvers 2 incorrect");
         assertEq(encodedCallConfig.allowsReuseUserOps(), false, "allowsReuseUserOps 2 incorrect");
-        assertEq(encodedCallConfig.allowsUserBundler(), true, "allowsUserBundler 2 incorrect");
-        assertEq(encodedCallConfig.allowsSolverBundler(), false, "allowsSolverBundler 2 incorrect");
+        assertEq(encodedCallConfig.allowsUserAuctioneer(), true, "allowsUserAuctioneer 2 incorrect");
+        assertEq(encodedCallConfig.allowsSolverAuctioneer(), false, "allowsSolverAuctioneer 2 incorrect");
         assertEq(
-            encodedCallConfig.verifySolverBundlerCallChainHash(), true, "verifySolverBundlerCallChainHash 2 incorrect"
+            encodedCallConfig.verifyCallChainHash(), true, "verifyCallChainHash 2 incorrect"
         );
-        assertEq(encodedCallConfig.allowsUnknownBundler(), false, "allowsUnknownBundler 2 incorrect");
+        assertEq(encodedCallConfig.allowsUnknownAuctioneer(), false, "allowsUnknownAuctioneer 2 incorrect");
         assertEq(encodedCallConfig.forwardReturnData(), true, "forwardPreOpsReturnData 2 incorrect");
         assertEq(encodedCallConfig.needsFulfillment(), false, "needsFulfillment 2 incorrect");
     }
