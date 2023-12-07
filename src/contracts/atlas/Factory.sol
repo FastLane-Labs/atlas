@@ -7,8 +7,6 @@ import { DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
 import { UserOperation } from "../types/UserCallTypes.sol";
 
-// TODO make sure no cases of address(this) when Atlas address is intended
-
 abstract contract Factory {
     bytes32 public immutable salt;
     address public immutable executionTemplate;
@@ -38,19 +36,6 @@ abstract contract Factory {
         callConfig = IDAppControl(dAppControl).callConfig();
         executionEnvironment = _getExecutionEnvironmentCustom(user, dAppControl.codehash, dAppControl, callConfig);
         exists = executionEnvironment.codehash != bytes32(0);
-    }
-
-    function getMimicCreationCode(
-        address controller,
-        uint32 callConfig,
-        address user,
-        bytes32 controlCodeHash
-    )
-        external
-        view
-        returns (bytes memory creationCode)
-    {
-        creationCode = _getMimicCreationCode(controller, callConfig, user, controlCodeHash);
     }
 
     // ------------------ //
@@ -98,19 +83,6 @@ abstract contract Factory {
                 executionEnvironment := create2(0, add(creationCode, 32), mload(creationCode), memSalt)
             }
         }
-    }
-
-    function _getExecutionEnvironment(
-        address user,
-        bytes32 controlCodeHash,
-        address controller
-    )
-        internal
-        view
-        returns (address executionEnvironment)
-    {
-        uint32 callConfig = IDAppControl(controller).callConfig();
-        executionEnvironment = _getExecutionEnvironmentCustom(user, controlCodeHash, controller, callConfig);
     }
 
     // NOTE: This func is used to generate the address of user ExecutionEnvironments that have
