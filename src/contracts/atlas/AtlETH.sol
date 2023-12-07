@@ -41,13 +41,11 @@ abstract contract AtlETH is Permit69 {
         return uint256(nonces[account].lastAccessed);
     }
 
+    // TODO
     // Other views needed:
     // - bonded balance
     // - unbonding balance
     // - time left until unbonded
-
-    // TO ADD:
-    // - Transferring of any unbonded AtlETH
 
     function balanceOf(address account) public view returns (uint256) {
         EscrowAccountData memory accountData = _balanceOf[account];

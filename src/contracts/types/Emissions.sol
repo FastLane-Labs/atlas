@@ -67,7 +67,7 @@ contract FastLaneErrorsEvents {
     error InvalidSigner();
     error EscrowLockActive();
     error InsufficientWithdrawableBalance(uint256 balance, uint256 requested);
-    error InsufficientAvailableBalance(uint256 balance, uint256 requested); // TODO check where this is used
+    error InsufficientAvailableBalance(uint256 balance, uint256 requested);
     error InsufficientSurchargeBalance(uint256 balance, uint256 requested);
 
     // NEW - DAppIntegration
