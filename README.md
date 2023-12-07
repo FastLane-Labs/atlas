@@ -96,4 +96,4 @@ A user must have an Execution Environment (EE) instance for each DApp they would
 
 ### Notes:
 
-Note that the auctioneer (typically the frontend) may want to use a reputation system for solver bids in order to not take up too much space in the block.  The further down the the solverOps[], the higher the reputation requirement for inclusion by the backend. This isnt necessarily required - it's not an economic issue - it's just that it's important to be a good member of the ecosystem and not waste too much precious blockspace by filling it with probabalistic solver txs that have a low success rate but a high profit-to-cost ratio. 
+Note that the auctioneer (typically the frontend) may want to use a reputation system for solver bids in order to not take up too much space in the block.  The further down the solverOps[], the higher the reputation requirement for inclusion by the backend. This isnt necessarily required - it's not an economic issue - it's just that it's important to be a good member of the ecosystem and not waste too much precious blockspace by filling it with probabalistic solver txs that have a low success rate but a high profit-to-cost ratio. 
