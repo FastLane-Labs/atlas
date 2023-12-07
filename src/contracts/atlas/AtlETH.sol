@@ -73,57 +73,26 @@ abstract contract AtlETH is Permit69 {
     }
 
     // Starts the unbonding wait time.
-    // Unbonding AtlETH is not available for use in the Atlas system,
-    // Nor is it withdrawable until after the unbonding period
+    // Unbonding AtlETH can still be used be solvers while unbonding,
+    // but adjustments may be made at withdrawal to ensure solvency
     function unbond(uint256 amount) external returns (uint256 unbondCompleteBlock) {
         _checkIfUnlocked();
-        // NOTE: No _checkTransfersAllowed here - allows solvers to call unbond many times
-        // to increase the unbonding amount (and push out end time) before final claim
 
         EscrowAccountData memory accountData = _balanceOf[msg.sender];
-        // TODO revisit errs, use appropriate args
-        if (accountData.holds < amount) revert InsufficientBondedBalance();
-
         EscrowNonce memory nonceData = nonces[msg.sender];
-        uint128 _amount = uint128(amount);
 
         nonceData.lastAccessed = uint64(block.number);
-        accountData.balance -= _amount;
-        accountData.holds -= _amount;
-        nonceData.withdrawalAmount += _amount;
+        nonceData.withdrawalAmount += uint128(amount);
 
-        // TODO this should maybe decrease accountData.balance for solver
-        // AND decrease holds (if it should NOT be accessible for solver ETH costs)
-        // Must then be withdrawn out of Atlas and manually redeposited
-        // Then the available bonded ETH = holds - withdrawable
-        // Gas efficiency:
-        // - for solver eth -> just use accData.holds
+        // The new withdrawAmount should not exceed the solver's holds balance
+        if (accountData.holds < nonceData.withdrawalAmount) {
+            revert InsufficientBondedBalance({ balance: accountData.holds, requested: amount });
+        }
 
         nonces[msg.sender] = nonceData;
         _balanceOf[msg.sender] = accountData;
 
         return block.number + ESCROW_DURATION;
-    }
-
-    // Redeem atlETH for ETH.
-    function redeem(uint256 amount) external {
-        _checkIfUnlocked();
-        _checkTransfersAllowed(msg.sender);
-
-        EscrowAccountData memory accountData = _balanceOf[msg.sender];
-
-        uint128 _amount = uint128(amount);
-
-        if (accountData.balance - accountData.holds < _amount) revert InsufficientUnbondedBalance();
-
-        EscrowNonce memory nonceData = nonces[msg.sender];
-
-        nonceData.lastAccessed = uint64(block.number);
-        nonceData.withdrawalAmount += _amount;
-        accountData.holds += _amount;
-
-        nonces[msg.sender] = nonceData;
-        _balanceOf[msg.sender] = accountData;
     }
 
     function withdraw(uint256 amount) external {
@@ -139,7 +108,7 @@ abstract contract AtlETH is Permit69 {
     function withdrawSurcharge(uint256 amount) external {
         _checkIfUnlocked();
 
-        if (surcharge < amount) revert InsufficientSurchargeBalance(surcharge, amount);
+        if (surcharge < amount) revert InsufficientSurchargeBalance({ balance: surcharge, requested: amount });
 
         unchecked {
             surcharge -= amount;
@@ -150,37 +119,53 @@ abstract contract AtlETH is Permit69 {
     }
 
     function _bond(address account, uint256 amount) internal {
-        // TODO should this be only callable when unlocked?
         EscrowAccountData memory accountData = _balanceOf[account];
-        // TODO revisit errs, use appropriate args
-        if (accountData.balance - accountData.holds < amount) revert InsufficientUnbondedBalance();
+        if (accountData.balance - accountData.holds < amount) {
+            revert InsufficientUnbondedBalance({ balance: accountData.balance - accountData.holds, requested: amount });
+        }
         accountData.holds += uint128(amount);
         _balanceOf[account] = accountData;
     }
 
-    function _withdrawAccounting(uint256 amount, address spender) internal {
+    // Returns the allowed withdrawal amount which may be <= the requested amount param
+    function _withdrawAccounting(uint256 amount, address spender) internal returns (uint256) {
         EscrowNonce memory nonceData = nonces[spender];
         EscrowAccountData memory accountData = _balanceOf[spender];
 
-        uint128 _amount = uint128(amount);
-
-        if (nonceData.withdrawalAmount < _amount) {
-            revert InsufficientRedeemedBalance(uint256(nonceData.withdrawalAmount), amount);
+        if (nonceData.withdrawalAmount < amount) {
+            revert InsufficientWithdrawableBalance({ balance: nonceData.withdrawalAmount, requested: amount });
         }
-        if (accountData.balance < _amount) revert InsufficientAvailableBalance(uint256(accountData.balance), amount);
 
         nonceData.lastAccessed = uint64(block.number);
-        nonceData.withdrawalAmount -= _amount;
 
+        // SAFE: When holds >= withdrawalAmount, we can safely withdraw the full amount
+        // UNSAFE: When holds < withdrawalAmount, we must make adjustments to ensure solvency
+        if (nonceData.withdrawalAmount > accountData.holds) {
+            // UNSAFE: When holds < withdrawalAmount, we must make adjustments to ensure solvency
+            if (nonceData.withdrawalAmount > accountData.balance) {
+                // If withdrawAmount > all of solver's AtlETH, adjust withdrawAmount down
+                nonceData.withdrawalAmount = accountData.balance;
+                amount = accountData.balance;
+            }
+            // In all unsafe cases, holds must be adjusted up to match withdrawalAmount
+            accountData.holds = nonceData.withdrawalAmount;
+        }
+
+        // Deduct the adjusted withdrawAmount from all 3 trackers
+        uint128 _amount = uint128(amount);
+        nonceData.withdrawalAmount -= _amount;
+        accountData.holds -= _amount;
         accountData.balance -= _amount;
-        accountData.holds = _amount > accountData.holds ? 0 : accountData.holds - _amount;
 
         nonces[spender] = nonceData;
         _balanceOf[spender] = accountData;
 
+        // If uint128(amount) does not revert on overflow above, this would be dangerous
         unchecked {
             totalSupply -= amount;
         }
+
+        return amount;
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -12,8 +12,11 @@ contract AtlETHTest is BaseTest {
 
         uint256 ethBalanceBefore = address(solverOneEOA).balance;
         vm.startPrank(solverOneEOA);
-        // Initiate the redeem for atlETH for ETH
-        atlas.redeem(1 ether);
+        // Bond 1 ETH so we can test the unbonding process
+        atlas.bond(1 ether);
+
+        // Call unbond to initiate the waiting period after which AtlETH can be burnt and ETH withdrawn
+        atlas.unbond(1 ether);
 
         vm.stopPrank();
 

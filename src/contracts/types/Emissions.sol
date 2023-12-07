@@ -61,13 +61,13 @@ contract FastLaneErrorsEvents {
     error UncoveredResult();
 
     // NEW - AtlETH
-    error InsufficientUnbondedBalance();
-    error InsufficientBondedBalance();
+    error InsufficientUnbondedBalance(uint256 balance, uint256 requested);
+    error InsufficientBondedBalance(uint256 balance, uint256 requested);
     error PermitDeadlineExpired();
     error InvalidSigner();
     error EscrowLockActive();
-    error InsufficientRedeemedBalance(uint256 balance, uint256 requested);
-    error InsufficientAvailableBalance(uint256 balance, uint256 requested);
+    error InsufficientWithdrawableBalance(uint256 balance, uint256 requested);
+    error InsufficientAvailableBalance(uint256 balance, uint256 requested); // TODO check where this is used
     error InsufficientSurchargeBalance(uint256 balance, uint256 requested);
 
     // NEW - DAppIntegration
