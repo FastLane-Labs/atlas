@@ -99,7 +99,8 @@ abstract contract AtlETH is Permit69 {
         _checkIfUnlocked();
         _checkTransfersAllowed(msg.sender);
 
-        _withdrawAccounting(amount, msg.sender);
+        // Amount may be adjusted down if solver does not hold enough AtlETH
+        amount = _withdrawAccounting(amount, msg.sender);
 
         emit Transfer(msg.sender, address(0), amount);
         SafeTransferLib.safeTransferETH(msg.sender, amount);
@@ -184,8 +185,17 @@ abstract contract AtlETH is Permit69 {
     function transfer(address to, uint256 amount) public returns (bool) {
         _checkTransfersAllowed(msg.sender);
 
-        _withdrawAccounting(amount, msg.sender);
+        EscrowNonce memory nonceData = nonces[msg.sender];
+        EscrowAccountData memory accountData = _balanceOf[msg.sender];
 
+        // Only allowed to transfer AtlETH that is not bonded or unbonding
+        uint128 maxUnavailable =
+            accountData.holds >= nonceData.withdrawalAmount ? accountData.holds : nonceData.withdrawalAmount;
+        if (amount > accountData.balance - maxUnavailable) {
+            revert InsufficientAvailableBalance({ balance: accountData.balance - maxUnavailable, requested: amount });
+        }
+
+        _balanceOf[msg.sender].balance -= uint128(amount);
         _balanceOf[to].balance += uint128(amount);
 
         emit Transfer(msg.sender, to, amount);
@@ -198,8 +208,17 @@ abstract contract AtlETH is Permit69 {
         uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
         if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
 
-        _withdrawAccounting(amount, from);
+        EscrowNonce memory nonceData = nonces[from];
+        EscrowAccountData memory accountData = _balanceOf[from];
 
+        // Only allowed to transfer AtlETH that is not bonded or unbonding
+        uint128 maxUnavailable =
+            accountData.holds >= nonceData.withdrawalAmount ? accountData.holds : nonceData.withdrawalAmount;
+        if (amount > accountData.balance - maxUnavailable) {
+            revert InsufficientAvailableBalance({ balance: accountData.balance - maxUnavailable, requested: amount });
+        }
+
+        _balanceOf[from].balance -= uint128(amount);
         _balanceOf[to].balance += uint128(amount);
 
         emit Transfer(from, to, amount);
