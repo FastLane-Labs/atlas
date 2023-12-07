@@ -61,7 +61,7 @@ contract FastLaneErrorsEvents {
     error UncoveredResult();
 
     // NEW - AtlETH
-    error InsufficientBalance();
+    error InsufficientUnbondedBalance();
     error PermitDeadlineExpired();
     error InvalidSigner();
     error EscrowLockActive();

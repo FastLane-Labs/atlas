@@ -48,9 +48,30 @@ abstract contract AtlETH is Permit69 {
 
     // Deposit ETH and get atlETH in return.
     function deposit() external payable {
-        // _checkIfUnlocked();
         _mint(msg.sender, msg.value);
     }
+
+    // Puts a "hold" on a solver's AtlETH, enabling it to be used in Atlas transactions
+    // Bonded AtlETH must first be unbonded to become transferrable or withdrawable
+    function bond(uint256 amount) external {
+        _bond(msg.sender, amount);
+    }
+
+    // Deposits the sender's full msg.value and converts to AtlETH
+    // Then bonds the given amountToBond
+    function depositAndBond(uint256 amountToBond) external payable {
+        _mint(msg.sender, msg.value);
+        _bond(msg.sender, amountToBond);
+    }
+
+    function _bond(address account, uint256 amount) internal {
+        EscrowAccountData memory accountData = _balanceOf[account];
+        if (accountData.balance - accountData.holds < amount) revert InsufficientUnbondedBalance();
+        accountData.holds += uint128(amount);
+        _balanceOf[account] = accountData;
+    }
+
+    function unbond() external { }
 
     // Redeem atlETH for ETH.
     function redeem(uint256 amount) external {
@@ -61,7 +82,7 @@ abstract contract AtlETH is Permit69 {
 
         uint128 _amount = uint128(amount);
 
-        if (accountData.balance - accountData.holds < _amount) revert InsufficientBalance();
+        if (accountData.balance - accountData.holds < _amount) revert InsufficientUnbondedBalance();
 
         EscrowNonce memory nonceData = nonces[msg.sender];
 
