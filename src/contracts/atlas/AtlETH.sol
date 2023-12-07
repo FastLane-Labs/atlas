@@ -41,6 +41,14 @@ abstract contract AtlETH is Permit69 {
         return uint256(nonces[account].lastAccessed);
     }
 
+    // Other views needed:
+    // - bonded balance
+    // - unbonding balance
+    // - time left until unbonded
+
+    // TO ADD:
+    // - Transferring of any unbonded AtlETH
+
     function balanceOf(address account) public view returns (uint256) {
         EscrowAccountData memory accountData = _balanceOf[account];
         return uint256(accountData.balance - accountData.holds);
@@ -58,20 +66,44 @@ abstract contract AtlETH is Permit69 {
     }
 
     // Deposits the sender's full msg.value and converts to AtlETH
-    // Then bonds the given amountToBond
+    // Then bonds the sender's amountToBond of AtlETH
     function depositAndBond(uint256 amountToBond) external payable {
         _mint(msg.sender, msg.value);
         _bond(msg.sender, amountToBond);
     }
 
-    function _bond(address account, uint256 amount) internal {
-        EscrowAccountData memory accountData = _balanceOf[account];
-        if (accountData.balance - accountData.holds < amount) revert InsufficientUnbondedBalance();
-        accountData.holds += uint128(amount);
-        _balanceOf[account] = accountData;
-    }
+    // Starts the unbonding wait time.
+    // Unbonding AtlETH is not available for use in the Atlas system,
+    // Nor is it withdrawable until after the unbonding period
+    function unbond(uint256 amount) external returns (uint256 unbondCompleteBlock) {
+        _checkIfUnlocked();
+        // NOTE: No _checkTransfersAllowed here - allows solvers to call unbond many times
+        // to increase the unbonding amount (and push out end time) before final claim
 
-    function unbond() external { }
+        EscrowAccountData memory accountData = _balanceOf[msg.sender];
+        // TODO revisit errs, use appropriate args
+        if (accountData.holds < amount) revert InsufficientBondedBalance();
+
+        EscrowNonce memory nonceData = nonces[msg.sender];
+        uint128 _amount = uint128(amount);
+
+        nonceData.lastAccessed = uint64(block.number);
+        accountData.balance -= _amount;
+        accountData.holds -= _amount;
+        nonceData.withdrawalAmount += _amount;
+
+        // TODO this should maybe decrease accountData.balance for solver
+        // AND decrease holds (if it should NOT be accessible for solver ETH costs)
+        // Must then be withdrawn out of Atlas and manually redeposited
+        // Then the available bonded ETH = holds - withdrawable
+        // Gas efficiency:
+        // - for solver eth -> just use accData.holds
+
+        nonces[msg.sender] = nonceData;
+        _balanceOf[msg.sender] = accountData;
+
+        return block.number + ESCROW_DURATION;
+    }
 
     // Redeem atlETH for ETH.
     function redeem(uint256 amount) external {
@@ -115,6 +147,15 @@ abstract contract AtlETH is Permit69 {
 
         // NOTE: Surcharges are not deducted from totalSupply.
         _balanceOf[address(0xa7145)].balance += uint128(amount);
+    }
+
+    function _bond(address account, uint256 amount) internal {
+        // TODO should this be only callable when unlocked?
+        EscrowAccountData memory accountData = _balanceOf[account];
+        // TODO revisit errs, use appropriate args
+        if (accountData.balance - accountData.holds < amount) revert InsufficientUnbondedBalance();
+        accountData.holds += uint128(amount);
+        _balanceOf[account] = accountData;
     }
 
     function _withdrawAccounting(uint256 amount, address spender) internal {
