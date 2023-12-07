@@ -118,11 +118,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
             if (msgValue < userOp.value) {
                 return (prunedSolverOps, ValidCallsResult.TxValueLowerThanCallValue);
             }
-
-            // Check the Execution Environment address is a smart contract
-            if (executionEnvironment.codehash == bytes32(0)) {
-                return (prunedSolverOps, ValidCallsResult.ExecutionEnvEmpty);
-            }
         }
 
         // Otherwise, prune invalid solver ops
