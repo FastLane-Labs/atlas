@@ -3,30 +3,35 @@ pragma solidity 0.8.21;
 
 import "forge-std/Test.sol";
 
-import { Factory as AbstractFactory } from "../src/contracts/atlas/Factory.sol";
+import { Factory } from "../src/contracts/atlas/Factory.sol";
 import { DummyDAppControl } from "./base/DummyDAppControl.sol";
 
 import "../src/contracts/types/UserCallTypes.sol";
 
 import "./base/TestUtils.sol";
 
-contract Factory is AbstractFactory {
+contract MockFactory is Factory, Test {
     function getOrCreateExecutionEnvironment(UserOperation calldata userOp)
         external
         returns (address executionEnvironment, DAppConfig memory dConfig)
     {
         return _getOrCreateExecutionEnvironment(userOp);
     }
+
+    function deployExecutionEnvironmentTemplate(address caller) external returns (address executionEnvironment) {
+        vm.prank(caller);
+        executionEnvironment = _deployExecutionEnvironmentTemplate();
+    }
 }
 
 contract FactoryTest is Test {
-    Factory public factory;
+    MockFactory public mockFactory;
     DummyDAppControl public dAppControl;
 
     address public user;
 
     function setUp() public {
-        factory = new Factory();
+        mockFactory = new MockFactory();
         dAppControl = new DummyDAppControl(address(0));
         user = address(999);
     }
@@ -34,14 +39,17 @@ contract FactoryTest is Test {
     function test_createExecutionEnvironment() public {
         uint32 callConfig = dAppControl.callConfig();
         bytes memory creationCode = TestUtils._getMimicCreationCode(
-            address(dAppControl), callConfig, factory.executionTemplate(), user, address(dAppControl).codehash
+            address(dAppControl), callConfig, mockFactory.executionTemplate(), user, address(dAppControl).codehash
         );
         address expectedExecutionEnvironment = address(
             uint160(
                 uint256(
                     keccak256(
                         abi.encodePacked(
-                            bytes1(0xff), address(factory), factory.salt(), keccak256(abi.encodePacked(creationCode))
+                            bytes1(0xff),
+                            address(mockFactory),
+                            mockFactory.salt(),
+                            keccak256(abi.encodePacked(creationCode))
                         )
                     )
                 )
@@ -51,7 +59,7 @@ contract FactoryTest is Test {
         assertTrue(expectedExecutionEnvironment.codehash == bytes32(0));
 
         vm.prank(user);
-        address actualExecutionEnvironment = factory.createExecutionEnvironment(address(dAppControl));
+        address actualExecutionEnvironment = mockFactory.createExecutionEnvironment(address(dAppControl));
 
         assertFalse(expectedExecutionEnvironment.codehash == bytes32(0));
         assertEq(
@@ -63,14 +71,14 @@ contract FactoryTest is Test {
         address executionEnvironment;
         bool exists;
 
-        (executionEnvironment,, exists) = factory.getExecutionEnvironment(user, address(dAppControl));
+        (executionEnvironment,, exists) = mockFactory.getExecutionEnvironment(user, address(dAppControl));
         assertFalse(exists, "Execution environment should not exist");
         assertTrue(executionEnvironment.codehash == bytes32(0));
 
         vm.prank(user);
-        factory.createExecutionEnvironment(address(dAppControl));
+        mockFactory.createExecutionEnvironment(address(dAppControl));
 
-        (executionEnvironment,, exists) = factory.getExecutionEnvironment(user, address(dAppControl));
+        (executionEnvironment,, exists) = mockFactory.getExecutionEnvironment(user, address(dAppControl));
         assertTrue(exists, "Execution environment should exist");
         assertFalse(executionEnvironment.codehash == bytes32(0));
     }
@@ -83,14 +91,19 @@ contract FactoryTest is Test {
         address executionEnvironment;
         bool exists;
 
-        (executionEnvironment,, exists) = factory.getExecutionEnvironment(user, address(dAppControl));
+        (executionEnvironment,, exists) = mockFactory.getExecutionEnvironment(user, address(dAppControl));
         assertFalse(exists, "Execution environment should not exist");
         assertTrue(executionEnvironment.codehash == bytes32(0));
 
-        factory.getOrCreateExecutionEnvironment(userOp);
+        mockFactory.getOrCreateExecutionEnvironment(userOp);
 
-        (executionEnvironment,, exists) = factory.getExecutionEnvironment(user, address(dAppControl));
+        (executionEnvironment,, exists) = mockFactory.getExecutionEnvironment(user, address(dAppControl));
         assertTrue(exists, "Execution environment should exist");
+        assertFalse(executionEnvironment.codehash == bytes32(0));
+    }
+
+    function test_deployExecutionEnvironmentTemplate() public {
+        address executionEnvironment = mockFactory.deployExecutionEnvironmentTemplate(user);
         assertFalse(executionEnvironment.codehash == bytes32(0));
     }
 }
