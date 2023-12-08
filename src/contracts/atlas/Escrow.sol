@@ -20,6 +20,8 @@ import { EscrowBits } from "../libraries/EscrowBits.sol";
 import { CallBits } from "../libraries/CallBits.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
 
+import "forge-std/Test.sol";
+
 // import "forge-std/Test.sol";
 
 abstract contract Escrow is AtlETH {
@@ -202,6 +204,7 @@ abstract contract Escrow is AtlETH {
 
         // Verify that we can lend the solver their tx value
         if (solverOp.value > address(this).balance - (gasLimit * tx.gasprice)) {
+            console.log(solverOp.value, address(this).balance);
             result |= 1 << uint256(SolverOutcome.CallValueTooHigh);
         }
 

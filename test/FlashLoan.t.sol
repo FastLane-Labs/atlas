@@ -62,10 +62,16 @@ contract FlashLoanTest is BaseTest {
             arb.ternarySearch(chain.weth, chain.dai, arb.v2Router(), arb.s2Router(), 1, 50e18, 0, 20);
 
         vm.startPrank(solverOneEOA);
-        SimpleArbitrageSolver solver = new SimpleArbitrageSolver(WETH_ADDRESS, address(atlas));
+        SimpleArbitrageSolver solver = new SimpleArbitrageSolver();
         deal(WETH_ADDRESS, address(solver), 1e18); // 1 WETH to solver to pay bid
-        atlas.deposit{ value: 1e18 }();
+        atlas.deposit{ value: 1e18 }(); // gas for solver to pay
         vm.stopPrank();
+
+        vm.startPrank(userEOA);
+        deal(userEOA, 100e18); // eth to solver for atleth deposit
+        atlas.deposit{ value: 100e18 }();
+        vm.stopPrank();
+
 
         // Input params for Atlas.metacall() - will be populated below
 
@@ -85,11 +91,9 @@ contract FlashLoanTest is BaseTest {
         });
 
         SolverOperation[] memory solverOps = new SolverOperation[](1);
-        bytes memory solverOpData =
-            abi.encodeWithSelector(SimpleArbitrageSolver.arbitrageNoPayback.selector, arb.v2Router(), arb.s2Router(), chain.dai, optimalAmountIn);
         solverOps[0] = txBuilder.buildSolverOperation({
             userOp: userOp,
-            solverOpData: solverOpData,
+            solverOpData: abi.encodeWithSelector(SimpleArbitrageSolver.arbitrageNoPayback.selector),
             solverEOA: solverOneEOA,
             solverContract: address(solver),
             bidAmount: 1e18,
@@ -111,6 +115,8 @@ contract FlashLoanTest is BaseTest {
         vm.startPrank(userEOA);
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
+
+        console.log("atlas has", address(atlas).balance);
 
     } 
 
@@ -157,11 +163,23 @@ contract DummyController is DAppControl {
     fallback() external {}
 }
 
-contract SimpleArbitrageSolver is SolverBase {
-    constructor(address weth, address atlas) SolverBase(weth, atlas, msg.sender) { }
+contract SimpleArbitrageSolver {
+    //constructor(address weth, address atlas) SolverBase(weth, atlas, msg.sender) { }
+
+    function atlasSolverCall(
+        address sender,
+        address bidToken,
+        uint256 bidAmount,
+        bytes calldata solverOpData,
+        bytes calldata extraReturnData
+    ) external payable returns (bool success, bytes memory data) {
+        (success, data) = address(this).call{ value: msg.value }(solverOpData);
+    }
 
     function arbitrageNoPayback() external payable {
         // Empty function, take the weth and not return anything - should fail
+        console.log("arbitrage call received eth:", msg.value);
+        address(0).call{ value: msg.value }(""); // do something with the weth, dont pay it back
     }
 
     function arbitrageWithPayback(address routerA, address routerB, address tradeToken, uint256 amountIn) external payable {
