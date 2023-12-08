@@ -88,7 +88,6 @@ abstract contract AtlETH is Permit69 {
         }
 
         nonces[msg.sender] = nonceData;
-        _balanceOf[msg.sender] = accountData;
 
         return block.number + ESCROW_DURATION;
     }
