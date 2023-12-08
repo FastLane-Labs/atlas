@@ -78,7 +78,7 @@ contract MockStorageTests is Storage {
         return INITIAL_DOMAIN_SEPARATOR;
     }
 
-    function _computeDomainSeparator() override internal view virtual returns (bytes32) {
+    function _computeDomainSeparator() internal view virtual override returns (bytes32) {
         return bytes32("SEPARATOR");
     }
 }
