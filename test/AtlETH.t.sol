@@ -9,9 +9,11 @@ contract AtlETHTest is BaseTest {
     function testBasicFunctionalities() public {
         // solverOne deposited 1 ETH into Atlas in BaseTest.setUp
         assertTrue(atlas.balanceOf(solverOneEOA) == 1 ether, "solverOne's atlETH balance should be 1");
+        assertEq(atlas.totalSupply(), 2 ether, "total atlETH supply should be 2");
 
         uint256 ethBalanceBefore = address(solverOneEOA).balance;
         vm.startPrank(solverOneEOA);
+
         // Bond 1 ETH so we can test the unbonding process
         atlas.bond(1 ether);
 
@@ -35,6 +37,7 @@ contract AtlETHTest is BaseTest {
         assertTrue(
             ethBalanceAfter == ethBalanceBefore + 1 ether, "solverOne's ETH balance should have been increased 1"
         );
+        assertEq(atlas.totalSupply(), 1 ether, "total atlETH supply should have decreased to 1");
 
         vm.stopPrank();
     }

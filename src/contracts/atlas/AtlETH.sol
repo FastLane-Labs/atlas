@@ -6,6 +6,8 @@ import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 import "../types/EscrowTypes.sol";
 import { Permit69 } from "../common/Permit69.sol";
 
+import "forge-std/Test.sol";
+
 // TODO split out events and errors to share with AtlasEscrow
 
 /// @notice Modified Solmate ERC20 with some Atlas-specific modifications.
@@ -130,11 +132,13 @@ abstract contract AtlETH is Permit69 {
         EscrowNonce memory nonceData = nonces[spender];
         EscrowAccountData memory accountData = _balanceOf[spender];
 
-        if (nonceData.withdrawalAmount < amount) {
+        uint128 _amount = uint128(amount);
+        uint128 unlockedBalance = accountData.balance - accountData.holds;
+        nonceData.lastAccessed = uint64(block.number);
+
+        if (nonceData.withdrawalAmount + unlockedBalance < _amount) {
             revert InsufficientWithdrawableBalance({ balance: nonceData.withdrawalAmount, requested: amount });
         }
-
-        nonceData.lastAccessed = uint64(block.number);
 
         // SAFE: When holds >= withdrawalAmount, we can safely withdraw the full amount
         // UNSAFE: When holds < withdrawalAmount, we must make adjustments to ensure solvency
@@ -143,25 +147,27 @@ abstract contract AtlETH is Permit69 {
             if (nonceData.withdrawalAmount > accountData.balance) {
                 // If withdrawAmount > all of solver's AtlETH, adjust withdrawAmount down
                 nonceData.withdrawalAmount = accountData.balance;
-                amount = accountData.balance;
+                _amount = accountData.balance;
             }
             // In all unsafe cases, holds must be adjusted up to match withdrawalAmount
             accountData.holds = nonceData.withdrawalAmount;
         }
 
-        // Deduct the adjusted withdrawAmount from all 3 trackers
-        uint128 _amount = uint128(amount);
-        nonceData.withdrawalAmount -= _amount;
-        accountData.holds -= _amount;
+        // First withdraw from unlocked balance
+        // Here, holds = max(holds, withdrawalAmount)
+        unlockedBalance = accountData.balance - accountData.holds;
         accountData.balance -= _amount;
+
+        // After withdrawing all unlocked balance, take the rest from holds and withdrawalAmount
+        if (_amount > unlockedBalance) {
+            nonceData.withdrawalAmount -= _amount - unlockedBalance;
+            accountData.holds -= _amount - unlockedBalance;
+        }
 
         nonces[spender] = nonceData;
         _balanceOf[spender] = accountData;
 
-        // If uint128(amount) does not revert on overflow above, this would be dangerous
-        unchecked {
-            totalSupply -= amount;
-        }
+        totalSupply -= _amount;
 
         return amount;
     }
