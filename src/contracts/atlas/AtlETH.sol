@@ -95,7 +95,7 @@ abstract contract AtlETH is Permit69 {
 
     function withdraw(uint256 amount) external {
         _checkIfUnlocked();
-        _checkTransfersAllowed(msg.sender);
+        _checkEscrowPeriodHasPassed(msg.sender);
 
         // Amount may be adjusted down if solver does not hold enough AtlETH
         amount = _withdrawAccounting(amount, msg.sender);
@@ -181,8 +181,6 @@ abstract contract AtlETH is Permit69 {
     // E.G.  start the withdrawal in advance. This would prevent searchers from xfering their escrowed gas in the same
     // block, but in front of their own searcher ops.
     function transfer(address to, uint256 amount) public returns (bool) {
-        _checkTransfersAllowed(msg.sender);
-
         EscrowNonce memory nonceData = nonces[msg.sender];
         EscrowAccountData memory accountData = _balanceOf[msg.sender];
 
@@ -201,8 +199,6 @@ abstract contract AtlETH is Permit69 {
     }
 
     function transferFrom(address from, address to, uint256 amount) public returns (bool) {
-        _checkTransfersAllowed(from);
-
         uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
         if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
 
@@ -289,7 +285,7 @@ abstract contract AtlETH is Permit69 {
     // Custom checks for atlETH transfer functions.
     // Interactions (transfers, withdrawals) are allowed only after the owner last interaction
     // with Atlas was at least `escrowDuration` blocks ago.
-    function _checkTransfersAllowed(address account) internal view {
+    function _checkEscrowPeriodHasPassed(address account) internal view {
         if (block.number < nonces[account].lastAccessed + ESCROW_DURATION) {
             revert EscrowLockActive();
         }
