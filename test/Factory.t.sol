@@ -56,12 +56,12 @@ contract FactoryTest is Test {
             )
         );
 
-        assertTrue(expectedExecutionEnvironment.codehash == bytes32(0));
+        assertTrue(expectedExecutionEnvironment.codehash == bytes32(0), "Execution environment should not exist");
 
         vm.prank(user);
         address actualExecutionEnvironment = mockFactory.createExecutionEnvironment(address(dAppControl));
 
-        assertFalse(expectedExecutionEnvironment.codehash == bytes32(0));
+        assertFalse(expectedExecutionEnvironment.codehash == bytes32(0), "Execution environment should exist");
         assertEq(
             expectedExecutionEnvironment, actualExecutionEnvironment, "Execution environment not the same as predicted"
         );
@@ -73,14 +73,14 @@ contract FactoryTest is Test {
 
         (executionEnvironment,, exists) = mockFactory.getExecutionEnvironment(user, address(dAppControl));
         assertFalse(exists, "Execution environment should not exist");
-        assertTrue(executionEnvironment.codehash == bytes32(0));
+        assertTrue(executionEnvironment.codehash == bytes32(0), "Execution environment should not exist");
 
         vm.prank(user);
         mockFactory.createExecutionEnvironment(address(dAppControl));
 
         (executionEnvironment,, exists) = mockFactory.getExecutionEnvironment(user, address(dAppControl));
         assertTrue(exists, "Execution environment should exist");
-        assertFalse(executionEnvironment.codehash == bytes32(0));
+        assertFalse(executionEnvironment.codehash == bytes32(0), "Execution environment should exist");
     }
 
     function test_getOrCreateExecutionEnvironment() public {
@@ -93,17 +93,17 @@ contract FactoryTest is Test {
 
         (executionEnvironment,, exists) = mockFactory.getExecutionEnvironment(user, address(dAppControl));
         assertFalse(exists, "Execution environment should not exist");
-        assertTrue(executionEnvironment.codehash == bytes32(0));
+        assertTrue(executionEnvironment.codehash == bytes32(0), "Execution environment should not exist");
 
         mockFactory.getOrCreateExecutionEnvironment(userOp);
 
         (executionEnvironment,, exists) = mockFactory.getExecutionEnvironment(user, address(dAppControl));
         assertTrue(exists, "Execution environment should exist");
-        assertFalse(executionEnvironment.codehash == bytes32(0));
+        assertFalse(executionEnvironment.codehash == bytes32(0), "Execution environment should exist");
     }
 
     function test_deployExecutionEnvironmentTemplate() public {
         address executionEnvironment = mockFactory.deployExecutionEnvironmentTemplate(user);
-        assertFalse(executionEnvironment.codehash == bytes32(0));
+        assertFalse(executionEnvironment.codehash == bytes32(0), "Execution environment should exist");
     }
 }
