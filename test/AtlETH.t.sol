@@ -41,4 +41,24 @@ contract AtlETHTest is BaseTest {
 
         vm.stopPrank();
     }
+
+    function testWithdrawWithoutBonding() public {
+        // solverOne deposited 1 ETH into Atlas in BaseTest.setUp
+        assertTrue(atlas.balanceOf(solverOneEOA) == 1 ether, "solverOne's atlETH balance should be 1");
+        assertEq(atlas.totalSupply(), 2 ether, "total atlETH supply should be 2");
+
+        uint256 ethBalanceBefore = address(solverOneEOA).balance;
+        vm.startPrank(solverOneEOA);
+
+        // Call withdraw without bonding first
+        atlas.withdraw(1 ether);
+        uint256 ethBalanceAfter = address(solverOneEOA).balance;
+
+        assertTrue(atlas.balanceOf(solverOneEOA) == 0, "solverOne's atlETH balance should be 0");
+        assertTrue(
+            ethBalanceAfter == ethBalanceBefore + 1 ether, "solverOne's ETH balance should have been increased 1"
+        );
+        assertEq(atlas.totalSupply(), 1 ether, "total atlETH supply should have decreased to 1");
+        vm.stopPrank();
+    }
 }
