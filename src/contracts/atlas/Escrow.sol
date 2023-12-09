@@ -164,7 +164,7 @@ abstract contract Escrow is AtlETH {
         (success,) = environment.call(postOpsData);
     }
 
-    // TODO Revisit the EscrowAccountData memory solverEscrow arg. Needs to be passed through from Atlas, through
+    // TODO Revisit the EscrowAccountBalance memory solverEscrow arg. Needs to be passed through from Atlas, through
     // callstack
     function _validateSolverOperation(
         SolverOperation calldata solverOp,
@@ -177,15 +177,15 @@ abstract contract Escrow is AtlETH {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
 
-        EscrowAccountData memory solverEscrow = _balanceOf[solverOp.from];
+        EscrowAccountBalance memory solverEscrow = _balanceOf[solverOp.from];
 
-        uint256 solverBalance = uint256(solverEscrow.balance - solverEscrow.holds);
+        uint256 solverBalance = uint256(solverEscrow.total - solverEscrow.bonded);
 
         if (solverOp.to != address(this)) {
             result |= 1 << uint256(SolverOutcome.InvalidTo);
         }
 
-        if (nonces[solverOp.from].lastAccessed >= uint64(block.number)) {
+        if (accessData[solverOp.from].lastAccessedBlock >= uint64(block.number)) {
             result |= 1 << uint256(SolverOutcome.PerBlockLimit);
         }
 

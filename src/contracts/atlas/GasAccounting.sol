@@ -65,15 +65,15 @@ abstract contract GasAccounting is SafetyLocks {
         // to be used to cover what they owe.  This will be subtracted later - tx will revert here if there isn't
         // enough.
 
-        EscrowAccountData memory solverEscrow = _balanceOf[solverFrom];
+        EscrowAccountBalance memory solverEscrow = _balanceOf[solverFrom];
 
         if (lock != environment) revert InvalidExecutionEnvironment(lock);
         if (solverFrom != solver) revert InvalidSolverFrom(solver);
-        if (uint256(solverEscrow.balance) - uint256(solverEscrow.holds) < maxApprovedGasSpend) {
+        if (uint256(solverEscrow.total) - uint256(solverEscrow.bonded) < maxApprovedGasSpend) {
             revert InsufficientSolverBalance(
-                uint256(_balanceOf[solverFrom].balance),
+                uint256(_balanceOf[solverFrom].total),
                 msg.value,
-                uint256(_balanceOf[solverFrom].holds),
+                uint256(_balanceOf[solverFrom].bonded),
                 maxApprovedGasSpend
             );
         }
@@ -86,7 +86,7 @@ abstract contract GasAccounting is SafetyLocks {
         if (deficit > surplus) revert InsufficientTotalBalance(deficit - surplus);
 
         // Increase solver holds by the approved amount - which will decrease solver's balance to pay for gas used
-        solverEscrow.holds += uint128(maxApprovedGasSpend);
+        solverEscrow.bonded += uint128(maxApprovedGasSpend);
         _balanceOf[solverFrom] = solverEscrow;
 
         // Add (msg.value + maxApprovedGasSpend) to solver's deposits
@@ -111,7 +111,7 @@ abstract contract GasAccounting is SafetyLocks {
     function _trySolverLock(SolverOperation calldata solverOp) internal returns (bool valid) {
         if (_borrow(solverOp.value)) {
             address solverFrom = solverOp.from;
-            nonces[solverFrom].lastAccessed = uint64(block.number);
+            accessData[solverFrom].lastAccessedBlock = uint64(block.number);
             solver = solverFrom;
             return true;
         } else {
@@ -123,7 +123,7 @@ abstract contract GasAccounting is SafetyLocks {
         // Calculate what the solver owes if they failed
         // NOTE: This will cause an error if you are simulating with a gasPrice of 0
         address solverFrom = solverOp.from;
-        uint256 solverBalance = (_balanceOf[solverFrom].balance);
+        uint256 solverBalance = (_balanceOf[solverFrom].total);
 
         uint256 gasUsed = gasWaterMark - gasleft() + 5000;
         if (result & EscrowBits._FULL_REFUND != 0) {
@@ -140,7 +140,7 @@ abstract contract GasAccounting is SafetyLocks {
 
         gasUsed = gasUsed > solverBalance ? solverBalance : gasUsed;
 
-        _balanceOf[solverFrom].balance -= uint128(gasUsed);
+        _balanceOf[solverFrom].total -= uint128(gasUsed);
 
         deposits += gasUsed;
     }
@@ -156,8 +156,8 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 _deposits = deposits;
         uint256 _supply = totalSupply;
 
-        EscrowAccountData memory solverEscrow = _balanceOf[winningSolver];
-        uint256 _solverHold = solverEscrow.holds;
+        EscrowAccountBalance memory solverEscrow = _balanceOf[winningSolver];
+        uint256 _solverBonded = solverEscrow.bonded;
 
         // Remove any remaining gas from the bundler's claim.
         uint256 gasRemainder = (gasleft() * tx.gasprice);
@@ -170,12 +170,12 @@ abstract contract GasAccounting is SafetyLocks {
 
         // Remove the hold
         // NOTE that holds can also be applied from withdrawals, so make sure we don't remove any non-transitory holds
-        if (surplus > _solverHold) {
-            surplus -= _solverHold;
-            solverEscrow.holds = 0;
-            solverEscrow.balance += uint128(surplus);
+        if (surplus > _solverBonded) {
+            surplus -= _solverBonded;
+            solverEscrow.bonded = 0;
+            solverEscrow.total += uint128(surplus);
         } else {
-            solverEscrow.holds -= uint128(surplus);
+            solverEscrow.bonded -= uint128(surplus);
             surplus = 0;
         }
 

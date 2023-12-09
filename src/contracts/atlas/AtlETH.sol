@@ -40,7 +40,7 @@ abstract contract AtlETH is Permit69 {
     //////////////////////////////////////////////////////////////*/
 
     function accountLastActiveBlock(address account) external view returns (uint256) {
-        return uint256(nonces[account].lastAccessed);
+        return uint256(accessData[account].lastAccessedBlock);
     }
 
     // TODO
@@ -50,8 +50,8 @@ abstract contract AtlETH is Permit69 {
     // - time left until unbonded
 
     function balanceOf(address account) public view returns (uint256) {
-        EscrowAccountData memory accountData = _balanceOf[account];
-        return uint256(accountData.balance - accountData.holds);
+        EscrowAccountBalance memory accountBalance = _balanceOf[account];
+        return uint256(accountBalance.total - accountBalance.bonded);
     }
 
     // Deposit ETH and get atlETH in return.
@@ -78,18 +78,18 @@ abstract contract AtlETH is Permit69 {
     function unbond(uint256 amount) external returns (uint256 unbondCompleteBlock) {
         _checkIfUnlocked();
 
-        EscrowAccountData memory accountData = _balanceOf[msg.sender];
-        EscrowNonce memory nonceData = nonces[msg.sender];
+        EscrowAccountBalance memory accountBalance = _balanceOf[msg.sender];
+        EscrowAccountAccessData memory _accessData = accessData[msg.sender];
 
-        nonceData.lastAccessed = uint64(block.number);
-        nonceData.withdrawalAmount += uint128(amount);
+        _accessData.lastAccessedBlock = uint64(block.number);
+        _accessData.unbondingBalance += uint128(amount);
 
         // The new withdrawAmount should not exceed the solver's holds balance
-        if (accountData.holds < nonceData.withdrawalAmount) {
-            revert InsufficientBondedBalance({ balance: accountData.holds, requested: amount });
+        if (accountBalance.bonded < _accessData.unbondingBalance) {
+            revert InsufficientBondedBalance({ balance: accountBalance.bonded, requested: amount });
         }
 
-        nonces[msg.sender] = nonceData;
+        accessData[msg.sender] = _accessData;
 
         return block.number + ESCROW_DURATION;
     }
@@ -115,57 +115,60 @@ abstract contract AtlETH is Permit69 {
         }
 
         // NOTE: Surcharges are not deducted from totalSupply.
-        _balanceOf[address(0xa7145)].balance += uint128(amount);
+        _balanceOf[address(0xa7145)].total += uint128(amount);
     }
 
     function _bond(address account, uint256 amount) internal {
-        EscrowAccountData memory accountData = _balanceOf[account];
-        if (accountData.balance - accountData.holds < amount) {
-            revert InsufficientUnbondedBalance({ balance: accountData.balance - accountData.holds, requested: amount });
+        EscrowAccountBalance memory accountBalance = _balanceOf[account];
+        if (accountBalance.total - accountBalance.bonded < amount) {
+            revert InsufficientUnbondedBalance({
+                balance: accountBalance.total - accountBalance.bonded,
+                requested: amount
+            });
         }
-        accountData.holds += uint128(amount);
-        _balanceOf[account] = accountData;
+        accountBalance.bonded += uint128(amount);
+        _balanceOf[account] = accountBalance;
     }
 
     // Returns the allowed withdrawal amount which may be <= the requested amount param
     function _withdrawAccounting(uint256 amount, address spender) internal returns (uint256) {
-        EscrowNonce memory nonceData = nonces[spender];
-        EscrowAccountData memory accountData = _balanceOf[spender];
+        EscrowAccountAccessData memory _accessData = accessData[spender];
+        EscrowAccountBalance memory accountBalance = _balanceOf[spender];
 
         uint128 _amount = uint128(amount);
-        uint128 unlockedBalance = accountData.balance - accountData.holds;
-        nonceData.lastAccessed = uint64(block.number);
+        uint128 unlockedBalance = accountBalance.total - accountBalance.bonded;
+        _accessData.lastAccessedBlock = uint64(block.number);
 
-        if (nonceData.withdrawalAmount + unlockedBalance < _amount) {
-            revert InsufficientWithdrawableBalance({ balance: nonceData.withdrawalAmount, requested: amount });
+        if (_accessData.unbondingBalance + unlockedBalance < _amount) {
+            revert InsufficientWithdrawableBalance({ balance: _accessData.unbondingBalance, requested: amount });
         }
 
         // SAFE: When holds >= withdrawalAmount, we can safely withdraw the full amount
         // UNSAFE: When holds < withdrawalAmount, we must make adjustments to ensure solvency
-        if (nonceData.withdrawalAmount > accountData.holds) {
+        if (_accessData.unbondingBalance > accountBalance.bonded) {
             // UNSAFE: When holds < withdrawalAmount, we must make adjustments to ensure solvency
-            if (nonceData.withdrawalAmount > accountData.balance) {
+            if (_accessData.unbondingBalance > accountBalance.total) {
                 // If withdrawAmount > all of solver's AtlETH, adjust withdrawAmount down
-                nonceData.withdrawalAmount = accountData.balance;
-                _amount = accountData.balance;
+                _accessData.unbondingBalance = accountBalance.total;
+                _amount = accountBalance.total;
             }
             // In all unsafe cases, holds must be adjusted up to match withdrawalAmount
-            accountData.holds = nonceData.withdrawalAmount;
+            accountBalance.bonded = _accessData.unbondingBalance;
         }
 
         // First withdraw from unlocked balance
-        // Here, holds = max(holds, withdrawalAmount)
-        unlockedBalance = accountData.balance - accountData.holds;
-        accountData.balance -= _amount;
+        // Here, holds = max(bonded, withdrawalAmount)
+        unlockedBalance = accountBalance.total - accountBalance.bonded;
+        accountBalance.total -= _amount;
 
         // After withdrawing all unlocked balance, take the rest from holds and withdrawalAmount
         if (_amount > unlockedBalance) {
-            nonceData.withdrawalAmount -= _amount - unlockedBalance;
-            accountData.holds -= _amount - unlockedBalance;
+            _accessData.unbondingBalance -= _amount - unlockedBalance;
+            accountBalance.bonded -= _amount - unlockedBalance;
         }
 
-        nonces[spender] = nonceData;
-        _balanceOf[spender] = accountData;
+        accessData[spender] = _accessData;
+        _balanceOf[spender] = accountBalance;
 
         totalSupply -= _amount;
 
@@ -186,18 +189,18 @@ abstract contract AtlETH is Permit69 {
     // E.G.  start the withdrawal in advance. This would prevent searchers from xfering their escrowed gas in the same
     // block, but in front of their own searcher ops.
     function transfer(address to, uint256 amount) public returns (bool) {
-        EscrowNonce memory nonceData = nonces[msg.sender];
-        EscrowAccountData memory accountData = _balanceOf[msg.sender];
+        EscrowAccountAccessData memory _accessData = accessData[msg.sender];
+        EscrowAccountBalance memory accountBalance = _balanceOf[msg.sender];
 
         // Only allowed to transfer AtlETH that is not bonded or unbonding
         uint128 maxUnavailable =
-            accountData.holds >= nonceData.withdrawalAmount ? accountData.holds : nonceData.withdrawalAmount;
-        if (amount > accountData.balance - maxUnavailable) {
-            revert InsufficientAvailableBalance({ balance: accountData.balance - maxUnavailable, requested: amount });
+            accountBalance.bonded >= _accessData.unbondingBalance ? accountBalance.bonded : _accessData.unbondingBalance;
+        if (amount > accountBalance.total - maxUnavailable) {
+            revert InsufficientAvailableBalance({ balance: accountBalance.total - maxUnavailable, requested: amount });
         }
 
-        _balanceOf[msg.sender].balance -= uint128(amount);
-        _balanceOf[to].balance += uint128(amount);
+        _balanceOf[msg.sender].total -= uint128(amount);
+        _balanceOf[to].total += uint128(amount);
 
         emit Transfer(msg.sender, to, amount);
         return true;
@@ -207,18 +210,18 @@ abstract contract AtlETH is Permit69 {
         uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
         if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
 
-        EscrowNonce memory nonceData = nonces[from];
-        EscrowAccountData memory accountData = _balanceOf[from];
+        EscrowAccountAccessData memory _accessData = accessData[from];
+        EscrowAccountBalance memory accountBalance = _balanceOf[from];
 
         // Only allowed to transfer AtlETH that is not bonded or unbonding
         uint128 maxUnavailable =
-            accountData.holds >= nonceData.withdrawalAmount ? accountData.holds : nonceData.withdrawalAmount;
-        if (amount > accountData.balance - maxUnavailable) {
-            revert InsufficientAvailableBalance({ balance: accountData.balance - maxUnavailable, requested: amount });
+            accountBalance.bonded >= _accessData.unbondingBalance ? accountBalance.bonded : _accessData.unbondingBalance;
+        if (amount > accountBalance.total - maxUnavailable) {
+            revert InsufficientAvailableBalance({ balance: accountBalance.total - maxUnavailable, requested: amount });
         }
 
-        _balanceOf[from].balance -= uint128(amount);
-        _balanceOf[to].balance += uint128(amount);
+        _balanceOf[from].total -= uint128(amount);
+        _balanceOf[to].total += uint128(amount);
 
         emit Transfer(from, to, amount);
         return true;
@@ -291,7 +294,7 @@ abstract contract AtlETH is Permit69 {
     // Interactions (transfers, withdrawals) are allowed only after the owner last interaction
     // with Atlas was at least `escrowDuration` blocks ago.
     function _checkEscrowPeriodHasPassed(address account) internal view {
-        if (block.number < nonces[account].lastAccessed + ESCROW_DURATION) {
+        if (block.number < accessData[account].lastAccessedBlock + ESCROW_DURATION) {
             revert EscrowLockActive();
         }
     }
@@ -303,13 +306,13 @@ abstract contract AtlETH is Permit69 {
     function _mint(address to, uint256 amount) internal {
         totalSupply += amount;
 
-        _balanceOf[to].balance += uint128(amount);
+        _balanceOf[to].total += uint128(amount);
 
         emit Transfer(address(0), to, amount);
     }
 
     function _burn(address from, uint256 amount) internal {
-        _balanceOf[from].balance -= uint128(amount);
+        _balanceOf[from].total -= uint128(amount);
         // Cannot underflow because a user's balance
         // will never be larger than the total supply.
         unchecked {
