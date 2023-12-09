@@ -84,7 +84,7 @@ abstract contract AtlETH is Permit69 {
         _accessData.lastAccessedBlock = uint64(block.number);
         _accessData.unbondingBalance += uint128(amount);
 
-        // The new withdrawAmount should not exceed the solver's holds balance
+        // The new withdrawAmount should not exceed the solver's unbonding balance
         if (accountBalance.bonded < _accessData.unbondingBalance) {
             revert InsufficientBondedBalance({ balance: accountBalance.bonded, requested: amount });
         }
@@ -143,10 +143,10 @@ abstract contract AtlETH is Permit69 {
             revert InsufficientWithdrawableBalance({ balance: _accessData.unbondingBalance, requested: amount });
         }
 
-        // SAFE: When holds >= withdrawalAmount, we can safely withdraw the full amount
-        // UNSAFE: When holds < withdrawalAmount, we must make adjustments to ensure solvency
+        // SAFE: When unbondingBalance >= withdrawalAmount, we can safely withdraw the full amount
+        // UNSAFE: When unbondingBalance < withdrawalAmount, we must make adjustments to ensure solvency
         if (_accessData.unbondingBalance > accountBalance.bonded) {
-            // UNSAFE: When holds < withdrawalAmount, we must make adjustments to ensure solvency
+            // UNSAFE: When unbondingBalance < withdrawalAmount, we must make adjustments to ensure solvency
             if (_accessData.unbondingBalance > accountBalance.total) {
                 // If withdrawAmount > all of solver's AtlETH, adjust withdrawAmount down
                 _accessData.unbondingBalance = accountBalance.total;
@@ -161,7 +161,7 @@ abstract contract AtlETH is Permit69 {
         unlockedBalance = accountBalance.total - accountBalance.bonded;
         accountBalance.total -= _amount;
 
-        // After withdrawing all unlocked balance, take the rest from holds and withdrawalAmount
+        // After withdrawing all unlocked balance, take the rest from unbondingBalance and withdrawalAmount
         if (_amount > unlockedBalance) {
             _accessData.unbondingBalance -= _amount - unlockedBalance;
             accountBalance.bonded -= _amount - unlockedBalance;
@@ -290,9 +290,6 @@ abstract contract AtlETH is Permit69 {
     }
     */
 
-    // Custom checks for atlETH transfer functions.
-    // Interactions (transfers, withdrawals) are allowed only after the owner last interaction
-    // with Atlas was at least `escrowDuration` blocks ago.
     function _checkEscrowPeriodHasPassed(address account) internal view {
         if (block.number < accessData[account].lastAccessedBlock + ESCROW_DURATION) {
             revert EscrowLockActive();
