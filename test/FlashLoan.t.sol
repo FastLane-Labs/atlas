@@ -4,7 +4,6 @@ pragma solidity ^0.8.21;
 import "forge-std/Test.sol";
 
 import { ERC20 } from "solmate/tokens/ERC20.sol";
-
 import { TxBuilder } from "../src/contracts/helpers/TxBuilder.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { ArbitrageTest } from "./base/ArbitrageTest.t.sol";
@@ -14,6 +13,11 @@ import { CallConfig } from "../src/contracts/types/DAppApprovalTypes.sol";
 import { UserOperation } from "../src/contracts/types/UserCallTypes.sol";
 import { SolverOperation } from "../src/contracts/types/SolverCallTypes.sol";
 import { DAppOperation } from "../src/contracts/types/DAppApprovalTypes.sol";
+import { FastLaneErrorsEvents } from "../src/contracts/types/Emissions.sol";
+
+interface IWETH {
+    function withdraw(uint256 wad) external;
+}
 
 contract FlashLoanTest is BaseTest {
     DummyController public controller;
@@ -62,7 +66,7 @@ contract FlashLoanTest is BaseTest {
             arb.ternarySearch(chain.weth, chain.dai, arb.v2Router(), arb.s2Router(), 1, 50e18, 0, 20);
 
         vm.startPrank(solverOneEOA);
-        SimpleArbitrageSolver solver = new SimpleArbitrageSolver();
+        SimpleArbitrageSolver solver = new SimpleArbitrageSolver(WETH_ADDRESS);
         deal(WETH_ADDRESS, address(solver), 1e18); // 1 WETH to solver to pay bid
         atlas.deposit{ value: 1e18 }(); // gas for solver to pay
         vm.stopPrank();
@@ -93,7 +97,7 @@ contract FlashLoanTest is BaseTest {
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         solverOps[0] = txBuilder.buildSolverOperation({
             userOp: userOp,
-            solverOpData: abi.encodeWithSelector(SimpleArbitrageSolver.arbitrageNoPayback.selector),
+            solverOpData: abi.encodeWithSelector(SimpleArbitrageSolver.noPayback.selector),
             solverEOA: solverOneEOA,
             solverContract: address(solver),
             bidAmount: 1e18,
@@ -113,11 +117,12 @@ contract FlashLoanTest is BaseTest {
 
         // make the actual atlas call
         vm.startPrank(userEOA);
+        vm.expectEmit(true, true, true, true);
+        emit FastLaneErrorsEvents.SolverTxResult(address(solver), solverOneEOA, true, false, 1048578);
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
 
         console.log("atlas has", address(atlas).balance);
-
     } 
 
 }
@@ -164,7 +169,10 @@ contract DummyController is DAppControl {
 }
 
 contract SimpleArbitrageSolver {
-    //constructor(address weth, address atlas) SolverBase(weth, atlas, msg.sender) { }
+    address weth;
+    constructor(address _weth) {
+        weth = _weth;
+    }
 
     function atlasSolverCall(
         address sender,
@@ -176,13 +184,14 @@ contract SimpleArbitrageSolver {
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
     }
 
-    function arbitrageNoPayback() external payable {
+    function noPayback() external payable {
         // Empty function, take the weth and not return anything - should fail
         console.log("arbitrage call received eth:", msg.value);
-        address(0).call{ value: msg.value }(""); // do something with the weth, dont pay it back
+        address(0).call{ value: msg.value }(""); // do something with the eth, dont pay it back
     }
 
-    function arbitrageWithPayback(address routerA, address routerB, address tradeToken, uint256 amountIn) external payable {
-
+    function payback(uint256 bidAmount) external payable {
+        IWETH(weth).withdraw(bidAmount);
+        payable(msg.sender).transfer(msg.value + bidAmount); // pay back to atlas
     }
 }
