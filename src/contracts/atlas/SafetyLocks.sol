@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.21;
+pragma solidity 0.8.22;
 
 import { SafetyBits } from "../libraries/SafetyBits.sol";
 import { CallBits } from "../libraries/CallBits.sol";

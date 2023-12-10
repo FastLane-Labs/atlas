@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.21;
+pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
@@ -29,6 +29,7 @@ contract FlashLoanTest is BaseTest {
         bytes32 r;
         bytes32 s;
     }
+
     Sig public sig;
 
     function setUp() public virtual override {
@@ -54,8 +55,9 @@ contract FlashLoanTest is BaseTest {
         vm.stopPrank();
 
         arb = new ArbitrageTest();
-        arb.setUpArbitragePools(chain.weth, chain.dai, 50e18, 100_000e18, address(arb.v2Router()), address(arb.s2Router()));
-
+        arb.setUpArbitragePools(
+            chain.weth, chain.dai, 50e18, 100_000e18, address(arb.v2Router()), address(arb.s2Router())
+        );
     }
 
     function testFlashLoanArbitrage() public {
@@ -75,7 +77,6 @@ contract FlashLoanTest is BaseTest {
         deal(userEOA, 100e18); // eth to solver for atleth deposit
         atlas.deposit{ value: 100e18 }();
         vm.stopPrank();
-
 
         // Input params for Atlas.metacall() - will be populated below
 
@@ -118,44 +119,49 @@ contract FlashLoanTest is BaseTest {
         // make the actual atlas call
         vm.startPrank(userEOA);
         vm.expectEmit(true, true, true, true);
-        emit FastLaneErrorsEvents.SolverTxResult(address(solver), solverOneEOA, true, false, 1048578);
+        emit FastLaneErrorsEvents.SolverTxResult(address(solver), solverOneEOA, true, false, 1_048_578);
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
 
         console.log("atlas has", address(atlas).balance);
-    } 
-
+    }
 }
 
 contract DummyController is DAppControl {
     address immutable weth;
-    constructor(address _escrow, address _weth) DAppControl(
-        _escrow,
-        msg.sender,
-        CallConfig({
-            sequenced: false,
-            requirePreOps: false,
-            trackPreOpsReturnData: false,
-            trackUserReturnData: false,
-            localUser: false,
-            delegateUser: true,
-            preSolver: false,
-            postSolver: false,
-            requirePostOps: false,
-            zeroSolvers: false,
-            reuseUserOp: false,
-            userBundler: true,
-            solverBundler: true,
-            verifySolverBundlerCallChainHash: true,
-            unknownBundler: true,
-            forwardReturnData: false,
-            requireFulfillment: true
-        })
-    ) {
+
+    constructor(
+        address _escrow,
+        address _weth
+    )
+        DAppControl(
+            _escrow,
+            msg.sender,
+            CallConfig({
+                sequenced: false,
+                requirePreOps: false,
+                trackPreOpsReturnData: false,
+                trackUserReturnData: false,
+                localUser: false,
+                delegateUser: true,
+                preSolver: false,
+                postSolver: false,
+                requirePostOps: false,
+                zeroSolvers: false,
+                reuseUserOp: false,
+                userBundler: true,
+                solverBundler: true,
+                verifySolverBundlerCallChainHash: true,
+                unknownBundler: true,
+                forwardReturnData: false,
+                requireFulfillment: true
+            })
+        )
+    {
         weth = _weth;
     }
 
-    function _allocateValueCall(address, uint256, bytes calldata) internal override {}
+    function _allocateValueCall(address, uint256, bytes calldata) internal override { }
 
     function getBidFormat(UserOperation calldata) public view override returns (address bidToken) {
         bidToken = weth;
@@ -165,11 +171,12 @@ contract DummyController is DAppControl {
         return solverOp.bidAmount;
     }
 
-    fallback() external {}
+    fallback() external { }
 }
 
 contract SimpleArbitrageSolver {
     address weth;
+
     constructor(address _weth) {
         weth = _weth;
     }
@@ -180,7 +187,11 @@ contract SimpleArbitrageSolver {
         uint256 bidAmount,
         bytes calldata solverOpData,
         bytes calldata extraReturnData
-    ) external payable returns (bool success, bytes memory data) {
+    )
+        external
+        payable
+        returns (bool success, bytes memory data)
+    {
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
     }
 
