@@ -18,7 +18,7 @@ import { CallVerification } from "../libraries/CallVerification.sol";
 
 import { DAppIntegration } from "./DAppIntegration.sol";
 
-// import "forge-std/Test.sol"; // TODO remove
+import "forge-std/Test.sol"; // TODO remove
 
 // NOTE: AtlasVerification is the separate contract version of the DappVerification/DAppIntegration
 // inheritance slice of the original Atlas design
@@ -98,13 +98,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 }
             }
 
-            // Some checks are only needed when call is not a simulation
-            if (isSimulation) {
-                // Add all solver ops if simulation
-                return (solverOps, ValidCallsResult.Valid);
-            }
-
-            // Check
+            // Check bundler matches dAppOp bundler
             if (dAppOp.bundler != address(0) && msgSender != dAppOp.bundler) {
                 return (prunedSolverOps, ValidCallsResult.InvalidBundler);
             }
@@ -148,6 +142,12 @@ contract AtlasVerification is EIP712, DAppIntegration {
                     ++validSolverCount;
                 }
             }
+        }
+
+        // Some checks are only needed when call is not a simulation
+        if (isSimulation) {
+            // Add all solver ops if simulation
+            return (prunedSolverOps, ValidCallsResult.Valid);
         }
 
         // Verify a solver was successfully verified.
