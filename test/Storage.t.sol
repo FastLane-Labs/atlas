@@ -11,19 +11,17 @@ contract StorageTest is Test {
     function testNewStorage() public {
         MockStorageTests s = new MockStorageTests(
             1, // _escrowDuration
-            address(1), // _factory
-            address(2), // _verification
-            address(3), // _gasAccLib
-            address(4), // _safetyLocksLib
-            address(5) // _simulator
+            address(1), // _verification
+            address(2), // _gasAccLib
+            address(3), // _safetyLocksLib
+            address(4) // _simulator
         );
 
         assertEq(s.ESCROW_DURATION(), 1);
-        assertEq(s.FACTORY(), address(1));
-        assertEq(s.VERIFICATION(), address(2));
-        assertEq(s.GAS_ACC_LIB(), address(3));
-        assertEq(s.SAFETY_LOCKS_LIB(), address(4));
-        assertEq(s.SIMULATOR(), address(5));
+        assertEq(s.VERIFICATION(), address(1));
+        assertEq(s.GAS_ACC_LIB(), address(2));
+        assertEq(s.SAFETY_LOCKS_LIB(), address(3));
+        assertEq(s.SIMULATOR(), address(4));
         assertEq(s.getInitialChainId(), block.chainid);
         assertEq(s.getInitialDomainSeparator(), bytes32("SEPARATOR"));
     }
@@ -31,11 +29,10 @@ contract StorageTest is Test {
     function testStorageSlotsDontChange() public {
         Storage s = new Storage(
             1, // _escrowDuration
-            address(1), // _factory
-            address(2), // _verification
-            address(3), // _gasAccLib
-            address(4), // _safetyLocksLib
-            address(5) // _simulator
+            address(1), // _verification
+            address(2), // _gasAccLib
+            address(3), // _safetyLocksLib
+            address(4) // _simulator
         );
 
         // look up the storage slots so that we can make sure they don't change by accident
@@ -61,13 +58,12 @@ contract StorageTest is Test {
 contract MockStorageTests is Storage {
     constructor(
         uint256 _escrowDuration,
-        address _factory,
         address _verification,
         address _gasAccLib,
         address _safetyLocksLib,
         address _simulator
     )
-        Storage(_escrowDuration, _factory, _verification, _gasAccLib, _safetyLocksLib, _simulator)
+        Storage(_escrowDuration, _verification, _gasAccLib, _safetyLocksLib, _simulator)
     { }
 
     function getInitialChainId() public view returns (uint256) {
