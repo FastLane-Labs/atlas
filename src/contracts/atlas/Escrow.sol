@@ -30,11 +30,10 @@ abstract contract Escrow is AtlETH {
 
     constructor(
         uint256 _escrowDuration,
-        address _factory,
         address _verification,
         address _simulator
     )
-        AtlETH(_escrowDuration, _factory, _verification, _simulator)
+        AtlETH(_escrowDuration, _verification, _simulator)
     { }
 
     ///////////////////////////////////////////////////

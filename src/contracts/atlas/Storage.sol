@@ -11,7 +11,6 @@ contract Storage {
     address internal constant UNLOCKED = address(1);
 
     uint256 public immutable ESCROW_DURATION;
-    address public immutable FACTORY;
     address public immutable VERIFICATION;
     address public immutable SIMULATOR;
 
@@ -51,9 +50,8 @@ contract Storage {
     uint256 public withdrawals; // transient storage
     uint256 public deposits; // transient storage
 
-    constructor(uint256 _escrowDuration, address _factory, address _verification, address _simulator) payable {
+    constructor(uint256 _escrowDuration, address _verification, address _simulator) payable {
         ESCROW_DURATION = _escrowDuration;
-        FACTORY = _factory;
         VERIFICATION = _verification;
         SIMULATOR = _simulator;
         INITIAL_CHAIN_ID = block.chainid;

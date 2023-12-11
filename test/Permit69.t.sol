@@ -42,7 +42,7 @@ contract Permit69Test is BaseTest {
             callDepth: 0
         });
 
-        mockAtlas = new MockAtlasForPermit69Tests(10, address(0), address(0), address(0));
+        mockAtlas = new MockAtlasForPermit69Tests(10, address(0), address(0));
         mockAtlas.setEscrowKey(escrowKey);
         mockAtlas.setEnvironment(mockExecutionEnvAddress);
 
@@ -260,11 +260,10 @@ contract Permit69Test is BaseTest {
 contract MockAtlasForPermit69Tests is Permit69 {
     constructor(
         uint256 _escrowDuration,
-        address _factory,
         address _verification,
         address _simulator
     )
-        Permit69(_escrowDuration, _factory, _verification, _simulator)
+        Permit69(_escrowDuration, _verification, _simulator)
     { }
 
     // Declared in SafetyLocks.sol in the canonical Atlas system
