@@ -24,14 +24,12 @@ contract SafetyLocksLib is Storage, FastLaneErrorsEvents {
 
     constructor(
         uint256 _escrowDuration,
-        address _factory,
         address _verification,
         address _gasAccLib,
-        // address _safetyLocksLib,
         address _simulator,
         address _atlas
     )
-        Storage(_escrowDuration, _factory, _verification, _gasAccLib, address(this), _simulator)
+        Storage(_escrowDuration, _verification, _gasAccLib, address(this), _simulator)
     {
         ATLAS = _atlas;
     }
