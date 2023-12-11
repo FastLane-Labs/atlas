@@ -50,6 +50,9 @@ abstract contract AtlETH is Permit69 {
         EscrowAccountAccessData memory _accessData = accessData[account];
         uint128 maxUnavailable =
             accountBalance.bonded >= _accessData.unbondingBalance ? accountBalance.bonded : _accessData.unbondingBalance;
+        if (maxUnavailable > accountBalance.total) {
+            return 0;
+        }
         return uint256(accountBalance.total - maxUnavailable);
     }
 
