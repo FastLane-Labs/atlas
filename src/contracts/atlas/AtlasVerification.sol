@@ -143,7 +143,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 if (solverOp.userOpHash != userOpHash) continue;
 
                 // If all initial checks succeed, add solver op to new array
-                prunedSolverOps[i] = solverOp;
+                prunedSolverOps[validSolverCount] = solverOp;
                 unchecked {
                     ++validSolverCount;
                 }
