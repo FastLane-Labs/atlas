@@ -7,7 +7,6 @@ import "forge-std/Test.sol";
 import { DeployBaseScript } from "script/base/deploy-base.s.sol";
 
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
-import { AtlasFactory } from "src/contracts/atlas/AtlasFactory.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import { GasAccountingLib } from "src/contracts/atlas/GasAccountingLib.sol";
 import { SafetyLocksLib } from "src/contracts/atlas/SafetyLocksLib.sol";
@@ -23,8 +22,7 @@ contract DeployAtlasScript is DeployBaseScript {
 
         uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
-        // Computes the addresses at which AtlasFactory and AtlasVerification will be deployed
-        address expectedAtlasFactoryAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
+        // Computes the addresses at which AtlasVerification will be deployed
         address expectedAtlasVerificationAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
         address expectedGasAccountingLibAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
         address expectedSafetyLocksLibAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 4);
@@ -36,17 +34,14 @@ contract DeployAtlasScript is DeployBaseScript {
 
         atlas = new Atlas({
             _escrowDuration: 64,
-            _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
             _gasAccLib: expectedGasAccountingLibAddr,
             _safetyLocksLib: expectedSafetyLocksLibAddr,
             _simulator: expectedSimulatorAddr
         });
-        atlasFactory = new AtlasFactory(address(atlas));
         atlasVerification = new AtlasVerification(address(atlas));
         gasAccountingLib = new GasAccountingLib({
             _escrowDuration: 64,
-            _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
             _safetyLocksLib: expectedSafetyLocksLibAddr,
             _simulator: expectedSimulatorAddr,
@@ -54,7 +49,6 @@ contract DeployAtlasScript is DeployBaseScript {
         });
         safetyLocksLib = new SafetyLocksLib({
             _escrowDuration: 64,
-            _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
             _gasAccLib: expectedGasAccountingLibAddr,
             _simulator: expectedSimulatorAddr,
@@ -74,9 +68,6 @@ contract DeployAtlasScript is DeployBaseScript {
                 "ERROR: Atlas address not set correctly in Simulator, AtlasVerification, GasAccountingLib, or SafetyLocksLib"
             );
         }
-        if (address(atlasFactory) != atlas.FACTORY()) {
-            console.log("ERROR: AtlasFactory address not set correctly in Atlas");
-        }
         if (address(atlasVerification) != atlas.VERIFICATION()) {
             console.log("ERROR: AtlasVerification address not set correctly in Atlas");
         }
@@ -91,7 +82,6 @@ contract DeployAtlasScript is DeployBaseScript {
         }
 
         _writeAddressToDeploymentsJson("ATLAS", address(atlas));
-        _writeAddressToDeploymentsJson("ATLAS_FACTORY", address(atlasFactory));
         _writeAddressToDeploymentsJson("ATLAS_VERIFICATION", address(atlasVerification));
         _writeAddressToDeploymentsJson("GAS_ACCOUNTING_LIB", address(gasAccountingLib));
         _writeAddressToDeploymentsJson("SAFETY_LOCKS_LIB", address(safetyLocksLib));
@@ -99,7 +89,6 @@ contract DeployAtlasScript is DeployBaseScript {
 
         console.log("\n");
         console.log("Atlas deployed at: \t\t\t\t", address(atlas));
-        console.log("AtlasFactory deployed at: \t\t\t", address(atlasFactory));
         console.log("AtlasVerification deployed at: \t\t", address(atlasVerification));
         console.log("GasAccountingLib deployed at: \t\t", address(gasAccountingLib));
         console.log("SafetyLocksLib deployed at: \t\t\t", address(safetyLocksLib));

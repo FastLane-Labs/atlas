@@ -30,13 +30,12 @@ abstract contract Permit69 is GasAccounting {
 
     constructor(
         uint256 _escrowDuration,
-        address _factory,
         address _verification,
         address _gasAccLib,
         address _safetyLocksLib,
         address _simulator
     )
-        GasAccounting(_escrowDuration, _factory, _verification, _gasAccLib, _safetyLocksLib, _simulator)
+        GasAccounting(_escrowDuration, _verification, _gasAccLib, _safetyLocksLib, _simulator)
     { }
 
     // Virtual Functions defined by other Atlas modules

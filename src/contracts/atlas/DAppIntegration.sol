@@ -68,7 +68,7 @@ contract DAppIntegration {
 
         signatories[signatoryKey] = true;
 
-        initializeNonce(msg.sender);
+        _initializeNonce(msg.sender);
     }
 
     function addSignatory(address controller, address signatory) external {
@@ -84,7 +84,7 @@ contract DAppIntegration {
 
         signatories[signatoryKey] = true;
 
-        initializeNonce(signatory);
+        _initializeNonce(signatory);
 
         emit NewDAppSignatory(controller, govData.governance, signatory, govData.callConfig);
     }
@@ -125,7 +125,11 @@ contract DAppIntegration {
         delete dapps[key];
     }
 
-    function initializeNonce(address account) public {
+    function initializeNonce(address account) external {
+        _initializeNonce(account);
+    }
+
+    function _initializeNonce(address account) internal returns (bool initialized) {
         if (asyncNonceBitIndex[account].LowestEmptyBitmap == uint128(0)) {
             unchecked {
                 asyncNonceBitIndex[account].LowestEmptyBitmap = 2;
@@ -134,6 +138,7 @@ contract DAppIntegration {
 
             // to skip the 0 nonce
             asyncNonceBitmap[bitmapKey] = NonceBitmap({ highestUsedNonce: uint8(1), bitmap: 0 });
+            initialized = true;
         }
     }
 

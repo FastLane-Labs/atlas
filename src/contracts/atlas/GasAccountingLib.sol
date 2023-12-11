@@ -22,14 +22,12 @@ contract GasAccountingLib is Storage, FastLaneErrorsEvents {
 
     constructor(
         uint256 _escrowDuration,
-        address _factory,
         address _verification,
-        // address _gasAccLib,
         address _safetyLocksLib,
         address _simulator,
         address _atlas
     )
-        Storage(_escrowDuration, _factory, _verification, address(this), _safetyLocksLib, _simulator)
+        Storage(_escrowDuration, _verification, address(this), _safetyLocksLib, _simulator)
     {
         ATLAS = _atlas;
     }
