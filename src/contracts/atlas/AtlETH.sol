@@ -43,15 +43,26 @@ abstract contract AtlETH is Permit69 {
         return uint256(accessData[account].lastAccessedBlock);
     }
 
-    // TODO
-    // Other views needed:
-    // - bonded balance
-    // - unbonding balance
-    // - time left until unbonded
-
+    // Note: balanceOf returns the available, unbonded balance of an account
+    // balanceOf = total - max(bonded, unbonding)
     function balanceOf(address account) public view returns (uint256) {
         EscrowAccountBalance memory accountBalance = _balanceOf[account];
-        return uint256(accountBalance.total - accountBalance.bonded);
+        EscrowAccountAccessData memory _accessData = accessData[account];
+        uint128 maxUnavailable =
+            accountBalance.bonded >= _accessData.unbondingBalance ? accountBalance.bonded : _accessData.unbondingBalance;
+        return uint256(accountBalance.total - maxUnavailable);
+    }
+
+    function balanceOfBonded(address account) external view returns (uint256) {
+        return uint256(_balanceOf[account].bonded);
+    }
+
+    function balanceOfUnbonding(address account) external view returns (uint256) {
+        return uint256(accessData[account].unbondingBalance);
+    }
+
+    function unbondingCompleteBlock(address account) external view returns (uint256) {
+        return uint256(accessData[account].lastAccessedBlock) + ESCROW_DURATION;
     }
 
     // Deposit ETH and get atlETH in return.
