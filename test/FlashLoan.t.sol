@@ -14,6 +14,7 @@ import { UserOperation } from "../src/contracts/types/UserCallTypes.sol";
 import { SolverOperation } from "../src/contracts/types/SolverCallTypes.sol";
 import { DAppOperation } from "../src/contracts/types/DAppApprovalTypes.sol";
 import { FastLaneErrorsEvents } from "../src/contracts/types/Emissions.sol";
+import { IEscrow } from "../src/contracts/interfaces/IEscrow.sol";
 
 interface IWETH {
     function withdraw(uint256 wad) external;
@@ -57,7 +58,7 @@ contract FlashLoanTest is BaseTest {
     function testFlashLoan() public {
 
         vm.startPrank(solverOneEOA);
-        SimpleSolver solver = new SimpleSolver(WETH_ADDRESS);
+        SimpleSolver solver = new SimpleSolver(WETH_ADDRESS, escrow);
         deal(WETH_ADDRESS, address(solver), 1e18); // 1 WETH to solver to pay bid
         atlas.deposit{ value: 1e18 }(); // gas for solver to pay
         vm.stopPrank();
@@ -134,7 +135,6 @@ contract FlashLoanTest is BaseTest {
         vm.startPrank(userEOA);
         vm.expectEmit(true, true, true, true);
         emit FastLaneErrorsEvents.SolverTxResult(address(solver), solverOneEOA, true, false, 1_048_578);
-        vm.expectRevert();
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
 
@@ -212,9 +212,11 @@ contract DummyController is DAppControl {
 contract SimpleSolver {
     address weth;
     address msgSender;
+    address escrow;
 
-    constructor(address _weth) {
+    constructor(address _weth, address _escrow) {
         weth = _weth;
+        escrow = _escrow;
     }
 
     function atlasSolverCall(
@@ -230,6 +232,13 @@ contract SimpleSolver {
     {
         msgSender = msg.sender;
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
+
+        uint256 shortfall = IEscrow(escrow).shortfall();
+
+        if (shortfall < msg.value) shortfall = 0;
+        else shortfall -= msg.value;
+
+        IEscrow(escrow).reconcile{ value: msg.value }(msg.sender, sender, shortfall);
     }
 
     function noPayback() external payable {
