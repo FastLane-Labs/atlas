@@ -6,7 +6,6 @@ import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
 interface IAtlas {
-    function createExecutionEnvironment(address dAppControl) external returns (address executionEnvironment);
     function metacall(
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
@@ -15,19 +14,4 @@ interface IAtlas {
         external
         payable
         returns (bool auctionWon);
-
-    function withdrawERC20(address token, uint256 amount, DAppConfig memory dConfig) external;
-    function withdrawEther(uint256 amount, DAppConfig memory dConfig) external;
-
-    function userDirectVerifyDApp(
-        address userOpFrom,
-        address userOpTo,
-        uint256 solverOpsLength,
-        DAppConfig calldata dConfig,
-        DAppOperation calldata verification
-    )
-        external
-        returns (bool);
-
-    function userDirectReleaseLock(address userOpFrom, bytes32 key, DAppConfig calldata dConfig) external;
 }

@@ -2,89 +2,108 @@
 pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
-import { BaseTest } from "./base/BaseTest.t.sol";
-import { DAppControl } from "../src/contracts/dapp/DAppControl.sol";
+
+import { Factory } from "../src/contracts/atlas/Factory.sol";
+import { DummyDAppControl } from "./base/DummyDAppControl.sol";
+
 import "../src/contracts/types/UserCallTypes.sol";
+
 import "./base/TestUtils.sol";
 
-contract DummyDAppControl is DAppControl {
-    constructor(address escrow)
-        DAppControl(
-            escrow,
-            address(0),
-            CallConfig(
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false
-            )
-        )
-    { }
+contract MockFactory is Factory, Test {
+    function getOrCreateExecutionEnvironment(UserOperation calldata userOp)
+        external
+        returns (address executionEnvironment, DAppConfig memory dConfig)
+    {
+        return _getOrCreateExecutionEnvironment(userOp);
+    }
 
-    function _preOpsCall(UserOperation calldata) internal override returns (bytes memory) { }
-    function _allocateValueCall(address, uint256, bytes calldata) internal override { }
-    // function getPayeeData(bytes calldata) external view override returns (PayeeData[] memory) {}
-    function getBidFormat(UserOperation calldata) public view override returns (address) { }
-    function getBidValue(SolverOperation calldata) public view override returns (uint256) { }
+    function deployExecutionEnvironmentTemplate(address caller) external returns (address executionEnvironment) {
+        vm.prank(caller);
+        executionEnvironment = _deployExecutionEnvironmentTemplate();
+    }
 }
 
-contract FactoryTest is BaseTest {
+contract FactoryTest is Test {
+    MockFactory public mockFactory;
     DummyDAppControl public dAppControl;
 
-    // TODO fix this to test AtlasFactory instead
+    address public user;
 
-    // function setUp() public virtual override {
-    //     BaseTest.setUp();
+    function setUp() public {
+        mockFactory = new MockFactory();
+        dAppControl = new DummyDAppControl(address(0));
+        user = address(999);
+    }
 
-    //     governancePK = 666;
-    //     governanceEOA = vm.addr(governancePK);
-    //     vm.startPrank(governanceEOA);
-    //     dAppControl = new DummyDAppControl(escrow);
-    //     vm.stopPrank();
-    // }
+    function test_createExecutionEnvironment() public {
+        uint32 callConfig = dAppControl.callConfig();
+        bytes memory creationCode = TestUtils._getMimicCreationCode(
+            address(dAppControl), callConfig, mockFactory.executionTemplate(), user, address(dAppControl).codehash
+        );
+        address expectedExecutionEnvironment = address(
+            uint160(
+                uint256(
+                    keccak256(
+                        abi.encodePacked(
+                            bytes1(0xff),
+                            address(mockFactory),
+                            mockFactory.salt(),
+                            keccak256(abi.encodePacked(creationCode))
+                        )
+                    )
+                )
+            )
+        );
 
-    // function testExecutionEnvironmentAddress() public {
-    //     UserOperation memory userOp = UserOperation({
-    //         from: address(this),
-    //         to: address(atlas),
-    //         deadline: 12,
-    //         gas: 34,
-    //         nonce: 56,
-    //         maxFeePerGas: 78,
-    //         value: 90,
-    //         dapp: address(0x2),
-    //         control: address(0x3),
-    //         data: "data",
-    //         signature: "signature"
-    //     });
+        assertTrue(expectedExecutionEnvironment.codehash == bytes32(0), "Execution environment should not exist");
 
-    //     address expectedExecutionEnvironment =
-    //         TestUtils.computeExecutionEnvironment(payable(atlas), userOp, address(dAppControl));
+        vm.prank(user);
+        address actualExecutionEnvironment = mockFactory.createExecutionEnvironment(address(dAppControl));
 
-    //     assertEq(
-    //         atlas.createExecutionEnvironment(address(dAppControl)),
-    //         expectedExecutionEnvironment,
-    //         "Create exec env address not same as predicted"
-    //     );
+        assertFalse(expectedExecutionEnvironment.codehash == bytes32(0), "Execution environment should exist");
+        assertEq(
+            expectedExecutionEnvironment, actualExecutionEnvironment, "Execution environment not the same as predicted"
+        );
+    }
 
-    //     (address executionEnvironment,,) = atlas.getExecutionEnvironment(userOp.from, address(dAppControl));
-    //     assertEq(
-    //         executionEnvironment,
-    //         expectedExecutionEnvironment,
-    //         "atlas.getExecEnv address not same as predicted"
-    //     );
-    // }
+    function test_getExecutionEnvironment() public {
+        address executionEnvironment;
+        bool exists;
+
+        (executionEnvironment,, exists) = mockFactory.getExecutionEnvironment(user, address(dAppControl));
+        assertFalse(exists, "Execution environment should not exist");
+        assertTrue(executionEnvironment.codehash == bytes32(0), "Execution environment should not exist");
+
+        vm.prank(user);
+        mockFactory.createExecutionEnvironment(address(dAppControl));
+
+        (executionEnvironment,, exists) = mockFactory.getExecutionEnvironment(user, address(dAppControl));
+        assertTrue(exists, "Execution environment should exist");
+        assertFalse(executionEnvironment.codehash == bytes32(0), "Execution environment should exist");
+    }
+
+    function test_getOrCreateExecutionEnvironment() public {
+        UserOperation memory userOp;
+        userOp.from = user;
+        userOp.control = address(dAppControl);
+
+        address executionEnvironment;
+        bool exists;
+
+        (executionEnvironment,, exists) = mockFactory.getExecutionEnvironment(user, address(dAppControl));
+        assertFalse(exists, "Execution environment should not exist");
+        assertTrue(executionEnvironment.codehash == bytes32(0), "Execution environment should not exist");
+
+        mockFactory.getOrCreateExecutionEnvironment(userOp);
+
+        (executionEnvironment,, exists) = mockFactory.getExecutionEnvironment(user, address(dAppControl));
+        assertTrue(exists, "Execution environment should exist");
+        assertFalse(executionEnvironment.codehash == bytes32(0), "Execution environment should exist");
+    }
+
+    function test_deployExecutionEnvironmentTemplate() public {
+        address executionEnvironment = mockFactory.deployExecutionEnvironmentTemplate(user);
+        assertFalse(executionEnvironment.codehash == bytes32(0), "Execution environment should exist");
+    }
 }
