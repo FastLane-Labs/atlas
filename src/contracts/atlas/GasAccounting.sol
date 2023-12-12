@@ -98,6 +98,8 @@ abstract contract GasAccounting is SafetyLocks {
         return true;
     }
 
+    // Takes AtlETH from 1) owner's bonded balance, and if more needed, also from 2) owner's unbonding balance
+    // and increases transient solver deposits by this amount
     function _assign(address owner, uint256 amount) internal returns (bool isDeficit) {
         if (amount == 0) {
             accessData[owner].lastAccessedBlock = uint128(block.number);
@@ -134,6 +136,7 @@ abstract contract GasAccounting is SafetyLocks {
         }
     }
 
+    // Increases owner's bonded balance by amount
     function _credit(address owner, uint256 amount) internal {
         uint128 amt = uint128(amount);
 
