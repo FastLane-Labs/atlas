@@ -22,7 +22,6 @@ interface IWETH {
 contract FlashLoanTest is BaseTest {
     DummyController public controller;
     TxBuilder public txBuilder;
-    ArbitrageTest public arb;
 
     struct Sig {
         uint8 v;
@@ -53,22 +52,12 @@ contract FlashLoanTest is BaseTest {
         });
 
         vm.stopPrank();
-
-        arb = new ArbitrageTest();
-        arb.setUpArbitragePools(
-            chain.weth, chain.dai, 50e18, 100_000e18, address(arb.v2Router()), address(arb.s2Router())
-        );
     }
 
-    function testFlashLoanArbitrage() public {
-        // Pools should already be setup for arbitrage. First try arbitraging without paying eth back to pool
-
-        // Arbitrage is fulfilled by swapping WETH for DAI on Uniswap, then DAI for WETH on Sushiswap
-        (uint256 revenue, uint256 optimalAmountIn) =
-            arb.ternarySearch(chain.weth, chain.dai, arb.v2Router(), arb.s2Router(), 1, 50e18, 0, 20);
+    function testFlashLoan() public {
 
         vm.startPrank(solverOneEOA);
-        SimpleArbitrageSolver solver = new SimpleArbitrageSolver(WETH_ADDRESS);
+        SimpleSolver solver = new SimpleSolver(WETH_ADDRESS);
         deal(WETH_ADDRESS, address(solver), 1e18); // 1 WETH to solver to pay bid
         atlas.deposit{ value: 1e18 }(); // gas for solver to pay
         vm.stopPrank();
@@ -98,11 +87,11 @@ contract FlashLoanTest is BaseTest {
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         solverOps[0] = txBuilder.buildSolverOperation({
             userOp: userOp,
-            solverOpData: abi.encodeWithSelector(SimpleArbitrageSolver.noPayback.selector),
+            solverOpData: abi.encodeWithSelector(SimpleSolver.noPayback.selector),
             solverEOA: solverOneEOA,
             solverContract: address(solver),
             bidAmount: 1e18,
-            value: optimalAmountIn
+            value: 10e18
         });
 
         // Solver signs the solverOp
@@ -116,14 +105,60 @@ contract FlashLoanTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-        // make the actual atlas call
+        // make the actual atlas call that should revert
         vm.startPrank(userEOA);
         vm.expectEmit(true, true, true, true);
         emit FastLaneErrorsEvents.SolverTxResult(address(solver), solverOneEOA, true, false, 1_048_578);
+        vm.expectRevert();
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
 
-        console.log("atlas has", address(atlas).balance);
+        // now try it again with a valid solverOp - but dont fully pay back
+        solverOps[0] = txBuilder.buildSolverOperation({
+            userOp: userOp,
+            solverOpData: abi.encodeWithSelector(SimpleSolver.onlyPayBid.selector, 1e18),
+            solverEOA: solverOneEOA,
+            solverContract: address(solver),
+            bidAmount: 1e18,
+            value: 10e18
+        });
+
+        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
+        solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
+        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
+        dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        // Call again with partial payback, should still revert
+        vm.startPrank(userEOA);
+        vm.expectEmit(true, true, true, true);
+        emit FastLaneErrorsEvents.SolverTxResult(address(solver), solverOneEOA, true, false, 1_048_578);
+        vm.expectRevert();
+        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
+        vm.stopPrank();
+
+        // final try, should be successful with full payback
+        solverOps[0] = txBuilder.buildSolverOperation({
+            userOp: userOp,
+            solverOpData: abi.encodeWithSelector(SimpleSolver.payback.selector, 1e18),
+            solverEOA: solverOneEOA,
+            solverContract: address(solver),
+            bidAmount: 1e18,
+            value: 10e18
+        });
+
+        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
+        solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
+        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
+        dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        // Last call - should succeed
+        vm.startPrank(userEOA);
+        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
+        vm.stopPrank();
     }
 }
 
@@ -164,7 +199,7 @@ contract DummyController is DAppControl {
     function _allocateValueCall(address, uint256, bytes calldata) internal override { }
 
     function getBidFormat(UserOperation calldata) public view override returns (address bidToken) {
-        bidToken = weth;
+        bidToken = address(0);
     }
 
     function getBidValue(SolverOperation calldata solverOp) public pure override returns (uint256) {
@@ -174,8 +209,9 @@ contract DummyController is DAppControl {
     fallback() external { }
 }
 
-contract SimpleArbitrageSolver {
+contract SimpleSolver {
     address weth;
+    address msgSender;
 
     constructor(address _weth) {
         weth = _weth;
@@ -192,17 +228,23 @@ contract SimpleArbitrageSolver {
         payable
         returns (bool success, bytes memory data)
     {
+        msgSender = msg.sender;
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
     }
 
     function noPayback() external payable {
-        // Empty function, take the weth and not return anything - should fail
-        console.log("arbitrage call received eth:", msg.value);
-        address(0).call{ value: msg.value }(""); // do something with the eth, dont pay it back
+        address(0).call{ value: msg.value }(""); // do something with the eth and dont pay it back
     }
 
+    function onlyPayBid(uint256 bidAmount) external payable {
+        IWETH(weth).withdraw(bidAmount);
+        payable(msgSender).transfer(bidAmount); // pay back to atlas
+    }
+    
     function payback(uint256 bidAmount) external payable {
         IWETH(weth).withdraw(bidAmount);
-        payable(msg.sender).transfer(msg.value + bidAmount); // pay back to atlas
+        payable(msgSender).transfer(msg.value + bidAmount); // pay back to atlas
     }
+
+    receive() external payable {}
 }

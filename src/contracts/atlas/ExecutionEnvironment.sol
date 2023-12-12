@@ -241,6 +241,8 @@ contract ExecutionEnvironment is Base {
         uint256 balance = etherIsBidToken ? address(this).balance : ERC20(solverOp.bidToken).balanceOf(address(this));
 
         if (balance < bidBalance + solverOp.bidAmount) {
+            console.log("execution env balance", balance);
+            console.log("expected balance", bidBalance + solverOp.bidAmount);
             revert FastLaneErrorsEvents.SolverBidUnpaid();
         }
 
