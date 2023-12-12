@@ -8,8 +8,6 @@ import { BoAtlETH } from "src/contracts/atlas/BoAtlETH.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
 
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-
 contract AtlETHTest is BaseTest {
     function testBasicFunctionalities() public {
         // solverOne deposited 1 ETH into Atlas in BaseTest.setUp
@@ -81,7 +79,7 @@ contract AtlETHTest is BaseTest {
         boAthETH = new BoAtlETH(address(atlas));
         vm.stopPrank();
 
-        ERC20 boAtlETH = ERC20(atlas.BOATLETH());
+        BoAtlETH boAtlETH = BoAtlETH(atlas.BOATLETH());
 
         vm.prank(solverOneEOA);
         atlas.deposit{ value: 1 ether }();
