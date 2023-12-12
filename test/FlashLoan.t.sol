@@ -56,7 +56,6 @@ contract FlashLoanTest is BaseTest {
     }
 
     function testFlashLoan() public {
-
         vm.startPrank(solverOneEOA);
         SimpleSolver solver = new SimpleSolver(WETH_ADDRESS, escrow);
         deal(WETH_ADDRESS, address(solver), 1e18); // 1 WETH to solver to pay bid
@@ -234,7 +233,7 @@ contract SimpleSolver {
         msgSender = msg.sender;
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
 
-        if(bytes4(solverOpData[:4]) == SimpleSolver.payback.selector) {
+        if (bytes4(solverOpData[:4]) == SimpleSolver.payback.selector) {
             uint256 shortfall = IEscrow(escrow).shortfall();
 
             if (shortfall < msg.value) shortfall = 0;
@@ -253,11 +252,11 @@ contract SimpleSolver {
         payable(msgSender).transfer(bidAmount); // pay back to atlas
         address(0).call{ value: msg.value }(""); // do something with the remaining eth
     }
-    
+
     function payback(uint256 bidAmount) external payable {
         IWETH(weth).withdraw(bidAmount);
         payable(msgSender).transfer(bidAmount); // pay back to atlas
     }
 
-    receive() external payable {}
+    receive() external payable { }
 }
