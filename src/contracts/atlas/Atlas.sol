@@ -168,13 +168,13 @@ contract Atlas is Escrow {
         }
 
         for (; winningSearcherIndex < solverOps.length;) {
-            // Only execute solver meta tx if userOpHash matches
-            if (!auctionWon && solverOps[winningSearcherIndex].from != address(0)) {
-                (auctionWon, key) = _solverExecutionIteration(
-                    dConfig, solverOps[winningSearcherIndex], returnData, auctionWon, executionEnvironment, bundler, key
-                );
-                if (auctionWon) break;
-            }
+            // valid solverOps are packed from left of array - break at first invalid solverOp
+            if (solverOps[winningSearcherIndex].from == address(0)) break;
+
+            (auctionWon, key) = _solverExecutionIteration(
+                dConfig, solverOps[winningSearcherIndex], returnData, auctionWon, executionEnvironment, bundler, key
+            );
+            if (auctionWon) break;
 
             unchecked {
                 ++winningSearcherIndex;
