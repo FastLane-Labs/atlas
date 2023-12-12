@@ -52,10 +52,10 @@ contract V4SwapIntentController is DAppControl {
                 requirePostOps: false,
                 zeroSolvers: false,
                 reuseUserOp: true,
-                userBundler: true,
-                solverBundler: true,
-                verifySolverBundlerCallChainHash: true,
-                unknownBundler: true,
+                userAuctioneer: true,
+                solverAuctioneer: true,
+                verifyCallChainHash: true,
+                unknownAuctioneer: true,
                 forwardReturnData: false,
                 requireFulfillment: true
             })
