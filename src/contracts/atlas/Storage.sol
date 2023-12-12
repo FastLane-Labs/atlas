@@ -26,10 +26,9 @@ contract Storage {
 
     // AtlETH ERC-20 storage
     uint256 public totalSupply;
+    uint256 public bondedTotalSupply;
 
     mapping(address => uint256) public nonces;
-
-    uint256 public bondedTotalSupply;
     mapping(address => EscrowAccountBalance) internal _balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
     mapping(address => EscrowAccountAccessData) public accessData;
