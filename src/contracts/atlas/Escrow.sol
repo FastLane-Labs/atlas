@@ -111,6 +111,7 @@ abstract contract Escrow is AtlETH {
 
                 // winning solver's gas is implicitly paid for by their allowance
                 return (true, key.turnSolverLockPayments(environment));
+
             } else {
                 _releaseSolverLock(solverOp, gasWaterMark, result);
                 result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
@@ -119,6 +120,8 @@ abstract contract Escrow is AtlETH {
                 emit SolverTxResult(solverOp.solver, solverOp.from, true, false, result);
             }
         } else {
+            _releaseSolverLock(solverOp, gasWaterMark, result);
+
             // emit event
             emit SolverTxResult(solverOp.solver, solverOp.from, false, false, result);
         }
@@ -177,15 +180,17 @@ abstract contract Escrow is AtlETH {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
 
-        EscrowAccountBalance memory solverEscrow = _balanceOf[solverOp.from];
+        EscrowAccountAccessData memory aData = accessData[solverOp.from];
 
-        uint256 solverBalance = uint256(solverEscrow.total - solverEscrow.bonded);
+        uint256 solverBalance = aData.bonded;
+        uint256 lastAccessedBlock = aData.lastAccessedBlock;
 
         if (solverOp.to != address(this)) {
             result |= 1 << uint256(SolverOutcome.InvalidTo);
         }
 
-        if (accessData[solverOp.from].lastAccessedBlock >= uint64(block.number)) {
+        // NOTE: Turn this into time stamp check for FCFS L2s?
+        if (lastAccessedBlock == block.number) {
             result |= 1 << uint256(SolverOutcome.PerBlockLimit);
         }
 

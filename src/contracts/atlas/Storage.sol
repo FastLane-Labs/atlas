@@ -26,6 +26,11 @@ contract Storage {
 
     // AtlETH ERC-20 storage
     uint256 public totalSupply;
+
+    mapping(address => uint256) public nonces;
+
+    uint256 public bondedTotalSupply;
+    mapping(address => EscrowAccountBalance) internal _balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
     mapping(address => EscrowAccountAccessData) public accessData;
 
@@ -34,11 +39,8 @@ contract Storage {
     uint256 public constant SURCHARGE = 10;
     address public constant SOLVER_FULFILLED = address(2);
 
-    // Atlas GasAccounting storage
-    // NOTE: these storage vars / maps should only be accessible by *signed* solver transactions
-    // and only once per solver per block (to avoid user-solver collaborative exploits)
-    // uint256 public immutable escrowDuration;
-    mapping(address => EscrowAccountBalance) internal _balanceOf;
+
+    // atlETH GasAccounting storage
 
     uint256 public surcharge; // Atlas gas surcharges
 
@@ -46,7 +48,6 @@ contract Storage {
     address public lock; // transient storage
     address public solver; // transient storage
     uint256 public claims; // transient storage
-    //uint256 public reimbursements; // transient storage
     uint256 public withdrawals; // transient storage
     uint256 public deposits; // transient storage
 
