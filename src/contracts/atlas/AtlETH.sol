@@ -180,11 +180,24 @@ abstract contract AtlETH is Permit69 {
     /*//////////////////////////////////////////////////////////////
                     EXTERNAL BOND/UNBOND LOGIC
     //////////////////////////////////////////////////////////////*/
+
+    // Puts a "hold" on a solver's AtlETH, enabling it to be used in Atlas transactions
+    // Bonded AtlETH must first be unbonded to become transferrable or withdrawable
     function bond(uint256 amount) external {
         // TODO: consider allowing msg.sender to bond another account holder via allowance
         _bond(msg.sender, amount);
     }
 
+    // Deposits the sender's full msg.value and converts to AtlETH
+    // Then bonds the sender's amountToBond of AtlETH
+    function depositAndBond(uint256 amountToBond) external payable {
+        _mint(msg.sender, msg.value);
+        _bond(msg.sender, amountToBond);
+    }
+
+    // Starts the unbonding wait time.
+    // Unbonding AtlETH can still be used be solvers while unbonding,
+    // but adjustments may be made at withdrawal to ensure solvency
     function unbond(uint256 amount) external {
         _unbond(msg.sender, amount);
     }
