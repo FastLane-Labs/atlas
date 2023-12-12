@@ -24,7 +24,8 @@ contract DeployAtlasScript is DeployBaseScript {
         // Computes the addresses at which AtlasFactory and AtlasVerification will be deployed
         address expectedAtlasFactoryAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
         address expectedAtlasVerificationAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
-        address expectedSimulatorAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
+        address expectedBoAtlETHAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
+        address expectedSimulatorAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 4);
 
         console.log("Deployer address: \t\t\t\t", deployer);
 
@@ -34,6 +35,7 @@ contract DeployAtlasScript is DeployBaseScript {
             _escrowDuration: 64,
             _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
+            _boAtlETH: expectedBoAtlETHAddr,
             _simulator: expectedSimulatorAddr
         });
         atlasFactory = new AtlasFactory(address(atlas));

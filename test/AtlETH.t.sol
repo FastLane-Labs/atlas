@@ -3,7 +3,12 @@ pragma solidity 0.8.21;
 
 import "forge-std/Test.sol";
 
+import { Atlas } from "src/contracts/atlas/Atlas.sol";
+import { BoAtlETH } from "src/contracts/atlas/BoAtlETH.sol";
+
 import { BaseTest } from "./base/BaseTest.t.sol";
+
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract AtlETHTest is BaseTest {
     function testBasicFunctionalities() public {
@@ -60,5 +65,62 @@ contract AtlETHTest is BaseTest {
         );
         assertEq(atlas.totalSupply(), 1 ether, "total atlETH supply should have decreased to 1");
         vm.stopPrank();
+    }
+
+    function testBondedAtlETHBalances() public {
+        // Deploy new Atlas contract with 0 escrow duration for this test
+        vm.startPrank(payee);
+        address expectedBoAtlEthAddr = computeCreateAddress(payee, vm.getNonce(payee) + 1);
+        atlas = new Atlas({
+            _escrowDuration: 0,
+            _factory: address(0),
+            _verification: address(0),
+            _boAtlETH: expectedBoAtlEthAddr,
+            _simulator: address(0)
+        });
+        boAthETH = new BoAtlETH(address(atlas));
+        vm.stopPrank();
+
+        ERC20 boAtlETH = ERC20(atlas.BOATLETH());
+
+        vm.prank(solverOneEOA);
+        atlas.deposit{ value: 1 ether }();
+
+        // solverOne's atlETH balance should be 1
+        assertTrue(atlas.balanceOf(solverOneEOA) == 1 ether, "solverOne's atlETH balance should be 1");
+
+        // solverOne hasn't bonded yet
+        assertTrue(boAtlETH.balanceOf(solverOneEOA) == 0, "solverOne's boAtlETH balance should be 0");
+
+        // solverOne bonds 1 ETH
+        vm.prank(solverOneEOA);
+        atlas.bond(1 ether);
+
+        // solverOne's atlETH balance should be 0
+        assertTrue(atlas.balanceOf(solverOneEOA) == 0, "solverOne's atlETH balance should be 0");
+
+        // solverOne's boAtlETH balance should be 1
+        assertTrue(boAtlETH.balanceOf(solverOneEOA) == 1 ether, "solverOne's boAtlETH balance should be 1");
+
+        uint256 ethBalanceBefore = address(solverOneEOA).balance;
+
+        // solverOne unbonds and withdraws 1 ETH
+        vm.startPrank(solverOneEOA);
+        atlas.unbond(1 ether);
+        atlas.withdraw(1 ether);
+        vm.stopPrank();
+
+        // solverOne's atlETH balance should be 0
+        assertTrue(atlas.balanceOf(solverOneEOA) == 0, "solverOne's atlETH balance should be 0");
+
+        // solverOne's boAtlETH balance should be 0
+        assertTrue(boAtlETH.balanceOf(solverOneEOA) == 0, "solverOne's boAtlETH balance should be 0");
+
+        uint256 ethBalanceAfter = address(solverOneEOA).balance;
+
+        // solverOne's ETH balance should have increased by 1
+        assertTrue(
+            ethBalanceAfter == ethBalanceBefore + 1 ether, "solverOne's ETH balance should have been increased 1"
+        );
     }
 }

@@ -18,9 +18,10 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 _escrowDuration,
         address _factory,
         address _verification,
+        address _boAtlETH,
         address _simulator
     )
-        SafetyLocks(_escrowDuration, _factory, _verification, _simulator)
+        SafetyLocks(_escrowDuration, _factory, _verification, _boAtlETH, _simulator)
     { }
 
     // ---------------------------------------

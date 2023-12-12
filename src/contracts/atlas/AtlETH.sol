@@ -6,6 +6,8 @@ import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 import "../types/EscrowTypes.sol";
 import { Permit69 } from "../common/Permit69.sol";
 
+import { IBoAtlETH } from "../interfaces/IBoAtlETH.sol";
+
 import "forge-std/Test.sol";
 
 // TODO split out events and errors to share with AtlasEscrow
@@ -30,9 +32,10 @@ abstract contract AtlETH is Permit69 {
         uint256 _escrowDuration,
         address _factory,
         address _verification,
+        address _boAtlETH,
         address _simulator
     )
-        Permit69(_escrowDuration, _factory, _verification, _simulator)
+        Permit69(_escrowDuration, _factory, _verification, _boAtlETH, _simulator)
     { }
 
     /*//////////////////////////////////////////////////////////////
@@ -142,6 +145,7 @@ abstract contract AtlETH is Permit69 {
         }
         accountBalance.bonded += uint128(amount);
         _balanceOf[account] = accountBalance;
+        IBoAtlETH(BOATLETH).mint(account, amount);
     }
 
     // Returns the allowed withdrawal amount which may be <= the requested amount param
@@ -179,6 +183,7 @@ abstract contract AtlETH is Permit69 {
         if (_amount > unlockedBalance) {
             _accessData.unbondingBalance -= _amount - unlockedBalance;
             accountBalance.bonded -= _amount - unlockedBalance;
+            IBoAtlETH(BOATLETH).burn(msg.sender, _amount - unlockedBalance);
         }
 
         accessData[spender] = _accessData;

@@ -33,9 +33,10 @@ contract Atlas is Escrow {
         uint256 _escrowDuration,
         address _factory,
         address _verification,
+        address _boAtlETH,
         address _simulator
     )
-        Escrow(_escrowDuration, _factory, _verification, _simulator)
+        Escrow(_escrowDuration, _factory, _verification, _boAtlETH, _simulator)
     { }
 
     function createExecutionEnvironment(address dAppControl) external returns (address executionEnvironment) {

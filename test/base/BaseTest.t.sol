@@ -8,6 +8,7 @@ import { IDAppIntegration } from "src/contracts/interfaces/IDAppIntegration.sol"
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
 import { AtlasFactory } from "src/contracts/atlas/AtlasFactory.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
+import { BoAtlETH } from "src/contracts/atlas/BoAtlETH.sol";
 
 import { Sorter } from "src/contracts/helpers/Sorter.sol";
 import { Simulator } from "src/contracts/helpers/Simulator.sol";
@@ -42,6 +43,7 @@ contract BaseTest is Test, TestConstants {
     Atlas public atlas;
     AtlasFactory public atlasFactory;
     AtlasVerification public atlasVerification;
+    BoAtlETH public boAthETH;
 
     Simulator public simulator;
     Sorter public sorter;
@@ -78,15 +80,18 @@ contract BaseTest is Test, TestConstants {
         // Computes the addresses at which AtlasFactory and AtlasVerification will be deployed
         address expectedAtlasFactoryAddr = computeCreateAddress(payee, vm.getNonce(payee) + 1);
         address expectedAtlasVerificationAddr = computeCreateAddress(payee, vm.getNonce(payee) + 2);
+        address expectedBoAtlEthAddr = computeCreateAddress(payee, vm.getNonce(payee) + 3);
 
         atlas = new Atlas({
             _escrowDuration: 64,
             _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
+            _boAtlETH: expectedBoAtlEthAddr,
             _simulator: address(simulator)
         });
         atlasFactory = new AtlasFactory(address(atlas));
         atlasVerification = new AtlasVerification(address(atlas));
+        boAthETH = new BoAtlETH(address(atlas));
 
         simulator.setAtlas(address(atlas));
 
