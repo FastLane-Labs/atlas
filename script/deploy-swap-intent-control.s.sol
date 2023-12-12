@@ -7,7 +7,6 @@ import "forge-std/Test.sol";
 import { DeployBaseScript } from "script/base/deploy-base.s.sol";
 
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
-import { AtlasFactory } from "src/contracts/atlas/AtlasFactory.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import { GasAccountingLib } from "src/contracts/atlas/GasAccountingLib.sol";
 import { SafetyLocksLib } from "src/contracts/atlas/SafetyLocksLib.sol";

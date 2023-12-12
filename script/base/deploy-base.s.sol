@@ -8,7 +8,6 @@ import "forge-std/StdJson.sol";
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
-import { AtlasFactory } from "src/contracts/atlas/AtlasFactory.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import { GasAccountingLib } from "src/contracts/atlas/GasAccountingLib.sol";
 import { SafetyLocksLib } from "src/contracts/atlas/SafetyLocksLib.sol";
@@ -26,7 +25,6 @@ contract DeployBaseScript is Script {
     ERC20 DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
 
     Atlas public atlas;
-    AtlasFactory public atlasFactory;
     AtlasVerification public atlasVerification;
     GasAccountingLib public gasAccountingLib;
     SafetyLocksLib public safetyLocksLib;
