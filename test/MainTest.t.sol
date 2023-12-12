@@ -341,7 +341,7 @@ contract MainTest is BaseTest {
 
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         bytes memory solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_ONE);
-        solverOps[0] = helper.buildSolverOperation(userOp, solverOpData, solverOneEOA, address(solverOne), 2e17);
+        solverOps[0] = helper.buildSolverOperation(userOp, solverOpData, solverOneEOA, address(solverOne), 2e17, 0);
         (v, r, s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(r, s, v);
 

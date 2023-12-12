@@ -162,7 +162,8 @@ contract V4SwapIntentTest is BaseTest {
             solverOpData: solverOpData,
             solverEOA: solverOneEOA,
             solverContract: address(solver),
-            bidAmount: 1e18
+            bidAmount: 1e18,
+            value: 0
         });
 
         // Solver signs the solverOp

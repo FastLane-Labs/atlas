@@ -135,6 +135,7 @@ contract FlashLoanTest is BaseTest {
         vm.startPrank(userEOA);
         vm.expectEmit(true, true, true, true);
         emit FastLaneErrorsEvents.SolverTxResult(address(solver), solverOneEOA, true, false, 1_048_578);
+        vm.expectRevert();
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
 
@@ -233,12 +234,14 @@ contract SimpleSolver {
         msgSender = msg.sender;
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
 
-        uint256 shortfall = IEscrow(escrow).shortfall();
+        if(bytes4(solverOpData[:4]) == SimpleSolver.payback.selector) {
+            uint256 shortfall = IEscrow(escrow).shortfall();
 
-        if (shortfall < msg.value) shortfall = 0;
-        else shortfall -= msg.value;
+            if (shortfall < msg.value) shortfall = 0;
+            else shortfall -= msg.value;
 
-        IEscrow(escrow).reconcile{ value: msg.value }(msg.sender, sender, shortfall);
+            IEscrow(escrow).reconcile{ value: msg.value }(msg.sender, sender, shortfall);
+        }
     }
 
     function noPayback() external payable {
@@ -248,11 +251,12 @@ contract SimpleSolver {
     function onlyPayBid(uint256 bidAmount) external payable {
         IWETH(weth).withdraw(bidAmount);
         payable(msgSender).transfer(bidAmount); // pay back to atlas
+        address(0).call{ value: msg.value }(""); // do something with the remaining eth
     }
     
     function payback(uint256 bidAmount) external payable {
         IWETH(weth).withdraw(bidAmount);
-        payable(msgSender).transfer(msg.value + bidAmount); // pay back to atlas
+        payable(msgSender).transfer(bidAmount); // pay back to atlas
     }
 
     receive() external payable {}
