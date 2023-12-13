@@ -24,7 +24,7 @@ contract AtlETHTest is BaseTest {
 
         uint256 activeFork = vm.activeFork();
 
-        vm.rollFork(activeFork, block.number + atlas.ESCROW_DURATION() + 1);
+        vm.rollFork(activeFork, block.number + atlas.ESCROW_DURATION() + 2);
         vm.selectFork(activeFork);
 
         vm.startPrank(solverOneEOA);

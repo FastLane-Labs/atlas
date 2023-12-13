@@ -70,7 +70,7 @@ abstract contract AtlETH is Permit69 {
 
     function transfer(address to, uint256 amount) public returns (bool) {
 
-        _balanceOf[msg.sender].balance -= uint128(amount);
+        _deduct(msg.sender, amount);
         _balanceOf[to].balance += uint128(amount);
         
         emit Transfer(msg.sender, to, amount);
@@ -81,7 +81,7 @@ abstract contract AtlETH is Permit69 {
 
         uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
         if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
-        _balanceOf[from].balance -= uint128(amount);
+        _deduct(from, amount);
         _balanceOf[to].balance += uint128(amount);
         emit Transfer(from, to, amount);
         return true;
@@ -158,9 +158,35 @@ abstract contract AtlETH is Permit69 {
     }
 
     function _burn(address from, uint256 amount) internal {
-        _balanceOf[from].balance -= uint128(amount);
-        totalSupply -= amount;
+        totalSupply -= (amount - _deduct(from, amount));
         emit Transfer(from, address(0), amount);
+    }
+
+    // NOTE: This does not change total supply. 
+    function _deduct(address account, uint256 amount) internal returns (uint256 releasedSupply) {
+        uint128 amt = uint128(amount);
+
+        EscrowAccountBalance memory aData = _balanceOf[account];
+
+        uint128 balance = aData.balance;
+
+        if (amt < balance) {
+            _balanceOf[account].balance = balance - amt;
+
+        } else if (amt == balance) {
+            _balanceOf[account].balance = 0;
+
+        } else if (uint128(block.number + ESCROW_DURATION) > accessData[account].lastAccessedBlock) {
+            uint128 shortfall = amt - balance;
+            aData.balance = 0;
+            aData.unbonding -= shortfall; // underflow here to revert if insufficient balance
+            _balanceOf[account] = aData;
+
+            releasedSupply = uint256(shortfall); // return the offset that has been readded to supply. 
+           
+        } else {
+            _balanceOf[account].balance -= amt; // underflow here to revert 
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
