@@ -69,10 +69,10 @@ contract SwapIntentController is DAppControl {
                 requirePostOps: false,
                 zeroSolvers: false,
                 reuseUserOp: true,
-                userBundler: true,
-                solverBundler: true,
-                verifySolverBundlerCallChainHash: true,
-                unknownBundler: true,
+                userAuctioneer: true,
+                solverAuctioneer: true,
+                unknownAuctioneer: true,
+                verifyCallChainHash: true,
                 forwardReturnData: false,
                 requireFulfillment: true
             })
@@ -167,7 +167,7 @@ contract SwapIntentController is DAppControl {
     //////////////////////////////////
 
     function _preSolverCall(bytes calldata data) internal override returns (bool) {
-        (address solverTo, bytes memory returnData) = abi.decode(data, (address, bytes));
+        (address solverTo,, bytes memory returnData) = abi.decode(data, (address, uint256, bytes));
         if (solverTo == address(this) || solverTo == _control() || solverTo == escrow) {
             return false;
         }
@@ -184,7 +184,7 @@ contract SwapIntentController is DAppControl {
 
     // Checking intent was fulfilled, and user has received their tokens, happens here
     function _postSolverCall(bytes calldata data) internal override returns (bool) {
-        (, bytes memory returnData) = abi.decode(data, (address, bytes));
+        (,, bytes memory returnData) = abi.decode(data, (address, uint256, bytes));
 
         SwapData memory swapData = abi.decode(returnData, (SwapData));
 

@@ -17,11 +17,6 @@ contract FastLaneErrorsEvents {
 
     event MEVPaymentFailure(address indexed controller, uint32 callConfig, address bidToken, uint256 bidAmount);
 
-    // TODO remove after AtlasFactory split-out
-    event NewExecutionEnvironment(
-        address indexed environment, address indexed user, address indexed controller, uint32 callConfig
-    );
-
     error SolverBidUnpaid();
     error SolverFailedCallback();
     error SolverMsgValueUnpaid();

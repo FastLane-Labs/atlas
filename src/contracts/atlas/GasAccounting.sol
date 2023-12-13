@@ -16,11 +16,10 @@ import { EscrowBits } from "../libraries/EscrowBits.sol";
 abstract contract GasAccounting is SafetyLocks {
     constructor(
         uint256 _escrowDuration,
-        address _factory,
         address _verification,
         address _simulator
     )
-        SafetyLocks(_escrowDuration, _factory, _verification, _simulator)
+        SafetyLocks(_escrowDuration, _verification, _simulator)
     { }
 
     // ---------------------------------------

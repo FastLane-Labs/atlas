@@ -6,7 +6,6 @@ import "forge-std/Test.sol";
 import { IDAppIntegration } from "src/contracts/interfaces/IDAppIntegration.sol";
 
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
-import { AtlasFactory } from "src/contracts/atlas/AtlasFactory.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 
 import { Sorter } from "src/contracts/helpers/Sorter.sol";
@@ -40,7 +39,6 @@ contract BaseTest is Test, TestConstants {
     address public userEOA = vm.addr(userPK);
 
     Atlas public atlas;
-    AtlasFactory public atlasFactory;
     AtlasVerification public atlasVerification;
 
     Simulator public simulator;
@@ -75,17 +73,14 @@ contract BaseTest is Test, TestConstants {
 
         simulator = new Simulator();
 
-        // Computes the addresses at which AtlasFactory and AtlasVerification will be deployed
-        address expectedAtlasFactoryAddr = computeCreateAddress(payee, vm.getNonce(payee) + 1);
-        address expectedAtlasVerificationAddr = computeCreateAddress(payee, vm.getNonce(payee) + 2);
+        // Computes the addresses at which AtlasVerification will be deployed
+        address expectedAtlasVerificationAddr = computeCreateAddress(payee, vm.getNonce(payee) + 1);
 
         atlas = new Atlas({
             _escrowDuration: 64,
-            _factory: expectedAtlasFactoryAddr,
             _verification: expectedAtlasVerificationAddr,
             _simulator: address(simulator)
         });
-        atlasFactory = new AtlasFactory(address(atlas));
         atlasVerification = new AtlasVerification(address(atlas));
 
         simulator.setAtlas(address(atlas));

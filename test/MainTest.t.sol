@@ -338,6 +338,38 @@ contract MainTest is BaseTest {
         );
     }
 
+    function testExecutionEnvironmentAutoCreation() public {
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+
+        UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
+        // User does not sign their own operation when bundling
+
+        SolverOperation[] memory solverOps = new SolverOperation[](1);
+        bytes memory solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_ONE);
+        solverOps[0] = helper.buildSolverOperation(userOp, solverOpData, solverOneEOA, address(solverOne), 2e17);
+        (v, r, s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
+        solverOps[0].signature = abi.encodePacked(r, s, v);
+
+        DAppOperation memory dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
+        (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
+        dAppOp.signature = abi.encodePacked(r, s, v);
+
+        // Execution environment should not exist yet
+        (,, bool exists) = atlas.getExecutionEnvironment(userEOA, address(control));
+        assertFalse(exists, "ExecutionEnvironment already exists");
+
+        vm.startPrank(userEOA);
+        ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
+        atlas.metacall(userOp, solverOps, dAppOp);
+        vm.stopPrank();
+
+        // Execution environment should exist now
+        (,, exists) = atlas.getExecutionEnvironment(userEOA, address(control));
+        assertTrue(exists, "ExecutionEnvironment wasn't created");
+    }
+
     function testTestUserOperation() public {
         uint8 v;
         bytes32 r;

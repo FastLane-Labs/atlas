@@ -13,7 +13,6 @@ interface IAtlasVerification {
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         DAppOperation calldata dAppOp,
-        address executionEnvironment,
         uint256 msgValue,
         address msgSender,
         bool isSimulation
