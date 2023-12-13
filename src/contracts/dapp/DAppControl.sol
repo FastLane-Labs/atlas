@@ -91,14 +91,14 @@ abstract contract DAppControl is Test, DAppControlTemplate, ExecutionBase {
         _allocateValueCall(bidToken, bidAmount, data);
     }
 
-    function postOpsCall(bytes calldata data)
+    function postOpsCall(bool solved, bytes calldata data)
         external
         payable
         validControl
         onlyAtlasEnvironment(ExecutionPhase.PostOps, _CONTROL_DEPTH)
         returns (bool)
     {
-        return _postOpsCall(data);
+        return _postOpsCall(solved, data);
     }
 
     // View functions

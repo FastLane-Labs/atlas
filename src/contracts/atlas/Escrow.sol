@@ -174,6 +174,7 @@ abstract contract Escrow is AtlETH {
     }
 
     function _executePostOpsCall(
+        bool solved,
         bytes memory returnData,
         address environment,
         bytes32 lockBytes
@@ -181,7 +182,7 @@ abstract contract Escrow is AtlETH {
         internal
         returns (bool success)
     {
-        bytes memory postOpsData = abi.encodeWithSelector(IExecutionEnvironment.postOpsWrapper.selector, returnData);
+        bytes memory postOpsData = abi.encodeWithSelector(IExecutionEnvironment.postOpsWrapper.selector, solved, returnData);
         postOpsData = abi.encodePacked(postOpsData, lockBytes);
         (success,) = environment.call{ value: msg.value }(postOpsData);
     }

@@ -183,7 +183,7 @@ contract Atlas is Escrow, Factory {
 
         if (dConfig.callConfig.needsPostOpsCall()) {
             key = key.holdDAppOperationLock(address(this));
-            callSuccessful = _executePostOpsCall(returnData, executionEnvironment, key.pack());
+            callSuccessful = _executePostOpsCall(auctionWon, returnData, executionEnvironment, key.pack());
             if (!callSuccessful) {
                 if (key.isSimulation) revert PostOpsSimFail();
                 else revert PostOpsFail();
