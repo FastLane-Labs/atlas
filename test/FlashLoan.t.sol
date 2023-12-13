@@ -155,10 +155,29 @@ contract FlashLoanTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
+        uint256 solverStartingWETH = WETH.balanceOf(address(solver));
+        uint256 atlasStartingETH = address(atlas).balance;
+        uint256 userStartingETH = address(userEOA).balance;
+
+        assertEq(solverStartingWETH, 1e18, "solver incorrect starting WETH");
+        assertEq(atlasStartingETH, 103e18, "atlas incorrect starting ETH"); // 2e initial + 1e solver + 100e user deposit
+
         // Last call - should succeed
         vm.startPrank(userEOA);
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
+
+        uint256 solverEndingWETH = WETH.balanceOf(address(solver));
+        uint256 atlasEndingETH = address(atlas).balance;
+        uint256 userEndingETH = address(userEOA).balance;
+
+        console.log("solverWETH", solverStartingWETH, solverEndingWETH);
+        console.log("atlasETH", atlasStartingETH, atlasEndingETH);
+        console.log("userETH", userStartingETH, userEndingETH);
+
+        assertEq(solverEndingWETH, 0, "solver WETH not used");
+        // assertEq(atlasEndingETH - atlasStartingETH, 999612266500000000, "atlas incorrect ending ETH"); // atlas should receive bid
+
     }
 }
 
