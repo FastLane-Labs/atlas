@@ -104,7 +104,7 @@ contract Atlas is Escrow, Factory {
             _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), bundler == SIMULATOR);
 
         // Begin execution
-        (auctionWon, winningSearcherIndex) = _execute(dConfig, userOp, solverOps, executionEnvironment, bundler, key);
+        (auctionWon, winningSearcherIndex) = _execute(dConfig, userOp, solverOps, executionEnvironment, key);
     }
 
     function _execute(
@@ -112,7 +112,6 @@ contract Atlas is Escrow, Factory {
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         address executionEnvironment,
-        address bundler,
         EscrowKey memory key
     )
         internal
@@ -157,7 +156,7 @@ contract Atlas is Escrow, Factory {
             if (solverOps[winningSearcherIndex].from == address(0)) break;
 
             (auctionWon, key) = _solverExecutionIteration(
-                dConfig, solverOps[winningSearcherIndex], returnData, auctionWon, executionEnvironment, bundler, key
+                dConfig, solverOps[winningSearcherIndex], returnData, auctionWon, executionEnvironment, key
             );
             if (auctionWon) break;
 
@@ -192,13 +191,12 @@ contract Atlas is Escrow, Factory {
         bytes memory dAppReturnData,
         bool auctionWon,
         address executionEnvironment,
-        address bundler,
         EscrowKey memory key
     )
         internal
         returns (bool, EscrowKey memory)
     {
-        (auctionWon, key) = _executeSolverOperation(solverOp, dAppReturnData, executionEnvironment, bundler, key);
+        (auctionWon, key) = _executeSolverOperation(solverOp, dAppReturnData, executionEnvironment, key);
         unchecked {
             ++key.callIndex;
         }

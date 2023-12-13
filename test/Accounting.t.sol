@@ -109,7 +109,7 @@ contract AccountingTest is BaseTest {
         uint256 solverMsgValue = 1e18;
 
         // NOTE: the solver also has to pay the gas cost
-        uint256 atlasStartBalance = solverMsgValue * 15 / 10;
+        uint256 atlasStartBalance = solverMsgValue * 35 / 10;
 
         deal(userEOA, userMsgValue);
         vm.prank(solverTwoEOA);
@@ -164,6 +164,9 @@ contract AccountingTest is BaseTest {
         // Build solver calldata (function selector on solver contract and its params)
         bytes memory solverOpData =
             abi.encodeWithSelector(HonestRFQSolver.fulfillRFQ.selector, swapIntent, executionEnvironment);
+
+        vm.prank(address(solverOneEOA));
+        atlas.bond(1 ether);
 
         // Builds the SolverCall
         solverOps[0] = txBuilder.buildSolverOperation({

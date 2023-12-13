@@ -11,7 +11,7 @@ import { SolverOperation } from "../types/SolverCallTypes.sol";
 
 import { EscrowBits } from "../libraries/EscrowBits.sol";
 
-// import "forge-std/Test.sol"; //TODO remove
+//import "forge-std/Test.sol"; //TODO remove
 
 abstract contract GasAccounting is SafetyLocks {
     constructor(
@@ -64,32 +64,22 @@ abstract contract GasAccounting is SafetyLocks {
         // to be used to cover what they owe.  This will be subtracted later - tx will revert here if there isn't
         // enough.
 
-        EscrowAccountData memory solverEscrow = _balanceOf[solverFrom];
+        uint256 bondedBalance = uint256(accessData[solverFrom].bonded);
+
+        if (maxApprovedGasSpend > bondedBalance) maxApprovedGasSpend = bondedBalance;
 
         if (lock != environment) revert InvalidExecutionEnvironment(lock);
         if (solverFrom != solver) revert InvalidSolverFrom(solver);
-        if (uint256(solverEscrow.balance) - uint256(solverEscrow.holds) < maxApprovedGasSpend) {
-            revert InsufficientSolverBalance(
-                uint256(_balanceOf[solverFrom].balance),
-                msg.value,
-                uint256(_balanceOf[solverFrom].holds),
-                maxApprovedGasSpend
-            );
-        }
 
-        uint256 _deposits = deposits;
+        uint256 _deposits = deposits + msg.value;
 
         uint256 deficit = claims + withdrawals;
-        uint256 surplus = _deposits + msg.value + maxApprovedGasSpend;
+        uint256 surplus = _deposits + maxApprovedGasSpend;
 
         if (deficit > surplus) revert InsufficientTotalBalance(deficit - surplus);
 
-        // Increase solver holds by the approved amount - which will decrease solver's balance to pay for gas used
-        solverEscrow.holds += uint128(maxApprovedGasSpend);
-        _balanceOf[solverFrom] = solverEscrow;
-
-        // Add (msg.value + maxApprovedGasSpend) to solver's deposits
-        deposits = surplus;
+        // Add msg.value to solver's deposits
+        if (msg.value > 0) deposits = _deposits;
 
         solver = SOLVER_FULFILLED;
 
@@ -102,16 +92,63 @@ abstract contract GasAccounting is SafetyLocks {
 
     function _borrow(uint256 amount) internal returns (bool valid) {
         if (amount == 0) return true;
-        if (address(this).balance < amount) return false;
+        if (address(this).balance < amount + claims + withdrawals) return false;
         withdrawals += amount;
         return true;
     }
 
+    // Takes AtlETH from 1) owner's bonded balance, and if more needed, also from 2) owner's unbonding balance
+    // and increases transient solver deposits by this amount
+    function _assign(address owner, uint256 amount) internal returns (bool isDeficit) {
+        if (amount == 0) {
+            accessData[owner].lastAccessedBlock = uint128(block.number);
+        } else {
+            uint128 amt = uint128(amount);
+
+            EscrowAccountAccessData memory aData = accessData[owner];
+
+            if (aData.bonded < amt) {
+                // CASE: Not enough bonded balance to cover amount owed
+                EscrowAccountBalance memory bData = _balanceOf[owner];
+                if (bData.unbonding + aData.bonded < amt) {
+                    isDeficit = true;
+                    amount = uint256(bData.unbonding + aData.bonded); // contribute less to deposits ledger
+                    _balanceOf[owner].unbonding = 0;
+                    aData.bonded = 0;
+                } else {
+                    _balanceOf[owner].unbonding = bData.unbonding + aData.bonded - amt;
+                    aData.bonded = 0;
+                }
+            } else {
+                aData.bonded -= amt;
+            }
+
+            aData.lastAccessedBlock = uint128(block.number);
+
+            accessData[owner] = aData;
+
+            bondedTotalSupply -= amount;
+            deposits += amount;
+        }
+    }
+
+    // Increases owner's bonded balance by amount
+    function _credit(address owner, uint256 amount) internal {
+        uint128 amt = uint128(amount);
+
+        EscrowAccountAccessData memory aData = accessData[owner];
+
+        aData.lastAccessedBlock = uint128(block.number);
+        aData.bonded += amt;
+
+        bondedTotalSupply += amount;
+
+        accessData[owner] = aData;
+    }
+
     function _trySolverLock(SolverOperation calldata solverOp) internal returns (bool valid) {
         if (_borrow(solverOp.value)) {
-            address solverFrom = solverOp.from;
-            nonces[solverFrom].lastAccessed = uint64(block.number);
-            solver = solverFrom;
+            solver = solverOp.from;
             return true;
         } else {
             return false;
@@ -122,7 +159,6 @@ abstract contract GasAccounting is SafetyLocks {
         // Calculate what the solver owes if they failed
         // NOTE: This will cause an error if you are simulating with a gasPrice of 0
         address solverFrom = solverOp.from;
-        uint256 solverBalance = (_balanceOf[solverFrom].balance);
 
         uint256 gasUsed = gasWaterMark - gasleft() + 5000;
         if (result & EscrowBits._FULL_REFUND != 0) {
@@ -137,11 +173,7 @@ abstract contract GasAccounting is SafetyLocks {
 
         gasUsed = (gasUsed + ((gasUsed * SURCHARGE) / SURCHARGE_BASE)) * tx.gasprice;
 
-        gasUsed = gasUsed > solverBalance ? solverBalance : gasUsed;
-
-        _balanceOf[solverFrom].balance -= uint128(gasUsed);
-
-        deposits += gasUsed;
+        _assign(solverFrom, gasUsed);
     }
 
     function _settle(address winningSolver, address bundler) internal {
@@ -153,36 +185,29 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 _claims = claims;
         uint256 _withdrawals = withdrawals;
         uint256 _deposits = deposits;
-        uint256 _supply = totalSupply;
 
-        EscrowAccountData memory solverEscrow = _balanceOf[winningSolver];
-        uint256 _solverHold = solverEscrow.holds;
-
-        // Remove any remaining gas from the bundler's claim.
+        // Remove any unused gas from the bundler's claim.
+        // TODO: consider penalizing bundler for too much unused gas (to prevent high escrow requirements for solvers)
         uint256 gasRemainder = (gasleft() * tx.gasprice);
         gasRemainder += ((gasRemainder * SURCHARGE) / SURCHARGE_BASE);
         _claims -= gasRemainder;
 
-        if (_deposits < _claims + _withdrawals) revert InsufficientTotalBalance((_claims + _withdrawals) - _deposits);
-
-        uint256 surplus = _deposits - _claims - _withdrawals;
-
-        // Remove the hold
-        // NOTE that holds can also be applied from withdrawals, so make sure we don't remove any non-transitory holds
-        if (surplus > _solverHold) {
-            surplus -= _solverHold;
-            solverEscrow.holds = 0;
-            solverEscrow.balance += uint128(surplus);
+        if (_deposits < _claims + _withdrawals) {
+            // CASE: in deficit, subtract from bonded balance
+            uint256 amountOwed = _claims + _withdrawals - _deposits;
+            if (_assign(winningSolver, amountOwed)) {
+                revert InsufficientTotalBalance((_claims + _withdrawals) - deposits);
+            }
         } else {
-            solverEscrow.holds -= uint128(surplus);
-            surplus = 0;
+            // CASE: in surplus, add to bonded balance
+            // TODO: make sure this works w/ the surcharge 10%
+            uint256 amountCredited = _deposits - _claims - _withdrawals;
+            _credit(winningSolver, amountCredited);
         }
 
         uint256 netGasSurcharge = (_claims * SURCHARGE) / SURCHARGE_BASE;
 
         _claims -= netGasSurcharge;
-
-        _balanceOf[winningSolver] = solverEscrow;
 
         surcharge = _surcharge + netGasSurcharge;
 

@@ -42,6 +42,8 @@ abstract contract SafetyLocks is Storage, FastLaneErrorsEvents {
         deposits = msg.value;
     }
 
+    // TODO are all these checks necessary? More gas efficient was to check if unlocked?
+    // Used in AtlETH
     function _checkIfUnlocked() internal view {
         if (lock != UNLOCKED) revert AlreadyInitialized();
         if (claims != type(uint256).max) revert AlreadyInitialized();
