@@ -178,12 +178,9 @@ abstract contract AtlETH is Permit69 {
             aData.unbonding -= _shortfall; // underflow here to revert if insufficient balance
             _balanceOf[account] = aData;
 
-            releasedSupply = uint256(_shortfall); // return the offset that has been readded to supply.
-            bondedTotalSupply -= releasedSupply; // subtract the unbonded, freed amount
-            uint256 shortfall256 = uint256(shortfall);
+            uint256 shortfall256 = uint256(_shortfall);
             totalSupply += shortfall256; // add the released supply back to atleth.
             bondedTotalSupply -= shortfall256; // subtract the unbonded, freed amount
-
         } else {
             _balanceOf[account].balance -= amt; // underflow here to revert
         }
