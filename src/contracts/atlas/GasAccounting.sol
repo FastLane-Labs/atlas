@@ -65,7 +65,7 @@ abstract contract GasAccounting is SafetyLocks {
         // to be used to cover what they owe.  This will be subtracted later - tx will revert here if there isn't
         // enough.
 
-        uint256 bondedBalance = uint256(_balanceOf[solverFrom].balance);
+        uint256 bondedBalance = uint256(accessData[solverFrom].bonded);
 
         if (maxApprovedGasSpend > bondedBalance) maxApprovedGasSpend = bondedBalance;
 
