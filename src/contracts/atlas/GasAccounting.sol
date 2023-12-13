@@ -200,7 +200,6 @@ abstract contract GasAccounting is SafetyLocks {
             // CASE: in deficit, subtract from bonded balance
             uint256 amountOwed = _claims + _withdrawals - _deposits;
             if (_assign(winningSolver, amountOwed)) revert InsufficientTotalBalance((_claims + _withdrawals) - deposits);
-            _deposits += amountOwed;
         
         } else {
             // CASE: in surplus, add to bonded balance
