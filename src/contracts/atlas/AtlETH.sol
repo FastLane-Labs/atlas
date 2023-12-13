@@ -155,12 +155,13 @@ abstract contract AtlETH is Permit69 {
     }
 
     function _burn(address from, uint256 amount) internal {
-        totalSupply -= (amount - _deduct(from, amount));
+        _deduct(from, amount);
+        totalSupply -= amount;
         emit Transfer(from, address(0), amount);
     }
 
     // NOTE: This does not change total supply.
-    function _deduct(address account, uint256 amount) internal returns (uint256 releasedSupply) {
+    function _deduct(address account, uint256 amount) internal {
         uint128 amt = uint128(amount);
 
         EscrowAccountBalance memory aData = _balanceOf[account];
@@ -177,8 +178,10 @@ abstract contract AtlETH is Permit69 {
             aData.unbonding -= shortfall; // underflow here to revert if insufficient balance
             _balanceOf[account] = aData;
 
-            releasedSupply = uint256(shortfall); // return the offset that has been readded to supply.
-            bondedTotalSupply -= releasedSupply; // subtract the unbonded, freed amount
+            uint256 shortfall256 = uint256(shortfall);
+            totalSupply += shortfall256; // add the released supply back to atleth.
+            bondedTotalSupply -= shortfall256; // subtract the unbonded, freed amount
+
         } else {
             _balanceOf[account].balance -= amt; // underflow here to revert
         }
