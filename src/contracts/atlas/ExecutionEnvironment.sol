@@ -47,16 +47,6 @@ contract ExecutionEnvironment is Base {
         _;
     }
 
-    modifier contributeSurplus(Party party) {
-        _;
-        {
-            uint256 balance = address(this).balance;
-            if (balance > 0) {
-                IEscrow(atlas).contribute{ value: balance }(party);
-            }
-        }
-    }
-
     modifier validSolver(SolverOperation calldata solverOp) {
         {
             address solverTo = solverOp.solver;
@@ -76,6 +66,16 @@ contract ExecutionEnvironment is Base {
         _;
     }
 
+    modifier contributeSurplus() {
+        _;
+        {
+            uint256 balance = address(this).balance;
+            if (balance > 0) {
+                IEscrow(atlas).contribute{ value: balance }();
+            }
+        }
+    }
+
     //////////////////////////////////
     ///    CORE CALL FUNCTIONS     ///
     //////////////////////////////////
@@ -83,7 +83,6 @@ contract ExecutionEnvironment is Base {
         external
         validUser(userOp)
         onlyAtlasEnvironment(ExecutionPhase.PreOps, _ENVIRONMENT_DEPTH)
-        contributeSurplus(Party.DApp)
         returns (bytes memory)
     {
         // msg.sender = atlas
@@ -105,8 +104,8 @@ contract ExecutionEnvironment is Base {
         payable
         validUser(userOp)
         onlyAtlasEnvironment(ExecutionPhase.UserOperation, _ENVIRONMENT_DEPTH)
-        contributeSurplus(Party.User)
         validControlHash
+        contributeSurplus
         returns (bytes memory userData)
     {
         // msg.sender = atlas
@@ -133,7 +132,6 @@ contract ExecutionEnvironment is Base {
     function postOpsWrapper(bytes calldata returnData)
         external
         onlyAtlasEnvironment(ExecutionPhase.PostOps, _ENVIRONMENT_DEPTH)
-        contributeSurplus(Party.DApp)
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
@@ -259,7 +257,7 @@ contract ExecutionEnvironment is Base {
     )
         external
         onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _ENVIRONMENT_DEPTH)
-        contributeSurplus(Party.Solver)
+        contributeSurplus
     {
         // msg.sender = escrow
         // address(this) = ExecutionEnvironment

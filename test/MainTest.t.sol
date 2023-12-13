@@ -54,6 +54,13 @@ contract MainTest is BaseTest {
 
         console.log("solverOneEOA WETH:", WETH.balanceOf(address(solverOneEOA)));
         console.log("solverOne    WETH:", WETH.balanceOf(address(solverOne)));
+
+        vm.prank(address(solverOneEOA));
+        atlas.bond(1 ether);
+
+        vm.prank(address(solverTwoEOA));
+        atlas.bond(1 ether);
+
         // First SolverOperation
         solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_ONE);
         solverOps[1] = helper.buildSolverOperation(
@@ -336,6 +343,9 @@ contract MainTest is BaseTest {
         bytes32 r;
         bytes32 s;
 
+        vm.prank(solverOneEOA);
+        atlas.bond(1 ether);
+
         UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
         // User does not sign their own operation when bundling
 
@@ -399,6 +409,13 @@ contract MainTest is BaseTest {
         SolverOperation[] memory solverOps = new SolverOperation[](1);
 
         // Success case
+
+        vm.prank(address(solverOneEOA));
+        atlas.bond(1 ether);
+
+        vm.prank(address(solverTwoEOA));
+        atlas.bond(1 ether);
+
         bytes memory solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_ONE);
         solverOps[0] = helper.buildSolverOperation(userOp, solverOpData, solverOneEOA, address(solverOne), 2e17);
         (v, r, s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));

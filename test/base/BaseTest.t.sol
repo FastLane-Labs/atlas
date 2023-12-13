@@ -7,8 +7,6 @@ import { IDAppIntegration } from "src/contracts/interfaces/IDAppIntegration.sol"
 
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
-import { GasAccountingLib } from "src/contracts/atlas/GasAccountingLib.sol";
-import { SafetyLocksLib } from "src/contracts/atlas/SafetyLocksLib.sol";
 
 import { Sorter } from "src/contracts/helpers/Sorter.sol";
 import { Simulator } from "src/contracts/helpers/Simulator.sol";
@@ -42,8 +40,6 @@ contract BaseTest is Test, TestConstants {
 
     Atlas public atlas;
     AtlasVerification public atlasVerification;
-    GasAccountingLib public gasAccountingLib;
-    SafetyLocksLib public safetyLocksLib;
 
     Simulator public simulator;
     Sorter public sorter;
@@ -79,31 +75,13 @@ contract BaseTest is Test, TestConstants {
 
         // Computes the addresses at which AtlasVerification will be deployed
         address expectedAtlasVerificationAddr = computeCreateAddress(payee, vm.getNonce(payee) + 1);
-        address expectedGasAccountingLibAddr = computeCreateAddress(payee, vm.getNonce(payee) + 2);
-        address expectedSafetyLocksLibAddr = computeCreateAddress(payee, vm.getNonce(payee) + 3);
 
         atlas = new Atlas({
             _escrowDuration: 64,
             _verification: expectedAtlasVerificationAddr,
-            _gasAccLib: expectedGasAccountingLibAddr,
-            _safetyLocksLib: expectedSafetyLocksLibAddr,
             _simulator: address(simulator)
         });
         atlasVerification = new AtlasVerification(address(atlas));
-        gasAccountingLib = new GasAccountingLib({
-            _escrowDuration: 64,
-            _verification: expectedAtlasVerificationAddr,
-            _safetyLocksLib: expectedSafetyLocksLibAddr,
-            _simulator: address(simulator),
-            _atlas: address(atlas)
-        });
-        safetyLocksLib = new SafetyLocksLib({
-            _escrowDuration: 64,
-            _verification: expectedAtlasVerificationAddr,
-            _gasAccLib: expectedGasAccountingLibAddr,
-            _simulator: address(simulator),
-            _atlas: address(atlas)
-        });
 
         simulator.setAtlas(address(atlas));
 

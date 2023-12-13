@@ -97,6 +97,7 @@ contract V4SwapIntentTest is BaseTest {
 
         // Deploy the solver contract
         vm.startPrank(solverOneEOA);
+        atlas.bond(1 ether);
         UniswapV4IntentSolver solver = new UniswapV4IntentSolver(WETH_ADDRESS, address(atlas), poolManager);
         vm.stopPrank();
 

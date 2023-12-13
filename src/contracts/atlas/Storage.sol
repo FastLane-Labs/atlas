@@ -7,13 +7,11 @@ import "../types/LockTypes.sol";
 contract Storage {
     // Atlas constants
     uint256 internal constant _MAX_GAS = 1_500_000;
-    uint256 internal constant LEDGER_LENGTH = 5; // type(Party).max = 5
+    uint256 internal constant LEDGER_LENGTH = 6; // type(Party).max = 6
     address internal constant UNLOCKED = address(1);
 
     uint256 public immutable ESCROW_DURATION;
     address public immutable VERIFICATION;
-    address public immutable GAS_ACC_LIB;
-    address public immutable SAFETY_LOCKS_LIB;
     address public immutable SIMULATOR;
 
     // AtlETH ERC-20 constants
@@ -27,40 +25,45 @@ contract Storage {
 
     // AtlETH ERC-20 storage
     uint256 public totalSupply;
-    mapping(address => mapping(address => uint256)) public allowance;
+    uint256 public bondedTotalSupply;
+
     mapping(address => uint256) public nonces;
+    mapping(address => EscrowAccountBalance) internal _balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
+    mapping(address => EscrowAccountAccessData) public accessData;
 
-    // Atlas GasAccounting storage
-    // NOTE: these storage vars / maps should only be accessible by *signed* solver transactions
-    // and only once per solver per block (to avoid user-solver collaborative exploits)
-    // uint256 public immutable escrowDuration;
-    mapping(address => EscrowAccountData) internal _escrowAccountData;
+    // Gas Accounting constants
+    uint256 public constant SURCHARGE_BASE = 100;
+    uint256 public constant SURCHARGE = 10;
+    address public constant SOLVER_FULFILLED = address(2);
 
-    // Atlas SafetyLocks storage
-    Lock public lock;
-    Ledger[LEDGER_LENGTH] public ledgers;
+    // atlETH GasAccounting storage
 
-    constructor(
-        uint256 _escrowDuration,
-        address _verification,
-        address _gasAccLib,
-        address _safetyLocksLib,
-        address _simulator
-    ) {
+    uint256 public surcharge; // Atlas gas surcharges
+
+    // Atlas SafetyLocks (transient storage)
+    address public lock; // transient storage
+    address public solver; // transient storage
+    uint256 public claims; // transient storage
+    uint256 public withdrawals; // transient storage
+    uint256 public deposits; // transient storage
+
+    constructor(uint256 _escrowDuration, address _verification, address _simulator) payable {
         ESCROW_DURATION = _escrowDuration;
         VERIFICATION = _verification;
-        GAS_ACC_LIB = _gasAccLib;
-        SAFETY_LOCKS_LIB = _safetyLocksLib;
         SIMULATOR = _simulator;
         INITIAL_CHAIN_ID = block.chainid;
         INITIAL_DOMAIN_SEPARATOR = _computeDomainSeparator();
-        lock = Lock({ activeEnvironment: UNLOCKED, activeParties: uint16(0), startingBalance: uint64(0) });
 
-        for (uint256 i; i < LEDGER_LENGTH; i++) {
-            // init the storage vars
-            ledgers[i] =
-                Ledger({ balance: 0, contributed: 0, requested: 0, status: LedgerStatus.Inactive, proxy: Party(i) });
-        }
+        // Gas Accounting
+        surcharge = msg.value;
+
+        // Gas Accounting - transient storage (delete this from constructor post dencun)
+        lock = UNLOCKED;
+        solver = UNLOCKED;
+        claims = type(uint256).max;
+        withdrawals = type(uint256).max;
+        deposits = type(uint256).max;
     }
 
     function _computeDomainSeparator() internal view virtual returns (bytes32) { }
