@@ -181,7 +181,6 @@ abstract contract AtlETH is Permit69 {
             uint256 shortfall256 = uint256(shortfall);
             totalSupply += shortfall256; // add the released supply back to atleth.
             bondedTotalSupply -= shortfall256; // subtract the unbonded, freed amount
-
         } else {
             _balanceOf[account].balance -= amt; // underflow here to revert
         }
