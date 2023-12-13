@@ -156,7 +156,7 @@ contract Atlas is Escrow, Factory {
             if (solverOps[winningSearcherIndex].from == address(0)) break;
 
             (auctionWon, key) = _solverExecutionIteration(
-                dConfig, solverOps[winningSearcherIndex], returnData, auctionWon, executionEnvironment, bundler, key
+                dConfig, solverOps[winningSearcherIndex], returnData, auctionWon, executionEnvironment, key
             );
             if (auctionWon) break;
 

@@ -343,6 +343,9 @@ contract MainTest is BaseTest {
         bytes32 r;
         bytes32 s;
 
+        vm.prank(solverOneEOA);
+        atlas.bond(1 ether);
+
         UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
         // User does not sign their own operation when bundling
 
