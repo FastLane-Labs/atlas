@@ -66,10 +66,10 @@ contract V4DAppControl is DAppControl {
                 requirePostOps: false,
                 zeroSolvers: true,
                 reuseUserOp: false,
-                userBundler: true,
-                solverBundler: true,
-                verifySolverBundlerCallChainHash: true,
-                unknownBundler: true,
+                userAuctioneer: true,
+                solverAuctioneer: true,
+                unknownAuctioneer: true,
+                verifyCallChainHash: true,
                 forwardReturnData: false,
                 requireFulfillment: true
             })

@@ -58,7 +58,7 @@ contract Atlas is Escrow, Factory {
         // NOTE: Currently reverting instead of graceful return to help w/ testing.
         ValidCallsResult validCallsResult;
         (solverOps, validCallsResult) = IAtlasVerification(VERIFICATION).validCalls(
-            dConfig, userOp, solverOps, dAppOp, executionEnvironment, msg.value, msg.sender, msg.sender == SIMULATOR
+            dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, msg.sender == SIMULATOR
         );
         if (validCallsResult != ValidCallsResult.Valid) {
             if (msg.sender == SIMULATOR) revert VerificationSimFail();
@@ -153,13 +153,13 @@ contract Atlas is Escrow, Factory {
         }
 
         for (; winningSearcherIndex < solverOps.length;) {
-            // Only execute solver meta tx if userOpHash matches
-            if (!auctionWon && solverOps[winningSearcherIndex].from != address(0)) {
-                (auctionWon, key) = _solverExecutionIteration(
-                    dConfig, solverOps[winningSearcherIndex], returnData, auctionWon, executionEnvironment, bundler, key
-                );
-                if (auctionWon) break;
-            }
+            // valid solverOps are packed from left of array - break at first invalid solverOp
+            if (solverOps[winningSearcherIndex].from == address(0)) break;
+
+            (auctionWon, key) = _solverExecutionIteration(
+                dConfig, solverOps[winningSearcherIndex], returnData, auctionWon, executionEnvironment, bundler, key
+            );
+            if (auctionWon) break;
 
             unchecked {
                 ++winningSearcherIndex;

@@ -69,10 +69,10 @@ contract SwapIntentController is DAppControl {
                 requirePostOps: false,
                 zeroSolvers: false,
                 reuseUserOp: true,
-                userBundler: true,
-                solverBundler: true,
-                verifySolverBundlerCallChainHash: true,
-                unknownBundler: true,
+                userAuctioneer: true,
+                solverAuctioneer: true,
+                unknownAuctioneer: true,
+                verifyCallChainHash: true,
                 forwardReturnData: false,
                 requireFulfillment: true
             })
