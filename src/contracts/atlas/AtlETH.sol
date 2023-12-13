@@ -172,12 +172,12 @@ abstract contract AtlETH is Permit69 {
         } else if (amt == balance) {
             _balanceOf[account].balance = 0;
         } else if (uint128(block.number + ESCROW_DURATION) > accessData[account].lastAccessedBlock) {
-            uint128 shortfall = amt - balance;
+            uint128 _shortfall = amt - balance;
             aData.balance = 0;
-            aData.unbonding -= shortfall; // underflow here to revert if insufficient balance
+            aData.unbonding -= _shortfall; // underflow here to revert if insufficient balance
             _balanceOf[account] = aData;
 
-            releasedSupply = uint256(shortfall); // return the offset that has been readded to supply.
+            releasedSupply = uint256(_shortfall); // return the offset that has been readded to supply.
             bondedTotalSupply -= releasedSupply; // subtract the unbonded, freed amount
         } else {
             _balanceOf[account].balance -= amt; // underflow here to revert
