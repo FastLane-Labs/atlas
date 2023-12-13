@@ -61,7 +61,6 @@ contract MainTest is BaseTest {
         vm.prank(address(solverTwoEOA));
         atlas.bond(1 ether);
 
-
         // First SolverOperation
         solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_ONE);
         solverOps[1] = helper.buildSolverOperation(
@@ -382,7 +381,6 @@ contract MainTest is BaseTest {
         vm.prank(address(solverTwoEOA));
         atlas.bond(1 ether);
 
-        
         bytes memory solverOpData = helper.buildV2SolverOperationData(POOL_TWO, POOL_ONE);
         solverOps[0] = helper.buildSolverOperation(userOp, solverOpData, solverOneEOA, address(solverOne), 2e17);
         (v, r, s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));

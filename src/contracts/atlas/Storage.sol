@@ -38,7 +38,6 @@ contract Storage {
     uint256 public constant SURCHARGE = 10;
     address public constant SOLVER_FULFILLED = address(2);
 
-
     // atlETH GasAccounting storage
 
     uint256 public surcharge; // Atlas gas surcharges

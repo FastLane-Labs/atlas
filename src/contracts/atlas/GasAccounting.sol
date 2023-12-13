@@ -103,26 +103,23 @@ abstract contract GasAccounting is SafetyLocks {
     function _assign(address owner, uint256 amount) internal returns (bool isDeficit) {
         if (amount == 0) {
             accessData[owner].lastAccessedBlock = uint128(block.number);
-
         } else {
             uint128 amt = uint128(amount);
 
             EscrowAccountAccessData memory aData = accessData[owner];
 
             if (aData.bonded < amt) {
-                // CASE: Not enough bonded balance to cover amount owed 
+                // CASE: Not enough bonded balance to cover amount owed
                 EscrowAccountBalance memory bData = _balanceOf[owner];
                 if (bData.unbonding + aData.bonded < amt) {
                     isDeficit = true;
                     amount = uint256(bData.unbonding + aData.bonded); // contribute less to deposits ledger
                     _balanceOf[owner].unbonding = 0;
                     aData.bonded = 0;
-
                 } else {
                     _balanceOf[owner].unbonding = bData.unbonding + aData.bonded - amt;
                     aData.bonded = 0;
                 }
-
             } else {
                 aData.bonded -= amt;
             }
@@ -199,8 +196,9 @@ abstract contract GasAccounting is SafetyLocks {
         if (_deposits < _claims + _withdrawals) {
             // CASE: in deficit, subtract from bonded balance
             uint256 amountOwed = _claims + _withdrawals - _deposits;
-            if (_assign(winningSolver, amountOwed)) revert InsufficientTotalBalance((_claims + _withdrawals) - deposits);
-        
+            if (_assign(winningSolver, amountOwed)) {
+                revert InsufficientTotalBalance((_claims + _withdrawals) - deposits);
+            }
         } else {
             // CASE: in surplus, add to bonded balance
             // TODO: make sure this works w/ the surcharge 10%

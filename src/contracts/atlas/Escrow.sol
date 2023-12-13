@@ -110,7 +110,6 @@ abstract contract Escrow is AtlETH {
 
                 // winning solver's gas is implicitly paid for by their allowance
                 return (true, key.turnSolverLockPayments(environment));
-
             } else {
                 _releaseSolverLock(solverOp, gasWaterMark, result);
                 result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
@@ -200,7 +199,6 @@ abstract contract Escrow is AtlETH {
 
         // see if solver's escrow can afford tx gascost
         if (gasCost > solverBalance) {
-
             // charge solver for calldata so that we can avoid vampire attacks from solver onto user
             result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
         }
