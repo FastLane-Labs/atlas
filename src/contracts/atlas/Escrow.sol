@@ -182,7 +182,8 @@ abstract contract Escrow is AtlETH {
         internal
         returns (bool success)
     {
-        bytes memory postOpsData = abi.encodeWithSelector(IExecutionEnvironment.postOpsWrapper.selector, solved, returnData);
+        bytes memory postOpsData =
+            abi.encodeWithSelector(IExecutionEnvironment.postOpsWrapper.selector, solved, returnData);
         postOpsData = abi.encodePacked(postOpsData, lockBytes);
         (success,) = environment.call{ value: msg.value }(postOpsData);
     }

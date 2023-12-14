@@ -130,7 +130,10 @@ contract ExecutionEnvironment is Base {
         }
     }
 
-    function postOpsWrapper(bool solved, bytes calldata returnData)
+    function postOpsWrapper(
+        bool solved,
+        bytes calldata returnData
+    )
         external
         onlyAtlasEnvironment(ExecutionPhase.PostOps, _ENVIRONMENT_DEPTH)
         contributeSurplus(Party.DApp)
