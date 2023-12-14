@@ -257,8 +257,36 @@ contract ExecutionEnvironmentTest is BaseTest {
     }
 
     function test_postOpsWrapper() public {
+        bytes memory postOpsData;
+        bool status;
+
+        setupDAppControl(callConfig);
+
         // Valid
-        
+        escrowKey = escrowKey.holdDAppOperationLock(address(dAppControl));
+        postOpsData = abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, abi.encode(false, true));
+        postOpsData = abi.encodePacked(postOpsData, escrowKey.pack());
+        vm.prank(address(atlas));
+        (status,) = address(executionEnvironment).call(postOpsData);
+        assertTrue(status);
+
+        // DelegateRevert
+        escrowKey = escrowKey.holdDAppOperationLock(address(dAppControl));
+        postOpsData = abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, abi.encode(true, false));
+        postOpsData = abi.encodePacked(postOpsData, escrowKey.pack());
+        vm.prank(address(atlas));
+        vm.expectRevert(bytes("ERR-EC02 DelegateRevert"));
+        (status,) = address(executionEnvironment).call(postOpsData);
+        assertTrue(status, "expectRevert ERR-EC02 DelegateRevert: call did not revert");
+
+        // DelegateUnsuccessful
+        escrowKey = escrowKey.holdDAppOperationLock(address(dAppControl));
+        postOpsData = abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, abi.encode(false, false));
+        postOpsData = abi.encodePacked(postOpsData, escrowKey.pack());
+        vm.prank(address(atlas));
+        vm.expectRevert(bytes("ERR-EC03a DelegateUnsuccessful"));
+        (status,) = address(executionEnvironment).call(postOpsData);
+        assertTrue(status, "expectRevert ERR-EC03a DelegateUnsuccessful: call did not revert");
     }
 }
 
@@ -284,6 +312,12 @@ contract MockDAppControl is DAppControl {
         return new bytes(0);
     }
 
+    function _postOpsCall(bytes calldata data) internal pure override returns (bool) {
+        (bool shouldRevert, bool returnValue) = abi.decode(data, (bool, bool));
+        require(!shouldRevert, "_postSolverCall revert requested");
+        return returnValue;
+    }
+
     function _allocateValueCall(address, uint256, bytes calldata) internal virtual override { }
     function getBidFormat(UserOperation calldata) public view virtual override returns (address) { }
     function getBidValue(SolverOperation calldata) public view virtual override returns (uint256) { }
@@ -293,7 +327,7 @@ contract MockDAppControl is DAppControl {
     //////////////////////////////////////////////////////////////*/
 
     function mockOperation(bool shouldRevert, uint256 returnValue) public pure returns (uint256) {
-        require(!shouldRevert, "revert requested");
+        require(!shouldRevert, "mockOperation revert requested");
         return returnValue;
     }
 }
