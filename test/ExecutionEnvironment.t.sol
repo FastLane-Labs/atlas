@@ -264,7 +264,8 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // Valid
         escrowKey = escrowKey.holdDAppOperationLock(address(dAppControl));
-        postOpsData = abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, abi.encode(false, true));
+        postOpsData =
+            abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, false, abi.encode(false, true));
         postOpsData = abi.encodePacked(postOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(postOpsData);
@@ -272,7 +273,8 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // DelegateRevert
         escrowKey = escrowKey.holdDAppOperationLock(address(dAppControl));
-        postOpsData = abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, abi.encode(true, false));
+        postOpsData =
+            abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, false, abi.encode(true, false));
         postOpsData = abi.encodePacked(postOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(bytes("ERR-EC02 DelegateRevert"));
@@ -281,7 +283,8 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // DelegateUnsuccessful
         escrowKey = escrowKey.holdDAppOperationLock(address(dAppControl));
-        postOpsData = abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, abi.encode(false, false));
+        postOpsData =
+            abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, false, abi.encode(false, false));
         postOpsData = abi.encodePacked(postOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(bytes("ERR-EC03a DelegateUnsuccessful"));
@@ -312,7 +315,7 @@ contract MockDAppControl is DAppControl {
         return new bytes(0);
     }
 
-    function _postOpsCall(bytes calldata data) internal pure override returns (bool) {
+    function _postOpsCall(bool, bytes calldata data) internal pure override returns (bool) {
         (bool shouldRevert, bool returnValue) = abi.decode(data, (bool, bool));
         require(!shouldRevert, "_postSolverCall revert requested");
         return returnValue;
