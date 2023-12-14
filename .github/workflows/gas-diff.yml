@@ -44,12 +44,6 @@ jobs:
           ignore: test-foundry/**/* # filter out gas reports from specific paths (test/ is included by default)
         id: gas_diff
 
-      # ONLY FOR DEBUGGING
-      - name: Echo gas diff output for debugging
-        run: |
-          echo "Gas Diff Markdown Output:"
-          echo "${{ steps.gas_diff.outputs.markdown }}"
-
       - name: Add gas diff to sticky comment
         if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
         uses: marocchino/sticky-pull-request-comment@v2
