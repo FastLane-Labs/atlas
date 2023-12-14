@@ -12,7 +12,7 @@ interface IDAppControl {
 
     function postSolverCall(bytes calldata data) external payable returns (bool);
 
-    function postOpsCall(bytes calldata data) external payable returns (bytes memory);
+    function postOpsCall(bool solved, bytes calldata data) external payable returns (bytes memory);
 
     function allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) external;
 
