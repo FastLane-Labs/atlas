@@ -30,9 +30,7 @@ jobs:
       - name: Run tests
         run: forge test --gas-report > gasreport.ansi # <- this file name should be unique in your repository!
         env:
-          # make fuzzing semi-deterministic to avoid noisy gas cost estimation
-          # due to non-deterministic fuzzing (but still use pseudo-random fuzzing seeds)
-          FOUNDRY_FUZZ_SEED: 0x${{ github.event.pull_request.base.sha || github.sha }}
+            MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
 
       - name: Compare gas reports
         uses: Rubilmax/foundry-gas-diff@v3.16
