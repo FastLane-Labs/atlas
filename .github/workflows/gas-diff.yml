@@ -1,4 +1,4 @@
-name: Report gas diff
+name: Gas Diff
 
 on:
   push:
@@ -38,7 +38,7 @@ jobs:
       - name: Compare gas reports
         uses: Rubilmax/foundry-gas-diff@v3.16
         with:
-          summaryQuantile: 0.8 # only display the 10% most significant gas diffs in the summary (defaults to 20%)
+          summaryQuantile: 0.9 # only display the 10% most significant gas diffs in the summary (defaults to 20%)
           sortCriteria: avg,max # sort diff rows by criteria
           sortOrders: desc,asc # and directions
           ignore: test-foundry/**/* # filter out gas reports from specific paths (test/ is included by default)
@@ -48,4 +48,5 @@ jobs:
         if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
         uses: marocchino/sticky-pull-request-comment@v2
         with:
-          message: ${{ steps.gas_diff.outputs.markdown }}
+            delete: ${{ !steps.gas_diff.outputs.markdown }}
+            message: ${{ steps.gas_diff.outputs.markdown }}
