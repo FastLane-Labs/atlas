@@ -255,6 +255,11 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(userData);
         assertTrue(status, "expectRevert ERR-EC02 DelegateRevert: call did not revert");
     }
+
+    function test_postOpsWrapper() public {
+        // Valid
+        
+    }
 }
 
 contract MockDAppControl is DAppControl {
