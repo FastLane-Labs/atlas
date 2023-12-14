@@ -11,7 +11,7 @@ contract DummyDAppControl is DAppControl {
     constructor(address escrow)
         DAppControl(
             escrow,
-            address(0),
+            msg.sender,
             CallConfig(
                 false,
                 false,
