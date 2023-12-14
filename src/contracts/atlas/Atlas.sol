@@ -48,6 +48,10 @@ contract Atlas is Escrow, Factory {
     {
         uint256 gasMarker = gasleft(); // + 21_000 + (msg.data.length * CALLDATA_LENGTH_PREMIUM);
 
+        bytes32 deleteThis = keccak256(abi.encodePacked(userOp.to));
+        deleteThis = keccak256(abi.encodePacked(userOp.from));
+        deleteThis = keccak256(abi.encodePacked(userOp.control));
+
         // Get or create the execution environment
         address executionEnvironment;
         DAppConfig memory dConfig;
