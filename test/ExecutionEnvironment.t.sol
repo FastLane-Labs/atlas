@@ -291,6 +291,38 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(postOpsData);
         assertTrue(status, "expectRevert ERR-EC03a DelegateUnsuccessful: call did not revert");
     }
+
+    function test_solverMetaTryCatch() public {
+        // TODO
+    }
+
+    function test_allocateValue() public {
+        bytes memory allocateData;
+        bool status;
+
+        setupDAppControl(callConfig);
+
+        // Valid
+        escrowKey = escrowKey.turnSolverLockPayments(address(dAppControl));
+        allocateData = abi.encodeWithSelector(
+            executionEnvironment.allocateValue.selector, address(0), uint256(0), abi.encode(false)
+        );
+        allocateData = abi.encodePacked(allocateData, escrowKey.pack());
+        vm.prank(address(atlas));
+        (status,) = address(executionEnvironment).call(allocateData);
+        assertTrue(status);
+
+        // DelegateRevert
+        escrowKey = escrowKey.turnSolverLockPayments(address(dAppControl));
+        allocateData = abi.encodeWithSelector(
+            executionEnvironment.allocateValue.selector, address(0), uint256(0), abi.encode(true)
+        );
+        allocateData = abi.encodePacked(allocateData, escrowKey.pack());
+        vm.prank(address(atlas));
+        vm.expectRevert(bytes("ERR-EC02 DelegateRevert"));
+        (status,) = address(executionEnvironment).call(allocateData);
+        assertTrue(status, "expectRevert ERR-EC02 DelegateRevert: call did not revert");
+    }
 }
 
 contract MockDAppControl is DAppControl {
@@ -321,7 +353,11 @@ contract MockDAppControl is DAppControl {
         return returnValue;
     }
 
-    function _allocateValueCall(address, uint256, bytes calldata) internal virtual override { }
+    function _allocateValueCall(address, uint256, bytes calldata data) internal virtual override {
+        (bool shouldRevert) = abi.decode(data, (bool));
+        require(!shouldRevert, "_allocateValueCall revert requested");
+    }
+
     function getBidFormat(UserOperation calldata) public view virtual override returns (address) { }
     function getBidValue(SolverOperation calldata) public view virtual override returns (uint256) { }
 
