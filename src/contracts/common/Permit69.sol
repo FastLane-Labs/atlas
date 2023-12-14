@@ -31,11 +31,9 @@ abstract contract Permit69 is GasAccounting {
     constructor(
         uint256 _escrowDuration,
         address _verification,
-        address _gasAccLib,
-        address _safetyLocksLib,
         address _simulator
     )
-        GasAccounting(_escrowDuration, _verification, _gasAccLib, _safetyLocksLib, _simulator)
+        GasAccounting(_escrowDuration, _verification, _simulator)
     { }
 
     // Virtual Functions defined by other Atlas modules
@@ -84,26 +82,6 @@ abstract contract Permit69 is GasAccounting {
 
         // Transfer token
         ERC20(token).safeTransferFrom(controller, destination, amount);
-    }
-
-    function requestGasFrom(Party donor, Party recipient, uint256 amt, uint16 lockState) external {
-        // Verify the parties
-        if (!_validParties(msg.sender, donor, recipient)) revert InvalidEnvironment();
-
-        // Verify the lock state
-        _verifyLockState({ lockState: lockState, safeExecutionPhaseSet: SAFE_GAS_TRANSFER });
-
-        _requestFrom(donor, recipient, amt);
-    }
-
-    function contributeGasTo(Party donor, Party recipient, uint256 amt, uint16 lockState) external {
-        // Verify the parties
-        if (!_validParties(msg.sender, donor, recipient)) revert InvalidEnvironment();
-
-        // Verify the lock state
-        _verifyLockState({ lockState: lockState, safeExecutionPhaseSet: SAFE_GAS_TRANSFER });
-
-        _contributeTo(donor, recipient, amt);
     }
 
     function _verifyLockState(uint16 lockState, uint16 safeExecutionPhaseSet) internal pure {

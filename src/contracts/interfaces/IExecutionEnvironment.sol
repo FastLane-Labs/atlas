@@ -6,11 +6,11 @@ import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
 interface IExecutionEnvironment {
-    function preOpsWrapper(UserOperation calldata userOp) external payable returns (bytes memory preOpsData);
+    function preOpsWrapper(UserOperation calldata userOp) external returns (bytes memory preOpsData);
 
     function userWrapper(UserOperation calldata userOp) external payable returns (bytes memory userReturnData);
 
-    function postOpsWrapper(bool solved, bytes calldata returnData) external payable;
+    function postOpsWrapper(bool solved, bytes calldata returnData) external;
 
     function solverMetaTryCatch(
         uint256 gasLimit,

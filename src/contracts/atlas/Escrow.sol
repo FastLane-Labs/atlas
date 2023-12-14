@@ -31,11 +31,9 @@ abstract contract Escrow is AtlETH {
     constructor(
         uint256 _escrowDuration,
         address _verification,
-        address _gasAccLib,
-        address _safetyLocksLib,
         address _simulator
     )
-        AtlETH(_escrowDuration, _verification, _gasAccLib, _safetyLocksLib, _simulator)
+        AtlETH(_escrowDuration, _verification, _simulator)
     { }
 
     ///////////////////////////////////////////////////
@@ -55,7 +53,7 @@ abstract contract Escrow is AtlETH {
     {
         preOpsData = abi.encodeWithSelector(IExecutionEnvironment.preOpsWrapper.selector, userOp);
         preOpsData = abi.encodePacked(preOpsData, lockBytes);
-        (success, preOpsData) = environment.call{ value: msg.value }(preOpsData);
+        (success, preOpsData) = environment.call(preOpsData);
         if (success) {
             preOpsData = abi.decode(preOpsData, (bytes));
         }
@@ -72,12 +70,8 @@ abstract contract Escrow is AtlETH {
         userData = abi.encodeWithSelector(IExecutionEnvironment.userWrapper.selector, userOp);
         userData = abi.encodePacked(userData, lockBytes);
 
-        if (userOp.value > 0) {
-            _use(Party.User, userOp.from, userOp.value);
-            (success, userData) = environment.call{ value: userOp.value }(userData);
-        } else {
-            (success, userData) = environment.call(userData);
-        }
+        (success, userData) = environment.call{ value: userOp.value }(userData);
+
         // require(success, "ERR-E002 UserFail");
         if (success) {
             userData = abi.decode(userData, (bytes));
@@ -88,7 +82,6 @@ abstract contract Escrow is AtlETH {
         SolverOperation calldata solverOp,
         bytes memory dAppReturnData,
         address environment,
-        address bundler,
         EscrowKey memory key
     )
         internal
@@ -97,21 +90,13 @@ abstract contract Escrow is AtlETH {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
 
-        EscrowAccountData memory solverEscrow = _escrowAccountData[solverOp.from];
-        uint256 result;
-        uint256 gasLimit;
-
         // Verify the transaction.
-        (result, gasLimit, solverEscrow) = _validateSolverOperation(solverOp, false);
+        (uint256 result, uint256 gasLimit) = _validateSolverOperation(solverOp, false);
 
         // If there are no errors, attempt to execute
-        if (result.canExecute() && _checkSolverProxy(solverOp.from, bundler)) {
+        if (result.canExecute() && _trySolverLock(solverOp)) {
             // Open the solver lock
             key = key.holdSolverLock(solverOp.solver);
-
-            if (solverOp.value != 0) {
-                _borrow(Party.Solver, solverOp.value);
-            }
 
             // Execute the solver call
             // _solverOpsWrapper returns a SolverOutcome enum value
@@ -122,25 +107,18 @@ abstract contract Escrow is AtlETH {
                 result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
                 emit SolverTxResult(solverOp.solver, solverOp.from, true, true, result);
 
-                _updateSolverProxy(solverOp.from, bundler, true);
-
                 // winning solver's gas is implicitly paid for by their allowance
                 return (true, key.turnSolverLockPayments(environment));
-            } else if (solverOp.value != 0) {
-                _tradeCorrection(Party.Solver, solverOp.value);
+            } else {
+                _releaseSolverLock(solverOp, gasWaterMark, result);
+                result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
+
+                // emit event
+                emit SolverTxResult(solverOp.solver, solverOp.from, true, false, result);
             }
-
-            _updateSolverProxy(solverOp.from, bundler, false);
-            result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
-
-            // Update the solver's escrow balances and the accumulated refund
-            if (result.updateEscrow()) {
-                key.gasRefund += uint32(_update(solverOp, solverEscrow, gasWaterMark, result));
-            }
-
-            // emit event
-            emit SolverTxResult(solverOp.solver, solverOp.from, true, false, result);
         } else {
+            _releaseSolverLock(solverOp, gasWaterMark, result);
+
             // emit event
             emit SolverTxResult(solverOp.solver, solverOp.from, false, false, result);
         }
@@ -185,10 +163,10 @@ abstract contract Escrow is AtlETH {
         bytes memory postOpsData =
             abi.encodeWithSelector(IExecutionEnvironment.postOpsWrapper.selector, solved, returnData);
         postOpsData = abi.encodePacked(postOpsData, lockBytes);
-        (success,) = environment.call{ value: msg.value }(postOpsData);
+        (success,) = environment.call(postOpsData);
     }
 
-    // TODO Revisit the EscrowAccountData memory solverEscrow arg. Needs to be passed through from Atlas, through
+    // TODO Revisit the EscrowAccountBalance memory solverEscrow arg. Needs to be passed through from Atlas, through
     // callstack
     function _validateSolverOperation(
         SolverOperation calldata solverOp,
@@ -196,94 +174,54 @@ abstract contract Escrow is AtlETH {
     )
         internal
         view
-        returns (uint256 result, uint256 gasLimit, EscrowAccountData memory solverEscrow)
+        returns (uint256 result, uint256 gasLimit)
     {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
 
-        solverEscrow = _escrowAccountData[solverOp.from];
+        EscrowAccountAccessData memory aData = accessData[solverOp.from];
 
-        // TODO big unchecked block - audit/review carefully
-        unchecked {
-            if (solverOp.to != address(this)) {
-                result |= 1 << uint256(SolverOutcome.InvalidTo);
-            }
+        uint256 solverBalance = aData.bonded;
+        uint256 lastAccessedBlock = aData.lastAccessedBlock;
 
-            if (solverEscrow.lastAccessed >= uint64(block.number)) {
-                result |= 1 << uint256(SolverOutcome.PerBlockLimit);
-            } else {
-                solverEscrow.lastAccessed = uint64(block.number);
-            }
-
-            gasLimit = (100) * (solverOp.gas < EscrowBits.SOLVER_GAS_LIMIT ? solverOp.gas : EscrowBits.SOLVER_GAS_LIMIT)
-                / (100 + EscrowBits.SOLVER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
-
-            uint256 gasCost = (tx.gasprice * gasLimit) + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
-
-            // see if solver's escrow can afford tx gascost
-            if (gasCost > solverEscrow.balance) {
-                // charge solver for calldata so that we can avoid vampire attacks from solver onto user
-                result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
-            }
-
-            // Verify that we can lend the solver their tx value
-            if (solverOp.value > address(this).balance - (gasLimit * tx.gasprice)) {
-                result |= 1 << uint256(SolverOutcome.CallValueTooHigh);
-            }
-
-            // subtract out the gas buffer since the solver's metaTx won't use it
-            gasLimit -= EscrowBits.FASTLANE_GAS_BUFFER;
-
-            if (auctionAlreadyComplete) {
-                result |= 1 << uint256(SolverOutcome.LostAuction);
-            }
-
-            if (gasWaterMark < EscrowBits.VALIDATION_GAS_LIMIT + EscrowBits.SOLVER_GAS_LIMIT) {
-                // Make sure to leave enough gas for dApp validation calls
-                result |= 1 << uint256(SolverOutcome.UserOutOfGas);
-            }
+        if (solverOp.to != address(this)) {
+            result |= 1 << uint256(SolverOutcome.InvalidTo);
         }
 
-        return (result, gasLimit, solverEscrow);
-    }
-
-    function _update(
-        SolverOperation calldata solverOp,
-        EscrowAccountData memory solverEscrow,
-        uint256 gasWaterMark,
-        uint256 result
-    )
-        internal
-        returns (uint256 gasRebate)
-    {
-        unchecked {
-            uint256 gasUsed = gasWaterMark - gasleft();
-
-            if (result & EscrowBits._FULL_REFUND != 0) {
-                gasRebate = gasUsed + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM);
-            } else if (result & EscrowBits._CALLDATA_REFUND != 0) {
-                gasRebate = (solverOp.data.length * CALLDATA_LENGTH_PREMIUM);
-            } else if (result & EscrowBits._NO_USER_REFUND != 0) {
-                // pass
-            } else {
-                revert UncoveredResult();
-            }
-
-            if (gasRebate != 0) {
-                // Calculate what the solver owes
-                gasRebate *= tx.gasprice;
-
-                gasRebate = gasRebate > solverEscrow.balance ? solverEscrow.balance : gasRebate;
-
-                solverEscrow.balance -= uint128(gasRebate);
-
-                // NOTE: This will cause an error if you are simulating with a gasPrice of 0
-                gasRebate /= tx.gasprice;
-
-                // Save the escrow data back into storage
-                _escrowAccountData[solverOp.from] = solverEscrow;
-            }
+        // NOTE: Turn this into time stamp check for FCFS L2s?
+        if (lastAccessedBlock == block.number) {
+            result |= 1 << uint256(SolverOutcome.PerBlockLimit);
         }
+
+        gasLimit = (100) * (solverOp.gas < EscrowBits.SOLVER_GAS_LIMIT ? solverOp.gas : EscrowBits.SOLVER_GAS_LIMIT)
+            / (100 + EscrowBits.SOLVER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
+
+        uint256 gasCost = (tx.gasprice * gasLimit) + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
+
+        // see if solver's escrow can afford tx gascost
+        if (gasCost > solverBalance) {
+            // charge solver for calldata so that we can avoid vampire attacks from solver onto user
+            result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
+        }
+
+        // Verify that we can lend the solver their tx value
+        if (solverOp.value > address(this).balance - (gasLimit * tx.gasprice)) {
+            result |= 1 << uint256(SolverOutcome.CallValueTooHigh);
+        }
+
+        // subtract out the gas buffer since the solver's metaTx won't use it
+        gasLimit -= EscrowBits.FASTLANE_GAS_BUFFER;
+
+        if (auctionAlreadyComplete) {
+            result |= 1 << uint256(SolverOutcome.LostAuction);
+        }
+
+        if (gasWaterMark < EscrowBits.VALIDATION_GAS_LIMIT + EscrowBits.SOLVER_GAS_LIMIT) {
+            // Make sure to leave enough gas for dApp validation calls
+            result |= 1 << uint256(SolverOutcome.UserOutOfGas);
+        }
+
+        return (result, gasLimit);
     }
 
     // Returns a SolverOutcome enum value

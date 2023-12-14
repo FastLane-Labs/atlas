@@ -13,51 +13,45 @@ import { Permit69 } from "../common/Permit69.sol";
 /// @author Modified from Solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC20.sol)
 /// @dev Do not manually set balances without updating totalSupply, as the sum of all user balances must not exceed it.
 abstract contract AtlETH is Permit69 {
-    /*//////////////////////////////////////////////////////////////
-                                 EVENTS
-    //////////////////////////////////////////////////////////////*/
-
-    event Transfer(address indexed from, address indexed to, uint256 amount);
-    event Approval(address indexed owner, address indexed spender, uint256 amount);
-
-    /*//////////////////////////////////////////////////////////////
-                               CONSTRUCTOR
-    //////////////////////////////////////////////////////////////*/
-
     constructor(
         uint256 _escrowDuration,
         address _verification,
-        address _gasAccLib,
-        address _safetyLocksLib,
         address _simulator
     )
-        Permit69(_escrowDuration, _verification, _gasAccLib, _safetyLocksLib, _simulator)
+        Permit69(_escrowDuration, _verification, _simulator)
     { }
 
     /*//////////////////////////////////////////////////////////////
                                 ATLETH
     //////////////////////////////////////////////////////////////*/
 
-    function balanceOf(address account) public view returns (uint256) {
-        return _escrowAccountData[account].balance;
+    function balanceOf(address account) external view returns (uint256) {
+        return uint256(_balanceOf[account].balance);
+    }
+
+    function balanceOfBonded(address account) external view returns (uint256) {
+        return uint256(accessData[account].bonded);
+    }
+
+    function balanceOfUnbonding(address account) external view returns (uint256) {
+        return uint256(_balanceOf[account].unbonding);
     }
 
     function accountLastActiveBlock(address account) external view returns (uint256) {
-        return uint256(_escrowAccountData[account].lastAccessed);
+        return uint256(accessData[account].lastAccessedBlock);
+    }
+
+    function unbondingCompleteBlock(address account) external view returns (uint256) {
+        return uint256(accessData[account].lastAccessedBlock) + ESCROW_DURATION;
     }
 
     // Deposit ETH and get atlETH in return.
     function deposit() external payable {
-        _checkIfUnlocked();
         _mint(msg.sender, msg.value);
     }
 
     // Redeem atlETH for ETH.
     function withdraw(uint256 amount) external {
-        _checkIfUnlocked();
-        _checkTransfersAllowed(msg.sender);
-
-        if (_escrowAccountData[msg.sender].balance < amount) revert InsufficientBalance();
         _burn(msg.sender, amount);
         SafeTransferLib.safeTransferETH(msg.sender, amount);
     }
@@ -73,29 +67,18 @@ abstract contract AtlETH is Permit69 {
     }
 
     function transfer(address to, uint256 amount) public returns (bool) {
-        _checkTransfersAllowed(msg.sender);
+        _deduct(msg.sender, amount);
+        _balanceOf[to].balance += uint128(amount);
 
-        _escrowAccountData[msg.sender].balance -= uint128(amount);
-        // Cannot overflow because the sum of all user
-        // balances can't exceed the max uint256 value.
-        unchecked {
-            _escrowAccountData[to].balance += uint128(amount);
-        }
         emit Transfer(msg.sender, to, amount);
         return true;
     }
 
     function transferFrom(address from, address to, uint256 amount) public returns (bool) {
-        _checkTransfersAllowed(from);
-
         uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
         if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
-        _escrowAccountData[from].balance -= uint128(amount);
-        // Cannot overflow because the sum of all user
-        // balances can't exceed the max uint256 value.
-        unchecked {
-            _escrowAccountData[to].balance += uint128(amount);
-        }
+        _deduct(from, amount);
+        _balanceOf[to].balance += uint128(amount);
         emit Transfer(from, to, amount);
         return true;
     }
@@ -160,36 +143,129 @@ abstract contract AtlETH is Permit69 {
         );
     }
 
-    // Custom checks for atlETH transfer functions.
-    // Interactions (transfers, withdrawals) are allowed only after the owner last interaction
-    // with Atlas was at least `escrowDuration` blocks ago.
-    function _checkTransfersAllowed(address account) internal view {
-        if (block.number <= _escrowAccountData[account].lastAccessed + ESCROW_DURATION) {
-            revert EscrowLockActive();
-        }
-    }
-
     /*//////////////////////////////////////////////////////////////
                         INTERNAL MINT/BURN LOGIC
     //////////////////////////////////////////////////////////////*/
 
     function _mint(address to, uint256 amount) internal {
         totalSupply += amount;
-        // Cannot overflow because the sum of all user
-        // balances can't exceed the max uint256 value.
-        unchecked {
-            _escrowAccountData[to].balance += uint128(amount);
-        }
+        _balanceOf[to].balance += uint128(amount);
         emit Transfer(address(0), to, amount);
     }
 
     function _burn(address from, uint256 amount) internal {
-        _escrowAccountData[from].balance -= uint128(amount);
-        // Cannot underflow because a user's balance
-        // will never be larger than the total supply.
-        unchecked {
-            totalSupply -= amount;
-        }
+        _deduct(from, amount);
+        totalSupply -= amount;
         emit Transfer(from, address(0), amount);
+    }
+
+    // NOTE: This does not change total supply.
+    function _deduct(address account, uint256 amount) internal {
+        uint128 amt = uint128(amount);
+
+        EscrowAccountBalance memory aData = _balanceOf[account];
+
+        uint128 balance = aData.balance;
+
+        if (amt < balance) {
+            _balanceOf[account].balance = balance - amt;
+        } else if (amt == balance) {
+            _balanceOf[account].balance = 0;
+        } else if (uint128(block.number + ESCROW_DURATION) > accessData[account].lastAccessedBlock) {
+            uint128 _shortfall = amt - balance;
+            aData.balance = 0;
+            aData.unbonding -= _shortfall; // underflow here to revert if insufficient balance
+            _balanceOf[account] = aData;
+
+            uint256 shortfall256 = uint256(_shortfall);
+            totalSupply += shortfall256; // add the released supply back to atleth.
+            bondedTotalSupply -= shortfall256; // subtract the unbonded, freed amount
+        } else {
+            // Reverts because amount > account's balance
+            revert InsufficientBalanceForDeduction(_balanceOf[account].balance, amount);
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    EXTERNAL BOND/UNBOND LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    // Puts a "hold" on a solver's AtlETH, enabling it to be used in Atlas transactions
+    // Bonded AtlETH must first be unbonded to become transferrable or withdrawable
+    function bond(uint256 amount) external {
+        // TODO: consider allowing msg.sender to bond another account holder via allowance
+        _bond(msg.sender, amount);
+    }
+
+    // Deposits the sender's full msg.value and converts to AtlETH
+    // Then bonds the sender's amountToBond of AtlETH
+    function depositAndBond(uint256 amountToBond) external payable {
+        _mint(msg.sender, msg.value);
+        _bond(msg.sender, amountToBond);
+    }
+
+    // Starts the unbonding wait time.
+    // Unbonding AtlETH can still be used be solvers while unbonding,
+    // but adjustments may be made at withdrawal to ensure solvency
+    function unbond(uint256 amount) external {
+        _unbond(msg.sender, amount);
+    }
+
+    function redeem(uint256 amount) external {
+        _redeem(msg.sender, amount);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    INTERNAL BOND/UNBOND LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function _bond(address owner, uint256 amount) internal {
+        uint128 amt = uint128(amount);
+
+        _balanceOf[owner].balance -= amt;
+        totalSupply -= amount;
+
+        accessData[owner].bonded += amt;
+        bondedTotalSupply += amount;
+
+        emit Bond(owner, amount);
+    }
+
+    function _unbond(address owner, uint256 amount) internal {
+        uint128 amt = uint128(amount);
+
+        // totalSupply and totalBondedSupply are unaffected; continue to count the
+        // unbonding amount as bonded total supply since it is still inaccessible
+        // for atomic xfer.
+
+        EscrowAccountAccessData memory aData = accessData[owner];
+
+        aData.bonded -= amt;
+        aData.lastAccessedBlock = uint128(block.number);
+        accessData[owner] = aData;
+
+        _balanceOf[owner].unbonding += amt;
+
+        emit Unbond(owner, amount, block.number + ESCROW_DURATION + 1);
+    }
+
+    function _redeem(address owner, uint256 amount) internal {
+        if (block.number <= uint256(accessData[owner].lastAccessedBlock) + ESCROW_DURATION) {
+            revert EscrowLockActive();
+        }
+
+        uint128 amt = uint128(amount);
+
+        EscrowAccountBalance memory bData = _balanceOf[owner];
+
+        bData.unbonding -= amt;
+        bondedTotalSupply -= amount;
+
+        bData.balance += amt;
+        totalSupply += amount;
+
+        _balanceOf[owner] = bData;
+
+        emit Redeem(owner, amount);
     }
 }

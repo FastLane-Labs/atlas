@@ -8,10 +8,8 @@ import { IEscrow } from "../interfaces/IEscrow.sol";
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
 import { ExecutionPhase, BaseLock } from "../types/LockTypes.sol";
-import { Party } from "../types/EscrowTypes.sol";
 
 import { EXECUTION_PHASE_OFFSET, SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "../libraries/SafetyBits.sol";
-import { PartyMath } from "../libraries/GasParties.sol";
 
 import "forge-std/Test.sol";
 
@@ -186,83 +184,25 @@ contract Base {
     function _activeEnvironment() internal view returns (address activeEnvironment) {
         activeEnvironment = ISafetyLocks(atlas).activeEnvironment();
     }
-
-    function _partyAddress(Party party) internal view returns (address partyAddress) {
-        uint256 pIndex = uint256(party);
-        // MEDIAN INDEX
-        if (pIndex < uint256(Party.Solver)) {
-            if (party == Party.Builder) {
-                // CASE: BUILDER
-                return block.coinbase;
-            } else {
-                // CASE: BUNDLER
-                return tx.origin; // TODO: This may be unreliable for smart wallet integrations.
-            }
-        } else if (pIndex > uint256(Party.Solver)) {
-            if (party == Party.User) {
-                // CASE: USER
-                return _user();
-            } else {
-                // CASE: DAPP
-                return _control();
-            }
-        } else {
-            // CASE: SOLVER
-            // NOTE: Currently unimplemented
-            // TODO: check if this is a SolverOp phase and use assembly to grab the solverOp.from from calldata
-            revert("ERR-EB090 SolverPartyUnimplemented");
-        }
-    }
 }
 
 contract ExecutionBase is Base {
-    using PartyMath for Party;
-
     constructor(address _atlas) Base(_atlas) { }
 
-    // Contribute local funds to be used by the recipient
-    function _contribute(Party recipient, uint256 amt) internal {
+    // Deposit local funds to the transient Atlas balance
+    // NOTE that this will go towards the Bundler, with the surplus going to the Solver.
+    function _contribute(uint256 amt) internal {
         if (msg.sender != atlas) revert("ERR-EB001 InvalidSender");
         if (amt > address(this).balance) revert("ERR-EB002 InsufficientLocalBalance");
 
-        IEscrow(atlas).contribute{ value: amt }(recipient);
+        IEscrow(atlas).contribute{ value: amt }();
     }
 
-    // Deposit local funds to the recipient's balance
-    function _deposit(Party recipient, uint256 amt) internal {
-        if (msg.sender != atlas) revert("ERR-EB001 InvalidSender");
-        if (amt > address(this).balance) revert("ERR-EB002 InsufficientLocalBalance");
-
-        IEscrow(atlas).deposit{ value: amt }(recipient);
-    }
-
-    // Contribute nonlocal funds on behalf of the donor to be used by the recipient
-    // Any unused funds are returned to the donor
-    function _contributeTo(Party donor, Party recipient, uint256 amt) internal {
-        if (msg.sender != atlas) revert("ERR-EB001 InvalidSender");
-        if (!donor.validContribution(_lockState())) revert("ERR-EB002 InvalidPhase");
-
-        IEscrow(atlas).contributeTo(donor, recipient, amt);
-    }
-
-    // Recipient requests a contribution from the donor.
-    // NOTE: Can be fulfilled by any party.
-    function _requestFrom(Party donor, Party recipient, uint256 amt) internal {
-        if (msg.sender != atlas) revert("ERR-EB001 InvalidSender");
-        if (!donor.validRequest(_lockState())) revert("ERR-EB002 InvalidPhase");
-
-        IEscrow(atlas).requestFrom(donor, recipient, amt);
-    }
-
-    // Finalize the gas ledger of the party, which will block all future requests and contributions.
-    // This will throw a revert if there is an unfulfilled request (either outbound or inbound).
-    // NOTE: The Solver party cannot be finalized in this manner - it must call the "reconcile" function.
-    function _finalize(Party party) internal {
+    // Borrow funds from the transient Atlas balance that will be repaid by the Solver (or self via another deposit)
+    function _borrow(uint256 amt) internal {
         if (msg.sender != atlas) revert("ERR-EB001 InvalidSender");
 
-        bool finalized = IEscrow(atlas).finalize(party, _partyAddress(party));
-
-        if (!finalized) revert("ERR-EB003 UnableToFinalize");
+        IEscrow(atlas).borrow(amt);
     }
 
     function _transferUserERC20(address token, address destination, uint256 amount) internal {
@@ -300,7 +240,6 @@ contract ExecutionBase is Base {
 
         if (source == user) {
             if (shiftedPhase & SAFE_USER_TRANSFER == 0) {
-                address(0).staticcall("");
                 return false;
             }
             if (ERC20(token).allowance(user, atlas) < amount) {
