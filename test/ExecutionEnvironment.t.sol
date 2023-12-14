@@ -16,6 +16,22 @@ import "../src/contracts/types/LockTypes.sol";
 
 contract MockDAppControl is DummyDAppControl {
     constructor(address escrow) DummyDAppControl(escrow) { }
+
+    function _preOpsCall(UserOperation calldata userOp) internal pure override returns (bytes memory) {
+        if (userOp.data.length > 0) {
+            (bytes4 selector, bytes memory data) = abi.decode(userOp.data, (bytes4, bytes));
+            if (selector == this.testPreOpsWrapper.selector) {
+                return testPreOpsWrapper(data);
+            }
+        }
+        return new bytes(0);
+    }
+
+    function testPreOpsWrapper(bytes memory data) public pure returns (bytes memory) {
+        (bool shouldRevert, uint256 returnValue) = abi.decode(data, (bool, uint256));
+        require(!shouldRevert);
+        return abi.encode(returnValue);
+    }
 }
 
 contract ExecutionEnvironmentTest is BaseTest {
@@ -95,8 +111,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
         preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
         vm.prank(address(atlas));
-        (bool success,) = address(executionEnvironment).call(preOpsData);
-        assertTrue(success);
+        (status,) = address(executionEnvironment).call(preOpsData);
+        assertTrue(status);
 
         // InvalidSender
         escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
@@ -121,5 +137,36 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // WrongDepth
         // TODO
+    }
+
+    function test_preOpsWrapper() public {
+        UserOperation memory userOp;
+        bytes memory preOpsData;
+        bool status;
+        bytes memory data;
+
+        userOp.from = user;
+        userOp.to = address(atlas);
+
+        // Valid
+        uint256 expectedReturnValue = 123;
+        userOp.data = abi.encode(dAppControl.testPreOpsWrapper.selector, abi.encode(false, expectedReturnValue));
+        escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
+        preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
+        preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
+        vm.prank(address(atlas));
+        (status, data) = address(executionEnvironment).call(preOpsData);
+        assertTrue(status);
+        assertEq(abi.decode(abi.decode(data, (bytes)), (uint256)), expectedReturnValue);
+
+        // DelegateRevert
+        userOp.data = abi.encode(dAppControl.testPreOpsWrapper.selector, abi.encode(true, 0));
+        escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
+        preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
+        preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
+        vm.prank(address(atlas));
+        vm.expectRevert(bytes("ERR-EC02 DelegateRevert"));
+        (status,) = address(executionEnvironment).call(preOpsData);
+        assertTrue(status, "expectRevert ERR-EB01 InvalidSender: call did not revert");
     }
 }
