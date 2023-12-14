@@ -139,6 +139,30 @@ contract ExecutionEnvironmentTest is BaseTest {
         // TODO
     }
 
+    function test_modifier_validControlHash() public {
+        UserOperation memory userOp;
+        bytes memory userData;
+        bool status;
+
+        userOp.from = user;
+        userOp.to = address(atlas);
+
+        // Valid
+        escrowKey = escrowKey.holdUserLock(address(dAppControl));
+        userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
+        userData = abi.encodePacked(userData, escrowKey.pack());
+        vm.prank(address(atlas));
+        (status,) = address(executionEnvironment).call(userData);
+        assertTrue(status);
+
+        // InvalidCodeHash
+        // TODO
+    }
+
+    function test_modifier_contributeSurplus() public {
+        // TODO ?
+    }
+
     function test_preOpsWrapper() public {
         UserOperation memory userOp;
         bytes memory preOpsData;
