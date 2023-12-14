@@ -11,6 +11,8 @@ import { IFactory } from "../src/contracts/interfaces/IFactory.sol";
 
 import { SafetyBits } from "../src/contracts/libraries/SafetyBits.sol";
 
+import { ERC20 } from "solmate/tokens/ERC20.sol";
+
 import "../src/contracts/types/DAppApprovalTypes.sol";
 import "../src/contracts/types/UserCallTypes.sol";
 import "../src/contracts/types/SolverCallTypes.sol";
