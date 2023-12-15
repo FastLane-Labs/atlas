@@ -144,8 +144,6 @@ contract ExecutionEnvironment is Base {
         // TODO: Change check to msg.value ?
         require(address(this).balance == solverOp.value, "ERR-CE05 IncorrectValue");
 
-        console.log("solverOp.value in solverMetaTryCatch", solverOp.value);
-
         // Track token balance to measure if the bid amount is paid.
         bool etherIsBidToken;
         uint256 bidBalance;
@@ -188,13 +186,15 @@ contract ExecutionEnvironment is Base {
         }
 
         // Execute the solver call.
-        (success,) = ISolverContract(solverOp.solver).atlasSolverCall{ gas: gasLimit, value: solverOp.value }(
+        bytes memory solverCallData = abi.encodeWithSelector(
+            ISolverContract.atlasSolverCall.selector,
             solverOp.from,
             solverOp.bidToken,
             solverOp.bidAmount,
             solverOp.data,
             _config().forwardReturnData() ? dAppReturnData : new bytes(0)
         );
+        (success,) = solverOp.solver.call{ gas: gasLimit, value: solverOp.value }(solverCallData);
 
         // Verify that it was successful
         if (!success) {
