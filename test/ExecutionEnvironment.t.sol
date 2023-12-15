@@ -18,6 +18,8 @@ import "../src/contracts/types/UserCallTypes.sol";
 import "../src/contracts/types/SolverCallTypes.sol";
 import "../src/contracts/types/LockTypes.sol";
 
+import "../src/contracts/libraries/CallBits.sol";
+
 contract ExecutionEnvironmentTest is BaseTest {
     using SafetyBits for EscrowKey;
 
@@ -438,6 +440,26 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.prank(address(atlas));
         vm.expectRevert(bytes("ERR-EC03 BalanceTooLow"));
         executionEnvironment.factoryWithdrawEther(user, 2e18);
+    }
+
+    function test_getUser() public {
+        setupDAppControl(callConfig);
+        assertEq(executionEnvironment.getUser(), user);
+    }
+
+    function test_getControl() public {
+        setupDAppControl(callConfig);
+        assertEq(executionEnvironment.getControl(), address(dAppControl));
+    }
+
+    function test_getConfig() public {
+        setupDAppControl(callConfig);
+        assertEq(executionEnvironment.getConfig(), CallBits.encodeCallConfig(callConfig));
+    }
+
+    function test_getEscrow() public {
+        setupDAppControl(callConfig);
+        assertEq(executionEnvironment.getEscrow(), escrow);
     }
 }
 
