@@ -599,18 +599,18 @@ contract MockSolverContract {
     }
 
     function atlasSolverCall(
-        address sender,
-        address bidToken,
-        uint256 bidAmount,
+        address,
+        address,
+        uint256,
         bytes calldata solverOpData,
-        bytes calldata extraReturnData
+        bytes calldata
     )
         external
         payable
         returns (bool success, bytes memory data)
     {
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
-        require(success, "atlasSolverCall CALL UNSUCCESSFUL");
+        require(success, "atlasSolverCall call reverted");
     }
 
     function solverMockOperation(bool shouldRevert) public pure {
