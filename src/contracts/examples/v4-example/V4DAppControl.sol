@@ -175,10 +175,12 @@ contract V4DAppControl is DAppControl {
         sequenceLock[sequenceKey] = true;
     }
 
-    function _postOpsCall(bytes calldata data) internal override returns (bool) {
+    function _postOpsCall(bool solved, bytes calldata data) internal override returns (bool) {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
+
+        if (!solved) return false;
 
         (bytes memory returnData) = abi.decode(data, (bytes));
 
