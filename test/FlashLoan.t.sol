@@ -203,10 +203,10 @@ contract DummyController is DAppControl {
                 requirePostOps: false,
                 zeroSolvers: false,
                 reuseUserOp: false,
-                userBundler: true,
-                solverBundler: true,
-                verifySolverBundlerCallChainHash: true,
-                unknownBundler: true,
+                userAuctioneer: true,
+                solverAuctioneer: true,
+                unknownAuctioneer: true,
+                verifyCallChainHash: true,
                 forwardReturnData: false,
                 requireFulfillment: true
             })
