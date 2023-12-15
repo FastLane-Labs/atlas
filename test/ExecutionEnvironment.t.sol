@@ -325,6 +325,120 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(allocateData);
         assertTrue(status, "expectRevert ERR-EC02 DelegateRevert: call did not revert");
     }
+
+    function test_withdrawERC20() public {
+        setupDAppControl(callConfig);
+
+        // Valid
+        deal(chain.weth, address(executionEnvironment), 2e18);
+        assertEq(ERC20(chain.weth).balanceOf(address(executionEnvironment)), 2e18);
+        assertEq(ERC20(chain.weth).balanceOf(user), 0);
+        vm.prank(user);
+        executionEnvironment.withdrawERC20(chain.weth, 2e18);
+        assertEq(ERC20(chain.weth).balanceOf(address(executionEnvironment)), 0);
+        assertEq(ERC20(chain.weth).balanceOf(user), 2e18);
+
+        // NotEnvironmentOwner
+        vm.prank(address(0)); // Invalid caller
+        vm.expectRevert(bytes("ERR-EC01 NotEnvironmentOwner"));
+        executionEnvironment.withdrawERC20(chain.weth, 2e18);
+
+        // EscrowLocked
+        // TODO
+
+        // BalanceTooLow
+        vm.prank(user);
+        vm.expectRevert(bytes("ERR-EC02 BalanceTooLow"));
+        executionEnvironment.withdrawERC20(chain.weth, 2e18);
+    }
+
+    function test_withdrawEther() public {
+        setupDAppControl(callConfig);
+
+        // Valid
+        deal(address(executionEnvironment), 2e18);
+        assertEq(address(executionEnvironment).balance, 2e18);
+        assertEq(user.balance, 0);
+        vm.prank(user);
+        executionEnvironment.withdrawEther(2e18);
+        assertEq(address(executionEnvironment).balance, 0);
+        assertEq(user.balance, 2e18);
+
+        // NotEnvironmentOwner
+        vm.prank(address(0)); // Invalid caller
+        vm.expectRevert(bytes("ERR-EC01 NotEnvironmentOwner"));
+        executionEnvironment.withdrawEther(2e18);
+
+        // EscrowLocked
+        // TODO
+
+        // BalanceTooLow
+        vm.prank(user);
+        vm.expectRevert(bytes("ERR-EC03 BalanceTooLow"));
+        executionEnvironment.withdrawEther(2e18);
+    }
+
+    function test_factoryWithdrawERC20() public {
+        setupDAppControl(callConfig);
+
+        // Valid
+        deal(chain.weth, address(executionEnvironment), 2e18);
+        assertEq(ERC20(chain.weth).balanceOf(address(executionEnvironment)), 2e18);
+        assertEq(ERC20(chain.weth).balanceOf(user), 0);
+        vm.prank(address(atlas));
+        executionEnvironment.factoryWithdrawERC20(user, chain.weth, 2e18);
+        assertEq(ERC20(chain.weth).balanceOf(address(executionEnvironment)), 0);
+        assertEq(ERC20(chain.weth).balanceOf(user), 2e18);
+
+        // NotFactory
+        vm.prank(address(0)); // Invalid caller
+        vm.expectRevert(bytes("ERR-EC10 NotFactory"));
+        executionEnvironment.factoryWithdrawERC20(user, chain.weth, 2e18);
+
+        // NotEnvironmentOwner
+        vm.prank(address(atlas));
+        vm.expectRevert(bytes("ERR-EC11 NotEnvironmentOwner"));
+        executionEnvironment.factoryWithdrawERC20(address(0), chain.weth, 2e18); // Invalid user
+
+        // EscrowLocked
+        // TODO
+
+        // BalanceTooLow
+        vm.prank(address(atlas));
+        vm.expectRevert(bytes("ERR-EC02 BalanceTooLow"));
+        executionEnvironment.factoryWithdrawERC20(user, chain.weth, 2e18);
+    }
+
+    function test_factoryWithdrawEther() public {
+        setupDAppControl(callConfig);
+
+        // Valid
+        deal(address(executionEnvironment), 2e18);
+        assertEq(address(executionEnvironment).balance, 2e18);
+        assertEq(user.balance, 0);
+        vm.prank(address(atlas));
+        executionEnvironment.factoryWithdrawEther(user, 2e18);
+        assertEq(address(executionEnvironment).balance, 0);
+        assertEq(user.balance, 2e18);
+
+        // NotFactory
+        vm.prank(address(0)); // Invalid caller
+        vm.expectRevert(bytes("ERR-EC10 NotFactory"));
+        executionEnvironment.factoryWithdrawEther(user, 2e18);
+
+        // NotEnvironmentOwner
+        vm.prank(address(atlas));
+        vm.expectRevert(bytes("ERR-EC11 NotEnvironmentOwner"));
+        executionEnvironment.factoryWithdrawEther(address(0), 2e18); // Invalid user
+
+        // EscrowLocked
+        // TODO
+
+        // BalanceTooLow
+        vm.prank(address(atlas));
+        vm.expectRevert(bytes("ERR-EC03 BalanceTooLow"));
+        executionEnvironment.factoryWithdrawEther(user, 2e18);
+    }
 }
 
 contract MockDAppControl is DAppControl {
