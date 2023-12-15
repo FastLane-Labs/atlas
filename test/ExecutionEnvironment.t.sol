@@ -33,6 +33,14 @@ contract ExecutionEnvironmentTest is BaseTest {
 
     CallConfig private callConfig;
 
+    function setUp() public override {
+        super.setUp();
+
+        // Default setting for tests is all callConfig flags set to false.
+        // For custom scenarios, set the needed flags and call setupDAppControl.
+        setupDAppControl(callConfig);
+    }
+
     function setupDAppControl(CallConfig memory customCallConfig) internal {
         vm.startPrank(governance);
         dAppControl = new MockDAppControl(escrow, governance, customCallConfig);
@@ -49,8 +57,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         UserOperation memory userOp;
         bytes memory preOpsData;
         bool status;
-
-        setupDAppControl(callConfig);
 
         // Valid
         userOp.from = user;
@@ -89,8 +95,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         UserOperation memory userOp;
         bytes memory preOpsData;
         bool status;
-
-        setupDAppControl(callConfig);
 
         userOp.from = user;
         userOp.to = address(atlas);
@@ -133,8 +137,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         bytes memory userData;
         bool status;
 
-        setupDAppControl(callConfig);
-
         userOp.from = user;
         userOp.to = address(atlas);
 
@@ -159,8 +161,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         bytes memory preOpsData;
         bool status;
         bytes memory data;
-
-        setupDAppControl(callConfig);
 
         userOp.from = user;
         userOp.to = address(atlas);
@@ -194,8 +194,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         bool status;
         bytes memory data;
         uint256 expectedReturnValue;
-
-        setupDAppControl(callConfig);
 
         userOp.from = user;
         userOp.to = address(atlas);
@@ -264,8 +262,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         bytes memory postOpsData;
         bool status;
 
-        setupDAppControl(callConfig);
-
         // Valid
         escrowKey = escrowKey.holdDAppOperationLock(address(dAppControl));
         postOpsData =
@@ -304,8 +300,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         bytes memory allocateData;
         bool status;
 
-        setupDAppControl(callConfig);
-
         // Valid
         escrowKey = escrowKey.turnSolverLockPayments(address(dAppControl));
         allocateData = abi.encodeWithSelector(
@@ -329,8 +323,6 @@ contract ExecutionEnvironmentTest is BaseTest {
     }
 
     function test_withdrawERC20() public {
-        setupDAppControl(callConfig);
-
         // Valid
         deal(chain.weth, address(executionEnvironment), 2e18);
         assertEq(ERC20(chain.weth).balanceOf(address(executionEnvironment)), 2e18);
@@ -355,8 +347,6 @@ contract ExecutionEnvironmentTest is BaseTest {
     }
 
     function test_withdrawEther() public {
-        setupDAppControl(callConfig);
-
         // Valid
         deal(address(executionEnvironment), 2e18);
         assertEq(address(executionEnvironment).balance, 2e18);
@@ -381,8 +371,6 @@ contract ExecutionEnvironmentTest is BaseTest {
     }
 
     function test_factoryWithdrawERC20() public {
-        setupDAppControl(callConfig);
-
         // Valid
         deal(chain.weth, address(executionEnvironment), 2e18);
         assertEq(ERC20(chain.weth).balanceOf(address(executionEnvironment)), 2e18);
@@ -412,8 +400,6 @@ contract ExecutionEnvironmentTest is BaseTest {
     }
 
     function test_factoryWithdrawEther() public {
-        setupDAppControl(callConfig);
-
         // Valid
         deal(address(executionEnvironment), 2e18);
         assertEq(address(executionEnvironment).balance, 2e18);
@@ -443,22 +429,18 @@ contract ExecutionEnvironmentTest is BaseTest {
     }
 
     function test_getUser() public {
-        setupDAppControl(callConfig);
         assertEq(executionEnvironment.getUser(), user);
     }
 
     function test_getControl() public {
-        setupDAppControl(callConfig);
         assertEq(executionEnvironment.getControl(), address(dAppControl));
     }
 
     function test_getConfig() public {
-        setupDAppControl(callConfig);
         assertEq(executionEnvironment.getConfig(), CallBits.encodeCallConfig(callConfig));
     }
 
     function test_getEscrow() public {
-        setupDAppControl(callConfig);
         assertEq(executionEnvironment.getEscrow(), escrow);
     }
 }
