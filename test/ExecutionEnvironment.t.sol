@@ -589,35 +589,6 @@ contract ExecutionEnvironmentTest is BaseTest {
     }
 }
 
-contract MockSolverContract {
-    address public immutable WETH_ADDRESS;
-    address private immutable _escrow;
-
-    constructor(address weth, address atlasEscrow) {
-        WETH_ADDRESS = weth;
-        _escrow = atlasEscrow;
-    }
-
-    function atlasSolverCall(
-        address,
-        address,
-        uint256,
-        bytes calldata solverOpData,
-        bytes calldata
-    )
-        external
-        payable
-        returns (bool success, bytes memory data)
-    {
-        (success, data) = address(this).call{ value: msg.value }(solverOpData);
-        require(success, "atlasSolverCall call reverted");
-    }
-
-    function solverMockOperation(bool shouldRevert) public pure {
-        require(!shouldRevert, "solverMockOperation revert requested");
-    }
-}
-
 contract MockDAppControl is DAppControl {
     constructor(
         address _escrow,
@@ -675,5 +646,34 @@ contract MockDAppControl is DAppControl {
     function mockOperation(bool shouldRevert, uint256 returnValue) public pure returns (uint256) {
         require(!shouldRevert, "mockOperation revert requested");
         return returnValue;
+    }
+}
+
+contract MockSolverContract {
+    address public immutable WETH_ADDRESS;
+    address private immutable _escrow;
+
+    constructor(address weth, address atlasEscrow) {
+        WETH_ADDRESS = weth;
+        _escrow = atlasEscrow;
+    }
+
+    function atlasSolverCall(
+        address,
+        address,
+        uint256,
+        bytes calldata solverOpData,
+        bytes calldata
+    )
+        external
+        payable
+        returns (bool success, bytes memory data)
+    {
+        (success, data) = address(this).call{ value: msg.value }(solverOpData);
+        require(success, "atlasSolverCall call reverted");
+    }
+
+    function solverMockOperation(bool shouldRevert) public pure {
+        require(!shouldRevert, "solverMockOperation revert requested");
     }
 }
