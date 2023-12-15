@@ -59,7 +59,6 @@ contract V4DAppControl is DAppControl {
                 requirePreOps: true,
                 trackPreOpsReturnData: true,
                 trackUserReturnData: false,
-                localUser: false,
                 delegateUser: false,
                 preSolver: false,
                 postSolver: false,

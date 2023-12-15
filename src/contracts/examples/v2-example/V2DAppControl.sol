@@ -56,7 +56,6 @@ contract V2DAppControl is DAppControl {
                 requirePreOps: true,
                 trackPreOpsReturnData: false,
                 trackUserReturnData: false,
-                localUser: false,
                 delegateUser: false,
                 preSolver: false,
                 postSolver: false,
