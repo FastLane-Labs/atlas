@@ -20,11 +20,6 @@ contract MockFactory is Factory, Test {
     {
         return _getOrCreateExecutionEnvironment(userOp);
     }
-
-    // function deployExecutionEnvironmentTemplate(address caller) external returns (address executionEnvironment) {
-    //     vm.prank(caller);
-    //     executionEnvironment = _deployExecutionEnvironmentTemplate();
-    // }
 }
 
 contract FactoryTest is Test {
@@ -40,7 +35,7 @@ contract FactoryTest is Test {
 
         vm.startPrank(deployer);
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedFactoryAddr);
-        mockFactory = new MockFactory({_executionTemplate: address(execEnvTemplate)});
+        mockFactory = new MockFactory({ _executionTemplate: address(execEnvTemplate) });
         dAppControl = new DummyDAppControl(address(0));
         vm.stopPrank();
         user = address(999);
@@ -115,9 +110,8 @@ contract FactoryTest is Test {
         assertFalse(executionEnvironment.codehash == bytes32(0), "Execution environment should exist");
     }
 
-    // TODO remove this and add new tests for changes
-    // function test_deployExecutionEnvironmentTemplate() public {
-    //     address executionEnvironment = mockFactory.deployExecutionEnvironmentTemplate(user);
-    //     assertFalse(executionEnvironment.codehash == bytes32(0), "Execution environment should exist");
-    // }
+    function test_FactorySaltSetCorrectly() public {
+        bytes32 expectedSalt = keccak256(abi.encodePacked(block.chainid, address(mockFactory), "AtlasFactory 1.0"));
+        assertEq(expectedSalt, mockFactory.salt(), "Factory salt not set correctly");
+    }
 }

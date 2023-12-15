@@ -12,11 +12,9 @@ abstract contract Factory {
     bytes32 public immutable salt;
     address public immutable executionTemplate;
 
+    // NOTE: The ExecutionEnvironment Template must be separately deployed using the same salt as calculated below
     constructor(address _executionTemplate) {
-        // TODO remove and clean up here
         salt = keccak256(abi.encodePacked(block.chainid, address(this), "AtlasFactory 1.0"));
-        console.log("Factory salt: ");
-        console.logBytes32(salt);
         executionTemplate = _executionTemplate;
     }
 
