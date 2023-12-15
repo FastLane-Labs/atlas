@@ -4,16 +4,20 @@ pragma solidity 0.8.21;
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 import { Mimic } from "./Mimic.sol";
 import { DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
-import { ExecutionEnvironment } from "./ExecutionEnvironment.sol";
 import { UserOperation } from "../types/UserCallTypes.sol";
+
+import "forge-std/Test.sol";
 
 abstract contract Factory {
     bytes32 public immutable salt;
     address public immutable executionTemplate;
 
-    constructor() {
+    constructor(address _executionTemplate) {
+        // TODO remove and clean up here
         salt = keccak256(abi.encodePacked(block.chainid, address(this), "AtlasFactory 1.0"));
-        executionTemplate = _deployExecutionEnvironmentTemplate();
+        console.log("Factory salt: ");
+        console.logBytes32(salt);
+        executionTemplate = _executionTemplate;
     }
 
     // ------------------ //
@@ -49,11 +53,6 @@ abstract contract Factory {
         address control = userOp.control;
         dConfig = IDAppControl(control).getDAppConfig(userOp);
         executionEnvironment = _setExecutionEnvironment(control, userOp.from, dConfig.callConfig, control.codehash);
-    }
-
-    function _deployExecutionEnvironmentTemplate() internal returns (address executionEnvironment) {
-        ExecutionEnvironment _environment = new ExecutionEnvironment{ salt: salt }(address(this));
-        executionEnvironment = address(_environment);
     }
 
     function _setExecutionEnvironment(
