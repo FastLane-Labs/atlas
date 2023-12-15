@@ -58,7 +58,7 @@ contract Atlas is Escrow, Factory {
         // NOTE: Currently reverting instead of graceful return to help w/ testing.
         ValidCallsResult validCallsResult;
         (solverOps, validCallsResult) = IAtlasVerification(VERIFICATION).validCalls(
-            dConfig, userOp, solverOps, dAppOp, executionEnvironment, msg.value, msg.sender, msg.sender == SIMULATOR
+            dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, msg.sender == SIMULATOR
         );
         if (validCallsResult != ValidCallsResult.Valid) {
             if (msg.sender == SIMULATOR) revert VerificationSimFail();
@@ -104,7 +104,7 @@ contract Atlas is Escrow, Factory {
             _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), bundler == SIMULATOR);
 
         // Begin execution
-        (auctionWon, winningSearcherIndex) = _execute(dConfig, userOp, solverOps, executionEnvironment, bundler, key);
+        (auctionWon, winningSearcherIndex) = _execute(dConfig, userOp, solverOps, executionEnvironment, key);
     }
 
     function _execute(
@@ -112,7 +112,6 @@ contract Atlas is Escrow, Factory {
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         address executionEnvironment,
-        address bundler,
         EscrowKey memory key
     )
         internal
@@ -153,13 +152,13 @@ contract Atlas is Escrow, Factory {
         }
 
         for (; winningSearcherIndex < solverOps.length;) {
-            // Only execute solver meta tx if userOpHash matches
-            if (!auctionWon && solverOps[winningSearcherIndex].from != address(0)) {
-                (auctionWon, key) = _solverExecutionIteration(
-                    dConfig, solverOps[winningSearcherIndex], returnData, auctionWon, executionEnvironment, bundler, key
-                );
-                if (auctionWon) break;
-            }
+            // valid solverOps are packed from left of array - break at first invalid solverOp
+            if (solverOps[winningSearcherIndex].from == address(0)) break;
+
+            (auctionWon, key) = _solverExecutionIteration(
+                dConfig, solverOps[winningSearcherIndex], returnData, auctionWon, executionEnvironment, key
+            );
+            if (auctionWon) break;
 
             unchecked {
                 ++winningSearcherIndex;
@@ -177,7 +176,7 @@ contract Atlas is Escrow, Factory {
 
         if (dConfig.callConfig.needsPostOpsCall()) {
             key = key.holdDAppOperationLock(address(this));
-            callSuccessful = _executePostOpsCall(returnData, executionEnvironment, key.pack());
+            callSuccessful = _executePostOpsCall(auctionWon, returnData, executionEnvironment, key.pack());
             if (!callSuccessful) {
                 if (key.isSimulation) revert PostOpsSimFail();
                 else revert PostOpsFail();
@@ -192,13 +191,12 @@ contract Atlas is Escrow, Factory {
         bytes memory dAppReturnData,
         bool auctionWon,
         address executionEnvironment,
-        address bundler,
         EscrowKey memory key
     )
         internal
         returns (bool, EscrowKey memory)
     {
-        (auctionWon, key) = _executeSolverOperation(solverOp, dAppReturnData, executionEnvironment, bundler, key);
+        (auctionWon, key) = _executeSolverOperation(solverOp, dAppReturnData, executionEnvironment, key);
         unchecked {
             ++key.callIndex;
         }

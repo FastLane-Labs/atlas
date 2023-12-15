@@ -46,7 +46,7 @@ contract Simulator is FastLaneErrorsEvents {
 
     function simUserOperation(UserOperation calldata userOp) external payable returns (bool success) {
         // SolverOperation memory solverOp;
-        SolverOperation[] memory solverOps = new SolverOperation[](1);
+        SolverOperation[] memory solverOps = new SolverOperation[](0);
         // solverOps[0] = solverOp;
         DAppOperation memory dAppOp;
         dAppOp.control = userOp.control;

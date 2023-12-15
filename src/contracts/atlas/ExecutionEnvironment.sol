@@ -129,14 +129,17 @@ contract ExecutionEnvironment is Base {
         }
     }
 
-    function postOpsWrapper(bytes calldata returnData)
+    function postOpsWrapper(
+        bool solved,
+        bytes calldata returnData
+    )
         external
         onlyAtlasEnvironment(ExecutionPhase.PostOps, _ENVIRONMENT_DEPTH)
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 
-        bytes memory data = abi.encodeWithSelector(IDAppControl.postOpsCall.selector, returnData);
+        bytes memory data = abi.encodeWithSelector(IDAppControl.postOpsCall.selector, solved, returnData);
 
         bool success;
         (success, data) = _control().delegatecall(forward(data));

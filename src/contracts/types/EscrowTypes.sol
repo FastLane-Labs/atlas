@@ -3,15 +3,15 @@ pragma solidity 0.8.22;
 
 uint256 constant CALLDATA_LENGTH_PREMIUM = 32; // 16 (default) * 2
 
-struct EscrowAccountData {
+// bonded = total - unbonding
+struct EscrowAccountBalance {
     uint128 balance;
-    uint128 holds;
+    uint128 unbonding;
 }
 
-struct EscrowNonce {
-    uint64 nonce;
-    uint64 lastAccessed;
-    uint128 withdrawalAmount;
+struct EscrowAccountAccessData {
+    uint128 bonded;
+    uint128 lastAccessedBlock;
 }
 
 // NOTE: The order is very important here for balance reconciliation.

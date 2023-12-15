@@ -47,17 +47,17 @@ library CallBits {
         if (callConfig.reuseUserOp) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.ReuseUserOp);
         }
-        if (callConfig.userBundler) {
-            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.UserBundler);
+        if (callConfig.userAuctioneer) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.UserAuctioneer);
         }
-        if (callConfig.solverBundler) {
-            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.SolverBundler);
+        if (callConfig.solverAuctioneer) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.SolverAuctioneer);
         }
-        if (callConfig.verifySolverBundlerCallChainHash) {
-            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.VerifySolverBundlerCallChainHash);
+        if (callConfig.unknownAuctioneer) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.UnknownAuctioneer);
         }
-        if (callConfig.unknownBundler) {
-            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.UnknownBundler);
+        if (callConfig.verifyCallChainHash) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.VerifyCallChainHash);
         }
         if (callConfig.forwardReturnData) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.ForwardReturnData);
@@ -80,10 +80,10 @@ library CallBits {
             requirePostOps: needsPostOpsCall(encodedCallConfig),
             zeroSolvers: allowsZeroSolvers(encodedCallConfig),
             reuseUserOp: allowsReuseUserOps(encodedCallConfig),
-            userBundler: allowsUserBundler(encodedCallConfig),
-            solverBundler: allowsSolverBundler(encodedCallConfig),
-            verifySolverBundlerCallChainHash: verifySolverBundlerCallChainHash(encodedCallConfig),
-            unknownBundler: allowsUnknownBundler(encodedCallConfig),
+            userAuctioneer: allowsUserAuctioneer(encodedCallConfig),
+            solverAuctioneer: allowsSolverAuctioneer(encodedCallConfig),
+            unknownAuctioneer: allowsUnknownAuctioneer(encodedCallConfig),
+            verifyCallChainHash: verifyCallChainHash(encodedCallConfig),
             forwardReturnData: forwardReturnData(encodedCallConfig),
             requireFulfillment: needsFulfillment(encodedCallConfig)
         });
@@ -133,20 +133,20 @@ library CallBits {
         reuseUserOp = (callConfig & 1 << uint32(CallConfigIndex.ReuseUserOp) != 0);
     }
 
-    function allowsUserBundler(uint32 callConfig) internal pure returns (bool userBundler) {
-        userBundler = (callConfig & 1 << uint32(CallConfigIndex.UserBundler) != 0);
+    function allowsUserAuctioneer(uint32 callConfig) internal pure returns (bool userAuctioneer) {
+        userAuctioneer = (callConfig & 1 << uint32(CallConfigIndex.UserAuctioneer) != 0);
     }
 
-    function allowsSolverBundler(uint32 callConfig) internal pure returns (bool userBundler) {
-        userBundler = (callConfig & 1 << uint32(CallConfigIndex.SolverBundler) != 0);
+    function allowsSolverAuctioneer(uint32 callConfig) internal pure returns (bool userAuctioneer) {
+        userAuctioneer = (callConfig & 1 << uint32(CallConfigIndex.SolverAuctioneer) != 0);
     }
 
-    function verifySolverBundlerCallChainHash(uint32 callConfig) internal pure returns (bool verify) {
-        verify = (callConfig & 1 << uint32(CallConfigIndex.VerifySolverBundlerCallChainHash) != 0);
+    function allowsUnknownAuctioneer(uint32 callConfig) internal pure returns (bool unknownAuctioneer) {
+        unknownAuctioneer = (callConfig & 1 << uint32(CallConfigIndex.UnknownAuctioneer) != 0);
     }
 
-    function allowsUnknownBundler(uint32 callConfig) internal pure returns (bool unknownBundler) {
-        unknownBundler = (callConfig & 1 << uint32(CallConfigIndex.UnknownBundler) != 0);
+    function verifyCallChainHash(uint32 callConfig) internal pure returns (bool verify) {
+        verify = (callConfig & 1 << uint32(CallConfigIndex.VerifyCallChainHash) != 0);
     }
 
     function forwardReturnData(uint32 callConfig) internal pure returns (bool) {

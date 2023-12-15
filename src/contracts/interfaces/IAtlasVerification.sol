@@ -13,7 +13,6 @@ interface IAtlasVerification {
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         DAppOperation calldata dAppOp,
-        address executionEnvironment,
         uint256 msgValue,
         address msgSender,
         bool isSimulation
@@ -23,13 +22,13 @@ interface IAtlasVerification {
 
     function verifySolverOp(
         SolverOperation calldata solverOp,
-        EscrowAccountData memory solverEscrow,
+        EscrowAccountBalance memory solverEscrow,
         uint256 gasWaterMark,
         bool auctionAlreadyComplete
     )
         external
         view
-        returns (uint256 result, uint256 gasLimit, EscrowAccountData memory);
+        returns (uint256 result, uint256 gasLimit, EscrowAccountBalance memory);
 
     function getUserOperationPayload(UserOperation memory userOp) external view returns (bytes32 payload);
     function getNextNonce(address account) external view returns (uint256 nextNonce);

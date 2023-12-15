@@ -84,7 +84,6 @@ abstract contract Escrow is AtlETH {
         SolverOperation calldata solverOp,
         bytes memory dAppReturnData,
         address environment,
-        address bundler,
         EscrowKey memory key
     )
         internal
@@ -120,6 +119,8 @@ abstract contract Escrow is AtlETH {
                 emit SolverTxResult(solverOp.solver, solverOp.from, true, false, result);
             }
         } else {
+            _releaseSolverLock(solverOp, gasWaterMark, result);
+
             // emit event
             emit SolverTxResult(solverOp.solver, solverOp.from, false, false, result);
         }
@@ -153,6 +154,7 @@ abstract contract Escrow is AtlETH {
     }
 
     function _executePostOpsCall(
+        bool solved,
         bytes memory returnData,
         address environment,
         bytes32 lockBytes
@@ -160,12 +162,13 @@ abstract contract Escrow is AtlETH {
         internal
         returns (bool success)
     {
-        bytes memory postOpsData = abi.encodeWithSelector(IExecutionEnvironment.postOpsWrapper.selector, returnData);
+        bytes memory postOpsData =
+            abi.encodeWithSelector(IExecutionEnvironment.postOpsWrapper.selector, solved, returnData);
         postOpsData = abi.encodePacked(postOpsData, lockBytes);
         (success,) = environment.call(postOpsData);
     }
 
-    // TODO Revisit the EscrowAccountData memory solverEscrow arg. Needs to be passed through from Atlas, through
+    // TODO Revisit the EscrowAccountBalance memory solverEscrow arg. Needs to be passed through from Atlas, through
     // callstack
     function _validateSolverOperation(
         SolverOperation calldata solverOp,
@@ -178,15 +181,17 @@ abstract contract Escrow is AtlETH {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
 
-        EscrowAccountData memory solverEscrow = _balanceOf[solverOp.from];
+        EscrowAccountAccessData memory aData = accessData[solverOp.from];
 
-        uint256 solverBalance = uint256(solverEscrow.balance - solverEscrow.holds);
+        uint256 solverBalance = aData.bonded;
+        uint256 lastAccessedBlock = aData.lastAccessedBlock;
 
         if (solverOp.to != address(this)) {
             result |= 1 << uint256(SolverOutcome.InvalidTo);
         }
 
-        if (nonces[solverOp.from].lastAccessed >= uint64(block.number)) {
+        // NOTE: Turn this into time stamp check for FCFS L2s?
+        if (lastAccessedBlock == block.number) {
             result |= 1 << uint256(SolverOutcome.PerBlockLimit);
         }
 

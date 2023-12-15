@@ -71,6 +71,7 @@ contract TxBuilder {
             deadline: deadline,
             dapp: to,
             control: control,
+            sessionKey: address(0),
             data: data,
             signature: new bytes(0)
         });
@@ -128,6 +129,7 @@ contract TxBuilder {
             nonce: governanceNextNonce(governanceEOA),
             deadline: userOp.deadline,
             control: userOp.control,
+            bundler: address(0),
             userOpHash: userOpHash,
             callChainHash: callChainHash,
             signature: new bytes(0)

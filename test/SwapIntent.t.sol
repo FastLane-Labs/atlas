@@ -94,6 +94,8 @@ contract SwapIntentTest is BaseTest {
         vm.startPrank(solverOneEOA);
         SimpleRFQSolver rfqSolver = new SimpleRFQSolver(WETH_ADDRESS, address(atlas));
         atlas.deposit{ value: 1e18 }();
+        atlas.bond(1 ether);
+
         vm.stopPrank();
 
         // Give 20 DAI to RFQ solver contract
@@ -217,6 +219,7 @@ contract SwapIntentTest is BaseTest {
         UniswapIntentSolver uniswapSolver = new UniswapIntentSolver(WETH_ADDRESS, address(atlas));
         deal(WETH_ADDRESS, address(uniswapSolver), 1e18); // 1 WETH to solver to pay bid
         atlas.deposit{ value: 1e18 }();
+        atlas.bond(1 ether);
         vm.stopPrank();
 
         // Input params for Atlas.metacall() - will be populated below

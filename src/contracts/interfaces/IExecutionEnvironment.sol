@@ -10,7 +10,7 @@ interface IExecutionEnvironment {
 
     function userWrapper(UserOperation calldata userOp) external payable returns (bytes memory userReturnData);
 
-    function postOpsWrapper(bytes calldata returnData) external;
+    function postOpsWrapper(bool solved, bytes calldata returnData) external;
 
     function solverMetaTryCatch(
         uint256 gasLimit,

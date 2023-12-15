@@ -44,7 +44,7 @@ contract FastLaneErrorsEvents {
 
     // NEW Custom Errors to replace string errors
 
-    // NEW - Atlas
+    // Atlas
     error PreOpsFail();
     error UserOpFail();
     // error SolverFail(); // Only sim version of err is used
@@ -52,19 +52,27 @@ contract FastLaneErrorsEvents {
     error RevertToReuse();
     error InvalidAccess();
 
-    // NEW - Escrow
+    // Escrow
     error UncoveredResult();
 
-    // NEW - AtlETH
-    error InsufficientBalance();
+    // AtlETH
+    error InsufficientUnbondedBalance(uint256 balance, uint256 requested);
+    error InsufficientBondedBalance(uint256 balance, uint256 requested);
     error PermitDeadlineExpired();
     error InvalidSigner();
     error EscrowLockActive();
-    error InsufficientRedeemedBalance(uint256 balance, uint256 requested);
+    error InsufficientWithdrawableBalance(uint256 balance, uint256 requested);
     error InsufficientAvailableBalance(uint256 balance, uint256 requested);
     error InsufficientSurchargeBalance(uint256 balance, uint256 requested);
+    error InsufficientBalanceForDeduction(uint256 balance, uint256 requested);
 
-    // NEW - DAppIntegration
+    event Bond(address indexed owner, uint256 amount);
+    event Unbond(address indexed owner, uint256 amount, uint256 earliestAvailable);
+    event Redeem(address indexed owner, uint256 amount);
+    event Transfer(address indexed from, address indexed to, uint256 amount);
+    event Approval(address indexed owner, address indexed spender, uint256 amount);
+
+    // DAppIntegration
     error OnlyGovernance();
     error OwnerActive();
     error SignatoryActive();
@@ -72,12 +80,12 @@ contract FastLaneErrorsEvents {
     error InvalidDAppControl();
     error DAppNotEnabled();
 
-    // NEW - Permit69
+    // Permit69
     error InvalidEnvironment();
     error EnvironmentMismatch();
     error InvalidLockState();
 
-    // NEW - GasAccounting
+    // GasAccounting
     error LedgerFinalized(uint8 id);
     error LedgerBalancing(uint8 id);
     error MissingFunds(uint8 id);
@@ -91,7 +99,7 @@ contract FastLaneErrorsEvents {
     error InsufficientTotalBalance(uint256 shortfall);
     error UnbalancedAccounting();
 
-    // NEW - SafetyLocks
+    // SafetyLocks
     error NotInitialized();
     error AlreadyInitialized();
 

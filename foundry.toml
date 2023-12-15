@@ -8,6 +8,7 @@
 
     solc_version = "0.8.22"
     evm_version = 'paris'
+    gas_reports = ["Atlas", "AtlasVerification", "Simulator", "ExecutionEnvironment"]
 
 [profile.ci]
   fuzz = { runs = 10_000 }

@@ -66,10 +66,10 @@ contract V4DAppControl is DAppControl {
                 requirePostOps: false,
                 zeroSolvers: true,
                 reuseUserOp: false,
-                userBundler: true,
-                solverBundler: true,
-                verifySolverBundlerCallChainHash: true,
-                unknownBundler: true,
+                userAuctioneer: true,
+                solverAuctioneer: true,
+                unknownAuctioneer: true,
+                verifyCallChainHash: true,
                 forwardReturnData: false,
                 requireFulfillment: true
             })
@@ -176,10 +176,12 @@ contract V4DAppControl is DAppControl {
         sequenceLock[sequenceKey] = true;
     }
 
-    function _postOpsCall(bytes calldata data) internal override returns (bool) {
+    function _postOpsCall(bool solved, bytes calldata data) internal override returns (bool) {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
+
+        if (!solved) return false;
 
         (bytes memory returnData) = abi.decode(data, (bytes));
 
