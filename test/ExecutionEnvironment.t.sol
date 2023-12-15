@@ -11,7 +11,11 @@ import { IFactory } from "../src/contracts/interfaces/IFactory.sol";
 
 import { SafetyBits } from "../src/contracts/libraries/SafetyBits.sol";
 
+import { SolverBase } from "../src/contracts/solver/SolverBase.sol";
+
 import { ERC20 } from "solmate/tokens/ERC20.sol";
+
+import { FastLaneErrorsEvents } from "../src/contracts/types/Emissions.sol";
 
 import "../src/contracts/types/DAppApprovalTypes.sol";
 import "../src/contracts/types/UserCallTypes.sol";
@@ -293,7 +297,147 @@ contract ExecutionEnvironmentTest is BaseTest {
     }
 
     function test_solverMetaTryCatch() public {
+        bytes memory solverMetaData;
+        bool status;
+
+        address solver = address(1337);
+        vm.prank(solver);
+        MockSolverContract solverContract = new MockSolverContract(chain.weth, address(atlas));
+
+        SolverOperation memory solverOp;
+        solverOp.from = solver;
+        solverOp.control = address(dAppControl);
+        solverOp.solver = address(solverContract);
+
+        uint256 solverGasLimit = 1_000_000;
+
+        // Valid (bid=ether)
         // TODO
+
+        // Valid (bid=ERC20)
+        // TODO
+
+        // IncorrectValue
+        solverOp.value = 1; // Positive value but EE has no balance
+        escrowKey = escrowKey.holdSolverLock(solverOp.solver);
+        solverMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverMetaTryCatch.selector, solverGasLimit, solverOp, new bytes(0)
+        );
+        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        vm.prank(address(atlas));
+        vm.expectRevert(bytes("ERR-CE05 IncorrectValue"));
+        (status,) = address(executionEnvironment).call(solverMetaData);
+        assertTrue(status, "expectRevert ERR-CE05 IncorrectValue: call did not revert");
+        solverOp.value = 0;
+
+        // AlteredControlHash
+        solverOp.control = address(0); // Invalid control
+        escrowKey = escrowKey.holdSolverLock(solverOp.solver);
+        solverMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverMetaTryCatch.selector, solverGasLimit, solverOp, new bytes(0)
+        );
+        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        vm.prank(address(atlas));
+        vm.expectRevert(FastLaneErrorsEvents.AlteredControlHash.selector);
+        (status,) = address(executionEnvironment).call(solverMetaData);
+        assertTrue(status, "expectRevert AlteredControlHash: call did not revert");
+        solverOp.control = address(dAppControl);
+
+        // SolverOperationReverted
+        solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, true);
+        escrowKey = escrowKey.holdSolverLock(solverOp.solver);
+        solverMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverMetaTryCatch.selector, solverGasLimit, solverOp, new bytes(0)
+        );
+        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        vm.prank(address(atlas));
+        vm.expectRevert(FastLaneErrorsEvents.SolverOperationReverted.selector);
+        (status,) = address(executionEnvironment).call(solverMetaData);
+        assertTrue(status, "expectRevert SolverOperationReverted: call did not revert");
+
+        // SolverBidUnpaid
+        solverOp.bidAmount = 1; // Bid won't be paid
+        solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
+        escrowKey = escrowKey.holdSolverLock(solverOp.solver);
+        solverMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverMetaTryCatch.selector, solverGasLimit, solverOp, new bytes(0)
+        );
+        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        vm.prank(address(atlas));
+        vm.expectRevert(FastLaneErrorsEvents.SolverBidUnpaid.selector);
+        (status,) = address(executionEnvironment).call(solverMetaData);
+        assertTrue(status, "expectRevert SolverBidUnpaid: call did not revert");
+        solverOp.bidAmount = 0;
+
+        // SolverMsgValueUnpaid
+        // Solver's contract does not call reconcile
+        solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
+        escrowKey = escrowKey.holdSolverLock(solverOp.solver);
+        solverMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverMetaTryCatch.selector, solverGasLimit, solverOp, new bytes(0)
+        );
+        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        vm.prank(address(atlas));
+        vm.expectRevert(FastLaneErrorsEvents.SolverMsgValueUnpaid.selector);
+        (status,) = address(executionEnvironment).call(solverMetaData);
+        assertTrue(status, "expectRevert SolverMsgValueUnpaid: call did not revert");
+
+        // Change of config
+        callConfig.preSolver = true;
+        setupDAppControl(callConfig);
+        solverOp.control = address(dAppControl);
+
+        // PreSolverFailed
+        escrowKey = escrowKey.holdSolverLock(solverOp.solver);
+        solverMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverMetaTryCatch.selector, solverGasLimit, solverOp, abi.encode(true, false)
+        );
+        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        vm.prank(address(atlas));
+        vm.expectRevert(FastLaneErrorsEvents.PreSolverFailed.selector);
+        (status,) = address(executionEnvironment).call(solverMetaData);
+        assertTrue(status, "expectRevert PreSolverFailed: call did not revert");
+
+        // PreSolverFailed 2
+        escrowKey = escrowKey.holdSolverLock(solverOp.solver);
+        solverMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverMetaTryCatch.selector, solverGasLimit, solverOp, abi.encode(false, false)
+        );
+        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        vm.prank(address(atlas));
+        vm.expectRevert(FastLaneErrorsEvents.PreSolverFailed.selector);
+        (status,) = address(executionEnvironment).call(solverMetaData);
+        assertTrue(status, "expectRevert PreSolverFailed 2: call did not revert");
+
+        // Change of config
+        callConfig.preSolver = false;
+        callConfig.postSolver = true;
+        setupDAppControl(callConfig);
+        solverOp.control = address(dAppControl);
+
+        // PostSolverFailed
+        solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
+        escrowKey = escrowKey.holdSolverLock(solverOp.solver);
+        solverMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverMetaTryCatch.selector, solverGasLimit, solverOp, abi.encode(true, false)
+        );
+        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        vm.prank(address(atlas));
+        vm.expectRevert(FastLaneErrorsEvents.PostSolverFailed.selector);
+        (status,) = address(executionEnvironment).call(solverMetaData);
+        assertTrue(status, "expectRevert PostSolverFailed: call did not revert");
+
+        // IntentUnfulfilled
+        solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
+        escrowKey = escrowKey.holdSolverLock(solverOp.solver);
+        solverMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverMetaTryCatch.selector, solverGasLimit, solverOp, abi.encode(false, false)
+        );
+        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        vm.prank(address(atlas));
+        vm.expectRevert(FastLaneErrorsEvents.IntentUnfulfilled.selector);
+        (status,) = address(executionEnvironment).call(solverMetaData);
+        assertTrue(status, "expectRevert IntentUnfulfilled: call did not revert");
     }
 
     function test_allocateValue() public {
@@ -445,6 +589,35 @@ contract ExecutionEnvironmentTest is BaseTest {
     }
 }
 
+contract MockSolverContract {
+    address public immutable WETH_ADDRESS;
+    address private immutable _escrow;
+
+    constructor(address weth, address atlasEscrow) {
+        WETH_ADDRESS = weth;
+        _escrow = atlasEscrow;
+    }
+
+    function atlasSolverCall(
+        address sender,
+        address bidToken,
+        uint256 bidAmount,
+        bytes calldata solverOpData,
+        bytes calldata extraReturnData
+    )
+        external
+        payable
+        returns (bool success, bytes memory data)
+    {
+        (success, data) = address(this).call{ value: msg.value }(solverOpData);
+        require(success, "atlasSolverCall CALL UNSUCCESSFUL");
+    }
+
+    function solverMockOperation(bool shouldRevert) public pure {
+        require(!shouldRevert, "solverMockOperation revert requested");
+    }
+}
+
 contract MockDAppControl is DAppControl {
     constructor(
         address _escrow,
@@ -469,6 +642,20 @@ contract MockDAppControl is DAppControl {
 
     function _postOpsCall(bool, bytes calldata data) internal pure override returns (bool) {
         (bool shouldRevert, bool returnValue) = abi.decode(data, (bool, bool));
+        require(!shouldRevert, "_postSolverCall revert requested");
+        return returnValue;
+    }
+
+    function _preSolverCall(bytes calldata data) internal pure override returns (bool) {
+        (,, bytes memory dAppReturnData) = abi.decode(data, (address, uint256, bytes));
+        (bool shouldRevert, bool returnValue) = abi.decode(dAppReturnData, (bool, bool));
+        require(!shouldRevert, "_preSolverCall revert requested");
+        return returnValue;
+    }
+
+    function _postSolverCall(bytes calldata data) internal pure override returns (bool) {
+        (,, bytes memory dAppReturnData) = abi.decode(data, (address, uint256, bytes));
+        (bool shouldRevert, bool returnValue) = abi.decode(dAppReturnData, (bool, bool));
         require(!shouldRevert, "_postSolverCall revert requested");
         return returnValue;
     }
