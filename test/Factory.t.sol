@@ -32,7 +32,7 @@ contract FactoryTest is Test {
 
     function setUp() public {
         mockFactory = new MockFactory();
-        dAppControl = new DummyDAppControl(address(0));
+        dAppControl = new DummyDAppControl(address(0), address(0));
         user = address(999);
     }
 

@@ -8,10 +8,10 @@ import "../../src/contracts/types/UserCallTypes.sol";
 import "../../src/contracts/types/SolverCallTypes.sol";
 
 contract DummyDAppControl is DAppControl {
-    constructor(address escrow)
+    constructor(address escrow, address governance)
         DAppControl(
             escrow,
-            address(0),
+            governance,
             CallConfig(
                 false,
                 false,
