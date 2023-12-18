@@ -3,6 +3,7 @@
 You will need to make sure you have these packages installed:
 
 * foundry
+* lcov
 
 The you need to ensure your environment has these variables set:
 
@@ -32,6 +33,6 @@ forge test
 # Generating a coverage report
 
 ```
-forge coverage --ir-minimum --report lcov
+npm run coverage
 ```
 
