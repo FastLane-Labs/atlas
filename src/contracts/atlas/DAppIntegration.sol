@@ -57,7 +57,7 @@ contract DAppIntegration {
 
         if (msg.sender != govAddress) revert FastLaneErrorsEvents.OnlyGovernance();
 
-        bytes32 signatoryKey = keccak256(abi.encode(msg.sender, msg.sender));
+        bytes32 signatoryKey = keccak256(abi.encode(msg.sender, controller));
 
         if (signatories[signatoryKey]) revert FastLaneErrorsEvents.OwnerActive();
 
