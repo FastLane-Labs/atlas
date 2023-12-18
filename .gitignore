@@ -9,3 +9,5 @@
 .env
 .DS_Store
 /broadcast
+lcov.info
+lcov_filtered.info
