@@ -1,0 +1,52 @@
+name: Gas Diff
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    # Optionally configure to run only for changes in specific files. For example:
+    # paths:
+    # - src/**
+    # - test/**
+    # - foundry.toml
+    # - remappings.txt
+    # - .github/workflows/foundry-gas-diff.yml
+
+permissions:
+    pull-requests: write
+
+jobs:
+  compare_gas_reports:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      # Add any step generating a gas report to a temporary file named gasreport.ansi. For example:
+      - name: Run tests
+        run: forge test --gas-report > gasreport.ansi # <- this file name should be unique in your repository!
+        env:
+            MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
+
+      - name: Compare gas reports
+        uses: Rubilmax/foundry-gas-diff@v3.16
+        with:
+          summaryQuantile: 0.9 # only display the 10% most significant gas diffs in the summary (defaults to 20%)
+          sortCriteria: avg,max # sort diff rows by criteria
+          sortOrders: desc,asc # and directions
+          ignore: test-foundry/**/* # filter out gas reports from specific paths (test/ is included by default)
+        id: gas_diff
+
+      - name: Add gas diff to sticky comment
+        if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+            delete: ${{ !steps.gas_diff.outputs.markdown }}
+            message: ${{ steps.gas_diff.outputs.markdown }}

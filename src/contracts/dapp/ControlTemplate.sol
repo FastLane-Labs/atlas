@@ -122,7 +122,7 @@ abstract contract DAppControlTemplate {
     //      Function: Executing the function set by DAppControl
     //      Container: Inside of the FastLane ExecutionEnvironment
     //      Access: Storage access (read+write) to the ExecutionEnvironment contract
-    function _postOpsCall(bytes calldata) internal virtual returns (bool) {
+    function _postOpsCall(bool, bytes calldata) internal virtual returns (bool) {
         revert(_NOT_IMPLEMENTED);
     }
 
