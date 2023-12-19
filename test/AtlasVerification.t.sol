@@ -62,7 +62,7 @@ contract AtlasVerificationTest is AtlasBaseTest {
         return builder;
     }
 
-    function buildUserOpeation() public view returns (UserOperation memory) {
+    function buildUserOperation() public view returns (UserOperation memory) {
         return txBuilder.buildUserOperation(
             userEOA,
             address(dAppControl),
