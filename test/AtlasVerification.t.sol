@@ -115,82 +115,59 @@ contract AtlasVerificationTest is AtlasBaseTest {
     // ---- TESTS BEGIN HERE ---- //
     //
 
-    function test_validCalls_InvalidCallerResult() public {
-        // Create atlas metacall transaction and state
-        UserOperation memory userOp = buildUserOpeation();
-        SolverOperation[] memory solverOps = buildSolverOperations(userOp);
-        DAppOperation memory dappOp = buildDAppOperation(userOp, solverOps);
+    // Valid cases
 
-        DAppConfig memory config = dAppControl.getDAppConfig(userOp);
-
-        // Setup expects for testcase
-        vm.expectRevert(AtlasVerification.InvalidCaller.selector);
-        
-        // Execute validCalls
-        ValidCallsResult validCallsResult;
-        SolverOperation[] memory prunedSolverOps;
-        (prunedSolverOps, validCallsResult) = atlasVerification.validCalls(config, userOp, solverOps, dappOp, 0, userEOA, false);
-    }
-
+    // 
+    // given a valid atlas transaction
+    // when validCalls is called
+    // then it should return Valid
+    //
     function test_validCalls_ValidResult() public {
-        // Create atlas metacall transaction and state
+        // given a valid atlas transaction
         UserOperation memory userOp = buildUserOpeation();
         SolverOperation[] memory solverOps = buildSolverOperations(userOp);
         DAppOperation memory dappOp = buildDAppOperation(userOp, solverOps);
 
         DAppConfig memory config = dAppControl.getDAppConfig(userOp);
 
-        // Execute validCalls
+        // when validCalls is called
         vm.startPrank(address(atlas));
-
         ValidCallsResult validCallsResult;
         SolverOperation[] memory prunedSolverOps;
         (prunedSolverOps, validCallsResult) = atlasVerification.validCalls(config, userOp, solverOps, dappOp, 0, userEOA, false);
 
-        // Asserts on validCallsResult
+        // then it should return Valid
         console.log("validCallsResult: ", uint(validCallsResult));
         assertTrue(validCallsResult == ValidCallsResult.Valid, "validCallsResult should be Valid");
     }
 
-    function test_validCalls_InvalidAuctioneer_verifyCallChainHash_isNotValid() public {
-        // Tweak callConfig globals for this test
-        callConfig.verifyCallChainHash = true;
-        refreshGlobals();
+    // InvalidCaller cases
 
-        // Create atlas metacall transaction and state
+    //
+    // given an otherwise valid atlas transaction where the caller is not the atlas contract
+    // when validCalls is called
+    // then it should return InvalidCaller
+    //
+    function test_validCalls_InvalidCallerResult() public {
+        // given an otherwise valid atlas transaction where the caller is not the atlas contract
         UserOperation memory userOp = buildUserOpeation();
         SolverOperation[] memory solverOps = buildSolverOperations(userOp);
-
-        // create our own dappOp so we can break the callChainHash to make auctioneer invalid
-        DAppOperation memory dappOp = txBuilder.buildDAppOperation(
-            governanceEOA,
-            userOp,
-            solverOps
-        );
-        // break the callChainHash
-        dappOp.callChainHash = bytes32(0);
-
-        Sig memory sig;
-        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dappOp));
-        dappOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+        DAppOperation memory dappOp = buildDAppOperation(userOp, solverOps);
 
         DAppConfig memory config = dAppControl.getDAppConfig(userOp);
 
-        // Execute validCalls
-        vm.startPrank(address(atlas));
-
+        // then it should return InvalidCaller
+        vm.expectRevert(AtlasVerification.InvalidCaller.selector);
+        
+        // when validCalls is called
         ValidCallsResult validCallsResult;
         SolverOperation[] memory prunedSolverOps;
         (prunedSolverOps, validCallsResult) = atlasVerification.validCalls(config, userOp, solverOps, dappOp, 0, userEOA, false);
-
-        // Asserts on validCallsResult
-        console.log("validCallsResult: ", uint(validCallsResult));
-        assertTrue(validCallsResult == ValidCallsResult.InvalidAuctioneer, "validCallsResult should be InvalidAuctioneer");
     }
-}
 
-
+    //
     // InvalidAuctioneer cases
+    //
     
     // 
     // given a valid atlas transaction
@@ -198,6 +175,28 @@ contract AtlasVerificationTest is AtlasBaseTest {
     // when validCalls is called
     // then it should return Valid
     //
+    function test_validCalls_VerifyCallChainHash_Valid() public {
+        // given a valid atlas transaction
+        //   and a callConfig with verifyCallChainHash = true
+        callConfig.verifyCallChainHash = true;
+        refreshGlobals();
+
+        UserOperation memory userOp = buildUserOpeation();
+        SolverOperation[] memory solverOps = buildSolverOperations(userOp);
+        DAppOperation memory dappOp = buildDAppOperation(userOp, solverOps);
+
+        DAppConfig memory config = dAppControl.getDAppConfig(userOp);
+
+        // when validCalls is called
+        vm.startPrank(address(atlas));
+        ValidCallsResult validCallsResult;
+        SolverOperation[] memory prunedSolverOps;
+        (prunedSolverOps, validCallsResult) = atlasVerification.validCalls(config, userOp, solverOps, dappOp, 0, userEOA, false);
+
+        // then it should return Valid
+        console.log("validCallsResult: ", uint(validCallsResult));
+        assertTrue(validCallsResult == ValidCallsResult.Valid, "validCallsResult should be Valid");
+    }
 
     //
     // given an atlas transaction with an invalid callChainHash
@@ -205,6 +204,39 @@ contract AtlasVerificationTest is AtlasBaseTest {
     // when validCalls is called
     // then it should return InvalidAuctioneer
     //
+    function test_validCalls_VerifyCallChainHash_InvalidAuctioneer() public {
+        // given an atlas transaction with an invalid callChainHash
+        //   and a callConfig with verifyCallChainHash = true
+        callConfig.verifyCallChainHash = true;
+        refreshGlobals();
+
+        UserOperation memory userOp = buildUserOpeation();
+        SolverOperation[] memory solverOps = buildSolverOperations(userOp);
+
+        DAppOperation memory dappOp = txBuilder.buildDAppOperation(
+            governanceEOA,
+            userOp,
+            solverOps
+        );
+        dappOp.callChainHash = bytes32(0); // break the callChainHash
+
+        Sig memory sig;
+        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dappOp));
+        dappOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        DAppConfig memory config = dAppControl.getDAppConfig(userOp);
+
+        // when validCalls is called
+        vm.startPrank(address(atlas));
+
+        ValidCallsResult validCallsResult;
+        SolverOperation[] memory prunedSolverOps;
+        (prunedSolverOps, validCallsResult) = atlasVerification.validCalls(config, userOp, solverOps, dappOp, 0, userEOA, false);
+
+        // then it should return InvalidAuctioneer
+        console.log("validCallsResult: ", uint(validCallsResult));
+        assertTrue(validCallsResult == ValidCallsResult.InvalidAuctioneer, "validCallsResult should be InvalidAuctioneer");
+    }
 
     //
     // given an atlas transaction with an invalid callChainHash
@@ -212,6 +244,39 @@ contract AtlasVerificationTest is AtlasBaseTest {
     // when validCalls is called with isSimulation = true
     // then it should return Valid
     //
+    function test_validCalls_Simulated_VerifyCallChainHash_Valid() public {
+        // given an atlas transaction with an invalid callChainHash
+        //   and a callConfig with verifyCallChainHash = true
+        callConfig.verifyCallChainHash = true;
+        refreshGlobals();
+
+        UserOperation memory userOp = buildUserOpeation();
+        SolverOperation[] memory solverOps = buildSolverOperations(userOp);
+
+        DAppOperation memory dappOp = txBuilder.buildDAppOperation(
+            governanceEOA,
+            userOp,
+            solverOps
+        );
+        dappOp.callChainHash = bytes32(0); // break the callChainHash
+
+        Sig memory sig;
+        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dappOp));
+        dappOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        DAppConfig memory config = dAppControl.getDAppConfig(userOp);
+
+        // when validCalls is called with isSimulation = true
+        vm.startPrank(address(atlas));
+
+        ValidCallsResult validCallsResult;
+        SolverOperation[] memory prunedSolverOps;
+        (prunedSolverOps, validCallsResult) = atlasVerification.validCalls(config, userOp, solverOps, dappOp, 0, userEOA, true);
+
+        // then it should return Valid
+        console.log("validCallsResult: ", uint(validCallsResult));
+        assertTrue(validCallsResult == ValidCallsResult.Valid, "validCallsResult should be Valid");
+    }
 
     // DAppSignatureInvalid cases
 
@@ -220,18 +285,78 @@ contract AtlasVerificationTest is AtlasBaseTest {
     // when validCalls is called
     // then it should return DAppSignatureInvalid
     // 
+    function test_validCalls_BrokenSignature_DAppSignatureInvalid() public {
+        // given an otherwise valid atlas transaction with an invalid dAppOp signature
+        UserOperation memory userOp = buildUserOpeation();
+        SolverOperation[] memory solverOps = buildSolverOperations(userOp);
+        DAppOperation memory dappOp = buildDAppOperation(userOp, solverOps);
+        dappOp.signature = bytes("");
+
+        DAppConfig memory config = dAppControl.getDAppConfig(userOp);
+
+        // when validCalls is called
+        vm.startPrank(address(atlas));
+        ValidCallsResult validCallsResult;
+        SolverOperation[] memory prunedSolverOps;
+        (prunedSolverOps, validCallsResult) = atlasVerification.validCalls(config, userOp, solverOps, dappOp, 0, userEOA, false);
+
+        // then it should return DAppSignatureInvalid
+        console.log("validCallsResult: ", uint(validCallsResult));
+        assertTrue(validCallsResult == ValidCallsResult.DAppSignatureInvalid, "validCallsResult should be DAppSignatureInvalid");
+    }
 
     //
     // given an otherwise valid atlas transaction with an invalid dAppOp signature
     // when validCalls is called with isSimulation = true
     // then it should return Valid
     //
+    function test_validCalls_Simulated_BrokenSignature_DAppSignatureInvalid() public {
+        // given an otherwise valid atlas transaction with an invalid dAppOp signature
+        UserOperation memory userOp = buildUserOpeation();
+        SolverOperation[] memory solverOps = buildSolverOperations(userOp);
+        DAppOperation memory dappOp = buildDAppOperation(userOp, solverOps);
+        dappOp.signature = bytes("");
+
+        DAppConfig memory config = dAppControl.getDAppConfig(userOp);
+
+        // when validCalls is called with isSimulation = true
+        vm.startPrank(address(atlas));
+        ValidCallsResult validCallsResult;
+        SolverOperation[] memory prunedSolverOps;
+        (prunedSolverOps, validCallsResult) = atlasVerification.validCalls(config, userOp, solverOps, dappOp, 0, userEOA, true);
+
+        // then it should return Valid
+        console.log("validCallsResult: ", uint(validCallsResult));
+        assertTrue(validCallsResult == ValidCallsResult.Valid, "validCallsResult should be Valid");
+    }
 
     //
-    // given an otherwise valid atlas transaction with an invalid dAppOp signature bundled by the DApp
+    // given an otherwise valid atlas transaction with an invalid dAppOp signature sent from the DApp EOA
     // when validCalls is called
     // then it should return Valid
     //
+    function test_validCalls_NoSignature_DAppBundled_Valid() public {
+        // callConfig.unknownAuctioneer = true;
+        // refreshGlobals();
+
+        // given an otherwise valid atlas transaction with an invalid dAppOp signature bundled by the DApp
+        UserOperation memory userOp = buildUserOpeation();
+        SolverOperation[] memory solverOps = buildSolverOperations(userOp);
+        DAppOperation memory dappOp = buildDAppOperation(userOp, solverOps);
+        dappOp.signature = bytes("");
+
+        DAppConfig memory config = dAppControl.getDAppConfig(userOp);
+
+        // when validCalls is called
+        vm.startPrank(address(atlas));
+        ValidCallsResult validCallsResult;
+        SolverOperation[] memory prunedSolverOps;
+        (prunedSolverOps, validCallsResult) = atlasVerification.validCalls(config, userOp, solverOps, dappOp, 0, governanceEOA, false);
+
+        // then it should return Valid
+        console.log("validCallsResult: ", uint(validCallsResult));
+        assertTrue(validCallsResult == ValidCallsResult.Valid, "validCallsResult should be Valid");
+    }
 
     // cases that cause bypassSignatoryApproval
     // * dConfig.callConfig.allowsUserAuctioneer() && dAppOp.from == userOp.sessionKey -> user is auctioneer
@@ -547,7 +672,5 @@ contract AtlasVerificationTest is AtlasBaseTest {
     // when validCalls is called
     // then it should return NoSolverOp
     //
-    
 
-    
-
+}
