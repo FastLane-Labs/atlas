@@ -11,7 +11,7 @@ import { EscrowBits } from "../src/contracts/libraries/EscrowBits.sol";
 import "../src/contracts/types/EscrowTypes.sol";
 import "../src/contracts/types/SolverCallTypes.sol";
 
-contract MockGasAccounting is GasAccounting {
+contract MockGasAccounting is GasAccounting, Test {
     constructor(
         uint256 _escrowDuration,
         address _verification,
@@ -49,11 +49,13 @@ contract MockGasAccounting is GasAccounting {
     }
 
     function increaseBondedBalance(address account, uint256 amount) external {
+        deal(address(this), amount);
         accessData[account].bonded += uint128(amount);
         bondedTotalSupply += uint128(amount);
     }
 
     function increaseUnbondingBalance(address account, uint256 amount) external {
+        deal(address(this), amount);
         _balanceOf[account].unbonding += uint128(amount);
         bondedTotalSupply += uint128(amount);
     }
@@ -63,15 +65,16 @@ contract GasAccountingTest is Test {
     MockGasAccounting public mockGasAccounting;
     address executionEnvironment = makeAddr("executionEnvironment");
 
-    uint256 _gasMarker = 150_000;
     uint256 initialClaims;
     SolverOperation solverOp;
 
     function setUp() public {
         mockGasAccounting = new MockGasAccounting(0, address(0), address(0));
-        mockGasAccounting.initializeEscrowLock(executionEnvironment, _gasMarker, 0);
+        uint256 gasMarker = gasleft();
 
-        initialClaims = getInitialClaims(_gasMarker);
+        mockGasAccounting.initializeEscrowLock(executionEnvironment, gasMarker, 0);
+
+        initialClaims = getInitialClaims(gasMarker);
         solverOp.from = makeAddr("solver");
     }
 
@@ -285,6 +288,31 @@ contract GasAccountingTest is Test {
     }
 
     function test_settle() public {
-        // TODO
+        address bundler = makeAddr("bundler");
+        uint128 bondedBefore;
+        uint128 bondedAfter;
+
+        vm.expectRevert();
+        // This reverts with FastLaneErrorsEvents.InsufficientTotalBalance(shortfall).
+        // The shortfall argument can't be reliably calculated in this test, hence
+        // we expect a generic revert. Run this test with high verbosity to confirm
+        // it reverts with the correct error.
+        mockGasAccounting.settle(solverOp.from, bundler);
+
+        // Deficit, but solver has enough balance to cover it
+        mockGasAccounting.increaseBondedBalance(solverOp.from, initialClaims);
+        (bondedBefore,) = mockGasAccounting.accessData(solverOp.from);
+        mockGasAccounting.settle(solverOp.from, bundler);
+        (bondedAfter,) = mockGasAccounting.accessData(solverOp.from);
+        assertLt(bondedAfter, bondedBefore);
+
+        // Surplus, credited to solver's bonded balance
+        deal(executionEnvironment, initialClaims);
+        vm.prank(executionEnvironment);
+        mockGasAccounting.contribute{ value: initialClaims }();
+        (bondedBefore,) = mockGasAccounting.accessData(solverOp.from);
+        mockGasAccounting.settle(solverOp.from, bundler);
+        (bondedAfter,) = mockGasAccounting.accessData(solverOp.from);
+        assertGt(bondedAfter, bondedBefore);
     }
 }
