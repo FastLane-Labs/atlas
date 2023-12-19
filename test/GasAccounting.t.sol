@@ -6,6 +6,8 @@ import "forge-std/Test.sol";
 import { GasAccounting } from "../src/contracts/atlas/GasAccounting.sol";
 import { FastLaneErrorsEvents } from "../src/contracts/types/Emissions.sol";
 
+import { EscrowBits } from "../src/contracts/libraries/EscrowBits.sol";
+
 import "../src/contracts/types/EscrowTypes.sol";
 import "../src/contracts/types/SolverCallTypes.sol";
 
@@ -234,7 +236,52 @@ contract GasAccountingTest is Test {
     }
 
     function test_releaseSolverLock() public {
-        // TODO
+        solverOp.data = abi.encodePacked("calldata");
+        uint256 calldataCost = (solverOp.data.length * CALLDATA_LENGTH_PREMIUM) + 1;
+        uint256 gasWaterMark = gasleft() + 5000;
+        uint256 maxGasUsed;
+        uint128 bondedBefore;
+        uint128 bondedAfter;
+        uint256 result;
+
+        // FULL_REFUND
+        result = EscrowBits._EXECUTION_REFUND;
+        maxGasUsed = gasWaterMark + calldataCost;
+        maxGasUsed = (maxGasUsed + ((maxGasUsed * mockGasAccounting.SURCHARGE()) / mockGasAccounting.SURCHARGE_BASE()))
+            * tx.gasprice;
+        mockGasAccounting.increaseBondedBalance(solverOp.from, maxGasUsed);
+        (bondedBefore,) = mockGasAccounting.accessData(solverOp.from);
+        mockGasAccounting.releaseSolverLock(solverOp, gasWaterMark, result);
+        (bondedAfter,) = mockGasAccounting.accessData(solverOp.from);
+        assertGt(
+            bondedBefore - bondedAfter,
+            (calldataCost + ((calldataCost * mockGasAccounting.SURCHARGE()) / mockGasAccounting.SURCHARGE_BASE()))
+                * tx.gasprice
+        ); // Must be greater than calldataCost
+        assertLt(bondedBefore - bondedAfter, maxGasUsed); // Must be less than maxGasUsed
+
+        // CALLDATA_REFUND
+        result = 1 << uint256(SolverOutcome.InsufficientEscrow);
+        maxGasUsed = (
+            calldataCost + ((calldataCost * mockGasAccounting.SURCHARGE()) / mockGasAccounting.SURCHARGE_BASE())
+        ) * tx.gasprice;
+        mockGasAccounting.increaseBondedBalance(solverOp.from, maxGasUsed);
+        (bondedBefore,) = mockGasAccounting.accessData(solverOp.from);
+        mockGasAccounting.releaseSolverLock(solverOp, gasWaterMark, result);
+        (bondedAfter,) = mockGasAccounting.accessData(solverOp.from);
+        assertEq(bondedBefore - bondedAfter, maxGasUsed);
+
+        // NO_USER_REFUND
+        result = 1 << uint256(SolverOutcome.InvalidTo);
+        (bondedBefore,) = mockGasAccounting.accessData(solverOp.from);
+        mockGasAccounting.releaseSolverLock(solverOp, gasWaterMark, result);
+        (bondedAfter,) = mockGasAccounting.accessData(solverOp.from);
+        assertEq(bondedBefore, bondedAfter);
+
+        // UncoveredResult
+        result = 0;
+        vm.expectRevert(FastLaneErrorsEvents.UncoveredResult.selector);
+        mockGasAccounting.releaseSolverLock(solverOp, gasWaterMark, result);
     }
 
     function test_settle() public {
