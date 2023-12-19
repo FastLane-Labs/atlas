@@ -160,6 +160,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
             }
         }
 
+        console.log('finished!');
         return (prunedSolverOps, ValidCallsResult.Valid);
     }
 
@@ -170,7 +171,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         DAppOperation calldata dAppOp
     )
         internal
-        pure
+        // pure
         returns (bool valid, bool bypassSignatoryApproval)
     {
         bool validCallChainHash = !dConfig.callConfig.verifyCallChainHash()

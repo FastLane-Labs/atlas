@@ -4,7 +4,7 @@ pragma solidity 0.8.21;
 import "forge-std/Test.sol";
 
 import { Factory } from "../src/contracts/atlas/Factory.sol";
-import { DummyDAppControl } from "./base/DummyDAppControl.sol";
+import { DummyDAppControl, CallConfigBuilder } from "./base/DummyDAppControl.sol";
 
 import "../src/contracts/types/UserCallTypes.sol";
 
@@ -32,7 +32,7 @@ contract FactoryTest is Test {
 
     function setUp() public {
         mockFactory = new MockFactory();
-        dAppControl = new DummyDAppControl(address(0), address(0));
+        dAppControl = new DummyDAppControl(address(0), address(0), CallConfigBuilder.allFalseCallConfig());
         user = address(999);
     }
 

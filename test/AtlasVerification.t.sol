@@ -4,12 +4,12 @@ pragma solidity 0.8.21;
 import "forge-std/Test.sol";
 
 import { AtlasVerification } from "../src/contracts/atlas/AtlasVerification.sol";
-import { DAppConfig, DAppOperation } from "../src/contracts/types/DAppApprovalTypes.sol";
+import { DAppConfig, DAppOperation, CallConfig } from "../src/contracts/types/DAppApprovalTypes.sol";
 import { UserOperation } from "../src/contracts/types/UserCallTypes.sol";
 import { SolverOperation } from "../src/contracts/types/SolverCallTypes.sol";
 import { ValidCallsResult } from "../src/contracts/types/ValidCallsTypes.sol";
 import { TxBuilder } from "../src/contracts/helpers/TxBuilder.sol";
-import { DummyDAppControl } from "./base/DummyDAppControl.sol";
+import { DummyDAppControl, CallConfigBuilder } from "./base/DummyDAppControl.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { SimpleRFQSolver } from "./SwapIntent.t.sol";
 
@@ -33,7 +33,10 @@ contract AtlasVerificationTest is BaseTest {
 
         // Deploy new DummyDAppControl Controller from new gov and initialize in Atlas
         vm.startPrank(governanceEOA);
-        dAppControl = new DummyDAppControl(address(atlas), governanceEOA);
+        CallConfig memory callConfig = CallConfigBuilder.allFalseCallConfig();
+        callConfig.verifyCallChainHash = true;
+
+        dAppControl = new DummyDAppControl(address(atlas), governanceEOA, callConfig);
         atlasVerification.initializeGovernance(address(dAppControl));
         atlasVerification.integrateDApp(address(dAppControl));
         vm.stopPrank();
@@ -45,7 +48,7 @@ contract AtlasVerificationTest is BaseTest {
         });
     }
 
-    function test_T() public {
+    function test_validCalls_InvalidCaller() public {
         // Create atlas metacall transaction
         UserOperation memory userOp = txBuilder.buildUserOperation(
             userEOA,
@@ -93,12 +96,111 @@ contract AtlasVerificationTest is BaseTest {
         ValidCallsResult validCallsResult;
         SolverOperation[] memory prunedSolverOps;
         (prunedSolverOps, validCallsResult) = atlasVerification.validCalls(config, userOp, solverOps, dappOp, msgValue, msgSender, isSimulation);
+    }
+
+    function test_validCalls_ValidCaller() public {
+        // Create atlas metacall transaction
+        UserOperation memory userOp = txBuilder.buildUserOperation(
+            userEOA,
+            address(dAppControl),
+            tx.gasprice + 1,
+            0,
+            block.number + 2,
+            ""
+        );
+
+        DAppConfig memory config = dAppControl.getDAppConfig(userOp);
+
+        SolverOperation memory solverOp = txBuilder.buildSolverOperation(
+            userOp,
+            "",
+            solverOneEOA,
+            address(0),
+            1e18
+        );
+
+        // Solver signs the solverOp
+        Sig memory sig;
+        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOp));
+        solverOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        SolverOperation[] memory solverOps = new SolverOperation[](1);
+        solverOps[0] = solverOp;
+
+        DAppOperation memory dappOp = txBuilder.buildDAppOperation(
+            governanceEOA,
+            userOp,
+            solverOps
+        );
+
+        // Frontend signs the dAppOp payload
+        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dappOp));
+        dappOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        uint256 msgValue = 0;
+        address msgSender = userEOA;
+        bool isSimulation = false;
 
         vm.startPrank(address(atlas));
 
+        ValidCallsResult validCallsResult;
+        SolverOperation[] memory prunedSolverOps;
         (prunedSolverOps, validCallsResult) = atlasVerification.validCalls(config, userOp, solverOps, dappOp, msgValue, msgSender, isSimulation);
 
         assertTrue(validCallsResult == ValidCallsResult.Valid, "validCallsResult should be Success");
     }
 
+    function test_validCalls_InvalidAuctioneer() public {
+        // Create atlas metacall transaction
+        UserOperation memory userOp = txBuilder.buildUserOperation(
+            userEOA,
+            address(dAppControl),
+            tx.gasprice + 1,
+            0,
+            block.number + 2,
+            ""
+        );
+
+        DAppConfig memory config = dAppControl.getDAppConfig(userOp);
+
+        SolverOperation memory solverOp = txBuilder.buildSolverOperation(
+            userOp,
+            "",
+            solverOneEOA,
+            address(0),
+            1e18
+        );
+
+        // Solver signs the solverOp
+        Sig memory sig;
+        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOp));
+        solverOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        SolverOperation[] memory solverOps = new SolverOperation[](1);
+        solverOps[0] = solverOp;
+
+        DAppOperation memory dappOp = txBuilder.buildDAppOperation(
+            governanceEOA,
+            userOp,
+            solverOps
+        );
+        dappOp.callChainHash = bytes32(0);
+
+        // Frontend signs the dAppOp payload
+        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dappOp));
+        dappOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        uint256 msgValue = 0;
+        address msgSender = userEOA;
+        bool isSimulation = false;
+
+        vm.startPrank(address(atlas));
+
+        ValidCallsResult validCallsResult;
+        SolverOperation[] memory prunedSolverOps;
+        (prunedSolverOps, validCallsResult) = atlasVerification.validCalls(config, userOp, solverOps, dappOp, msgValue, msgSender, isSimulation);
+
+        console.log("validCallsResult: ", uint(validCallsResult));
+        assertTrue(validCallsResult == ValidCallsResult.InvalidAuctioneer, "validCallsResult should be InvalidAuctioneer");
+    }
 }
