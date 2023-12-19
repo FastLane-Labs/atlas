@@ -63,7 +63,7 @@ contract MockSafetyLocks is SafetyLocks {
 
 contract SafetyLocksTest is Test {
     MockSafetyLocks public safetyLocks;
-    address executionEnvironment = address(111);
+    address executionEnvironment = makeAddr("executionEnvironment");
 
     function setUp() public {
         safetyLocks = new MockSafetyLocks();
