@@ -160,7 +160,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
             }
         }
 
-        console.log('finished!');
         return (prunedSolverOps, ValidCallsResult.Valid);
     }
 
@@ -171,7 +170,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         DAppOperation calldata dAppOp
     )
         internal
-        // pure
+        pure
         returns (bool valid, bool bypassSignatoryApproval)
     {
         bool validCallChainHash = !dConfig.callConfig.verifyCallChainHash()
@@ -368,7 +367,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         uint256 highestFullBitmap = uint256(nonceTracker.HighestFullBitmap);
         uint256 lowestEmptyBitmap = uint256(nonceTracker.LowestEmptyBitmap);
 
-        // Handle non-async nonce logic
+        // Handle sequential nonce logic
         if (!async) {
             if (bitmapIndex != highestFullBitmap + 1) {
                 return false;
