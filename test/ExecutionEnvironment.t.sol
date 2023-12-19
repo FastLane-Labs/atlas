@@ -32,8 +32,10 @@ contract ExecutionEnvironmentTest is BaseTest {
 
     EscrowKey public escrowKey;
 
-    address public constant governance = address(888);
-    address public constant user = address(999);
+    address public governance = makeAddr("governance");
+    address public user = makeAddr("user");
+    address public solver = makeAddr("solver");
+    address public invalid = makeAddr("invalid");
 
     CallConfig private callConfig;
 
@@ -73,7 +75,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertTrue(status);
 
         // InvalidUser
-        userOp.from = address(0); // Invalid from
+        userOp.from = invalid; // Invalid from
         userOp.to = address(atlas);
         escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
@@ -85,7 +87,7 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // InvalidTo
         userOp.from = user;
-        userOp.to = address(0); // Invalid to
+        userOp.to = invalid; // Invalid to
         escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
         preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
@@ -300,7 +302,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         bytes memory solverMetaData;
         bool status;
 
-        address solver = address(1337);
         vm.prank(solver);
         MockSolverContract solverContract = new MockSolverContract(chain.weth, address(atlas));
 
@@ -331,7 +332,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverOp.value = 0;
 
         // AlteredControlHash
-        solverOp.control = address(0); // Invalid control
+        solverOp.control = invalid; // Invalid control
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
             executionEnvironment.solverMetaTryCatch.selector, solverGasLimit, solverOp, new bytes(0)
@@ -477,7 +478,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertEq(ERC20(chain.weth).balanceOf(user), 2e18);
 
         // NotEnvironmentOwner
-        vm.prank(address(0)); // Invalid caller
+        vm.prank(invalid); // Invalid caller
         vm.expectRevert(bytes("ERR-EC01 NotEnvironmentOwner"));
         executionEnvironment.withdrawERC20(chain.weth, 2e18);
 
@@ -525,14 +526,14 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertEq(ERC20(chain.weth).balanceOf(user), 2e18);
 
         // NotFactory
-        vm.prank(address(0)); // Invalid caller
+        vm.prank(invalid); // Invalid caller
         vm.expectRevert(bytes("ERR-EC10 NotFactory"));
         executionEnvironment.factoryWithdrawERC20(user, chain.weth, 2e18);
 
         // NotEnvironmentOwner
         vm.prank(address(atlas));
         vm.expectRevert(bytes("ERR-EC11 NotEnvironmentOwner"));
-        executionEnvironment.factoryWithdrawERC20(address(0), chain.weth, 2e18); // Invalid user
+        executionEnvironment.factoryWithdrawERC20(invalid, chain.weth, 2e18); // Invalid user
 
         // EscrowLocked
         // TODO
@@ -554,14 +555,14 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertEq(user.balance, 2e18);
 
         // NotFactory
-        vm.prank(address(0)); // Invalid caller
+        vm.prank(invalid); // Invalid caller
         vm.expectRevert(bytes("ERR-EC10 NotFactory"));
         executionEnvironment.factoryWithdrawEther(user, 2e18);
 
         // NotEnvironmentOwner
         vm.prank(address(atlas));
         vm.expectRevert(bytes("ERR-EC11 NotEnvironmentOwner"));
-        executionEnvironment.factoryWithdrawEther(address(0), 2e18); // Invalid user
+        executionEnvironment.factoryWithdrawEther(invalid, 2e18); // Invalid user
 
         // EscrowLocked
         // TODO
