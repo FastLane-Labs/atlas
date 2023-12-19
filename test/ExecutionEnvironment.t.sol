@@ -340,12 +340,6 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         uint256 solverGasLimit = 1_000_000;
 
-        // Valid (bid=ether)
-        // TODO
-
-        // Valid (bid=ERC20)
-        // TODO
-
         // IncorrectValue
         solverOp.value = 1; // Positive value but EE has no balance
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
@@ -510,12 +504,23 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.expectRevert(bytes("ERR-EC01 NotEnvironmentOwner"));
         executionEnvironment.withdrawERC20(chain.weth, 2e18);
 
-        // EscrowLocked
-        // TODO
-
         // BalanceTooLow
         vm.prank(user);
         vm.expectRevert(bytes("ERR-EC02 BalanceTooLow"));
+        executionEnvironment.withdrawERC20(chain.weth, 2e18);
+
+        // The following line changes an Atlas storage value in order to make the test succeed.
+        // lock value is normally initialized in the _initializeEscrowLock function,
+        // but we can't call it in the current setup.
+        // Any changes in the Storage contract could make this test fail, feel free to comment it until
+        // the contract's layout is finalized.
+
+        // Set lock address to the execution environment
+        vm.store(address(atlas), bytes32(uint256(7)), bytes32(uint256(uint160(address(executionEnvironment)))));
+
+        // EscrowLocked
+        vm.prank(user);
+        vm.expectRevert(bytes("ERR-EC15 EscrowLocked"));
         executionEnvironment.withdrawERC20(chain.weth, 2e18);
     }
 
@@ -534,12 +539,23 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.expectRevert(bytes("ERR-EC01 NotEnvironmentOwner"));
         executionEnvironment.withdrawEther(2e18);
 
-        // EscrowLocked
-        // TODO
-
         // BalanceTooLow
         vm.prank(user);
         vm.expectRevert(bytes("ERR-EC03 BalanceTooLow"));
+        executionEnvironment.withdrawEther(2e18);
+
+        // The following line changes an Atlas storage value in order to make the test succeed.
+        // lock value is normally initialized in the _initializeEscrowLock function,
+        // but we can't call it in the current setup.
+        // Any changes in the Storage contract could make this test fail, feel free to comment it until
+        // the contract's layout is finalized.
+
+        // Set lock address to the execution environment
+        vm.store(address(atlas), bytes32(uint256(7)), bytes32(uint256(uint160(address(executionEnvironment)))));
+
+        // EscrowLocked
+        vm.prank(user);
+        vm.expectRevert(bytes("ERR-EC15 EscrowLocked"));
         executionEnvironment.withdrawEther(2e18);
     }
 
@@ -563,12 +579,23 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.expectRevert(bytes("ERR-EC11 NotEnvironmentOwner"));
         executionEnvironment.factoryWithdrawERC20(invalid, chain.weth, 2e18); // Invalid user
 
-        // EscrowLocked
-        // TODO
-
         // BalanceTooLow
         vm.prank(address(atlas));
         vm.expectRevert(bytes("ERR-EC02 BalanceTooLow"));
+        executionEnvironment.factoryWithdrawERC20(user, chain.weth, 2e18);
+
+        // The following line changes an Atlas storage value in order to make the test succeed.
+        // lock value is normally initialized in the _initializeEscrowLock function,
+        // but we can't call it in the current setup.
+        // Any changes in the Storage contract could make this test fail, feel free to comment it until
+        // the contract's layout is finalized.
+
+        // Set lock address to the execution environment
+        vm.store(address(atlas), bytes32(uint256(7)), bytes32(uint256(uint160(address(executionEnvironment)))));
+
+        // EscrowLocked
+        vm.prank(address(atlas));
+        vm.expectRevert(bytes("ERR-EC15 EscrowLocked"));
         executionEnvironment.factoryWithdrawERC20(user, chain.weth, 2e18);
     }
 
@@ -592,12 +619,23 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.expectRevert(bytes("ERR-EC11 NotEnvironmentOwner"));
         executionEnvironment.factoryWithdrawEther(invalid, 2e18); // Invalid user
 
-        // EscrowLocked
-        // TODO
-
         // BalanceTooLow
         vm.prank(address(atlas));
         vm.expectRevert(bytes("ERR-EC03 BalanceTooLow"));
+        executionEnvironment.factoryWithdrawEther(user, 2e18);
+
+        // The following line changes an Atlas storage value in order to make the test succeed.
+        // lock value is normally initialized in the _initializeEscrowLock function,
+        // but we can't call it in the current setup.
+        // Any changes in the Storage contract could make this test fail, feel free to comment it until
+        // the contract's layout is finalized.
+
+        // Set lock address to the execution environment
+        vm.store(address(atlas), bytes32(uint256(7)), bytes32(uint256(uint160(address(executionEnvironment)))));
+
+        // EscrowLocked
+        vm.prank(address(atlas));
+        vm.expectRevert(bytes("ERR-EC15 EscrowLocked"));
         executionEnvironment.factoryWithdrawEther(user, 2e18);
     }
 
