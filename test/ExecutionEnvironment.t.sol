@@ -156,7 +156,16 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertTrue(status);
 
         // InvalidCodeHash
-        // TODO
+        // Alter the code hash of the control contract
+        vm.etch(address(dAppControl), address(atlas).code);
+
+        escrowKey = escrowKey.holdUserLock(address(dAppControl));
+        userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
+        userData = abi.encodePacked(userData, escrowKey.pack());
+        vm.prank(address(atlas));
+        vm.expectRevert(bytes("ERR-EV008 InvalidCodeHash"));
+        (status,) = address(executionEnvironment).call(userData);
+        assertTrue(status, "expectRevert ERR-EV008 InvalidCodeHash: call did not revert");
     }
 
     function test_modifier_contributeSurplus() public {
