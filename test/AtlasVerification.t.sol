@@ -63,7 +63,7 @@ contract AtlasVerificationTest is AtlasBaseTest {
     }
 
     function buildUserOperation() public view returns (UserOperation memory) {
-        return txBuilder.buildUserOperation(
+        UserOperation memory userOp = txBuilder.buildUserOperation(
             userEOA,
             address(dAppControl),
             tx.gasprice + 1,
@@ -71,6 +71,13 @@ contract AtlasVerificationTest is AtlasBaseTest {
             block.number + 2,
             ""
         );
+
+        // User signs the userOp
+        Sig memory sig;
+        (sig.v, sig.r, sig.s) = vm.sign(userPK, atlasVerification.getUserOperationPayload(userOp));
+        userOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        return userOp;
     }
 
     function buildSolverOperation(UserOperation memory userOp) public view returns (SolverOperation memory) {
@@ -124,7 +131,7 @@ contract AtlasVerificationTest is AtlasBaseTest {
     //
     function test_validCalls_ValidResult() public {
         // given a valid atlas transaction
-        UserOperation memory userOp = buildUserOpeation();
+        UserOperation memory userOp = buildUserOperation();
         SolverOperation[] memory solverOps = buildSolverOperations(userOp);
         DAppOperation memory dappOp = buildDAppOperation(userOp, solverOps);
 
@@ -150,7 +157,7 @@ contract AtlasVerificationTest is AtlasBaseTest {
     //
     function test_validCalls_InvalidCallerResult() public {
         // given an otherwise valid atlas transaction where the caller is not the atlas contract
-        UserOperation memory userOp = buildUserOpeation();
+        UserOperation memory userOp = buildUserOperation();
         SolverOperation[] memory solverOps = buildSolverOperations(userOp);
         DAppOperation memory dappOp = buildDAppOperation(userOp, solverOps);
 
@@ -181,7 +188,7 @@ contract AtlasVerificationTest is AtlasBaseTest {
         callConfig.verifyCallChainHash = true;
         refreshGlobals();
 
-        UserOperation memory userOp = buildUserOpeation();
+        UserOperation memory userOp = buildUserOperation();
         SolverOperation[] memory solverOps = buildSolverOperations(userOp);
         DAppOperation memory dappOp = buildDAppOperation(userOp, solverOps);
 
@@ -210,7 +217,7 @@ contract AtlasVerificationTest is AtlasBaseTest {
         callConfig.verifyCallChainHash = true;
         refreshGlobals();
 
-        UserOperation memory userOp = buildUserOpeation();
+        UserOperation memory userOp = buildUserOperation();
         SolverOperation[] memory solverOps = buildSolverOperations(userOp);
 
         DAppOperation memory dappOp = txBuilder.buildDAppOperation(
@@ -250,7 +257,7 @@ contract AtlasVerificationTest is AtlasBaseTest {
         callConfig.verifyCallChainHash = true;
         refreshGlobals();
 
-        UserOperation memory userOp = buildUserOpeation();
+        UserOperation memory userOp = buildUserOperation();
         SolverOperation[] memory solverOps = buildSolverOperations(userOp);
 
         DAppOperation memory dappOp = txBuilder.buildDAppOperation(
@@ -287,7 +294,7 @@ contract AtlasVerificationTest is AtlasBaseTest {
     // 
     function test_validCalls_BrokenSignature_DAppSignatureInvalid() public {
         // given an otherwise valid atlas transaction with an invalid dAppOp signature
-        UserOperation memory userOp = buildUserOpeation();
+        UserOperation memory userOp = buildUserOperation();
         SolverOperation[] memory solverOps = buildSolverOperations(userOp);
         DAppOperation memory dappOp = buildDAppOperation(userOp, solverOps);
         dappOp.signature = bytes("");
@@ -312,7 +319,7 @@ contract AtlasVerificationTest is AtlasBaseTest {
     //
     function test_validCalls_Simulated_BrokenSignature_DAppSignatureInvalid() public {
         // given an otherwise valid atlas transaction with an invalid dAppOp signature
-        UserOperation memory userOp = buildUserOpeation();
+        UserOperation memory userOp = buildUserOperation();
         SolverOperation[] memory solverOps = buildSolverOperations(userOp);
         DAppOperation memory dappOp = buildDAppOperation(userOp, solverOps);
         dappOp.signature = bytes("");
@@ -330,33 +337,8 @@ contract AtlasVerificationTest is AtlasBaseTest {
         assertTrue(validCallsResult == ValidCallsResult.Valid, "validCallsResult should be Valid");
     }
 
-    //
-    // given an otherwise valid atlas transaction with an invalid dAppOp signature sent from the DApp EOA
-    // when validCalls is called
-    // then it should return Valid
-    //
-    function test_validCalls_NoSignature_DAppBundled_Valid() public {
-        // callConfig.unknownAuctioneer = true;
-        // refreshGlobals();
 
-        // given an otherwise valid atlas transaction with an invalid dAppOp signature bundled by the DApp
-        UserOperation memory userOp = buildUserOpeation();
-        SolverOperation[] memory solverOps = buildSolverOperations(userOp);
-        DAppOperation memory dappOp = buildDAppOperation(userOp, solverOps);
-        dappOp.signature = bytes("");
-
-        DAppConfig memory config = dAppControl.getDAppConfig(userOp);
-
-        // when validCalls is called
-        vm.startPrank(address(atlas));
-        ValidCallsResult validCallsResult;
-        SolverOperation[] memory prunedSolverOps;
-        (prunedSolverOps, validCallsResult) = atlasVerification.validCalls(config, userOp, solverOps, dappOp, 0, governanceEOA, false);
-
-        // then it should return Valid
-        console.log("validCallsResult: ", uint(validCallsResult));
-        assertTrue(validCallsResult == ValidCallsResult.Valid, "validCallsResult should be Valid");
-    }
+    // TODO: tests for _verifyAuctioneer where (true, true) is returned
 
     // cases that cause bypassSignatoryApproval
     // * dConfig.callConfig.allowsUserAuctioneer() && dAppOp.from == userOp.sessionKey -> user is auctioneer
@@ -364,19 +346,131 @@ contract AtlasVerificationTest is AtlasBaseTest {
     // * dConfig.callConfig.allowsUnknownAuctioneer() -> unknown auctioneer
 
     // 
-    // given a valid atlas transaction with an invalid signatory and any of:
+    // given a valid atlas transaction with a disabled signatory and user is auctioneer
     //  - user is auctioneer
     //  - solver is auctioneer
     //  - unknown auctioneer
     // when validCalls is called
     // then it should return Valid
     //
+    function test_validCalls_SignerNotEnabled_BypassSignatory_UserAuctioneer_Valid() public {
+        // given a valid atlas transaction with a disabled signatory and user is auctioneer
+        callConfig.userAuctioneer = true;
+        refreshGlobals();
+        vm.prank(governanceEOA);
+        atlasVerification.removeSignatory(address(dAppControl), governanceEOA);
+
+        UserOperation memory userOp = buildUserOperation();
+        userOp.sessionKey = governanceEOA;
+        SolverOperation[] memory solverOps = buildSolverOperations(userOp);
+        DAppOperation memory dappOp = buildDAppOperation(userOp, solverOps);
+
+        DAppConfig memory config = dAppControl.getDAppConfig(userOp);
+
+        // when validCalls is called
+        vm.startPrank(address(atlas));
+        ValidCallsResult validCallsResult;
+        SolverOperation[] memory prunedSolverOps;
+        (prunedSolverOps, validCallsResult) = atlasVerification.validCalls(config, userOp, solverOps, dappOp, 0, userEOA, false);
+
+        // then it should return Valid
+        console.log("validCallsResult: ", uint(validCallsResult));
+        assertTrue(validCallsResult == ValidCallsResult.Valid, "validCallsResult should be Valid");
+    }
+
+    // 
+    // given a valid atlas transaction with a disabled signatory and solver is auctioneer
+    // when validCalls is called
+    // then it should return Valid
+    //
+    function test_validCalls_SignerNotEnabled_BypassSignatory_SolverAuctioneer_Valid() public {
+        // given a valid atlas transaction with a disabled signatory and user is auctioneer
+        callConfig.solverAuctioneer = true;
+        refreshGlobals();
+        vm.prank(governanceEOA);
+        atlasVerification.removeSignatory(address(dAppControl), governanceEOA);
+
+        UserOperation memory userOp = buildUserOperation();
+        SolverOperation[] memory solverOps = buildSolverOperations(userOp);
+        DAppOperation memory dappOp = txBuilder.buildDAppOperation(
+            solverOneEOA,
+            userOp,
+            solverOps
+        );
+
+        // Frontend signs the dAppOp payload
+        Sig memory sig;
+        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dappOp));
+        dappOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        DAppConfig memory config = dAppControl.getDAppConfig(userOp);
+
+        // when validCalls is called
+        vm.startPrank(address(atlas));
+        ValidCallsResult validCallsResult;
+        SolverOperation[] memory prunedSolverOps;
+        (prunedSolverOps, validCallsResult) = atlasVerification.validCalls(config, userOp, solverOps, dappOp, 0, solverOneEOA, false);
+
+        // then it should return Valid
+        console.log("validCallsResult: ", uint(validCallsResult));
+        assertTrue(validCallsResult == ValidCallsResult.Valid, "validCallsResult should be Valid");
+    }
+
+    // 
+    // given a valid atlas transaction with a disabled signatory and unknown auctioneer
+    // when validCalls is called
+    // then it should return Valid
+    //
+    function test_validCalls_SignerNotEnabled_BypassSignatory_UnknownAuctioneer_Valid() public {
+        // given a valid atlas transaction with a disabled signatory and user is auctioneer
+        callConfig.unknownAuctioneer = true;
+        refreshGlobals();
+        vm.prank(governanceEOA);
+        atlasVerification.removeSignatory(address(dAppControl), governanceEOA);
+
+        UserOperation memory userOp = buildUserOperation();
+        SolverOperation[] memory solverOps = buildSolverOperations(userOp);
+        DAppOperation memory dappOp = buildDAppOperation(userOp, solverOps);
+
+        DAppConfig memory config = dAppControl.getDAppConfig(userOp);
+
+        // when validCalls is called
+        vm.startPrank(address(atlas));
+        ValidCallsResult validCallsResult;
+        SolverOperation[] memory prunedSolverOps;
+        (prunedSolverOps, validCallsResult) = atlasVerification.validCalls(config, userOp, solverOps, dappOp, 0, userEOA, false);
+
+        // then it should return Valid
+        console.log("validCallsResult: ", uint(validCallsResult));
+        assertTrue(validCallsResult == ValidCallsResult.Valid, "validCallsResult should be Valid");
+    }
 
     //
     // given an otherwise valid atlas transaction where the signer is not enabled by the dApp
     // when validCalls is called
     // then it should return DAppSignatureInvalid
     //
+    function test_validCalls_SignerNotEnabled_DAppSignatureInvalid() public {
+        // given an otherwise valid atlas transaction where the signer is not enabled by the dApp
+        vm.prank(governanceEOA);
+        atlasVerification.removeSignatory(address(dAppControl), governanceEOA);
+
+        UserOperation memory userOp = buildUserOperation();
+        SolverOperation[] memory solverOps = buildSolverOperations(userOp);
+        DAppOperation memory dappOp = buildDAppOperation(userOp, solverOps);
+
+        DAppConfig memory config = dAppControl.getDAppConfig(userOp);
+
+        // when validCalls is called
+        vm.startPrank(address(atlas));
+        ValidCallsResult validCallsResult;
+        SolverOperation[] memory prunedSolverOps;
+        (prunedSolverOps, validCallsResult) = atlasVerification.validCalls(config, userOp, solverOps, dappOp, 0, userEOA, false);
+
+        // then it should return DAppSignatureInvalid
+        console.log("validCallsResult: ", uint(validCallsResult));
+        assertTrue(validCallsResult == ValidCallsResult.DAppSignatureInvalid, "validCallsResult should be DAppSignatureInvalid");
+    }
 
     //
     // given an otherwise valid atlas transaction where the signer is not enabled by the dApp
