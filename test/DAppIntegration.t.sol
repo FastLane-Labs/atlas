@@ -79,9 +79,19 @@ contract DAppIntegrationTest is Test {
         bytes32 signatoryKey = keccak256(abi.encode(governance, signatory));
         assertTrue(dAppIntegration.signatories(signatoryKey));
 
+        // Governance is allowed to remove a signatory
         vm.prank(governance);
         dAppIntegration.removeSignatory(address(dAppControl), signatory);
+        assertFalse(dAppIntegration.signatories(signatoryKey));
 
+        // Add the signatory back
+        vm.prank(governance);
+        dAppIntegration.addSignatory(address(dAppControl), signatory);
+        assertTrue(dAppIntegration.signatories(signatoryKey));
+
+        // Signatory is allowed to remove itself
+        vm.prank(signatory);
+        dAppIntegration.removeSignatory(address(dAppControl), signatory);
         assertFalse(dAppIntegration.signatories(signatoryKey));
 
         vm.prank(governance);
