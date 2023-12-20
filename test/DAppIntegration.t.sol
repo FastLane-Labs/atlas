@@ -94,9 +94,10 @@ contract DAppIntegrationTest is Test {
         dAppIntegration.removeSignatory(address(dAppControl), signatory);
         assertFalse(dAppIntegration.signatories(signatoryKey));
 
+        // signatoryKey is now invalid
         vm.prank(governance);
         vm.expectRevert(FastLaneErrorsEvents.InvalidDAppControl.selector);
-        dAppIntegration.removeSignatory(address(dAppControl), makeAddr("other"));
+        dAppIntegration.removeSignatory(address(dAppControl), signatory);
     }
 
     function test_integrateDApp() public {
