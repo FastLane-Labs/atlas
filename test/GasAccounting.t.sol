@@ -104,6 +104,7 @@ contract GasAccountingTest is Test {
         vm.prank(executionEnvironment);
         mockGasAccounting.contribute{ value: contributeValue }();
 
+        assertEq(address(mockGasAccounting).balance, contributeValue);
         assertEq(mockGasAccounting.deposits(), contributeValue);
     }
 
