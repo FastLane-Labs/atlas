@@ -74,6 +74,11 @@ contract SafetyLocksTest is Test {
         uint256 userOpValue = 333;
         uint256 msgValue = 444;
 
+        safetyLocks.setLock(address(2));
+        vm.expectRevert(FastLaneErrorsEvents.AlreadyInitialized.selector);
+        safetyLocks.initializeEscrowLock{ value: msgValue }(executionEnvironment, gasMarker, userOpValue);
+        safetyLocks.setLock(address(1)); // Reset to UNLOCKED
+
         safetyLocks.initializeEscrowLock{ value: msgValue }(executionEnvironment, gasMarker, userOpValue);
 
         uint256 rawClaims = (gasMarker + 1) * tx.gasprice;
