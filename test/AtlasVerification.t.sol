@@ -477,6 +477,27 @@ contract AtlasVerificationTest is AtlasBaseTest {
     // when validCalls is called with isSimulation = true
     // then it should return Valid
     //
+    function test_validCalls_SignerNotEnabled_Valid() public {
+        // given an otherwise valid atlas transaction where the signer is not enabled by the dApp
+        vm.prank(governanceEOA);
+        atlasVerification.removeSignatory(address(dAppControl), governanceEOA);
+
+        UserOperation memory userOp = buildUserOperation();
+        SolverOperation[] memory solverOps = buildSolverOperations(userOp);
+        DAppOperation memory dappOp = buildDAppOperation(userOp, solverOps);
+
+        DAppConfig memory config = dAppControl.getDAppConfig(userOp);
+
+        // when validCalls is called
+        vm.startPrank(address(atlas));
+        ValidCallsResult validCallsResult;
+        SolverOperation[] memory prunedSolverOps;
+        (prunedSolverOps, validCallsResult) = atlasVerification.validCalls(config, userOp, solverOps, dappOp, 0, userEOA, true);
+
+        // then it should return Valid
+        console.log("validCallsResult: ", uint(validCallsResult));
+        assertTrue(validCallsResult == ValidCallsResult.Valid, "validCallsResult should be Valid");
+    }
 
     //
     // given an otherwise valid atlas transaction where the control address doesn't match the dApp config.to
