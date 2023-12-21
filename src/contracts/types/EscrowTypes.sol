@@ -26,8 +26,7 @@ enum Party {
     DApp
 }
 
-enum SolverOutcome
-{
+enum SolverOutcome {
     // future task tracking
     PendingUpdate,
     ExecutionCompleted,
