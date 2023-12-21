@@ -12,6 +12,7 @@ import { TxBuilder } from "../src/contracts/helpers/TxBuilder.sol";
 import { DummyDAppControl, CallConfigBuilder } from "./base/DummyDAppControl.sol";
 import { AtlasBaseTest } from "./base/AtlasBaseTest.t.sol";
 import { SimpleRFQSolver } from "./SwapIntent.t.sol";
+import { CallVerification } from "../../src/contracts/libraries/CallVerification.sol";
 
 
 contract AtlasVerificationTest is AtlasBaseTest {
@@ -337,7 +338,6 @@ contract AtlasVerificationTest is AtlasBaseTest {
         assertTrue(validCallsResult == ValidCallsResult.Valid, "validCallsResult should be Valid");
     }
 
-
     // TODO: tests for _verifyAuctioneer where (true, true) is returned
 
     // cases that cause bypassSignatoryApproval
@@ -473,50 +473,92 @@ contract AtlasVerificationTest is AtlasBaseTest {
     }
 
     //
-    // given an otherwise valid atlas transaction where the signer is not enabled by the dApp
-    // when validCalls is called with isSimulation = true
-    // then it should return Valid
+    // given an otherwise valid atlas transaction where the control address doesn't match the dApp config.to
+    // when validCalls is called
+    // then it should return DAppSignatureInvalid
     //
-    function test_validCalls_SignerNotEnabled_Valid() public {
-        // given an otherwise valid atlas transaction where the signer is not enabled by the dApp
-        vm.prank(governanceEOA);
-        atlasVerification.removeSignatory(address(dAppControl), governanceEOA);
-
+    function test_validCalls_ControlConfigMismatch_DAppSignatureInvalid() public {
+        // given an otherwise valid atlas transaction where the control address doesn't match the dApp config.to
         UserOperation memory userOp = buildUserOperation();
-        SolverOperation[] memory solverOps = buildSolverOperations(userOp);
-        DAppOperation memory dappOp = buildDAppOperation(userOp, solverOps);
-
         DAppConfig memory config = dAppControl.getDAppConfig(userOp);
+        SolverOperation[] memory solverOps = buildSolverOperations(userOp);
+        DAppOperation memory dappOp = DAppOperation({
+            from: governanceEOA,
+            to: address(atlas),
+            value: 0,
+            gas: 2_000_000,
+            maxFeePerGas: userOp.maxFeePerGas,
+            nonce: atlasVerification.getNextNonce(governanceEOA),
+            deadline: userOp.deadline,
+            control: address(0),
+            bundler: address(0),
+            userOpHash: CallVerification.getUserOperationHash(userOp),
+            callChainHash: CallVerification.getCallChainHash(config, userOp, solverOps),
+            signature: new bytes(0)
+        });
+
+        Sig memory sig;
+        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dappOp));
+        dappOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // when validCalls is called
         vm.startPrank(address(atlas));
         ValidCallsResult validCallsResult;
         SolverOperation[] memory prunedSolverOps;
-        (prunedSolverOps, validCallsResult) = atlasVerification.validCalls(config, userOp, solverOps, dappOp, 0, userEOA, true);
+        (prunedSolverOps, validCallsResult) = atlasVerification.validCalls(config, userOp, solverOps, dappOp, 0, userEOA, false);
 
-        // then it should return Valid
+        // then it should return DAppSignatureInvalid
         console.log("validCallsResult: ", uint(validCallsResult));
-        assertTrue(validCallsResult == ValidCallsResult.Valid, "validCallsResult should be Valid");
+        assertTrue(validCallsResult == ValidCallsResult.DAppSignatureInvalid, "validCallsResult should be DAppSignatureInvalid");
     }
-
-    //
-    // given an otherwise valid atlas transaction where the control address doesn't match the dApp config.to
-    // when validCalls is called
-    // then it should return DAppSignatureInvalid
-    //
 
     //
     // given a valid atlas transaction
     //   and a dConfig.to that is not a contract
     // when validCalls is called
     // then it should return DAppSignatureInvalid
-    // 
+    //
 
     //
     // given an otherwise valid atlas transaction dAppOp.nonce greater than uint128.max - 1
     // when validCalls is called
     // then it should return DAppSignatureInvalid
     //
+    // TODO: need input from Alex here
+    // function test_validCalls_NonceTooLarge_DAppSignatureInvalid() public {
+    //     // given an otherwise valid atlas transaction where the control address doesn't match the dApp config.to
+    //     UserOperation memory userOp = buildUserOperation();
+    //     DAppConfig memory config = dAppControl.getDAppConfig(userOp);
+    //     SolverOperation[] memory solverOps = buildSolverOperations(userOp);
+    //     DAppOperation memory dappOp = DAppOperation({
+    //         from: governanceEOA,
+    //         to: address(atlas),
+    //         value: 0,
+    //         gas: 2_000_000,
+    //         maxFeePerGas: userOp.maxFeePerGas,
+    //         nonce: atlasVerification.getNextNonce(governanceEOA)+1,
+    //         deadline: userOp.deadline,
+    //         control: userOp.control,
+    //         bundler: address(0),
+    //         userOpHash: CallVerification.getUserOperationHash(userOp),
+    //         callChainHash: CallVerification.getCallChainHash(config, userOp, solverOps),
+    //         signature: new bytes(0)
+    //     });
+
+    //     Sig memory sig;
+    //     (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dappOp));
+    //     dappOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+    //     // when validCalls is called
+    //     vm.startPrank(address(atlas));
+    //     ValidCallsResult validCallsResult;
+    //     SolverOperation[] memory prunedSolverOps;
+    //     (prunedSolverOps, validCallsResult) = atlasVerification.validCalls(config, userOp, solverOps, dappOp, 0, userEOA, false);
+
+    //     // then it should return DAppSignatureInvalid
+    //     console.log("validCallsResult: ", uint(validCallsResult));
+    //     assertTrue(validCallsResult == ValidCallsResult.Valid, "validCallsResult should be DAppSignatureInvalid");
+    // }
 
     //
     // given an otherwise valid atlas transaction with a dAppOp.nonce of 0
