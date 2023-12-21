@@ -175,7 +175,7 @@ contract DAppIntegrationTest is Test {
 
         assertFalse(
             dAppIntegration.dapps(key) == address(dAppControl).codehash,
-            "dapps[key] should not be set when dApp is not inetgrated"
+            "dapps[key] should not be set when a dApp is not integrated"
         );
     }
 
