@@ -7,54 +7,82 @@ import { UserOperation } from "../../../src/contracts/types/UserCallTypes.sol";
 
 import { IAtlasVerification } from "../../../src/contracts/interfaces/IAtlasVerification.sol";
 
-import "./BaseOperationBuilder.sol";
+contract UserOperationBuilder is Test {
+    UserOperation userOperation;
 
-contract UserOperationBuilder is BaseOperationBuilder, Test {
-    function user_validAndUnsigned(
-        address from,
-        address to,
-        address control,
-        uint256 value,
-        uint256 gasLimit,
-        uint256 maxFeePerGas,
-        uint256 deadline,
-        bytes memory data
-    )
-        public
-        returns (UserOperation memory userOp)
-    {
-        userOp = UserOperation({
-            from: from,
-            to: _atlas(),
-            value: value,
-            gas: gasLimit,
-            maxFeePerGas: maxFeePerGas,
-            nonce: IAtlasVerification(_atlasVerification()).getNextNonce(from),
-            deadline: deadline,
-            dapp: to,
-            control: control,
-            sessionKey: address(0),
-            data: data,
-            signature: new bytes(0)
-        });
+    function withFrom(address from) public returns (UserOperationBuilder) {
+        userOperation.from = from;
+        return this;
     }
 
-    function user_validAndSigned(
-        address from,
-        address to,
-        address control,
-        uint256 value,
-        uint256 gasLimit,
-        uint256 maxFeePerGas,
-        uint256 deadline,
-        bytes memory data,
-        uint256 privateKey
-    )
-        public
-        returns (UserOperation memory userOp)
-    {
-        userOp = user_validAndSigned(from, to, control, value, gasLimit, maxFeePerGas, deadline, data, privateKey);
-        (v, r, s) = vm.sign(privateKey, IAtlasVerification(_atlasVerification()).getUserOperationPayload(userOp));
-        userOp.signature = abi.encodePacked(r, s, v);
+    function withTo(address to) public returns (UserOperationBuilder) {
+        userOperation.to = to;
+        return this;
+    }
+
+    function withValue(uint256 value) public returns (UserOperationBuilder) {
+        userOperation.value = value;
+        return this;
+    }
+
+    function withGas(uint256 gas) public returns (UserOperationBuilder) {
+        userOperation.gas = gas;
+        return this;
+    }
+
+    function withMaxFeePerGas(uint256 maxFeePerGas) public returns (UserOperationBuilder) {
+        userOperation.maxFeePerGas = maxFeePerGas;
+        return this;
+    }
+
+    function withNonce(uint256 nonce) public returns (UserOperationBuilder) {
+        userOperation.nonce = nonce;
+        return this;
+    }
+
+    function withNonce(address atlasVerification, address account) public returns (UserOperationBuilder) {
+        userOperation.nonce = IAtlasVerification(atlasVerification).getNextNonce(account);
+        return this;
+    }
+
+    function withDeadline(uint256 deadline) public returns (UserOperationBuilder) {
+        userOperation.deadline = deadline;
+        return this;
+    }
+
+    function withDapp(address dapp) public returns (UserOperationBuilder) {
+        userOperation.dapp = dapp;
+        return this;
+    }
+
+    function withControl(address control) public returns (UserOperationBuilder) {
+        userOperation.control = control;
+        return this;
+    }
+
+    function withSessionKey(address sessionKey) public returns (UserOperationBuilder) {
+        userOperation.sessionKey = sessionKey;
+        return this;
+    }
+
+    function withData(bytes memory data) public returns (UserOperationBuilder) {
+        userOperation.data = data;
+        return this;
+    }
+
+    function withSignature(bytes memory signature) public returns (UserOperationBuilder) {
+        userOperation.signature = signature;
+        return this;
+    }
+
+    function sign(address atlasVerification, uint256 privateKey) public returns (UserOperationBuilder) {
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(privateKey, IAtlasVerification(atlasVerification).getUserOperationPayload(userOperation));
+        userOperation.signature = abi.encodePacked(r, s, v);
+        return this;
+    }
+
+    function build() public view returns (UserOperation memory) {
+        return userOperation;
     }
 }
