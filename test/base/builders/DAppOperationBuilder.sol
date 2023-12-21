@@ -14,7 +14,7 @@ import { IAtlasVerification } from "../../../src/contracts/interfaces/IAtlasVeri
 
 import "../../../src/contracts/types/DAppApprovalTypes.sol";
 
-abstract contract DAppOperationBuilder is Test {
+contract DAppOperationBuilder is Test {
     using CallVerification for UserOperation;
 
     DAppOperation dappOperation;

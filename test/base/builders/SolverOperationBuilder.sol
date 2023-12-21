@@ -11,7 +11,7 @@ import { CallVerification } from "../../../src/contracts/libraries/CallVerificat
 import { IAtlasVerification } from "../../../src/contracts/interfaces/IAtlasVerification.sol";
 import { IDAppControl } from "../../../src/contracts/interfaces/IDAppControl.sol";
 
-abstract contract SolverOperationBuilder is Test {
+contract SolverOperationBuilder is Test {
     using CallVerification for UserOperation;
 
     SolverOperation solverOperation;

@@ -40,6 +40,11 @@ contract UserOperationBuilder is Test {
         return this;
     }
 
+    function withNonce(address atlasVerification) public returns (UserOperationBuilder) {
+        userOperation.nonce = IAtlasVerification(atlasVerification).getNextNonce(userOperation.from);
+        return this;
+    }
+
     function withNonce(address atlasVerification, address account) public returns (UserOperationBuilder) {
         userOperation.nonce = IAtlasVerification(atlasVerification).getNextNonce(account);
         return this;
