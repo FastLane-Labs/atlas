@@ -24,114 +24,194 @@ contract DAppIntegrationTest is Test {
 
     address governance = makeAddr("governance");
     address signatory = makeAddr("signatory");
+    address invalid = makeAddr("invalid");
 
     function setUp() public {
         dAppIntegration = new MockDAppIntegration(address(0));
         dAppControl = new DummyDAppControl(address(0), governance);
     }
 
-    function test_initializeGovernance() public {
+    function test_initializeGovernance_successfullyInitialized() public {
+        bytes32 signatoryKey = keccak256(abi.encode(governance, address(dAppControl)));
+        vm.prank(governance);
+        dAppIntegration.initializeGovernance(address(dAppControl));
+        assertTrue(
+            dAppIntegration.signatories(signatoryKey), "signatories[signatoryKey] should be true when initialized"
+        );
+    }
+
+    function test_initializeGovernance_notInitialized() public {
+        bytes32 signatoryKey = keccak256(abi.encode(governance, address(dAppControl)));
+        assertFalse(
+            dAppIntegration.signatories(signatoryKey), "signatories[signatoryKey] should be false when not initialized"
+        );
+    }
+
+    function test_initializeGovernance_onlyGovernanceAllowed() public {
+        vm.prank(invalid);
         vm.expectRevert(FastLaneErrorsEvents.OnlyGovernance.selector);
         dAppIntegration.initializeGovernance(address(dAppControl));
+    }
 
-        bytes32 signatoryKey = keccak256(abi.encode(governance, address(dAppControl)));
-        assertFalse(dAppIntegration.signatories(signatoryKey));
-
-        vm.prank(governance);
+    function test_initializeGovernance_alreadyInitialized() public {
+        vm.startPrank(governance);
         dAppIntegration.initializeGovernance(address(dAppControl));
-
-        assertTrue(dAppIntegration.signatories(signatoryKey));
-
-        vm.prank(governance);
         vm.expectRevert(FastLaneErrorsEvents.OwnerActive.selector);
         dAppIntegration.initializeGovernance(address(dAppControl));
+        vm.stopPrank();
     }
 
-    function test_addSignatory() public {
+    function test_addSignatory_successfullyAdded() public {
+        bytes32 signatoryKey = keccak256(abi.encode(governance, signatory));
+
+        vm.startPrank(governance);
+        dAppIntegration.initializeGovernance(address(dAppControl));
+        dAppIntegration.addSignatory(address(dAppControl), signatory);
+        assertTrue(dAppIntegration.signatories(signatoryKey), "signatories[signatoryKey] should be true when added");
+        vm.stopPrank();
+    }
+
+    function test_addSignatory_notSignatory() public {
         vm.prank(governance);
         dAppIntegration.initializeGovernance(address(dAppControl));
 
+        bytes32 signatoryKey = keccak256(abi.encode(governance, signatory));
+        assertFalse(
+            dAppIntegration.signatories(signatoryKey), "signatories[signatoryKey] should be false when not added"
+        );
+    }
+
+    function test_addSignatory_onlyGovernanceAllowed() public {
+        vm.prank(governance);
+        dAppIntegration.initializeGovernance(address(dAppControl));
+
+        vm.prank(invalid);
         vm.expectRevert(FastLaneErrorsEvents.OnlyGovernance.selector);
         dAppIntegration.addSignatory(address(dAppControl), signatory);
+    }
 
-        bytes32 signatoryKey = keccak256(abi.encode(governance, signatory));
-        assertFalse(dAppIntegration.signatories(signatoryKey));
-
-        vm.prank(governance);
+    function test_addSignatory_alreadyActive() public {
+        vm.startPrank(governance);
+        dAppIntegration.initializeGovernance(address(dAppControl));
         dAppIntegration.addSignatory(address(dAppControl), signatory);
-
-        assertTrue(dAppIntegration.signatories(signatoryKey));
-
-        vm.prank(governance);
         vm.expectRevert(FastLaneErrorsEvents.SignatoryActive.selector);
         dAppIntegration.addSignatory(address(dAppControl), signatory);
+        vm.stopPrank();
     }
 
-    function test_removeSignatory() public {
+    function test_removeSignatory_successfullyRemovedByGovernance() public {
+        bytes32 signatoryKey = keccak256(abi.encode(governance, signatory));
+
+        vm.startPrank(governance);
+        dAppIntegration.initializeGovernance(address(dAppControl));
+        dAppIntegration.addSignatory(address(dAppControl), signatory);
+        dAppIntegration.removeSignatory(address(dAppControl), signatory);
+        vm.stopPrank();
+
+        assertFalse(
+            dAppIntegration.signatories(signatoryKey),
+            "signatories[signatoryKey] should be false when governance removes a signatory"
+        );
+    }
+
+    function test_removeSignatory_successfullyRemovedBySignatoryItself() public {
+        bytes32 signatoryKey = keccak256(abi.encode(governance, signatory));
+
         vm.startPrank(governance);
         dAppIntegration.initializeGovernance(address(dAppControl));
         dAppIntegration.addSignatory(address(dAppControl), signatory);
         vm.stopPrank();
 
-        vm.expectRevert(FastLaneErrorsEvents.InvalidCaller.selector);
-        dAppIntegration.removeSignatory(address(dAppControl), signatory);
-
-        bytes32 signatoryKey = keccak256(abi.encode(governance, signatory));
-        assertTrue(dAppIntegration.signatories(signatoryKey));
-
-        // Governance is allowed to remove a signatory
-        vm.prank(governance);
-        dAppIntegration.removeSignatory(address(dAppControl), signatory);
-        assertFalse(dAppIntegration.signatories(signatoryKey));
-
-        // Add the signatory back
-        vm.prank(governance);
-        dAppIntegration.addSignatory(address(dAppControl), signatory);
-        assertTrue(dAppIntegration.signatories(signatoryKey));
-
-        // Signatory is allowed to remove itself
         vm.prank(signatory);
         dAppIntegration.removeSignatory(address(dAppControl), signatory);
-        assertFalse(dAppIntegration.signatories(signatoryKey));
 
-        // signatoryKey is now invalid
-        vm.prank(governance);
-        vm.expectRevert(FastLaneErrorsEvents.InvalidDAppControl.selector);
+        assertFalse(
+            dAppIntegration.signatories(signatoryKey),
+            "signatories[signatoryKey] should be false when a signatory removes itself"
+        );
+    }
+
+    function test_removeSignatory_invalidCaller() public {
+        vm.startPrank(governance);
+        dAppIntegration.initializeGovernance(address(dAppControl));
+        dAppIntegration.addSignatory(address(dAppControl), signatory);
+        vm.stopPrank();
+
+        vm.prank(invalid);
+        vm.expectRevert(FastLaneErrorsEvents.InvalidCaller.selector);
         dAppIntegration.removeSignatory(address(dAppControl), signatory);
     }
 
-    function test_integrateDApp() public {
-        vm.prank(governance);
+    function test_removeSignatory_invalidSignatoryKey() public {
+        vm.startPrank(governance);
         dAppIntegration.initializeGovernance(address(dAppControl));
-
-        vm.expectRevert(FastLaneErrorsEvents.OnlyGovernance.selector);
-        dAppIntegration.integrateDApp(address(dAppControl));
-
-        bytes32 key = keccak256(abi.encode(address(dAppControl), governance, dAppControl.callConfig()));
-        assertFalse(dAppIntegration.dapps(key) == address(dAppControl).codehash);
-
-        vm.prank(governance);
-        dAppIntegration.integrateDApp(address(dAppControl));
-
-        assertTrue(dAppIntegration.dapps(key) == address(dAppControl).codehash);
+        dAppIntegration.addSignatory(address(dAppControl), signatory);
+        dAppIntegration.removeSignatory(address(dAppControl), signatory);
+        // signatoryKey is now invalid
+        vm.expectRevert(FastLaneErrorsEvents.InvalidDAppControl.selector);
+        dAppIntegration.removeSignatory(address(dAppControl), signatory);
+        vm.stopPrank();
     }
 
-    function test_disableDApp() public {
+    function test_integrateDApp_successfullyIntegrated() public {
+        bytes32 key = keccak256(abi.encode(address(dAppControl), governance, dAppControl.callConfig()));
+
         vm.startPrank(governance);
         dAppIntegration.initializeGovernance(address(dAppControl));
         dAppIntegration.integrateDApp(address(dAppControl));
         vm.stopPrank();
 
-        vm.expectRevert(FastLaneErrorsEvents.OnlyGovernance.selector);
-        dAppIntegration.disableDApp(address(dAppControl));
+        assertTrue(
+            dAppIntegration.dapps(key) == address(dAppControl).codehash,
+            "dapps[key] should be set when a dApp is integrated"
+        );
+    }
 
+    function test_integrateDApp_notIntegrated() public {
         bytes32 key = keccak256(abi.encode(address(dAppControl), governance, dAppControl.callConfig()));
-        assertTrue(dAppIntegration.dapps(key) == address(dAppControl).codehash);
 
         vm.prank(governance);
-        dAppIntegration.disableDApp(address(dAppControl));
+        dAppIntegration.initializeGovernance(address(dAppControl));
 
-        assertFalse(dAppIntegration.dapps(key) == address(dAppControl).codehash);
+        assertFalse(
+            dAppIntegration.dapps(key) == address(dAppControl).codehash,
+            "dapps[key] should not be set when dApp is not inetgrated"
+        );
+    }
+
+    function test_integrateDApp_onlyGovernanceAllowed() public {
+        vm.prank(governance);
+        dAppIntegration.initializeGovernance(address(dAppControl));
+
+        vm.prank(invalid);
+        vm.expectRevert(FastLaneErrorsEvents.OnlyGovernance.selector);
+        dAppIntegration.integrateDApp(address(dAppControl));
+    }
+
+    function test_disableDApp_successfullyDisabled() public {
+        bytes32 key = keccak256(abi.encode(address(dAppControl), governance, dAppControl.callConfig()));
+
+        vm.startPrank(governance);
+        dAppIntegration.initializeGovernance(address(dAppControl));
+        dAppIntegration.integrateDApp(address(dAppControl));
+        dAppIntegration.disableDApp(address(dAppControl));
+        vm.stopPrank();
+
+        assertFalse(
+            dAppIntegration.dapps(key) == address(dAppControl).codehash,
+            "dapps[key] should be unset when a dApp is disabled"
+        );
+    }
+
+    function test_disableDApp_onlyGovernanceAllowed() public {
+        vm.startPrank(governance);
+        dAppIntegration.initializeGovernance(address(dAppControl));
+        dAppIntegration.integrateDApp(address(dAppControl));
+        vm.stopPrank();
+
+        vm.prank(invalid);
+        vm.expectRevert(FastLaneErrorsEvents.OnlyGovernance.selector);
+        dAppIntegration.disableDApp(address(dAppControl));
     }
 
     function test_initializeNonce() public {
@@ -143,23 +223,25 @@ contract DAppIntegrationTest is Test {
 
         assertEq(LowestEmptyBitmap, uint128(2));
         assertEq(HighestEmptyBitmap, uint128(0));
-
         assertEq(highestUsedNonce, uint8(1));
         assertEq(bitmap, uint240(0));
     }
 
     function test_initializeNonce_internal() public {
-        assertTrue(dAppIntegration.initializeNonceInternal(governance));
-        assertFalse(dAppIntegration.initializeNonceInternal(governance));
+        assertTrue(dAppIntegration.initializeNonceInternal(governance), "should return true when initialized");
+        assertFalse(dAppIntegration.initializeNonceInternal(governance), "should return false when already initialized");
     }
 
     function test_getGovFromControl() public {
-        vm.expectRevert(FastLaneErrorsEvents.DAppNotEnabled.selector);
-        dAppIntegration.getGovFromControl(address(dAppControl));
-
         vm.prank(governance);
         dAppIntegration.initializeGovernance(address(dAppControl));
+        assertEq(
+            dAppIntegration.getGovFromControl(address(dAppControl)), governance, "should return correct governance"
+        );
+    }
 
-        assertEq(dAppIntegration.getGovFromControl(address(dAppControl)), governance);
+    function test_getGovFromControl_dAppNotEnabled() public {
+        vm.expectRevert(FastLaneErrorsEvents.DAppNotEnabled.selector);
+        dAppIntegration.getGovFromControl(address(dAppControl));
     }
 }
