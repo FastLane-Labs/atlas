@@ -27,8 +27,8 @@ enum Party {
 }
 
 enum SolverOutcome
-// future task tracking
 {
+    // future task tracking
     PendingUpdate,
     ExecutionCompleted,
     UpdateCompleted,
