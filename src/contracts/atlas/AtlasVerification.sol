@@ -277,14 +277,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
             return (false);
         }
 
-        // NOTE: This check does not work if DAppControl is a proxy contract.
-        // To avoid exposure to social engineering vulnerabilities, disgruntled
-        // former employees, or beneficiary uncertainty during intra-DAO conflict,
-        // governance should refrain from using a proxy contract for DAppControl.
-        if (dConfig.to.codehash == bytes32(0) || dapps[dAppKey] != dConfig.to.codehash) {
-            return (false);
-        }
-
         // If the dapp indicated that they only accept sequenced nonces
         // (IE for FCFS execution), check and make sure the order is correct
         // NOTE: allowing only sequenced nonces could create a scenario in
