@@ -31,6 +31,7 @@ interface IAtlasVerification {
         returns (uint256 result, uint256 gasLimit, EscrowAccountBalance memory);
 
     function getUserOperationPayload(UserOperation memory userOp) external view returns (bytes32 payload);
+    function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload);
     function getNextNonce(address account) external view returns (uint256 nextNonce);
 
     function initializeGovernance(address controller) external;
