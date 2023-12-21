@@ -9,11 +9,13 @@ import { UserOperation } from "../src/contracts/types/UserCallTypes.sol";
 import { SolverOperation } from "../src/contracts/types/SolverCallTypes.sol";
 import { ValidCallsResult } from "../src/contracts/types/ValidCallsTypes.sol";
 import { TxBuilder } from "../src/contracts/helpers/TxBuilder.sol";
-import { DummyDAppControl, CallConfigBuilder } from "./base/DummyDAppControl.sol";
+import { DummyDAppControl } from "./base/DummyDAppControl.sol";
 import { AtlasBaseTest } from "./base/AtlasBaseTest.t.sol";
 import { SimpleRFQSolver } from "./SwapIntent.t.sol";
 import { CallVerification } from "../../src/contracts/libraries/CallVerification.sol";
 import { CallBits } from "../src/contracts/libraries/CallBits.sol";
+import { DummyDAppControlBuilder } from "./helpers/DummyDAppControlBuilder.sol";
+import { CallConfigBuilder } from "./helpers/CallConfigBuilder.sol";
 
 
 contract AtlasVerificationTest is AtlasBaseTest {
@@ -33,7 +35,7 @@ contract AtlasVerificationTest is AtlasBaseTest {
         // we then need to call refreshGlobals() to rebuild the
         // dAppControl and txBuilder in the test itself. not every test
         // needs to do this, so we try handle the most common case here.
-        callConfig = CallConfigBuilder.allFalseCallConfig();
+        callConfig = new CallConfigBuilder().build();
         refreshGlobals();
     }
 
@@ -43,25 +45,20 @@ contract AtlasVerificationTest is AtlasBaseTest {
         txBuilder = buildTxBuilder();
     }
 
-    function buildDummyDAppControl() public returns (DummyDAppControl) {
-        // Deploy new DummyDAppControl Controller from new gov and initialize in Atlas
-        vm.startPrank(governanceEOA);
-        DummyDAppControl control = new DummyDAppControl(address(atlas), governanceEOA, callConfig);
-        atlasVerification.initializeGovernance(address(control));
-        atlasVerification.integrateDApp(address(control));
-        vm.stopPrank();
-
-        return control;
+    function buildDummyDAppControl() public returns (DummyDAppControl control) {
+        control = new DummyDAppControlBuilder()
+            .withEscrow(address(atlas))
+            .withGovernance(governanceEOA)
+            .withCallConfig(callConfig)
+            .buildAndIntegrate(atlasVerification);
     }
 
-    function buildTxBuilder() public returns (TxBuilder) {
-        TxBuilder builder = new TxBuilder({
+    function buildTxBuilder() public returns (TxBuilder builder) {
+        builder = new TxBuilder({
             controller: address(dAppControl),
             atlasAddress: address(atlas),
             _verification: address(atlasVerification)
         });
-
-        return builder;
     }
 
     function buildUserOperation() public view returns (UserOperation memory) {
