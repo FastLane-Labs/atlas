@@ -4,6 +4,7 @@ pragma solidity 0.8.21;
 import "forge-std/Test.sol";
 
 import { Factory } from "../src/contracts/atlas/Factory.sol";
+import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
 import { DummyDAppControl } from "./base/DummyDAppControl.sol";
 
 import "../src/contracts/types/UserCallTypes.sol";
@@ -11,16 +12,13 @@ import "../src/contracts/types/UserCallTypes.sol";
 import "./base/TestUtils.sol";
 
 contract MockFactory is Factory, Test {
+    constructor(address _executionTemplate) Factory(_executionTemplate) { }
+
     function getOrCreateExecutionEnvironment(UserOperation calldata userOp)
         external
         returns (address executionEnvironment, DAppConfig memory dConfig)
     {
         return _getOrCreateExecutionEnvironment(userOp);
-    }
-
-    function deployExecutionEnvironmentTemplate(address caller) external returns (address executionEnvironment) {
-        vm.prank(caller);
-        executionEnvironment = _deployExecutionEnvironmentTemplate();
     }
 }
 
@@ -31,9 +29,19 @@ contract FactoryTest is Test {
     address public user;
 
     function setUp() public {
-        mockFactory = new MockFactory();
+        address deployer = address(333);
+        address expectedFactoryAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
+        bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedFactoryAddr, "AtlasFactory 1.0"));
+
+        vm.startPrank(deployer);
+        ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedFactoryAddr);
+        mockFactory = new MockFactory({ _executionTemplate: address(execEnvTemplate) });
         dAppControl = new DummyDAppControl(address(0));
+        vm.stopPrank();
         user = address(999);
+
+        console.log("Factory address: ", address(mockFactory));
+        console.log("Factory expected address: ", expectedFactoryAddr);
     }
 
     function test_createExecutionEnvironment() public {
@@ -102,8 +110,8 @@ contract FactoryTest is Test {
         assertFalse(executionEnvironment.codehash == bytes32(0), "Execution environment should exist");
     }
 
-    function test_deployExecutionEnvironmentTemplate() public {
-        address executionEnvironment = mockFactory.deployExecutionEnvironmentTemplate(user);
-        assertFalse(executionEnvironment.codehash == bytes32(0), "Execution environment should exist");
+    function test_FactorySaltSetCorrectly() public {
+        bytes32 expectedSalt = keccak256(abi.encodePacked(block.chainid, address(mockFactory), "AtlasFactory 1.0"));
+        assertEq(expectedSalt, mockFactory.salt(), "Factory salt not set correctly");
     }
 }

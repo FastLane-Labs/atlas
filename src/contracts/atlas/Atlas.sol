@@ -32,9 +32,11 @@ contract Atlas is Escrow, Factory {
     constructor(
         uint256 _escrowDuration,
         address _verification,
-        address _simulator
+        address _simulator,
+        address _executionTemplate
     )
         Escrow(_escrowDuration, _verification, _simulator)
+        Factory(_executionTemplate)
     { }
 
     function metacall( // <- Entrypoint Function
