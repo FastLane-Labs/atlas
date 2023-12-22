@@ -29,9 +29,6 @@ library CallBits {
         if (callConfig.delegateUser) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.DelegateUser);
         }
-        if (callConfig.localUser) {
-            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.LocalUser);
-        }
         if (callConfig.preSolver) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.PreSolver);
         }
@@ -74,7 +71,6 @@ library CallBits {
             trackPreOpsReturnData: needsPreOpsReturnData(encodedCallConfig),
             trackUserReturnData: needsUserReturnData(encodedCallConfig),
             delegateUser: needsDelegateUser(encodedCallConfig),
-            localUser: needsLocalUser(encodedCallConfig),
             preSolver: needsPreSolver(encodedCallConfig),
             postSolver: needsSolverPostCall(encodedCallConfig),
             requirePostOps: needsPostOpsCall(encodedCallConfig),
@@ -107,10 +103,6 @@ library CallBits {
 
     function needsDelegateUser(uint32 callConfig) internal pure returns (bool delegateUser) {
         delegateUser = (callConfig & 1 << uint32(CallConfigIndex.DelegateUser) != 0);
-    }
-
-    function needsLocalUser(uint32 callConfig) internal pure returns (bool localUser) {
-        localUser = (callConfig & 1 << uint32(CallConfigIndex.LocalUser) != 0);
     }
 
     function needsPreSolver(uint32 callConfig) internal pure returns (bool preSolver) {
