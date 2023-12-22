@@ -45,7 +45,6 @@ contract V4SwapIntentController is DAppControl {
                 requirePreOps: false,
                 trackPreOpsReturnData: false,
                 trackUserReturnData: true,
-                localUser: false,
                 delegateUser: true,
                 preSolver: true,
                 postSolver: true,
