@@ -90,4 +90,9 @@ contract UserOperationBuilder is Test {
     function build() public view returns (UserOperation memory) {
         return userOperation;
     }
+
+    function signAndBuild(address atlasVerification, uint256 privateKey) public returns (UserOperation memory) {
+        sign(atlasVerification, privateKey);
+        return userOperation;
+    }
 }

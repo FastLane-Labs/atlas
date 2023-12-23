@@ -112,4 +112,9 @@ contract SolverOperationBuilder is Test {
     function build() public view returns (SolverOperation memory) {
         return solverOperation;
     }
+
+    function signAndBuild(address atlasVerification, uint256 privateKey) public returns (SolverOperation memory) {
+        sign(atlasVerification, privateKey);
+        return build();
+    }
 }

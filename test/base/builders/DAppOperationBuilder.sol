@@ -111,4 +111,9 @@ contract DAppOperationBuilder is Test {
     function build() public view returns (DAppOperation memory) {
         return dappOperation;
     }
+
+    function signAndBuild(address atlasVerification, uint256 privateKey) public returns (DAppOperation memory) {
+        sign(atlasVerification, privateKey);
+        return build();
+    }
 }
