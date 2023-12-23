@@ -708,7 +708,7 @@ contract AtlasVerificationTest is AtlasBaseTest {
     //
     // given a default atlas environment
     //   and otherwise valid user, solver and dapp operations
-    //     where the user op control address is address(0)
+    //     where the user op control address is different to the dapp config to address
     // when validCalls is called from the userEOA
     // then it should return UserSignatureInvalid
     // because the user op signature control address must match the dapp config to address
@@ -719,7 +719,7 @@ contract AtlasVerificationTest is AtlasBaseTest {
 
         UserOperation memory userOp = validUserOperation().withControl(address(0)).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
-        DAppOperation memory dappOp = validDAppOperation(config, userOp, solverOps).build();
+        DAppOperation memory dappOp = validDAppOperation(config, userOp, solverOps).withControl(address(dAppControl)).signAndBuild(address(atlasVerification), governancePK);
 
         ValidCallsResult result;
         vm.startPrank(address(atlas));
@@ -1349,6 +1349,7 @@ contract AtlasVerificationTest is AtlasBaseTest {
     //   and otherwise valid user, solver and dapp operations
     //     where all solver ops are pruned
     //   and callConfig.requireFulfillment = true
+    //   and callConfig.zeroSolvers = true
     // when validCalls is called from the userEOA
     // then it should return NoSolverOp
     // because all solver ops are pruned
