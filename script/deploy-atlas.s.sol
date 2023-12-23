@@ -11,6 +11,7 @@ import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import { SwapIntentController } from "src/contracts/examples/intents-example/SwapIntent.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 import { Simulator } from "src/contracts/helpers/Simulator.sol";
+import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
 
 contract DeployAtlasScript is DeployBaseScript {
     function run() external {
@@ -20,18 +21,24 @@ contract DeployAtlasScript is DeployBaseScript {
 
         uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
+
+        // TODO check all pre-computed addresses are correct - changes made since last deploy
         // Computes the addresses at which AtlasVerification will be deployed
+        address expectedAtlasAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
         address expectedAtlasVerificationAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
         address expectedSimulatorAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
+        bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedAtlasAddr, "AtlasFactory 1.0"));
 
         console.log("Deployer address: \t\t\t\t", deployer);
 
         vm.startBroadcast(deployerPrivateKey);
 
+        ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
         atlas = new Atlas({
             _escrowDuration: 64,
             _verification: expectedAtlasVerificationAddr,
-            _simulator: expectedSimulatorAddr
+            _simulator: expectedSimulatorAddr,
+            _executionTemplate: address(execEnvTemplate)
         });
         atlasVerification = new AtlasVerification(address(atlas));
 

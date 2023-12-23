@@ -12,7 +12,6 @@ contract CallConfigBuilder is Test {
     bool trackPreOpsReturnData;
     bool trackUserReturnData;
     bool delegateUser;
-    bool localUser;
     bool preSolver;
     bool postSolver;
     bool requirePostOps;
@@ -47,11 +46,6 @@ contract CallConfigBuilder is Test {
 
     function withDelegateUser(bool _delegateUser) public returns (CallConfigBuilder) {
         delegateUser = _delegateUser;
-        return this;
-    }
-
-    function withLocalUser(bool _localUser) public returns (CallConfigBuilder) {
-        localUser = _localUser;
         return this;
     }
 
@@ -117,7 +111,6 @@ contract CallConfigBuilder is Test {
                 trackPreOpsReturnData,
                 trackUserReturnData,
                 delegateUser,
-                localUser,
                 preSolver,
                 postSolver,
                 requirePostOps,

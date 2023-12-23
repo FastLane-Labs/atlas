@@ -40,7 +40,6 @@ library CallConfigBuilder {
                 false,
                 false,
                 false,
-                false,
                 false
             );
     }
