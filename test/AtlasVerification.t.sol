@@ -32,39 +32,7 @@ struct ValidCallsCall {
 
 
 contract AtlasVerificationTest is AtlasBaseTest {
-    TxBuilder txBuilder;
     DummyDAppControl dAppControl;
-    CallConfig callConfig;
-
-    struct Sig {
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-    }
-
-    function setUp() public virtual override {
-        // we reset the callConfig to all false for each test
-        // this allows us to selectively enable flags for each test.
-        // we then need to call refreshGlobals() to rebuild the
-        // dAppControl and txBuilder in the test itself. not every test
-        // needs to do this, so we try handle the most common case here.
-        callConfig = new CallConfigBuilder().build();
-        refreshGlobals();
-    }
-
-    function refreshGlobals() public {
-        AtlasBaseTest.setUp();
-        dAppControl = buildDummyDAppControl();
-        txBuilder = buildTxBuilder();
-    }
-
-    function buildDummyDAppControl() public returns (DummyDAppControl control) {
-        control = new DummyDAppControlBuilder()
-            .withEscrow(address(atlas))
-            .withGovernance(governanceEOA)
-            .withCallConfig(callConfig)
-            .buildAndIntegrate(atlasVerification);
-    }
 
     function defaultCallConfig() public returns (CallConfigBuilder) {
         return new CallConfigBuilder();
@@ -75,14 +43,6 @@ contract AtlasVerificationTest is AtlasBaseTest {
             .withEscrow(address(atlas))
             .withGovernance(governanceEOA)
             .withCallConfig(defaultCallConfig().build());
-    }
-
-    function buildTxBuilder() public returns (TxBuilder builder) {
-        builder = new TxBuilder({
-            controller: address(dAppControl),
-            atlasAddress: address(atlas),
-            _verification: address(atlasVerification)
-        });
     }
 
     function validUserOperation() public returns (UserOperationBuilder) {
@@ -755,7 +715,7 @@ contract AtlasVerificationTest is AtlasBaseTest {
     //
     function test_validCalls_InvalidUserOpControl_UserSignatureInvalid() public {
         defaultAtlasEnvironment();
-        DAppConfig memory config = DAppConfig({ to: address(dAppControl), callConfig: CallBits.encodeCallConfig(callConfig), bidToken: address(0) });
+        DAppConfig memory config = DAppConfig({ to: address(dAppControl), callConfig: CallBits.encodeCallConfig(defaultCallConfig().build()), bidToken: address(0) });
 
         UserOperation memory userOp = validUserOperation().withControl(address(0)).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
