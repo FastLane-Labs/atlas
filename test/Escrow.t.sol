@@ -3,4 +3,194 @@ pragma solidity 0.8.21;
 
 import "forge-std/Test.sol";
 
-contract EscrowTest is Test { }
+import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
+
+import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
+import { FastLaneErrorsEvents } from "../src/contracts/types/Emissions.sol";
+import { DummyDAppControl } from "./base/DummyDAppControl.sol";
+import { AtlasBaseTest } from "./base/AtlasBaseTest.t.sol";
+import { DummyDAppControlBuilder } from "./helpers/DummyDAppControlBuilder.sol";
+import { CallConfigBuilder } from "./helpers/CallConfigBuilder.sol";
+import { UserOperationBuilder } from "./base/builders/UserOperationBuilder.sol";
+import { SolverOperationBuilder } from "./base/builders/SolverOperationBuilder.sol";
+import { DAppOperationBuilder } from "./base/builders/DAppOperationBuilder.sol";
+
+import "../src/contracts/types/UserCallTypes.sol";
+import "../src/contracts/types/SolverCallTypes.sol";
+import "../src/contracts/types/DAppApprovalTypes.sol";
+
+contract EscrowTest is AtlasBaseTest {
+    DummyDAppControl dAppControl;
+    DummySolver dummySolver;
+
+    function defaultCallConfig() public returns (CallConfigBuilder) {
+        return new CallConfigBuilder();
+    }
+
+    function defaultDAppControl() public returns (DummyDAppControlBuilder) {
+        return new DummyDAppControlBuilder()
+            .withEscrow(address(atlas))
+            .withGovernance(governanceEOA)
+            .withCallConfig(defaultCallConfig().build());
+    }
+
+    function validUserOperation() public returns (UserOperationBuilder) {
+        return new UserOperationBuilder()
+            .withFrom(userEOA)
+            .withTo(address(atlas))
+            .withValue(0)
+            .withGas(1_000_000)
+            .withMaxFeePerGas(tx.gasprice + 1)
+            .withNonce(address(atlasVerification), userEOA)
+            .withDeadline(block.number + 2)
+            .withDapp(address(dAppControl))
+            .withControl(address(dAppControl))
+            .withSessionKey(address(0))
+            .withData("")
+            .sign(address(atlasVerification), userPK);
+    }
+
+    function validSolverOperation(UserOperation memory userOp) public returns (SolverOperationBuilder) {
+        return new SolverOperationBuilder()
+            .withFrom(solverOneEOA)
+            .withTo(address(atlas))
+            .withValue(0)
+            .withGas(1_000_000)
+            .withMaxFeePerGas(userOp.maxFeePerGas)
+            .withDeadline(userOp.deadline)
+            .withSolver(address(dummySolver))
+            .withControl(userOp.control)
+            .withUserOpHash(userOp)
+            .withBidToken(userOp)
+            .withBidAmount(0)
+            .withData("")
+            .sign(address(atlasVerification), solverOnePK);
+    }
+
+    function validDAppOperation(
+        UserOperation memory userOp,
+        SolverOperation[] memory solverOps
+    )
+        public
+        returns (DAppOperationBuilder)
+    {
+        return new DAppOperationBuilder()
+            .withFrom(governanceEOA)
+            .withTo(address(atlas))
+            .withValue(0)
+            .withGas(2_000_000)
+            .withMaxFeePerGas(userOp.maxFeePerGas)
+            .withNonce(address(atlasVerification), governanceEOA)
+            .withDeadline(userOp.deadline)
+            .withControl(userOp.control)
+            .withBundler(address(0))
+            .withUserOpHash(userOp)
+            .withCallChainHash(userOp, solverOps)
+            .sign(address(atlasVerification), governancePK);
+    }
+
+    function defaultAtlasWithCallConfig(CallConfig memory callConfig) public {
+        dAppControl = defaultDAppControl().withCallConfig(callConfig).buildAndIntegrate(atlasVerification);
+    }
+
+    function setUp() public override {
+        super.setUp();
+
+        deal(solverOneEOA, 1 ether);
+
+        vm.startPrank(solverOneEOA);
+        dummySolver = new DummySolver(address(atlas));
+        atlas.depositAndBond{ value: 1 ether }(1 ether);
+        vm.stopPrank();
+
+        deal(address(dummySolver), 1);
+    }
+
+    // Ensure the preOps hook is successfully called. To ensure the hooks' returned data is as expected, we forward it
+    // to the solver call; the data field of the solverOperation contains the expected value, the check is made in the
+    // solver's atlasSolverCall function, as defined in the DummySolver contract.
+    function test_executePreOpsCall_success() public {
+        defaultAtlasWithCallConfig(
+            defaultCallConfig()
+                .withRequirePreOps(true)
+                .withForwardReturnData(true)
+                .build()
+        );
+        executePreOpsCallCase(false, block.timestamp);
+    }
+
+    // Ensure metacall reverts with the proper error code when the preOps hook reverts.
+    function test_executePreOpsCall_failure() public {
+        defaultAtlasWithCallConfig(
+            defaultCallConfig()
+                .withRequirePreOps(true)
+                .build()
+        );
+        executePreOpsCallCase(true, 0);
+    }
+
+    function executePreOpsCallCase(bool preOpsHookShouldRevert, uint256 expectedPreOpsHookReturnValue) public {
+        UserOperation memory userOp = validUserOperation()
+            .withData(
+                abi.encodeWithSelector(
+                    dAppControl.userOperationCall.selector,
+                    abi.encode(preOpsHookShouldRevert, abi.encode(expectedPreOpsHookReturnValue))
+                )
+            )
+            .signAndBuild(address(atlasVerification), userPK);
+
+        SolverOperation[] memory solverOps = new SolverOperation[](1);
+        solverOps[0] = validSolverOperation(userOp)
+            .withBidAmount(1)
+            .withData(abi.encode(expectedPreOpsHookReturnValue))
+            .signAndBuild(address(atlasVerification), solverOnePK);
+
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        if (preOpsHookShouldRevert) {
+            vm.expectRevert(FastLaneErrorsEvents.PreOpsFail.selector);
+        }
+
+        vm.prank(userEOA);
+        bool auctionWon = atlas.metacall(userOp, solverOps, dappOp);
+        
+        if (!preOpsHookShouldRevert) {
+            assertTrue(auctionWon, "Auction should have been won");
+        }
+    }
+}
+
+contract DummySolver {
+    address private _atlas;
+
+    constructor(address atlas) {
+        _atlas = atlas;
+    }
+
+    function atlasSolverCall(
+        address sender,
+        address,
+        uint256 bidAmount,
+        bytes calldata solverOpData,
+        bytes calldata extraReturnData
+    )
+        external
+        payable
+        returns (bool success, bytes memory data)
+    {
+        if (solverOpData.length > 0 && extraReturnData.length > 0) {
+            (uint256 solverDataValue) = abi.decode(solverOpData, (uint256));
+            (uint256 extraDataValue) = abi.decode(extraReturnData, (uint256));
+            require(solverDataValue == extraDataValue, "Solver data and extra data do not match");
+        }
+
+        // Pay bid
+        SafeTransferLib.safeTransferETH(msg.sender, bidAmount);
+
+        // Pay gas
+        uint256 shortfall = IEscrow(_atlas).shortfall();
+        IEscrow(_atlas).reconcile(msg.sender, sender, shortfall);
+
+        success = true;
+    }
+}

@@ -36,13 +36,6 @@ abstract contract Escrow is AtlETH {
         AtlETH(_escrowDuration, _verification, _simulator)
     { }
 
-    ///////////////////////////////////////////////////
-    /// EXTERNAL FUNCTIONS FOR BUNDLER INTERACTION  ///
-    ///////////////////////////////////////////////////
-
-    ///////////////////////////////////////////////////
-    ///             INTERNAL FUNCTIONS              ///
-    ///////////////////////////////////////////////////
     function _executePreOpsCall(
         UserOperation calldata userOp,
         address environment,
