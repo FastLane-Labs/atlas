@@ -39,9 +39,9 @@ contract DummyDAppControl is DAppControl {
             return true;
         }
 
-        (bool shouldRevert, bool returnValue) = abi.decode(data, (bool, bool));
+        (bool shouldRevert) = abi.decode(data, (bool));
         require(!shouldRevert, "_postSolverCall revert requested");
-        return returnValue;
+        return true;
     }
 
     function _preSolverCall(bytes calldata data) internal pure virtual override returns (bool) {

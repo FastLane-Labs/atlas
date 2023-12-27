@@ -23,6 +23,8 @@ contract EscrowTest is AtlasBaseTest {
     DummyDAppControl dAppControl;
     DummySolver dummySolver;
 
+    error NoError();
+
     function defaultCallConfig() public returns (CallConfigBuilder) {
         return new CallConfigBuilder();
     }
@@ -117,10 +119,10 @@ contract EscrowTest is AtlasBaseTest {
                 .withForwardReturnData(true) // Forward the preOps hook's return data to the solver call
                 .build()
         );
-        executeCase(false, block.timestamp * 2, 0);
+        executeCase(false, block.timestamp * 2, NoError.selector);
     }
 
-    // Ensure metacall reverts with the proper error code when the preOps hook reverts.
+    // Ensure metacall reverts with the proper error when the preOps hook reverts.
     function test_executePreOpsCall_failure() public {
         defaultAtlasWithCallConfig(
             defaultCallConfig()
@@ -141,10 +143,10 @@ contract EscrowTest is AtlasBaseTest {
                 .withForwardReturnData(true) // Forward the user operation's return data to the solver call
                 .build()
         );
-        executeCase(false, block.timestamp * 3, 0);
+        executeCase(false, block.timestamp * 3, NoError.selector);
     }
 
-    // Ensure metacall reverts with the proper error code when the user operation reverts.
+    // Ensure metacall reverts with the proper error when the user operation reverts.
     function test_executeUserOperation_failure() public {
         defaultAtlasWithCallConfig(
             defaultCallConfig()
@@ -154,7 +156,33 @@ contract EscrowTest is AtlasBaseTest {
         executeCase(true, 0, FastLaneErrorsEvents.UserOpFail.selector);
     }
 
+    // Ensure the postOps hook is successfully called. No return data is expected from the postOps hook, so we do not
+    // forward any data to the solver call.
+    function test_executePostOpsCall_success() public {
+        defaultAtlasWithCallConfig(
+            defaultCallConfig()
+                .withRequirePostOps(true) // Execute the postOps hook
+                .build()
+        );
+        executeCase(false, 0, NoError.selector);
+    }
+
+    // Ensure metacall reverts with the proper error when the postOps hook reverts.
+    function test_executePostOpsCall_failure() public {
+        defaultAtlasWithCallConfig(
+            defaultCallConfig()
+                .withTrackUserReturnData(true) // Track the user operation's return data
+                .withForwardReturnData(true) // Forward the user operation's return data to the solver call
+                .withRequirePostOps(true) // Execute the postOps hook
+                .withReuseUserOp(true) // Allow metacall to revert
+                .build()
+        );
+        executeCase(false, 1, FastLaneErrorsEvents.PostOpsFail.selector);
+    }
+
     function executeCase(bool hookShouldRevert, uint256 expectedHookReturnValue, bytes4 expectedError) public {
+        bool revertExpected = expectedError != NoError.selector;
+
         UserOperation memory userOp = validUserOperation()
             .withData(
                 abi.encodeWithSelector(
@@ -173,14 +201,14 @@ contract EscrowTest is AtlasBaseTest {
 
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
-        if (hookShouldRevert) {
+        if (revertExpected) {
             vm.expectRevert(expectedError);
         }
 
         vm.prank(userEOA);
         bool auctionWon = atlas.metacall(userOp, solverOps, dappOp);
         
-        if (!hookShouldRevert) {
+        if (!revertExpected) {
             assertTrue(auctionWon, "Auction should have been won");
         }
     }
