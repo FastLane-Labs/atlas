@@ -283,15 +283,22 @@ contract EscrowTest is AtlasBaseTest {
     }
 
     function test_executeSolverOperation_validateSolverOperation_callValueTooHigh() public {
-        // TODO
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit();
+        solverOps[0] = validSolverOperation(userOp)
+            .withValue(100 ether) // Set a call value that is too high
+            .withBidAmount(defaultBidAmount)
+            .signAndBuild(address(atlasVerification), solverOnePK);
+        executeSolverOperationCase(userOp, solverOps, 1 << uint256(SolverOutcome.CallValueTooHigh));
     }
 
     function test_executeSolverOperation_validateSolverOperation_lostAuction() public {
-        // TODO
+        // Impossible case, auctionAlreadyComplete is systematically set to false in executeSolverOperation
+        vm.skip(true);
     }
 
     function test_executeSolverOperation_validateSolverOperation_userOutOfGas() public {
-        // TODO
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit();
+        this.executeSolverOperationCase{gas: 2_000_000}(userOp, solverOps, 1 << uint256(SolverOutcome.UserOutOfGas));
     }
 
     function executeSolverOperationInit()
