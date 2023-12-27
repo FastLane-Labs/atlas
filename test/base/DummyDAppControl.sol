@@ -31,7 +31,7 @@ contract DummyDAppControl is DAppControl {
 
         (bool success, bytes memory data) = address(userOp.dapp).call(userOp.data);
         require(success, "_preOpsCall reverted");
-        return abi.decode(data, (bytes));
+        return data;
     }
 
     function _postOpsCall(bool, bytes calldata data) internal pure virtual override returns (bool) {
@@ -82,12 +82,7 @@ contract DummyDAppControl is DAppControl {
     // Custom functions
     // ****************************************
 
-    function userOperationCall(bytes calldata data) public pure returns (bytes memory) {
-        if (data.length == 0) {
-            return new bytes(0);
-        }
-
-        (bool shouldRevert, bytes memory returnValue) = abi.decode(data, (bool, bytes));
+    function userOperationCall(bool shouldRevert, uint256 returnValue) public pure returns (uint256) {
         require(!shouldRevert, "userOperationCall revert requested");
         return returnValue;
     }
