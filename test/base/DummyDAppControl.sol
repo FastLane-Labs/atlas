@@ -12,6 +12,8 @@ library CallConfigBuilder {
 }
 
 contract DummyDAppControl is DAppControl {
+    event MEVPaymentSuccess(address bidToken, uint256 bidAmount);
+
     constructor(
         address escrow,
         address governance,
@@ -66,13 +68,22 @@ contract DummyDAppControl is DAppControl {
         return returnValue;
     }
 
-    function _allocateValueCall(address, uint256, bytes calldata data) internal virtual override {
+    function _allocateValueCall(
+        address bidToken,
+        uint256 winningAmount,
+        bytes calldata data
+    )
+        internal
+        virtual
+        override
+    {
         if (data.length == 0) {
             return;
         }
 
         (bool shouldRevert) = abi.decode(data, (bool));
         require(!shouldRevert, "_allocateValueCall revert requested");
+        emit MEVPaymentSuccess(bidToken, winningAmount);
     }
 
     function getBidFormat(UserOperation calldata) public view virtual override returns (address) { }

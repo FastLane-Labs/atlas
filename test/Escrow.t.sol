@@ -14,16 +14,22 @@ import { CallConfigBuilder } from "./helpers/CallConfigBuilder.sol";
 import { UserOperationBuilder } from "./base/builders/UserOperationBuilder.sol";
 import { SolverOperationBuilder } from "./base/builders/SolverOperationBuilder.sol";
 import { DAppOperationBuilder } from "./base/builders/DAppOperationBuilder.sol";
+import { CallBits } from "../src/contracts/libraries/CallBits.sol";
 
 import "../src/contracts/types/UserCallTypes.sol";
 import "../src/contracts/types/SolverCallTypes.sol";
 import "../src/contracts/types/DAppApprovalTypes.sol";
 
 contract EscrowTest is AtlasBaseTest {
+    using CallBits for CallConfig;
+
     DummyDAppControl dAppControl;
     DummySolver dummySolver;
+    uint256 defaultBidAmount = 1;
+    bytes4 noError = 0;
 
-    error NoError();
+    event MEVPaymentSuccess(address bidToken, uint256 bidAmount);
+    event MEVPaymentFailure(address indexed controller, uint32 callConfig, address bidToken, uint256 bidAmount);
 
     function defaultCallConfig() public returns (CallConfigBuilder) {
         return new CallConfigBuilder();
@@ -119,7 +125,7 @@ contract EscrowTest is AtlasBaseTest {
                 .withForwardReturnData(true) // Forward the preOps hook's return data to the solver call
                 .build()
         );
-        executeCase(false, block.timestamp * 2, NoError.selector);
+        executeCase(false, block.timestamp * 2, noError);
     }
 
     // Ensure metacall reverts with the proper error when the preOps hook reverts.
@@ -143,7 +149,7 @@ contract EscrowTest is AtlasBaseTest {
                 .withForwardReturnData(true) // Forward the user operation's return data to the solver call
                 .build()
         );
-        executeCase(false, block.timestamp * 3, NoError.selector);
+        executeCase(false, block.timestamp * 3, noError);
     }
 
     // Ensure metacall reverts with the proper error when the user operation reverts.
@@ -164,7 +170,7 @@ contract EscrowTest is AtlasBaseTest {
                 .withRequirePostOps(true) // Execute the postOps hook
                 .build()
         );
-        executeCase(false, 0, NoError.selector);
+        executeCase(false, 0, noError);
     }
 
     // Ensure metacall reverts with the proper error when the postOps hook reverts.
@@ -180,8 +186,38 @@ contract EscrowTest is AtlasBaseTest {
         executeCase(false, 1, FastLaneErrorsEvents.PostOpsFail.selector);
     }
 
+    // Ensure the allocateValue hook is successfully called. No return data is expected from the allocateValue hook, so
+    // we check by emitting an event in the hook. The emitter must be the executionEnvironment since allocateValue is
+    // delegatecalled.
+    function test_allocateValue_success() public {
+        defaultAtlasWithCallConfig(
+            defaultCallConfig()
+                .withTrackUserReturnData(true) // Track the user operation's return data
+                .build()
+        );
+
+        vm.prank(userEOA);
+        address executionEnvironment = atlas.createExecutionEnvironment(address(dAppControl));
+
+        vm.expectEmit(false, false, false, true, executionEnvironment);
+        emit MEVPaymentSuccess(address(0), defaultBidAmount);
+        this.executeCase(false, 0, noError);
+    }
+
+    // Ensure the proper event is emitted when allocateValue fails.
+    function test_allocateValue_failure() public {
+        CallConfig memory callConfig = defaultCallConfig()
+            .withTrackUserReturnData(true) // Track the user operation's return data
+            .build();
+        defaultAtlasWithCallConfig(callConfig);
+
+        vm.expectEmit(false, false, false, true, address(atlas));
+        emit MEVPaymentFailure(address(dAppControl), callConfig.encodeCallConfig(), address(0), defaultBidAmount);
+        this.executeCase(false, 1, noError);
+    }
+
     function executeCase(bool hookShouldRevert, uint256 expectedHookReturnValue, bytes4 expectedError) public {
-        bool revertExpected = expectedError != NoError.selector;
+        bool revertExpected = expectedError != noError;
 
         UserOperation memory userOp = validUserOperation()
             .withData(
@@ -195,7 +231,7 @@ contract EscrowTest is AtlasBaseTest {
 
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         solverOps[0] = validSolverOperation(userOp)
-            .withBidAmount(1)
+            .withBidAmount(defaultBidAmount)
             .withData(abi.encode(expectedHookReturnValue))
             .signAndBuild(address(atlasVerification), solverOnePK);
 
