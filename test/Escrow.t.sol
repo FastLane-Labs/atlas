@@ -19,6 +19,7 @@ import { CallBits } from "../src/contracts/libraries/CallBits.sol";
 import "../src/contracts/types/UserCallTypes.sol";
 import "../src/contracts/types/SolverCallTypes.sol";
 import "../src/contracts/types/DAppApprovalTypes.sol";
+import "../src/contracts/types/EscrowTypes.sol";
 
 contract EscrowTest is AtlasBaseTest {
     using CallBits for CallConfig;
@@ -27,9 +28,13 @@ contract EscrowTest is AtlasBaseTest {
     DummySolver dummySolver;
     uint256 defaultBidAmount = 1;
     bytes4 noError = 0;
+    address invalid = makeAddr("invalid");
 
     event MEVPaymentSuccess(address bidToken, uint256 bidAmount);
     event MEVPaymentFailure(address indexed controller, uint32 callConfig, address bidToken, uint256 bidAmount);
+    event SolverTxResult(
+        address indexed solverTo, address indexed solverFrom, bool executed, bool success, uint256 result
+    );
 
     function defaultCallConfig() public returns (CallConfigBuilder) {
         return new CallConfigBuilder();
@@ -125,7 +130,7 @@ contract EscrowTest is AtlasBaseTest {
                 .withForwardReturnData(true) // Forward the preOps hook's return data to the solver call
                 .build()
         );
-        executeCase(false, block.timestamp * 2, noError);
+        executeHookCase(false, block.timestamp * 2, noError);
     }
 
     // Ensure metacall reverts with the proper error when the preOps hook reverts.
@@ -136,7 +141,7 @@ contract EscrowTest is AtlasBaseTest {
                 .withReuseUserOp(true) // Allow metacall to revert
                 .build()
         );
-        executeCase(true, 0, FastLaneErrorsEvents.PreOpsFail.selector);
+        executeHookCase(true, 0, FastLaneErrorsEvents.PreOpsFail.selector);
     }
 
     // Ensure the user operation executes successfully. To ensure the operation's returned data is as expected, we
@@ -149,7 +154,7 @@ contract EscrowTest is AtlasBaseTest {
                 .withForwardReturnData(true) // Forward the user operation's return data to the solver call
                 .build()
         );
-        executeCase(false, block.timestamp * 3, noError);
+        executeHookCase(false, block.timestamp * 3, noError);
     }
 
     // Ensure metacall reverts with the proper error when the user operation reverts.
@@ -159,7 +164,7 @@ contract EscrowTest is AtlasBaseTest {
                 .withReuseUserOp(true) // Allow metacall to revert
                 .build()
         );
-        executeCase(true, 0, FastLaneErrorsEvents.UserOpFail.selector);
+        executeHookCase(true, 0, FastLaneErrorsEvents.UserOpFail.selector);
     }
 
     // Ensure the postOps hook is successfully called. No return data is expected from the postOps hook, so we do not
@@ -170,7 +175,7 @@ contract EscrowTest is AtlasBaseTest {
                 .withRequirePostOps(true) // Execute the postOps hook
                 .build()
         );
-        executeCase(false, 0, noError);
+        executeHookCase(false, 0, noError);
     }
 
     // Ensure metacall reverts with the proper error when the postOps hook reverts.
@@ -183,7 +188,7 @@ contract EscrowTest is AtlasBaseTest {
                 .withReuseUserOp(true) // Allow metacall to revert
                 .build()
         );
-        executeCase(false, 1, FastLaneErrorsEvents.PostOpsFail.selector);
+        executeHookCase(false, 1, FastLaneErrorsEvents.PostOpsFail.selector);
     }
 
     // Ensure the allocateValue hook is successfully called. No return data is expected from the allocateValue hook, so
@@ -201,7 +206,7 @@ contract EscrowTest is AtlasBaseTest {
 
         vm.expectEmit(false, false, false, true, executionEnvironment);
         emit MEVPaymentSuccess(address(0), defaultBidAmount);
-        this.executeCase(false, 0, noError);
+        this.executeHookCase(false, 0, noError);
     }
 
     // Ensure the proper event is emitted when allocateValue fails.
@@ -213,10 +218,10 @@ contract EscrowTest is AtlasBaseTest {
 
         vm.expectEmit(false, false, false, true, address(atlas));
         emit MEVPaymentFailure(address(dAppControl), callConfig.encodeCallConfig(), address(0), defaultBidAmount);
-        this.executeCase(false, 1, noError);
+        this.executeHookCase(false, 1, noError);
     }
 
-    function executeCase(bool hookShouldRevert, uint256 expectedHookReturnValue, bytes4 expectedError) public {
+    function executeHookCase(bool hookShouldRevert, uint256 expectedHookReturnValue, bytes4 expectedError) public {
         bool revertExpected = expectedError != noError;
 
         UserOperation memory userOp = validUserOperation()
@@ -247,6 +252,76 @@ contract EscrowTest is AtlasBaseTest {
         if (!revertExpected) {
             assertTrue(auctionWon, "Auction should have been won");
         }
+    }
+
+    function test_executeSolverOperation_validateSolverOperation_invalidTo() public {
+        // This test can't pass with metacall as the entrypoint. Because a solverOp with an invalid .to will
+        // be filtered out by the AtlasVerification contract, before reaching executeSolverOperation.
+        vm.skip();
+
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit();
+        solverOps[0] = validSolverOperation(userOp)
+            .withTo(invalid)
+            .withBidAmount(defaultBidAmount)
+            .signAndBuild(address(atlasVerification), solverOnePK);
+        executeSolverOperationCase(userOp, solverOps, 1 << uint256(SolverOutcome.InvalidTo));
+    }
+
+    function test_executeSolverOperation_validateSolverOperation_perBlockLimit() public {
+        vm.prank(solverOneEOA);
+        atlas.unbond(1); // This will set the solver's lastAccessedBlock to the current block
+
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit();
+        executeSolverOperationCase(userOp, solverOps, 1 << uint256(SolverOutcome.PerBlockLimit));
+    }
+
+    function test_executeSolverOperation_validateSolverOperation_insufficientEscrow() public {
+        // TODO
+    }
+
+    function test_executeSolverOperation_validateSolverOperation_callValueTooHigh() public {
+        // TODO
+    }
+
+    function test_executeSolverOperation_validateSolverOperation_lostAuction() public {
+        // TODO
+    }
+
+    function test_executeSolverOperation_validateSolverOperation_userOutOfGas() public {
+        // TODO
+    }
+
+    function executeSolverOperationInit()
+        public
+        returns (UserOperation memory userOp, SolverOperation[] memory solverOps)
+    {
+        defaultAtlasWithCallConfig(defaultCallConfig().build());
+
+        userOp = validUserOperation()
+            .withData(abi.encodeWithSelector(dAppControl.userOperationCall.selector, false, 0))
+            .signAndBuild(address(atlasVerification), userPK);
+        
+        solverOps = new SolverOperation[](1);
+        solverOps[0] = validSolverOperation(userOp)
+            .withBidAmount(defaultBidAmount)
+            .signAndBuild(address(atlasVerification), solverOnePK);
+    }
+
+    function executeSolverOperationCase(
+        UserOperation memory userOp,
+        SolverOperation[] memory solverOps,
+        uint256 expectedResult
+    )
+        public
+    {
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        vm.expectEmit(false, false, false, true, address(atlas));
+        emit SolverTxResult(solverOps[0].solver, solverOps[0].from, false, false, expectedResult);
+
+        vm.prank(userEOA);
+        vm.expectRevert(); // Metacall should revert, the reason isn't important, we're only checking the event
+        atlas.metacall(userOp, solverOps, dappOp);
     }
 }
 
