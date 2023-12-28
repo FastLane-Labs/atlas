@@ -116,7 +116,7 @@ contract EscrowTest is AtlasBaseTest {
         atlas.depositAndBond{ value: 1 ether }(1 ether);
         vm.stopPrank();
 
-        deal(address(dummySolver), 1);
+        deal(address(dummySolver), defaultBidAmount);
     }
 
     // Ensure the preOps hook is successfully called. To ensure the hooks' returned data is as expected, we forward it
@@ -264,7 +264,7 @@ contract EscrowTest is AtlasBaseTest {
             .withTo(invalid)
             .withBidAmount(defaultBidAmount)
             .signAndBuild(address(atlasVerification), solverOnePK);
-        executeSolverOperationCase(userOp, solverOps, 1 << uint256(SolverOutcome.InvalidTo));
+        executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.InvalidTo), true);
     }
 
     function test_executeSolverOperation_validateSolverOperation_perBlockLimit() public {
@@ -272,14 +272,14 @@ contract EscrowTest is AtlasBaseTest {
         atlas.unbond(1); // This will set the solver's lastAccessedBlock to the current block
 
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit();
-        executeSolverOperationCase(userOp, solverOps, 1 << uint256(SolverOutcome.PerBlockLimit));
+        executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.PerBlockLimit), true);
     }
 
     function test_executeSolverOperation_validateSolverOperation_insufficientEscrow() public {
         vm.txGasPrice(1e100); // Set a gas price that will cause the solver to run out of escrow
 
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit();
-        executeSolverOperationCase(userOp, solverOps, 1 << uint256(SolverOutcome.InsufficientEscrow));
+        executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.InsufficientEscrow), true);
     }
 
     function test_executeSolverOperation_validateSolverOperation_callValueTooHigh() public {
@@ -288,7 +288,7 @@ contract EscrowTest is AtlasBaseTest {
             .withValue(100 ether) // Set a call value that is too high
             .withBidAmount(defaultBidAmount)
             .signAndBuild(address(atlasVerification), solverOnePK);
-        executeSolverOperationCase(userOp, solverOps, 1 << uint256(SolverOutcome.CallValueTooHigh));
+        executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.CallValueTooHigh), true);
     }
 
     function test_executeSolverOperation_validateSolverOperation_lostAuction() public {
@@ -298,7 +298,51 @@ contract EscrowTest is AtlasBaseTest {
 
     function test_executeSolverOperation_validateSolverOperation_userOutOfGas() public {
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit();
-        this.executeSolverOperationCase{gas: 2_000_000}(userOp, solverOps, 1 << uint256(SolverOutcome.UserOutOfGas));
+        this.executeSolverOperationCase{gas: 2_000_000}(
+            userOp, solverOps, false, false, 1 << uint256(SolverOutcome.UserOutOfGas), true
+        );
+    }
+
+    function test_executeSolverOperation_solverOpWrapper_success() public {
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit();
+        uint256 result = (1 << uint256(SolverOutcome.Success)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
+        executeSolverOperationCase(userOp, solverOps, true, true, result, false);
+    }
+
+    function test_executeSolverOperation_solverOpWrapper_bidNotPaid() public {
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit();
+        solverOps[0] = validSolverOperation(userOp)
+            .withBidAmount(defaultBidAmount * 2) // Solver's contract doesn't have that much
+            .signAndBuild(address(atlasVerification), solverOnePK);
+        uint256 result = (1 << uint256(SolverOutcome.BidNotPaid)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
+        executeSolverOperationCase(userOp, solverOps, true, false, result, true);
+    }
+
+    function test_executeSolverOperation_solverOpWrapper_callValueTooHigh() public {
+        // TODO: must find a way for the solver's contract not to call reconcile
+        // (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit();
+        // uint256 result = (1 << uint256(SolverOutcome.CallValueTooHigh)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
+        // executeSolverOperationCase(userOp, solverOps, true, false, result, true);
+    }
+
+    function test_executeSolverOperation_solverOpWrapper_intentUnfulfilled() public {
+        // TODO
+    }
+
+    function test_executeSolverOperation_solverOpWrapper_callReverted() public {
+        // TODO
+    }
+
+    function test_executeSolverOperation_solverOpWrapper_callbackFailed() public {
+        // TODO
+    }
+
+    function test_executeSolverOperation_solverOpWrapper_invalidControlHash() public {
+        // TODO
+    }
+
+    function test_executeSolverOperation_solverOpWrapper_preSolverFailed() public {
+        // TODO
     }
 
     function executeSolverOperationInit()
@@ -320,17 +364,20 @@ contract EscrowTest is AtlasBaseTest {
     function executeSolverOperationCase(
         UserOperation memory userOp,
         SolverOperation[] memory solverOps,
-        uint256 expectedResult
+        bool solverOpExecuted,
+        bool solverOpSuccess,
+        uint256 expectedResult,
+        bool metacallShouldRevert
     )
         public
     {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         vm.expectEmit(false, false, false, true, address(atlas));
-        emit SolverTxResult(solverOps[0].solver, solverOps[0].from, false, false, expectedResult);
+        emit SolverTxResult(solverOps[0].solver, solverOps[0].from, solverOpExecuted, solverOpSuccess, expectedResult);
 
         vm.prank(userEOA);
-        vm.expectRevert(); // Metacall should revert, the reason isn't important, we're only checking the event
+        if (metacallShouldRevert) vm.expectRevert(); // Metacall should revert, the reason isn't important, we're only checking the event
         atlas.metacall(userOp, solverOps, dappOp);
     }
 }
@@ -360,7 +407,9 @@ contract DummySolver {
         }
 
         // Pay bid
-        SafeTransferLib.safeTransferETH(msg.sender, bidAmount);
+        if (address(this).balance >= bidAmount) {
+            SafeTransferLib.safeTransferETH(msg.sender, bidAmount);
+        }
 
         // Pay gas
         uint256 shortfall = IEscrow(_atlas).shortfall();
