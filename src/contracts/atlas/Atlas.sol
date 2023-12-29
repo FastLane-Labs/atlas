@@ -227,7 +227,10 @@ contract Atlas is Escrow, Factory {
             revert UserNotFulfilled();
         }
         if (callConfig.allowsReuseUserOps()) {
-            revert RevertToReuse();
+            assembly {
+                mstore(0, errorSwitch)
+                revert(0, 4)
+            }
         }
     }
 
