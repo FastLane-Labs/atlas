@@ -207,13 +207,15 @@ contract ExecutionEnvironment is Base {
         }
 
         // Execute the solver call.
-        (success,) = ISolverContract(solverOp.solver).atlasSolverCall{ gas: gasLimit, value: solverOp.value }(
+        bytes memory solverCallData = abi.encodeWithSelector(
+            ISolverContract.atlasSolverCall.selector,
             solverOp.from,
             solverOp.bidToken,
             solverOp.bidAmount,
             solverOp.data,
             _config().forwardReturnData() ? dAppReturnData : new bytes(0)
         );
+        (success,) = solverOp.solver.call{ gas: gasLimit, value: solverOp.value }(solverCallData);
 
         // Verify that it was successful
         if (!success) {
