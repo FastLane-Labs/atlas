@@ -279,7 +279,7 @@ contract ExecutionEnvironment is Base {
     ///////////////////////////////////////
     function withdrawERC20(address token, uint256 amount) external {
         require(msg.sender == _user(), "ERR-EC01 NotEnvironmentOwner");
-        require(ISafetyLocks(atlas).getLockState().lockState == 0, "ERR-EC15 EscrowLocked");
+        require(ISafetyLocks(atlas).isUnlocked(), "ERR-EC15 EscrowLocked");
 
         if (ERC20(token).balanceOf(address(this)) >= amount) {
             SafeTransferLib.safeTransfer(ERC20(token), msg.sender, amount);
@@ -291,7 +291,7 @@ contract ExecutionEnvironment is Base {
     function factoryWithdrawERC20(address msgSender, address token, uint256 amount) external {
         require(msg.sender == atlas, "ERR-EC10 NotFactory");
         require(msgSender == _user(), "ERR-EC11 NotEnvironmentOwner");
-        require(ISafetyLocks(atlas).getLockState().lockState == 0, "ERR-EC15 EscrowLocked");
+        require(ISafetyLocks(atlas).isUnlocked(), "ERR-EC15 EscrowLocked");
 
         if (ERC20(token).balanceOf(address(this)) >= amount) {
             SafeTransferLib.safeTransfer(ERC20(token), _user(), amount);
@@ -302,7 +302,7 @@ contract ExecutionEnvironment is Base {
 
     function withdrawEther(uint256 amount) external {
         require(msg.sender == _user(), "ERR-EC01 NotEnvironmentOwner");
-        require(ISafetyLocks(atlas).getLockState().lockState == 0, "ERR-EC15 EscrowLocked");
+        require(ISafetyLocks(atlas).isUnlocked(), "ERR-EC15 EscrowLocked");
 
         if (address(this).balance >= amount) {
             SafeTransferLib.safeTransferETH(msg.sender, amount);
@@ -314,7 +314,7 @@ contract ExecutionEnvironment is Base {
     function factoryWithdrawEther(address msgSender, uint256 amount) external {
         require(msg.sender == atlas, "ERR-EC10 NotFactory");
         require(msgSender == _user(), "ERR-EC11 NotEnvironmentOwner");
-        require(ISafetyLocks(atlas).getLockState().lockState == 0, "ERR-EC15 EscrowLocked");
+        require(ISafetyLocks(atlas).isUnlocked(), "ERR-EC15 EscrowLocked");
 
         if (address(this).balance >= amount) {
             SafeTransferLib.safeTransferETH(_user(), amount);
