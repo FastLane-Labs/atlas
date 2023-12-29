@@ -257,7 +257,7 @@ contract EscrowTest is AtlasBaseTest {
     function test_executeSolverOperation_validateSolverOperation_invalidTo() public {
         // This test can't pass with metacall as the entrypoint, because a solverOp with an invalid .to will
         // be filtered out by the AtlasVerification contract, before reaching executeSolverOperation.
-        vm.skip();
+        vm.skip(true);
 
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit();
         solverOps[0] = validSolverOperation(userOp)
@@ -276,7 +276,7 @@ contract EscrowTest is AtlasBaseTest {
     }
 
     function test_executeSolverOperation_validateSolverOperation_insufficientEscrow() public {
-        vm.txGasPrice(1e100); // Set a gas price that will cause the solver to run out of escrow
+        vm.txGasPrice(1e70); // Set a gas price that will cause the solver to run out of escrow
 
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit();
         executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.InsufficientEscrow), true);
