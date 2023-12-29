@@ -49,7 +49,6 @@ contract FastLaneErrorsEvents {
     error UserOpFail();
     // error SolverFail(); // Only sim version of err is used
     error PostOpsFail();
-    error RevertToReuse();
     error InvalidAccess();
 
     // Escrow
