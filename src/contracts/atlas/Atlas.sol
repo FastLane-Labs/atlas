@@ -81,6 +81,9 @@ contract Atlas is Escrow, Factory {
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
             _handleErrors(bytes4(revertData), dConfig.callConfig);
+
+            // Refund the msg.value to sender if it errored
+            if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
         }
 
         // Release the lock
@@ -234,9 +237,6 @@ contract Atlas is Escrow, Factory {
                 revert(0, 4)
             }
         }
-
-        // Refund the msg.value to sender if it errored
-        SafeTransferLib.safeTransferETH(msg.sender, msg.value);
     }
 
     function _verifyCallerIsExecutionEnv(address user, address controller, uint32 callConfig) internal view override {
