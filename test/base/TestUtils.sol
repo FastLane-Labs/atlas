@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.21;
+pragma solidity 0.8.22;
 
 import { IDAppControl } from "../../src/contracts/interfaces/IDAppControl.sol";
 import { Mimic } from "../../src/contracts/atlas/Mimic.sol";

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.21;
+pragma solidity 0.8.22;
 
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 import { IDAppIntegration } from "../interfaces/IDAppIntegration.sol";
@@ -82,7 +82,8 @@ contract TxBuilder {
         bytes memory solverOpData,
         address solverEOA,
         address solverContract,
-        uint256 bidAmount
+        uint256 bidAmount,
+        uint256 value
     )
         public
         view
@@ -91,7 +92,7 @@ contract TxBuilder {
         solverOp = SolverOperation({
             from: solverEOA,
             to: atlas,
-            value: 0,
+            value: value,
             gas: gas,
             maxFeePerGas: userOp.maxFeePerGas,
             deadline: userOp.deadline,

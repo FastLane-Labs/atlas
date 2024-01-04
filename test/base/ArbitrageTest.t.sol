@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.21;
+pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
@@ -127,7 +127,7 @@ contract ArbitrageTest is BaseTest {
         uint24 c,
         uint24 m
     )
-        internal
+        public
         returns (uint256 revenue, uint256 optimalAmountIn)
     {
         uint256 mid1 = left + (right - left) / 3;
