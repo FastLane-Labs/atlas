@@ -367,7 +367,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         uint256 highestFullBitmap = uint256(nonceTracker.HighestFullBitmap);
         uint256 lowestEmptyBitmap = uint256(nonceTracker.LowestEmptyBitmap);
 
-        // Handle non-async nonce logic
+        // Handle sequential nonce logic
         if (!async) {
             if (bitmapIndex != highestFullBitmap + 1) {
                 return false;
