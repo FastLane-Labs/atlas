@@ -32,7 +32,6 @@ contract DeploySwapIntentControlScript is DeployBaseScript {
 
         // Integrate SwapIntent with Atlas
         atlasVerification.initializeGovernance(address(swapIntentControl));
-        atlasVerification.integrateDApp(address(swapIntentControl));
 
         vm.stopBroadcast();
 

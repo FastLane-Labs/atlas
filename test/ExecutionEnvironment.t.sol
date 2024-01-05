@@ -54,7 +54,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.startPrank(governance);
         dAppControl = new MockDAppControl(escrow, governance, customCallConfig);
         atlasVerification.initializeGovernance(address(dAppControl));
-        atlasVerification.integrateDApp(address(dAppControl));
         vm.stopPrank();
 
         vm.prank(user);
