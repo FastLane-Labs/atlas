@@ -1,13 +1,13 @@
 [profile.default]
-    bytecode_hash = "none"
-    optimizer_runs = 20
-    timeout = 30000
-    block_gas_limit = 300000000
-    gas_limit = 3000000000
-    gas_price = 1500000000
-    solc_version = "0.8.21"
-    evm_version = 'paris'
-    gas_reports = ["Atlas", "AtlasVerification", "Simulator", "ExecutionEnvironment"]
+  bytecode_hash = "none"
+  optimizer_runs = 20
+  timeout = 30000
+  block_gas_limit = 300000000
+  gas_limit = 3000000000
+  gas_price = 1500000000
+  solc_version = "0.8.21"
+  evm_version = 'paris'
+  gas_reports = ["Atlas", "AtlasVerification", "Simulator", "ExecutionEnvironment"]
 
 [profile.ci]
   fuzz = { runs = 10_000 }
@@ -22,5 +22,6 @@
   quote_style = "double"
   tab_width = 4
   wrap_comments = true
+  ignore = ["./**/*.t.sol"]
 
 fs_permissions = [{ access = "read-write", path = "./"}]
