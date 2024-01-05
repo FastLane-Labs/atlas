@@ -281,7 +281,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // To avoid exposure to social engineering vulnerabilities, disgruntled
         // former employees, or beneficiary uncertainty during intra-DAO conflict,
         // governance should refrain from using a proxy contract for DAppControl.
-        if (dConfig.to.codehash == bytes32(0) || dapps[dAppKey] != dConfig.to.codehash) {
+        if (dConfig.to.codehash == bytes32(0)) {
             return (false);
         }
 

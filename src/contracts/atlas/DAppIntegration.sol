@@ -45,8 +45,6 @@ contract DAppIntegration {
     //  keccak256(governance, signor)  => enabled
     mapping(bytes32 => bool) public signatories;
 
-    mapping(bytes32 => bytes32) public dapps;
-
     constructor(address _atlas) {
         ATLAS = _atlas;
     }
@@ -103,26 +101,12 @@ contract DAppIntegration {
         delete signatories[signatoryKey];
     }
 
-    function integrateDApp(address dAppControl) external {
-        GovernanceData memory govData = governance[dAppControl];
-
-        if (msg.sender != govData.governance) revert FastLaneErrorsEvents.OnlyGovernance();
-
-        bytes32 key = keccak256(abi.encode(dAppControl, govData.governance, govData.callConfig));
-
-        dapps[key] = dAppControl.codehash;
-
-        emit NewDAppSignatory(dAppControl, govData.governance, govData.governance, govData.callConfig);
-    }
-
     function disableDApp(address dAppControl) external {
         GovernanceData memory govData = governance[dAppControl];
 
         if (msg.sender != govData.governance) revert FastLaneErrorsEvents.OnlyGovernance();
 
-        bytes32 key = keccak256(abi.encode(dAppControl, govData.governance, govData.callConfig));
-
-        delete dapps[key];
+        delete governance[dAppControl];
     }
 
     function initializeNonce(address account) external {
