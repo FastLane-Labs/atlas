@@ -69,7 +69,7 @@ contract AtlasBaseTest is Test, TestConstants {
 
         // Computes the addresses at which AtlasVerification will be deployed
         address expectedAtlasAddr = computeCreateAddress(payee, vm.getNonce(payee) + 1);
-        address expectedAtlasVerificationAddr = computeCreateAddress(payee, vm.getNonce(payee) + 1);
+        address expectedAtlasVerificationAddr = computeCreateAddress(payee, vm.getNonce(payee) + 2);
         bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedAtlasAddr, "AtlasFactory 1.0"));
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
 
