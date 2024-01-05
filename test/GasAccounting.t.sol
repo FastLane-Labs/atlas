@@ -156,7 +156,9 @@ contract GasAccountingTest is Test {
         vm.expectRevert(abi.encodeWithSelector(FastLaneErrorsEvents.InsufficientTotalBalance.selector, initialClaims));
         mockGasAccounting.reconcile(executionEnvironment, solverOp.from, 0);
 
+        assertEq(mockGasAccounting.solver(), solverOp.from);
         assertTrue(mockGasAccounting.reconcile{ value: initialClaims }(executionEnvironment, solverOp.from, 0));
+        assertEq(mockGasAccounting.solver(), mockGasAccounting.SOLVER_FULFILLED());
     }
 
     function test_assign() public {
