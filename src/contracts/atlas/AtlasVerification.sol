@@ -261,10 +261,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         GovernanceData memory govData = governance[dConfig.to];
 
-        // Verify that the dapp is onboarded and that the call config is
-        // genuine.
-        bytes32 dAppKey = keccak256(abi.encode(dConfig.to, govData.governance, dConfig.callConfig));
-
         // Make sure the signer is currently enabled by dapp owner
         if (!signatories[keccak256(abi.encode(govData.governance, dAppOp.from))]) {
             bool bypassSignatoryCheck = isSimulation && dAppOp.from == address(0);
