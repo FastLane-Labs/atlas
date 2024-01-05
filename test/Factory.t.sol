@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 
 import { Factory } from "../src/contracts/atlas/Factory.sol";
 import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
-import { DummyDAppControl } from "./base/DummyDAppControl.sol";
+import { DummyDAppControl, CallConfigBuilder } from "./base/DummyDAppControl.sol";
 
 import "../src/contracts/types/UserCallTypes.sol";
 
@@ -36,7 +36,7 @@ contract FactoryTest is Test {
         vm.startPrank(deployer);
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedFactoryAddr);
         mockFactory = new MockFactory({ _executionTemplate: address(execEnvTemplate) });
-        dAppControl = new DummyDAppControl(address(0), address(0));
+        dAppControl = new DummyDAppControl(address(0), address(0), CallConfigBuilder.allFalseCallConfig());
         vm.stopPrank();
         user = address(999);
 
