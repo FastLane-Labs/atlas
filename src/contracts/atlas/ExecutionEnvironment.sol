@@ -47,25 +47,6 @@ contract ExecutionEnvironment is Base {
         _;
     }
 
-    modifier validSolver(SolverOperation calldata solverOp) {
-        {
-            address solverTo = solverOp.solver;
-            address solverFrom = solverOp.from;
-            address control = _control();
-
-            if (solverTo == address(this) || solverTo == control || solverTo == atlas) {
-                revert("ERR-EV008 InvalidTo");
-            }
-            if (solverTo != _approvedCaller()) {
-                revert("ERR-EV009 WrongSolver");
-            }
-            if (solverFrom == _user() || solverFrom == solverTo || solverFrom == control) {
-                revert("ERR-EV009 InvalidFrom");
-            }
-        }
-        _;
-    }
-
     modifier contributeSurplus() {
         _;
         {
@@ -162,8 +143,6 @@ contract ExecutionEnvironment is Base {
         // address(this) = ExecutionEnvironment
         // TODO: Change check to msg.value ?
         require(address(this).balance == solverOp.value, "ERR-CE05 IncorrectValue");
-
-        console.log("solverOp.value in solverMetaTryCatch", solverOp.value);
 
         // Track token balance to measure if the bid amount is paid.
         bool etherIsBidToken;

@@ -3,8 +3,6 @@ pragma solidity 0.8.21;
 
 import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
 
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
-
 import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 
 import { AtlasVerification } from "./AtlasVerification.sol";
