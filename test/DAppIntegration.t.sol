@@ -6,7 +6,7 @@ import "forge-std/Test.sol";
 import { DAppIntegration } from "../src/contracts/atlas/DAppIntegration.sol";
 import { FastLaneErrorsEvents } from "../src/contracts/types/Emissions.sol";
 
-import { DummyDAppControl } from "./base/DummyDAppControl.sol";
+import { DummyDAppControl, CallConfigBuilder } from "./base/DummyDAppControl.sol";
 
 import "../src/contracts/types/GovernanceTypes.sol";
 
@@ -28,7 +28,7 @@ contract DAppIntegrationTest is Test {
 
     function setUp() public {
         dAppIntegration = new MockDAppIntegration(address(0));
-        dAppControl = new DummyDAppControl(address(0), governance);
+        dAppControl = new DummyDAppControl(address(0), governance, CallConfigBuilder.allFalseCallConfig());
     }
 
     function test_initializeGovernance_successfullyInitialized() public {
