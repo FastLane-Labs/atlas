@@ -57,7 +57,7 @@ contract DAppIntegration {
 
         if (msg.sender != govAddress) revert FastLaneErrorsEvents.OnlyGovernance();
 
-        bytes32 signatoryKey = keccak256(abi.encode(msg.sender, controller));
+        bytes32 signatoryKey = keccak256(abi.encode(msg.sender, controller, msg.sender));
 
         if (signatories[signatoryKey]) revert FastLaneErrorsEvents.OwnerActive();
 
@@ -76,7 +76,7 @@ contract DAppIntegration {
 
         if (msg.sender != govData.governance) revert FastLaneErrorsEvents.OnlyGovernance();
 
-        bytes32 signatoryKey = keccak256(abi.encode(msg.sender, signatory));
+        bytes32 signatoryKey = keccak256(abi.encode(msg.sender, controller, signatory));
 
         if (signatories[signatoryKey]) {
             revert FastLaneErrorsEvents.SignatoryActive();
@@ -96,7 +96,7 @@ contract DAppIntegration {
             revert FastLaneErrorsEvents.InvalidCaller();
         }
 
-        bytes32 signatoryKey = keccak256(abi.encode(govData.governance, signatory));
+        bytes32 signatoryKey = keccak256(abi.encode(govData.governance, controller, signatory));
 
         if (!signatories[signatoryKey]) revert FastLaneErrorsEvents.InvalidDAppControl();
 
