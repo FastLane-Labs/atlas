@@ -96,7 +96,7 @@ contract DAppIntegration {
             revert FastLaneErrorsEvents.InvalidCaller();
         }
 
-        bytes32 signatoryKey = keccak256(abi.encode(msg.sender, signatory));
+        bytes32 signatoryKey = keccak256(abi.encode(govData.governance, signatory));
 
         if (!signatories[signatoryKey]) revert FastLaneErrorsEvents.InvalidDAppControl();
 
