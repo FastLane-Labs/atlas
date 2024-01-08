@@ -16,9 +16,9 @@ interface ISafetyLocks {
 
     function activeEnvironment() external view returns (address);
 
-    function getLockState() external view returns (EscrowKey memory);
-
     function isUnlocked() external view returns (bool);
+
+    function getLockState() external view returns (EscrowKey memory);
 
     function confirmSafetyCallback() external view returns (bool);
 }
