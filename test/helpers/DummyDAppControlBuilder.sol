@@ -7,7 +7,6 @@ import { AtlasVerification } from "../../src/contracts/atlas/AtlasVerification.s
 
 import "forge-std/Test.sol";
 
-
 contract DummyDAppControlBuilder is Test {
     address public escrow;
     address public governance;
@@ -29,11 +28,7 @@ contract DummyDAppControlBuilder is Test {
     }
 
     function build() public returns (DummyDAppControl) {
-        return new DummyDAppControl(
-            escrow,
-            governance,
-            callConfig
-        );
+        return new DummyDAppControl(escrow, governance, callConfig);
     }
 
     /*
@@ -45,7 +40,6 @@ contract DummyDAppControlBuilder is Test {
         vm.startPrank(governance);
         DummyDAppControl control = build();
         verification.initializeGovernance(address(control));
-        verification.integrateDApp(address(control));
         vm.stopPrank();
         return control;
     }

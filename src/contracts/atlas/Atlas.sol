@@ -5,6 +5,8 @@ import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
 
+import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+
 import { Escrow } from "./Escrow.sol";
 import { Factory } from "./Factory.sol";
 
@@ -79,6 +81,9 @@ contract Atlas is Escrow, Factory {
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
             _handleErrors(bytes4(revertData), dConfig.callConfig);
+
+            // Refund the msg.value to sender if it errored
+            if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
         }
 
         // Release the lock
@@ -227,7 +232,10 @@ contract Atlas is Escrow, Factory {
             revert UserNotFulfilled();
         }
         if (callConfig.allowsReuseUserOps()) {
-            revert RevertToReuse();
+            assembly {
+                mstore(0, errorSwitch)
+                revert(0, 4)
+            }
         }
     }
 

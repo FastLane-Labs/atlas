@@ -5,7 +5,6 @@ import { CallConfig } from "../../src/contracts/types/DAppApprovalTypes.sol";
 
 import "forge-std/Test.sol";
 
-
 contract CallConfigBuilder is Test {
     bool sequenced;
     bool requirePreOps;

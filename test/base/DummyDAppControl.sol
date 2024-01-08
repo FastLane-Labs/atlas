@@ -8,10 +8,10 @@ import "../../src/contracts/types/UserCallTypes.sol";
 import "../../src/contracts/types/SolverCallTypes.sol";
 
 contract DummyDAppControl is DAppControl {
-    constructor(address escrow, address governance, CallConfig memory _callConfig)
+    constructor(address _escrow, address _governance, CallConfig memory _callConfig)
         DAppControl(
-            escrow,
-            governance,
+            _escrow,
+            _governance,
             _callConfig
         )
     { }
@@ -23,24 +23,5 @@ contract DummyDAppControl is DAppControl {
 }
 
 library CallConfigBuilder {
-    function allFalseCallConfig() internal pure returns (CallConfig memory) {
-        return CallConfig(
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false
-            );
-    }
+    function allFalseCallConfig() internal pure returns (CallConfig memory) { }
 }
