@@ -105,22 +105,22 @@ contract CallConfigBuilder is Test {
 
     function build() public view returns (CallConfig memory) {
         return CallConfig(
-                sequenced,
-                requirePreOps,
-                trackPreOpsReturnData,
-                trackUserReturnData,
-                delegateUser,
-                preSolver,
-                postSolver,
-                requirePostOps,
-                zeroSolvers,
-                reuseUserOp,
-                userAuctioneer,
-                solverAuctioneer,
-                unknownAuctioneer,
-                verifyCallChainHash,
-                forwardReturnData,
-                requireFulfillment
-            );
+            sequenced,
+            requirePreOps,
+            trackPreOpsReturnData,
+            trackUserReturnData,
+            delegateUser,
+            preSolver,
+            postSolver,
+            requirePostOps,
+            zeroSolvers,
+            reuseUserOp,
+            userAuctioneer,
+            solverAuctioneer,
+            unknownAuctioneer,
+            verifyCallChainHash,
+            forwardReturnData,
+            requireFulfillment
+        );
     }
 }
