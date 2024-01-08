@@ -236,12 +236,16 @@ contract GasAccountingTest is Test {
 
     function test_credit() public {
         uint256 creditedAmount = 10_000;
+        uint256 lastAccessedBlock;
 
         uint256 bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
         (uint128 bondedBefore,) = mockGasAccounting.accessData(solverOp.from);
+        (, lastAccessedBlock) = mockGasAccounting.accessData(solverOp.from);
+        assertEq(lastAccessedBlock, 0);
 
         mockGasAccounting.credit(solverOp.from, creditedAmount);
-        (, uint256 lastAccessedBlock) = mockGasAccounting.accessData(solverOp.from);
+
+        (, lastAccessedBlock) = mockGasAccounting.accessData(solverOp.from);
         (uint128 bondedAfter,) = mockGasAccounting.accessData(solverOp.from);
 
         assertEq(lastAccessedBlock, uint128(block.number));
