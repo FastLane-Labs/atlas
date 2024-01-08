@@ -251,6 +251,10 @@ contract GasAccountingTest is Test {
         assertEq(lastAccessedBlock, uint128(block.number));
         assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore + creditedAmount);
         assertEq(bondedAfter, bondedBefore + uint128(creditedAmount));
+
+        // Testing uint128 boundary values for casting from uint256 to uint128 in _credit()
+        vm.expectRevert(stdError.arithmeticError);
+        mockGasAccounting.credit(solverOp.from, type(uint128).max + 1);
     }
 
     function test_trySolverLock() public {
