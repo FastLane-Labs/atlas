@@ -86,6 +86,10 @@ abstract contract GasAccounting is SafetyLocks {
         return true;
     }
 
+    // ---------------------------------------
+    //          INTERNAL FUNCTIONS
+    // ---------------------------------------
+
     function _contribute() internal {
         if (msg.value != 0) deposits += msg.value;
     }
