@@ -22,7 +22,7 @@ import { V2Helper } from "../V2Helper.sol";
 
 import { Utilities } from "src/contracts/helpers/Utilities.sol";
 
-contract BaseTest is Test, TestConstants {
+contract AtlasBaseTest is Test, TestConstants {
     address public me = address(this);
 
     address public payee; // = makeAddr("FastLanePayee");
@@ -47,13 +47,6 @@ contract BaseTest is Test, TestConstants {
 
     address public escrow;
 
-    Solver public solverOne;
-    Solver public solverTwo;
-
-    V2DAppControl public control;
-
-    V2Helper public helper;
-
     Utilities public u;
 
     // Fork stuff
@@ -76,12 +69,9 @@ contract BaseTest is Test, TestConstants {
 
         // Computes the addresses at which AtlasVerification will be deployed
         address expectedAtlasAddr = computeCreateAddress(payee, vm.getNonce(payee) + 1);
-        address expectedAtlasVerificationAddr = computeCreateAddress(payee, vm.getNonce(payee) + 2);
+        address expectedAtlasVerificationAddr = computeCreateAddress(payee, vm.getNonce(payee) + 1);
         bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedAtlasAddr, "AtlasFactory 1.0"));
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
-
-        console.log("Test salt:");
-        console.logBytes32(salt);
 
         atlas = new Atlas({
             _escrowDuration: 64,
@@ -91,56 +81,15 @@ contract BaseTest is Test, TestConstants {
         });
         atlasVerification = new AtlasVerification(address(atlas));
 
-        console.log("atlas real:", address(atlas));
-        console.log("atlas expected:", expectedAtlasAddr);
-
-        console.log("verification real:", address(atlasVerification));
-        console.log("verification expected:", expectedAtlasVerificationAddr);
-
         simulator.setAtlas(address(atlas));
 
         escrow = address(atlas);
         sorter = new Sorter(address(atlas), escrow);
 
         vm.stopPrank();
-        vm.startPrank(governanceEOA);
-
-        control = new V2DAppControl(escrow);
-        atlasVerification.initializeGovernance(address(control));
-
-        vm.stopPrank();
-
-        vm.deal(solverOneEOA, 100e18);
-
-        vm.startPrank(solverOneEOA);
-
-        solverOne = new Solver(WETH_ADDRESS, escrow, solverOneEOA);
-        atlas.deposit{ value: 1e18 }();
-
-        deal(TOKEN_ZERO, address(solverOne), 10e24);
-        deal(TOKEN_ONE, address(solverOne), 10e24);
-
-        vm.deal(solverTwoEOA, 100e18);
-
-        vm.startPrank(solverTwoEOA);
-
-        solverTwo = new Solver(WETH_ADDRESS, escrow, solverTwoEOA);
-        atlas.deposit{ value: 1e18 }();
-
-        vm.stopPrank();
-
-        deal(TOKEN_ZERO, address(solverTwo), 10e24);
-        deal(TOKEN_ONE, address(solverTwo), 10e24);
-
-        helper = new V2Helper(address(control), address(atlas), address(atlasVerification));
-        u = new Utilities();
-
-        deal(TOKEN_ZERO, address(atlas), 1);
-        deal(TOKEN_ONE, address(atlas), 1);
 
         vm.label(userEOA, "USER");
         vm.label(escrow, "ESCROW");
         vm.label(address(atlas), "ATLAS");
-        vm.label(address(control), "DAPP CONTROL");
     }
 }

@@ -3,8 +3,6 @@ pragma solidity 0.8.21;
 
 import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
 
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
-
 import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 
 import { AtlasVerification } from "./AtlasVerification.sol";
@@ -91,7 +89,7 @@ abstract contract Escrow is AtlETH {
         uint256 gasWaterMark = gasleft();
 
         // Verify the transaction.
-        (uint256 result, uint256 gasLimit) = _validateSolverOperation(solverOp, false);
+        (uint256 result, uint256 gasLimit) = _validateSolverOperation(solverOp);
 
         // If there are no errors, attempt to execute
         if (result.canExecute() && _trySolverLock(solverOp)) {
@@ -168,10 +166,7 @@ abstract contract Escrow is AtlETH {
 
     // TODO Revisit the EscrowAccountBalance memory solverEscrow arg. Needs to be passed through from Atlas, through
     // callstack
-    function _validateSolverOperation(
-        SolverOperation calldata solverOp,
-        bool auctionAlreadyComplete
-    )
+    function _validateSolverOperation(SolverOperation calldata solverOp)
         internal
         view
         returns (uint256 result, uint256 gasLimit)
@@ -211,10 +206,6 @@ abstract contract Escrow is AtlETH {
 
         // subtract out the gas buffer since the solver's metaTx won't use it
         gasLimit -= EscrowBits.FASTLANE_GAS_BUFFER;
-
-        if (auctionAlreadyComplete) {
-            result |= 1 << uint256(SolverOutcome.LostAuction);
-        }
 
         if (gasWaterMark < EscrowBits.VALIDATION_GAS_LIMIT + EscrowBits.SOLVER_GAS_LIMIT) {
             // Make sure to leave enough gas for dApp validation calls
