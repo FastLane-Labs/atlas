@@ -266,7 +266,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         bytes32 dAppKey = keccak256(abi.encode(dConfig.to, govData.governance, dConfig.callConfig));
 
         // Make sure the signer is currently enabled by dapp owner
-        if (!signatories[keccak256(abi.encode(govData.governance, dAppOp.from))]) {
+        if (!signatories[keccak256(abi.encode(govData.governance, dAppOp.control, dAppOp.from))]) {
             bool bypassSignatoryCheck = isSimulation && dAppOp.from == address(0);
             if (!bypassSignatoryCheck) {
                 return (false);
@@ -281,7 +281,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // To avoid exposure to social engineering vulnerabilities, disgruntled
         // former employees, or beneficiary uncertainty during intra-DAO conflict,
         // governance should refrain from using a proxy contract for DAppControl.
-        if (dConfig.to.codehash == bytes32(0) || dapps[dAppKey] != dConfig.to.codehash) {
+        if (dConfig.to.codehash == bytes32(0)) {
             return (false);
         }
 

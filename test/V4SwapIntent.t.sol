@@ -53,7 +53,6 @@ contract V4SwapIntentTest is BaseTest {
         vm.startPrank(governanceEOA);
         swapIntentController = new V4SwapIntentController(address(escrow), address(poolManager));
         atlasVerification.initializeGovernance(address(swapIntentController));
-        atlasVerification.integrateDApp(address(swapIntentController));
         vm.stopPrank();
 
         txBuilder = new TxBuilder({

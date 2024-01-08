@@ -107,7 +107,6 @@ contract BaseTest is Test, TestConstants {
 
         control = new V2DAppControl(escrow);
         atlasVerification.initializeGovernance(address(control));
-        atlasVerification.integrateDApp(address(control));
 
         vm.stopPrank();
 
