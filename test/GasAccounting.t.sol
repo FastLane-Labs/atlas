@@ -217,6 +217,21 @@ contract GasAccountingTest is Test {
         (bonded,) = mockGasAccounting.accessData(solverOp.from);
         assertEq(unbonding, unbondingBefore);
         assertEq(bonded, bondedAmount - assignedAmount);
+
+        // Testing uint128 boundary values for casting between uint128 and uint256 in _assign()
+        bondedAmount = uint256(type(uint128).max) + 1e18;
+        assignedAmount = uint256(type(uint128).max) + 1;
+        mockGasAccounting.increaseBondedBalance(solverOp.from, bondedAmount);
+        bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
+        depositsBefore = mockGasAccounting.deposits();
+        (, unbondingBefore) = mockGasAccounting.balanceOf(solverOp.from);
+        vm.expectRevert(stdError.arithmeticError);
+        mockGasAccounting.assign(solverOp.from, assignedAmount);
+        // Check assign reverted with overflow, and accounting values did not change
+        assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore);
+        assertEq(mockGasAccounting.deposits(), depositsBefore);
+        (, unbonding) = mockGasAccounting.balanceOf(solverOp.from);
+        assertEq(unbonding, unbondingBefore);
     }
 
     function test_credit() public {
