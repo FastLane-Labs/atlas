@@ -68,16 +68,20 @@ library stdStorageSafe {
                 if (prev == bytes32(0)) {
                     emit WARNING_UninitedSlot(who, uint256(reads[i]));
                 }
+                if (prev != fdat) {
+                    continue;
+                }
+                bytes32 new_val = ~prev;
                 // store
-                vm.store(who, reads[i], bytes32(hex"1337"));
+                vm.store(who, reads[i], new_val);
                 bool success;
-                bytes memory rdat;
                 {
+                    bytes memory rdat;
                     (success, rdat) = who.staticcall(cald);
                     fdat = bytesToBytes32(rdat, 32 * field_depth);
                 }
 
-                if (success && fdat == bytes32(hex"1337")) {
+                if (success && fdat == new_val) {
                     // we found which of the slots is the actual one
                     emit SlotFound(who, fsig, keccak256(abi.encodePacked(ins, field_depth)), uint256(reads[i]));
                     self.slots[who][fsig][keccak256(abi.encodePacked(ins, field_depth))] = uint256(reads[i]);
@@ -88,7 +92,7 @@ library stdStorageSafe {
                 vm.store(who, reads[i], prev);
             }
         } else {
-            require(false, "stdStorage find(StdStorage): No storage use detected for target.");
+            revert("stdStorage find(StdStorage): No storage use detected for target.");
         }
 
         require(
@@ -168,6 +172,41 @@ library stdStorageSafe {
         return abi.decode(read(self), (int256));
     }
 
+    function parent(StdStorage storage self) internal returns (uint256, bytes32) {
+        address who = self._target;
+        uint256 field_depth = self._depth;
+        vm.startMappingRecording();
+        uint256 child = find(self) - field_depth;
+        (bool found, bytes32 key, bytes32 parent_slot) = vm.getMappingKeyAndParentOf(who, bytes32(child));
+        if (!found) {
+            revert(
+                "stdStorage read_bool(StdStorage): Cannot find parent. Make sure you give a slot and startMappingRecording() has been called."
+            );
+        }
+        return (uint256(parent_slot), key);
+    }
+
+    function root(StdStorage storage self) internal returns (uint256) {
+        address who = self._target;
+        uint256 field_depth = self._depth;
+        vm.startMappingRecording();
+        uint256 child = find(self) - field_depth;
+        bool found;
+        bytes32 root_slot;
+        bytes32 parent_slot;
+        (found,, parent_slot) = vm.getMappingKeyAndParentOf(who, bytes32(child));
+        if (!found) {
+            revert(
+                "stdStorage read_bool(StdStorage): Cannot find parent. Make sure you give a slot and startMappingRecording() has been called."
+            );
+        }
+        while (found) {
+            root_slot = parent_slot;
+            (found,, parent_slot) = vm.getMappingKeyAndParentOf(who, bytes32(root_slot));
+        }
+        return uint256(root_slot);
+    }
+
     function bytesToBytes32(bytes memory b, uint256 offset) private pure returns (bytes32) {
         bytes32 out;
 
@@ -239,6 +278,10 @@ library stdStorage {
         checked_write(self, bytes32(amt));
     }
 
+    function checked_write_int(StdStorage storage self, int256 val) internal {
+        checked_write(self, bytes32(uint256(val)));
+    }
+
     function checked_write(StdStorage storage self, bool write) internal {
         bytes32 t;
         /// @solidity memory-safe-assembly
@@ -298,6 +341,14 @@ library stdStorage {
 
     function read_int(StdStorage storage self) internal returns (int256) {
         return stdStorageSafe.read_int(self);
+    }
+
+    function parent(StdStorage storage self) internal returns (uint256, bytes32) {
+        return stdStorageSafe.parent(self);
+    }
+
+    function root(StdStorage storage self) internal returns (uint256) {
+        return stdStorageSafe.root(self);
     }
 
     // Private function so needs to be copied over

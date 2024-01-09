@@ -21,6 +21,20 @@ contract SignedWadMathTest is DSTestPlus {
         assertEq(wadMul(xPrime, yPrime), (xPrime * yPrime) / 1e18);
     }
 
+    function testFailWadMulEdgeCase() public pure {
+        int256 x = -1;
+        int256 y = type(int256).min;
+
+        wadMul(x, y);
+    }
+
+    function testFailWadMulEdgeCase2() public pure {
+        int256 x = type(int256).min;
+        int256 y = -1;
+
+        wadMul(x, y);
+    }
+
     function testFailWadMulOverflow(int256 x, int256 y) public pure {
         // Ignore cases where x * y does not overflow.
         unchecked {
