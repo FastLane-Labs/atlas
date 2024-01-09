@@ -47,25 +47,6 @@ contract ExecutionEnvironment is Base {
         _;
     }
 
-    modifier validSolver(SolverOperation calldata solverOp) {
-        {
-            address solverTo = solverOp.solver;
-            address solverFrom = solverOp.from;
-            address control = _control();
-
-            if (solverTo == address(this) || solverTo == control || solverTo == atlas) {
-                revert("ERR-EV008 InvalidTo");
-            }
-            if (solverTo != _approvedCaller()) {
-                revert("ERR-EV009 WrongSolver");
-            }
-            if (solverFrom == _user() || solverFrom == solverTo || solverFrom == control) {
-                revert("ERR-EV009 InvalidFrom");
-            }
-        }
-        _;
-    }
-
     modifier contributeSurplus() {
         _;
         {
@@ -163,8 +144,6 @@ contract ExecutionEnvironment is Base {
         // TODO: Change check to msg.value ?
         require(address(this).balance == solverOp.value, "ERR-CE05 IncorrectValue");
 
-        console.log("solverOp.value in solverMetaTryCatch", solverOp.value);
-
         // Track token balance to measure if the bid amount is paid.
         bool etherIsBidToken;
         uint256 bidBalance;
@@ -207,13 +186,15 @@ contract ExecutionEnvironment is Base {
         }
 
         // Execute the solver call.
-        (success,) = ISolverContract(solverOp.solver).atlasSolverCall{ gas: gasLimit, value: solverOp.value }(
+        bytes memory solverCallData = abi.encodeWithSelector(
+            ISolverContract.atlasSolverCall.selector,
             solverOp.from,
             solverOp.bidToken,
             solverOp.bidAmount,
             solverOp.data,
             _config().forwardReturnData() ? dAppReturnData : new bytes(0)
         );
+        (success,) = solverOp.solver.call{ gas: gasLimit, value: solverOp.value }(solverCallData);
 
         // Verify that it was successful
         if (!success) {
@@ -277,7 +258,7 @@ contract ExecutionEnvironment is Base {
     ///////////////////////////////////////
     function withdrawERC20(address token, uint256 amount) external {
         require(msg.sender == _user(), "ERR-EC01 NotEnvironmentOwner");
-        require(ISafetyLocks(atlas).getLockState().lockState == 0, "ERR-EC15 EscrowLocked");
+        require(ISafetyLocks(atlas).isUnlocked(), "ERR-EC15 EscrowLocked");
 
         if (ERC20(token).balanceOf(address(this)) >= amount) {
             SafeTransferLib.safeTransfer(ERC20(token), msg.sender, amount);
@@ -289,7 +270,7 @@ contract ExecutionEnvironment is Base {
     function factoryWithdrawERC20(address msgSender, address token, uint256 amount) external {
         require(msg.sender == atlas, "ERR-EC10 NotFactory");
         require(msgSender == _user(), "ERR-EC11 NotEnvironmentOwner");
-        require(ISafetyLocks(atlas).getLockState().lockState == 0, "ERR-EC15 EscrowLocked");
+        require(ISafetyLocks(atlas).isUnlocked(), "ERR-EC15 EscrowLocked");
 
         if (ERC20(token).balanceOf(address(this)) >= amount) {
             SafeTransferLib.safeTransfer(ERC20(token), _user(), amount);
@@ -300,7 +281,7 @@ contract ExecutionEnvironment is Base {
 
     function withdrawEther(uint256 amount) external {
         require(msg.sender == _user(), "ERR-EC01 NotEnvironmentOwner");
-        require(ISafetyLocks(atlas).getLockState().lockState == 0, "ERR-EC15 EscrowLocked");
+        require(ISafetyLocks(atlas).isUnlocked(), "ERR-EC15 EscrowLocked");
 
         if (address(this).balance >= amount) {
             SafeTransferLib.safeTransferETH(msg.sender, amount);
@@ -312,7 +293,7 @@ contract ExecutionEnvironment is Base {
     function factoryWithdrawEther(address msgSender, uint256 amount) external {
         require(msg.sender == atlas, "ERR-EC10 NotFactory");
         require(msgSender == _user(), "ERR-EC11 NotEnvironmentOwner");
-        require(ISafetyLocks(atlas).getLockState().lockState == 0, "ERR-EC15 EscrowLocked");
+        require(ISafetyLocks(atlas).isUnlocked(), "ERR-EC15 EscrowLocked");
 
         if (address(this).balance >= amount) {
             SafeTransferLib.safeTransferETH(_user(), amount);

@@ -32,7 +32,6 @@ struct CallConfig {
     bool trackPreOpsReturnData;
     bool trackUserReturnData;
     bool delegateUser;
-    bool localUser;
     bool preSolver;
     bool postSolver;
     bool requirePostOps;
@@ -52,7 +51,6 @@ enum CallConfigIndex {
     TrackPreOpsReturnData,
     TrackUserReturnData,
     DelegateUser,
-    LocalUser,
     PreSolver,
     PostSolver,
     RequirePostOpsCall,

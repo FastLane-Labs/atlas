@@ -47,7 +47,11 @@ contract Mimic {
                 bytes32(uint256(0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee))
             )
         );
-        if (!success) revert();
+        if (!success) {
+            assembly {
+                revert(add(output, 32), mload(output))
+            }
+        }
         return output;
     }
 }

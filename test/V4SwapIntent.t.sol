@@ -12,6 +12,10 @@ import { SolverOperation } from "../src/contracts/types/SolverCallTypes.sol";
 import { UserOperation } from "../src/contracts/types/UserCallTypes.sol";
 import { DAppOperation, DAppConfig } from "../src/contracts/types/DAppApprovalTypes.sol";
 
+import { UserOperationBuilder } from "./base/builders/UserOperationBuilder.sol";
+import { SolverOperationBuilder } from "./base/builders/SolverOperationBuilder.sol";
+import { DAppOperationBuilder } from "./base/builders/DAppOperationBuilder.sol";
+
 import { V4SwapIntentController, SwapData } from "../src/contracts/examples/intents-example/V4SwapIntent.sol";
 import { SolverBase } from "../src/contracts/solver/SolverBase.sol";
 
@@ -49,7 +53,6 @@ contract V4SwapIntentTest is BaseTest {
         vm.startPrank(governanceEOA);
         swapIntentController = new V4SwapIntentController(address(escrow), address(poolManager));
         atlasVerification.initializeGovernance(address(swapIntentController));
-        atlasVerification.integrateDApp(address(swapIntentController));
         vm.stopPrank();
 
         txBuilder = new TxBuilder({
@@ -132,15 +135,17 @@ contract V4SwapIntentTest is BaseTest {
             })
         );
 
-        // Builds the metaTx and to parts of userOp, signature still to be set
-        userOp = txBuilder.buildUserOperation({
-            from: userEOA, // NOTE: Would from ever not be user?
-            to: address(swapIntentController),
-            maxFeePerGas: tx.gasprice + 1, // TODO update
-            value: 0,
-            deadline: block.number + 2,
-            data: userOpData
-        });
+        userOp = new UserOperationBuilder()
+            .withFrom(userEOA)
+            .withTo(address(atlas))
+            .withGas(1_000_000)
+            .withMaxFeePerGas(tx.gasprice + 1)
+            .withNonce(address(atlasVerification))
+            .withDapp(address(swapIntentController))
+            .withControl(address(swapIntentController))
+            .withDeadline(block.number + 2)
+            .withData(userOpData)
+            .build();
 
         SwapData memory swapData = SwapData({
             tokenIn: address(WETH),
@@ -158,25 +163,34 @@ contract V4SwapIntentTest is BaseTest {
         );
 
         // Builds the SolverOperation
-        solverOps[0] = txBuilder.buildSolverOperation({
-            userOp: userOp,
-            solverOpData: solverOpData,
-            solverEOA: solverOneEOA,
-            solverContract: address(solver),
-            bidAmount: 1e18,
-            value: 0
-        });
-
-        // Solver signs the solverOp
-        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
-        solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
+        solverOps[0] = new SolverOperationBuilder()
+            .withFrom(solverOneEOA)
+            .withTo(address(atlas))
+            .withGas(1_000_000)
+            .withMaxFeePerGas(userOp.maxFeePerGas)
+            .withDeadline(userOp.deadline)
+            .withSolver(address(solver))
+            .withControl(address(swapIntentController))
+            .withUserOpHash(userOp)
+            .withBidToken(userOp)
+            .withBidAmount(solverBid)
+            .withData(solverOpData)
+            .sign(address(atlasVerification), solverOnePK)
+            .build();
 
         // Frontend creates dAppOp calldata after seeing rest of data
-        dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
-
-        // Frontend signs the dAppOp payload
-        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
-        dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+        dAppOp = new DAppOperationBuilder()
+            .withFrom(governanceEOA)
+            .withTo(address(atlas))
+            .withGas(2_000_000)
+            .withMaxFeePerGas(userOp.maxFeePerGas)
+            .withNonce(address(atlasVerification), governanceEOA)
+            .withDeadline(userOp.deadline)
+            .withControl(address(swapIntentController))
+            .withUserOpHash(userOp)
+            .withCallChainHash(userOp, solverOps)
+            .sign(address(atlasVerification), governancePK)
+            .build();
 
         // Check user token balances before
         uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);
@@ -274,7 +288,6 @@ contract UniswapV4IntentSolver is SolverBase {
         );
 
         // Send min tokens back to user to fulfill intent, rest are profit for solver
-        address(0).staticcall(abi.encode(bid));
         ERC20(swap.tokenOut).transfer(
             executionEnvironment, swap.requestedAmount > 0 ? bid : uint256(-swap.requestedAmount)
         );

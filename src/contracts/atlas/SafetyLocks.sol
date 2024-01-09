@@ -81,4 +81,8 @@ abstract contract SafetyLocks is Storage, FastLaneErrorsEvents {
     function activeEnvironment() external view returns (address) {
         return lock;
     }
+
+    function isUnlocked() external view returns (bool) {
+        return lock == UNLOCKED;
+    }
 }

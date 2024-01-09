@@ -26,9 +26,8 @@ enum Party {
     DApp
 }
 
-enum SolverOutcome
-// future task tracking
-{
+enum SolverOutcome {
+    // future task tracking
     PendingUpdate,
     ExecutionCompleted,
     UpdateCompleted,
@@ -52,7 +51,6 @@ enum SolverOutcome
     // if they sent two we wouldn't be able to flag builder censorship
     InvalidFormat,
     // dApp / external user refund (TODO: keep?)
-    LostAuction, // a higher bidding solver was successful
     // call, with full user refund
     UnknownError,
     CallReverted,
