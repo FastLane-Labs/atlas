@@ -3,17 +3,17 @@ pragma solidity 0.8.21;
 
 import "forge-std/Test.sol";
 
-import { AtlasVerification } from "../src/contracts/atlas/AtlasVerification.sol";
-import { DAppConfig, DAppOperation, CallConfig } from "../src/contracts/types/DAppApprovalTypes.sol";
-import { UserOperation } from "../src/contracts/types/UserCallTypes.sol";
-import { SolverOperation } from "../src/contracts/types/SolverCallTypes.sol";
-import { ValidCallsResult } from "../src/contracts/types/ValidCallsTypes.sol";
-import { TxBuilder } from "../src/contracts/helpers/TxBuilder.sol";
+import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
+import { DAppConfig, DAppOperation, CallConfig } from "src/contracts/types/DAppApprovalTypes.sol";
+import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
+import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
+import { ValidCallsResult } from "src/contracts/types/ValidCallsTypes.sol";
+import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 import { DummyDAppControl } from "./base/DummyDAppControl.sol";
 import { AtlasBaseTest } from "./base/AtlasBaseTest.t.sol";
 import { SimpleRFQSolver } from "./SwapIntent.t.sol";
-import { CallVerification } from "../../src/contracts/libraries/CallVerification.sol";
-import { CallBits } from "../src/contracts/libraries/CallBits.sol";
+import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
+import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { DummyDAppControlBuilder } from "./helpers/DummyDAppControlBuilder.sol";
 import { CallConfigBuilder } from "./helpers/CallConfigBuilder.sol";
 import { UserOperationBuilder } from "./base/builders/UserOperationBuilder.sol";
