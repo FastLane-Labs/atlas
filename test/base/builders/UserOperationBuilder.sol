@@ -3,9 +3,9 @@ pragma solidity 0.8.21;
 
 import "forge-std/Test.sol";
 
-import { UserOperation } from "../../../src/contracts/types/UserCallTypes.sol";
+import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
 
-import { IAtlasVerification } from "../../../src/contracts/interfaces/IAtlasVerification.sol";
+import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
 
 contract UserOperationBuilder is Test {
     UserOperation userOperation;

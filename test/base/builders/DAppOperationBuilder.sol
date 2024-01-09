@@ -3,16 +3,16 @@ pragma solidity 0.8.21;
 
 import "forge-std/Test.sol";
 
-import { UserOperation } from "../../../src/contracts/types/UserCallTypes.sol";
-import { SolverOperation } from "../../../src/contracts/types/SolverCallTypes.sol";
-import { DAppOperation } from "../../../src/contracts/types/DAppApprovalTypes.sol";
+import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
+import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
+import { DAppOperation } from "src/contracts/types/DAppApprovalTypes.sol";
 
-import { CallVerification } from "../../../src/contracts/libraries/CallVerification.sol";
+import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 
-import { IDAppControl } from "../../../src/contracts/interfaces/IDAppControl.sol";
-import { IAtlasVerification } from "../../../src/contracts/interfaces/IAtlasVerification.sol";
+import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
+import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
 
-import "../../../src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/DAppApprovalTypes.sol";
 
 contract DAppOperationBuilder is Test {
     using CallVerification for UserOperation;

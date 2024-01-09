@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.21;
 
-import { CallConfig } from "../../src/contracts/types/DAppApprovalTypes.sol";
+import { CallConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 
 import "forge-std/Test.sol";
 
