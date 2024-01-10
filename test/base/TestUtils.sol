@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.21;
 
-import { IDAppControl } from "../../src/contracts/interfaces/IDAppControl.sol";
-import { Mimic } from "../../src/contracts/atlas/Mimic.sol";
+import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
+import { Mimic } from "src/contracts/atlas/Mimic.sol";
 
-import "../../src/contracts/types/UserCallTypes.sol";
-import "../../src/contracts/types/SolverCallTypes.sol";
-import "../../src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/UserCallTypes.sol";
+import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/DAppApprovalTypes.sol";
 
 library TestUtils {
     // String <> uint16 binary Converter Utility
