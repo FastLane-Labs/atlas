@@ -118,7 +118,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         bytes32 userOpHash = userOp.getUserOperationHash();
 
         for (uint256 i = 0; i < solverOpCount; i++) {
-            if (msgSender == solverOps[i].from || _verifySignature(solverOps[i])) {
+            if (msgSender == solverOps[i].from || _verifySolverSignature(solverOps[i])) {
                 // Validate solver signature
 
                 SolverOperation memory solverOp = solverOps[i];
@@ -191,7 +191,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
         payload = _hashTypedDataV4(_getSolverHash(solverOp));
     }
 
-    function _verifySignature(SolverOperation calldata solverOp) internal view returns (bool) {
+    function _verifySolverSignature(SolverOperation calldata solverOp) internal view returns (bool) {
+        if (solverOp.signature.length == 0) return false;
         address signer = _hashTypedDataV4(_getSolverHash(solverOp)).recover(solverOp.signature);
         return signer == solverOp.from;
     }
