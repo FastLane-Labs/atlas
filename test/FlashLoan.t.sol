@@ -44,7 +44,7 @@ contract FlashLoanTest is BaseTest {
 
         controller = new DummyController(address(escrow), WETH_ADDRESS);
         atlasVerification.initializeGovernance(address(controller));
-        atlasVerification.integrateDApp(address(controller));
+        vm.stopPrank();
 
         txBuilder = new TxBuilder({
             controller: address(controller),
@@ -52,14 +52,13 @@ contract FlashLoanTest is BaseTest {
             _verification: address(atlasVerification)
         });
 
-        vm.stopPrank();
     }
 
     function testFlashLoan() public {
         vm.startPrank(solverOneEOA);
         SimpleSolver solver = new SimpleSolver(WETH_ADDRESS, escrow);
         deal(WETH_ADDRESS, address(solver), 1e18); // 1 WETH to solver to pay bid
-        atlas.deposit{ value: 1e18 }(); // gas for solver to pay
+        atlas.bond(1 ether); // gas for solver to pay
         vm.stopPrank();
 
         vm.startPrank(userEOA);
@@ -108,7 +107,7 @@ contract FlashLoanTest is BaseTest {
         // make the actual atlas call that should revert
         vm.startPrank(userEOA);
         vm.expectEmit(true, true, true, true);
-        emit FastLaneErrorsEvents.SolverTxResult(address(solver), solverOneEOA, true, false, 1_048_578);
+        emit FastLaneErrorsEvents.SolverTxResult(address(solver), solverOneEOA, true, false, 1048578);
         vm.expectRevert();
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
@@ -133,7 +132,7 @@ contract FlashLoanTest is BaseTest {
         // Call again with partial payback, should still revert
         vm.startPrank(userEOA);
         vm.expectEmit(true, true, true, true);
-        emit FastLaneErrorsEvents.SolverTxResult(address(solver), solverOneEOA, true, false, 1_048_578);
+        emit FastLaneErrorsEvents.SolverTxResult(address(solver), solverOneEOA, true, false, 8388610);
         vm.expectRevert();
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
@@ -160,7 +159,7 @@ contract FlashLoanTest is BaseTest {
         uint256 userStartingETH = address(userEOA).balance;
 
         assertEq(solverStartingWETH, 1e18, "solver incorrect starting WETH");
-        assertEq(atlasStartingETH, 103e18, "atlas incorrect starting ETH"); // 2e initial + 1e solver + 100e user deposit
+        assertEq(atlasStartingETH, 102e18, "atlas incorrect starting ETH"); // 2e initial + 1e solver + 100e user deposit
 
         // Last call - should succeed
         vm.startPrank(userEOA);
@@ -196,7 +195,6 @@ contract DummyController is DAppControl {
                 requirePreOps: false,
                 trackPreOpsReturnData: false,
                 trackUserReturnData: false,
-                localUser: false,
                 delegateUser: true,
                 preSolver: false,
                 postSolver: false,
