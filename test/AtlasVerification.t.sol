@@ -939,7 +939,7 @@ contract AtlasVerificationTest is AtlasBaseTest {
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.Valid);
+        ), ValidCallsResult.DAppSignatureInvalid);
     }
 
     // TooManySolverOps cases
