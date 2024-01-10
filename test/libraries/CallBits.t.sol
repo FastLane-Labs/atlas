@@ -3,8 +3,8 @@ pragma solidity 0.8.21;
 
 import "forge-std/Test.sol";
 
-import { CallBits } from "../../src/contracts/libraries/CallBits.sol";
-import "../../src/contracts/types/UserCallTypes.sol";
+import { CallBits } from "src/contracts/libraries/CallBits.sol";
+import "src/contracts/types/UserCallTypes.sol";
 import "../base/TestUtils.sol";
 
 contract CallBitsTest is Test {

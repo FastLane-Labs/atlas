@@ -3,12 +3,12 @@ pragma solidity 0.8.21;
 
 import "forge-std/Test.sol";
 
-import { DAppIntegration } from "../src/contracts/atlas/DAppIntegration.sol";
-import { FastLaneErrorsEvents } from "../src/contracts/types/Emissions.sol";
+import { DAppIntegration } from "src/contracts/atlas/DAppIntegration.sol";
+import { FastLaneErrorsEvents } from "src/contracts/types/Emissions.sol";
 
 import { DummyDAppControl, CallConfigBuilder } from "./base/DummyDAppControl.sol";
 
-import "../src/contracts/types/GovernanceTypes.sol";
+import "src/contracts/types/GovernanceTypes.sol";
 
 contract MockDAppIntegration is DAppIntegration {
     constructor(address _atlas) DAppIntegration(_atlas) { }

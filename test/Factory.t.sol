@@ -3,11 +3,11 @@ pragma solidity 0.8.21;
 
 import "forge-std/Test.sol";
 
-import { Factory } from "../src/contracts/atlas/Factory.sol";
+import { Factory } from "src/contracts/atlas/Factory.sol";
 import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
 import { DummyDAppControl, CallConfigBuilder } from "./base/DummyDAppControl.sol";
 
-import "../src/contracts/types/UserCallTypes.sol";
+import "src/contracts/types/UserCallTypes.sol";
 
 import "./base/TestUtils.sol";
 
