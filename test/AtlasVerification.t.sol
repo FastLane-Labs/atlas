@@ -512,7 +512,7 @@ contract AtlasVerificationTest is AtlasBaseTest {
     //  and this is the first call for the user
     //
     function test_validCalls_SequencedNonceIsOne_Valid() public {
-        defaultAtlasEnvironment();
+        defaultAtlasWithCallConfig(defaultCallConfig().withSequenced(true).build());
 
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
