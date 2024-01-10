@@ -248,8 +248,6 @@ abstract contract Escrow is AtlETH {
             return uint256(SolverOutcome.IntentUnfulfilled);
         } else if (errorSwitch == SolverOperationReverted.selector) {
             return uint256(SolverOutcome.CallReverted);
-        } else if (errorSwitch == SolverFailedCallback.selector) {
-            return uint256(SolverOutcome.CallbackFailed);
         } else if (errorSwitch == AlteredControlHash.selector) {
             return uint256(SolverOutcome.InvalidControlHash);
         } else if (errorSwitch == PreSolverFailed.selector) {

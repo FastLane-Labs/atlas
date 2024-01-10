@@ -6,7 +6,10 @@ import "forge-std/Test.sol";
 import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 
 import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
-import { FastLaneErrorsEvents } from "../src/contracts/types/Emissions.sol";
+import { FastLaneErrorsEvents } from "src/contracts/types/Emissions.sol";
+import { CallBits } from "src/contracts/libraries/CallBits.sol";
+import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
+
 import { DummyDAppControl } from "./base/DummyDAppControl.sol";
 import { AtlasBaseTest } from "./base/AtlasBaseTest.t.sol";
 import { DummyDAppControlBuilder } from "./helpers/DummyDAppControlBuilder.sol";
@@ -14,12 +17,11 @@ import { CallConfigBuilder } from "./helpers/CallConfigBuilder.sol";
 import { UserOperationBuilder } from "./base/builders/UserOperationBuilder.sol";
 import { SolverOperationBuilder } from "./base/builders/SolverOperationBuilder.sol";
 import { DAppOperationBuilder } from "./base/builders/DAppOperationBuilder.sol";
-import { CallBits } from "../src/contracts/libraries/CallBits.sol";
 
-import "../src/contracts/types/UserCallTypes.sol";
-import "../src/contracts/types/SolverCallTypes.sol";
-import "../src/contracts/types/DAppApprovalTypes.sol";
-import "../src/contracts/types/EscrowTypes.sol";
+import "src/contracts/types/UserCallTypes.sol";
+import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/EscrowTypes.sol";
 
 contract EscrowTest is AtlasBaseTest {
     using CallBits for CallConfig;
@@ -118,6 +120,10 @@ contract EscrowTest is AtlasBaseTest {
 
         deal(address(dummySolver), defaultBidAmount);
     }
+
+    //
+    // ---- TESTS BEGIN HERE ---- //
+    //
 
     // Ensure the preOps hook is successfully called. To ensure the hooks' returned data is as expected, we forward it
     // to the solver call; the data field of the solverOperation contains the expected value, the check is made in the
@@ -250,7 +256,7 @@ contract EscrowTest is AtlasBaseTest {
         bool auctionWon = atlas.metacall(userOp, solverOps, dappOp);
         
         if (!revertExpected) {
-            assertTrue(auctionWon, "Auction should have been won");
+            assertTrue(auctionWon, "auction should have been won");
         }
     }
 
@@ -259,7 +265,7 @@ contract EscrowTest is AtlasBaseTest {
         // be filtered out by the AtlasVerification contract, before reaching executeSolverOperation.
         vm.skip(true);
 
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit();
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
         solverOps[0] = validSolverOperation(userOp)
             .withTo(invalid)
             .withBidAmount(defaultBidAmount)
@@ -271,19 +277,19 @@ contract EscrowTest is AtlasBaseTest {
         vm.prank(solverOneEOA);
         atlas.unbond(1); // This will set the solver's lastAccessedBlock to the current block
 
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit();
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
         executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.PerBlockLimit), true);
     }
 
     function test_executeSolverOperation_validateSolverOperation_insufficientEscrow() public {
-        vm.txGasPrice(1e70); // Set a gas price that will cause the solver to run out of escrow
+        vm.txGasPrice(1e50); // Set a gas price that will cause the solver to run out of escrow
 
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit();
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
         executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.InsufficientEscrow), true);
     }
 
     function test_executeSolverOperation_validateSolverOperation_callValueTooHigh() public {
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit();
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
         solverOps[0] = validSolverOperation(userOp)
             .withValue(100 ether) // Set a call value that is too high
             .withBidAmount(defaultBidAmount)
@@ -292,20 +298,20 @@ contract EscrowTest is AtlasBaseTest {
     }
 
     function test_executeSolverOperation_validateSolverOperation_userOutOfGas() public {
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit();
-        this.executeSolverOperationCase{gas: 2_000_000}(
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
+        this.executeSolverOperationCase{gas: EscrowBits.VALIDATION_GAS_LIMIT + EscrowBits.SOLVER_GAS_LIMIT + 1_000_000}(
             userOp, solverOps, false, false, 1 << uint256(SolverOutcome.UserOutOfGas), true
         );
     }
 
     function test_executeSolverOperation_solverOpWrapper_success() public {
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit();
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
         uint256 result = (1 << uint256(SolverOutcome.Success)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
         executeSolverOperationCase(userOp, solverOps, true, true, result, false);
     }
 
-    function test_executeSolverOperation_solverOpWrapper_bidNotPaid() public {
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit();
+    function test_executeSolverOperation_solverOpWrapper_solverBidUnpaid() public {
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
         solverOps[0] = validSolverOperation(userOp)
             .withBidAmount(defaultBidAmount * 2) // Solver's contract doesn't have that much
             .signAndBuild(address(atlasVerification), solverOnePK);
@@ -313,38 +319,102 @@ contract EscrowTest is AtlasBaseTest {
         executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
-    function test_executeSolverOperation_solverOpWrapper_callValueTooHigh() public {
-        // TODO: must find a way for the solver's contract not to call reconcile
-        // (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit();
-        // uint256 result = (1 << uint256(SolverOutcome.CallValueTooHigh)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
-        // executeSolverOperationCase(userOp, solverOps, true, false, result, true);
+    function test_executeSolverOperation_solverOpWrapper_solverMsgValueUnpaid() public {
+        uint256 bidAmount = dummySolver.noGasPayBack(); // Special bid value that will cause the solver to not call reconcile
+        deal(address(dummySolver), bidAmount);
+
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
+        solverOps[0] = validSolverOperation(userOp)
+            .withBidAmount(bidAmount)
+            .signAndBuild(address(atlasVerification), solverOnePK);
+        uint256 result = (1 << uint256(SolverOutcome.CallValueTooHigh)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
+        executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
     function test_executeSolverOperation_solverOpWrapper_intentUnfulfilled() public {
-        // TODO
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
+            defaultCallConfig()
+                .withTrackPreOpsReturnData(true)
+                .withTrackUserReturnData(true)
+                .withRequirePreOps(true)
+                .withPostSolver(true)
+                .build()
+        );
+        uint256 result = (1 << uint256(SolverOutcome.IntentUnfulfilled)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
+        executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
-    function test_executeSolverOperation_solverOpWrapper_callReverted() public {
-        // TODO
+    function test_executeSolverOperation_solverOpWrapper_solverOperationReverted() public {
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
+            defaultCallConfig()
+                .withTrackUserReturnData(true)
+                .withForwardReturnData(true)
+                .build()
+        );
+        solverOps[0] = validSolverOperation(userOp)
+            .withData(abi.encode(1))
+            .withBidAmount(defaultBidAmount)
+            .signAndBuild(address(atlasVerification), solverOnePK);
+        uint256 result = (1 << uint256(SolverOutcome.CallReverted)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
+        executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
-    function test_executeSolverOperation_solverOpWrapper_callbackFailed() public {
-        // TODO
-    }
-
-    function test_executeSolverOperation_solverOpWrapper_invalidControlHash() public {
-        // TODO
+    function test_executeSolverOperation_solverOpWrapper_alteredControlHash() public {
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
+        solverOps[0] = validSolverOperation(userOp)
+            .withControl(invalid) // Set an invalid dApp controller
+            .withBidAmount(defaultBidAmount)
+            .signAndBuild(address(atlasVerification), solverOnePK);
+        uint256 result = (1 << uint256(SolverOutcome.InvalidControlHash)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
+        executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
     function test_executeSolverOperation_solverOpWrapper_preSolverFailed() public {
-        // TODO
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
+            defaultCallConfig()
+                .withTrackPreOpsReturnData(true)
+                .withTrackUserReturnData(true)
+                .withRequirePreOps(true)
+                .withPreSolver(true)
+                .build()
+        );
+        uint256 result = (1 << uint256(SolverOutcome.PreSolverFailed)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
+        executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
-    function executeSolverOperationInit()
+    function test_executeSolverOperation_solverOpWrapper_postSolverFailed() public {
+        defaultAtlasWithCallConfig(
+            defaultCallConfig()
+                .withTrackPreOpsReturnData(true)
+                .withTrackUserReturnData(true)
+                .withRequirePreOps(true)
+                .withPostSolver(true)
+                .build()
+        );
+
+        UserOperation memory userOp = validUserOperation()
+            .withData(abi.encodeWithSelector(dAppControl.userOperationCall.selector, false, 1))
+            .signAndBuild(address(atlasVerification), userPK);
+        
+        SolverOperation[] memory solverOps = new SolverOperation[](1);
+        solverOps[0] = validSolverOperation(userOp)
+            .withBidAmount(defaultBidAmount)
+            .signAndBuild(address(atlasVerification), solverOnePK);
+        
+        uint256 result = (1 << uint256(SolverOutcome.IntentUnfulfilled)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
+        executeSolverOperationCase(userOp, solverOps, true, false, result, true);
+    }
+
+    function test_executeSolverOperation_solverOpWrapper_defaultCase() public {
+        // Can't find a way to reach the default case (which is a good thing)
+        vm.skip(true);
+    }
+
+    function executeSolverOperationInit(CallConfig memory callConfig)
         public
         returns (UserOperation memory userOp, SolverOperation[] memory solverOps)
     {
-        defaultAtlasWithCallConfig(defaultCallConfig().build());
+        defaultAtlasWithCallConfig(callConfig);
 
         userOp = validUserOperation()
             .withData(abi.encodeWithSelector(dAppControl.userOperationCall.selector, false, 0))
@@ -378,6 +448,7 @@ contract EscrowTest is AtlasBaseTest {
 }
 
 contract DummySolver {
+    uint256 public noGasPayBack = 123456789;
     address private _atlas;
 
     constructor(address atlas) {
@@ -393,12 +464,12 @@ contract DummySolver {
     )
         external
         payable
-        returns (bool success, bytes memory data)
+        returns (bool, bytes memory)
     {
         if (solverOpData.length > 0 && extraReturnData.length > 0) {
             (uint256 solverDataValue) = abi.decode(solverOpData, (uint256));
             (uint256 extraDataValue) = abi.decode(extraReturnData, (uint256));
-            require(solverDataValue == extraDataValue, "Solver data and extra data do not match");
+            require(solverDataValue == extraDataValue, "solver data and extra data do not match");
         }
 
         // Pay bid
@@ -407,9 +478,11 @@ contract DummySolver {
         }
 
         // Pay gas
-        uint256 shortfall = IEscrow(_atlas).shortfall();
-        IEscrow(_atlas).reconcile(msg.sender, sender, shortfall);
+        if (bidAmount != noGasPayBack) {
+            uint256 shortfall = IEscrow(_atlas).shortfall();
+            IEscrow(_atlas).reconcile(msg.sender, sender, shortfall);
+        }
 
-        success = true;
+        return (true, new bytes(0));
     }
 }

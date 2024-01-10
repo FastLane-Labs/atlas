@@ -18,7 +18,6 @@ contract FastLaneErrorsEvents {
     event MEVPaymentFailure(address indexed controller, uint32 callConfig, address bidToken, uint256 bidAmount);
 
     error SolverBidUnpaid();
-    error SolverFailedCallback();
     error SolverMsgValueUnpaid();
     error SolverOperationReverted();
     error SolverEVMError();
