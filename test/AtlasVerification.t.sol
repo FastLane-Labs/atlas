@@ -1299,8 +1299,8 @@ contract AtlasVerificationTest is AtlasBaseTest {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.NoSolverOp);
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: true}
+        ), ValidCallsResult.Valid);
     }
 
     //
