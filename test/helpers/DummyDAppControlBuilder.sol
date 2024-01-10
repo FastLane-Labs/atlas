@@ -40,7 +40,6 @@ contract DummyDAppControlBuilder is Test {
         vm.startPrank(governance);
         DummyDAppControl control = build();
         verification.initializeGovernance(address(control));
-        verification.integrateDApp(address(control));
         vm.stopPrank();
         return control;
     }

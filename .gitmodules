@@ -9,9 +9,3 @@
 	path = lib/openzeppelin-contracts
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts
 	branch = release-v4.8
-[submodule "lib/periphery-next"]
-	path = lib/periphery-next
-	url = https://github.com/Uniswap/periphery-next
-[submodule "lib/v4-core"]
-	path = lib/v4-core
-	url = https://github.com/Uniswap/v4-core

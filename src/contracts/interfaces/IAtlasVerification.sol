@@ -38,7 +38,6 @@ interface IAtlasVerification {
     function initializeGovernance(address controller) external;
     function addSignatory(address controller, address signatory) external;
     function removeSignatory(address controller, address signatory) external;
-    function integrateDApp(address dAppControl) external;
     function disableDApp(address dAppControl) external;
 
     function initializeNonce(address account) external;
