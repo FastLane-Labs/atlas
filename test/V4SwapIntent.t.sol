@@ -6,18 +6,18 @@ import "forge-std/Test.sol";
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
-import { TxBuilder } from "../src/contracts/helpers/TxBuilder.sol";
+import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 
-import { SolverOperation } from "../src/contracts/types/SolverCallTypes.sol";
-import { UserOperation } from "../src/contracts/types/UserCallTypes.sol";
-import { DAppOperation, DAppConfig } from "../src/contracts/types/DAppApprovalTypes.sol";
+import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
+import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
+import { DAppOperation, DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 
 import { UserOperationBuilder } from "./base/builders/UserOperationBuilder.sol";
 import { SolverOperationBuilder } from "./base/builders/SolverOperationBuilder.sol";
 import { DAppOperationBuilder } from "./base/builders/DAppOperationBuilder.sol";
 
-import { V4SwapIntentController, SwapData } from "../src/contracts/examples/intents-example/V4SwapIntent.sol";
-import { SolverBase } from "../src/contracts/solver/SolverBase.sol";
+import { V4SwapIntentController, SwapData } from "src/contracts/examples/intents-example/V4SwapIntent.sol";
+import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
 import { PoolManager, IPoolManager, PoolKey, Currency, IHooks } from "v4-core/PoolManager.sol";
 
