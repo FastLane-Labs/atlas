@@ -4,25 +4,27 @@ pragma solidity 0.8.22;
 import "forge-std/Test.sol";
 
 import { ERC20 } from "solmate/tokens/ERC20.sol";
-import { TxBuilder } from "../src/contracts/helpers/TxBuilder.sol";
+import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { ArbitrageTest } from "./base/ArbitrageTest.t.sol";
-import { SolverBase } from "../src/contracts/solver/SolverBase.sol";
-import { DAppControl } from "../src/contracts/dapp/DAppControl.sol";
-import { CallConfig } from "../src/contracts/types/DAppApprovalTypes.sol";
-import { UserOperation } from "../src/contracts/types/UserCallTypes.sol";
-import { SolverOperation } from "../src/contracts/types/SolverCallTypes.sol";
-import { DAppOperation } from "../src/contracts/types/DAppApprovalTypes.sol";
-import { FastLaneErrorsEvents } from "../src/contracts/types/Emissions.sol";
-import { IEscrow } from "../src/contracts/interfaces/IEscrow.sol";
+import { SolverBase } from "src/contracts/solver/SolverBase.sol";
+import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
+import { CallConfig } from "src/contracts/types/DAppApprovalTypes.sol";
+import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
+import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
+import { DAppOperation } from "src/contracts/types/DAppApprovalTypes.sol";
+import { FastLaneErrorsEvents } from "src/contracts/types/Emissions.sol";
+import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
+import { UserOperationBuilder } from "./base/builders/UserOperationBuilder.sol";
+import { SolverOperationBuilder } from "./base/builders/SolverOperationBuilder.sol";
+import { DAppOperationBuilder } from "./base/builders/DAppOperationBuilder.sol";
 
 interface IWETH {
     function withdraw(uint256 wad) external;
 }
 
 contract FlashLoanTest is BaseTest {
-    DummyController public controller;
-    TxBuilder public txBuilder;
+    DummyDAppControlBuilder public controller;
 
     struct Sig {
         uint8 v;
@@ -42,16 +44,9 @@ contract FlashLoanTest is BaseTest {
         // Deploy
         vm.startPrank(governanceEOA);
 
-        controller = new DummyController(address(escrow), WETH_ADDRESS);
+        controller = new DummyDAppControlBuilder(address(escrow), WETH_ADDRESS);
         atlasVerification.initializeGovernance(address(controller));
         vm.stopPrank();
-
-        txBuilder = new TxBuilder({
-            controller: address(controller),
-            atlasAddress: address(atlas),
-            _verification: address(atlasVerification)
-        });
-
     }
 
     function testFlashLoan() public {
@@ -68,37 +63,51 @@ contract FlashLoanTest is BaseTest {
 
         // Input params for Atlas.metacall() - will be populated below
 
-        vm.startPrank(userEOA);
-        address executionEnvironment = atlas.createExecutionEnvironment(txBuilder.control());
-        console.log("executionEnvironment a", executionEnvironment);
-        vm.stopPrank();
-        vm.label(address(executionEnvironment), "EXECUTION ENV");
-
-        UserOperation memory userOp = txBuilder.buildUserOperation({
-            from: userEOA, // NOTE: Would from ever not be user?
-            to: address(controller),
-            maxFeePerGas: tx.gasprice + 1, // TODO update
-            value: 0,
-            deadline: block.number + 2,
-            data: new bytes(0)
-        });
+        UserOperation memory userOp = new UserOperationBuilder()
+            .withFrom(userEOA)
+            .withTo(address(atlas))
+            .withGas(1_000_000)
+            .withNonce(address(atlasVerification))
+            .withDapp(address(controller))
+            .withControl(address(controller))
+            .withDeadline(block.number + 2)
+            .withData(new bytes(0))
+            .build();
 
         SolverOperation[] memory solverOps = new SolverOperation[](1);
-        solverOps[0] = txBuilder.buildSolverOperation({
-            userOp: userOp,
-            solverOpData: abi.encodeWithSelector(SimpleSolver.noPayback.selector),
-            solverEOA: solverOneEOA,
-            solverContract: address(solver),
-            bidAmount: 1e18,
-            value: 10e18
-        });
+        solverOps[0] = new SolverOperationBuilder()
+            .withFrom(solverOneEOA)
+            .withTo(address(atlas))
+            .withGas(1_000_000)
+            .withMaxFeePerGas(userOp.maxFeePerGas)
+            .withDeadline(userOp.deadline)
+            .withSolver(address(solver))
+            .withControl(address(controller))
+            .withUserOpHash(userOp)
+            .withBidToken(userOp)
+            .withBidAmount(1e18)
+            .withData(abi.encodeWithSelector(SimpleSolver.noPayback.selector))
+            .withValue(10e18)
+            .sign(address(atlasVerification), solverOnePK)
+            .build();
 
         // Solver signs the solverOp
         (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Frontend creates dAppOp calldata after seeing rest of data
-        DAppOperation memory dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
+        DAppOperation memory dAppOp = new DAppOperationBuilder()
+            .withFrom(governanceEOA)
+            .withTo(address(atlas))
+            .withGas(2_000_000)
+            .withMaxFeePerGas(userOp.maxFeePerGas)
+            .withNonce(address(atlasVerification), governanceEOA)
+            .withDeadline(userOp.deadline)
+            .withControl(address(controller))
+            .withUserOpHash(userOp)
+            .withCallChainHash(userOp, solverOps)
+            .sign(address(atlasVerification), governancePK)
+            .build();
 
         // Frontend signs the dAppOp payload
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
@@ -113,19 +122,38 @@ contract FlashLoanTest is BaseTest {
         vm.stopPrank();
 
         // now try it again with a valid solverOp - but dont fully pay back
-        solverOps[0] = txBuilder.buildSolverOperation({
-            userOp: userOp,
-            solverOpData: abi.encodeWithSelector(SimpleSolver.onlyPayBid.selector, 1e18),
-            solverEOA: solverOneEOA,
-            solverContract: address(solver),
-            bidAmount: 1e18,
-            value: 10e18
-        });
+        solverOps[0] = new SolverOperationBuilder()
+            .withFrom(solverOneEOA)
+            .withTo(address(atlas))
+            .withGas(1_000_000)
+            .withMaxFeePerGas(userOp.maxFeePerGas)
+            .withDeadline(userOp.deadline)
+            .withSolver(address(solver))
+            .withControl(address(controller))
+            .withUserOpHash(userOp)
+            .withBidToken(userOp)
+            .withBidAmount(1e18)
+            .withData(abi.encodeWithSelector(SimpleSolver.onlyPayBid.selector, 1e18))
+            .withValue(10e18)
+            .sign(address(atlasVerification), solverOnePK)
+            .build();
 
         (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-        dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
+        dAppOp = new DAppOperationBuilder()
+            .withFrom(governanceEOA)
+            .withTo(address(atlas))
+            .withGas(2_000_000)
+            .withMaxFeePerGas(userOp.maxFeePerGas)
+            .withNonce(address(atlasVerification), governanceEOA)
+            .withDeadline(userOp.deadline)
+            .withControl(address(controller))
+            .withUserOpHash(userOp)
+            .withCallChainHash(userOp, solverOps)
+            .sign(address(atlasVerification), governancePK)
+            .build();
+            
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
@@ -138,19 +166,38 @@ contract FlashLoanTest is BaseTest {
         vm.stopPrank();
 
         // final try, should be successful with full payback
-        solverOps[0] = txBuilder.buildSolverOperation({
-            userOp: userOp,
-            solverOpData: abi.encodeWithSelector(SimpleSolver.payback.selector, 1e18),
-            solverEOA: solverOneEOA,
-            solverContract: address(solver),
-            bidAmount: 1e18,
-            value: 10e18
-        });
+        solverOps[0] = new SolverOperationBuilder()
+            .withFrom(solverOneEOA)
+            .withTo(address(atlas))
+            .withGas(1_000_000)
+            .withMaxFeePerGas(userOp.maxFeePerGas)
+            .withDeadline(userOp.deadline)
+            .withSolver(address(solver))
+            .withControl(address(controller))
+            .withUserOpHash(userOp)
+            .withBidToken(userOp)
+            .withBidAmount(1e18)
+            .withData(abi.encodeWithSelector(SimpleSolver.payback.selector, 1e18))
+            .withValue(10e18)
+            .sign(address(atlasVerification), solverOnePK)
+            .build();
 
         (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-        dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
+        dAppOp = new DAppOperationBuilder()
+            .withFrom(governanceEOA)
+            .withTo(address(atlas))
+            .withGas(2_000_000)
+            .withMaxFeePerGas(userOp.maxFeePerGas)
+            .withNonce(address(atlasVerification), governanceEOA)
+            .withDeadline(userOp.deadline)
+            .withControl(address(controller))
+            .withUserOpHash(userOp)
+            .withCallChainHash(userOp, solverOps)
+            .sign(address(atlasVerification), governancePK)
+            .build();
+            
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
@@ -180,7 +227,7 @@ contract FlashLoanTest is BaseTest {
     }
 }
 
-contract DummyController is DAppControl {
+contract DummyDAppControlBuilder is DAppControl {
     address immutable weth;
 
     constructor(
