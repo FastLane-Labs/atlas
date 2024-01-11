@@ -291,7 +291,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // NOTE: allowing only sequenced nonces could create a scenario in
         // which builders or validators may be able to profit via censorship.
         // DApps are encouraged to rely on the deadline parameter.
-        if (!_handleNonces(dAppOp.from, dAppOp.nonce, dConfig.callConfig.needsSequencedNonces(), isSimulation)) {
+        if (!_handleNonces(dAppOp.from, dAppOp.nonce, !dConfig.callConfig.needsSequencedNonces(), isSimulation)) {
             return (false);
         }
 
@@ -379,12 +379,12 @@ contract AtlasVerification is EIP712, DAppIntegration {
             }
         }
 
-        if (bitmapNonce > uint256(239) || !async) {
+        if (bitmapNonce > 239 || !async) {
             bool updateTracker;
 
-            if (bitmapIndex > highestFullBitmap) {
+            if (bitmapIndex > highestFullBitmap + 1) {
                 updateTracker = true;
-                highestFullBitmap = bitmapIndex;
+                highestFullBitmap = bitmapIndex - 1;
             }
 
             if (bitmapIndex + 2 > lowestEmptyBitmap) {
@@ -425,7 +425,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
         address signer = _hashTypedDataV4(_getProofHash(dAppOp)).recover(dAppOp.signature);
 
         return signer == dAppOp.from;
-        // return true;
     }
 
     function getDAppOperationPayload(DAppOperation memory dAppOp) public view returns (bytes32 payload) {
@@ -469,7 +468,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // which builders or validators may be able to profit via censorship.
         // DApps are encouraged to rely on the deadline parameter
         // to prevent replay attacks.
-        if (!_handleNonces(userOp.from, userOp.nonce, dConfig.callConfig.needsSequencedNonces(), isSimulation)) {
+        if (!_handleNonces(userOp.from, userOp.nonce, !dConfig.callConfig.needsSequencedNonces(), isSimulation)) {
             return false;
         }
 
