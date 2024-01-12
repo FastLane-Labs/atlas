@@ -10,6 +10,7 @@ import { ArbitrageTest } from "./base/ArbitrageTest.t.sol";
 import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 import { CallConfig } from "src/contracts/types/DAppApprovalTypes.sol";
+import { SolverOutcome } from "src/contracts/types/EscrowTypes.sol";
 import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
 import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
 import { DAppOperation } from "src/contracts/types/DAppApprovalTypes.sol";
@@ -67,6 +68,7 @@ contract FlashLoanTest is BaseTest {
             .withFrom(userEOA)
             .withTo(address(atlas))
             .withGas(1_000_000)
+            .withMaxFeePerGas(tx.gasprice + 1)
             .withNonce(address(atlasVerification))
             .withDapp(address(controller))
             .withControl(address(controller))
@@ -116,7 +118,8 @@ contract FlashLoanTest is BaseTest {
         // make the actual atlas call that should revert
         vm.startPrank(userEOA);
         vm.expectEmit(true, true, true, true);
-        emit FastLaneErrorsEvents.SolverTxResult(address(solver), solverOneEOA, true, false, 1048578);
+        uint256 result = (1 << uint256(SolverOutcome.BidNotPaid)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
+        emit FastLaneErrorsEvents.SolverTxResult(address(solver), solverOneEOA, true, false, result);
         vm.expectRevert();
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
@@ -160,7 +163,8 @@ contract FlashLoanTest is BaseTest {
         // Call again with partial payback, should still revert
         vm.startPrank(userEOA);
         vm.expectEmit(true, true, true, true);
-        emit FastLaneErrorsEvents.SolverTxResult(address(solver), solverOneEOA, true, false, 8388610);
+        result = (1 << uint256(SolverOutcome.CallValueTooHigh)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
+        emit FastLaneErrorsEvents.SolverTxResult(address(solver), solverOneEOA, true, false, result);
         vm.expectRevert();
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
@@ -197,7 +201,7 @@ contract FlashLoanTest is BaseTest {
             .withCallChainHash(userOp, solverOps)
             .sign(address(atlasVerification), governancePK)
             .build();
-            
+
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
@@ -210,6 +214,9 @@ contract FlashLoanTest is BaseTest {
 
         // Last call - should succeed
         vm.startPrank(userEOA);
+        result = (1 << uint256(SolverOutcome.Success)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
+        vm.expectEmit(true, true, true, true);
+        emit FastLaneErrorsEvents.SolverTxResult(address(solver), solverOneEOA, true, true, result);
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
 
@@ -222,7 +229,7 @@ contract FlashLoanTest is BaseTest {
         console.log("userETH", userStartingETH, userEndingETH);
 
         assertEq(solverEndingWETH, 0, "solver WETH not used");
-        // assertEq(atlasEndingETH - atlasStartingETH, 999612266500000000, "atlas incorrect ending ETH"); // atlas should receive bid
+        assertEq(atlasEndingETH - atlasStartingETH, 999424451125000000, "atlas incorrect ending ETH"); // atlas should receive bid
 
     }
 }
