@@ -8,10 +8,8 @@ import { DAppConfig, DAppOperation, CallConfig } from "src/contracts/types/DAppA
 import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
 import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
 import { ValidCallsResult } from "src/contracts/types/ValidCallsTypes.sol";
-import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 import { DummyDAppControl } from "./base/DummyDAppControl.sol";
 import { AtlasBaseTest } from "./base/AtlasBaseTest.t.sol";
-import { SimpleRFQSolver } from "./SwapIntent.t.sol";
 import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { DummyDAppControlBuilder } from "./helpers/DummyDAppControlBuilder.sol";
@@ -20,19 +18,23 @@ import { UserOperationBuilder } from "./base/builders/UserOperationBuilder.sol";
 import { SolverOperationBuilder } from "./base/builders/SolverOperationBuilder.sol";
 import { DAppOperationBuilder } from "./base/builders/DAppOperationBuilder.sol";
 
+// 
+// ---- TEST HELPERS BEGIN HERE ---- //
+// --- (Also used in other files) --- //
+// - Scroll down for the actual tests - //
+//
 
-struct ValidCallsCall {
-    UserOperation userOp;
-    SolverOperation[] solverOps;
-    DAppOperation dAppOp;
-    uint256 msgValue;
-    address msgSender;
-    bool isSimulation;
-}
-
-
-contract AtlasVerificationTest is AtlasBaseTest {
+contract AtlasVerificationBase is AtlasBaseTest {
     DummyDAppControl dAppControl;
+
+    struct ValidCallsCall {
+        UserOperation userOp;
+        SolverOperation[] solverOps;
+        DAppOperation dAppOp;
+        uint256 msgValue;
+        address msgSender;
+        bool isSimulation;
+    }
 
     function defaultCallConfig() public returns (CallConfigBuilder) {
         return new CallConfigBuilder();
@@ -153,10 +155,13 @@ contract AtlasVerificationTest is AtlasBaseTest {
         AtlasBaseTest.setUp();
         dAppControl = defaultDAppControl().withCallConfig(callConfig).buildAndIntegrate(atlasVerification);
     }
+}
 
-    //
-    // ---- TESTS BEGIN HERE ---- //
-    //
+//
+// ---- TESTS BEGIN HERE ---- //
+//
+
+contract AtlasVerificationTest is AtlasVerificationBase {
 
     // Valid cases
 
@@ -574,6 +579,8 @@ contract AtlasVerificationTest is AtlasBaseTest {
         doValidCalls(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
+
+        console.log("\nTX 2\n");
 
         // this is the actual testcase
         userOp = validUserOperation().build();
@@ -1365,5 +1372,4 @@ contract AtlasVerificationTest is AtlasBaseTest {
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.NoSolverOp);
     }
-
 }
