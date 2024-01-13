@@ -12,6 +12,10 @@ import { AtlasVerificationBase } from "./AtlasVerification.t.sol";
 
 contract AtlasVerificationNoncesTest is AtlasVerificationBase {
 
+    // Q: Why track lowestEmptyBitmap and highestFullBitmap?
+    // A:   - lowestEmptyBitmap = ??
+    //      - highestFullBitmap = to calc getNextNonce (highestFullBitmap * 240) + highestUsedNonce
+    // --> can we just track highestFullBitmap and highestUsedNonce?
 
 
     function testFirstTenNonces_Sequenced() public {
@@ -28,6 +32,36 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         for (uint256 i = 0; i < 10; i++) {
             // TODO make calls, check nonces
         }
-    } 
+    }
+
+    function test_bitmap2UsedAfterBitmap1Fulled_Sequenced() public {}
+
+    function test_bitmap3UsedAfterBitmap2Fulled_Sequenced() public {
+        // Use nonce 1 in bitmap 1
+        // Use nonce 239 in bitmap 1 (last in bitmap)
+        // Next nonce is 240, which should tick over to bitmap 2
+        // Use nonce 279 in bitmap 2 (last in bitmap)
+        // Next nonce is 280, which should tick over to bitmap 3
+    }
+
+    function test_emptyNoncesInUsedBitmapsCanBeUsed() public {
+        // Use nonce 1 in bitmap 1
+        // Use nonce 239 in bitmap 1 (last in bitmap)
+        // Try using nonce 2 in bitmap 1, should work - unused
+        // Next nonce is 240, which should tick over to bitmap 2
+        // Try using nonce 3 in bitmap 1, should work - unused
+    }
+
+    // does this need sequenced and non sequenced versions?
+    function test_usedNoncesCannotBeReused() public {
+        // Test nonce 1 works, uses bitmap 1
+        // Test using nonce 1 again fails
+        // Test nonce 2 works, uses bitmap 1
+        // Test using nonce 2 again fails
+        // Jump to bitmap 2
+        // Test nonce x works, uses bitmap 2
+        // Test using nonce x again fails
+        // Test using nonce 1 in bitmap 1 still fails
+    }
    
 }
