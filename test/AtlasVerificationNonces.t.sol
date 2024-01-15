@@ -18,20 +18,37 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
     // --> can we just track highestFullBitmap and highestUsedNonce?
 
 
-    function testFirstTenNonces_Sequenced() public {
+    function testFirstEightNonces_Sequenced() public {
         defaultAtlasWithCallConfig(defaultCallConfig().withSequenced(true).build());
+
+        console.log("next gov nonce: ", atlasVerification.getNextNonce(governanceEOA), "\n");
         
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).signAndBuild(address(atlasVerification), governancePK);
+        // First call initializes at nonce = 1
         doValidCalls(AtlasVerificationBase.ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
 
+        // Testing nonces 2 - 8
+        for (uint256 i = 2; i < 9; i++) {
 
-        for (uint256 i = 0; i < 10; i++) {
-            // TODO make calls, check nonces
+            console.log("next gov nonce: ", atlasVerification.getNextNonce(governanceEOA));
+            console.log("\nTX ", i, "\n");
+
+            assertEq(atlasVerification.getNextNonce(governanceEOA), i, "Next nonce not incrementing as expected");
+            
+
+            userOp = validUserOperation().build();
+            solverOps = validSolverOperations(userOp);
+            dappOp = validDAppOperation(userOp, solverOps).withNonce(i).signAndBuild(address(atlasVerification), governancePK);
+            callAndAssert(ValidCallsCall({
+                userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+            ), ValidCallsResult.Valid);
         }
+        
+        assertEq(atlasVerification.getNextNonce(governanceEOA), 9, "Next nonce should be 9 after 8 seq nonces used");
     }
 
     function test_bitmap2UsedAfterBitmap1Fulled_Sequenced() public {}
@@ -52,7 +69,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         // Try using nonce 3 in bitmap 1, should work - unused
     }
 
-    // does this need sequenced and non sequenced versions?
+    // does this need sequenced and non sequenced versions? - YES
     function test_usedNoncesCannotBeReused() public {
         // Test nonce 1 works, uses bitmap 1
         // Test using nonce 1 again fails

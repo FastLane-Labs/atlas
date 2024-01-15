@@ -39,6 +39,14 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
     constructor(address _atlas) EIP712("ProtoCallHandler", "0.0.1") DAppIntegration(_atlas) { }
 
+    // TODO delete this
+    function logIfGov(address account, string memory message, address addrToLog, uint256 uintToLog) internal {
+        if(account == 0x97663E0c017FE7194C5D5c0b03D9BE6B54f4aF38){
+            if(addrToLog != address(0)) console.log("GOV:", message, addrToLog);
+            else console.log("GOV:", message, uintToLog);
+        }
+    }
+
     function validCalls(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
@@ -307,10 +315,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
         internal
         returns (bool validNonce)
     {
-        console.log("account:", account);
-        console.log("nonce:", nonce);
-        console.log("async:", async);
-        console.log("isSimulation:", isSimulation);
+        logIfGov(account, "account:", account, 0);
+        logIfGov(account, "nonce:", address(0), nonce);
 
         if (nonce > type(uint128).max - 1) {
             return false;
@@ -327,10 +333,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
         }
 
         uint256 bitmapIndex = (nonce / 240) + 1; // +1 because highestFullBitmap initializes at 0
-        uint256 bitmapNonce = (nonce % 240) + 1;
+        uint256 bitmapNonce = (nonce % 240) + 1; // TODO if 1 passed as nonce, this should be 1 right?
 
-        console.log("bitmapIndex:", bitmapIndex);
-        console.log("bitmapNonce:", bitmapNonce);
+        logIfGov(account, "bitmapIndex:", address(0), bitmapIndex);
+        logIfGov(account, "bitmapNonce:", address(0), bitmapNonce);
 
         bytes32 bitmapKey = keccak256(abi.encode(account, bitmapIndex));
 
@@ -350,9 +356,9 @@ contract AtlasVerification is EIP712, DAppIntegration {
         if (bitmap == 0) {
             // Current bitmap is empty, but about to be used.
             // So increment lowest empty bitmap index to the next one
-            console.log("bitmap == 0:", bitmapIndex + 1);
-            console.log("Updating lowestEmptyBitmap from", asyncNonceBitIndex[account].LowestEmptyBitmap);
-            console.log("to", bitmapIndex + 1);
+            logIfGov(account, "bitmap == 0 at bitmap idx:", address(0), bitmapIndex);
+            logIfGov(account, "Updating lowestEmptyBitmap from:", address(0), asyncNonceBitIndex[account].LowestEmptyBitmap);
+            logIfGov(account, "to:", address(0), bitmapIndex + 1);
 
             asyncNonceBitIndex[account].LowestEmptyBitmap = uint128(bitmapIndex + 1);
         }
@@ -389,16 +395,20 @@ contract AtlasVerification is EIP712, DAppIntegration {
         uint256 highestFullBitmap = uint256(nonceTracker.HighestFullBitmap);
         uint256 lowestEmptyBitmap = uint256(nonceTracker.LowestEmptyBitmap);
 
-        console.log("highestFullBitmap:", highestFullBitmap);
-        console.log("lowestEmptyBitmap:", lowestEmptyBitmap);
+        logIfGov(account, "highestFullBitmap:", address(0), highestFullBitmap);
+        logIfGov(account, "curr bitmapIndex:", address(0), bitmapIndex);
+        logIfGov(account, "curr bitmapNonce:", address(0), bitmapNonce);
+        logIfGov(account, "lowestEmptyBitmap:", address(0), lowestEmptyBitmap);
+        // console.log("highestFullBitmap:", highestFullBitmap);
+        // console.log("lowestEmptyBitmap:", lowestEmptyBitmap);
 
         // Handle sequential nonce logic
         if (!async) {
             // TODO remove this completely if working
-            if (bitmapIndex != highestFullBitmap + 1) {
-                console.log("FALSE 1: bitmapIndex != highestFullBitmap + 1");
-                return false;
-            }
+            // if (bitmapIndex != highestFullBitmap + 1) {
+            //     console.log("FALSE 1: bitmapIndex != highestFullBitmap + 1");
+            //     return false;
+            // }
 
             if (bitmapNonce != highestUsedBitmapNonce + 1) {
                 console.log("FALSE 2: bitmapNonce != highestUsedBitmapNonce + 1");
@@ -409,16 +419,17 @@ contract AtlasVerification is EIP712, DAppIntegration {
         if (bitmapNonce > 239 || !async) {
             bool updateTracker;
 
-            // Prev working version:
-            // if (bitmapIndex > highestFullBitmap + 1) {
-            //     updateTracker = true;
-            //     highestFullBitmap = bitmapIndex - 1;
-            // }
-
-            if (bitmapIndex > highestFullBitmap) {
+            // If 
+            if (bitmapIndex > highestFullBitmap + 1) {
                 updateTracker = true;
-                highestFullBitmap = bitmapIndex;
+                highestFullBitmap = bitmapIndex - 1;
             }
+
+            // TODO original version - maybe needed
+            // if (bitmapIndex > highestFullBitmap) {
+            //     updateTracker = true;
+            //     highestFullBitmap = bitmapIndex;
+            // }
 
             if (bitmapIndex + 2 > lowestEmptyBitmap) {
                 updateTracker = true;
