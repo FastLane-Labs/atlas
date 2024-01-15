@@ -548,6 +548,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         payload = _hashTypedDataV4(_getProofHash(userOp));
     }
 
+    // TODO delete this when new version ready
     function getNextNonce(address account) external view returns (uint256 nextNonce) {
         NonceTracker memory nonceTracker = nonceTrackers[account];
 
@@ -565,5 +566,27 @@ contract AtlasVerification is EIP712, DAppIntegration {
         uint256 highestUsedNonce = uint256(nonceBitmap.highestUsedNonce); //  has a +1 offset
 
         nextNonce = ((nextBitmapIndex - 1) * 240) + highestUsedNonce;
+    }
+
+    function getNextNonce(address account, bool sequenced) external view returns (uint256) {
+        NonceTracker memory nonceTracker = nonceTrackers[account];
+
+        // NOTE: No concept of uninitialized accounts:
+        // - seq and async nonces are ready to go with every account without any initialization
+
+        if(sequenced) {
+            return nonceTracker.LastUsedSeqNonce + 1;
+        } else {
+            // TODO retrieve the next free nonce in the lowest non-full bitmap
+            // keep lowest full bitmap updated in _updateNonceTracker
+            //     but always check from last full bitmap and increment - no skipping for lowest full bitmap
+
+            // Async bitmaps start at index 1. I.e. accounts start with bitmap 0 = HighestFullAsyncBitmap
+            bytes32 bitmapKey = keccak256(abi.encode(account, nonceTracker.HighestFullBitmap + 1));
+            NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
+
+            // TODO Re-check that highestUsedNonce and HighestFullBitmap are always reliable
+            return ((nonceTracker.HighestFullBitmap * 240) + nonceBitmap.highestUsedNonce + 1);
+        }
     }
 }
