@@ -340,7 +340,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         bytes32 bitmapKey = keccak256(abi.encode(account, bitmapIndex));
 
-        NonceBitmap memory nonceBitmap = asyncNonceBitmap[bitmapKey];
+        NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
 
         uint256 bitmap = uint256(nonceBitmap.bitmap);
         // Check if the nonce has already been used
@@ -357,10 +357,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
             // Current bitmap is empty, but about to be used.
             // So increment lowest empty bitmap index to the next one
             logIfGov(account, "bitmap == 0 at bitmap idx:", address(0), bitmapIndex);
-            logIfGov(account, "Updating lowestEmptyBitmap from:", address(0), asyncNonceBitIndex[account].LowestEmptyBitmap);
+            logIfGov(account, "Updating lowestEmptyBitmap from:", address(0), nonceTrackers[account].LowestEmptyBitmap);
             logIfGov(account, "to:", address(0), bitmapIndex + 1);
 
-            asyncNonceBitIndex[account].LowestEmptyBitmap = uint128(bitmapIndex + 1);
+            nonceTrackers[account].LowestEmptyBitmap = uint128(bitmapIndex + 1);
         }
 
         // TODO check if caching this shifted nonce in a var is cheaper - already done above
@@ -374,7 +374,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         }
 
         // Update the nonceBitmap
-        asyncNonceBitmap[bitmapKey] = nonceBitmap;
+        nonceBitmaps[bitmapKey] = nonceBitmap;
 
         // Update the nonce tracker
         return _updateNonceTracker(account, highestUsedBitmapNonce, bitmapIndex, bitmapNonce, async);
@@ -390,7 +390,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         internal
         returns (bool)
     {
-        NonceTracker memory nonceTracker = asyncNonceBitIndex[account];
+        NonceTracker memory nonceTracker = nonceTrackers[account];
 
         uint256 highestFullBitmap = uint256(nonceTracker.HighestFullBitmap);
         uint256 lowestEmptyBitmap = uint256(nonceTracker.LowestEmptyBitmap);
@@ -437,7 +437,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
             }
 
             if (updateTracker) {
-                asyncNonceBitIndex[account] = NonceTracker({
+                nonceTrackers[account] = NonceTracker({
                     HighestFullBitmap: uint128(highestFullBitmap),
                     LowestEmptyBitmap: uint128(lowestEmptyBitmap)
                 });
@@ -549,7 +549,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     }
 
     function getNextNonce(address account) external view returns (uint256 nextNonce) {
-        NonceTracker memory nonceTracker = asyncNonceBitIndex[account];
+        NonceTracker memory nonceTracker = nonceTrackers[account];
 
         uint256 nextBitmapIndex = uint256(nonceTracker.HighestFullBitmap) + 1;
         uint256 lowestEmptyBitmap = uint256(nonceTracker.LowestEmptyBitmap);
@@ -560,7 +560,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         bytes32 bitmapKey = keccak256(abi.encode(account, nextBitmapIndex));
 
-        NonceBitmap memory nonceBitmap = asyncNonceBitmap[bitmapKey];
+        NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
 
         uint256 highestUsedNonce = uint256(nonceBitmap.highestUsedNonce); //  has a +1 offset
 

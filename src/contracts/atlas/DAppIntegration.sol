@@ -19,22 +19,22 @@ contract DAppIntegration {
     );
 
     struct NonceBitmap {
-        uint8 highestUsedNonce;
+        uint8 highestUsedNonce; // TODO for async, may not need to track highest per bitmap - rethink this
         uint240 bitmap;
     }
 
     struct NonceTracker {
-        uint128 LowestEmptyBitmap;
-        uint128 HighestFullBitmap;
+        uint128 LastUsedSeqNonce; // Sequenced nonces tracked using only this value 
+        uint128 HighestFullAsyncBitmap; // Async nonces tracked using bitmaps
     }
 
     address public immutable ATLAS;
 
     //     from         nonceTracker
-    mapping(address => NonceTracker) public asyncNonceBitIndex;
+    mapping(address => NonceTracker) public nonceTrackers;
 
     //  keccak256(from, bitmapNonceIndex) => to
-    mapping(bytes32 => NonceBitmap) public asyncNonceBitmap;
+    mapping(bytes32 => NonceBitmap) public nonceBitmaps;
 
     // NOTE: To prevent builder censorship, dapp nonces can be
     // processed in any order so long as they arent duplicated and
@@ -116,14 +116,14 @@ contract DAppIntegration {
     }
 
     function _initializeNonce(address account) internal returns (bool initialized) {
-        if (asyncNonceBitIndex[account].LowestEmptyBitmap == uint128(0)) {
+        if (nonceTrackers[account].LowestEmptyBitmap == uint128(0)) {
             unchecked {
-                asyncNonceBitIndex[account].LowestEmptyBitmap = 2;
+                nonceTrackers[account].LowestEmptyBitmap = 2;
             }
             bytes32 bitmapKey = keccak256(abi.encode(account, 1));
 
             // to skip the 0 nonce
-            asyncNonceBitmap[bitmapKey] = NonceBitmap({ highestUsedNonce: uint8(1), bitmap: 0 });
+            nonceBitmaps[bitmapKey] = NonceBitmap({ highestUsedNonce: uint8(1), bitmap: 0 });
             initialized = true;
         }
     }
