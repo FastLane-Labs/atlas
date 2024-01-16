@@ -11,17 +11,12 @@ import { AtlasVerificationBase } from "./AtlasVerification.t.sol";
 
 
 contract AtlasVerificationNoncesTest is AtlasVerificationBase {
-
-    // Q: Why track lowestEmptyBitmap and highestFullBitmap?
-    // A:   - lowestEmptyBitmap = ??
-    //      - highestFullBitmap = to calc getNextNonce (highestFullBitmap * 240) + highestUsedNonce
-    // --> can we just track highestFullBitmap and highestUsedNonce?
-
+    bool sequenced = true;
 
     function testFirstEightNonces_Sequenced() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withSequenced(true).build());
+        defaultAtlasWithCallConfig(defaultCallConfig().withSequenced(sequenced).build());
 
-        console.log("next gov nonce: ", atlasVerification.getNextNonce(governanceEOA), "\n");
+        console.log("next gov nonce: ", atlasVerification.getNextNonce(governanceEOA, sequenced), "\n");
         
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -34,10 +29,10 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         // Testing nonces 2 - 8
         for (uint256 i = 2; i < 9; i++) {
 
-            console.log("next gov nonce: ", atlasVerification.getNextNonce(governanceEOA));
+            console.log("next gov nonce: ", atlasVerification.getNextNonce(governanceEOA, sequenced));
             console.log("\nTX ", i, "\n");
 
-            assertEq(atlasVerification.getNextNonce(governanceEOA), i, "Next nonce not incrementing as expected");
+            assertEq(atlasVerification.getNextNonce(governanceEOA, sequenced), i, "Next nonce not incrementing as expected");
             
 
             userOp = validUserOperation().build();
@@ -47,8 +42,8 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
                 userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
             ), ValidCallsResult.Valid);
         }
-        
-        assertEq(atlasVerification.getNextNonce(governanceEOA), 9, "Next nonce should be 9 after 8 seq nonces used");
+
+        assertEq(atlasVerification.getNextNonce(governanceEOA, sequenced), 9, "Next nonce should be 9 after 8 seq nonces used");
     }
 
     function test_bitmap2UsedAfterBitmap1Fulled_Sequenced() public {}
