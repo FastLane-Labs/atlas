@@ -350,10 +350,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
             NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
             uint256 bitmap = uint256(nonceBitmap.bitmap);
 
-            // Even if nonce rejected, increment highestFullBitmap to keep records up to date
+            // Even if nonce rejected, increment highestFullAsyncBitmap to keep records up to date
             if (!isSimulation && _isBitmapFull(bitmap)) {
-                if (bitmapIndex == nonceTracker.highestFullBitmap + 1) {
-                    ++nonceTracker.highestFullBitmap;
+                if (bitmapIndex == nonceTracker.highestFullAsyncBitmap + 1) {
+                    ++nonceTracker.highestFullAsyncBitmap;
                 }
                 return false;
             }
@@ -377,9 +377,9 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
             // Mark bitmap as full if necessary
             if (_isBitmapFull(bitmap)) {
-                // Update highestFullBitmap if necessary
-                if (bitmapIndex == nonceTracker.highestFullBitmap + 1) {
-                    ++nonceTracker.highestFullBitmap;
+                // Update highestFullAsyncBitmap if necessary
+                if (bitmapIndex == nonceTracker.highestFullAsyncBitmap + 1) {
+                    ++nonceTracker.highestFullAsyncBitmap;
                 }
             }
 
@@ -500,10 +500,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
             return nonceTracker.lastUsedSeqNonce + 1;
         } else {
             // Async bitmaps start at index 1. I.e. accounts start with bitmap 0 = HighestFullAsyncBitmap
-            bytes32 bitmapKey = keccak256(abi.encode(account, nonceTracker.highestFullBitmap + 1));
+            bytes32 bitmapKey = keccak256(abi.encode(account, nonceTracker.highestFullAsyncBitmap + 1));
             NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
 
-            return ((nonceTracker.highestFullBitmap * 240) + nonceBitmap.highestUsedNonce + 1);
+            return ((nonceTracker.highestFullAsyncBitmap * 240) + nonceBitmap.highestUsedNonce + 1);
         }
     }
 

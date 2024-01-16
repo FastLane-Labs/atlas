@@ -67,8 +67,6 @@ contract DAppIntegration {
             GovernanceData({ governance: govAddress, callConfig: callConfig, lastUpdate: uint64(block.number) });
 
         signatories[signatoryKey] = true;
-
-        _initializeNonce(msg.sender);
     }
 
     function addSignatory(address controller, address signatory) external {
@@ -83,8 +81,6 @@ contract DAppIntegration {
         }
 
         signatories[signatoryKey] = true;
-
-        _initializeNonce(signatory);
 
         emit NewDAppSignatory(controller, govData.governance, signatory, govData.callConfig);
     }
@@ -109,23 +105,6 @@ contract DAppIntegration {
         if (msg.sender != govData.governance) revert FastLaneErrorsEvents.OnlyGovernance();
 
         delete governance[dAppControl];
-    }
-
-    function initializeNonce(address account) external {
-        _initializeNonce(account);
-    }
-
-    function _initializeNonce(address account) internal returns (bool initialized) {
-        if (nonceTrackers[account].LowestEmptyBitmap == uint128(0)) {
-            unchecked {
-                nonceTrackers[account].LowestEmptyBitmap = 2;
-            }
-            bytes32 bitmapKey = keccak256(abi.encode(account, 1));
-
-            // to skip the 0 nonce
-            nonceBitmaps[bitmapKey] = NonceBitmap({ highestUsedNonce: uint8(1), bitmap: 0 });
-            initialized = true;
-        }
     }
 
     function getGovFromControl(address dAppControl) external view returns (address governanceAddress) {
