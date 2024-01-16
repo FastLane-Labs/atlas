@@ -13,14 +13,29 @@ import { AtlasVerificationBase } from "./AtlasVerification.t.sol";
 contract AtlasVerificationNoncesTest is AtlasVerificationBase {
     bool sequenced = true;
 
+
+    function testGetNextNonceReturnsOneForNewAccount_Sequenced() public {
+        sequenced = true;
+        defaultAtlasWithCallConfig(defaultCallConfig().withSequenced(sequenced).build());
+        assertEq(atlasVerification.getNextNonce(userEOA, sequenced), 1, "User seq next nonce should be 1");
+        assertEq(atlasVerification.getNextNonce(governanceEOA, sequenced), 1, "Gov seq next nonce should be 1");
+    }
+
+    function testGetNextNonceReturnsOneForNewAccount_Async() public {
+        sequenced = false;
+        defaultAtlasWithCallConfig(defaultCallConfig().withSequenced(sequenced).build());
+        assertEq(atlasVerification.getNextNonce(userEOA, sequenced), 1, "User async next nonce should be 1");
+        assertEq(atlasVerification.getNextNonce(governanceEOA, sequenced), 1, "Gov async next nonce should be 1");
+    }
+
     function testFirstEightNonces_Sequenced() public {
         defaultAtlasWithCallConfig(defaultCallConfig().withSequenced(sequenced).build());
 
         console.log("next gov nonce: ", atlasVerification.getNextNonce(governanceEOA, sequenced), "\n");
         
-        UserOperation memory userOp = validUserOperation().build();
+        UserOperation memory userOp = validUserOperation().withNonce(1).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
-        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).signAndBuild(address(atlasVerification), governancePK);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(1).signAndBuild(address(atlasVerification), governancePK);
         // First call initializes at nonce = 1
         doValidCalls(AtlasVerificationBase.ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
@@ -35,7 +50,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
             assertEq(atlasVerification.getNextNonce(governanceEOA, sequenced), i, "Next nonce not incrementing as expected");
             
 
-            userOp = validUserOperation().build();
+            userOp = validUserOperation().withNonce(i).build();
             solverOps = validSolverOperations(userOp);
             dappOp = validDAppOperation(userOp, solverOps).withNonce(i).signAndBuild(address(atlasVerification), governancePK);
             callAndAssert(ValidCallsCall({
