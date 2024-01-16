@@ -107,12 +107,10 @@ contract UserOperationBuilder is Test {
     }
 
     function build() public returns (UserOperation memory) {
-        if (userOperation.nonce == 0) userOperation.nonce = 1;
         return userOperation;
     }
 
     function signAndBuild(address atlasVerification, uint256 privateKey) public returns (UserOperation memory) {
-        if (userOperation.nonce == 0) userOperation.nonce = 1;
         sign(atlasVerification, privateKey);
         return userOperation;
     }

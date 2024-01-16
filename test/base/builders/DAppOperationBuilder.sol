@@ -122,12 +122,10 @@ contract DAppOperationBuilder is Test {
     }
 
     function build() public returns (DAppOperation memory) {
-        if (dappOperation.nonce == 0) dappOperation.nonce = 1;
         return dappOperation;
     }
 
     function signAndBuild(address atlasVerification, uint256 privateKey) public returns (DAppOperation memory) {
-        if (dappOperation.nonce == 0) dappOperation.nonce = 1;
         sign(atlasVerification, privateKey);
         return build();
     }
