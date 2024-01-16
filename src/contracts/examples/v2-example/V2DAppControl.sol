@@ -52,7 +52,8 @@ contract V2DAppControl is DAppControl {
             _escrow,
             msg.sender,
             CallConfig({
-                sequenced: false,
+                userNoncesSequenced: false,
+                dappNoncesSequenced: false,
                 requirePreOps: true,
                 trackPreOpsReturnData: false,
                 trackUserReturnData: false,

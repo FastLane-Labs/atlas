@@ -109,8 +109,12 @@ abstract contract DAppControl is Test, DAppControlTemplate, ExecutionBase {
         delegated = CallBits.needsDelegateUser(callConfig);
     }
 
-    function requireSequencedNonces() external view returns (bool isSequenced) {
-        isSequenced = CallBits.needsSequencedNonces(callConfig);
+    function requireSequencedUserNonces() external view returns (bool isSequenced) {
+        isSequenced = CallBits.needsSequencedUserNonces(callConfig);
+    }
+
+    function requireSequencedDAppNonces() external view returns (bool isSequenced) {
+        isSequenced = CallBits.needsSequencedDAppNonces(callConfig);
     }
 
     function getDAppConfig(UserOperation calldata userOp)

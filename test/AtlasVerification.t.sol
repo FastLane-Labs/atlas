@@ -517,7 +517,7 @@ contract AtlasVerificationTest is AtlasVerificationBase {
     //  and this is the first call for the user
     //
     function test_validCalls_SequencedNonceIsOne_Valid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withSequenced(true).build());
+        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequenced(true).build());
 
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -539,7 +539,7 @@ contract AtlasVerificationTest is AtlasVerificationBase {
     //  and this is the first call for the user
     //
     function test_validCalls_SequencedNonceIsTwo_DAppSignatureInvalid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withSequenced(true).build());
+        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequenced(true).build());
 
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -570,12 +570,12 @@ contract AtlasVerificationTest is AtlasVerificationBase {
     //  and this is the first call for the user
     //
     function test_validCalls_SequencedNonceWasOneIsNowTwo_Valid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withSequenced(true).build());
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
 
         // these first ops are to increment the nonce to 1
-        UserOperation memory userOp = validUserOperation().withNonce(1).build();
+        UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
-        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(1).signAndBuild(address(atlasVerification), governancePK);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).signAndBuild(address(atlasVerification), governancePK);
         doValidCalls(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
@@ -602,7 +602,7 @@ contract AtlasVerificationTest is AtlasVerificationBase {
     //  and the next valid nonce is 2
     //
     function test_validCalls_SequencedNonceWasOneIsNowThree_DAppSignatureInvalid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withSequenced(true).build());
+        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequenced(true).build());
 
         // these first ops are to increment the nonce to 1
         UserOperation memory userOp = validUserOperation().build();
@@ -834,7 +834,7 @@ contract AtlasVerificationTest is AtlasVerificationBase {
     //  and this is the first call for the user
     //
     function test_validCalls_SequencedUserOpNonceIsOne_Valid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withSequenced(true).build());
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
 
         UserOperation memory userOp = validUserOperation().withNonce(1).signAndBuild(address(atlasVerification), userPK);
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -864,7 +864,7 @@ contract AtlasVerificationTest is AtlasVerificationBase {
     //  and this is the first call for the user
     //
     function test_validCalls_SequencedUserOpNonceIsTwo_UserSignatureInvalid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withSequenced(true).build());
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
 
         UserOperation memory userOp = validUserOperation().withNonce(2).signAndBuild(address(atlasVerification), userPK);
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -887,12 +887,12 @@ contract AtlasVerificationTest is AtlasVerificationBase {
     //  and the next valid nonce is 2
     //
     function test_validCalls_SequencedUserOpNonceIsTwo_Valid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withSequenced(true).build());
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
 
         // increment the nonce to 1
-        UserOperation memory userOp = validUserOperation().withNonce(1).signAndBuild(address(atlasVerification), userPK);
+        UserOperation memory userOp = validUserOperation().signAndBuild(address(atlasVerification), userPK);
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
-        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(1).build();
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
         doValidCalls(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: governanceEOA, isSimulation: false}
         ));
@@ -927,12 +927,12 @@ contract AtlasVerificationTest is AtlasVerificationBase {
     //   and the next valid nonce is 2
     //
     function test_validCalls_SequencedUserOpNonceIsThree_UserSignatureInvalid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withSequenced(true).build());
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
 
         // increment the nonce to 1
-        UserOperation memory userOp = validUserOperation().withNonce(1).signAndBuild(address(atlasVerification), userPK);
+        UserOperation memory userOp = validUserOperation().signAndBuild(address(atlasVerification), userPK);
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
-        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(1).build();
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
         doValidCalls(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: governanceEOA, isSimulation: false}
         ));

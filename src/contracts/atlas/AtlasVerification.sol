@@ -304,7 +304,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // NOTE: allowing only sequenced nonces could create a scenario in
         // which builders or validators may be able to profit via censorship.
         // DApps are encouraged to rely on the deadline parameter.
-        if (!_handleNonces(dAppOp.from, dAppOp.nonce, !dConfig.callConfig.needsSequencedNonces(), isSimulation)) {
+        if (!_handleNonces(dAppOp.from, dAppOp.nonce, !dConfig.callConfig.needsSequencedDAppNonces(), isSimulation)) {
             return (false);
         }
 
@@ -456,7 +456,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // which builders or validators may be able to profit via censorship.
         // DApps are encouraged to rely on the deadline parameter
         // to prevent replay attacks.
-        if (!_handleNonces(userOp.from, userOp.nonce, !dConfig.callConfig.needsSequencedNonces(), isSimulation)) {
+        if (!_handleNonces(userOp.from, userOp.nonce, !dConfig.callConfig.needsSequencedUserNonces(), isSimulation)) {
             return false;
         }
 

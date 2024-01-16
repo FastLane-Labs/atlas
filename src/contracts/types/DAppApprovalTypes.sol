@@ -27,7 +27,7 @@ struct DAppConfig {
 }
 
 struct CallConfig {
-    bool sequenced;
+    bool userNoncesSequenced;
     bool requirePreOps;
     bool trackPreOpsReturnData;
     bool trackUserReturnData;
@@ -43,10 +43,11 @@ struct CallConfig {
     bool verifyCallChainHash;
     bool forwardReturnData;
     bool requireFulfillment;
+    bool dappNoncesSequenced; // TODO move to below userNoncesSequenced
 }
 
 enum CallConfigIndex {
-    Sequenced,
+    UserNoncesSequenced,
     RequirePreOps,
     TrackPreOpsReturnData,
     TrackUserReturnData,
@@ -62,5 +63,7 @@ enum CallConfigIndex {
     // Default = DAppAuctioneer
     VerifyCallChainHash,
     ForwardReturnData,
-    RequireFulfillment
+    RequireFulfillment,
+    DAppNoncesSequenced // TODO move to below userNoncesSequenced
+
 }

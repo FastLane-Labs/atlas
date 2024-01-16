@@ -15,7 +15,7 @@ contract CallBitsTest is Test {
 
     function setUp() public {
         callConfig1 = CallConfig({
-            sequenced: true,
+            userNoncesSequenced: true,
             requirePreOps: false,
             trackPreOpsReturnData: true,
             trackUserReturnData: false,
@@ -30,11 +30,12 @@ contract CallBitsTest is Test {
             unknownAuctioneer: true,
             verifyCallChainHash: false,
             forwardReturnData: true,
-            requireFulfillment: false
+            requireFulfillment: false,
+            dappNoncesSequenced: true
         });
 
         callConfig2 = CallConfig({
-            sequenced: !callConfig1.sequenced,
+            userNoncesSequenced: !callConfig1.userNoncesSequenced,
             requirePreOps: !callConfig1.requirePreOps,
             trackPreOpsReturnData: !callConfig1.trackPreOpsReturnData,
             trackUserReturnData: !callConfig1.trackUserReturnData,
@@ -49,19 +50,20 @@ contract CallBitsTest is Test {
             unknownAuctioneer: !callConfig1.unknownAuctioneer,
             verifyCallChainHash: !callConfig1.verifyCallChainHash,
             forwardReturnData: !callConfig1.forwardReturnData,
-            requireFulfillment: !callConfig1.requireFulfillment
+            requireFulfillment: !callConfig1.requireFulfillment,
+            dappNoncesSequenced: !callConfig1.dappNoncesSequenced
         });
     }
 
     function testEncodeCallConfig() public {
-        string memory expectedBitMapString = "00000000000000000101010101010101";
+        string memory expectedBitMapString = "00000000000000010101010101010101";
         assertEq(
             TestUtils.uint32ToBinaryString(CallBits.encodeCallConfig(callConfig1)),
             expectedBitMapString,
             "callConfig1 incorrect"
         );
 
-        expectedBitMapString = "00000000000000001010101010101010";
+        expectedBitMapString = "00000000000000101010101010101010";
         assertEq(
             TestUtils.uint32ToBinaryString(CallBits.encodeCallConfig(callConfig2)),
             expectedBitMapString,
@@ -72,7 +74,7 @@ contract CallBitsTest is Test {
     function testDecodeCallConfig() public {
         uint32 encodedCallConfig = CallBits.encodeCallConfig(callConfig1);
         CallConfig memory decodedCallConfig = encodedCallConfig.decodeCallConfig();
-        assertEq(decodedCallConfig.sequenced, true, "sequenced 1 incorrect");
+        assertEq(decodedCallConfig.userNoncesSequenced, true, "userNoncesSequenced 1 incorrect");
         assertEq(decodedCallConfig.requirePreOps, false, "requirePreOps 1 incorrect");
         assertEq(decodedCallConfig.trackPreOpsReturnData, true, "trackPreOpsReturnData 1 incorrect");
         assertEq(decodedCallConfig.trackUserReturnData, false, "trackUserReturnData 1 incorrect");
@@ -88,10 +90,11 @@ contract CallBitsTest is Test {
         assertEq(decodedCallConfig.verifyCallChainHash, false, "verifyCallChainHash 1 incorrect");
         assertEq(decodedCallConfig.forwardReturnData, true, "forwardPreOpsReturnData 1 incorrect");
         assertEq(decodedCallConfig.requireFulfillment, false, "requireFulfillment 1 incorrect");
+        assertEq(decodedCallConfig.dappNoncesSequenced, true, "dappNoncesSequenced 1 incorrect");
 
         encodedCallConfig = CallBits.encodeCallConfig(callConfig2);
         decodedCallConfig = encodedCallConfig.decodeCallConfig();
-        assertEq(decodedCallConfig.sequenced, false, "sequenced 2 incorrect");
+        assertEq(decodedCallConfig.userNoncesSequenced, false, "userNoncesSequenced 2 incorrect");
         assertEq(decodedCallConfig.requirePreOps, true, "requirePreOps 2 incorrect");
         assertEq(decodedCallConfig.trackPreOpsReturnData, false, "trackPreOpsReturnData 2 incorrect");
         assertEq(decodedCallConfig.trackUserReturnData, true, "trackUserReturnData 2 incorrect");
@@ -107,11 +110,12 @@ contract CallBitsTest is Test {
         assertEq(decodedCallConfig.verifyCallChainHash, true, "verifyCallChainHash 2 incorrect");
         assertEq(decodedCallConfig.forwardReturnData, false, "forwardPreOpsReturnData 2 incorrect");
         assertEq(decodedCallConfig.requireFulfillment, true, "requireFulfillment 2 incorrect");
+        assertEq(decodedCallConfig.dappNoncesSequenced, false, "dappNoncesSequenced 2 incorrect");
     }
 
     function testConfigParameters() public {
         uint32 encodedCallConfig = CallBits.encodeCallConfig(callConfig1);
-        assertEq(encodedCallConfig.needsSequencedNonces(), true, "needsSequencedNonces 1 incorrect");
+        assertEq(encodedCallConfig.needsSequencedUserNonces(), true, "needsSequencedUserNonces 1 incorrect");
         assertEq(encodedCallConfig.needsPreOpsCall(), false, "needsPreOpsCall 1 incorrect");
         assertEq(encodedCallConfig.needsPreOpsReturnData(), true, "needsPreOpsReturnData 1 incorrect");
         assertEq(encodedCallConfig.needsUserReturnData(), false, "needsUserReturnData 1 incorrect");
@@ -127,8 +131,10 @@ contract CallBitsTest is Test {
         assertEq(encodedCallConfig.verifyCallChainHash(), false, "verifyCallChainHash 1 incorrect");
         assertEq(encodedCallConfig.forwardReturnData(), true, "forwardPreOpsReturnData 1 incorrect");
         assertEq(encodedCallConfig.needsFulfillment(), false, "needsFulfillment 1 incorrect");
+        assertEq(encodedCallConfig.needsSequencedDAppNonces(), true, "needsSequencedDAppNonces 1 incorrect");
+
         encodedCallConfig = CallBits.encodeCallConfig(callConfig2);
-        assertEq(encodedCallConfig.needsSequencedNonces(), false, "needsSequencedNonces 2 incorrect");
+        assertEq(encodedCallConfig.needsSequencedUserNonces(), false, "needsSequencedUserNonces 2 incorrect");
         assertEq(encodedCallConfig.needsPreOpsCall(), true, "needsPreOpsCall 2 incorrect");
         assertEq(encodedCallConfig.needsPreOpsReturnData(), false, "needsPreOpsReturnData 2 incorrect");
         assertEq(encodedCallConfig.needsUserReturnData(), true, "needsUserReturnData 2 incorrect");
@@ -144,5 +150,6 @@ contract CallBitsTest is Test {
         assertEq(encodedCallConfig.verifyCallChainHash(), true, "verifyCallChainHash 2 incorrect");
         assertEq(encodedCallConfig.forwardReturnData(), false, "forwardPreOpsReturnData 2 incorrect");
         assertEq(encodedCallConfig.needsFulfillment(), true, "needsFulfillment 2 incorrect");
+        assertEq(encodedCallConfig.needsSequencedDAppNonces(), false, "needsSequencedDAppNonces 2 incorrect");
     }
 }
