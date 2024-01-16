@@ -573,17 +573,15 @@ contract AtlasVerificationTest is AtlasVerificationBase {
         defaultAtlasWithCallConfig(defaultCallConfig().withSequenced(true).build());
 
         // these first ops are to increment the nonce to 1
-        UserOperation memory userOp = validUserOperation().build();
+        UserOperation memory userOp = validUserOperation().withNonce(1).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
-        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).signAndBuild(address(atlasVerification), governancePK);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(1).signAndBuild(address(atlasVerification), governancePK);
         doValidCalls(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
 
-        console.log("\nTX 2\n");
-
         // this is the actual testcase
-        userOp = validUserOperation().build();
+        userOp = validUserOperation().withNonce(2).build();
         solverOps = validSolverOperations(userOp);
         dappOp = validDAppOperation(userOp, solverOps).withNonce(2).signAndBuild(address(atlasVerification), governancePK);
 
@@ -894,7 +892,7 @@ contract AtlasVerificationTest is AtlasVerificationBase {
         // increment the nonce to 1
         UserOperation memory userOp = validUserOperation().withNonce(1).signAndBuild(address(atlasVerification), userPK);
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
-        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(1).build();
         doValidCalls(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: governanceEOA, isSimulation: false}
         ));
@@ -902,7 +900,7 @@ contract AtlasVerificationTest is AtlasVerificationBase {
         // this is the actual testcase
         userOp = validUserOperation().withNonce(2).signAndBuild(address(atlasVerification), userPK);
         solverOps = validSolverOperations(userOp);
-        dappOp = validDAppOperation(userOp, solverOps).build();
+        dappOp = validDAppOperation(userOp, solverOps).withNonce(2).signAndBuild(address(atlasVerification), governancePK);
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
@@ -934,7 +932,7 @@ contract AtlasVerificationTest is AtlasVerificationBase {
         // increment the nonce to 1
         UserOperation memory userOp = validUserOperation().withNonce(1).signAndBuild(address(atlasVerification), userPK);
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
-        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(1).build();
         doValidCalls(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: governanceEOA, isSimulation: false}
         ));
@@ -942,7 +940,7 @@ contract AtlasVerificationTest is AtlasVerificationBase {
         // this is the actual testcase
         userOp = validUserOperation().withNonce(3).signAndBuild(address(atlasVerification), userPK);
         solverOps = validSolverOperations(userOp);
-        dappOp = validDAppOperation(userOp, solverOps).build();
+        dappOp = validDAppOperation(userOp, solverOps).withNonce(2).signAndBuild(address(atlasVerification), governancePK);
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
