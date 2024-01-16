@@ -17,6 +17,9 @@ library CallBits {
         if (callConfig.userNoncesSequenced) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.UserNoncesSequenced);
         }
+        if (callConfig.dappNoncesSequenced) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.DAppNoncesSequenced);
+        }
         if (callConfig.requirePreOps) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.RequirePreOps);
         }

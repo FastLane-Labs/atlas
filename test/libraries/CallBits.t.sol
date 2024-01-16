@@ -63,7 +63,7 @@ contract CallBitsTest is Test {
             "callConfig1 incorrect"
         );
 
-        expectedBitMapString = "00000000000000101010101010101010";
+        expectedBitMapString = "00000000000000001010101010101010";
         assertEq(
             TestUtils.uint32ToBinaryString(CallBits.encodeCallConfig(callConfig2)),
             expectedBitMapString,
