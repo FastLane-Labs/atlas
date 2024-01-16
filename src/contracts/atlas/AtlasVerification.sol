@@ -33,6 +33,11 @@ contract AtlasVerification is EIP712, DAppIntegration {
     using CallBits for uint32;
     using CallVerification for UserOperation;
 
+    uint256 internal constant FIRST_16_BITS_TRUE =
+        uint256(0xFFFF000000000000000000000000000000000000000000000000000000000000);
+    uint256 internal constant ALL_BITS_TRUE =
+        uint256(0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF);
+
     uint8 internal constant MAX_SOLVERS = type(uint8).max - 2;
 
     error InvalidCaller();
@@ -41,8 +46,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
     // TODO delete this
     function logIfGov(address account, string memory message, address addrToLog, uint256 uintToLog) internal {
-        if(account == 0x97663E0c017FE7194C5D5c0b03D9BE6B54f4aF38){
-            if(addrToLog != address(0)) console.log("GOV:", message, addrToLog);
+        if (account == 0x97663E0c017FE7194C5D5c0b03D9BE6B54f4aF38) {
+            if (addrToLog != address(0)) console.log("GOV:", message, addrToLog);
             else console.log("GOV:", message, uintToLog);
         }
     }
@@ -306,19 +311,11 @@ contract AtlasVerification is EIP712, DAppIntegration {
         return (true);
     }
 
-    function _handleNonces(
-        address account,
-        uint256 nonce,
-        bool async,
-        bool isSimulation
-    )
-        internal
-        returns (bool validNonce)
-    {
+    // Returns true if nonce is valid, otherwise returns false
+    function _handleNonces(address account, uint256 nonce, bool async, bool isSimulation) internal returns (bool) {
         // TODO remove
         logIfGov(account, "account:", account, 0);
         logIfGov(account, "nonce:", address(0), nonce);
-
 
         if (nonce > type(uint128).max - 1) {
             return false;
@@ -330,27 +327,66 @@ contract AtlasVerification is EIP712, DAppIntegration {
             return false;
         }
 
+        NonceTracker memory nonceTracker = nonceTrackers[account];
 
         if (!async) {
             // SEQUENTIAL NONCES
-            NonceTracker memory nonceTracker = nonceTrackers[account];
 
             // Nonces must increase by 1 if sequential
-            if (nonce != nonceTracker.LastUsedSeqNonce + 1) return false;
+            if (nonce != nonceTracker.lastUsedSeqNonce + 1) return false;
 
             // Return true here if simulation to avoid storing nonce updates
             if (isSimulation) return true;
 
-            ++nonceTracker.LastUsedSeqNonce;
+            ++nonceTracker.lastUsedSeqNonce;
             nonceTrackers[account] = nonceTracker;
-            // TODO make sure we return true below
         } else {
             // ASYNC NONCES
+
+            uint256 bitmapIndex = (nonce / 240) + 1; // +1 because highestFullBitmap initializes at 0
+            uint256 bitmapNonce = nonce % 240;
+
+            bytes32 bitmapKey = keccak256(abi.encode(account, bitmapIndex));
+            NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
+            uint256 bitmap = uint256(nonceBitmap.bitmap);
+
+            // Even if nonce rejected, increment highestFullBitmap to keep records up to date
+            if (!isSimulation && _isBitmapFull(bitmap)) {
+                if (bitmapIndex == nonceTracker.highestFullBitmap + 1) {
+                    ++nonceTracker.highestFullBitmap;
+                }
+                return false;
+            }
+
+            // Check if nonce has already been used
+            if (_nonceUsedInBitmap(bitmap, bitmapNonce)) {
+                return false;
+            }
+
+            // Return true here if simulation to avoid storing nonce updates
+            if (isSimulation) return true;
+
+            // Mark nonce as used in bitmap
+            bitmap |= 1 << bitmapNonce;
+            nonceBitmap.bitmap = uint240(bitmap);
+
+            // Update highestUsedNonce if necessary
+            if (bitmapNonce > uint256(nonceBitmap.highestUsedNonce)) {
+                nonceBitmap.highestUsedNonce = uint8(bitmapNonce);
+            }
+
+            // Mark bitmap as full if necessary
+            if (_isBitmapFull(bitmap)) {
+                // Update highestFullBitmap if necessary
+                if (bitmapIndex == nonceTracker.highestFullBitmap + 1) {
+                    ++nonceTracker.highestFullBitmap;
+                }
+            }
+
+            nonceBitmaps[bitmapKey] = nonceBitmap;
         }
 
-  
-
-
+        nonceTrackers[account] = nonceTracker;
         return true;
     }
 
@@ -469,7 +505,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         if (bitmapNonce > 239 || !async) {
             bool updateTracker;
 
-            // If 
+            // If
             if (bitmapIndex > highestFullBitmap + 1) {
                 updateTracker = true;
                 highestFullBitmap = bitmapIndex - 1;
@@ -598,26 +634,18 @@ contract AtlasVerification is EIP712, DAppIntegration {
         payload = _hashTypedDataV4(_getProofHash(userOp));
     }
 
-    // TODO new version of getNextNonce
+    // Returns the next nonce for the given account, in sequential or async mode
     function getNextNonce(address account, bool sequenced) external view returns (uint256) {
         NonceTracker memory nonceTracker = nonceTrackers[account];
 
-        // NOTE: No concept of uninitialized accounts:
-        // - seq and async nonces are ready to go with every account without any initialization
-
-        if(sequenced) {
-            return nonceTracker.LastUsedSeqNonce + 1;
+        if (sequenced) {
+            return nonceTracker.lastUsedSeqNonce + 1;
         } else {
-            // TODO retrieve the next free nonce in the lowest non-full bitmap
-            // keep lowest full bitmap updated in _updateNonceTracker
-            //     but always check from last full bitmap and increment - no skipping for lowest full bitmap
-
             // Async bitmaps start at index 1. I.e. accounts start with bitmap 0 = HighestFullAsyncBitmap
-            bytes32 bitmapKey = keccak256(abi.encode(account, nonceTracker.HighestFullBitmap + 1));
+            bytes32 bitmapKey = keccak256(abi.encode(account, nonceTracker.highestFullBitmap + 1));
             NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
 
-            // TODO Re-check that highestUsedNonce and HighestFullBitmap are always reliable
-            return ((nonceTracker.HighestFullBitmap * 240) + nonceBitmap.highestUsedNonce + 1);
+            return ((nonceTracker.highestFullBitmap * 240) + nonceBitmap.highestUsedNonce + 1);
         }
     }
 
@@ -639,5 +667,17 @@ contract AtlasVerification is EIP712, DAppIntegration {
         uint256 highestUsedNonce = uint256(nonceBitmap.highestUsedNonce); //  has a +1 offset
 
         nextNonce = ((nextBitmapIndex - 1) * 240) + highestUsedNonce;
+    }
+
+    // Of the 256-bit bitmap param, only the rightmost 240 bits are checked.
+    // The leftmost 16 bits are ignored - 8 for highestUsedNonce, and 8 unused
+    function _isBitmapFull(uint256 bitmap) internal pure returns (bool) {
+        // Set first 16 bits to true, to ignore those - only rightmost 240 bits hold the bitmap
+        return ((bitmap | FIRST_16_BITS_TRUE) & ALL_BITS_TRUE) == ALL_BITS_TRUE;
+    }
+
+    // Only accurate for nonces 1 - 240 within a 256-bit bitmap
+    function _nonceUsedInBitmap(uint256 bitmap, uint256 nonce) internal pure returns (bool) {
+        return (bitmap & (1 << nonce)) != 0;
     }
 }

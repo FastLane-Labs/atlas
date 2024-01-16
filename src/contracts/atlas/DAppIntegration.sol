@@ -19,21 +19,21 @@ contract DAppIntegration {
     );
 
     struct NonceBitmap {
-        uint8 highestUsedNonce; // TODO for async, may not need to track highest per bitmap - rethink this
+        uint8 highestUsedNonce;
         uint240 bitmap;
     }
 
     struct NonceTracker {
-        uint128 LastUsedSeqNonce; // Sequenced nonces tracked using only this value 
-        uint128 HighestFullAsyncBitmap; // Async nonces tracked using bitmaps
+        uint128 lastUsedSeqNonce; // Sequenced nonces tracked using only this value
+        uint128 highestFullAsyncBitmap; // Async nonces tracked using bitmaps
     }
 
     address public immutable ATLAS;
 
-    //     from         nonceTracker
+    // from => nonceTracker
     mapping(address => NonceTracker) public nonceTrackers;
 
-    //  keccak256(from, bitmapNonceIndex) => to
+    // keccak256(from, bitmapNonceIndex) => nonceBitmap
     mapping(bytes32 => NonceBitmap) public nonceBitmaps;
 
     // NOTE: To prevent builder censorship, dapp nonces can be
