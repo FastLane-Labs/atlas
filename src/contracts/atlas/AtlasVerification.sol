@@ -315,6 +315,55 @@ contract AtlasVerification is EIP712, DAppIntegration {
         internal
         returns (bool validNonce)
     {
+        // TODO remove
+        logIfGov(account, "account:", account, 0);
+        logIfGov(account, "nonce:", address(0), nonce);
+
+
+        if (nonce > type(uint128).max - 1) {
+            return false;
+        }
+
+        if (!isSimulation && nonce == 0) {
+            // Allow 0 nonce for simulations to avoid unnecessary init txs
+            // For non-simulation calls, 0 is not a valid nonce
+            return false;
+        }
+
+
+        if (!async) {
+            // SEQUENTIAL NONCES
+            NonceTracker memory nonceTracker = nonceTrackers[account];
+
+            // Nonces must increase by 1 if sequential
+            if (nonce != nonceTracker.LastUsedSeqNonce + 1) return false;
+
+            // Return true here if simulation to avoid storing nonce updates
+            if (isSimulation) return true;
+
+            ++nonceTracker.LastUsedSeqNonce;
+            nonceTrackers[account] = nonceTracker;
+            // TODO make sure we return true below
+        } else {
+            // ASYNC NONCES
+        }
+
+  
+
+
+        return true;
+    }
+
+    // TODO old version - delete when ready
+    function _handleNoncesOld(
+        address account,
+        uint256 nonce,
+        bool async,
+        bool isSimulation
+    )
+        internal
+        returns (bool validNonce)
+    {
         logIfGov(account, "account:", account, 0);
         logIfGov(account, "nonce:", address(0), nonce);
 
@@ -325,6 +374,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         if (!isSimulation) {
             if (nonce == 0) {
                 // Allow 0 nonce for simulations to avoid unnecessary init txs
+                // For non-simulation calls, 0 is not a valid nonce
                 return false;
             } else if (nonce == 1) {
                 // Check if nonce needs to be initialized - do so if necessary.
@@ -548,26 +598,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         payload = _hashTypedDataV4(_getProofHash(userOp));
     }
 
-    // TODO delete this when new version ready
-    function getNextNonce(address account) external view returns (uint256 nextNonce) {
-        NonceTracker memory nonceTracker = nonceTrackers[account];
-
-        uint256 nextBitmapIndex = uint256(nonceTracker.HighestFullBitmap) + 1;
-        uint256 lowestEmptyBitmap = uint256(nonceTracker.LowestEmptyBitmap);
-
-        if (lowestEmptyBitmap == 0) {
-            return 1; // uninitialized
-        }
-
-        bytes32 bitmapKey = keccak256(abi.encode(account, nextBitmapIndex));
-
-        NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
-
-        uint256 highestUsedNonce = uint256(nonceBitmap.highestUsedNonce); //  has a +1 offset
-
-        nextNonce = ((nextBitmapIndex - 1) * 240) + highestUsedNonce;
-    }
-
+    // TODO new version of getNextNonce
     function getNextNonce(address account, bool sequenced) external view returns (uint256) {
         NonceTracker memory nonceTracker = nonceTrackers[account];
 
@@ -588,5 +619,25 @@ contract AtlasVerification is EIP712, DAppIntegration {
             // TODO Re-check that highestUsedNonce and HighestFullBitmap are always reliable
             return ((nonceTracker.HighestFullBitmap * 240) + nonceBitmap.highestUsedNonce + 1);
         }
+    }
+
+    // TODO delete this when new version ready
+    function getNextNonce(address account) external view returns (uint256 nextNonce) {
+        NonceTracker memory nonceTracker = nonceTrackers[account];
+
+        uint256 nextBitmapIndex = uint256(nonceTracker.HighestFullBitmap) + 1;
+        uint256 lowestEmptyBitmap = uint256(nonceTracker.LowestEmptyBitmap);
+
+        if (lowestEmptyBitmap == 0) {
+            return 1; // uninitialized
+        }
+
+        bytes32 bitmapKey = keccak256(abi.encode(account, nextBitmapIndex));
+
+        NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
+
+        uint256 highestUsedNonce = uint256(nonceBitmap.highestUsedNonce); //  has a +1 offset
+
+        nextNonce = ((nextBitmapIndex - 1) * 240) + highestUsedNonce;
     }
 }
