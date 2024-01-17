@@ -29,7 +29,7 @@ abstract contract DAppControl is Test, DAppControlTemplate, ExecutionBase {
 
     constructor(address _escrow, address _governance, CallConfig memory _callConfig) ExecutionBase(_escrow) {
         if (_callConfig.userNoncesSequenced && _callConfig.dappNoncesSequenced) {
-            revert("DAPP AND USER CANT BOTH BE SEQ");
+            revert("DAPP AND USER CANT BOTH BE SEQ"); // TODO convert to custom errors
         }
 
         control = address(this);

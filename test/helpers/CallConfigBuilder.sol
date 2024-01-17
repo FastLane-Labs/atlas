@@ -112,6 +112,7 @@ contract CallConfigBuilder is Test {
     function build() public view returns (CallConfig memory) {
         return CallConfig(
             userNoncesSequenced,
+            dappNoncesSequenced,
             requirePreOps,
             trackPreOpsReturnData,
             trackUserReturnData,
@@ -126,8 +127,7 @@ contract CallConfigBuilder is Test {
             unknownAuctioneer,
             verifyCallChainHash,
             forwardReturnData,
-            requireFulfillment,
-            dappNoncesSequenced
+            requireFulfillment
         );
     }
 }
