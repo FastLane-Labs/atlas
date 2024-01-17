@@ -296,21 +296,21 @@ contract AtlasVerificationTest is AtlasVerificationBase {
     //
     // given a default atlas environment
     //   and otherwise valid user, solver and dapp operations
-    //     where the dapp operation has an empty signature
+    //     where the dapp operation is signed by the wrong PK
     // when validCalls is called from the userEOA
     //   and isSimulation = true
-    // then it should return Valid
+    // then it should return DAppSignatureInvalid
     //
     function test_validCalls_Simulated_BrokenSignature_DAppSignatureInvalid() public {
         defaultAtlasEnvironment();
 
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
-        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withSignature(bytes("")).build();
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).signAndBuild(address(atlasVerification), userPK);
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: true}
-        ), ValidCallsResult.Valid);
+        ), ValidCallsResult.DAppSignatureInvalid);
     }
 
     // 
@@ -480,7 +480,7 @@ contract AtlasVerificationTest is AtlasVerificationBase {
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: true}
-        ), ValidCallsResult.Valid);
+        ), ValidCallsResult.DAppSignatureInvalid);
     }
 
     //
@@ -786,10 +786,10 @@ contract AtlasVerificationTest is AtlasVerificationBase {
     //     where the user operation nonce is zero
     // when validCalls is called from the userEOA
     //   and isSimulation = true
-    // then it should return Valid
-    // because zero is a valid nonce for simulations
+    // then it should return UserSignatureInvalid
+    // because zero is never a valid nonce
     //
-    function test_validCalls_UserOpNonceIsZero_Simulated_Valid() public {
+    function test_validCalls_UserOpNonceIsZero_Simulated_UserSignatureInvalid() public {
         defaultAtlasEnvironment();
 
         UserOperation memory userOp = validUserOperation().withNonce(0).signAndBuild(address(atlasVerification), userPK);
@@ -798,7 +798,7 @@ contract AtlasVerificationTest is AtlasVerificationBase {
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: true}
-        ), ValidCallsResult.Valid);
+        ), ValidCallsResult.UserSignatureInvalid);
     }
 
     //
