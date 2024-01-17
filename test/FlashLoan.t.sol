@@ -224,13 +224,18 @@ contract FlashLoanTest is BaseTest {
         uint256 atlasEndingETH = address(atlas).balance;
         uint256 userEndingETH = address(userEOA).balance;
 
+        // atlas 2e beginning bal + 1e from solver +100e eth from user = 103e atlas total
+        // after metacall 1e user payout + 0.0001e bundler(user) gas refund = 101.9999e after metacall
+
         console.log("solverWETH", solverStartingWETH, solverEndingWETH);
+        console.log("solveratlETH", atlas.balanceOf(solverOneEOA));
         console.log("atlasETH", atlasStartingETH, atlasEndingETH);
         console.log("userETH", userStartingETH, userEndingETH);
 
         assertEq(solverEndingWETH, 0, "solver WETH not used");
-        assertEq(atlasEndingETH - atlasStartingETH, 999424451125000000, "atlas incorrect ending ETH"); // atlas should receive bid
-
+        assertEq(atlas.balanceOf(solverOneEOA), 0, "solver atlETH not used");
+        assertTrue(atlasEndingETH < atlasStartingETH, "atlas incorrect ending ETH"); // atlas should lose a bit of eth used for gas refund
+        assertTrue((userEndingETH - userStartingETH) > 1 ether, "user incorrect ending ETH"); // user bal should increase by more than 1e (bid + gas refund)
     }
 }
 
