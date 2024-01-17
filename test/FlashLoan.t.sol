@@ -3,7 +3,7 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { ERC20 } from "solmate/tokens/ERC20.sol";
+import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { ArbitrageTest } from "./base/ArbitrageTest.t.sol";
@@ -267,7 +267,13 @@ contract DummyDAppControlBuilder is DAppControl {
         weth = _weth;
     }
 
-    function _allocateValueCall(address, uint256, bytes calldata) internal override { }
+    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
+        if (bidToken != address(0)) {
+            revert("not supported");
+        } else {
+            SafeTransferLib.safeTransferETH(_user(), address(this).balance);
+        }
+    }
 
     function getBidFormat(UserOperation calldata) public view override returns (address bidToken) {
         bidToken = address(0);
