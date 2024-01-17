@@ -38,6 +38,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
     uint256 internal constant ALL_BITS_TRUE =
         uint256(0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF);
 
+    uint256 internal constant FULL_BITMAP = uint256(0x0000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF);
+
     uint8 internal constant MAX_SOLVERS = type(uint8).max - 2;
 
     error InvalidCaller();
@@ -314,8 +316,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
     // Returns true if nonce is valid, otherwise returns false
     function _handleNonces(address account, uint256 nonce, bool async, bool isSimulation) internal returns (bool) {
         // TODO remove
-        logIfGov(account, "account:", account, 0);
-        logIfGov(account, "nonce:", address(0), nonce);
+        console.log(account, "account:", account);
+        console.log(account, "nonce:", nonce);
 
         if (nonce > type(uint128).max - 1) {
             return false;
@@ -342,6 +344,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
         } else {
             // ASYNC NONCES
 
+            // TODO fix this - bitmap ticking up issue
+            // uint256 bitmapIndex = ((nonce - 1) / 240) + 1; // +1 because highestFullBitmap initializes at 0
+            // uint256 bitmapNonce = ((nonce - 1) % 240);
+
             uint256 bitmapIndex = (nonce / 240) + 1; // +1 because highestFullBitmap initializes at 0
             uint256 bitmapNonce = nonce % 240;
 
@@ -350,7 +356,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
             uint256 bitmap = uint256(nonceBitmap.bitmap);
 
             // Even if nonce rejected, increment highestFullAsyncBitmap to keep records up to date
-            if (!isSimulation && _isBitmapFull(bitmap)) {
+            if (!isSimulation && bitmap == FULL_BITMAP) {
                 if (bitmapIndex == nonceTracker.highestFullAsyncBitmap + 1) {
                     ++nonceTracker.highestFullAsyncBitmap;
                     nonceTrackers[account] = nonceTracker;
@@ -376,7 +382,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
             }
 
             // Mark bitmap as full if necessary
-            if (_isBitmapFull(bitmap)) {
+            if (bitmap == FULL_BITMAP) {
                 // Update highestFullAsyncBitmap if necessary
                 if (bitmapIndex == nonceTracker.highestFullAsyncBitmap + 1) {
                     ++nonceTracker.highestFullAsyncBitmap;
@@ -507,15 +513,11 @@ contract AtlasVerification is EIP712, DAppIntegration {
         }
     }
 
-    // Of the 256-bit bitmap param, only the rightmost 240 bits are checked.
-    // The leftmost 16 bits are ignored - 8 for highestUsedNonce, and 8 unused
-    function _isBitmapFull(uint256 bitmap) internal pure returns (bool) {
-        // Set first 16 bits to true, to ignore those - only rightmost 240 bits hold the bitmap
-        return ((bitmap | FIRST_16_BITS_TRUE) & ALL_BITS_TRUE) == ALL_BITS_TRUE;
-    }
-
     // Only accurate for nonces 1 - 240 within a 256-bit bitmap
-    function _nonceUsedInBitmap(uint256 bitmap, uint256 nonce) internal pure returns (bool) {
+    function _nonceUsedInBitmap(uint256 bitmap, uint256 nonce) internal view returns (bool) {
+        console.log("checking nonceUsedInBitmap", bitmap, nonce);
+        console.log("answer", (bitmap & (1 << nonce)) != 0);
+
         return (bitmap & (1 << nonce)) != 0;
     }
 }

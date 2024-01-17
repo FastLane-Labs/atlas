@@ -7,6 +7,7 @@ import { DAppConfig, DAppOperation, CallConfig } from "src/contracts/types/DAppA
 import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
 import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
 import { ValidCallsResult } from "src/contracts/types/ValidCallsTypes.sol";
+import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import { AtlasVerificationBase } from "./AtlasVerification.t.sol";
 
 
@@ -221,6 +222,76 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         }
 
         assertEq(atlasVerification.getNextNonce(governanceEOA, true), 9, "Next nonce should be 9 after 8 seq nonces used");
+    }
+
+    function testHighestFullBitmapIncreasesWhenFilled_Async() public {
+        uint128 highestFullBitmap;
+
+        // Modify storage such that bitmap at index 1 has 239 of 240 nonces used
+
+        uint256 noncesUsed = 239;
+        uint256 bitmap = (2 ** noncesUsed - 1) << 8;
+        uint256 highestUsedNonceInBitmap = uint256(noncesUsed);
+        uint256 nonceBitmapSlot = highestUsedNonceInBitmap | bitmap;
+
+        console.log("bitmap", bitmap);
+        console.log("highestUsedNonceInBitmap", highestUsedNonceInBitmap);
+        console.log("nonceBitmapSlot", nonceBitmapSlot);
+
+        // TODO - get the slot and set its value to nonceBitmapSlot
+
+        // Only concerned with async user nonces in this test
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(false).withDappNoncesSequenced(true).build());
+
+        // UserOperation memory userOp = validUserOperation().withNonce(239).build();
+        // SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        // DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).signAndBuild(address(atlasVerification), governancePK);
+        // // First call initializes at nonce = 1
+        // doValidCalls(AtlasVerificationBase.ValidCallsCall({
+        //     userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+        // ));
+
+        bytes32 bitmapKey = keccak256(abi.encode(userEOA, 1));
+        
+        vm.record();
+        (uint8 highestUsedNonce,) = atlasVerification.nonceBitmaps(bitmapKey);
+
+        (bytes32[] memory reads, ) = vm.accesses(address(atlasVerification));
+        console.log("Reads[0]", uint256(reads[0]));
+
+        uint256 val = uint256(vm.load(address(atlasVerification), reads[0]));
+        console.log("Value at read slot", val);
+
+        vm.store(address(atlasVerification), reads[0], bytes32(nonceBitmapSlot));
+
+
+        console.log("Next nonce after store", atlasVerification.getNextNonce(userEOA, false));
+
+        (uint8 storedHighestUsedNonce, uint240 storedNonceBitmap) = atlasVerification.nonceBitmaps(bitmapKey);
+
+        console.log("storedHighestUsedNonce", storedHighestUsedNonce);
+        console.log("storedNonceBitmap", storedNonceBitmap);
+
+        // Then do a call with nonce 240 to fill the bitmap
+        
+        
+
+        (, highestFullBitmap) = atlasVerification.nonceTrackers(userEOA);
+        assertEq(highestFullBitmap, 0, "Highest full bitmap should 0 if 239 nonces used");
+        (highestUsedNonce,) = atlasVerification.nonceBitmaps(bitmapKey);
+        assertEq(highestUsedNonce, noncesUsed, "Highest used nonce should be 239");
+        assertEq(atlasVerification.getNextNonce(userEOA, false), 240, "Next nonce should be 240 if 239 nonces used");
+
+        UserOperation memory userOp = validUserOperation().withNonce(240).build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).signAndBuild(address(atlasVerification), governancePK);
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+        ), ValidCallsResult.Valid);
+
+        (, highestFullBitmap) = atlasVerification.nonceTrackers(userEOA);
+        assertEq(highestFullBitmap, 1, "Highest full bitmap should be 1 after 240 nonces used");
+        assertEq(atlasVerification.getNextNonce(userEOA, false), 241, "Next nonce should be 241 after 240 nonces used");
     }
    
 }
