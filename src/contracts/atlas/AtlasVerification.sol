@@ -33,26 +33,12 @@ contract AtlasVerification is EIP712, DAppIntegration {
     using CallBits for uint32;
     using CallVerification for UserOperation;
 
-    uint256 internal constant FIRST_16_BITS_TRUE =
-        uint256(0xFFFF000000000000000000000000000000000000000000000000000000000000);
-    uint256 internal constant ALL_BITS_TRUE =
-        uint256(0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF);
-
     uint256 internal constant FULL_BITMAP = uint256(0x0000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF);
-
     uint8 internal constant MAX_SOLVERS = type(uint8).max - 2;
 
     error InvalidCaller();
 
     constructor(address _atlas) EIP712("ProtoCallHandler", "0.0.1") DAppIntegration(_atlas) { }
-
-    // TODO delete this
-    function logIfGov(address account, string memory message, address addrToLog, uint256 uintToLog) internal {
-        if (account == 0x97663E0c017FE7194C5D5c0b03D9BE6B54f4aF38) {
-            if (addrToLog != address(0)) console.log("GOV:", message, addrToLog);
-            else console.log("GOV:", message, uintToLog);
-        }
-    }
 
     function validCalls(
         DAppConfig calldata dConfig,
@@ -315,19 +301,12 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
     // Returns true if nonce is valid, otherwise returns false
     function _handleNonces(address account, uint256 nonce, bool async, bool isSimulation) internal returns (bool) {
-        // TODO remove
-        console.log(account, "account:", account);
-        console.log(account, "nonce:", nonce);
-
         if (nonce > type(uint128).max - 1) {
             return false;
         }
 
-        if (!isSimulation && nonce == 0) {
-            // Allow 0 nonce for simulations to avoid unnecessary init txs
-            // For non-simulation calls, 0 is not a valid nonce
-            return false;
-        }
+        // 0 Nonces are not allowed. Nonces start at 1 for both sequenced and async.
+        if (nonce == 0) return false;
 
         NonceTracker memory nonceTracker = nonceTrackers[account];
 
@@ -344,12 +323,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
         } else {
             // ASYNC NONCES
 
-            // TODO fix this - bitmap ticking up issue
-            // uint256 bitmapIndex = ((nonce - 1) / 240) + 1; // +1 because highestFullBitmap initializes at 0
-            // uint256 bitmapNonce = ((nonce - 1) % 240);
-
-            uint256 bitmapIndex = (nonce / 240) + 1; // +1 because highestFullBitmap initializes at 0
-            uint256 bitmapNonce = nonce % 240;
+            uint256 bitmapIndex = ((nonce - 1) / 240) + 1; // +1 because highestFullBitmap initializes at 0
+            uint256 bitmapNonce = ((nonce - 1) % 240); // 1 -> 0, 240 -> 239. Needed for shifts in bitmap.
 
             bytes32 bitmapKey = keccak256(abi.encode(account, bitmapIndex));
             NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
@@ -376,9 +351,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
             bitmap |= 1 << bitmapNonce;
             nonceBitmap.bitmap = uint240(bitmap);
 
-            // Update highestUsedNonce if necessary
-            if (bitmapNonce > uint256(nonceBitmap.highestUsedNonce)) {
-                nonceBitmap.highestUsedNonce = uint8(bitmapNonce);
+            // Update highestUsedNonce if necessary.
+            // Add 1 back to bitmapNonce: 1 -> 1, 240 -> 240. As opposed to the shift form used above.
+            if (bitmapNonce + 1 > uint256(nonceBitmap.highestUsedNonce)) {
+                nonceBitmap.highestUsedNonce = uint8(bitmapNonce + 1);
             }
 
             // Mark bitmap as full if necessary
@@ -514,10 +490,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     }
 
     // Only accurate for nonces 1 - 240 within a 256-bit bitmap
-    function _nonceUsedInBitmap(uint256 bitmap, uint256 nonce) internal view returns (bool) {
-        console.log("checking nonceUsedInBitmap", bitmap, nonce);
-        console.log("answer", (bitmap & (1 << nonce)) != 0);
-
+    function _nonceUsedInBitmap(uint256 bitmap, uint256 nonce) internal pure returns (bool) {
         return (bitmap & (1 << nonce)) != 0;
     }
 }
