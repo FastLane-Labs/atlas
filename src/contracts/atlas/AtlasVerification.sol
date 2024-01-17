@@ -354,8 +354,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 if (bitmapIndex == nonceTracker.highestFullAsyncBitmap + 1) {
                     ++nonceTracker.highestFullAsyncBitmap;
                     nonceTrackers[account] = nonceTracker;
-
-                    // TODO do I need to update and store nonceBitmap here as well?
                 }
                 return false;
             }
