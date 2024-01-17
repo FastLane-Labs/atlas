@@ -6,21 +6,21 @@ import "forge-std/Test.sol";
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
-import { TxBuilder } from "../src/contracts/helpers/TxBuilder.sol";
-import { SolverOperation } from "../src/contracts/types/SolverCallTypes.sol";
-import { UserOperation } from "../src/contracts/types/UserCallTypes.sol";
-import { DAppOperation, DAppConfig } from "../src/contracts/types/DAppApprovalTypes.sol";
+import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
+import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
+import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
+import { DAppOperation, DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 
-import { SafetyBits } from "../src/contracts/libraries/SafetyBits.sol";
-import "../src/contracts/types/LockTypes.sol";
+import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
+import "src/contracts/types/LockTypes.sol";
 
 import { TestUtils } from "./base/TestUtils.sol";
 
-import { SwapIntentController, SwapIntent, Condition } from "../src/contracts/examples/intents-example/SwapIntent.sol";
+import { SwapIntentController, SwapIntent, Condition } from "src/contracts/examples/intents-example/SwapIntent.sol";
 
-import { SolverBase } from "../src/contracts/solver/SolverBase.sol";
+import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
-import { IEscrow } from "../src/contracts/interfaces/IEscrow.sol";
+import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
 
 contract AccountingTest is BaseTest {
     SwapIntentController public swapIntentController;

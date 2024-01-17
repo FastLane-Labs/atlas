@@ -8,15 +8,15 @@ import { ERC20 } from "solmate/tokens/ERC20.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
 import "./base/TestUtils.sol";
 
-import { Permit69 } from "../src/contracts/common/Permit69.sol";
-import { Mimic } from "../src/contracts/atlas/Mimic.sol";
+import { Permit69 } from "src/contracts/common/Permit69.sol";
+import { Mimic } from "src/contracts/atlas/Mimic.sol";
 
-import { EXECUTION_PHASE_OFFSET } from "../src/contracts/libraries/SafetyBits.sol";
-import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "../src/contracts/common/Permit69.sol";
+import { EXECUTION_PHASE_OFFSET } from "src/contracts/libraries/SafetyBits.sol";
+import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "src/contracts/common/Permit69.sol";
 
-import { FastLaneErrorsEvents } from "../src/contracts/types/Emissions.sol";
+import { FastLaneErrorsEvents } from "src/contracts/types/Emissions.sol";
 
-import "../src/contracts/types/LockTypes.sol";
+import "src/contracts/types/LockTypes.sol";
 
 contract Permit69Test is BaseTest {
     uint16 constant EXEC_PHASE_PRE_OPS = uint16(1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps)));

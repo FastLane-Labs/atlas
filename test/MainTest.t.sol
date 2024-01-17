@@ -3,21 +3,21 @@ pragma solidity 0.8.22;
 
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 
-import { IDAppIntegration } from "../src/contracts/interfaces/IDAppIntegration.sol";
-import { IExecutionEnvironment } from "../src/contracts/interfaces/IExecutionEnvironment.sol";
+import { IDAppIntegration } from "src/contracts/interfaces/IDAppIntegration.sol";
+import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 
-import { Atlas } from "../src/contracts/atlas/Atlas.sol";
-import { Mimic } from "../src/contracts/atlas/Mimic.sol";
+import { Atlas } from "src/contracts/atlas/Atlas.sol";
+import { Mimic } from "src/contracts/atlas/Mimic.sol";
 
-import { V2DAppControl } from "../src/contracts/examples/v2-example/V2DAppControl.sol";
+import { V2DAppControl } from "src/contracts/examples/v2-example/V2DAppControl.sol";
 
 import { Solver } from "src/contracts/solver/src/TestSolver.sol";
 
-import "../src/contracts/types/UserCallTypes.sol";
-import "../src/contracts/types/SolverCallTypes.sol";
-import "../src/contracts/types/EscrowTypes.sol";
-import "../src/contracts/types/LockTypes.sol";
-import "../src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/UserCallTypes.sol";
+import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/EscrowTypes.sol";
+import "src/contracts/types/LockTypes.sol";
+import "src/contracts/types/DAppApprovalTypes.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { V2Helper } from "./V2Helper.sol";

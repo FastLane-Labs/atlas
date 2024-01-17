@@ -4,25 +4,25 @@ pragma solidity 0.8.22;
 import "forge-std/Test.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
 
-import { ExecutionEnvironment } from "../src/contracts/atlas/ExecutionEnvironment.sol";
-import { DAppControl } from "../src/contracts/dapp/DAppControl.sol";
+import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
+import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 
-import { IFactory } from "../src/contracts/interfaces/IFactory.sol";
+import { IFactory } from "src/contracts/interfaces/IFactory.sol";
 
-import { SafetyBits } from "../src/contracts/libraries/SafetyBits.sol";
+import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 
-import { SolverBase } from "../src/contracts/solver/SolverBase.sol";
+import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 
-import { FastLaneErrorsEvents } from "../src/contracts/types/Emissions.sol";
+import { FastLaneErrorsEvents } from "src/contracts/types/Emissions.sol";
 
-import "../src/contracts/types/DAppApprovalTypes.sol";
-import "../src/contracts/types/UserCallTypes.sol";
-import "../src/contracts/types/SolverCallTypes.sol";
-import "../src/contracts/types/LockTypes.sol";
+import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/UserCallTypes.sol";
+import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/LockTypes.sol";
 
-import "../src/contracts/libraries/CallBits.sol";
+import "src/contracts/libraries/CallBits.sol";
 
 /// @notice ExecutionEnvironmentTest tests deploy ExecutionEnvironment contracts through the factory. Because all calls
 /// are delegated through the mimic contract, the reported coverage is at 0%, but the actual coverage is close to 100%.

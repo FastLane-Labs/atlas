@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import { DAppControl } from "../../src/contracts/dapp/DAppControl.sol";
+import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 
-import "../../src/contracts/types/DAppApprovalTypes.sol";
-import "../../src/contracts/types/UserCallTypes.sol";
-import "../../src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/UserCallTypes.sol";
+import "src/contracts/types/SolverCallTypes.sol";
 
 contract DummyDAppControl is DAppControl {
     constructor(
