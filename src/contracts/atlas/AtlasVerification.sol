@@ -271,12 +271,12 @@ contract AtlasVerification is EIP712, DAppIntegration {
         if (!signatories[keccak256(abi.encode(govData.governance, dAppOp.control, dAppOp.from))]) {
             bool bypassSignatoryCheck = isSimulation && dAppOp.from == address(0);
             if (!bypassSignatoryCheck) {
-                return (false);
+                return false;
             }
         }
 
         if (dAppOp.control != dConfig.to) {
-            return (false);
+            return false;
         }
 
         // NOTE: This check does not work if DAppControl is a proxy contract.
@@ -284,7 +284,13 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // former employees, or beneficiary uncertainty during intra-DAO conflict,
         // governance should refrain from using a proxy contract for DAppControl.
         if (dConfig.to.codehash == bytes32(0)) {
-            return (false);
+            return false;
+        }
+
+        // If dAppOp.from is left blank and sim = true,
+        // implies a simUserOp call, so dapp nonce check is skipped.
+        if (dAppOp.from == address(0) && isSimulation) {
+            return true;
         }
 
         // If the dapp indicated that they only accept sequenced nonces
@@ -293,10 +299,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // which builders or validators may be able to profit via censorship.
         // DApps are encouraged to rely on the deadline parameter.
         if (!_handleNonces(dAppOp.from, dAppOp.nonce, !dConfig.callConfig.needsSequencedDAppNonces(), isSimulation)) {
-            return (false);
+            return false;
         }
 
-        return (true);
+        return true;
     }
 
     // Returns true if nonce is valid, otherwise returns false
