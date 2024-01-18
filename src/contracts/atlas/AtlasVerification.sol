@@ -17,6 +17,7 @@ import { EscrowBits } from "../libraries/EscrowBits.sol";
 import { CallVerification } from "../libraries/CallVerification.sol";
 
 import { DAppIntegration } from "./DAppIntegration.sol";
+import { FastLaneErrorsEvents } from "../types/Emissions.sol";
 
 import "forge-std/Test.sol"; // TODO remove
 
@@ -532,6 +533,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
             }
         }
 
-        return 0; // Only returns 0 if bitmap is full
+        revert FastLaneErrorsEvents.NoUnusedNonceInBitmap();
     }
 }
