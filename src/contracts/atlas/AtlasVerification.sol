@@ -499,4 +499,40 @@ contract AtlasVerification is EIP712, DAppIntegration {
     function _nonceUsedInBitmap(uint256 bitmap, uint256 nonce) internal pure returns (bool) {
         return (bitmap & (1 << nonce)) != 0;
     }
+
+    // Returns the first unused nonce in the given bitmap.
+    // Returned nonce is 1-indexed. If 0 returned, bitmap is full.
+    function _getFirstUnusedNonceInBitmap(uint256 bitmap) internal pure returns (uint256) {
+        // Check the 240-bit bitmap, 16 bits at a time, if a 16 bit chunk is not full.
+        // Then check the located 16-bit chunk, 4 bits at a time, for an unused 4-bit chunk.
+        // Then loop normally from the start of the 4-bit chunk to find the first unused bit.
+
+        // TODO move to constants
+        uint256 FIRST_16_BITS_FULL = uint256(0xFFFF);
+        uint256 FIRST_4_BITS_FULL = uint256(0xF);
+
+        for (uint256 i = 0; i < 240; i += 16) {
+            // Isolate the next 16 bits to check
+            uint256 chunk16 = (bitmap >> i) & FIRST_16_BITS_FULL;
+            // Find non-full 16-bit chunk
+            if (chunk16 != FIRST_16_BITS_FULL) {
+                for (uint256 j = 0; j < 16; j += 4) {
+                    // Isolate the next 4 bits within the 16-bit chunk to check
+                    uint256 chunk4 = (chunk16 >> j) & FIRST_4_BITS_FULL;
+                    // Find non-full 4-bit chunk
+                    if (chunk4 != FIRST_4_BITS_FULL) {
+                        for (uint256 k = 0; k < 4; k++) {
+                            // Find first unused bit
+                            if ((chunk4 >> k) & 0x1 == 0) {
+                                // Returns 1-indexed nonce
+                                return i + j + k + 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return 0; // Only returns 0 if bitmap is full
+    }
 }
