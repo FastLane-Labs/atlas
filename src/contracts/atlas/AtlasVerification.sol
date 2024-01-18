@@ -499,6 +499,28 @@ contract AtlasVerification is EIP712, DAppIntegration {
         }
     }
 
+    // Call if highestFullAsyncBitmap doesn't reflect real full bitmap of an account
+    function manuallyUpdateNonceTracker(address account) external {
+        if (msg.sender != account) revert FastLaneErrorsEvents.OnlyAccount();
+
+        NonceTracker memory nonceTracker = nonceTrackers[account];
+        NonceBitmap memory nonceBitmap;
+
+        // Checks the next 10 bitmaps for a higher full bitmap
+        uint128 nonceIndexToCheck = nonceTracker.highestFullAsyncBitmap + 10;
+        for (; nonceIndexToCheck > nonceTracker.highestFullAsyncBitmap; nonceIndexToCheck--) {
+            bytes32 bitmapKey = keccak256(abi.encode(account, nonceIndexToCheck));
+            nonceBitmap = nonceBitmaps[bitmapKey];
+
+            if (nonceBitmap.bitmap == FULL_BITMAP) {
+                nonceTracker.highestFullAsyncBitmap = nonceIndexToCheck;
+                break;
+            }
+        }
+
+        nonceTrackers[account] = nonceTracker;
+    }
+
     // Only accurate for nonces 1 - 240 within a 256-bit bitmap
     function _nonceUsedInBitmap(uint256 bitmap, uint256 nonce) internal pure returns (bool) {
         return (bitmap & (1 << nonce)) != 0;

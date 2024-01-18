@@ -104,6 +104,7 @@ contract FastLaneErrorsEvents {
 
     // AtlasVerification
     error NoUnusedNonceInBitmap();
+    error OnlyAccount();
 
     /*
     event NewDAppIntegration(
