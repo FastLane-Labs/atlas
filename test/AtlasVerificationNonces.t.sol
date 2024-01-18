@@ -265,4 +265,41 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         assertEq(highestFullBitmap, 1, "Highest full bitmap should be 1 after 240 nonces used");
         assertEq(atlasVerification.getNextNonce(userEOA, false), 241, "Next nonce should be 241 after 240 nonces used");
     }
+
+    function testGetFirstUnusedNonceInBitmap() public {
+        MockVerification mockVerification = new MockVerification(address(atlas));
+
+        // empty bitmap should return 1
+        assertEq(mockVerification.getFirstUnusedNonceInBitmap(0), 1, "Empty bitmap should return 1");
+
+        // full bitmap should return 0
+        assertEq(mockVerification.getFirstUnusedNonceInBitmap(type(uint240).max), 0, "Full bitmap should return 0");
+
+        // bitmap 000...01 should return 2
+        assertEq(mockVerification.getFirstUnusedNonceInBitmap(1), 2, "Bitmap 000...01 should return 2");
+
+        // bitmap 000...10 should return 1
+        assertEq(mockVerification.getFirstUnusedNonceInBitmap(2), 1, "Bitmap 000...10 should return 1");
+
+        // bitmap 000...11 should return 3
+        assertEq(mockVerification.getFirstUnusedNonceInBitmap(3), 3, "Bitmap 000...11 should return 3");
+
+        // bitmap 000...1101_1111_1111_1111_1111_1111_1111_1111_1111 should return 34
+        // because 2 full 16-bit chunks used, and 1 bit used in the 3rd chunk before an unused bit
+        // 60129542143 = 000...1101_1111_1111_1111_1111_1111_1111_1111_1111
+        assertEq(mockVerification.getFirstUnusedNonceInBitmap(60129542143), 34, "Bitmap 000...1101 (+32 more 1s) should return 34");
+
+        // bitmap 0111...111 should return 240 - only last bit unused
+        // type(uint240).max - (2 ** 239) = 0111...111 (only last bit unused)
+        uint256 leftmostBitFree = type(uint240).max - (2 ** 239);
+        assertEq(mockVerification.getFirstUnusedNonceInBitmap(leftmostBitFree), 240, "Bitmap 0111...111 should return 240");
+    }
+}
+
+contract MockVerification is AtlasVerification {
+    constructor(address _atlas) AtlasVerification(_atlas) {}
+
+    function getFirstUnusedNonceInBitmap(uint256 bitmap) public pure returns (uint256) {
+        return _getFirstUnusedNonceInBitmap(bitmap);
+    }
 }

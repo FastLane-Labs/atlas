@@ -34,6 +34,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
     using CallVerification for UserOperation;
 
     uint256 internal constant FULL_BITMAP = uint256(0x0000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF);
+    uint256 internal constant FIRST_16_BITS_FULL = uint256(0xFFFF);
+    uint256 internal constant FIRST_4_BITS_FULL = uint256(0xF);
     uint8 internal constant MAX_SOLVERS = type(uint8).max - 2;
 
     error InvalidCaller();
@@ -506,10 +508,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // Check the 240-bit bitmap, 16 bits at a time, if a 16 bit chunk is not full.
         // Then check the located 16-bit chunk, 4 bits at a time, for an unused 4-bit chunk.
         // Then loop normally from the start of the 4-bit chunk to find the first unused bit.
-
-        // TODO move to constants
-        uint256 FIRST_16_BITS_FULL = uint256(0xFFFF);
-        uint256 FIRST_4_BITS_FULL = uint256(0xF);
 
         for (uint256 i = 0; i < 240; i += 16) {
             // Isolate the next 16 bits to check
