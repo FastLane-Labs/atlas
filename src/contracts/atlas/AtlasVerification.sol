@@ -493,7 +493,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
             bytes32 bitmapKey = keccak256(abi.encode(account, nonceTracker.highestFullAsyncBitmap + 1));
             NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
 
-            return ((nonceTracker.highestFullAsyncBitmap * 240) + nonceBitmap.highestUsedNonce + 1);
+            return
+                (nonceTracker.highestFullAsyncBitmap * 240) + _getFirstUnusedNonceInBitmap(uint256(nonceBitmap.bitmap));
         }
     }
 
