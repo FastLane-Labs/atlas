@@ -31,6 +31,8 @@ contract Atlas is Escrow, Factory {
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
+    event MetacallResult(address indexed bundler, address indexed user, address indexed winningSolver);
+
     constructor(
         uint256 _escrowDuration,
         address _verification,
@@ -78,6 +80,8 @@ contract Atlas is Escrow, Factory {
             auctionWon = _auctionWon;
             // Gas Refund to sender only if execution is successful
             _settle({ winningSolver: auctionWon ? solverOps[winningSolverIndex].from : msg.sender, bundler: msg.sender });
+
+            emit MetacallResult(msg.sender, userOp.from, auctionWon ? solverOps[winningSolverIndex].from : address(0));
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
             _handleErrors(bytes4(revertData), dConfig.callConfig);

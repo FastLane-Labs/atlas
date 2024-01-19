@@ -12,6 +12,8 @@ abstract contract Factory {
     bytes32 public immutable salt;
     address public immutable executionTemplate;
 
+    event ExecutionEnvironmentCreated(address indexed user, address indexed executionEnvironment);
+
     // NOTE: The ExecutionEnvironment Template must be separately deployed using the same salt as calculated below
     constructor(address _executionTemplate) {
         salt = keccak256(abi.encodePacked(block.chainid, address(this), "AtlasFactory 1.0"));
@@ -79,6 +81,7 @@ abstract contract Factory {
             assembly {
                 executionEnvironment := create2(0, add(creationCode, 32), mload(creationCode), memSalt)
             }
+            emit ExecutionEnvironmentCreated(user, executionEnvironment);
         }
     }
 

@@ -20,6 +20,8 @@ abstract contract SafetyLocks is Storage, FastLaneErrorsEvents {
     using SafetyBits for EscrowKey;
     using CallBits for uint32;
 
+    event EscrowLocked(address indexed executionEnvironment, uint256 claims);
+
     constructor(
         uint256 _escrowDuration,
         address _verification,
@@ -40,6 +42,8 @@ abstract contract SafetyLocks is Storage, FastLaneErrorsEvents {
         // Set any withdraws or deposits
         withdrawals = userOpValue;
         deposits = msg.value;
+
+        emit EscrowLocked(executionEnvironment, claims);
     }
 
     // TODO are all these checks necessary? More gas efficient was to check if unlocked?
