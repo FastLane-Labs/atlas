@@ -341,10 +341,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
             // Even if nonce rejected, increment highestFullAsyncBitmap to keep records up to date
             if (!isSimulation && bitmap == FULL_BITMAP) {
-                if (bitmapIndex == nonceTracker.highestFullAsyncBitmap + 1) {
-                    ++nonceTracker.highestFullAsyncBitmap;
-                    nonceTrackers[account] = nonceTracker;
-                }
+                _incrementHighestFullAsyncBitmap(nonceTracker, account);
                 return false;
             }
 
@@ -366,19 +363,24 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 nonceBitmap.highestUsedNonce = uint8(bitmapNonce + 1);
             }
 
-            // Mark bitmap as full if necessary
-            if (bitmap == FULL_BITMAP) {
-                // Update highestFullAsyncBitmap if necessary
-                if (bitmapIndex == nonceTracker.highestFullAsyncBitmap + 1) {
-                    ++nonceTracker.highestFullAsyncBitmap;
-                }
-            }
-
             nonceBitmaps[bitmapKey] = nonceBitmap;
         }
 
         nonceTrackers[account] = nonceTracker;
         return true;
+    }
+
+    function _incrementHighestFullAsyncBitmap(NonceTracker memory nonceTracker, address account) internal {
+
+        uint256 bitmap;
+        do {
+            unchecked{++nonceTracker.highestFullAsyncBitmap;}
+            uint256 bitmapIndex = uint256(nonceTracker.highestFullAsyncBitmap) + 1;
+            bytes32 bitmapKey = keccak256(abi.encode(account, bitmapIndex));
+            bitmap = uint256(nonceBitmaps[bitmapKey].bitmap);
+        } while (bitmap == FULL_BITMAP);
+
+        nonceTrackers[account] = nonceTracker;
     }
 
     function _getProofHash(DAppOperation memory approval) internal pure returns (bytes32 proofHash) {
@@ -490,12 +492,19 @@ contract AtlasVerification is EIP712, DAppIntegration {
         if (sequenced) {
             return nonceTracker.lastUsedSeqNonce + 1;
         } else {
-            // Async bitmaps start at index 1. I.e. accounts start with bitmap 0 = HighestFullAsyncBitmap
-            bytes32 bitmapKey = keccak256(abi.encode(account, nonceTracker.highestFullAsyncBitmap + 1));
-            NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
+            uint256 n;
+            uint256 bitmap256;
+            do {
+                unchecked {++n;}
+                // Async bitmaps start at index 1. I.e. accounts start with bitmap 0 = HighestFullAsyncBitmap
+                bytes32 bitmapKey = keccak256(abi.encode(account, nonceTracker.highestFullAsyncBitmap + n));
+                NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
+                bitmap256 = uint256(nonceBitmap.bitmap);
 
-            return
-                (nonceTracker.highestFullAsyncBitmap * 240) + _getFirstUnusedNonceInBitmap(uint256(nonceBitmap.bitmap));
+            } while (bitmap256 == FULL_BITMAP);
+
+            uint256 remainder = _getFirstUnusedNonceInBitmap(bitmap256);
+            return (nonceTracker.highestFullAsyncBitmap * 240) + remainder;
         }
     }
 
@@ -555,6 +564,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
             }
         }
 
-        revert FastLaneErrorsEvents.NoUnusedNonceInBitmap();
+        return 0;
     }
 }
