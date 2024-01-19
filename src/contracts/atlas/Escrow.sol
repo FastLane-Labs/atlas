@@ -26,6 +26,10 @@ abstract contract Escrow is AtlETH {
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
+    event PreOpsCall(address environment, bool success, bytes returnData);
+    event UserCall(address environment, bool success, bytes returnData);
+    event PostOpsCall(address environment, bool success); // No return data tracking for post ops?
+
     constructor(
         uint256 _escrowDuration,
         address _verification,
@@ -55,6 +59,7 @@ abstract contract Escrow is AtlETH {
         if (success) {
             preOpsData = abi.decode(preOpsData, (bytes));
         }
+        emit PreOpsCall(environment, success, preOpsData);
     }
 
     function _executeUserOperation(
@@ -74,6 +79,8 @@ abstract contract Escrow is AtlETH {
         if (success) {
             userData = abi.decode(userData, (bytes));
         }
+
+        emit UserCall(environment, success, userData);
     }
 
     function _executeSolverOperation(
@@ -162,6 +169,7 @@ abstract contract Escrow is AtlETH {
             abi.encodeWithSelector(IExecutionEnvironment.postOpsWrapper.selector, solved, returnData);
         postOpsData = abi.encodePacked(postOpsData, lockBytes);
         (success,) = environment.call(postOpsData);
+        emit PostOpsCall(environment, success);
     }
 
     // TODO Revisit the EscrowAccountBalance memory solverEscrow arg. Needs to be passed through from Atlas, through

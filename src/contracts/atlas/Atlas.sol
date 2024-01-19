@@ -32,6 +32,7 @@ contract Atlas is Escrow, Factory {
     using SafetyBits for EscrowKey;
 
     event MetacallResult(address indexed bundler, address indexed user, address indexed winningSolver);
+    event SolverExecution(address indexed solver, uint256 index, bool isWin);
 
     constructor(
         uint256 _escrowDuration,
@@ -169,6 +170,7 @@ contract Atlas is Escrow, Factory {
             (auctionWon, key) = _solverExecutionIteration(
                 dConfig, solverOps[winningSearcherIndex], returnData, auctionWon, executionEnvironment, key
             );
+            emit SolverExecution(solverOps[winningSearcherIndex].from, winningSearcherIndex, auctionWon);
             if (auctionWon) break;
 
             unchecked {
