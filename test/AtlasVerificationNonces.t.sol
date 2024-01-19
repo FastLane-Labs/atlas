@@ -272,9 +272,10 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         // empty bitmap should return 1
         assertEq(mockVerification.getFirstUnusedNonceInBitmap(0), 1, "Empty bitmap should return 1");
 
-        // full bitmap should revert
-        vm.expectRevert(FastLaneErrorsEvents.NoUnusedNonceInBitmap.selector);
-        mockVerification.getFirstUnusedNonceInBitmap(type(uint240).max);
+        // full bitmap should return 0
+        // vm.expectRevert(FastLaneErrorsEvents.NoUnusedNonceInBitmap.selector);
+        // mockVerification.getFirstUnusedNonceInBitmap(type(uint240).max);
+        assertEq(mockVerification.getFirstUnusedNonceInBitmap(type(uint240).max), 0, "Full bitmap should return 0");
 
         // bitmap 000...01 should return 2
         assertEq(mockVerification.getFirstUnusedNonceInBitmap(1), 2, "Bitmap 000...01 should return 2");
@@ -348,7 +349,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
 
         // Check highestFullAsyncBitmap is now 1
         (, highestFullBitmap) = atlasVerification.nonceTrackers(userEOA);
-        assertEq(highestFullBitmap, 1, "Highest full bitmap should be 1 after 240 nonces used");
+        assertEq(highestFullBitmap, 1, "Highest full bitmap value should be 1");
 
         // getNextNonce should return 480 = (240 used in slot 1 + 239 used in slot 2)
         assertEq(atlasVerification.getNextNonce(userEOA, false), 480, "Next unused nonce should be 480");
@@ -363,10 +364,10 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
 
         // Check highestFullAsyncBitmap is now 2
         (, highestFullBitmap) = atlasVerification.nonceTrackers(userEOA);
+        assertEq(highestFullBitmap, 2, "Highest full bitmap value should be 2");
 
-        // getNextNonce should revert because it will try to find an unused nonce in bitmap 3, which is full
-        vm.expectRevert(FastLaneErrorsEvents.NoUnusedNonceInBitmap.selector);
-        atlasVerification.getNextNonce(userEOA, false);
+        // getNextNonce should return the correct next nonce = 240 * 4 + 1 = 961
+        assertEq(atlasVerification.getNextNonce(userEOA, false), 961, "Next unused nonce should be 961");
 
         // MAIN PART OF TEST: Call manuallyUpdateNonceTracker to set highestFullAsyncBitmap to 4
         vm.prank(userEOA);

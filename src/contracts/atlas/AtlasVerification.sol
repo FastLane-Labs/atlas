@@ -363,6 +363,18 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 nonceBitmap.highestUsedNonce = uint8(bitmapNonce + 1);
             }
 
+            // Mark bitmap as full if necessary
+            if (bitmap == FULL_BITMAP) {
+                // Update highestFullAsyncBitmap if necessary
+                // Allowed to jump up to 5 bitmaps ahead
+                if (
+                    bitmapIndex > nonceTracker.highestFullAsyncBitmap
+                        && bitmapIndex <= nonceTracker.highestFullAsyncBitmap + 5
+                ) {
+                    nonceTracker.highestFullAsyncBitmap = uint128(bitmapIndex);
+                }
+            }
+
             nonceBitmaps[bitmapKey] = nonceBitmap;
         }
 
@@ -371,10 +383,11 @@ contract AtlasVerification is EIP712, DAppIntegration {
     }
 
     function _incrementHighestFullAsyncBitmap(NonceTracker memory nonceTracker, address account) internal {
-
         uint256 bitmap;
         do {
-            unchecked{++nonceTracker.highestFullAsyncBitmap;}
+            unchecked {
+                ++nonceTracker.highestFullAsyncBitmap;
+            }
             uint256 bitmapIndex = uint256(nonceTracker.highestFullAsyncBitmap) + 1;
             bytes32 bitmapKey = keccak256(abi.encode(account, bitmapIndex));
             bitmap = uint256(nonceBitmaps[bitmapKey].bitmap);
@@ -495,16 +508,17 @@ contract AtlasVerification is EIP712, DAppIntegration {
             uint256 n;
             uint256 bitmap256;
             do {
-                unchecked {++n;}
+                unchecked {
+                    ++n;
+                }
                 // Async bitmaps start at index 1. I.e. accounts start with bitmap 0 = HighestFullAsyncBitmap
                 bytes32 bitmapKey = keccak256(abi.encode(account, nonceTracker.highestFullAsyncBitmap + n));
                 NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
                 bitmap256 = uint256(nonceBitmap.bitmap);
-
             } while (bitmap256 == FULL_BITMAP);
 
             uint256 remainder = _getFirstUnusedNonceInBitmap(bitmap256);
-            return (nonceTracker.highestFullAsyncBitmap * 240) + remainder;
+            return ((nonceTracker.highestFullAsyncBitmap + n - 1) * 240) + remainder;
         }
     }
 
