@@ -339,12 +339,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
             NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
             uint256 bitmap = uint256(nonceBitmap.bitmap);
 
-            // Even if nonce rejected, increment highestFullAsyncBitmap to keep records up to date
-            if (!isSimulation && bitmap == FULL_BITMAP) {
-                _incrementHighestFullAsyncBitmap(nonceTracker, account);
-                return false;
-            }
-
             // Check if nonce has already been used
             if (_nonceUsedInBitmap(bitmap, bitmapNonce)) {
                 return false;
@@ -366,12 +360,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
             // Mark bitmap as full if necessary
             if (bitmap == FULL_BITMAP) {
                 // Update highestFullAsyncBitmap if necessary
-                // Allowed to jump up to 5 bitmaps ahead
-                if (
-                    bitmapIndex > nonceTracker.highestFullAsyncBitmap
-                        && bitmapIndex <= nonceTracker.highestFullAsyncBitmap + 5
-                ) {
-                    nonceTracker.highestFullAsyncBitmap = uint128(bitmapIndex);
+                if (bitmapIndex == nonceTracker.highestFullAsyncBitmap + 1) {
+                    nonceTracker = _incrementHighestFullAsyncBitmap(nonceTracker, account);
                 }
             }
 
@@ -382,7 +372,14 @@ contract AtlasVerification is EIP712, DAppIntegration {
         return true;
     }
 
-    function _incrementHighestFullAsyncBitmap(NonceTracker memory nonceTracker, address account) internal {
+    function _incrementHighestFullAsyncBitmap(
+        NonceTracker memory nonceTracker,
+        address account
+    )
+        internal
+        view
+        returns (NonceTracker memory)
+    {
         uint256 bitmap;
         do {
             unchecked {
@@ -393,7 +390,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
             bitmap = uint256(nonceBitmaps[bitmapKey].bitmap);
         } while (bitmap == FULL_BITMAP);
 
-        nonceTrackers[account] = nonceTracker;
+        return nonceTracker;
     }
 
     function _getProofHash(DAppOperation memory approval) internal pure returns (bytes32 proofHash) {

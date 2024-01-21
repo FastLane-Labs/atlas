@@ -297,7 +297,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         assertEq(mockVerification.getFirstUnusedNonceInBitmap(leftmostBitFree), 240, "Bitmap 0111...111 should return 240");
     }
 
-    function testManuallyUpdateNonceTracker() public {
+    function testIncrementFullBitmapEdgeCase() public {
         // For edge cases when highestFullAsyncBitmap needs to be re-synced. Example:
         // Bitmap 4 is full
         // Bitmap 3 is full
@@ -354,7 +354,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         // getNextNonce should return 480 = (240 used in slot 1 + 239 used in slot 2)
         assertEq(atlasVerification.getNextNonce(userEOA, false), 480, "Next unused nonce should be 480");
 
-        // Now use nonce 480, which should set highestFullAsyncBitmap to 2
+        // Now use nonce 480, which should full bitmap 2 and set highest bitmap to the next consecutive full bitmap (4)
         userOp = validUserOperation().withNonce(480).build();
         solverOps = validSolverOperations(userOp);
         dappOp = validDAppOperation(userOp, solverOps).withNonce(2).signAndBuild(address(atlasVerification), governancePK);
@@ -362,9 +362,9 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, isSimulation: false, msgValue: 0, msgSender: userEOA}
         ), ValidCallsResult.Valid);
 
-        // Check highestFullAsyncBitmap is now 2
+        // Check highestFullAsyncBitmap is now 4
         (, highestFullBitmap) = atlasVerification.nonceTrackers(userEOA);
-        assertEq(highestFullBitmap, 2, "Highest full bitmap value should be 2");
+        assertEq(highestFullBitmap, 4, "Highest full bitmap value should be 4");
 
         // getNextNonce should return the correct next nonce = 240 * 4 + 1 = 961
         assertEq(atlasVerification.getNextNonce(userEOA, false), 961, "Next unused nonce should be 961");
@@ -376,6 +376,47 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         // Check highestFullAsyncBitmap is now 4 and getNextNonce returns 240 * 4 + 1 = 961
         (, highestFullBitmap) = atlasVerification.nonceTrackers(userEOA);
         assertEq(highestFullBitmap, 4, "Highest full bitmap should be 4 after manually updating");
+        assertEq(atlasVerification.getNextNonce(userEOA, false), 961, "Next unused nonce should be 961");
+    }
+
+    function testManuallyUpdateNonceTracker() public {
+        uint128 highestFullBitmap;
+        uint8 highestUsedNonce;
+
+        uint256 fullBitmapSlot = uint256(240) | (uint256(type(uint240).max) << 8);
+        bytes32 bitmap1Key = keccak256(abi.encode(userEOA, 1));
+        bytes32 bitmap2Key = keccak256(abi.encode(userEOA, 2));
+        bytes32 bitmap3Key = keccak256(abi.encode(userEOA, 3));
+        bytes32 bitmap4Key = keccak256(abi.encode(userEOA, 4));
+
+        // Only concerned with async user nonces in this test
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(false).withDappNoncesSequenced(true).build());
+        
+        // Modify bitmaps 1 - 4 to be full
+        vm.record();
+        (highestUsedNonce,) = atlasVerification.nonceBitmaps(bitmap1Key);
+        (highestUsedNonce,) = atlasVerification.nonceBitmaps(bitmap2Key);
+        (highestUsedNonce,) = atlasVerification.nonceBitmaps(bitmap3Key);
+        (highestUsedNonce,) = atlasVerification.nonceBitmaps(bitmap4Key);
+        (bytes32[] memory reads, ) = vm.accesses(address(atlasVerification));
+        vm.store(address(atlasVerification), reads[0], bytes32(fullBitmapSlot));
+        vm.store(address(atlasVerification), reads[1], bytes32(fullBitmapSlot));
+        vm.store(address(atlasVerification), reads[2], bytes32(fullBitmapSlot));
+        vm.store(address(atlasVerification), reads[3], bytes32(fullBitmapSlot));
+
+        // Check highestFullAsyncBitmap is still 0
+        (, highestFullBitmap) = atlasVerification.nonceTrackers(userEOA);
+        assertEq(highestFullBitmap, 0, "Highest full bitmap should 0 because not updated yet");
+
+        // MAIN PART OF TEST: Call manuallyUpdateNonceTracker to update highestFullAsyncBitmap to 4
+        vm.prank(userEOA);
+        atlasVerification.manuallyUpdateNonceTracker(userEOA);
+
+        // Check highestFullAsyncBitmap is now 4
+        (, highestFullBitmap) = atlasVerification.nonceTrackers(userEOA);
+        assertEq(highestFullBitmap, 4, "Highest full bitmap should be 4 after manually updating");
+
+        // getNextNonce should return 240 * 4 + 1 = 961
         assertEq(atlasVerification.getNextNonce(userEOA, false), 961, "Next unused nonce should be 961");
     }
 }
