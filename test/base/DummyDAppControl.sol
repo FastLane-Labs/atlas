@@ -9,11 +9,11 @@ import "src/contracts/types/SolverCallTypes.sol";
 
 contract DummyDAppControl is DAppControl {
     constructor(
-        address escrow,
-        address governance,
+        address _escrow,
+        address _governance,
         CallConfig memory _callConfig
     )
-        DAppControl(escrow, governance, _callConfig)
+        DAppControl(_escrow, _governance, _callConfig)
     { }
 
     function _preOpsCall(UserOperation calldata) internal virtual override returns (bytes memory) { }
