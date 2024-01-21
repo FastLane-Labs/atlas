@@ -250,7 +250,8 @@ contract DummyDAppControlBuilder is DAppControl {
             _escrow,
             msg.sender,
             CallConfig({
-                sequenced: false,
+                userNoncesSequenced: false,
+                dappNoncesSequenced: false,
                 requirePreOps: false,
                 trackPreOpsReturnData: false,
                 trackUserReturnData: false,
