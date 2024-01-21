@@ -27,7 +27,8 @@ struct DAppConfig {
 }
 
 struct CallConfig {
-    bool sequenced;
+    bool userNoncesSequenced;
+    bool dappNoncesSequenced;
     bool requirePreOps;
     bool trackPreOpsReturnData;
     bool trackUserReturnData;
@@ -46,7 +47,8 @@ struct CallConfig {
 }
 
 enum CallConfigIndex {
-    Sequenced,
+    UserNoncesSequenced,
+    DAppNoncesSequenced,
     RequirePreOps,
     TrackPreOpsReturnData,
     TrackUserReturnData,

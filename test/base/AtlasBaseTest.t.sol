@@ -89,6 +89,9 @@ contract AtlasBaseTest is Test, TestConstants {
         vm.stopPrank();
 
         vm.label(userEOA, "USER");
+        vm.label(governanceEOA, "GOVERNANCE");
+        vm.label(solverOneEOA, "SOLVER_ONE");
+        vm.label(solverTwoEOA, "SOLVER_TWO");
         vm.label(escrow, "ESCROW");
         vm.label(address(atlas), "ATLAS");
     }

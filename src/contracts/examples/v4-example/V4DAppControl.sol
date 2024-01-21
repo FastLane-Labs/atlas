@@ -55,7 +55,8 @@ contract V4DAppControl is DAppControl {
             _escrow,
             msg.sender,
             CallConfig({
-                sequenced: false,
+                userNoncesSequenced: false,
+                dappNoncesSequenced: false,
                 requirePreOps: true,
                 trackPreOpsReturnData: true,
                 trackUserReturnData: false,

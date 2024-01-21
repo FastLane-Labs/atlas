@@ -28,6 +28,10 @@ abstract contract DAppControl is Test, DAppControlTemplate, ExecutionBase {
     uint8 private constant _CONTROL_DEPTH = 1 << 2;
 
     constructor(address _escrow, address _governance, CallConfig memory _callConfig) ExecutionBase(_escrow) {
+        if (_callConfig.userNoncesSequenced && _callConfig.dappNoncesSequenced) {
+            revert("DAPP AND USER CANT BOTH BE SEQ"); // TODO convert to custom errors
+        }
+
         control = address(this);
         escrow = _escrow;
         governance = _governance;
@@ -109,8 +113,12 @@ abstract contract DAppControl is Test, DAppControlTemplate, ExecutionBase {
         delegated = CallBits.needsDelegateUser(callConfig);
     }
 
-    function requireSequencedNonces() external view returns (bool isSequenced) {
-        isSequenced = CallBits.needsSequencedNonces(callConfig);
+    function requireSequencedUserNonces() external view returns (bool isSequenced) {
+        isSequenced = CallBits.needsSequencedUserNonces(callConfig);
+    }
+
+    function requireSequencedDAppNonces() external view returns (bool isSequenced) {
+        isSequenced = CallBits.needsSequencedDAppNonces(callConfig);
     }
 
     function getDAppConfig(UserOperation calldata userOp)
