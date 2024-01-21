@@ -102,6 +102,10 @@ contract FastLaneErrorsEvents {
     error NotInitialized();
     error AlreadyInitialized();
 
+    // AtlasVerification
+    error NoUnusedNonceInBitmap();
+    error OnlyAccount();
+
     /*
     event NewDAppIntegration(
         address indexed environment,
