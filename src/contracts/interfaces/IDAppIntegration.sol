@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.21;
+pragma solidity 0.8.22;
 
 interface IDAppIntegration {
     function initializeGovernance(address controller) external;
@@ -11,8 +11,6 @@ interface IDAppIntegration {
     function integrateDApp(address dAppControl) external;
 
     function disableDApp(address dAppControl) external;
-
-    function initializeNonce(address account) external;
 
     function nextGovernanceNonce(address governanceSignatory) external view returns (uint256 nextNonce);
 

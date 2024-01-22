@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.21;
+pragma solidity 0.8.22;
 
 // Base Imports
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
@@ -52,7 +52,8 @@ contract V2DAppControl is DAppControl {
             _escrow,
             msg.sender,
             CallConfig({
-                sequenced: false,
+                userNoncesSequenced: false,
+                dappNoncesSequenced: false,
                 requirePreOps: true,
                 trackPreOpsReturnData: false,
                 trackUserReturnData: false,

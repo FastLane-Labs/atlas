@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.21;
+pragma solidity 0.8.22;
 
 import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 
@@ -15,11 +15,11 @@ contract DummyDAppControl is DAppControl {
     event MEVPaymentSuccess(address bidToken, uint256 bidAmount);
 
     constructor(
-        address escrow,
-        address governance,
+        address _escrow,
+        address _governance,
         CallConfig memory _callConfig
     )
-        DAppControl(escrow, governance, _callConfig)
+        DAppControl(_escrow, _governance, _callConfig)
     { }
 
     // ****************************************
