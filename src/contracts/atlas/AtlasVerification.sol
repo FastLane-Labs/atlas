@@ -471,6 +471,9 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         if (userOp.from.code.length > 0) {
             // TODO: not sure if 30k gas limit is accurate
+            if (userOp.from == address(this) || userOp.from == ATLAS || userOp.from == userOp.control) {
+                return false;
+            }
             bool validSmartWallet = IAccount(userOp.from).validateUserOp{gas: 30_000}(userOp, _getProofHash(userOp), 0) == 0;
             return (isSimulation || validSmartWallet);
         }
