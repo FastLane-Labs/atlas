@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.21;
+pragma solidity 0.8.22;
 
 import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
@@ -33,12 +33,10 @@ interface IAtlasVerification {
     function getUserOperationPayload(UserOperation memory userOp) external view returns (bytes32 payload);
     function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload);
     function getDAppOperationPayload(DAppOperation memory dAppOp) external view returns (bytes32 payload);
-    function getNextNonce(address account) external view returns (uint256 nextNonce);
+    function getNextNonce(address account, bool sequenced) external view returns (uint256 nextNonce);
 
     function initializeGovernance(address controller) external;
     function addSignatory(address controller, address signatory) external;
     function removeSignatory(address controller, address signatory) external;
     function disableDApp(address dAppControl) external;
-
-    function initializeNonce(address account) external;
 }

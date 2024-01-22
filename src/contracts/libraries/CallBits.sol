@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.21;
+pragma solidity 0.8.22;
 
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
@@ -14,8 +14,11 @@ library CallBits {
     }
 
     function encodeCallConfig(CallConfig memory callConfig) internal pure returns (uint32 encodedCallConfig) {
-        if (callConfig.sequenced) {
-            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.Sequenced);
+        if (callConfig.userNoncesSequenced) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.UserNoncesSequenced);
+        }
+        if (callConfig.dappNoncesSequenced) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.DAppNoncesSequenced);
         }
         if (callConfig.requirePreOps) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.RequirePreOps);
@@ -66,7 +69,7 @@ library CallBits {
 
     function decodeCallConfig(uint32 encodedCallConfig) internal pure returns (CallConfig memory callConfig) {
         callConfig = CallConfig({
-            sequenced: needsSequencedNonces(encodedCallConfig),
+            userNoncesSequenced: needsSequencedUserNonces(encodedCallConfig),
             requirePreOps: needsPreOpsCall(encodedCallConfig),
             trackPreOpsReturnData: needsPreOpsReturnData(encodedCallConfig),
             trackUserReturnData: needsUserReturnData(encodedCallConfig),
@@ -81,12 +84,17 @@ library CallBits {
             unknownAuctioneer: allowsUnknownAuctioneer(encodedCallConfig),
             verifyCallChainHash: verifyCallChainHash(encodedCallConfig),
             forwardReturnData: forwardReturnData(encodedCallConfig),
-            requireFulfillment: needsFulfillment(encodedCallConfig)
-        });
+            requireFulfillment: needsFulfillment(encodedCallConfig),
+            dappNoncesSequenced: needsSequencedDAppNonces(encodedCallConfig) // TODO move to below userNoncesSequenced
+         });
     }
 
-    function needsSequencedNonces(uint32 callConfig) internal pure returns (bool sequenced) {
-        sequenced = (callConfig & 1 << uint32(CallConfigIndex.Sequenced) != 0);
+    function needsSequencedUserNonces(uint32 callConfig) internal pure returns (bool sequenced) {
+        sequenced = (callConfig & 1 << uint32(CallConfigIndex.UserNoncesSequenced) != 0);
+    }
+
+    function needsSequencedDAppNonces(uint32 callConfig) internal pure returns (bool sequenced) {
+        sequenced = (callConfig & 1 << uint32(CallConfigIndex.DAppNoncesSequenced) != 0);
     }
 
     function needsPreOpsCall(uint32 callConfig) internal pure returns (bool needsPreOps) {

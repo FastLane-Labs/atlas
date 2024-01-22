@@ -1,21 +1,17 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.21;
+pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { DAppIntegration } from "../src/contracts/atlas/DAppIntegration.sol";
-import { FastLaneErrorsEvents } from "../src/contracts/types/Emissions.sol";
+import { DAppIntegration } from "src/contracts/atlas/DAppIntegration.sol";
+import { FastLaneErrorsEvents } from "src/contracts/types/Emissions.sol";
 
 import { DummyDAppControl, CallConfigBuilder } from "./base/DummyDAppControl.sol";
 
-import "../src/contracts/types/GovernanceTypes.sol";
+import "src/contracts/types/GovernanceTypes.sol";
 
 contract MockDAppIntegration is DAppIntegration {
     constructor(address _atlas) DAppIntegration(_atlas) { }
-
-    function initializeNonceInternal(address account) external returns (bool) {
-        return _initializeNonce(account);
-    }
 }
 
 contract DAppIntegrationTest is Test {
@@ -174,24 +170,6 @@ contract DAppIntegrationTest is Test {
         vm.prank(invalid);
         vm.expectRevert(FastLaneErrorsEvents.OnlyGovernance.selector);
         dAppIntegration.disableDApp(address(dAppControl));
-    }
-
-    function test_initializeNonce() public {
-        dAppIntegration.initializeNonce(governance);
-
-        bytes32 bitmapKey = keccak256(abi.encode(governance, 1));
-        (uint128 LowestEmptyBitmap, uint128 HighestEmptyBitmap) = dAppIntegration.asyncNonceBitIndex(governance);
-        (uint8 highestUsedNonce, uint240 bitmap) = dAppIntegration.asyncNonceBitmap(bitmapKey);
-
-        assertEq(LowestEmptyBitmap, uint128(2));
-        assertEq(HighestEmptyBitmap, uint128(0));
-        assertEq(highestUsedNonce, uint8(1));
-        assertEq(bitmap, uint240(0));
-    }
-
-    function test_initializeNonce_internal() public {
-        assertTrue(dAppIntegration.initializeNonceInternal(governance), "should return true when initialized");
-        assertFalse(dAppIntegration.initializeNonceInternal(governance), "should return false when already initialized");
     }
 
     function test_getGovFromControl() public {

@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.21;
+pragma solidity 0.8.22;
 
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
@@ -8,6 +8,8 @@ import { CallBits } from "../libraries/CallBits.sol";
 import "../types/GovernanceTypes.sol";
 
 import { FastLaneErrorsEvents } from "../types/Emissions.sol";
+
+import "forge-std/Test.sol"; // TODO remove
 
 contract DAppIntegration {
     using CallBits for uint32;
@@ -22,17 +24,17 @@ contract DAppIntegration {
     }
 
     struct NonceTracker {
-        uint128 LowestEmptyBitmap;
-        uint128 HighestFullBitmap;
+        uint128 lastUsedSeqNonce; // Sequenced nonces tracked using only this value
+        uint128 highestFullAsyncBitmap; // Async nonces tracked using bitmaps
     }
 
     address public immutable ATLAS;
 
-    //     from         nonceTracker
-    mapping(address => NonceTracker) public asyncNonceBitIndex;
+    // from => nonceTracker
+    mapping(address => NonceTracker) public nonceTrackers;
 
-    //  keccak256(from, bitmapNonceIndex) => to
-    mapping(bytes32 => NonceBitmap) public asyncNonceBitmap;
+    // keccak256(from, bitmapNonceIndex) => nonceBitmap
+    mapping(bytes32 => NonceBitmap) public nonceBitmaps;
 
     // NOTE: To prevent builder censorship, dapp nonces can be
     // processed in any order so long as they arent duplicated and
@@ -65,8 +67,6 @@ contract DAppIntegration {
             GovernanceData({ governance: govAddress, callConfig: callConfig, lastUpdate: uint64(block.number) });
 
         signatories[signatoryKey] = true;
-
-        _initializeNonce(msg.sender);
     }
 
     function addSignatory(address controller, address signatory) external {
@@ -81,8 +81,6 @@ contract DAppIntegration {
         }
 
         signatories[signatoryKey] = true;
-
-        _initializeNonce(signatory);
 
         emit NewDAppSignatory(controller, govData.governance, signatory, govData.callConfig);
     }
@@ -107,23 +105,6 @@ contract DAppIntegration {
         if (msg.sender != govData.governance) revert FastLaneErrorsEvents.OnlyGovernance();
 
         delete governance[dAppControl];
-    }
-
-    function initializeNonce(address account) external {
-        _initializeNonce(account);
-    }
-
-    function _initializeNonce(address account) internal returns (bool initialized) {
-        if (asyncNonceBitIndex[account].LowestEmptyBitmap == uint128(0)) {
-            unchecked {
-                asyncNonceBitIndex[account].LowestEmptyBitmap = 2;
-            }
-            bytes32 bitmapKey = keccak256(abi.encode(account, 1));
-
-            // to skip the 0 nonce
-            asyncNonceBitmap[bitmapKey] = NonceBitmap({ highestUsedNonce: uint8(1), bitmap: 0 });
-            initialized = true;
-        }
     }
 
     function getGovFromControl(address dAppControl) external view returns (address governanceAddress) {

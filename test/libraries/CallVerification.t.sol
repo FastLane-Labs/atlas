@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.21;
+pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { CallVerification } from "../../src/contracts/libraries/CallVerification.sol";
-import "../../src/contracts/types/UserCallTypes.sol";
+import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
+import "src/contracts/types/UserCallTypes.sol";
 import "../base/TestUtils.sol";
 
 contract CallVerificationTest is Test {

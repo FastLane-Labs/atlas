@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.21;
+pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { UserOperation } from "../../../src/contracts/types/UserCallTypes.sol";
-import { SolverOperation } from "../../../src/contracts/types/SolverCallTypes.sol";
-import { DAppOperation } from "../../../src/contracts/types/DAppApprovalTypes.sol";
+import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
+import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
+import { DAppOperation } from "src/contracts/types/DAppApprovalTypes.sol";
 
-import { CallVerification } from "../../../src/contracts/libraries/CallVerification.sol";
+import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 
-import { IDAppControl } from "../../../src/contracts/interfaces/IDAppControl.sol";
-import { IAtlasVerification } from "../../../src/contracts/interfaces/IAtlasVerification.sol";
+import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
+import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
 
-import "../../../src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/DAppApprovalTypes.sol";
 
 contract DAppOperationBuilder is Test {
     using CallVerification for UserOperation;
@@ -50,7 +50,20 @@ contract DAppOperationBuilder is Test {
     }
 
     function withNonce(address atlasVerification, address account) public returns (DAppOperationBuilder) {
-        dappOperation.nonce = IAtlasVerification(atlasVerification).getNextNonce(account);
+        // Assumes sequenced = false. Use withNonce(address, address, bool) to specify sequenced.
+        dappOperation.nonce = IAtlasVerification(atlasVerification).getNextNonce(account, false);
+        return this;
+    }
+
+    function withNonce(
+        address atlasVerification,
+        address account,
+        bool sequenced
+    )
+        public
+        returns (DAppOperationBuilder)
+    {
+        dappOperation.nonce = IAtlasVerification(atlasVerification).getNextNonce(account, sequenced);
         return this;
     }
 
@@ -108,7 +121,7 @@ contract DAppOperationBuilder is Test {
         return this;
     }
 
-    function build() public view returns (DAppOperation memory) {
+    function build() public returns (DAppOperation memory) {
         return dappOperation;
     }
 

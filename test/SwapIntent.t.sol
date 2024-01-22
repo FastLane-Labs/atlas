@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.21;
+pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
-import { TxBuilder } from "../src/contracts/helpers/TxBuilder.sol";
+import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 
-import { SolverOperation } from "../src/contracts/types/SolverCallTypes.sol";
-import { UserOperation } from "../src/contracts/types/UserCallTypes.sol";
-import { DAppOperation, DAppConfig } from "../src/contracts/types/DAppApprovalTypes.sol";
+import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
+import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
+import { DAppOperation, DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 
-import { SwapIntentController, SwapIntent, Condition } from "../src/contracts/examples/intents-example/SwapIntent.sol";
-import { SolverBase } from "../src/contracts/solver/SolverBase.sol";
+import { SwapIntentController, SwapIntent, Condition } from "src/contracts/examples/intents-example/SwapIntent.sol";
+import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
 interface IUniV2Router02 {
     function swapExactTokensForTokens(
@@ -144,7 +144,8 @@ contract SwapIntentTest is BaseTest {
             solverOpData: solverOpData,
             solverEOA: solverOneEOA,
             solverContract: address(rfqSolver),
-            bidAmount: 1e18
+            bidAmount: 1e18,
+            value: 0
         });
 
         // Solver signs the solverOp
@@ -263,7 +264,8 @@ contract SwapIntentTest is BaseTest {
             solverOpData: solverOpData,
             solverEOA: solverOneEOA,
             solverContract: address(uniswapSolver),
-            bidAmount: 1e18
+            bidAmount: 1e18,
+            value: 0
         });
 
         // Solver signs the solverOp

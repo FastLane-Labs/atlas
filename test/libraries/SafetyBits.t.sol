@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.21;
+pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { SafetyBits } from "../../src/contracts/libraries/SafetyBits.sol";
-import "../../src/contracts/types/LockTypes.sol";
+import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
+import "src/contracts/types/LockTypes.sol";
 import "../base/TestUtils.sol";
 
 contract SafetyBitsTest is Test {

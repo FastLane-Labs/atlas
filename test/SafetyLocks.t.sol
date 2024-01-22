@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.21;
+pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { SafetyLocks } from "../src/contracts/atlas/SafetyLocks.sol";
-import { FastLaneErrorsEvents } from "../src/contracts/types/Emissions.sol";
+import { SafetyLocks } from "src/contracts/atlas/SafetyLocks.sol";
+import { FastLaneErrorsEvents } from "src/contracts/types/Emissions.sol";
 
-import "../src/contracts/types/DAppApprovalTypes.sol";
-import "../src/contracts/types/LockTypes.sol";
+import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/LockTypes.sol";
 
 contract MockSafetyLocks is SafetyLocks {
     constructor() SafetyLocks(0, address(0), address(0)) { }
