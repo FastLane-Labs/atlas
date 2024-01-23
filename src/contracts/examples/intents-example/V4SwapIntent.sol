@@ -41,7 +41,8 @@ contract V4SwapIntentController is DAppControl {
             _escrow,
             msg.sender,
             CallConfig({
-                sequenced: false,
+                userNoncesSequenced: false,
+                dappNoncesSequenced: false,
                 requirePreOps: false,
                 trackPreOpsReturnData: false,
                 trackUserReturnData: true,

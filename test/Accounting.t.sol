@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.21;
+pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
@@ -173,7 +173,8 @@ contract AccountingTest is BaseTest {
             solverOpData: solverOpData,
             solverEOA: solverOneEOA,
             solverContract: rfqSolver,
-            bidAmount: solverMsgValue
+            bidAmount: solverMsgValue,
+            value: 0
         });
 
         solverOps[0].value = solverMsgValue;

@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.21;
+pragma solidity 0.8.22;
 
 import "../types/UserCallTypes.sol";
 import "../types/SolverCallTypes.sol";
@@ -26,7 +26,9 @@ interface IDAppControl {
 
     function getDAppSignatory() external view returns (address governanceAddress);
 
-    function requireSequencedNonces() external view returns (bool isSequenced);
+    function requireSequencedUserNonces() external view returns (bool isSequenced);
+
+    function requireSequencedDAppNonces() external view returns (bool isSequenced);
 
     function preOpsDelegated() external view returns (bool delegated);
 

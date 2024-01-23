@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.21;
+pragma solidity 0.8.22;
 
 import { CallConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 
 import "forge-std/Test.sol";
 
 contract CallConfigBuilder is Test {
-    bool sequenced;
+    bool userNoncesSequenced;
+    bool dappNoncesSequenced;
     bool requirePreOps;
     bool trackPreOpsReturnData;
     bool trackUserReturnData;
@@ -23,8 +24,13 @@ contract CallConfigBuilder is Test {
     bool forwardReturnData;
     bool requireFulfillment;
 
-    function withSequenced(bool _sequenced) public returns (CallConfigBuilder) {
-        sequenced = _sequenced;
+    function withUserNoncesSequenced(bool _sequenced) public returns (CallConfigBuilder) {
+        userNoncesSequenced = _sequenced;
+        return this;
+    }
+
+    function withDappNoncesSequenced(bool _sequenced) public returns (CallConfigBuilder) {
+        dappNoncesSequenced = _sequenced;
         return this;
     }
 
@@ -105,7 +111,8 @@ contract CallConfigBuilder is Test {
 
     function build() public view returns (CallConfig memory) {
         return CallConfig(
-            sequenced,
+            userNoncesSequenced,
+            dappNoncesSequenced,
             requirePreOps,
             trackPreOpsReturnData,
             trackUserReturnData,
