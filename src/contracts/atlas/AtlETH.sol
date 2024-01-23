@@ -271,7 +271,7 @@ abstract contract AtlETH is Permit69 {
 
     // Surcharge withdrawal
     function withdrawSurcharge() external {
-        if(msg.sender != surchargeRecipient) {
+        if (msg.sender != surchargeRecipient) {
             revert InvalidAccess();
         }
 
@@ -281,7 +281,7 @@ abstract contract AtlETH is Permit69 {
     }
 
     function newSurchargeRecipient(address newRecipient) external {
-        if(msg.sender != surchargeRecipient) {
+        if (msg.sender != surchargeRecipient) {
             revert InvalidAccess();
         }
 
