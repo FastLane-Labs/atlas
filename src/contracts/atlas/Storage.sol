@@ -40,6 +40,7 @@ contract Storage {
     // atlETH GasAccounting storage
 
     uint256 public surcharge; // Atlas gas surcharges
+    address public surchargeRecipient; // Fastlane surcharge recipient
 
     // Atlas SafetyLocks (transient storage)
     address public lock; // transient storage
@@ -57,6 +58,7 @@ contract Storage {
 
         // Gas Accounting
         surcharge = msg.value;
+        surchargeRecipient = msg.sender;
 
         // Gas Accounting - transient storage (delete this from constructor post dencun)
         lock = UNLOCKED;

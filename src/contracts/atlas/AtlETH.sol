@@ -268,4 +268,23 @@ abstract contract AtlETH is Permit69 {
 
         emit Redeem(owner, amount);
     }
+
+    // Surcharge withdrawal
+    function withdrawSurcharge() external {
+        if(msg.sender != surchargeRecipient) {
+            revert InvalidAccess();
+        }
+
+        uint256 paymentAmount = surcharge;
+        surcharge = 0; // Clear beore transfer to prevent reentrancy
+        SafeTransferLib.safeTransferETH(msg.sender, paymentAmount);
+    }
+
+    function newSurchargeRecipient(address newRecipient) external {
+        if(msg.sender != surchargeRecipient) {
+            revert InvalidAccess();
+        }
+
+        surchargeRecipient = newRecipient;
+    }
 }
