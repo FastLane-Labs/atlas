@@ -182,9 +182,9 @@ contract ExecutionEnvironmentTest is BaseTest {
         // the contract's layout is finalized.
 
         // Set lock address to the execution environment
-        vm.store(address(atlas), bytes32(uint256(7)), bytes32(uint256(uint160(address(executionEnvironment)))));
+        vm.store(address(atlas), bytes32(uint256(8)), bytes32(uint256(uint160(address(executionEnvironment)))));
         // Set deposits to 0
-        vm.store(address(atlas), bytes32(uint256(11)), bytes32(uint256(0)));
+        vm.store(address(atlas), bytes32(uint256(12)), bytes32(uint256(0)));
 
         uint256 depositsBefore = atlas.deposits();
         uint256 surplusAmount = 50_000;
@@ -524,7 +524,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         // the contract's layout is finalized.
 
         // Set lock address to the execution environment
-        vm.store(address(atlas), bytes32(uint256(7)), bytes32(uint256(uint160(address(executionEnvironment)))));
+        vm.store(address(atlas), bytes32(uint256(8)), bytes32(uint256(uint160(address(executionEnvironment)))));
 
         // EscrowLocked
         vm.prank(user);
@@ -559,7 +559,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         // the contract's layout is finalized.
 
         // Set lock address to the execution environment
-        vm.store(address(atlas), bytes32(uint256(7)), bytes32(uint256(uint160(address(executionEnvironment)))));
+        vm.store(address(atlas), bytes32(uint256(8)), bytes32(uint256(uint160(address(executionEnvironment)))));
 
         // EscrowLocked
         vm.prank(user);
@@ -599,7 +599,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         // the contract's layout is finalized.
 
         // Set lock address to the execution environment
-        vm.store(address(atlas), bytes32(uint256(7)), bytes32(uint256(uint160(address(executionEnvironment)))));
+        vm.store(address(atlas), bytes32(uint256(8)), bytes32(uint256(uint160(address(executionEnvironment)))));
 
         // EscrowLocked
         vm.prank(address(atlas));
@@ -639,7 +639,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         // the contract's layout is finalized.
 
         // Set lock address to the execution environment
-        vm.store(address(atlas), bytes32(uint256(7)), bytes32(uint256(uint160(address(executionEnvironment)))));
+        vm.store(address(atlas), bytes32(uint256(8)), bytes32(uint256(uint160(address(executionEnvironment)))));
 
         // EscrowLocked
         vm.prank(address(atlas));

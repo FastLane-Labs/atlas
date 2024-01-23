@@ -269,7 +269,7 @@ abstract contract AtlETH is Permit69 {
         emit Redeem(owner, amount);
     }
 
-    // Surcharge withdrawal
+    // Surcharge withdrawals
     function withdrawSurcharge() external {
         if (msg.sender != surchargeRecipient) {
             revert InvalidAccess();
