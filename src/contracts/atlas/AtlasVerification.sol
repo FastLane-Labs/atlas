@@ -56,7 +56,9 @@ interface IAccount {
         UserOperation calldata userOp,
         bytes32 userOpHash,
         uint256 missingAccountFunds
-    ) external returns (uint256 validationData);
+    )
+        external
+        returns (uint256 validationData);
 }
 
 // NOTE: AtlasVerification is the separate contract version of the DappVerification/DAppIntegration
@@ -474,7 +476,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
             if (userOp.from == address(this) || userOp.from == ATLAS || userOp.from == userOp.control) {
                 return false;
             }
-            bool validSmartWallet = IAccount(userOp.from).validateUserOp{gas: 30_000}(userOp, _getProofHash(userOp), 0) == 0;
+            bool validSmartWallet =
+                IAccount(userOp.from).validateUserOp{ gas: 30_000 }(userOp, _getProofHash(userOp), 0) == 0;
             return (isSimulation || validSmartWallet);
         }
 
