@@ -280,11 +280,22 @@ abstract contract AtlETH is Permit69 {
         SafeTransferLib.safeTransferETH(msg.sender, paymentAmount);
     }
 
+    address pendingSurchargeRecipient;
+
     function newSurchargeRecipient(address newRecipient) external {
         if (msg.sender != surchargeRecipient) {
             revert InvalidAccess();
         }
 
-        surchargeRecipient = newRecipient;
+        pendingSurchargeRecipient = newRecipient;
+    }
+
+    function becomeSurchargeRecipient() external {
+        if (msg.sender != pendingSurchargeRecipient) {
+            revert InvalidAccess();
+        }
+
+        surchargeRecipient = pendingSurchargeRecipient;
+        pendingSurchargeRecipient = address(0);
     }
 }
