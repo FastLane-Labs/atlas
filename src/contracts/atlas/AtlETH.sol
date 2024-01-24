@@ -16,9 +16,10 @@ abstract contract AtlETH is Permit69 {
     constructor(
         uint256 _escrowDuration,
         address _verification,
-        address _simulator
+        address _simulator,
+        address _surchargeRecipient
     )
-        Permit69(_escrowDuration, _verification, _simulator)
+        Permit69(_escrowDuration, _verification, _simulator, _surchargeRecipient)
     { }
 
     /*//////////////////////////////////////////////////////////////

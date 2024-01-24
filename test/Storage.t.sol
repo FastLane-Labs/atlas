@@ -12,7 +12,8 @@ contract StorageTest is Test {
         MockStorageTests s = new MockStorageTests(
             1, // _escrowDuration
             address(1), // _verification
-            address(2) // _simulator
+            address(2), // _simulator
+            address(3) // _surchargeRecipient
         );
 
         assertEq(s.ESCROW_DURATION(), 1);
@@ -54,9 +55,10 @@ contract MockStorageTests is Storage {
     constructor(
         uint256 _escrowDuration,
         address _verification,
-        address _simulator
+        address _simulator,
+        address _surchargeRecipient
     )
-        Storage(_escrowDuration, _verification, _simulator)
+        Storage(_escrowDuration, _verification, _simulator, _surchargeRecipient)
     { }
 
     function getInitialChainId() public view returns (uint256) {

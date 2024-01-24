@@ -49,7 +49,7 @@ contract Storage {
     uint256 public withdrawals; // transient storage
     uint256 public deposits; // transient storage
 
-    constructor(uint256 _escrowDuration, address _verification, address _simulator) payable {
+    constructor(uint256 _escrowDuration, address _verification, address _simulator, address _surchargeRecipient) payable {
         ESCROW_DURATION = _escrowDuration;
         VERIFICATION = _verification;
         SIMULATOR = _simulator;
@@ -58,7 +58,7 @@ contract Storage {
 
         // Gas Accounting
         surcharge = msg.value;
-        surchargeRecipient = msg.sender;
+        surchargeRecipient = _surchargeRecipient;
 
         // Gas Accounting - transient storage (delete this from constructor post dencun)
         lock = UNLOCKED;
