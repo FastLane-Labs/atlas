@@ -42,7 +42,7 @@ contract DummyDAppControl is DAppControl {
         }
 
         (bool shouldRevert) = abi.decode(data, (bool));
-        require(!shouldRevert, "_postSolverCall revert requested");
+        require(!shouldRevert, "_postOpsCall revert requested");
         return true;
     }
 
