@@ -49,7 +49,14 @@ contract Storage {
     uint256 public withdrawals; // transient storage
     uint256 public deposits; // transient storage
 
-    constructor(uint256 _escrowDuration, address _verification, address _simulator, address _surchargeRecipient) payable {
+    constructor(
+        uint256 _escrowDuration,
+        address _verification,
+        address _simulator,
+        address _surchargeRecipient
+    )
+        payable
+    {
         ESCROW_DURATION = _escrowDuration;
         VERIFICATION = _verification;
         SIMULATOR = _simulator;

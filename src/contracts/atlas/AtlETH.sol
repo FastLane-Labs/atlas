@@ -270,6 +270,10 @@ abstract contract AtlETH is Permit69 {
         emit Redeem(owner, amount);
     }
 
+    event SurchargeWithdrawn(address to, uint256 amount);
+    event SurchargeRecipientTransferStarted(address current, address target);
+    event SurchargeRecipientTransferred(address newRecipient);
+
     // Surcharge withdrawals
     function withdrawSurcharge() external {
         if (msg.sender != surchargeRecipient) {
@@ -279,6 +283,7 @@ abstract contract AtlETH is Permit69 {
         uint256 paymentAmount = surcharge;
         surcharge = 0; // Clear beore transfer to prevent reentrancy
         SafeTransferLib.safeTransferETH(msg.sender, paymentAmount);
+        emit SurchargeWithdrawn(msg.sender, paymentAmount);
     }
 
     address pendingSurchargeRecipient;
@@ -289,6 +294,7 @@ abstract contract AtlETH is Permit69 {
         }
 
         pendingSurchargeRecipient = newRecipient;
+        emit SurchargeRecipientTransferStarted(surchargeRecipient, newRecipient);
     }
 
     function becomeSurchargeRecipient() external {
@@ -298,5 +304,6 @@ abstract contract AtlETH is Permit69 {
 
         surchargeRecipient = pendingSurchargeRecipient;
         pendingSurchargeRecipient = address(0);
+        emit SurchargeRecipientTransferred(surchargeRecipient);
     }
 }
