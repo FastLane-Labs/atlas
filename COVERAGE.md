@@ -71,7 +71,23 @@ Last updated: 2024-Jan-30
 
 ### SafetyLocks.sol
 
+Coverage as per coverage report:
+
+- Lines: 18/20 (90%)
+- Functions: 5/6 (83.3%)
+
+Work Needed:
+
+- L32 calling `_checkIfUnlocked` in `_initializeEscrowLock`
+- L86 `isUnlocked` view function (in true and false states)
+
+Last updated: 2024-Jan-30
+
 ### Storage.sol
+
+Does not show up on coverage report. Check `Storage.t.sol`.
+
+Last updated: 2024-Jan-30
 
 ### AtlasVerification.sol
 
