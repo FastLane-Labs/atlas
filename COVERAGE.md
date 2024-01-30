@@ -6,6 +6,17 @@ Some parts of the codebase are either difficult to reach in tests, or do not reg
 
 ### Atlas.sol
 
+Coverage as per coverage report:
+
+- Lines: 33/73 (45.2%)
+- Functions: 4/6 (66.7%)
+
+Work Needed:
+
+- Lots of work needed.
+
+Last updated: 2024-Jan-30
+
 ### Escrow.sol
 
 Fully tested in `/test/Escrow.t.sol`, besides the following unreachable lines:
@@ -16,6 +27,17 @@ Fully tested in `/test/Escrow.t.sol`, besides the following unreachable lines:
 Last updated: 2024-Jan-25
 
 ### Factory.sol
+
+Coverage as per coverage report:
+
+- Lines: 14/16 (87.5%)
+- Functions: 6/6 (100%)
+
+Work Needed:
+
+- Only L78 and L80 in `_setExecutionEnvironment`. L80 is assembly, coverage might get tricky.
+
+Last updated: 2024-Jan-30
 
 ### AtlETH.sol
 
