@@ -41,7 +41,33 @@ Last updated: 2024-Jan-30
 
 ### AtlETH.sol
 
+Coverage as per coverage report:
+
+- Lines: 42/78 (53.8%)
+- Functions: 12/23 (52.2%)
+
+Work Needed:
+
+- View function tests
+- AtlETH's ERC20 functions (approve, transfer, transferFrom)
+- Permit (Also for ERC20 functionality)
+- Branches in `_deduct`
+- All `redeem` and `_redeem` functionality
+
+Last updated: 2024-Jan-30
+
 ### GasAccounting.sol
+
+Coverage as per coverage report:
+
+- Lines: 81/82 (98.8%)
+- Functions: 12/12 (100%)
+
+Work Needed:
+
+- Just 1 line: L36 in `contribute` (which calls `_contribute`)
+
+Last updated: 2024-Jan-30
 
 ### SafetyLocks.sol
 
