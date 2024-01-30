@@ -91,7 +91,43 @@ Last updated: 2024-Jan-30
 
 ### AtlasVerification.sol
 
+Coverage as per coverage report:
+
+- Lines: 145/151 (96%)
+- Functions: 18/19 (94.7%)
+
+Work Needed:
+
+- L163 return with `ValidCallResult.NoSolverOp`
+- L278 return false if `dAppOp.control != dConfig.to`
+- L360 `_handleNonces` returns true at end. Probably a bug and already covered.
+- L381 `_incrementHighestFullAsyncBitmap` returns nonceTracker at end. Probably a bug and already covered.
+- L414 `getDomainSeparator` view function.
+- L525 `manuallyUpdateNonceTracker` breaks if `nonceBitmap.bitmap == FULL_BITMAP` in loop. Probably a bug and already covered.
+
+Last updated: 2024-Jan-30
+
 ### DAppIntegration.sol
+
+Coverage as per coverage report:
+
+- Lines: 26/26 (100%)
+- Functions: 5/5 (100%)
+
+Last updated: 2024-Jan-30
+
+### Mimic.sol
+
+Coverage as per coverage report:
+
+- Lines: 0/3 (0%)
+- Functions: 0/1 (0%)
+
+Work Needed:
+
+- Full tests, its just a fallback function so may be hard to reflect in coverage report.
+
+Last updated: 2024-Jan-30
 
 ## Common Contracts - `/contracts/common`
 
