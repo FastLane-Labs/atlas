@@ -129,6 +129,19 @@ Work Needed:
 
 Last updated: 2024-Jan-30
 
+### ExecutionEnvironment.sol
+
+Coverage as per coverage report:
+
+- Lines: 0/86 (0%)
+- Functions: 0/14 (0%)
+
+Work Needed:
+
+- EE and ExecutionBase should be tested together. May be difficult because delegatecall involved.
+
+Last updated: 2024-Jan-30
+
 ## Common Contracts - `/contracts/common`
 
 ### Permit69.sol
