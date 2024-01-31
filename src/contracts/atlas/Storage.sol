@@ -4,6 +4,8 @@ pragma solidity 0.8.22;
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
 
+import { AtlasEvents } from "src/contracts/types/Emissions.sol";
+
 contract Storage {
     // Atlas constants
     uint256 internal constant _MAX_GAS = 1_500_000;
@@ -73,6 +75,8 @@ contract Storage {
         claims = type(uint256).max;
         withdrawals = type(uint256).max;
         deposits = type(uint256).max;
+
+        emit AtlasEvents.SurchargeRecipientTransferred(_surchargeRecipient);
     }
 
     function _computeDomainSeparator() internal view virtual returns (bytes32) { }
