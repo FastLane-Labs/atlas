@@ -28,6 +28,7 @@ import "src/contracts/libraries/CallBits.sol";
 /// are delegated through the mimic contract, the reported coverage is at 0%, but the actual coverage is close to 100%.
 /// Non covered parts are explicitly mentioned in the comments, with the reason it couldn't be covered.
 contract ExecutionEnvironmentTest is BaseTest {
+    using stdStorage for StdStorage;
     using SafetyBits for EscrowKey;
 
     ExecutionEnvironment public executionEnvironment;
@@ -40,8 +41,8 @@ contract ExecutionEnvironmentTest is BaseTest {
     address public solver = makeAddr("solver");
     address public invalid = makeAddr("invalid");
 
-    uint256 public lockSlot = 8;
-    uint256 public depositsSlot = 12;
+    uint256 public lockSlot;
+    uint256 public depositsSlot;
 
     CallConfig private callConfig;
 
@@ -51,6 +52,9 @@ contract ExecutionEnvironmentTest is BaseTest {
         // Default setting for tests is all callConfig flags set to false.
         // For custom scenarios, set the needed flags and call setupDAppControl.
         setupDAppControl(callConfig);
+
+        lockSlot = stdstore.target(address(atlas)).sig("lock()").find();
+        depositsSlot = stdstore.target(address(atlas)).sig("deposits()").find();
     }
 
     function setupDAppControl(CallConfig memory customCallConfig) internal {

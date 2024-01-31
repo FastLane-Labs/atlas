@@ -5,23 +5,25 @@ import "forge-std/Test.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { FastLaneErrorsEvents, AtlasEvents } from "src/contracts/types/Emissions.sol";
 
-using stdStorage for StdStorage;
-
 contract SurchargeTest is BaseTest {
+    using stdStorage for StdStorage;
+
     function testSurchargeRecipient() public {
         // Check if the surcharge recipient is set to the correct address on deploy
         assertEq(atlas.surchargeRecipient(), payee, "surcharge recipient should be set to payee");
+        assertEq(atlas.pendingSurchargeRecipient(), address(0), "pending surcharge recipient should be 0x0");
     
         // Check a random cant transfer the surcharge recipient
         vm.expectRevert(FastLaneErrorsEvents.InvalidAccess.selector);
-        atlas.newSurchargeRecipient(address(this));
+        atlas.transferSurchargeRecipient(address(this));
 
         // Check the transfer process works as expected
         vm.startPrank(atlas.surchargeRecipient());
         vm.expectEmit(true, true, true, true);
         emit AtlasEvents.SurchargeRecipientTransferStarted(payee, address(this));
-        atlas.newSurchargeRecipient(address(this));
+        atlas.transferSurchargeRecipient(address(this));
         assertEq(atlas.surchargeRecipient(), payee, "recipient should not change until accepted by new address");
+        assertEq(atlas.pendingSurchargeRecipient(), address(this), "pending surcharge recipient should now be address(this)");
 
         // Check that only correct recipient can accept the transfer
         vm.expectRevert(FastLaneErrorsEvents.InvalidAccess.selector);
@@ -33,6 +35,7 @@ contract SurchargeTest is BaseTest {
         emit AtlasEvents.SurchargeRecipientTransferred(address(this));
         atlas.becomeSurchargeRecipient();
         assertEq(atlas.surchargeRecipient(), address(this), "recipient should change to new address");
+        assertEq(atlas.pendingSurchargeRecipient(), address(0), "pending surcharge recipient should now be 0x0");
     }
 
     function testSurchargeWithdraw() public {
