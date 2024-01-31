@@ -43,6 +43,7 @@ contract Storage {
 
     uint256 public surcharge; // Atlas gas surcharges
     address public surchargeRecipient; // Fastlane surcharge recipient
+    address public pendingSurchargeRecipient; // For 2-step transfer process
 
     // Atlas SafetyLocks (transient storage)
     address public lock; // transient storage

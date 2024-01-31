@@ -277,14 +277,15 @@ abstract contract AtlETH is Permit69 {
         }
 
         uint256 paymentAmount = surcharge;
-        surcharge = 0; // Clear beore transfer to prevent reentrancy
+        surcharge = 0; // Clear before transfer to prevent reentrancy
         SafeTransferLib.safeTransferETH(msg.sender, paymentAmount);
         emit SurchargeWithdrawn(msg.sender, paymentAmount);
     }
 
-    address pendingSurchargeRecipient;
-
-    function newSurchargeRecipient(address newRecipient) external {
+    // Transfers the surcharge recipient to a new address
+    // Only callable by the current surcharge recipient
+    // The new recipient must call becomeSurchargeRecipient() for transfer to take effect
+    function transferSurchargeRecipient(address newRecipient) external {
         if (msg.sender != surchargeRecipient) {
             revert InvalidAccess();
         }
@@ -293,6 +294,8 @@ abstract contract AtlETH is Permit69 {
         emit SurchargeRecipientTransferStarted(surchargeRecipient, newRecipient);
     }
 
+    // Finalizes the transfer of surcharge recipient to a new address
+    // Only callable by the pending surcharge recipient
     function becomeSurchargeRecipient() external {
         if (msg.sender != pendingSurchargeRecipient) {
             revert InvalidAccess();
