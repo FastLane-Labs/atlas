@@ -146,7 +146,26 @@ Last updated: 2024-Jan-30
 
 ### Permit69.sol
 
+Coverage as per coverage report:
+
+- Lines: 8/8 (100%)
+- Functions: 3/4 (75%)
+
+Work Needed:
+
+- Only missing function is the virtual `_verifyCallerIsExecutionEnv` function which gets overridden.
+- Double check Permit69.t.sol covers all edge cases
+
 ### ExecutionBase.sol
+
+Coverage as per coverage report:
+
+- Lines: 0/62 (0%)
+- Functions: 0/25 (0%)
+
+Work Needed:
+
+- Full ExecutionBase coverage, done in conjunction with EE.
 
 ## DApp Contracts - `/contracts/dapp`
 
