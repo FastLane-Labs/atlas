@@ -270,10 +270,6 @@ abstract contract AtlETH is Permit69 {
         emit Redeem(owner, amount);
     }
 
-    event SurchargeWithdrawn(address to, uint256 amount);
-    event SurchargeRecipientTransferStarted(address current, address target);
-    event SurchargeRecipientTransferred(address newRecipient);
-
     // Surcharge withdrawals
     function withdrawSurcharge() external {
         if (msg.sender != surchargeRecipient) {
