@@ -30,7 +30,7 @@ contract FactoryTest is Test {
 
     function setUp() public {
         address deployer = address(333);
-        address expectedFactoryAddr = computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
+        address expectedFactoryAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
         bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedFactoryAddr, "AtlasFactory 1.0"));
 
         vm.startPrank(deployer);

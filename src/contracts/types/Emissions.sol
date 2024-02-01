@@ -18,7 +18,6 @@ contract FastLaneErrorsEvents {
     event MEVPaymentFailure(address indexed controller, uint32 callConfig, address bidToken, uint256 bidAmount);
 
     error SolverBidUnpaid();
-    error SolverFailedCallback();
     error SolverMsgValueUnpaid();
     error SolverOperationReverted();
     error SolverEVMError();
@@ -121,4 +120,10 @@ contract FastLaneErrorsEvents {
         uint32 callConfig
     );
     */
+}
+
+contract AtlasEvents {
+    event SurchargeWithdrawn(address to, uint256 amount);
+    event SurchargeRecipientTransferStarted(address currentRecipient, address newRecipient);
+    event SurchargeRecipientTransferred(address newRecipient);
 }

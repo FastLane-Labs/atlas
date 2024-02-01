@@ -35,18 +35,12 @@ abstract contract Escrow is AtlETH {
     constructor(
         uint256 _escrowDuration,
         address _verification,
-        address _simulator
+        address _simulator,
+        address _surchargeRecipient
     )
-        AtlETH(_escrowDuration, _verification, _simulator)
+        AtlETH(_escrowDuration, _verification, _simulator, _surchargeRecipient)
     { }
 
-    ///////////////////////////////////////////////////
-    /// EXTERNAL FUNCTIONS FOR BUNDLER INTERACTION  ///
-    ///////////////////////////////////////////////////
-
-    ///////////////////////////////////////////////////
-    ///             INTERNAL FUNCTIONS              ///
-    ///////////////////////////////////////////////////
     function _executePreOpsCall(
         UserOperation calldata userOp,
         address environment,
@@ -210,7 +204,10 @@ abstract contract Escrow is AtlETH {
         }
 
         // Verify that we can lend the solver their tx value
-        if (solverOp.value > address(this).balance - (gasLimit * tx.gasprice)) {
+        if (
+            solverOp.value
+                > address(this).balance - (gasLimit * tx.gasprice > address(this).balance ? 0 : gasLimit * tx.gasprice)
+        ) {
             result |= 1 << uint256(SolverOutcome.CallValueTooHigh);
         }
 
@@ -262,8 +259,6 @@ abstract contract Escrow is AtlETH {
             return uint256(SolverOutcome.IntentUnfulfilled);
         } else if (errorSwitch == SolverOperationReverted.selector) {
             return uint256(SolverOutcome.CallReverted);
-        } else if (errorSwitch == SolverFailedCallback.selector) {
-            return uint256(SolverOutcome.CallbackFailed);
         } else if (errorSwitch == AlteredControlHash.selector) {
             return uint256(SolverOutcome.InvalidControlHash);
         } else if (errorSwitch == PreSolverFailed.selector) {
