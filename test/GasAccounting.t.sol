@@ -15,9 +15,10 @@ contract MockGasAccounting is GasAccounting, Test {
     constructor(
         uint256 _escrowDuration,
         address _verification,
-        address _simulator
+        address _simulator,
+        address _surchargeRecipient
     )
-        GasAccounting(_escrowDuration, _verification, _simulator)
+        GasAccounting(_escrowDuration, _verification, _simulator, _surchargeRecipient)
     { }
 
     function balanceOf(address account) external view returns (uint128, uint128) {
@@ -69,7 +70,7 @@ contract GasAccountingTest is Test {
     SolverOperation solverOp;
 
     function setUp() public {
-        mockGasAccounting = new MockGasAccounting(0, address(0), address(0));
+        mockGasAccounting = new MockGasAccounting(0, address(0), address(0), address(0));
         uint256 gasMarker = gasleft();
 
         mockGasAccounting.initializeEscrowLock(executionEnvironment, gasMarker, 0);

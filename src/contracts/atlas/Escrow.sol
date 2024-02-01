@@ -31,9 +31,10 @@ abstract contract Escrow is AtlETH {
     constructor(
         uint256 _escrowDuration,
         address _verification,
-        address _simulator
+        address _simulator,
+        address _surchargeRecipient
     )
-        AtlETH(_escrowDuration, _verification, _simulator)
+        AtlETH(_escrowDuration, _verification, _simulator, _surchargeRecipient)
     { }
 
     function _executePreOpsCall(

@@ -121,3 +121,9 @@ contract FastLaneErrorsEvents {
     );
     */
 }
+
+contract AtlasEvents {
+    event SurchargeWithdrawn(address to, uint256 amount);
+    event SurchargeRecipientTransferStarted(address currentRecipient, address newRecipient);
+    event SurchargeRecipientTransferred(address newRecipient);
+}
