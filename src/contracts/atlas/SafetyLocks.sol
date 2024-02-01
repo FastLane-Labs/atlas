@@ -20,8 +20,6 @@ abstract contract SafetyLocks is Storage, FastLaneErrorsEvents, AtlasEvents {
     using SafetyBits for EscrowKey;
     using CallBits for uint32;
 
-    event EscrowLocked(address indexed executionEnvironment, uint256 claims);
-
     constructor(
         uint256 _escrowDuration,
         address _verification,

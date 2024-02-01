@@ -31,9 +31,6 @@ contract Atlas is Escrow, Factory {
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
-    event MetacallResult(address indexed bundler, address indexed user, address indexed winningSolver);
-    event SolverExecution(address indexed solver, uint256 index, bool isWin);
-
     constructor(
         uint256 _escrowDuration,
         address _verification,

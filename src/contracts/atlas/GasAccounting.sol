@@ -14,8 +14,6 @@ import { EscrowBits } from "../libraries/EscrowBits.sol";
 //import "forge-std/Test.sol"; //TODO remove
 
 abstract contract GasAccounting is SafetyLocks {
-    event GasRefundSettled(address indexed bundler, uint256 refundedETH);
-
     constructor(
         uint256 _escrowDuration,
         address _verification,

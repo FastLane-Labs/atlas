@@ -123,6 +123,25 @@ contract FastLaneErrorsEvents {
 }
 
 contract AtlasEvents {
+    // Metacall events
+    event MetacallResult(address indexed bundler, address indexed user, address indexed winningSolver);
+    event SolverExecution(address indexed solver, uint256 index, bool isWin);
+
+    // Escrow call step events
+    event PreOpsCall(address environment, bool success, bytes returnData);
+    event UserCall(address environment, bool success, bytes returnData);
+    event PostOpsCall(address environment, bool success); // No return data tracking for post ops?
+
+    // Factory
+    event ExecutionEnvironmentCreated(address indexed user, address indexed executionEnvironment);
+
+    // Gas accounting
+    event GasRefundSettled(address indexed bundler, uint256 refundedETH);
+
+    // Locks
+    event EscrowLocked(address indexed executionEnvironment, uint256 claims);
+
+    // Surcharge events
     event SurchargeWithdrawn(address to, uint256 amount);
     event SurchargeRecipientTransferStarted(address currentRecipient, address newRecipient);
     event SurchargeRecipientTransferred(address newRecipient);

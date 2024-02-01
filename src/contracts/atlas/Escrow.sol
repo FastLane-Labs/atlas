@@ -28,10 +28,6 @@ abstract contract Escrow is AtlETH {
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
-    event PreOpsCall(address environment, bool success, bytes returnData);
-    event UserCall(address environment, bool success, bytes returnData);
-    event PostOpsCall(address environment, bool success); // No return data tracking for post ops?
-
     constructor(
         uint256 _escrowDuration,
         address _verification,
