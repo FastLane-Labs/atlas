@@ -5,6 +5,7 @@ import { IDAppControl } from "../interfaces/IDAppControl.sol";
 import { Mimic } from "./Mimic.sol";
 import { DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 import { UserOperation } from "../types/UserCallTypes.sol";
+import { AtlasEvents } from "../types/Emissions.sol";
 
 import "forge-std/Test.sol";
 
@@ -79,7 +80,7 @@ abstract contract Factory {
             assembly {
                 executionEnvironment := create2(0, add(creationCode, 32), mload(creationCode), memSalt)
             }
-            emit ExecutionEnvironmentCreated(user, executionEnvironment);
+            emit AtlasEvents.ExecutionEnvironmentCreated(user, executionEnvironment);
         }
     }
 
