@@ -3,9 +3,7 @@ pragma solidity 0.8.22;
 
 import { IAtlas } from "../interfaces/IAtlas.sol";
 
-import { UserSimulationFailed, UserUnexpectedSuccess, UserSimulationSucceeded } from "../types/Emissions.sol";
-
-import { FastLaneErrorsEvents } from "../types/Emissions.sol";
+import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
@@ -18,7 +16,7 @@ import { SafetyBits } from "../libraries/SafetyBits.sol";
 
 import "forge-std/Test.sol";
 
-contract Simulator is FastLaneErrorsEvents {
+contract Simulator is AtlasErrors {
     using CallVerification for UserOperation;
     using CallBits for uint32;
 

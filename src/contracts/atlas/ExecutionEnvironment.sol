@@ -19,9 +19,9 @@ import { Base } from "../common/ExecutionBase.sol";
 
 import { CallBits } from "../libraries/CallBits.sol";
 
-import "forge-std/Test.sol";
+import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
-import { FastLaneErrorsEvents } from "../types/Emissions.sol";
+import "forge-std/Test.sol";
 
 contract ExecutionEnvironment is Base {
     using CallBits for uint32;
@@ -162,7 +162,7 @@ contract ExecutionEnvironment is Base {
 
         // Verify that the DAppControl contract matches the solver's expectations
         if (solverOp.control != _control()) {
-            revert FastLaneErrorsEvents.AlteredControlHash();
+            revert AtlasErrors.AlteredControlHash();
         }
 
         bool success;
@@ -176,12 +176,12 @@ contract ExecutionEnvironment is Base {
             (success, data) = _control().delegatecall(forwardSpecial(data, ExecutionPhase.PreSolver));
 
             if (!success) {
-                revert FastLaneErrorsEvents.PreSolverFailed();
+                revert AtlasErrors.PreSolverFailed();
             }
 
             success = abi.decode(data, (bool));
             if (!success) {
-                revert FastLaneErrorsEvents.PreSolverFailed();
+                revert AtlasErrors.PreSolverFailed();
             }
         }
 
@@ -198,7 +198,7 @@ contract ExecutionEnvironment is Base {
 
         // Verify that it was successful
         if (!success) {
-            revert FastLaneErrorsEvents.SolverOperationReverted();
+            revert AtlasErrors.SolverOperationReverted();
         }
 
         // If this was a user intent, handle and verify fulfillment
@@ -212,12 +212,12 @@ contract ExecutionEnvironment is Base {
             (success, data) = _control().delegatecall(forwardSpecial(data, ExecutionPhase.PostSolver));
 
             if (!success) {
-                revert FastLaneErrorsEvents.PostSolverFailed();
+                revert AtlasErrors.PostSolverFailed();
             }
 
             success = abi.decode(data, (bool));
             if (!success) {
-                revert FastLaneErrorsEvents.IntentUnfulfilled();
+                revert AtlasErrors.IntentUnfulfilled();
             }
         }
 
@@ -225,12 +225,12 @@ contract ExecutionEnvironment is Base {
         uint256 balance = etherIsBidToken ? address(this).balance : ERC20(solverOp.bidToken).balanceOf(address(this));
 
         if (balance < bidBalance + solverOp.bidAmount) {
-            revert FastLaneErrorsEvents.SolverBidUnpaid();
+            revert AtlasErrors.SolverBidUnpaid();
         }
 
         // Verify that the solver repaid their msg.value
         if (!IEscrow(atlas).validateBalances()) {
-            revert FastLaneErrorsEvents.SolverMsgValueUnpaid();
+            revert AtlasErrors.SolverMsgValueUnpaid();
         }
     }
 

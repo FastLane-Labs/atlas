@@ -4,7 +4,8 @@ pragma solidity 0.8.22;
 import "forge-std/Test.sol";
 
 import { GasAccounting } from "../src/contracts/atlas/GasAccounting.sol";
-import { FastLaneErrorsEvents, AtlasEvents } from "../src/contracts/types/Emissions.sol";
+import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
+import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import { EscrowBits } from "../src/contracts/libraries/EscrowBits.sol";
 
@@ -95,7 +96,7 @@ contract GasAccountingTest is Test {
 
     function test_contribute() public {
         vm.expectRevert(
-            abi.encodeWithSelector(FastLaneErrorsEvents.InvalidExecutionEnvironment.selector, executionEnvironment)
+            abi.encodeWithSelector(AtlasErrors.InvalidExecutionEnvironment.selector, executionEnvironment)
         );
         mockGasAccounting.contribute();
 
@@ -113,13 +114,13 @@ contract GasAccountingTest is Test {
         uint256 borrowedAmount = 5000;
 
         vm.expectRevert(
-            abi.encodeWithSelector(FastLaneErrorsEvents.InvalidExecutionEnvironment.selector, executionEnvironment)
+            abi.encodeWithSelector(AtlasErrors.InvalidExecutionEnvironment.selector, executionEnvironment)
         );
         mockGasAccounting.borrow(borrowedAmount);
 
         vm.prank(executionEnvironment);
         vm.expectRevert(
-            abi.encodeWithSelector(FastLaneErrorsEvents.InsufficientAtlETHBalance.selector, 0, borrowedAmount)
+            abi.encodeWithSelector(AtlasErrors.InsufficientAtlETHBalance.selector, 0, borrowedAmount)
         );
         mockGasAccounting.borrow(borrowedAmount);
 
@@ -146,15 +147,15 @@ contract GasAccountingTest is Test {
 
     function test_reconcile() public {
         vm.expectRevert(
-            abi.encodeWithSelector(FastLaneErrorsEvents.InvalidExecutionEnvironment.selector, executionEnvironment)
+            abi.encodeWithSelector(AtlasErrors.InvalidExecutionEnvironment.selector, executionEnvironment)
         );
         mockGasAccounting.reconcile(makeAddr("wrongExecutionEnvironment"), solverOp.from, 0);
 
         mockGasAccounting.trySolverLock(solverOp);
-        vm.expectRevert(abi.encodeWithSelector(FastLaneErrorsEvents.InvalidSolverFrom.selector, solverOp.from));
+        vm.expectRevert(abi.encodeWithSelector(AtlasErrors.InvalidSolverFrom.selector, solverOp.from));
         mockGasAccounting.reconcile(executionEnvironment, makeAddr("wrongSolver"), 0);
 
-        vm.expectRevert(abi.encodeWithSelector(FastLaneErrorsEvents.InsufficientTotalBalance.selector, initialClaims));
+        vm.expectRevert(abi.encodeWithSelector(AtlasErrors.InsufficientTotalBalance.selector, initialClaims));
         mockGasAccounting.reconcile(executionEnvironment, solverOp.from, 0);
 
         assertEq(mockGasAccounting.solver(), solverOp.from);
@@ -310,7 +311,7 @@ contract GasAccountingTest is Test {
 
         // UncoveredResult
         result = 0;
-        vm.expectRevert(FastLaneErrorsEvents.UncoveredResult.selector);
+        vm.expectRevert(AtlasErrors.UncoveredResult.selector);
         mockGasAccounting.releaseSolverLock(solverOp, gasWaterMark, result);
     }
 
@@ -320,7 +321,7 @@ contract GasAccountingTest is Test {
         uint128 bondedAfter;
 
         vm.expectRevert();
-        // This reverts with FastLaneErrorsEvents.InsufficientTotalBalance(shortfall).
+        // This reverts with AtlasErrors.InsufficientTotalBalance(shortfall).
         // The shortfall argument can't be reliably calculated in this test, hence
         // we expect a generic revert. Run this test with high verbosity to confirm
         // it reverts with the correct error.

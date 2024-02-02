@@ -10,9 +10,8 @@ import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 import { Escrow } from "./Escrow.sol";
 import { Factory } from "./Factory.sol";
 
-import { UserSimulationFailed, UserUnexpectedSuccess, UserSimulationSucceeded } from "../types/Emissions.sol";
-
-import { FastLaneErrorsEvents } from "../types/Emissions.sol";
+import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
+import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
