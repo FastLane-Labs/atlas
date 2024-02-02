@@ -138,9 +138,6 @@ contract AtlasEvents {
     // Gas accounting
     event GasRefundSettled(address indexed bundler, uint256 refundedETH);
 
-    // Locks
-    event EscrowLocked(address indexed executionEnvironment, uint256 claims);
-
     // Surcharge events
     event SurchargeWithdrawn(address to, uint256 amount);
     event SurchargeRecipientTransferStarted(address currentRecipient, address newRecipient);

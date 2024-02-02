@@ -41,8 +41,6 @@ abstract contract SafetyLocks is Storage, FastLaneErrorsEvents, AtlasEvents {
         // Set any withdraws or deposits
         withdrawals = userOpValue;
         deposits = msg.value;
-
-        emit EscrowLocked(executionEnvironment, claims);
     }
 
     // TODO are all these checks necessary? More gas efficient was to check if unlocked?
