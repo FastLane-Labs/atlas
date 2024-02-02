@@ -6,7 +6,7 @@ import "forge-std/Test.sol";
 import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 
 import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
-import { FastLaneErrorsEvents } from "src/contracts/types/Emissions.sol";
+import { FastLaneErrorsEvents, AtlasEvents } from "src/contracts/types/Emissions.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 

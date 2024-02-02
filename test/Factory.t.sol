@@ -6,6 +6,7 @@ import "forge-std/Test.sol";
 import { Factory } from "src/contracts/atlas/Factory.sol";
 import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
 import { DummyDAppControl, CallConfigBuilder } from "./base/DummyDAppControl.sol";
+import { AtlasEvents } from "src/contracts/types/Emissions.sol";
 
 import "src/contracts/types/UserCallTypes.sol";
 
@@ -67,6 +68,8 @@ contract FactoryTest is Test {
         assertTrue(expectedExecutionEnvironment.codehash == bytes32(0), "Execution environment should not exist");
 
         vm.prank(user);
+        vm.expectEmit(true, true, true, true);
+        emit AtlasEvents.ExecutionEnvironmentCreated(user, expectedExecutionEnvironment);
         address actualExecutionEnvironment = mockFactory.createExecutionEnvironment(address(dAppControl));
 
         assertFalse(expectedExecutionEnvironment.codehash == bytes32(0), "Execution environment should exist");
