@@ -17,7 +17,7 @@ import { EscrowBits } from "../libraries/EscrowBits.sol";
 import { CallVerification } from "../libraries/CallVerification.sol";
 
 import { DAppIntegration } from "./DAppIntegration.sol";
-import { FastLaneErrorsEvents } from "../types/Emissions.sol";
+import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import "forge-std/Test.sol"; // TODO remove
 
@@ -58,7 +58,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // Verify that the calldata injection came from the dApp frontend
         // and that the signatures are valid.
 
-        if (msg.sender != ATLAS) revert InvalidCaller();
+        if (msg.sender != ATLAS) revert AtlasErrors.InvalidCaller();
 
         uint256 solverOpCount = solverOps.length;
         SolverOperation[] memory prunedSolverOps = new SolverOperation[](solverOpCount);
@@ -509,7 +509,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
     // Call if highestFullAsyncBitmap doesn't reflect real full bitmap of an account
     function manuallyUpdateNonceTracker(address account) external {
-        if (msg.sender != account) revert FastLaneErrorsEvents.OnlyAccount();
+        if (msg.sender != account) revert AtlasErrors.OnlyAccount();
 
         NonceTracker memory nonceTracker = nonceTrackers[account];
         NonceBitmap memory nonceBitmap;

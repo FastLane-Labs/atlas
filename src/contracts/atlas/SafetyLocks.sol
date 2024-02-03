@@ -12,11 +12,10 @@ import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
 
 import { Storage } from "./Storage.sol";
-import { FastLaneErrorsEvents, AtlasEvents } from "../types/Emissions.sol";
 
 // import "forge-std/Test.sol";
 
-abstract contract SafetyLocks is Storage, FastLaneErrorsEvents, AtlasEvents {
+abstract contract SafetyLocks is Storage {
     using SafetyBits for EscrowKey;
     using CallBits for uint32;
 

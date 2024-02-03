@@ -15,7 +15,7 @@ import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 
-import { FastLaneErrorsEvents } from "src/contracts/types/Emissions.sol";
+import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import "src/contracts/types/DAppApprovalTypes.sol";
 import "src/contracts/types/UserCallTypes.sol";
@@ -376,7 +376,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(FastLaneErrorsEvents.AlteredControlHash.selector);
+        vm.expectRevert(AtlasErrors.AlteredControlHash.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert AlteredControlHash: call did not revert");
         solverOp.control = address(dAppControl);
@@ -389,7 +389,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(FastLaneErrorsEvents.SolverOperationReverted.selector);
+        vm.expectRevert(AtlasErrors.SolverOperationReverted.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert SolverOperationReverted: call did not revert");
 
@@ -402,7 +402,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(FastLaneErrorsEvents.SolverBidUnpaid.selector);
+        vm.expectRevert(AtlasErrors.SolverBidUnpaid.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert SolverBidUnpaid: call did not revert");
         solverOp.bidAmount = 0;
@@ -416,7 +416,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(FastLaneErrorsEvents.SolverMsgValueUnpaid.selector);
+        vm.expectRevert(AtlasErrors.SolverMsgValueUnpaid.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert SolverMsgValueUnpaid: call did not revert");
 
@@ -432,7 +432,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(FastLaneErrorsEvents.PreSolverFailed.selector);
+        vm.expectRevert(AtlasErrors.PreSolverFailed.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert PreSolverFailed: call did not revert");
 
@@ -443,7 +443,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(FastLaneErrorsEvents.PreSolverFailed.selector);
+        vm.expectRevert(AtlasErrors.PreSolverFailed.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert PreSolverFailed 2: call did not revert");
 
@@ -461,7 +461,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(FastLaneErrorsEvents.PostSolverFailed.selector);
+        vm.expectRevert(AtlasErrors.PostSolverFailed.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert PostSolverFailed: call did not revert");
 
@@ -473,7 +473,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(FastLaneErrorsEvents.IntentUnfulfilled.selector);
+        vm.expectRevert(AtlasErrors.IntentUnfulfilled.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert IntentUnfulfilled: call did not revert");
     }
