@@ -21,7 +21,7 @@ import "src/contracts/types/DAppApprovalTypes.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { V2Helper } from "./V2Helper.sol";
-import { AtlasEvents } from "src/contracts/types/Emissions.sol";
+import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 
 import "forge-std/Test.sol";
 
