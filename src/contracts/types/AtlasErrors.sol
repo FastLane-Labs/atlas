@@ -3,19 +3,10 @@ pragma solidity 0.8.22;
 
 import "../types/ValidCallsTypes.sol";
 
-error UserSimulationFailed();
-error UserSimulationSucceeded();
-error UserUnexpectedSuccess();
-
-contract FastLaneErrorsEvents {
-    // NOTE: nonce is the executed nonce
-    event SolverTxResult(
-        address indexed solverTo, address indexed solverFrom, bool executed, bool success, uint256 result
-    );
-
-    event UserTxResult(address indexed user, uint256 valueReturned, uint256 gasRefunded);
-
-    event MEVPaymentFailure(address indexed controller, uint32 callConfig, address bidToken, uint256 bidAmount);
+contract AtlasErrors {
+    error UserSimulationFailed();
+    error UserSimulationSucceeded();
+    error UserUnexpectedSuccess();
 
     error SolverBidUnpaid();
     error SolverMsgValueUnpaid();
@@ -38,10 +29,7 @@ contract FastLaneErrorsEvents {
     error SolverSimFail();
     error PostOpsSimFail();
     error SimulationPassed();
-
     error ValidCalls(ValidCallsResult);
-
-    // NEW Custom Errors to replace string errors
 
     // Atlas
     error PreOpsFail();
@@ -104,26 +92,4 @@ contract FastLaneErrorsEvents {
     // AtlasVerification
     error NoUnusedNonceInBitmap();
     error OnlyAccount();
-
-    /*
-    event NewDAppIntegration(
-        address indexed environment,
-        address indexed user,
-        address indexed controller,
-        uint32 callConfig
-    );
-
-    event DAppDisabled(
-        address indexed environment,
-        address indexed user,
-        address indexed controller,
-        uint32 callConfig
-    );
-    */
-}
-
-contract AtlasEvents {
-    event SurchargeWithdrawn(address to, uint256 amount);
-    event SurchargeRecipientTransferStarted(address currentRecipient, address newRecipient);
-    event SurchargeRecipientTransferred(address newRecipient);
 }

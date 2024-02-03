@@ -10,9 +10,8 @@ import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 import { Escrow } from "./Escrow.sol";
 import { Factory } from "./Factory.sol";
 
-import { UserSimulationFailed, UserUnexpectedSuccess, UserSimulationSucceeded } from "../types/Emissions.sol";
-
-import { FastLaneErrorsEvents } from "../types/Emissions.sol";
+import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
+import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
@@ -79,6 +78,8 @@ contract Atlas is Escrow, Factory {
             auctionWon = _auctionWon;
             // Gas Refund to sender only if execution is successful
             _settle({ winningSolver: auctionWon ? solverOps[winningSolverIndex].from : msg.sender, bundler: msg.sender });
+
+            emit MetacallResult(msg.sender, userOp.from, auctionWon ? solverOps[winningSolverIndex].from : address(0));
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
             _handleErrors(bytes4(revertData), dConfig.callConfig);
@@ -166,6 +167,7 @@ contract Atlas is Escrow, Factory {
             (auctionWon, key) = _solverExecutionIteration(
                 dConfig, solverOps[winningSearcherIndex], returnData, auctionWon, executionEnvironment, key
             );
+            emit SolverExecution(solverOps[winningSearcherIndex].from, winningSearcherIndex, auctionWon);
             if (auctionWon) break;
 
             unchecked {

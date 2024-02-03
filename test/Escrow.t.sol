@@ -6,7 +6,8 @@ import "forge-std/Test.sol";
 import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 
 import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
-import { FastLaneErrorsEvents } from "src/contracts/types/Emissions.sol";
+import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
+import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 
@@ -147,7 +148,7 @@ contract EscrowTest is AtlasBaseTest {
                 .withReuseUserOp(true) // Allow metacall to revert
                 .build()
         );
-        executeHookCase(true, 0, FastLaneErrorsEvents.PreOpsFail.selector);
+        executeHookCase(true, 0, AtlasErrors.PreOpsFail.selector);
     }
 
     // Ensure the user operation executes successfully. To ensure the operation's returned data is as expected, we
@@ -170,7 +171,7 @@ contract EscrowTest is AtlasBaseTest {
                 .withReuseUserOp(true) // Allow metacall to revert
                 .build()
         );
-        executeHookCase(true, 0, FastLaneErrorsEvents.UserOpFail.selector);
+        executeHookCase(true, 0, AtlasErrors.UserOpFail.selector);
     }
 
     // Ensure the postOps hook is successfully called. No return data is expected from the postOps hook, so we do not
@@ -194,7 +195,7 @@ contract EscrowTest is AtlasBaseTest {
                 .withReuseUserOp(true) // Allow metacall to revert
                 .build()
         );
-        executeHookCase(false, 1, FastLaneErrorsEvents.PostOpsFail.selector);
+        executeHookCase(false, 1, AtlasErrors.PostOpsFail.selector);
     }
 
     // Ensure the allocateValue hook is successfully called. No return data is expected from the allocateValue hook, so

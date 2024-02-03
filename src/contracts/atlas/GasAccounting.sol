@@ -217,5 +217,6 @@ abstract contract GasAccounting is SafetyLocks {
         surcharge = _surcharge + netGasSurcharge;
 
         SafeTransferLib.safeTransferETH(bundler, _claims);
+        emit GasRefundSettled(bundler, _claims);
     }
 }
