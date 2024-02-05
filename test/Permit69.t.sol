@@ -253,9 +253,12 @@ contract Permit69Test is BaseTest {
             "Binary string form of bit map not as expected"
         );
     }
+
+    function testVerifyCallerIsExecutionEnv() public {
+        // TODO Implement to complete Permit69 coverage
+    }
 }
 
-// TODO probably refactor some of this stuff to a shared folder of standard implementations
 // Mock Atlas with standard implementations of Permit69's virtual functions
 contract MockAtlasForPermit69Tests is Permit69 {
     constructor(
