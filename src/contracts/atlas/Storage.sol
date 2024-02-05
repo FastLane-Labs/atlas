@@ -67,6 +67,7 @@ contract Storage {
         INITIAL_DOMAIN_SEPARATOR = _computeDomainSeparator();
 
         // Gas Accounting
+        // Initialized with msg.value to seed flash loan liquidity
         surcharge = msg.value;
         surchargeRecipient = _surchargeRecipient;
 
