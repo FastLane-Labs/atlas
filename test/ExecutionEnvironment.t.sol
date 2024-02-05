@@ -15,7 +15,7 @@ import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 
-import { FastLaneErrorsEvents } from "src/contracts/types/Emissions.sol";
+import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import "src/contracts/types/DAppApprovalTypes.sol";
 import "src/contracts/types/UserCallTypes.sol";
@@ -28,6 +28,7 @@ import "src/contracts/libraries/CallBits.sol";
 /// are delegated through the mimic contract, the reported coverage is at 0%, but the actual coverage is close to 100%.
 /// Non covered parts are explicitly mentioned in the comments, with the reason it couldn't be covered.
 contract ExecutionEnvironmentTest is BaseTest {
+    using stdStorage for StdStorage;
     using SafetyBits for EscrowKey;
 
     ExecutionEnvironment public executionEnvironment;
@@ -40,6 +41,9 @@ contract ExecutionEnvironmentTest is BaseTest {
     address public solver = makeAddr("solver");
     address public invalid = makeAddr("invalid");
 
+    uint256 public lockSlot;
+    uint256 public depositsSlot;
+
     CallConfig private callConfig;
 
     function setUp() public override {
@@ -48,6 +52,9 @@ contract ExecutionEnvironmentTest is BaseTest {
         // Default setting for tests is all callConfig flags set to false.
         // For custom scenarios, set the needed flags and call setupDAppControl.
         setupDAppControl(callConfig);
+
+        lockSlot = stdstore.target(address(atlas)).sig("lock()").find();
+        depositsSlot = stdstore.target(address(atlas)).sig("deposits()").find();
     }
 
     function setupDAppControl(CallConfig memory customCallConfig) internal {
@@ -182,9 +189,9 @@ contract ExecutionEnvironmentTest is BaseTest {
         // the contract's layout is finalized.
 
         // Set lock address to the execution environment
-        vm.store(address(atlas), bytes32(uint256(7)), bytes32(uint256(uint160(address(executionEnvironment)))));
+        vm.store(address(atlas), bytes32(lockSlot), bytes32(uint256(uint160(address(executionEnvironment)))));
         // Set deposits to 0
-        vm.store(address(atlas), bytes32(uint256(11)), bytes32(uint256(0)));
+        vm.store(address(atlas), bytes32(depositsSlot), bytes32(uint256(0)));
 
         uint256 depositsBefore = atlas.deposits();
         uint256 surplusAmount = 50_000;
@@ -369,7 +376,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(FastLaneErrorsEvents.AlteredControlHash.selector);
+        vm.expectRevert(AtlasErrors.AlteredControlHash.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert AlteredControlHash: call did not revert");
         solverOp.control = address(dAppControl);
@@ -382,7 +389,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(FastLaneErrorsEvents.SolverOperationReverted.selector);
+        vm.expectRevert(AtlasErrors.SolverOperationReverted.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert SolverOperationReverted: call did not revert");
 
@@ -395,7 +402,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(FastLaneErrorsEvents.SolverBidUnpaid.selector);
+        vm.expectRevert(AtlasErrors.SolverBidUnpaid.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert SolverBidUnpaid: call did not revert");
         solverOp.bidAmount = 0;
@@ -409,7 +416,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(FastLaneErrorsEvents.SolverMsgValueUnpaid.selector);
+        vm.expectRevert(AtlasErrors.SolverMsgValueUnpaid.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert SolverMsgValueUnpaid: call did not revert");
 
@@ -425,7 +432,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(FastLaneErrorsEvents.PreSolverFailed.selector);
+        vm.expectRevert(AtlasErrors.PreSolverFailed.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert PreSolverFailed: call did not revert");
 
@@ -436,7 +443,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(FastLaneErrorsEvents.PreSolverFailed.selector);
+        vm.expectRevert(AtlasErrors.PreSolverFailed.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert PreSolverFailed 2: call did not revert");
 
@@ -454,7 +461,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(FastLaneErrorsEvents.PostSolverFailed.selector);
+        vm.expectRevert(AtlasErrors.PostSolverFailed.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert PostSolverFailed: call did not revert");
 
@@ -466,7 +473,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(FastLaneErrorsEvents.IntentUnfulfilled.selector);
+        vm.expectRevert(AtlasErrors.IntentUnfulfilled.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert IntentUnfulfilled: call did not revert");
     }
@@ -524,7 +531,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         // the contract's layout is finalized.
 
         // Set lock address to the execution environment
-        vm.store(address(atlas), bytes32(uint256(7)), bytes32(uint256(uint160(address(executionEnvironment)))));
+        vm.store(address(atlas), bytes32(lockSlot), bytes32(uint256(uint160(address(executionEnvironment)))));
 
         // EscrowLocked
         vm.prank(user);
@@ -559,7 +566,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         // the contract's layout is finalized.
 
         // Set lock address to the execution environment
-        vm.store(address(atlas), bytes32(uint256(7)), bytes32(uint256(uint160(address(executionEnvironment)))));
+        vm.store(address(atlas), bytes32(lockSlot), bytes32(uint256(uint160(address(executionEnvironment)))));
 
         // EscrowLocked
         vm.prank(user);
@@ -599,7 +606,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         // the contract's layout is finalized.
 
         // Set lock address to the execution environment
-        vm.store(address(atlas), bytes32(uint256(7)), bytes32(uint256(uint160(address(executionEnvironment)))));
+        vm.store(address(atlas), bytes32(lockSlot), bytes32(uint256(uint160(address(executionEnvironment)))));
 
         // EscrowLocked
         vm.prank(address(atlas));
@@ -639,7 +646,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         // the contract's layout is finalized.
 
         // Set lock address to the execution environment
-        vm.store(address(atlas), bytes32(uint256(7)), bytes32(uint256(uint160(address(executionEnvironment)))));
+        vm.store(address(atlas), bytes32(lockSlot), bytes32(uint256(uint160(address(executionEnvironment)))));
 
         // EscrowLocked
         vm.prank(address(atlas));

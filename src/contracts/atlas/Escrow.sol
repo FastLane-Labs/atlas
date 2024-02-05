@@ -31,9 +31,10 @@ abstract contract Escrow is AtlETH {
     constructor(
         uint256 _escrowDuration,
         address _verification,
-        address _simulator
+        address _simulator,
+        address _surchargeRecipient
     )
-        AtlETH(_escrowDuration, _verification, _simulator)
+        AtlETH(_escrowDuration, _verification, _simulator, _surchargeRecipient)
     { }
 
     function _executePreOpsCall(
@@ -50,6 +51,7 @@ abstract contract Escrow is AtlETH {
         if (success) {
             preOpsData = abi.decode(preOpsData, (bytes));
         }
+        emit PreOpsCall(environment, success, preOpsData);
     }
 
     function _executeUserOperation(
@@ -69,6 +71,8 @@ abstract contract Escrow is AtlETH {
         if (success) {
             userData = abi.decode(userData, (bytes));
         }
+
+        emit UserCall(environment, success, userData);
     }
 
     function _executeSolverOperation(
@@ -157,6 +161,7 @@ abstract contract Escrow is AtlETH {
             abi.encodeWithSelector(IExecutionEnvironment.postOpsWrapper.selector, solved, returnData);
         postOpsData = abi.encodePacked(postOpsData, lockBytes);
         (success,) = environment.call(postOpsData);
+        emit PostOpsCall(environment, success);
     }
 
     // TODO Revisit the EscrowAccountBalance memory solverEscrow arg. Needs to be passed through from Atlas, through

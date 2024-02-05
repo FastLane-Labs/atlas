@@ -4,7 +4,10 @@ pragma solidity 0.8.22;
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
 
-contract Storage {
+import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
+import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+
+contract Storage is AtlasEvents, AtlasErrors {
     // Atlas constants
     uint256 internal constant _MAX_GAS = 1_500_000;
     uint256 internal constant LEDGER_LENGTH = 6; // type(Party).max = 6
@@ -40,6 +43,8 @@ contract Storage {
     // atlETH GasAccounting storage
 
     uint256 public surcharge; // Atlas gas surcharges
+    address public surchargeRecipient; // Fastlane surcharge recipient
+    address public pendingSurchargeRecipient; // For 2-step transfer process
 
     // Atlas SafetyLocks (transient storage)
     address public lock; // transient storage
@@ -48,7 +53,14 @@ contract Storage {
     uint256 public withdrawals; // transient storage
     uint256 public deposits; // transient storage
 
-    constructor(uint256 _escrowDuration, address _verification, address _simulator) payable {
+    constructor(
+        uint256 _escrowDuration,
+        address _verification,
+        address _simulator,
+        address _surchargeRecipient
+    )
+        payable
+    {
         ESCROW_DURATION = _escrowDuration;
         VERIFICATION = _verification;
         SIMULATOR = _simulator;
@@ -57,6 +69,7 @@ contract Storage {
 
         // Gas Accounting
         surcharge = msg.value;
+        surchargeRecipient = _surchargeRecipient;
 
         // Gas Accounting - transient storage (delete this from constructor post dencun)
         lock = UNLOCKED;
@@ -64,6 +77,8 @@ contract Storage {
         claims = type(uint256).max;
         withdrawals = type(uint256).max;
         deposits = type(uint256).max;
+
+        emit SurchargeRecipientTransferred(_surchargeRecipient);
     }
 
     function _computeDomainSeparator() internal view virtual returns (bytes32) { }

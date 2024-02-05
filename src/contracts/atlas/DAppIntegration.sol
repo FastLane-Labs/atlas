@@ -7,7 +7,7 @@ import { CallBits } from "../libraries/CallBits.sol";
 
 import "../types/GovernanceTypes.sol";
 
-import { FastLaneErrorsEvents } from "../types/Emissions.sol";
+import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import "forge-std/Test.sol"; // TODO remove
 
@@ -55,11 +55,11 @@ contract DAppIntegration {
     function initializeGovernance(address controller) external {
         address govAddress = IDAppControl(controller).getDAppSignatory();
 
-        if (msg.sender != govAddress) revert FastLaneErrorsEvents.OnlyGovernance();
+        if (msg.sender != govAddress) revert AtlasErrors.OnlyGovernance();
 
         bytes32 signatoryKey = keccak256(abi.encode(msg.sender, controller, msg.sender));
 
-        if (signatories[signatoryKey]) revert FastLaneErrorsEvents.OwnerActive();
+        if (signatories[signatoryKey]) revert AtlasErrors.OwnerActive();
 
         uint32 callConfig = CallBits.buildCallConfig(controller);
 
@@ -72,12 +72,12 @@ contract DAppIntegration {
     function addSignatory(address controller, address signatory) external {
         GovernanceData memory govData = governance[controller];
 
-        if (msg.sender != govData.governance) revert FastLaneErrorsEvents.OnlyGovernance();
+        if (msg.sender != govData.governance) revert AtlasErrors.OnlyGovernance();
 
         bytes32 signatoryKey = keccak256(abi.encode(msg.sender, controller, signatory));
 
         if (signatories[signatoryKey]) {
-            revert FastLaneErrorsEvents.SignatoryActive();
+            revert AtlasErrors.SignatoryActive();
         }
 
         signatories[signatoryKey] = true;
@@ -89,12 +89,12 @@ contract DAppIntegration {
         GovernanceData memory govData = governance[controller];
 
         if (msg.sender != govData.governance && msg.sender != signatory) {
-            revert FastLaneErrorsEvents.InvalidCaller();
+            revert AtlasErrors.InvalidCaller();
         }
 
         bytes32 signatoryKey = keccak256(abi.encode(govData.governance, controller, signatory));
 
-        if (!signatories[signatoryKey]) revert FastLaneErrorsEvents.InvalidDAppControl();
+        if (!signatories[signatoryKey]) revert AtlasErrors.InvalidDAppControl();
 
         delete signatories[signatoryKey];
     }
@@ -102,14 +102,14 @@ contract DAppIntegration {
     function disableDApp(address dAppControl) external {
         GovernanceData memory govData = governance[dAppControl];
 
-        if (msg.sender != govData.governance) revert FastLaneErrorsEvents.OnlyGovernance();
+        if (msg.sender != govData.governance) revert AtlasErrors.OnlyGovernance();
 
         delete governance[dAppControl];
     }
 
     function getGovFromControl(address dAppControl) external view returns (address governanceAddress) {
         GovernanceData memory govData = governance[dAppControl];
-        if (govData.lastUpdate == 0) revert FastLaneErrorsEvents.DAppNotEnabled();
+        if (govData.lastUpdate == 0) revert AtlasErrors.DAppNotEnabled();
         governanceAddress = govData.governance;
     }
 }

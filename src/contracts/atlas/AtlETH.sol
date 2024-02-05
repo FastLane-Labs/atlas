@@ -16,9 +16,10 @@ abstract contract AtlETH is Permit69 {
     constructor(
         uint256 _escrowDuration,
         address _verification,
-        address _simulator
+        address _simulator,
+        address _surchargeRecipient
     )
-        Permit69(_escrowDuration, _verification, _simulator)
+        Permit69(_escrowDuration, _verification, _simulator, _surchargeRecipient)
     { }
 
     /*//////////////////////////////////////////////////////////////
@@ -267,5 +268,41 @@ abstract contract AtlETH is Permit69 {
         _balanceOf[owner] = bData;
 
         emit Redeem(owner, amount);
+    }
+
+    // Surcharge withdrawals
+    function withdrawSurcharge() external {
+        if (msg.sender != surchargeRecipient) {
+            revert InvalidAccess();
+        }
+
+        uint256 paymentAmount = surcharge;
+        surcharge = 0; // Clear before transfer to prevent reentrancy
+        SafeTransferLib.safeTransferETH(msg.sender, paymentAmount);
+        emit SurchargeWithdrawn(msg.sender, paymentAmount);
+    }
+
+    // Transfers the surcharge recipient to a new address
+    // Only callable by the current surcharge recipient
+    // The new recipient must call becomeSurchargeRecipient() for transfer to take effect
+    function transferSurchargeRecipient(address newRecipient) external {
+        if (msg.sender != surchargeRecipient) {
+            revert InvalidAccess();
+        }
+
+        pendingSurchargeRecipient = newRecipient;
+        emit SurchargeRecipientTransferStarted(surchargeRecipient, newRecipient);
+    }
+
+    // Finalizes the transfer of surcharge recipient to a new address
+    // Only callable by the pending surcharge recipient
+    function becomeSurchargeRecipient() external {
+        if (msg.sender != pendingSurchargeRecipient) {
+            revert InvalidAccess();
+        }
+
+        surchargeRecipient = pendingSurchargeRecipient;
+        pendingSurchargeRecipient = address(0);
+        emit SurchargeRecipientTransferred(surchargeRecipient);
     }
 }

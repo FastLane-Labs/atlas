@@ -12,20 +12,20 @@ import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
 
 import { Storage } from "./Storage.sol";
-import { FastLaneErrorsEvents } from "../types/Emissions.sol";
 
 // import "forge-std/Test.sol";
 
-abstract contract SafetyLocks is Storage, FastLaneErrorsEvents {
+abstract contract SafetyLocks is Storage {
     using SafetyBits for EscrowKey;
     using CallBits for uint32;
 
     constructor(
         uint256 _escrowDuration,
         address _verification,
-        address _simulator
+        address _simulator,
+        address _surchargeRecipient
     )
-        Storage(_escrowDuration, _verification, _simulator)
+        Storage(_escrowDuration, _verification, _simulator, _surchargeRecipient)
     { }
 
     function _initializeEscrowLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) internal {

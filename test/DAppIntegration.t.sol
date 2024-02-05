@@ -4,7 +4,8 @@ pragma solidity 0.8.22;
 import "forge-std/Test.sol";
 
 import { DAppIntegration } from "src/contracts/atlas/DAppIntegration.sol";
-import { FastLaneErrorsEvents } from "src/contracts/types/Emissions.sol";
+// import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
+import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import { DummyDAppControl, CallConfigBuilder } from "./base/DummyDAppControl.sol";
 
@@ -45,14 +46,14 @@ contract DAppIntegrationTest is Test {
 
     function test_initializeGovernance_onlyGovernanceAllowed() public {
         vm.prank(invalid);
-        vm.expectRevert(FastLaneErrorsEvents.OnlyGovernance.selector);
+        vm.expectRevert(AtlasErrors.OnlyGovernance.selector);
         dAppIntegration.initializeGovernance(address(dAppControl));
     }
 
     function test_initializeGovernance_alreadyInitialized() public {
         vm.startPrank(governance);
         dAppIntegration.initializeGovernance(address(dAppControl));
-        vm.expectRevert(FastLaneErrorsEvents.OwnerActive.selector);
+        vm.expectRevert(AtlasErrors.OwnerActive.selector);
         dAppIntegration.initializeGovernance(address(dAppControl));
         vm.stopPrank();
     }
@@ -82,7 +83,7 @@ contract DAppIntegrationTest is Test {
         dAppIntegration.initializeGovernance(address(dAppControl));
 
         vm.prank(invalid);
-        vm.expectRevert(FastLaneErrorsEvents.OnlyGovernance.selector);
+        vm.expectRevert(AtlasErrors.OnlyGovernance.selector);
         dAppIntegration.addSignatory(address(dAppControl), signatory);
     }
 
@@ -90,7 +91,7 @@ contract DAppIntegrationTest is Test {
         vm.startPrank(governance);
         dAppIntegration.initializeGovernance(address(dAppControl));
         dAppIntegration.addSignatory(address(dAppControl), signatory);
-        vm.expectRevert(FastLaneErrorsEvents.SignatoryActive.selector);
+        vm.expectRevert(AtlasErrors.SignatoryActive.selector);
         dAppIntegration.addSignatory(address(dAppControl), signatory);
         vm.stopPrank();
     }
@@ -134,7 +135,7 @@ contract DAppIntegrationTest is Test {
         vm.stopPrank();
 
         vm.prank(invalid);
-        vm.expectRevert(FastLaneErrorsEvents.InvalidCaller.selector);
+        vm.expectRevert(AtlasErrors.InvalidCaller.selector);
         dAppIntegration.removeSignatory(address(dAppControl), signatory);
     }
 
@@ -144,7 +145,7 @@ contract DAppIntegrationTest is Test {
         dAppIntegration.addSignatory(address(dAppControl), signatory);
         dAppIntegration.removeSignatory(address(dAppControl), signatory);
         // signatoryKey is now invalid
-        vm.expectRevert(FastLaneErrorsEvents.InvalidDAppControl.selector);
+        vm.expectRevert(AtlasErrors.InvalidDAppControl.selector);
         dAppIntegration.removeSignatory(address(dAppControl), signatory);
         vm.stopPrank();
     }
@@ -168,7 +169,7 @@ contract DAppIntegrationTest is Test {
         vm.stopPrank();
 
         vm.prank(invalid);
-        vm.expectRevert(FastLaneErrorsEvents.OnlyGovernance.selector);
+        vm.expectRevert(AtlasErrors.OnlyGovernance.selector);
         dAppIntegration.disableDApp(address(dAppControl));
     }
 
@@ -181,7 +182,7 @@ contract DAppIntegrationTest is Test {
     }
 
     function test_getGovFromControl_dAppNotEnabled() public {
-        vm.expectRevert(FastLaneErrorsEvents.DAppNotEnabled.selector);
+        vm.expectRevert(AtlasErrors.DAppNotEnabled.selector);
         dAppIntegration.getGovFromControl(address(dAppControl));
     }
 }

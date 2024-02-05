@@ -4,13 +4,14 @@ pragma solidity 0.8.22;
 import "forge-std/Test.sol";
 
 import { SafetyLocks } from "src/contracts/atlas/SafetyLocks.sol";
-import { FastLaneErrorsEvents } from "src/contracts/types/Emissions.sol";
+import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
+import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import "src/contracts/types/DAppApprovalTypes.sol";
 import "src/contracts/types/LockTypes.sol";
 
 contract MockSafetyLocks is SafetyLocks {
-    constructor() SafetyLocks(0, address(0), address(0)) { }
+    constructor() SafetyLocks(0, address(0), address(0), address(0)) { }
 
     function initializeEscrowLock(
         address executionEnvironment,
@@ -75,7 +76,7 @@ contract SafetyLocksTest is Test {
         uint256 msgValue = 444;
 
         safetyLocks.setLock(address(2));
-        vm.expectRevert(FastLaneErrorsEvents.AlreadyInitialized.selector);
+        vm.expectRevert(AtlasErrors.AlreadyInitialized.selector);
         safetyLocks.initializeEscrowLock{ value: msgValue }(executionEnvironment, gasMarker, userOpValue);
         safetyLocks.setLock(address(1)); // Reset to UNLOCKED
 
@@ -92,22 +93,22 @@ contract SafetyLocksTest is Test {
 
     function test_checkIfUnlocked() public {
         safetyLocks.setLock(address(2));
-        vm.expectRevert(FastLaneErrorsEvents.AlreadyInitialized.selector);
+        vm.expectRevert(AtlasErrors.AlreadyInitialized.selector);
         safetyLocks.checkIfUnlocked();
         safetyLocks.setLock(address(1)); // Reset to UNLOCKED
 
         safetyLocks.setClaims(1);
-        vm.expectRevert(FastLaneErrorsEvents.AlreadyInitialized.selector);
+        vm.expectRevert(AtlasErrors.AlreadyInitialized.selector);
         safetyLocks.checkIfUnlocked();
         safetyLocks.setClaims(type(uint256).max); // Reset
 
         safetyLocks.setWithdrawals(1);
-        vm.expectRevert(FastLaneErrorsEvents.AlreadyInitialized.selector);
+        vm.expectRevert(AtlasErrors.AlreadyInitialized.selector);
         safetyLocks.checkIfUnlocked();
         safetyLocks.setWithdrawals(type(uint256).max); // Reset
 
         safetyLocks.setDeposits(1);
-        vm.expectRevert(FastLaneErrorsEvents.AlreadyInitialized.selector);
+        vm.expectRevert(AtlasErrors.AlreadyInitialized.selector);
         safetyLocks.checkIfUnlocked();
         safetyLocks.setDeposits(type(uint256).max); // Reset
     }
@@ -115,7 +116,7 @@ contract SafetyLocksTest is Test {
     function test_buildEscrowLock() public {
         DAppConfig memory dConfig = DAppConfig({ to: address(10), callConfig: 0, bidToken: address(0) });
 
-        vm.expectRevert(FastLaneErrorsEvents.NotInitialized.selector);
+        vm.expectRevert(AtlasErrors.NotInitialized.selector);
         safetyLocks.buildEscrowLock(dConfig, executionEnvironment, 0, false);
 
         safetyLocks.initializeEscrowLock(executionEnvironment, 0, 0);
@@ -124,7 +125,7 @@ contract SafetyLocksTest is Test {
     }
 
     function test_releaseEscrowLock() public {
-        vm.expectRevert(FastLaneErrorsEvents.NotInitialized.selector);
+        vm.expectRevert(AtlasErrors.NotInitialized.selector);
         safetyLocks.releaseEscrowLock();
 
         safetyLocks.initializeEscrowLock(executionEnvironment, 0, 0);
