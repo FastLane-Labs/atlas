@@ -14,7 +14,8 @@ import { SolverOutcome } from "src/contracts/types/EscrowTypes.sol";
 import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
 import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
 import { DAppOperation } from "src/contracts/types/DAppApprovalTypes.sol";
-import { FastLaneErrorsEvents } from "src/contracts/types/Emissions.sol";
+import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
+import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
 import { UserOperationBuilder } from "./base/builders/UserOperationBuilder.sol";
 import { SolverOperationBuilder } from "./base/builders/SolverOperationBuilder.sol";
@@ -119,7 +120,7 @@ contract FlashLoanTest is BaseTest {
         vm.startPrank(userEOA);
         vm.expectEmit(true, true, true, true);
         uint256 result = (1 << uint256(SolverOutcome.BidNotPaid)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
-        emit FastLaneErrorsEvents.SolverTxResult(address(solver), solverOneEOA, true, false, result);
+        emit AtlasEvents.SolverTxResult(address(solver), solverOneEOA, true, false, result);
         vm.expectRevert();
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
@@ -164,7 +165,7 @@ contract FlashLoanTest is BaseTest {
         vm.startPrank(userEOA);
         vm.expectEmit(true, true, true, true);
         result = (1 << uint256(SolverOutcome.CallValueTooHigh)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
-        emit FastLaneErrorsEvents.SolverTxResult(address(solver), solverOneEOA, true, false, result);
+        emit AtlasEvents.SolverTxResult(address(solver), solverOneEOA, true, false, result);
         vm.expectRevert();
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
@@ -216,7 +217,7 @@ contract FlashLoanTest is BaseTest {
         vm.startPrank(userEOA);
         result = (1 << uint256(SolverOutcome.Success)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
         vm.expectEmit(true, true, true, true);
-        emit FastLaneErrorsEvents.SolverTxResult(address(solver), solverOneEOA, true, true, result);
+        emit AtlasEvents.SolverTxResult(address(solver), solverOneEOA, true, true, result);
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
 

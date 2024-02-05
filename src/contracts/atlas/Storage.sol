@@ -4,9 +4,10 @@ pragma solidity 0.8.22;
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
 
-import { AtlasEvents } from "src/contracts/types/Emissions.sol";
+import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
+import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
-contract Storage {
+contract Storage is AtlasEvents, AtlasErrors {
     // Atlas constants
     uint256 internal constant _MAX_GAS = 1_500_000;
     uint256 internal constant LEDGER_LENGTH = 6; // type(Party).max = 6
@@ -78,7 +79,7 @@ contract Storage {
         withdrawals = type(uint256).max;
         deposits = type(uint256).max;
 
-        emit AtlasEvents.SurchargeRecipientTransferred(_surchargeRecipient);
+        emit SurchargeRecipientTransferred(_surchargeRecipient);
     }
 
     function _computeDomainSeparator() internal view virtual returns (bytes32) { }

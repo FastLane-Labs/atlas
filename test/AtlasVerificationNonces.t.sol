@@ -9,7 +9,6 @@ import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
 import { ValidCallsResult } from "src/contracts/types/ValidCallsTypes.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import { AtlasVerificationBase } from "./AtlasVerification.t.sol";
-import { FastLaneErrorsEvents } from "src/contracts/types/Emissions.sol";
 
 contract AtlasVerificationNoncesTest is AtlasVerificationBase {
 
@@ -273,8 +272,6 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         assertEq(mockVerification.getFirstUnusedNonceInBitmap(0), 1, "Empty bitmap should return 1");
 
         // full bitmap should return 0
-        // vm.expectRevert(FastLaneErrorsEvents.NoUnusedNonceInBitmap.selector);
-        // mockVerification.getFirstUnusedNonceInBitmap(type(uint240).max);
         assertEq(mockVerification.getFirstUnusedNonceInBitmap(type(uint240).max), 0, "Full bitmap should return 0");
 
         // bitmap 000...01 should return 2
