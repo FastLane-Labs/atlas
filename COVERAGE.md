@@ -146,15 +146,18 @@ Last updated: 2024-Jan-30
 
 ### Permit69.sol
 
+Effective Test Coverage: 100%
+
 Coverage as per coverage report:
 
 - Lines: 8/8 (100%)
 - Functions: 3/4 (75%)
 
-Work Needed:
+Notes:
 
-- Only missing function is the virtual `_verifyCallerIsExecutionEnv` function which gets overridden.
-- Double check Permit69.t.sol covers all edge cases
+- Coverage report shows internal virtual function `verifyCallerIsExecutionEnv` as not covered, but is covered in `Permit69.t.sol` in `testVerifyCallerIsExecutionEnv`.
+
+Last updated: 2024-Feb-05
 
 ### ExecutionBase.sol
 

@@ -255,7 +255,13 @@ contract Permit69Test is BaseTest {
     }
 
     function testVerifyCallerIsExecutionEnv() public {
-        // TODO Implement to complete Permit69 coverage
+        vm.prank(solverOneEOA);
+        vm.expectRevert(AtlasErrors.EnvironmentMismatch.selector);
+        mockAtlas.verifyCallerIsExecutionEnv(solverOneEOA, userEOA, 0);
+
+        vm.prank(mockExecutionEnvAddress);
+        bool res = mockAtlas.verifyCallerIsExecutionEnv(solverOneEOA, userEOA, 0);
+        assertTrue(res, "Should return true and not revert");
     }
 }
 
@@ -302,6 +308,12 @@ contract MockAtlasForPermit69Tests is Permit69 {
         if (msg.sender != _environment) {
             revert AtlasErrors.EnvironmentMismatch();
         }
+    }
+
+    // Exposing above overridden function for testing and Permit69 coverage
+    function verifyCallerIsExecutionEnv(address user, address controller, uint32 callConfig) public returns (bool) {
+        _verifyCallerIsExecutionEnv(user, controller, callConfig);
+        return true; // Added to test lack of revert
     }
 
     // Implemented in Factory.sol in the canonical Atlas system
