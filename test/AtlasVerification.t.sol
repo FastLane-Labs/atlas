@@ -1360,11 +1360,23 @@ contract AtlasVerificationTest is AtlasVerificationBase {
     // because all solver ops are pruned
     //
     function test_validCalls_NoSolverOps_ZeroSolverSet_NoSolverOp() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withRequireFulfillment(true).build());
+        // Should return NoSolverOp in the `if (!dConfig.callConfig.allowsZeroSolvers())` branch
+        defaultAtlasWithCallConfig(defaultCallConfig().withRequireFulfillment(true).withZeroSolvers(false).build());
 
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = new SolverOperation[](0);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+        ), ValidCallsResult.NoSolverOp);
+
+        // Should return NoSolverOp in the `if (dConfig.callConfig.needsFulfillment())` branch
+        defaultAtlasWithCallConfig(defaultCallConfig().withRequireFulfillment(true).withZeroSolvers(true).build());
+
+        userOp = validUserOperation().build();
+        solverOps = new SolverOperation[](0);
+        dappOp = validDAppOperation(userOp, solverOps).build();
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}

@@ -93,17 +93,19 @@ Last updated: 2024-Jan-30
 
 Coverage as per coverage report:
 
-- Lines: 145/151 (96%)
+- Lines: 146/151 (96.7%)
 - Functions: 18/19 (94.7%)
 
 Work Needed:
 
-- L163 return with `ValidCallResult.NoSolverOp`
 - L278 return false if `dAppOp.control != dConfig.to`
 - L360 `_handleNonces` returns true at end. Probably a bug and already covered.
 - L381 `_incrementHighestFullAsyncBitmap` returns nonceTracker at end. Probably a bug and already covered.
 - L414 `getDomainSeparator` view function.
-- L525 `manuallyUpdateNonceTracker` breaks if `nonceBitmap.bitmap == FULL_BITMAP` in loop. Probably a bug and already covered.
+
+Coverage Bugs:
+
+- L525 the `break` in `manuallyUpdateNonceTracker` is covered if the line above is covered, which it is.
 
 Last updated: 2024-Jan-30
 
