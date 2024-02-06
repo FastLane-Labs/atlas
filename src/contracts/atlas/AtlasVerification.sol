@@ -41,7 +41,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
     error InvalidCaller();
 
-    constructor(address _atlas) EIP712("ProtoCallHandler", "0.0.1") DAppIntegration(_atlas) { }
+    constructor(address _atlas) EIP712("AtlasVerification", "0.0.1") DAppIntegration(_atlas) { }
 
     function validCalls(
         DAppConfig calldata dConfig,
