@@ -91,25 +91,28 @@ Last updated: 2024-Jan-30
 
 ### AtlasVerification.sol
 
+Effective Test Coverage: 100%
+
 Coverage as per coverage report:
 
-- Lines: 146/151 (96.7%)
-- Functions: 18/19 (94.7%)
+- Lines: 147/151 (97.4%)
+- Functions: 19/19 (100%)
 
-Work Needed:
+Unreachable Code:
 
-- L278 return false if `dAppOp.control != dConfig.to`
-- L360 `_handleNonces` returns true at end. Probably a bug and already covered.
-- L381 `_incrementHighestFullAsyncBitmap` returns nonceTracker at end. Probably a bug and already covered.
-- L414 `getDomainSeparator` view function.
+- L278 Cannot be reached as `_verifyDApp` would return false before L278 if either dAppOp.control or dConfig.to are invalid, and if both are valid then this `return false` line would be bypassed.
 
 Coverage Bugs:
 
+- L360 `_handleNonces` last return line is covered as function is tested without revert.
+- L381 `_incrementHighestFullAsyncBitmap` last return line is covered as function is tested without revert.
 - L525 the `break` in `manuallyUpdateNonceTracker` is covered if the line above is covered, which it is.
 
-Last updated: 2024-Jan-30
+Last updated: 2024-Feb-06
 
 ### DAppIntegration.sol
+
+Effective Test Coverage: 100%
 
 Coverage as per coverage report:
 

@@ -275,6 +275,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         }
 
         if (dAppOp.control != dConfig.to) {
+            // This should be unreachable but returning false just in case.
             return false;
         }
 
