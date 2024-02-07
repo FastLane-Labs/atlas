@@ -23,6 +23,16 @@ contract MimicTest is Test {
         assertEq(success, true);
         assertEq(data, hex"0001");
     }
+
+    function testMimicRevert() public {
+        // Deploy mimic
+        Mimic mimic = new Mimic();
+        deployCodeTo("Mimic.t.sol:MimicRevertCheck", 0xaAaAaAaaAaAaAaaAaAAAAAAAAaaaAaAaAaaAaaAa);
+        // Check that revert data gets forwarded to top level caller
+        (bool success, bytes memory data) = address(mimic).call(hex"01");
+        assertEq(success, false);
+        assertEq(data, abi.encode(uint256(1)));
+    }
 }
 
 contract MimicDelegateCheck {
@@ -39,5 +49,14 @@ contract MimicDelegateCheck {
         }
         emit DelegateCalled(msg.data);
         return hex"0001";
+    }
+}
+
+contract MimicRevertCheck {
+    fallback() external {
+        assembly {
+            mstore(0, 0x01)
+            revert(0, 32)
+        }
     }
 }
