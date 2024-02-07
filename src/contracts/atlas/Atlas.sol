@@ -72,9 +72,8 @@ contract Atlas is Escrow, Factory {
         // Initialize the lock
         _initializeEscrowLock(executionEnvironment, gasMarker, userOp.value);
 
-        try this.execute{ value: msg.value }(dConfig, userOp, solverOps, executionEnvironment, msg.sender == SIMULATOR) returns (
-            bool _auctionWon, uint256 winningSolverIndex
-        ) {
+        try this.execute{ value: msg.value }(dConfig, userOp, solverOps, executionEnvironment, msg.sender == SIMULATOR)
+        returns (bool _auctionWon, uint256 winningSolverIndex) {
             auctionWon = _auctionWon;
             // Gas Refund to sender only if execution is successful
             _settle({ winningSolver: auctionWon ? solverOps[winningSolverIndex].from : msg.sender, bundler: msg.sender });
@@ -94,13 +93,12 @@ contract Atlas is Escrow, Factory {
         console.log("total gas used", gasMarker - gasleft());
     }
 
-    /*
     function execute(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         address executionEnvironment,
-        address bundler
+        bool success // Used for a variety of bool variables. Initially, it's bundler == SIMULATOR
     )
         external
         payable
@@ -110,32 +108,7 @@ contract Atlas is Escrow, Factory {
         if (msg.sender != address(this)) revert InvalidAccess();
 
         // Build the memory lock
-        EscrowKey memory key =
-            _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), bundler == SIMULATOR);
-
-        // Begin execution
-        (auctionWon, winningSearcherIndex) = _execute(dConfig, userOp, solverOps, executionEnvironment, key);
-    }
-    */
-
-    function execute(
-        DAppConfig calldata dConfig,
-        UserOperation calldata userOp,
-        SolverOperation[] calldata solverOps,
-        address executionEnvironment,
-        bool success // Used for a variety of bool variables. Initially, it's bundler == SIMULATOR 
-    )
-        external
-        payable
-        returns (bool auctionWon, uint256 winningSearcherIndex)
-    {
-
-        // This is a self.call made externally so that it can be used with try/catch
-        if (msg.sender != address(this)) revert InvalidAccess();
-
-        // Build the memory lock
-        EscrowKey memory key =
-            _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), success);
+        EscrowKey memory key = _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), success);
 
         bytes memory returnData;
 
