@@ -72,7 +72,7 @@ contract Atlas is Escrow, Factory {
         // Initialize the lock
         _initializeEscrowLock(executionEnvironment, gasMarker, userOp.value);
 
-        try this.execute{ value: msg.value }(dConfig, userOp, solverOps, executionEnvironment, msg.sender) returns (
+        try this.execute{ value: msg.value }(dConfig, userOp, solverOps, executionEnvironment, msg.sender == SIMULATOR) returns (
             bool _auctionWon, uint256 winningSolverIndex
         ) {
             auctionWon = _auctionWon;
@@ -94,6 +94,7 @@ contract Atlas is Escrow, Factory {
         console.log("total gas used", gasMarker - gasleft());
     }
 
+    /*
     function execute(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
@@ -115,28 +116,33 @@ contract Atlas is Escrow, Factory {
         // Begin execution
         (auctionWon, winningSearcherIndex) = _execute(dConfig, userOp, solverOps, executionEnvironment, key);
     }
+    */
 
-    function _execute(
+    function execute(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         address executionEnvironment,
-        EscrowKey memory key
+        bool success // Used for a variety of bool variables. Initially, it's bundler == SIMULATOR 
     )
-        internal
+        external
+        payable
         returns (bool auctionWon, uint256 winningSearcherIndex)
     {
-        // Build the CallChainProof.  The penultimate hash will be used
-        // to verify against the hash supplied by DAppControl
 
-        bool callSuccessful;
+        // This is a self.call made externally so that it can be used with try/catch
+        if (msg.sender != address(this)) revert InvalidAccess();
+
+        // Build the memory lock
+        EscrowKey memory key =
+            _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), success);
 
         bytes memory returnData;
 
         if (dConfig.callConfig.needsPreOpsCall()) {
             key = key.holdPreOpsLock(dConfig.to);
-            (callSuccessful, returnData) = _executePreOpsCall(userOp, executionEnvironment, key.pack());
-            if (!callSuccessful) {
+            (success, returnData) = _executePreOpsCall(userOp, executionEnvironment, key.pack());
+            if (!success) {
                 if (key.isSimulation) revert PreOpsSimFail();
                 else revert PreOpsFail();
             }
@@ -145,8 +151,8 @@ contract Atlas is Escrow, Factory {
         key = key.holdUserLock(userOp.dapp);
 
         bytes memory userReturnData;
-        (callSuccessful, userReturnData) = _executeUserOperation(userOp, executionEnvironment, key.pack());
-        if (!callSuccessful) {
+        (success, userReturnData) = _executeUserOperation(userOp, executionEnvironment, key.pack());
+        if (!success) {
             if (key.isSimulation) revert UserOpSimFail();
             else revert UserOpFail();
         }
@@ -186,8 +192,8 @@ contract Atlas is Escrow, Factory {
 
         if (dConfig.callConfig.needsPostOpsCall()) {
             key = key.holdDAppOperationLock(address(this));
-            callSuccessful = _executePostOpsCall(auctionWon, returnData, executionEnvironment, key.pack());
-            if (!callSuccessful) {
+            success = _executePostOpsCall(auctionWon, returnData, executionEnvironment, key.pack());
+            if (!success) {
                 if (key.isSimulation) revert PostOpsSimFail();
                 else revert PostOpsFail();
             }
