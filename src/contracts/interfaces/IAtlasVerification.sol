@@ -20,15 +20,26 @@ interface IAtlasVerification {
         external
         returns (SolverOperation[] memory, ValidCallsResult);
 
-    function verifySolverOp(
-        SolverOperation calldata solverOp,
-        EscrowAccountBalance memory solverEscrow,
-        uint256 gasWaterMark,
-        bool auctionAlreadyComplete
+    function validateCalls(
+        DAppConfig calldata dConfig,
+        UserOperation calldata userOp,
+        SolverOperation[] calldata solverOps,
+        DAppOperation calldata dAppOp,
+        uint256 msgValue,
+        address msgSender,
+        bool isSimulation
     )
         external
+        returns (bytes32 userOpHash, ValidCallsResult);
+
+    function verifySolverOp(
+        SolverOperation calldata solverOp,
+        bytes32 userOpHash,
+        address bundler
+    ) 
+        external
         view
-        returns (uint256 result, uint256 gasLimit, EscrowAccountBalance memory);
+        returns (bool valid, bool paysGas);
 
     function getUserOperationPayload(UserOperation memory userOp) external view returns (bytes32 payload);
     function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload);

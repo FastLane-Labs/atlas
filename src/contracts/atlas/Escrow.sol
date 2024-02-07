@@ -5,7 +5,7 @@ import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
 
 import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 
-import { AtlasVerification } from "./AtlasVerification.sol";
+import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
 import { AtlETH } from "./AtlETH.sol";
 
 import "../types/SolverCallTypes.sol";
@@ -79,6 +79,8 @@ abstract contract Escrow is AtlETH {
         SolverOperation calldata solverOp,
         bytes memory dAppReturnData,
         address environment,
+        address bundler,
+        bytes32 userOpHash,
         EscrowKey memory key
     )
         internal
@@ -86,6 +88,22 @@ abstract contract Escrow is AtlETH {
     {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
+
+        (bool valid, bool paysGas) = IAtlasVerification(VERIFICATION).verifySolverOp(
+            solverOp, userOpHash, bundler
+        );
+
+        if (!valid) {
+            if (paysGas) {
+                uint256 gasUsed = gasWaterMark - gasleft() + 5000;
+                gasUsed = (gasUsed + ((gasUsed * SURCHARGE) / SURCHARGE_BASE)) * tx.gasprice;
+                _assign(solverOp.from, gasUsed);
+            } 
+
+            emit SolverTxResult(solverOp.solver, solverOp.from, false, false, 0);
+
+            return (auctionWon, key);
+        }
 
         // Verify the transaction.
         (uint256 result, uint256 gasLimit) = _validateSolverOperation(solverOp);
@@ -119,6 +137,7 @@ abstract contract Escrow is AtlETH {
             // emit event
             emit SolverTxResult(solverOp.solver, solverOp.from, false, false, result);
         }
+
         return (auctionWon, key);
     }
 

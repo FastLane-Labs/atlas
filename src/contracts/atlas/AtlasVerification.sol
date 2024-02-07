@@ -43,6 +43,157 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
     constructor(address _atlas) EIP712("ProtoCallHandler", "0.0.1") DAppIntegration(_atlas) { }
 
+    function validateCalls(
+        DAppConfig calldata dConfig,
+        UserOperation calldata userOp,
+        SolverOperation[] calldata solverOps,
+        DAppOperation calldata dAppOp,
+        uint256 msgValue,
+        address msgSender,
+        bool isSimulation
+    )
+        external
+        returns (bytes32 userOpHash, ValidCallsResult)
+    {
+        if (msg.sender != ATLAS) revert AtlasErrors.InvalidCaller();
+        _validCalls(dConfig, userOp, solverOps, dAppOp, msgValue, msgSender, isSimulation);
+    }
+
+    function _validCalls(
+        DAppConfig calldata dConfig,
+        UserOperation calldata userOp,
+        SolverOperation[] calldata solverOps,
+        DAppOperation calldata dAppOp,
+        uint256 msgValue,
+        address msgSender,
+        bool isSimulation
+    )
+        internal
+        returns (bytes32 userOpHash, ValidCallsResult)
+    {
+        // Verify that the calldata injection came from the dApp frontend
+        // and that the signatures are valid.
+
+        userOpHash = userOp.getUserOperationHash();
+
+        uint256 solverOpCount = solverOps.length;
+
+        {
+            // bypassSignatoryApproval still verifies signature match, but does not check
+            // if dApp approved the signor.
+            (bool validAuctioneer, bool bypassSignatoryApproval) = _verifyAuctioneer(dConfig, userOp, solverOps, dAppOp);
+
+            if (!validAuctioneer && !isSimulation) {
+                return (userOpHash, ValidCallsResult.InvalidAuctioneer);
+            }
+
+            // Check dapp signature
+            if (!_verifyDApp(dConfig, dAppOp, msgSender, bypassSignatoryApproval, isSimulation)) {
+                return (userOpHash, ValidCallsResult.DAppSignatureInvalid);
+            }
+
+            // Check user signature
+            if (!_verifyUser(dConfig, userOp, msgSender, isSimulation)) {
+                return (userOpHash, ValidCallsResult.UserSignatureInvalid);
+            }
+
+            // Check solvers not over the max (253)
+            if (solverOpCount > MAX_SOLVERS) {
+                return (userOpHash, ValidCallsResult.TooManySolverOps);
+            }
+
+            // Check if past user's deadline
+            if (block.number > userOp.deadline) {
+                if (userOp.deadline != 0 && !isSimulation) {
+                    return (userOpHash, ValidCallsResult.UserDeadlineReached);
+                }
+            }
+
+            // Check if past dapp's deadline
+            if (block.number > dAppOp.deadline) {
+                if (dAppOp.deadline != 0 && !isSimulation) {
+                    return (userOpHash, ValidCallsResult.DAppDeadlineReached);
+                }
+            }
+
+            // Check bundler matches dAppOp bundler
+            if (dAppOp.bundler != address(0) && msgSender != dAppOp.bundler) {
+                return (userOpHash, ValidCallsResult.InvalidBundler);
+            }
+
+            // Check gas price is within user's limit
+            if (tx.gasprice > userOp.maxFeePerGas) {
+                return (userOpHash, ValidCallsResult.GasPriceHigherThanMax);
+            }
+
+            // Check that the value of the tx is greater than or equal to the value specified
+            if (msgValue < userOp.value) {
+                return (userOpHash, ValidCallsResult.TxValueLowerThanCallValue);
+            }
+        }
+
+        // Some checks are only needed when call is not a simulation
+        if (isSimulation) {
+            // Add all solver ops if simulation
+            return (userOpHash, ValidCallsResult.Valid);
+        }
+
+        // Verify a solver was successfully verified.
+        if (solverOpCount == 0) {
+            if (!dConfig.callConfig.allowsZeroSolvers()) {
+                return (userOpHash, ValidCallsResult.NoSolverOp);
+            }
+
+            if (dConfig.callConfig.needsFulfillment()) {
+                return (userOpHash, ValidCallsResult.NoSolverOp);
+            }
+        }
+
+        return (userOpHash, ValidCallsResult.Valid);
+    }
+
+    function verifySolverOp(
+        SolverOperation calldata solverOp,
+        bytes32 userOpHash,
+        address bundler
+    ) 
+        external
+        view
+        returns (bool valid, bool paysGas)  
+    {
+        (valid, paysGas) = _verifySolverOp(solverOp, userOpHash, bundler);
+    }
+
+    function _verifySolverOp(
+        SolverOperation calldata solverOp,
+        bytes32 userOpHash,
+        address bundler
+    ) 
+        internal
+        view
+        returns (bool valid, bool paysGas)  
+    {
+        if (bundler == solverOp.from || _verifySolverSignature(solverOp)) {
+            // Validate solver signature
+            if (solverOp.userOpHash != userOpHash) return (false, false);
+
+            if (block.number > solverOp.deadline) return (false, false);
+
+            // NOTE: While SolverOp maxFeePerGas must be greater than or equal to the 
+            // UserOp maxFeePerGas, we must verify this again at the solver level to 
+            // ensure User + Bundler aren't colluding to attack Solver. 
+            if (tx.gasprice > solverOp.maxFeePerGas) return (false, false);
+
+            if (solverOp.to != ATLAS) return (false, true);
+
+            if (solverOp.solver == ATLAS || solverOp.solver == address(this)) return (false, true);
+
+            return (true, true);
+        }
+
+        return (false, false);
+    }
+
     function validCalls(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
@@ -60,111 +211,31 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         if (msg.sender != ATLAS) revert AtlasErrors.InvalidCaller();
 
-        uint256 solverOpCount = solverOps.length;
-        SolverOperation[] memory prunedSolverOps = new SolverOperation[](solverOpCount);
+        SolverOperation[] memory prunedSolverOps = new SolverOperation[](solverOps.length);
 
-        {
-            // bypassSignatoryApproval still verifies signature match, but does not check
-            // if dApp approved the signor.
-            (bool validAuctioneer, bool bypassSignatoryApproval) = _verifyAuctioneer(dConfig, userOp, solverOps, dAppOp);
+        (bytes32 userOpHash, ValidCallsResult result) = _validCalls(
+            dConfig, userOp, solverOps, dAppOp, msgValue, msgSender, isSimulation);
 
-            if (!validAuctioneer && !isSimulation) {
-                return (prunedSolverOps, ValidCallsResult.InvalidAuctioneer);
-            }
-
-            // Check dapp signature
-            if (!_verifyDApp(dConfig, dAppOp, msgSender, bypassSignatoryApproval, isSimulation)) {
-                return (prunedSolverOps, ValidCallsResult.DAppSignatureInvalid);
-            }
-
-            // Check user signature
-            if (!_verifyUser(dConfig, userOp, msgSender, isSimulation)) {
-                return (prunedSolverOps, ValidCallsResult.UserSignatureInvalid);
-            }
-
-            // Check solvers not over the max (253)
-            if (solverOpCount > MAX_SOLVERS) {
-                return (prunedSolverOps, ValidCallsResult.TooManySolverOps);
-            }
-
-            // Check if past user's deadline
-            if (block.number > userOp.deadline) {
-                if (userOp.deadline != 0 && !isSimulation) {
-                    return (prunedSolverOps, ValidCallsResult.UserDeadlineReached);
-                }
-            }
-
-            // Check if past dapp's deadline
-            if (block.number > dAppOp.deadline) {
-                if (dAppOp.deadline != 0 && !isSimulation) {
-                    return (prunedSolverOps, ValidCallsResult.DAppDeadlineReached);
-                }
-            }
-
-            // Check bundler matches dAppOp bundler
-            if (dAppOp.bundler != address(0) && msgSender != dAppOp.bundler) {
-                return (prunedSolverOps, ValidCallsResult.InvalidBundler);
-            }
-
-            // Check gas price is within user's limit
-            if (tx.gasprice > userOp.maxFeePerGas) {
-                return (prunedSolverOps, ValidCallsResult.GasPriceHigherThanMax);
-            }
-
-            // Check that the value of the tx is greater than or equal to the value specified
-            if (msgValue < userOp.value) {
-                return (prunedSolverOps, ValidCallsResult.TxValueLowerThanCallValue);
-            }
-        }
-
-        // Otherwise, prune invalid solver ops
         uint256 validSolverCount;
-        bytes32 userOpHash = userOp.getUserOperationHash();
 
-        for (uint256 i = 0; i < solverOpCount; i++) {
-            if (msgSender == solverOps[i].from || _verifySolverSignature(solverOps[i])) {
-                // Validate solver signature
+        for (uint256 i = 0; i < solverOps.length; i++) {
 
+            (bool valid,) = _verifySolverOp(solverOps[i], userOpHash, msgSender);
+            
+            if (valid) {
+                // If all initial checks succeed, add solver op to new array
                 SolverOperation memory solverOp = solverOps[i];
 
-                if (tx.gasprice > solverOp.maxFeePerGas) continue;
-
-                if (block.number > solverOp.deadline) continue;
-
-                if (solverOp.from == userOp.from) continue;
-
-                if (solverOp.to != ATLAS) continue;
-
-                if (solverOp.solver == ATLAS || solverOp.solver == address(this)) continue;
-
-                if (solverOp.userOpHash != userOpHash) continue;
-
-                // If all initial checks succeed, add solver op to new array
-                prunedSolverOps[validSolverCount] = solverOp;
-                unchecked {
-                    ++validSolverCount;
+                if (solverOp.from != userOp.from) {
+                    prunedSolverOps[validSolverCount] = solverOp;
+                    unchecked {
+                        ++validSolverCount;
+                    }
                 }
             }
         }
 
-        // Some checks are only needed when call is not a simulation
-        if (isSimulation) {
-            // Add all solver ops if simulation
-            return (prunedSolverOps, ValidCallsResult.Valid);
-        }
-
-        // Verify a solver was successfully verified.
-        if (validSolverCount == 0) {
-            if (!dConfig.callConfig.allowsZeroSolvers()) {
-                return (prunedSolverOps, ValidCallsResult.NoSolverOp);
-            }
-
-            if (dConfig.callConfig.needsFulfillment()) {
-                return (prunedSolverOps, ValidCallsResult.NoSolverOp);
-            }
-        }
-
-        return (prunedSolverOps, ValidCallsResult.Valid);
+        return (prunedSolverOps, result);
     }
 
     function _verifyAuctioneer(
