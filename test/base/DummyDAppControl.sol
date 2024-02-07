@@ -86,8 +86,11 @@ contract DummyDAppControl is DAppControl {
         emit MEVPaymentSuccess(bidToken, winningAmount);
     }
 
+    function getBidValue(SolverOperation calldata solverOp) public view virtual override returns (uint256) {
+        return solverOp.bidAmount;
+    }
+
     function getBidFormat(UserOperation calldata) public view virtual override returns (address) { }
-    function getBidValue(SolverOperation calldata) public view virtual override returns (uint256) { }
 
     // ****************************************
     // Custom functions

@@ -101,7 +101,7 @@ contract BaseTest is Test, TestConstants {
         simulator.setAtlas(address(atlas));
 
         escrow = address(atlas);
-        sorter = new Sorter(address(atlas), escrow);
+        sorter = new Sorter(address(atlas));
 
         vm.stopPrank();
         vm.startPrank(governanceEOA);
