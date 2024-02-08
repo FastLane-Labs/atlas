@@ -123,16 +123,18 @@ Last updated: 2024-Jan-30
 
 ### Mimic.sol
 
+Effective Test Coverage: 100%
+
 Coverage as per coverage report:
 
-- Lines: 0/3 (0%)
-- Functions: 0/1 (0%)
+- Lines: 2/3 (66.7%)
+- Functions: 1/1 (100%)
 
-Work Needed:
+Coverage Bugs:
 
-- Full tests, its just a fallback function so may be hard to reflect in coverage report.
+- L55 `return output` is shown as not covered, but it is covered in the successful function call in `testMimicDelegatecall`.
 
-Last updated: 2024-Jan-30
+Last updated: 2024-Feb-07
 
 ### ExecutionEnvironment.sol
 
