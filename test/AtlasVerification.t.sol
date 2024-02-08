@@ -115,10 +115,10 @@ contract AtlasVerificationBase is AtlasBaseTest {
             .sign(address(atlasVerification), governancePK);
     }
 
-    function doValidCalls(ValidCallsCall memory call) public returns (ValidCallsResult result, SolverOperation[] memory prunedSolverOps) {
+    function doValidateCalls(ValidCallsCall memory call) public returns (ValidCallsResult result) {
         DAppConfig memory config = dAppControl.getDAppConfig(call.userOp);
         vm.startPrank(address(atlas));
-        (, result) = atlasVerification.validCalls(
+        (, result) = atlasVerification.validateCalls(
             config,
             call.userOp,
             call.solverOps,
@@ -137,13 +137,13 @@ contract AtlasVerificationBase is AtlasBaseTest {
 
     function callAndAssert(ValidCallsCall memory call, ValidCallsResult expected) public {
         ValidCallsResult result;
-        (result,) = doValidCalls(call);
+        result = doValidateCalls(call);
         assertValidCallsResult(result, expected);
     }
 
     function callAndExpectRevert(ValidCallsCall memory call, bytes4 selector) public {
         vm.expectRevert(selector);
-        doValidCalls(call);
+        doValidateCalls(call);
     }
 
     function defaultAtlasEnvironment() public {
@@ -201,7 +201,7 @@ contract AtlasVerificationTest is AtlasVerificationBase {
 
         DAppConfig memory config = dAppControl.getDAppConfig(userOp);
         vm.expectRevert(AtlasVerification.InvalidCaller.selector);
-        atlasVerification.validCalls(config, userOp, solverOps, dappOp, 0, userEOA, false);
+        atlasVerification.validateCalls(config, userOp, solverOps, dappOp, 0, userEOA, false);
     }
 
     //
@@ -576,7 +576,7 @@ contract AtlasVerificationTest is AtlasVerificationBase {
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).signAndBuild(address(atlasVerification), governancePK);
-        doValidCalls(ValidCallsCall({
+        doValidateCalls(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
 
@@ -608,7 +608,7 @@ contract AtlasVerificationTest is AtlasVerificationBase {
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
-        doValidCalls(ValidCallsCall({
+        doValidateCalls(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
 
@@ -728,7 +728,7 @@ contract AtlasVerificationTest is AtlasVerificationBase {
 
         ValidCallsResult result;
         vm.startPrank(address(atlas));
-        (, result) = atlasVerification.validCalls(
+        (, result) = atlasVerification.validateCalls(
             config,
             userOp,
             solverOps,
@@ -893,7 +893,7 @@ contract AtlasVerificationTest is AtlasVerificationBase {
         UserOperation memory userOp = validUserOperation().signAndBuild(address(atlasVerification), userPK);
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
-        doValidCalls(ValidCallsCall({
+        doValidateCalls(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: governanceEOA, isSimulation: false}
         ));
 
@@ -933,7 +933,7 @@ contract AtlasVerificationTest is AtlasVerificationBase {
         UserOperation memory userOp = validUserOperation().signAndBuild(address(atlasVerification), userPK);
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
-        doValidCalls(ValidCallsCall({
+        doValidateCalls(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: governanceEOA, isSimulation: false}
         ));
 

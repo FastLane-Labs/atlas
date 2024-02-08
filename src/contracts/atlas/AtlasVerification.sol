@@ -194,49 +194,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
         return (false, false);
     }
 
-    function validCalls(
-        DAppConfig calldata dConfig,
-        UserOperation calldata userOp,
-        SolverOperation[] calldata solverOps,
-        DAppOperation calldata dAppOp,
-        uint256 msgValue,
-        address msgSender,
-        bool isSimulation
-    )
-        external
-        returns (SolverOperation[] memory, ValidCallsResult)
-    {
-        // Verify that the calldata injection came from the dApp frontend
-        // and that the signatures are valid.
-
-        if (msg.sender != ATLAS) revert AtlasErrors.InvalidCaller();
-
-        SolverOperation[] memory prunedSolverOps = new SolverOperation[](solverOps.length);
-
-        (bytes32 userOpHash, ValidCallsResult result) =
-            _validCalls(dConfig, userOp, solverOps, dAppOp, msgValue, msgSender, isSimulation);
-
-        uint256 validSolverCount;
-
-        for (uint256 i = 0; i < solverOps.length; i++) {
-            (bool valid,) = _verifySolverOp(solverOps[i], userOpHash, msgSender);
-
-            if (valid) {
-                // If all initial checks succeed, add solver op to new array
-                SolverOperation memory solverOp = solverOps[i];
-
-                if (solverOp.from != userOp.from) {
-                    prunedSolverOps[validSolverCount] = solverOp;
-                    unchecked {
-                        ++validSolverCount;
-                    }
-                }
-            }
-        }
-
-        return (prunedSolverOps, result);
-    }
-
     function _verifyAuctioneer(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,

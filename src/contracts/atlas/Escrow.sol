@@ -199,6 +199,7 @@ abstract contract Escrow is AtlETH {
         uint256 solverBalance = aData.bonded;
         uint256 lastAccessedBlock = aData.lastAccessedBlock;
 
+        // TODO this check is duplicated in AtlasVerification._verifySolverOp. Maybe remove one of them.
         if (solverOp.to != address(this)) {
             result |= 1 << uint256(SolverOutcome.InvalidTo);
         }
