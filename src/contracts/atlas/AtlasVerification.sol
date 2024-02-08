@@ -56,7 +56,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         returns (bytes32 userOpHash, ValidCallsResult)
     {
         if (msg.sender != ATLAS) revert AtlasErrors.InvalidCaller();
-        _validCalls(dConfig, userOp, solverOps, dAppOp, msgValue, msgSender, isSimulation);
+        return _validCalls(dConfig, userOp, solverOps, dAppOp, msgValue, msgSender, isSimulation);
     }
 
     function _validCalls(
@@ -156,10 +156,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
         SolverOperation calldata solverOp,
         bytes32 userOpHash,
         address bundler
-    ) 
+    )
         external
         view
-        returns (bool valid, bool paysGas)  
+        returns (bool valid, bool paysGas)
     {
         (valid, paysGas) = _verifySolverOp(solverOp, userOpHash, bundler);
     }
@@ -168,10 +168,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
         SolverOperation calldata solverOp,
         bytes32 userOpHash,
         address bundler
-    ) 
+    )
         internal
         view
-        returns (bool valid, bool paysGas)  
+        returns (bool valid, bool paysGas)
     {
         if (bundler == solverOp.from || _verifySolverSignature(solverOp)) {
             // Validate solver signature
@@ -179,9 +179,9 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
             if (block.number > solverOp.deadline) return (false, false);
 
-            // NOTE: While SolverOp maxFeePerGas must be greater than or equal to the 
-            // UserOp maxFeePerGas, we must verify this again at the solver level to 
-            // ensure User + Bundler aren't colluding to attack Solver. 
+            // NOTE: While SolverOp maxFeePerGas must be greater than or equal to the
+            // UserOp maxFeePerGas, we must verify this again at the solver level to
+            // ensure User + Bundler aren't colluding to attack Solver.
             if (tx.gasprice > solverOp.maxFeePerGas) return (false, false);
 
             if (solverOp.to != ATLAS) return (false, true);
@@ -213,15 +213,14 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         SolverOperation[] memory prunedSolverOps = new SolverOperation[](solverOps.length);
 
-        (bytes32 userOpHash, ValidCallsResult result) = _validCalls(
-            dConfig, userOp, solverOps, dAppOp, msgValue, msgSender, isSimulation);
+        (bytes32 userOpHash, ValidCallsResult result) =
+            _validCalls(dConfig, userOp, solverOps, dAppOp, msgValue, msgSender, isSimulation);
 
         uint256 validSolverCount;
 
         for (uint256 i = 0; i < solverOps.length; i++) {
-
             (bool valid,) = _verifySolverOp(solverOps[i], userOpHash, msgSender);
-            
+
             if (valid) {
                 // If all initial checks succeed, add solver op to new array
                 SolverOperation memory solverOp = solverOps[i];
