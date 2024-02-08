@@ -91,23 +91,28 @@ Last updated: 2024-Jan-30
 
 ### AtlasVerification.sol
 
+Effective Test Coverage: 100%
+
 Coverage as per coverage report:
 
-- Lines: 145/151 (96%)
-- Functions: 18/19 (94.7%)
+- Lines: 147/151 (97.4%)
+- Functions: 19/19 (100%)
 
-Work Needed:
+Unreachable Code:
 
-- L163 return with `ValidCallResult.NoSolverOp`
-- L278 return false if `dAppOp.control != dConfig.to`
-- L360 `_handleNonces` returns true at end. Probably a bug and already covered.
-- L381 `_incrementHighestFullAsyncBitmap` returns nonceTracker at end. Probably a bug and already covered.
-- L414 `getDomainSeparator` view function.
-- L525 `manuallyUpdateNonceTracker` breaks if `nonceBitmap.bitmap == FULL_BITMAP` in loop. Probably a bug and already covered.
+- L278 Cannot be reached as `_verifyDApp` would return false before L278 if either dAppOp.control or dConfig.to are invalid, and if both are valid then this `return false` line would be bypassed.
 
-Last updated: 2024-Jan-30
+Coverage Bugs:
+
+- L360 `_handleNonces` last return line is covered as function is tested without revert.
+- L381 `_incrementHighestFullAsyncBitmap` last return line is covered as function is tested without revert.
+- L525 the `break` in `manuallyUpdateNonceTracker` is covered if the line above is covered, which it is.
+
+Last updated: 2024-Feb-06
 
 ### DAppIntegration.sol
+
+Effective Test Coverage: 100%
 
 Coverage as per coverage report:
 
@@ -118,16 +123,18 @@ Last updated: 2024-Jan-30
 
 ### Mimic.sol
 
+Effective Test Coverage: 100%
+
 Coverage as per coverage report:
 
-- Lines: 0/3 (0%)
-- Functions: 0/1 (0%)
+- Lines: 2/3 (66.7%)
+- Functions: 1/1 (100%)
 
-Work Needed:
+Coverage Bugs:
 
-- Full tests, its just a fallback function so may be hard to reflect in coverage report.
+- L55 `return output` is shown as not covered, but it is covered in the successful function call in `testMimicDelegatecall`.
 
-Last updated: 2024-Jan-30
+Last updated: 2024-Feb-07
 
 ### ExecutionEnvironment.sol
 
@@ -146,15 +153,18 @@ Last updated: 2024-Jan-30
 
 ### Permit69.sol
 
+Effective Test Coverage: 100%
+
 Coverage as per coverage report:
 
 - Lines: 8/8 (100%)
 - Functions: 3/4 (75%)
 
-Work Needed:
+Notes:
 
-- Only missing function is the virtual `_verifyCallerIsExecutionEnv` function which gets overridden.
-- Double check Permit69.t.sol covers all edge cases
+- Coverage report shows internal virtual function `verifyCallerIsExecutionEnv` as not covered, but is covered in `Permit69.t.sol` in `testVerifyCallerIsExecutionEnv`.
+
+Last updated: 2024-Feb-05
 
 ### ExecutionBase.sol
 
