@@ -36,7 +36,7 @@ interface IAtlasVerification {
         SolverOperation calldata solverOp,
         bytes32 userOpHash,
         address bundler
-    ) 
+    )
         external
         view
         returns (bool valid, bool paysGas);

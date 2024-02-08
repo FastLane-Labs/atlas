@@ -43,7 +43,7 @@ contract Atlas is Escrow, Factory {
 
     function metacall( // <- Entrypoint Function
         UserOperation calldata userOp, // set by user
-        SolverOperation[] calldata solverOps, // supplied by ops relay 
+        SolverOperation[] calldata solverOps, // supplied by ops relay
         DAppOperation calldata dAppOp // supplied by front end via atlas SDK
     )
         external
@@ -72,9 +72,8 @@ contract Atlas is Escrow, Factory {
         // Initialize the lock
         _initializeEscrowLock(executionEnvironment, gasMarker, userOp.value);
 
-        try this.execute{ value: msg.value }(dConfig, userOp, solverOps, executionEnvironment, msg.sender, userOpHash) returns (
-            bool _auctionWon, uint256 winningSolverIndex
-        ) {
+        try this.execute{ value: msg.value }(dConfig, userOp, solverOps, executionEnvironment, msg.sender, userOpHash)
+        returns (bool _auctionWon, uint256 winningSolverIndex) {
             auctionWon = _auctionWon;
             // Gas Refund to sender only if execution is successful
             _settle({ winningSolver: auctionWon ? solverOps[winningSolverIndex].from : msg.sender, bundler: msg.sender });
@@ -108,19 +107,18 @@ contract Atlas is Escrow, Factory {
     {
         // This is a self.call made externally so that it can be used with try/catch
         if (msg.sender != address(this)) revert InvalidAccess();
-        
-        (bytes memory returnData, EscrowKey memory key) = _preOpsUserExecutionIteration(
-            dConfig, userOp, solverOps, executionEnvironment, bundler);
+
+        (bytes memory returnData, EscrowKey memory key) =
+            _preOpsUserExecutionIteration(dConfig, userOp, solverOps, executionEnvironment, bundler);
 
         for (; winningSearcherIndex < solverOps.length;) {
             // valid solverOps are packed from left of array - break at first invalid solverOp
-            
+
             SolverOperation calldata solverOp = solverOps[winningSearcherIndex];
             // if (solverOp.from == address(0)) break;
 
-            (auctionWon, key) = _solverExecutionIteration(
-                dConfig, solverOp, returnData, executionEnvironment, bundler, userOpHash, key
-            );
+            (auctionWon, key) =
+                _solverExecutionIteration(dConfig, solverOp, returnData, executionEnvironment, bundler, userOpHash, key);
             emit SolverExecution(solverOp.from, winningSearcherIndex, auctionWon);
             if (auctionWon) break;
 
@@ -155,8 +153,8 @@ contract Atlas is Escrow, Factory {
         SolverOperation[] calldata solverOps,
         address executionEnvironment,
         address bundler
-    ) 
-        internal 
+    )
+        internal
         returns (bytes memory, EscrowKey memory)
     {
         bool callSuccessful;
@@ -170,12 +168,11 @@ contract Atlas is Escrow, Factory {
         if (dConfig.callConfig.needsPreOpsCall()) {
             // CASE: Need PreOps Call
             key = key.holdPreOpsLock(dConfig.to);
-            
+
             if (CallBits.needsPreOpsReturnData(dConfig.callConfig)) {
                 // CASE: Need PreOps return data
                 usePreOpsReturnData = true;
                 (callSuccessful, returnData) = _executePreOpsCall(userOp, executionEnvironment, key.pack());
-        
             } else {
                 // CASE: Ignore PreOps return data
                 (callSuccessful,) = _executePreOpsCall(userOp, executionEnvironment, key.pack());
@@ -188,7 +185,7 @@ contract Atlas is Escrow, Factory {
         }
 
         key = key.holdUserLock(userOp.dapp);
-        
+
         if (CallBits.needsUserReturnData(dConfig.callConfig)) {
             // CASE: Need User return data
 
@@ -197,22 +194,20 @@ contract Atlas is Escrow, Factory {
                 bytes memory userReturnData;
                 (callSuccessful, userReturnData) = _executeUserOperation(userOp, executionEnvironment, key.pack());
                 returnData = bytes.concat(returnData, userReturnData);
-
             } else {
                 // CASE: Ignore PreOps return data, Need User return data
                 (callSuccessful, returnData) = _executeUserOperation(userOp, executionEnvironment, key.pack());
             }
-        
         } else {
             // CASE: Ignore User return data
-            (callSuccessful, ) = _executeUserOperation(userOp, executionEnvironment, key.pack());
+            (callSuccessful,) = _executeUserOperation(userOp, executionEnvironment, key.pack());
         }
 
         if (!callSuccessful) {
             if (key.isSimulation) revert UserOpSimFail();
             else revert UserOpFail();
         }
-        
+
         return (returnData, key);
     }
 
@@ -229,7 +224,8 @@ contract Atlas is Escrow, Factory {
         returns (bool, EscrowKey memory)
     {
         bool auctionWon;
-        (auctionWon, key) = _executeSolverOperation(solverOp, dAppReturnData, executionEnvironment, bundler, userOpHash, key);
+        (auctionWon, key) =
+            _executeSolverOperation(solverOp, dAppReturnData, executionEnvironment, bundler, userOpHash, key);
         unchecked {
             ++key.callIndex;
         }
