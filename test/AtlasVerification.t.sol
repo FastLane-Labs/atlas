@@ -1360,7 +1360,8 @@ contract AtlasVerificationTest is AtlasVerificationBase {
     // because all solver ops are pruned
     //
     function test_validCalls_NoSolverOps_ZeroSolverSet_NoSolverOp() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withRequireFulfillment(true).build());
+        // Should return NoSolverOp in the `if (!dConfig.callConfig.allowsZeroSolvers())` branch
+        defaultAtlasWithCallConfig(defaultCallConfig().withRequireFulfillment(true).withZeroSolvers(false).build());
 
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = new SolverOperation[](0);
@@ -1369,5 +1370,28 @@ contract AtlasVerificationTest is AtlasVerificationBase {
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.NoSolverOp);
+
+        // Should return NoSolverOp in the `if (dConfig.callConfig.needsFulfillment())` branch
+        defaultAtlasWithCallConfig(defaultCallConfig().withRequireFulfillment(true).withZeroSolvers(true).build());
+
+        userOp = validUserOperation().build();
+        solverOps = new SolverOperation[](0);
+        dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+        ), ValidCallsResult.NoSolverOp);
+    }
+
+    function testGetDomainSeparatorInAtlasVerification() public {
+        bytes32 hashedName = keccak256(bytes("AtlasVerification"));
+        bytes32 hashedVersion = keccak256(bytes("0.0.1"));
+        bytes32 typeHash = keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+        );
+        bytes32 predictedDomainSeparator = keccak256(abi.encode(typeHash, hashedName, hashedVersion, block.chainid, address(atlasVerification)));
+        bytes32 domainSeparator = atlasVerification.getDomainSeparator();
+
+        assertEq(predictedDomainSeparator, domainSeparator);
     }
 }
