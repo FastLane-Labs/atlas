@@ -75,6 +75,7 @@ abstract contract Escrow is AtlETH {
         emit UserCall(environment, success, userData);
     }
 
+    // Returns (bool auctionWon, EscrowKey key)
     function _executeSolverOperation(
         SolverOperation calldata solverOp,
         bytes memory dAppReturnData,
@@ -84,7 +85,7 @@ abstract contract Escrow is AtlETH {
         EscrowKey memory key
     )
         internal
-        returns (bool auctionWon, EscrowKey memory)
+        returns (bool, EscrowKey memory)
     {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
@@ -100,7 +101,8 @@ abstract contract Escrow is AtlETH {
 
             emit SolverTxResult(solverOp.solver, solverOp.from, false, false, 0);
 
-            return (auctionWon, key);
+            // auctionWon = false
+            return (false, key);
         }
 
         // Verify the transaction.
@@ -136,7 +138,8 @@ abstract contract Escrow is AtlETH {
             emit SolverTxResult(solverOp.solver, solverOp.from, false, false, result);
         }
 
-        return (auctionWon, key);
+        // auctionWon = false
+        return (false, key);
     }
 
     // TODO: who should pay gas cost of MEV Payments?
