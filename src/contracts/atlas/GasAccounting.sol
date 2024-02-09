@@ -11,7 +11,7 @@ import { SolverOperation } from "../types/SolverCallTypes.sol";
 
 import { EscrowBits } from "../libraries/EscrowBits.sol";
 
-//import "forge-std/Test.sol"; //TODO remove
+import "forge-std/Test.sol"; //TODO remove
 
 abstract contract GasAccounting is SafetyLocks {
     constructor(
@@ -108,6 +108,7 @@ abstract contract GasAccounting is SafetyLocks {
         if (amount == 0) {
             accessData[owner].lastAccessedBlock = uint32(block.number);
         } else {
+            if (amount > type(uint112).max) revert ValueTooLarge();
             uint112 amt = uint112(amount);
 
             EscrowAccountAccessData memory aData = accessData[owner];
@@ -139,6 +140,7 @@ abstract contract GasAccounting is SafetyLocks {
 
     // Increases owner's bonded balance by amount
     function _credit(address owner, uint256 amount) internal {
+        if (amount > type(uint112).max) revert ValueTooLarge();
         uint112 amt = uint112(amount);
 
         EscrowAccountAccessData memory aData = accessData[owner];

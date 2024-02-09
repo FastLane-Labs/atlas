@@ -51,6 +51,7 @@ contract AtlasErrors {
     error InsufficientAvailableBalance(uint256 balance, uint256 requested);
     error InsufficientSurchargeBalance(uint256 balance, uint256 requested);
     error InsufficientBalanceForDeduction(uint256 balance, uint256 requested);
+    error ValueTooLarge();
 
     event Bond(address indexed owner, uint256 amount);
     event Unbond(address indexed owner, uint256 amount, uint256 earliestAvailable);

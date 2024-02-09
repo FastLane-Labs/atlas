@@ -175,7 +175,7 @@ contract GasAccountingTest is Test {
         depositsBefore = mockGasAccounting.deposits();
         assertFalse(mockGasAccounting.assign(solverOp.from, 0));
         (, lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
-        assertEq(lastAccessedBlock, uint128(block.number));
+        assertEq(lastAccessedBlock, uint32(block.number));
         assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore);
         assertEq(mockGasAccounting.deposits(), depositsBefore);
 
@@ -183,7 +183,7 @@ contract GasAccountingTest is Test {
         depositsBefore = mockGasAccounting.deposits();
         assertTrue(mockGasAccounting.assign(solverOp.from, assignedAmount));
         (, lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
-        assertEq(lastAccessedBlock, uint128(block.number));
+        assertEq(lastAccessedBlock, uint32(block.number));
         assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore);
         assertEq(mockGasAccounting.deposits(), depositsBefore);
         (, unbonding) = mockGasAccounting.balanceOf(solverOp.from);
@@ -197,7 +197,7 @@ contract GasAccountingTest is Test {
         depositsBefore = mockGasAccounting.deposits();
         assertFalse(mockGasAccounting.assign(solverOp.from, assignedAmount));
         (, lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
-        assertEq(lastAccessedBlock, uint128(block.number));
+        assertEq(lastAccessedBlock, uint32(block.number));
         assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore - assignedAmount);
         assertEq(mockGasAccounting.deposits(), depositsBefore + assignedAmount);
         (, unbonding) = mockGasAccounting.balanceOf(solverOp.from);
@@ -209,10 +209,10 @@ contract GasAccountingTest is Test {
         mockGasAccounting.increaseBondedBalance(solverOp.from, bondedAmount);
         bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
         depositsBefore = mockGasAccounting.deposits();
-        (, uint128 unbondingBefore) = mockGasAccounting.balanceOf(solverOp.from);
+        (, uint112 unbondingBefore) = mockGasAccounting.balanceOf(solverOp.from);
         assertFalse(mockGasAccounting.assign(solverOp.from, assignedAmount));
         (, lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
-        assertEq(lastAccessedBlock, uint128(block.number));
+        assertEq(lastAccessedBlock, uint32(block.number));
         assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore - assignedAmount);
         assertEq(mockGasAccounting.deposits(), depositsBefore + assignedAmount);
         (, unbonding) = mockGasAccounting.balanceOf(solverOp.from);
@@ -220,14 +220,14 @@ contract GasAccountingTest is Test {
         assertEq(unbonding, unbondingBefore);
         assertEq(bonded, bondedAmount - assignedAmount);
 
-        // Testing uint128 boundary values for casting between uint128 and uint256 in _assign()
-        bondedAmount = uint256(type(uint128).max) + 1e18;
-        assignedAmount = uint256(type(uint128).max) + 1;
+        // Testing uint112 boundary values for casting between uint112 and uint256 in _assign()
+        bondedAmount = uint256(type(uint112).max) + 1e18;
+        assignedAmount = uint256(type(uint112).max) + 1;
         mockGasAccounting.increaseBondedBalance(solverOp.from, bondedAmount);
         bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
         depositsBefore = mockGasAccounting.deposits();
         (, unbondingBefore) = mockGasAccounting.balanceOf(solverOp.from);
-        vm.expectRevert(stdError.arithmeticError);
+        vm.expectRevert(AtlasErrors.ValueTooLarge.selector);
         mockGasAccounting.assign(solverOp.from, assignedAmount);
         // Check assign reverted with overflow, and accounting values did not change
         assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore);
@@ -255,8 +255,9 @@ contract GasAccountingTest is Test {
         assertEq(bondedAfter, bondedBefore + uint112(creditedAmount));
 
         // Testing uint112 boundary values for casting from uint256 to uint112 in _credit()
-        vm.expectRevert(stdError.arithmeticError);
-        mockGasAccounting.credit(solverOp.from, type(uint112).max + 1);
+        uint256 overflowAmount = uint256(type(uint112).max) + 1;
+        vm.expectRevert(AtlasErrors.ValueTooLarge.selector);
+        mockGasAccounting.credit(solverOp.from, overflowAmount);
     }
 
     function test_trySolverLock() public {
