@@ -30,8 +30,8 @@ contract MockGasAccounting is GasAccounting, Test {
         _initializeEscrowLock(executionEnvironment, gasMarker, userOpValue);
     }
 
-    function assign(address owner, uint256 value) external returns (bool) {
-        return _assign(owner, value);
+    function assign(address owner, uint256 value, bool solverWon) external returns (bool) {
+        return _assign(owner, value, solverWon);
     }
 
     function credit(address owner, uint256 value) external {
@@ -173,7 +173,7 @@ contract GasAccountingTest is Test {
 
         bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
         depositsBefore = mockGasAccounting.deposits();
-        assertFalse(mockGasAccounting.assign(solverOp.from, 0));
+        assertFalse(mockGasAccounting.assign(solverOp.from, 0, true));
         (, lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
         assertEq(lastAccessedBlock, uint32(block.number));
         assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore);
@@ -181,7 +181,7 @@ contract GasAccountingTest is Test {
 
         bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
         depositsBefore = mockGasAccounting.deposits();
-        assertTrue(mockGasAccounting.assign(solverOp.from, assignedAmount));
+        assertTrue(mockGasAccounting.assign(solverOp.from, assignedAmount, true));
         (, lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
         assertEq(lastAccessedBlock, uint32(block.number));
         assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore);
@@ -195,7 +195,7 @@ contract GasAccountingTest is Test {
         mockGasAccounting.increaseUnbondingBalance(solverOp.from, unbondingAmount);
         bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
         depositsBefore = mockGasAccounting.deposits();
-        assertFalse(mockGasAccounting.assign(solverOp.from, assignedAmount));
+        assertFalse(mockGasAccounting.assign(solverOp.from, assignedAmount, true));
         (, lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
         assertEq(lastAccessedBlock, uint32(block.number));
         assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore - assignedAmount);
@@ -210,7 +210,7 @@ contract GasAccountingTest is Test {
         bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
         depositsBefore = mockGasAccounting.deposits();
         (, uint112 unbondingBefore) = mockGasAccounting.balanceOf(solverOp.from);
-        assertFalse(mockGasAccounting.assign(solverOp.from, assignedAmount));
+        assertFalse(mockGasAccounting.assign(solverOp.from, assignedAmount, true));
         (, lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
         assertEq(lastAccessedBlock, uint32(block.number));
         assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore - assignedAmount);
@@ -228,7 +228,7 @@ contract GasAccountingTest is Test {
         depositsBefore = mockGasAccounting.deposits();
         (, unbondingBefore) = mockGasAccounting.balanceOf(solverOp.from);
         vm.expectRevert(AtlasErrors.ValueTooLarge.selector);
-        mockGasAccounting.assign(solverOp.from, assignedAmount);
+        mockGasAccounting.assign(solverOp.from, assignedAmount, true);
         // Check assign reverted with overflow, and accounting values did not change
         assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore);
         assertEq(mockGasAccounting.deposits(), depositsBefore);
