@@ -106,9 +106,9 @@ abstract contract GasAccounting is SafetyLocks {
     // and increases transient solver deposits by this amount
     function _assign(address owner, uint256 amount) internal returns (bool isDeficit) {
         if (amount == 0) {
-            accessData[owner].lastAccessedBlock = uint128(block.number);
+            accessData[owner].lastAccessedBlock = uint32(block.number);
         } else {
-            uint128 amt = uint128(amount);
+            uint112 amt = uint112(amount);
 
             EscrowAccountAccessData memory aData = accessData[owner];
 
@@ -128,7 +128,7 @@ abstract contract GasAccounting is SafetyLocks {
                 aData.bonded -= amt;
             }
 
-            aData.lastAccessedBlock = uint128(block.number);
+            aData.lastAccessedBlock = uint32(block.number);
 
             accessData[owner] = aData;
 
@@ -139,11 +139,11 @@ abstract contract GasAccounting is SafetyLocks {
 
     // Increases owner's bonded balance by amount
     function _credit(address owner, uint256 amount) internal {
-        uint128 amt = uint128(amount);
+        uint112 amt = uint112(amount);
 
         EscrowAccountAccessData memory aData = accessData[owner];
 
-        aData.lastAccessedBlock = uint128(block.number);
+        aData.lastAccessedBlock = uint32(block.number);
         aData.bonded += amt;
 
         bondedTotalSupply += amount;
