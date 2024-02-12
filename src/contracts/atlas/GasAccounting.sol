@@ -138,7 +138,6 @@ abstract contract GasAccounting is SafetyLocks {
             } else {
                 aData.auctionFails++;
             }
-            // TODO maybe add event for analytics? Will be emitted for each solver win/fail
 
             accessData[owner] = aData;
 

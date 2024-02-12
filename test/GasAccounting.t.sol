@@ -236,6 +236,49 @@ contract GasAccountingTest is Test {
         assertEq(unbonding, unbondingBefore);
     }
 
+    function test_assign_reputation_analytics() public {
+        uint256 gasUsedDecimalsToDrop = 1000; // This should be same value as in Storage.sol
+        uint256 assignedAmount = 1_234_567;
+        uint24 auctionWins;
+        uint24 auctionFails;
+        uint64 totalGasUsed;
+
+        mockGasAccounting.increaseBondedBalance(solverOp.from, 100e18);
+        (,,auctionWins,auctionFails,totalGasUsed) = mockGasAccounting.accessData(solverOp.from);
+        assertEq(auctionWins, 0, "auctionWins should start at 0");
+        assertEq(auctionFails, 0, "auctionFails should start at 0");
+        assertEq(totalGasUsed, 0, "totalGasUsed should start at 0");
+
+        mockGasAccounting.assign(solverOp.from, assignedAmount, true);
+        uint256 expectedGasUsed = assignedAmount / gasUsedDecimalsToDrop;
+            
+        (,,auctionWins,auctionFails,totalGasUsed) = mockGasAccounting.accessData(solverOp.from);
+        assertEq(auctionWins, 1, "auctionWins should be incremented by 1");
+        assertEq(auctionFails, 0, "auctionFails should remain at 0");
+        assertEq(totalGasUsed, expectedGasUsed, "totalGasUsed not as expected");
+
+        mockGasAccounting.assign(solverOp.from, assignedAmount, false);
+        expectedGasUsed += assignedAmount / gasUsedDecimalsToDrop;
+
+        (,,auctionWins,auctionFails,totalGasUsed) = mockGasAccounting.accessData(solverOp.from);
+        assertEq(auctionWins, 1, "auctionWins should remain at 1");
+        assertEq(auctionFails, 1, "auctionFails should be incremented by 1");
+        assertEq(totalGasUsed, expectedGasUsed, "totalGasUsed not as expected");
+
+        // Check (type(uint64).max + 2) * gasUsedDecimalsToDrop
+        // Should NOT overflow but rather increase totalGasUsed by 1
+        // Because uint64() cast takes first 64 bits which only include the 1
+        // And exclude (type(uint64).max + 1) * gasUsedDecimalsToDrop hex digits
+        // NOTE: This truncation only happens at values > 1.844e22 which is unrealistic for gas spent
+        uint256 largeAmountOfGas = (uint256(type(uint64).max) + 2) * gasUsedDecimalsToDrop;
+
+        mockGasAccounting.increaseBondedBalance(address(12345), 1000000e18);
+        mockGasAccounting.assign(address(12345), largeAmountOfGas, false);
+
+        (,,,,totalGasUsed) = mockGasAccounting.accessData(address(12345));
+        assertEq(totalGasUsed, 1, "totalGasUsed should be 1");
+    }
+
     function test_credit() public {
         uint256 creditedAmount = 10_000;
         uint256 lastAccessedBlock;
