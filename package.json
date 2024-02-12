@@ -30,7 +30,7 @@
       "deploy-solver-sepolia": "source .env && forge script script/deploy-solver.s.sol:DeploySimpleRFQSolverScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
       "deploy-solver-local": "source .env && forge script script/deploy-solver.s.sol:DeploySimpleRFQSolverScript --fork-url http://localhost:8545 --broadcast",
 
-      "deploy-all-sepolia": "npm run deploy-atlas-sepolia && npm run deploy-swap-intent-sepolia && npm run deploy-tx-builder-sepolia && npm run deploy-solver-sepolia",
+      "deploy-all-sepolia": "npm run deploy-atlas-sepolia && npm run deploy-swap-intent-sepolia && npm run deploy-tx-builder-sepolia && npm run deploy-solver-sepolia && npm run deploy-sorter-sepolia",
 
       "deploy-exec-env-sepolia": "source .env && forge script script/deploy-exec-env.s.sol:DeployExecEnvScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
 
