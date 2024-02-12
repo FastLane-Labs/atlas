@@ -282,12 +282,13 @@ contract EscrowTest is AtlasBaseTest {
         executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.PerBlockLimit), true);
     }
 
-    // function test_executeSolverOperation_validateSolverOperation_insufficientEscrow() public {
-    //     vm.txGasPrice(1e50); // Set a gas price that will cause the solver to run out of escrow
+    function test_executeSolverOperation_validateSolverOperation_insufficientEscrow() public {
+        // Solver only has 1 ETH escrowed
+        vm.txGasPrice(10e18); // Set a gas price that will cause the solver to run out of escrow
 
-    //     (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
-    //     executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.InsufficientEscrow), true);
-    // }
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
+        executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.InsufficientEscrow), true);
+    }
 
     function test_executeSolverOperation_validateSolverOperation_callValueTooHigh() public {
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
