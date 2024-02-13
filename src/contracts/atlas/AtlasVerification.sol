@@ -495,6 +495,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 userOp.deadline,
                 userOp.dapp,
                 userOp.control,
+                userOp.sessionKey,
                 keccak256(userOp.data)
             )
         );
