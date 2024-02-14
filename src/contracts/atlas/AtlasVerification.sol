@@ -161,18 +161,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
         view
         returns (bool valid, bool paysGas)
     {
-        (valid, paysGas) = _verifySolverOp(solverOp, userOpHash, bundler);
-    }
-
-    function _verifySolverOp(
-        SolverOperation calldata solverOp,
-        bytes32 userOpHash,
-        address bundler
-    )
-        internal
-        view
-        returns (bool valid, bool paysGas)
-    {
         if (bundler == solverOp.from || _verifySolverSignature(solverOp)) {
             // Validate solver signature
             if (solverOp.userOpHash != userOpHash) return (false, false);
