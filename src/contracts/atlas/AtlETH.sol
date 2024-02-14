@@ -69,7 +69,7 @@ abstract contract AtlETH is Permit69 {
 
     function transfer(address to, uint256 amount) public returns (bool) {
         _deduct(msg.sender, amount);
-        _balanceOf[to].balance += uint128(amount);
+        _balanceOf[to].balance += uint112(amount);
 
         emit Transfer(msg.sender, to, amount);
         return true;
@@ -79,7 +79,7 @@ abstract contract AtlETH is Permit69 {
         uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
         if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
         _deduct(from, amount);
-        _balanceOf[to].balance += uint128(amount);
+        _balanceOf[to].balance += uint112(amount);
         emit Transfer(from, to, amount);
         return true;
     }
@@ -150,7 +150,7 @@ abstract contract AtlETH is Permit69 {
 
     function _mint(address to, uint256 amount) internal {
         totalSupply += amount;
-        _balanceOf[to].balance += uint128(amount);
+        _balanceOf[to].balance += uint112(amount);
         emit Transfer(address(0), to, amount);
     }
 
@@ -162,18 +162,18 @@ abstract contract AtlETH is Permit69 {
 
     // NOTE: This does not change total supply.
     function _deduct(address account, uint256 amount) internal {
-        uint128 amt = uint128(amount);
+        uint112 amt = uint112(amount);
 
         EscrowAccountBalance memory aData = _balanceOf[account];
 
-        uint128 balance = aData.balance;
+        uint112 balance = aData.balance;
 
         if (amt < balance) {
             _balanceOf[account].balance = balance - amt;
         } else if (amt == balance) {
             _balanceOf[account].balance = 0;
-        } else if (uint128(block.number + ESCROW_DURATION) > accessData[account].lastAccessedBlock) {
-            uint128 _shortfall = amt - balance;
+        } else if (uint32(block.number + ESCROW_DURATION) > accessData[account].lastAccessedBlock) {
+            uint112 _shortfall = amt - balance;
             aData.balance = 0;
             aData.unbonding -= _shortfall; // underflow here to revert if insufficient balance
             _balanceOf[account] = aData;
@@ -221,7 +221,7 @@ abstract contract AtlETH is Permit69 {
     //////////////////////////////////////////////////////////////*/
 
     function _bond(address owner, uint256 amount) internal {
-        uint128 amt = uint128(amount);
+        uint112 amt = uint112(amount);
 
         _balanceOf[owner].balance -= amt;
         totalSupply -= amount;
@@ -233,7 +233,7 @@ abstract contract AtlETH is Permit69 {
     }
 
     function _unbond(address owner, uint256 amount) internal {
-        uint128 amt = uint128(amount);
+        uint112 amt = uint112(amount);
 
         // totalSupply and totalBondedSupply are unaffected; continue to count the
         // unbonding amount as bonded total supply since it is still inaccessible
@@ -242,7 +242,7 @@ abstract contract AtlETH is Permit69 {
         EscrowAccountAccessData memory aData = accessData[owner];
 
         aData.bonded -= amt;
-        aData.lastAccessedBlock = uint128(block.number);
+        aData.lastAccessedBlock = uint32(block.number);
         accessData[owner] = aData;
 
         _balanceOf[owner].unbonding += amt;
@@ -255,7 +255,7 @@ abstract contract AtlETH is Permit69 {
             revert EscrowLockActive();
         }
 
-        uint128 amt = uint128(amount);
+        uint112 amt = uint112(amount);
 
         EscrowAccountBalance memory bData = _balanceOf[owner];
 
