@@ -96,7 +96,7 @@ abstract contract Escrow is AtlETH {
             if (paysGas) {
                 uint256 gasUsed = gasWaterMark - gasleft() + 5000;
                 gasUsed = (gasUsed + ((gasUsed * SURCHARGE) / SURCHARGE_BASE)) * tx.gasprice;
-                _assign(solverOp.from, gasUsed);
+                _assign(solverOp.from, gasUsed, false);
             }
 
             emit SolverTxResult(solverOp.solver, solverOp.from, false, false, 0);
