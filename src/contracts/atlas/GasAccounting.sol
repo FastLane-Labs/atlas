@@ -11,7 +11,7 @@ import { SolverOperation } from "../types/SolverCallTypes.sol";
 
 import { EscrowBits } from "../libraries/EscrowBits.sol";
 
-//import "forge-std/Test.sol"; //TODO remove
+import "forge-std/Test.sol"; //TODO remove
 
 abstract contract GasAccounting is SafetyLocks {
     constructor(
@@ -104,11 +104,12 @@ abstract contract GasAccounting is SafetyLocks {
 
     // Takes AtlETH from 1) owner's bonded balance, and if more needed, also from 2) owner's unbonding balance
     // and increases transient solver deposits by this amount
-    function _assign(address owner, uint256 amount) internal returns (bool isDeficit) {
+    function _assign(address owner, uint256 amount, bool solverWon) internal returns (bool isDeficit) {
         if (amount == 0) {
-            accessData[owner].lastAccessedBlock = uint128(block.number);
+            accessData[owner].lastAccessedBlock = uint32(block.number);
         } else {
-            uint128 amt = uint128(amount);
+            if (amount > type(uint112).max) revert ValueTooLarge();
+            uint112 amt = uint112(amount);
 
             EscrowAccountAccessData memory aData = accessData[owner];
 
@@ -128,7 +129,15 @@ abstract contract GasAccounting is SafetyLocks {
                 aData.bonded -= amt;
             }
 
-            aData.lastAccessedBlock = uint128(block.number);
+            aData.lastAccessedBlock = uint32(block.number);
+
+            // Reputation Analytics: Track total gas used, solver wins, and failures
+            aData.totalGasUsed += uint64(amount / GAS_USED_DECIMALS_TO_DROP);
+            if (solverWon) {
+                aData.auctionWins++;
+            } else {
+                aData.auctionFails++;
+            }
 
             accessData[owner] = aData;
 
@@ -139,11 +148,12 @@ abstract contract GasAccounting is SafetyLocks {
 
     // Increases owner's bonded balance by amount
     function _credit(address owner, uint256 amount) internal {
-        uint128 amt = uint128(amount);
+        if (amount > type(uint112).max) revert ValueTooLarge();
+        uint112 amt = uint112(amount);
 
         EscrowAccountAccessData memory aData = accessData[owner];
 
-        aData.lastAccessedBlock = uint128(block.number);
+        aData.lastAccessedBlock = uint32(block.number);
         aData.bonded += amt;
 
         bondedTotalSupply += amount;
@@ -178,7 +188,7 @@ abstract contract GasAccounting is SafetyLocks {
 
         gasUsed = (gasUsed + ((gasUsed * SURCHARGE) / SURCHARGE_BASE)) * tx.gasprice;
 
-        _assign(solverFrom, gasUsed);
+        _assign(solverFrom, gasUsed, false);
     }
 
     function _settle(address winningSolver, address bundler) internal {
@@ -200,7 +210,7 @@ abstract contract GasAccounting is SafetyLocks {
         if (_deposits < _claims + _withdrawals) {
             // CASE: in deficit, subtract from bonded balance
             uint256 amountOwed = _claims + _withdrawals - _deposits;
-            if (_assign(winningSolver, amountOwed)) {
+            if (_assign(winningSolver, amountOwed, true)) {
                 revert InsufficientTotalBalance((_claims + _withdrawals) - deposits);
             }
         } else {
