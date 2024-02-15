@@ -15,91 +15,55 @@ contract SafetyBitsTest is Test {
     }
 
     // TODO Let's fix the constants test last.
-    /*
+
     function testConstants() public {
-        string memory expectedBitMapString = "0010000010001000";
+        string memory expectedBitMapString = "0000000100001000";
         assertEq(
             TestUtils.uint16ToBinaryString(SafetyBits._LOCKED_X_SOLVERS_X_REQUESTED),
             expectedBitMapString,
             "_LOCKED_X_SOLVERS_X_REQUESTED incorrect"
         );
 
-        expectedBitMapString = "0100000010001000";
-        assertEq(
-            TestUtils.uint16ToBinaryString(SafetyBits._LOCKED_X_SOLVERS_X_VERIFIED),
-            expectedBitMapString,
-            "_LOCKED_X_SOLVERS_X_VERIFIED incorrect"
-        );
-
-        expectedBitMapString = "0001000000100100";
+        expectedBitMapString = "0000000000100100";
         assertEq(
             TestUtils.uint16ToBinaryString(SafetyBits._ACTIVE_X_PRE_OPS_X_UNSET),
             expectedBitMapString,
             "_ACTIVE_X_PRE_OPS_X_UNSET incorrect"
         );
 
-        expectedBitMapString = "0001100000000010";
-        assertEq(
-            TestUtils.uint16ToBinaryString(SafetyBits._PENDING_X_RELEASING_X_UNSET),
-            expectedBitMapString,
-            "_PENDING_X_RELEASING_X_UNSET incorrect"
-        );
-
-        expectedBitMapString = "0001000000101000";
+        expectedBitMapString = "0000000000101000";
         assertEq(
             TestUtils.uint16ToBinaryString(SafetyBits._LOCKED_X_PRE_OPS_X_UNSET),
             expectedBitMapString,
             "_LOCKED_X_PRE_OPS_X_UNSET incorrect"
         );
 
-        expectedBitMapString = "0001000001000100";
+        expectedBitMapString = "0000000001000100";
         assertEq(
             TestUtils.uint16ToBinaryString(SafetyBits._ACTIVE_X_USER_X_UNSET),
             expectedBitMapString,
             "_ACTIVE_X_USER_X_UNSET incorrect"
         );
 
-        expectedBitMapString = "0001000001001000";
+        expectedBitMapString = "0000000001001000";
         assertEq(
             TestUtils.uint16ToBinaryString(SafetyBits._LOCKED_X_USER_X_UNSET),
             expectedBitMapString,
             "_LOCKED_X_USER_X_UNSET incorrect"
         );
 
-        expectedBitMapString = "0001000010000010";
+        expectedBitMapString = "0000010000001000";
         assertEq(
-            TestUtils.uint16ToBinaryString(SafetyBits._PENDING_X_SOLVER_X_UNSET),
-            expectedBitMapString,
-            "_PENDING_X_SOLVER_X_UNSET incorrect"
+            TestUtils.uint16ToBinaryString(SafetyBits._LOCK_PAYMENTS), expectedBitMapString, "_LOCK_PAYMENTS incorrect"
         );
 
-        expectedBitMapString = "0001000010000010";
-        assertEq(
-            TestUtils.uint16ToBinaryString(SafetyBits._ACTIVE_X_SOLVER_X_UNSET),
-            expectedBitMapString,
-            "_ACTIVE_X_SOLVER_X_UNSET incorrect"
-        );
-
-        expectedBitMapString = "0001000100001000";
-        assertEq(
-    TestUtils.uint16ToBinaryString(SafetyBits._LOCK_PAYMENTS), expectedBitMapString, "_LOCK_PAYMENTS incorrect"
-        );
-
-        expectedBitMapString = "0001010000000100";
-        assertEq(
-            TestUtils.uint16ToBinaryString(SafetyBits._NO_SOLVER_SUCCESS),
-            expectedBitMapString,
-            "_NO_SOLVER_SUCCESS incorrect"
-        );
-
-        expectedBitMapString = "0001010000001000";
+        expectedBitMapString = "0000100000001000";
         assertEq(
             TestUtils.uint16ToBinaryString(SafetyBits._LOCKED_X_VERIFICATION_X_UNSET),
             expectedBitMapString,
             "_LOCKED_X_VERIFICATION_X_UNSET incorrect"
         );
     }
-    */
 
     function testInitializeEscrowLock() public {
         EscrowKey memory key = initializeEscrowLock();
@@ -129,7 +93,7 @@ contract SafetyBitsTest is Test {
         assertTrue(key.lockState == SafetyBits._LOCKED_X_VERIFICATION_X_UNSET);
         assertFalse(key.addressPointer == address(1));
         assertTrue(key.callIndex == 3);
-      
+
         EscrowKey memory newKey = initializeEscrowLock();
         newKey.addressPointer = address(1);
         newKey.solverSuccessful = true;

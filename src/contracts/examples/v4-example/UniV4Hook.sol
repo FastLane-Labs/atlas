@@ -84,7 +84,7 @@ contract UniV4Hook is V4DAppControl {
 
             // Verify that the pool is valid for the user to trade in.
             require(keccak256(abi.encode(key, sender)) == hashLock, "ERR-H02 InvalidSwapper");
-        } else if (escrowKey.lockState == SafetyBits._LOCKED_X_SOLVERS_X_VERIFIED) {
+        } else if (escrowKey.lockState == SafetyBits._LOCKED_X_SOLVERS_X_REQUESTED) {
             // Case: Solver call
             // Sender = Solver contract
             // NOTE: This lockState verifies that the user's transaction has already
