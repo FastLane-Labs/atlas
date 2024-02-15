@@ -86,7 +86,7 @@ contract SwapIntentController is DAppControl {
     // swap() selector = 0x98434997
     function swap(SwapIntent calldata swapIntent) external payable returns (SwapData memory) {
         require(msg.sender == escrow, "ERR-PI002 InvalidSender");
-        require(_approvedCaller() == control, "ERR-PI003 InvalidLockState");
+        require(_addressPointer() == control, "ERR-PI003 InvalidLockState");
         require(address(this) != control, "ERR-PI004 MustBeDelegated");
 
         address user = _user();

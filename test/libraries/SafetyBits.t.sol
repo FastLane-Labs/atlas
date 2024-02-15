@@ -103,11 +103,11 @@ contract SafetyBitsTest is Test {
 
     function testInitializeEscrowLock() public {
         EscrowKey memory key = initializeEscrowLock();
-        assertTrue(key.approvedCaller == address(0));
-        assertTrue(key.makingPayments == false);
-        assertTrue(key.paymentsComplete == false);
+        assertTrue(key.addressPointer == address(0));
+        assertTrue(key.solverSuccessful == false);
+        assertTrue(key.paymentsSuccessful == false);
         assertTrue(key.callIndex == 0);
-        assertTrue(key.callMax == 4);
+        assertTrue(key.callCount == 4);
         assertTrue(key.lockState == SafetyBits._ACTIVE_X_PRE_OPS_X_UNSET);
         assertTrue(key.gasRefund == 0);
     }
@@ -122,47 +122,43 @@ contract SafetyBitsTest is Test {
 
     function testHoldDAppOperationLock() public {
         EscrowKey memory key = initializeEscrowLock();
-        key = key.holdDAppOperationLock(address(1));
+        key.addressPointer = address(1);
+        key.callCount = 4;
+        key.callIndex = 2;
+        key = key.holdPostOpsLock();
         assertTrue(key.lockState == SafetyBits._LOCKED_X_VERIFICATION_X_UNSET);
-        assertTrue(key.approvedCaller == address(1));
-        assertTrue(key.callIndex == 1);
-    }
-
-    function testSetAllSolversFailed() public {
-        EscrowKey memory key = initializeEscrowLock();
-        key = key.setAllSolversFailed();
-        assertTrue(key.lockState == SafetyBits._NO_SOLVER_SUCCESS);
-        assertTrue(key.approvedCaller == address(0));
+        assertFalse(key.addressPointer == address(1));
         assertTrue(key.callIndex == 3);
-    }
-
-    function testAllocationComplete() public {
-        EscrowKey memory key = initializeEscrowLock();
-        key = key.allocationComplete();
-        assertTrue(key.makingPayments == false);
-        assertTrue(key.paymentsComplete == true);
+      
+        EscrowKey memory newKey = initializeEscrowLock();
+        newKey.addressPointer = address(1);
+        newKey.solverSuccessful = true;
+        newKey.callCount = 4;
+        newKey.callIndex = 2;
+        newKey = newKey.holdPostOpsLock();
+        assertTrue(newKey.addressPointer == address(1));
+        assertTrue(newKey.callIndex == 3);
     }
 
     function testTurnSolverLockPayments() public {
         EscrowKey memory key = initializeEscrowLock();
-        key = key.turnSolverLockPayments(address(1));
-        assertTrue(key.makingPayments == true);
+        key = key.holdAllocateValueLock(address(1));
         assertTrue(key.lockState == SafetyBits._LOCK_PAYMENTS);
-        assertTrue(key.approvedCaller == address(1));
+        assertTrue(key.addressPointer == address(1));
     }
 
     function testHoldSolverLock() public {
         EscrowKey memory key = initializeEscrowLock();
         key = key.holdSolverLock(address(1));
         assertTrue(key.lockState == SafetyBits._LOCKED_X_SOLVERS_X_REQUESTED);
-        assertTrue(key.approvedCaller == address(1));
+        assertTrue(key.addressPointer == address(1));
     }
 
     function testHoldUserLock() public {
         EscrowKey memory key = initializeEscrowLock();
         key = key.holdUserLock(address(1));
         assertTrue(key.lockState == SafetyBits._LOCKED_X_USER_X_UNSET);
-        assertTrue(key.approvedCaller == address(1));
+        assertTrue(key.addressPointer == address(1));
         assertTrue(key.callIndex == 1);
     }
 
@@ -170,14 +166,7 @@ contract SafetyBitsTest is Test {
         EscrowKey memory key = initializeEscrowLock();
         key = key.holdPreOpsLock(address(1));
         assertTrue(key.lockState == SafetyBits._LOCKED_X_PRE_OPS_X_UNSET);
-        assertTrue(key.approvedCaller == address(1));
+        assertTrue(key.addressPointer == address(1));
         assertTrue(key.callIndex == 1);
-    }
-
-    function testTurnSolverLock() public {
-        EscrowKey memory key = initializeEscrowLock();
-        key = key.turnSolverLock(address(1));
-        assertTrue(key.lockState == SafetyBits._LOCKED_X_SOLVERS_X_VERIFIED);
-        assertTrue(key.approvedCaller == address(1));
     }
 }

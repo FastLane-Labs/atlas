@@ -57,11 +57,11 @@ contract Base {
 
     function _firstSet() internal pure returns (bytes memory data) {
         data = abi.encodePacked(
-            _approvedCaller(),
-            _makingPayments(),
-            _paymentsComplete(),
+            _addressPointer(),
+            _solverSuccessful(),
+            _paymentsSuccessful(),
             _callIndex(),
-            _callMax(),
+            _callCount(),
             _lockState(),
             _gasRefund(),
             _simulation(),
@@ -89,11 +89,11 @@ contract Base {
         }
 
         data = abi.encodePacked(
-            _approvedCaller(),
-            _makingPayments(),
-            _paymentsComplete(),
+            _addressPointer(),
+            _solverSuccessful(),
+            _paymentsSuccessful(),
             _callIndex(),
-            _callMax(),
+            _callCount(),
             lockState,
             _gasRefund(),
             _simulation(),
@@ -151,9 +151,9 @@ contract Base {
         }
     }
 
-    function _callMax() internal pure returns (uint8 callMax) {
+    function _callCount() internal pure returns (uint8 callCount) {
         assembly {
-            callMax := shr(248, calldataload(sub(calldatasize(), 85)))
+            callCount := shr(248, calldataload(sub(calldatasize(), 85)))
         }
     }
 
@@ -163,21 +163,21 @@ contract Base {
         }
     }
 
-    function _paymentsComplete() internal pure returns (bool paymentsComplete) {
+    function _paymentsSuccessful() internal pure returns (bool paymentsSuccessful) {
         assembly {
-            paymentsComplete := shr(248, calldataload(sub(calldatasize(), 87)))
+            paymentsSuccessful := shr(248, calldataload(sub(calldatasize(), 87)))
         }
     }
 
-    function _makingPayments() internal pure returns (bool makingPayments) {
+    function _solverSuccessful() internal pure returns (bool solverSuccessful) {
         assembly {
-            makingPayments := shr(248, calldataload(sub(calldatasize(), 88)))
+            solverSuccessful := shr(248, calldataload(sub(calldatasize(), 88)))
         }
     }
 
-    function _approvedCaller() internal pure returns (address approvedCaller) {
+    function _addressPointer() internal pure returns (address addressPointer) {
         assembly {
-            approvedCaller := shr(96, calldataload(sub(calldatasize(), 108)))
+            addressPointer := shr(96, calldataload(sub(calldatasize(), 108)))
         }
     }
 

@@ -2,11 +2,11 @@
 pragma solidity 0.8.22;
 
 struct EscrowKey {
-    address approvedCaller;
-    bool makingPayments;
-    bool paymentsComplete;
+    address addressPointer;
+    bool solverSuccessful;
+    bool paymentsSuccessful;
     uint8 callIndex;
-    uint8 callMax;
+    uint8 callCount;
     uint16 lockState; // bitwise
     uint32 gasRefund;
     bool isSimulation;

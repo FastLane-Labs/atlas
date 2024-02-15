@@ -91,10 +91,10 @@ contract UniV4Hook is V4DAppControl {
             // been executed.
             // NOTE: Solvers must have triggered the safetyCallback on the ExecutionEnvironment
             // *before* swapping.  The safetyCallback sets the ExecutionEnvironment as the
-            // escrowKey.approvedCaller.
+            // escrowKey.addressPointer.
 
             // Verify that the pool is valid for a solver to trade in.
-            require(hashLock == keccak256(abi.encode(key, escrowKey.approvedCaller)), "ERR-H04 InvalidPoolKey");
+            require(hashLock == keccak256(abi.encode(key, escrowKey.addressPointer)), "ERR-H04 InvalidPoolKey");
         } else {
             // Case: Other call
             // Determine if the sequenced order was processed earlier in the block
