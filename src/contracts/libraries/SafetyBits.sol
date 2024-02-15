@@ -63,7 +63,7 @@ library SafetyBits {
         uint16(1 << uint16(BaseLock.Pending) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations)));
 
     uint16 internal constant _ACTIVE_X_SOLVER_X_UNSET =
-        uint16(1 << uint16(BaseLock.Pending) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations)));
+        uint16(1 << uint16(BaseLock.Active) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations)));
 
     uint16 internal constant _LOCK_PAYMENTS =
         uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.HandlingPayments)));
