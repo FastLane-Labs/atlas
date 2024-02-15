@@ -74,19 +74,6 @@ library SafetyBits {
     uint16 internal constant _LOCKED_X_VERIFICATION_X_UNSET =
         uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps)));
 
-    //TODO change to pure after testing
-    function getCurrentExecutionPhase(uint16 lockState) internal view returns (uint16) {
-        // console.log("IN getCurrentExecutionPhase");
-        uint16 isolatedPhaseBits = lockState & ONLY_EXECUTION_PHASE_MASK;
-        //console.log("isolatedPhaseBits: %s", TestUtils.uint16ToBinaryString(isolatedPhaseBits));
-        //console.log("returning: %s", TestUtils.uint16ToBinaryString(uint16(isolatedPhaseBits >>
-        // EXECUTION_PHASE_OFFSET)));
-
-        // TODO Need to take dec number returned below and calculate log_2(dec num) to get the bit number
-
-        return uint16(isolatedPhaseBits >> EXECUTION_PHASE_OFFSET);
-    }
-
     function pack(EscrowKey memory self) internal pure returns (bytes32 packedKey) {
         packedKey = bytes32(
             abi.encodePacked(
