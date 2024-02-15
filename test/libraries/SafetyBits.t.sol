@@ -14,8 +14,6 @@ contract SafetyBitsTest is Test {
         key = key.initializeEscrowLock(true, 1, address(0), false);
     }
 
-    // TODO Let's fix the constants test last.
-
     function testConstants() public {
         string memory expectedBitMapString = "0000000100001000";
         assertEq(
