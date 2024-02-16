@@ -5,13 +5,16 @@ uint256 constant CALLDATA_LENGTH_PREMIUM = 32; // 16 (default) * 2
 
 // bonded = total - unbonding
 struct EscrowAccountBalance {
-    uint128 balance;
-    uint128 unbonding;
+    uint112 balance;
+    uint112 unbonding;
 }
 
 struct EscrowAccountAccessData {
-    uint128 bonded;
-    uint128 lastAccessedBlock;
+    uint112 bonded;
+    uint32 lastAccessedBlock;
+    uint24 auctionWins;
+    uint24 auctionFails;
+    uint64 totalGasUsed;
 }
 
 // NOTE: The order is very important here for balance reconciliation.
