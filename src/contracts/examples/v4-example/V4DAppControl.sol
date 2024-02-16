@@ -205,7 +205,7 @@ contract V4DAppControl is DAppControl {
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that DAppControl supplied a valid signature
         require(address(this) == hook, "ERR-H00 InvalidCallee");
-        require(hook == escrowKey.approvedCaller, "ERR-H01 InvalidCaller");
+        require(hook == escrowKey.addressPointer, "ERR-H01 InvalidCaller");
         require(escrowKey.lockState == SafetyBits._LOCKED_X_PRE_OPS_X_UNSET, "ERR-H02 InvalidLockStage");
         require(hashLock == bytes32(0), "ERR-H03 AlreadyActive");
 
@@ -223,7 +223,7 @@ contract V4DAppControl is DAppControl {
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that DAppControl supplied a valid signature
         require(address(this) == hook, "ERR-H20 InvalidCallee");
-        require(hook == escrowKey.approvedCaller, "ERR-H21 InvalidCaller");
+        require(hook == escrowKey.addressPointer, "ERR-H21 InvalidCaller");
         require(escrowKey.lockState == SafetyBits._LOCKED_X_VERIFICATION_X_UNSET, "ERR-H22 InvalidLockStage");
         require(hashLock == keccak256(abi.encode(key, msg.sender)), "ERR-H23 InvalidKey");
 

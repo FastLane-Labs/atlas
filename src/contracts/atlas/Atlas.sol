@@ -127,17 +127,19 @@ contract Atlas is Escrow, Factory {
             }
         }
 
-        // If no solver was successful, manually transition the lock
+        // If no solver was successful, handle revert decision
         if (!auctionWon) {
             if (key.isSimulation) revert SolverSimFail();
             if (dConfig.callConfig.needsFulfillment()) {
                 revert UserNotFulfilled(); // revert("ERR-E003 SolverFulfillmentFailure");
             }
-            key = key.setAllSolversFailed();
         }
 
         if (dConfig.callConfig.needsPostOpsCall()) {
-            key = key.holdDAppOperationLock(address(this));
+            // NOTE: key.addressPointer currently points at address(0) if all solvers fail.
+            // TODO: point key.addressPointer at bundler if all fail.
+            key = key.holdPostOpsLock(); // preserves addressPointer of winning solver
+
             bool callSuccessful = _executePostOpsCall(auctionWon, returnData, executionEnvironment, key.pack());
             if (!callSuccessful) {
                 if (key.isSimulation) revert PostOpsSimFail();
@@ -221,18 +223,16 @@ contract Atlas is Escrow, Factory {
         EscrowKey memory key
     )
         internal
-        returns (bool, EscrowKey memory)
+        returns (bool auctionWon, EscrowKey memory)
     {
-        bool auctionWon;
         (auctionWon, key) =
             _executeSolverOperation(solverOp, dAppReturnData, executionEnvironment, bundler, userOpHash, key);
-        unchecked {
-            ++key.callIndex;
-        }
 
         if (auctionWon) {
-            _allocateValue(dConfig, solverOp.bidAmount, dAppReturnData, executionEnvironment, key.pack());
-            key = key.allocationComplete();
+            key = key.holdAllocateValueLock(solverOp.from);
+
+            key.paymentsSuccessful =
+                _allocateValue(dConfig, solverOp.bidAmount, dAppReturnData, executionEnvironment, key.pack());
         }
         return (auctionWon, key);
     }

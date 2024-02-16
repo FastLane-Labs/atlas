@@ -122,8 +122,8 @@ abstract contract Escrow is AtlETH {
                 result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
                 emit SolverTxResult(solverOp.solver, solverOp.from, true, true, result);
 
-                // winning solver's gas is implicitly paid for by their allowance
-                return (true, key.turnSolverLockPayments(environment));
+                auctionWon = true;
+                key.solverSuccessful = true;
             } else {
                 _releaseSolverLock(solverOp, gasWaterMark, result);
                 result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
@@ -134,6 +134,9 @@ abstract contract Escrow is AtlETH {
         } else {
             _releaseSolverLock(solverOp, gasWaterMark, result);
 
+            unchecked {
+                ++key.callIndex;
+            }
             // emit event
             emit SolverTxResult(solverOp.solver, solverOp.from, false, false, result);
         }
@@ -142,8 +145,6 @@ abstract contract Escrow is AtlETH {
         return (false, key);
     }
 
-    // TODO: who should pay gas cost of MEV Payments?
-    // TODO: Should payment failure trigger subsequent solver calls?
     // (Note that balances are held in the execution environment, meaning
     // that payment failure is typically a result of a flaw in the
     // DAppControl contract)
