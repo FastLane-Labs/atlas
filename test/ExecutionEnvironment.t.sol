@@ -312,7 +312,9 @@ contract ExecutionEnvironmentTest is BaseTest {
         bool status;
 
         // Valid
-        escrowKey = escrowKey.holdDAppOperationLock(address(dAppControl));
+        escrowKey.addressPointer = address(dAppControl);
+        escrowKey.callCount = 4;
+        escrowKey = escrowKey.holdPostOpsLock();
         postOpsData =
             abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, false, abi.encode(false, true));
         postOpsData = abi.encodePacked(postOpsData, escrowKey.pack());
@@ -321,7 +323,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertTrue(status);
 
         // DelegateRevert
-        escrowKey = escrowKey.holdDAppOperationLock(address(dAppControl));
+        escrowKey = escrowKey.holdPostOpsLock();
         postOpsData =
             abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, false, abi.encode(true, false));
         postOpsData = abi.encodePacked(postOpsData, escrowKey.pack());
@@ -331,7 +333,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertTrue(status, "expectRevert ERR-EC02 DelegateRevert: call did not revert");
 
         // DelegateUnsuccessful
-        escrowKey = escrowKey.holdDAppOperationLock(address(dAppControl));
+        escrowKey = escrowKey.holdPostOpsLock();
         postOpsData =
             abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, false, abi.encode(false, false));
         postOpsData = abi.encodePacked(postOpsData, escrowKey.pack());
@@ -483,7 +485,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         bool status;
 
         // Valid
-        escrowKey = escrowKey.turnSolverLockPayments(address(dAppControl));
+        escrowKey = escrowKey.holdAllocateValueLock(address(dAppControl));
         allocateData = abi.encodeWithSelector(
             executionEnvironment.allocateValue.selector, address(0), uint256(0), abi.encode(false)
         );
@@ -493,7 +495,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertTrue(status);
 
         // DelegateRevert
-        escrowKey = escrowKey.turnSolverLockPayments(address(dAppControl));
+        escrowKey = escrowKey.holdAllocateValueLock(address(dAppControl));
         allocateData = abi.encodeWithSelector(
             executionEnvironment.allocateValue.selector, address(0), uint256(0), abi.encode(true)
         );
