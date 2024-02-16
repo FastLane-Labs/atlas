@@ -122,8 +122,9 @@ abstract contract Escrow is AtlETH {
                 result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
                 emit SolverTxResult(solverOp.solver, solverOp.from, true, true, result);
 
-                auctionWon = true;
                 key.solverSuccessful = true;
+                // auctionWon = true
+                return (true, key);
             } else {
                 _releaseSolverLock(solverOp, gasWaterMark, result);
                 result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
