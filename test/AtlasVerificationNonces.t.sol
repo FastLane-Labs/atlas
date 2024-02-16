@@ -32,7 +32,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         UserOperation memory userOp = validUserOperation().withNonce(1).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).signAndBuild(address(atlasVerification), governancePK);
-        doValidCalls(AtlasVerificationBase.ValidCallsCall({
+        doValidateCalls(AtlasVerificationBase.ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
         assertEq(atlasVerification.getNextNonce(userEOA, true), 2, "User next seq nonce should now be 2");
@@ -47,7 +47,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         UserOperation memory userOp = validUserOperation().withNonce(1).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).signAndBuild(address(atlasVerification), governancePK);
-        doValidCalls(AtlasVerificationBase.ValidCallsCall({
+        doValidateCalls(AtlasVerificationBase.ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
         assertEq(atlasVerification.getNextNonce(userEOA, true), 1, "User next seq nonce should still be 1");
@@ -60,7 +60,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         UserOperation memory userOp = validUserOperation().withNonce(1).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(1).signAndBuild(address(atlasVerification), governancePK);
-        doValidCalls(AtlasVerificationBase.ValidCallsCall({
+        doValidateCalls(AtlasVerificationBase.ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
 
@@ -89,7 +89,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         UserOperation memory userOp = validUserOperation().withNonce(1).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(1).signAndBuild(address(atlasVerification), governancePK);
-        doValidCalls(AtlasVerificationBase.ValidCallsCall({
+        doValidateCalls(AtlasVerificationBase.ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
 
@@ -204,7 +204,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).signAndBuild(address(atlasVerification), governancePK);
         // First call initializes at nonce = 1
-        doValidCalls(AtlasVerificationBase.ValidCallsCall({
+        doValidateCalls(AtlasVerificationBase.ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
 
