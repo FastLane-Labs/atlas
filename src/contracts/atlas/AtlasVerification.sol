@@ -81,7 +81,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
     error InvalidCaller();
 
-    constructor(address _atlas) EIP712("ProtoCallHandler", "0.0.1") DAppIntegration(_atlas) { }
+    constructor(address _atlas) EIP712("AtlasVerification", "0.0.1") DAppIntegration(_atlas) { }
 
     function validCalls(
         DAppConfig calldata dConfig,
@@ -315,6 +315,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         }
 
         if (dAppOp.control != dConfig.to) {
+            // This should be unreachable but returning false just in case.
             return false;
         }
 
@@ -517,6 +518,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 userOp.deadline,
                 userOp.dapp,
                 userOp.control,
+                userOp.sessionKey,
                 keccak256(userOp.data)
             )
         );

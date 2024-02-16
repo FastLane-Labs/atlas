@@ -11,6 +11,7 @@ contract Storage is AtlasEvents, AtlasErrors {
     // Atlas constants
     uint256 internal constant _MAX_GAS = 1_500_000;
     uint256 internal constant LEDGER_LENGTH = 6; // type(Party).max = 6
+    uint256 internal constant GAS_USED_DECIMALS_TO_DROP = 1000;
     address internal constant UNLOCKED = address(1);
 
     uint256 public immutable ESCROW_DURATION;
@@ -68,6 +69,7 @@ contract Storage is AtlasEvents, AtlasErrors {
         INITIAL_DOMAIN_SEPARATOR = _computeDomainSeparator();
 
         // Gas Accounting
+        // Initialized with msg.value to seed flash loan liquidity
         surcharge = msg.value;
         surchargeRecipient = _surchargeRecipient;
 
