@@ -12,8 +12,6 @@ import "../types/LockTypes.sol";
 
 uint16 constant EXECUTION_PHASE_OFFSET = uint16(type(BaseLock).max) + 1;
 
-uint16 constant ONLY_EXECUTION_PHASE_MASK = uint16(4080); // 0000 1111 1111 0000
-
 // NOTE: No user transfers allowed during HandlingPayments
 uint16 constant SAFE_USER_TRANSFER = uint16(
     1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps))
@@ -31,24 +29,12 @@ uint16 constant SAFE_DAPP_TRANSFER = uint16(
         | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
 );
 
-uint16 constant SAFE_GAS_TRANSFER = uint16(
-    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps))
-        | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserOperation))
-        | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreSolver))
-);
-
 library SafetyBits {
     uint16 internal constant _LOCKED_X_SOLVERS_X_REQUESTED =
         uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations)));
 
-    uint16 internal constant _LOCKED_X_SOLVERS_X_VERIFIED =
-        uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations)));
-
     uint16 internal constant _ACTIVE_X_PRE_OPS_X_UNSET =
         uint16(1 << uint16(BaseLock.Active) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps)));
-
-    uint16 internal constant _PENDING_X_RELEASING_X_UNSET =
-        uint16(1 << uint16(BaseLock.Pending) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.Releasing)));
 
     uint16 internal constant _LOCKED_X_PRE_OPS_X_UNSET =
         uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps)));
@@ -59,17 +45,8 @@ library SafetyBits {
     uint16 internal constant _LOCKED_X_USER_X_UNSET =
         uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserOperation)));
 
-    uint16 internal constant _PENDING_X_SOLVER_X_UNSET =
-        uint16(1 << uint16(BaseLock.Pending) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations)));
-
-    uint16 internal constant _ACTIVE_X_SOLVER_X_UNSET =
-        uint16(1 << uint16(BaseLock.Active) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations)));
-
     uint16 internal constant _LOCK_PAYMENTS =
         uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.HandlingPayments)));
-
-    uint16 internal constant _NO_SOLVER_SUCCESS =
-        uint16(1 << uint16(BaseLock.Active) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps)));
 
     uint16 internal constant _LOCKED_X_VERIFICATION_X_UNSET =
         uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps)));
