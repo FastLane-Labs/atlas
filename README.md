@@ -1,40 +1,41 @@
 # Atlas
-*This repo is still under development.  No assumptions about the production implementation of Atlas should be derived from reading the current codebase; many core design elements and interfaces can -and probably will- be changed.*
 
 ### Concept:
 
-Atlas is a permissionless and modular smart contract framework that provides DApps with an auction system in which Solvers compete to provide optimal solutions.  A User Operation is collected by the DApp's frontend via the Atlas Plugin and sent to a DApp-designated bundler, who combines it with Solver Operations into a single transaction governed by the Atlas smart contract. 
+Atlas is a permissionless and modular smart contract framework for Execution Abstraction. It provides apps and frontends with an auction system in which Solvers compete to provide optimal solutions for user intents or MEV redistribution.  A User Operation is collected by the app's frontend via the Atlas SDK and sent to a app-designated bundler, which combines it with Solver Operations into a single transaction. 
 
 ### DApp Integration
 
-A DApp wishing to participate can integrate with Atlas by completing three steps:
+A frontend or API wishing to participate can integrate with Atlas by completing three steps:
 
-1. Embed the Atlas API or SDK into their frontend or API.
+1. Embed the Atlas SDK into their frontend or API.
 2. Create and publish a DAppControl contract.
-3. Interact with the Atlas contract to initialize the DAppControl contract and link it to the Atlas API on their frontend or API.
+3. Interact with the Atlas contract to initialize the DAppControl contract and link it to the Atlas SDK on their frontend or API.
 
 ### Network Overview
 
-Atlas is infrastructure-agnostic; each DApp may choose how the DApp-designated bundler may aggregate the User Operations and Solver Operations. Examples include:
+Atlas is infrastructure-agnostic; each app may choose how the app-designated bundler may aggregate the User Operations and Solver Operations. Examples include:
 1. **On Chain**: When gas cost is not an issue, the entire auction can take place on chain (or rollup).
-2. **EIP-4337 Mempool**: Once live, Operations can be distributed via this alternate mempool.
+2. **On Another Chain**: So many decentralized networks - it'd be a shame to use only one.
 3. **BloXroute**: When Atlas is launched, BloXroute's BDN will support the aggregation of User and Solver Operations for rapid bundling. 
 4. **SUAVE**: Once live, Operations can be sent to the SUAVE network, bundled into a transaction by the SUAVE Atlas implementation, and then made available for use by builders. 
 
 ### Auctioneer Overview
 
-Each DApp may choose a party to act as a trusted auctioneer.  **It is strongly recommended that the DApp select the auction beneficiary act as the auctioneer.**  The beneficiary can always trust themselves and this prevents adding new, trusted parties.  We expect most -but not all- DApps to select the User as the auctioneer and to handle the auctioneer duties without User input through the frontend, which the User already trusts explicitly.
+Each frontend may choose a party to act as the auctioneer.  **It is strongly recommended to select the auction beneficiary act as the auctioneer.**  The beneficiary can always trust themselves and this prevents adding new, trusted parties.  We expect most -but not all- frontends to select the User as the auctioneer and to handle the auctioneer duties without User input via session keys through the frontend, which the User already trusts explicitly.
 
 The auctioneer is tasked with signing a **DAppOperation** that includes a **CallChainHash**.  This hash guarantees that the bundler cannot tamper with the execution order of the **SolverOperation**s.  Any party can easily generate this hash by making a view call to the *getCallChainHash(SolverOperations[])* function. Note that infrastructure networks with programmable guarantees such as SUAVE will not require this as it can be handled trustlessly in-network. 
 
 ***Auctioneer Example***:
-1. User connects to a DApp frontend and receives a session key from a FastLane x DApp backend.
+*Featuring BloXroute as the Operations Relay*
+1. User connects to a frontend and receives a session key.
 2. User signs their UserOperation, which is propagated over the bloXroute BDN to solvers.
-3. The frontend receives SolverOperations via the BDN.
-4. After a set period of time, the frontend calls the *getCallChainHash()* view function via the User's RPC.
+3. The frontend receives SolverOperations back via the BDN.
+4. After a set period of time, the frontend calls the *getCallChainHash()* view function via the User's wallet's RPC.
 5. The frontend then uses the session key from step 1 to sign the **DAppOperation**, which includes the **CallChainHash**.
-6. The frontend then propagates the DAppOperation over the BDN to bundlers.
-7. Any bundler who tampers with the order of the SolverOperations will cause their transaction to revert, thereby blocking any gas reimbursement from Atlas.
+6. The frontend then propagates the DAppOperation over the BDN to designated bundler.
+
+Note that any bundler who tampers with the order of the SolverOperations will cause the transaction to revert, thereby blocking any gas reimbursement from Atlas.
 
 Note that input from the User is only required for step 2; all other steps have no impact on UX. 
 
@@ -45,9 +46,9 @@ Note that input from the User is only required for step 2; all other steps have 
 
 #### DAppControl
 
-The DAppControl contract is where DApps define functions that will execute at specific stages during the Atlas transaction.  The contract also contains DApp-specific settings, such as the address of permitted bundlers, or if  the asynchronous processing of User nonces is permitted.  These functions and settings are referenced by the Atlas smart contract during execution to create a trustless environment that is maximally composable with the DApp's existing smart contracts - no upgrades or redeployments are required.  
+The DAppControl contract is where frontends and APIs define functions that will execute at specific stages during the Atlas transaction.  The contract also contains app-specific settings, such as the address of permitted bundlers, or if  the asynchronous processing of User nonces is permitted.  These functions and settings are referenced by the Atlas smart contract during execution to create a trustless environment that is maximally composable with the DApp's existing smart contracts - no upgrades or redeployments are required.  
 
-The DAppControl contract may define which entities are permitted to act as the Bundler.  The DApp can designate one or more of the following:
+The DAppControl contract may define which entities are permitted to act as the Bundler.  The frontend can designate one or more of the following:
 1. **DAppProxy**: A specific address (or addresses) is permitted to bundle operations.
 2. **User**: The User is permitted to bundle operations.
 3. **Builder**: The builder ("block.coinbase") is permitted to bundle operations.
@@ -78,21 +79,21 @@ A user must have an Execution Environment (EE) instance for each DApp they would
 ### Advantages:
 - Atlas Solvers have first access to any value created by the User Operation.  This exclusive access supercedes that of any wallets, RPCs, relays, builders, validators, and sequencers.  
 
-- By acting as the Auctioneer for the Solvers and the beneficiary of any surplus value, DApp Governance bypasses the "trusted auctioneer" problem by virtue of being able to trust itself. 
+- By acting as the Auctioneer for the Solvers and the beneficiary of any surplus value, Governance bypasses the "trusted auctioneer" problem by virtue of being able to trust itself. 
 
 - The allocation of MEV is modular and fully customizable by DApp Governance.  For example, they could elect to use a portion of the MEV to refund the User's gas cost, a portion to offset the impermanent loss of the protocol's liquidity providers, and the remainder to buy that protocol's governance token for the User. 
 
 - Due to the unique nature of the Execution Environment - a smart account that Atlas creates to facilitate a trustless environment for Users, Solvers, and DApps  - Users have an extra layer of protection against allowance-based exploits.
 
-- DApp Governance has the option to subsidize a User's gas cost. Note that unlike traditional Account Abstraction protocols, Atlas empowers DApp Governance to subsidize the User's gas costs *conditionally* based on the *result* of the User's (or Solver's) execution. We expect that most DApps will require Solvers to subsidize all gas costs not attributed to other Solvers. 
+- By default, a successful Solver must pay the full gas cost of the transaction less the gas attributed to the failed operations of other Solvers.  DApp Governance has the option to subsidize a Solver's gas cost *conditionally* based on the *result* of the User's (or Solver's) execution. 
 
-- By putting control of any User-created value in the hands of each DApp's Governance team, and by retaining the MEV before any RPCs or private relays see the transaction, Atlas has the potential to nullify the value of private orderflow, thereby acting as a counterforce to one of the strongest centralization risks in the Ethereum ecosystem. 
+- By putting control of any User-created value in the hands of each frontend's Governance team, and by retaining the MEV or intent-generated value before RPCs or private relays see the transaction, Atlas has the potential to nullify the value of private orderflow, thereby acting as a counterforce to one of the strongest centralization vectors in the Ethereum ecosystem. 
 
 ### Disadvantages:
 
-- Just as in the early days of Ethereum, Solvers do not benefit from "free reverts." If a Solver Operation fails, then the Solver still must pay their gas cost to the Bundler.
+- Just as in the early days of Ethereum, Solvers do not benefit from "free reverts." If a Solver Operation fails, then the Solver still must pay their gas cost to the Bundler.  Gas cost acts as a DDoS mitigator - this is a good thing for permissionless auctions. 
 
-- Atlas represents a less efficient use of block space than traditional, infrastructure-based MEV capture systems. This arises due to the checks and verifications that allow Atlas to function without relying on privacy guarantees from centralized, third-party infrastructure or off-chain agreements with permissioned builders.  Note that this extra usage of gas will typically be handled by Solvers, and that if no Solver is willing to pay for the increased gas cost then the User can simply do a non-Atlas transaction. In other words, the extra gas cost will only be incurred when its cost is less than its benefit. 
+- Atlas represents a less efficient use of block space than traditional, infrastructure-based MEV capture systems. This arises due to the checks and verifications that allow Atlas to function without relying on privacy guarantees from centralized, third-party infrastructure or off-chain agreements with permissioned builders.  Note that this extra usage of gas will typically be handled by Solvers, and that if no Solver is willing to pay for the increased gas cost then the User can simply do a non-Atlas transaction. In other words, the extra gas cost will only be incurred when its cost is less than its expected benefit. 
 
 ### Notes:
 
