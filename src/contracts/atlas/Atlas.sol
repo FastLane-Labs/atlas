@@ -43,14 +43,15 @@ contract Atlas is Escrow, Factory {
 
     function metacall( // <- Entrypoint Function
         UserOperation calldata userOp, // set by user
-        SolverOperation[] memory solverOps, // supplied by FastLane via frontend integration
-        DAppOperation calldata dAppOp // supplied by front end after it sees the other data
+        SolverOperation[] calldata solverOps, // supplied by ops relay
+        DAppOperation calldata dAppOp // supplied by front end via atlas SDK
     )
         external
         payable
         returns (bool auctionWon)
     {
         uint256 gasMarker = gasleft(); // + 21_000 + (msg.data.length * CALLDATA_LENGTH_PREMIUM);
+        bool isSimulation = msg.sender == SIMULATOR;
 
         // Get or create the execution environment
         address executionEnvironment;
@@ -60,21 +61,19 @@ contract Atlas is Escrow, Factory {
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
         // NOTE: Currently reverting instead of graceful return to help w/ testing.
-        ValidCallsResult validCallsResult;
-        (solverOps, validCallsResult) = IAtlasVerification(VERIFICATION).validCalls(
-            dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, msg.sender == SIMULATOR
+        (bytes32 userOpHash, ValidCallsResult validCallsResult) = IAtlasVerification(VERIFICATION).validateCalls(
+            dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, isSimulation
         );
         if (validCallsResult != ValidCallsResult.Valid) {
-            if (msg.sender == SIMULATOR) revert VerificationSimFail();
+            if (isSimulation) revert VerificationSimFail();
             else revert ValidCalls(validCallsResult);
         }
 
         // Initialize the lock
         _initializeEscrowLock(executionEnvironment, gasMarker, userOp.value);
 
-        try this.execute{ value: msg.value }(dConfig, userOp, solverOps, executionEnvironment, msg.sender) returns (
-            bool _auctionWon, uint256 winningSolverIndex
-        ) {
+        try this.execute{ value: msg.value }(dConfig, userOp, solverOps, executionEnvironment, msg.sender, userOpHash)
+        returns (bool _auctionWon, uint256 winningSolverIndex) {
             auctionWon = _auctionWon;
             // Gas Refund to sender only if execution is successful
             _settle({ winningSolver: auctionWon ? solverOps[winningSolverIndex].from : msg.sender, bundler: msg.sender });
@@ -99,7 +98,8 @@ contract Atlas is Escrow, Factory {
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         address executionEnvironment,
-        address bundler
+        address bundler,
+        bytes32 userOpHash
     )
         external
         payable
@@ -108,66 +108,18 @@ contract Atlas is Escrow, Factory {
         // This is a self.call made externally so that it can be used with try/catch
         if (msg.sender != address(this)) revert InvalidAccess();
 
-        // Build the memory lock
-        EscrowKey memory key =
-            _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), bundler == SIMULATOR);
-
-        // Begin execution
-        (auctionWon, winningSearcherIndex) = _execute(dConfig, userOp, solverOps, executionEnvironment, key);
-    }
-
-    function _execute(
-        DAppConfig calldata dConfig,
-        UserOperation calldata userOp,
-        SolverOperation[] calldata solverOps,
-        address executionEnvironment,
-        EscrowKey memory key
-    )
-        internal
-        returns (bool auctionWon, uint256 winningSearcherIndex)
-    {
-        // Build the CallChainProof.  The penultimate hash will be used
-        // to verify against the hash supplied by DAppControl
-
-        bool callSuccessful;
-
-        bytes memory returnData;
-
-        if (dConfig.callConfig.needsPreOpsCall()) {
-            key = key.holdPreOpsLock(dConfig.to);
-            (callSuccessful, returnData) = _executePreOpsCall(userOp, executionEnvironment, key.pack());
-            if (!callSuccessful) {
-                if (key.isSimulation) revert PreOpsSimFail();
-                else revert PreOpsFail();
-            }
-        }
-
-        key = key.holdUserLock(userOp.dapp);
-
-        bytes memory userReturnData;
-        (callSuccessful, userReturnData) = _executeUserOperation(userOp, executionEnvironment, key.pack());
-        if (!callSuccessful) {
-            if (key.isSimulation) revert UserOpSimFail();
-            else revert UserOpFail();
-        }
-
-        if (CallBits.needsPreOpsReturnData(dConfig.callConfig)) {
-            //returnData = returnData;
-            if (CallBits.needsUserReturnData(dConfig.callConfig)) {
-                returnData = bytes.concat(returnData, userReturnData);
-            }
-        } else if (CallBits.needsUserReturnData(dConfig.callConfig)) {
-            returnData = userReturnData;
-        }
+        (bytes memory returnData, EscrowKey memory key) =
+            _preOpsUserExecutionIteration(dConfig, userOp, solverOps, executionEnvironment, bundler);
 
         for (; winningSearcherIndex < solverOps.length;) {
             // valid solverOps are packed from left of array - break at first invalid solverOp
-            if (solverOps[winningSearcherIndex].from == address(0)) break;
 
-            (auctionWon, key) = _solverExecutionIteration(
-                dConfig, solverOps[winningSearcherIndex], returnData, auctionWon, executionEnvironment, key
-            );
-            emit SolverExecution(solverOps[winningSearcherIndex].from, winningSearcherIndex, auctionWon);
+            SolverOperation calldata solverOp = solverOps[winningSearcherIndex];
+            // if (solverOp.from == address(0)) break;
+
+            (auctionWon, key) =
+                _solverExecutionIteration(dConfig, solverOp, returnData, executionEnvironment, bundler, userOpHash, key);
+            emit SolverExecution(solverOp.from, winningSearcherIndex, auctionWon);
             if (auctionWon) break;
 
             unchecked {
@@ -175,18 +127,20 @@ contract Atlas is Escrow, Factory {
             }
         }
 
-        // If no solver was successful, manually transition the lock
+        // If no solver was successful, handle revert decision
         if (!auctionWon) {
             if (key.isSimulation) revert SolverSimFail();
             if (dConfig.callConfig.needsFulfillment()) {
                 revert UserNotFulfilled(); // revert("ERR-E003 SolverFulfillmentFailure");
             }
-            key = key.setAllSolversFailed();
         }
 
         if (dConfig.callConfig.needsPostOpsCall()) {
-            key = key.holdDAppOperationLock(address(this));
-            callSuccessful = _executePostOpsCall(auctionWon, returnData, executionEnvironment, key.pack());
+            // NOTE: key.addressPointer currently points at address(0) if all solvers fail.
+            // TODO: point key.addressPointer at bundler if all fail.
+            key = key.holdPostOpsLock(); // preserves addressPointer of winning solver
+
+            bool callSuccessful = _executePostOpsCall(auctionWon, returnData, executionEnvironment, key.pack());
             if (!callSuccessful) {
                 if (key.isSimulation) revert PostOpsSimFail();
                 else revert PostOpsFail();
@@ -195,25 +149,90 @@ contract Atlas is Escrow, Factory {
         return (auctionWon, winningSearcherIndex);
     }
 
+    function _preOpsUserExecutionIteration(
+        DAppConfig calldata dConfig,
+        UserOperation calldata userOp,
+        SolverOperation[] calldata solverOps,
+        address executionEnvironment,
+        address bundler
+    )
+        internal
+        returns (bytes memory, EscrowKey memory)
+    {
+        bool callSuccessful;
+        bool usePreOpsReturnData;
+        bytes memory returnData;
+
+        // Build the memory lock
+        EscrowKey memory key =
+            _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), bundler == SIMULATOR);
+
+        if (dConfig.callConfig.needsPreOpsCall()) {
+            // CASE: Need PreOps Call
+            key = key.holdPreOpsLock(dConfig.to);
+
+            if (CallBits.needsPreOpsReturnData(dConfig.callConfig)) {
+                // CASE: Need PreOps return data
+                usePreOpsReturnData = true;
+                (callSuccessful, returnData) = _executePreOpsCall(userOp, executionEnvironment, key.pack());
+            } else {
+                // CASE: Ignore PreOps return data
+                (callSuccessful,) = _executePreOpsCall(userOp, executionEnvironment, key.pack());
+            }
+
+            if (!callSuccessful) {
+                if (key.isSimulation) revert PreOpsSimFail();
+                else revert PreOpsFail();
+            }
+        }
+
+        key = key.holdUserLock(userOp.dapp);
+
+        if (CallBits.needsUserReturnData(dConfig.callConfig)) {
+            // CASE: Need User return data
+
+            if (usePreOpsReturnData) {
+                // CASE: Need PreOps return Data, Need User return data
+                bytes memory userReturnData;
+                (callSuccessful, userReturnData) = _executeUserOperation(userOp, executionEnvironment, key.pack());
+                returnData = bytes.concat(returnData, userReturnData);
+            } else {
+                // CASE: Ignore PreOps return data, Need User return data
+                (callSuccessful, returnData) = _executeUserOperation(userOp, executionEnvironment, key.pack());
+            }
+        } else {
+            // CASE: Ignore User return data
+            (callSuccessful,) = _executeUserOperation(userOp, executionEnvironment, key.pack());
+        }
+
+        if (!callSuccessful) {
+            if (key.isSimulation) revert UserOpSimFail();
+            else revert UserOpFail();
+        }
+
+        return (returnData, key);
+    }
+
     function _solverExecutionIteration(
         DAppConfig calldata dConfig,
         SolverOperation calldata solverOp,
         bytes memory dAppReturnData,
-        bool auctionWon,
         address executionEnvironment,
+        address bundler,
+        bytes32 userOpHash,
         EscrowKey memory key
     )
         internal
-        returns (bool, EscrowKey memory)
+        returns (bool auctionWon, EscrowKey memory)
     {
-        (auctionWon, key) = _executeSolverOperation(solverOp, dAppReturnData, executionEnvironment, key);
-        unchecked {
-            ++key.callIndex;
-        }
+        (auctionWon, key) =
+            _executeSolverOperation(solverOp, dAppReturnData, executionEnvironment, bundler, userOpHash, key);
 
         if (auctionWon) {
-            _allocateValue(dConfig, solverOp.bidAmount, dAppReturnData, executionEnvironment, key.pack());
-            key = key.allocationComplete();
+            key = key.holdAllocateValueLock(solverOp.from);
+
+            key.paymentsSuccessful =
+                _allocateValue(dConfig, solverOp.bidAmount, dAppReturnData, executionEnvironment, key.pack());
         }
         return (auctionWon, key);
     }

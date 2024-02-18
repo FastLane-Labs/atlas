@@ -31,11 +31,11 @@ contract Permit69Test is BaseTest {
         BaseTest.setUp();
 
         escrowKey = EscrowKey({
-            approvedCaller: address(0),
-            makingPayments: false,
-            paymentsComplete: false,
+            addressPointer: address(0),
+            solverSuccessful: false,
+            paymentsSuccessful: false,
             callIndex: 0,
-            callMax: 0,
+            callCount: 0,
             lockState: EXEC_PHASE_PRE_OPS,
             gasRefund: 0,
             isSimulation: false,

@@ -4,6 +4,8 @@
 /out
 /report
 /lib
+lib
+/lib/*
 /lib/uniswap
 /lib/uniswap/*
 .env

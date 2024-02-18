@@ -5,7 +5,7 @@ import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
 
 import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 
-import { AtlasVerification } from "./AtlasVerification.sol";
+import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
 import { AtlETH } from "./AtlETH.sol";
 
 import "../types/SolverCallTypes.sol";
@@ -75,17 +75,35 @@ abstract contract Escrow is AtlETH {
         emit UserCall(environment, success, userData);
     }
 
+    // Returns (bool auctionWon, EscrowKey key)
     function _executeSolverOperation(
         SolverOperation calldata solverOp,
         bytes memory dAppReturnData,
         address environment,
+        address bundler,
+        bytes32 userOpHash,
         EscrowKey memory key
     )
         internal
-        returns (bool auctionWon, EscrowKey memory)
+        returns (bool, EscrowKey memory)
     {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
+
+        (bool valid, bool paysGas) = IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, userOpHash, bundler);
+
+        if (!valid) {
+            if (paysGas) {
+                uint256 gasUsed = gasWaterMark - gasleft() + 5000;
+                gasUsed = (gasUsed + ((gasUsed * SURCHARGE) / SURCHARGE_BASE)) * tx.gasprice;
+                _assign(solverOp.from, gasUsed, false);
+            }
+
+            emit SolverTxResult(solverOp.solver, solverOp.from, false, false, 0);
+
+            // auctionWon = false
+            return (false, key);
+        }
 
         // Verify the transaction.
         (uint256 result, uint256 gasLimit) = _validateSolverOperation(solverOp);
@@ -104,8 +122,9 @@ abstract contract Escrow is AtlETH {
                 result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
                 emit SolverTxResult(solverOp.solver, solverOp.from, true, true, result);
 
-                // winning solver's gas is implicitly paid for by their allowance
-                return (true, key.turnSolverLockPayments(environment));
+                key.solverSuccessful = true;
+                // auctionWon = true
+                return (true, key);
             } else {
                 _releaseSolverLock(solverOp, gasWaterMark, result);
                 result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
@@ -116,14 +135,17 @@ abstract contract Escrow is AtlETH {
         } else {
             _releaseSolverLock(solverOp, gasWaterMark, result);
 
+            unchecked {
+                ++key.callIndex;
+            }
             // emit event
             emit SolverTxResult(solverOp.solver, solverOp.from, false, false, result);
         }
-        return (auctionWon, key);
+
+        // auctionWon = false
+        return (false, key);
     }
 
-    // TODO: who should pay gas cost of MEV Payments?
-    // TODO: Should payment failure trigger subsequent solver calls?
     // (Note that balances are held in the execution environment, meaning
     // that payment failure is typically a result of a flaw in the
     // DAppControl contract)
@@ -179,6 +201,7 @@ abstract contract Escrow is AtlETH {
         uint256 solverBalance = aData.bonded;
         uint256 lastAccessedBlock = aData.lastAccessedBlock;
 
+        // TODO this check is duplicated in AtlasVerification._verifySolverOp. Maybe remove one of them.
         if (solverOp.to != address(this)) {
             result |= 1 << uint256(SolverOutcome.InvalidTo);
         }

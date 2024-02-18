@@ -8,7 +8,7 @@ import "../types/EscrowTypes.sol";
 import "../types/ValidCallsTypes.sol";
 
 interface IAtlasVerification {
-    function validCalls(
+    function validateCalls(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
@@ -18,17 +18,16 @@ interface IAtlasVerification {
         bool isSimulation
     )
         external
-        returns (SolverOperation[] memory, ValidCallsResult);
+        returns (bytes32 userOpHash, ValidCallsResult);
 
     function verifySolverOp(
         SolverOperation calldata solverOp,
-        EscrowAccountBalance memory solverEscrow,
-        uint256 gasWaterMark,
-        bool auctionAlreadyComplete
+        bytes32 userOpHash,
+        address bundler
     )
         external
         view
-        returns (uint256 result, uint256 gasLimit, EscrowAccountBalance memory);
+        returns (bool valid, bool paysGas);
 
     function getUserOperationPayload(UserOperation memory userOp) external view returns (bytes32 payload);
     function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload);

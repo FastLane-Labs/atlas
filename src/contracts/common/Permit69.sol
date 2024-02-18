@@ -8,12 +8,7 @@ import { GasAccounting } from "../atlas/GasAccounting.sol";
 import "../types/LockTypes.sol";
 import "../types/EscrowTypes.sol";
 
-import {
-    EXECUTION_PHASE_OFFSET,
-    SAFE_USER_TRANSFER,
-    SAFE_DAPP_TRANSFER,
-    SAFE_GAS_TRANSFER
-} from "../libraries/SafetyBits.sol";
+import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "../libraries/SafetyBits.sol";
 
 // NOTE: IPermit69 only works inside of the Atlas environment - specifically
 // inside of the custom ExecutionEnvironments that each user deploys when
