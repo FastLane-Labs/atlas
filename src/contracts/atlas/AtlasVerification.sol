@@ -218,6 +218,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
             if (solverOp.solver == ATLAS || solverOp.solver == address(this)) {
                 result |= (1 << uint256(SolverOutcome.InvalidSolver));
             }
+            // NOTE: If result is not set above, result stays 0, therefore result is `canExecute == true`
         } else {
             // No refund
             result |= (1 << uint256(SolverOutcome.InvalidSignature));
