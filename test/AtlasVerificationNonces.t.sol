@@ -78,7 +78,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         dappOp = validDAppOperation(userOp, solverOps).withNonce(1).signAndBuild(address(atlasVerification), governancePK);
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.DAppSignatureInvalid);
+        ), ValidCallsResult.InvalidDAppNonce);
     }
 
     function testSameNonceValidForSeqAndAsyncDApps() public {
