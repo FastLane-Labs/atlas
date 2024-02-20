@@ -150,7 +150,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
             }
 
             // Check dapp signature
-            (bool validDAppOp, ValidCallsResult result) = _verifyDApp(dConfig, dAppOp, msgSender, bypassSignatoryApproval, isSimulation);
+            (bool validDAppOp, ValidCallsResult result) =
+                _verifyDApp(dConfig, dAppOp, msgSender, bypassSignatoryApproval, isSimulation);
             if (!validDAppOp) {
                 return (userOpHash, result);
             }
@@ -333,7 +334,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
             return (false, ValidCallsResult.DAppSignatureInvalid);
         }
 
-        if (bypassSignatoryApproval) return (true, ValidCallsResult.Valid); // If bypass, return true after signature verification
+        if (bypassSignatoryApproval) return (true, ValidCallsResult.Valid); // If bypass, return true after signature
+            // verification
 
         // NOTE: to avoid replay attacks arising from key management errors,
         // the state changes below must be *saved* even if they render the
