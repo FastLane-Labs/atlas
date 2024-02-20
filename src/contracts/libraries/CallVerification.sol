@@ -13,14 +13,9 @@ library CallVerification {
     }
 
     function getAltOperationHash(UserOperation memory userOp) internal pure returns (bytes32 altOpHash) {
-        altOpHash = keccak256(abi.encodePacked(
-            userOp.from,
-            userOp.to,
-            userOp.deadline,
-            userOp.dapp,
-            userOp.control,
-            userOp.sessionKey
-        ));
+        altOpHash = keccak256(
+            abi.encodePacked(userOp.from, userOp.to, userOp.deadline, userOp.dapp, userOp.control, userOp.sessionKey)
+        );
     }
 
     function getCallChainHash(

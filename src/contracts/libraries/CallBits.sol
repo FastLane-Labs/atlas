@@ -90,7 +90,7 @@ library CallBits {
             forwardReturnData: forwardReturnData(encodedCallConfig),
             requireFulfillment: needsFulfillment(encodedCallConfig),
             trustedOpHash: allowsTrustedOpHash(encodedCallConfig)
-         });
+        });
     }
 
     function needsSequencedUserNonces(uint32 callConfig) internal pure returns (bool sequenced) {

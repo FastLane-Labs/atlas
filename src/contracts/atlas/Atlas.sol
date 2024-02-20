@@ -117,8 +117,9 @@ contract Atlas is Escrow, Factory {
             SolverOperation calldata solverOp = solverOps[winningSearcherIndex];
             // if (solverOp.from == address(0)) break;
 
-            (auctionWon, key) =
-                _solverExecutionIteration(dConfig, userOp, solverOp, returnData, executionEnvironment, bundler, userOpHash, key);
+            (auctionWon, key) = _solverExecutionIteration(
+                dConfig, userOp, solverOp, returnData, executionEnvironment, bundler, userOpHash, key
+            );
             emit SolverExecution(solverOp.from, winningSearcherIndex, auctionWon);
             if (auctionWon) break;
 
@@ -226,8 +227,9 @@ contract Atlas is Escrow, Factory {
         internal
         returns (bool auctionWon, EscrowKey memory)
     {
-        (auctionWon, key) =
-            _executeSolverOperation(dConfig, userOp, solverOp, dAppReturnData, executionEnvironment, bundler, userOpHash, key);
+        (auctionWon, key) = _executeSolverOperation(
+            dConfig, userOp, solverOp, dAppReturnData, executionEnvironment, bundler, userOpHash, key
+        );
 
         if (auctionWon) {
             key = key.holdAllocateValueLock(solverOp.from);

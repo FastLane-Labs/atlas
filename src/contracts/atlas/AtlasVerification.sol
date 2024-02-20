@@ -117,7 +117,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // CASE: Solvers trust app to update content of UserOp after submission of solverOp
         if (dConfig.callConfig.allowsTrustedOpHash()) {
             userOpHash = userOp.getAltOperationHash();
-            
+
             if (!isSimulation) {
                 // SessionKey must match explicitly - cannot be skipped
                 if (userOp.sessionKey == address(0)) {
@@ -137,7 +137,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
                     return (userOpHash, ValidCallsResult.InvalidBundler);
                 }
             }
-
         } else {
             userOpHash = userOp.getUserOperationHash();
         }

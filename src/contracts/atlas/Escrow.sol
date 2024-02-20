@@ -250,13 +250,13 @@ abstract contract Escrow is AtlETH {
     function _handleAltOpHash(
         UserOperation calldata userOp,
         SolverOperation calldata solverOp
-    ) 
-        internal 
-        returns (bool) 
+    )
+        internal
+        returns (bool)
     {
         // These failures should be attributed to bundler maliciousness
         if (solverOp.deadline != userOp.deadline || solverOp.control != userOp.control) {
-            return false;   
+            return false;
         }
         bytes32 hashId = keccak256(abi.encodePacked(solverOp.userOpHash, solverOp.from));
         if (_solverOpHashes[hashId]) {
