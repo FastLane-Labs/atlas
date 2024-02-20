@@ -96,8 +96,7 @@ abstract contract GasAccounting is SafetyLocks {
         // CASE: Callback verified but insufficient balance
         if (deficit > surplus) {
             if (!verified) {
-                uint256 solverLock = uint256(uint160(currentSolver)) | _solverVerified;
-                _solverLock = solverLock;
+                _solverLock = uint256(uint160(currentSolver)) | _solverVerified;
             }
             return deficit - surplus;
         }
