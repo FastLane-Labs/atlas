@@ -120,9 +120,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
             if (!isSimulation) {
                 // SessionKey must match explicitly - cannot be skipped
-                if (userOp.sessionKey == address(0)) {
-                    return (userOpHash, ValidCallsResult.InvalidAuctioneer);
-                }
                 if (userOp.sessionKey != dAppOp.from) {
                     return (userOpHash, ValidCallsResult.InvalidAuctioneer);
                 }
