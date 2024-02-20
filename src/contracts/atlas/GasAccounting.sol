@@ -31,8 +31,8 @@ abstract contract GasAccounting is SafetyLocks {
 
     // Returns true if Solver status is Finalized and the caller (Execution Environment) is in surplus
     function validateBalances() external view returns (bool valid) {
-        (, bool verified, bool fulfilled) = solverLockData();
-        if (!verified) {
+        (, bool calledBack, bool fulfilled) = solverLockData();
+        if (!calledBack) {
             return false;
         }
 
@@ -81,7 +81,7 @@ abstract contract GasAccounting is SafetyLocks {
 
         if (lock != environment) revert InvalidExecutionEnvironment(lock);
 
-        (address currentSolver, bool verified, bool fulfilled) = solverLockData();
+        (address currentSolver, bool calledBack, bool fulfilled) = solverLockData();
 
         if (solverFrom != currentSolver) revert InvalidSolverFrom(currentSolver);
 
@@ -95,16 +95,15 @@ abstract contract GasAccounting is SafetyLocks {
 
         // CASE: Callback verified but insufficient balance
         if (deficit > surplus) {
-            if (!verified) {
-                _solverLock = uint256(uint160(currentSolver)) | _solverVerified;
+            if (!calledBack) {
+                _solverLock = uint256(uint160(currentSolver)) | _solverCalledBack;
             }
             return deficit - surplus;
         }
 
         // CASE: Callback verified and solver duty fulfilled
-        if (!verified || !fulfilled) {
-            uint256 solverLock = uint256(uint160(currentSolver)) | _solverVerified | _solverFulfilled;
-            _solverLock = solverLock;
+        if (!calledBack || !fulfilled) {
+            _solverLock = uint256(uint160(currentSolver)) | _solverCalledBack | _solverFulfilled;
         }
         return 0;
     }

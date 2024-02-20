@@ -53,7 +53,7 @@ contract Storage is AtlasEvents, AtlasErrors {
     uint256 public withdrawals; // transient storage
     uint256 public deposits; // transient storage
 
-    uint256 internal _solverVerified = 1 << 161;
+    uint256 internal _solverCalledBack = 1 << 161;
     uint256 internal _solverFulfilled = 1 << 162;
 
     constructor(
@@ -88,7 +88,7 @@ contract Storage is AtlasEvents, AtlasErrors {
     function solverLockData() public view returns (address currentSolver, bool verified, bool fulfilled) {
         uint256 solverLock = _solverLock;
         currentSolver = address(uint160(solverLock));
-        verified = solverLock & _solverVerified != 0;
+        verified = solverLock & _solverCalledBack != 0;
         fulfilled = solverLock & _solverFulfilled != 0;
     }
 
