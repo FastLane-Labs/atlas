@@ -114,7 +114,33 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // Verify that the calldata injection came from the dApp frontend
         // and that the signatures are valid.
 
-        userOpHash = userOp.getUserOperationHash();
+        // CASE: Solvers trust app to update content of UserOp after submission of solverOp
+        if (dConfig.callConfig.allowsTrustedOpHash()) {
+            userOpHash = userOp.getAltOperationHash();
+            
+            if (!isSimulation) {
+                // SessionKey must match explicitly - cannot be skipped
+                if (userOp.sessionKey == address(0)) {
+                    return (userOpHash, ValidCallsResult.InvalidAuctioneer);
+                }
+                if (userOp.sessionKey != dAppOp.from) {
+                    return (userOpHash, ValidCallsResult.InvalidAuctioneer);
+                }
+
+                // Deadlines must match
+                if (userOp.deadline != dAppOp.deadline) {
+                    return (userOpHash, ValidCallsResult.DeadlineMismatch);
+                }
+
+                // msgSender must be userOp.from or userOp.sessionKey / dappOp.from
+                if (msgSender != dAppOp.from || msgSender != userOp.from) {
+                    return (userOpHash, ValidCallsResult.InvalidBundler);
+                }
+            }
+
+        } else {
+            userOpHash = userOp.getUserOperationHash();
+        }
 
         uint256 solverOpCount = solverOps.length;
 
@@ -161,6 +187,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 return (userOpHash, ValidCallsResult.InvalidBundler);
             }
 
+            if (dAppOp.control != userOp.control) {
+                return (userOpHash, ValidCallsResult.InvalidControl);
+            }
+
             // Check gas price is within user's limit
             if (tx.gasprice > userOp.maxFeePerGas) {
                 return (userOpHash, ValidCallsResult.GasPriceHigherThanMax);
@@ -187,6 +217,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
             if (dConfig.callConfig.needsFulfillment()) {
                 return (userOpHash, ValidCallsResult.NoSolverOp);
             }
+        }
+
+        if (userOpHash != dAppOp.userOpHash) {
+            return (userOpHash, ValidCallsResult.OpHashMismatch);
         }
 
         return (userOpHash, ValidCallsResult.Valid);

@@ -35,6 +35,7 @@ contract Storage is AtlasEvents, AtlasErrors {
     mapping(address => EscrowAccountBalance) internal _balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
     mapping(address => EscrowAccountAccessData) public accessData;
+    mapping(bytes32 => bool) internal _solverOpHashes; // NOTE: Only used for when allowTrustedOpHash is enabled
 
     // Gas Accounting constants
     uint256 public constant SURCHARGE_BASE = 100;
