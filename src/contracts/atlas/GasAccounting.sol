@@ -14,6 +14,8 @@ import { EscrowBits } from "../libraries/EscrowBits.sol";
 import "forge-std/Test.sol"; //TODO remove
 
 abstract contract GasAccounting is SafetyLocks {
+    using EscrowBits for uint256;
+
     constructor(
         uint256 _escrowDuration,
         address _verification,
@@ -29,7 +31,15 @@ abstract contract GasAccounting is SafetyLocks {
 
     // Returns true if Solver status is Finalized and the caller (Execution Environment) is in surplus
     function validateBalances() external view returns (bool valid) {
-        return solver == SOLVER_FULFILLED;
+        (, bool verified, bool fulfilled) = solverLockData();
+        if (!verified) {
+            return false;
+        }
+
+        if (!fulfilled) {
+            return (deposits >= claims + withdrawals);
+        }
+        return true;
     }
 
     function contribute() external payable {
@@ -59,7 +69,7 @@ abstract contract GasAccounting is SafetyLocks {
     )
         external
         payable
-        returns (bool)
+        returns (uint256 owed)
     {
         // NOTE: approvedAmount is the amount of the solver's atlETH that the solver is allowing
         // to be used to cover what they owe.  This will be subtracted later - tx will revert here if there isn't
@@ -70,21 +80,34 @@ abstract contract GasAccounting is SafetyLocks {
         if (maxApprovedGasSpend > bondedBalance) maxApprovedGasSpend = bondedBalance;
 
         if (lock != environment) revert InvalidExecutionEnvironment(lock);
-        if (solverFrom != solver) revert InvalidSolverFrom(solver);
 
-        uint256 _deposits = deposits + msg.value;
+        (address currentSolver, bool verified, bool fulfilled) = solverLockData();
+
+        if (solverFrom != currentSolver) revert InvalidSolverFrom(currentSolver);
 
         uint256 deficit = claims + withdrawals;
-        uint256 surplus = _deposits + maxApprovedGasSpend;
+        uint256 surplus = deposits + maxApprovedGasSpend + msg.value;
 
-        if (deficit > surplus) revert InsufficientTotalBalance(deficit - surplus);
+        // if (deficit > surplus) revert InsufficientTotalBalance(deficit - surplus);
 
         // Add msg.value to solver's deposits
-        if (msg.value > 0) deposits = _deposits;
+        if (msg.value > 0 || maxApprovedGasSpend > 0) deposits = surplus;
 
-        solver = SOLVER_FULFILLED;
+        // CASE: Callback verified but insufficient balance
+        if (deficit > surplus) {
+            if (!verified) {
+                uint256 solverLock = uint256(uint160(currentSolver)) | _solverVerified;
+                _solverLock = solverLock;
+            }
+            return deficit - surplus;
+        }
 
-        return true;
+        // CASE: Callback verified and solver duty fulfilled
+        if (!verified || !fulfilled) {
+            uint256 solverLock = uint256(uint160(currentSolver)) | _solverVerified | _solverFulfilled;
+            _solverLock = solverLock;
+        }
+        return 0;
     }
 
     // ---------------------------------------
@@ -163,7 +186,7 @@ abstract contract GasAccounting is SafetyLocks {
 
     function _trySolverLock(SolverOperation calldata solverOp) internal returns (bool valid) {
         if (_borrow(solverOp.value)) {
-            solver = solverOp.from;
+            _solverLock = uint256(uint160(solverOp.from));
             return true;
         } else {
             return false;
@@ -173,22 +196,11 @@ abstract contract GasAccounting is SafetyLocks {
     function _releaseSolverLock(SolverOperation calldata solverOp, uint256 gasWaterMark, uint256 result) internal {
         // Calculate what the solver owes if they failed
         // NOTE: This will cause an error if you are simulating with a gasPrice of 0
-        address solverFrom = solverOp.from;
+        if (!result.updateEscrow()) return;
 
-        uint256 gasUsed = gasWaterMark - gasleft() + 5000;
-        if (result & EscrowBits._FULL_REFUND != 0) {
-            gasUsed = gasUsed + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM) + 1;
-        } else if (result & EscrowBits._CALLDATA_REFUND != 0) {
-            gasUsed = (solverOp.data.length * CALLDATA_LENGTH_PREMIUM) + 1;
-        } else if (result & EscrowBits._NO_USER_REFUND != 0) {
-            return;
-        } else {
-            revert UncoveredResult();
-        }
-
+        uint256 gasUsed = gasWaterMark - gasleft() + 5000 + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM);
         gasUsed = (gasUsed + ((gasUsed * SURCHARGE) / SURCHARGE_BASE)) * tx.gasprice;
-
-        _assign(solverFrom, gasUsed, false);
+        _assign(solverOp.from, gasUsed, false);
     }
 
     function _settle(address winningSolver, address bundler) internal {

@@ -10,9 +10,9 @@ import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 contract Storage is AtlasEvents, AtlasErrors {
     // Atlas constants
     uint256 internal constant _MAX_GAS = 1_500_000;
-    uint256 internal constant LEDGER_LENGTH = 6; // type(Party).max = 6
     uint256 internal constant GAS_USED_DECIMALS_TO_DROP = 1000;
     address internal constant UNLOCKED = address(1);
+    uint256 internal constant _UNLOCKED_UINT = 1;
 
     uint256 public immutable ESCROW_DURATION;
     address public immutable VERIFICATION;
@@ -39,7 +39,6 @@ contract Storage is AtlasEvents, AtlasErrors {
     // Gas Accounting constants
     uint256 public constant SURCHARGE_BASE = 100;
     uint256 public constant SURCHARGE = 10;
-    address public constant SOLVER_FULFILLED = address(2);
 
     // atlETH GasAccounting storage
 
@@ -49,10 +48,13 @@ contract Storage is AtlasEvents, AtlasErrors {
 
     // Atlas SafetyLocks (transient storage)
     address public lock; // transient storage
-    address public solver; // transient storage
+    uint256 internal _solverLock; // transient storage
     uint256 public claims; // transient storage
     uint256 public withdrawals; // transient storage
     uint256 public deposits; // transient storage
+
+    uint256 internal _solverVerified = 1 << 161;
+    uint256 internal _solverFulfilled = 1 << 162;
 
     constructor(
         uint256 _escrowDuration,
@@ -75,12 +77,23 @@ contract Storage is AtlasEvents, AtlasErrors {
 
         // Gas Accounting - transient storage (delete this from constructor post dencun)
         lock = UNLOCKED;
-        solver = UNLOCKED;
+        _solverLock = _UNLOCKED_UINT;
         claims = type(uint256).max;
         withdrawals = type(uint256).max;
         deposits = type(uint256).max;
 
         emit SurchargeRecipientTransferred(_surchargeRecipient);
+    }
+
+    function solverLockData() public view returns (address currentSolver, bool verified, bool fulfilled) {
+        uint256 solverLock = _solverLock;
+        currentSolver = address(uint160(solverLock));
+        verified = solverLock & _solverVerified != 0;
+        fulfilled = solverLock & _solverFulfilled != 0;
+    }
+
+    function solver() public view returns (address) {
+        return address(uint160(_solverLock));
     }
 
     function _computeDomainSeparator() internal view virtual returns (bytes32) { }

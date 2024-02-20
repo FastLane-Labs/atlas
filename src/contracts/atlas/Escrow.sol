@@ -89,58 +89,41 @@ abstract contract Escrow is AtlETH {
     {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
-
-        (bool valid, bool paysGas) = IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, userOpHash, bundler);
-
-        if (!valid) {
-            if (paysGas) {
-                uint256 gasUsed = gasWaterMark - gasleft() + 5000;
-                gasUsed = (gasUsed + ((gasUsed * SURCHARGE) / SURCHARGE_BASE)) * tx.gasprice;
-                _assign(solverOp.from, gasUsed, false);
-            }
-
-            emit SolverTxResult(solverOp.solver, solverOp.from, false, false, 0);
-
-            // auctionWon = false
-            return (false, key);
-        }
+        uint256 result = IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, userOpHash, bundler);
 
         // Verify the transaction.
-        (uint256 result, uint256 gasLimit) = _validateSolverOperation(solverOp);
+        if (result.canExecute()) {
+            uint256 gasLimit;
+            (result, gasLimit) = _validateSolverOperation(solverOp, gasWaterMark, result);
 
-        // If there are no errors, attempt to execute
-        if (result.canExecute() && _trySolverLock(solverOp)) {
-            // Open the solver lock
-            key = key.holdSolverLock(solverOp.solver);
+            // If there are no errors, attempt to execute
+            if (result.canExecute() && _trySolverLock(solverOp)) {
+                // Open the solver lock
+                key = key.holdSolverLock(solverOp.solver);
 
-            // Execute the solver call
-            // _solverOpsWrapper returns a SolverOutcome enum value
-            result |= 1 << _solverOpWrapper(gasLimit, environment, solverOp, dAppReturnData, key.pack());
+                // Execute the solver call
+                // _solverOpsWrapper returns a SolverOutcome enum value
+                result |= _solverOpWrapper(gasLimit, environment, solverOp, dAppReturnData, key.pack());
 
-            if (result.executionSuccessful()) {
-                // first successful solver call that paid what it bid
-                result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
-                emit SolverTxResult(solverOp.solver, solverOp.from, true, true, result);
+                if (result.executionSuccessful()) {
+                    // first successful solver call that paid what it bid
 
-                key.solverSuccessful = true;
-                // auctionWon = true
-                return (true, key);
-            } else {
-                _releaseSolverLock(solverOp, gasWaterMark, result);
-                result |= 1 << uint256(SolverOutcome.ExecutionCompleted);
+                    emit SolverTxResult(solverOp.solver, solverOp.from, true, true, result);
 
-                // emit event
-                emit SolverTxResult(solverOp.solver, solverOp.from, true, false, result);
+                    key.solverSuccessful = true;
+                    // auctionWon = true
+                    return (true, key);
+                }
             }
-        } else {
-            _releaseSolverLock(solverOp, gasWaterMark, result);
-
-            unchecked {
-                ++key.callIndex;
-            }
-            // emit event
-            emit SolverTxResult(solverOp.solver, solverOp.from, false, false, result);
         }
+
+        _releaseSolverLock(solverOp, gasWaterMark, result);
+
+        unchecked {
+            ++key.callIndex;
+        }
+        // emit event
+        emit SolverTxResult(solverOp.solver, solverOp.from, result.executedWithError(), false, result);
 
         // auctionWon = false
         return (false, key);
@@ -188,23 +171,19 @@ abstract contract Escrow is AtlETH {
 
     // TODO Revisit the EscrowAccountBalance memory solverEscrow arg. Needs to be passed through from Atlas, through
     // callstack
-    function _validateSolverOperation(SolverOperation calldata solverOp)
+    function _validateSolverOperation(
+        SolverOperation calldata solverOp,
+        uint256 gasWaterMark,
+        uint256 result
+    )
         internal
         view
-        returns (uint256 result, uint256 gasLimit)
+        returns (uint256, uint256 gasLimit)
     {
-        // Set the gas baseline
-        uint256 gasWaterMark = gasleft();
-
         EscrowAccountAccessData memory aData = accessData[solverOp.from];
 
         uint256 solverBalance = aData.bonded;
         uint256 lastAccessedBlock = aData.lastAccessedBlock;
-
-        // TODO this check is duplicated in AtlasVerification._verifySolverOp. Maybe remove one of them.
-        if (solverOp.to != address(this)) {
-            result |= 1 << uint256(SolverOutcome.InvalidTo);
-        }
 
         // NOTE: Turn this into time stamp check for FCFS L2s?
         if (lastAccessedBlock == block.number) {
@@ -266,26 +245,26 @@ abstract contract Escrow is AtlETH {
         (success, data) = environment.call{ value: solverOp.value }(data);
 
         if (success) {
-            return uint256(SolverOutcome.Success);
+            return uint256(0);
         }
         bytes4 errorSwitch = bytes4(data);
 
-        if (errorSwitch == SolverBidUnpaid.selector) {
-            return uint256(SolverOutcome.BidNotPaid);
-        } else if (errorSwitch == SolverMsgValueUnpaid.selector) {
-            return uint256(SolverOutcome.CallValueTooHigh);
-        } else if (errorSwitch == IntentUnfulfilled.selector) {
-            return uint256(SolverOutcome.IntentUnfulfilled);
-        } else if (errorSwitch == SolverOperationReverted.selector) {
-            return uint256(SolverOutcome.CallReverted);
-        } else if (errorSwitch == AlteredControlHash.selector) {
-            return uint256(SolverOutcome.InvalidControlHash);
+        if (errorSwitch == AlteredControl.selector) {
+            return 1 << uint256(SolverOutcome.AlteredControl);
         } else if (errorSwitch == PreSolverFailed.selector) {
-            return uint256(SolverOutcome.PreSolverFailed);
+            return 1 << uint256(SolverOutcome.PreSolverFailed);
+        } else if (errorSwitch == SolverOperationReverted.selector) {
+            return 1 << uint256(SolverOutcome.SolverOpReverted);
         } else if (errorSwitch == PostSolverFailed.selector) {
-            return uint256(SolverOutcome.IntentUnfulfilled);
+            return 1 << uint256(SolverOutcome.PostSolverFailed);
+        } else if (errorSwitch == IntentUnfulfilled.selector) {
+            return 1 << uint256(SolverOutcome.IntentUnfulfilled);
+        } else if (errorSwitch == SolverBidUnpaid.selector) {
+            return 1 << uint256(SolverOutcome.BidNotPaid);
+        } else if (errorSwitch == BalanceNotReconciled.selector) {
+            return 1 << uint256(SolverOutcome.BalanceNotReconciled);
         } else {
-            return uint256(SolverOutcome.CallReverted);
+            return 1 << uint256(SolverOutcome.EVMError);
         }
     }
 

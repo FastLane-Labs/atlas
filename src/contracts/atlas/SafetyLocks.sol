@@ -72,7 +72,7 @@ abstract contract SafetyLocks is Storage {
     function _releaseEscrowLock() internal {
         if (lock == UNLOCKED) revert NotInitialized();
         lock = UNLOCKED;
-        solver = UNLOCKED;
+        _solverLock = _UNLOCKED_UINT;
         claims = type(uint256).max;
         withdrawals = type(uint256).max;
         deposits = type(uint256).max;

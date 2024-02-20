@@ -13,7 +13,6 @@ import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
 import { ExecutionPhase } from "../types/LockTypes.sol";
-import { Party } from "../types/EscrowTypes.sol";
 
 import { Base } from "../common/ExecutionBase.sol";
 
@@ -146,6 +145,7 @@ contract ExecutionEnvironment is Base {
 
         // Track token balance to measure if the bid amount is paid.
         bool etherIsBidToken;
+        // uint256 etherBalance;
         uint256 bidBalance;
         // Ether balance
         if (solverOp.bidToken == address(0)) {
@@ -162,7 +162,7 @@ contract ExecutionEnvironment is Base {
 
         // Verify that the DAppControl contract matches the solver's expectations
         if (solverOp.control != _control()) {
-            revert AtlasErrors.AlteredControlHash();
+            revert AtlasErrors.AlteredControl();
         }
 
         bool success;
@@ -228,9 +228,15 @@ contract ExecutionEnvironment is Base {
             revert AtlasErrors.SolverBidUnpaid();
         }
 
+        // Contribute any surplus back - this may be used to validate balance.
+        uint256 surplusEtherBalance = etherIsBidToken ? balance - solverOp.bidAmount : address(this).balance;
+        if (surplusEtherBalance > 0) {
+            IEscrow(atlas).contribute{ value: surplusEtherBalance }();
+        }
+
         // Verify that the solver repaid their msg.value
         if (!IEscrow(atlas).validateBalances()) {
-            revert AtlasErrors.SolverMsgValueUnpaid();
+            revert AtlasErrors.BalanceNotReconciled();
         }
     }
 

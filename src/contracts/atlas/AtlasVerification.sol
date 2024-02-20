@@ -199,27 +199,29 @@ contract AtlasVerification is EIP712, DAppIntegration {
     )
         external
         view
-        returns (bool valid, bool paysGas)
+        returns (uint256 result)
     {
         if (bundler == solverOp.from || _verifySolverSignature(solverOp)) {
             // Validate solver signature
-            if (solverOp.userOpHash != userOpHash) return (false, false);
+            // NOTE: First three failures are the bundler's fault - solver does not
+            // owe a gas refund to the bundler.
+            if (solverOp.userOpHash != userOpHash) result |= (1 << uint256(SolverOutcome.InvalidUserHash));
 
-            if (block.number > solverOp.deadline) return (false, false);
+            if (block.number > solverOp.deadline) result |= (1 << uint256(SolverOutcome.DeadlinePassed));
 
-            // NOTE: While SolverOp maxFeePerGas must be greater than or equal to the
-            // UserOp maxFeePerGas, we must verify this again at the solver level to
-            // ensure User + Bundler aren't colluding to attack Solver.
-            if (tx.gasprice > solverOp.maxFeePerGas) return (false, false);
+            if (solverOp.to != ATLAS) result |= (1 << uint256(SolverOutcome.InvalidTo));
 
-            if (solverOp.to != ATLAS) return (false, true);
+            // NOTE: The next two failures below here are the solver's fault, and as a result
+            // they are on the hook for their own gas cost.
+            if (tx.gasprice > solverOp.maxFeePerGas) result |= (1 << uint256(SolverOutcome.GasPriceOverCap));
 
-            if (solverOp.solver == ATLAS || solverOp.solver == address(this)) return (false, true);
-
-            return (true, true);
+            if (solverOp.solver == ATLAS || solverOp.solver == address(this)) {
+                result |= (1 << uint256(SolverOutcome.InvalidSolver));
+            }
+        } else {
+            // No refund
+            result |= (1 << uint256(SolverOutcome.InvalidSignature));
         }
-
-        return (false, false);
     }
 
     function _verifyAuctioneer(
