@@ -12,6 +12,7 @@ import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import { SwapIntentController } from "src/contracts/examples/intents-example/SwapIntent.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 import { Simulator } from "src/contracts/helpers/Simulator.sol";
+import { Sorter } from "src/contracts/helpers/Sorter.sol";
 import { SimpleRFQSolver } from "test/SwapIntent.t.sol";
 
 import { Utilities } from "src/contracts/helpers/Utilities.sol";
@@ -25,6 +26,7 @@ contract DeployBaseScript is Script {
     Atlas public atlas;
     AtlasVerification public atlasVerification;
     Simulator public simulator;
+    Sorter public sorter;
     SwapIntentController public swapIntentControl;
     TxBuilder public txBuilder;
     SimpleRFQSolver public rfqSolver;
