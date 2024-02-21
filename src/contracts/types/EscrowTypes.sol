@@ -17,51 +17,27 @@ struct EscrowAccountAccessData {
     uint64 totalGasUsed;
 }
 
-// NOTE: The order is very important here for balance reconciliation.
-// We _MUST_ net the balances in order from LastLook to FirstLook
-// TODO: add 'dAppSignatory' option
-enum Party {
-    Builder, // block.coinbase
-    Bundler, // tx.origin
-    Sequencer, // dApp signatory
-    Solver,
-    User,
-    DApp
-}
-
 enum SolverOutcome {
-    // future task tracking
-    PendingUpdate,
-    ExecutionCompleted,
-    UpdateCompleted,
-    BlockExecution,
-    // no user refund (relay error or hostile user)
-    InvalidTo,
+    // no refund (relay error or hostile user)
     InvalidSignature,
     InvalidUserHash,
-    InvalidControlHash,
-    InvalidBidsHash,
-    InvalidSequencing,
-    GasPriceOverCap,
+    DeadlinePassed,
+    InvalidTo,
     UserOutOfGas,
-    // calldata user refund from solver
-    InsufficientEscrow,
-    InvalidNonceOver,
-    // no call, but full user refund
-    AlreadyExecuted,
-    InvalidNonceUnder,
+    AlteredControl,
+    // Partial Refund but no execution
+    GasPriceOverCap,
+    InvalidSolver,
     PerBlockLimit, // solvers can only send one tx per block
     // if they sent two we wouldn't be able to flag builder censorship
-    InvalidFormat,
-    // dApp / external user refund (TODO: keep?)
-    // call, with full user refund
-    UnknownError,
-    CallReverted,
-    BidNotPaid,
-    IntentUnfulfilled,
-    PreSolverFailed,
+    InsufficientEscrow,
     CallValueTooHigh,
-    CallbackFailed,
-    EVMError,
-    Success
+    // execution, with full user refund
+    PreSolverFailed,
+    SolverOpReverted,
+    PostSolverFailed,
+    IntentUnfulfilled,
+    BidNotPaid,
+    BalanceNotReconciled,
+    EVMError
 }
