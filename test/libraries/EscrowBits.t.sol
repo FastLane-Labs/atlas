@@ -12,55 +12,23 @@ contract EscrowBitsTest is Test {
 
     function testConstants() public {
         string memory expectedBitMapString =
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000111111111000000000000000000";
+            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000111111";
         assertEq(
-            TestUtils.uint256ToBinaryString(EscrowBits._EXECUTION_REFUND),
+            TestUtils.uint256ToBinaryString(EscrowBits._NO_REFUND),
             expectedBitMapString,
-            "_EXECUTION_REFUND incorrect"
+            "_NO_REFUND incorrect"
         );
 
         expectedBitMapString =
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001100000000100000";
+            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000111111000000";
         assertEq(
-            TestUtils.uint256ToBinaryString(EscrowBits._NO_NONCE_UPDATE),
+            TestUtils.uint256ToBinaryString(EscrowBits._PARTIAL_REFUND),
             expectedBitMapString,
-            "_NO_NONCE_UPDATE incorrect"
+            "_PARTIAL_REFUND incorrect"
         );
 
         expectedBitMapString =
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000011111111000000000000000000";
-        assertEq(
-            TestUtils.uint256ToBinaryString(EscrowBits._EXECUTED_WITH_ERROR),
-            expectedBitMapString,
-            "_EXECUTED_WITH_ERROR incorrect"
-        );
-
-        expectedBitMapString =
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000";
-        assertEq(
-            TestUtils.uint256ToBinaryString(EscrowBits._EXECUTED_SUCCESSFULLY),
-            expectedBitMapString,
-            "_EXECUTED_SUCCESSFULLY incorrect"
-        );
-
-        expectedBitMapString =
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000011111110000";
-        assertEq(
-            TestUtils.uint256ToBinaryString(EscrowBits._NO_USER_REFUND),
-            expectedBitMapString,
-            "_NO_USER_REFUND incorrect"
-        );
-
-        expectedBitMapString =
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000011100000000000";
-        assertEq(
-            TestUtils.uint256ToBinaryString(EscrowBits._CALLDATA_REFUND),
-            expectedBitMapString,
-            "_CALLDATA_REFUND incorrect"
-        );
-
-        expectedBitMapString =
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000111111111111100000000000000";
+            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000111111000000000000";
         assertEq(
             TestUtils.uint256ToBinaryString(EscrowBits._FULL_REFUND), expectedBitMapString, "_FULL_REFUND incorrect"
         );
@@ -68,8 +36,6 @@ contract EscrowBitsTest is Test {
 
     function testCanExecute() public {
         uint256 valid = 0;
-        assertEq(valid.canExecute(), true);
-        valid = 1;
         assertEq(valid.canExecute(), true);
 
         uint256 invalid = 1 << 1;
@@ -79,26 +45,14 @@ contract EscrowBitsTest is Test {
     }
 
     function testExecutionSuccessful() public {
-        uint256 valid = 1 << uint256(SolverOutcome.Success);
+        uint256 valid = 0;
         assertEq(valid.executionSuccessful(), true);
 
-        uint256 invalid = 1 << uint256(SolverOutcome.PendingUpdate);
-        assertEq(invalid.executionSuccessful(), false);
-        invalid = 1 << uint256(SolverOutcome.ExecutionCompleted);
-        assertEq(invalid.executionSuccessful(), false);
-        invalid = 1 << uint256(SolverOutcome.UpdateCompleted);
-        assertEq(invalid.executionSuccessful(), false);
-        invalid = 1 << uint256(SolverOutcome.BlockExecution);
-        assertEq(invalid.executionSuccessful(), false);
-        invalid = 1 << uint256(SolverOutcome.InvalidSignature);
+        uint256 invalid = 1 << uint256(SolverOutcome.InvalidSignature);
         assertEq(invalid.executionSuccessful(), false);
         invalid = 1 << uint256(SolverOutcome.InvalidUserHash);
         assertEq(invalid.executionSuccessful(), false);
-        invalid = 1 << uint256(SolverOutcome.InvalidControlHash);
-        assertEq(invalid.executionSuccessful(), false);
-        invalid = 1 << uint256(SolverOutcome.InvalidBidsHash);
-        assertEq(invalid.executionSuccessful(), false);
-        invalid = 1 << uint256(SolverOutcome.InvalidSequencing);
+        invalid = 1 << uint256(SolverOutcome.AlteredControl);
         assertEq(invalid.executionSuccessful(), false);
         invalid = 1 << uint256(SolverOutcome.GasPriceOverCap);
         assertEq(invalid.executionSuccessful(), false);
@@ -106,19 +60,9 @@ contract EscrowBitsTest is Test {
         assertEq(invalid.executionSuccessful(), false);
         invalid = 1 << uint256(SolverOutcome.InsufficientEscrow);
         assertEq(invalid.executionSuccessful(), false);
-        invalid = 1 << uint256(SolverOutcome.InvalidNonceOver);
-        assertEq(invalid.executionSuccessful(), false);
-        invalid = 1 << uint256(SolverOutcome.AlreadyExecuted);
-        assertEq(invalid.executionSuccessful(), false);
-        invalid = 1 << uint256(SolverOutcome.InvalidNonceUnder);
-        assertEq(invalid.executionSuccessful(), false);
         invalid = 1 << uint256(SolverOutcome.PerBlockLimit);
         assertEq(invalid.executionSuccessful(), false);
-        invalid = 1 << uint256(SolverOutcome.InvalidFormat);
-        assertEq(invalid.executionSuccessful(), false);
-        invalid = 1 << uint256(SolverOutcome.UnknownError);
-        assertEq(invalid.executionSuccessful(), false);
-        invalid = 1 << uint256(SolverOutcome.CallReverted);
+        invalid = 1 << uint256(SolverOutcome.SolverOpReverted);
         assertEq(invalid.executionSuccessful(), false);
         invalid = 1 << uint256(SolverOutcome.BidNotPaid);
         assertEq(invalid.executionSuccessful(), false);
@@ -128,49 +72,33 @@ contract EscrowBitsTest is Test {
         assertEq(invalid.executionSuccessful(), false);
         invalid = 1 << uint256(SolverOutcome.CallValueTooHigh);
         assertEq(invalid.executionSuccessful(), false);
-        invalid = 1 << uint256(SolverOutcome.CallbackFailed);
-        assertEq(invalid.executionSuccessful(), false);
         invalid = 1 << uint256(SolverOutcome.EVMError);
         assertEq(invalid.executionSuccessful(), false);
     }
 
     function testExecutedWithError() public {
-        uint256 valid = 1 << uint256(SolverOutcome.CallReverted);
+        uint256 valid = 1 << uint256(SolverOutcome.SolverOpReverted);
         assertEq(valid.executedWithError(), true);
         valid = 1 << uint256(SolverOutcome.BidNotPaid);
         assertEq(valid.executedWithError(), true);
         valid = 1 << uint256(SolverOutcome.CallValueTooHigh);
-        assertEq(valid.executedWithError(), true);
-        valid = 1 << uint256(SolverOutcome.UnknownError);
-        assertEq(valid.executedWithError(), true);
-        valid = 1 << uint256(SolverOutcome.CallbackFailed);
-        assertEq(valid.executedWithError(), true);
+        assertEq(valid.executedWithError(), false);
         valid = 1 << uint256(SolverOutcome.IntentUnfulfilled);
         assertEq(valid.executedWithError(), true);
         valid = 1 << uint256(SolverOutcome.PreSolverFailed);
+        assertEq(valid.executedWithError(), false);
+        valid = 1 << uint256(SolverOutcome.BalanceNotReconciled);
         assertEq(valid.executedWithError(), true);
         valid = 1 << uint256(SolverOutcome.EVMError);
         assertEq(valid.executedWithError(), true);
 
-        uint256 invalid = 1 << uint256(SolverOutcome.Success);
-        assertEq(invalid.executedWithError(), false);
-        invalid = 1 << uint256(SolverOutcome.PendingUpdate);
-        assertEq(invalid.executedWithError(), false);
-        invalid = 1 << uint256(SolverOutcome.ExecutionCompleted);
-        assertEq(invalid.executedWithError(), false);
-        invalid = 1 << uint256(SolverOutcome.UpdateCompleted);
-        assertEq(invalid.executedWithError(), false);
-        invalid = 1 << uint256(SolverOutcome.BlockExecution);
+        uint256 invalid = 0;
         assertEq(invalid.executedWithError(), false);
         invalid = 1 << uint256(SolverOutcome.InvalidSignature);
         assertEq(invalid.executedWithError(), false);
         invalid = 1 << uint256(SolverOutcome.InvalidUserHash);
         assertEq(invalid.executedWithError(), false);
-        invalid = 1 << uint256(SolverOutcome.InvalidControlHash);
-        assertEq(invalid.executedWithError(), false);
-        invalid = 1 << uint256(SolverOutcome.InvalidBidsHash);
-        assertEq(invalid.executedWithError(), false);
-        invalid = 1 << uint256(SolverOutcome.InvalidSequencing);
+        invalid = 1 << uint256(SolverOutcome.AlteredControl);
         assertEq(invalid.executedWithError(), false);
         invalid = 1 << uint256(SolverOutcome.GasPriceOverCap);
         assertEq(invalid.executedWithError(), false);
@@ -178,42 +106,20 @@ contract EscrowBitsTest is Test {
         assertEq(invalid.executedWithError(), false);
         invalid = 1 << uint256(SolverOutcome.InsufficientEscrow);
         assertEq(invalid.executedWithError(), false);
-        invalid = 1 << uint256(SolverOutcome.InvalidNonceOver);
-        assertEq(invalid.executedWithError(), false);
-        invalid = 1 << uint256(SolverOutcome.AlreadyExecuted);
-        assertEq(invalid.executedWithError(), false);
-        invalid = 1 << uint256(SolverOutcome.InvalidNonceUnder);
-        assertEq(invalid.executedWithError(), false);
         invalid = 1 << uint256(SolverOutcome.PerBlockLimit);
-        assertEq(invalid.executedWithError(), false);
-        invalid = 1 << uint256(SolverOutcome.InvalidFormat);
         assertEq(invalid.executedWithError(), false);
     }
 
     function testUpdateEscrow() public {
-        uint256 valid = 1 << uint256(SolverOutcome.Success);
-        assertEq(valid.updateEscrow(), true);
-        valid = 1 << uint256(SolverOutcome.PendingUpdate);
-        assertEq(valid.updateEscrow(), true);
-        valid = 1 << uint256(SolverOutcome.ExecutionCompleted);
-        assertEq(valid.updateEscrow(), true);
-        valid = 1 << uint256(SolverOutcome.UpdateCompleted);
-        assertEq(valid.updateEscrow(), true);
-        valid = 1 << uint256(SolverOutcome.BlockExecution);
+        uint256 valid = 0;
         assertEq(valid.updateEscrow(), true);
         valid = 1 << uint256(SolverOutcome.UserOutOfGas);
-        assertEq(valid.updateEscrow(), true);
+        assertEq(valid.updateEscrow(), false);
         valid = 1 << uint256(SolverOutcome.InsufficientEscrow);
-        assertEq(valid.updateEscrow(), true);
-        valid = 1 << uint256(SolverOutcome.InvalidNonceOver);
         assertEq(valid.updateEscrow(), true);
         valid = 1 << uint256(SolverOutcome.PerBlockLimit);
         assertEq(valid.updateEscrow(), true);
-        valid = 1 << uint256(SolverOutcome.InvalidFormat);
-        assertEq(valid.updateEscrow(), true);
-        valid = 1 << uint256(SolverOutcome.UnknownError);
-        assertEq(valid.updateEscrow(), true);
-        valid = 1 << uint256(SolverOutcome.CallReverted);
+        valid = 1 << uint256(SolverOutcome.SolverOpReverted);
         assertEq(valid.updateEscrow(), true);
         valid = 1 << uint256(SolverOutcome.BidNotPaid);
         assertEq(valid.updateEscrow(), true);
@@ -223,26 +129,16 @@ contract EscrowBitsTest is Test {
         assertEq(valid.updateEscrow(), true);
         valid = 1 << uint256(SolverOutcome.CallValueTooHigh);
         assertEq(valid.updateEscrow(), true);
-        valid = 1 << uint256(SolverOutcome.CallbackFailed);
-        assertEq(valid.updateEscrow(), true);
         valid = 1 << uint256(SolverOutcome.EVMError);
         assertEq(valid.updateEscrow(), true);
 
         uint256 invalid = 1 << uint256(SolverOutcome.InvalidSignature);
         assertEq(invalid.updateEscrow(), false);
-        invalid = 1 << uint256(SolverOutcome.AlreadyExecuted);
-        assertEq(invalid.updateEscrow(), false);
-        invalid = 1 << uint256(SolverOutcome.InvalidNonceUnder);
-        assertEq(invalid.updateEscrow(), false);
         invalid = 1 << uint256(SolverOutcome.InvalidUserHash);
         assertEq(invalid.updateEscrow(), false);
-        invalid = 1 << uint256(SolverOutcome.InvalidBidsHash);
-        assertEq(invalid.updateEscrow(), false);
         invalid = 1 << uint256(SolverOutcome.GasPriceOverCap);
-        assertEq(invalid.updateEscrow(), false);
-        invalid = 1 << uint256(SolverOutcome.InvalidSequencing);
-        assertEq(invalid.updateEscrow(), false);
-        invalid = 1 << uint256(SolverOutcome.InvalidControlHash);
+        assertEq(invalid.updateEscrow(), true);
+        invalid = 1 << uint256(SolverOutcome.AlteredControl);
         assertEq(invalid.updateEscrow(), false);
     }
 }

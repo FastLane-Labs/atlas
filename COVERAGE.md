@@ -22,7 +22,7 @@ Last updated: 2024-Jan-30
 Fully tested in `/test/Escrow.t.sol`, besides the following unreachable lines:
 
 - L177 `if (solverOp.to != address(this))` - Metacall reverts early in AtlasVerification if this condition is true.
-- L260 `return uint256(SolverOutcome.CallReverted);` - The default case in the switch statement is unreachable (as intended)
+- L260 `return uint256(SolverOutcome.SolverOpReverted);` - The default case in the switch statement is unreachable (as intended)
 
 Last updated: 2024-Jan-25
 
