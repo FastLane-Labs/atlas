@@ -176,10 +176,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 return (userOpHash, ValidCallsResult.InvalidBundler);
             }
 
-            if (dAppOp.control != userOp.control) {
-                return (userOpHash, ValidCallsResult.InvalidControl);
-            }
-
             // Check gas price is within user's limit
             if (tx.gasprice > userOp.maxFeePerGas) {
                 return (userOpHash, ValidCallsResult.GasPriceHigherThanMax);
@@ -354,7 +350,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
         }
 
         if (dAppOp.control != dConfig.to) {
-            // This should be unreachable but returning false just in case.
             return false;
         }
 
