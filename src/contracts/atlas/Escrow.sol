@@ -96,7 +96,7 @@ abstract contract Escrow is AtlETH {
         // Verify the transaction.
         if (result.canExecute()) {
             uint256 gasLimit;
-            (result, gasLimit) = _validateSolverOperation(solverOp, gasWaterMark, result);
+            (result, gasLimit) = _validateSolverOperation(dConfig, solverOp, gasWaterMark, result);
 
             if (dConfig.callConfig.allowsTrustedOpHash()) {
                 if (!_handleAltOpHash(userOp, solverOp)) return (false, key);
@@ -178,6 +178,7 @@ abstract contract Escrow is AtlETH {
     // TODO Revisit the EscrowAccountBalance memory solverEscrow arg. Needs to be passed through from Atlas, through
     // callstack
     function _validateSolverOperation(
+        DAppConfig calldata dConfig,
         SolverOperation calldata solverOp,
         uint256 gasWaterMark,
         uint256 result
@@ -186,6 +187,33 @@ abstract contract Escrow is AtlETH {
         view
         returns (uint256, uint256 gasLimit)
     {
+        if (gasWaterMark < EscrowBits.VALIDATION_GAS_LIMIT + EscrowBits.SOLVER_GAS_LIMIT) {
+            // Make sure to leave enough gas for dApp validation calls
+            return (result | 1 << uint256(SolverOutcome.UserOutOfGas), gasLimit);
+        }
+        
+        if (block.number > solverOp.deadline) {
+            return (result | 1 << uint256(dConfig.callConfig.allowsTrustedOpHash() ? 
+                uint256(SolverOutcome.DeadlinePassedAlt):
+                uint256(SolverOutcome.DeadlinePassed)), 0);
+        }
+
+        gasLimit = (100) * (solverOp.gas < EscrowBits.SOLVER_GAS_LIMIT ? solverOp.gas : EscrowBits.SOLVER_GAS_LIMIT)
+            / (100 + EscrowBits.SOLVER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
+
+        uint256 gasCost = (tx.gasprice * gasLimit) + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
+        
+        // Verify that we can lend the solver their tx value
+        if (
+            solverOp.value
+                > address(this).balance - (gasLimit * tx.gasprice > address(this).balance ? 0 : gasLimit * tx.gasprice)
+        ) {
+            return (result |= 1 << uint256(SolverOutcome.CallValueTooHigh), gasLimit);
+        }
+
+        // subtract out the gas buffer since the solver's metaTx won't use it
+        gasLimit -= EscrowBits.FASTLANE_GAS_BUFFER;
+
         EscrowAccountAccessData memory aData = accessData[solverOp.from];
 
         uint256 solverBalance = aData.bonded;
@@ -196,31 +224,10 @@ abstract contract Escrow is AtlETH {
             result |= 1 << uint256(SolverOutcome.PerBlockLimit);
         }
 
-        gasLimit = (100) * (solverOp.gas < EscrowBits.SOLVER_GAS_LIMIT ? solverOp.gas : EscrowBits.SOLVER_GAS_LIMIT)
-            / (100 + EscrowBits.SOLVER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
-
-        uint256 gasCost = (tx.gasprice * gasLimit) + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
-
         // see if solver's escrow can afford tx gascost
         if (gasCost > solverBalance) {
             // charge solver for calldata so that we can avoid vampire attacks from solver onto user
             result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
-        }
-
-        // Verify that we can lend the solver their tx value
-        if (
-            solverOp.value
-                > address(this).balance - (gasLimit * tx.gasprice > address(this).balance ? 0 : gasLimit * tx.gasprice)
-        ) {
-            result |= 1 << uint256(SolverOutcome.CallValueTooHigh);
-        }
-
-        // subtract out the gas buffer since the solver's metaTx won't use it
-        gasLimit -= EscrowBits.FASTLANE_GAS_BUFFER;
-
-        if (gasWaterMark < EscrowBits.VALIDATION_GAS_LIMIT + EscrowBits.SOLVER_GAS_LIMIT) {
-            // Make sure to leave enough gas for dApp validation calls
-            result |= 1 << uint256(SolverOutcome.UserOutOfGas);
         }
 
         return (result, gasLimit);
@@ -237,7 +244,7 @@ abstract contract Escrow is AtlETH {
         if (solverOp.deadline != userOp.deadline || solverOp.control != userOp.control) {
             return false;
         }
-        bytes32 hashId = keccak256(abi.encodePacked(solverOp.userOpHash, solverOp.from));
+        bytes32 hashId = keccak256(abi.encodePacked(solverOp.userOpHash, solverOp.from, solverOp.deadline));
         if (_solverOpHashes[hashId]) {
             return false;
         }
