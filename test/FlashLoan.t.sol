@@ -119,7 +119,7 @@ contract FlashLoanTest is BaseTest {
         // make the actual atlas call that should revert
         vm.startPrank(userEOA);
         vm.expectEmit(true, true, true, true);
-        uint256 result = (1 << uint256(SolverOutcome.BidNotPaid)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
+        uint256 result = (1 << uint256(SolverOutcome.BidNotPaid));
         emit AtlasEvents.SolverTxResult(address(solver), solverOneEOA, true, false, result);
         vm.expectRevert();
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
@@ -138,7 +138,7 @@ contract FlashLoanTest is BaseTest {
             .withBidToken(userOp)
             .withBidAmount(1e18)
             .withData(abi.encodeWithSelector(SimpleSolver.onlyPayBid.selector, 1e18))
-            .withValue(10e18)
+            .withValue(address(atlas).balance + 1)
             .sign(address(atlasVerification), solverOnePK)
             .build();
 
@@ -164,8 +164,9 @@ contract FlashLoanTest is BaseTest {
         // Call again with partial payback, should still revert
         vm.startPrank(userEOA);
         vm.expectEmit(true, true, true, true);
-        result = (1 << uint256(SolverOutcome.CallValueTooHigh)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
-        emit AtlasEvents.SolverTxResult(address(solver), solverOneEOA, true, false, result);
+        result = (1 << uint256(SolverOutcome.CallValueTooHigh));
+        console.log("result", result);
+        emit AtlasEvents.SolverTxResult(address(solver), solverOneEOA, false, false, result);
         vm.expectRevert();
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
@@ -215,7 +216,7 @@ contract FlashLoanTest is BaseTest {
 
         // Last call - should succeed
         vm.startPrank(userEOA);
-        result = (1 << uint256(SolverOutcome.Success)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
+        result = 0;
         vm.expectEmit(true, true, true, true);
         emit AtlasEvents.SolverTxResult(address(solver), solverOneEOA, true, true, result);
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });

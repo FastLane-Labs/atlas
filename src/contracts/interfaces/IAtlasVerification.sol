@@ -27,7 +27,7 @@ interface IAtlasVerification {
     )
         external
         view
-        returns (bool valid, bool paysGas);
+        returns (uint256 result);
 
     function getUserOperationPayload(UserOperation memory userOp) external view returns (bytes32 payload);
     function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload);

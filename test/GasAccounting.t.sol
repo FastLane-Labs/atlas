@@ -155,12 +155,14 @@ contract GasAccountingTest is Test {
         vm.expectRevert(abi.encodeWithSelector(AtlasErrors.InvalidSolverFrom.selector, solverOp.from));
         mockGasAccounting.reconcile(executionEnvironment, makeAddr("wrongSolver"), 0);
 
-        vm.expectRevert(abi.encodeWithSelector(AtlasErrors.InsufficientTotalBalance.selector, initialClaims));
-        mockGasAccounting.reconcile(executionEnvironment, solverOp.from, 0);
+        assertTrue(mockGasAccounting.reconcile(executionEnvironment, solverOp.from, 0) > 0);
 
         assertEq(mockGasAccounting.solver(), solverOp.from);
-        assertTrue(mockGasAccounting.reconcile{ value: initialClaims }(executionEnvironment, solverOp.from, 0));
-        assertEq(mockGasAccounting.solver(), mockGasAccounting.SOLVER_FULFILLED());
+        assertTrue(mockGasAccounting.reconcile{ value: initialClaims }(executionEnvironment, solverOp.from, 0) == 0);
+        (address currentSolver, bool verified, bool fulfilled) = mockGasAccounting.solverLockData();
+        assertTrue(verified && fulfilled);
+        assertEq(currentSolver, solverOp.from);
+        assertEq(mockGasAccounting.solver(), solverOp.from);
     }
 
     function test_assign() public {
@@ -320,7 +322,7 @@ contract GasAccountingTest is Test {
         uint256 result;
 
         // FULL_REFUND
-        result = EscrowBits._EXECUTION_REFUND;
+        result = EscrowBits._FULL_REFUND;
         maxGasUsed = gasWaterMark + calldataCost;
         maxGasUsed = (maxGasUsed + ((maxGasUsed * mockGasAccounting.SURCHARGE()) / mockGasAccounting.SURCHARGE_BASE()))
             * tx.gasprice;
@@ -335,27 +337,16 @@ contract GasAccountingTest is Test {
         ); // Must be greater than calldataCost
         assertLt(bondedBefore - bondedAfter, maxGasUsed); // Must be less than maxGasUsed
 
-        // CALLDATA_REFUND
-        result = 1 << uint256(SolverOutcome.InsufficientEscrow);
-        maxGasUsed = (
-            calldataCost + ((calldataCost * mockGasAccounting.SURCHARGE()) / mockGasAccounting.SURCHARGE_BASE())
-        ) * tx.gasprice;
-        mockGasAccounting.increaseBondedBalance(solverOp.from, maxGasUsed);
-        (bondedBefore,,,,) = mockGasAccounting.accessData(solverOp.from);
-        mockGasAccounting.releaseSolverLock(solverOp, gasWaterMark, result);
-        (bondedAfter,,,,) = mockGasAccounting.accessData(solverOp.from);
-        assertEq(bondedBefore - bondedAfter, maxGasUsed);
-
-        // NO_USER_REFUND
+        // NO_REFUND
         result = 1 << uint256(SolverOutcome.InvalidTo);
         (bondedBefore,,,,) = mockGasAccounting.accessData(solverOp.from);
         mockGasAccounting.releaseSolverLock(solverOp, gasWaterMark, result);
         (bondedAfter,,,,) = mockGasAccounting.accessData(solverOp.from);
+        console.log("b");
         assertEq(bondedBefore, bondedAfter);
 
         // UncoveredResult
         result = 0;
-        vm.expectRevert(AtlasErrors.UncoveredResult.selector);
         mockGasAccounting.releaseSolverLock(solverOp, gasWaterMark, result);
     }
 

@@ -9,13 +9,9 @@ contract AtlasErrors {
     error UserUnexpectedSuccess();
 
     error SolverBidUnpaid();
-    error SolverMsgValueUnpaid();
+    error BalanceNotReconciled();
     error SolverOperationReverted();
-    error SolverEVMError();
-    error AlteredUserHash();
-    error AlteredControlHash();
-    error InvalidSolverHash();
-    error HashChainBroken();
+    error AlteredControl();
     error IntentUnfulfilled();
     error PreSolverFailed();
     error PostSolverFailed();
