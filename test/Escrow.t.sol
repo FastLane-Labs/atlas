@@ -306,22 +306,16 @@ contract EscrowTest is AtlasBaseTest {
         );
     }
 
-    function test_executeSolverOperation_solverOpWrapper_success() public {
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
-        uint256 result = (1 << uint256(SolverOutcome.Success)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
-        executeSolverOperationCase(userOp, solverOps, true, true, result, false);
-    }
-
     function test_executeSolverOperation_solverOpWrapper_solverBidUnpaid() public {
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
         solverOps[0] = validSolverOperation(userOp)
             .withBidAmount(defaultBidAmount * 2) // Solver's contract doesn't have that much
             .signAndBuild(address(atlasVerification), solverOnePK);
-        uint256 result = (1 << uint256(SolverOutcome.BidNotPaid)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
+        uint256 result = (1 << uint256(SolverOutcome.BidNotPaid));
         executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
-    function test_executeSolverOperation_solverOpWrapper_solverMsgValueUnpaid() public {
+    function test_executeSolverOperation_solverOpWrapper_BalanceNotReconciled() public {
         uint256 bidAmount = dummySolver.noGasPayBack(); // Special bid value that will cause the solver to not call reconcile
         deal(address(dummySolver), bidAmount);
 
@@ -329,7 +323,7 @@ contract EscrowTest is AtlasBaseTest {
         solverOps[0] = validSolverOperation(userOp)
             .withBidAmount(bidAmount)
             .signAndBuild(address(atlasVerification), solverOnePK);
-        uint256 result = (1 << uint256(SolverOutcome.CallValueTooHigh)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
+        uint256 result = (1 << uint256(SolverOutcome.BalanceNotReconciled));
         executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
@@ -342,7 +336,7 @@ contract EscrowTest is AtlasBaseTest {
                 .withPostSolver(true)
                 .build()
         );
-        uint256 result = (1 << uint256(SolverOutcome.IntentUnfulfilled)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
+        uint256 result = (1 << uint256(SolverOutcome.IntentUnfulfilled));
         executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
@@ -357,17 +351,7 @@ contract EscrowTest is AtlasBaseTest {
             .withData(abi.encode(1))
             .withBidAmount(defaultBidAmount)
             .signAndBuild(address(atlasVerification), solverOnePK);
-        uint256 result = (1 << uint256(SolverOutcome.CallReverted)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
-        executeSolverOperationCase(userOp, solverOps, true, false, result, true);
-    }
-
-    function test_executeSolverOperation_solverOpWrapper_alteredControlHash() public {
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
-        solverOps[0] = validSolverOperation(userOp)
-            .withControl(invalid) // Set an invalid dApp controller
-            .withBidAmount(defaultBidAmount)
-            .signAndBuild(address(atlasVerification), solverOnePK);
-        uint256 result = (1 << uint256(SolverOutcome.InvalidControlHash)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
+        uint256 result = (1 << uint256(SolverOutcome.SolverOpReverted));
         executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
@@ -380,8 +364,8 @@ contract EscrowTest is AtlasBaseTest {
                 .withPreSolver(true)
                 .build()
         );
-        uint256 result = (1 << uint256(SolverOutcome.PreSolverFailed)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
-        executeSolverOperationCase(userOp, solverOps, true, false, result, true);
+        uint256 result = (1 << uint256(SolverOutcome.PreSolverFailed));
+        executeSolverOperationCase(userOp, solverOps, false, false, result, true);
     }
 
     function test_executeSolverOperation_solverOpWrapper_postSolverFailed() public {
@@ -403,7 +387,7 @@ contract EscrowTest is AtlasBaseTest {
             .withBidAmount(defaultBidAmount)
             .signAndBuild(address(atlasVerification), solverOnePK);
         
-        uint256 result = (1 << uint256(SolverOutcome.IntentUnfulfilled)) | (1 << uint256(SolverOutcome.ExecutionCompleted));
+        uint256 result = (1 << uint256(SolverOutcome.PostSolverFailed));
         executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 

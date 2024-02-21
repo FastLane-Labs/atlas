@@ -370,7 +370,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertTrue(status, "expectRevert ERR-CE05 IncorrectValue: call did not revert");
         solverOp.value = 0;
 
-        // AlteredControlHash
+        // AlteredControl
         solverOp.control = invalid; // Invalid control
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
@@ -378,9 +378,9 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.AlteredControlHash.selector);
+        vm.expectRevert(AtlasErrors.AlteredControl.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
-        assertTrue(status, "expectRevert AlteredControlHash: call did not revert");
+        assertTrue(status, "expectRevert AlteredControl: call did not revert");
         solverOp.control = address(dAppControl);
 
         // SolverOperationReverted
@@ -409,7 +409,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertTrue(status, "expectRevert SolverBidUnpaid: call did not revert");
         solverOp.bidAmount = 0;
 
-        // SolverMsgValueUnpaid
+        // BalanceNotReconciled
         // Solver's contract does not call reconcile
         solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
@@ -418,9 +418,9 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.SolverMsgValueUnpaid.selector);
+        vm.expectRevert(AtlasErrors.BalanceNotReconciled.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
-        assertTrue(status, "expectRevert SolverMsgValueUnpaid: call did not revert");
+        assertTrue(status, "expectRevert BalanceNotReconciled: call did not revert");
 
         // Change of config
         callConfig.preSolver = true;
