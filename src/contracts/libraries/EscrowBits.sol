@@ -16,8 +16,9 @@ library EscrowBits {
             | 1 << uint256(SolverOutcome.DeadlinePassed) // <- detected by verification
             | 1 << uint256(SolverOutcome.InvalidTo) // <- detected by verification
             | 1 << uint256(SolverOutcome.UserOutOfGas) // <- detected by escrow
-            | 1 << uint256(SolverOutcome.AlteredControl)
-    ); // <- detected by EE
+            | 1 << uint256(SolverOutcome.AlteredControl) // <- detected by EE
+            | 1 << uint256(SolverOutcome.GasPriceBelowUsers)
+    ); // <- detected by verification
 
     // Solver's Fault - solver *does* owe gas refund, SolverOp isn't executed
     uint256 internal constant _PARTIAL_REFUND = (

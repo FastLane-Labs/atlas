@@ -78,10 +78,10 @@ abstract contract Escrow is AtlETH {
     // Returns (bool auctionWon, EscrowKey key)
     function _executeSolverOperation(
         SolverOperation calldata solverOp,
+        SolverVerificationUserData memory solverVerificationUserData,
         bytes memory dAppReturnData,
         address environment,
         address bundler,
-        bytes32 userOpHash,
         EscrowKey memory key
     )
         internal
@@ -89,7 +89,7 @@ abstract contract Escrow is AtlETH {
     {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
-        uint256 result = IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, userOpHash, bundler);
+        uint256 result = IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, solverVerificationUserData, bundler);
 
         // Verify the transaction.
         if (result.canExecute()) {

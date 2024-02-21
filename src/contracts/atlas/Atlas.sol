@@ -111,14 +111,18 @@ contract Atlas is Escrow, Factory {
         (bytes memory returnData, EscrowKey memory key) =
             _preOpsUserExecutionIteration(dConfig, userOp, solverOps, executionEnvironment, bundler);
 
+        SolverVerificationUserData memory solverVerificationUserData;
+
         for (; winningSearcherIndex < solverOps.length;) {
             // valid solverOps are packed from left of array - break at first invalid solverOp
 
             SolverOperation calldata solverOp = solverOps[winningSearcherIndex];
-            // if (solverOp.from == address(0)) break;
+            solverVerificationUserData.userOpHash = userOpHash;
+            solverVerificationUserData.userMaxFeePerGas = userOp.maxFeePerGas;
 
-            (auctionWon, key) =
-                _solverExecutionIteration(dConfig, solverOp, returnData, executionEnvironment, bundler, userOpHash, key);
+            (auctionWon, key) = _solverExecutionIteration(
+                dConfig, solverOp, solverVerificationUserData, returnData, executionEnvironment, bundler, key
+            );
             emit SolverExecution(solverOp.from, winningSearcherIndex, auctionWon);
             if (auctionWon) break;
 
@@ -216,17 +220,18 @@ contract Atlas is Escrow, Factory {
     function _solverExecutionIteration(
         DAppConfig calldata dConfig,
         SolverOperation calldata solverOp,
+        SolverVerificationUserData memory solverVerificationUserData,
         bytes memory dAppReturnData,
         address executionEnvironment,
         address bundler,
-        bytes32 userOpHash,
         EscrowKey memory key
     )
         internal
         returns (bool auctionWon, EscrowKey memory)
     {
-        (auctionWon, key) =
-            _executeSolverOperation(solverOp, dAppReturnData, executionEnvironment, bundler, userOpHash, key);
+        (auctionWon, key) = _executeSolverOperation(
+            solverOp, solverVerificationUserData, dAppReturnData, executionEnvironment, bundler, key
+        );
 
         if (auctionWon) {
             key = key.holdAllocateValueLock(solverOp.from);

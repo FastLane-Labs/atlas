@@ -25,6 +25,7 @@ enum SolverOutcome {
     InvalidTo,
     UserOutOfGas,
     AlteredControl,
+    GasPriceBelowUsers,
     // Partial Refund but no execution
     GasPriceOverCap,
     InvalidSolver,
