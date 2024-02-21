@@ -191,18 +191,25 @@ abstract contract Escrow is AtlETH {
             // Make sure to leave enough gas for dApp validation calls
             return (result | 1 << uint256(SolverOutcome.UserOutOfGas), gasLimit);
         }
-        
+
         if (block.number > solverOp.deadline) {
-            return (result | 1 << uint256(dConfig.callConfig.allowsTrustedOpHash() ? 
-                uint256(SolverOutcome.DeadlinePassedAlt):
-                uint256(SolverOutcome.DeadlinePassed)), 0);
+            return (
+                result
+                    | 1
+                        << uint256(
+                            dConfig.callConfig.allowsTrustedOpHash()
+                                ? uint256(SolverOutcome.DeadlinePassedAlt)
+                                : uint256(SolverOutcome.DeadlinePassed)
+                        ),
+                0
+            );
         }
 
         gasLimit = (100) * (solverOp.gas < EscrowBits.SOLVER_GAS_LIMIT ? solverOp.gas : EscrowBits.SOLVER_GAS_LIMIT)
             / (100 + EscrowBits.SOLVER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
 
         uint256 gasCost = (tx.gasprice * gasLimit) + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);
-        
+
         // Verify that we can lend the solver their tx value
         if (
             solverOp.value

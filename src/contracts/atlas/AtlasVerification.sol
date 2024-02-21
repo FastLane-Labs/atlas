@@ -127,7 +127,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
             if ((msgSender != dAppOp.from || msgSender != userOp.from) && !isSimulation) {
                 return (userOpHash, ValidCallsResult.InvalidBundler);
             }
-            
         } else {
             userOpHash = userOp.getUserOperationHash();
         }
@@ -257,8 +256,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
         pure
         returns (bool valid, bool bypassSignatoryApproval)
     {
-        if (dConfig.callConfig.verifyCallChainHash() && 
-            dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps)) return (false, false);
+        if (
+            dConfig.callConfig.verifyCallChainHash()
+                && dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps)
+        ) return (false, false);
 
         if (dConfig.callConfig.allowsUserAuctioneer() && dAppOp.from == userOp.sessionKey) return (true, true);
 
