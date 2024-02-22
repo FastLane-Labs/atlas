@@ -34,7 +34,7 @@ contract ChainlinkDAppControl is DAppControl {
                 verifyCallChainHash: true,
                 forwardReturnData: false,
                 requireFulfillment: true,
-                trustedOpHash: false
+                trustedOpHash: true
             })
         )
     { }
