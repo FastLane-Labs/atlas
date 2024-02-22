@@ -11,7 +11,6 @@ import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 
 import "forge-std/Test.sol";
 
-
 contract ChainlinkDAppControl is DAppControl {
     constructor(address _atlas)
         DAppControl(
@@ -46,9 +45,7 @@ contract ChainlinkDAppControl is DAppControl {
 
     // TODO update this to a Chainlink Price Update function
     // swap() selector = 0x98434997
-    function swap() external payable returns (uint256) {
-
-    }
+    function swap() external payable returns (uint256) { }
 
     //////////////////////////////////
     //   ATLAS OVERRIDE FUNCTIONS   //
@@ -64,7 +61,6 @@ contract ChainlinkDAppControl is DAppControl {
 
         return true;
     }
-
 
     function _postSolverCall(bytes calldata data) internal override returns (bool) {
         (,, bytes memory returnData) = abi.decode(data, (address, uint256, bytes));
