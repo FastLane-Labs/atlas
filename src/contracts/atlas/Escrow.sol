@@ -91,7 +91,8 @@ abstract contract Escrow is AtlETH {
     {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
-        uint256 result = IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, userOpHash, bundler);
+        uint256 result =
+            IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, userOpHash, userOp.maxFeePerGas, bundler);
 
         // Verify the transaction.
         if (result.canExecute()) {

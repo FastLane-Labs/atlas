@@ -115,7 +115,6 @@ contract Atlas is Escrow, Factory {
             // valid solverOps are packed from left of array - break at first invalid solverOp
 
             SolverOperation calldata solverOp = solverOps[winningSearcherIndex];
-            // if (solverOp.from == address(0)) break;
 
             (auctionWon, key) = _solverExecutionIteration(
                 dConfig, userOp, solverOp, returnData, executionEnvironment, bundler, userOpHash, key

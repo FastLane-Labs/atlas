@@ -7,7 +7,8 @@
   gas_price = 1500000000
   solc_version = "0.8.22"
   evm_version = 'paris'
-  gas_reports = ["Atlas", "AtlasVerification", "Simulator", "ExecutionEnvironment"]
+  gas_reports = ["Atlas", "AtlasVerification", "Simulator", "Sorter", "ExecutionEnvironment"]
+  fs_permissions = [{ access = "read-write", path = "./"}]
 
 [profile.ci]
   fuzz = { runs = 10_000 }
@@ -23,5 +24,3 @@
   tab_width = 4
   wrap_comments = true
   ignore = ["./**/*.t.sol"]
-
-fs_permissions = [{ access = "read-write", path = "./"}]

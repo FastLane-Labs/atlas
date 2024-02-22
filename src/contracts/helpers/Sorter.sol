@@ -1,29 +1,24 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { IDAppControl } from "../interfaces/IDAppControl.sol";
 import { IAtlETH } from "../interfaces/IAtlETH.sol";
+import { IDAppControl } from "../interfaces/IDAppControl.sol";
+import { CallVerification } from "../libraries/CallVerification.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
-import { CallVerification } from "../libraries/CallVerification.sol";
-
-import "forge-std/Test.sol";
-
 contract Sorter {
     address public immutable atlas;
-    address public immutable escrow;
-
-    constructor(address _atlas, address _escrow) {
-        atlas = _atlas;
-        escrow = _escrow;
-    }
 
     struct SortingData {
         uint256 amount;
         bool valid;
+    }
+
+    constructor(address _atlas) {
+        atlas = _atlas;
     }
 
     function sortBids(
@@ -58,11 +53,7 @@ contract Sorter {
     }
 
     function _verifyBidFormat(address bidToken, SolverOperation calldata solverOp) internal pure returns (bool) {
-        if (solverOp.bidToken != bidToken) {
-            return false;
-        }
-
-        return true;
+        return solverOp.bidToken == bidToken;
     }
 
     function _verifySolverEligibility(
@@ -80,16 +71,14 @@ contract Sorter {
             return false;
         }
 
-        // Make sure the solver has enough funds escrowed
-        // TODO: subtract any pending withdrawals
-        uint256 solverBalance = IAtlETH(escrow).balanceOf(solverOp.from);
+        // Make sure the solver has enough funds bonded
+        uint256 solverBalance = IAtlETH(atlas).balanceOfBonded(solverOp.from);
         if (solverBalance < solverOp.maxFeePerGas * solverOp.gas) {
             return false;
         }
 
-        // Solvers can only do one tx per block - this prevents double counting escrow balances.
-        // TODO: Add in "targetBlockNumber" as an arg?
-        uint256 solverLastActiveBlock = IAtlETH(escrow).accountLastActiveBlock(solverOp.from);
+        // Solvers can only do one tx per block - this prevents double counting bonded balances
+        uint256 solverLastActiveBlock = IAtlETH(atlas).accountLastActiveBlock(solverOp.from);
         if (solverLastActiveBlock >= block.number) {
             return false;
         }
@@ -151,42 +140,33 @@ contract Sorter {
         returns (uint256[] memory)
     {
         uint256[] memory sorted = new uint256[](count - invalid);
+        if (sorted.length == 0) {
+            return sorted;
+        }
 
-        uint256 n; // outer loop counter
-        uint256 i; // inner loop counter
+        uint256 topBidAmount;
+        uint256 topBidIndex;
+        uint256 i;
+        uint256 j;
 
-        uint256 topBid;
-        uint256 bottomBid;
+        for (; i < sorted.length;) {
+            topBidAmount = 0;
+            topBidIndex = 0;
 
-        for (; invalid < count;) {
-            // Reset the ceiling / floor
-            topBid = 0;
-            bottomBid = type(uint256).max;
-
-            // Loop through and find the highest and lowest remaining valid bids
-            for (; i < sortingData.length;) {
-                if (sortingData[i].valid) {
-                    if (sortingData[i].amount > topBid) {
-                        sorted[n] = i;
-                    }
-                    if (sortingData[i].amount < bottomBid) {
-                        sorted[count - 1 - n] = i;
-                    }
+            for (j = 0; j < count;) {
+                if (sortingData[j].valid && sortingData[j].amount > topBidAmount) {
+                    topBidAmount = sortingData[j].amount;
+                    topBidIndex = j;
                 }
                 unchecked {
-                    ++i;
+                    ++j;
                 }
             }
 
-            // Mark the lowest & highest bids invalid (Used)
-            sortingData[sorted[n]].valid = false;
-            sortingData[sorted[count - 1 - n]].valid = false;
-
+            sortingData[topBidIndex].valid = false;
+            sorted[i] = topBidIndex;
             unchecked {
-                invalid += 2;
-            }
-            unchecked {
-                ++n;
+                ++i;
             }
         }
 

@@ -26,6 +26,7 @@ library EscrowBits {
             | 1 << uint256(SolverOutcome.InvalidSolver) // <- detected by verification
             | 1 << uint256(SolverOutcome.PerBlockLimit) // <- detected by escrow
             | 1 << uint256(SolverOutcome.InsufficientEscrow) // <- detected by escrow
+            | 1 << uint256(SolverOutcome.GasPriceBelowUsers) // <- detected by verification
             | 1 << uint256(SolverOutcome.CallValueTooHigh) // <- detected by escrow
             | 1 << uint256(SolverOutcome.PreSolverFailed)
     ); // <- detected by EE

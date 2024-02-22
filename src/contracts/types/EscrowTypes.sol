@@ -32,6 +32,7 @@ enum SolverOutcome {
     PerBlockLimit, // solvers can only send one tx per block
     // if they sent two we wouldn't be able to flag builder censorship
     InsufficientEscrow,
+    GasPriceBelowUsers,
     CallValueTooHigh,
     // execution, with full user refund
     PreSolverFailed,

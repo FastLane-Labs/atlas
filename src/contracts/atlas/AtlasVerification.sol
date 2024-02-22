@@ -211,6 +211,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     function verifySolverOp(
         SolverOperation calldata solverOp,
         bytes32 userOpHash,
+        uint256 userMaxFeePerGas,
         address bundler
     )
         external
@@ -219,15 +220,21 @@ contract AtlasVerification is EIP712, DAppIntegration {
     {
         if (bundler == solverOp.from || _verifySolverSignature(solverOp)) {
             // Validate solver signature
-            // NOTE: First three failures are the bundler's fault - solver does not
+            // NOTE: First two failures are the bundler's fault - solver does not
             // owe a gas refund to the bundler.
-            if (solverOp.userOpHash != userOpHash) result |= (1 << uint256(SolverOutcome.InvalidUserHash));
+            if (solverOp.userOpHash != userOpHash) {
+                result |= (1 << uint256(SolverOutcome.InvalidUserHash));
+            }
 
             if (solverOp.to != ATLAS) result |= (1 << uint256(SolverOutcome.InvalidTo));
 
-            // NOTE: The next two failures below here are the solver's fault, and as a result
+            // NOTE: The next three failures below here are the solver's fault, and as a result
             // they are on the hook for their own gas cost.
             if (tx.gasprice > solverOp.maxFeePerGas) result |= (1 << uint256(SolverOutcome.GasPriceOverCap));
+
+            if (solverOp.maxFeePerGas < userMaxFeePerGas) {
+                result |= (1 << uint256(SolverOutcome.GasPriceBelowUsers));
+            }
 
             if (solverOp.solver == ATLAS || solverOp.solver == address(this)) {
                 result |= (1 << uint256(SolverOutcome.InvalidSolver));
