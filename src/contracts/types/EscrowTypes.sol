@@ -21,12 +21,13 @@ enum SolverOutcome {
     // no refund (relay error or hostile user)
     InvalidSignature,
     InvalidUserHash,
-    DeadlinePassed,
+    DeadlinePassedAlt,
     InvalidTo,
     UserOutOfGas,
     AlteredControl,
     GasPriceBelowUsers,
     // Partial Refund but no execution
+    DeadlinePassed,
     GasPriceOverCap,
     InvalidSolver,
     PerBlockLimit, // solvers can only send one tx per block

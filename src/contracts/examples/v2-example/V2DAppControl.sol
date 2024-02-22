@@ -68,7 +68,8 @@ contract V2DAppControl is DAppControl {
                 unknownAuctioneer: true,
                 verifyCallChainHash: true,
                 forwardReturnData: false,
-                requireFulfillment: false
+                requireFulfillment: false,
+                trustedOpHash: false
             })
         )
     {

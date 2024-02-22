@@ -121,7 +121,7 @@ contract Atlas is Escrow, Factory {
             solverVerificationUserData.userMaxFeePerGas = userOp.maxFeePerGas;
 
             (auctionWon, key) = _solverExecutionIteration(
-                dConfig, solverOp, solverVerificationUserData, returnData, executionEnvironment, bundler, key
+                dConfig, userOp, solverOp, returnData, executionEnvironment, bundler, userOpHash, key
             );
             emit SolverExecution(solverOp.from, winningSearcherIndex, auctionWon);
             if (auctionWon) break;
@@ -219,6 +219,7 @@ contract Atlas is Escrow, Factory {
 
     function _solverExecutionIteration(
         DAppConfig calldata dConfig,
+        UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         SolverVerificationUserData memory solverVerificationUserData,
         bytes memory dAppReturnData,
@@ -230,7 +231,7 @@ contract Atlas is Escrow, Factory {
         returns (bool auctionWon, EscrowKey memory)
     {
         (auctionWon, key) = _executeSolverOperation(
-            solverOp, solverVerificationUserData, dAppReturnData, executionEnvironment, bundler, key
+            dConfig, userOp, solverOp, dAppReturnData, executionEnvironment, bundler, userOpHash, key
         );
 
         if (auctionWon) {

@@ -35,6 +35,7 @@ contract Storage is AtlasEvents, AtlasErrors {
     mapping(address => EscrowAccountBalance) internal _balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
     mapping(address => EscrowAccountAccessData) public accessData;
+    mapping(bytes32 => bool) internal _solverOpHashes; // NOTE: Only used for when allowTrustedOpHash is enabled
 
     // Gas Accounting constants
     uint256 public constant SURCHARGE_BASE = 100;
@@ -85,10 +86,10 @@ contract Storage is AtlasEvents, AtlasErrors {
         emit SurchargeRecipientTransferred(_surchargeRecipient);
     }
 
-    function solverLockData() public view returns (address currentSolver, bool verified, bool fulfilled) {
+    function solverLockData() public view returns (address currentSolver, bool calledBack, bool fulfilled) {
         uint256 solverLock = _solverLock;
         currentSolver = address(uint160(solverLock));
-        verified = solverLock & _solverCalledBack != 0;
+        calledBack = solverLock & _solverCalledBack != 0;
         fulfilled = solverLock & _solverFulfilled != 0;
     }
 

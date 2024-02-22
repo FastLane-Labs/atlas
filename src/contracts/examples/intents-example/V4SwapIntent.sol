@@ -57,7 +57,8 @@ contract V4SwapIntentController is DAppControl {
                 verifyCallChainHash: true,
                 unknownAuctioneer: true,
                 forwardReturnData: false,
-                requireFulfillment: true
+                requireFulfillment: true,
+                trustedOpHash: false
             })
         )
     {

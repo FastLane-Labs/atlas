@@ -71,7 +71,8 @@ contract V4DAppControl is DAppControl {
                 unknownAuctioneer: true,
                 verifyCallChainHash: true,
                 forwardReturnData: false,
-                requireFulfillment: true
+                requireFulfillment: true,
+                trustedOpHash: false
             })
         )
     {
