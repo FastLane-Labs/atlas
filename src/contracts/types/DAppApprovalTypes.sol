@@ -44,6 +44,7 @@ struct CallConfig {
     bool verifyCallChainHash;
     bool forwardReturnData;
     bool requireFulfillment;
+    bool trustedOpHash;
 }
 
 enum CallConfigIndex {
@@ -64,5 +65,6 @@ enum CallConfigIndex {
     // Default = DAppAuctioneer
     VerifyCallChainHash,
     ForwardReturnData,
-    RequireFulfillment
+    RequireFulfillment,
+    TrustedOpHash
 }

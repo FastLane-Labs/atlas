@@ -77,6 +77,8 @@ abstract contract Escrow is AtlETH {
 
     // Returns (bool auctionWon, EscrowKey key)
     function _executeSolverOperation(
+        DAppConfig calldata dConfig,
+        UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         bytes memory dAppReturnData,
         address environment,
@@ -95,6 +97,10 @@ abstract contract Escrow is AtlETH {
         if (result.canExecute()) {
             uint256 gasLimit;
             (result, gasLimit) = _validateSolverOperation(solverOp, gasWaterMark, result);
+
+            if (dConfig.callConfig.allowsTrustedOpHash()) {
+                if (!_handleAltOpHash(userOp, solverOp)) return (false, key);
+            }
 
             // If there are no errors, attempt to execute
             if (result.canExecute() && _trySolverLock(solverOp)) {
@@ -218,6 +224,25 @@ abstract contract Escrow is AtlETH {
         }
 
         return (result, gasLimit);
+    }
+
+    function _handleAltOpHash(
+        UserOperation calldata userOp,
+        SolverOperation calldata solverOp
+    )
+        internal
+        returns (bool)
+    {
+        // These failures should be attributed to bundler maliciousness
+        if (solverOp.deadline != userOp.deadline || solverOp.control != userOp.control) {
+            return false;
+        }
+        bytes32 hashId = keccak256(abi.encodePacked(solverOp.userOpHash, solverOp.from));
+        if (_solverOpHashes[hashId]) {
+            return false;
+        }
+        _solverOpHashes[hashId] = true;
+        return true;
     }
 
     // Returns a SolverOutcome enum value

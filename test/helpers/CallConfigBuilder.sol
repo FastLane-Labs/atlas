@@ -23,6 +23,7 @@ contract CallConfigBuilder is Test {
     bool verifyCallChainHash;
     bool forwardReturnData;
     bool requireFulfillment;
+    bool trustedOpHash;
 
     function withUserNoncesSequenced(bool _sequenced) public returns (CallConfigBuilder) {
         userNoncesSequenced = _sequenced;
@@ -109,6 +110,11 @@ contract CallConfigBuilder is Test {
         return this;
     }
 
+    function withTrustedOpHash(bool _allowTrustedOpHash) public returns (CallConfigBuilder) {
+        trustedOpHash = _allowTrustedOpHash;
+        return this;
+    }
+
     function build() public view returns (CallConfig memory) {
         return CallConfig(
             userNoncesSequenced,
@@ -127,7 +133,8 @@ contract CallConfigBuilder is Test {
             unknownAuctioneer,
             verifyCallChainHash,
             forwardReturnData,
-            requireFulfillment
+            requireFulfillment,
+            trustedOpHash
         );
     }
 }

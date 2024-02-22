@@ -65,11 +65,15 @@ library CallBits {
         if (callConfig.requireFulfillment) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.RequireFulfillment);
         }
+        if (callConfig.trustedOpHash) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.TrustedOpHash);
+        }
     }
 
     function decodeCallConfig(uint32 encodedCallConfig) internal pure returns (CallConfig memory callConfig) {
         callConfig = CallConfig({
             userNoncesSequenced: needsSequencedUserNonces(encodedCallConfig),
+            dappNoncesSequenced: needsSequencedDAppNonces(encodedCallConfig),
             requirePreOps: needsPreOpsCall(encodedCallConfig),
             trackPreOpsReturnData: needsPreOpsReturnData(encodedCallConfig),
             trackUserReturnData: needsUserReturnData(encodedCallConfig),
@@ -85,8 +89,8 @@ library CallBits {
             verifyCallChainHash: verifyCallChainHash(encodedCallConfig),
             forwardReturnData: forwardReturnData(encodedCallConfig),
             requireFulfillment: needsFulfillment(encodedCallConfig),
-            dappNoncesSequenced: needsSequencedDAppNonces(encodedCallConfig) // TODO move to below userNoncesSequenced
-         });
+            trustedOpHash: allowsTrustedOpHash(encodedCallConfig)
+        });
     }
 
     function needsSequencedUserNonces(uint32 callConfig) internal pure returns (bool sequenced) {
@@ -155,5 +159,9 @@ library CallBits {
 
     function needsFulfillment(uint32 callConfig) internal pure returns (bool) {
         return (callConfig & 1 << uint32(CallConfigIndex.RequireFulfillment) != 0);
+    }
+
+    function allowsTrustedOpHash(uint32 callConfig) internal pure returns (bool) {
+        return (callConfig & 1 << uint32(CallConfigIndex.TrustedOpHash) != 0);
     }
 }

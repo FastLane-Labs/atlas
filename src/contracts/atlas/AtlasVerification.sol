@@ -114,7 +114,29 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // Verify that the calldata injection came from the dApp frontend
         // and that the signatures are valid.
 
-        userOpHash = userOp.getUserOperationHash();
+        // CASE: Solvers trust app to update content of UserOp after submission of solverOp
+        if (dConfig.callConfig.allowsTrustedOpHash()) {
+            userOpHash = userOp.getAltOperationHash();
+
+            if (!isSimulation) {
+                // SessionKey must match explicitly - cannot be skipped
+                if (userOp.sessionKey != dAppOp.from) {
+                    return (userOpHash, ValidCallsResult.InvalidAuctioneer);
+                }
+
+                // Deadlines must match
+                if (userOp.deadline != dAppOp.deadline) {
+                    return (userOpHash, ValidCallsResult.DeadlineMismatch);
+                }
+
+                // msgSender must be userOp.from or userOp.sessionKey / dappOp.from
+                if (msgSender != dAppOp.from || msgSender != userOp.from) {
+                    return (userOpHash, ValidCallsResult.InvalidBundler);
+                }
+            }
+        } else {
+            userOpHash = userOp.getUserOperationHash();
+        }
 
         uint256 solverOpCount = solverOps.length;
 
@@ -128,8 +150,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
             }
 
             // Check dapp signature
-            if (!_verifyDApp(dConfig, dAppOp, msgSender, bypassSignatoryApproval, isSimulation)) {
-                return (userOpHash, ValidCallsResult.DAppSignatureInvalid);
+            (bool validDAppOp, ValidCallsResult result) =
+                _verifyDApp(dConfig, dAppOp, msgSender, bypassSignatoryApproval, isSimulation);
+            if (!validDAppOp) {
+                return (userOpHash, result);
             }
 
             // Check user signature
@@ -156,9 +180,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 }
             }
 
-            // Check bundler matches dAppOp bundler
-            if (dAppOp.bundler != address(0) && msgSender != dAppOp.bundler) {
-                return (userOpHash, ValidCallsResult.InvalidBundler);
+            if (dAppOp.control != userOp.control) {
+                return (userOpHash, ValidCallsResult.InvalidControl);
             }
 
             // Check gas price is within user's limit
@@ -187,6 +210,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
             if (dConfig.callConfig.needsFulfillment()) {
                 return (userOpHash, ValidCallsResult.NoSolverOp);
             }
+        }
+
+        if (userOpHash != dAppOp.userOpHash) {
+            return (userOpHash, ValidCallsResult.OpHashMismatch);
         }
 
         return (userOpHash, ValidCallsResult.Valid);
@@ -299,7 +326,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         bool isSimulation
     )
         internal
-        returns (bool)
+        returns (bool, ValidCallsResult)
     {
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp nonces
@@ -307,10 +334,11 @@ contract AtlasVerification is EIP712, DAppIntegration {
         bool bypassSignature = msgSender == dAppOp.from || (isSimulation && dAppOp.signature.length == 0);
 
         if (!bypassSignature && !_verifyDAppSignature(dAppOp)) {
-            return false;
+            return (false, ValidCallsResult.DAppSignatureInvalid);
         }
 
-        if (bypassSignatoryApproval) return true; // If bypass, return true after signature verification
+        if (bypassSignatoryApproval) return (true, ValidCallsResult.Valid); // If bypass, return true after signature
+            // verification
 
         // NOTE: to avoid replay attacks arising from key management errors,
         // the state changes below must be *saved* even if they render the
@@ -324,23 +352,33 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         GovernanceData memory govData = governance[dConfig.to];
 
+        // Check bundler matches dAppOp bundler
+        if (dAppOp.bundler != address(0) && msgSender != dAppOp.bundler) {
+            if (!signatories[keccak256(abi.encodePacked(govData.governance, dAppOp.control, msgSender))]) {
+                bool bypassSignatoryCheck = isSimulation && dAppOp.from == address(0);
+                if (!isSimulation) {
+                    return (false, ValidCallsResult.InvalidBundler);
+                }
+            }
+        }
+
         // Make sure the signer is currently enabled by dapp owner
-        if (!signatories[keccak256(abi.encode(govData.governance, dAppOp.control, dAppOp.from))]) {
+        if (!signatories[keccak256(abi.encodePacked(govData.governance, dAppOp.control, dAppOp.from))]) {
             bool bypassSignatoryCheck = isSimulation && dAppOp.from == address(0);
             if (!bypassSignatoryCheck) {
-                return false;
+                return (false, ValidCallsResult.DAppSignatureInvalid);
             }
         }
 
         if (dAppOp.control != dConfig.to) {
             // This should be unreachable but returning false just in case.
-            return false;
+            return (false, ValidCallsResult.InvalidControl);
         }
 
         // If dAppOp.from is left blank and sim = true,
         // implies a simUserOp call, so dapp nonce check is skipped.
         if (dAppOp.from == address(0) && isSimulation) {
-            return true;
+            return (true, ValidCallsResult.Valid);
         }
 
         // If the dapp indicated that they only accept sequenced nonces
@@ -349,10 +387,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // which builders or validators may be able to profit via censorship.
         // DApps are encouraged to rely on the deadline parameter.
         if (!_handleNonces(dAppOp.from, dAppOp.nonce, !dConfig.callConfig.needsSequencedDAppNonces(), isSimulation)) {
-            return false;
+            return (false, ValidCallsResult.InvalidDAppNonce);
         }
 
-        return true;
+        return (true, ValidCallsResult.Valid);
     }
 
     // Returns true if nonce is valid, otherwise returns false

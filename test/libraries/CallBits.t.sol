@@ -31,7 +31,8 @@ contract CallBitsTest is Test {
             unknownAuctioneer: true,
             verifyCallChainHash: false,
             forwardReturnData: true,
-            requireFulfillment: false
+            requireFulfillment: false,
+            trustedOpHash: true
         });
 
         callConfig2 = CallConfig({
@@ -51,12 +52,13 @@ contract CallBitsTest is Test {
             unknownAuctioneer: !callConfig1.unknownAuctioneer,
             verifyCallChainHash: !callConfig1.verifyCallChainHash,
             forwardReturnData: !callConfig1.forwardReturnData,
-            requireFulfillment: !callConfig1.requireFulfillment
+            requireFulfillment: !callConfig1.requireFulfillment,
+            trustedOpHash: !callConfig1.trustedOpHash
         });
     }
 
     function testEncodeCallConfig() public {
-        string memory expectedBitMapString = "00000000000000001010101010101010";
+        string memory expectedBitMapString = "00000000000000101010101010101010";
         assertEq(
             TestUtils.uint32ToBinaryString(CallBits.encodeCallConfig(callConfig1)),
             expectedBitMapString,
@@ -91,6 +93,7 @@ contract CallBitsTest is Test {
         assertEq(decodedCallConfig.verifyCallChainHash, false, "verifyCallChainHash 1 incorrect");
         assertEq(decodedCallConfig.forwardReturnData, true, "forwardPreOpsReturnData 1 incorrect");
         assertEq(decodedCallConfig.requireFulfillment, false, "requireFulfillment 1 incorrect");
+        assertEq(decodedCallConfig.trustedOpHash, true, "trustedOpHash 1 incorrect");
 
         encodedCallConfig = CallBits.encodeCallConfig(callConfig2);
         decodedCallConfig = encodedCallConfig.decodeCallConfig();
@@ -111,6 +114,7 @@ contract CallBitsTest is Test {
         assertEq(decodedCallConfig.verifyCallChainHash, true, "verifyCallChainHash 2 incorrect");
         assertEq(decodedCallConfig.forwardReturnData, false, "forwardPreOpsReturnData 2 incorrect");
         assertEq(decodedCallConfig.requireFulfillment, true, "requireFulfillment 2 incorrect");   
+        assertEq(decodedCallConfig.trustedOpHash, false, "trustedOpHash 2 incorrect");
     }
 
     function testConfigParameters() public {
