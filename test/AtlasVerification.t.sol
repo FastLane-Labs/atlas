@@ -439,7 +439,7 @@ contract AtlasVerificationTest is AtlasVerificationBase {
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.DAppSignatureInvalid);
+        ), ValidCallsResult.InvalidDAppNonce);
     }
 
     //
@@ -459,7 +459,7 @@ contract AtlasVerificationTest is AtlasVerificationBase {
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.DAppSignatureInvalid);
+        ), ValidCallsResult.InvalidDAppNonce);
     }
 
     //
@@ -480,7 +480,7 @@ contract AtlasVerificationTest is AtlasVerificationBase {
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: true}
-        ), ValidCallsResult.DAppSignatureInvalid);
+        ), ValidCallsResult.InvalidDAppNonce);
     }
 
     //
@@ -547,7 +547,7 @@ contract AtlasVerificationTest is AtlasVerificationBase {
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.DAppSignatureInvalid);
+        ), ValidCallsResult.InvalidDAppNonce);
     }
 
     //
@@ -619,7 +619,7 @@ contract AtlasVerificationTest is AtlasVerificationBase {
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.DAppSignatureInvalid);
+        ), ValidCallsResult.InvalidDAppNonce);
     }
 
     // UserSignatureInvalid cases

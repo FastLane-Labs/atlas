@@ -29,7 +29,7 @@ contract DAppIntegrationTest is Test {
     }
 
     function test_initializeGovernance_successfullyInitialized() public {
-        bytes32 signatoryKey = keccak256(abi.encode(governance, address(dAppControl), governance));
+        bytes32 signatoryKey = keccak256(abi.encodePacked(governance, address(dAppControl), governance));
         vm.prank(governance);
         dAppIntegration.initializeGovernance(address(dAppControl));
         assertTrue(
@@ -38,7 +38,7 @@ contract DAppIntegrationTest is Test {
     }
 
     function test_initializeGovernance_notInitialized() public {
-        bytes32 signatoryKey = keccak256(abi.encode(governance, address(dAppControl), governance));
+        bytes32 signatoryKey = keccak256(abi.encodePacked(governance, address(dAppControl), governance));
         assertFalse(
             dAppIntegration.signatories(signatoryKey), "signatories[signatoryKey] should be false when not initialized"
         );
@@ -59,7 +59,7 @@ contract DAppIntegrationTest is Test {
     }
 
     function test_addSignatory_successfullyAdded() public {
-        bytes32 signatoryKey = keccak256(abi.encode(governance, address(dAppControl), signatory));
+        bytes32 signatoryKey = keccak256(abi.encodePacked(governance, address(dAppControl), signatory));
 
         vm.startPrank(governance);
         dAppIntegration.initializeGovernance(address(dAppControl));
@@ -72,7 +72,7 @@ contract DAppIntegrationTest is Test {
         vm.prank(governance);
         dAppIntegration.initializeGovernance(address(dAppControl));
 
-        bytes32 signatoryKey = keccak256(abi.encode(governance, address(dAppControl), signatory));
+        bytes32 signatoryKey = keccak256(abi.encodePacked(governance, address(dAppControl), signatory));
         assertFalse(
             dAppIntegration.signatories(signatoryKey), "signatories[signatoryKey] should be false when not added"
         );
@@ -97,7 +97,7 @@ contract DAppIntegrationTest is Test {
     }
 
     function test_removeSignatory_successfullyRemovedByGovernance() public {
-        bytes32 signatoryKey = keccak256(abi.encode(governance, address(dAppControl), signatory));
+        bytes32 signatoryKey = keccak256(abi.encodePacked(governance, address(dAppControl), signatory));
 
         vm.startPrank(governance);
         dAppIntegration.initializeGovernance(address(dAppControl));
@@ -112,7 +112,7 @@ contract DAppIntegrationTest is Test {
     }
 
     function test_removeSignatory_successfullyRemovedBySignatoryItself() public {
-        bytes32 signatoryKey = keccak256(abi.encode(governance, address(dAppControl), signatory));
+        bytes32 signatoryKey = keccak256(abi.encodePacked(governance, address(dAppControl), signatory));
 
         vm.startPrank(governance);
         dAppIntegration.initializeGovernance(address(dAppControl));
