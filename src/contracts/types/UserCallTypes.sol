@@ -19,8 +19,3 @@ struct UserOperation {
     bytes data;
     bytes signature;
 }
-
-struct SolverVerificationUserData {
-    uint256 userMaxFeePerGas;
-    bytes32 userOpHash;
-}

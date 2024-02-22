@@ -22,7 +22,8 @@ interface IAtlasVerification {
 
     function verifySolverOp(
         SolverOperation calldata solverOp,
-        SolverVerificationUserData calldata solverVerificationUserData,
+        bytes32 userOpHash,
+        uint256 userMaxFeePerGas,
         address bundler
     )
         external

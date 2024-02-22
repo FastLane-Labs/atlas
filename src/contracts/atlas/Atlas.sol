@@ -111,14 +111,10 @@ contract Atlas is Escrow, Factory {
         (bytes memory returnData, EscrowKey memory key) =
             _preOpsUserExecutionIteration(dConfig, userOp, solverOps, executionEnvironment, bundler);
 
-        SolverVerificationUserData memory solverVerificationUserData;
-
         for (; winningSearcherIndex < solverOps.length;) {
             // valid solverOps are packed from left of array - break at first invalid solverOp
 
             SolverOperation calldata solverOp = solverOps[winningSearcherIndex];
-            solverVerificationUserData.userOpHash = userOpHash;
-            solverVerificationUserData.userMaxFeePerGas = userOp.maxFeePerGas;
 
             (auctionWon, key) = _solverExecutionIteration(
                 dConfig, userOp, solverOp, returnData, executionEnvironment, bundler, userOpHash, key
@@ -221,10 +217,10 @@ contract Atlas is Escrow, Factory {
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
         SolverOperation calldata solverOp,
-        SolverVerificationUserData memory solverVerificationUserData,
         bytes memory dAppReturnData,
         address executionEnvironment,
         address bundler,
+        bytes32 userOpHash,
         EscrowKey memory key
     )
         internal
