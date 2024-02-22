@@ -23,17 +23,17 @@ contract ChainlinkDAppControl is DAppControl {
                 trackPreOpsReturnData: false,
                 trackUserReturnData: true,
                 delegateUser: true,
-                preSolver: true,
-                postSolver: true,
-                requirePostOps: false,
+                preSolver: false,
+                postSolver: false,
+                requirePostOps: true, // update base oracle in postOps
                 zeroSolvers: false,
-                reuseUserOp: true,
+                reuseUserOp: false,
                 userAuctioneer: true,
-                solverAuctioneer: true,
+                solverAuctioneer: false,
                 unknownAuctioneer: true,
                 verifyCallChainHash: true,
                 forwardReturnData: false,
-                requireFulfillment: true,
+                requireFulfillment: false, // Update oracle even if all solvers fail
                 trustedOpHash: true
             })
         )
@@ -62,12 +62,16 @@ contract ChainlinkDAppControl is DAppControl {
         return true;
     }
 
-    function _postSolverCall(bytes calldata data) internal override returns (bool) {
-        (,, bytes memory returnData) = abi.decode(data, (address, uint256, bytes));
+    // Update the base Chainlink Price Oracle after solvers have had an opportunity
+    function _postOpsCall(bool solved, bytes calldata data) internal override returns (bool) {
+        // TODO extract from data:
+        // - aggregator contract (address)
+        // - rs (bytes32[] calldata) [array of oracle sig r peices]
+        // - ss (bytes32[] calldata) [array of oracle sig s peices]
+        // - rawVs (bytes32) [array of oracle sig v peices]
+        // - report (bytes calldata)
 
-        // TODO add logic here if post solver phase needed
-
-        return true;
+        // call transmit() on the target aggregator contract
     }
 
     // This occurs after a Solver has successfully paid their bid, which is
@@ -98,4 +102,8 @@ contract ChainlinkDAppControl is DAppControl {
     function getBidValue(SolverOperation calldata solverOp) public pure override returns (uint256) {
         return solverOp.bidAmount;
     }
+}
+
+interface ChainlinkAggregator {
+    function transmit(bytes calldata report, bytes32[] calldata rs, bytes32[] calldata ss, bytes32 rawVs) external;
 }
