@@ -118,21 +118,14 @@ contract AtlasVerification is EIP712, DAppIntegration {
         if (dConfig.callConfig.allowsTrustedOpHash()) {
             userOpHash = userOp.getAltOperationHash();
 
-            if (!isSimulation) {
-                // SessionKey must match explicitly - cannot be skipped
-                if (userOp.sessionKey != dAppOp.from) {
-                    return (userOpHash, ValidCallsResult.InvalidAuctioneer);
-                }
+            // SessionKey must match explicitly - cannot be skipped
+            if (userOp.sessionKey != dAppOp.from && !isSimulation) {
+                return (userOpHash, ValidCallsResult.InvalidAuctioneer);
+            }
 
-                // Deadlines must match
-                if (userOp.deadline != dAppOp.deadline) {
-                    return (userOpHash, ValidCallsResult.DeadlineMismatch);
-                }
-
-                // msgSender must be userOp.from or userOp.sessionKey / dappOp.from
-                if (msgSender != dAppOp.from || msgSender != userOp.from) {
-                    return (userOpHash, ValidCallsResult.InvalidBundler);
-                }
+            // msgSender must be userOp.from or userOp.sessionKey / dappOp.from
+            if ((msgSender != dAppOp.from || msgSender != userOp.from) && !isSimulation) {
+                return (userOpHash, ValidCallsResult.InvalidBundler);
             }
         } else {
             userOpHash = userOp.getUserOperationHash();
@@ -178,10 +171,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 if (dAppOp.deadline != 0 && !isSimulation) {
                     return (userOpHash, ValidCallsResult.DAppDeadlineReached);
                 }
-            }
-
-            if (dAppOp.control != userOp.control) {
-                return (userOpHash, ValidCallsResult.InvalidControl);
             }
 
             // Check gas price is within user's limit
@@ -234,8 +223,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
             // owe a gas refund to the bundler.
             if (solverOp.userOpHash != userOpHash) result |= (1 << uint256(SolverOutcome.InvalidUserHash));
 
-            if (block.number > solverOp.deadline) result |= (1 << uint256(SolverOutcome.DeadlinePassed));
-
             if (solverOp.to != ATLAS) result |= (1 << uint256(SolverOutcome.InvalidTo));
 
             // NOTE: The next two failures below here are the solver's fault, and as a result
@@ -262,10 +249,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
         pure
         returns (bool valid, bool bypassSignatoryApproval)
     {
-        bool validCallChainHash = !dConfig.callConfig.verifyCallChainHash()
-            || dAppOp.callChainHash == CallVerification.getCallChainHash(dConfig, userOp, solverOps);
-
-        if (!validCallChainHash) return (false, false);
+        if (
+            dConfig.callConfig.verifyCallChainHash()
+                && dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps)
+        ) return (false, false);
 
         if (dConfig.callConfig.allowsUserAuctioneer() && dAppOp.from == userOp.sessionKey) return (true, true);
 
@@ -371,7 +358,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
         }
 
         if (dAppOp.control != dConfig.to) {
-            // This should be unreachable but returning false just in case.
             return (false, ValidCallsResult.InvalidControl);
         }
 

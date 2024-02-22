@@ -86,10 +86,10 @@ contract Storage is AtlasEvents, AtlasErrors {
         emit SurchargeRecipientTransferred(_surchargeRecipient);
     }
 
-    function solverLockData() public view returns (address currentSolver, bool verified, bool fulfilled) {
+    function solverLockData() public view returns (address currentSolver, bool calledBack, bool fulfilled) {
         uint256 solverLock = _solverLock;
         currentSolver = address(uint160(solverLock));
-        verified = solverLock & _solverCalledBack != 0;
+        calledBack = solverLock & _solverCalledBack != 0;
         fulfilled = solverLock & _solverFulfilled != 0;
     }
 
