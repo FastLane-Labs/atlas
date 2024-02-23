@@ -10,13 +10,16 @@ contract ChainlinkAtlasWrapperETHUSD is Ownable {
     address public immutable ATLAS;
     IChainlinkAggregator public immutable BASE_SOURCE; // Base Chainlink Aggregator
 
+    uint256 internal constant maxNumOracles = 31;
+
     int256 public atlasLatestAnswer;
     uint256 public atlasLatestTimestamp;
 
+    // Trusted ExecutionEnvironments
     mapping(address transmitter => bool trusted) public transmitters;
 
     error TransmitterNotTrusted(address transmitter);
-    error InvalidTransmitData();
+    error ObservationsNotOrdered();
 
     constructor(address atlas, address _baseChainlinkAggregator) {
         ATLAS = atlas;
@@ -35,18 +38,11 @@ contract ChainlinkAtlasWrapperETHUSD is Ownable {
     }
 
     // Called by a trusted ExecutionEnvironment during an Atlas metacall
-    function transmit(
-        bytes calldata _report,
-        bytes32[] calldata _rs,
-        bytes32[] calldata _ss,
-        bytes32 _rawVs
-    )
-        external
-    {
+    function transmit(TransmitPayload memory transmitPayload) external {
         if (!transmitters[msg.sender]) revert TransmitterNotTrusted(msg.sender);
 
-        (bool dataVerified, int256 answer) = _verifyTransmitData(_report, _rs, _ss, _rawVs);
-        if (!dataVerified) revert InvalidTransmitData(); // TODO move to more specific reverts in verify func
+        int256 answer =
+            _verifyTransmitData(transmitPayload.report, transmitPayload.rs, transmitPayload.ss, transmitPayload.rawVs);
 
         atlasLatestAnswer = answer;
         atlasLatestTimestamp = block.timestamp;
@@ -54,18 +50,31 @@ contract ChainlinkAtlasWrapperETHUSD is Ownable {
 
     // Verifies
     function _verifyTransmitData(
-        bytes calldata _report,
-        bytes32[] calldata _rs,
-        bytes32[] calldata _ss,
+        bytes memory _report,
+        bytes32[] memory _rs,
+        bytes32[] memory _ss,
         bytes32 _rawVs
     )
         internal
-        returns (bool, int256)
+        pure
+        returns (int256)
     {
-        // TODO implement based on Chainlink Aggregator transmit function logic
+        // TODO more checks needed OffchainAggregator transmit function logic
+        // Need ways to access s_hotVars and s_oracles in the CL ETHUSD contract
+
+        ReportData memory r;
+        (,, r.observations) = abi.decode(_report, (bytes32, bytes32, int192[]));
+
+        // 1. Check observations are ordered, then take median
+        for (uint256 i = 0; i < r.observations.length - 1; ++i) {
+            bool inOrder = r.observations[i] <= r.observations[i + 1];
+            if (!inOrder) revert ObservationsNotOrdered();
+        }
+        int192 median = r.observations[r.observations.length / 2];
+        return int256(median);
     }
 
-    // Owner can add/remove trusted transmitters
+    // Owner can add/remove trusted transmitters (ExecutionEnvironments)
     function setTransmitterStatus(address transmitter, bool trusted) external onlyOwner {
         transmitters[transmitter] = trusted;
     }
@@ -74,6 +83,13 @@ contract ChainlinkAtlasWrapperETHUSD is Ownable {
 // -----------------------------------------------
 // Structs and interface for Chainlink Aggregator
 // -----------------------------------------------
+
+struct TransmitPayload {
+    bytes report;
+    bytes32[] rs;
+    bytes32[] ss;
+    bytes32 rawVs;
+}
 
 struct ReportData {
     HotVars hotVars; // Only read from storage once

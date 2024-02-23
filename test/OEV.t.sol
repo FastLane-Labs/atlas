@@ -13,6 +13,7 @@ import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
 import { DAppOperation, DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 
 import { ChainlinkDAppControl } from "src/contracts/examples/oev-example/ChainlinkDAppControl.sol";
+import {ChainlinkAtlasWrapperETHUSD, TransmitPayload } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapperETHUSD.sol";
 import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
 
@@ -30,13 +31,6 @@ contract OEVTest is BaseTest {
         uint8 v;
         bytes32 r;
         bytes32 s;
-    }
-
-    struct TransmitPayload {
-        bytes reportBytes;
-        bytes32[] rs;
-        bytes32[] ss;
-        bytes32 rawVs;
     }
 
     function setUp() public virtual override {
@@ -63,7 +57,7 @@ contract OEVTest is BaseTest {
 
         TransmitPayload memory transmitPayload = getTransmitPayload();
 
-        console.logBytes(transmitPayload.reportBytes);
+        console.logBytes(transmitPayload.report);
 
         // NOTES:
         // - The EE must be whitelisted to post answers to Wrapper and Base oracles
@@ -116,7 +110,7 @@ contract OEVTest is BaseTest {
         ss[10] = 0x2768d43bca650e9a452db41730c4e31b600f5398c49490d66f4065a0b357707f;
 
         return TransmitPayload({
-            reportBytes: report,
+            report: report,
             rs: rs,
             ss: ss,
             rawVs: rawVs
