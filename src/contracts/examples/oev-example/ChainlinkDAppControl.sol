@@ -12,7 +12,12 @@ import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 import "forge-std/Test.sol";
 
 contract ChainlinkDAppControl is DAppControl {
-    constructor(address _atlas)
+    address public immutable CHAINLINK_WRAPPER;
+
+    constructor(
+        address _atlas,
+        address _wrapper
+    )
         DAppControl(
             _atlas,
             msg.sender,
@@ -37,15 +42,16 @@ contract ChainlinkDAppControl is DAppControl {
                 trustedOpHash: true
             })
         )
-    { }
+    {
+        CHAINLINK_WRAPPER = _wrapper;
+    }
 
     //////////////////////////////////
     // CONTRACT-SPECIFIC FUNCTIONS  //
     //////////////////////////////////
 
     // TODO update this to a Chainlink Price Update function
-    // swap() selector = 0x98434997
-    function swap() external payable returns (uint256) { }
+    function transmit() external payable returns (uint256) { }
 
     //////////////////////////////////
     //   ATLAS OVERRIDE FUNCTIONS   //
@@ -60,18 +66,6 @@ contract ChainlinkDAppControl is DAppControl {
         // TODO add logic here if pre solver phase needed
 
         return true;
-    }
-
-    // Update the base Chainlink Price Oracle after solvers have had an opportunity
-    function _postOpsCall(bool solved, bytes calldata data) internal override returns (bool) {
-        // TODO extract from data:
-        // - aggregator contract (address)
-        // - rs (bytes32[] calldata) [array of oracle sig r peices]
-        // - ss (bytes32[] calldata) [array of oracle sig s peices]
-        // - rawVs (bytes32) [array of oracle sig v peices]
-        // - report (bytes calldata)
-
-        // call transmit() on the target aggregator contract
     }
 
     // This occurs after a Solver has successfully paid their bid, which is

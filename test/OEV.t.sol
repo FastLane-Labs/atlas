@@ -23,9 +23,13 @@ import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 // ETH/USD set to: $2941.02 == 294102000000
 
 contract OEVTest is BaseTest {
+    ChainlinkAtlasWrapperETHUSD public chainlinkAtlasWrapperETHUSD;
     ChainlinkDAppControl public chainlinkDAppControl;
     TxBuilder public txBuilder;
     Sig public sig;
+
+    address chainlinkETHUSD = 0xE62B71cf983019BFf55bC83B48601ce8419650CC;
+    uint256 forkBlock = 19289829; // Block just before the transmit tx above
 
     struct Sig {
         uint8 v;
@@ -35,15 +39,21 @@ contract OEVTest is BaseTest {
 
     function setUp() public virtual override {
         BaseTest.setUp();
+        vm.rollFork(forkBlock);
 
         // Creating new gov address (ERR-V49 OwnerActive if already registered with controller)
         governancePK = 11_112;
         governanceEOA = vm.addr(governancePK);
 
-        // Deploy new SwapIntent Controller from new gov and initialize in Atlas
+        
         vm.startPrank(governanceEOA);
-        chainlinkDAppControl = new ChainlinkDAppControl(address(atlas));
+        // Chainlink's Gov address deploys the Chainlink DAppControl and AtlasWrapper
+        chainlinkAtlasWrapperETHUSD = new ChainlinkAtlasWrapperETHUSD(address(atlas), chainlinkETHUSD);
+        chainlinkDAppControl = new ChainlinkDAppControl(address(atlas), address(chainlinkAtlasWrapperETHUSD));
+
+        // Chainlink's Gov address initializes the Chainlink DAppControl in Atlas, and as a transmitter in the wrapper
         atlasVerification.initializeGovernance(address(chainlinkDAppControl));
+        chainlinkAtlasWrapperETHUSD.setTransmitterStatus(address(chainlinkDAppControl), true);
         vm.stopPrank();
 
         txBuilder = new TxBuilder({
