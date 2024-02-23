@@ -13,7 +13,7 @@ import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
 import { DAppOperation, DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 
 import { ChainlinkDAppControl } from "src/contracts/examples/oev-example/ChainlinkDAppControl.sol";
-import {ChainlinkAtlasWrapperETHUSD, TransmitPayload } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapperETHUSD.sol";
+import {ChainlinkAtlasWrapperETHUSD, TransmitPayload, IChainlinkAggregator } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapperETHUSD.sol";
 import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
 
@@ -25,6 +25,9 @@ import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 contract OEVTest is BaseTest {
     ChainlinkAtlasWrapperETHUSD public chainlinkAtlasWrapperETHUSD;
     ChainlinkDAppControl public chainlinkDAppControl;
+    MockLiquidatable public mockLiquidatable;
+
+
     TxBuilder public txBuilder;
     Sig public sig;
 
@@ -44,7 +47,12 @@ contract OEVTest is BaseTest {
         // Creating new gov address (ERR-V49 OwnerActive if already registered with controller)
         governancePK = 11_112;
         governanceEOA = vm.addr(governancePK);
+        address liquidatableGovEOA = vm.addr(11_113);
 
+        vm.startPrank(liquidatableGovEOA);
+        // Lending protocol liquidations must use the Chainlink Atlas Wrapper for price feed
+        mockLiquidatable = new MockLiquidatable(address(chainlinkAtlasWrapperETHUSD), 294102000000);
+        vm.stopPrank();
         
         vm.startPrank(governanceEOA);
         // Chainlink's Gov address deploys the Chainlink DAppControl and AtlasWrapper
@@ -128,9 +136,7 @@ contract OEVTest is BaseTest {
     }
 }
 
-// This solver magically has the tokens needed to fulfil the user's swap.
-// This might involve an offchain RFQ system
-contract AaveLiquidationOEVSolver is SolverBase {
+contract LiquidationOEVSolver is SolverBase {
     constructor(address weth, address atlas) SolverBase(weth, atlas, msg.sender) { }
 
     // This ensures a function can only be called through metaFlashCall
@@ -142,4 +148,28 @@ contract AaveLiquidationOEVSolver is SolverBase {
 
     fallback() external payable { }
     receive() external payable { }
+}
+
+// Super basic mock to represent a liquidation payout dependent on oracle price
+contract MockLiquidatable {
+
+    address public oracle;
+    uint256 public liquidationPrice;
+
+    constructor(address _oracle, uint256 _liquidationPrice) {
+        oracle = _oracle;
+        liquidationPrice = _liquidationPrice;
+    }
+
+    function liquidate() public {
+        require(canLiquidate(), "Cannot liquidate");
+        
+        payable(msg.sender).call{value: address(this).balance}("");
+    }
+
+    // Can only liquidate if the oracle price is exactly the liquidation price
+    function canLiquidate() public view returns (bool) {
+        return uint256(IChainlinkAggregator(oracle).latestAnswer()) == liquidationPrice;
+    }
+
 }

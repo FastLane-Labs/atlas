@@ -98,6 +98,6 @@ contract ChainlinkDAppControl is DAppControl {
     }
 }
 
-interface ChainlinkAggregator {
+interface IChainlinkAtlasWrapper {
     function transmit(bytes calldata report, bytes32[] calldata rs, bytes32[] calldata ss, bytes32 rawVs) external;
 }
