@@ -75,7 +75,7 @@ contract TxBuilder {
             maxFeePerGas: maxFeePerGas,
             nonce: userNextNonce(from),
             deadline: deadline,
-            dapp: to,
+            dapp: control,
             control: control,
             sessionKey: address(0),
             data: data,
