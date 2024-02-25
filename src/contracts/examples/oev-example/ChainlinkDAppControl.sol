@@ -26,11 +26,11 @@ contract ChainlinkDAppControl is DAppControl {
                 dappNoncesSequenced: false,
                 requirePreOps: false,
                 trackPreOpsReturnData: false,
-                trackUserReturnData: true,
+                trackUserReturnData: false,
                 delegateUser: true,
                 preSolver: false,
                 postSolver: false,
-                requirePostOps: true, // update base oracle in postOps
+                requirePostOps: false,
                 zeroSolvers: false,
                 reuseUserOp: false,
                 userAuctioneer: true,

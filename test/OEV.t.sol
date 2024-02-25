@@ -32,8 +32,9 @@ contract OEVTest is BaseTest {
     TxBuilder public txBuilder;
     Sig public sig;
 
-    address chainlinkETHUSD = 0xE62B71cf983019BFf55bC83B48601ce8419650CC;
+    address chainlinkETHUSD = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
     uint256 forkBlock = 19289829; // Block just before the transmit tx above
+    uint256 targetOracleAnswer = 294102000000;
 
     struct Sig {
         uint8 v;
@@ -50,12 +51,6 @@ contract OEVTest is BaseTest {
         governanceEOA = vm.addr(governancePK);
         address liquidatableGovEOA = vm.addr(11_113);
 
-        vm.startPrank(liquidatableGovEOA);
-        // Lending protocol liquidations must use the Chainlink Atlas Wrapper for price feed
-        mockLiquidatable = new MockLiquidatable(address(chainlinkAtlasWrapperETHUSD), 294102000000);
-        vm.stopPrank();
-        deal(address(mockLiquidatable), 10e18); // Add 10 ETH as liquidation reward
-        
         vm.startPrank(governanceEOA);
         // Chainlink's Gov address deploys the Chainlink DAppControl and AtlasWrapper
         chainlinkAtlasWrapperETHUSD = new ChainlinkAtlasWrapperETHUSD(address(atlas), chainlinkETHUSD);
@@ -66,11 +61,21 @@ contract OEVTest is BaseTest {
         chainlinkAtlasWrapperETHUSD.setTransmitterStatus(address(chainlinkDAppControl), true);
         vm.stopPrank();
 
+        vm.startPrank(liquidatableGovEOA);
+        // Lending protocol liquidations must use the Chainlink Atlas Wrapper for price feed
+        mockLiquidatable = new MockLiquidatable(address(chainlinkAtlasWrapperETHUSD), targetOracleAnswer);
+        vm.stopPrank();
+        deal(address(mockLiquidatable), 10e18); // Add 10 ETH as liquidation reward
+
         txBuilder = new TxBuilder({
             controller: address(chainlinkDAppControl),
             atlasAddress: address(atlas),
             _verification: address(atlasVerification)
         });
+
+        vm.label(address(chainlinkAtlasWrapperETHUSD), "Chainlink Atlas Wrapper");
+        vm.label(address(chainlinkDAppControl), "Chainlink DApp Control");
+        vm.label(address(chainlinkETHUSD), "Chainlink Base ETH/USD Feed");
     }
 
     function testChainlinkOEV() public {
@@ -84,11 +89,8 @@ contract OEVTest is BaseTest {
         atlas.bond(1e18);
         vm.stopPrank();
 
-
         (bytes memory report, bytes32[] memory rs, bytes32[] memory ss, bytes32 rawVs)
             = getTransmitPayload();
-
-        console.logBytes(report);
 
         vm.startPrank(userEOA); // User is a Chainlink Node
         address executionEnvironment = atlas.createExecutionEnvironment(address(chainlinkDAppControl));
@@ -103,6 +105,7 @@ contract OEVTest is BaseTest {
             rawVs
         );
 
+        // TODO change order of ops built here to reflect solverOps built first regardless of userOp changes
         userOp = txBuilder.buildUserOperation({
             from: userEOA,
             to: address(atlas),
@@ -111,6 +114,7 @@ contract OEVTest is BaseTest {
             deadline: block.number + 2,
             data: userOpData
         });
+        userOp.sessionKey = governanceEOA;
 
         bytes memory solverOpData =
             abi.encodeWithSelector(LiquidationOEVSolver.liquidate.selector, address(mockLiquidatable));
@@ -131,9 +135,23 @@ contract OEVTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
+        console.log("Chainlink latestAnswer:", uint(IChainlinkAggregator(chainlinkETHUSD).latestAnswer()));
+
+        assertEq(mockLiquidatable.canLiquidate(), false);
+        assertTrue(uint(chainlinkAtlasWrapperETHUSD.latestAnswer()) !=  targetOracleAnswer);
+
+        console.log("Before:");
+        console.log("Wrapper latest answer:", uint(chainlinkAtlasWrapperETHUSD.latestAnswer()));
+        console.log("Wrapper atlasLatestAnswer", uint(chainlinkAtlasWrapperETHUSD.atlasLatestAnswer()));
+
         vm.startPrank(userEOA);
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
+
+        console.log("After:");
+        console.log("Wrapper latest answer:", uint(chainlinkAtlasWrapperETHUSD.latestAnswer()));
+        console.log("Wrapper atlasLatestAnswer", uint(chainlinkAtlasWrapperETHUSD.atlasLatestAnswer()));
+
 
         // NOTES:
         // - The EE must be whitelisted to post answers to Wrapper and Base oracles
@@ -220,7 +238,6 @@ contract LiquidationOEVSolver is SolverBase {
 
 // Super basic mock to represent a liquidation payout dependent on oracle price
 contract MockLiquidatable {
-
     address public oracle;
     uint256 public liquidationPrice;
 
@@ -237,6 +254,7 @@ contract MockLiquidatable {
 
     // Can only liquidate if the oracle price is exactly the liquidation price
     function canLiquidate() public view returns (bool) {
+        console.log("Checking if liquidatable from:", oracle);
         return uint256(IChainlinkAggregator(oracle).latestAnswer()) == liquidationPrice;
     }
 
