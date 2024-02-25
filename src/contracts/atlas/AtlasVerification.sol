@@ -125,10 +125,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
             // msgSender must be userOp.from or userOp.sessionKey / dappOp.from
             if (!(msgSender == dAppOp.from || msgSender == userOp.from) && !isSimulation) {
-                console.log("msgSender: ", msgSender);
-                console.log("dAppOp.from: ", dAppOp.from);
-                console.log("userOp.from: ", userOp.from);
-                console.log("Here 2");
                 return (userOpHash, ValidCallsResult.InvalidBundler);
             }
         } else {
@@ -355,7 +351,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
             if (!signatories[keccak256(abi.encodePacked(govData.governance, dAppOp.control, msgSender))]) {
                 bool bypassSignatoryCheck = isSimulation && dAppOp.from == address(0);
                 if (!isSimulation) {
-                    console.log("Here 1");
                     return (false, ValidCallsResult.InvalidBundler);
                 }
             }
