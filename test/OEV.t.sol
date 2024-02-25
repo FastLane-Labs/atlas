@@ -97,6 +97,11 @@ contract OEVTest is BaseTest {
         vm.stopPrank();
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
+        vm.startPrank(governanceEOA);
+        // Registed the EE as a trusted transmitter in the Chainlink Atlas Wrapper
+        chainlinkAtlasWrapperETHUSD.setTransmitterStatus(executionEnvironment, true);
+        vm.stopPrank();
+
         bytes memory userOpData = abi.encodeWithSelector(
             chainlinkDAppControl.transmit.selector,
             report,
