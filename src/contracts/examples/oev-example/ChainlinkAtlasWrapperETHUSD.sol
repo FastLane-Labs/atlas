@@ -38,11 +38,10 @@ contract ChainlinkAtlasWrapperETHUSD is Ownable {
     }
 
     // Called by a trusted ExecutionEnvironment during an Atlas metacall
-    function transmit(TransmitPayload memory transmitPayload) external {
+    function transmit(bytes calldata report, bytes32[] calldata rs, bytes32[] calldata ss, bytes32 rawVs) external {
         if (!transmitters[msg.sender]) revert TransmitterNotTrusted(msg.sender);
 
-        int256 answer =
-            _verifyTransmitData(transmitPayload.report, transmitPayload.rs, transmitPayload.ss, transmitPayload.rawVs);
+        int256 answer = _verifyTransmitData(report, rs, ss, rawVs);
 
         atlasLatestAnswer = answer;
         atlasLatestTimestamp = block.timestamp;
@@ -50,10 +49,10 @@ contract ChainlinkAtlasWrapperETHUSD is Ownable {
 
     // Verifies
     function _verifyTransmitData(
-        bytes memory _report,
-        bytes32[] memory _rs,
-        bytes32[] memory _ss,
-        bytes32 _rawVs
+        bytes calldata report,
+        bytes32[] calldata rs,
+        bytes32[] calldata ss,
+        bytes32 rawVs
     )
         internal
         pure
@@ -63,7 +62,7 @@ contract ChainlinkAtlasWrapperETHUSD is Ownable {
         // Need ways to access s_hotVars and s_oracles in the CL ETHUSD contract
 
         ReportData memory r;
-        (,, r.observations) = abi.decode(_report, (bytes32, bytes32, int192[]));
+        (,, r.observations) = abi.decode(report, (bytes32, bytes32, int192[]));
 
         // 1. Check observations are ordered, then take median
         for (uint256 i = 0; i < r.observations.length - 1; ++i) {

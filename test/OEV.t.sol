@@ -7,6 +7,7 @@ import { ERC20 } from "solmate/tokens/ERC20.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
+import { UserOperationBuilder } from "./base/builders/UserOperationBuilder.sol";
 
 import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
 import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
@@ -53,6 +54,7 @@ contract OEVTest is BaseTest {
         // Lending protocol liquidations must use the Chainlink Atlas Wrapper for price feed
         mockLiquidatable = new MockLiquidatable(address(chainlinkAtlasWrapperETHUSD), 294102000000);
         vm.stopPrank();
+        deal(address(mockLiquidatable), 10e18); // Add 10 ETH as liquidation reward
         
         vm.startPrank(governanceEOA);
         // Chainlink's Gov address deploys the Chainlink DAppControl and AtlasWrapper
@@ -72,10 +74,66 @@ contract OEVTest is BaseTest {
     }
 
     function testChainlinkOEV() public {
+        UserOperation memory userOp;
+        SolverOperation[] memory solverOps = new SolverOperation[](1);
+        DAppOperation memory dAppOp;
 
-        TransmitPayload memory transmitPayload = getTransmitPayload();
+        vm.startPrank(solverOneEOA);
+        LiquidationOEVSolver liquidationSolver = new LiquidationOEVSolver(WETH_ADDRESS, address(atlas));
+        atlas.deposit{ value: 1e18 }();
+        atlas.bond(1e18);
+        vm.stopPrank();
 
-        console.logBytes(transmitPayload.report);
+
+        (bytes memory report, bytes32[] memory rs, bytes32[] memory ss, bytes32 rawVs)
+            = getTransmitPayload();
+
+        console.logBytes(report);
+
+        vm.startPrank(userEOA); // User is a Chainlink Node
+        address executionEnvironment = atlas.createExecutionEnvironment(address(chainlinkDAppControl));
+        vm.stopPrank();
+        vm.label(address(executionEnvironment), "EXECUTION ENV");
+
+        bytes memory userOpData = abi.encodeWithSelector(
+            chainlinkDAppControl.transmit.selector,
+            report,
+            rs,
+            ss,
+            rawVs
+        );
+
+        userOp = txBuilder.buildUserOperation({
+            from: userEOA,
+            to: address(atlas),
+            maxFeePerGas: tx.gasprice + 1,
+            value: 0,
+            deadline: block.number + 2,
+            data: userOpData
+        });
+
+        bytes memory solverOpData =
+            abi.encodeWithSelector(LiquidationOEVSolver.liquidate.selector, address(mockLiquidatable));
+
+        solverOps[0] = txBuilder.buildSolverOperation({
+            userOp: userOp,
+            solverOpData: solverOpData,
+            solverEOA: solverOneEOA,
+            solverContract: address(liquidationSolver),
+            bidAmount: 1e18,
+            value: 0
+        });
+
+        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
+        solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
+        (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
+        dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        vm.startPrank(userEOA);
+        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
+        vm.stopPrank();
 
         // NOTES:
         // - The EE must be whitelisted to post answers to Wrapper and Base oracles
@@ -93,7 +151,12 @@ contract OEVTest is BaseTest {
     // ----------------
 
     // Returns calldata taken from a real Chainlink ETH/USD transmit tx
-    function getTransmitPayload() public returns (TransmitPayload memory) {
+    function getTransmitPayload() public returns (
+        bytes memory report,
+        bytes32[] memory rs,
+        bytes32[] memory ss,
+        bytes32 rawVs
+    ) {
         // From this ETHUSD transmit tx: Transmit tx:
         // https://etherscan.io/tx/0x3645d1bc223efe0861e02aeb95d6204c5ebfe268b64a7d23d385520faf452bc0
         // ETHUSD set to: $2941.02 == 294102000000
@@ -127,17 +190,22 @@ contract OEVTest is BaseTest {
         ss[9] = 0x7a1e1d7b9c865b34d966a94e21f0d2c73473a30bf03c1f8eff7b88b5c3183c31;
         ss[10] = 0x2768d43bca650e9a452db41730c4e31b600f5398c49490d66f4065a0b357707f;
 
-        return TransmitPayload({
-            report: report,
-            rs: rs,
-            ss: ss,
-            rawVs: rawVs
-        });
+        return (report, rs, ss, rawVs);
     }
 }
 
 contract LiquidationOEVSolver is SolverBase {
     constructor(address weth, address atlas) SolverBase(weth, atlas, msg.sender) { }
+
+    function liquidate(address liquidatable) public onlySelf {
+        if(MockLiquidatable(liquidatable).canLiquidate()) {
+            console.log("Solver able to liquidate...");
+            MockLiquidatable(liquidatable).liquidate();
+            _owner.call{value: address(this).balance}("");
+        } else {
+            console.log("Solver NOT able to liquidate.");
+        }
+    }
 
     // This ensures a function can only be called through metaFlashCall
     // which includes security checks to work safely with Atlas
@@ -163,7 +231,7 @@ contract MockLiquidatable {
 
     function liquidate() public {
         require(canLiquidate(), "Cannot liquidate");
-        
+        // If liquidated successfully, sends all the ETH in this contract to caller
         payable(msg.sender).call{value: address(this).balance}("");
     }
 

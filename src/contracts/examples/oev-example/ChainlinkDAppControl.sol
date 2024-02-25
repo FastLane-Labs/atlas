@@ -51,22 +51,24 @@ contract ChainlinkDAppControl is DAppControl {
     //////////////////////////////////
 
     // TODO update this to a Chainlink Price Update function
-    function transmit() external payable returns (uint256) { }
+    function transmit(
+        bytes calldata report,
+        bytes32[] calldata rs,
+        bytes32[] calldata ss,
+        bytes32 rawVs
+    )
+        external
+        payable
+        returns (uint256)
+    {
+        // TODO add checks here maybe and fix up function
+        IChainlinkAtlasWrapper(CHAINLINK_WRAPPER).transmit(report, rs, ss, rawVs);
+        return 0;
+    }
 
     //////////////////////////////////
     //   ATLAS OVERRIDE FUNCTIONS   //
     //////////////////////////////////
-
-    function _preSolverCall(bytes calldata data) internal override returns (bool) {
-        (address solverTo,, bytes memory returnData) = abi.decode(data, (address, uint256, bytes));
-        if (solverTo == address(this) || solverTo == _control() || solverTo == escrow) {
-            return false;
-        }
-
-        // TODO add logic here if pre solver phase needed
-
-        return true;
-    }
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
