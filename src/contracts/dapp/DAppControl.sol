@@ -63,24 +63,24 @@ abstract contract DAppControl is Test, DAppControlTemplate, ExecutionBase {
         return _preOpsCall(userOp);
     }
 
-    function preSolverCall(bytes calldata data)
+    function preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData)
         external
         payable
         validControl
         onlyAtlasEnvironment(ExecutionPhase.PreSolver, _CONTROL_DEPTH)
         returns (bool)
     {
-        return _preSolverCall(data);
+        return _preSolverCall(solverOp, returnData);
     }
 
-    function postSolverCall(bytes calldata data)
+    function postSolverCall(SolverOperation calldata solverOp, bytes calldata returnData)
         external
         payable
         validControl
         onlyAtlasEnvironment(ExecutionPhase.PostSolver, _CONTROL_DEPTH)
         returns (bool)
     {
-        return _postSolverCall(data);
+        return _postSolverCall(solverOp, returnData);
     }
 
     function allocateValueCall(

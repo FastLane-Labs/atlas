@@ -46,24 +46,22 @@ contract DummyDAppControl is DAppControl {
         return true;
     }
 
-    function _preSolverCall(bytes calldata data) internal pure virtual override returns (bool) {
-        if (data.length == 0) {
+    function _preSolverCall(SolverOperation calldata, bytes calldata returnData) internal pure virtual override returns (bool) {
+        if (returnData.length == 0) {
             return true;
         }
 
-        (,, bytes memory dAppReturnData) = abi.decode(data, (address, uint256, bytes));
-        (bool shouldRevert, bool returnValue) = abi.decode(dAppReturnData, (bool, bool));
+        (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
         require(!shouldRevert, "_preSolverCall revert requested");
         return returnValue;
     }
 
-    function _postSolverCall(bytes calldata data) internal pure virtual override returns (bool) {
-        if (data.length == 0) {
+    function _postSolverCall(SolverOperation calldata, bytes calldata returnData) internal pure virtual override returns (bool) {
+        if (returnData.length == 0) {
             return true;
         }
 
-        (,, bytes memory dAppReturnData) = abi.decode(data, (address, uint256, bytes));
-        (bool shouldRevert, bool returnValue) = abi.decode(dAppReturnData, (bool, bool));
+        (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
         require(!shouldRevert, "_postSolverCall revert requested");
         return returnValue;
     }

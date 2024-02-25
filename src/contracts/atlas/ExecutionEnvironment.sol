@@ -169,9 +169,8 @@ contract ExecutionEnvironment is Base {
 
         // Handle any solver preOps, if necessary
         if (_config().needsPreSolver()) {
-            bytes memory data = abi.encode(solverOp.solver, solverOp.bidAmount, dAppReturnData);
-
-            data = abi.encodeWithSelector(IDAppControl.preSolverCall.selector, data);
+            bytes memory data = abi.encodeWithSelector(
+                IDAppControl.preSolverCall.selector, solverOp, dAppReturnData);
 
             (success, data) = _control().delegatecall(forwardSpecial(data, ExecutionPhase.PreSolver));
 
@@ -203,11 +202,9 @@ contract ExecutionEnvironment is Base {
 
         // If this was a user intent, handle and verify fulfillment
         if (_config().needsSolverPostCall()) {
-            bytes memory data = dAppReturnData;
 
-            data = abi.encode(solverOp.solver, solverOp.bidAmount, data);
-
-            data = abi.encodeWithSelector(IDAppControl.postSolverCall.selector, data);
+            bytes memory data = abi.encodeWithSelector(
+                IDAppControl.postSolverCall.selector, solverOp, dAppReturnData);
 
             (success, data) = _control().delegatecall(forwardSpecial(data, ExecutionPhase.PostSolver));
 

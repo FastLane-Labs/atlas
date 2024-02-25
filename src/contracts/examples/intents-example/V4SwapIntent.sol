@@ -151,8 +151,8 @@ contract V4SwapIntentController is DAppControl {
     //   ATLAS OVERRIDE FUNCTIONS   //
     //////////////////////////////////
 
-    function _preSolverCall(bytes calldata data) internal override returns (bool) {
-        (address solverTo, uint256 solverBid, bytes memory returnData) = abi.decode(data, (address, uint256, bytes));
+    function _preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override returns (bool) {
+        address solverTo = solverOp.solver;
         if (solverTo == address(this) || solverTo == _control() || solverTo == escrow) {
             return false;
         }
@@ -167,7 +167,7 @@ contract V4SwapIntentController is DAppControl {
         } else {
             // exact output
             startingBalance = ERC20(swapData.tokenOut).balanceOf(V4_POOL);
-            _transferUserERC20(swapData.tokenIn, solverTo, swapData.limitAmount - solverBid);
+            _transferUserERC20(swapData.tokenIn, solverTo, swapData.limitAmount - solverOp.bidAmount);
             // For exact output swaps, the solver solvers compete and bid on how much tokens they can
             // return to the user in excess of their specified limit input. We only transfer what they
             // require to make the swap in this step.
@@ -179,9 +179,8 @@ contract V4SwapIntentController is DAppControl {
     }
 
     // Checking intent was fulfilled, and user has received their tokens, happens here
-    function _postSolverCall(bytes calldata data) internal override returns (bool) {
-        (, uint256 solverBid, bytes memory returnData) = abi.decode(data, (address, uint256, bytes));
-
+    function _postSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override returns (bool) {
+      
         SwapData memory swapData = abi.decode(returnData, (SwapData));
 
         uint256 buyTokenBalance = ERC20(swapData.tokenOut).balanceOf(address(this));
@@ -196,7 +195,7 @@ contract V4SwapIntentController is DAppControl {
             if (buyTokenBalance < swapData.limitAmount) {
                 return false; // insufficient amount out
             }
-            if (buyTokenBalance < solverBid) {
+            if (buyTokenBalance < solverOp.bidAmount) {
                 return false; // does not meet solver bid
             }
             uint256 endingBalance = ERC20(swapData.tokenIn).balanceOf(V4_POOL);

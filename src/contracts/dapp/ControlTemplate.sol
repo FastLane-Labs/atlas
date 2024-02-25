@@ -80,7 +80,7 @@ abstract contract DAppControlTemplate {
     //      and is designed to give the solver everything they need to fulfill
     //      the user's 'intent.'
 
-    function _preSolverCall(bytes calldata) internal virtual returns (bool) {
+    function _preSolverCall(SolverOperation calldata, bytes calldata) internal virtual returns (bool) {
         revert(_NOT_IMPLEMENTED);
     }
 
@@ -102,7 +102,7 @@ abstract contract DAppControlTemplate {
     //      and is designed to make sure that the solver is fulfilling
     //      the user's 'intent.'
 
-    function _postSolverCall(bytes calldata) internal virtual returns (bool) {
+    function _postSolverCall(SolverOperation calldata, bytes calldata) internal virtual returns (bool) {
         revert(_NOT_IMPLEMENTED);
     }
 
