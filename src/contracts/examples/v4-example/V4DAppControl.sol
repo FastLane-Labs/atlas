@@ -72,7 +72,8 @@ contract V4DAppControl is DAppControl {
                 verifyCallChainHash: true,
                 forwardReturnData: false,
                 requireFulfillment: true,
-                trustedOpHash: false
+                trustedOpHash: false,
+                bypassBidPaymentCheck: false
             })
         )
     {

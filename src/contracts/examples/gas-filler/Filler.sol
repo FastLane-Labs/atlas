@@ -91,18 +91,19 @@ contract Filler is DAppControl {
                 verifyCallChainHash: true,
                 forwardReturnData: true,
                 requireFulfillment: true,
-                trustedOpHash: false
+                trustedOpHash: false,
+                bypassBidPaymentCheck: true
             })
         )
     { }
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
+    function _allocateValueCall(address, uint256 bidAmount, bytes calldata) internal override {
        // NOTE: gas value xferred to user in postSolverCall
        // Pay the solver (since auction is reversed)
        // Address Pointer = winning solver. 
-        ERC20(bidToken).safeTransfer(_addressPointer(), bidAmount);
+        SafeTransferLib.safeTransferETH(_user(), bidAmount);
     }
 
     function _preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override returns (bool) {
@@ -117,10 +118,7 @@ contract Filler is DAppControl {
         if (solverOp.bidAmount > maxTokenAmount) return false;
         if (solverOp.bidToken != approvalToken) return false;
 
-        // NOTE: We can't optimistically transfer the solver contract the tokens because that'll
-        // force the solverWrapper balance check to fail. 
-        // TODO: atlas v2 o.O
-        _transferDAppERC20(approvalToken, address(this), solverOp.bidAmount);
+        _transferDAppERC20(approvalToken, solverOp.solver, solverOp.bidAmount);
 
         return true;
     }
@@ -137,9 +135,6 @@ contract Filler is DAppControl {
 
         (bool success, ) = _control().call(forward(data));
         require(success, "HITTING THIS = JOB OFFER");
-
-        SafeTransferLib.safeTransferETH(_user(), gasNeeded);
-        // NOTE: surplus this.balance goes towards paying for this tx
 
         return true;
     }
@@ -210,7 +205,6 @@ contract Filler is DAppControl {
         // NOTE: approvalTx.data includes func selector
 
         require(success, "ERR - REJECTED");
-        require(IERC20(approvalToken).balanceOf(address(this)) > 0, "ERR - NO TRANSFER");
 
         return abi.decode(returnData, (bytes));
     }

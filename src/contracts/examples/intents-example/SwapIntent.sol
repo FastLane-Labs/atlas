@@ -75,7 +75,8 @@ contract SwapIntentController is DAppControl {
                 verifyCallChainHash: true,
                 forwardReturnData: false,
                 requireFulfillment: true,
-                trustedOpHash: false
+                trustedOpHash: false,
+                bypassBidPaymentCheck: false
             })
         )
     { }

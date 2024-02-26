@@ -69,7 +69,8 @@ contract V2DAppControl is DAppControl {
                 verifyCallChainHash: true,
                 forwardReturnData: false,
                 requireFulfillment: false,
-                trustedOpHash: false
+                trustedOpHash: false,
+                bypassBidPaymentCheck: false
             })
         )
     {
