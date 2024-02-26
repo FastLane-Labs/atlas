@@ -50,34 +50,12 @@ contract ChainlinkDAppControl is DAppControl {
     // CONTRACT-SPECIFIC FUNCTIONS  //
     //////////////////////////////////
 
-    // TODO update this to a Chainlink Price Update function
-    function transmit(
-        bytes calldata report,
-        bytes32[] calldata rs,
-        bytes32[] calldata ss,
-        bytes32 rawVs
-    )
-        external
-        payable
-        returns (uint256)
-    {
-        // TODO add checks here maybe and fix up function
+    function transmit(bytes calldata report, bytes32[] calldata rs, bytes32[] calldata ss, bytes32 rawVs) external {
         IChainlinkAtlasWrapper(CHAINLINK_WRAPPER).transmit(report, rs, ss, rawVs);
-        return 0;
     }
 
-    //////////////////////////////////
-    //   ATLAS OVERRIDE FUNCTIONS   //
-    //////////////////////////////////
-
-    // This occurs after a Solver has successfully paid their bid, which is
-    // held in ExecutionEnvironment.
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
-        // This function is delegatecalled
-        // address(this) = ExecutionEnvironment
-        // msg.sender = Escrow
-
-        // TODO add logic here if custom logic needed at value allocation time
+    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) internal virtual override {
+        // TODO send ETH bid to Chainlink or Protocol that created liquidation opportunity
     }
 
     /////////////////////////////////////////////////////////
@@ -86,12 +64,7 @@ contract ChainlinkDAppControl is DAppControl {
     // NOTE: These are not delegatecalled
 
     function getBidFormat(UserOperation calldata userOp) public pure override returns (address bidToken) {
-        // This is a helper function called by solvers
-        // so that they can get the proper format for
-        // submitting their bids to the hook.
-
-        // TODO add bid format - LINK token?
-
+        // Address(0) --> ETH is bid token
         return address(0);
     }
 

@@ -35,6 +35,7 @@ contract OEVTest is BaseTest {
     address chainlinkETHUSD = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
     uint256 forkBlock = 19289829; // Block just before the transmit tx above
     uint256 targetOracleAnswer = 294102000000;
+    uint256 liquidationReward = 10e18;
 
     struct Sig {
         uint8 v;
@@ -65,7 +66,7 @@ contract OEVTest is BaseTest {
         // Lending protocol liquidations must use the Chainlink Atlas Wrapper for price feed
         mockLiquidatable = new MockLiquidatable(address(chainlinkAtlasWrapperETHUSD), targetOracleAnswer);
         vm.stopPrank();
-        deal(address(mockLiquidatable), 10e18); // Add 10 ETH as liquidation reward
+        deal(address(mockLiquidatable), liquidationReward); // Add 10 ETH as liquidation reward
 
         txBuilder = new TxBuilder({
             controller: address(chainlinkDAppControl),
@@ -102,22 +103,14 @@ contract OEVTest is BaseTest {
         chainlinkAtlasWrapperETHUSD.setTransmitterStatus(executionEnvironment, true);
         vm.stopPrank();
 
-        bytes memory userOpData = abi.encodeWithSelector(
-            chainlinkDAppControl.transmit.selector,
-            report,
-            rs,
-            ss,
-            rawVs
-        );
-
-        // TODO change order of ops built here to reflect solverOps built first regardless of userOp changes
+        // Basic userOp created but excludes oracle price update data
         userOp = txBuilder.buildUserOperation({
             from: userEOA,
             to: address(atlas),
             maxFeePerGas: tx.gasprice + 1,
             value: 0,
             deadline: block.number + 2,
-            data: userOpData
+            data: "" // No userOp.data yet - only created after solverOps are signed
         });
         userOp.sessionKey = governanceEOA;
 
@@ -135,6 +128,15 @@ contract OEVTest is BaseTest {
 
         (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        // After solvers have signed their ops, Chainlink creates the userOp with price update data
+        userOp.data = abi.encodeWithSelector(
+            chainlinkDAppControl.transmit.selector,
+            report,
+            rs,
+            ss,
+            rawVs
+        );
 
         dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
@@ -155,17 +157,7 @@ contract OEVTest is BaseTest {
 
         console.log("After:");
         console.log("Wrapper latest answer:", uint(chainlinkAtlasWrapperETHUSD.latestAnswer()));
-        console.log("Wrapper atlasLatestAnswer", uint(chainlinkAtlasWrapperETHUSD.atlasLatestAnswer()));
-
-
-        // NOTES:
-        // - The EE must be whitelisted to post answers to Wrapper and Base oracles
-
-        // Inside Atlas.metacall:
-        // 1. userOp - updates the oracle wrapper with new int256
-        // 2. solverOps - capture OEV by liquidating things that use the oracle wrapper
-        // 3. postOpsCall - update the base chainlink oracle with signed `transmit` data
-        
+        console.log("Wrapper atlasLatestAnswer", uint(chainlinkAtlasWrapperETHUSD.atlasLatestAnswer()));        
     }
 
 
@@ -218,16 +210,20 @@ contract OEVTest is BaseTest {
 }
 
 contract LiquidationOEVSolver is SolverBase {
+    error NotSolverOwner();
     constructor(address weth, address atlas) SolverBase(weth, atlas, msg.sender) { }
 
     function liquidate(address liquidatable) public onlySelf {
         if(MockLiquidatable(liquidatable).canLiquidate()) {
-            console.log("Solver able to liquidate...");
             MockLiquidatable(liquidatable).liquidate();
-            _owner.call{value: address(this).balance}("");
         } else {
             console.log("Solver NOT able to liquidate.");
         }
+    }
+
+    function withdrawETH() public {
+        if(msg.sender != _owner) revert NotSolverOwner();
+        payable(msg.sender).call{value: address(this).balance}("");
     }
 
     // This ensures a function can only be called through metaFlashCall
@@ -259,8 +255,6 @@ contract MockLiquidatable {
 
     // Can only liquidate if the oracle price is exactly the liquidation price
     function canLiquidate() public view returns (bool) {
-        console.log("Checking if liquidatable from:", oracle);
         return uint256(IChainlinkAggregator(oracle).latestAnswer()) == liquidationPrice;
     }
-
 }
