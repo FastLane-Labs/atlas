@@ -66,7 +66,6 @@ contract TxBuilder {
         view
         returns (UserOperation memory userOp)
     {
-        userOp.to = atlas;
         userOp = UserOperation({
             from: from,
             to: atlas,
@@ -75,7 +74,7 @@ contract TxBuilder {
             maxFeePerGas: maxFeePerGas,
             nonce: userNextNonce(from),
             deadline: deadline,
-            dapp: control,
+            dapp: to,
             control: control,
             sessionKey: address(0),
             data: data,
