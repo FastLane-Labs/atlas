@@ -131,4 +131,8 @@ contract DAppIntegration {
         if (govData.lastUpdate == 0) revert AtlasErrors.DAppNotEnabled();
         governanceAddress = govData.governance;
     }
+
+    function getDAppSignatories(address dAppControl) external view returns (address[] memory) {
+        return dAppSignatories[dAppControl];
+    }
 }
