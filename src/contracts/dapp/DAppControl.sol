@@ -63,7 +63,10 @@ abstract contract DAppControl is Test, DAppControlTemplate, ExecutionBase {
         return _preOpsCall(userOp);
     }
 
-    function preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData)
+    function preSolverCall(
+        SolverOperation calldata solverOp,
+        bytes calldata returnData
+    )
         external
         payable
         validControl
@@ -73,7 +76,10 @@ abstract contract DAppControl is Test, DAppControlTemplate, ExecutionBase {
         return _preSolverCall(solverOp, returnData);
     }
 
-    function postSolverCall(SolverOperation calldata solverOp, bytes calldata returnData)
+    function postSolverCall(
+        SolverOperation calldata solverOp,
+        bytes calldata returnData
+    )
         external
         payable
         validControl

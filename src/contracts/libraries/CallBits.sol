@@ -168,6 +168,7 @@ library CallBits {
     function allowsTrustedOpHash(uint32 callConfig) internal pure returns (bool) {
         return (callConfig & 1 << uint32(CallConfigIndex.TrustedOpHash) != 0);
     }
+
     function bypassesBidPaymentCheck(uint32 callConfig) internal pure returns (bool) {
         return (callConfig & 1 << uint32(CallConfigIndex.BypassBidPaymentCheck) != 0);
     }

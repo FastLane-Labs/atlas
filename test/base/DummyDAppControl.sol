@@ -46,7 +46,16 @@ contract DummyDAppControl is DAppControl {
         return true;
     }
 
-    function _preSolverCall(SolverOperation calldata, bytes calldata returnData) internal pure virtual override returns (bool) {
+    function _preSolverCall(
+        SolverOperation calldata,
+        bytes calldata returnData
+    )
+        internal
+        pure
+        virtual
+        override
+        returns (bool)
+    {
         if (returnData.length == 0) {
             return true;
         }
@@ -56,7 +65,16 @@ contract DummyDAppControl is DAppControl {
         return returnValue;
     }
 
-    function _postSolverCall(SolverOperation calldata, bytes calldata returnData) internal pure virtual override returns (bool) {
+    function _postSolverCall(
+        SolverOperation calldata,
+        bytes calldata returnData
+    )
+        internal
+        pure
+        virtual
+        override
+        returns (bool)
+    {
         if (returnData.length == 0) {
             return true;
         }

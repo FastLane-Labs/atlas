@@ -152,7 +152,14 @@ contract V4SwapIntentController is DAppControl {
     //   ATLAS OVERRIDE FUNCTIONS   //
     //////////////////////////////////
 
-    function _preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override returns (bool) {
+    function _preSolverCall(
+        SolverOperation calldata solverOp,
+        bytes calldata returnData
+    )
+        internal
+        override
+        returns (bool)
+    {
         address solverTo = solverOp.solver;
         if (solverTo == address(this) || solverTo == _control() || solverTo == escrow) {
             return false;
@@ -180,8 +187,14 @@ contract V4SwapIntentController is DAppControl {
     }
 
     // Checking intent was fulfilled, and user has received their tokens, happens here
-    function _postSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override returns (bool) {
-      
+    function _postSolverCall(
+        SolverOperation calldata solverOp,
+        bytes calldata returnData
+    )
+        internal
+        override
+        returns (bool)
+    {
         SwapData memory swapData = abi.decode(returnData, (SwapData));
 
         uint256 buyTokenBalance = ERC20(swapData.tokenOut).balanceOf(address(this));

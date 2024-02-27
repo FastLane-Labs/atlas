@@ -25,11 +25,7 @@ interface IERC20 {
     function approve(address spender, uint256 amount) external returns (bool);
     function balanceOf(address account) external view returns (uint256);
     function transfer(address to, uint256 amount) external returns (bool);
-    function transferFrom(
-        address from,
-        address to,
-        uint256 amount
-    ) external returns (bool);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
 }
 
 contract Filler is DAppControl {
@@ -69,7 +65,10 @@ contract Filler is DAppControl {
     address public userLock;
     bytes32 public hashLock;
 
-    constructor(address _escrow, address _wrappedGasToken)
+    constructor(
+        address _escrow,
+        address _wrappedGasToken
+    )
         DAppControl(
             _escrow,
             msg.sender,
@@ -100,20 +99,26 @@ contract Filler is DAppControl {
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
     function _allocateValueCall(address, uint256 bidAmount, bytes calldata) internal override {
-       // NOTE: gas value xferred to user in postSolverCall
-       // Pay the solver (since auction is reversed)
-       // Address Pointer = winning solver. 
+        // NOTE: gas value xferred to user in postSolverCall
+        // Pay the solver (since auction is reversed)
+        // Address Pointer = winning solver.
         SafeTransferLib.safeTransferETH(_user(), bidAmount);
     }
 
-    function _preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override returns (bool) {
+    function _preSolverCall(
+        SolverOperation calldata solverOp,
+        bytes calldata returnData
+    )
+        internal
+        override
+        returns (bool)
+    {
         address solverTo = solverOp.solver;
         if (solverTo == address(this) || solverTo == _control() || solverTo == escrow) {
             return false;
         }
 
-        (address approvalToken, uint256 maxTokenAmount, ) = abi.decode(
-            returnData, (address, uint256, uint256));
+        (address approvalToken, uint256 maxTokenAmount,) = abi.decode(returnData, (address, uint256, uint256));
 
         if (solverOp.bidAmount > maxTokenAmount) return false;
         if (solverOp.bidToken != approvalToken) return false;
@@ -123,22 +128,25 @@ contract Filler is DAppControl {
         return true;
     }
 
-    function _postSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override returns (bool) {
+    function _postSolverCall(
+        SolverOperation calldata solverOp,
+        bytes calldata returnData
+    )
+        internal
+        override
+        returns (bool)
+    {
+        (, uint256 maxTokenAmount, uint256 gasNeeded) = abi.decode(returnData, (address, uint256, uint256));
 
-        (, uint256 maxTokenAmount, uint256 gasNeeded) = abi.decode(
-            returnData, (address, uint256, uint256));
-        
         require(address(this).balance >= gasNeeded, "ERR - EXISTING GAS BALANCE");
 
-        bytes memory data = abi.encodeWithSelector(
-            this.postOpBalancing.selector, maxTokenAmount - solverOp.bidAmount);
+        bytes memory data = abi.encodeWithSelector(this.postOpBalancing.selector, maxTokenAmount - solverOp.bidAmount);
 
-        (bool success, ) = _control().call(forward(data));
+        (bool success,) = _control().call(forward(data));
         require(success, "HITTING THIS = JOB OFFER");
 
         return true;
     }
-
 
     ///////////////// GETTERS & HELPERS // //////////////////
 
@@ -152,10 +160,9 @@ contract Filler is DAppControl {
 
     function getBidValue(SolverOperation calldata solverOp) public pure override returns (uint256) {
         // NOTE: This is just for sorting
-        // Invert the amounts - less = more. 
+        // Invert the amounts - less = more.
         return type(uint256).max - solverOp.bidAmount;
     }
-
 
     ///////////////////// DAPP STUFF ///////////////////////
 
@@ -167,7 +174,7 @@ contract Filler is DAppControl {
         prepaid = prepaidAmount;
     }
 
-    // FUN AND TOTALLY UNNECESSARY MIND WORM 
+    // FUN AND TOTALLY UNNECESSARY MIND WORM
     // (BUT IT HELPS WITH MENTALLY GROKKING THE FLOW)
     function approve(bytes calldata data) external returns (bytes memory) {
         // CASE: Base call
@@ -175,13 +182,12 @@ contract Filler is DAppControl {
             require(address(this) != _control(), "ERR - NOT DELEGATED");
             return _innerApprove(data);
 
-        
-        // CASE: Nested call from Atlas EE
+            // CASE: Nested call from Atlas EE
         } else if (msg.sender == ISafetyLocks(atlas).activeEnvironment()) {
             require(address(this) == _control(), "ERR - INVALID CONTROL");
             return _outerApprove(data);
 
-        // CASE: Non-Atlas external call
+            // CASE: Non-Atlas external call
         } else {
             require(address(this) == _control(), "ERR - INVALID CONTROL");
             _externalApprove(data);
@@ -198,8 +204,7 @@ contract Filler is DAppControl {
         require(address(this).balance == 0, "ERR - EXISTING GAS BALANCE");
 
         // TODO: use assembly (current impl is a lazy way to grab the approval tx data)
-        bytes memory data = abi.encodeWithSelector(
-            this.approve.selector, bytes.concat(approvalTx.data, data));
+        bytes memory data = abi.encodeWithSelector(this.approve.selector, bytes.concat(approvalTx.data, data));
 
         (bool success, bytes memory returnData) = _control().call(forward(data));
         // NOTE: approvalTx.data includes func selector
@@ -210,16 +215,15 @@ contract Filler is DAppControl {
     }
 
     function _outerApprove(bytes calldata data) internal returns (bytes memory) {
-
-        (address spender, uint256 amount, uint256 gasNeeded, ApprovalTx memory approvalTx) = abi.decode(
-            data[4:], (address, uint256, uint256, ApprovalTx));
+        (address spender, uint256 amount, uint256 gasNeeded, ApprovalTx memory approvalTx) =
+            abi.decode(data[4:], (address, uint256, uint256, ApprovalTx));
 
         address user = _user();
         address approvalToken = approvalTx.to;
 
         require(user.code.length == 0, "ERR - NOT FOR SMART ACCOUNTS"); // NOTE shouldn't be necessary b/c sig check
         // but might change sig check in future versions to support smart accounts, in which case revisit safety
-        // checks at this stage. 
+        // checks at this stage.
 
         require(spender == address(this), "ERR - INVALID SPENDER");
         require(IERC20(approvalToken).allowance(user, address(this)) == 0, "ERR - EXISTING APPROVAL");
@@ -238,8 +242,8 @@ contract Filler is DAppControl {
         owed = amount;
 
         // IERC20(approvalToken).transfer(msg.sender, amount);
-        // NOTE: We handle the token xfers with dapp-side permit69 
-    
+        // NOTE: We handle the token xfers with dapp-side permit69
+
         return abi.encode(approvalToken, amount, gasNeeded);
     }
 
@@ -265,7 +269,7 @@ contract Filler is DAppControl {
 
         uint256 allowance = IERC20(approvalToken).allowance(_user, address(this));
         require(allowance >= _owed - _prepaid, "ERR - ALLOWANCE TOO LOW");
-        
+
         // use up the entire allowance
         IERC20(approvalToken).transferFrom(_user, address(this), allowance);
 
@@ -279,19 +283,22 @@ contract Filler is DAppControl {
         delete prepaid;
     }
 
-    function _decodeRawData(bytes calldata data) internal pure returns (uint256 gasNeeded, ApprovalTx memory approvalTx) {
+    function _decodeRawData(bytes calldata data)
+        internal
+        pure
+        returns (uint256 gasNeeded, ApprovalTx memory approvalTx)
+    {
         // BELOW HERE IS WRONG - TODO: COMPLETE
         (gasNeeded, approvalTx) = abi.decode(data, (uint256, ApprovalTx));
         address signer = _user();
         // TODO: NEED TO SIG VERIFY JUST approvalTx
         // ABOVE HERE IS WRONG - TODO: COMPLETE
 
-        require (signer == _user(), "ERR - INVALID SIGNER");
+        require(signer == _user(), "ERR - INVALID SIGNER");
     }
 
     function _getApprovalTxHash(ApprovalTx memory approvalTx) internal returns (bytes32) {
         // TODO: this is wrong
         return keccak256(abi.encode(approvalTx));
     }
-
 }

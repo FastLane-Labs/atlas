@@ -173,8 +173,7 @@ contract ExecutionEnvironment is Base {
 
         // Handle any solver preOps, if necessary
         if (config.needsPreSolver()) {
-            bytes memory data = abi.encodeWithSelector(
-                IDAppControl.preSolverCall.selector, solverOp, dAppReturnData);
+            bytes memory data = abi.encodeWithSelector(IDAppControl.preSolverCall.selector, solverOp, dAppReturnData);
 
             (success, data) = control.delegatecall(forwardSpecial(data, ExecutionPhase.PreSolver));
 
@@ -206,9 +205,7 @@ contract ExecutionEnvironment is Base {
 
         // If this was a user intent, handle and verify fulfillment
         if (config.needsSolverPostCall()) {
-
-            bytes memory data = abi.encodeWithSelector(
-                IDAppControl.postSolverCall.selector, solverOp, dAppReturnData);
+            bytes memory data = abi.encodeWithSelector(IDAppControl.postSolverCall.selector, solverOp, dAppReturnData);
 
             (success, data) = control.delegatecall(forwardSpecial(data, ExecutionPhase.PostSolver));
 
@@ -224,7 +221,8 @@ contract ExecutionEnvironment is Base {
 
         if (!config.bypassesBidPaymentCheck()) {
             // Verify that the solver paid what they bid
-            uint256 balance = etherIsBidToken ? address(this).balance : ERC20(solverOp.bidToken).balanceOf(address(this));
+            uint256 balance =
+                etherIsBidToken ? address(this).balance : ERC20(solverOp.bidToken).balanceOf(address(this));
 
             if (balance < bidBalance + solverOp.bidAmount) {
                 revert AtlasErrors.SolverBidUnpaid();
