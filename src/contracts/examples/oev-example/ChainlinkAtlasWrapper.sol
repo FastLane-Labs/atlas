@@ -41,13 +41,24 @@ contract ChainlinkAtlasWrapper is Ownable {
     }
 
     // Called by a trusted ExecutionEnvironment during an Atlas metacall
-    function transmit(bytes calldata report, bytes32[] calldata rs, bytes32[] calldata ss, bytes32 rawVs) external {
+    // Returns address of this contract - used in allocateValueCall for OEV allocation
+    function transmit(
+        bytes calldata report,
+        bytes32[] calldata rs,
+        bytes32[] calldata ss,
+        bytes32 rawVs
+    )
+        external
+        returns (address)
+    {
         if (!transmitters[msg.sender]) revert TransmitterNotTrusted(msg.sender);
 
         int256 answer = _verifyTransmitData(report, rs, ss, rawVs);
 
         atlasLatestAnswer = answer;
         atlasLatestTimestamp = block.timestamp;
+
+        return address(this);
     }
 
     // Verifies
@@ -96,6 +107,9 @@ contract ChainlinkAtlasWrapper is Ownable {
     function withdrawERC20(address token, address recipient) external onlyOwner {
         SafeERC20.safeTransfer(IERC20(token), recipient, IERC20(token).balanceOf(address(this)));
     }
+
+    fallback() external payable { }
+    receive() external payable { }
 }
 
 // -----------------------------------------------

@@ -16,6 +16,7 @@ import "forge-std/Test.sol";
 // and as a factory for ChainlinkAtlasWrapper contracts
 contract ChainlinkDAppControl is DAppControl {
     error InvalidBaseFeed();
+    error FailedToAllocateOEV();
 
     event NewChainlinkWrapperCreated(address indexed wrapper, address indexed baseFeed, address indexed owner);
 
@@ -28,7 +29,7 @@ contract ChainlinkDAppControl is DAppControl {
                 dappNoncesSequenced: false,
                 requirePreOps: false,
                 trackPreOpsReturnData: false,
-                trackUserReturnData: false, //TODO return address here
+                trackUserReturnData: true,
                 delegateUser: false,
                 preSolver: false,
                 postSolver: false,
@@ -51,7 +52,9 @@ contract ChainlinkDAppControl is DAppControl {
     //////////////////////////////////
 
     function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) internal virtual override {
-        // TODO need to get userOp.dapp address to here to allocate OEV to wrapper
+        address chainlinkWrapper = abi.decode(data, (address));
+        (bool success,) = chainlinkWrapper.call{ value: bidAmount }("");
+        if (!success) revert FailedToAllocateOEV();
     }
 
     /////////////////////////////////////////////////////////

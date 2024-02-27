@@ -37,6 +37,7 @@ contract OEVTest is BaseTest {
     uint256 forkBlock = 19289829; // Block just before the transmit tx above
     uint256 targetOracleAnswer = 294102000000;
     uint256 liquidationReward = 10e18;
+    uint256 solverWinningBid = 1e18;
 
     struct Sig {
         uint8 v;
@@ -63,7 +64,7 @@ contract OEVTest is BaseTest {
 
         vm.startPrank(aaveGovEOA);
         // Aave creates a Chainlink Atlas Wrapper for ETH/USD to capture OEV
-        chainlinkAtlasWrapper = ChainlinkAtlasWrapper(chainlinkDAppControl.createNewChainlinkAtlasWrapper(address(chainlinkETHUSD)));
+        chainlinkAtlasWrapper = ChainlinkAtlasWrapper(payable(chainlinkDAppControl.createNewChainlinkAtlasWrapper(chainlinkETHUSD)));
         // OEV-generating protocols must use the Chainlink Atlas Wrapper for price feed in order to capture the OEV
         mockLiquidatable = new MockLiquidatable(address(chainlinkAtlasWrapper), targetOracleAnswer);
         // Aave sets the Chainlink Execution Environment as a trusted transmitter in the Chainlink Atlas Wrapper
@@ -128,7 +129,7 @@ contract OEVTest is BaseTest {
             solverOpData: solverOpData,
             solverEOA: solverOneEOA,
             solverContract: address(liquidationSolver),
-            bidAmount: 1e18,
+            bidAmount: solverWinningBid,
             value: 0
         });
 
@@ -142,24 +143,18 @@ contract OEVTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-        console.log("Chainlink latestAnswer:", uint(IChainlinkFeed(chainlinkETHUSD).latestAnswer()));
-
         assertEq(mockLiquidatable.canLiquidate(), false);
-        assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) !=  targetOracleAnswer);
-
-        console.log("Before:");
-        console.log("Wrapper latest answer:", uint(chainlinkAtlasWrapper.latestAnswer()));
-        console.log("Wrapper atlasLatestAnswer", uint(chainlinkAtlasWrapper.atlasLatestAnswer()));
+        assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) !=  targetOracleAnswer, "Wrapper answer should not be target yet");
+        assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), uint(IChainlinkFeed(chainlinkETHUSD).latestAnswer()), "Wrapper and base feed should report same answer");
+        assertEq(address(chainlinkAtlasWrapper).balance, 0, "Wrapper should not have any ETH");
 
         vm.startPrank(userEOA);
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
 
-        console.log("After:");
-        console.log("Wrapper latest answer:", uint(chainlinkAtlasWrapper.latestAnswer()));
-        console.log("Wrapper atlasLatestAnswer", uint(chainlinkAtlasWrapper.atlasLatestAnswer())); 
-
-        assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), targetOracleAnswer, "Wrapper did not update as expected");       
+        assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), targetOracleAnswer, "Wrapper did not update as expected");
+        assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) != uint(IChainlinkFeed(chainlinkETHUSD).latestAnswer()), "Wrapper and base feed should report different answers");
+        assertEq(address(chainlinkAtlasWrapper).balance, solverWinningBid, "Wrapper should hold winning bid as OEV");
     }
 
 
