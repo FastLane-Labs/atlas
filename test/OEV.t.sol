@@ -14,7 +14,7 @@ import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
 import { DAppOperation, DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 
 import { ChainlinkDAppControl } from "src/contracts/examples/oev-example/ChainlinkDAppControl.sol";
-import {ChainlinkAtlasWrapperETHUSD, TransmitPayload, IChainlinkAggregator } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapperETHUSD.sol";
+import {ChainlinkAtlasWrapper, IChainlinkAggregator } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapper.sol";
 import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
 
@@ -24,13 +24,14 @@ import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 // ETH/USD set to: $2941.02 == 294102000000
 
 contract OEVTest is BaseTest {
-    ChainlinkAtlasWrapperETHUSD public chainlinkAtlasWrapperETHUSD;
+    ChainlinkAtlasWrapper public chainlinkAtlasWrapper;
     ChainlinkDAppControl public chainlinkDAppControl;
     MockLiquidatable public mockLiquidatable;
-
-
     TxBuilder public txBuilder;
     Sig public sig;
+
+    address chainlinkGovEOA;
+    address aaveGovEOA;
 
     address chainlinkETHUSD = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
     uint256 forkBlock = 19289829; // Block just before the transmit tx above
@@ -48,23 +49,24 @@ contract OEVTest is BaseTest {
         vm.rollFork(forkBlock);
 
         // Creating new gov address (ERR-V49 OwnerActive if already registered with controller)
-        governancePK = 11_112;
-        governanceEOA = vm.addr(governancePK);
-        address liquidatableGovEOA = vm.addr(11_113);
+        uint256 chainlinkGovPK = 11_112;
+        uint256 aaveGovPK = 11_113;
+        chainlinkGovEOA = vm.addr(chainlinkGovPK);
+        aaveGovEOA = vm.addr(aaveGovPK);
 
         vm.startPrank(governanceEOA);
         // Chainlink's Gov address deploys the Chainlink DAppControl and AtlasWrapper
-        chainlinkAtlasWrapperETHUSD = new ChainlinkAtlasWrapperETHUSD(address(atlas), chainlinkETHUSD);
-        chainlinkDAppControl = new ChainlinkDAppControl(address(atlas), address(chainlinkAtlasWrapperETHUSD));
+        chainlinkAtlasWrapper = new ChainlinkAtlasWrapper(address(atlas), chainlinkETHUSD, aaveGovEOA);
+        chainlinkDAppControl = new ChainlinkDAppControl(address(atlas), address(chainlinkAtlasWrapper));
 
         // Chainlink's Gov address initializes the Chainlink DAppControl in Atlas, and as a transmitter in the wrapper
         atlasVerification.initializeGovernance(address(chainlinkDAppControl));
-        chainlinkAtlasWrapperETHUSD.setTransmitterStatus(address(chainlinkDAppControl), true);
+        chainlinkAtlasWrapper.setTransmitterStatus(address(chainlinkDAppControl), true);
         vm.stopPrank();
 
-        vm.startPrank(liquidatableGovEOA);
+        vm.startPrank(aaveGovEOA);
         // Lending protocol liquidations must use the Chainlink Atlas Wrapper for price feed
-        mockLiquidatable = new MockLiquidatable(address(chainlinkAtlasWrapperETHUSD), targetOracleAnswer);
+        mockLiquidatable = new MockLiquidatable(address(chainlinkAtlasWrapper), targetOracleAnswer);
         vm.stopPrank();
         deal(address(mockLiquidatable), liquidationReward); // Add 10 ETH as liquidation reward
 
@@ -74,7 +76,9 @@ contract OEVTest is BaseTest {
             _verification: address(atlasVerification)
         });
 
-        vm.label(address(chainlinkAtlasWrapperETHUSD), "Chainlink Atlas Wrapper");
+        vm.label(chainlinkGovEOA, "Chainlink Gov");
+        vm.label(aaveGovEOA, "Aave Gov");
+        vm.label(address(chainlinkAtlasWrapper), "Chainlink Atlas Wrapper");
         vm.label(address(chainlinkDAppControl), "Chainlink DApp Control");
         vm.label(address(chainlinkETHUSD), "Chainlink Base ETH/USD Feed");
     }
@@ -98,15 +102,15 @@ contract OEVTest is BaseTest {
         vm.stopPrank();
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
-        vm.startPrank(governanceEOA);
+        vm.startPrank(aaveGovEOA);
         // Registed the EE as a trusted transmitter in the Chainlink Atlas Wrapper
-        chainlinkAtlasWrapperETHUSD.setTransmitterStatus(executionEnvironment, true);
+        chainlinkAtlasWrapper.setTransmitterStatus(executionEnvironment, true);
         vm.stopPrank();
 
         // Basic userOp created but excludes oracle price update data
         userOp = txBuilder.buildUserOperation({
             from: userEOA,
-            to: address(atlas),
+            to: address(chainlinkAtlasWrapper), // Aave's ChainlinkAtlasWrapper for ETHUSD
             maxFeePerGas: tx.gasprice + 1,
             value: 0,
             deadline: block.number + 2,
@@ -130,13 +134,7 @@ contract OEVTest is BaseTest {
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // After solvers have signed their ops, Chainlink creates the userOp with price update data
-        userOp.data = abi.encodeWithSelector(
-            chainlinkDAppControl.transmit.selector,
-            report,
-            rs,
-            ss,
-            rawVs
-        );
+        userOp.data = abi.encodePacked(report, rs, ss, rawVs);
 
         dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
@@ -145,19 +143,19 @@ contract OEVTest is BaseTest {
         console.log("Chainlink latestAnswer:", uint(IChainlinkAggregator(chainlinkETHUSD).latestAnswer()));
 
         assertEq(mockLiquidatable.canLiquidate(), false);
-        assertTrue(uint(chainlinkAtlasWrapperETHUSD.latestAnswer()) !=  targetOracleAnswer);
+        assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) !=  targetOracleAnswer);
 
         console.log("Before:");
-        console.log("Wrapper latest answer:", uint(chainlinkAtlasWrapperETHUSD.latestAnswer()));
-        console.log("Wrapper atlasLatestAnswer", uint(chainlinkAtlasWrapperETHUSD.atlasLatestAnswer()));
+        console.log("Wrapper latest answer:", uint(chainlinkAtlasWrapper.latestAnswer()));
+        console.log("Wrapper atlasLatestAnswer", uint(chainlinkAtlasWrapper.atlasLatestAnswer()));
 
         vm.startPrank(userEOA);
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
 
         console.log("After:");
-        console.log("Wrapper latest answer:", uint(chainlinkAtlasWrapperETHUSD.latestAnswer()));
-        console.log("Wrapper atlasLatestAnswer", uint(chainlinkAtlasWrapperETHUSD.atlasLatestAnswer()));        
+        console.log("Wrapper latest answer:", uint(chainlinkAtlasWrapper.latestAnswer()));
+        console.log("Wrapper atlasLatestAnswer", uint(chainlinkAtlasWrapper.atlasLatestAnswer()));        
     }
 
 
@@ -249,6 +247,7 @@ contract MockLiquidatable {
 
     function liquidate() public {
         require(canLiquidate(), "Cannot liquidate");
+        require(address(this).balance > 0, "No liquidation reward available");
         // If liquidated successfully, sends all the ETH in this contract to caller
         payable(msg.sender).call{value: address(this).balance}("");
     }
