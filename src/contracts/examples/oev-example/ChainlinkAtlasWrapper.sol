@@ -19,6 +19,7 @@ contract ChainlinkAtlasWrapper is Ownable {
 
     error TransmitterNotTrusted(address transmitter);
     error ObservationsNotOrdered();
+    error AnswerCannotBeZero();
     error WithdrawETHFailed();
 
     event TransmitterStatusChanged(address transmitter, bool trusted);
@@ -37,6 +38,32 @@ contract ChainlinkAtlasWrapper is Ownable {
             return BASE_FEED.latestAnswer();
         } else {
             return atlasLatestAnswer;
+        }
+    }
+
+    // Use this contract's latestTimestamp if more recent than base oracle's.
+    // Otherwise fallback to base oracle's latestTimestamp
+    function latestTimestamp() public view returns (uint256) {
+        if (BASE_FEED.latestTimestamp() >= atlasLatestTimestamp) {
+            return BASE_FEED.latestTimestamp();
+        } else {
+            return atlasLatestTimestamp;
+        }
+    }
+
+    // Fallback to base oracle's latestRoundData, unless this contract's latestTimestamp and latestAnswer are more
+    // recent, in which case return those values as well as the other round data from the base oracle.
+    function latestRoundData()
+        public
+        view
+        returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)
+    {
+        if (BASE_FEED.latestTimestamp() >= atlasLatestTimestamp) {
+            (roundId, answer, startedAt, updatedAt, answeredInRound) = BASE_FEED.latestRoundData();
+        } else {
+            (roundId,, startedAt,, answeredInRound) = BASE_FEED.latestRoundData();
+            answer = atlasLatestAnswer;
+            updatedAt = atlasLatestTimestamp;
         }
     }
 
@@ -84,6 +111,9 @@ contract ChainlinkAtlasWrapper is Ownable {
             if (!inOrder) revert ObservationsNotOrdered();
         }
         int192 median = r.observations[r.observations.length / 2];
+
+        if (median == 0) revert AnswerCannotBeZero();
+
         return int256(median);
     }
 
@@ -143,4 +173,8 @@ struct HotVars {
 interface IChainlinkFeed {
     function latestAnswer() external view returns (int256);
     function latestTimestamp() external view returns (uint256);
+    function latestRoundData()
+        external
+        view
+        returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound);
 }
