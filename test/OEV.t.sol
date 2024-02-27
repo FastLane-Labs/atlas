@@ -14,7 +14,7 @@ import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
 import { DAppOperation, DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 
 import { ChainlinkDAppControl } from "src/contracts/examples/oev-example/ChainlinkDAppControl.sol";
-import {ChainlinkAtlasWrapper, IChainlinkAggregator } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapper.sol";
+import {ChainlinkAtlasWrapper, IChainlinkFeed } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapper.sol";
 import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
 
@@ -55,19 +55,21 @@ contract OEVTest is BaseTest {
         aaveGovEOA = vm.addr(aaveGovPK);
 
         vm.startPrank(governanceEOA);
-        // Chainlink's Gov address deploys the Chainlink DAppControl and AtlasWrapper
-        chainlinkAtlasWrapper = new ChainlinkAtlasWrapper(address(atlas), chainlinkETHUSD, aaveGovEOA);
-        chainlinkDAppControl = new ChainlinkDAppControl(address(atlas), address(chainlinkAtlasWrapper));
-
-        // Chainlink's Gov address initializes the Chainlink DAppControl in Atlas, and as a transmitter in the wrapper
+        // Chainlink's Gov address deploys the Chainlink DAppControl
+        chainlinkDAppControl = new ChainlinkDAppControl(address(atlas));
+        // Chainlink's Gov address initializes the Chainlink DAppControl in Atlas
         atlasVerification.initializeGovernance(address(chainlinkDAppControl));
-        chainlinkAtlasWrapper.setTransmitterStatus(address(chainlinkDAppControl), true);
         vm.stopPrank();
 
         vm.startPrank(aaveGovEOA);
-        // Lending protocol liquidations must use the Chainlink Atlas Wrapper for price feed
+        // Aave creates a Chainlink Atlas Wrapper for ETH/USD to capture OEV
+        chainlinkAtlasWrapper = ChainlinkAtlasWrapper(chainlinkDAppControl.createNewChainlinkAtlasWrapper(address(chainlinkETHUSD)));
+        // OEV-generating protocols must use the Chainlink Atlas Wrapper for price feed in order to capture the OEV
         mockLiquidatable = new MockLiquidatable(address(chainlinkAtlasWrapper), targetOracleAnswer);
+        // Aave sets the Chainlink Execution Environment as a trusted transmitter in the Chainlink Atlas Wrapper
+        chainlinkAtlasWrapper.setTransmitterStatus(address(chainlinkDAppControl), true);
         vm.stopPrank();
+
         deal(address(mockLiquidatable), liquidationReward); // Add 10 ETH as liquidation reward
 
         txBuilder = new TxBuilder({
@@ -134,13 +136,13 @@ contract OEVTest is BaseTest {
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // After solvers have signed their ops, Chainlink creates the userOp with price update data
-        userOp.data = abi.encodePacked(report, rs, ss, rawVs);
+        userOp.data = abi.encodeWithSelector(ChainlinkAtlasWrapper.transmit.selector, report, rs, ss, rawVs);
 
         dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-        console.log("Chainlink latestAnswer:", uint(IChainlinkAggregator(chainlinkETHUSD).latestAnswer()));
+        console.log("Chainlink latestAnswer:", uint(IChainlinkFeed(chainlinkETHUSD).latestAnswer()));
 
         assertEq(mockLiquidatable.canLiquidate(), false);
         assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) !=  targetOracleAnswer);
@@ -155,7 +157,9 @@ contract OEVTest is BaseTest {
 
         console.log("After:");
         console.log("Wrapper latest answer:", uint(chainlinkAtlasWrapper.latestAnswer()));
-        console.log("Wrapper atlasLatestAnswer", uint(chainlinkAtlasWrapper.atlasLatestAnswer()));        
+        console.log("Wrapper atlasLatestAnswer", uint(chainlinkAtlasWrapper.atlasLatestAnswer())); 
+
+        assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), targetOracleAnswer, "Wrapper did not update as expected");       
     }
 
 
@@ -254,6 +258,6 @@ contract MockLiquidatable {
 
     // Can only liquidate if the oracle price is exactly the liquidation price
     function canLiquidate() public view returns (bool) {
-        return uint256(IChainlinkAggregator(oracle).latestAnswer()) == liquidationPrice;
+        return uint256(IChainlinkFeed(oracle).latestAnswer()) == liquidationPrice;
     }
 }

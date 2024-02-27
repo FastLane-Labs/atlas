@@ -15,25 +15,21 @@ import "forge-std/Test.sol";
 // NOTE: This contract acts as the Chainlink DAppControl for Atlas,
 // and as a factory for ChainlinkAtlasWrapper contracts
 contract ChainlinkDAppControl is DAppControl {
-    address public immutable CHAINLINK_WRAPPER; // TODO remove and use userOp.dapp addr instead to target protocol
-        // wrapper
+    error InvalidBaseFeed();
 
-    event NewChainlinkWrapperCreated(address wrapper, address baseFeed, address owner);
+    event NewChainlinkWrapperCreated(address indexed wrapper, address indexed baseFeed, address indexed owner);
 
-    constructor(
-        address _atlas,
-        address _wrapper
-    )
+    constructor(address _atlas)
         DAppControl(
             _atlas,
             msg.sender,
             CallConfig({
                 userNoncesSequenced: false,
                 dappNoncesSequenced: false,
-                requirePreOps: true,
+                requirePreOps: false,
                 trackPreOpsReturnData: false,
-                trackUserReturnData: false,
-                delegateUser: true,
+                trackUserReturnData: false, //TODO return address here
+                delegateUser: false,
                 preSolver: false,
                 postSolver: false,
                 requirePostOps: false,
@@ -48,26 +44,11 @@ contract ChainlinkDAppControl is DAppControl {
                 trustedOpHash: true
             })
         )
-    {
-        CHAINLINK_WRAPPER = _wrapper;
-    }
+    { }
 
     //////////////////////////////////
     // CONTRACT-SPECIFIC FUNCTIONS  //
     //////////////////////////////////
-
-    // Update the ChainlinkAtlasWrapper at userOp.dapp address, with Chainlink transmit data
-    function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory) {
-        (bytes memory report, bytes32[] memory rs, bytes32[] memory ss, bytes32 rawVs) =
-            abi.decode(userOp.data, (bytes, bytes32[], bytes32[], bytes32));
-
-        IChainlinkAtlasWrapper(userOp.dapp).transmit(report, rs, ss, rawVs);
-    }
-
-    // TODO remove this
-    function transmit(bytes calldata report, bytes32[] calldata rs, bytes32[] calldata ss, bytes32 rawVs) external {
-        IChainlinkAtlasWrapper(CHAINLINK_WRAPPER).transmit(report, rs, ss, rawVs);
-    }
 
     function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) internal virtual override {
         // TODO need to get userOp.dapp address to here to allocate OEV to wrapper
@@ -93,6 +74,8 @@ contract ChainlinkDAppControl is DAppControl {
     // Creates a new wrapper contract for a specific Chainlink feed, to attribute OEV captured by Atlas to the
     // OEV-generating protocol.
     function createNewChainlinkAtlasWrapper(address baseChainlinkFeed) external returns (address) {
+        if (IChainlinkFeed(baseChainlinkFeed).latestAnswer() == 0) revert InvalidBaseFeed();
+
         address newWrapper = address(new ChainlinkAtlasWrapper(atlas, baseChainlinkFeed, msg.sender));
         emit NewChainlinkWrapperCreated(newWrapper, baseChainlinkFeed, msg.sender);
         return newWrapper;
@@ -101,4 +84,8 @@ contract ChainlinkDAppControl is DAppControl {
 
 interface IChainlinkAtlasWrapper {
     function transmit(bytes calldata report, bytes32[] calldata rs, bytes32[] calldata ss, bytes32 rawVs) external;
+}
+
+interface IChainlinkFeed {
+    function latestAnswer() external view returns (int256);
 }

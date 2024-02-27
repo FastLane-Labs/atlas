@@ -9,7 +9,7 @@ import { SafeERC20, IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/
 
 contract ChainlinkAtlasWrapper is Ownable {
     address public immutable ATLAS;
-    IChainlinkAggregator public immutable BASE_FEED; // Base Chainlink Feed
+    IChainlinkFeed public immutable BASE_FEED; // Base Chainlink Feed
 
     int256 public atlasLatestAnswer;
     uint256 public atlasLatestTimestamp;
@@ -25,7 +25,7 @@ contract ChainlinkAtlasWrapper is Ownable {
 
     constructor(address atlas, address baseChainlinkFeed, address _owner) {
         ATLAS = atlas;
-        BASE_FEED = IChainlinkAggregator(baseChainlinkFeed);
+        BASE_FEED = IChainlinkFeed(baseChainlinkFeed);
         _transferOwnership(_owner);
     }
 
@@ -126,7 +126,7 @@ struct HotVars {
     uint32 latestAggregatorRoundId;
 }
 
-interface IChainlinkAggregator {
+interface IChainlinkFeed {
     function latestAnswer() external view returns (int256);
     function latestTimestamp() external view returns (uint256);
 }

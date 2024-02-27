@@ -16,9 +16,6 @@ import "../types/DAppApprovalTypes.sol";
 
 import "forge-std/Test.sol";
 
-// TODO: Check payable is appropriate in pre/post ops and solver calls. Needed to send ETH if necessary (even when
-// delegatecalled)
-
 abstract contract DAppControl is Test, DAppControlTemplate, ExecutionBase {
     address public immutable escrow;
     address public immutable governance;
@@ -33,7 +30,7 @@ abstract contract DAppControl is Test, DAppControlTemplate, ExecutionBase {
         }
 
         control = address(this);
-        escrow = _escrow;
+        escrow = _escrow; // TODO remove - same as atlas var in Base.sol
         governance = _governance;
         callConfig = CallBits.encodeCallConfig(_callConfig);
     }
