@@ -142,6 +142,7 @@ contract ExecutionEnvironment is Base {
         require(address(this).balance == solverOp.value, "ERR-CE05 IncorrectValue");
 
         uint32 config = _config();
+        address control = _control();
 
         // Track token balance to measure if the bid amount is paid.
         bool etherIsBidToken;
@@ -164,7 +165,7 @@ contract ExecutionEnvironment is Base {
         ////////////////////////////
 
         // Verify that the DAppControl contract matches the solver's expectations
-        if (solverOp.control != _control()) {
+        if (solverOp.control != control) {
             revert AtlasErrors.AlteredControl();
         }
 
@@ -175,7 +176,7 @@ contract ExecutionEnvironment is Base {
             bytes memory data = abi.encodeWithSelector(
                 IDAppControl.preSolverCall.selector, solverOp, dAppReturnData);
 
-            (success, data) = _control().delegatecall(forwardSpecial(data, ExecutionPhase.PreSolver));
+            (success, data) = control.delegatecall(forwardSpecial(data, ExecutionPhase.PreSolver));
 
             if (!success) {
                 revert AtlasErrors.PreSolverFailed();
@@ -209,7 +210,7 @@ contract ExecutionEnvironment is Base {
             bytes memory data = abi.encodeWithSelector(
                 IDAppControl.postSolverCall.selector, solverOp, dAppReturnData);
 
-            (success, data) = _control().delegatecall(forwardSpecial(data, ExecutionPhase.PostSolver));
+            (success, data) = control.delegatecall(forwardSpecial(data, ExecutionPhase.PostSolver));
 
             if (!success) {
                 revert AtlasErrors.PostSolverFailed();
