@@ -130,7 +130,6 @@ contract TxBuilder {
             to: atlas,
             value: 0,
             gas: 2_000_000,
-            maxFeePerGas: userOp.maxFeePerGas,
             nonce: governanceNextNonce(governanceEOA),
             deadline: userOp.deadline,
             control: userOp.control,
