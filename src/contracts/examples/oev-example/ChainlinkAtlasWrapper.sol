@@ -6,7 +6,6 @@ import { SafeERC20, IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/
 
 // A wrapper contract for a specific Chainlink price feed, used by Atlas to capture Oracle Extractable Value (OEV).
 // Each MEV-generating protocol needs their own wrapper for each Chainlink price feed they use.
-
 contract ChainlinkAtlasWrapper is Ownable {
     address public immutable ATLAS;
     IChainlinkFeed public immutable BASE_FEED; // Base Chainlink Feed
@@ -58,10 +57,8 @@ contract ChainlinkAtlasWrapper is Ownable {
         view
         returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)
     {
-        if (BASE_FEED.latestTimestamp() >= atlasLatestTimestamp) {
-            (roundId, answer, startedAt, updatedAt, answeredInRound) = BASE_FEED.latestRoundData();
-        } else {
-            (roundId,, startedAt,, answeredInRound) = BASE_FEED.latestRoundData();
+        (roundId, answer, startedAt, updatedAt, answeredInRound) = BASE_FEED.latestRoundData();
+        if (updatedAt < atlasLatestTimestamp) {
             answer = atlasLatestAnswer;
             updatedAt = atlasLatestTimestamp;
         }
@@ -88,7 +85,7 @@ contract ChainlinkAtlasWrapper is Ownable {
         return address(this);
     }
 
-    // Verifies
+    // Verification checks for new transmit data
     function _verifyTransmitData(
         bytes calldata report,
         bytes32[] calldata rs,
@@ -105,7 +102,7 @@ contract ChainlinkAtlasWrapper is Ownable {
         ReportData memory r;
         (,, r.observations) = abi.decode(report, (bytes32, bytes32, int192[]));
 
-        // 1. Check observations are ordered, then take median
+        // Check observations are ordered, then take median observation
         for (uint256 i = 0; i < r.observations.length - 1; ++i) {
             bool inOrder = r.observations[i] <= r.observations[i + 1];
             if (!inOrder) revert ObservationsNotOrdered();
