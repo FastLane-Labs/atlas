@@ -15,11 +15,11 @@ contract DummyDAppControl is DAppControl {
     event MEVPaymentSuccess(address bidToken, uint256 bidAmount);
 
     constructor(
-        address _escrow,
+        address _atlas,
         address _governance,
         CallConfig memory _callConfig
     )
-        DAppControl(_escrow, _governance, _callConfig)
+        DAppControl(_atlas, _governance, _callConfig)
     { }
 
     // ****************************************

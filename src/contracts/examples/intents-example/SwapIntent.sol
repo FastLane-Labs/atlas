@@ -53,9 +53,9 @@ contract SwapIntentController is DAppControl {
 
     uint256 public constant EXPECTED_GAS_USAGE_EX_SOLVER = 200_000;
 
-    constructor(address _escrow)
+    constructor(address _atlas)
         DAppControl(
-            _escrow,
+            _atlas,
             msg.sender,
             CallConfig({
                 userNoncesSequenced: false,
@@ -86,7 +86,7 @@ contract SwapIntentController is DAppControl {
 
     // swap() selector = 0x98434997
     function swap(SwapIntent calldata swapIntent) external payable returns (SwapData memory) {
-        require(msg.sender == escrow, "ERR-PI002 InvalidSender");
+        require(msg.sender == atlas, "ERR-PI002 InvalidSender");
         require(_addressPointer() == control, "ERR-PI003 InvalidLockState");
         require(address(this) != control, "ERR-PI004 MustBeDelegated");
 
@@ -169,7 +169,7 @@ contract SwapIntentController is DAppControl {
 
     function _preSolverCall(bytes calldata data) internal override returns (bool) {
         (address solverTo,, bytes memory returnData) = abi.decode(data, (address, uint256, bytes));
-        if (solverTo == address(this) || solverTo == _control() || solverTo == escrow) {
+        if (solverTo == address(this) || solverTo == _control() || solverTo == atlas) {
             return false;
         }
 
