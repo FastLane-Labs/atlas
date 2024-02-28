@@ -32,6 +32,7 @@ contract OEVTest is BaseTest {
 
     address chainlinkGovEOA;
     address aaveGovEOA;
+    address executionEnvironment;
 
     address chainlinkETHUSD = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
     uint256 forkBlock = 19289829; // Block just before the transmit tx above
@@ -43,6 +44,13 @@ contract OEVTest is BaseTest {
         uint8 v;
         bytes32 r;
         bytes32 s;
+    }
+
+    struct TransmitData {
+        bytes report;
+        bytes32[] rs;
+        bytes32[] ss;
+        bytes32 rawVs;
     }
 
     function setUp() public virtual override {
@@ -62,13 +70,17 @@ contract OEVTest is BaseTest {
         atlasVerification.initializeGovernance(address(chainlinkDAppControl));
         vm.stopPrank();
 
+        vm.startPrank(userEOA); // User is a Chainlink Node
+        executionEnvironment = atlas.createExecutionEnvironment(address(chainlinkDAppControl));
+        vm.stopPrank();
+        
         vm.startPrank(aaveGovEOA);
         // Aave creates a Chainlink Atlas Wrapper for ETH/USD to capture OEV
         chainlinkAtlasWrapper = ChainlinkAtlasWrapper(payable(chainlinkDAppControl.createNewChainlinkAtlasWrapper(chainlinkETHUSD)));
         // OEV-generating protocols must use the Chainlink Atlas Wrapper for price feed in order to capture the OEV
         mockLiquidatable = new MockLiquidatable(address(chainlinkAtlasWrapper), targetOracleAnswer);
         // Aave sets the Chainlink Execution Environment as a trusted transmitter in the Chainlink Atlas Wrapper
-        chainlinkAtlasWrapper.setTransmitterStatus(address(chainlinkDAppControl), true);
+        chainlinkAtlasWrapper.setTransmitterStatus(executionEnvironment, true);
         vm.stopPrank();
 
         deal(address(mockLiquidatable), liquidationReward); // Add 10 ETH as liquidation reward
@@ -81,6 +93,7 @@ contract OEVTest is BaseTest {
 
         vm.label(chainlinkGovEOA, "Chainlink Gov");
         vm.label(aaveGovEOA, "Aave Gov");
+        vm.label(address(executionEnvironment), "EXECUTION ENV");
         vm.label(address(chainlinkAtlasWrapper), "Chainlink Atlas Wrapper");
         vm.label(address(chainlinkDAppControl), "Chainlink DApp Control");
         vm.label(address(chainlinkETHUSD), "Chainlink Base ETH/USD Feed");
@@ -99,16 +112,6 @@ contract OEVTest is BaseTest {
 
         (bytes memory report, bytes32[] memory rs, bytes32[] memory ss, bytes32 rawVs)
             = getTransmitPayload();
-
-        vm.startPrank(userEOA); // User is a Chainlink Node
-        address executionEnvironment = atlas.createExecutionEnvironment(address(chainlinkDAppControl));
-        vm.stopPrank();
-        vm.label(address(executionEnvironment), "EXECUTION ENV");
-
-        vm.startPrank(aaveGovEOA);
-        // Registed the EE as a trusted transmitter in the Chainlink Atlas Wrapper
-        chainlinkAtlasWrapper.setTransmitterStatus(executionEnvironment, true);
-        vm.stopPrank();
 
         // Basic userOp created but excludes oracle price update data
         userOp = txBuilder.buildUserOperation({
@@ -155,6 +158,47 @@ contract OEVTest is BaseTest {
         assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), targetOracleAnswer, "Wrapper did not update as expected");
         assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) != uint(IChainlinkFeed(chainlinkETHUSD).latestAnswer()), "Wrapper and base feed should report different answers");
         assertEq(address(chainlinkAtlasWrapper).balance, solverWinningBid, "Wrapper should hold winning bid as OEV");
+    }
+
+    function testChainlinkAtlasWrapperViewFunctions() public {
+        // Check wrapper and base start as expected
+        assertEq(chainlinkAtlasWrapper.atlasLatestAnswer(), 0, "Wrapper stored latestAnswer should be 0");
+        assertTrue(IChainlinkFeed(chainlinkETHUSD).latestAnswer() != 0, "Base latestAnswer should not be 0");
+        assertEq(chainlinkAtlasWrapper.atlasLatestTimestamp(), 0, "Wrapper stored latestTimestamp should be 0");
+        assertTrue(IChainlinkFeed(chainlinkETHUSD).latestTimestamp() != 0, "Base latestTimestamp should not be 0");
+
+        (uint80 roundIdAtlas, int256 answerAtlas, uint256 startedAtAtlas, uint256 updatedAtAtlas, uint80 answeredInRoundAtlas) = chainlinkAtlasWrapper.latestRoundData();
+        (uint80 roundIdBase, int256 answerBase, uint256 startedAtBase, uint256 updatedAtBase, uint80 answeredInRoundBase) = IChainlinkFeed(chainlinkETHUSD).latestRoundData();
+
+        // Before Atlas price update, all view functions should fall back to base oracle
+        assertEq(chainlinkAtlasWrapper.latestAnswer(), IChainlinkFeed(chainlinkETHUSD).latestAnswer(), "latestAnswer should be same as base");
+        assertEq(chainlinkAtlasWrapper.latestTimestamp(), IChainlinkFeed(chainlinkETHUSD).latestTimestamp(), "latestTimestamp should be same as base");
+        assertEq(roundIdAtlas, roundIdBase, "roundId should be same as base");
+        assertEq(answerAtlas, answerBase, "answer should be same as base");
+        assertEq(startedAtAtlas, startedAtBase, "startedAt should be same as base");
+        assertEq(updatedAtAtlas, updatedAtBase, "updatedAt should be same as base");
+        assertEq(answeredInRoundAtlas, answeredInRoundBase, "answeredInRound should be same as base");
+
+        // Update wrapper with new price by calling transmit from an approved EE
+        TransmitData memory transmitData;
+        (transmitData.report, transmitData.rs, transmitData.ss, transmitData.rawVs) = getTransmitPayload();
+        vm.prank(executionEnvironment);
+        chainlinkAtlasWrapper.transmit(transmitData.report, transmitData.rs, transmitData.ss, transmitData.rawVs);
+
+        // After Atlas price update, latestAnswer and latestTimestamp should be different to base oracle
+        assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), targetOracleAnswer, "latestAnswer should be updated");
+        assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) != uint(IChainlinkFeed(chainlinkETHUSD).latestAnswer()), "latestAnswer should be different to base");
+        assertEq(chainlinkAtlasWrapper.latestTimestamp(), block.timestamp, "latestTimestamp should be updated");
+        assertTrue(chainlinkAtlasWrapper.latestTimestamp() > IChainlinkFeed(chainlinkETHUSD).latestTimestamp(), "latestTimestamp should be later than base");
+
+        (roundIdAtlas, answerAtlas, startedAtAtlas, updatedAtAtlas, answeredInRoundAtlas) = chainlinkAtlasWrapper.latestRoundData();
+        (roundIdBase, answerBase, startedAtBase, updatedAtBase, answeredInRoundBase) = IChainlinkFeed(chainlinkETHUSD).latestRoundData();
+
+        assertEq(roundIdAtlas, roundIdBase, "roundId should still be same as base");
+        assertTrue(answerAtlas == int(targetOracleAnswer) && answerAtlas != answerBase, "answer should be updated");
+        assertEq(startedAtAtlas, startedAtBase, "startedAt should still be same as base");
+        assertTrue(updatedAtAtlas > updatedAtBase, "updatedAt should be later than base");
+        assertEq(answeredInRoundAtlas, answeredInRoundBase, "answeredInRound should still be same as base");
     }
 
 
