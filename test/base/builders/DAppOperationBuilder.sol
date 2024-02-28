@@ -39,11 +39,6 @@ contract DAppOperationBuilder is Test {
         return this;
     }
 
-    function withMaxFeePerGas(uint256 maxFeePerGas) public returns (DAppOperationBuilder) {
-        dappOperation.maxFeePerGas = maxFeePerGas;
-        return this;
-    }
-
     function withNonce(uint256 nonce) public returns (DAppOperationBuilder) {
         dappOperation.nonce = nonce;
         return this;

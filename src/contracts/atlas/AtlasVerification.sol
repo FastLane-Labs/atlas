@@ -479,7 +479,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 approval.to,
                 approval.value,
                 approval.gas,
-                approval.maxFeePerGas,
                 approval.nonce,
                 approval.deadline,
                 approval.control,
