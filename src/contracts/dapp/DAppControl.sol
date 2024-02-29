@@ -16,7 +16,6 @@ import "../types/DAppApprovalTypes.sol";
 
 import "forge-std/Test.sol";
 
-
 abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     address public immutable governance;
     address public immutable control;
