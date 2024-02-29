@@ -6,8 +6,6 @@ import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 import "../types/EscrowTypes.sol";
 import { Permit69 } from "../common/Permit69.sol";
 
-// TODO split out events and errors to share with AtlasEscrow
-
 /// @notice Modified Solmate ERC20 with some Atlas-specific modifications.
 /// @author FastLane Labs
 /// @author Modified from Solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC20.sol)

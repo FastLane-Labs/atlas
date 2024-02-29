@@ -242,11 +242,11 @@ contract DummyDAppControlBuilder is DAppControl {
     address immutable weth;
 
     constructor(
-        address _escrow,
+        address _atlas,
         address _weth
     )
         DAppControl(
-            _escrow,
+            _atlas,
             msg.sender,
             CallConfig({
                 userNoncesSequenced: false,
@@ -295,11 +295,11 @@ contract DummyDAppControlBuilder is DAppControl {
 contract SimpleSolver {
     address weth;
     address msgSender;
-    address escrow;
+    address atlas;
 
-    constructor(address _weth, address _escrow) {
+    constructor(address _weth, address _atlas) {
         weth = _weth;
-        escrow = _escrow;
+        atlas = _atlas;
     }
 
     function atlasSolverCall(
@@ -317,12 +317,12 @@ contract SimpleSolver {
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
 
         if (bytes4(solverOpData[:4]) == SimpleSolver.payback.selector) {
-            uint256 shortfall = IEscrow(escrow).shortfall();
+            uint256 shortfall = IEscrow(atlas).shortfall();
 
             if (shortfall < msg.value) shortfall = 0;
             else shortfall -= msg.value;
 
-            IEscrow(escrow).reconcile{ value: msg.value }(msg.sender, sender, shortfall);
+            IEscrow(atlas).reconcile{ value: msg.value }(msg.sender, sender, shortfall);
         }
     }
 

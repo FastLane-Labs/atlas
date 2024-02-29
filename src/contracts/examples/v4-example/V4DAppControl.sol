@@ -48,11 +48,11 @@ contract V4DAppControl is DAppControl {
     PoolKey internal _currentKey; // TODO: Transient storage <-
 
     constructor(
-        address _escrow,
+        address _atlas,
         address _v4Singleton
     )
         DAppControl(
-            _escrow,
+            _atlas,
             msg.sender,
             CallConfig({
                 userNoncesSequenced: false,
@@ -98,7 +98,7 @@ contract V4DAppControl is DAppControl {
 
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that DAppControl supplied a valid signature
-        require(msg.sender == escrow, "ERR-H00 InvalidCaller");
+        require(msg.sender == atlas, "ERR-H00 InvalidCaller");
 
         (IPoolManager.PoolKey memory key, IPoolManager.SwapParams memory params) =
             abi.decode(userOp.data[4:], (IPoolManager.PoolKey, IPoolManager.SwapParams));
@@ -201,7 +201,7 @@ contract V4DAppControl is DAppControl {
         // address(this) = hook
         // msg.sender = ExecutionEnvironment
 
-        EscrowKey memory escrowKey = ISafetyLocks(escrow).getLockState();
+        EscrowKey memory escrowKey = ISafetyLocks(atlas).getLockState();
 
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that DAppControl supplied a valid signature
@@ -219,7 +219,7 @@ contract V4DAppControl is DAppControl {
         // address(this) = hook
         // msg.sender = ExecutionEnvironment
 
-        EscrowKey memory escrowKey = ISafetyLocks(escrow).getLockState();
+        EscrowKey memory escrowKey = ISafetyLocks(atlas).getLockState();
 
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that DAppControl supplied a valid signature

@@ -8,12 +8,12 @@ import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import "forge-std/Test.sol";
 
 contract DummyDAppControlBuilder is Test {
-    address public escrow;
+    address public atlas;
     address public governance;
     CallConfig callConfig;
 
-    function withEscrow(address _escrow) public returns (DummyDAppControlBuilder) {
-        escrow = _escrow;
+    function withEscrow(address _atlas) public returns (DummyDAppControlBuilder) {
+        atlas = _atlas;
         return this;
     }
 
@@ -28,7 +28,7 @@ contract DummyDAppControlBuilder is Test {
     }
 
     function build() public returns (DummyDAppControl) {
-        return new DummyDAppControl(escrow, governance, callConfig);
+        return new DummyDAppControl(atlas, governance, callConfig);
     }
 
     /*

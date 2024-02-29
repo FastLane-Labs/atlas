@@ -8,11 +8,7 @@ import "../types/DAppApprovalTypes.sol";
 import "forge-std/Test.sol";
 
 abstract contract DAppControlTemplate {
-    address internal immutable _executionBase;
-
-    constructor() {
-        _executionBase = address(this);
-    }
+    constructor() { }
 
     string internal constant _NOT_IMPLEMENTED = "NOT IMPLEMENTED";
     // Virtual functions to be overridden by participating dApp governance
