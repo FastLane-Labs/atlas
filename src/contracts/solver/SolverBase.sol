@@ -18,12 +18,12 @@ interface IWETH9 {
 contract SolverBase is Test {
     address public immutable WETH_ADDRESS;
     address internal immutable _owner;
-    address internal immutable _escrow;
+    address internal immutable _atlas;
 
-    constructor(address weth, address atlasEscrow, address owner) {
+    constructor(address weth, address atlas, address owner) {
         WETH_ADDRESS = weth;
         _owner = owner;
-        _escrow = atlasEscrow;
+        _atlas = atlas;
     }
 
     function atlasSolverCall(
@@ -51,12 +51,12 @@ contract SolverBase is Test {
 
         _;
 
-        uint256 shortfall = IEscrow(_escrow).shortfall();
+        uint256 shortfall = IEscrow(_atlas).shortfall();
 
         if (shortfall < msg.value) shortfall = 0;
         else shortfall -= msg.value;
 
-        IEscrow(_escrow).reconcile{ value: msg.value }(msg.sender, sender, shortfall);
+        IEscrow(_atlas).reconcile{ value: msg.value }(msg.sender, sender, shortfall);
     }
 
     modifier payBids(address bidToken, uint256 bidAmount) {

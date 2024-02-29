@@ -47,9 +47,9 @@ contract V2DAppControl is DAppControl {
 
     event GiftedGovernanceToken(address indexed user, address indexed token, uint256 amount);
 
-    constructor(address _escrow)
+    constructor(address _atlas)
         DAppControl(
-            _escrow,
+            _atlas,
             msg.sender,
             CallConfig({
                 userNoncesSequenced: false,

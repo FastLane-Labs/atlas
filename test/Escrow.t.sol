@@ -95,7 +95,6 @@ contract EscrowTest is AtlasBaseTest {
             .withTo(address(atlas))
             .withValue(0)
             .withGas(2_000_000)
-            .withMaxFeePerGas(userOp.maxFeePerGas)
             .withNonce(address(atlasVerification), governanceEOA)
             .withDeadline(userOp.deadline)
             .withControl(userOp.control)

@@ -220,17 +220,17 @@ contract ExecutionBase is Base {
     }
 
     function _availableFundsERC20(
-        address token,
-        address source,
-        uint256 amount,
+        address _token,
+        address _source,
+        uint256 _amount,
         ExecutionPhase phase
     )
         internal
         view
         returns (bool available)
     {
-        uint256 balance = ERC20(token).balanceOf(source);
-        if (balance < amount) {
+        uint256 balance = ERC20(_token).balanceOf(_source);
+        if (balance < _amount) {
             return false;
         }
 
@@ -238,19 +238,19 @@ contract ExecutionBase is Base {
         address user = _user();
         address dapp = _control();
 
-        if (source == user) {
+        if (_source == user) {
             if (shiftedPhase & SAFE_USER_TRANSFER == 0) {
                 return false;
             }
-            if (ERC20(token).allowance(user, atlas) < amount) {
+            if (ERC20(_token).allowance(user, atlas) < _amount) {
                 return false;
             }
             return true;
-        } else if (source == dapp) {
+        } else if (_source == dapp) {
             if (shiftedPhase & SAFE_DAPP_TRANSFER == 0) {
                 return false;
             }
-            if (ERC20(token).allowance(dapp, atlas) < amount) {
+            if (ERC20(_token).allowance(dapp, atlas) < _amount) {
                 return false;
             }
             return true;

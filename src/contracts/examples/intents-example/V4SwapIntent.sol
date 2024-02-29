@@ -34,11 +34,11 @@ contract V4SwapIntentController is DAppControl {
     uint256 startingBalance; // Balance tracked for the v4 pool
 
     constructor(
-        address _escrow,
+        address _atlas,
         address poolManager
     )
         DAppControl(
-            _escrow,
+            _atlas,
             msg.sender,
             CallConfig({
                 userNoncesSequenced: false,
@@ -70,7 +70,7 @@ contract V4SwapIntentController is DAppControl {
     //////////////////////////////////
 
     modifier verifyCall(address tokenIn, address tokenOut, uint256 amount) {
-        require(msg.sender == escrow, "ERR-PI002 InvalidSender");
+        require(msg.sender == atlas, "ERR-PI002 InvalidSender");
         require(_addressPointer() == control, "ERR-PI003 InvalidLockState");
         require(address(this) != control, "ERR-PI004 MustBeDelegated");
 
@@ -153,7 +153,7 @@ contract V4SwapIntentController is DAppControl {
 
     function _preSolverCall(bytes calldata data) internal override returns (bool) {
         (address solverTo, uint256 solverBid, bytes memory returnData) = abi.decode(data, (address, uint256, bytes));
-        if (solverTo == address(this) || solverTo == _control() || solverTo == escrow) {
+        if (solverTo == address(this) || solverTo == _control() || solverTo == atlas) {
             return false;
         }
 
@@ -233,7 +233,7 @@ contract V4SwapIntentController is DAppControl {
     function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
-        // msg.sender = Escrow
+        // msg.sender = Atlas
         if (bidToken != address(0)) {
             ERC20(bidToken).safeTransfer(_user(), bidAmount);
         } else {

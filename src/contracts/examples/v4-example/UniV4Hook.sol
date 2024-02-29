@@ -29,7 +29,7 @@ import "../../types/LockTypes.sol";
 /////////////////////////////////////////////////////////
 
 contract UniV4Hook is V4DAppControl {
-    constructor(address _escrow, address _v4Singleton) V4DAppControl(_escrow, _v4Singleton) { }
+    constructor(address _atlas, address _v4Singleton) V4DAppControl(_atlas, _v4Singleton) { }
 
     function getHooksCalls() public pure returns (IHooks.Calls memory) {
         // override
@@ -76,7 +76,7 @@ contract UniV4Hook is V4DAppControl {
         require(address(this) == hook, "ERR-H00 InvalidCallee");
         require(msg.sender == v4Singleton, "ERR-H01 InvalidCaller"); // TODO: Confirm this
 
-        EscrowKey memory escrowKey = ISafetyLocks(escrow).getLockState();
+        EscrowKey memory escrowKey = ISafetyLocks(atlas).getLockState();
 
         if (escrowKey.lockState == SafetyBits._LOCKED_X_USER_X_UNSET) {
             // Case: User call

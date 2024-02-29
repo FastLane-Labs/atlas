@@ -675,11 +675,11 @@ contract ExecutionEnvironmentTest is BaseTest {
 
 contract MockDAppControl is DAppControl {
     constructor(
-        address _escrow,
+        address _atlas,
         address _governance,
         CallConfig memory _callConfig
     )
-        DAppControl(_escrow, _governance, _callConfig)
+        DAppControl(_atlas, _governance, _callConfig)
     { }
 
     /*//////////////////////////////////////////////////////////////
@@ -735,11 +735,11 @@ contract MockDAppControl is DAppControl {
 
 contract MockSolverContract {
     address public immutable WETH_ADDRESS;
-    address private immutable _escrow;
+    address private immutable _atlas;
 
-    constructor(address weth, address atlasEscrow) {
+    constructor(address weth, address atlas) {
         WETH_ADDRESS = weth;
-        _escrow = atlasEscrow;
+        _atlas = atlas;
     }
 
     function atlasSolverCall(
