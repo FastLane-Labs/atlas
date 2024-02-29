@@ -66,11 +66,11 @@ contract Filler is DAppControl {
     bytes32 public hashLock;
 
     constructor(
-        address _escrow,
+        address _atlas,
         address _wrappedGasToken
     )
         DAppControl(
-            _escrow,
+            _atlas,
             msg.sender,
             CallConfig({
                 userNoncesSequenced: false,
@@ -114,7 +114,7 @@ contract Filler is DAppControl {
         returns (bool)
     {
         address solverTo = solverOp.solver;
-        if (solverTo == address(this) || solverTo == _control() || solverTo == escrow) {
+        if (solverTo == address(this) || solverTo == _control() || solverTo == atlas) {
             return false;
         }
 
@@ -261,20 +261,20 @@ contract Filler is DAppControl {
         // Verify balances
         address approvalToken = approvalTx.to;
 
-        address _user = userLock;
+        address _userLock = userLock;
         uint256 _owed = owed;
         uint256 _prepaid = prepaid;
 
         require(_owed >= _prepaid, "ERR - PREPAID TOO HIGH"); // should get caught as overflow below
 
-        uint256 allowance = IERC20(approvalToken).allowance(_user, address(this));
+        uint256 allowance = IERC20(approvalToken).allowance(_userLock, address(this));
         require(allowance >= _owed - _prepaid, "ERR - ALLOWANCE TOO LOW");
 
         // use up the entire allowance
-        IERC20(approvalToken).transferFrom(_user, address(this), allowance);
+        IERC20(approvalToken).transferFrom(_userLock, address(this), allowance);
 
         // transfer back the prepaid amount
-        IERC20(approvalToken).transfer(_user, _prepaid);
+        IERC20(approvalToken).transfer(_userLock, _prepaid);
 
         // Clear the locks
         delete userLock;
