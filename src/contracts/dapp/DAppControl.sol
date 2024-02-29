@@ -19,21 +19,19 @@ import "forge-std/Test.sol";
 // TODO: Check payable is appropriate in pre/post ops and solver calls. Needed to send ETH if necessary (even when
 // delegatecalled)
 
-abstract contract DAppControl is Test, DAppControlTemplate, ExecutionBase {
-    address public immutable escrow;
+abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     address public immutable governance;
     address public immutable control;
     uint32 public immutable callConfig;
 
     uint8 private constant _CONTROL_DEPTH = 1 << 2;
 
-    constructor(address _escrow, address _governance, CallConfig memory _callConfig) ExecutionBase(_escrow) {
+    constructor(address _atlas, address _governance, CallConfig memory _callConfig) ExecutionBase(_atlas) {
         if (_callConfig.userNoncesSequenced && _callConfig.dappNoncesSequenced) {
             revert("DAPP AND USER CANT BOTH BE SEQ"); // TODO convert to custom errors
         }
 
         control = address(this);
-        escrow = _escrow;
         governance = _governance;
         callConfig = CallBits.encodeCallConfig(_callConfig);
     }
