@@ -21,7 +21,7 @@ contract ChainlinkAtlasWrapper is Ownable {
     error AnswerCannotBeZero();
     error WithdrawETHFailed();
 
-    event TransmitterStatusChanged(address transmitter, bool trusted);
+    event TransmitterStatusChanged(address indexed transmitter, bool trusted);
 
     constructor(address atlas, address baseChainlinkFeed, address _owner) {
         ATLAS = atlas;

@@ -4,6 +4,7 @@ pragma solidity 0.8.22;
 import "forge-std/Test.sol";
 
 import { ERC20 } from "solmate/tokens/ERC20.sol";
+import { Ownable } from "openzeppelin-contracts/contracts/access/Ownable.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
@@ -33,12 +34,14 @@ contract OEVTest is BaseTest {
     address chainlinkGovEOA;
     address aaveGovEOA;
     address executionEnvironment;
-
+    
     address chainlinkETHUSD = 0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419;
     uint256 forkBlock = 19289829; // Block just before the transmit tx above
     uint256 targetOracleAnswer = 294102000000;
     uint256 liquidationReward = 10e18;
     uint256 solverWinningBid = 1e18;
+
+    ERC20 public DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
 
     struct Sig {
         uint8 v;
@@ -199,6 +202,78 @@ contract OEVTest is BaseTest {
         assertEq(startedAtAtlas, startedAtBase, "startedAt should still be same as base");
         assertTrue(updatedAtAtlas > updatedAtBase, "updatedAt should be later than base");
         assertEq(answeredInRoundAtlas, answeredInRoundBase, "answeredInRound should still be same as base");
+    }
+
+    function testChainlinkAtlasWrapperWithdrawFunctions() public {
+        uint256 startETH = 10e18;
+        uint256 startDai = 5e18;
+        deal(address(chainlinkAtlasWrapper), startETH); // Give wrapper 10 ETH
+        deal(address(DAI), address(chainlinkAtlasWrapper), startDai); // Give wrapper 5 DAI
+
+        assertEq(address(chainlinkAtlasWrapper).balance, startETH, "Wrapper should have 10 ETH");
+        assertEq(DAI.balanceOf(address(chainlinkAtlasWrapper)), startDai, "Wrapper should have 5 DAI");
+        assertEq(aaveGovEOA.balance, 0, "Aave Gov should have 0 ETH");
+        assertEq(DAI.balanceOf(aaveGovEOA), 0, "Aave Gov should have 0 DAI");
+
+        vm.startPrank(chainlinkGovEOA);
+        vm.expectRevert("Ownable: caller is not the owner");
+        chainlinkAtlasWrapper.withdrawETH(chainlinkGovEOA);
+        vm.expectRevert("Ownable: caller is not the owner");
+        chainlinkAtlasWrapper.withdrawERC20(address(DAI), chainlinkGovEOA);
+        vm.stopPrank();
+
+        assertEq(aaveGovEOA.balance, 0, "Aave Gov should still have 0 ETH");
+        assertEq(DAI.balanceOf(aaveGovEOA), 0, "Aave Gov should still have 0 DAI");
+
+        vm.startPrank(aaveGovEOA);
+        chainlinkAtlasWrapper.withdrawETH(aaveGovEOA);
+        chainlinkAtlasWrapper.withdrawERC20(address(DAI), aaveGovEOA);
+        vm.stopPrank();
+
+        assertEq(address(chainlinkAtlasWrapper).balance, 0, "Wrapper should have 0 ETH");
+        assertEq(DAI.balanceOf(address(chainlinkAtlasWrapper)), 0, "Wrapper should have 0 DAI");
+        assertEq(aaveGovEOA.balance, startETH, "Aave Gov should have 10 ETH");
+        assertEq(DAI.balanceOf(aaveGovEOA), startDai, "Aave Gov should have 5 DAI");
+    }
+
+    function testChainlinkAtlasWrapperOwnableFunctionsEvents() public {
+        address mockEE = makeAddr("Mock EE");
+
+        // Wrapper emits event on deployment to show ownership transfer
+        vm.expectEmit(true, false, false, true);
+        emit Ownable.OwnershipTransferred(address(this), address(chainlinkAtlasWrapper.owner()));
+        new ChainlinkAtlasWrapper(address(atlas), chainlinkETHUSD, aaveGovEOA);
+
+        vm.prank(chainlinkGovEOA);
+        vm.expectRevert("Ownable: caller is not the owner");
+        chainlinkAtlasWrapper.setTransmitterStatus(mockEE, true);
+
+        assertEq(chainlinkAtlasWrapper.transmitters(mockEE), false, "EE should not be trusted yet");
+
+        vm.prank(aaveGovEOA);
+        chainlinkAtlasWrapper.setTransmitterStatus(mockEE, true);
+
+        assertEq(chainlinkAtlasWrapper.transmitters(mockEE), true, "EE should be trusted now");
+    }
+
+    function testChainlinkAtlasWrapperTransmit() public {
+        TransmitData memory transmitData;
+        (transmitData.report, transmitData.rs, transmitData.ss, transmitData.rawVs) = getTransmitPayload();
+
+        assertEq(chainlinkAtlasWrapper.atlasLatestAnswer(), 0, "Wrapper stored latestAnswer should be 0");
+        
+        vm.prank(chainlinkGovEOA);
+        vm.expectRevert(abi.encodeWithSelector(ChainlinkAtlasWrapper.TransmitterNotTrusted.selector, chainlinkGovEOA));
+        chainlinkAtlasWrapper.transmit(transmitData.report, transmitData.rs, transmitData.ss, transmitData.rawVs);
+
+        assertEq(chainlinkAtlasWrapper.atlasLatestAnswer(), 0, "Wrapper stored latestAnswer should still be 0");
+
+        vm.prank(executionEnvironment);
+        chainlinkAtlasWrapper.transmit(transmitData.report, transmitData.rs, transmitData.ss, transmitData.rawVs);
+
+        assertEq(uint(chainlinkAtlasWrapper.atlasLatestAnswer()), targetOracleAnswer, "Wrapper stored latestAnswer should be updated");
+
+        // TODO more verification and security checks for `transmit` and `_verifyTransmitData`
     }
 
 
