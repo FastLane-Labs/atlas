@@ -6,6 +6,38 @@ import "forge-std/Test.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
 
 contract AtlETHTest is BaseTest {
+
+    // AtlETH Tests
+
+    function test_atleth_bond() public {}
+
+    // View Function Tests
+    
+    function test_atleth_balanceOf() public {
+
+    }
+
+    function test_atleth_balanceOfBonded() public {
+
+    }
+
+    function test_atleth_balanceOfUnbonding() public {
+
+    }
+
+    function test_atleth_accountLastActiveBlock() public {
+
+    }
+
+    function test_atleth_unbondingCompleteBlock() public {
+
+    }
+
+    // ERC20 Function Tests
+
+    // TODO
+
+
     function testBasicFunctionalities() public {
         // solverOne deposited 1 ETH into Atlas in BaseTest.setUp
         assertTrue(atlas.balanceOf(solverOneEOA) == 1 ether, "solverOne's atlETH balance should be 1");
