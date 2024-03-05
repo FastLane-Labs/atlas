@@ -146,7 +146,32 @@ contract AtlETHTest is BaseTest {
         assertEq(atlas.bondedTotalSupply(), 1e18, "total bonded atlETH supply should be 1e18");
     }
 
-    function test_atleth_redeem() public {}
+    function test_atleth_redeem() public {
+        vm.startPrank(solverOneEOA);
+        atlas.bond(1e18);
+        atlas.unbond(1e18);
+
+        uint256 solverEthBefore = address(solverOneEOA).balance;
+        uint256 totalSupplyBefore = atlas.totalSupply();
+        assertEq(atlas.balanceOf(solverOneEOA), 0, "solverOne's atlETH balance should be 0");
+        assertEq(atlas.balanceOfUnbonding(solverOneEOA), 1e18, "solverOne's unbonding atlETH should be 1 ETH");
+        assertEq(atlas.bondedTotalSupply(), 1e18, "total bonded atlETH supply should be 1 ETH");
+
+        vm.expectRevert(AtlasErrors.EscrowLockActive.selector);
+        atlas.redeem(1e18);
+
+        vm.roll(block.number + atlas.ESCROW_DURATION() + 1);
+
+        vm.expectEmit(true, true, false, true);
+        emit AtlasEvents.Redeem(solverOneEOA, 1e18);
+        atlas.redeem(1e18);
+
+        assertEq(address(solverOneEOA).balance, solverEthBefore, "solverOne's ETH balance should be the same");
+        assertEq(atlas.totalSupply(), totalSupplyBefore + 1e18, "total atlETH supply should be 1 ETH more");
+        assertEq(atlas.balanceOf(solverOneEOA), 1e18, "solverOne's atlETH balance should be 1 ETH");
+        assertEq(atlas.balanceOfUnbonding(solverOneEOA), 0, "solverOne's unbonding atlETH should be 0");
+        assertEq(atlas.bondedTotalSupply(), 0, "total bonded atlETH supply should be 0");
+    }
 
     // ERC20 Function Tests
 
@@ -293,7 +318,6 @@ contract AtlETHTest is BaseTest {
     }
 
     function test_atleth_domainSeparator() public {
-        bytes32 domainSeparator = atlas.DOMAIN_SEPARATOR();
         bytes32 expectedDomainSeparator = keccak256(
             abi.encode(
                     keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
@@ -303,64 +327,11 @@ contract AtlETHTest is BaseTest {
                     address(atlas)
                 )
         );
-        assertEq(domainSeparator, expectedDomainSeparator, "domainSeparator not as expected");
-    }
+        assertEq(atlas.DOMAIN_SEPARATOR(), expectedDomainSeparator, "domainSeparator should be expected value");
 
-    // TODO - OLD tests - move to above
+        // Change chainId to check _computeDomainSeparator() is run
+        vm.chainId(321);
 
-    function testBasicFunctionalities() public {
-        // solverOne deposited 1 ETH into Atlas in BaseTest.setUp
-        assertTrue(atlas.balanceOf(solverOneEOA) == 1 ether, "solverOne's atlETH balance should be 1");
-        assertEq(atlas.totalSupply(), 2 ether, "total atlETH supply should be 2");
-
-        uint256 ethBalanceBefore = address(solverOneEOA).balance;
-        vm.startPrank(solverOneEOA);
-
-        // Bond 1 ETH so we can test the unbonding process
-        atlas.bond(1 ether);
-
-        // Call unbond to initiate the waiting period after which AtlETH can be burnt and ETH withdrawn
-        atlas.unbond(1 ether);
-
-        vm.stopPrank();
-
-        uint256 activeFork = vm.activeFork();
-
-        vm.rollFork(activeFork, block.number + atlas.ESCROW_DURATION() + 2);
-        vm.selectFork(activeFork);
-
-        vm.startPrank(solverOneEOA);
-
-        // Handle the withdrawal.
-        atlas.withdraw(1 ether);
-        uint256 ethBalanceAfter = address(solverOneEOA).balance;
-
-        assertTrue(atlas.balanceOf(solverOneEOA) == 0, "solverOne's atlETH balance should be 0");
-        assertTrue(
-            ethBalanceAfter == ethBalanceBefore + 1 ether, "solverOne's ETH balance should have been increased 1"
-        );
-        assertEq(atlas.totalSupply(), 1 ether, "total atlETH supply should have decreased to 1");
-
-        vm.stopPrank();
-    }
-
-    function testWithdrawWithoutBonding() public {
-        // solverOne deposited 1 ETH into Atlas in BaseTest.setUp
-        assertTrue(atlas.balanceOf(solverOneEOA) == 1 ether, "solverOne's atlETH balance should be 1");
-        assertEq(atlas.totalSupply(), 2 ether, "total atlETH supply should be 2");
-
-        uint256 ethBalanceBefore = address(solverOneEOA).balance;
-        vm.startPrank(solverOneEOA);
-
-        // Call withdraw without bonding first
-        atlas.withdraw(1 ether);
-        uint256 ethBalanceAfter = address(solverOneEOA).balance;
-
-        assertTrue(atlas.balanceOf(solverOneEOA) == 0, "solverOne's atlETH balance should be 0");
-        assertTrue(
-            ethBalanceAfter == ethBalanceBefore + 1 ether, "solverOne's ETH balance should have been increased 1"
-        );
-        assertEq(atlas.totalSupply(), 1 ether, "total atlETH supply should have decreased to 1");
-        vm.stopPrank();
+        assertTrue(atlas.DOMAIN_SEPARATOR() != expectedDomainSeparator, "domainSeparator should change with chainId");
     }
 }
