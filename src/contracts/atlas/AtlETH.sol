@@ -41,7 +41,9 @@ abstract contract AtlETH is Permit69 {
     }
 
     function unbondingCompleteBlock(address account) external view returns (uint256) {
-        return uint256(accessData[account].lastAccessedBlock) + ESCROW_DURATION;
+        uint256 lastAccessedBlock = uint256(accessData[account].lastAccessedBlock);
+        if (lastAccessedBlock == 0) return 0;
+        return lastAccessedBlock + ESCROW_DURATION;
     }
 
     // Deposit ETH and get atlETH in return.
