@@ -35,7 +35,6 @@ contract AtlETHTest is BaseTest {
     }
 
     function test_atleth_transfer() public {
-        // solverOne deposited 1 ETH into Atlas in BaseTest.setUp
         assertEq(atlas.balanceOf(solverOneEOA), 1e18, "solverOne's atlETH balance should be 1 ETH");
         assertEq(atlas.balanceOf(userEOA), 0, "user's atlETH balance should be 0");
 
@@ -47,7 +46,6 @@ contract AtlETHTest is BaseTest {
     }
 
     function test_atleth_transferFrom() public {
-        // solverOne deposited 1 ETH into Atlas in BaseTest.setUp
         assertEq(atlas.balanceOf(solverOneEOA), 1e18, "solverOne's atlETH balance should be 1 ETH");
         assertEq(atlas.balanceOf(solverTwoEOA), 1e18, "solverTwo's atlETH balance should be 1 ETH");
         assertEq(atlas.balanceOf(userEOA), 0, "user's atlETH balance should be 0");
@@ -73,7 +71,34 @@ contract AtlETHTest is BaseTest {
         assertEq(atlas.balanceOf(userEOA), 2e18, "user's atlETH balance should be 2 ETH");
     }
 
-    function test_atleth_permit() public {}
+    function test_atleth_permit() public {
+        assertEq(atlas.balanceOf(solverOneEOA), 1e18, "solverOne's atlETH balance should be 1 ETH");
+        assertEq(atlas.allowance(solverOneEOA, userEOA), 0, "solverOne's allowance for user should be 0");
+
+        bytes32 domainSeparator = atlas.DOMAIN_SEPARATOR();
+        bytes32 digest = keccak256(
+            abi.encodePacked(
+                "\x19\x01",
+                domainSeparator,
+                keccak256(
+                    abi.encode(
+                        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"),
+                        solverOneEOA,
+                        userEOA,
+                        1e18,
+                        atlas.nonces(solverOneEOA),
+                        type(uint256).max
+                    )
+                )
+            )
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(solverOnePK, digest);
+
+        vm.prank(userEOA);
+        atlas.permit(solverOneEOA, userEOA, 1e18, type(uint256).max, v, r, s);
+
+        assertEq(atlas.allowance(solverOneEOA, userEOA), 1e18, "solverOne's allowance for user should be 1 ETH");
+    }
 
     // View Function Tests
     
