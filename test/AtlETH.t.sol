@@ -7,10 +7,6 @@ import { BaseTest } from "./base/BaseTest.t.sol";
 
 contract AtlETHTest is BaseTest {
 
-    function setUp() public override {
-        super.setUp();
-    }
-
     // AtlETH Tests
 
     function test_atleth_deposit() public {}
@@ -27,11 +23,55 @@ contract AtlETHTest is BaseTest {
 
     // ERC20 Function Tests
 
-    function test_atleth_approve() public {}
+    function test_atleth_approve() public {
+        // solverOne deposited 1 ETH into Atlas in BaseTest.setUp
+        assertEq(atlas.balanceOf(solverOneEOA), 1e18, "solverOne's atlETH balance should be 1 ETH");
+        assertEq(atlas.allowance(solverOneEOA, userEOA), 0, "solverOne's allowance for user should be 0");
 
-    function test_atleth_transfer() public {}
+        vm.prank(solverOneEOA);
+        atlas.approve(userEOA, 1e18);
 
-    function test_atleth_transferFrom() public {}
+        assertEq(atlas.allowance(solverOneEOA, userEOA), 1e18, "solverOne's allowance for user should be 1 ETH");
+    }
+
+    function test_atleth_transfer() public {
+        // solverOne deposited 1 ETH into Atlas in BaseTest.setUp
+        assertEq(atlas.balanceOf(solverOneEOA), 1e18, "solverOne's atlETH balance should be 1 ETH");
+        assertEq(atlas.balanceOf(userEOA), 0, "user's atlETH balance should be 0");
+
+        vm.prank(solverOneEOA);
+        atlas.transfer(userEOA, 1e18);
+
+        assertEq(atlas.balanceOf(solverOneEOA), 0, "solverOne's atlETH balance should be 0");
+        assertEq(atlas.balanceOf(userEOA), 1e18, "user's atlETH balance should be 1 ETH");
+    }
+
+    function test_atleth_transferFrom() public {
+        // solverOne deposited 1 ETH into Atlas in BaseTest.setUp
+        assertEq(atlas.balanceOf(solverOneEOA), 1e18, "solverOne's atlETH balance should be 1 ETH");
+        assertEq(atlas.balanceOf(solverTwoEOA), 1e18, "solverTwo's atlETH balance should be 1 ETH");
+        assertEq(atlas.balanceOf(userEOA), 0, "user's atlETH balance should be 0");
+
+        vm.prank(solverOneEOA);
+        atlas.approve(userEOA, 1e18); // approve only 1 ETH
+
+        vm.prank(userEOA);
+        atlas.transferFrom(solverOneEOA, userEOA, 1e18);
+
+        assertEq(atlas.balanceOf(solverOneEOA), 0, "solverOne's atlETH balance should be 0");
+        assertEq(atlas.balanceOf(solverTwoEOA), 1e18, "solverTwo's atlETH balance should be 1 ETH");
+        assertEq(atlas.balanceOf(userEOA), 1e18, "user's atlETH balance should be 1 ETH");
+
+
+        vm.prank(solverTwoEOA);
+        atlas.approve(userEOA, type(uint256).max); // approve max
+        
+        vm.prank(userEOA);
+        atlas.transferFrom(solverTwoEOA, userEOA, 1e18);
+
+        assertEq(atlas.balanceOf(solverTwoEOA), 0, "solverTwo's atlETH balance should be 0");
+        assertEq(atlas.balanceOf(userEOA), 2e18, "user's atlETH balance should be 2 ETH");
+    }
 
     function test_atleth_permit() public {}
 
