@@ -78,11 +78,73 @@ contract AtlETHTest is BaseTest {
         assertEq(address(solverTwoEOA).balance, solverEthBalanceBefore + 1e18, "solverTwo's ETH balance should be 1 ETH more");
     }
 
-    function test_atleth_bond() public {}
+    function test_atleth_bond() public {
+        assertEq(atlas.balanceOf(solverOneEOA), 1e18, "solverOne's atlETH balance should be 1 ETH");
+        assertEq(atlas.balanceOfBonded(solverOneEOA), 0, "solverOne's bonded atlETH should be 0");
+        assertEq(atlas.bondedTotalSupply(), 0, "total bonded atlETH supply should be 0");
 
-    function test_atleth_depositAndBond() public {}
+        vm.prank(solverOneEOA);
+        vm.expectRevert(); // Underflow error
+        atlas.bond(2e18);
 
-    function test_atleth_unbond() public {}
+        vm.prank(solverOneEOA);
+        vm.expectEmit(true, true, false, true);
+        emit AtlasEvents.Bond(solverOneEOA, 1e18);
+        atlas.bond(1e18);
+
+        assertEq(atlas.balanceOf(solverOneEOA), 0, "solverOne's atlETH balance should be 0");
+        assertEq(atlas.balanceOfBonded(solverOneEOA), 1e18, "solverOne's bonded atlETH should be 1 ETH");
+        assertEq(atlas.bondedTotalSupply(), 1e18, "total bonded atlETH supply should be 1 ETH");
+    }
+
+    function test_atleth_depositAndBond() public {
+        assertEq(atlas.balanceOf(userEOA), 0, "user's atlETH balance should be 0");
+        assertEq(atlas.balanceOfBonded(userEOA), 0, "user's bonded atlETH should be 0");
+        assertEq(atlas.bondedTotalSupply(), 0, "total bonded atlETH supply should be 0");
+
+        deal(userEOA, 1e18);
+
+        vm.prank(userEOA);
+        vm.expectRevert(); // Underflow error
+        atlas.depositAndBond{ value: 1e18 }(2e18);
+
+        vm.prank(userEOA);
+        vm.expectEmit(true, true, false, true);
+        emit AtlasEvents.Transfer(address(0), userEOA, 1e18);
+        vm.expectEmit(true, true, false, true);
+        emit AtlasEvents.Bond(userEOA, 1e18);
+        atlas.depositAndBond{ value: 1e18 }(1e18);
+
+        assertEq(atlas.balanceOf(userEOA), 0, "user's atlETH balance should still be 0");
+        assertEq(atlas.balanceOfBonded(userEOA), 1e18, "user's bonded atlETH should be 1 ETH");
+        assertEq(atlas.bondedTotalSupply(), 1e18, "total bonded atlETH supply should be 1 ETH");
+    }
+
+    function test_atleth_unbond() public {
+        vm.startPrank(solverOneEOA);
+        atlas.bond(1e18);
+
+        assertEq(atlas.balanceOf(solverOneEOA), 0, "solverOne's atlETH balance should be 0");
+        assertEq(atlas.balanceOfBonded(solverOneEOA), 1e18, "solverOne's bonded atlETH should be 1 ETH");
+        assertEq(atlas.balanceOfUnbonding(solverOneEOA), 0, "solverOne's unbonding atlETH should be 0");
+        assertEq(atlas.accountLastActiveBlock(solverOneEOA), 0, "solverOne's last active block should be 0");
+        assertEq(atlas.bondedTotalSupply(), 1e18, "total bonded atlETH supply should be 1 ETH");
+
+        // Reverts if unbonding more than bonded balance
+        vm.expectRevert(); // Underflow error
+        atlas.unbond(2e18);
+
+        vm.expectEmit(true, true, false, true);
+        emit AtlasEvents.Unbond(solverOneEOA, 1e18, block.number + atlas.ESCROW_DURATION() + 1);
+        atlas.unbond(1e18);
+
+        // NOTE: On unbonding, individual account bonded balances decrease, but total bonded supply remains the same
+        assertEq(atlas.balanceOf(solverOneEOA), 0, "solverOne's atlETH balance should be 0");
+        assertEq(atlas.balanceOfBonded(solverOneEOA), 0, "solverOne's bonded atlETH should be 1 ETH");
+        assertEq(atlas.balanceOfUnbonding(solverOneEOA), 1e18, "solverOne's unbonding atlETH should be 1 ETH");
+        assertEq(atlas.accountLastActiveBlock(solverOneEOA), block.number, "solverOne's last active block should be the current block");
+        assertEq(atlas.bondedTotalSupply(), 1e18, "total bonded atlETH supply should be 1e18");
+    }
 
     function test_atleth_redeem() public {}
 
