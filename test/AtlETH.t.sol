@@ -4,6 +4,7 @@ pragma solidity 0.8.22;
 import "forge-std/Test.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
+import {AtlasEvents} from "src/contracts/types/AtlasEvents.sol";
 
 contract AtlETHTest is BaseTest {
 
@@ -29,6 +30,8 @@ contract AtlETHTest is BaseTest {
         assertEq(atlas.allowance(solverOneEOA, userEOA), 0, "solverOne's allowance for user should be 0");
 
         vm.prank(solverOneEOA);
+        vm.expectEmit(true, true, false, true);
+        emit AtlasEvents.Approval(solverOneEOA, userEOA, 1e18);
         atlas.approve(userEOA, 1e18);
 
         assertEq(atlas.allowance(solverOneEOA, userEOA), 1e18, "solverOne's allowance for user should be 1 ETH");
@@ -39,6 +42,8 @@ contract AtlETHTest is BaseTest {
         assertEq(atlas.balanceOf(userEOA), 0, "user's atlETH balance should be 0");
 
         vm.prank(solverOneEOA);
+        vm.expectEmit(true, true, false, true);
+        emit AtlasEvents.Transfer(solverOneEOA, userEOA, 1e18);
         atlas.transfer(userEOA, 1e18);
 
         assertEq(atlas.balanceOf(solverOneEOA), 0, "solverOne's atlETH balance should be 0");
@@ -65,6 +70,8 @@ contract AtlETHTest is BaseTest {
         atlas.approve(userEOA, type(uint256).max); // approve max
         
         vm.prank(userEOA);
+        vm.expectEmit(true, true, false, true);
+        emit AtlasEvents.Transfer(solverTwoEOA, userEOA, 1e18);
         atlas.transferFrom(solverTwoEOA, userEOA, 1e18);
 
         assertEq(atlas.balanceOf(solverTwoEOA), 0, "solverTwo's atlETH balance should be 0");
@@ -95,6 +102,8 @@ contract AtlETHTest is BaseTest {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(solverOnePK, digest);
 
         vm.prank(userEOA);
+        vm.expectEmit(true, true, false, true);
+        emit AtlasEvents.Approval(solverOneEOA, userEOA, 1e18);
         atlas.permit(solverOneEOA, userEOA, 1e18, type(uint256).max, v, r, s);
 
         assertEq(atlas.allowance(solverOneEOA, userEOA), 1e18, "solverOne's allowance for user should be 1 ETH");
