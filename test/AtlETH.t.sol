@@ -10,9 +10,35 @@ contract AtlETHTest is BaseTest {
 
     // AtlETH Tests
 
-    function test_atleth_deposit() public {}
+    function test_atleth_deposit() public {
+        uint256 totalSupplyBefore = atlas.totalSupply();
+        assertEq(atlas.balanceOf(userEOA), 0, "user's atlETH balance should be 0");
 
-    function test_atleth_withdraw() public {}
+        deal(userEOA, 1e18);
+        vm.prank(userEOA);
+        vm.expectEmit(true, true, false, true);
+        emit AtlasEvents.Transfer(address(0), userEOA, 1e18);
+        atlas.deposit{ value: 1e18 }();
+
+        assertEq(atlas.balanceOf(userEOA), 1e18, "user's atlETH balance should be 1 ETH");
+        assertEq(atlas.totalSupply(), totalSupplyBefore + 1e18, "total atlETH supply should be 1 ETH more");
+    }
+
+    function test_atleth_withdraw() public {
+        uint256 totalSupplyBefore = atlas.totalSupply();
+        uint256 solverEthBalanceBefore = address(solverOneEOA).balance;
+        assertEq(atlas.balanceOf(solverOneEOA), 1e18, "solverOne's atlETH balance should be 1 ETH");
+
+
+        vm.prank(solverOneEOA);
+        vm.expectEmit(true, true, false, true);
+        emit AtlasEvents.Transfer(solverOneEOA, address(0), 1e18);
+        atlas.withdraw(1e18);
+
+        assertEq(atlas.balanceOf(solverOneEOA), 0, "solverOne's atlETH balance should be 0");
+        assertEq(atlas.totalSupply(), totalSupplyBefore - 1e18, "total atlETH supply should be 1 ETH less");
+        assertEq(address(solverOneEOA).balance, solverEthBalanceBefore + 1e18, "solverOne's ETH balance should be 1 ETH more");
+    }
 
     function test_atleth_bond() public {}
 
