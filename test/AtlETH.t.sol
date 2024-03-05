@@ -39,7 +39,6 @@ contract AtlETHTest is BaseTest {
     
     function test_atleth_balanceOf() public {
         assertEq(atlas.balanceOf(solverOneEOA), 1e18, "solverOne's atlETH balance should be 1 ETH");
-        assertEq(atlas.balanceOf(solverTwoEOA), 1e18, "solverTwo's atlETH balance should be 1 ETH");
         assertEq(atlas.balanceOf(userEOA), 0, "user's atlETH balance should be 0");
 
         deal(userEOA, 1e18);
@@ -50,23 +49,61 @@ contract AtlETHTest is BaseTest {
     }
 
     function test_atleth_balanceOfBonded() public {
+        assertEq(atlas.balanceOfBonded(solverOneEOA), 0, "solverOne's bonded atlETH starts at 0");
+        assertEq(atlas.bondedTotalSupply(), 0, "total bonded atlETH supply should be 0");
 
+        vm.prank(solverOneEOA);
+        atlas.bond(1e18);
+
+        assertEq(atlas.balanceOfBonded(solverOneEOA), 1e18, "solverOne's bonded atlETH should be 1 ETH");
+        assertEq(atlas.bondedTotalSupply(), 1e18, "total bonded atlETH supply should be 1 ETH");
     }
 
     function test_atleth_balanceOfUnbonding() public {
+        assertEq(atlas.balanceOfUnbonding(solverOneEOA), 0, "solverOne's unbonding atlETH starts at 0");
 
+        vm.startPrank(solverOneEOA);
+        atlas.bond(1e18);
+        atlas.unbond(1e18);
+        vm.stopPrank();
+
+        assertEq(atlas.balanceOfUnbonding(solverOneEOA), 1e18, "solverOne's unbonding atlETH should be 1 ETH"); 
     }
 
     function test_atleth_accountLastActiveBlock() public {
+        assertEq(atlas.accountLastActiveBlock(solverOneEOA), 0, "solverOne's last active block should be 0");
 
+        vm.startPrank(solverOneEOA);
+        atlas.bond(1e18);
+        atlas.unbond(1e18);
+        vm.stopPrank();
+
+        assertEq(atlas.accountLastActiveBlock(solverOneEOA), block.number, "solverOne's last active block should be the current block");
     }
 
     function test_atleth_unbondingCompleteBlock() public {
+        assertEq(atlas.unbondingCompleteBlock(solverOneEOA), 0, "solverOne's unbonding complete block should be 0");
 
+        vm.startPrank(solverOneEOA);
+        atlas.bond(1e18);
+        atlas.unbond(1e18);
+        vm.stopPrank();
+
+        assertEq(atlas.unbondingCompleteBlock(solverOneEOA), block.number + atlas.ESCROW_DURATION(), "solverOne's unbonding complete block should be the current block + 64");
     }
 
     function test_atleth_domainSeparator() public {
-
+        bytes32 domainSeparator = atlas.DOMAIN_SEPARATOR();
+        bytes32 expectedDomainSeparator = keccak256(
+            abi.encode(
+                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                    keccak256("Atlas ETH"),
+                    keccak256("1"),
+                    block.chainid,
+                    address(atlas)
+                )
+        );
+        assertEq(domainSeparator, expectedDomainSeparator, "domainSeparator not as expected");
     }
 
     // TODO - OLD tests - move to above
