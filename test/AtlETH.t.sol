@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
 import {AtlasEvents} from "src/contracts/types/AtlasEvents.sol";
+import {AtlasErrors} from "src/contracts/types/AtlasErrors.sol";
 
 contract AtlETHTest is BaseTest {
 
@@ -29,7 +30,6 @@ contract AtlETHTest is BaseTest {
         uint256 solverEthBalanceBefore = address(solverOneEOA).balance;
         assertEq(atlas.balanceOf(solverOneEOA), 1e18, "solverOne's atlETH balance should be 1 ETH");
 
-
         vm.prank(solverOneEOA);
         vm.expectEmit(true, true, false, true);
         emit AtlasEvents.Transfer(solverOneEOA, address(0), 1e18);
@@ -38,6 +38,44 @@ contract AtlETHTest is BaseTest {
         assertEq(atlas.balanceOf(solverOneEOA), 0, "solverOne's atlETH balance should be 0");
         assertEq(atlas.totalSupply(), totalSupplyBefore - 1e18, "total atlETH supply should be 1 ETH less");
         assertEq(address(solverOneEOA).balance, solverEthBalanceBefore + 1e18, "solverOne's ETH balance should be 1 ETH more");
+
+        // Testing _deduct(from, amount) within withdraw
+        uint256 solverTwoAtlETH = atlas.balanceOf(solverTwoEOA);
+        uint256 snapshot = vm.snapshot();
+
+        // Test withdraw less than full AtlETH balance
+        vm.prank(solverTwoEOA);
+        atlas.withdraw(solverTwoAtlETH / 2);
+
+        assertEq(atlas.balanceOf(solverTwoEOA), solverTwoAtlETH / 2, "solverTwo's atlETH balance should be half of what it was");
+
+        // Test withdraw 2x AtlETH balance - should revert with custom error
+        vm.revertTo(snapshot);
+        vm.startPrank(solverTwoEOA);
+        atlas.bond(1e18);
+        atlas.unbond(1e18);
+        vm.expectRevert(abi.encodeWithSelector(AtlasErrors.InsufficientBalanceForDeduction.selector, 0, 2e18));
+        atlas.withdraw(solverTwoAtlETH * 2);
+        vm.stopPrank();
+
+        // Test withdraw after unbonding and waiting the escrow duration
+        vm.revertTo(snapshot);
+        vm.startPrank(solverTwoEOA);
+        atlas.bond(1e18);
+        atlas.unbond(1e18);
+        vm.stopPrank();
+
+        assertEq(atlas.balanceOfUnbonding(solverTwoEOA), 1e18, "unbonding atleth should be 1 ETH");
+        vm.roll(block.number + atlas.ESCROW_DURATION() + 1);
+        assertEq(atlas.balanceOfUnbonding(solverTwoEOA), 1e18, "unbonding atleth should still be 1 ETH");
+        solverEthBalanceBefore = address(solverTwoEOA).balance;
+
+        vm.prank(solverTwoEOA);
+        atlas.withdraw(solverTwoAtlETH);
+
+        assertEq(atlas.balanceOf(solverTwoEOA), 0, "solverTwo's atlETH balance should be 0");
+        assertEq(atlas.balanceOfUnbonding(solverTwoEOA), 0, "unbonding atleth should be 0");
+        assertEq(address(solverTwoEOA).balance, solverEthBalanceBefore + 1e18, "solverTwo's ETH balance should be 1 ETH more");
     }
 
     function test_atleth_bond() public {}
