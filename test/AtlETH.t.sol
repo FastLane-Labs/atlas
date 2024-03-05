@@ -7,14 +7,46 @@ import { BaseTest } from "./base/BaseTest.t.sol";
 
 contract AtlETHTest is BaseTest {
 
+    function setUp() public override {
+        super.setUp();
+    }
+
     // AtlETH Tests
 
+    function test_atleth_deposit() public {}
+
+    function test_atleth_withdraw() public {}
+
     function test_atleth_bond() public {}
+
+    function test_atleth_depositAndBond() public {}
+
+    function test_atleth_unbond() public {}
+
+    function test_atleth_redeem() public {}
+
+    // ERC20 Function Tests
+
+    function test_atleth_approve() public {}
+
+    function test_atleth_transfer() public {}
+
+    function test_atleth_transferFrom() public {}
+
+    function test_atleth_permit() public {}
 
     // View Function Tests
     
     function test_atleth_balanceOf() public {
+        assertEq(atlas.balanceOf(solverOneEOA), 1e18, "solverOne's atlETH balance should be 1 ETH");
+        assertEq(atlas.balanceOf(solverTwoEOA), 1e18, "solverTwo's atlETH balance should be 1 ETH");
+        assertEq(atlas.balanceOf(userEOA), 0, "user's atlETH balance should be 0");
 
+        deal(userEOA, 1e18);
+        vm.prank(userEOA);
+        atlas.deposit{ value: 1e18 }();
+
+        assertEq(atlas.balanceOf(userEOA), 1e18, "user's atlETH balance should now be 1 ETH");
     }
 
     function test_atleth_balanceOfBonded() public {
@@ -33,10 +65,11 @@ contract AtlETHTest is BaseTest {
 
     }
 
-    // ERC20 Function Tests
+    function test_atleth_domainSeparator() public {
 
-    // TODO
+    }
 
+    // TODO - OLD tests - move to above
 
     function testBasicFunctionalities() public {
         // solverOne deposited 1 ETH into Atlas in BaseTest.setUp
