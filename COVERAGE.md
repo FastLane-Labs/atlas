@@ -85,24 +85,27 @@ Last updated: 2024-Jan-30
 
 ### AtlasVerification.sol
 
-Effective Test Coverage: 100%
-
 Coverage as per coverage report:
 
-- Lines: 147/151 (97.4%)
+- Lines: 166/176 (94.3%)
 - Functions: 19/19 (100%)
 
 Unreachable Code:
 
-- L278 Cannot be reached as `_verifyDApp` would return false before L278 if either dAppOp.control or dConfig.to are invalid, and if both are valid then this `return false` line would be bypassed.
+- L368 Cannot be reached as `_verifyDApp` would return false before L278 if either dAppOp.control or dConfig.to are invalid, and if both are valid then this `return false` line would be bypassed.
 
 Coverage Bugs:
 
-- L360 `_handleNonces` last return line is covered as function is tested without revert.
-- L381 `_incrementHighestFullAsyncBitmap` last return line is covered as function is tested without revert.
-- L525 the `break` in `manuallyUpdateNonceTracker` is covered if the line above is covered, which it is.
+- L139 `_verifyAuctioneer` is called as the lines of the internal function have full coverage.
+- L450 `_handleNonces` last return line is covered as function is tested without revert.
+- L471 `_incrementHighestFullAsyncBitmap` last return line is covered as function is tested without revert.
+- L625 the `break` in `manuallyUpdateNonceTracker` is covered if the line above is covered, which it is.
 
-Last updated: 2024-Feb-06
+Not Covered By Tests:
+
+- The `if (userOp.from.code.length > 0)` block in _verifyUser for ERC-4337 Smart Wallets.
+
+Last updated: 2024-Mar-06
 
 ### DAppIntegration.sol
 
