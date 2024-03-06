@@ -160,50 +160,130 @@ contract AtlasVerificationBase is AtlasBaseTest {
 // ---- NON VALID CALLS TESTS ---- //
 //
 
-contract AtlasVerificationOtherTest is AtlasVerificationBase {
+contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
     using CallVerification for UserOperation;
 
-    function test_verification_verifySolverOp() public {
+    function test_verifySolverOp_InvalidSignature() public {
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         address bundler = userEOA;
-        uint256 userMaxFeePerGas = userOp.maxFeePerGas;
-        uint256 result;
 
-        // Solver not bundler and invalid solver sig = SolverOutcome.InvalidSignature
+        // Signed by wrong PK = SolverOutcome.InvalidSignature
         solverOps[0] = validSolverOperation(userOp).signAndBuild(address(atlasVerification), userPK);
-        result = atlasVerification.verifySolverOp(
+        uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
             userOp.getUserOperationHash(),
-            userMaxFeePerGas,
-            bundler 
-        );
-        assertEq(result, 1 << uint256(SolverOutcome.InvalidSignature));
-
-        // Solver not bundler and no solver sig = SolverOutcome.InvalidSignature
-        solverOps[0].signature = "";
-        result = atlasVerification.verifySolverOp(
-            solverOps[0],
-            userOp.getUserOperationHash(),
-            userMaxFeePerGas,
+            userOp.maxFeePerGas,
             bundler
         );
-        assertEq(result, 1 << uint256(SolverOutcome.InvalidSignature));
+        assertEq(result, 1 << uint256(SolverOutcome.InvalidSignature), "Expected InvalidSignature 1");
 
-        // TODO more errors here - including tx.gasprice check 
-
-        // Solver is the bundler, no sig, everything valid = Valid result
-        solverOps = validSolverOperations(userOp);
+        // No signature = SolverOutcome.InvalidSignature
         solverOps[0].signature = "";
-        bundler = solverOneEOA;
+        result = atlasVerification.verifySolverOp(
+            solverOps[0],
+            userOp.getUserOperationHash(),
+            userOp.maxFeePerGas,
+            bundler
+        );
+        assertEq(result, 1 << uint256(SolverOutcome.InvalidSignature), "Expected InvalidSignature 2");
+    }
+
+    function test_verifySolverOp_InvalidUserHash() public {
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        address bundler = solverOneEOA;
+
+        // userOpHash doesnt match = SolverOutcome.InvalidUserHash
+        solverOps[0].userOpHash = keccak256(abi.encodePacked("Not the userOp"));
+        uint256 result = atlasVerification.verifySolverOp(
+            solverOps[0],
+            userOp.getUserOperationHash(),
+            userOp.maxFeePerGas,
+            bundler
+        );
+        assertEq(result, 1 << uint256(SolverOutcome.InvalidUserHash), "Expected InvalidUserHash");
+    }
+
+    function test_verifySolverOp_InvalidTo() public {
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        address bundler = solverOneEOA;
+
+        // solverOp.to != atlas = SolverOutcome.InvalidTo
+        solverOps[0].to = address(0);
+        uint256 result = atlasVerification.verifySolverOp(
+            solverOps[0],
+            userOp.getUserOperationHash(),
+            userOp.maxFeePerGas,
+            bundler
+        );
+        assertEq(result, 1 << uint256(SolverOutcome.InvalidTo), "Expected InvalidTo");
+    }
+
+    function test_verifySolverOp_GasPriceOverCap() public {
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        address bundler = solverOneEOA;
+
+        // solverOp.maxFeePerGas < tx.gasprice = SolverOutcome.GasPriceOverCap
+        vm.txGasPrice(solverOps[0].maxFeePerGas + 1); // Increase gas price above solver's max
+        uint256 result = atlasVerification.verifySolverOp(
+            solverOps[0],
+            userOp.getUserOperationHash(),
+            userOp.maxFeePerGas,
+            bundler
+        );
+        assertEq(result, 1 << uint256(SolverOutcome.GasPriceOverCap), "Expected GasPriceOverCap");
+        vm.txGasPrice(tx.gasprice); // Reset gas price to expected level
+    }
+
+    function test_verifySolverOp_GasPriceBelowUsers() public {
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        address bundler = solverOneEOA;
+
+        // maxFeePerGas is below user's = SolverOutcome.GasPriceBelowUsers
+        uint256 result = atlasVerification.verifySolverOp(
+            solverOps[0],
+            userOp.getUserOperationHash(),
+            userOp.maxFeePerGas + 1,
+            bundler
+        );
+        assertEq(result, 1 << uint256(SolverOutcome.GasPriceBelowUsers), "Expected GasPriceBelowUsers");
+    }
+
+    function test_verifySolverOp_InvalidSolver() public {
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        address bundler = solverOneEOA;
+
+        // solverOp.solver is atlas = SolverOutcome.InvalidSolver
+        solverOps[0].solver = address(atlas);
+        uint256 result = atlasVerification.verifySolverOp(
+            solverOps[0],
+            userOp.getUserOperationHash(),
+            userOp.maxFeePerGas,
+            bundler
+        );
+        assertEq(result, 1 << uint256(SolverOutcome.InvalidSolver), "Expected InvalidSolver");
+    }
+
+    function test_verifySolverOp_Valid() public {
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        address bundler = solverOneEOA;
+
+        // no sig, everything valid = Valid result
+        solverOps[0].signature = "";
         vm.prank(solverOneEOA);
-        result = atlasVerification.verifySolverOp(
+        uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
             userOp.getUserOperationHash(),
-            userMaxFeePerGas,
+            userOp.maxFeePerGas,
             bundler
         );
-        assertEq(result, 0); // 0 = No SolverOutcome errors
+        assertEq(result, 0, "Expected No Errors 1"); // 0 = No SolverOutcome errors
 
         // Valid solver sig, everything valid = Valid result
         solverOps = validSolverOperations(userOp);
@@ -211,10 +291,10 @@ contract AtlasVerificationOtherTest is AtlasVerificationBase {
         result = atlasVerification.verifySolverOp(
             solverOps[0],
             userOp.getUserOperationHash(),
-            userMaxFeePerGas,
+            userOp.maxFeePerGas,
             bundler
         );
-        assertEq(result, 0); // 0 = No SolverOutcome errors
+        assertEq(result, 0, "Expected No Errors 2"); // 0 = No SolverOutcome errors
     }
 }
 
