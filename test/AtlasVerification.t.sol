@@ -12,6 +12,7 @@ import { DummyDAppControl } from "./base/DummyDAppControl.sol";
 import { AtlasBaseTest } from "./base/AtlasBaseTest.t.sol";
 import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
+import { SolverOutcome } from "src/contracts/types/EscrowTypes.sol";
 import { DummyDAppControlBuilder } from "./helpers/DummyDAppControlBuilder.sol";
 import { CallConfigBuilder } from "./helpers/CallConfigBuilder.sol";
 import { UserOperationBuilder } from "./base/builders/UserOperationBuilder.sol";
@@ -156,10 +157,72 @@ contract AtlasVerificationBase is AtlasBaseTest {
 }
 
 //
-// ---- TESTS BEGIN HERE ---- //
+// ---- NON VALID CALLS TESTS ---- //
 //
 
-contract AtlasVerificationTest is AtlasVerificationBase {
+contract AtlasVerificationOtherTest is AtlasVerificationBase {
+    using CallVerification for UserOperation;
+
+    function test_verification_verifySolverOp() public {
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        address bundler = userEOA;
+        uint256 userMaxFeePerGas = userOp.maxFeePerGas;
+        uint256 result;
+
+        // Solver not bundler and invalid solver sig = SolverOutcome.InvalidSignature
+        solverOps[0] = validSolverOperation(userOp).signAndBuild(address(atlasVerification), userPK);
+        result = atlasVerification.verifySolverOp(
+            solverOps[0],
+            userOp.getUserOperationHash(),
+            userMaxFeePerGas,
+            bundler 
+        );
+        assertEq(result, 1 << uint256(SolverOutcome.InvalidSignature));
+
+        // Solver not bundler and no solver sig = SolverOutcome.InvalidSignature
+        solverOps[0].signature = "";
+        result = atlasVerification.verifySolverOp(
+            solverOps[0],
+            userOp.getUserOperationHash(),
+            userMaxFeePerGas,
+            bundler
+        );
+        assertEq(result, 1 << uint256(SolverOutcome.InvalidSignature));
+
+        // TODO more errors here - including tx.gasprice check 
+
+        // Solver is the bundler, no sig, everything valid = Valid result
+        solverOps = validSolverOperations(userOp);
+        solverOps[0].signature = "";
+        bundler = solverOneEOA;
+        vm.prank(solverOneEOA);
+        result = atlasVerification.verifySolverOp(
+            solverOps[0],
+            userOp.getUserOperationHash(),
+            userMaxFeePerGas,
+            bundler
+        );
+        assertEq(result, 0); // 0 = No SolverOutcome errors
+
+        // Valid solver sig, everything valid = Valid result
+        solverOps = validSolverOperations(userOp);
+        bundler = userEOA;
+        result = atlasVerification.verifySolverOp(
+            solverOps[0],
+            userOp.getUserOperationHash(),
+            userMaxFeePerGas,
+            bundler
+        );
+        assertEq(result, 0); // 0 = No SolverOutcome errors
+    }
+}
+
+//
+// ---- VALID CALLS TESTS BEGIN HERE ---- //
+//
+
+contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     // Valid cases
 
