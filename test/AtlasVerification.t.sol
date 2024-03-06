@@ -355,6 +355,21 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         ), ValidCallsResult.Valid);
     }
 
+    // OpHashMismatch case
+    // When userOpHash != dAppOp.userOpHash
+
+    function test_validCalls_OpHashMismatch() public {
+        defaultAtlasEnvironment();
+
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withUserOpHash(bytes32(0)).signAndBuild(address(atlasVerification), governancePK);
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+        ), ValidCallsResult.OpHashMismatch);
+    }
+
     // InvalidCaller cases
 
     //
