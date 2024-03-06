@@ -304,6 +304,37 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
 
 contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
+    // TrustedOpHash Allowed Tests
+
+    function test_validCalls_trustedOpHash_sessionKeyWrong_InvalidAuctioneer() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withTrustedOpHash(true).build());
+
+        UserOperation memory userOp = validUserOperation().withSessionKey(address(0)).build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+        solverOps[0] = validSolverOperation(userOp).withAltUserOpHash(userOp).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+        ), ValidCallsResult.InvalidAuctioneer);
+    }
+
+
+    function test_validCalls_trustedOpHash_msgSenderWrong_InvalidBundler() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withTrustedOpHash(true).build());
+
+        UserOperation memory userOp = validUserOperation().withSessionKey(governanceEOA).build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withAltUserOpHash(userOp).build();
+        solverOps[0] = validSolverOperation(userOp).withAltUserOpHash(userOp).build();
+
+        // If msgSender in _validCalls is neither dAppOp.from nor userOp.from,
+        // and trustedOpHash is true --> return InvalidBundler
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+        ), ValidCallsResult.InvalidBundler);
+    }
+
     // Valid cases
 
     // 
