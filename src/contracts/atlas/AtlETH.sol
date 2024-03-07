@@ -41,7 +41,9 @@ abstract contract AtlETH is Permit69 {
     }
 
     function unbondingCompleteBlock(address account) external view returns (uint256) {
-        return uint256(accessData[account].lastAccessedBlock) + ESCROW_DURATION;
+        uint256 lastAccessedBlock = uint256(accessData[account].lastAccessedBlock);
+        if (lastAccessedBlock == 0) return 0;
+        return lastAccessedBlock + ESCROW_DURATION;
     }
 
     // Deposit ETH and get atlETH in return.
@@ -166,11 +168,9 @@ abstract contract AtlETH is Permit69 {
 
         uint112 balance = aData.balance;
 
-        if (amt < balance) {
+        if (amt <= balance) {
             _balanceOf[account].balance = balance - amt;
-        } else if (amt == balance) {
-            _balanceOf[account].balance = 0;
-        } else if (uint32(block.number + ESCROW_DURATION) > accessData[account].lastAccessedBlock) {
+        } else if (block.number > accessData[account].lastAccessedBlock + ESCROW_DURATION) {
             uint112 _shortfall = amt - balance;
             aData.balance = 0;
             aData.unbonding -= _shortfall; // underflow here to revert if insufficient balance

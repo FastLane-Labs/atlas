@@ -41,20 +41,14 @@ Last updated: 2024-Jan-30
 
 ### AtlETH.sol
 
+Fully tested in `/test/AtlETH.t.sol`.
+
 Coverage as per coverage report:
 
-- Lines: 42/78 (53.8%)
-- Functions: 12/23 (52.2%)
+- Lines: 93/93 (100%)
+- Functions: 26/26 (100%)
 
-Work Needed:
-
-- View function tests
-- AtlETH's ERC20 functions (approve, transfer, transferFrom)
-- Permit (Also for ERC20 functionality)
-- Branches in `_deduct`
-- All `redeem` and `_redeem` functionality
-
-Last updated: 2024-Jan-30
+Last updated: 2024-Mar-05
 
 ### GasAccounting.sol
 
