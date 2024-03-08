@@ -113,10 +113,14 @@ Effective Test Coverage: 100%
 
 Coverage as per coverage report:
 
-- Lines: 26/26 (100%)
+- Lines: 34/35 (97.1%)
 - Functions: 5/5 (100%)
 
-Last updated: 2024-Jan-30
+Coverage Bugs:
+
+- L114 `break` is covered because the lines above in the if block are covered
+
+Last updated: 2024-Mar-07
 
 ### Mimic.sol
 
