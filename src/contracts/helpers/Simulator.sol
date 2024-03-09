@@ -38,7 +38,7 @@ contract Simulator is AtlasErrors {
     }
 
     function setAtlas(address _atlas) external {
-        require(msg.sender == deployer, "err - invalid sender");
+        if (msg.sender != deployer) revert Unauthorized();
         atlas = _atlas;
     }
 
@@ -127,7 +127,7 @@ contract Simulator is AtlasErrors {
         external
         payable
     {
-        require(msg.sender == address(this), "invalid entry func");
+        if (msg.sender != address(this)) revert InvalidEntryFunction();
         if (!IAtlas(atlas).metacall(userOp, solverOps, dAppOp)) {
             revert NoAuctionWinner(); // should be unreachable
         }
@@ -135,6 +135,5 @@ contract Simulator is AtlasErrors {
     }
 
     receive() external payable { }
-
     fallback() external payable { }
 }
