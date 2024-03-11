@@ -50,7 +50,7 @@ contract SwapIntentTest is BaseTest {
 
         // Deploy new SwapIntent Controller from new gov and initialize in Atlas
         vm.startPrank(governanceEOA);
-        swapIntentController = new SwapIntentController(address(escrow));
+        swapIntentController = new SwapIntentController(address(atlas));
         atlasVerification.initializeGovernance(address(swapIntentController));
         vm.stopPrank();
 
@@ -177,11 +177,13 @@ contract SwapIntentTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        assertFalse(simulator.simUserOperation(userOp), "metasimUserOperationcall tested true a");
+        (bool simResult, ) = simulator.simUserOperation(userOp);
+        assertFalse(simResult, "metasimUserOperationcall tested true a");
 
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
-        assertTrue(simulator.simUserOperation(userOp), "metasimUserOperationcall tested false c");
+        (simResult,) = simulator.simUserOperation(userOp);
+        assertTrue(simResult, "metasimUserOperationcall tested false c");
 
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
@@ -297,11 +299,13 @@ contract SwapIntentTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        assertFalse(simulator.simUserOperation(userOp), "metasimUserOperationcall tested true");
+        (bool simResult, ) = simulator.simUserOperation(userOp);
+        assertFalse(simResult, "metasimUserOperationcall tested true a");
 
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
-        assertTrue(simulator.simUserOperation(userOp), "metasimUserOperationcall tested false");
+        (simResult,) = simulator.simUserOperation(userOp);
+        assertTrue(simResult, "metasimUserOperationcall tested false c");
 
         // Check solver does NOT have DAI - it must use Uniswap to get it during metacall
         assertEq(DAI.balanceOf(address(uniswapSolver)), 0, "Solver has DAI before metacall");

@@ -45,8 +45,6 @@ contract BaseTest is Test, TestConstants {
     Simulator public simulator;
     Sorter public sorter;
 
-    address public escrow;
-
     Solver public solverOne;
     Solver public solverTwo;
 
@@ -99,14 +97,12 @@ contract BaseTest is Test, TestConstants {
         console.log("verification expected:", expectedAtlasVerificationAddr);
 
         simulator.setAtlas(address(atlas));
-
-        escrow = address(atlas);
         sorter = new Sorter(address(atlas));
 
         vm.stopPrank();
         vm.startPrank(governanceEOA);
 
-        control = new V2DAppControl(escrow);
+        control = new V2DAppControl(address(atlas));
         atlasVerification.initializeGovernance(address(control));
 
         vm.stopPrank();
@@ -115,7 +111,7 @@ contract BaseTest is Test, TestConstants {
 
         vm.startPrank(solverOneEOA);
 
-        solverOne = new Solver(WETH_ADDRESS, escrow, solverOneEOA);
+        solverOne = new Solver(WETH_ADDRESS, address(atlas), solverOneEOA);
         atlas.deposit{ value: 1e18 }();
 
         deal(TOKEN_ZERO, address(solverOne), 10e24);
@@ -125,7 +121,7 @@ contract BaseTest is Test, TestConstants {
 
         vm.startPrank(solverTwoEOA);
 
-        solverTwo = new Solver(WETH_ADDRESS, escrow, solverTwoEOA);
+        solverTwo = new Solver(WETH_ADDRESS, address(atlas), solverTwoEOA);
         atlas.deposit{ value: 1e18 }();
 
         vm.stopPrank();
@@ -140,7 +136,6 @@ contract BaseTest is Test, TestConstants {
         deal(TOKEN_ONE, address(atlas), 1);
 
         vm.label(userEOA, "USER");
-        vm.label(escrow, "ESCROW");
         vm.label(address(atlas), "ATLAS");
         vm.label(address(control), "DAPP CONTROL");
     }
