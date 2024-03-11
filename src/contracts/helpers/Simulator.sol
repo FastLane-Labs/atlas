@@ -9,6 +9,7 @@ import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
 import "../types/LockTypes.sol";
 import "../types/DAppApprovalTypes.sol";
+import "../types/ValidCallsTypes.sol";
 
 import { CallVerification } from "../libraries/CallVerification.sol";
 import { CallBits } from "../libraries/CallBits.sol";
@@ -42,14 +43,14 @@ contract Simulator is AtlasErrors {
         atlas = _atlas;
     }
 
-    function simUserOperation(UserOperation calldata userOp) external payable returns (bool success) {
-        // SolverOperation memory solverOp;
+    function simUserOperation(UserOperation calldata userOp) external payable returns (bool success, uint256) {
         SolverOperation[] memory solverOps = new SolverOperation[](0);
-        // solverOps[0] = solverOp;
         DAppOperation memory dAppOp;
         dAppOp.control = userOp.control;
 
-        success = uint8(_errorCatcher(userOp, solverOps, dAppOp)) > uint8(Result.UserOpSimFail);
+        (Result result, uint256 additionalErrorCode) = _errorCatcher(userOp, solverOps, dAppOp);
+        success = uint8(result) > uint8(Result.UserOpSimFail);
+        return (success, additionalErrorCode);
     }
 
     function simSolverCall(
@@ -64,7 +65,8 @@ contract Simulator is AtlasErrors {
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         solverOps[0] = solverOp;
 
-        success = _errorCatcher(userOp, solverOps, dAppOp) == Result.SimulationPassed;
+        (Result result,) = _errorCatcher(userOp, solverOps, dAppOp);
+        success = result == Result.SimulationPassed;
     }
 
     function simSolverCalls(
@@ -79,7 +81,8 @@ contract Simulator is AtlasErrors {
         if (solverOps.length == 0) {
             return false;
         }
-        success = _errorCatcher(userOp, solverOps, dAppOp) == Result.SimulationPassed;
+        (Result result,) = _errorCatcher(userOp, solverOps, dAppOp);
+        success = result == Result.SimulationPassed;
     }
 
     function _errorCatcher(
@@ -88,15 +91,23 @@ contract Simulator is AtlasErrors {
         DAppOperation memory dAppOp
     )
         internal
-        returns (Result result)
+        returns (Result result, uint256 additionalErrorCode)
     {
         try this.metacallSimulation{ value: msg.value }(userOp, solverOps, dAppOp) {
-            revert("unreachable");
+            revert Unreachable();
         } catch (bytes memory revertData) {
             bytes4 errorSwitch = bytes4(revertData);
             if (errorSwitch == VerificationSimFail.selector) {
+                // revertData in form [bytes4, uint256] but reverts on abi.decode
+                // This decodes the uint256 error code portion of the revertData
+                uint256 validCallsResult;
+                uint256 startIndex = revertData.length - 32;
+                assembly {
+                    validCallsResult := mload(add(add(revertData, 0x20), startIndex))
+                }
                 result = Result.VerificationSimFail;
                 console.log("Result.VerificationSimFail");
+                console.log("ValidCallsResult:", validCallsResult);
             } else if (errorSwitch == PreOpsSimFail.selector) {
                 result = Result.PreOpsSimFail;
                 console.log("Result.PreOpsSimFail");
@@ -116,6 +127,8 @@ contract Simulator is AtlasErrors {
                 result = Result.Unknown;
                 console.log("Result.Unknown");
             }
+
+            return (result, additionalErrorCode);
         }
     }
 
