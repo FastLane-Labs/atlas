@@ -8,6 +8,7 @@ import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
 import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import { ValidCallsResult } from "src/contracts/types/ValidCallsTypes.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { UserOperationBuilder } from "./base/builders/UserOperationBuilder.sol";
@@ -75,9 +76,21 @@ contract SimulatorTest is BaseTest {
         simulator.simUserOperation(userOp);
     }
 
-    function test_simUserOperation_success_valid() public {}
+    function test_simUserOperation_success_valid() public {
+        UserOperation memory userOp = validUserOperation().build();
+        (bool success, uint256 validCallsResult) = simulator.simUserOperation(userOp);
+        assertEq(success, true);
+        assertEq(validCallsResult, 0);
+    }
 
-    function test_simUserOperation_fail_bubblesUpValidCallsResult() public {}
+    function test_simUserOperation_fail_bubblesUpValidCallsResult() public {
+        UserOperation memory userOp = validUserOperation().build();
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(userPK, "wrong data");
+        userOp.signature = abi.encodePacked(r, s, v); // use bad sig
+        (bool success, uint256 validCallsResult) = simulator.simUserOperation(userOp);
+        assertEq(success, false);
+        assertEq(validCallsResult, uint256(ValidCallsResult.UserSignatureInvalid));
+    }
 
     function test_simSolverCall_success_validSolverOutcome() public {}
 
