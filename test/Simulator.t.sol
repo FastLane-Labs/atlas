@@ -69,7 +69,10 @@ contract SimulatorTest is BaseTest {
 
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = new SolverOperation[](1);
-        solverOps[0] = validSolverOperation(userOp).withSolver(address(solver)).withData(abi.encodeWithSelector(solver.solverFunc.selector)).signAndBuild(address(atlasVerification), solverOnePK);
+        solverOps[0] = validSolverOperation(userOp)
+            .withSolver(address(solver))
+            .withData(abi.encodeWithSelector(solver.solverFunc.selector))
+            .signAndBuild(address(atlasVerification), solverOnePK);
         DAppOperation memory dAppOp = validDAppOperation(userOp, solverOps).build();
 
         (bool success, uint256 solverOutcomeResult) = simulator.simSolverCall(userOp, solverOps[0], dAppOp);
@@ -86,7 +89,10 @@ contract SimulatorTest is BaseTest {
 
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = new SolverOperation[](1);
-        solverOps[0] = validSolverOperation(userOp).withSolver(address(solver)).withData(abi.encodeWithSelector(solver.solverFunc.selector)).signAndBuild(address(atlasVerification), solverOnePK);
+        solverOps[0] = validSolverOperation(userOp)
+            .withSolver(address(solver))
+            .withData(abi.encodeWithSelector(solver.solverFunc.selector))
+            .signAndBuild(address(atlasVerification), solverOnePK);
         DAppOperation memory dAppOp = validDAppOperation(userOp, solverOps).build();
 
         (bool success, uint256 solverOutcomeResult) = simulator.simSolverCall(userOp, solverOps[0], dAppOp);
@@ -95,12 +101,56 @@ contract SimulatorTest is BaseTest {
         assertEq(solverOutcomeResult, 1 << uint256(SolverOutcome.InsufficientEscrow));
     }
 
-    function test_simSolverCalls_success_validSolverOutcome() public {}
+    function test_simSolverCalls_success_validSolverOutcome() public {
+        vm.startPrank(solverOneEOA);
+        DummySolver solver = new DummySolver(WETH_ADDRESS, address(atlas));
+        atlas.bond(1e18);
+        vm.stopPrank();
 
-    function test_simSolverCalls_fail_noSolverOps() public {}
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = new SolverOperation[](1);
+        solverOps[0] = validSolverOperation(userOp)
+            .withSolver(address(solver))
+            .withData(abi.encodeWithSelector(solver.solverFunc.selector))
+            .signAndBuild(address(atlasVerification), solverOnePK);
+        DAppOperation memory dAppOp = validDAppOperation(userOp, solverOps).build();
 
-    function test_simSolverCalls_fail_bubblesUpSolverOutcomeResult() public {}
+        (bool success, uint256 solverOutcomeResult) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
 
+        assertEq(success, true);
+        assertEq(solverOutcomeResult, 0);
+    }
+
+    function test_simSolverCalls_fail_noSolverOps() public {
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = new SolverOperation[](0);
+        DAppOperation memory dAppOp = validDAppOperation(userOp, solverOps).build();
+
+        (bool success, uint256 solverOutcomeResult) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
+
+        assertEq(success, false);
+        assertEq(solverOutcomeResult, uint256(type(SolverOutcome).max) + 1);
+    }
+
+    function test_simSolverCalls_fail_bubblesUpSolverOutcomeResult() public {
+        vm.startPrank(solverOneEOA);
+        DummySolver solver = new DummySolver(WETH_ADDRESS, address(atlas));
+        // atlas.bond(1e18); - DO NOT BOND - Triggers InsufficientEscrow error
+        vm.stopPrank();
+
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = new SolverOperation[](1);
+        solverOps[0] = validSolverOperation(userOp)
+            .withSolver(address(solver))
+            .withData(abi.encodeWithSelector(solver.solverFunc.selector))
+            .signAndBuild(address(atlasVerification), solverOnePK);
+        DAppOperation memory dAppOp = validDAppOperation(userOp, solverOps).build();
+
+        (bool success, uint256 solverOutcomeResult) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
+
+        assertEq(success, false);
+        assertEq(solverOutcomeResult, 1 << uint256(SolverOutcome.InsufficientEscrow));
+    }
 
     // Test Helpers
 
