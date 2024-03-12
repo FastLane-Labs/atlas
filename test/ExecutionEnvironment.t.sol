@@ -59,7 +59,7 @@ contract ExecutionEnvironmentTest is BaseTest {
 
     function setupDAppControl(CallConfig memory customCallConfig) internal {
         vm.startPrank(governance);
-        dAppControl = new MockDAppControl(escrow, governance, customCallConfig);
+        dAppControl = new MockDAppControl(address(atlas), governance, customCallConfig);
         atlasVerification.initializeGovernance(address(dAppControl));
         vm.stopPrank();
 
@@ -669,7 +669,7 @@ contract ExecutionEnvironmentTest is BaseTest {
     }
 
     function test_getEscrow() public {
-        assertEq(executionEnvironment.getEscrow(), escrow);
+        assertEq(executionEnvironment.getEscrow(), address(atlas));
     }
 }
 
