@@ -74,41 +74,19 @@ contract SimulatorTest is BaseTest {
 
         simulator.simUserOperation(userOp);
     }
-    
+
     function test_simUserOperation_success_valid() public {}
 
-    function test_simUserOperation_fail_GasPriceHigherThanMax() public {}
+    function test_simUserOperation_fail_bubblesUpValidCallsResult() public {}
 
-    function test_simUserOperation_fail_TxValueLowerThanCallValue() public {}
+    function test_simSolverCall_success_validSolverOutcome() public {}
 
-    function test_simUserOperation_fail_DAppSignatureInvalid() public {}
+    function test_simSolverCall_fail_bubblesUpSolverOutcomeResult() public {}
 
-    function test_simUserOperation_fail_UserSignatureInvalid() public {}
+    function test_simSolverCalls_success_validSolverOutcome() public {}
 
-    function test_simUserOperation_fail_TooManySolverOps() public {}
+    function test_simSolverCalls_fail_noSolverOps() public {}
 
-    function test_simUserOperation_fail_UserDeadlineReached() public {}
-
-    function test_simUserOperation_fail_DAppDeadlineReached() public {}
-
-    function test_simUserOperation_fail_ExecutionEnvEmpty() public {}
-
-    function test_simUserOperation_fail_NoSolverOp() public {}
-
-    function test_simUserOperation_fail_UnknownAuctioneerNotAllowed() public {}
-
-    function test_simUserOperation_fail_InvalidSequence() public {}
-
-    function test_simUserOperation_fail_InvalidAuctioneer() public {}
-
-    function test_simUserOperation_fail_InvalidBundler() public {}
-
-    function test_simUserOperation_fail_OpHashMismatch() public {}
-
-    function test_simUserOperation_fail_DeadlineMismatch() public {}
-
-    function test_simUserOperation_fail_InvalidControl() public {}
-
-    function test_simUserOperation_fail_InvalidDAppNonce() public {}
+    function test_simSolverCalls_fail_bubblesUpSolverOutcomeResult() public {}
 
 }
