@@ -27,7 +27,7 @@ contract AtlasErrors {
     error VerificationSimFail(uint256 validCallsResult);
     error PreOpsSimFail();
     error UserOpSimFail();
-    error SolverSimFail();
+    error SolverSimFail(uint256 solverOutcomeResult); // uint param is result returned in `verifySolverOp`
     error PostOpsSimFail();
     error ValidCalls(ValidCallsResult);
 
