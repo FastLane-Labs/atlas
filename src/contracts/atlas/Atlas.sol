@@ -250,9 +250,12 @@ contract Atlas is Escrow, Factory {
             } else if (errorSwitch == UserOpSimFail.selector) {
                 revert UserOpSimFail();
             } else if (errorSwitch == SolverSimFail.selector) {
-                console.log("before decode in atlas");
-                (, uint256 solverOutcomeResult) = abi.decode(revertData, (bytes4, uint256));
-                console.log("after decode in atlas");
+                // Expects revertData in form [bytes4, uint256]
+                uint256 solverOutcomeResult;
+                uint256 startIndex = revertData.length - 32;
+                assembly {
+                    solverOutcomeResult := mload(add(add(revertData, 0x20), startIndex))
+                }
                 revert SolverSimFail(solverOutcomeResult);
             } else if (errorSwitch == PostOpsSimFail.selector) {
                 revert PostOpsSimFail();
