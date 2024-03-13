@@ -73,7 +73,7 @@ contract V4DAppControl is DAppControl {
                 forwardReturnData: false,
                 requireFulfillment: true,
                 trustedOpHash: false,
-                bypassBidPaymentCheck: false
+                invertBidValue: false
             })
         )
     {

@@ -267,7 +267,7 @@ contract DummyDAppControlBuilder is DAppControl {
                 forwardReturnData: false,
                 requireFulfillment: true,
                 trustedOpHash: false,
-                bypassBidPaymentCheck: false
+                invertBidValue: false
             })
         )
     {

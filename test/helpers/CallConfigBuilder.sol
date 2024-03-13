@@ -24,7 +24,7 @@ contract CallConfigBuilder is Test {
     bool forwardReturnData;
     bool requireFulfillment;
     bool trustedOpHash;
-    bool bypassBidPaymentCheck;
+    bool invertBidValue;
 
     function withUserNoncesSequenced(bool _sequenced) public returns (CallConfigBuilder) {
         userNoncesSequenced = _sequenced;
@@ -116,8 +116,8 @@ contract CallConfigBuilder is Test {
         return this;
     }
 
-    function withBypassBidPaymentCheck(bool _bypassBidPaymentCheck) public returns (CallConfigBuilder) {
-        bypassBidPaymentCheck = _bypassBidPaymentCheck;
+    function withinvertBidValue(bool _invertBidValue) public returns (CallConfigBuilder) {
+        invertBidValue = _invertBidValue;
         return this;
     }
 
@@ -141,7 +141,7 @@ contract CallConfigBuilder is Test {
             forwardReturnData,
             requireFulfillment,
             trustedOpHash,
-            bypassBidPaymentCheck
+            invertBidValue
         );
     }
 }

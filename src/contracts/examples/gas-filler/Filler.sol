@@ -91,7 +91,7 @@ contract Filler is DAppControl {
                 forwardReturnData: true,
                 requireFulfillment: true,
                 trustedOpHash: false,
-                bypassBidPaymentCheck: true
+                invertBidValue: true
             })
         )
     { }

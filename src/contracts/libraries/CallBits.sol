@@ -68,8 +68,8 @@ library CallBits {
         if (callConfig.trustedOpHash) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.TrustedOpHash);
         }
-        if (callConfig.bypassBidPaymentCheck) {
-            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.BypassBidPaymentCheck);
+        if (callConfig.invertBidValue) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.invertBidValue);
         }
     }
 
@@ -93,7 +93,7 @@ library CallBits {
             forwardReturnData: forwardReturnData(encodedCallConfig),
             requireFulfillment: needsFulfillment(encodedCallConfig),
             trustedOpHash: allowsTrustedOpHash(encodedCallConfig),
-            bypassBidPaymentCheck: bypassesBidPaymentCheck(encodedCallConfig)
+            invertBidValue: invertsBidValue(encodedCallConfig)
         });
     }
 
@@ -169,7 +169,7 @@ library CallBits {
         return (callConfig & 1 << uint32(CallConfigIndex.TrustedOpHash) != 0);
     }
 
-    function bypassesBidPaymentCheck(uint32 callConfig) internal pure returns (bool) {
-        return (callConfig & 1 << uint32(CallConfigIndex.BypassBidPaymentCheck) != 0);
+    function invertsBidValue(uint32 callConfig) internal pure returns (bool) {
+        return (callConfig & 1 << uint32(CallConfigIndex.invertBidValue) != 0);
     }
 }

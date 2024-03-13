@@ -33,7 +33,7 @@ contract CallBitsTest is Test {
             forwardReturnData: true,
             requireFulfillment: false,
             trustedOpHash: true,
-            bypassBidPaymentCheck: false
+            invertBidValue: false
         });
 
         callConfig2 = CallConfig({
@@ -55,7 +55,7 @@ contract CallBitsTest is Test {
             forwardReturnData: !callConfig1.forwardReturnData,
             requireFulfillment: !callConfig1.requireFulfillment,
             trustedOpHash: !callConfig1.trustedOpHash,
-            bypassBidPaymentCheck: !callConfig1.bypassBidPaymentCheck
+            invertBidValue: !callConfig1.invertBidValue
         });
     }
 
@@ -96,7 +96,7 @@ contract CallBitsTest is Test {
         assertEq(decodedCallConfig.forwardReturnData, true, "forwardPreOpsReturnData 1 incorrect");
         assertEq(decodedCallConfig.requireFulfillment, false, "requireFulfillment 1 incorrect");
         assertEq(decodedCallConfig.trustedOpHash, true, "trustedOpHash 1 incorrect");
-        assertEq(decodedCallConfig.bypassBidPaymentCheck, false, "bypassBidPaymentCheck 1 incorrect");
+        assertEq(decodedCallConfig.invertBidValue, false, "invertBidValue 1 incorrect");
 
         encodedCallConfig = CallBits.encodeCallConfig(callConfig2);
         decodedCallConfig = encodedCallConfig.decodeCallConfig();
@@ -118,7 +118,7 @@ contract CallBitsTest is Test {
         assertEq(decodedCallConfig.forwardReturnData, false, "forwardPreOpsReturnData 2 incorrect");
         assertEq(decodedCallConfig.requireFulfillment, true, "requireFulfillment 2 incorrect");   
         assertEq(decodedCallConfig.trustedOpHash, false, "trustedOpHash 2 incorrect");
-        assertEq(decodedCallConfig.bypassBidPaymentCheck, true, "bypassBidPaymentCheck 2 incorrect");
+        assertEq(decodedCallConfig.invertBidValue, true, "invertBidValue 2 incorrect");
     }
 
     function testConfigParameters() public {
@@ -141,7 +141,7 @@ contract CallBitsTest is Test {
         assertEq(encodedCallConfig.forwardReturnData(), true, "forwardPreOpsReturnData 1 incorrect");
         assertEq(encodedCallConfig.needsFulfillment(), false, "needsFulfillment 1 incorrect");
         assertEq(encodedCallConfig.allowsTrustedOpHash(), true, "allowsTrustedOpHash 1 incorrect");
-        assertEq(encodedCallConfig.bypassesBidPaymentCheck(), false, "bypassesBidPaymentCheck 1 incorrect");
+        assertEq(encodedCallConfig.invertsBidValue(), false, "invertsBidValue 1 incorrect");
         
 
         encodedCallConfig = CallBits.encodeCallConfig(callConfig2);
@@ -163,6 +163,6 @@ contract CallBitsTest is Test {
         assertEq(encodedCallConfig.forwardReturnData(), false, "forwardPreOpsReturnData 2 incorrect");
         assertEq(encodedCallConfig.needsFulfillment(), true, "needsFulfillment 2 incorrect");
         assertEq(encodedCallConfig.allowsTrustedOpHash(), false, "allowsTrustedOpHash 2 incorrect");
-        assertEq(encodedCallConfig.bypassesBidPaymentCheck(), true, "bypassesBidPaymentCheck 2 incorrect");
+        assertEq(encodedCallConfig.invertsBidValue(), true, "invertsBidValue 2 incorrect");
     }
 }
