@@ -147,7 +147,7 @@ contract ExecutionEnvironment is Base {
         // Track token balance to measure if the bid amount is paid.
         bool etherIsBidToken;
         uint256 startBalance;
-       
+
         if (solverOp.bidToken == address(0)) {
             startBalance = address(this).balance - solverOp.value; // NOTE: this is the meta tx value
             etherIsBidToken = true;
@@ -155,8 +155,6 @@ contract ExecutionEnvironment is Base {
         } else {
             startBalance = ERC20(solverOp.bidToken).balanceOf(address(this));
         }
-
-
 
         ////////////////////////////
         // SOLVER SAFETY CHECKS //
@@ -217,8 +215,7 @@ contract ExecutionEnvironment is Base {
             }
         }
 
-        uint256 endBalance =
-                etherIsBidToken ? address(this).balance : ERC20(solverOp.bidToken).balanceOf(address(this));
+        uint256 endBalance = etherIsBidToken ? address(this).balance : ERC20(solverOp.bidToken).balanceOf(address(this));
 
         // Verify that the solver paid what they bid
         if (!config.invertsBidValue()) {
@@ -230,11 +227,11 @@ contract ExecutionEnvironment is Base {
 
             // Get ending eth balance
             endBalance = etherIsBidToken ? endBalance - solverOp.bidAmount : address(this).balance;
-
         } else {
             // CASE: lower bids are desired by beneficiary (E.G. amount transferred out to solver)
-            
-            if (endBalance < startBalance - solverOp.bidAmount) { // underflow -> revert = intended
+
+            if (endBalance < startBalance - solverOp.bidAmount) {
+                // underflow -> revert = intended
                 revert AtlasErrors.SolverBidUnpaid();
             }
 
@@ -246,7 +243,6 @@ contract ExecutionEnvironment is Base {
         if (endBalance > 0) {
             IEscrow(atlas).contribute{ value: endBalance }();
         }
-
 
         // Verify that the solver repaid their msg.value
         if (!IEscrow(atlas).validateBalances()) {
