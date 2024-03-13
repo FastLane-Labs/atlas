@@ -136,24 +136,24 @@ contract ExecutionEnvironment is Base {
         external
         payable
         onlyAtlasEnvironment(ExecutionPhase.SolverOperations, _ENVIRONMENT_DEPTH)
-    // No donate surplus here - donate after value xfer
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
-        // TODO: Change check to msg.value ?
         require(address(this).balance == solverOp.value, "ERR-CE05 IncorrectValue");
+
+        uint32 config = _config();
+        address control = _control();
 
         // Track token balance to measure if the bid amount is paid.
         bool etherIsBidToken;
-        // uint256 etherBalance;
-        uint256 bidBalance;
-        // Ether balance
+        uint256 startBalance;
+
         if (solverOp.bidToken == address(0)) {
-            bidBalance = address(this).balance - solverOp.value; // NOTE: this is the meta tx value
+            startBalance = address(this).balance - solverOp.value; // NOTE: this is the meta tx value
             etherIsBidToken = true;
             // ERC20 balance
         } else {
-            bidBalance = ERC20(solverOp.bidToken).balanceOf(address(this));
+            startBalance = ERC20(solverOp.bidToken).balanceOf(address(this));
         }
 
         ////////////////////////////
@@ -161,19 +161,17 @@ contract ExecutionEnvironment is Base {
         ////////////////////////////
 
         // Verify that the DAppControl contract matches the solver's expectations
-        if (solverOp.control != _control()) {
+        if (solverOp.control != control) {
             revert AtlasErrors.AlteredControl();
         }
 
         bool success;
 
         // Handle any solver preOps, if necessary
-        if (_config().needsPreSolver()) {
-            bytes memory data = abi.encode(solverOp.solver, solverOp.bidAmount, dAppReturnData);
+        if (config.needsPreSolver()) {
+            bytes memory data = abi.encodeWithSelector(IDAppControl.preSolverCall.selector, solverOp, dAppReturnData);
 
-            data = abi.encodeWithSelector(IDAppControl.preSolverCall.selector, data);
-
-            (success, data) = _control().delegatecall(forwardSpecial(data, ExecutionPhase.PreSolver));
+            (success, data) = control.delegatecall(forwardSpecial(data, ExecutionPhase.PreSolver));
 
             if (!success) {
                 revert AtlasErrors.PreSolverFailed();
@@ -192,7 +190,7 @@ contract ExecutionEnvironment is Base {
             solverOp.bidToken,
             solverOp.bidAmount,
             solverOp.data,
-            _config().forwardReturnData() ? dAppReturnData : new bytes(0)
+            config.forwardReturnData() ? dAppReturnData : new bytes(0)
         );
         (success,) = solverOp.solver.call{ gas: gasLimit, value: solverOp.value }(solverCallData);
 
@@ -202,14 +200,10 @@ contract ExecutionEnvironment is Base {
         }
 
         // If this was a user intent, handle and verify fulfillment
-        if (_config().needsSolverPostCall()) {
-            bytes memory data = dAppReturnData;
+        if (config.needsSolverPostCall()) {
+            bytes memory data = abi.encodeWithSelector(IDAppControl.postSolverCall.selector, solverOp, dAppReturnData);
 
-            data = abi.encode(solverOp.solver, solverOp.bidAmount, data);
-
-            data = abi.encodeWithSelector(IDAppControl.postSolverCall.selector, data);
-
-            (success, data) = _control().delegatecall(forwardSpecial(data, ExecutionPhase.PostSolver));
+            (success, data) = control.delegatecall(forwardSpecial(data, ExecutionPhase.PostSolver));
 
             if (!success) {
                 revert AtlasErrors.PostSolverFailed();
@@ -221,17 +215,33 @@ contract ExecutionEnvironment is Base {
             }
         }
 
-        // Verify that the solver paid what they bid
-        uint256 balance = etherIsBidToken ? address(this).balance : ERC20(solverOp.bidToken).balanceOf(address(this));
+        uint256 endBalance = etherIsBidToken ? address(this).balance : ERC20(solverOp.bidToken).balanceOf(address(this));
 
-        if (balance < bidBalance + solverOp.bidAmount) {
-            revert AtlasErrors.SolverBidUnpaid();
+        // Verify that the solver paid what they bid
+        if (!config.invertsBidValue()) {
+            // CASE: higher bids are desired by beneficiary (E.G. amount transferred in by solver)
+
+            if (endBalance < startBalance + solverOp.bidAmount) {
+                revert AtlasErrors.SolverBidUnpaid();
+            }
+
+            // Get ending eth balance
+            endBalance = etherIsBidToken ? endBalance - solverOp.bidAmount : address(this).balance;
+        } else {
+            // CASE: lower bids are desired by beneficiary (E.G. amount transferred out to solver)
+
+            if (endBalance < startBalance - solverOp.bidAmount) {
+                // underflow -> revert = intended
+                revert AtlasErrors.SolverBidUnpaid();
+            }
+
+            // Get ending eth balance
+            endBalance = etherIsBidToken ? endBalance : address(this).balance;
         }
 
         // Contribute any surplus back - this may be used to validate balance.
-        uint256 surplusEtherBalance = etherIsBidToken ? balance - solverOp.bidAmount : address(this).balance;
-        if (surplusEtherBalance > 0) {
-            IEscrow(atlas).contribute{ value: surplusEtherBalance }();
+        if (endBalance > 0) {
+            IEscrow(atlas).contribute{ value: endBalance }();
         }
 
         // Verify that the solver repaid their msg.value
