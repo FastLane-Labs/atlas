@@ -4,28 +4,45 @@ pragma solidity 0.8.22;
 import { Ownable } from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import { SafeERC20, IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import "forge-std/Test.sol"; //TODO remove
+
 // A wrapper contract for a specific Chainlink price feed, used by Atlas to capture Oracle Extractable Value (OEV).
 // Each MEV-generating protocol needs their own wrapper for each Chainlink price feed they use.
 contract ChainlinkAtlasWrapper is Ownable {
     address public immutable ATLAS;
     IChainlinkFeed public immutable BASE_FEED; // Base Chainlink Feed
 
+    int192 public immutable MIN_ANSWER;
+    int192 public immutable MAX_ANSWER;
+
     int256 public atlasLatestAnswer;
     uint256 public atlasLatestTimestamp;
 
     // Trusted ExecutionEnvironments
     mapping(address transmitter => bool trusted) public transmitters;
+    mapping(address account => bool isSigner) public signers;
 
+    error InvalidMinAnswer();
+    error InvalidMaxAnswer();
     error TransmitterNotTrusted(address transmitter);
+    error InvalidTransmitMsgDataLength();
     error ObservationsNotOrdered();
-    error AnswerCannotBeZero();
+    error AnswerOutOfRange();
     error WithdrawETHFailed();
 
     event TransmitterStatusChanged(address indexed transmitter, bool trusted);
+    event SignerStatusChanged(address indexed account, bool isSigner);
 
-    constructor(address atlas, address baseChainlinkFeed, address _owner) {
+    constructor(address atlas, address baseChainlinkFeed, address _owner, int192 minAnswer, int192 maxAnswer) {
         ATLAS = atlas;
         BASE_FEED = IChainlinkFeed(baseChainlinkFeed);
+
+        if (minAnswer <= 0) revert InvalidMinAnswer();
+        if (maxAnswer <= minAnswer) revert InvalidMaxAnswer();
+
+        MIN_ANSWER = minAnswer;
+        MAX_ANSWER = maxAnswer;
+
         _transferOwnership(_owner);
     }
 
@@ -93,7 +110,7 @@ contract ChainlinkAtlasWrapper is Ownable {
         bytes32 rawVs
     )
         internal
-        pure
+        view // TODO change to pure after removing logs
         returns (int256)
     {
         // TODO more checks needed OffchainAggregator transmit function logic
@@ -109,7 +126,7 @@ contract ChainlinkAtlasWrapper is Ownable {
         }
         int192 median = r.observations[r.observations.length / 2];
 
-        if (median == 0) revert AnswerCannotBeZero();
+        if (median < MIN_ANSWER || median > MAX_ANSWER) revert AnswerOutOfRange();
 
         return int256(median);
     }
@@ -122,6 +139,12 @@ contract ChainlinkAtlasWrapper is Ownable {
     function setTransmitterStatus(address transmitter, bool trusted) external onlyOwner {
         transmitters[transmitter] = trusted;
         emit TransmitterStatusChanged(transmitter, trusted);
+    }
+
+    // Owner can add/remove transmit observation signers
+    function setSignerStatus(address account, bool isSigner) external onlyOwner {
+        signers[account] = isSigner;
+        emit SignerStatusChanged(account, isSigner);
     }
 
     // Withdraw ETH OEV captured via Atlas solver bids

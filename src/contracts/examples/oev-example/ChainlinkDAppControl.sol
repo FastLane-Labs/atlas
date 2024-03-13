@@ -79,7 +79,7 @@ contract ChainlinkDAppControl is DAppControl {
     function createNewChainlinkAtlasWrapper(address baseChainlinkFeed) external returns (address) {
         if (IChainlinkFeed(baseChainlinkFeed).latestAnswer() == 0) revert InvalidBaseFeed();
 
-        address newWrapper = address(new ChainlinkAtlasWrapper(atlas, baseChainlinkFeed, msg.sender));
+        address newWrapper = address(new ChainlinkAtlasWrapper(atlas, baseChainlinkFeed, msg.sender, 1, type(int192).max));
         emit NewChainlinkWrapperCreated(newWrapper, baseChainlinkFeed, msg.sender);
         return newWrapper;
     }
