@@ -3,6 +3,7 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
+import { Result } from "src/contracts/helpers/Simulator.sol";
 import { DAppConfig, DAppOperation, CallConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
 import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
@@ -44,21 +45,20 @@ contract SimulatorTest is BaseTest {
     function test_simUserOperation_success_valid() public {
         UserOperation memory userOp = validUserOperation().build();
 
-        (bool success, uint256 validCallsResult) = simulator.simUserOperation(userOp);
+        (bool success, Result result, uint256 validCallsResult) = simulator.simUserOperation(userOp);
 
         assertEq(success, true);
+        assertTrue(uint(result) > uint(Result.UserOpSimFail)); // Actually fails with SolverSimFail here
         assertEq(validCallsResult, 0);
     }
 
     function test_simUserOperation_fail_bubblesUpValidCallsResult() public {
-        UserOperation memory userOp = validUserOperation().build();
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(userPK, "wrong data");
-        userOp.signature = abi.encodePacked(r, s, v); // use bad sig
-
-        (bool success, uint256 validCallsResult) = simulator.simUserOperation(userOp);
+        UserOperation memory userOp = validUserOperation().withMaxFeePerGas(1).signAndBuild(address(atlasVerification), userPK);
+        (bool success, Result result, uint256 validCallsResult) = simulator.simUserOperation(userOp);
 
         assertEq(success, false);
-        assertEq(validCallsResult, uint256(ValidCallsResult.UserSignatureInvalid));
+        assertEq(uint(result), uint(Result.VerificationSimFail));
+        assertEq(validCallsResult, uint256(ValidCallsResult.GasPriceHigherThanMax));
     }
 
     function test_simSolverCall_success_validSolverOutcome() public {
@@ -75,9 +75,10 @@ contract SimulatorTest is BaseTest {
             .signAndBuild(address(atlasVerification), solverOnePK);
         DAppOperation memory dAppOp = validDAppOperation(userOp, solverOps).build();
 
-        (bool success, uint256 solverOutcomeResult) = simulator.simSolverCall(userOp, solverOps[0], dAppOp);
+        (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCall(userOp, solverOps[0], dAppOp);
 
         assertEq(success, true);
+        assertEq(uint(result), uint(Result.SimulationPassed));
         assertEq(solverOutcomeResult, 0);
     }
 
@@ -95,9 +96,10 @@ contract SimulatorTest is BaseTest {
             .signAndBuild(address(atlasVerification), solverOnePK);
         DAppOperation memory dAppOp = validDAppOperation(userOp, solverOps).build();
 
-        (bool success, uint256 solverOutcomeResult) = simulator.simSolverCall(userOp, solverOps[0], dAppOp);
+        (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCall(userOp, solverOps[0], dAppOp);
 
         assertEq(success, false);
+        assertEq(uint(result), uint(Result.SolverSimFail));
         assertEq(solverOutcomeResult, 1 << uint256(SolverOutcome.InsufficientEscrow));
     }
 
@@ -115,9 +117,10 @@ contract SimulatorTest is BaseTest {
             .signAndBuild(address(atlasVerification), solverOnePK);
         DAppOperation memory dAppOp = validDAppOperation(userOp, solverOps).build();
 
-        (bool success, uint256 solverOutcomeResult) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
+        (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
 
         assertEq(success, true);
+        assertEq(uint(result), uint(Result.SimulationPassed));
         assertEq(solverOutcomeResult, 0);
     }
 
@@ -126,9 +129,10 @@ contract SimulatorTest is BaseTest {
         SolverOperation[] memory solverOps = new SolverOperation[](0);
         DAppOperation memory dAppOp = validDAppOperation(userOp, solverOps).build();
 
-        (bool success, uint256 solverOutcomeResult) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
+        (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
 
         assertEq(success, false);
+        assertEq(uint(result), uint(Result.Unknown)); // Should return Unknown if no solverOps given
         assertEq(solverOutcomeResult, uint256(type(SolverOutcome).max) + 1);
     }
 
@@ -146,9 +150,10 @@ contract SimulatorTest is BaseTest {
             .signAndBuild(address(atlasVerification), solverOnePK);
         DAppOperation memory dAppOp = validDAppOperation(userOp, solverOps).build();
 
-        (bool success, uint256 solverOutcomeResult) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
+        (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
 
         assertEq(success, false);
+        assertEq(uint(result), uint(Result.SolverSimFail));
         assertEq(solverOutcomeResult, 1 << uint256(SolverOutcome.InsufficientEscrow));
     }
 

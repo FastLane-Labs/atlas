@@ -390,13 +390,13 @@ contract MainTest is BaseTest {
         atlas.createExecutionEnvironment(userOp.control);
 
         // Failure case, user hasn't approved Atlas for TOKEN_ONE, operation must fail
-        (bool simResult, ) = simulator.simUserOperation(userOp);
+        (bool simResult,,) = simulator.simUserOperation(userOp);
         assertFalse(simResult, "metasimUserOperationcall tested true");
 
         // Success case
         ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
 
-        (simResult,) = simulator.simUserOperation(userOp);
+        (simResult,,) = simulator.simUserOperation(userOp);
         assertTrue(simResult, "metasimUserOperationcall tested false");
 
         vm.stopPrank();

@@ -212,7 +212,7 @@ contract AccountingTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        (bool simResult, ) = simulator.simUserOperation(userOp);
+        (bool simResult,, ) = simulator.simUserOperation(userOp);
         assertFalse(simResult, "metasimUserOperationcall tested true a");
 
         WETH.approve(address(atlas), swapIntent.amountUserSells);

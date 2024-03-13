@@ -177,12 +177,12 @@ contract SwapIntentTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        (bool simResult, ) = simulator.simUserOperation(userOp);
+        (bool simResult,, ) = simulator.simUserOperation(userOp);
         assertFalse(simResult, "metasimUserOperationcall tested true a");
 
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
-        (simResult,) = simulator.simUserOperation(userOp);
+        (simResult,,) = simulator.simUserOperation(userOp);
         assertTrue(simResult, "metasimUserOperationcall tested false c");
 
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
@@ -299,12 +299,12 @@ contract SwapIntentTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        (bool simResult, ) = simulator.simUserOperation(userOp);
+        (bool simResult,, ) = simulator.simUserOperation(userOp);
         assertFalse(simResult, "metasimUserOperationcall tested true a");
 
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
-        (simResult,) = simulator.simUserOperation(userOp);
+        (simResult,,) = simulator.simUserOperation(userOp);
         assertTrue(simResult, "metasimUserOperationcall tested false c");
 
         // Check solver does NOT have DAI - it must use Uniswap to get it during metacall

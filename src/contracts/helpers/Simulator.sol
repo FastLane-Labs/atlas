@@ -18,19 +18,19 @@ import { SafetyBits } from "../libraries/SafetyBits.sol";
 
 import "forge-std/Test.sol";
 
+enum Result {
+    Unknown,
+    VerificationSimFail,
+    PreOpsSimFail,
+    UserOpSimFail,
+    SolverSimFail,
+    PostOpsSimFail,
+    SimulationPassed
+}
+
 contract Simulator is AtlasErrors {
     using CallVerification for UserOperation;
     using CallBits for uint32;
-
-    enum Result {
-        Unknown,
-        VerificationSimFail,
-        PreOpsSimFail,
-        UserOpSimFail,
-        SolverSimFail,
-        PostOpsSimFail,
-        SimulationPassed
-    }
 
     address public immutable deployer;
     address public atlas;
@@ -44,7 +44,11 @@ contract Simulator is AtlasErrors {
         atlas = _atlas;
     }
 
-    function simUserOperation(UserOperation calldata userOp) external payable returns (bool success, uint256) {
+    function simUserOperation(UserOperation calldata userOp)
+        external
+        payable
+        returns (bool success, Result simResult, uint256)
+    {
         SolverOperation[] memory solverOps = new SolverOperation[](0);
         DAppOperation memory dAppOp;
         dAppOp.control = userOp.control;
@@ -52,7 +56,7 @@ contract Simulator is AtlasErrors {
         (Result result, uint256 validCallsResult) = _errorCatcher(userOp, solverOps, dAppOp);
         success = uint8(result) > uint8(Result.UserOpSimFail);
         if (success) validCallsResult = uint256(ValidCallsResult.Valid);
-        return (success, validCallsResult);
+        return (success, result, validCallsResult);
     }
 
     function simSolverCall(
@@ -62,7 +66,7 @@ contract Simulator is AtlasErrors {
     )
         external
         payable
-        returns (bool success, uint256)
+        returns (bool success, Result simResult, uint256)
     {
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         solverOps[0] = solverOp;
@@ -70,7 +74,7 @@ contract Simulator is AtlasErrors {
         (Result result, uint256 solverOutcomeResult) = _errorCatcher(userOp, solverOps, dAppOp);
         success = result == Result.SimulationPassed;
         if (success) solverOutcomeResult = 0; // discard additional error uint if solver stage was successful
-        return (success, solverOutcomeResult);
+        return (success, result, solverOutcomeResult);
     }
 
     function simSolverCalls(
@@ -80,16 +84,16 @@ contract Simulator is AtlasErrors {
     )
         external
         payable
-        returns (bool success, uint256)
+        returns (bool success, Result simResult, uint256)
     {
         if (solverOps.length == 0) {
             // Returns number out of usual range of SolverOutcome enum to indicate no solverOps
-            return (false, uint256(type(SolverOutcome).max) + 1);
+            return (false, Result.Unknown, uint256(type(SolverOutcome).max) + 1);
         }
         (Result result, uint256 solverOutcomeResult) = _errorCatcher(userOp, solverOps, dAppOp);
         success = result == Result.SimulationPassed;
         if (success) solverOutcomeResult = 0; // discard additional error uint if solver stage was successful
-        return (success, solverOutcomeResult);
+        return (success, result, solverOutcomeResult);
     }
 
     function _errorCatcher(
