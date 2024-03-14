@@ -150,7 +150,7 @@ contract ExecutionEnvironment is Base {
         uint256 startBalance;
 
         if (solverOp.bidToken == address(0)) {
-            startBalance = solverOp.value; 
+            startBalance = solverOp.value;
             etherIsBidToken = true;
             // ERC20 balance
         } else {
@@ -225,16 +225,15 @@ contract ExecutionEnvironment is Base {
             if (!config.invertsBidValue()) {
                 netBid = endBalance - startBalance; // intentionally underflow on fail
                 if (solverOp.bidAmount != 0 && netBid > solverOp.bidAmount) {
-                    netBid = solverOp.bidAmount;  
+                    netBid = solverOp.bidAmount;
                     endBalance = etherIsBidToken ? netBid - solverOp.bidAmount : address(this).balance;
                 } else {
                     endBalance = 0;
                 }
-
             } else {
                 netBid = startBalance - endBalance; // intentionally underflow on fail
                 if (solverOp.bidAmount != 0 && netBid < solverOp.bidAmount) {
-                    netBid = solverOp.bidAmount;  
+                    netBid = solverOp.bidAmount;
                     endBalance = etherIsBidToken ? solverOp.bidAmount - netBid : address(this).balance;
                 } else {
                     endBalance = 0;
@@ -251,7 +250,7 @@ contract ExecutionEnvironment is Base {
                 revert AtlasErrors.BalanceNotReconciled();
             }
 
-            // Solver bid was successful, revert with highest amount. 
+            // Solver bid was successful, revert with highest amount.
             revert AtlasErrors.BidFindSuccessful(netBid);
         }
 
@@ -260,19 +259,18 @@ contract ExecutionEnvironment is Base {
             // CASE: higher bids are desired by beneficiary (E.G. amount transferred in by solver)
 
             // Use bidAmount arg instead of solverOp element to ensure that ex ante bid results
-            // aren't tampered with or otherwise altered the second time around. 
-            if (endBalance < startBalance + bidAmount) { 
+            // aren't tampered with or otherwise altered the second time around.
+            if (endBalance < startBalance + bidAmount) {
                 revert AtlasErrors.SolverBidUnpaid();
             }
 
             // Get ending eth balance
             endBalance = etherIsBidToken ? endBalance - bidAmount : address(this).balance;
-
         } else {
             // CASE: lower bids are desired by beneficiary (E.G. amount transferred out to solver)
 
             // Use bidAmount arg instead of solverOp element to ensure that ex ante bid results
-            // aren't tampered with or otherwise altered the second time around. 
+            // aren't tampered with or otherwise altered the second time around.
             if (endBalance < startBalance - bidAmount) {
                 // underflow -> revert = intended
                 revert AtlasErrors.SolverBidUnpaid();

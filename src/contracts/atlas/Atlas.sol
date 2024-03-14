@@ -118,19 +118,25 @@ contract Atlas is Escrow, Factory {
             (auctionWon, winningSearcherIndex, key) = _bidFindingIteration(
                 dConfig, userOp, solverOps, executionEnvironment, bundler, userOpHash, key, returnData
             );
-
         } else {
-
             for (; winningSearcherIndex < solverOps.length;) {
                 // valid solverOps are packed from left of array - break at first invalid solverOp
 
                 SolverOperation calldata solverOp = solverOps[winningSearcherIndex];
 
-            (auctionWon, key, solverOutcomeResult) = _solverExecutionIteration(
-                dConfig, userOp, solverOp, returnData, executionEnvironment, bundler, userOpHash, solverOp.bidAmount, key
-            );
-            emit SolverExecution(solverOp.from, winningSearcherIndex, auctionWon);
-            if (auctionWon) break;
+                (auctionWon, key, solverOutcomeResult) = _solverExecutionIteration(
+                    dConfig,
+                    userOp,
+                    solverOp,
+                    returnData,
+                    executionEnvironment,
+                    bundler,
+                    userOpHash,
+                    solverOp.bidAmount,
+                    key
+                );
+                emit SolverExecution(solverOp.from, winningSearcherIndex, auctionWon);
+                if (auctionWon) break;
 
                 unchecked {
                     ++winningSearcherIndex;
@@ -233,37 +239,34 @@ contract Atlas is Escrow, Factory {
         bytes32 userOpHash,
         EscrowKey memory key,
         bytes memory returnData
-    ) internal returns (
-        bool auctionWon,
-        uint256 i, // winningSolverIndex
-        EscrowKey memory
-    ) {
+    )
+        internal
+        returns (
+            bool auctionWon,
+            uint256 i, // winningSolverIndex
+            EscrowKey memory
+        )
+    {
         key.bidFind = true;
 
         uint256[] memory sortedOps = new uint256[](solverOps.length);
         uint256[] memory bidAmounts = new uint256[](solverOps.length);
 
         for (i; i < solverOps.length; i++) {
-
             SolverOperation calldata solverOp = solverOps[i];
 
-            uint256 bidAmount = _getBidAmount(
-                executionEnvironment, solverOp, returnData, key
-            );
+            uint256 bidAmount = _getBidAmount(executionEnvironment, solverOp, returnData, key);
 
             if (bidAmount != 0) {
                 bidAmounts[i] = bidAmount;
 
-                for (uint256 j = i+1; j > 0; j--) {
-        
-                    if (bidAmount > bidAmounts[sortedOps[j-1]]) {
-                        if (bidAmounts[sortedOps[j-1]] != 0) {
-                            sortedOps[j] = sortedOps[j-1];
-                            
-                        } else if (j-1 == 0) {
+                for (uint256 j = i + 1; j > 0; j--) {
+                    if (bidAmount > bidAmounts[sortedOps[j - 1]]) {
+                        if (bidAmounts[sortedOps[j - 1]] != 0) {
+                            sortedOps[j] = sortedOps[j - 1];
+                        } else if (j - 1 == 0) {
                             sortedOps[0] = i;
                         }
-
                     } else {
                         sortedOps[j] = i;
                         break;
@@ -276,12 +279,19 @@ contract Atlas is Escrow, Factory {
         i = 0;
 
         for (i; i < solverOps.length; i++) {
-
             // TODO: handle uint256 solverOutcomeResult
-            (auctionWon, key, ) = _solverExecutionIteration(
-                dConfig, userOp, solverOps[sortedOps[i]], returnData, executionEnvironment, bundler, userOpHash, bidAmounts[sortedOps[i]], key
+            (auctionWon, key,) = _solverExecutionIteration(
+                dConfig,
+                userOp,
+                solverOps[sortedOps[i]],
+                returnData,
+                executionEnvironment,
+                bundler,
+                userOpHash,
+                bidAmounts[sortedOps[i]],
+                key
             );
-            
+
             if (auctionWon) {
                 i = sortedOps[i];
                 break;

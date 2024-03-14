@@ -258,10 +258,10 @@ abstract contract Escrow is AtlETH {
         if (solverOp.value * 2 > address(this).balance) return 0;
 
         bytes memory data = abi.encodeWithSelector(
-            IExecutionEnvironment(environment).solverMetaTryCatch.selector, 
+            IExecutionEnvironment(environment).solverMetaTryCatch.selector,
             solverOp.bidAmount,
-            solverOp.gas > _MAX_GAS ? _MAX_GAS : solverOp.gas, 
-            solverOp, 
+            solverOp.gas > _MAX_GAS ? _MAX_GAS : solverOp.gas,
+            solverOp,
             dAppReturnData
         );
 
@@ -272,17 +272,13 @@ abstract contract Escrow is AtlETH {
         if (success) {
             revert AtlasErrors.UnexpectedNonRevert();
         }
-        
+
         if (bytes4(data) == BidFindSuccessful.selector) {
             // Get the uint256 from the memory array
             assembly {
-                bidAmount := and(
-                    shl(32, mload(add(data,0x20))),
-                    shr(224, mload(add(data,0x40)))
-                )
+                bidAmount := and(shl(32, mload(add(data, 0x20))), shr(224, mload(add(data, 0x40))))
             }
             return bidAmount;
-
         } else {
             return 0;
         }
@@ -325,7 +321,11 @@ abstract contract Escrow is AtlETH {
         bool success;
 
         bytes memory data = abi.encodeWithSelector(
-            IExecutionEnvironment(environment).solverMetaTryCatch.selector, bidAmount, gasLimit, solverOp, dAppReturnData
+            IExecutionEnvironment(environment).solverMetaTryCatch.selector,
+            bidAmount,
+            gasLimit,
+            solverOp,
+            dAppReturnData
         );
 
         data = abi.encodePacked(data, lockBytes);
