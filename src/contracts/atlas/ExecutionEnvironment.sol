@@ -150,7 +150,7 @@ contract ExecutionEnvironment is Base {
         uint256 startBalance;
 
         if (solverOp.bidToken == address(0)) {
-            startBalance = address(this).balance - solverOp.value; // NOTE: this is the meta tx value
+            startBalance = solverOp.value; 
             etherIsBidToken = true;
             // ERC20 balance
         } else {
@@ -189,7 +189,7 @@ contract ExecutionEnvironment is Base {
             ISolverContract.atlasSolverCall.selector,
             solverOp.from,
             solverOp.bidToken,
-            solverOp.bidAmount,
+            bidAmount,
             solverOp.data,
             config.forwardReturnData() ? dAppReturnData : new bytes(0)
         );
@@ -267,6 +267,7 @@ contract ExecutionEnvironment is Base {
 
             // Get ending eth balance
             endBalance = etherIsBidToken ? endBalance - bidAmount : address(this).balance;
+
         } else {
             // CASE: lower bids are desired by beneficiary (E.G. amount transferred out to solver)
 
