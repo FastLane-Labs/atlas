@@ -701,16 +701,14 @@ contract MockDAppControl is DAppControl {
         return returnValue;
     }
 
-    function _preSolverCall(bytes calldata data) internal pure override returns (bool) {
-        (,, bytes memory dAppReturnData) = abi.decode(data, (address, uint256, bytes));
-        (bool shouldRevert, bool returnValue) = abi.decode(dAppReturnData, (bool, bool));
+    function _preSolverCall(SolverOperation calldata, bytes calldata returnData) internal pure override returns (bool) {
+        (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
         require(!shouldRevert, "_preSolverCall revert requested");
         return returnValue;
     }
 
-    function _postSolverCall(bytes calldata data) internal pure override returns (bool) {
-        (,, bytes memory dAppReturnData) = abi.decode(data, (address, uint256, bytes));
-        (bool shouldRevert, bool returnValue) = abi.decode(dAppReturnData, (bool, bool));
+    function _postSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal pure override returns (bool) {
+        (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
         require(!shouldRevert, "_postSolverCall revert requested");
         return returnValue;
     }

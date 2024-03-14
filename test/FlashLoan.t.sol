@@ -266,7 +266,8 @@ contract DummyDAppControlBuilder is DAppControl {
                 verifyCallChainHash: true,
                 forwardReturnData: false,
                 requireFulfillment: true,
-                trustedOpHash: false
+                trustedOpHash: false,
+                invertBidValue: false
             })
         )
     {
