@@ -70,7 +70,8 @@ contract V2DAppControl is DAppControl {
                 forwardReturnData: false,
                 requireFulfillment: false,
                 trustedOpHash: false,
-                invertBidValue: false
+                invertBidValue: false,
+                exPostBids: false
             })
         )
     {

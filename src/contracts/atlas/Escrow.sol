@@ -18,9 +18,9 @@ import { EscrowBits } from "../libraries/EscrowBits.sol";
 import { CallBits } from "../libraries/CallBits.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
 
-import "forge-std/Test.sol";
+import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
-// import "forge-std/Test.sol";
+import "forge-std/Test.sol";
 
 abstract contract Escrow is AtlETH {
     using ECDSA for bytes32;
@@ -84,6 +84,7 @@ abstract contract Escrow is AtlETH {
         address environment,
         address bundler,
         bytes32 userOpHash,
+        uint256 bidAmount,
         EscrowKey memory key
     )
         internal
@@ -110,7 +111,7 @@ abstract contract Escrow is AtlETH {
 
                 // Execute the solver call
                 // _solverOpsWrapper returns a SolverOutcome enum value
-                result |= _solverOpWrapper(gasLimit, environment, solverOp, dAppReturnData, key.pack());
+                result |= _solverOpWrapper(bidAmount, gasLimit, environment, solverOp, dAppReturnData, key.pack());
 
                 if (result.executionSuccessful()) {
                     // first successful solver call that paid what it bid
@@ -241,6 +242,53 @@ abstract contract Escrow is AtlETH {
         return (result, gasLimit);
     }
 
+    function _getBidAmount(
+        address environment,
+        SolverOperation calldata solverOp,
+        bytes memory dAppReturnData,
+        EscrowKey memory key
+    )
+        internal
+        returns (uint256 bidAmount)
+    {
+        // NOTE: To prevent a malicious bundler from aggressively collecting storage refunds,
+        // solvers should not be on the hook for any 'on chain bid finding' gas usage.
+
+        bool success;
+
+        if (solverOp.value * 2 > address(this).balance) return 0;
+
+        bytes memory data = abi.encodeWithSelector(
+            IExecutionEnvironment(environment).solverMetaTryCatch.selector, 
+            solverOp.bidAmount,
+            solverOp.gas > _MAX_GAS ? _MAX_GAS : solverOp.gas, 
+            solverOp, 
+            dAppReturnData
+        );
+
+        data = abi.encodePacked(data, key.holdSolverLock(solverOp.solver).pack());
+
+        (success, data) = environment.call{ value: solverOp.value }(data);
+
+        if (success) {
+            revert AtlasErrors.UnexpectedNonRevert();
+        }
+        
+        if (bytes4(data) == BidFindSuccessful.selector) {
+            // Get the uint256 from the memory array
+            assembly {
+                bidAmount := and(
+                    shl(32, mload(add(data,0x20))),
+                    shr(224, mload(add(data,0x40)))
+                )
+            }
+            return bidAmount;
+
+        } else {
+            return 0;
+        }
+    }
+
     function _handleAltOpHash(
         UserOperation calldata userOp,
         SolverOperation calldata solverOp
@@ -262,6 +310,7 @@ abstract contract Escrow is AtlETH {
 
     // Returns a SolverOutcome enum value
     function _solverOpWrapper(
+        uint256 bidAmount,
         uint256 gasLimit,
         address environment,
         SolverOperation calldata solverOp,
@@ -277,7 +326,7 @@ abstract contract Escrow is AtlETH {
         bool success;
 
         bytes memory data = abi.encodeWithSelector(
-            IExecutionEnvironment(environment).solverMetaTryCatch.selector, gasLimit, solverOp, dAppReturnData
+            IExecutionEnvironment(environment).solverMetaTryCatch.selector, bidAmount, gasLimit, solverOp, dAppReturnData
         );
 
         data = abi.encodePacked(data, lockBytes);

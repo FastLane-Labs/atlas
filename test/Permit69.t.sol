@@ -37,7 +37,8 @@ contract Permit69Test is BaseTest {
             callIndex: 0,
             callCount: 0,
             lockState: EXEC_PHASE_PRE_OPS,
-            gasRefund: 0,
+            blank: 0,
+            bidFind: false,
             isSimulation: false,
             callDepth: 0
         });

@@ -8,7 +8,8 @@ struct EscrowKey {
     uint8 callIndex;
     uint8 callCount;
     uint16 lockState; // bitwise
-    uint32 gasRefund;
+    uint24 blank;
+    bool bidFind;
     bool isSimulation;
     uint8 callDepth;
 }

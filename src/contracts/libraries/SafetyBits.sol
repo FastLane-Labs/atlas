@@ -60,7 +60,8 @@ library SafetyBits {
                 self.callIndex,
                 self.callCount,
                 self.lockState,
-                self.gasRefund,
+                self.blank,
+                self.bidFind,
                 self.isSimulation,
                 uint8(1) // callDepth
             )
