@@ -4,9 +4,17 @@ pragma solidity 0.8.22;
 import "../types/ValidCallsTypes.sol";
 
 contract AtlasErrors {
+    // Simulator
+    error Unauthorized();
+    error Unreachable();
+    error NoAuctionWinner();
+    error InvalidEntryFunction();
+    error SimulationPassed();
+
     error UserSimulationFailed();
     error UserSimulationSucceeded();
     error UserUnexpectedSuccess();
+    error UserNotFulfilled();
 
     error BidFindSuccessful(uint256 bidAmount);
     error UnexpectedNonRevert();
@@ -19,15 +27,11 @@ contract AtlasErrors {
     error PreSolverFailed();
     error PostSolverFailed();
 
-    error UserNotFulfilled();
-    error NoAuctionWinner();
-
-    error VerificationSimFail();
+    error VerificationSimFail(uint256 validCallsResult);
     error PreOpsSimFail();
     error UserOpSimFail();
-    error SolverSimFail();
+    error SolverSimFail(uint256 solverOutcomeResult); // uint param is result returned in `verifySolverOp`
     error PostOpsSimFail();
-    error SimulationPassed();
     error ValidCalls(ValidCallsResult);
 
     // Atlas

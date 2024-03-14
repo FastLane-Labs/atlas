@@ -22,6 +22,7 @@ import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
 import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
 
+// TODO Check if this is tested in more contract-specific tests, then delete this if true.
 contract AccountingTest is BaseTest {
     SwapIntentController public swapIntentController;
     TxBuilder public txBuilder;
@@ -49,7 +50,7 @@ contract AccountingTest is BaseTest {
 
         // Deploy new SwapIntent Controller from new gov and initialize in Atlas
         vm.startPrank(governanceEOA);
-        swapIntentController = new SwapIntentController(address(escrow));
+        swapIntentController = new SwapIntentController(address(atlas));
         atlasVerification.initializeGovernance(address(swapIntentController));
         vm.stopPrank();
 
@@ -211,7 +212,8 @@ contract AccountingTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        assertFalse(simulator.simUserOperation(userOp), "metasimUserOperationcall tested true a");
+        (bool simResult,, ) = simulator.simUserOperation(userOp);
+        assertFalse(simResult, "metasimUserOperationcall tested true a");
 
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 

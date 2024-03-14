@@ -65,7 +65,8 @@ contract Atlas is Escrow, Factory {
             dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, isSimulation
         );
         if (validCallsResult != ValidCallsResult.Valid) {
-            if (isSimulation) revert VerificationSimFail();
+            // TODO group lines below into single revert line?
+            if (isSimulation) revert VerificationSimFail(uint256(validCallsResult));
             else revert ValidCalls(validCallsResult);
         }
 
@@ -81,7 +82,7 @@ contract Atlas is Escrow, Factory {
             emit MetacallResult(msg.sender, userOp.from, auctionWon ? solverOps[winningSolverIndex].from : address(0));
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
-            _handleErrors(bytes4(revertData), dConfig.callConfig);
+            _handleErrors(revertData, dConfig.callConfig);
 
             // Refund the msg.value to sender if it errored
             if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
@@ -111,6 +112,8 @@ contract Atlas is Escrow, Factory {
         (bytes memory returnData, EscrowKey memory key) =
             _preOpsUserExecutionIteration(dConfig, userOp, solverOps, executionEnvironment, bundler);
 
+        uint256 solverOutcomeResult;
+
         if (dConfig.callConfig.exPostBids()) {
             (auctionWon, winningSearcherIndex, key) = _bidFindingIteration(
                 dConfig, userOp, solverOps, executionEnvironment, bundler, userOpHash, key, returnData
@@ -123,11 +126,11 @@ contract Atlas is Escrow, Factory {
 
                 SolverOperation calldata solverOp = solverOps[winningSearcherIndex];
 
-                (auctionWon, key) = _solverExecutionIteration(
-                    dConfig, userOp, solverOp, returnData, executionEnvironment, bundler, userOpHash, solverOp.bidAmount, key
-                );
-              
-                if (auctionWon) break;
+            (auctionWon, key, solverOutcomeResult) = _solverExecutionIteration(
+                dConfig, userOp, solverOp, returnData, executionEnvironment, bundler, userOpHash, solverOp.bidAmount, key
+            );
+            emit SolverExecution(solverOp.from, winningSearcherIndex, auctionWon);
+            if (auctionWon) break;
 
                 unchecked {
                     ++winningSearcherIndex;
@@ -137,7 +140,7 @@ contract Atlas is Escrow, Factory {
 
         // If no solver was successful, handle revert decision
         if (!auctionWon) {
-            if (key.isSimulation) revert SolverSimFail();
+            if (key.isSimulation) revert SolverSimFail(solverOutcomeResult);
             if (dConfig.callConfig.needsFulfillment()) {
                 revert UserNotFulfilled(); // revert("ERR-E003 SolverFulfillmentFailure");
             }
@@ -274,7 +277,8 @@ contract Atlas is Escrow, Factory {
 
         for (i; i < solverOps.length; i++) {
 
-            (auctionWon, key) = _solverExecutionIteration(
+            // TODO: handle uint256 solverOutcomeResult
+            (auctionWon, key, ) = _solverExecutionIteration(
                 dConfig, userOp, solverOps[sortedOps[i]], returnData, executionEnvironment, bundler, userOpHash, bidAmounts[sortedOps[i]], key
             );
             
@@ -298,9 +302,9 @@ contract Atlas is Escrow, Factory {
         EscrowKey memory key
     )
         internal
-        returns (bool auctionWon, EscrowKey memory)
+        returns (bool auctionWon, EscrowKey memory, uint256 solverOutcomeResult)
     {
-        (auctionWon, key) = _executeSolverOperation(
+        (auctionWon, key, solverOutcomeResult) = _executeSolverOperation(
             dConfig, userOp, solverOp, dAppReturnData, executionEnvironment, bundler, userOpHash, bidAmount, key
         );
 
@@ -310,10 +314,11 @@ contract Atlas is Escrow, Factory {
             key.paymentsSuccessful =
                 _allocateValue(dConfig, bidAmount, dAppReturnData, executionEnvironment, key.pack());
         }
-        return (auctionWon, key);
+        return (auctionWon, key, solverOutcomeResult);
     }
 
-    function _handleErrors(bytes4 errorSwitch, uint32 callConfig) internal view {
+    function _handleErrors(bytes memory revertData, uint32 callConfig) internal view {
+        bytes4 errorSwitch = bytes4(revertData);
         if (msg.sender == SIMULATOR) {
             // Simulation
             if (errorSwitch == PreOpsSimFail.selector) {
@@ -321,7 +326,13 @@ contract Atlas is Escrow, Factory {
             } else if (errorSwitch == UserOpSimFail.selector) {
                 revert UserOpSimFail();
             } else if (errorSwitch == SolverSimFail.selector) {
-                revert SolverSimFail();
+                // Expects revertData in form [bytes4, uint256]
+                uint256 solverOutcomeResult;
+                uint256 startIndex = revertData.length - 32;
+                assembly {
+                    solverOutcomeResult := mload(add(add(revertData, 0x20), startIndex))
+                }
+                revert SolverSimFail(solverOutcomeResult);
             } else if (errorSwitch == PostOpsSimFail.selector) {
                 revert PostOpsSimFail();
             }
