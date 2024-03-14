@@ -41,20 +41,14 @@ Last updated: 2024-Jan-30
 
 ### AtlETH.sol
 
+Fully tested in `/test/AtlETH.t.sol`.
+
 Coverage as per coverage report:
 
-- Lines: 42/78 (53.8%)
-- Functions: 12/23 (52.2%)
+- Lines: 93/93 (100%)
+- Functions: 26/26 (100%)
 
-Work Needed:
-
-- View function tests
-- AtlETH's ERC20 functions (approve, transfer, transferFrom)
-- Permit (Also for ERC20 functionality)
-- Branches in `_deduct`
-- All `redeem` and `_redeem` functionality
-
-Last updated: 2024-Jan-30
+Last updated: 2024-Mar-05
 
 ### GasAccounting.sol
 
@@ -91,24 +85,27 @@ Last updated: 2024-Jan-30
 
 ### AtlasVerification.sol
 
-Effective Test Coverage: 100%
-
 Coverage as per coverage report:
 
-- Lines: 147/151 (97.4%)
+- Lines: 166/176 (94.3%)
 - Functions: 19/19 (100%)
 
 Unreachable Code:
 
-- L278 Cannot be reached as `_verifyDApp` would return false before L278 if either dAppOp.control or dConfig.to are invalid, and if both are valid then this `return false` line would be bypassed.
+- L368 Cannot be reached as `_verifyDApp` would return false before L278 if either dAppOp.control or dConfig.to are invalid, and if both are valid then this `return false` line would be bypassed.
 
 Coverage Bugs:
 
-- L360 `_handleNonces` last return line is covered as function is tested without revert.
-- L381 `_incrementHighestFullAsyncBitmap` last return line is covered as function is tested without revert.
-- L525 the `break` in `manuallyUpdateNonceTracker` is covered if the line above is covered, which it is.
+- L139 `_verifyAuctioneer` is called as the lines of the internal function have full coverage.
+- L450 `_handleNonces` last return line is covered as function is tested without revert.
+- L471 `_incrementHighestFullAsyncBitmap` last return line is covered as function is tested without revert.
+- L625 the `break` in `manuallyUpdateNonceTracker` is covered if the line above is covered, which it is.
 
-Last updated: 2024-Feb-06
+Not Covered By Tests:
+
+- The `if (userOp.from.code.length > 0)` block in _verifyUser for ERC-4337 Smart Wallets.
+
+Last updated: 2024-Mar-06
 
 ### DAppIntegration.sol
 
@@ -116,10 +113,14 @@ Effective Test Coverage: 100%
 
 Coverage as per coverage report:
 
-- Lines: 26/26 (100%)
+- Lines: 34/35 (97.1%)
 - Functions: 5/5 (100%)
 
-Last updated: 2024-Jan-30
+Coverage Bugs:
+
+- L114 `break` is covered because the lines above in the if block are covered
+
+Last updated: 2024-Mar-07
 
 ### Mimic.sol
 

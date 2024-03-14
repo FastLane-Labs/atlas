@@ -185,4 +185,30 @@ contract DAppIntegrationTest is Test {
         vm.expectRevert(AtlasErrors.DAppNotEnabled.selector);
         dAppIntegration.getGovFromControl(address(dAppControl));
     }
+
+    function test_getDAppSignatories() public {
+        assertEq(new address[](0), dAppIntegration.getDAppSignatories(address(dAppControl)), "should start as empty array");
+
+        vm.prank(governance);
+        dAppIntegration.initializeGovernance(address(dAppControl));
+
+        address[] memory signatories = dAppIntegration.getDAppSignatories(address(dAppControl));
+        assertEq(signatories.length, 1, "should return 1 signatory");
+        assertEq(signatories[0], governance, "gov should be a signatory");
+
+        vm.prank(governance);
+        dAppIntegration.addSignatory(address(dAppControl), signatory);
+
+        signatories = dAppIntegration.getDAppSignatories(address(dAppControl));
+        assertEq(signatories.length, 2, "should return 2 signatories");
+        assertEq(signatories[1], signatory, "should return correct 2nd signatory");
+
+        address anotherSignatory = makeAddr("anotherSignatory");
+        vm.prank(governance);
+        dAppIntegration.addSignatory(address(dAppControl), anotherSignatory);
+
+        signatories = dAppIntegration.getDAppSignatories(address(dAppControl));
+        assertEq(signatories.length, 3, "should return 3 signatories");
+        assertEq(signatories[2], anotherSignatory, "should return correct 3rd signatory");
+    }
 }

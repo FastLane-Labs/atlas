@@ -12,6 +12,7 @@ import { DummyDAppControl } from "./base/DummyDAppControl.sol";
 import { AtlasBaseTest } from "./base/AtlasBaseTest.t.sol";
 import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
+import { SolverOutcome } from "src/contracts/types/EscrowTypes.sol";
 import { DummyDAppControlBuilder } from "./helpers/DummyDAppControlBuilder.sol";
 import { CallConfigBuilder } from "./helpers/CallConfigBuilder.sol";
 import { UserOperationBuilder } from "./base/builders/UserOperationBuilder.sol";
@@ -156,10 +157,183 @@ contract AtlasVerificationBase is AtlasBaseTest {
 }
 
 //
-// ---- TESTS BEGIN HERE ---- //
+// ---- NON VALID CALLS TESTS ---- //
 //
 
-contract AtlasVerificationTest is AtlasVerificationBase {
+contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
+    using CallVerification for UserOperation;
+
+    function test_verifySolverOp_InvalidSignature() public {
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        address bundler = userEOA;
+
+        // Signed by wrong PK = SolverOutcome.InvalidSignature
+        solverOps[0] = validSolverOperation(userOp).signAndBuild(address(atlasVerification), userPK);
+        uint256 result = atlasVerification.verifySolverOp(
+            solverOps[0],
+            userOp.getUserOperationHash(),
+            userOp.maxFeePerGas,
+            bundler
+        );
+        assertEq(result, 1 << uint256(SolverOutcome.InvalidSignature), "Expected InvalidSignature 1");
+
+        // No signature = SolverOutcome.InvalidSignature
+        solverOps[0].signature = "";
+        result = atlasVerification.verifySolverOp(
+            solverOps[0],
+            userOp.getUserOperationHash(),
+            userOp.maxFeePerGas,
+            bundler
+        );
+        assertEq(result, 1 << uint256(SolverOutcome.InvalidSignature), "Expected InvalidSignature 2");
+    }
+
+    function test_verifySolverOp_InvalidUserHash() public {
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        address bundler = solverOneEOA;
+
+        // userOpHash doesnt match = SolverOutcome.InvalidUserHash
+        solverOps[0].userOpHash = keccak256(abi.encodePacked("Not the userOp"));
+        uint256 result = atlasVerification.verifySolverOp(
+            solverOps[0],
+            userOp.getUserOperationHash(),
+            userOp.maxFeePerGas,
+            bundler
+        );
+        assertEq(result, 1 << uint256(SolverOutcome.InvalidUserHash), "Expected InvalidUserHash");
+    }
+
+    function test_verifySolverOp_InvalidTo() public {
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        address bundler = solverOneEOA;
+
+        // solverOp.to != atlas = SolverOutcome.InvalidTo
+        solverOps[0].to = address(0);
+        uint256 result = atlasVerification.verifySolverOp(
+            solverOps[0],
+            userOp.getUserOperationHash(),
+            userOp.maxFeePerGas,
+            bundler
+        );
+        assertEq(result, 1 << uint256(SolverOutcome.InvalidTo), "Expected InvalidTo");
+    }
+
+    function test_verifySolverOp_GasPriceOverCap() public {
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        address bundler = solverOneEOA;
+
+        // solverOp.maxFeePerGas < tx.gasprice = SolverOutcome.GasPriceOverCap
+        vm.txGasPrice(solverOps[0].maxFeePerGas + 1); // Increase gas price above solver's max
+        uint256 result = atlasVerification.verifySolverOp(
+            solverOps[0],
+            userOp.getUserOperationHash(),
+            userOp.maxFeePerGas,
+            bundler
+        );
+        assertEq(result, 1 << uint256(SolverOutcome.GasPriceOverCap), "Expected GasPriceOverCap");
+        vm.txGasPrice(tx.gasprice); // Reset gas price to expected level
+    }
+
+    function test_verifySolverOp_GasPriceBelowUsers() public {
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        address bundler = solverOneEOA;
+
+        // maxFeePerGas is below user's = SolverOutcome.GasPriceBelowUsers
+        uint256 result = atlasVerification.verifySolverOp(
+            solverOps[0],
+            userOp.getUserOperationHash(),
+            userOp.maxFeePerGas + 1,
+            bundler
+        );
+        assertEq(result, 1 << uint256(SolverOutcome.GasPriceBelowUsers), "Expected GasPriceBelowUsers");
+    }
+
+    function test_verifySolverOp_InvalidSolver() public {
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        address bundler = solverOneEOA;
+
+        // solverOp.solver is atlas = SolverOutcome.InvalidSolver
+        solverOps[0].solver = address(atlas);
+        uint256 result = atlasVerification.verifySolverOp(
+            solverOps[0],
+            userOp.getUserOperationHash(),
+            userOp.maxFeePerGas,
+            bundler
+        );
+        assertEq(result, 1 << uint256(SolverOutcome.InvalidSolver), "Expected InvalidSolver");
+    }
+
+    function test_verifySolverOp_Valid() public {
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        address bundler = solverOneEOA;
+
+        // no sig, everything valid = Valid result
+        solverOps[0].signature = "";
+        vm.prank(solverOneEOA);
+        uint256 result = atlasVerification.verifySolverOp(
+            solverOps[0],
+            userOp.getUserOperationHash(),
+            userOp.maxFeePerGas,
+            bundler
+        );
+        assertEq(result, 0, "Expected No Errors 1"); // 0 = No SolverOutcome errors
+
+        // Valid solver sig, everything valid = Valid result
+        solverOps = validSolverOperations(userOp);
+        bundler = userEOA;
+        result = atlasVerification.verifySolverOp(
+            solverOps[0],
+            userOp.getUserOperationHash(),
+            userOp.maxFeePerGas,
+            bundler
+        );
+        assertEq(result, 0, "Expected No Errors 2"); // 0 = No SolverOutcome errors
+    }
+}
+
+//
+// ---- VALID CALLS TESTS BEGIN HERE ---- //
+//
+
+contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
+
+    // TrustedOpHash Allowed Tests
+
+    function test_validCalls_trustedOpHash_sessionKeyWrong_InvalidAuctioneer() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withTrustedOpHash(true).build());
+
+        UserOperation memory userOp = validUserOperation().withSessionKey(address(0)).build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+        solverOps[0] = validSolverOperation(userOp).withAltUserOpHash(userOp).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+        ), ValidCallsResult.InvalidAuctioneer);
+    }
+
+
+    function test_validCalls_trustedOpHash_msgSenderWrong_InvalidBundler() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withTrustedOpHash(true).build());
+
+        UserOperation memory userOp = validUserOperation().withSessionKey(governanceEOA).build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withAltUserOpHash(userOp).build();
+        solverOps[0] = validSolverOperation(userOp).withAltUserOpHash(userOp).build();
+
+        // If msgSender in _validCalls is neither dAppOp.from nor userOp.from,
+        // and trustedOpHash is true --> return InvalidBundler
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+        ), ValidCallsResult.InvalidBundler);
+    }
 
     // Valid cases
 
@@ -179,6 +353,21 @@ contract AtlasVerificationTest is AtlasVerificationBase {
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
+    }
+
+    // OpHashMismatch case
+    // When userOpHash != dAppOp.userOpHash
+
+    function test_validCalls_OpHashMismatch() public {
+        defaultAtlasEnvironment();
+
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withUserOpHash(bytes32(0)).signAndBuild(address(atlasVerification), governancePK);
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+        ), ValidCallsResult.OpHashMismatch);
     }
 
     // InvalidCaller cases
@@ -502,8 +691,6 @@ contract AtlasVerificationTest is AtlasVerificationBase {
         ), ValidCallsResult.Valid);
     }
 
-    // TODO: tests to do with the nonce bitmap stuff, no idea what is going on in there yet
-
     //
     // given a default atlas environment
     //   and callConfig.sequenced = true
@@ -819,8 +1006,6 @@ contract AtlasVerificationTest is AtlasVerificationBase {
         ), ValidCallsResult.Valid);
     }
 
-    // TODO: test to do with the nonce bitmap stuff, nfi what its doing
-
     //
     // given a default atlas environment
     //   and callConfig.sequenced = true
@@ -1124,173 +1309,6 @@ contract AtlasVerificationTest is AtlasVerificationBase {
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
-
-    // TODO Redo test with new solverOp sequential validation system
-    //
-    // given a default atlas environment
-    //   and otherwise valid user, solver and dapp operations
-    //     where the solver op has an invalid signature
-    // when validCalls is called from the userEOA
-    // then it should return NoSolverOp
-    // because the solver op signature is required when the solver is not the bundler
-    //
-    // function test_validCalls_SolverWithNoSignature_NoSolverOp() public {
-    //     defaultAtlasEnvironment();
-
-    //     UserOperation memory userOp = validUserOperation().build();
-    //     SolverOperation[] memory solverOps = new SolverOperation[](1);
-    //     SolverOperation memory solverOp = validSolverOperation(userOp).withSignature(bytes("")).build();
-    //     solverOps[0] = solverOp;
-    //     DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
-
-    //     callAndAssert(ValidCallsCall({
-    //         userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-    //     ), ValidCallsResult.NoSolverOp);
-    // }
-
-    //
-    // given an otherwise valid atlas transaction where tx.gasprice > solverOp.maxFeePerGas
-    // when validCalls is called
-    // then it should return NoSolverOp
-    //
-
-    // TODO Redo test with new solverOp sequential validation system
-    //
-    // given a default atlas environment
-    //   and otherwise valid user, solver and dapp operations
-    //     where the solver op maxFeePerGas is lower than tx.gasprice
-    // when validCalls is called from the userEOA
-    // then it should return NoSolverOp
-    // because the solver op maxFeePerGas must be higher than tx.gasprice
-    //
-    // function test_validCalls_SolverWithGasPriceBelowTxprice_NoSolverOp() public {
-    //     defaultAtlasEnvironment();
-
-    //     UserOperation memory userOp = validUserOperation().build();
-    //     SolverOperation[] memory solverOps = new SolverOperation[](1);
-    //     SolverOperation memory solverOp = validSolverOperation(userOp).withMaxFeePerGas(tx.gasprice - 1).signAndBuild(address(atlasVerification), solverOnePK);
-    //     solverOps[0] = solverOp;
-    //     DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
-
-    //     callAndAssert(ValidCallsCall({
-    //         userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-    //     ), ValidCallsResult.NoSolverOp);
-    // }
-
-    // TODO Redo test with new solverOp sequential validation system
-    //
-    // given a default atlas environment
-    //   and otherwise valid user, solver and dapp operations
-    //     where the solver op deadline is earlier than block.number
-    // when validCalls is called from the userEOA
-    // then it should return NoSolverOp
-    // because the solver op deadline must be block.number or later
-    //
-    // function test_validCalls_SolverWithDeadlineInPast_NoSolverOp() public {
-    //     defaultAtlasEnvironment();
-
-    //     UserOperation memory userOp = validUserOperation().build();
-    //     SolverOperation[] memory solverOps = new SolverOperation[](1);
-    //     SolverOperation memory solverOp = validSolverOperation(userOp).withDeadline(block.number - 1).signAndBuild(address(atlasVerification), solverOnePK);
-    //     solverOps[0] = solverOp;
-    //     DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
-
-    //     callAndAssert(ValidCallsCall({
-    //         userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-    //     ), ValidCallsResult.NoSolverOp);
-    // }
-
-    // TODO Redo test with new solverOp sequential validation system
-    //
-    // given a default atlas environment
-    //   and otherwise valid user, solver and dapp operations
-    //     where the solver op and user op are from the same address
-    // when validCalls is called from the userEOA
-    // then it should return NoSolverOp
-    // because the user can't also be the solver
-    //
-    // function test_validCalls_SolverFromUserEOA_NoSolverOp() public {
-    //     defaultAtlasEnvironment();
-
-    //     UserOperation memory userOp = validUserOperation().build();
-    //     SolverOperation[] memory solverOps = new SolverOperation[](1);
-    //     SolverOperation memory solverOp = validSolverOperation(userOp).withFrom(userEOA).signAndBuild(address(atlasVerification), userPK);
-    //     solverOps[0] = solverOp;
-    //     DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
-
-    //     callAndAssert(ValidCallsCall({
-    //         userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-    //     ), ValidCallsResult.NoSolverOp);
-    // }
-
-    // TODO Redo test with new solverOp sequential validation system
-    //
-    // given a default atlas environment
-    //   and otherwise valid user, solver and dapp operations
-    //     where the solver op is not calling the atlas contract
-    // when validCalls is called from the userEOA
-    // then it should return NoSolverOp
-    // because the solver op must call the atlas contract
-    //
-    // function test_validCalls_SolverToNotAtlas_NoSolverOp() public {
-    //     defaultAtlasEnvironment();
-
-    //     UserOperation memory userOp = validUserOperation().build();
-    //     SolverOperation[] memory solverOps = new SolverOperation[](1);
-    //     SolverOperation memory solverOp = validSolverOperation(userOp).withTo(address(0)).signAndBuild(address(atlasVerification), solverOnePK);
-    //     solverOps[0] = solverOp;
-    //     DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
-
-    //     callAndAssert(ValidCallsCall({
-    //         userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-    //     ), ValidCallsResult.NoSolverOp);
-    // }
-
-    // TODO Redo test with new solverOp sequential validation system
-    //
-    // given a default atlas environment
-    //   and otherwise valid user, solver and dapp operations
-    //     where the solver op contract is the atlas contract
-    // when validCalls is called from the userEOA
-    // then it should return NoSolverOp
-    // because the solver op contract must not be atlas
-    //
-    // function test_validCalls_SolverContractIsAtlas_NoSolverOp() public {
-    //     defaultAtlasEnvironment();
-
-    //     UserOperation memory userOp = validUserOperation().build();
-    //     SolverOperation[] memory solverOps = new SolverOperation[](1);
-    //     SolverOperation memory solverOp = validSolverOperation(userOp).withSolver(address(atlas)).signAndBuild(address(atlasVerification), solverOnePK);
-    //     solverOps[0] = solverOp;
-    //     DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
-
-    //     callAndAssert(ValidCallsCall({
-    //         userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-    //     ), ValidCallsResult.NoSolverOp);
-    // }
-
-    // TODO Redo test with new solverOp sequential validation system
-    //
-    // given a default atlas environment
-    //   and otherwise valid user, solver and dapp operations
-    //     where the solver op userOpHash is not the same as the user op userOpHash
-    // when validCalls is called from the userEOA
-    // then it should return NoSolverOp
-    // because the solver op userOpHash must be the same as the user op userOpHash
-    //
-    // function test_validCalls_SolverOpUserOpHashWrong_NoSolverOp() public {
-    //     defaultAtlasEnvironment();
-
-    //     UserOperation memory userOp = validUserOperation().build();
-    //     SolverOperation[] memory solverOps = new SolverOperation[](1);
-    //     SolverOperation memory solverOp = validSolverOperation(userOp).withUserOpHash(bytes32(0)).signAndBuild(address(atlasVerification), solverOnePK);
-    //     solverOps[0] = solverOp;
-    //     DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
-
-    //     callAndAssert(ValidCallsCall({
-    //         userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-    //     ), ValidCallsResult.NoSolverOp);
-    // }
 
     //
     // given a default atlas environment

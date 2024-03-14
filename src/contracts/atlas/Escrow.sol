@@ -87,12 +87,11 @@ abstract contract Escrow is AtlETH {
         EscrowKey memory key
     )
         internal
-        returns (bool, EscrowKey memory)
+        returns (bool, EscrowKey memory, uint256 result)
     {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
-        uint256 result =
-            IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, userOpHash, userOp.maxFeePerGas, bundler);
+        result = IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, userOpHash, userOp.maxFeePerGas, bundler);
 
         // Verify the transaction.
         if (result.canExecute()) {
@@ -100,7 +99,7 @@ abstract contract Escrow is AtlETH {
             (result, gasLimit) = _validateSolverOperation(dConfig, solverOp, gasWaterMark, result);
 
             if (dConfig.callConfig.allowsTrustedOpHash()) {
-                if (!_handleAltOpHash(userOp, solverOp)) return (false, key);
+                if (!_handleAltOpHash(userOp, solverOp)) return (false, key, result);
             }
 
             // If there are no errors, attempt to execute
@@ -119,7 +118,7 @@ abstract contract Escrow is AtlETH {
 
                     key.solverSuccessful = true;
                     // auctionWon = true
-                    return (true, key);
+                    return (true, key, result);
                 }
             }
         }
@@ -133,7 +132,7 @@ abstract contract Escrow is AtlETH {
         emit SolverTxResult(solverOp.solver, solverOp.from, result.executedWithError(), false, result);
 
         // auctionWon = false
-        return (false, key);
+        return (false, key, result);
     }
 
     // (Note that balances are held in the execution environment, meaning

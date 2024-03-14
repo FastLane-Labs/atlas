@@ -67,6 +67,16 @@ contract SolverOperationBuilder is Test {
         return this;
     }
 
+    function withAltUserOpHash(bytes32 altUserOpHash) public returns (SolverOperationBuilder) {
+        solverOperation.userOpHash = altUserOpHash;
+        return this;
+    }
+
+    function withAltUserOpHash(UserOperation memory userOperation) public returns (SolverOperationBuilder) {
+        solverOperation.userOpHash = userOperation.getAltOperationHash();
+        return this;
+    }
+
     function withBidToken(address bidToken) public returns (SolverOperationBuilder) {
         solverOperation.bidToken = bidToken;
         return this;
