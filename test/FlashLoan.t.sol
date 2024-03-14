@@ -46,14 +46,14 @@ contract FlashLoanTest is BaseTest {
         // Deploy
         vm.startPrank(governanceEOA);
 
-        controller = new DummyDAppControlBuilder(address(escrow), WETH_ADDRESS);
+        controller = new DummyDAppControlBuilder(address(atlas), WETH_ADDRESS);
         atlasVerification.initializeGovernance(address(controller));
         vm.stopPrank();
     }
 
     function testFlashLoan() public {
         vm.startPrank(solverOneEOA);
-        SimpleSolver solver = new SimpleSolver(WETH_ADDRESS, escrow);
+        SimpleSolver solver = new SimpleSolver(WETH_ADDRESS, address(atlas));
         deal(WETH_ADDRESS, address(solver), 1e18); // 1 WETH to solver to pay bid
         atlas.bond(1 ether); // gas for solver to pay
         vm.stopPrank();

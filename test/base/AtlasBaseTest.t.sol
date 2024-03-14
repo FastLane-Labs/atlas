@@ -45,8 +45,6 @@ contract AtlasBaseTest is Test, TestConstants {
     Simulator public simulator;
     Sorter public sorter;
 
-    address public escrow;
-
     Utilities public u;
 
     // Fork stuff
@@ -83,8 +81,6 @@ contract AtlasBaseTest is Test, TestConstants {
         atlasVerification = new AtlasVerification(address(atlas));
 
         simulator.setAtlas(address(atlas));
-
-        escrow = address(atlas);
         sorter = new Sorter(address(atlas));
 
         vm.stopPrank();
@@ -93,7 +89,6 @@ contract AtlasBaseTest is Test, TestConstants {
         vm.label(governanceEOA, "GOVERNANCE");
         vm.label(solverOneEOA, "SOLVER_ONE");
         vm.label(solverTwoEOA, "SOLVER_TWO");
-        vm.label(escrow, "ESCROW");
         vm.label(address(atlas), "ATLAS");
     }
 }
