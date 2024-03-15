@@ -84,6 +84,7 @@ library SafetyBits {
         self.callIndex = needsPreOps ? 0 : 1;
         self.lockState = needsPreOps ? _ACTIVE_X_PRE_OPS_X_UNSET : _ACTIVE_X_USER_X_UNSET;
         self.isSimulation = isSimulation;
+        self.bidFind = false;
         return self;
     }
 
