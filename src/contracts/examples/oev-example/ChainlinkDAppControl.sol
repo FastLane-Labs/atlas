@@ -12,11 +12,38 @@ import { ChainlinkAtlasWrapper } from "src/contracts/examples/oev-example/Chainl
 
 import "forge-std/Test.sol";
 
+// Used for s_oracles[a].role, where a is an address, to track the purpose
+// of the address, or to indicate that the address is unset.
+enum Role {
+    // No oracle role has been set for address a
+    Unset,
+    // Signing address for the s_oracles[a].index'th oracle. I.e., report
+    // signatures from this oracle should ecrecover back to address a.
+    Signer,
+    // Transmission address for the s_oracles[a].index'th oracle. I.e., if a
+    // report is received by OffchainAggregator.transmit in which msg.sender is
+    // a, it is attributed to the s_oracles[a].index'th oracle.
+    Transmitter
+}
+
+struct Oracle {
+    uint8 index; // Index of oracle in s_signers/s_transmitters
+    Role role; // Role of the address which mapped to this struct
+}
+
+struct VerificationVars {
+    mapping(address signer => Oracle oracle) oracles;
+    address[] signers;
+}
+
 // NOTE: This contract acts as the Chainlink DAppControl for Atlas,
 // and as a factory for ChainlinkAtlasWrapper contracts
 contract ChainlinkDAppControl is DAppControl {
+    mapping(address baseChainlinkFeed => VerificationVars) internal verificationVars;
+
     error InvalidBaseFeed();
     error FailedToAllocateOEV();
+    error OnlyGovernance();
 
     event NewChainlinkWrapperCreated(address indexed wrapper, address indexed baseFeed, address indexed owner);
 
@@ -58,10 +85,11 @@ contract ChainlinkDAppControl is DAppControl {
         if (!success) revert FailedToAllocateOEV();
     }
 
-    /////////////////////////////////////////////////////////
-    ///////////////// GETTERS & HELPERS // //////////////////
-    /////////////////////////////////////////////////////////
-    // NOTE: These are not delegatecalled
+    // NOTE: Functions below are not delegatecalled
+
+    // ---------------------------------------------------- //
+    //                    View Functions                    //
+    // ---------------------------------------------------- //
 
     function getBidFormat(UserOperation calldata userOp) public pure override returns (address bidToken) {
         return address(0); // ETH is bid token
@@ -69,6 +97,10 @@ contract ChainlinkDAppControl is DAppControl {
 
     function getBidValue(SolverOperation calldata solverOp) public pure override returns (uint256) {
         return solverOp.bidAmount;
+    }
+
+    function getSignersForBaseFeed(address baseChainlinkFeed) external view returns (address[] memory) {
+        return verificationVars[baseChainlinkFeed].signers;
     }
 
     // ---------------------------------------------------- //
@@ -84,6 +116,19 @@ contract ChainlinkDAppControl is DAppControl {
             address(new ChainlinkAtlasWrapper(atlas, baseChainlinkFeed, msg.sender, 1, type(int192).max));
         emit NewChainlinkWrapperCreated(newWrapper, baseChainlinkFeed, msg.sender);
         return newWrapper;
+    }
+
+    // ---------------------------------------------------- //
+    //                    OnlyGov Functions                 //
+    // ---------------------------------------------------- //
+
+    function setSignersForBaseFeed(address baseChainlinkFeed, address[] calldata signers) external {
+        if (msg.sender != governance) revert OnlyGovernance();
+        VerificationVars storage vars = verificationVars[baseChainlinkFeed];
+        for (uint256 i = 0; i < signers.length; i++) {
+            vars.oracles[signers[i]] = Oracle({ index: uint8(i), role: Role.Signer });
+        }
+        vars.signers = signers;
     }
 }
 
