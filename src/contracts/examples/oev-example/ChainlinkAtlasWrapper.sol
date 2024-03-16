@@ -11,6 +11,7 @@ import "forge-std/Test.sol"; //TODO remove
 contract ChainlinkAtlasWrapper is Ownable {
     address public immutable ATLAS;
     IChainlinkFeed public immutable BASE_FEED; // Base Chainlink Feed
+    IChainlinkDAppControl public immutable DAPP_CONTROL; // Chainlink Atlas DAppControl
 
     int192 public immutable MIN_ANSWER;
     int192 public immutable MAX_ANSWER;
@@ -28,6 +29,7 @@ contract ChainlinkAtlasWrapper is Ownable {
     error InvalidTransmitMsgDataLength();
     error ObservationsNotOrdered();
     error AnswerOutOfRange();
+    error SignerVerificationFailed();
     error WithdrawETHFailed();
 
     event TransmitterStatusChanged(address indexed transmitter, bool trusted);
@@ -36,6 +38,7 @@ contract ChainlinkAtlasWrapper is Ownable {
     constructor(address atlas, address baseChainlinkFeed, address _owner, int192 minAnswer, int192 maxAnswer) {
         ATLAS = atlas;
         BASE_FEED = IChainlinkFeed(baseChainlinkFeed);
+        DAPP_CONTROL = IChainlinkDAppControl(msg.sender); // Chainlink DAppControl is also wrapper factory
 
         if (minAnswer <= 0) revert InvalidMinAnswer();
         if (maxAnswer <= minAnswer) revert InvalidMaxAnswer();
@@ -128,6 +131,10 @@ contract ChainlinkAtlasWrapper is Ownable {
 
         if (median < MIN_ANSWER || median > MAX_ANSWER) revert AnswerOutOfRange();
 
+        bool signersVerified =
+            IChainlinkDAppControl(DAPP_CONTROL).verifyTransmitSigners(address(BASE_FEED), report, rs, ss, rawVs);
+        if (!signersVerified) revert SignerVerificationFailed();
+
         return int256(median);
     }
 
@@ -197,4 +204,17 @@ interface IChainlinkFeed {
         external
         view
         returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound);
+}
+
+interface IChainlinkDAppControl {
+    function verifyTransmitSigners(
+        address baseChainlinkFeed,
+        bytes calldata report,
+        bytes32[] calldata rs,
+        bytes32[] calldata ss,
+        bytes32 rawVs
+    )
+        external
+        view
+        returns (bool verified);
 }

@@ -112,10 +112,41 @@ contract ChainlinkDAppControl is DAppControl {
     function createNewChainlinkAtlasWrapper(address baseChainlinkFeed) external returns (address) {
         if (IChainlinkFeed(baseChainlinkFeed).latestAnswer() == 0) revert InvalidBaseFeed();
 
+        // TODO reconsider min, max params. Can probably just check price != 0
         address newWrapper =
             address(new ChainlinkAtlasWrapper(atlas, baseChainlinkFeed, msg.sender, 1, type(int192).max));
         emit NewChainlinkWrapperCreated(newWrapper, baseChainlinkFeed, msg.sender);
         return newWrapper;
+    }
+
+    // Called by a ChainlinkAtlasWrapper to verify if the signers of a price update via `transmit` are verified.
+    function verifyTransmitSigners(
+        address baseChainlinkFeed,
+        bytes calldata report,
+        bytes32[] calldata rs,
+        bytes32[] calldata ss,
+        bytes32 rawVs
+    )
+        external
+        view
+        returns (bool verified)
+    {
+        bool[] memory signed = new bool[](rs.length);
+        bytes32 reportHash = keccak256(report);
+        Oracle memory currOracle;
+
+        for (uint256 i = 0; i < rs.length; ++i) {
+            // TODO build bytes array for rawVs if this iteration doesnt compile
+            address signer = ecrecover(reportHash, uint8(rawVs[i]) + 27, rs[i], ss[i]);
+            currOracle = verificationVars[baseChainlinkFeed].oracles[signer];
+
+            // Signer must be pre-approved and only 1 observation per signer
+            if (currOracle.role != Role.Signer || signed[currOracle.index]) {
+                return false;
+            }
+            signed[currOracle.index] = true;
+        }
+        return true;
     }
 
     // ---------------------------------------------------- //
