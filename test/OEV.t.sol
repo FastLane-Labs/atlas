@@ -66,12 +66,14 @@ contract OEVTest is BaseTest {
         chainlinkGovEOA = vm.addr(chainlinkGovPK);
         aaveGovEOA = vm.addr(aaveGovPK);
 
-        vm.startPrank(governanceEOA);
+        vm.startPrank(chainlinkGovEOA);
         // Chainlink's Gov address deploys the Chainlink DAppControl
         chainlinkDAppControl = new ChainlinkDAppControl(address(atlas));
         // Chainlink's Gov address initializes the Chainlink DAppControl in Atlas
         atlasVerification.initializeGovernance(address(chainlinkDAppControl));
         vm.stopPrank();
+
+        setEthUsdFeedSignersInDAppControl();
 
         vm.startPrank(userEOA); // User is a Chainlink Node
         executionEnvironment = atlas.createExecutionEnvironment(address(chainlinkDAppControl));
@@ -323,6 +325,44 @@ contract OEVTest is BaseTest {
         ss[10] = 0x2768d43bca650e9a452db41730c4e31b600f5398c49490d66f4065a0b357707f;
 
         return (report, rs, ss, rawVs);
+    }
+
+    function setEthUsdFeedSignersInDAppControl() public {
+        address[] memory signers = new address[](31);
+        signers[0] = 0xCdEf689d3098A796F840A26f383CE19F4f023B5B;
+        signers[1] = 0xb7bEA3A5d410F7c4eC2aa446ae4236F6Eed6b16A;
+        signers[2] = 0x5ba2D2B875626901fed647411AD08009b1ee35e2;
+        signers[3] = 0x21389cBcdb25c8859c704BD8Cd7252902384FceF;
+        signers[4] = 0x03A67cD8467642a03d5ebd67F97157931D94fA32;
+        signers[5] = 0x3650Da40Fe97A93bfC2623E0DcA3899a91Eca0e2;
+        signers[6] = 0x1F31c45AE0605690D63D26d7CdA4035c3668D473;
+        signers[7] = 0xCc1b49B86F79C7E50E294D3e3734fe94DB9A42F0;
+        signers[8] = 0xA4EBE1e06dd0bf674B0757cd20b97Ee16b00aF1B;
+        signers[9] = 0x8d4AE8b06701f53f7a34421461441E4492E1C578;
+        signers[10] = 0x5007b477F939646b4E4416AFcEf6b00567F5F078;
+        signers[11] = 0x55048BC9f3a3f373031fB32C0D0d5C1Bc6E10B3b;
+        signers[12] = 0x8316e3Eb7eccfCAF0c1967903CcA8ECda3dF37E0;
+        signers[13] = 0x503bd542a29F089319855cd9F6F6F937C7Be87c7;
+        signers[14] = 0xbd34530f411130fd7aCB88b8251009A0829379aA;
+        signers[15] = 0x54103390874885e164d69bf08B6db480E5E8fE5d;
+        signers[16] = 0xC01465eBA4FA3A72309374bb67149A8FD14Cb687;
+        signers[17] = 0xAF447dA1E8c277C41983B1732BECF39129BE5CA6;
+        signers[18] = 0xbe15B23E9F03e3Bb44c5E35549354649fb25b87B;
+        signers[19] = 0x1E15545b23B831fD39e1d9579427DeA61425DD47;
+        signers[20] = 0xD1C8b1e58C1186597D1897054b738c551ec74BD4;
+        signers[21] = 0x8EB664cD767f12507E7e3864Ba5B7E925090A0E5;
+        signers[22] = 0x656Fc633eb33cF5daD0bCEa0E42cde85fb7A4Ab8;
+        signers[23] = 0x076b12D219a32613cd370eA9649a860114D3015e;
+        signers[24] = 0x0ac6c28B582016A55f6d4e3aC77b64749568Ffe1;
+        signers[25] = 0xD3b9610534994aAb2777D8Af6C41d1e54F2ef33f;
+        signers[26] = 0xbeB19b5EC84DdC9426d84e5cE7403AFB7BB56700;
+        signers[27] = 0xd54DDB3A256a40061C41Eb6ADF4f412ca8e17c25;
+        signers[28] = 0xdb69C372B30D7A663BDE45d31a4886385F50Ea51;
+        signers[29] = 0x67a95e050d2E4200808A488628d55269dDeFC455;
+        signers[30] = 0x080D263FAA8CBd848f0b9B24B40e1f23EA06b3A3;
+
+        vm.prank(chainlinkGovEOA);
+        chainlinkDAppControl.setSignersForBaseFeed(chainlinkETHUSD, signers);
     }
 }
 

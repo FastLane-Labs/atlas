@@ -39,6 +39,8 @@ struct VerificationVars {
 // NOTE: This contract acts as the Chainlink DAppControl for Atlas,
 // and as a factory for ChainlinkAtlasWrapper contracts
 contract ChainlinkDAppControl is DAppControl {
+    uint256 internal constant MAX_NUM_ORACLES = 31;
+
     mapping(address baseChainlinkFeed => VerificationVars) internal verificationVars;
 
     error InvalidBaseFeed();
@@ -131,12 +133,11 @@ contract ChainlinkDAppControl is DAppControl {
         view
         returns (bool verified)
     {
-        bool[] memory signed = new bool[](rs.length);
+        bool[] memory signed = new bool[](MAX_NUM_ORACLES);
         bytes32 reportHash = keccak256(report);
         Oracle memory currOracle;
 
         for (uint256 i = 0; i < rs.length; ++i) {
-            // TODO build bytes array for rawVs if this iteration doesnt compile
             address signer = ecrecover(reportHash, uint8(rawVs[i]) + 27, rs[i], ss[i]);
             currOracle = verificationVars[baseChainlinkFeed].oracles[signer];
 
@@ -153,10 +154,11 @@ contract ChainlinkDAppControl is DAppControl {
     //                    OnlyGov Functions                 //
     // ---------------------------------------------------- //
 
+    // TODO this works for add, but need to loop through signers array to delete before adding new set
     function setSignersForBaseFeed(address baseChainlinkFeed, address[] calldata signers) external {
         if (msg.sender != governance) revert OnlyGovernance();
         VerificationVars storage vars = verificationVars[baseChainlinkFeed];
-        for (uint256 i = 0; i < signers.length; i++) {
+        for (uint256 i = 0; i < signers.length; ++i) {
             vars.oracles[signers[i]] = Oracle({ index: uint8(i), role: Role.Signer });
         }
         vars.signers = signers;
