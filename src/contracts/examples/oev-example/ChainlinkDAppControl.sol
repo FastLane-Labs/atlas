@@ -46,6 +46,7 @@ contract ChainlinkDAppControl is DAppControl {
     error InvalidBaseFeed();
     error FailedToAllocateOEV();
     error OnlyGovernance();
+    error SignerNotFound();
 
     event NewChainlinkWrapperCreated(address indexed wrapper, address indexed baseFeed, address indexed owner);
 
@@ -77,9 +78,9 @@ contract ChainlinkDAppControl is DAppControl {
         )
     { }
 
-    //////////////////////////////////
-    // CONTRACT-SPECIFIC FUNCTIONS  //
-    //////////////////////////////////
+    // ---------------------------------------------------- //
+    //                  Atlas Hook Overrides                //
+    // ---------------------------------------------------- //
 
     function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) internal virtual override {
         address chainlinkWrapper = abi.decode(data, (address));
@@ -135,17 +136,17 @@ contract ChainlinkDAppControl is DAppControl {
     {
         bool[] memory signed = new bool[](MAX_NUM_ORACLES);
         bytes32 reportHash = keccak256(report);
-        Oracle memory currOracle;
+        Oracle memory currentOracle;
 
         for (uint256 i = 0; i < rs.length; ++i) {
             address signer = ecrecover(reportHash, uint8(rawVs[i]) + 27, rs[i], ss[i]);
-            currOracle = verificationVars[baseChainlinkFeed].oracles[signer];
+            currentOracle = verificationVars[baseChainlinkFeed].oracles[signer];
 
             // Signer must be pre-approved and only 1 observation per signer
-            if (currOracle.role != Role.Signer || signed[currOracle.index]) {
+            if (currentOracle.role != Role.Signer || signed[currentOracle.index]) {
                 return false;
             }
-            signed[currOracle.index] = true;
+            signed[currentOracle.index] = true;
         }
         return true;
     }
@@ -155,13 +156,47 @@ contract ChainlinkDAppControl is DAppControl {
     // ---------------------------------------------------- //
 
     // TODO this works for add, but need to loop through signers array to delete before adding new set
-    function setSignersForBaseFeed(address baseChainlinkFeed, address[] calldata signers) external {
-        if (msg.sender != governance) revert OnlyGovernance();
+    function setSignersForBaseFeed(address baseChainlinkFeed, address[] calldata signers) external onlyGov {
+        // TODO check array is empty - clear before adding if not
+
         VerificationVars storage vars = verificationVars[baseChainlinkFeed];
         for (uint256 i = 0; i < signers.length; ++i) {
             vars.oracles[signers[i]] = Oracle({ index: uint8(i), role: Role.Signer });
         }
         vars.signers = signers;
+        // TODO event
+    }
+
+    function addSignerForBaseFeed(address baseChainlinkFeed, address signer) external onlyGov {
+        // TODO
+    }
+
+    function removeSignerOfBaseFeed(address baseChainlinkFeed, address signer) external onlyGov {
+        Oracle memory oracle = verificationVars[baseChainlinkFeed].oracles[signer];
+        address[] storage signers = verificationVars[baseChainlinkFeed].signers;
+
+        if (oracle.role != Role.Signer) revert SignerNotFound();
+
+        if (oracle.index < signers.length - 1) {
+            signers[oracle.index] = signers[signers.length - 1];
+            verificationVars[baseChainlinkFeed].oracles[signers[oracle.index]].index = oracle.index;
+        }
+        signers.pop();
+        delete verificationVars[baseChainlinkFeed].oracles[signer];
+        // TODO event
+    }
+
+    function _removeAllSignersOfBaseFeed(address baseChainlinkFeed) external {
+        // TODO
+    }
+
+    function _onlyGov() internal view {
+        if (msg.sender != governance) revert OnlyGovernance();
+    }
+
+    modifier onlyGov() {
+        _onlyGov();
+        _;
     }
 }
 

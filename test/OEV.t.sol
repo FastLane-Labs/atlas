@@ -327,6 +327,8 @@ contract OEVTest is BaseTest {
         return (report, rs, ss, rawVs);
     }
 
+    // Sets the real ETHUSD Chainlink Feed signers as approved signers
+    // in the Chainlink DApp Control contract
     function setEthUsdFeedSignersInDAppControl() public {
         address[] memory signers = new address[](31);
         signers[0] = 0xCdEf689d3098A796F840A26f383CE19F4f023B5B;
