@@ -14,7 +14,7 @@ import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
 import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
 import { DAppOperation, DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 
-import { ChainlinkDAppControl } from "src/contracts/examples/oev-example/ChainlinkDAppControl.sol";
+import { ChainlinkDAppControl, Oracle, Role } from "src/contracts/examples/oev-example/ChainlinkDAppControl.sol";
 import {ChainlinkAtlasWrapper, IChainlinkFeed } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapper.sol";
 import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
@@ -71,9 +71,9 @@ contract OEVTest is BaseTest {
         chainlinkDAppControl = new ChainlinkDAppControl(address(atlas));
         // Chainlink's Gov address initializes the Chainlink DAppControl in Atlas
         atlasVerification.initializeGovernance(address(chainlinkDAppControl));
+        // Set Chainlink's ETHUSD feed signers in DAppControl for verification
+        chainlinkDAppControl.setSignersForBaseFeed(chainlinkETHUSD, getETHUSDSigners());
         vm.stopPrank();
-
-        setEthUsdFeedSignersInDAppControl();
 
         vm.startPrank(userEOA); // User is a Chainlink Node
         executionEnvironment = atlas.createExecutionEnvironment(address(chainlinkDAppControl));
@@ -103,6 +103,10 @@ contract OEVTest is BaseTest {
         vm.label(address(chainlinkDAppControl), "Chainlink DApp Control");
         vm.label(address(chainlinkETHUSD), "Chainlink Base ETH/USD Feed");
     }
+
+    // ---------------------------------------------------- //
+    //                  Full OEV Capture Test               //
+    // ---------------------------------------------------- //
 
     function testChainlinkOEV() public {
         UserOperation memory userOp;
@@ -164,6 +168,10 @@ contract OEVTest is BaseTest {
         assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) != uint(IChainlinkFeed(chainlinkETHUSD).latestAnswer()), "Wrapper and base feed should report different answers");
         assertEq(address(chainlinkAtlasWrapper).balance, solverWinningBid, "Wrapper should hold winning bid as OEV");
     }
+
+    // ---------------------------------------------------- //
+    //               ChainlinkAtlasWrapper Tests            //
+    // ---------------------------------------------------- //
 
     function testChainlinkAtlasWrapperViewFunctions() public {
         // Check wrapper and base start as expected
@@ -244,7 +252,7 @@ contract OEVTest is BaseTest {
         // Wrapper emits event on deployment to show ownership transfer
         vm.expectEmit(true, false, false, true);
         emit Ownable.OwnershipTransferred(address(this), address(chainlinkAtlasWrapper.owner()));
-        new ChainlinkAtlasWrapper(address(atlas), chainlinkETHUSD, aaveGovEOA, 1, type(int192).max);
+        new ChainlinkAtlasWrapper(address(atlas), chainlinkETHUSD, aaveGovEOA);
 
         vm.prank(chainlinkGovEOA);
         vm.expectRevert("Ownable: caller is not the owner");
@@ -278,10 +286,67 @@ contract OEVTest is BaseTest {
         // TODO more verification and security checks for `transmit` and `_verifyTransmitData`
     }
 
+    // ---------------------------------------------------- //
+    //               ChainlinkDAppControl Tests             //
+    // ---------------------------------------------------- //
 
-    // ----------------
-    // OEV Test Utils
-    // ----------------
+    function test_ChainlinkDAppControl_setSignersForBaseFeed() public {
+        // Checks:
+        // onlyGov
+
+    }
+
+    function test_ChainlinkDAppControl_addSignerForBaseFeed() public {
+
+    }
+
+    function test_ChainlinkDAppControl_removeSignerOfBaseFeed() public {
+
+    }
+
+    function test_ChainlinkDAppControl_verifyTransmitSigners() public {
+
+    }
+
+    function test_ChainlinkDAppControl_createNewChainlinkAtlasWrapper() public {
+
+    }
+
+    // View Functions
+
+    function test_ChainlinkDAppControl_getBidFormat() public {
+        UserOperation memory userOp;
+        assertEq(chainlinkDAppControl.getBidFormat(userOp), address(0), "Bid format should be addr 0 for ETH");
+    }
+
+    function test_ChainlinkDAppControl_getBidValue() public {
+        SolverOperation memory solverOp;
+        solverOp.bidAmount = 123;
+        assertEq(chainlinkDAppControl.getBidValue(solverOp), 123, "Bid value should return solverOp.bidAmount");
+    }
+
+    function test_ChainlinkDAppControl_getSignersForBaseFeed() public {
+        address[] memory signersFromDAppControl = chainlinkDAppControl.getSignersForBaseFeed(chainlinkETHUSD);
+        address[] memory signers = getETHUSDSigners();
+        assertEq(signersFromDAppControl.length, signers.length, "Signers length should be same as expected");
+        for (uint i = 0; i < signers.length; i++) {
+            assertEq(signersFromDAppControl[i], signers[i], "Signer should be same as expected");
+        }
+    }
+
+    function test_ChainlinkDAppControl_getOracleDataForBaseFeed() public {
+        address[] memory signers = getETHUSDSigners();
+        for (uint i = 0; i < signers.length; i++) {
+            Oracle memory oracle = chainlinkDAppControl.getOracleDataForBaseFeed(chainlinkETHUSD, signers[i]);
+            assertEq(uint(oracle.role), uint(Role.Signer), "Oracle role should be Signer");
+            assertEq(oracle.index, i, "Oracle index not as expected");
+        }
+    }
+
+
+    // ---------------------------------------------------- //
+    //                     OEV Test Utils                   //
+    // ---------------------------------------------------- //
 
     // Returns calldata taken from a real Chainlink ETH/USD transmit tx
     function getTransmitPayload() public returns (
@@ -327,9 +392,7 @@ contract OEVTest is BaseTest {
         return (report, rs, ss, rawVs);
     }
 
-    // Sets the real ETHUSD Chainlink Feed signers as approved signers
-    // in the Chainlink DApp Control contract
-    function setEthUsdFeedSignersInDAppControl() public {
+    function getETHUSDSigners() public view returns (address[] memory) {
         address[] memory signers = new address[](31);
         signers[0] = 0xCdEf689d3098A796F840A26f383CE19F4f023B5B;
         signers[1] = 0xb7bEA3A5d410F7c4eC2aa446ae4236F6Eed6b16A;
@@ -362,9 +425,7 @@ contract OEVTest is BaseTest {
         signers[28] = 0xdb69C372B30D7A663BDE45d31a4886385F50Ea51;
         signers[29] = 0x67a95e050d2E4200808A488628d55269dDeFC455;
         signers[30] = 0x080D263FAA8CBd848f0b9B24B40e1f23EA06b3A3;
-
-        vm.prank(chainlinkGovEOA);
-        chainlinkDAppControl.setSignersForBaseFeed(chainlinkETHUSD, signers);
+        return signers;
     }
 }
 

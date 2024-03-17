@@ -12,22 +12,18 @@ import { ChainlinkAtlasWrapper } from "src/contracts/examples/oev-example/Chainl
 
 import "forge-std/Test.sol";
 
-// Used for s_oracles[a].role, where a is an address, to track the purpose
-// of the address, or to indicate that the address is unset.
+// Role enum as per Chainlink's OffchainAggregatorBilling.sol contract
 enum Role {
     // No oracle role has been set for address a
     Unset,
-    // Signing address for the s_oracles[a].index'th oracle. I.e., report
-    // signatures from this oracle should ecrecover back to address a.
+    // Signing address a of an oracle. I.e. report signatures from this oracle should ecrecover back to address a.
     Signer,
-    // Transmission address for the s_oracles[a].index'th oracle. I.e., if a
-    // report is received by OffchainAggregator.transmit in which msg.sender is
-    // a, it is attributed to the s_oracles[a].index'th oracle.
+    // Transmitter role is not used
     Transmitter
 }
 
 struct Oracle {
-    uint8 index; // Index of oracle in s_signers/s_transmitters
+    uint8 index; // Index of oracle in signers array
     Role role; // Role of the address which mapped to this struct
 }
 
@@ -111,6 +107,17 @@ contract ChainlinkDAppControl is DAppControl {
         return verificationVars[baseChainlinkFeed].signers;
     }
 
+    function getOracleDataForBaseFeed(
+        address baseChainlinkFeed,
+        address signer
+    )
+        external
+        view
+        returns (Oracle memory)
+    {
+        return verificationVars[baseChainlinkFeed].oracles[signer];
+    }
+
     // ---------------------------------------------------- //
     //          ChainlinkWrapper Factory Functions          //
     // ---------------------------------------------------- //
@@ -119,10 +126,7 @@ contract ChainlinkDAppControl is DAppControl {
     // OEV-generating protocol.
     function createNewChainlinkAtlasWrapper(address baseChainlinkFeed) external returns (address) {
         if (IChainlinkFeed(baseChainlinkFeed).latestAnswer() == 0) revert InvalidBaseFeed();
-
-        // TODO reconsider min, max params. Can probably just check price != 0
-        address newWrapper =
-            address(new ChainlinkAtlasWrapper(atlas, baseChainlinkFeed, msg.sender, 1, type(int192).max));
+        address newWrapper = address(new ChainlinkAtlasWrapper(atlas, baseChainlinkFeed, msg.sender));
         emit NewChainlinkWrapperCreated(newWrapper, baseChainlinkFeed, msg.sender);
         return newWrapper;
     }

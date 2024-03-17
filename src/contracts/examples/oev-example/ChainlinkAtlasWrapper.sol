@@ -13,9 +13,6 @@ contract ChainlinkAtlasWrapper is Ownable {
     IChainlinkFeed public immutable BASE_FEED; // Base Chainlink Feed
     IChainlinkDAppControl public immutable DAPP_CONTROL; // Chainlink Atlas DAppControl
 
-    int192 public immutable MIN_ANSWER;
-    int192 public immutable MAX_ANSWER;
-
     int256 public atlasLatestAnswer;
     uint256 public atlasLatestTimestamp;
 
@@ -23,28 +20,20 @@ contract ChainlinkAtlasWrapper is Ownable {
     mapping(address transmitter => bool trusted) public transmitters;
     mapping(address account => bool isSigner) public signers;
 
-    error InvalidMinAnswer();
-    error InvalidMaxAnswer();
     error TransmitterNotTrusted(address transmitter);
     error InvalidTransmitMsgDataLength();
     error ObservationsNotOrdered();
-    error AnswerOutOfRange();
+    error AnswerMustBeAboveZero();
     error SignerVerificationFailed();
     error WithdrawETHFailed();
 
     event TransmitterStatusChanged(address indexed transmitter, bool trusted);
     event SignerStatusChanged(address indexed account, bool isSigner);
 
-    constructor(address atlas, address baseChainlinkFeed, address _owner, int192 minAnswer, int192 maxAnswer) {
+    constructor(address atlas, address baseChainlinkFeed, address _owner) {
         ATLAS = atlas;
         BASE_FEED = IChainlinkFeed(baseChainlinkFeed);
         DAPP_CONTROL = IChainlinkDAppControl(msg.sender); // Chainlink DAppControl is also wrapper factory
-
-        if (minAnswer <= 0) revert InvalidMinAnswer();
-        if (maxAnswer <= minAnswer) revert InvalidMaxAnswer();
-
-        MIN_ANSWER = minAnswer;
-        MAX_ANSWER = maxAnswer;
 
         _transferOwnership(_owner);
     }
@@ -129,7 +118,7 @@ contract ChainlinkAtlasWrapper is Ownable {
         }
         int192 median = r.observations[r.observations.length / 2];
 
-        if (median < MIN_ANSWER || median > MAX_ANSWER) revert AnswerOutOfRange();
+        if (median <= 0) revert AnswerMustBeAboveZero();
 
         bool signersVerified =
             IChainlinkDAppControl(DAPP_CONTROL).verifyTransmitSigners(address(BASE_FEED), report, rs, ss, rawVs);
