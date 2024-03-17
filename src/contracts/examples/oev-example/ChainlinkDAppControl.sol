@@ -51,6 +51,9 @@ contract ChainlinkDAppControl is DAppControl {
     error DuplicateSigner(address signer);
 
     event NewChainlinkWrapperCreated(address indexed wrapper, address indexed baseFeed, address indexed owner);
+    event SignersSetForBaseFeed(address indexed baseFeed, address[] signers);
+    event SignerAddedForBaseFeed(address indexed baseFeed, address indexed signer);
+    event SignerRemovedForBaseFeed(address indexed baseFeed, address indexed signer);
 
     constructor(address _atlas)
         DAppControl(
@@ -171,7 +174,7 @@ contract ChainlinkDAppControl is DAppControl {
         }
         vars.signers = signers;
 
-        // TODO event
+        emit SignersSetForBaseFeed(baseChainlinkFeed, signers);
     }
 
     // Adds a specific signer to a specific Chainlink feed.
@@ -184,7 +187,7 @@ contract ChainlinkDAppControl is DAppControl {
         vars.signers.push(signer);
         vars.oracles[signer] = Oracle({ index: uint8(vars.signers.length - 1), role: Role.Signer });
 
-        // TODO event
+        emit SignerAddedForBaseFeed(baseChainlinkFeed, signer);
     }
 
     // Removes a specific signer from a specific Chainlink feed.
@@ -201,7 +204,7 @@ contract ChainlinkDAppControl is DAppControl {
         signers.pop();
         delete verificationVars[baseChainlinkFeed].oracles[signer];
 
-        // TODO event
+        emit SignerRemovedForBaseFeed(baseChainlinkFeed, signer);
     }
 
     function _removeAllSignersOfBaseFeed(address baseChainlinkFeed) internal {
