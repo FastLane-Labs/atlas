@@ -47,6 +47,8 @@ contract ChainlinkDAppControl is DAppControl {
     error FailedToAllocateOEV();
     error OnlyGovernance();
     error SignerNotFound();
+    error TooManySigners();
+    error DuplicateSigner(address signer);
 
     event NewChainlinkWrapperCreated(address indexed wrapper, address indexed baseFeed, address indexed owner);
 
@@ -155,22 +157,37 @@ contract ChainlinkDAppControl is DAppControl {
     //                    OnlyGov Functions                 //
     // ---------------------------------------------------- //
 
-    // TODO this works for add, but need to loop through signers array to delete before adding new set
+    // Clears any existing signers and adds a new set of signers for a specific Chainlink feed.
     function setSignersForBaseFeed(address baseChainlinkFeed, address[] calldata signers) external onlyGov {
-        // TODO check array is empty - clear before adding if not
+        if (signers.length > MAX_NUM_ORACLES) revert TooManySigners();
 
+        _removeAllSignersOfBaseFeed(baseChainlinkFeed); // Removes any existing signers first
         VerificationVars storage vars = verificationVars[baseChainlinkFeed];
+        Oracle memory currentOracle;
+
         for (uint256 i = 0; i < signers.length; ++i) {
+            if (vars.oracles[signers[i]].role != Role.Unset) revert DuplicateSigner(signers[i]);
             vars.oracles[signers[i]] = Oracle({ index: uint8(i), role: Role.Signer });
         }
         vars.signers = signers;
+
         // TODO event
     }
 
+    // Adds a specific signer to a specific Chainlink feed.
     function addSignerForBaseFeed(address baseChainlinkFeed, address signer) external onlyGov {
-        // TODO
+        VerificationVars storage vars = verificationVars[baseChainlinkFeed];
+
+        if (vars.signers.length >= MAX_NUM_ORACLES) revert TooManySigners();
+        if (vars.oracles[signer].role != Role.Unset) revert DuplicateSigner(signer);
+
+        vars.signers.push(signer);
+        vars.oracles[signer] = Oracle({ index: uint8(vars.signers.length - 1), role: Role.Signer });
+
+        // TODO event
     }
 
+    // Removes a specific signer from a specific Chainlink feed.
     function removeSignerOfBaseFeed(address baseChainlinkFeed, address signer) external onlyGov {
         Oracle memory oracle = verificationVars[baseChainlinkFeed].oracles[signer];
         address[] storage signers = verificationVars[baseChainlinkFeed].signers;
@@ -183,11 +200,18 @@ contract ChainlinkDAppControl is DAppControl {
         }
         signers.pop();
         delete verificationVars[baseChainlinkFeed].oracles[signer];
+
         // TODO event
     }
 
-    function _removeAllSignersOfBaseFeed(address baseChainlinkFeed) external {
-        // TODO
+    function _removeAllSignersOfBaseFeed(address baseChainlinkFeed) internal {
+        VerificationVars storage vars = verificationVars[baseChainlinkFeed];
+        address[] storage signers = vars.signers;
+        if (signers.length == 0) return;
+        for (uint256 i = 0; i < signers.length; ++i) {
+            delete vars.oracles[signers[i]];
+        }
+        delete vars.signers;
     }
 
     function _onlyGov() internal view {
