@@ -6,9 +6,9 @@ import "forge-std/Test.sol";
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 import { Ownable } from "openzeppelin-contracts/contracts/access/Ownable.sol";
 
-import { BaseTest } from "./base/BaseTest.t.sol";
+import { BaseTest } from "test/base/BaseTest.t.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
-import { UserOperationBuilder } from "./base/builders/UserOperationBuilder.sol";
+import { UserOperationBuilder } from "test/base/builders/UserOperationBuilder.sol";
 
 import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
 import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
@@ -291,13 +291,123 @@ contract OEVTest is BaseTest {
     // ---------------------------------------------------- //
 
     function test_ChainlinkDAppControl_setSignersForBaseFeed() public {
-        // Checks:
-        // onlyGov
+        address[] memory signers = getETHUSDSigners();
+        address[] memory signersFromDAppControl;
 
+        vm.expectRevert(ChainlinkDAppControl.OnlyGovernance.selector);
+        chainlinkDAppControl.setSignersForBaseFeed(chainlinkETHUSD, signers);
+
+        vm.prank(chainlinkGovEOA);
+        vm.expectEmit(true, false, false, true);
+        emit ChainlinkDAppControl.SignersSetForBaseFeed(chainlinkETHUSD, signers);
+        chainlinkDAppControl.setSignersForBaseFeed(chainlinkETHUSD, signers);
+
+        signersFromDAppControl = chainlinkDAppControl.getSignersForBaseFeed(chainlinkETHUSD);
+        assertEq(signersFromDAppControl.length, signers.length, "Signers length should be same as expected");
+        for (uint i = 0; i < signers.length; i++) {
+            assertEq(signersFromDAppControl[i], signers[i], "Signer should be same as expected");
+        }
+
+        address[] memory blankSigners = new address[](0);
+        vm.prank(chainlinkGovEOA);
+        vm.expectEmit(true, false, false, true);
+        emit ChainlinkDAppControl.SignersSetForBaseFeed(chainlinkETHUSD, blankSigners);
+        chainlinkDAppControl.setSignersForBaseFeed(chainlinkETHUSD, blankSigners);
+
+        assertEq(chainlinkDAppControl.getSignersForBaseFeed(chainlinkETHUSD).length, 0, "Signers should be empty");
+
+        // Should revert on too many signers
+        address[] memory tooManySigners = new address[](chainlinkDAppControl.MAX_NUM_ORACLES() + 1);
+        for (uint i = 0; i < signers.length; i++) {
+            tooManySigners[i] = signers[i];
+        }
+        tooManySigners[chainlinkDAppControl.MAX_NUM_ORACLES()] = chainlinkGovEOA;
+
+        vm.prank(chainlinkGovEOA);
+        vm.expectRevert(ChainlinkDAppControl.TooManySigners.selector);
+        chainlinkDAppControl.setSignersForBaseFeed(chainlinkETHUSD, tooManySigners);
+
+        // Should revert on duplicate signers in the array
+        address[] memory duplicateSigners = new address[](2);
+        duplicateSigners[0] = chainlinkGovEOA;
+        duplicateSigners[1] = chainlinkGovEOA;
+        
+        vm.prank(chainlinkGovEOA);
+        vm.expectRevert(abi.encodeWithSelector(ChainlinkDAppControl.DuplicateSigner.selector, chainlinkGovEOA));
+        chainlinkDAppControl.setSignersForBaseFeed(chainlinkETHUSD, duplicateSigners);
+
+        // Check properties set correctly on valid signer set
+        address[] memory validSigners = new address[](2);
+        validSigners[0] = chainlinkGovEOA;
+        validSigners[1] = aaveGovEOA;
+
+        Oracle memory oracle = chainlinkDAppControl.getOracleDataForBaseFeed(chainlinkETHUSD, chainlinkGovEOA);
+        assertEq(uint(oracle.role), uint(Role.Unset), "Oracle role should be Unset");
+
+        vm.prank(chainlinkGovEOA);
+        vm.expectEmit(true, false, false, true);
+        emit ChainlinkDAppControl.SignersSetForBaseFeed(chainlinkETHUSD, validSigners);
+        chainlinkDAppControl.setSignersForBaseFeed(chainlinkETHUSD, validSigners);
+
+        address[] memory signersFromDappControl = chainlinkDAppControl.getSignersForBaseFeed(chainlinkETHUSD);
+        oracle = chainlinkDAppControl.getOracleDataForBaseFeed(chainlinkETHUSD, chainlinkGovEOA);
+        assertEq(signersFromDappControl.length, validSigners.length, "length mismatch");
+        assertEq(signersFromDappControl[0], validSigners[0]);
+        assertEq(signersFromDappControl[1], validSigners[1]);
+        assertEq(uint(oracle.role), uint(Role.Signer), "Oracle role should be Signer");
+        assertEq(oracle.index, 0, "Oracle index should be 0");
+        oracle = chainlinkDAppControl.getOracleDataForBaseFeed(chainlinkETHUSD, aaveGovEOA);
+        assertEq(uint(oracle.role), uint(Role.Signer), "Oracle role should be Signer");
+        assertEq(oracle.index, 1, "Oracle index should be 1");
     }
 
     function test_ChainlinkDAppControl_addSignerForBaseFeed() public {
+        vm.expectRevert(ChainlinkDAppControl.OnlyGovernance.selector);
+        chainlinkDAppControl.addSignerForBaseFeed(chainlinkETHUSD, chainlinkGovEOA);
 
+        address[] memory signersFromDappControl = chainlinkDAppControl.getSignersForBaseFeed(chainlinkETHUSD);
+        assertEq(signersFromDappControl.length, chainlinkDAppControl.MAX_NUM_ORACLES(), "Should have max signers");
+
+        vm.prank(chainlinkGovEOA);
+        vm.expectRevert(ChainlinkDAppControl.TooManySigners.selector);
+        chainlinkDAppControl.addSignerForBaseFeed(chainlinkETHUSD, chainlinkGovEOA);
+
+        // clear signers so we can add individually
+        address[] memory blankSigners = new address[](0);
+        vm.prank(chainlinkGovEOA);
+        chainlinkDAppControl.setSignersForBaseFeed(chainlinkETHUSD, blankSigners);
+        assertEq(chainlinkDAppControl.getSignersForBaseFeed(chainlinkETHUSD).length, 0, "Signers should be empty");
+
+        Oracle memory oracle = chainlinkDAppControl.getOracleDataForBaseFeed(chainlinkETHUSD, chainlinkGovEOA);
+        assertEq(uint(oracle.role), uint(Role.Unset), "Oracle role should be Unset");
+
+        vm.prank(chainlinkGovEOA);
+        vm.expectEmit(true, false, false, true);
+        emit ChainlinkDAppControl.SignerAddedForBaseFeed(chainlinkETHUSD, chainlinkGovEOA);
+        chainlinkDAppControl.addSignerForBaseFeed(chainlinkETHUSD, chainlinkGovEOA);
+
+        signersFromDappControl = chainlinkDAppControl.getSignersForBaseFeed(chainlinkETHUSD);
+        oracle = chainlinkDAppControl.getOracleDataForBaseFeed(chainlinkETHUSD, chainlinkGovEOA);
+        assertEq(signersFromDappControl.length, 1, "Signers should have 1");
+        assertEq(signersFromDappControl[0], chainlinkGovEOA, "Signer should be chainlinkGovEOA");
+        assertEq(uint(oracle.role), uint(Role.Signer), "Oracle role should be Signer");
+
+        vm.prank(chainlinkGovEOA);
+        vm.expectRevert(abi.encodeWithSelector(ChainlinkDAppControl.DuplicateSigner.selector, chainlinkGovEOA));
+        chainlinkDAppControl.addSignerForBaseFeed(chainlinkETHUSD, chainlinkGovEOA);
+
+        oracle = chainlinkDAppControl.getOracleDataForBaseFeed(chainlinkETHUSD, address(1));
+        assertEq(uint(oracle.role), uint(Role.Unset), "Oracle role should be Unset");
+        assertEq(oracle.index, 0, "Oracle index should be 0");
+
+        vm.prank(chainlinkGovEOA);
+        chainlinkDAppControl.addSignerForBaseFeed(chainlinkETHUSD, address(1));
+
+        signersFromDappControl = chainlinkDAppControl.getSignersForBaseFeed(chainlinkETHUSD);
+        oracle = chainlinkDAppControl.getOracleDataForBaseFeed(chainlinkETHUSD, address(1));
+        assertEq(signersFromDappControl.length, 2, "Signers should have 2");
+        assertEq(uint(oracle.role), uint(Role.Signer), "Oracle role should be Signer");
+        assertEq(oracle.index, 1, "Oracle index should be 1");
     }
 
     function test_ChainlinkDAppControl_removeSignerOfBaseFeed() public {

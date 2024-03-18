@@ -35,7 +35,7 @@ struct VerificationVars {
 // NOTE: This contract acts as the Chainlink DAppControl for Atlas,
 // and as a factory for ChainlinkAtlasWrapper contracts
 contract ChainlinkDAppControl is DAppControl {
-    uint256 internal constant MAX_NUM_ORACLES = 31;
+    uint256 public constant MAX_NUM_ORACLES = 31;
 
     mapping(address baseChainlinkFeed => VerificationVars) internal verificationVars;
 
