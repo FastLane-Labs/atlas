@@ -441,7 +441,20 @@ contract OEVTest is BaseTest {
     }
 
     function test_ChainlinkDAppControl_verifyTransmitSigners() public {
+        // 3rd signer in the ETHUSD transmit example tx used
+        address signerToRemove = 0xCc1b49B86F79C7E50E294D3e3734fe94DB9A42F0;
+        (
+            bytes memory report, bytes32[] memory rs,
+            bytes32[] memory ss, bytes32 rawVs
+        ) = getTransmitPayload();
 
+        // All signers should be verified
+        assertEq(chainlinkDAppControl.verifyTransmitSigners(chainlinkETHUSD, report, rs, ss, rawVs), true);
+
+        // If a verified signer is removed from DAppControl, should return false
+        vm.prank(chainlinkGovEOA);
+        chainlinkDAppControl.removeSignerOfBaseFeed(chainlinkETHUSD, signerToRemove);
+        assertEq(chainlinkDAppControl.verifyTransmitSigners(chainlinkETHUSD, report, rs, ss, rawVs), false);
     }
 
     function test_ChainlinkDAppControl_createNewChainlinkAtlasWrapper() public {
