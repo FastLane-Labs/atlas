@@ -112,13 +112,12 @@ contract Atlas is Escrow, Factory {
         (bytes memory returnData, EscrowKey memory key) =
             _preOpsUserExecutionIteration(dConfig, userOp, solverOps, executionEnvironment, bundler);
 
-        uint256 solverOutcomeResult;
         for (; winningSearcherIndex < solverOps.length;) {
             // valid solverOps are packed from left of array - break at first invalid solverOp
 
             SolverOperation calldata solverOp = solverOps[winningSearcherIndex];
 
-            (auctionWon, key, solverOutcomeResult) = _solverExecutionIteration(
+            (auctionWon, key) = _solverExecutionIteration(
                 dConfig, userOp, solverOp, returnData, executionEnvironment, bundler, userOpHash, key
             );
             emit SolverExecution(solverOp.from, winningSearcherIndex, auctionWon);
@@ -131,7 +130,7 @@ contract Atlas is Escrow, Factory {
 
         // If no solver was successful, handle revert decision
         if (!auctionWon) {
-            if (key.isSimulation) revert SolverSimFail(solverOutcomeResult);
+            if (key.isSimulation) revert SolverSimFail(key.solverOutcome);
             if (dConfig.callConfig.needsFulfillment()) {
                 revert UserNotFulfilled(); // revert("ERR-E003 SolverFulfillmentFailure");
             }
@@ -226,9 +225,9 @@ contract Atlas is Escrow, Factory {
         EscrowKey memory key
     )
         internal
-        returns (bool auctionWon, EscrowKey memory, uint256 solverOutcomeResult)
+        returns (bool auctionWon, EscrowKey memory)
     {
-        (auctionWon, key, solverOutcomeResult) = _executeSolverOperation(
+        (auctionWon, key) = _executeSolverOperation(
             dConfig, userOp, solverOp, dAppReturnData, executionEnvironment, bundler, userOpHash, key
         );
 
@@ -238,7 +237,7 @@ contract Atlas is Escrow, Factory {
             key.paymentsSuccessful =
                 _allocateValue(dConfig, solverOp.bidAmount, dAppReturnData, executionEnvironment, key.pack());
         }
-        return (auctionWon, key, solverOutcomeResult);
+        return (auctionWon, key);
     }
 
     function _handleErrors(bytes memory revertData, uint32 callConfig) internal view {
@@ -252,9 +251,9 @@ contract Atlas is Escrow, Factory {
             } else if (errorSwitch == SolverSimFail.selector) {
                 // Expects revertData in form [bytes4, uint256]
                 uint256 solverOutcomeResult;
-                uint256 startIndex = revertData.length - 32;
                 assembly {
-                    solverOutcomeResult := mload(add(add(revertData, 0x20), startIndex))
+                    let dataLocation := add(revertData, 0x20)
+                    solverOutcomeResult := mload(add(dataLocation, sub(mload(revertData), 32)))
                 }
                 revert SolverSimFail(solverOutcomeResult);
             } else if (errorSwitch == PostOpsSimFail.selector) {
