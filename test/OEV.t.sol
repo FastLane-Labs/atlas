@@ -411,7 +411,33 @@ contract OEVTest is BaseTest {
     }
 
     function test_ChainlinkDAppControl_removeSignerOfBaseFeed() public {
+        address[] memory realSigners = getETHUSDSigners();
+        address signerToRemove = realSigners[10];
+        address[] memory signersFromDappControl = chainlinkDAppControl.getSignersForBaseFeed(chainlinkETHUSD);
+        Oracle memory oracle = chainlinkDAppControl.getOracleDataForBaseFeed(chainlinkETHUSD, signerToRemove);
+        assertEq(signersFromDappControl.length, 31, "Should have 31 signers at start");
+        assertEq(signersFromDappControl[10], realSigners[10], "targeted signer still registered");
+        assertEq(oracle.index, 10);
+        assertEq(uint(oracle.role), uint(Role.Signer));
 
+        vm.expectRevert(ChainlinkDAppControl.OnlyGovernance.selector);
+        chainlinkDAppControl.removeSignerOfBaseFeed(chainlinkETHUSD, realSigners[30]);
+
+        vm.prank(chainlinkGovEOA);
+        vm.expectRevert(ChainlinkDAppControl.SignerNotFound.selector);
+        chainlinkDAppControl.removeSignerOfBaseFeed(chainlinkETHUSD, address(1));
+
+        vm.prank(chainlinkGovEOA);
+        vm.expectEmit(true, false, false, true);
+        emit ChainlinkDAppControl.SignerRemovedForBaseFeed(chainlinkETHUSD, signerToRemove);
+        chainlinkDAppControl.removeSignerOfBaseFeed(chainlinkETHUSD, signerToRemove);
+
+        signersFromDappControl = chainlinkDAppControl.getSignersForBaseFeed(chainlinkETHUSD);
+        oracle = chainlinkDAppControl.getOracleDataForBaseFeed(chainlinkETHUSD, signerToRemove);
+        assertEq(signersFromDappControl.length, realSigners.length - 1, "Should have 30 signers now");
+        assertTrue(signersFromDappControl[10] != realSigners[10], "Idx 10 signers should be diff now");
+        assertEq(oracle.index, 0);
+        assertEq(uint(oracle.role), uint(Role.Unset));
     }
 
     function test_ChainlinkDAppControl_verifyTransmitSigners() public {
