@@ -458,7 +458,21 @@ contract OEVTest is BaseTest {
     }
 
     function test_ChainlinkDAppControl_createNewChainlinkAtlasWrapper() public {
+        MockBadChainlinkFeed mockBadFeed = new MockBadChainlinkFeed();
 
+        // Should revert is base feed returns price of 0
+        vm.expectRevert(ChainlinkDAppControl.InvalidBaseFeed.selector);
+        chainlinkDAppControl.createNewChainlinkAtlasWrapper(address(mockBadFeed));
+
+        address predictedWrapperAddr = vm.computeCreateAddress(address(chainlinkDAppControl), vm.getNonce(address(chainlinkDAppControl)));
+
+        vm.prank(aaveGovEOA);
+        vm.expectEmit(true, true, false, true);
+        emit ChainlinkDAppControl.NewChainlinkWrapperCreated(predictedWrapperAddr, chainlinkETHUSD, aaveGovEOA);
+        address wrapperAddr = chainlinkDAppControl.createNewChainlinkAtlasWrapper(chainlinkETHUSD);
+
+        assertEq(predictedWrapperAddr, wrapperAddr, "wrapper addr not as predicted");
+        assertEq(ChainlinkAtlasWrapper(payable(wrapperAddr)).owner(), aaveGovEOA, "caller is not wrapper owner");
     }
 
     // View Functions
@@ -626,5 +640,11 @@ contract MockLiquidatable {
     // Can only liquidate if the oracle price is exactly the liquidation price
     function canLiquidate() public view returns (bool) {
         return uint256(IChainlinkFeed(oracle).latestAnswer()) == liquidationPrice;
+    }
+}
+
+contract MockBadChainlinkFeed {
+    function latestAnswer() external returns(int256) {
+        return 0;
     }
 }
