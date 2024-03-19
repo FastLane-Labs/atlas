@@ -160,9 +160,26 @@ contract OEVTest is BaseTest {
         assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), uint(IChainlinkFeed(chainlinkETHUSD).latestAnswer()), "Wrapper and base feed should report same answer");
         assertEq(address(chainlinkAtlasWrapper).balance, 0, "Wrapper should not have any ETH");
 
-        vm.startPrank(userEOA);
+        // To show the signer verification checks cause metacall to pass/fail:
+        uint256 snapshot = vm.snapshot();
+
+        // 3rd signer in the ETHUSD transmit example tx used
+        address signerToRemove = 0xCc1b49B86F79C7E50E294D3e3734fe94DB9A42F0;
+        vm.prank(chainlinkGovEOA);
+        chainlinkDAppControl.removeSignerOfBaseFeed(chainlinkETHUSD, signerToRemove);
+
+        // Should Fail
+        vm.prank(userEOA);
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
-        vm.stopPrank();
+
+        assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), uint(IChainlinkFeed(chainlinkETHUSD).latestAnswer()), "Metacall unexpectedly succeeded");
+
+        // Go back to before removing the signer
+        vm.revertTo(snapshot);
+
+        // Should Succeed
+        vm.prank(userEOA);
+        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
 
         assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), targetOracleAnswer, "Wrapper did not update as expected");
         assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) != uint(IChainlinkFeed(chainlinkETHUSD).latestAnswer()), "Wrapper and base feed should report different answers");
@@ -282,8 +299,19 @@ contract OEVTest is BaseTest {
         chainlinkAtlasWrapper.transmit(transmitData.report, transmitData.rs, transmitData.ss, transmitData.rawVs);
 
         assertEq(uint(chainlinkAtlasWrapper.atlasLatestAnswer()), targetOracleAnswer, "Wrapper stored latestAnswer should be updated");
+    }
 
-        // TODO more verification and security checks for `transmit` and `_verifyTransmitData`
+    function testChainlinkAtlasWrapperCanReceiveETH() public {
+        deal(userEOA, 2e18);
+
+        assertEq(address(chainlinkAtlasWrapper).balance, 0, "Wrapper should have 0 ETH");
+
+        vm.startPrank(userEOA);
+        payable(address(chainlinkAtlasWrapper)).transfer(1e18);
+        address(chainlinkAtlasWrapper).call{value: 1e18}("");
+        vm.stopPrank();
+
+        assertEq(address(chainlinkAtlasWrapper).balance, 2e18, "Wrapper should have 2 ETH");
     }
 
     // ---------------------------------------------------- //

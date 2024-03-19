@@ -18,7 +18,6 @@ contract ChainlinkAtlasWrapper is Ownable {
 
     // Trusted ExecutionEnvironments
     mapping(address transmitter => bool trusted) public transmitters;
-    mapping(address account => bool isSigner) public signers;
 
     error TransmitterNotTrusted(address transmitter);
     error InvalidTransmitMsgDataLength();
@@ -102,12 +101,9 @@ contract ChainlinkAtlasWrapper is Ownable {
         bytes32 rawVs
     )
         internal
-        view // TODO change to pure after removing logs
+        view
         returns (int256)
     {
-        // TODO more checks needed OffchainAggregator transmit function logic
-        // Need ways to access s_hotVars and s_oracles in the CL ETHUSD contract
-
         ReportData memory r;
         (,, r.observations) = abi.decode(report, (bytes32, bytes32, int192[]));
 
@@ -135,12 +131,6 @@ contract ChainlinkAtlasWrapper is Ownable {
     function setTransmitterStatus(address transmitter, bool trusted) external onlyOwner {
         transmitters[transmitter] = trusted;
         emit TransmitterStatusChanged(transmitter, trusted);
-    }
-
-    // Owner can add/remove transmit observation signers
-    function setSignerStatus(address account, bool isSigner) external onlyOwner {
-        signers[account] = isSigner;
-        emit SignerStatusChanged(account, isSigner);
     }
 
     // Withdraw ETH OEV captured via Atlas solver bids
