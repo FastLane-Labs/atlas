@@ -70,16 +70,21 @@ library SafetyBits {
 
     function initializeEscrowLock(
         EscrowKey memory self,
+        bytes32 userOpHash,
+        address bundler,
         bool needsPreOps,
         uint8 solverOpCount,
-        address firstApprovedAddress,
+        address executionEnvironment,
         bool isSimulation
     )
         internal
         pure
         returns (EscrowKey memory)
     {
-        self.addressPointer = firstApprovedAddress;
+        self.executionEnvironment = executionEnvironment;
+        self.userOpHash = userOpHash;
+        self.bundler = bundler;
+        self.addressPointer = executionEnvironment;
         self.callCount = solverOpCount + 3;
         self.callIndex = needsPreOps ? 0 : 1;
         self.lockState = needsPreOps ? _ACTIVE_X_PRE_OPS_X_UNSET : _ACTIVE_X_USER_X_UNSET;

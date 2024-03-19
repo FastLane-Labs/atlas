@@ -31,6 +31,9 @@ contract Permit69Test is BaseTest {
         BaseTest.setUp();
 
         escrowKey = EscrowKey({
+            executionEnvironment: address(0),
+            userOpHash: bytes32(0),
+            bundler: address(0),
             addressPointer: address(0),
             solverSuccessful: false,
             paymentsSuccessful: false,

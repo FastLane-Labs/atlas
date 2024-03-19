@@ -54,6 +54,8 @@ abstract contract SafetyLocks is Storage {
     function _buildEscrowLock(
         DAppConfig calldata dConfig,
         address executionEnvironment,
+        bytes32 userOpHash,
+        address bundler,
         uint8 solverOpCount,
         bool isSimulation
     )
@@ -65,7 +67,7 @@ abstract contract SafetyLocks is Storage {
         if (lock != executionEnvironment) revert NotInitialized();
 
         self = self.initializeEscrowLock(
-            dConfig.callConfig.needsPreOpsCall(), solverOpCount, executionEnvironment, isSimulation
+            userOpHash, bundler, dConfig.callConfig.needsPreOpsCall(), solverOpCount, executionEnvironment, isSimulation
         );
     }
 

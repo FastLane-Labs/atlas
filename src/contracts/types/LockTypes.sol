@@ -2,6 +2,9 @@
 pragma solidity 0.8.22;
 
 struct EscrowKey {
+    address executionEnvironment; // not packed
+    bytes32 userOpHash; // not packed
+    address bundler; // not packed
     address addressPointer;
     bool solverSuccessful;
     bool paymentsSuccessful;

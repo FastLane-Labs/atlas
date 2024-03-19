@@ -81,9 +81,6 @@ abstract contract Escrow is AtlETH {
         UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         bytes memory dAppReturnData,
-        address environment,
-        address bundler,
-        bytes32 userOpHash,
         uint256 bidAmount,
         EscrowKey memory key
     )
@@ -92,7 +89,7 @@ abstract contract Escrow is AtlETH {
     {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
-        result = IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, userOpHash, userOp.maxFeePerGas, bundler);
+        result = IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, key.userOpHash, userOp.maxFeePerGas, key.bundler);
 
         // Verify the transaction.
         if (result.canExecute()) {
@@ -110,7 +107,7 @@ abstract contract Escrow is AtlETH {
 
                 // Execute the solver call
                 // _solverOpsWrapper returns a SolverOutcome enum value
-                result |= _solverOpWrapper(bidAmount, gasLimit, environment, solverOp, dAppReturnData, key.pack());
+                result |= _solverOpWrapper(bidAmount, gasLimit, key.executionEnvironment, solverOp, dAppReturnData, key.pack());
 
                 if (result.executionSuccessful()) {
                     // first successful solver call that paid what it bid
@@ -141,39 +138,44 @@ abstract contract Escrow is AtlETH {
     // DAppControl contract)
     function _allocateValue(
         DAppConfig calldata dConfig,
+        SolverOperation calldata solverOp,
         uint256 winningBidAmount,
         bytes memory returnData,
-        address environment,
-        bytes32 lockBytes
+        EscrowKey memory key
     )
         internal
-        returns (bool success)
+        returns (EscrowKey memory)
     {
         // process dApp payments
+        key = key.holdAllocateValueLock(solverOp.from);
+
         bytes memory data = abi.encodeWithSelector(
             IExecutionEnvironment.allocateValue.selector, dConfig.bidToken, winningBidAmount, returnData
         );
-        data = abi.encodePacked(data, lockBytes);
-        (success,) = environment.call(data);
+        data = abi.encodePacked(data, key.pack());
+        (bool success,) = key.executionEnvironment.call(data);
         if (!success) {
             emit MEVPaymentFailure(dConfig.to, dConfig.callConfig, dConfig.bidToken, winningBidAmount);
+        } else {
+            key.paymentsSuccessful = true;
         }
+
+        return key;
     }
 
     function _executePostOpsCall(
         bool solved,
         bytes memory returnData,
-        address environment,
-        bytes32 lockBytes
+        EscrowKey memory key
     )
         internal
         returns (bool success)
     {
         bytes memory postOpsData =
             abi.encodeWithSelector(IExecutionEnvironment.postOpsWrapper.selector, solved, returnData);
-        postOpsData = abi.encodePacked(postOpsData, lockBytes);
-        (success,) = environment.call(postOpsData);
-        emit PostOpsCall(environment, success);
+        postOpsData = abi.encodePacked(postOpsData, key.pack());
+        (success,) = key.executionEnvironment.call(postOpsData);
+        emit PostOpsCall(key.executionEnvironment, success);
     }
 
     // TODO Revisit the EscrowAccountBalance memory solverEscrow arg. Needs to be passed through from Atlas, through
@@ -242,7 +244,6 @@ abstract contract Escrow is AtlETH {
     }
 
     function _getBidAmount(
-        address environment,
         SolverOperation calldata solverOp,
         bytes memory dAppReturnData,
         EscrowKey memory key
@@ -258,7 +259,7 @@ abstract contract Escrow is AtlETH {
         if (solverOp.value * 2 > address(this).balance) return 0;
 
         bytes memory data = abi.encodeWithSelector(
-            IExecutionEnvironment(environment).solverMetaTryCatch.selector,
+            IExecutionEnvironment(key.executionEnvironment).solverMetaTryCatch.selector,
             solverOp.bidAmount,
             solverOp.gas > _MAX_GAS ? _MAX_GAS : solverOp.gas,
             solverOp,
@@ -267,7 +268,7 @@ abstract contract Escrow is AtlETH {
 
         data = abi.encodePacked(data, key.holdSolverLock(solverOp.solver).pack());
 
-        (success, data) = environment.call{ value: solverOp.value }(data);
+        (success, data) = key.executionEnvironment.call{ value: solverOp.value }(data);
 
         if (success) {
             revert AtlasErrors.UnexpectedNonRevert();

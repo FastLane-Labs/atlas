@@ -31,6 +31,8 @@ contract MockSafetyLocks is SafetyLocks {
     function buildEscrowLock(
         DAppConfig calldata dConfig,
         address executionEnvironment,
+        bytes32 userOpHash,
+        address bundler,
         uint8 solverOpCount,
         bool isSimulation
     )
@@ -38,7 +40,7 @@ contract MockSafetyLocks is SafetyLocks {
         view
         returns (EscrowKey memory escrowKey)
     {
-        return _buildEscrowLock(dConfig, executionEnvironment, solverOpCount, isSimulation);
+        return _buildEscrowLock(dConfig, executionEnvironment, userOpHash, bundler, solverOpCount, isSimulation);
     }
 
     function releaseEscrowLock() external {
@@ -117,10 +119,10 @@ contract SafetyLocksTest is Test {
         DAppConfig memory dConfig = DAppConfig({ to: address(10), callConfig: 0, bidToken: address(0) });
 
         vm.expectRevert(AtlasErrors.NotInitialized.selector);
-        safetyLocks.buildEscrowLock(dConfig, executionEnvironment, 0, false);
+        safetyLocks.buildEscrowLock(dConfig, executionEnvironment, bytes32(0), address(0), 0, false);
 
         safetyLocks.initializeEscrowLock(executionEnvironment, 0, 0);
-        safetyLocks.buildEscrowLock(dConfig, executionEnvironment, 0, false);
+        safetyLocks.buildEscrowLock(dConfig, executionEnvironment, bytes32(0), address(0), 0, false);
         // No assertion needed, the test is valid if it doesn't revert
     }
 
