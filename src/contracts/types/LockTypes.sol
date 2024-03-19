@@ -7,10 +7,11 @@ struct EscrowKey {
     bool paymentsSuccessful;
     uint8 callIndex;
     uint8 callCount;
-    uint16 lockState; // bitwise
+    uint16 lockState; // bitmap
     uint32 gasRefund;
     bool isSimulation;
     uint8 callDepth;
+    uint256 solverOutcome; // TODO this could be 24 bits but not sure we can improve packing
 }
 
 enum BaseLock {
