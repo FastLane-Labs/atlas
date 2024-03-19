@@ -87,11 +87,12 @@ abstract contract Escrow is AtlETH {
         EscrowKey memory key
     )
         internal
-        returns (bool, EscrowKey memory, uint256 result)
+        returns (bool, EscrowKey memory)
     {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
-        result = IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, userOpHash, userOp.maxFeePerGas, bundler);
+        uint256 result =
+            IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, userOpHash, userOp.maxFeePerGas, bundler);
 
         // Verify the transaction.
         if (result.canExecute()) {
@@ -99,7 +100,8 @@ abstract contract Escrow is AtlETH {
             (result, gasLimit) = _validateSolverOperation(dConfig, solverOp, gasWaterMark, result);
 
             if (dConfig.callConfig.allowsTrustedOpHash()) {
-                if (!_handleAltOpHash(userOp, solverOp)) return (false, key, result);
+                key.solverOutcome = result;
+                if (!_handleAltOpHash(userOp, solverOp)) return (false, key);
             }
 
             // If there are no errors, attempt to execute
@@ -111,6 +113,8 @@ abstract contract Escrow is AtlETH {
                 // _solverOpsWrapper returns a SolverOutcome enum value
                 result |= _solverOpWrapper(gasLimit, environment, solverOp, dAppReturnData, key.pack());
 
+                key.solverOutcome = result;
+
                 if (result.executionSuccessful()) {
                     // first successful solver call that paid what it bid
 
@@ -118,10 +122,12 @@ abstract contract Escrow is AtlETH {
 
                     key.solverSuccessful = true;
                     // auctionWon = true
-                    return (true, key, result);
+                    return (true, key);
                 }
             }
         }
+
+        key.solverOutcome = result;
 
         _releaseSolverLock(solverOp, gasWaterMark, result);
 
@@ -132,7 +138,7 @@ abstract contract Escrow is AtlETH {
         emit SolverTxResult(solverOp.solver, solverOp.from, result.executedWithError(), false, result);
 
         // auctionWon = false
-        return (false, key, result);
+        return (false, key);
     }
 
     // (Note that balances are held in the execution environment, meaning
