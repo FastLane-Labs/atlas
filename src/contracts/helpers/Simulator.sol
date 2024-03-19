@@ -112,9 +112,9 @@ contract Simulator is AtlasErrors {
                 // revertData in form [bytes4, uint256] but reverts on abi.decode
                 // This decodes the uint256 error code portion of the revertData
                 uint256 validCallsResult;
-                uint256 startIndex = revertData.length - 32;
                 assembly {
-                    validCallsResult := mload(add(add(revertData, 0x20), startIndex))
+                    let dataLocation := add(revertData, 0x20)
+                    validCallsResult := mload(add(dataLocation, sub(mload(revertData), 32)))
                 }
                 result = Result.VerificationSimFail;
                 additionalErrorCode = validCallsResult;
@@ -129,9 +129,9 @@ contract Simulator is AtlasErrors {
             } else if (errorSwitch == SolverSimFail.selector) {
                 // Expects revertData in form [bytes4, uint256]
                 uint256 solverOutcomeResult;
-                uint256 startIndex = revertData.length - 32;
                 assembly {
-                    solverOutcomeResult := mload(add(add(revertData, 0x20), startIndex))
+                    let dataLocation := add(revertData, 0x20)
+                    solverOutcomeResult := mload(add(dataLocation, sub(mload(revertData), 32)))
                 }
                 result = Result.SolverSimFail;
                 additionalErrorCode = solverOutcomeResult;

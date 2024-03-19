@@ -39,7 +39,8 @@ contract Permit69Test is BaseTest {
             lockState: EXEC_PHASE_PRE_OPS,
             gasRefund: 0,
             isSimulation: false,
-            callDepth: 0
+            callDepth: 0,
+            solverOutcome: 0
         });
 
         mockAtlas = new MockAtlasForPermit69Tests(10, address(0), address(0), address(0));
