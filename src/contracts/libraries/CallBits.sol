@@ -97,7 +97,7 @@ library CallBits {
             requireFulfillment: needsFulfillment(encodedCallConfig),
             trustedOpHash: allowsTrustedOpHash(encodedCallConfig),
             invertBidValue: invertsBidValue(encodedCallConfig),
-            exPostBids: invertsBidValue(encodedCallConfig)
+            exPostBids: exPostBids(encodedCallConfig)
         });
     }
 

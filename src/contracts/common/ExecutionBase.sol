@@ -143,13 +143,13 @@ contract Base {
 
     function _bidFind() internal pure returns (bool bidFind) {
         assembly {
-            bidFind := shr(224, calldataload(sub(calldatasize(), 79)))
+            bidFind := shr(248, calldataload(sub(calldatasize(), 79)))
         }
     }
 
     function _blank() internal pure returns (uint24 blank) {
         assembly {
-            blank := shr(224, calldataload(sub(calldatasize(), 82)))
+            blank := shr(232, calldataload(sub(calldatasize(), 82)))
         }
     }
 

@@ -150,7 +150,7 @@ contract ExecutionEnvironment is Base {
         uint256 startBalance;
 
         if (solverOp.bidToken == address(0)) {
-            startBalance = solverOp.value;
+            startBalance = 0; // address(this).balance - solverOp.value;
             etherIsBidToken = true;
             // ERC20 balance
         } else {
@@ -218,7 +218,7 @@ contract ExecutionEnvironment is Base {
 
         uint256 endBalance = etherIsBidToken ? address(this).balance : ERC20(solverOp.bidToken).balanceOf(address(this));
 
-        // Check if this is an on-chain, ex ante bid search
+        // Check if this is an on-chain, ex post bid search
         if (_bidFind()) {
             uint256 netBid;
 
