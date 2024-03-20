@@ -79,6 +79,7 @@ contract ExPostTest is BaseTest {
 
         console.log("solverTwoEOA WETH:", WETH.balanceOf(address(solverTwoEOA)));
         console.log("solverTwoXP  WETH:", WETH.balanceOf(address(solverTwoXP)));
+        
         // Second SolverOperation
         solverOpData = helper.buildV2SolverOperationData(POOL_ONE, POOL_TWO);
         solverOps[0] = helper.buildSolverOperation(

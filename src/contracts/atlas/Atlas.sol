@@ -230,8 +230,13 @@ contract Atlas is Escrow, Factory {
         uint256 bidPlaceholder;
 
         for (uint256 i; i < solverOps.length; i++) {
-
-            bidPlaceholder = _getBidAmount(solverOps[i], returnData, key);
+            
+            bidPlaceholder = _getBidAmount(dConfig, userOp, solverOps[i], returnData, key);
+            console.log("----");
+            console.log("bidFind for", solverOps[i].solver);
+            console.log("bid Amount ", bidPlaceholder);
+            console.log("---");
+            
             if (bidPlaceholder == 0) {
                 unchecked {++j;}
                 continue;
@@ -240,7 +245,7 @@ contract Atlas is Escrow, Factory {
                 bidAmounts[i] = bidPlaceholder;
 
                 for (uint256 k = i - j + 1; k > 0; k--) {
-                    if (bidPlaceholder > bidAmounts[sortedOps[k - 1]]) {
+                    if (bidPlaceholder > bidAmounts[sortedOps[k - 1]]) { // should be >= ?
                         sortedOps[k] = sortedOps[k - 1];
                         sortedOps[k - 1] = i;
                         
@@ -253,20 +258,23 @@ contract Atlas is Escrow, Factory {
         }
 
         key.bidFind = false;
+        j = solverOps.length - j;
 
-        for (uint256 i; i < solverOps.length; i++) {
+        for (uint256 i; i < j; i++) {
             // bidPlaceholder = solverOutcomeResult
 
-            j = sortedOps[i];
+            console.log("solver execute", solverOps[i].solver);
+
+            bidPlaceholder = sortedOps[i];
 
             (auctionWon, key) = _executeSolverOperation(
-                dConfig, userOp, solverOps[j], returnData, bidAmounts[j], key
+                dConfig, userOp, solverOps[bidPlaceholder], returnData, bidAmounts[bidPlaceholder], true, key
             );
 
             if (auctionWon) {
 
-                key = _allocateValue(dConfig, solverOps[j], bidAmounts[j], returnData, key);
-                key.solverOutcome = uint24(j);
+                key = _allocateValue(dConfig, solverOps[bidPlaceholder], bidAmounts[bidPlaceholder], returnData, key);
+                key.solverOutcome = uint24(bidPlaceholder);
                 return (auctionWon, key);
             }
         }
@@ -297,7 +305,7 @@ contract Atlas is Escrow, Factory {
             SolverOperation calldata solverOp = solverOps[i];
 
             (auctionWon, key) = _executeSolverOperation(
-                dConfig, userOp, solverOp, returnData, solverOp.bidAmount, key
+                dConfig, userOp, solverOp, returnData, solverOp.bidAmount, false, key
             );
 
             if (auctionWon) {
