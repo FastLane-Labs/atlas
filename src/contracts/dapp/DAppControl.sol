@@ -1,18 +1,15 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { ExecutionPhase } from "../types/LockTypes.sol";
-
-import { CallBits } from "../libraries/CallBits.sol";
-
 import { DAppControlTemplate } from "./ControlTemplate.sol";
 import { ExecutionBase } from "../common/ExecutionBase.sol";
-
 import { EXECUTION_PHASE_OFFSET } from "../libraries/SafetyBits.sol";
-
+import { ExecutionPhase } from "../types/LockTypes.sol";
+import { CallBits } from "../libraries/CallBits.sol";
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
+import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import "forge-std/Test.sol";
 
@@ -25,7 +22,8 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
 
     constructor(address _atlas, address _governance, CallConfig memory _callConfig) ExecutionBase(_atlas) {
         if (_callConfig.userNoncesSequenced && _callConfig.dappNoncesSequenced) {
-            revert("DAPP AND USER CANT BOTH BE SEQ"); // TODO convert to custom errors
+            // Max one of user or dapp nonces can be sequenced, not both
+            revert AtlasErrors.BothUserAndDAppNoncesCannotBeSequenced();
         }
 
         control = address(this);
@@ -38,12 +36,12 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
 
     // Modifiers
     modifier validControl() {
-        require(control == _control(), "ERR-PC050 InvalidControl");
+        if (control != _control()) revert AtlasErrors.InvalidControl();
         _;
     }
 
     modifier mustBeCalled() {
-        require(address(this) == control, "ERR-PC052 MustBeCalled");
+        if (address(this) != control) revert AtlasErrors.NoDelegatecall();
         _;
     }
 

@@ -127,18 +127,18 @@ contract ExecutionEnvironmentTest is BaseTest {
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
         preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
         vm.prank(address(0)); // Invalid sender
-        vm.expectRevert(bytes("ERR-EB01 InvalidSender"));
+        vm.expectRevert(AtlasErrors.OnlyAtlas.selector);
         (status,) = address(executionEnvironment).call(preOpsData);
-        assertTrue(status, "expectRevert ERR-EB01 InvalidSender: call did not revert");
+        assertTrue(status, "expectRevert OnlyAtlas: call did not revert");
 
         // WrongPhase
         escrowKey = escrowKey.holdUserLock(address(dAppControl)); // Invalid lock state
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
         preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EB02 WrongPhase"));
+        vm.expectRevert(AtlasErrors.WrongPhase.selector);
         (status,) = address(executionEnvironment).call(preOpsData);
-        assertTrue(status, "expectRevert ERR-EB02 WrongPhase: call did not revert");
+        assertTrue(status, "expectRevert WrongPhase: call did not revert");
 
         // NotDelegated and WrongDepth
         // Can't be reached with this setup.
