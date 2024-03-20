@@ -85,11 +85,11 @@ abstract contract Escrow is AtlETH {
         EscrowKey memory key
     )
         internal
-        returns (bool, EscrowKey memory, uint256 result)
+        returns (bool, EscrowKey memory)
     {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
-        result = IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, key.userOpHash, userOp.maxFeePerGas, key.bundler);
+        uint256 result = IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, key.userOpHash, userOp.maxFeePerGas, key.bundler);
 
         // Verify the transaction.
         if (result.canExecute()) {
@@ -97,7 +97,10 @@ abstract contract Escrow is AtlETH {
             (result, gasLimit) = _validateSolverOperation(dConfig, solverOp, gasWaterMark, result);
 
             if (dConfig.callConfig.allowsTrustedOpHash()) {
-                if (!_handleAltOpHash(userOp, solverOp)) return (false, key, result);
+                if (!_handleAltOpHash(userOp, solverOp)) {
+                    key.solverOutcome = uint24(result);
+                    return (false, key);
+                }
             }
 
             // If there are no errors, attempt to execute
@@ -109,6 +112,8 @@ abstract contract Escrow is AtlETH {
                 // _solverOpsWrapper returns a SolverOutcome enum value
                 result |= _solverOpWrapper(bidAmount, gasLimit, key.executionEnvironment, solverOp, dAppReturnData, key.pack());
 
+                key.solverOutcome = uint24(result);
+
                 if (result.executionSuccessful()) {
                     // first successful solver call that paid what it bid
 
@@ -116,10 +121,12 @@ abstract contract Escrow is AtlETH {
 
                     key.solverSuccessful = true;
                     // auctionWon = true
-                    return (true, key, result);
+                    return (true, key);
                 }
             }
         }
+
+        key.solverOutcome = uint24(result);
 
         _releaseSolverLock(solverOp, gasWaterMark, result);
 
@@ -130,7 +137,7 @@ abstract contract Escrow is AtlETH {
         emit SolverTxResult(solverOp.solver, solverOp.from, result.executedWithError(), false, result);
 
         // auctionWon = false
-        return (false, key, result);
+        return (false, key);
     }
 
     // (Note that balances are held in the execution environment, meaning

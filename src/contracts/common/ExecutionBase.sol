@@ -63,7 +63,7 @@ contract Base {
             _callIndex(),
             _callCount(),
             _lockState(),
-            _blank(),
+            _solverOutcome(),
             _bidFind(),
             _simulation(),
             _depth() + 1
@@ -96,7 +96,7 @@ contract Base {
             _callIndex(),
             _callCount(),
             lockState,
-            _blank(),
+            _solverOutcome(),
             _bidFind(),
             _simulation(),
             depth + 1
@@ -147,9 +147,9 @@ contract Base {
         }
     }
 
-    function _blank() internal pure returns (uint24 blank) {
+    function _solverOutcome() internal pure returns (uint24 solverOutcome) {
         assembly {
-            blank := shr(232, calldataload(sub(calldatasize(), 82)))
+            solverOutcome := shr(232, calldataload(sub(calldatasize(), 82)))
         }
     }
 

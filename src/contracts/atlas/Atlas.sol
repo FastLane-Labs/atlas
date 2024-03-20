@@ -104,7 +104,7 @@ contract Atlas is Escrow, Factory {
     )
         external
         payable
-        returns (bool auctionWon, uint256 solverPointer)
+        returns (bool auctionWon, uint256)
     {
         // This is a self.call made externally so that it can be used with try/catch
         if (msg.sender != address(this)) revert InvalidAccess();
@@ -113,18 +113,18 @@ contract Atlas is Escrow, Factory {
             _preOpsUserExecutionIteration(dConfig, userOp, solverOps, executionEnvironment, bundler, userOpHash);
 
         if (dConfig.callConfig.exPostBids()) {
-            (auctionWon, solverPointer, key) = _bidFindingIteration(
+            (auctionWon, key) = _bidFindingIteration(
                 dConfig, userOp, solverOps, returnData, key
             );
         } else {
-            (auctionWon, solverPointer, key) = _bidKnownIteration(
+            (auctionWon, key) = _bidKnownIteration(
                 dConfig, userOp, solverOps, returnData, key
             );
         }
 
         // If no solver was successful, handle revert decision
         if (!auctionWon) {
-            if (key.isSimulation) revert SolverSimFail(solverPointer);
+            if (key.isSimulation) revert SolverSimFail(uint256(key.solverOutcome));
             if (dConfig.callConfig.needsFulfillment()) {
                 revert UserNotFulfilled(); // revert("ERR-E003 SolverFulfillmentFailure");
             }
@@ -141,7 +141,7 @@ contract Atlas is Escrow, Factory {
                 else revert PostOpsFail();
             }
         }
-        return (auctionWon, solverPointer);
+        return (auctionWon, uint256(key.solverOutcome));
     }
 
     function _preOpsUserExecutionIteration(
@@ -219,7 +219,6 @@ contract Atlas is Escrow, Factory {
         internal
         returns (
             bool auctionWon,
-            uint256 bidPlaceholder, // winningSolverIndex or solverOutcomeResult
             EscrowKey memory
         )
     {
@@ -228,6 +227,7 @@ contract Atlas is Escrow, Factory {
         uint256[] memory sortedOps = new uint256[](solverOps.length);
         uint256[] memory bidAmounts = new uint256[](solverOps.length);
         uint256 j;
+        uint256 bidPlaceholder;
 
         for (uint256 i; i < solverOps.length; i++) {
 
@@ -259,18 +259,19 @@ contract Atlas is Escrow, Factory {
 
             j = sortedOps[i];
 
-            (auctionWon, key, bidPlaceholder) = _executeSolverOperation(
+            (auctionWon, key) = _executeSolverOperation(
                 dConfig, userOp, solverOps[j], returnData, bidAmounts[j], key
             );
 
             if (auctionWon) {
 
                 key = _allocateValue(dConfig, solverOps[j], bidAmounts[j], returnData, key);
-            
-                return (auctionWon, j, key);
+                key.solverOutcome = uint24(j);
+                return (auctionWon, key);
             }
         }
-        return (auctionWon, bidPlaceholder, key);
+
+        return (auctionWon, key);
     }
 
     function _bidKnownIteration(
@@ -283,13 +284,11 @@ contract Atlas is Escrow, Factory {
         internal 
         returns (
             bool auctionWon,
-            uint256, // winningSolverIndex (or solverOutcomeResult if all fail)
             EscrowKey memory
         )
     {
         uint256 k = solverOps.length;
         uint256 i;
-        uint256 solverOutcomeResult;
 
 
          for (; i < k;) {
@@ -297,7 +296,7 @@ contract Atlas is Escrow, Factory {
 
             SolverOperation calldata solverOp = solverOps[i];
 
-            (auctionWon, key, solverOutcomeResult) = _executeSolverOperation(
+            (auctionWon, key) = _executeSolverOperation(
                 dConfig, userOp, solverOp, returnData, solverOp.bidAmount, key
             );
 
@@ -307,7 +306,9 @@ contract Atlas is Escrow, Factory {
                 
                 emit SolverExecution(solverOp.from, i, true);
 
-                return (true, i, key);
+                key.solverOutcome = uint24(i);
+
+                return (auctionWon, key);
             }
 
             emit SolverExecution(solverOp.from, i, false);
@@ -317,7 +318,7 @@ contract Atlas is Escrow, Factory {
             }
         }
 
-        return (false, solverOutcomeResult, key);
+        return (auctionWon, key);
     }
 
 
@@ -332,9 +333,9 @@ contract Atlas is Escrow, Factory {
             } else if (errorSwitch == SolverSimFail.selector) {
                 // Expects revertData in form [bytes4, uint256]
                 uint256 solverOutcomeResult;
-                uint256 startIndex = revertData.length - 32;
                 assembly {
-                    solverOutcomeResult := mload(add(add(revertData, 0x20), startIndex))
+                    let dataLocation := add(revertData, 0x20)
+                    solverOutcomeResult := mload(add(dataLocation, sub(mload(revertData), 32)))
                 }
                 revert SolverSimFail(solverOutcomeResult);
             } else if (errorSwitch == PostOpsSimFail.selector) {

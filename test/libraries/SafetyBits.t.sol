@@ -71,7 +71,7 @@ contract SafetyBitsTest is Test {
         assertTrue(key.callIndex == 0);
         assertTrue(key.callCount == 4);
         assertTrue(key.lockState == SafetyBits._ACTIVE_X_PRE_OPS_X_UNSET);
-        assertTrue(key.blank == 0);
+        assertTrue(key.solverOutcome == 0);
     }
 
     function testPack() public {

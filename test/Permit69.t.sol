@@ -40,7 +40,7 @@ contract Permit69Test is BaseTest {
             callIndex: 0,
             callCount: 0,
             lockState: EXEC_PHASE_PRE_OPS,
-            blank: 0,
+            solverOutcome: 0,
             bidFind: false,
             isSimulation: false,
             callDepth: 0

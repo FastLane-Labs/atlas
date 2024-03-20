@@ -11,7 +11,7 @@ struct EscrowKey {
     uint8 callIndex;
     uint8 callCount;
     uint16 lockState; // bitwise
-    uint24 blank;
+    uint24 solverOutcome;
     bool bidFind;
     bool isSimulation;
     uint8 callDepth;
