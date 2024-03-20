@@ -92,7 +92,9 @@ abstract contract Escrow is AtlETH {
         uint256 gasWaterMark = gasleft();
         uint256 result;
         if (!prevalidated) {
-            result = IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, key.userOpHash, userOp.maxFeePerGas, key.bundler);
+            result = IAtlasVerification(VERIFICATION).verifySolverOp(
+                solverOp, key.userOpHash, userOp.maxFeePerGas, key.bundler
+            );
         }
 
         // Verify the transaction.
@@ -115,7 +117,9 @@ abstract contract Escrow is AtlETH {
 
                 // Execute the solver call
                 // _solverOpsWrapper returns a SolverOutcome enum value
-                result |= _solverOpWrapper(bidAmount, gasLimit, key.executionEnvironment, solverOp, dAppReturnData, key.pack());
+                result |= _solverOpWrapper(
+                    bidAmount, gasLimit, key.executionEnvironment, solverOp, dAppReturnData, key.pack()
+                );
 
                 key.solverOutcome = uint24(result);
 
@@ -270,7 +274,8 @@ abstract contract Escrow is AtlETH {
 
         bool success;
         uint256 gasWaterMark = gasleft();
-        uint256 result = IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, key.userOpHash, userOp.maxFeePerGas, key.bundler);
+        uint256 result =
+            IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, key.userOpHash, userOp.maxFeePerGas, key.bundler);
 
         // Verify the transaction.
         if (!result.canExecute()) return 0;
@@ -286,7 +291,7 @@ abstract contract Escrow is AtlETH {
 
         // If there are no errors, attempt to execute
         if (!result.canExecute() || !_trySolverLock(solverOp)) return 0;
-        
+
         data = abi.encodeWithSelector(
             IExecutionEnvironment(key.executionEnvironment).solverMetaTryCatch.selector,
             solverOp.bidAmount,
@@ -309,12 +314,13 @@ abstract contract Escrow is AtlETH {
             // Get the uint256 from the memory array
             assembly {
                 let dataLocation := add(data, 0x20)
-                bidAmount := mload(
-                    add(
-                        dataLocation, 
-                        sub(mload(data), 32) // TODO: make sure a full uint256 is safe from overflow
+                bidAmount :=
+                    mload(
+                        add(
+                            dataLocation,
+                            sub(mload(data), 32) // TODO: make sure a full uint256 is safe from overflow
+                        )
                     )
-                )
             }
             return bidAmount;
         } else {

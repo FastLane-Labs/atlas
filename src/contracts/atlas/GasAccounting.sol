@@ -194,16 +194,20 @@ abstract contract GasAccounting is SafetyLocks {
     }
 
     function _releaseSolverLock(
-        SolverOperation calldata solverOp, uint256 gasWaterMark, uint256 result, bool bidFind, bool includeCalldata
-    ) 
-        internal 
+        SolverOperation calldata solverOp,
+        uint256 gasWaterMark,
+        uint256 result,
+        bool bidFind,
+        bool includeCalldata
+    )
+        internal
     {
         // Calculate what the solver owes if they failed
         // NOTE: This will cause an error if you are simulating with a gasPrice of 0
         if (!bidFind && !result.updateEscrow()) return;
 
         uint256 gasUsed = (gasWaterMark - gasleft() + 5000) * tx.gasprice;
-        
+
         if (includeCalldata) {
             gasUsed += _getCalldataCost(solverOp.data.length);
         }
@@ -253,7 +257,7 @@ abstract contract GasAccounting is SafetyLocks {
 
     function _getCalldataCost(uint256 calldataLength) internal view returns (uint256 calldataCost) {
         // Alter this for L2s.
-        // TODO: replace 128 w/ actual extra length of calldata that isn't in the 
+        // TODO: replace 128 w/ actual extra length of calldata that isn't in the
         // solverOp.data field (from, to, etc)
         calldataCost = (calldataLength + 128) * CALLDATA_LENGTH_PREMIUM * tx.gasprice;
     }

@@ -16,7 +16,14 @@ interface IWETH9 {
 contract SolverExPost is SolverBase, BlindBackrun {
     uint256 private immutable _bidPayPercent;
 
-    constructor(address weth, address atlasEscrow, address owner, uint256 bidPayPercent) SolverBase(weth, atlasEscrow, owner) {
+    constructor(
+        address weth,
+        address atlasEscrow,
+        address owner,
+        uint256 bidPayPercent
+    )
+        SolverBase(weth, atlasEscrow, owner)
+    {
         require(bidPayPercent <= 100, "bidPayPercent must < 100");
         _bidPayPercent = bidPayPercent;
     }
@@ -30,7 +37,7 @@ contract SolverExPost is SolverBase, BlindBackrun {
     )
         external
         payable
-        override (SolverBase)
+        override(SolverBase)
         safetyFirst(sender)
         findAndPayBids(bidToken, bidAmount)
         returns (bool success, bytes memory data)
@@ -39,7 +46,6 @@ contract SolverExPost is SolverBase, BlindBackrun {
 
         require(success, "CALL UNSUCCESSFUL");
     }
-
 
     modifier findAndPayBids(address bidToken, uint256 bidAmount) {
         // Track starting balances
@@ -51,7 +57,9 @@ contract SolverExPost is SolverBase, BlindBackrun {
         _;
 
         // Calculate profit
-        balance = (bidToken == address(0) ? address(this).balance - msg.value : ERC20(bidToken).balanceOf(address(this))) - balance;
+        balance = (
+            bidToken == address(0) ? address(this).balance - msg.value : ERC20(bidToken).balanceOf(address(this))
+        ) - balance;
 
         // Handle bid payment
         if (bidToken == address(0)) {
