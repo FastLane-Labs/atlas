@@ -65,7 +65,7 @@ contract DAppIntegration {
 
         if (msg.sender != govAddress) revert AtlasErrors.OnlyGovernance();
 
-        bytes32 signatoryKey = keccak256(abi.encodePacked(msg.sender, controller, msg.sender));
+        bytes32 signatoryKey = keccak256(abi.encodePacked(controller, msg.sender));
 
         if (signatories[signatoryKey]) revert AtlasErrors.OwnerActive();
 
@@ -83,7 +83,7 @@ contract DAppIntegration {
 
         if (msg.sender != govData.governance) revert AtlasErrors.OnlyGovernance();
 
-        bytes32 signatoryKey = keccak256(abi.encodePacked(msg.sender, controller, signatory));
+        bytes32 signatoryKey = keccak256(abi.encodePacked(controller, signatory));
 
         if (signatories[signatoryKey]) {
             revert AtlasErrors.SignatoryActive();
@@ -102,7 +102,7 @@ contract DAppIntegration {
             revert AtlasErrors.InvalidCaller();
         }
 
-        bytes32 signatoryKey = keccak256(abi.encodePacked(govData.governance, controller, signatory));
+        bytes32 signatoryKey = keccak256(abi.encodePacked(controller, signatory));
 
         if (!signatories[signatoryKey]) revert AtlasErrors.InvalidDAppControl();
 

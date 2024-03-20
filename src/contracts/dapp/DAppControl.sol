@@ -137,7 +137,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         return _getCallConfig();
     }
 
-    function getDAppSignatory() external view returns (address governanceAddress) {
-        governanceAddress = governance;
+    function getDAppSignatory() external view returns (address) {
+        return governance;
     }
 }
