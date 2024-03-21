@@ -3,8 +3,9 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
+import { Atlas } from "src/contracts/atlas/Atlas.sol";
+import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
 import { DAppIntegration } from "src/contracts/atlas/DAppIntegration.sol";
-// import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import { DummyDAppControl, CallConfigBuilder } from "./base/DummyDAppControl.sol";
@@ -14,16 +15,35 @@ contract MockDAppIntegration is DAppIntegration {
 }
 
 contract DAppIntegrationTest is Test {
+    Atlas public atlas;
     MockDAppIntegration public dAppIntegration;
     DummyDAppControl public dAppControl;
 
+    address atlasDeployer = makeAddr("atlas deployer");
     address governance = makeAddr("governance");
     address signatory = makeAddr("signatory");
     address invalid = makeAddr("invalid");
 
     function setUp() public {
-        dAppIntegration = new MockDAppIntegration(address(0));
-        dAppControl = new DummyDAppControl(address(0), governance, CallConfigBuilder.allFalseCallConfig());
+    
+        vm.startPrank(atlasDeployer);
+        // Computes the addresses at which AtlasVerification will be deployed
+        address expectedAtlasAddr = vm.computeCreateAddress(atlasDeployer, vm.getNonce(atlasDeployer) + 1);
+        address expectedAtlasVerificationAddr = vm.computeCreateAddress(atlasDeployer, vm.getNonce(atlasDeployer) + 2);
+        bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedAtlasAddr, "AtlasFactory 1.0"));
+        ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
+
+        atlas = new Atlas({
+            _escrowDuration: 64,
+            _verification: expectedAtlasVerificationAddr,
+            _simulator: address(0),
+            _executionTemplate: address(execEnvTemplate),
+            _surchargeRecipient: atlasDeployer
+        });
+        dAppIntegration = new MockDAppIntegration(expectedAtlasAddr);
+        vm.stopPrank();
+
+        dAppControl = new DummyDAppControl(expectedAtlasAddr, governance, CallConfigBuilder.allFalseCallConfig());
     }
 
     function test_initializeGovernance_successfullyInitialized() public {
