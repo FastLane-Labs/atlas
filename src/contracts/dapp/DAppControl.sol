@@ -10,15 +10,20 @@ import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 
 import "forge-std/Test.sol";
 
 abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
-    address public immutable governance;
-    address public immutable control;
-    uint32 public immutable callConfig;
-
     uint8 private constant _CONTROL_DEPTH = 1 << 2;
+
+    // TODO name in caps if constant/immutable
+    uint32 public immutable callConfig;
+    address public immutable control;
+    address public immutable atlasVerification;
+
+    address public governance;
+    address public pendingGovernance;
 
     constructor(address _atlas, address _governance, CallConfig memory _callConfig) ExecutionBase(_atlas) {
         if (_callConfig.userNoncesSequenced && _callConfig.dappNoncesSequenced) {
@@ -139,5 +144,25 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
 
     function getDAppSignatory() external view returns (address) {
         return governance;
+    }
+
+    // Governance functions
+
+    function transferGovernance(address newGovernance) external {
+        if (msg.sender != governance) {
+            revert AtlasErrors.OnlyGovernance();
+        }
+        pendingGovernance = newGovernance;
+        emit AtlasEvents.GovernanceTransferStarted(governance, newGovernance);
+    }
+
+    function acceptGovernance() external {
+        if (msg.sender != pendingGovernance) {
+            revert AtlasErrors.Unauthorized();
+        }
+        address prevGovernance = governance;
+        governance = pendingGovernance;
+        delete pendingGovernance;
+        emit AtlasEvents.GovernanceTransferred(prevGovernance, governance);
     }
 }
