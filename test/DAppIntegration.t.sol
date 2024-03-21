@@ -9,8 +9,6 @@ import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import { DummyDAppControl, CallConfigBuilder } from "./base/DummyDAppControl.sol";
 
-import "src/contracts/types/GovernanceTypes.sol";
-
 contract MockDAppIntegration is DAppIntegration {
     constructor(address _atlas) DAppIntegration(_atlas) { }
 }
@@ -139,28 +137,16 @@ contract DAppIntegrationTest is Test {
         dAppIntegration.removeSignatory(address(dAppControl), signatory);
     }
 
-    function test_removeSignatory_invalidSignatoryKey() public {
-        vm.startPrank(governance);
-        dAppIntegration.initializeGovernance(address(dAppControl));
-        dAppIntegration.addSignatory(address(dAppControl), signatory);
-        dAppIntegration.removeSignatory(address(dAppControl), signatory);
-        // signatoryKey is now invalid
-        vm.expectRevert(AtlasErrors.InvalidDAppControl.selector);
-        dAppIntegration.removeSignatory(address(dAppControl), signatory);
-        vm.stopPrank();
-    }
-
     function test_disableDApp_successfullyDisabled() public {
+        assertEq(dAppIntegration.isDAppSignatory(address(dAppControl), governance), false);
+
         vm.startPrank(governance);
         dAppIntegration.initializeGovernance(address(dAppControl));
+        assertEq(dAppIntegration.isDAppSignatory(address(dAppControl), governance), true);
         dAppIntegration.disableDApp(address(dAppControl));
         vm.stopPrank();
 
-        (address gov, uint32 callConfig, uint64 lastUpdate) = dAppIntegration.governance(address(dAppControl));
-
-        assertTrue(gov == address(0), "gov should be address(0)");
-        assertTrue(callConfig == 0, "callConfig should be 0");
-        assertTrue(lastUpdate == 0, "lastUpdate should be 0");
+        assertEq(dAppIntegration.isDAppSignatory(address(dAppControl), governance), false);
     }
 
     function test_disableDApp_onlyGovernanceAllowed() public {

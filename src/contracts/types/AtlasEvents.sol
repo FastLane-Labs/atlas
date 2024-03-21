@@ -36,4 +36,16 @@ contract AtlasEvents {
     // DAppControl events
     event GovernanceTransferStarted(address indexed previousGovernance, address indexed newGovernance);
     event GovernanceTransferred(address indexed previousGovernance, address indexed newGovernance);
+
+    // DAppIntegration events
+    event NewDAppSignatory(
+        address indexed controller, address indexed governance, address indexed signatory, uint32 callConfig
+    );
+    event RemovedDAppSignatory(
+        address indexed controller, address indexed governance, address indexed signatory, uint32 callConfig
+    );
+    event DAppGovernanceChanged(
+        address indexed controller, address indexed oldGovernance, address indexed newGovernance, uint32 callConfig
+    );
+    event DAppDisabled(address indexed controller, address indexed governance, uint32 callConfig);
 }

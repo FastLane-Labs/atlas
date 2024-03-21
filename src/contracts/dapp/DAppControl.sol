@@ -161,6 +161,9 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         address prevGovernance = governance;
         governance = pendingGovernance;
         delete pendingGovernance;
+
+        // TODO register transfer on DAppIntegration
+
         emit AtlasEvents.GovernanceTransferred(prevGovernance, governance);
     }
 }

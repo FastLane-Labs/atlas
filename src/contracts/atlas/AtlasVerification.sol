@@ -7,8 +7,6 @@ import { CallBits } from "../libraries/CallBits.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
-import "../types/GovernanceTypes.sol";
-
 import "../types/DAppApprovalTypes.sol";
 import "../types/EscrowTypes.sol";
 import "../types/ValidCallsTypes.sol";
