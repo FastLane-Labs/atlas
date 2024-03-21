@@ -34,28 +34,28 @@ contract ChainlinkAtlasWrapper is Ownable {
 
         _transferOwnership(_owner);
 
-        // do a gas usage check on an invalid trasmitting address  
+        // do a gas usage check on an invalid trasmitting address
         address aggregator = BASE_FEED.aggregator();
 
         // heat up the address
-        IOffchainAggregator(aggregator).oracleObservationCount{gas: 10_000}(_owner);
+        IOffchainAggregator(aggregator).oracleObservationCount{ gas: 10_000 }(_owner);
 
         // get the gas usage of an Unset address
         uint256 gasUsed = gasleft();
-        IOffchainAggregator(aggregator).oracleObservationCount{gas: 10_000}(atlas);
+        IOffchainAggregator(aggregator).oracleObservationCount{ gas: 10_000 }(atlas);
         gasUsed -= gasleft();
 
         _GAS_THRESHOLD = gasUsed + 199; // 199 = warm SLOADx2 - 1
 
         address transmitter = IOffchainAggregator(aggregator).transmitters()[2];
         // heat up the second storage slot
-        IOffchainAggregator(aggregator).oracleObservationCount{gas: 10_000}(transmitter);
+        IOffchainAggregator(aggregator).oracleObservationCount{ gas: 10_000 }(transmitter);
         // change to next transmitter (packed w/ prev one in second storage slot)
         transmitter = IOffchainAggregator(aggregator).transmitters()[3];
 
-        // check gas used 
+        // check gas used
         gasUsed = gasleft();
-        IOffchainAggregator(aggregator).oracleObservationCount{gas: 10_000}(transmitter);
+        IOffchainAggregator(aggregator).oracleObservationCount{ gas: 10_000 }(transmitter);
         gasUsed -= gasleft();
 
         console.log("gasUsed:", gasUsed);
@@ -145,10 +145,10 @@ contract ChainlinkAtlasWrapper is Ownable {
         for (uint256 i = 0; i < rs.length; ++i) {
             address signer = ecrecover(reportHash, uint8(rawVs[i]) + 27, rs[i], ss[i]);
             if (!_isSigner(validTransmitters, aggregator, signer)) {
-                console.log("invalid signer:", signer);
+                // console.log("invalid signer:", signer);
                 revert();
             }
-            console.log("__valid signer:", signer);
+            // console.log("__valid signer:", signer);
         }
 
         int192 median = r.observations[r.observations.length / 2];
@@ -158,34 +158,33 @@ contract ChainlinkAtlasWrapper is Ownable {
         return int256(median);
     }
 
-    function _validateTransmitter() 
-        internal 
-        view
-        returns (address[] memory validTransmitters, address aggregator) 
-    {
+    function _validateTransmitter() internal view returns (address[] memory validTransmitters, address aggregator) {
         // Get the user from the EE
         // NOTE: technically we can pull this from calldata, including full function here for readability
         address transmitter = IExecutionEnvironment(msg.sender).getUser();
-        
+
         // Verify that the execution environment (msg.sender) is genuine
         // NOTE: Technically we can skip this too since the activeEnvironment check below also validates this
-        (address executionEnvironment,,) = IAtlasFactory(ATLAS).getExecutionEnvironment(transmitter, address(DAPP_CONTROL));
-        
+        (address executionEnvironment,,) =
+            IAtlasFactory(ATLAS).getExecutionEnvironment(transmitter, address(DAPP_CONTROL));
+
         if (msg.sender != executionEnvironment) {
             revert TransmitterInvalid(transmitter);
-        } 
-        
+        }
+
         if (IExecutionEnvironment(msg.sender).getControl() != address(DAPP_CONTROL)) {
             revert TransmitterInvalid(transmitter);
-        } 
+        }
 
         // Verify that this environment is the currently active one according to Atlas
         // require(msg.sender == IAtlasFactory(ATLAS).activeEnvironment(), "inactive EE");
 
         // Get the valid transmitters
-        // NOTE: Be careful if considering storing these in a map - that would make it tricky to deauthorize for this contract
-        // when they're deauthorized on the parent aggregator. imo it's better to skip the map altogether since we'd want a 
-        //fully updated list each time to make sure no transmitter has been removed. 
+        // NOTE: Be careful if considering storing these in a map - that would make it tricky to deauthorize for this
+        // contract
+        // when they're deauthorized on the parent aggregator. imo it's better to skip the map altogether since we'd
+        // want a
+        //fully updated list each time to make sure no transmitter has been removed.
         aggregator = BASE_FEED.aggregator();
         validTransmitters = IOffchainAggregator(aggregator).transmitters();
 
@@ -198,27 +197,23 @@ contract ChainlinkAtlasWrapper is Ownable {
         IOffchainAggregator(aggregator).oracleObservationCount(transmitter);
     }
 
-    function _isTransmitter(
-        address[] memory validTransmitters, address transmitter
-    ) 
-        internal 
-        pure 
-        returns (bool) 
-    {
+    function _isTransmitter(address[] memory validTransmitters, address transmitter) internal pure returns (bool) {
         uint256 len = validTransmitters.length;
         // Loop through them and see if there's a match
-        for (uint256 i; i<len; i++) {
-            if (transmitter == validTransmitters[i]) return true;   
+        for (uint256 i; i < len; i++) {
+            if (transmitter == validTransmitters[i]) return true;
         }
         return false;
     }
 
     function _isSigner(
-        address[] memory validTransmitters, address aggregator, address signer
-    ) 
-        internal 
-        view 
-        returns (bool) 
+        address[] memory validTransmitters,
+        address aggregator,
+        address signer
+    )
+        internal
+        view
+        returns (bool)
     {
         /*
             Super hacky approach... but if an address isn't "Role.Unset" and it also isn't
@@ -239,22 +234,22 @@ contract ChainlinkAtlasWrapper is Ownable {
         */
 
         uint256 gasUsed = gasleft();
-        IOffchainAggregator(aggregator).oracleObservationCount{gas: 10_000}(signer);
+        IOffchainAggregator(aggregator).oracleObservationCount{ gas: 10_000 }(signer);
         gasUsed -= gasleft();
 
-        
+        /*
             console.log("---");
             console.log("signer:", signer);
             console.log("gas used:", gasUsed);
-        
+        */
 
         // NOTE: The gas usage check also will fail if a signer doublesigns
-        if (gasUsed > _GAS_THRESHOLD) { // TODO: pinpoint the actual threshold, add in index + packing.
+        if (gasUsed > _GAS_THRESHOLD) {
+            // TODO: pinpoint the actual threshold, add in index + packing.
             return !_isTransmitter(validTransmitters, signer);
-        }  
+        }
         return false;
     }
-    
 
     // ---------------------------------------------------- //
     //                     Owner Functions                  //
@@ -334,10 +329,7 @@ interface IChainlinkFeed {
 
 interface IOffchainAggregator {
     function transmitters() external view returns (address[] memory);
-    function oracleObservationCount(address _signerOrTransmitter)
-        external
-        view
-        returns (uint16);
+    function oracleObservationCount(address _signerOrTransmitter) external view returns (uint16);
 }
 
 interface IExecutionEnvironment {
