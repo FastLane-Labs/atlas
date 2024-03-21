@@ -1,8 +1,6 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
-import { IDAppControl } from "../interfaces/IDAppControl.sol";
 import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
 
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
@@ -10,8 +8,8 @@ import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 import { Escrow } from "./Escrow.sol";
 import { Factory } from "./Factory.sol";
 
-import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
-import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+// import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
+// import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
@@ -24,7 +22,7 @@ import { CALLDATA_LENGTH_PREMIUM } from "../types/EscrowTypes.sol";
 import { CallBits } from "../libraries/CallBits.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
 
-import "forge-std/Test.sol";
+// import "forge-std/Test.sol";
 
 contract Atlas is Escrow, Factory {
     using CallBits for uint32;
@@ -71,7 +69,7 @@ contract Atlas is Escrow, Factory {
         }
 
         // Initialize the lock
-        _initializeEscrowLock(executionEnvironment, gasMarker, userOp.value);
+        _setAtlasLock(executionEnvironment, gasMarker, userOp.value);
 
         try this.execute{ value: msg.value }(dConfig, userOp, solverOps, executionEnvironment, msg.sender, userOpHash)
         returns (bool _auctionWon, uint256 winningSolverIndex) {
@@ -91,7 +89,7 @@ contract Atlas is Escrow, Factory {
         // Release the lock
         _releaseEscrowLock();
 
-        console.log("total gas used", gasMarker - gasleft());
+        // console.log("total gas used", gasMarker - gasleft());
     }
 
     function execute(
@@ -225,10 +223,12 @@ contract Atlas is Escrow, Factory {
 
         for (uint256 i; i < solverOps.length; i++) {
             bidPlaceholder = _getBidAmount(dConfig, userOp, solverOps[i], returnData, key);
-            console.log("----");
-            console.log("bidFind for", solverOps[i].solver);
-            console.log("bid Amount ", bidPlaceholder);
-            console.log("---");
+            /*
+                console.log("----");
+                console.log("bidFind for", solverOps[i].solver);
+                console.log("bid Amount ", bidPlaceholder);
+                console.log("---");
+            */
 
             if (bidPlaceholder == 0) {
                 unchecked {
@@ -257,7 +257,7 @@ contract Atlas is Escrow, Factory {
         for (uint256 i; i < j; i++) {
             // bidPlaceholder = solverOutcomeResult
 
-            console.log("solver execute", solverOps[i].solver);
+            // console.log("solver execute", solverOps[i].solver);
 
             bidPlaceholder = sortedOps[i];
 

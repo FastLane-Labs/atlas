@@ -3,7 +3,7 @@ pragma solidity 0.8.22;
 
 import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
 
-import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
+// import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 
 import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
 import { AtlETH } from "./AtlETH.sol";
@@ -18,12 +18,9 @@ import { EscrowBits } from "../libraries/EscrowBits.sol";
 import { CallBits } from "../libraries/CallBits.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
 
-import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
-
-import "forge-std/Test.sol";
+// import "forge-std/Test.sol";
 
 abstract contract Escrow is AtlETH {
-    using ECDSA for bytes32;
     using EscrowBits for uint256;
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
@@ -307,7 +304,7 @@ abstract contract Escrow is AtlETH {
         _releaseSolverLock(solverOp, gasWaterMark, result, true, true);
 
         if (success) {
-            revert AtlasErrors.UnexpectedNonRevert();
+            revert();
         }
 
         if (bytes4(data) == BidFindSuccessful.selector) {

@@ -7,11 +7,55 @@ import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 import "src/contracts/types/LockTypes.sol";
 import "../base/TestUtils.sol";
 
+import { CallBits } from "src/contracts/libraries/CallBits.sol";
+
+import { EXECUTION_PHASE_OFFSET } from "src/contracts/libraries/SafetyBits.sol";
+
+
 contract SafetyBitsTest is Test {
     using SafetyBits for EscrowKey;
+    using CallBits for uint32;
 
-    function initializeEscrowLock() public pure returns (EscrowKey memory key) {
-        key = key.initializeEscrowLock(bytes32(0), address(0), true, 1, address(0), false);
+    uint16 internal constant _ACTIVE_X_PRE_OPS_X_UNSET =
+        uint16(1 << uint16(BaseLock.Active) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps)));
+
+    uint16 internal constant _ACTIVE_X_USER_X_UNSET =
+        uint16(1 << uint16(BaseLock.Active) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserOperation)));
+
+
+    function initializeEscrowLock() public view returns (EscrowKey memory key) {
+        key = _buildEscrowLock(0, address(0), bytes32(0), address(0), 1, false);
+    }
+
+    function _buildEscrowLock(
+        uint32 callConfig,
+        address executionEnvironment,
+        bytes32 userOpHash,
+        address bundler,
+        uint8 solverOpCount,
+        bool isSimulation
+    )
+        internal
+        view
+        returns (EscrowKey memory)
+    {
+        bool needsPreOps = callConfig.needsPreOpsCall();
+        
+        return EscrowKey({
+            executionEnvironment: executionEnvironment,
+            userOpHash: userOpHash,
+            bundler: bundler,
+            addressPointer: executionEnvironment,
+            solverSuccessful: false,
+            paymentsSuccessful: false,
+            callIndex: needsPreOps ? 0 : 1,
+            callCount: solverOpCount + 3,
+            lockState: needsPreOps ? _ACTIVE_X_PRE_OPS_X_UNSET : _ACTIVE_X_USER_X_UNSET,
+            solverOutcome: 0,
+            bidFind: false,
+            isSimulation: isSimulation,
+            callDepth: 0
+        });
     }
 
     function testConstants() public {

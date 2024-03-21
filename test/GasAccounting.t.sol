@@ -27,7 +27,7 @@ contract MockGasAccounting is GasAccounting, Test {
     }
 
     function initializeEscrowLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) external {
-        _initializeEscrowLock(executionEnvironment, gasMarker, userOpValue);
+        _setAtlasLock(executionEnvironment, gasMarker, userOpValue);
     }
 
     function assign(address owner, uint256 value, bool solverWon) external returns (bool) {

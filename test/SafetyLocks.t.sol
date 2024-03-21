@@ -21,7 +21,7 @@ contract MockSafetyLocks is SafetyLocks {
         external
         payable
     {
-        _initializeEscrowLock(executionEnvironment, gasMarker, userOpValue);
+        _setAtlasLock(executionEnvironment, gasMarker, userOpValue);
     }
 
     function checkIfUnlocked() external view {
@@ -72,7 +72,7 @@ contract SafetyLocksTest is Test {
         safetyLocks = new MockSafetyLocks();
     }
 
-    function test_initializeEscrowLock() public {
+    function test_setAtlasLock() public {
         uint256 gasMarker = 222;
         uint256 userOpValue = 333;
         uint256 msgValue = 444;

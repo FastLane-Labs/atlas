@@ -11,13 +11,20 @@ import "../types/EscrowTypes.sol";
 
 import "../types/LockTypes.sol";
 
+import { EXECUTION_PHASE_OFFSET } from "../libraries/SafetyBits.sol";
+
 import { Storage } from "./Storage.sol";
 
 // import "forge-std/Test.sol";
 
 abstract contract SafetyLocks is Storage {
-    using SafetyBits for EscrowKey;
     using CallBits for uint32;
+
+    uint16 internal constant _ACTIVE_X_PRE_OPS_X_UNSET =
+        uint16(1 << uint16(BaseLock.Active) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps)));
+
+    uint16 internal constant _ACTIVE_X_USER_X_UNSET =
+        uint16(1 << uint16(BaseLock.Active) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserOperation)));
 
     constructor(
         uint256 _escrowDuration,
@@ -28,7 +35,7 @@ abstract contract SafetyLocks is Storage {
         Storage(_escrowDuration, _verification, _simulator, _surchargeRecipient)
     { }
 
-    function _initializeEscrowLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) internal {
+    function _setAtlasLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) internal {
         _checkIfUnlocked();
         // Initialize the Lock
         lock = executionEnvironment;
@@ -60,15 +67,26 @@ abstract contract SafetyLocks is Storage {
         bool isSimulation
     )
         internal
-        view
-        returns (EscrowKey memory self)
+        pure
+        returns (EscrowKey memory)
     {
-        // TODO: can we bypass this check?
-        if (lock != executionEnvironment) revert NotInitialized();
+        bool needsPreOps = dConfig.callConfig.needsPreOpsCall();
 
-        self = self.initializeEscrowLock(
-            userOpHash, bundler, dConfig.callConfig.needsPreOpsCall(), solverOpCount, executionEnvironment, isSimulation
-        );
+        return EscrowKey({
+            executionEnvironment: executionEnvironment,
+            userOpHash: userOpHash,
+            bundler: bundler,
+            addressPointer: executionEnvironment,
+            solverSuccessful: false,
+            paymentsSuccessful: false,
+            callIndex: needsPreOps ? 0 : 1,
+            callCount: solverOpCount + 3,
+            lockState: needsPreOps ? _ACTIVE_X_PRE_OPS_X_UNSET : _ACTIVE_X_USER_X_UNSET,
+            solverOutcome: 0,
+            bidFind: false,
+            isSimulation: isSimulation,
+            callDepth: 0
+        });
     }
 
     function _releaseEscrowLock() internal {
