@@ -17,10 +17,9 @@ import "forge-std/Test.sol";
 abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     uint8 private constant _CONTROL_DEPTH = 1 << 2;
 
-    // TODO name in caps if constant/immutable
-    uint32 public immutable callConfig;
-    address public immutable control;
-    address public immutable atlasVerification;
+    uint32 public immutable CALL_CONFIG;
+    address public immutable CONTROL;
+    address public immutable ATLAS_VERIFICATION;
 
     address public governance;
     address public pendingGovernance;
@@ -30,10 +29,9 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
             // Max one of user or dapp nonces can be sequenced, not both
             revert AtlasErrors.BothUserAndDAppNoncesCannotBeSequenced();
         }
-
-        control = address(this);
+        CONTROL = address(this);
+        CALL_CONFIG = CallBits.encodeCallConfig(_callConfig);
         governance = _governance;
-        callConfig = CallBits.encodeCallConfig(_callConfig);
     }
 
     // Safety and support functions and modifiers that make the relationship between dApp
@@ -41,12 +39,12 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
 
     // Modifiers
     modifier validControl() {
-        if (control != _control()) revert AtlasErrors.InvalidControl();
+        if (CONTROL != _control()) revert AtlasErrors.InvalidControl();
         _;
     }
 
     modifier mustBeCalled() {
-        if (address(this) != control) revert AtlasErrors.NoDelegatecall();
+        if (address(this) != CONTROL) revert AtlasErrors.NoDelegatecall();
         _;
     }
 
@@ -114,15 +112,15 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
 
     // View functions
     function userDelegated() external view returns (bool delegated) {
-        delegated = CallBits.needsDelegateUser(callConfig);
+        delegated = CallBits.needsDelegateUser(CALL_CONFIG);
     }
 
     function requireSequencedUserNonces() external view returns (bool isSequenced) {
-        isSequenced = CallBits.needsSequencedUserNonces(callConfig);
+        isSequenced = CallBits.needsSequencedUserNonces(CALL_CONFIG);
     }
 
     function requireSequencedDAppNonces() external view returns (bool isSequenced) {
-        isSequenced = CallBits.needsSequencedDAppNonces(callConfig);
+        isSequenced = CallBits.needsSequencedDAppNonces(CALL_CONFIG);
     }
 
     function getDAppConfig(UserOperation calldata userOp)
@@ -131,15 +129,15 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         mustBeCalled
         returns (DAppConfig memory dConfig)
     {
-        dConfig = DAppConfig({ to: address(this), callConfig: callConfig, bidToken: getBidFormat(userOp) });
-    }
-
-    function _getCallConfig() internal view returns (CallConfig memory) {
-        return CallBits.decodeCallConfig(callConfig);
+        dConfig = DAppConfig({ to: address(this), callConfig: CALL_CONFIG, bidToken: getBidFormat(userOp) });
     }
 
     function getCallConfig() external view returns (CallConfig memory) {
         return _getCallConfig();
+    }
+
+    function _getCallConfig() internal view returns (CallConfig memory) {
+        return CallBits.decodeCallConfig(CALL_CONFIG);
     }
 
     function getDAppSignatory() external view returns (address) {

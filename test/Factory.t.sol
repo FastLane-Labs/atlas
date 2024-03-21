@@ -47,7 +47,7 @@ contract FactoryTest is Test {
     }
 
     function test_createExecutionEnvironment() public {
-        uint32 callConfig = dAppControl.callConfig();
+        uint32 callConfig = dAppControl.CALL_CONFIG();
         bytes memory creationCode = TestUtils._getMimicCreationCode(
             address(dAppControl), callConfig, mockFactory.executionTemplate(), user, address(dAppControl).codehash
         );

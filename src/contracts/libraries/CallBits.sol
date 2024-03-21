@@ -9,8 +9,7 @@ library CallBits {
     uint32 internal constant _ONE = uint32(1);
 
     function buildCallConfig(address controller) internal view returns (uint32 callConfig) {
-        CallConfig memory callconfig = IDAppControl(controller).getCallConfig();
-        callConfig = encodeCallConfig(callconfig);
+        callConfig = IDAppControl(controller).CALL_CONFIG();
     }
 
     function encodeCallConfig(CallConfig memory callConfig) internal pure returns (uint32 encodedCallConfig) {
