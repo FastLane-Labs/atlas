@@ -5,6 +5,8 @@ import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
+// TODO add all Atlas functions here
+
 interface IAtlas {
     function metacall(
         UserOperation calldata userOp,
@@ -14,4 +16,6 @@ interface IAtlas {
         external
         payable
         returns (bool auctionWon);
+
+    function VERIFICATION() external view returns (address);
 }

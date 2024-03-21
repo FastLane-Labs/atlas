@@ -11,6 +11,8 @@ import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
+import { IDAppIntegration } from "src/contracts/interfaces/IDAppIntegration.sol";
 
 import "forge-std/Test.sol";
 
@@ -29,8 +31,10 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
             // Max one of user or dapp nonces can be sequenced, not both
             revert AtlasErrors.BothUserAndDAppNoncesCannotBeSequenced();
         }
-        CONTROL = address(this);
         CALL_CONFIG = CallBits.encodeCallConfig(_callConfig);
+        CONTROL = address(this);
+        ATLAS_VERIFICATION = IAtlas(_atlas).VERIFICATION();
+
         governance = _governance;
     }
 
@@ -155,15 +159,17 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     }
 
     function acceptGovernance() external {
-        if (msg.sender != pendingGovernance) {
+        address newGovernance = pendingGovernance;
+        if (msg.sender != newGovernance) {
             revert AtlasErrors.Unauthorized();
         }
+
         address prevGovernance = governance;
-        governance = pendingGovernance;
+        governance = newGovernance;
         delete pendingGovernance;
 
-        // TODO register transfer on DAppIntegration
+        IDAppIntegration(ATLAS_VERIFICATION).changeDAppGovernance(prevGovernance, newGovernance);
 
-        emit AtlasEvents.GovernanceTransferred(prevGovernance, governance);
+        emit AtlasEvents.GovernanceTransferred(prevGovernance, newGovernance);
     }
 }
