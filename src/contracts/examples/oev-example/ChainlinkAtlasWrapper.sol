@@ -16,6 +16,8 @@ contract ChainlinkAtlasWrapper is Ownable {
     int256 public atlasLatestAnswer;
     uint256 public atlasLatestTimestamp;
 
+    uint256 private immutable _GAS_THRESHOLD;
+
     error TransmitterInvalid(address transmitter);
     error InvalidTransmitMsgDataLength();
     error ObservationsNotOrdered();
@@ -30,9 +32,36 @@ contract ChainlinkAtlasWrapper is Ownable {
         BASE_FEED = IChainlinkFeed(baseChainlinkFeed);
         DAPP_CONTROL = IChainlinkDAppControl(msg.sender); // Chainlink DAppControl is also wrapper factory
 
-        // TODO: Just give ownership to the oracle owner?
-        // _transferOwnership(BASE_FEED.owner());
         _transferOwnership(_owner);
+
+        // do a gas usage check on an invalid trasmitting address  
+        address aggregator = BASE_FEED.aggregator();
+
+        // heat up the address
+        IOffchainAggregator(aggregator).oracleObservationCount{gas: 10_000}(_owner);
+
+        // get the gas usage of an Unset address
+        uint256 gasUsed = gasleft();
+        IOffchainAggregator(aggregator).oracleObservationCount{gas: 10_000}(atlas);
+        gasUsed -= gasleft();
+
+        _GAS_THRESHOLD = gasUsed + 199; // 199 = warm SLOADx2 - 1
+
+        address transmitter = IOffchainAggregator(aggregator).transmitters()[2];
+        // heat up the second storage slot
+        IOffchainAggregator(aggregator).oracleObservationCount{gas: 10_000}(transmitter);
+        // change to next transmitter (packed w/ prev one in second storage slot)
+        transmitter = IOffchainAggregator(aggregator).transmitters()[3];
+
+        // check gas used 
+        gasUsed = gasleft();
+        IOffchainAggregator(aggregator).oracleObservationCount{gas: 10_000}(transmitter);
+        gasUsed -= gasleft();
+
+        console.log("gasUsed:", gasUsed);
+        console.log("_GAS_THRESHOLD", _GAS_THRESHOLD);
+
+        require(gasUsed > _GAS_THRESHOLD, "invalid gas threshold");
     }
 
     // Called by the contract which creates OEV when reading a price feed update.
@@ -213,14 +242,14 @@ contract ChainlinkAtlasWrapper is Ownable {
         IOffchainAggregator(aggregator).oracleObservationCount{gas: 10_000}(signer);
         gasUsed -= gasleft();
 
-        /*
+        
             console.log("---");
             console.log("signer:", signer);
             console.log("gas used:", gasUsed);
-        */
+        
 
         // NOTE: The gas usage check also will fail if a signer doublesigns
-        if (gasUsed > 3_500) { // TODO: pinpoint the actual threshold, add in index + packing.
+        if (gasUsed > _GAS_THRESHOLD) { // TODO: pinpoint the actual threshold, add in index + packing.
             return !_isTransmitter(validTransmitters, signer);
         }  
         return false;
