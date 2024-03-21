@@ -3,6 +3,6 @@ pragma solidity 0.8.22;
 
 struct GovernanceData {
     address governance;
-    uint32 callConfig; // bitwise
+    uint32 callConfig; // bitmap
     uint64 lastUpdate;
 }

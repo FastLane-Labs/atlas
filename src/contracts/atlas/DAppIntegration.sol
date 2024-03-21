@@ -65,40 +65,33 @@ contract DAppIntegration {
 
         if (msg.sender != govAddress) revert AtlasErrors.OnlyGovernance();
 
+        // Add DAppControl gov as a signatory
         bytes32 signatoryKey = keccak256(abi.encodePacked(controller, msg.sender));
 
         if (signatories[signatoryKey]) revert AtlasErrors.OwnerActive();
-
-        uint32 callConfig = CallBits.buildCallConfig(controller);
-
-        governance[controller] =
-            GovernanceData({ governance: govAddress, callConfig: callConfig, lastUpdate: uint64(block.number) });
 
         signatories[signatoryKey] = true;
         dAppSignatories[controller].push(msg.sender);
     }
 
     function addSignatory(address controller, address signatory) external {
-        GovernanceData memory govData = governance[controller];
-
-        if (msg.sender != govData.governance) revert AtlasErrors.OnlyGovernance();
+        address dAppGov = IDAppControl(controller).getDAppSignatory();
+        if (msg.sender != dAppGov) revert AtlasErrors.OnlyGovernance();
 
         bytes32 signatoryKey = keccak256(abi.encodePacked(controller, signatory));
 
-        if (signatories[signatoryKey]) {
-            revert AtlasErrors.SignatoryActive();
-        }
+        if (signatories[signatoryKey]) revert AtlasErrors.SignatoryActive();
 
         signatories[signatoryKey] = true;
         dAppSignatories[controller].push(signatory);
 
-        emit NewDAppSignatory(controller, govData.governance, signatory, govData.callConfig);
+        uint32 callConfig = IDAppControl(controller).CALL_CONFIG();
+        emit NewDAppSignatory(controller, dAppGov, signatory, callConfig);
     }
 
     function removeSignatory(address controller, address signatory) external {
-        GovernanceData memory govData = governance[controller];
-
-        if (msg.sender != govData.governance && msg.sender != signatory) {
+        address dAppGov = IDAppControl(controller).getDAppSignatory();
+        if (msg.sender != dAppGov && msg.sender != signatory) {
             revert AtlasErrors.InvalidCaller();
         }
 
@@ -115,21 +108,27 @@ contract DAppIntegration {
             }
         }
 
-        emit RemovedDAppSignatory(controller, govData.governance, signatory, govData.callConfig);
+        uint32 callConfig = IDAppControl(controller).CALL_CONFIG();
+        emit RemovedDAppSignatory(controller, dAppGov, signatory, callConfig);
+    }
+
+    // Called by the DAppControl contract on acceptGovernance when governance is transferred.
+    function changeDAppGovernance(address newGovernance) external {
+        // TODO called by acceptGovernance in DAppControl
     }
 
     function disableDApp(address dAppControl) external {
-        GovernanceData memory govData = governance[dAppControl];
-
-        if (msg.sender != govData.governance) revert AtlasErrors.OnlyGovernance();
-
-        delete governance[dAppControl];
+        address dAppGov = IDAppControl(dAppControl).getDAppSignatory();
+        if (msg.sender != dAppGov) revert AtlasErrors.OnlyGovernance();
+        bytes32 signatoryKey = keccak256(abi.encodePacked(dAppControl, dAppGov));
+        signatories[signatoryKey] = false;
     }
 
-    function getGovFromControl(address dAppControl) external view returns (address governanceAddress) {
-        GovernanceData memory govData = governance[dAppControl];
-        if (govData.lastUpdate == 0) revert AtlasErrors.DAppNotEnabled();
-        governanceAddress = govData.governance;
+    function getGovFromControl(address dAppControl) external view returns (address) {
+        address dAppGov = IDAppControl(dAppControl).getDAppSignatory();
+        bytes32 signatoryKey = keccak256(abi.encodePacked(dAppControl, dAppGov));
+        if (!signatories[signatoryKey]) revert AtlasErrors.DAppNotEnabled();
+        return dAppGov;
     }
 
     function getDAppSignatories(address dAppControl) external view returns (address[] memory) {

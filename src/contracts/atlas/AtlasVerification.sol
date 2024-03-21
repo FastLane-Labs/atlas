@@ -344,8 +344,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // users not having to trust the front end at all - a huge
         // improvement over the current experience.
 
-        GovernanceData memory govData = governance[dConfig.to];
-
         // Check bundler matches dAppOp bundler
         if (dAppOp.bundler != address(0) && msgSender != dAppOp.bundler) {
             if (!signatories[keccak256(abi.encodePacked(dAppOp.control, msgSender))]) {
