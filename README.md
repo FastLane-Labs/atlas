@@ -9,16 +9,17 @@ Atlas is a permissionless and modular smart contract framework for Execution Abs
 A frontend or API wishing to participate can integrate with Atlas by completing three steps:
 
 1. Embed the Atlas SDK into their frontend or API.
-2. Create and publish a DAppControl contract.
-3. Interact with the Atlas contract to initialize the DAppControl contract and link it to the Atlas SDK on their frontend or API.
+2. Choose an Operations Relay.
+3. Create and publish a DAppControl contract.
+4. Interact with the Atlas contract to initialize the DAppControl contract and link it to the Atlas SDK on their frontend or API.
 
 ### Network Overview
 
-Atlas is infrastructure-agnostic; each app may choose how the app-designated bundler may aggregate the User Operations and Solver Operations. Examples include:
-1. **On Chain**: When gas cost is not an issue, the entire auction can take place on chain (or rollup).
-2. **On Another Chain**: So many decentralized networks - it'd be a shame to use only one.
+Atlas is infrastructure-agnostic; each app may choose how the User Operations and Solver Operations are aggregated. Examples include:
+1. **On Chain**: When gas cost is not an issue, Solver Operations may be sent on-chain, and then aggregated by any party.
+2. **On Another Chain**:  Solver Operations may be posted and aggregated on another chain, and the output can be used to settle the atlas transaction on the settlement chain.
 3. **BloXroute**: When Atlas is launched, BloXroute's BDN will support the aggregation of User and Solver Operations for rapid bundling. 
-4. **SUAVE**: Once live, Operations can be sent to the SUAVE network, bundled into a transaction by the SUAVE Atlas implementation, and then made available for use by builders. 
+4. **SUAVE**: Once live, Operations can be sent to the SUAVE network, bundled into a transaction by the SUAVE Atlas implementation, and then made available for use by bundlers. 
 
 ### Auctioneer Overview
 
@@ -33,7 +34,7 @@ The auctioneer is tasked with signing a **DAppOperation** that includes a **Call
 3. The frontend receives SolverOperations back via the BDN.
 4. After a set period of time, the frontend calls the *getCallChainHash()* view function via the User's wallet's RPC.
 5. The frontend then uses the session key from step 1 to sign the **DAppOperation**, which includes the **CallChainHash**.
-6. The frontend then propagates the DAppOperation over the BDN to designated bundler.
+6. The frontend then propagates the DAppOperation over the BDN to a designated bundler, if the user themselves is not the bundler.
 
 Note that any bundler who tampers with the order of the SolverOperations will cause the transaction to revert, thereby blocking any gas reimbursement from Atlas.
 
@@ -97,4 +98,4 @@ A user must have an Execution Environment (EE) instance for each DApp they would
 
 ### Notes:
 
-Note that the auctioneer (typically the frontend) may want to use a reputation system for solver bids in order to not take up too much space in the block.  The further down the solverOps[], the higher the reputation requirement for inclusion by the backend. This isnt necessarily required - it's not an economic issue - it's just that it's important to be a good member of the ecosystem and not waste too much precious blockspace by filling it with probabalistic solver txs that have a low success rate but a high profit-to-cost ratio. 
+Note that the auctioneer (typically the frontend) and/or the Operations relay may want to use a reputation system for solver bids to efficiently use the space in the solverOps[]. This isnt necessarily required - it's not an economic issue - it's just that it's important to be a good member of the ecosystem and not waste too much precious blockspace by filling it with probabalistic solver txs that have a low success rate but a high profit-to-cost ratio. 
