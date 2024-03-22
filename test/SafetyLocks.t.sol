@@ -114,7 +114,7 @@ contract SafetyLocksTest is Test {
     }
 
     function test_buildEscrowLock() public {
-        DAppConfig memory dConfig = DAppConfig({ to: address(10), callConfig: 0, bidToken: address(0) });
+        DAppConfig memory dConfig = DAppConfig({ to: address(10), callConfig: 0, bidToken: address(0), solverGasLimit: 1_000_000});
 
         vm.expectRevert(AtlasErrors.NotInitialized.selector);
         safetyLocks.buildEscrowLock(dConfig, executionEnvironment, 0, false);

@@ -9,6 +9,8 @@ import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import "forge-std/Test.sol";
 
 abstract contract DAppControlTemplate {
+    uint32 internal constant DEFAULT_SOLVER_GAS_LIMIT = 1_000_000;
+
     constructor() { }
 
     // Virtual functions to be overridden by participating dApp governance
@@ -132,4 +134,8 @@ abstract contract DAppControlTemplate {
     function getBidFormat(UserOperation calldata userOp) public view virtual returns (address bidToken);
 
     function getBidValue(SolverOperation calldata solverOp) public view virtual returns (uint256);
+
+    function getSolverGasLimit() public view virtual returns (uint32) {
+        return DEFAULT_SOLVER_GAS_LIMIT;
+    }
 }

@@ -133,7 +133,12 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         mustBeCalled
         returns (DAppConfig memory dConfig)
     {
-        dConfig = DAppConfig({ to: address(this), callConfig: CALL_CONFIG, bidToken: getBidFormat(userOp) });
+        dConfig = DAppConfig({
+            to: address(this),
+            callConfig: CALL_CONFIG,
+            bidToken: getBidFormat(userOp),
+            solverGasLimit: getSolverGasLimit()
+        });
     }
 
     function getCallConfig() external view returns (CallConfig memory) {
