@@ -212,7 +212,7 @@ abstract contract GasAccounting is SafetyLocks {
             gasUsed += _getCalldataCost(solverOp.data.length);
         }
 
-        gasUsed = (gasUsed + ((gasUsed * SURCHARGE) / SURCHARGE_BASE));
+        gasUsed = (gasUsed + ((gasUsed * SURCHARGE) / 10_000_000));
         _assign(solverOp.from, gasUsed, false, bidFind);
     }
 
@@ -229,7 +229,7 @@ abstract contract GasAccounting is SafetyLocks {
         // Remove any unused gas from the bundler's claim.
         // TODO: consider penalizing bundler for too much unused gas (to prevent high escrow requirements for solvers)
         uint256 gasRemainder = (gasleft() * tx.gasprice);
-        gasRemainder += ((gasRemainder * SURCHARGE) / SURCHARGE_BASE);
+        gasRemainder += ((gasRemainder * SURCHARGE) / 10_000_000);
         _claims -= gasRemainder;
 
         if (_deposits < _claims + _withdrawals) {
@@ -245,7 +245,7 @@ abstract contract GasAccounting is SafetyLocks {
             _credit(winningSolver, amountCredited);
         }
 
-        uint256 netGasSurcharge = (_claims * SURCHARGE) / SURCHARGE_BASE;
+        uint256 netGasSurcharge = (_claims * SURCHARGE) / 10_000_000;
 
         _claims -= netGasSurcharge;
 
@@ -259,6 +259,6 @@ abstract contract GasAccounting is SafetyLocks {
         // Alter this for L2s.
         // TODO: replace 128 w/ actual extra length of calldata that isn't in the
         // solverOp.data field (from, to, etc)
-        calldataCost = (calldataLength + 128) * CALLDATA_LENGTH_PREMIUM * tx.gasprice;
+        calldataCost = (calldataLength + 128) * _CALLDATA_LENGTH_PREMIUM * tx.gasprice;
     }
 }

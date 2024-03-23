@@ -44,7 +44,7 @@ contract MockSafetyLocks is SafetyLocks {
     }
 
     function releaseEscrowLock() external {
-        _releaseEscrowLock();
+        _releaseAtlasLock();
     }
 
     function setLock(address _lock) external {
@@ -85,7 +85,7 @@ contract SafetyLocksTest is Test {
         safetyLocks.initializeEscrowLock{ value: msgValue }(executionEnvironment, gasMarker, userOpValue);
 
         uint256 rawClaims = (gasMarker + 1) * tx.gasprice;
-        uint256 expectedClaims = rawClaims + ((rawClaims * safetyLocks.SURCHARGE()) / safetyLocks.SURCHARGE_BASE());
+        uint256 expectedClaims = rawClaims + ((rawClaims * safetyLocks.SURCHARGE()) / 10_000_000);
 
         assertEq(safetyLocks.lock(), executionEnvironment);
         assertEq(safetyLocks.claims(), expectedClaims);
@@ -98,35 +98,18 @@ contract SafetyLocksTest is Test {
         vm.expectRevert(AtlasErrors.AlreadyInitialized.selector);
         safetyLocks.checkIfUnlocked();
         safetyLocks.setLock(address(1)); // Reset to UNLOCKED
-
-        safetyLocks.setClaims(1);
-        vm.expectRevert(AtlasErrors.AlreadyInitialized.selector);
-        safetyLocks.checkIfUnlocked();
-        safetyLocks.setClaims(type(uint256).max); // Reset
-
-        safetyLocks.setWithdrawals(1);
-        vm.expectRevert(AtlasErrors.AlreadyInitialized.selector);
-        safetyLocks.checkIfUnlocked();
-        safetyLocks.setWithdrawals(type(uint256).max); // Reset
-
-        safetyLocks.setDeposits(1);
-        vm.expectRevert(AtlasErrors.AlreadyInitialized.selector);
-        safetyLocks.checkIfUnlocked();
-        safetyLocks.setDeposits(type(uint256).max); // Reset
     }
 
     function test_buildEscrowLock() public {
         DAppConfig memory dConfig = DAppConfig({ to: address(10), callConfig: 0, bidToken: address(0) });
 
-        vm.expectRevert(AtlasErrors.NotInitialized.selector);
-        safetyLocks.buildEscrowLock(dConfig, executionEnvironment, bytes32(0), address(0), 0, false);
-
         safetyLocks.initializeEscrowLock(executionEnvironment, 0, 0);
-        safetyLocks.buildEscrowLock(dConfig, executionEnvironment, bytes32(0), address(0), 0, false);
-        // No assertion needed, the test is valid if it doesn't revert
+        EscrowKey memory key = safetyLocks.buildEscrowLock(dConfig, executionEnvironment, bytes32(0), address(0), 0, false);
+        assertEq(executionEnvironment, key.executionEnvironment);
+        assertEq(executionEnvironment, key.addressPointer);
     }
 
-    function test_releaseEscrowLock() public {
+    function test_releaseAtlasLock() public {
         vm.expectRevert(AtlasErrors.NotInitialized.selector);
         safetyLocks.releaseEscrowLock();
 

@@ -17,8 +17,6 @@ import "../types/LockTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 import "../types/ValidCallsTypes.sol";
 
-import { CALLDATA_LENGTH_PREMIUM } from "../types/EscrowTypes.sol";
-
 import { CallBits } from "../libraries/CallBits.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
 
@@ -48,13 +46,11 @@ contract Atlas is Escrow, Factory {
         payable
         returns (bool auctionWon)
     {
-        uint256 gasMarker = gasleft(); // + 21_000 + (msg.data.length * CALLDATA_LENGTH_PREMIUM);
+        uint256 gasMarker = gasleft(); // + 21_000 + (msg.data.length * _CALLDATA_LENGTH_PREMIUM);
         bool isSimulation = msg.sender == SIMULATOR;
 
         // Get or create the execution environment
-        address executionEnvironment;
-        DAppConfig memory dConfig;
-        (executionEnvironment, dConfig) = _getOrCreateExecutionEnvironment(userOp);
+        (address executionEnvironment, DAppConfig memory dConfig) = _getOrCreateExecutionEnvironment(userOp);
 
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
@@ -87,7 +83,7 @@ contract Atlas is Escrow, Factory {
         }
 
         // Release the lock
-        _releaseEscrowLock();
+        _releaseAtlasLock();
 
         // console.log("total gas used", gasMarker - gasleft());
     }
@@ -255,10 +251,6 @@ contract Atlas is Escrow, Factory {
         j = solverOps.length - j;
 
         for (uint256 i; i < j; i++) {
-            // bidPlaceholder = solverOutcomeResult
-
-            // console.log("solver execute", solverOps[i].solver);
-
             bidPlaceholder = sortedOps[i];
 
             (auctionWon, key) = _executeSolverOperation(

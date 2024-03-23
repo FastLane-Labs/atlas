@@ -33,6 +33,11 @@ contract EscrowTest is AtlasBaseTest {
     bytes4 noError = 0;
     address invalid = makeAddr("invalid");
 
+    uint256 private constant _SOLVER_GAS_LIMIT = 1_000_000;
+    uint256 private constant _VALIDATION_GAS_LIMIT = 500_000;
+    uint256 private constant _SOLVER_GAS_BUFFER = 5; // out of 100
+    uint256 private constant _FASTLANE_GAS_BUFFER = 125_000; // integer amount
+
     event MEVPaymentSuccess(address bidToken, uint256 bidAmount);
     event MEVPaymentFailure(address indexed controller, uint32 callConfig, address bidToken, uint256 bidAmount);
     event SolverTxResult(
@@ -300,7 +305,7 @@ contract EscrowTest is AtlasBaseTest {
 
     function test_executeSolverOperation_validateSolverOperation_userOutOfGas() public {
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
-        this.executeSolverOperationCase{gas: EscrowBits.VALIDATION_GAS_LIMIT + EscrowBits.SOLVER_GAS_LIMIT + 1_000_000}(
+        this.executeSolverOperationCase{gas: _VALIDATION_GAS_LIMIT + _SOLVER_GAS_LIMIT + 1_000_000}(
             userOp, solverOps, false, false, 1 << uint256(SolverOutcome.UserOutOfGas), true
         );
     }

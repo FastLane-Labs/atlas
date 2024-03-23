@@ -25,6 +25,11 @@ abstract contract Escrow is AtlETH {
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
+    uint256 private constant _SOLVER_GAS_LIMIT = 1_000_000;
+    uint256 private constant _VALIDATION_GAS_LIMIT = 500_000;
+    uint256 private constant _SOLVER_GAS_BUFFER = 5; // out of 100
+    uint256 private constant _FASTLANE_GAS_BUFFER = 125_000; // integer amount
+
     constructor(
         uint256 _escrowDuration,
         address _verification,
@@ -203,7 +208,7 @@ abstract contract Escrow is AtlETH {
         view
         returns (uint256, uint256 gasLimit)
     {
-        if (gasWaterMark < EscrowBits.VALIDATION_GAS_LIMIT + EscrowBits.SOLVER_GAS_LIMIT) {
+        if (gasWaterMark < _VALIDATION_GAS_LIMIT + _SOLVER_GAS_LIMIT) {
             // Make sure to leave enough gas for dApp validation calls
             return (result | 1 << uint256(SolverOutcome.UserOutOfGas), gasLimit);
         }
@@ -221,8 +226,8 @@ abstract contract Escrow is AtlETH {
             );
         }
 
-        gasLimit = (100) * (solverOp.gas < EscrowBits.SOLVER_GAS_LIMIT ? solverOp.gas : EscrowBits.SOLVER_GAS_LIMIT)
-            / (100 + EscrowBits.SOLVER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
+        gasLimit = (100) * (solverOp.gas < _SOLVER_GAS_LIMIT ? solverOp.gas : _SOLVER_GAS_LIMIT)
+            / (100 + _SOLVER_GAS_BUFFER) + _FASTLANE_GAS_BUFFER;
 
         uint256 gasCost = (tx.gasprice * gasLimit) + _getCalldataCost(solverOp.data.length);
 
@@ -235,7 +240,7 @@ abstract contract Escrow is AtlETH {
         }
 
         // subtract out the gas buffer since the solver's metaTx won't use it
-        gasLimit -= EscrowBits.FASTLANE_GAS_BUFFER;
+        gasLimit -= _FASTLANE_GAS_BUFFER;
 
         EscrowAccountAccessData memory aData = accessData[solverOp.from];
 

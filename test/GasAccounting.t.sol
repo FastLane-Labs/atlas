@@ -61,6 +61,10 @@ contract MockGasAccounting is GasAccounting, Test {
         _balanceOf[account].unbonding += uint112(amount);
         bondedTotalSupply += amount;
     }
+
+    function calldataLengthPremium() external returns (uint256) {
+        return _CALLDATA_LENGTH_PREMIUM;
+    }
 }
 
 contract GasAccountingTest is Test {
@@ -82,7 +86,7 @@ contract GasAccountingTest is Test {
 
     function getInitialClaims(uint256 gasMarker) public view returns (uint256 claims) {
         uint256 rawClaims = (gasMarker + 1) * tx.gasprice;
-        claims = rawClaims + ((rawClaims * mockGasAccounting.SURCHARGE()) / mockGasAccounting.SURCHARGE_BASE());
+        claims = rawClaims + ((rawClaims * mockGasAccounting.SURCHARGE()) / 10_000_000);
     }
 
     function test_validateBalances() public {
@@ -314,7 +318,7 @@ contract GasAccountingTest is Test {
 
     function test_releaseSolverLock() public {
         solverOp.data = abi.encodePacked("calldata");
-        uint256 calldataCost = (solverOp.data.length * CALLDATA_LENGTH_PREMIUM) + 1;
+        uint256 calldataCost = (solverOp.data.length * mockGasAccounting.calldataLengthPremium()) + 1;
         uint256 gasWaterMark = gasleft() + 5000;
         uint256 maxGasUsed;
         uint112 bondedBefore;
@@ -324,7 +328,7 @@ contract GasAccountingTest is Test {
         // FULL_REFUND
         result = EscrowBits._FULL_REFUND;
         maxGasUsed = gasWaterMark + calldataCost;
-        maxGasUsed = (maxGasUsed + ((maxGasUsed * mockGasAccounting.SURCHARGE()) / mockGasAccounting.SURCHARGE_BASE()))
+        maxGasUsed = (maxGasUsed + ((maxGasUsed * mockGasAccounting.SURCHARGE()) / 10_000_000))
             * tx.gasprice;
         mockGasAccounting.increaseBondedBalance(solverOp.from, maxGasUsed);
         (bondedBefore,,,,) = mockGasAccounting.accessData(solverOp.from);
@@ -332,7 +336,7 @@ contract GasAccountingTest is Test {
         (bondedAfter,,,,) = mockGasAccounting.accessData(solverOp.from);
         assertGt(
             bondedBefore - bondedAfter,
-            (calldataCost + ((calldataCost * mockGasAccounting.SURCHARGE()) / mockGasAccounting.SURCHARGE_BASE()))
+            (calldataCost + ((calldataCost * mockGasAccounting.SURCHARGE()) / 10_000_000))
                 * tx.gasprice
         ); // Must be greater than calldataCost
         assertLt(bondedBefore - bondedAfter, maxGasUsed); // Must be less than maxGasUsed

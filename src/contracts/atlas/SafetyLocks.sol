@@ -11,20 +11,12 @@ import "../types/EscrowTypes.sol";
 
 import "../types/LockTypes.sol";
 
-import { EXECUTION_PHASE_OFFSET } from "../libraries/SafetyBits.sol";
-
 import { Storage } from "./Storage.sol";
 
 // import "forge-std/Test.sol";
 
 abstract contract SafetyLocks is Storage {
     using CallBits for uint32;
-
-    uint16 internal constant _ACTIVE_X_PRE_OPS_X_UNSET =
-        uint16(1 << uint16(BaseLock.Active) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps)));
-
-    uint16 internal constant _ACTIVE_X_USER_X_UNSET =
-        uint16(1 << uint16(BaseLock.Active) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserOperation)));
 
     constructor(
         uint256 _escrowDuration,
@@ -42,20 +34,16 @@ abstract contract SafetyLocks is Storage {
 
         // Set the claimed amount
         uint256 rawClaims = (gasMarker + 1) * tx.gasprice;
-        claims = rawClaims + ((rawClaims * SURCHARGE) / SURCHARGE_BASE);
+        claims = rawClaims + ((rawClaims * SURCHARGE) / 10_000_000);
 
         // Set any withdraws or deposits
         withdrawals = userOpValue;
         deposits = msg.value;
     }
 
-    // TODO are all these checks necessary? More gas efficient was to check if unlocked?
     // Used in AtlETH
     function _checkIfUnlocked() internal view {
         if (lock != UNLOCKED) revert AlreadyInitialized();
-        if (claims != type(uint256).max) revert AlreadyInitialized();
-        if (withdrawals != type(uint256).max) revert AlreadyInitialized();
-        if (deposits != type(uint256).max) revert AlreadyInitialized();
     }
 
     function _buildEscrowLock(
@@ -70,8 +58,6 @@ abstract contract SafetyLocks is Storage {
         pure
         returns (EscrowKey memory)
     {
-        bool needsPreOps = dConfig.callConfig.needsPreOpsCall();
-
         return EscrowKey({
             executionEnvironment: executionEnvironment,
             userOpHash: userOpHash,
@@ -79,9 +65,9 @@ abstract contract SafetyLocks is Storage {
             addressPointer: executionEnvironment,
             solverSuccessful: false,
             paymentsSuccessful: false,
-            callIndex: needsPreOps ? 0 : 1,
+            callIndex: dConfig.callConfig.needsPreOpsCall() ? 0 : 1,
             callCount: solverOpCount + 3,
-            lockState: needsPreOps ? _ACTIVE_X_PRE_OPS_X_UNSET : _ACTIVE_X_USER_X_UNSET,
+            lockState: 0,
             solverOutcome: 0,
             bidFind: false,
             isSimulation: isSimulation,
@@ -89,7 +75,7 @@ abstract contract SafetyLocks is Storage {
         });
     }
 
-    function _releaseEscrowLock() internal {
+    function _releaseAtlasLock() internal {
         if (lock == UNLOCKED) revert NotInitialized();
         lock = UNLOCKED;
         _solverLock = _UNLOCKED_UINT;

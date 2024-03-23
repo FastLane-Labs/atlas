@@ -34,6 +34,12 @@ contract EscrowBitsTest is Test {
         );
     }
 
+    function testLogEscrowConstants() public {
+        console.log("EscrowBits._NO_REFUND", EscrowBits._NO_REFUND);
+        console.log("EscrowBits._NO_REFUND", EscrowBits._PARTIAL_REFUND);
+        console.log("EscrowBits._NO_REFUND", EscrowBits._FULL_REFUND);
+    }
+
     function testCanExecute() public {
         uint256 valid = 0;
         assertEq(valid.canExecute(), true);
