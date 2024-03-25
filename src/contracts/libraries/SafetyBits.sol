@@ -34,7 +34,7 @@ uint16 constant SAFE_DAPP_TRANSFER = 0x0ca0; // 3232
 library SafetyBits {
     uint16 internal constant _LOCKED_X_SOLVERS_X_REQUESTED = 0x0108; // 264
         // uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET +
-            // uint16(ExecutionPhase.SolverOperations)));
+        // uint16(ExecutionPhase.SolverOperations)));
 
     uint16 internal constant _LOCKED_X_PRE_OPS_X_UNSET = 0x0028; // 40
         // uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps)));
@@ -44,7 +44,7 @@ library SafetyBits {
 
     uint16 internal constant _LOCK_PAYMENTS = 0x0408; // 1032
         // uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET +
-            // uint16(ExecutionPhase.HandlingPayments)));
+        // uint16(ExecutionPhase.HandlingPayments)));
 
     uint16 internal constant _LOCKED_X_VERIFICATION_X_UNSET = 0x0808; // 2056
         // uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps)));
