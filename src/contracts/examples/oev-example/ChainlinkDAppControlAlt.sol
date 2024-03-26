@@ -8,7 +8,7 @@ import "src/contracts/types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
 import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
-import { ChainlinkAtlasWrapper } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapper.sol";
+import { ChainlinkAtlasWrapper } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapperAlt.sol";
 
 import "forge-std/Test.sol";
 

@@ -16,15 +16,17 @@ contract ChainlinkAtlasWrapper is Ownable {
     int256 public atlasLatestAnswer;
     uint256 public atlasLatestTimestamp;
 
-    uint256 private immutable _GAS_THRESHOLD;
+    // Trusted ExecutionEnvironments
+    mapping(address transmitter => bool trusted) public transmitters;
 
-    error TransmitterInvalid(address transmitter);
+    error TransmitterNotTrusted(address transmitter);
     error InvalidTransmitMsgDataLength();
     error ObservationsNotOrdered();
     error AnswerMustBeAboveZero();
     error SignerVerificationFailed();
     error WithdrawETHFailed();
 
+    event TransmitterStatusChanged(address indexed transmitter, bool trusted);
     event SignerStatusChanged(address indexed account, bool isSigner);
 
     constructor(address atlas, address baseChainlinkFeed, address _owner) {
@@ -33,35 +35,6 @@ contract ChainlinkAtlasWrapper is Ownable {
         DAPP_CONTROL = IChainlinkDAppControl(msg.sender); // Chainlink DAppControl is also wrapper factory
 
         _transferOwnership(_owner);
-
-        // do a gas usage check on an invalid trasmitting address
-        address aggregator = BASE_FEED.aggregator();
-
-        // heat up the address
-        IOffchainAggregator(aggregator).oracleObservationCount{ gas: 10_000 }(_owner);
-
-        // get the gas usage of an Unset address
-        uint256 gasUsed = gasleft();
-        IOffchainAggregator(aggregator).oracleObservationCount{ gas: 10_000 }(atlas);
-        gasUsed -= gasleft();
-
-        _GAS_THRESHOLD = gasUsed + 199; // 199 = warm SLOADx2 - 1
-
-        address transmitter = IOffchainAggregator(aggregator).transmitters()[2];
-        // heat up the second storage slot
-        IOffchainAggregator(aggregator).oracleObservationCount{ gas: 10_000 }(transmitter);
-        // change to next transmitter (packed w/ prev one in second storage slot)
-        transmitter = IOffchainAggregator(aggregator).transmitters()[3];
-
-        // check gas used
-        gasUsed = gasleft();
-        IOffchainAggregator(aggregator).oracleObservationCount{ gas: 10_000 }(transmitter);
-        gasUsed -= gasleft();
-
-        console.log("gasUsed:", gasUsed);
-        console.log("_GAS_THRESHOLD", _GAS_THRESHOLD);
-
-        require(gasUsed > _GAS_THRESHOLD, "invalid gas threshold");
     }
 
     // Called by the contract which creates OEV when reading a price feed update.
@@ -110,6 +83,8 @@ contract ChainlinkAtlasWrapper is Ownable {
         external
         returns (address)
     {
+        if (!transmitters[msg.sender]) revert TransmitterNotTrusted(msg.sender);
+
         int256 answer = _verifyTransmitData(report, rs, ss, rawVs);
 
         atlasLatestAnswer = answer;
@@ -137,123 +112,26 @@ contract ChainlinkAtlasWrapper is Ownable {
             bool inOrder = r.observations[i] <= r.observations[i + 1];
             if (!inOrder) revert ObservationsNotOrdered();
         }
-
-        (address[] memory validTransmitters, address aggregator) = _validateTransmitter();
-
-        bytes32 reportHash = keccak256(report);
-
-        for (uint256 i = 0; i < rs.length; ++i) {
-            address signer = ecrecover(reportHash, uint8(rawVs[i]) + 27, rs[i], ss[i]);
-            if (!_isSigner(validTransmitters, aggregator, signer)) {
-                // console.log("invalid signer:", signer);
-                revert();
-            }
-            // console.log("__valid signer:", signer);
-        }
-
         int192 median = r.observations[r.observations.length / 2];
 
         if (median <= 0) revert AnswerMustBeAboveZero();
 
+        bool signersVerified =
+            IChainlinkDAppControl(DAPP_CONTROL).verifyTransmitSigners(address(BASE_FEED), report, rs, ss, rawVs);
+        if (!signersVerified) revert SignerVerificationFailed();
+
         return int256(median);
-    }
-
-    function _validateTransmitter() internal view returns (address[] memory validTransmitters, address aggregator) {
-        // Get the user from the EE
-        // NOTE: technically we can pull this from calldata, including full function here for readability
-        address transmitter = IExecutionEnvironment(msg.sender).getUser();
-
-        // Verify that the execution environment (msg.sender) is genuine
-        // NOTE: Technically we can skip this too since the activeEnvironment check below also validates this
-        (address executionEnvironment,,) =
-            IAtlasFactory(ATLAS).getExecutionEnvironment(transmitter, address(DAPP_CONTROL));
-
-        if (msg.sender != executionEnvironment) {
-            revert TransmitterInvalid(transmitter);
-        }
-
-        if (IExecutionEnvironment(msg.sender).getControl() != address(DAPP_CONTROL)) {
-            revert TransmitterInvalid(transmitter);
-        }
-
-        // Verify that this environment is the currently active one according to Atlas
-        // require(msg.sender == IAtlasFactory(ATLAS).activeEnvironment(), "inactive EE");
-
-        // Get the valid transmitters
-        // NOTE: Be careful if considering storing these in a map - that would make it tricky to deauthorize for this
-        // contract
-        // when they're deauthorized on the parent aggregator. imo it's better to skip the map altogether since we'd
-        // want a
-        //fully updated list each time to make sure no transmitter has been removed.
-        aggregator = BASE_FEED.aggregator();
-        validTransmitters = IOffchainAggregator(aggregator).transmitters();
-
-        // Make sure this transmitter is valid
-        if (!_isTransmitter(validTransmitters, transmitter)) {
-            revert TransmitterInvalid(transmitter);
-        }
-
-        // Heat up the storage access on the s_oracle array loc/length so that _isSigner()'s gasleft() checks are even
-        IOffchainAggregator(aggregator).oracleObservationCount(transmitter);
-    }
-
-    function _isTransmitter(address[] memory validTransmitters, address transmitter) internal pure returns (bool) {
-        uint256 len = validTransmitters.length;
-        // Loop through them and see if there's a match
-        for (uint256 i; i < len; i++) {
-            if (transmitter == validTransmitters[i]) return true;
-        }
-        return false;
-    }
-
-    function _isSigner(
-        address[] memory validTransmitters,
-        address aggregator,
-        address signer
-    )
-        internal
-        view
-        returns (bool)
-    {
-        /*
-            Super hacky approach... but if an address isn't "Role.Unset" and it also isn't
-            Role.Transmitter then by the process of elimination that means it's a valid signer.
-
-            We can determine if it's Unset or not by the gas used for the view call:
-            Unset = 1 storage read, Transmitter or Signer = 2 storage reads:
-
-                function oracleObservationCount(address _signerOrTransmitter) {
-                    Oracle memory oracle = s_oracles[_signerOrTransmitter];
-                    if (oracle.role == Role.Unset) { return 0; }
-                    return s_oracleObservationsCounts[oracle.index] - 1;
-                }
-
-            s_oracles[i] should be a cold storage load - if not, it's invalid.
-            s_oracleObservationsCounts[i] may be cold or hot - it's a packed struct. 
-            aggregator is a hot address.
-        */
-
-        uint256 gasUsed = gasleft();
-        IOffchainAggregator(aggregator).oracleObservationCount{ gas: 10_000 }(signer);
-        gasUsed -= gasleft();
-
-        /*
-            console.log("---");
-            console.log("signer:", signer);
-            console.log("gas used:", gasUsed);
-        */
-
-        // NOTE: The gas usage check also will fail if a signer doublesigns
-        if (gasUsed > _GAS_THRESHOLD) {
-            // TODO: pinpoint the actual threshold, add in index + packing.
-            return !_isTransmitter(validTransmitters, signer);
-        }
-        return false;
     }
 
     // ---------------------------------------------------- //
     //                     Owner Functions                  //
     // ---------------------------------------------------- //
+
+    // Owner can add/remove trusted transmitters (ExecutionEnvironments)
+    function setTransmitterStatus(address transmitter, bool trusted) external onlyOwner {
+        transmitters[transmitter] = trusted;
+        emit TransmitterStatusChanged(transmitter, trusted);
+    }
 
     // Withdraw ETH OEV captured via Atlas solver bids
     function withdrawETH(address recipient) external onlyOwner {
@@ -268,21 +146,6 @@ contract ChainlinkAtlasWrapper is Ownable {
 
     fallback() external payable { }
     receive() external payable { }
-
-    // ---------------------------------------------------- //
-    //                     View  Functions                  //
-    // ---------------------------------------------------- //
-    function aggregator() external view returns (address) {
-        return BASE_FEED.aggregator();
-    }
-
-    function transmitters() external view returns (address[] memory) {
-        return IOffchainAggregator(BASE_FEED.aggregator()).transmitters();
-    }
-
-    function executionEnvironment(address transmitter) external view returns (address environment) {
-        (environment,,) = IAtlasFactory(ATLAS).getExecutionEnvironment(transmitter, address(DAPP_CONTROL));
-    }
 }
 
 // -----------------------------------------------
@@ -320,32 +183,6 @@ interface IChainlinkFeed {
         external
         view
         returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound);
-    function owner() external view returns (address);
-    function aggregator() external view returns (address);
-    function phaseId() external view returns (uint16);
-    function phaseAggregators(uint16 phaseId) external view returns (address);
-    function proposedAggregator() external view returns (address);
-}
-
-interface IOffchainAggregator {
-    function transmitters() external view returns (address[] memory);
-    function oracleObservationCount(address _signerOrTransmitter) external view returns (uint16);
-}
-
-interface IExecutionEnvironment {
-    function getUser() external pure returns (address user);
-    function getControl() external pure returns (address control);
-}
-
-interface IAtlasFactory {
-    function activeEnvironment() external view returns (address);
-    function getExecutionEnvironment(
-        address user,
-        address dAppControl
-    )
-        external
-        view
-        returns (address executionEnvironment, uint32 callConfig, bool exists);
 }
 
 interface IChainlinkDAppControl {
