@@ -4,7 +4,6 @@ pragma solidity 0.8.22;
 import "../types/EscrowTypes.sol";
 
 library EscrowBits {
-    uint256 public constant SOLVER_GAS_LIMIT = 1_000_000;
     uint256 public constant VALIDATION_GAS_LIMIT = 500_000;
     uint256 public constant SOLVER_GAS_BUFFER = 5; // out of 100
     uint256 public constant FASTLANE_GAS_BUFFER = 125_000; // integer amount

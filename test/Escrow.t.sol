@@ -300,7 +300,8 @@ contract EscrowTest is AtlasBaseTest {
 
     function test_executeSolverOperation_validateSolverOperation_userOutOfGas() public {
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
-        this.executeSolverOperationCase{gas: EscrowBits.VALIDATION_GAS_LIMIT + EscrowBits.SOLVER_GAS_LIMIT + 1_000_000}(
+        // First 1_000_000 is the default solver gas limit defined in a DAppControl contract
+        this.executeSolverOperationCase{gas: EscrowBits.VALIDATION_GAS_LIMIT + 1_000_000 + 1_000_000}(
             userOp, solverOps, false, false, 1 << uint256(SolverOutcome.UserOutOfGas), true
         );
     }

@@ -193,7 +193,7 @@ abstract contract Escrow is AtlETH {
         view
         returns (uint256, uint256 gasLimit)
     {
-        if (gasWaterMark < EscrowBits.VALIDATION_GAS_LIMIT + EscrowBits.SOLVER_GAS_LIMIT) {
+        if (gasWaterMark < EscrowBits.VALIDATION_GAS_LIMIT + dConfig.solverGasLimit) {
             // Make sure to leave enough gas for dApp validation calls
             return (result | 1 << uint256(SolverOutcome.UserOutOfGas), gasLimit);
         }
@@ -211,7 +211,7 @@ abstract contract Escrow is AtlETH {
             );
         }
 
-        gasLimit = (100) * (solverOp.gas < EscrowBits.SOLVER_GAS_LIMIT ? solverOp.gas : EscrowBits.SOLVER_GAS_LIMIT)
+        gasLimit = (100) * (solverOp.gas < dConfig.solverGasLimit ? solverOp.gas : dConfig.solverGasLimit)
             / (100 + EscrowBits.SOLVER_GAS_BUFFER) + EscrowBits.FASTLANE_GAS_BUFFER;
 
         uint256 gasCost = (tx.gasprice * gasLimit) + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM * tx.gasprice);

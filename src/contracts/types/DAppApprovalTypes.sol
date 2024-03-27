@@ -23,6 +23,7 @@ struct DAppConfig {
     address to;
     uint32 callConfig;
     address bidToken;
+    uint32 solverGasLimit;
 }
 
 struct CallConfig {

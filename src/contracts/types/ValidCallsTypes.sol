@@ -19,5 +19,6 @@ enum ValidCallsResult {
     OpHashMismatch,
     DeadlineMismatch,
     InvalidControl,
+    InvalidSolverGasLimit,
     InvalidDAppNonce
 }
