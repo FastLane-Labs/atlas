@@ -364,6 +364,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
             return (false, ValidCallsResult.InvalidControl);
         }
 
+        if (dConfig.solverGasLimit >= block.gaslimit) {
+            return (false, ValidCallsResult.InvalidSolverGasLimit);
+        }
+
         // If dAppOp.from is left blank and sim = true,
         // implies a simUserOp call, so dapp nonce check is skipped.
         if (dAppOp.from == address(0) && isSimulation) {
