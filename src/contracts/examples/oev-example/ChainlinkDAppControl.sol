@@ -74,7 +74,8 @@ contract ChainlinkDAppControl is DAppControl {
                 forwardReturnData: false,
                 requireFulfillment: false, // Update oracle even if all solvers fail
                 trustedOpHash: true,
-                invertBidValue: false
+                invertBidValue: false,
+                exPostBids: false
             })
         )
     { }
