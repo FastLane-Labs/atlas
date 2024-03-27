@@ -2,6 +2,7 @@
 pragma solidity 0.8.22;
 
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
+import { IAtlas } from "../interfaces/IAtlas.sol";
 import { CallBits } from "../libraries/CallBits.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
@@ -21,6 +22,7 @@ contract DAppIntegration {
         uint128 highestFullAsyncBitmap; // Async nonces tracked using bitmaps
     }
 
+    address internal constant UNLOCKED = address(1);
     address public immutable ATLAS;
 
     // from => nonceTracker
@@ -51,6 +53,7 @@ contract DAppIntegration {
 
     // Permissionlessly integrates a new dApp
     function initializeGovernance(address controller) external {
+        _checkAtlasIsUnlocked();
         address govAddress = IDAppControl(controller).getDAppSignatory();
         if (msg.sender != govAddress) revert AtlasErrors.OnlyGovernance();
 
@@ -67,6 +70,7 @@ contract DAppIntegration {
     }
 
     function addSignatory(address controller, address signatory) external {
+        _checkAtlasIsUnlocked();
         address dAppGov = IDAppControl(controller).getDAppSignatory();
         if (msg.sender != dAppGov) revert AtlasErrors.OnlyGovernance();
 
@@ -77,6 +81,7 @@ contract DAppIntegration {
     }
 
     function removeSignatory(address controller, address signatory) external {
+        _checkAtlasIsUnlocked();
         address dAppGov = IDAppControl(controller).getDAppSignatory();
         if (msg.sender != dAppGov && msg.sender != signatory) {
             revert AtlasErrors.InvalidCaller();
@@ -90,6 +95,7 @@ contract DAppIntegration {
 
     // Called by the DAppControl contract on acceptGovernance when governance is transferred.
     function changeDAppGovernance(address oldGovernance, address newGovernance) external {
+        _checkAtlasIsUnlocked();
         address controller = msg.sender;
         bytes32 signatoryKey = keccak256(abi.encodePacked(controller, oldGovernance));
         if (!signatories[signatoryKey]) revert AtlasErrors.DAppNotEnabled();
@@ -102,6 +108,7 @@ contract DAppIntegration {
     }
 
     function disableDApp(address dAppControl) external {
+        _checkAtlasIsUnlocked();
         address dAppGov = IDAppControl(dAppControl).getDAppSignatory();
         if (msg.sender != dAppGov) revert AtlasErrors.OnlyGovernance();
         bytes32 signatoryKey = keccak256(abi.encodePacked(dAppControl, dAppGov));
@@ -132,6 +139,10 @@ contract DAppIntegration {
                 break;
             }
         }
+    }
+
+    function _checkAtlasIsUnlocked() internal view {
+        if (IAtlas(ATLAS).lock() != UNLOCKED) revert AtlasErrors.AtlasLockActive();
     }
 
     // ---------------------------------------------------- //

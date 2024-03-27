@@ -18,4 +18,6 @@ interface IAtlas {
         returns (bool auctionWon);
 
     function VERIFICATION() external view returns (address);
+
+    function lock() external view returns (address);
 }

@@ -60,6 +60,7 @@ contract AtlasErrors {
     error InvalidCaller();
     error InvalidDAppControl();
     error DAppNotEnabled();
+    error AtlasLockActive();
 
     // Permit69
     error InvalidEnvironment();
