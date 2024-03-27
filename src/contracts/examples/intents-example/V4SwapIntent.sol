@@ -73,8 +73,8 @@ contract V4SwapIntentController is DAppControl {
 
     modifier verifyCall(address tokenIn, address tokenOut, uint256 amount) {
         require(msg.sender == atlas, "ERR-PI002 InvalidSender");
-        require(_addressPointer() == control, "ERR-PI003 InvalidLockState");
-        require(address(this) != control, "ERR-PI004 MustBeDelegated");
+        require(_addressPointer() == CONTROL, "ERR-PI003 InvalidLockState");
+        require(address(this) != CONTROL, "ERR-PI004 MustBeDelegated");
 
         address user = _user();
 

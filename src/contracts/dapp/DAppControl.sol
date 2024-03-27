@@ -1,39 +1,41 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { ExecutionPhase } from "../types/LockTypes.sol";
-
-import { CallBits } from "../libraries/CallBits.sol";
-
 import { DAppControlTemplate } from "./ControlTemplate.sol";
 import { ExecutionBase } from "../common/ExecutionBase.sol";
-
 import { EXECUTION_PHASE_OFFSET } from "../libraries/SafetyBits.sol";
-
+import { ExecutionPhase } from "../types/LockTypes.sol";
+import { CallBits } from "../libraries/CallBits.sol";
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
+import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
+import { IDAppIntegration } from "src/contracts/interfaces/IDAppIntegration.sol";
 
 import "forge-std/Test.sol";
 
-// TODO: Check payable is appropriate in pre/post ops and solver calls. Needed to send ETH if necessary (even when
-// delegatecalled)
-
 abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
-    address public immutable governance;
-    address public immutable control;
-    uint32 public immutable callConfig;
-
     uint8 private constant _CONTROL_DEPTH = 1 << 2;
+
+    uint32 public immutable CALL_CONFIG;
+    address public immutable CONTROL;
+    address public immutable ATLAS_VERIFICATION;
+
+    address public governance;
+    address public pendingGovernance;
 
     constructor(address _atlas, address _governance, CallConfig memory _callConfig) ExecutionBase(_atlas) {
         if (_callConfig.userNoncesSequenced && _callConfig.dappNoncesSequenced) {
-            revert("DAPP AND USER CANT BOTH BE SEQ"); // TODO convert to custom errors
+            // Max one of user or dapp nonces can be sequenced, not both
+            revert AtlasErrors.BothUserAndDAppNoncesCannotBeSequenced();
         }
+        CALL_CONFIG = CallBits.encodeCallConfig(_callConfig);
+        CONTROL = address(this);
+        ATLAS_VERIFICATION = IAtlas(_atlas).VERIFICATION();
 
-        control = address(this);
         governance = _governance;
-        callConfig = CallBits.encodeCallConfig(_callConfig);
     }
 
     // Safety and support functions and modifiers that make the relationship between dApp
@@ -41,12 +43,12 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
 
     // Modifiers
     modifier validControl() {
-        require(control == _control(), "ERR-PC050 InvalidControl");
+        if (CONTROL != _control()) revert AtlasErrors.InvalidControl();
         _;
     }
 
     modifier mustBeCalled() {
-        require(address(this) == control, "ERR-PC052 MustBeCalled");
+        if (address(this) != CONTROL) revert AtlasErrors.NoDelegatecall();
         _;
     }
 
@@ -114,15 +116,15 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
 
     // View functions
     function userDelegated() external view returns (bool delegated) {
-        delegated = CallBits.needsDelegateUser(callConfig);
+        delegated = CallBits.needsDelegateUser(CALL_CONFIG);
     }
 
     function requireSequencedUserNonces() external view returns (bool isSequenced) {
-        isSequenced = CallBits.needsSequencedUserNonces(callConfig);
+        isSequenced = CallBits.needsSequencedUserNonces(CALL_CONFIG);
     }
 
     function requireSequencedDAppNonces() external view returns (bool isSequenced) {
-        isSequenced = CallBits.needsSequencedDAppNonces(callConfig);
+        isSequenced = CallBits.needsSequencedDAppNonces(CALL_CONFIG);
     }
 
     function getDAppConfig(UserOperation calldata userOp)
@@ -131,18 +133,48 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         mustBeCalled
         returns (DAppConfig memory dConfig)
     {
-        dConfig = DAppConfig({ to: address(this), callConfig: callConfig, bidToken: getBidFormat(userOp) });
-    }
-
-    function _getCallConfig() internal view returns (CallConfig memory) {
-        return CallBits.decodeCallConfig(callConfig);
+        dConfig = DAppConfig({
+            to: address(this),
+            callConfig: CALL_CONFIG,
+            bidToken: getBidFormat(userOp),
+            solverGasLimit: getSolverGasLimit()
+        });
     }
 
     function getCallConfig() external view returns (CallConfig memory) {
         return _getCallConfig();
     }
 
-    function getDAppSignatory() external view returns (address governanceAddress) {
-        governanceAddress = governance;
+    function _getCallConfig() internal view returns (CallConfig memory) {
+        return CallBits.decodeCallConfig(CALL_CONFIG);
+    }
+
+    function getDAppSignatory() external view returns (address) {
+        return governance;
+    }
+
+    // Governance functions
+
+    function transferGovernance(address newGovernance) external {
+        if (msg.sender != governance) {
+            revert AtlasErrors.OnlyGovernance();
+        }
+        pendingGovernance = newGovernance;
+        emit AtlasEvents.GovernanceTransferStarted(governance, newGovernance);
+    }
+
+    function acceptGovernance() external {
+        address newGovernance = pendingGovernance;
+        if (msg.sender != newGovernance) {
+            revert AtlasErrors.Unauthorized();
+        }
+
+        address prevGovernance = governance;
+        governance = newGovernance;
+        delete pendingGovernance;
+
+        IDAppIntegration(ATLAS_VERIFICATION).changeDAppGovernance(prevGovernance, newGovernance);
+
+        emit AtlasEvents.GovernanceTransferred(prevGovernance, newGovernance);
     }
 }

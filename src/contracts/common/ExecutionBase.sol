@@ -4,12 +4,10 @@ pragma solidity 0.8.22;
 import { IPermit69 } from "../interfaces/IPermit69.sol";
 import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
 import { IEscrow } from "../interfaces/IEscrow.sol";
-
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
-
 import { ExecutionPhase, BaseLock } from "../types/LockTypes.sol";
-
 import { EXECUTION_PHASE_OFFSET, SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "../libraries/SafetyBits.sol";
+import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import "forge-std/Test.sol";
 
@@ -17,8 +15,6 @@ contract Base {
     address public immutable atlas;
     address public immutable source;
     bytes32 public immutable salt;
-
-    uint16 internal phasesWithDonations; //TODO remember to clear after call
 
     constructor(address _atlas) {
         atlas = _atlas;
@@ -37,16 +33,16 @@ contract Base {
 
     function _onlyAtlasEnvironment(ExecutionPhase phase, uint8 acceptableDepths) internal view {
         if (address(this) == source) {
-            revert("ERR-EB00 NotDelegated");
+            revert AtlasErrors.MustBeDelegatecalled();
         }
         if (msg.sender != atlas) {
-            revert("ERR-EB01 InvalidSender");
+            revert AtlasErrors.OnlyAtlas();
         }
         if (uint16(1 << (EXECUTION_PHASE_OFFSET + uint16(phase))) & _lockState() == 0) {
-            revert("ERR-EB02 WrongPhase");
+            revert AtlasErrors.WrongPhase();
         }
         if (1 << _depth() & acceptableDepths == 0) {
-            revert("ERR-EB03 WrongDepth");
+            revert AtlasErrors.WrongDepth();
         }
     }
 
@@ -200,29 +196,29 @@ contract ExecutionBase is Base {
     // Deposit local funds to the transient Atlas balance
     // NOTE that this will go towards the Bundler, with the surplus going to the Solver.
     function _contribute(uint256 amt) internal {
-        if (msg.sender != atlas) revert("ERR-EB001 InvalidSender");
-        if (amt > address(this).balance) revert("ERR-EB002 InsufficientLocalBalance");
+        if (msg.sender != atlas) revert AtlasErrors.OnlyAtlas();
+        if (amt > address(this).balance) revert AtlasErrors.InsufficientLocalFunds();
 
         IEscrow(atlas).contribute{ value: amt }();
     }
 
     // Borrow funds from the transient Atlas balance that will be repaid by the Solver (or self via another deposit)
     function _borrow(uint256 amt) internal {
-        if (msg.sender != atlas) revert("ERR-EB001 InvalidSender");
+        if (msg.sender != atlas) revert AtlasErrors.OnlyAtlas();
 
         IEscrow(atlas).borrow(amt);
     }
 
     function _transferUserERC20(address token, address destination, uint256 amount) internal {
         if (msg.sender != atlas) {
-            revert("ERR-EB001 InvalidSender");
+            revert AtlasErrors.OnlyAtlas();
         }
         IPermit69(atlas).transferUserERC20(token, destination, amount, _user(), _control(), _config(), _lockState());
     }
 
     function _transferDAppERC20(address token, address destination, uint256 amount) internal {
         if (msg.sender != atlas) {
-            revert("ERR-EB001 InvalidSender");
+            revert AtlasErrors.OnlyAtlas();
         }
         IPermit69(atlas).transferDAppERC20(token, destination, amount, _user(), _control(), _config(), _lockState());
     }

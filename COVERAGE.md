@@ -178,10 +178,44 @@ Work Needed:
 
 - Full ExecutionBase coverage, done in conjunction with EE.
 
-## DApp Contracts - `/contracts/dapp`
+## DAppControl Base Contracts - `/contracts/dapp`
 
 ### DAppControl.sol
 
 ### ControlTemplate.sol
+
+## Example DAppControls - `/contracts/examples`
+
+### ChainlinkAtlasWrapper.sol (OEV Example)
+
+Effective Test Coverage: 100%
+
+Coverage as per coverage report:
+
+- Lines: 31/31 (100%)
+- Functions: 8/9 (88.9%)
+
+Coverage Bugs:
+
+- All lines are covered, but report says 1 function is not. Only functions with no internal lines are `fallback` and `receive`, which are tested in `testChainlinkAtlasWrapperCanReceiveETH`
+
+Last updated: 2024-Mar-19
+
+### ChainlinkDAppControl.sol (OEV Example)
+
+Effective Test Coverage: 100%
+
+Coverage as per coverage report:
+
+- Lines: 48/52 (92.3%)
+- Functions: 11/12 (91.7%)
+
+Coverage Bugs:
+
+- L86 `_allocateValueCall` hook is delegatecalled in the full Atlas test of the OEV module.
+- L131 the `return newWrapper;` line in `createNewChainlinkAtlasWrapper` is tested in `test_ChainlinkDAppControl_createNewChainlinkAtlasWrapper`
+
+Last updated: 2024-Mar-19
+
 
 <!-- TODO add more folders and contracts -->

@@ -85,9 +85,6 @@ contract BaseTest is Test, TestConstants {
         bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedAtlasAddr, "AtlasFactory 1.0"));
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
 
-        console.log("Test salt:");
-        console.logBytes32(salt);
-
         atlas = new Atlas({
             _escrowDuration: 64,
             _verification: expectedAtlasVerificationAddr,
@@ -96,13 +93,6 @@ contract BaseTest is Test, TestConstants {
             _surchargeRecipient: payee
         });
         atlasVerification = new AtlasVerification(address(atlas));
-
-        console.log("atlas real:", address(atlas));
-        console.log("atlas expected:", expectedAtlasAddr);
-
-        console.log("verification real:", address(atlasVerification));
-        console.log("verification expected:", expectedAtlasVerificationAddr);
-
         simulator.setAtlas(address(atlas));
         sorter = new Sorter(address(atlas));
 

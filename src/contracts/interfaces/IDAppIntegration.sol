@@ -8,11 +8,15 @@ interface IDAppIntegration {
 
     function removeSignatory(address controller, address signatory) external;
 
-    function integrateDApp(address dAppControl) external;
+    function changeDAppGovernance(address oldGovernance, address newGovernance) external;
 
     function disableDApp(address dAppControl) external;
 
     function nextGovernanceNonce(address governanceSignatory) external view returns (uint256 nextNonce);
 
     function getGovFromControl(address dAppControl) external view returns (address governanceAddress);
+
+    function isDAppSignatory(address dAppControl, address signatory) external view returns (bool);
+
+    function getDAppSignatories(address dAppControl) external view returns (address[] memory);
 }

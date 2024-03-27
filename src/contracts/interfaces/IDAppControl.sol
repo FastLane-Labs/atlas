@@ -50,5 +50,5 @@ interface IDAppControl {
 
     function verificationDelegated() external view returns (bool delegated);
 
-    function callConfig() external view returns (uint32);
+    function CALL_CONFIG() external view returns (uint32);
 }

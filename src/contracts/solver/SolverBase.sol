@@ -17,10 +17,8 @@ interface IWETH9 {
 
 contract SolverBase is Test {
     address public immutable WETH_ADDRESS;
-
-    // TODO consider making these accessible (internal) for solvers which may want to use them
-    address private immutable _owner;
-    address private immutable _atlas;
+    address internal immutable _owner;
+    address internal immutable _atlas;
 
     constructor(address weth, address atlas, address owner) {
         WETH_ADDRESS = weth;
