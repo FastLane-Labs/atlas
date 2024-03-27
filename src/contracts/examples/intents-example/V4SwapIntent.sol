@@ -59,7 +59,8 @@ contract V4SwapIntentController is DAppControl {
                 forwardReturnData: false,
                 requireFulfillment: true,
                 trustedOpHash: false,
-                invertBidValue: false
+                invertBidValue: false,
+                exPostBids: false
             })
         )
     {

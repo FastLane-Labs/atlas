@@ -31,16 +31,19 @@ contract Permit69Test is BaseTest {
         BaseTest.setUp();
 
         escrowKey = EscrowKey({
+            executionEnvironment: address(0),
+            userOpHash: bytes32(0),
+            bundler: address(0),
             addressPointer: address(0),
             solverSuccessful: false,
             paymentsSuccessful: false,
             callIndex: 0,
             callCount: 0,
             lockState: EXEC_PHASE_PRE_OPS,
-            gasRefund: 0,
+            solverOutcome: 0,
+            bidFind: false,
             isSimulation: false,
-            callDepth: 0,
-            solverOutcome: 0
+            callDepth: 0
         });
 
         mockAtlas = new MockAtlasForPermit69Tests(10, address(0), address(0), address(0));
