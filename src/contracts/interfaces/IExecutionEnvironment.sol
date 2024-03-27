@@ -13,6 +13,7 @@ interface IExecutionEnvironment {
     function postOpsWrapper(bool solved, bytes calldata returnData) external;
 
     function solverMetaTryCatch(
+        uint256 bidAmount,
         uint256 gasLimit,
         SolverOperation calldata solverOp,
         bytes calldata dAppReturnData

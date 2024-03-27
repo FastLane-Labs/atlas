@@ -11,12 +11,12 @@ import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import "forge-std/Test.sol";
 
 abstract contract Factory {
-    bytes32 public immutable salt;
+    bytes32 internal immutable _salt;
     address public immutable executionTemplate;
 
     // NOTE: The ExecutionEnvironment Template must be separately deployed using the same salt as calculated below
     constructor(address _executionTemplate) {
-        salt = keccak256(abi.encodePacked(block.chainid, address(this), "AtlasFactory 1.0"));
+        _salt = keccak256(abi.encodePacked(block.chainid, address(this), "AtlasFactory 1.0"));
         executionTemplate = _executionTemplate;
     }
 
@@ -70,14 +70,14 @@ abstract contract Factory {
             uint160(
                 uint256(
                     keccak256(
-                        abi.encodePacked(bytes1(0xff), address(this), salt, keccak256(abi.encodePacked(creationCode)))
+                        abi.encodePacked(bytes1(0xff), address(this), _salt, keccak256(abi.encodePacked(creationCode)))
                     )
                 )
             )
         );
 
         if (executionEnvironment.codehash == bytes32(0)) {
-            bytes32 memSalt = salt;
+            bytes32 memSalt = _salt;
             assembly {
                 executionEnvironment := create2(0, add(creationCode, 32), mload(creationCode), memSalt)
             }
@@ -104,7 +104,7 @@ abstract contract Factory {
                         abi.encodePacked(
                             bytes1(0xff),
                             address(this),
-                            salt,
+                            _salt,
                             keccak256(
                                 abi.encodePacked(_getMimicCreationCode(controller, callConfig, user, controlCodeHash))
                             )

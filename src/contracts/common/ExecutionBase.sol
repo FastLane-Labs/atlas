@@ -59,7 +59,8 @@ contract Base {
             _callIndex(),
             _callCount(),
             _lockState(),
-            _gasRefund(),
+            _solverOutcome(),
+            _bidFind(),
             _simulation(),
             _depth() + 1
         );
@@ -91,7 +92,8 @@ contract Base {
             _callIndex(),
             _callCount(),
             lockState,
-            _gasRefund(),
+            _solverOutcome(),
+            _bidFind(),
             _simulation(),
             depth + 1
         );
@@ -135,9 +137,15 @@ contract Base {
         }
     }
 
-    function _gasRefund() internal pure returns (uint32 gasRefund) {
+    function _bidFind() internal pure returns (bool bidFind) {
         assembly {
-            gasRefund := shr(224, calldataload(sub(calldatasize(), 82)))
+            bidFind := shr(248, calldataload(sub(calldatasize(), 79)))
+        }
+    }
+
+    function _solverOutcome() internal pure returns (uint24 solverOutcome) {
+        assembly {
+            solverOutcome := shr(232, calldataload(sub(calldatasize(), 82)))
         }
     }
 

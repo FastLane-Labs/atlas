@@ -46,6 +46,7 @@ struct CallConfig {
     bool requireFulfillment;
     bool trustedOpHash;
     bool invertBidValue;
+    bool exPostBids;
 }
 
 enum CallConfigIndex {
@@ -68,5 +69,6 @@ enum CallConfigIndex {
     ForwardReturnData,
     RequireFulfillment,
     TrustedOpHash,
-    invertBidValue
+    InvertBidValue,
+    ExPostBids
 }
