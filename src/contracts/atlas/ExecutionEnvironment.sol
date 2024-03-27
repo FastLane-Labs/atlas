@@ -129,6 +129,7 @@ contract ExecutionEnvironment is Base {
     }
 
     function solverMetaTryCatch(
+        uint256 bidAmount,
         uint256 gasLimit,
         SolverOperation calldata solverOp,
         bytes calldata dAppReturnData
@@ -149,7 +150,7 @@ contract ExecutionEnvironment is Base {
         uint256 startBalance;
 
         if (solverOp.bidToken == address(0)) {
-            startBalance = address(this).balance - solverOp.value; // NOTE: this is the meta tx value
+            startBalance = 0; // address(this).balance - solverOp.value;
             etherIsBidToken = true;
             // ERC20 balance
         } else {
@@ -188,7 +189,7 @@ contract ExecutionEnvironment is Base {
             ISolverContract.atlasSolverCall.selector,
             solverOp.from,
             solverOp.bidToken,
-            solverOp.bidAmount,
+            bidAmount,
             solverOp.data,
             config.forwardReturnData() ? dAppReturnData : new bytes(0)
         );
@@ -217,20 +218,60 @@ contract ExecutionEnvironment is Base {
 
         uint256 endBalance = etherIsBidToken ? address(this).balance : ERC20(solverOp.bidToken).balanceOf(address(this));
 
+        // Check if this is an on-chain, ex post bid search
+        if (_bidFind()) {
+            uint256 netBid;
+
+            if (!config.invertsBidValue()) {
+                netBid = endBalance - startBalance; // intentionally underflow on fail
+                if (solverOp.bidAmount != 0 && netBid > solverOp.bidAmount) {
+                    netBid = solverOp.bidAmount;
+                    endBalance = etherIsBidToken ? netBid - solverOp.bidAmount : address(this).balance;
+                } else {
+                    endBalance = 0;
+                }
+            } else {
+                netBid = startBalance - endBalance; // intentionally underflow on fail
+                if (solverOp.bidAmount != 0 && netBid < solverOp.bidAmount) {
+                    netBid = solverOp.bidAmount;
+                    endBalance = etherIsBidToken ? solverOp.bidAmount - netBid : address(this).balance;
+                } else {
+                    endBalance = 0;
+                }
+            }
+
+            // Contribute any surplus balance
+            if (endBalance > 0) {
+                IEscrow(atlas).contribute{ value: endBalance }();
+            }
+
+            // Verify payback
+            if (!IEscrow(atlas).validateBalances()) {
+                revert AtlasErrors.BalanceNotReconciled();
+            }
+
+            // Solver bid was successful, revert with highest amount.
+            revert AtlasErrors.BidFindSuccessful(netBid);
+        }
+
         // Verify that the solver paid what they bid
         if (!config.invertsBidValue()) {
             // CASE: higher bids are desired by beneficiary (E.G. amount transferred in by solver)
 
-            if (endBalance < startBalance + solverOp.bidAmount) {
+            // Use bidAmount arg instead of solverOp element to ensure that ex ante bid results
+            // aren't tampered with or otherwise altered the second time around.
+            if (endBalance < startBalance + bidAmount) {
                 revert AtlasErrors.SolverBidUnpaid();
             }
 
             // Get ending eth balance
-            endBalance = etherIsBidToken ? endBalance - solverOp.bidAmount : address(this).balance;
+            endBalance = etherIsBidToken ? endBalance - bidAmount : address(this).balance;
         } else {
             // CASE: lower bids are desired by beneficiary (E.G. amount transferred out to solver)
 
-            if (endBalance < startBalance - solverOp.bidAmount) {
+            // Use bidAmount arg instead of solverOp element to ensure that ex ante bid results
+            // aren't tampered with or otherwise altered the second time around.
+            if (endBalance < startBalance - bidAmount) {
                 // underflow -> revert = intended
                 revert AtlasErrors.SolverBidUnpaid();
             }

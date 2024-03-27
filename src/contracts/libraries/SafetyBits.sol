@@ -13,43 +13,41 @@ import "../types/LockTypes.sol";
 uint16 constant EXECUTION_PHASE_OFFSET = uint16(type(BaseLock).max) + 1;
 
 // NOTE: No user transfers allowed during HandlingPayments
-uint16 constant SAFE_USER_TRANSFER = uint16(
-    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps))
-        | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserOperation))
-        | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreSolver))
-        | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostSolver))
-        | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
-);
+uint16 constant SAFE_USER_TRANSFER = 0x0ae0; // 2784
+    /* 
+        uint16( 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps))
+            | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserOperation))
+            | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreSolver))
+            | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostSolver))
+            | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
+        */
 
 // NOTE: No Dapp transfers allowed during UserOperation
-uint16 constant SAFE_DAPP_TRANSFER = uint16(
-    1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps))
-        | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreSolver))
-        | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.HandlingPayments))
-        | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
-);
+uint16 constant SAFE_DAPP_TRANSFER = 0x0ca0; // 3232
+    /*
+        uint16(1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps))
+            | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreSolver))
+            | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.HandlingPayments))
+            | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
+        */
 
 library SafetyBits {
-    uint16 internal constant _LOCKED_X_SOLVERS_X_REQUESTED =
-        uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations)));
+    uint16 internal constant _LOCKED_X_SOLVERS_X_REQUESTED = 0x0108; // 264
+        // uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET +
+        // uint16(ExecutionPhase.SolverOperations)));
 
-    uint16 internal constant _ACTIVE_X_PRE_OPS_X_UNSET =
-        uint16(1 << uint16(BaseLock.Active) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps)));
+    uint16 internal constant _LOCKED_X_PRE_OPS_X_UNSET = 0x0028; // 40
+        // uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps)));
 
-    uint16 internal constant _LOCKED_X_PRE_OPS_X_UNSET =
-        uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps)));
+    uint16 internal constant _LOCKED_X_USER_X_UNSET = 0x0048; // 72
+        // uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserOperation)));
 
-    uint16 internal constant _ACTIVE_X_USER_X_UNSET =
-        uint16(1 << uint16(BaseLock.Active) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserOperation)));
+    uint16 internal constant _LOCK_PAYMENTS = 0x0408; // 1032
+        // uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET +
+        // uint16(ExecutionPhase.HandlingPayments)));
 
-    uint16 internal constant _LOCKED_X_USER_X_UNSET =
-        uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.UserOperation)));
-
-    uint16 internal constant _LOCK_PAYMENTS =
-        uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.HandlingPayments)));
-
-    uint16 internal constant _LOCKED_X_VERIFICATION_X_UNSET =
-        uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps)));
+    uint16 internal constant _LOCKED_X_VERIFICATION_X_UNSET = 0x0808; // 2056
+        // uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps)));
 
     function pack(EscrowKey memory self) internal pure returns (bytes32 packedKey) {
         packedKey = bytes32(
@@ -60,30 +58,12 @@ library SafetyBits {
                 self.callIndex,
                 self.callCount,
                 self.lockState,
-                self.gasRefund,
+                self.solverOutcome,
+                self.bidFind,
                 self.isSimulation,
                 uint8(1) // callDepth
             )
         );
-    }
-
-    function initializeEscrowLock(
-        EscrowKey memory self,
-        bool needsPreOps,
-        uint8 solverOpCount,
-        address firstApprovedAddress,
-        bool isSimulation
-    )
-        internal
-        pure
-        returns (EscrowKey memory)
-    {
-        self.addressPointer = firstApprovedAddress;
-        self.callCount = solverOpCount + 3;
-        self.callIndex = needsPreOps ? 0 : 1;
-        self.lockState = needsPreOps ? _ACTIVE_X_PRE_OPS_X_UNSET : _ACTIVE_X_USER_X_UNSET;
-        self.isSimulation = isSimulation;
-        return self;
     }
 
     function holdPreOpsLock(EscrowKey memory self, address controller) internal pure returns (EscrowKey memory) {

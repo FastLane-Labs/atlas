@@ -482,6 +482,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 approval.nonce,
                 approval.deadline,
                 approval.control,
+                approval.bundler,
                 approval.userOpHash,
                 approval.callChainHash
             )

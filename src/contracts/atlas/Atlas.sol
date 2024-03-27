@@ -1,8 +1,6 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
-import { IDAppControl } from "../interfaces/IDAppControl.sol";
 import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
 
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
@@ -10,8 +8,8 @@ import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 import { Escrow } from "./Escrow.sol";
 import { Factory } from "./Factory.sol";
 
-import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
-import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+// import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
+// import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
@@ -19,12 +17,10 @@ import "../types/LockTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 import "../types/ValidCallsTypes.sol";
 
-import { CALLDATA_LENGTH_PREMIUM } from "../types/EscrowTypes.sol";
-
 import { CallBits } from "../libraries/CallBits.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
 
-import "forge-std/Test.sol";
+// import "forge-std/Test.sol";
 
 contract Atlas is Escrow, Factory {
     using CallBits for uint32;
@@ -50,13 +46,11 @@ contract Atlas is Escrow, Factory {
         payable
         returns (bool auctionWon)
     {
-        uint256 gasMarker = gasleft(); // + 21_000 + (msg.data.length * CALLDATA_LENGTH_PREMIUM);
+        uint256 gasMarker = gasleft(); // + 21_000 + (msg.data.length * _CALLDATA_LENGTH_PREMIUM);
         bool isSimulation = msg.sender == SIMULATOR;
 
         // Get or create the execution environment
-        address executionEnvironment;
-        DAppConfig memory dConfig;
-        (executionEnvironment, dConfig) = _getOrCreateExecutionEnvironment(userOp);
+        (address executionEnvironment, DAppConfig memory dConfig) = _getOrCreateExecutionEnvironment(userOp);
 
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
@@ -71,7 +65,7 @@ contract Atlas is Escrow, Factory {
         }
 
         // Initialize the lock
-        _initializeEscrowLock(executionEnvironment, gasMarker, userOp.value);
+        _setAtlasLock(executionEnvironment, gasMarker, userOp.value);
 
         try this.execute{ value: msg.value }(dConfig, userOp, solverOps, executionEnvironment, msg.sender, userOpHash)
         returns (bool _auctionWon, uint256 winningSolverIndex) {
@@ -89,9 +83,9 @@ contract Atlas is Escrow, Factory {
         }
 
         // Release the lock
-        _releaseEscrowLock();
+        _releaseAtlasLock();
 
-        console.log("total gas used", gasMarker - gasleft());
+        // console.log("total gas used", gasMarker - gasleft());
     }
 
     function execute(
@@ -104,33 +98,23 @@ contract Atlas is Escrow, Factory {
     )
         external
         payable
-        returns (bool auctionWon, uint256 winningSearcherIndex)
+        returns (bool auctionWon, uint256)
     {
         // This is a self.call made externally so that it can be used with try/catch
         if (msg.sender != address(this)) revert InvalidAccess();
 
         (bytes memory returnData, EscrowKey memory key) =
-            _preOpsUserExecutionIteration(dConfig, userOp, solverOps, executionEnvironment, bundler);
+            _preOpsUserExecutionIteration(dConfig, userOp, solverOps, executionEnvironment, bundler, userOpHash);
 
-        for (; winningSearcherIndex < solverOps.length;) {
-            // valid solverOps are packed from left of array - break at first invalid solverOp
-
-            SolverOperation calldata solverOp = solverOps[winningSearcherIndex];
-
-            (auctionWon, key) = _solverExecutionIteration(
-                dConfig, userOp, solverOp, returnData, executionEnvironment, bundler, userOpHash, key
-            );
-            emit SolverExecution(solverOp.from, winningSearcherIndex, auctionWon);
-            if (auctionWon) break;
-
-            unchecked {
-                ++winningSearcherIndex;
-            }
+        if (dConfig.callConfig.exPostBids()) {
+            (auctionWon, key) = _bidFindingIteration(dConfig, userOp, solverOps, returnData, key);
+        } else {
+            (auctionWon, key) = _bidKnownIteration(dConfig, userOp, solverOps, returnData, key);
         }
 
         // If no solver was successful, handle revert decision
         if (!auctionWon) {
-            if (key.isSimulation) revert SolverSimFail(key.solverOutcome);
+            if (key.isSimulation) revert SolverSimFail(uint256(key.solverOutcome));
             if (dConfig.callConfig.needsFulfillment()) {
                 revert UserNotFulfilled(); // revert("ERR-E003 SolverFulfillmentFailure");
             }
@@ -141,13 +125,13 @@ contract Atlas is Escrow, Factory {
             // TODO: point key.addressPointer at bundler if all fail.
             key = key.holdPostOpsLock(); // preserves addressPointer of winning solver
 
-            bool callSuccessful = _executePostOpsCall(auctionWon, returnData, executionEnvironment, key.pack());
+            bool callSuccessful = _executePostOpsCall(auctionWon, returnData, key);
             if (!callSuccessful) {
                 if (key.isSimulation) revert PostOpsSimFail();
                 else revert PostOpsFail();
             }
         }
-        return (auctionWon, winningSearcherIndex);
+        return (auctionWon, uint256(key.solverOutcome));
     }
 
     function _preOpsUserExecutionIteration(
@@ -155,7 +139,8 @@ contract Atlas is Escrow, Factory {
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         address executionEnvironment,
-        address bundler
+        address bundler,
+        bytes32 userOpHash
     )
         internal
         returns (bytes memory, EscrowKey memory)
@@ -165,8 +150,9 @@ contract Atlas is Escrow, Factory {
         bytes memory returnData;
 
         // Build the memory lock
-        EscrowKey memory key =
-            _buildEscrowLock(dConfig, executionEnvironment, uint8(solverOps.length), bundler == SIMULATOR);
+        EscrowKey memory key = _buildEscrowLock(
+            dConfig, executionEnvironment, userOpHash, bundler, uint8(solverOps.length), bundler == SIMULATOR
+        );
 
         if (dConfig.callConfig.needsPreOpsCall()) {
             // CASE: Need PreOps Call
@@ -214,29 +200,111 @@ contract Atlas is Escrow, Factory {
         return (returnData, key);
     }
 
-    function _solverExecutionIteration(
+    function _bidFindingIteration(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
-        SolverOperation calldata solverOp,
-        bytes memory dAppReturnData,
-        address executionEnvironment,
-        address bundler,
-        bytes32 userOpHash,
+        SolverOperation[] calldata solverOps,
+        bytes memory returnData,
         EscrowKey memory key
     )
         internal
         returns (bool auctionWon, EscrowKey memory)
     {
-        (auctionWon, key) = _executeSolverOperation(
-            dConfig, userOp, solverOp, dAppReturnData, executionEnvironment, bundler, userOpHash, key
-        );
+        key.bidFind = true;
 
-        if (auctionWon) {
-            key = key.holdAllocateValueLock(solverOp.from);
+        uint256[] memory sortedOps = new uint256[](solverOps.length);
+        uint256[] memory bidAmounts = new uint256[](solverOps.length);
+        uint256 j;
+        uint256 bidPlaceholder;
 
-            key.paymentsSuccessful =
-                _allocateValue(dConfig, solverOp.bidAmount, dAppReturnData, executionEnvironment, key.pack());
+        for (uint256 i; i < solverOps.length; i++) {
+            bidPlaceholder = _getBidAmount(dConfig, userOp, solverOps[i], returnData, key);
+            /*
+                console.log("----");
+                console.log("bidFind for", solverOps[i].solver);
+                console.log("bid Amount ", bidPlaceholder);
+                console.log("---");
+            */
+
+            if (bidPlaceholder == 0) {
+                unchecked {
+                    ++j;
+                }
+                continue;
+            } else {
+                bidAmounts[i] = bidPlaceholder;
+
+                for (uint256 k = i - j + 1; k > 0; k--) {
+                    if (bidPlaceholder > bidAmounts[sortedOps[k - 1]]) {
+                        // should be >= ?
+                        sortedOps[k] = sortedOps[k - 1];
+                        sortedOps[k - 1] = i;
+                    } else {
+                        sortedOps[k] = i;
+                        break;
+                    }
+                }
+            }
         }
+
+        key.bidFind = false;
+        j = solverOps.length - j;
+
+        for (uint256 i; i < j; i++) {
+            bidPlaceholder = sortedOps[i];
+
+            (auctionWon, key) = _executeSolverOperation(
+                dConfig, userOp, solverOps[bidPlaceholder], returnData, bidAmounts[bidPlaceholder], true, key
+            );
+
+            if (auctionWon) {
+                key = _allocateValue(dConfig, solverOps[bidPlaceholder], bidAmounts[bidPlaceholder], returnData, key);
+                key.solverOutcome = uint24(bidPlaceholder);
+                return (auctionWon, key);
+            }
+        }
+
+        return (auctionWon, key);
+    }
+
+    function _bidKnownIteration(
+        DAppConfig calldata dConfig,
+        UserOperation calldata userOp,
+        SolverOperation[] calldata solverOps,
+        bytes memory returnData,
+        EscrowKey memory key
+    )
+        internal
+        returns (bool auctionWon, EscrowKey memory)
+    {
+        uint256 k = solverOps.length;
+        uint256 i;
+
+        for (; i < k;) {
+            // valid solverOps are packed from left of array - break at first invalid solverOp
+
+            SolverOperation calldata solverOp = solverOps[i];
+
+            (auctionWon, key) =
+                _executeSolverOperation(dConfig, userOp, solverOp, returnData, solverOp.bidAmount, false, key);
+
+            if (auctionWon) {
+                key = _allocateValue(dConfig, solverOp, solverOp.bidAmount, returnData, key);
+
+                emit SolverExecution(solverOp.from, i, true);
+
+                key.solverOutcome = uint24(i);
+
+                return (auctionWon, key);
+            }
+
+            emit SolverExecution(solverOp.from, i, false);
+
+            unchecked {
+                ++i;
+            }
+        }
+
         return (auctionWon, key);
     }
 

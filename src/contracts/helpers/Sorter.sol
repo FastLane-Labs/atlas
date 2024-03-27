@@ -154,7 +154,7 @@ contract Sorter {
             topBidIndex = 0;
 
             for (j = 0; j < count;) {
-                if (sortingData[j].valid && sortingData[j].amount > topBidAmount) {
+                if (sortingData[j].valid && sortingData[j].amount >= topBidAmount) {
                     topBidAmount = sortingData[j].amount;
                     topBidIndex = j;
                 }

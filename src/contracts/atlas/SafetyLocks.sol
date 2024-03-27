@@ -16,7 +16,6 @@ import { Storage } from "./Storage.sol";
 // import "forge-std/Test.sol";
 
 abstract contract SafetyLocks is Storage {
-    using SafetyBits for EscrowKey;
     using CallBits for uint32;
 
     constructor(
@@ -28,48 +27,55 @@ abstract contract SafetyLocks is Storage {
         Storage(_escrowDuration, _verification, _simulator, _surchargeRecipient)
     { }
 
-    function _initializeEscrowLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) internal {
+    function _setAtlasLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) internal {
         _checkIfUnlocked();
         // Initialize the Lock
         lock = executionEnvironment;
 
         // Set the claimed amount
         uint256 rawClaims = (gasMarker + 1) * tx.gasprice;
-        claims = rawClaims + ((rawClaims * SURCHARGE) / SURCHARGE_BASE);
+        claims = rawClaims + ((rawClaims * SURCHARGE) / 10_000_000);
 
         // Set any withdraws or deposits
         withdrawals = userOpValue;
         deposits = msg.value;
     }
 
-    // TODO are all these checks necessary? More gas efficient was to check if unlocked?
     // Used in AtlETH
     function _checkIfUnlocked() internal view {
         if (lock != UNLOCKED) revert AlreadyInitialized();
-        if (claims != type(uint256).max) revert AlreadyInitialized();
-        if (withdrawals != type(uint256).max) revert AlreadyInitialized();
-        if (deposits != type(uint256).max) revert AlreadyInitialized();
     }
 
     function _buildEscrowLock(
         DAppConfig calldata dConfig,
         address executionEnvironment,
+        bytes32 userOpHash,
+        address bundler,
         uint8 solverOpCount,
         bool isSimulation
     )
         internal
-        view
-        returns (EscrowKey memory self)
+        pure
+        returns (EscrowKey memory)
     {
-        // TODO: can we bypass this check?
-        if (lock != executionEnvironment) revert NotInitialized();
-
-        self = self.initializeEscrowLock(
-            dConfig.callConfig.needsPreOpsCall(), solverOpCount, executionEnvironment, isSimulation
-        );
+        return EscrowKey({
+            executionEnvironment: executionEnvironment,
+            userOpHash: userOpHash,
+            bundler: bundler,
+            addressPointer: executionEnvironment,
+            solverSuccessful: false,
+            paymentsSuccessful: false,
+            callIndex: dConfig.callConfig.needsPreOpsCall() ? 0 : 1,
+            callCount: solverOpCount + 3,
+            lockState: 0,
+            solverOutcome: 0,
+            bidFind: false,
+            isSimulation: isSimulation,
+            callDepth: 0
+        });
     }
 
-    function _releaseEscrowLock() internal {
+    function _releaseAtlasLock() internal {
         if (lock == UNLOCKED) revert NotInitialized();
         lock = UNLOCKED;
         _solverLock = _UNLOCKED_UINT;

@@ -33,7 +33,8 @@ contract CallBitsTest is Test {
             forwardReturnData: true,
             requireFulfillment: false,
             trustedOpHash: true,
-            invertBidValue: false
+            invertBidValue: false,
+            exPostBids: true
         });
 
         callConfig2 = CallConfig({
@@ -55,12 +56,13 @@ contract CallBitsTest is Test {
             forwardReturnData: !callConfig1.forwardReturnData,
             requireFulfillment: !callConfig1.requireFulfillment,
             trustedOpHash: !callConfig1.trustedOpHash,
-            invertBidValue: !callConfig1.invertBidValue
+            invertBidValue: !callConfig1.invertBidValue,
+            exPostBids: !callConfig1.exPostBids
         });
     }
 
     function testEncodeCallConfig() public {
-        string memory expectedBitMapString = "00000000000000101010101010101010";
+        string memory expectedBitMapString = "00000000000010101010101010101010";
         assertEq(
             TestUtils.uint32ToBinaryString(CallBits.encodeCallConfig(callConfig1)),
             expectedBitMapString,
@@ -97,6 +99,7 @@ contract CallBitsTest is Test {
         assertEq(decodedCallConfig.requireFulfillment, false, "requireFulfillment 1 incorrect");
         assertEq(decodedCallConfig.trustedOpHash, true, "trustedOpHash 1 incorrect");
         assertEq(decodedCallConfig.invertBidValue, false, "invertBidValue 1 incorrect");
+        assertEq(decodedCallConfig.exPostBids, true, "exPostBids 1 incorrect");
 
         encodedCallConfig = CallBits.encodeCallConfig(callConfig2);
         decodedCallConfig = encodedCallConfig.decodeCallConfig();
@@ -119,6 +122,7 @@ contract CallBitsTest is Test {
         assertEq(decodedCallConfig.requireFulfillment, true, "requireFulfillment 2 incorrect");   
         assertEq(decodedCallConfig.trustedOpHash, false, "trustedOpHash 2 incorrect");
         assertEq(decodedCallConfig.invertBidValue, true, "invertBidValue 2 incorrect");
+        assertEq(decodedCallConfig.exPostBids, false, "exPostBids 2 incorrect");
     }
 
     function testConfigParameters() public {
@@ -142,6 +146,7 @@ contract CallBitsTest is Test {
         assertEq(encodedCallConfig.needsFulfillment(), false, "needsFulfillment 1 incorrect");
         assertEq(encodedCallConfig.allowsTrustedOpHash(), true, "allowsTrustedOpHash 1 incorrect");
         assertEq(encodedCallConfig.invertsBidValue(), false, "invertsBidValue 1 incorrect");
+        assertEq(encodedCallConfig.exPostBids(), true, "exPostBids 1 incorrect");
         
 
         encodedCallConfig = CallBits.encodeCallConfig(callConfig2);
@@ -164,5 +169,6 @@ contract CallBitsTest is Test {
         assertEq(encodedCallConfig.needsFulfillment(), true, "needsFulfillment 2 incorrect");
         assertEq(encodedCallConfig.allowsTrustedOpHash(), false, "allowsTrustedOpHash 2 incorrect");
         assertEq(encodedCallConfig.invertsBidValue(), true, "invertsBidValue 2 incorrect");
+        assertEq(encodedCallConfig.exPostBids(), false, "exPostBids 2 incorrect");
     }
 }

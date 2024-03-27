@@ -22,6 +22,10 @@ contract MockFactory is Factory, Test {
     {
         return _getOrCreateExecutionEnvironment(userOp);
     }
+
+    function salt() external returns (bytes32) {
+        return _salt;
+    }
 }
 
 contract FactoryTest is Test {

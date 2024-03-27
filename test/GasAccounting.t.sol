@@ -27,11 +27,11 @@ contract MockGasAccounting is GasAccounting, Test {
     }
 
     function initializeEscrowLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) external {
-        _initializeEscrowLock(executionEnvironment, gasMarker, userOpValue);
+        _setAtlasLock(executionEnvironment, gasMarker, userOpValue);
     }
 
     function assign(address owner, uint256 value, bool solverWon) external returns (bool) {
-        return _assign(owner, value, solverWon);
+        return _assign(owner, value, solverWon, false);
     }
 
     function credit(address owner, uint256 value) external {
@@ -43,7 +43,7 @@ contract MockGasAccounting is GasAccounting, Test {
     }
 
     function releaseSolverLock(SolverOperation calldata solverOp, uint256 gasWaterMark, uint256 result) external {
-        _releaseSolverLock(solverOp, gasWaterMark, result);
+        _releaseSolverLock(solverOp, gasWaterMark, result, false, true);
     }
 
     function settle(address winningSolver, address bundler) external {
@@ -60,6 +60,10 @@ contract MockGasAccounting is GasAccounting, Test {
         deal(address(this), amount);
         _balanceOf[account].unbonding += uint112(amount);
         bondedTotalSupply += amount;
+    }
+
+    function calldataLengthPremium() external returns (uint256) {
+        return _CALLDATA_LENGTH_PREMIUM;
     }
 }
 
@@ -82,7 +86,7 @@ contract GasAccountingTest is Test {
 
     function getInitialClaims(uint256 gasMarker) public view returns (uint256 claims) {
         uint256 rawClaims = (gasMarker + 1) * tx.gasprice;
-        claims = rawClaims + ((rawClaims * mockGasAccounting.SURCHARGE()) / mockGasAccounting.SURCHARGE_BASE());
+        claims = rawClaims + ((rawClaims * mockGasAccounting.SURCHARGE()) / 10_000_000);
     }
 
     function test_validateBalances() public {
@@ -314,7 +318,7 @@ contract GasAccountingTest is Test {
 
     function test_releaseSolverLock() public {
         solverOp.data = abi.encodePacked("calldata");
-        uint256 calldataCost = (solverOp.data.length * CALLDATA_LENGTH_PREMIUM) + 1;
+        uint256 calldataCost = (solverOp.data.length * mockGasAccounting.calldataLengthPremium()) + 1;
         uint256 gasWaterMark = gasleft() + 5000;
         uint256 maxGasUsed;
         uint112 bondedBefore;
@@ -324,7 +328,7 @@ contract GasAccountingTest is Test {
         // FULL_REFUND
         result = EscrowBits._FULL_REFUND;
         maxGasUsed = gasWaterMark + calldataCost;
-        maxGasUsed = (maxGasUsed + ((maxGasUsed * mockGasAccounting.SURCHARGE()) / mockGasAccounting.SURCHARGE_BASE()))
+        maxGasUsed = (maxGasUsed + ((maxGasUsed * mockGasAccounting.SURCHARGE()) / 10_000_000))
             * tx.gasprice;
         mockGasAccounting.increaseBondedBalance(solverOp.from, maxGasUsed);
         (bondedBefore,,,,) = mockGasAccounting.accessData(solverOp.from);
@@ -332,7 +336,7 @@ contract GasAccountingTest is Test {
         (bondedAfter,,,,) = mockGasAccounting.accessData(solverOp.from);
         assertGt(
             bondedBefore - bondedAfter,
-            (calldataCost + ((calldataCost * mockGasAccounting.SURCHARGE()) / mockGasAccounting.SURCHARGE_BASE()))
+            (calldataCost + ((calldataCost * mockGasAccounting.SURCHARGE()) / 10_000_000))
                 * tx.gasprice
         ); // Must be greater than calldataCost
         assertLt(bondedBefore - bondedAfter, maxGasUsed); // Must be less than maxGasUsed

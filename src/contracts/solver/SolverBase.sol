@@ -35,6 +35,7 @@ contract SolverBase is Test {
     )
         external
         payable
+        virtual
         safetyFirst(sender)
         payBids(bidToken, bidAmount)
         returns (bool success, bytes memory data)
