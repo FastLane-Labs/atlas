@@ -256,9 +256,9 @@ abstract contract GasAccounting is SafetyLocks {
     }
 
     function _getCalldataCost(uint256 calldataLength) internal view returns (uint256 calldataCost) {
-        // Alter this for L2s.
-        // TODO: replace 128 w/ actual extra length of calldata that isn't in the
-        // solverOp.data field (from, to, etc)
-        calldataCost = (calldataLength + 128) * _CALLDATA_LENGTH_PREMIUM * tx.gasprice;
+        // NOTE: Alter this for L2s.
+
+        // SolverOperation calldata length is 608 (excluding solverOp.data)
+        calldataCost = (calldataLength + 608) * _CALLDATA_LENGTH_PREMIUM * tx.gasprice;
     }
 }
