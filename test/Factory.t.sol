@@ -3,6 +3,8 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
+import { Atlas } from "src/contracts/atlas/Atlas.sol";
+import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import { Factory } from "src/contracts/atlas/Factory.sol";
 import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
 import { DummyDAppControl, CallConfigBuilder } from "./base/DummyDAppControl.sol";
@@ -29,29 +31,44 @@ contract MockFactory is Factory, Test {
 }
 
 contract FactoryTest is Test {
+    Atlas public atlas;
+    AtlasVerification public atlasVerification;
     MockFactory public mockFactory;
     DummyDAppControl public dAppControl;
 
     address public user;
 
     function setUp() public {
-        address deployer = address(333);
-        address expectedFactoryAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
-        bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedFactoryAddr, "AtlasFactory 1.0"));
-
-        vm.startPrank(deployer);
-        ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedFactoryAddr);
-        mockFactory = new MockFactory({ _executionTemplate: address(execEnvTemplate) });
-        dAppControl = new DummyDAppControl(address(0), address(0), CallConfigBuilder.allFalseCallConfig());
-        vm.stopPrank();
         user = address(999);
-
+        address deployer = address(333);
+        address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 0);
+        address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
+        address expectedFactoryAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
+        bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedFactoryAddr, "AtlasFactory 1.0"));
+        ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedFactoryAddr);
+        
+        vm.startPrank(deployer);
+        atlas = new Atlas({
+            _escrowDuration: 64,
+            _verification: expectedAtlasVerificationAddr,
+            _simulator: address(0),
+            _executionTemplate: address(execEnvTemplate),
+            _surchargeRecipient: deployer
+        });
+        assertEq(address(atlas), expectedAtlasAddr, "Atlas address mismatch");
+        atlasVerification = new AtlasVerification(address(atlas));
+        assertEq(address(atlasVerification), expectedAtlasVerificationAddr, "AtlasVerification address mismatch");
+        mockFactory = new MockFactory({ _executionTemplate: address(execEnvTemplate) });
+        assertEq(address(mockFactory), expectedFactoryAddr, "Factory address mismatch");
+        dAppControl = new DummyDAppControl(expectedAtlasAddr, deployer, CallConfigBuilder.allFalseCallConfig());
+        vm.stopPrank();
+        
         console.log("Factory address: ", address(mockFactory));
         console.log("Factory expected address: ", expectedFactoryAddr);
     }
 
     function test_createExecutionEnvironment() public {
-        uint32 callConfig = dAppControl.callConfig();
+        uint32 callConfig = dAppControl.CALL_CONFIG();
         bytes memory creationCode = TestUtils._getMimicCreationCode(
             address(dAppControl), callConfig, mockFactory.executionTemplate(), user, address(dAppControl).codehash
         );

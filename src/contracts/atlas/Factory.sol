@@ -25,7 +25,7 @@ abstract contract Factory {
     // ------------------ //
 
     function createExecutionEnvironment(address dAppControl) external returns (address executionEnvironment) {
-        uint32 callConfig = IDAppControl(dAppControl).callConfig();
+        uint32 callConfig = IDAppControl(dAppControl).CALL_CONFIG();
         executionEnvironment = _setExecutionEnvironment(dAppControl, msg.sender, callConfig, dAppControl.codehash);
     }
 
@@ -37,7 +37,7 @@ abstract contract Factory {
         view
         returns (address executionEnvironment, uint32 callConfig, bool exists)
     {
-        callConfig = IDAppControl(dAppControl).callConfig();
+        callConfig = IDAppControl(dAppControl).CALL_CONFIG();
         executionEnvironment = _getExecutionEnvironmentCustom(user, dAppControl.codehash, dAppControl, callConfig);
         exists = executionEnvironment.codehash != bytes32(0);
     }

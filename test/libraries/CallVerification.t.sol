@@ -54,7 +54,7 @@ contract CallVerificationTest is Test {
     }
 
     function testGetCallChainHash() public {
-        DAppConfig memory dConfig = DAppConfig({ to: address(0x1), callConfig: 1, bidToken: address(0) });
+        DAppConfig memory dConfig = DAppConfig({ to: address(0x1), callConfig: 1, bidToken: address(0), solverGasLimit: 1_000_000 });
         UserOperation memory userOp = buildUserOperation();
         SolverOperation[] memory solverOps = new SolverOperation[](2);
         solverOps[0] = builderSolverOperation();

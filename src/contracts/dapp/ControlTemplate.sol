@@ -4,13 +4,15 @@ pragma solidity 0.8.22;
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
+import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import "forge-std/Test.sol";
 
 abstract contract DAppControlTemplate {
+    uint32 internal constant DEFAULT_SOLVER_GAS_LIMIT = 1_000_000;
+
     constructor() { }
 
-    string internal constant _NOT_IMPLEMENTED = "NOT IMPLEMENTED";
     // Virtual functions to be overridden by participating dApp governance
     // (not FastLane) prior to deploying contract. Note that dApp governance
     // will "own" this contract but that it should be immutable.
@@ -36,7 +38,7 @@ abstract contract DAppControlTemplate {
     // DApp exposure: Trustless
     // User exposure: Trustless
     function _preOpsCall(UserOperation calldata) internal virtual returns (bytes memory) {
-        revert(_NOT_IMPLEMENTED);
+        revert AtlasErrors.NotImplemented();
     }
 
     /////////////////////////////////////////////////////////
@@ -77,7 +79,7 @@ abstract contract DAppControlTemplate {
     //      the user's 'intent.'
 
     function _preSolverCall(SolverOperation calldata, bytes calldata) internal virtual returns (bool) {
-        revert(_NOT_IMPLEMENTED);
+        revert AtlasErrors.NotImplemented();
     }
 
     // _postSolverCall
@@ -99,7 +101,7 @@ abstract contract DAppControlTemplate {
     //      the user's 'intent.'
 
     function _postSolverCall(SolverOperation calldata, bytes calldata) internal virtual returns (bool) {
-        revert(_NOT_IMPLEMENTED);
+        revert AtlasErrors.NotImplemented();
     }
 
     /////////////////////////////////////////////////////////
@@ -119,7 +121,7 @@ abstract contract DAppControlTemplate {
     //      Container: Inside of the FastLane ExecutionEnvironment
     //      Access: Storage access (read+write) to the ExecutionEnvironment contract
     function _postOpsCall(bool, bytes calldata) internal virtual returns (bool) {
-        revert(_NOT_IMPLEMENTED);
+        revert AtlasErrors.NotImplemented();
     }
 
     /////////////////////////////////////////////////////////
@@ -132,4 +134,8 @@ abstract contract DAppControlTemplate {
     function getBidFormat(UserOperation calldata userOp) public view virtual returns (address bidToken);
 
     function getBidValue(SolverOperation calldata solverOp) public view virtual returns (uint256);
+
+    function getSolverGasLimit() public view virtual returns (uint32) {
+        return DEFAULT_SOLVER_GAS_LIMIT;
+    }
 }
