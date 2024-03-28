@@ -68,10 +68,10 @@ contract ExecutionEnvironment is Base {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 
-        bytes memory preOpsData = abi.encodeWithSelector(IDAppControl.preOpsCall.selector, userOp);
+        bytes memory preOpsData = forward(abi.encodeWithSelector(IDAppControl.preOpsCall.selector, userOp));
 
         bool success;
-        (success, preOpsData) = _control().delegatecall(forward(preOpsData));
+        (success, preOpsData) = _control().delegatecall(preOpsData);
 
         require(success, "ERR-EC02 DelegateRevert");
 
@@ -86,7 +86,7 @@ contract ExecutionEnvironment is Base {
         onlyAtlasEnvironment(ExecutionPhase.UserOperation, _ENVIRONMENT_DEPTH)
         validControlHash
         contributeSurplus
-        returns (bytes memory userData)
+        returns (bytes memory returnData)
     {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
@@ -98,13 +98,11 @@ contract ExecutionEnvironment is Base {
         bool success;
 
         if (config.needsDelegateUser()) {
-            (success, userData) = userOp.dapp.delegatecall(forward(userOp.data));
+            (success, returnData) = userOp.dapp.delegatecall(forward(userOp.data));
             require(success, "ERR-EC02 DelegateRevert");
-
-            // userData = abi.decode(userData, (bytes));
         } else {
             // regular user call - executed at regular destination and not performed locally
-            (success, userData) = userOp.dapp.call{ value: userOp.value }(forward(userOp.data));
+            (success, returnData) = userOp.dapp.call{ value: userOp.value }(forward(userOp.data));
             require(success, "ERR-EC04a CallRevert");
         }
     }
@@ -119,10 +117,10 @@ contract ExecutionEnvironment is Base {
         // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 
-        bytes memory data = abi.encodeWithSelector(IDAppControl.postOpsCall.selector, solved, returnData);
+        bytes memory data = forward(abi.encodeWithSelector(IDAppControl.postOpsCall.selector, solved, returnData));
 
         bool success;
-        (success, data) = _control().delegatecall(forward(data));
+        (success, data) = _control().delegatecall(data);
 
         require(success, "ERR-EC02 DelegateRevert");
         require(abi.decode(data, (bool)), "ERR-EC03a DelegateUnsuccessful");
@@ -132,7 +130,7 @@ contract ExecutionEnvironment is Base {
         uint256 bidAmount,
         uint256 gasLimit,
         SolverOperation calldata solverOp,
-        bytes calldata dAppReturnData
+        bytes calldata returnData
     )
         external
         payable
@@ -170,9 +168,12 @@ contract ExecutionEnvironment is Base {
 
         // Handle any solver preOps, if necessary
         if (config.needsPreSolver()) {
-            bytes memory data = abi.encodeWithSelector(IDAppControl.preSolverCall.selector, solverOp, dAppReturnData);
+            bytes memory data = forwardSpecial(
+                abi.encodeWithSelector(IDAppControl.preSolverCall.selector, solverOp, returnData),
+                ExecutionPhase.PreSolver
+            );
 
-            (success, data) = control.delegatecall(forwardSpecial(data, ExecutionPhase.PreSolver));
+            (success, data) = control.delegatecall(data);
 
             if (!success) {
                 revert AtlasErrors.PreSolverFailed();
@@ -191,7 +192,7 @@ contract ExecutionEnvironment is Base {
             solverOp.bidToken,
             bidAmount,
             solverOp.data,
-            config.forwardReturnData() ? dAppReturnData : new bytes(0)
+            config.forwardReturnData() ? returnData : new bytes(0)
         );
         (success,) = solverOp.solver.call{ gas: gasLimit, value: solverOp.value }(solverCallData);
 
@@ -202,9 +203,12 @@ contract ExecutionEnvironment is Base {
 
         // If this was a user intent, handle and verify fulfillment
         if (config.needsSolverPostCall()) {
-            bytes memory data = abi.encodeWithSelector(IDAppControl.postSolverCall.selector, solverOp, dAppReturnData);
+            bytes memory data = forwardSpecial(
+                abi.encodeWithSelector(IDAppControl.postSolverCall.selector, solverOp, returnData),
+                ExecutionPhase.PostSolver
+            );
 
-            (success, data) = control.delegatecall(forwardSpecial(data, ExecutionPhase.PostSolver));
+            (success, data) = control.delegatecall(data);
 
             if (!success) {
                 revert AtlasErrors.PostSolverFailed();
@@ -300,13 +304,13 @@ contract ExecutionEnvironment is Base {
         onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _ENVIRONMENT_DEPTH)
         contributeSurplus
     {
-        // msg.sender = escrow
+        // msg.sender = atlas
         // address(this) = ExecutionEnvironment
 
         allocateData =
-            abi.encodeWithSelector(IDAppControl.allocateValueCall.selector, bidToken, bidAmount, allocateData);
+            forward(abi.encodeWithSelector(IDAppControl.allocateValueCall.selector, bidToken, bidAmount, allocateData));
 
-        (bool success,) = _control().delegatecall(forward(allocateData));
+        (bool success,) = _control().delegatecall(allocateData);
         require(success, "ERR-EC02 DelegateRevert");
     }
 
