@@ -9,8 +9,6 @@ import { ExecutionPhase, BaseLock } from "../types/LockTypes.sol";
 import { EXECUTION_PHASE_OFFSET, SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "../libraries/SafetyBits.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
-import "forge-std/Test.sol";
-
 contract Base {
     address public immutable atlas;
     address public immutable source;
@@ -47,56 +45,51 @@ contract Base {
     }
 
     function forward(bytes memory data) internal pure returns (bytes memory) {
-        // TODO: simplify this into just the bytes
-        return bytes.concat(data, _firstSet(), _secondSet());
-    }
+        bytes memory appendedBytes = new bytes(108);
 
-    function _firstSet() internal pure returns (bytes memory data) {
-        data = abi.encodePacked(
-            _addressPointer(),
-            _solverSuccessful(),
-            _paymentsSuccessful(),
-            _callIndex(),
-            _callCount(),
-            _lockState(),
-            _solverOutcome(),
-            _bidFind(),
-            _simulation(),
-            _depth() + 1
-        );
-    }
-
-    function _secondSet() internal pure returns (bytes memory data) {
-        data = abi.encodePacked(_user(), _control(), _config(), _controlCodeHash());
+        assembly {
+            calldatacopy(add(appendedBytes, sub(mload(appendedBytes), 76)), sub(calldatasize(), 108), 108)
+            mstore8(
+                add(appendedBytes, sub(mload(appendedBytes), 45)),
+                add(shr(248, calldataload(sub(calldatasize(), 77))), 1)
+            )
+        }
+        return bytes.concat(data, appendedBytes);
     }
 
     function forwardSpecial(bytes memory data, ExecutionPhase phase) internal pure returns (bytes memory) {
-        // TODO: simplify this into just the bytes
-        return bytes.concat(data, _firstSetSpecial(phase), _secondSet());
-    }
+        // Handles switching the phase between PreSolver, Solver, and PostSolver inside of a single
+        // ExecutionEnvironment function.
 
-    function _firstSetSpecial(ExecutionPhase phase) internal pure returns (bytes memory data) {
         uint8 depth = _depth();
         uint16 lockState = _lockState();
+        bytes memory appendedBytes = new bytes(108);
 
-        if (depth == 1 && lockState & 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations)) != 0) {
-            if (phase == ExecutionPhase.PreSolver || phase == ExecutionPhase.PostSolver) {
-                lockState = uint16(1) << uint16(BaseLock.Active) | uint16(1) << (EXECUTION_PHASE_OFFSET + uint16(phase));
+        if (
+            (depth == 1 && lockState & 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations)) != 0)
+                && (phase == ExecutionPhase.PreSolver || phase == ExecutionPhase.PostSolver)
+        ) {
+            lockState = uint16(1) << uint16(BaseLock.Active) | uint16(1) << (EXECUTION_PHASE_OFFSET + uint16(phase));
+
+            assembly {
+                calldatacopy(add(appendedBytes, sub(mload(appendedBytes), 76)), sub(calldatasize(), 108), 108)
+                mstore8(
+                    add(appendedBytes, sub(mload(appendedBytes), 45)),
+                    add(shr(248, calldataload(sub(calldatasize(), 77))), 1)
+                )
+                mstore8(add(appendedBytes, sub(mload(appendedBytes), 51)), lockState)
+                mstore8(add(appendedBytes, sub(mload(appendedBytes), 52)), shr(8, lockState))
+            }
+        } else {
+            assembly {
+                calldatacopy(add(appendedBytes, sub(mload(appendedBytes), 76)), sub(calldatasize(), 108), 108)
+                mstore8(
+                    add(appendedBytes, sub(mload(appendedBytes), 45)),
+                    add(shr(248, calldataload(sub(calldatasize(), 77))), 1)
+                )
             }
         }
-
-        data = abi.encodePacked(
-            _addressPointer(),
-            _solverSuccessful(),
-            _paymentsSuccessful(),
-            _callIndex(),
-            _callCount(),
-            lockState,
-            _solverOutcome(),
-            _bidFind(),
-            _simulation(),
-            depth + 1
-        );
+        return bytes.concat(data, appendedBytes);
     }
 
     // Returns the address(DAppControl).codehash for the calling
