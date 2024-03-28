@@ -24,10 +24,6 @@ contract MockSafetyLocks is SafetyLocks {
         _setAtlasLock(executionEnvironment, gasMarker, userOpValue);
     }
 
-    function checkIfUnlocked() external view {
-        _checkIfUnlocked();
-    }
-
     function buildEscrowLock(
         DAppConfig calldata dConfig,
         address executionEnvironment,
@@ -91,13 +87,6 @@ contract SafetyLocksTest is Test {
         assertEq(safetyLocks.claims(), expectedClaims);
         assertEq(safetyLocks.withdrawals(), userOpValue);
         assertEq(safetyLocks.deposits(), msgValue);
-    }
-
-    function test_checkIfUnlocked() public {
-        safetyLocks.setLock(address(2));
-        vm.expectRevert(AtlasErrors.AlreadyInitialized.selector);
-        safetyLocks.checkIfUnlocked();
-        safetyLocks.setLock(address(1)); // Reset to UNLOCKED
     }
 
     function test_buildEscrowLock() public {
