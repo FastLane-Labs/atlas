@@ -17,8 +17,9 @@ import "src/contracts/types/ValidCallsTypes.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 
-/// @title Atlas
+/// @title Atlas V1
 /// @author FastLane Labs
+/// @notice The Execution Abstraction protocol.
 contract Atlas is Escrow, Factory {
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
@@ -85,7 +86,7 @@ contract Atlas is Escrow, Factory {
         _releaseAtlasLock();
     }
 
-    /// @notice Execute is called above, in a try-catch block in metacall.
+    /// @notice execute is called above, in a try-catch block in metacall.
     /// @param dConfig DAppConfig of the DAppControl for the current metacall tx.
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
@@ -140,6 +141,15 @@ contract Atlas is Escrow, Factory {
         return (auctionWon, uint256(key.solverOutcome));
     }
 
+    /// @notice Called above in `execute`, this function executes the preOps and userOp calls.
+    /// @param dConfig DAppConfig of the DAppControl for the current metacall tx.
+    /// @param userOp UserOperation struct of the current metacall tx.
+    /// @param solverOps SolverOperation array of the current metacall tx.
+    /// @param executionEnvironment Address of the execution environment contract of the current metacall tx.
+    /// @param bundler Address of the bundler of the current metacall tx.
+    /// @param userOpHash Hash of the userOp struct of the current metacall tx.
+    /// @return bytes returnData returned from the preOps and/or userOp calls.
+    /// @return EscrowKey struct containing the current state of the escrow lock.
     function _preOpsUserExecutionIteration(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
@@ -206,6 +216,15 @@ contract Atlas is Escrow, Factory {
         return (returnData, key);
     }
 
+    /// @notice Called above in `execute` if the DAppConfig requires ex post bids. Sorts solverOps by bid amount and
+    /// executes them in descending order until a successful winner is found.
+    /// @param dConfig DAppConfig of the DAppControl for the current metacall tx.
+    /// @param userOp UserOperation struct of the current metacall tx.
+    /// @param solverOps SolverOperation array of the current metacall tx.
+    /// @param returnData Return data from the preOps and userOp calls.
+    /// @param key EscrowKey struct containing the current state of the escrow lock.
+    /// @return auctionWon bool indicating whether a winning solver was found or not.
+    /// @return EscrowKey struct containing the current state of the escrow lock.
     function _bidFindingIteration(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
@@ -236,7 +255,6 @@ contract Atlas is Escrow, Factory {
 
                 for (uint256 k = i - j + 1; k > 0; k--) {
                     if (bidPlaceholder > bidAmounts[sortedOps[k - 1]]) {
-                        // TODO should be >= ?
                         sortedOps[k] = sortedOps[k - 1];
                         sortedOps[k - 1] = i;
                     } else {
@@ -267,6 +285,15 @@ contract Atlas is Escrow, Factory {
         return (auctionWon, key);
     }
 
+    /// @notice Called above in `execute` as an alternative to `_bidFindingIteration`, if solverOps have already been
+    /// reliably sorted. Executes solverOps in order until a successful winner is found.
+    /// @param dConfig DAppConfig of the DAppControl for the current metacall tx.
+    /// @param userOp UserOperation struct of the current metacall tx.
+    /// @param solverOps SolverOperation array of the current metacall tx.
+    /// @param returnData Return data from the preOps and userOp calls.
+    /// @param key EscrowKey struct containing the current state of the escrow lock.
+    /// @return auctionWon bool indicating whether a winning solver was found or not.
+    /// @return EscrowKey struct containing the current state of the escrow lock.
     function _bidKnownIteration(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
@@ -308,6 +335,9 @@ contract Atlas is Escrow, Factory {
         return (auctionWon, key);
     }
 
+    /// @notice Called at the end of `metacall` to bubble up specific error info in a revert.
+    /// @param revertData Revert data from a failure during the execution of the metacall.
+    /// @param callConfig The CallConfig of the current metacall tx.
     function _handleErrors(bytes memory revertData, uint32 callConfig) internal view {
         bytes4 errorSwitch = bytes4(revertData);
         if (msg.sender == SIMULATOR) {
@@ -339,6 +369,10 @@ contract Atlas is Escrow, Factory {
         }
     }
 
+    /// @notice Reverts if the caller is not the execution environment address expected from the set of inputs.
+    /// @param user User address
+    /// @param controller DAppControl contract address
+    /// @param callConfig CallConfig of the current metacall tx.
     function _verifyCallerIsExecutionEnv(address user, address controller, uint32 callConfig) internal view override {
         if (msg.sender != _getExecutionEnvironmentCustom(user, controller.codehash, controller, callConfig)) {
             revert EnvironmentMismatch();
