@@ -87,7 +87,7 @@ contract Atlas is Escrow, Factory {
     }
 
     /// @notice execute is called above, in a try-catch block in metacall.
-    /// @param dConfig DAppConfig of the DAppControl for the current metacall tx.
+    /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param executionEnvironment Address of the execution environment contract of the current metacall tx.
@@ -142,7 +142,7 @@ contract Atlas is Escrow, Factory {
     }
 
     /// @notice Called above in `execute`, this function executes the preOps and userOp calls.
-    /// @param dConfig DAppConfig of the DAppControl for the current metacall tx.
+    /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param executionEnvironment Address of the execution environment contract of the current metacall tx.
@@ -218,7 +218,7 @@ contract Atlas is Escrow, Factory {
 
     /// @notice Called above in `execute` if the DAppConfig requires ex post bids. Sorts solverOps by bid amount and
     /// executes them in descending order until a successful winner is found.
-    /// @param dConfig DAppConfig of the DAppControl for the current metacall tx.
+    /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param returnData Return data from the preOps and userOp calls.
@@ -287,7 +287,7 @@ contract Atlas is Escrow, Factory {
 
     /// @notice Called above in `execute` as an alternative to `_bidFindingIteration`, if solverOps have already been
     /// reliably sorted. Executes solverOps in order until a successful winner is found.
-    /// @param dConfig DAppConfig of the DAppControl for the current metacall tx.
+    /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param returnData Return data from the preOps and userOp calls.
