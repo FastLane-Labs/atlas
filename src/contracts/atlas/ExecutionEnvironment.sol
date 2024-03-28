@@ -183,6 +183,11 @@ contract ExecutionEnvironment is Base {
             if (!success) {
                 revert AtlasErrors.PreSolverFailed();
             }
+
+            // Verify that the hook didn't illegally enter the Solver contract
+            // success = "calledBack"
+            (, success,) = IEscrow(atlas).solverLockData();
+            if (success) revert AtlasErrors.InvalidEntry();
         }
 
         // Execute the solver call.
@@ -200,6 +205,11 @@ contract ExecutionEnvironment is Base {
         if (!success) {
             revert AtlasErrors.SolverOperationReverted();
         }
+
+        // Verify that the solver contract hit the callback
+        // NOTE The balance may still be unfulfilled and handled by the PostSolver hook.
+        (, success,) = IEscrow(atlas).solverLockData();
+        if (!success) revert AtlasErrors.BalanceNotReconciled();
 
         // If this was a user intent, handle and verify fulfillment
         if (config.needsSolverPostCall()) {
@@ -250,9 +260,8 @@ contract ExecutionEnvironment is Base {
             }
 
             // Verify payback
-            if (!IEscrow(atlas).validateBalances()) {
-                revert AtlasErrors.BalanceNotReconciled();
-            }
+            (, success) = IEscrow(atlas).validateBalances();
+            if (!success) revert AtlasErrors.BalanceNotReconciled();
 
             // Solver bid was successful, revert with highest amount.
             revert AtlasErrors.BidFindSuccessful(netBid);
@@ -290,7 +299,8 @@ contract ExecutionEnvironment is Base {
         }
 
         // Verify that the solver repaid their msg.value
-        if (!IEscrow(atlas).validateBalances()) {
+        (, success) = IEscrow(atlas).validateBalances();
+        if (!success) {
             revert AtlasErrors.BalanceNotReconciled();
         }
     }

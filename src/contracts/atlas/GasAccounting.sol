@@ -29,17 +29,12 @@ abstract contract GasAccounting is SafetyLocks {
     //          EXTERNAL FUNCTIONS
     // ---------------------------------------
 
-    // Returns true if Solver status is Finalized and the caller (Execution Environment) is in surplus
-    function validateBalances() external view returns (bool valid) {
-        (, bool calledBack, bool fulfilled) = solverLockData();
-        if (!calledBack) {
-            return false;
-        }
-
+    // Returns (true, true) if Solver status is Finalized and the caller (Execution Environment) is in surplus
+    function validateBalances() external view returns (bool calledBack, bool fulfilled) {
+        (, calledBack, fulfilled) = solverLockData();
         if (!fulfilled) {
-            return (deposits >= claims + withdrawals);
+            fulfilled = deposits >= claims + withdrawals;
         }
-        return true;
     }
 
     function contribute() external payable {
@@ -82,6 +77,8 @@ abstract contract GasAccounting is SafetyLocks {
         if (lock != environment) revert InvalidExecutionEnvironment(lock);
 
         (address currentSolver, bool calledBack, bool fulfilled) = solverLockData();
+
+        if (calledBack) revert DoubleReconcile();
 
         if (solverFrom != currentSolver) revert InvalidSolverFrom(currentSolver);
 

@@ -23,6 +23,7 @@ contract AtlasErrors {
     error BalanceNotReconciled();
     error SolverOperationReverted();
     error AlteredControl();
+    error InvalidEntry();
     error IntentUnfulfilled();
     error PreSolverFailed();
     error PostSolverFailed();
@@ -77,6 +78,7 @@ contract AtlasErrors {
     error InsufficientFunds();
     error NoUnfilledRequests();
     error SolverMustReconcile();
+    error DoubleReconcile();
     error InvalidExecutionEnvironment(address correctEnvironment);
     error InvalidSolverFrom(address solverFrom);
     error InsufficientSolverBalance(uint256 actual, uint256 msgValue, uint256 holds, uint256 needed);

@@ -90,12 +90,16 @@ contract GasAccountingTest is Test {
     }
 
     function test_validateBalances() public {
-        assertFalse(mockGasAccounting.validateBalances());
+        (bool calledBack, bool fulfilled) = mockGasAccounting.validateBalances();
+        assertFalse(calledBack);
+        assertFalse(fulfilled);
 
         mockGasAccounting.trySolverLock(solverOp);
         mockGasAccounting.reconcile{ value: initialClaims }(executionEnvironment, solverOp.from, 0);
 
-        assertTrue(mockGasAccounting.validateBalances());
+        (calledBack, fulfilled) = mockGasAccounting.validateBalances();
+        assertTrue(calledBack);
+        assertTrue(fulfilled);
     }
 
     function test_contribute() public {
