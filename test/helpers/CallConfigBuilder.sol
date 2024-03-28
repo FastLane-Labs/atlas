@@ -25,6 +25,7 @@ contract CallConfigBuilder is Test {
     bool requireFulfillment;
     bool trustedOpHash;
     bool invertBidValue;
+    bool exPostBids;
 
     function withUserNoncesSequenced(bool _sequenced) public returns (CallConfigBuilder) {
         userNoncesSequenced = _sequenced;
@@ -121,6 +122,11 @@ contract CallConfigBuilder is Test {
         return this;
     }
 
+    function withExPostBids(bool _exPostBids) public returns (CallConfigBuilder) {
+        exPostBids = _exPostBids;
+        return this;
+    }
+
     function build() public view returns (CallConfig memory) {
         return CallConfig(
             userNoncesSequenced,
@@ -141,7 +147,8 @@ contract CallConfigBuilder is Test {
             forwardReturnData,
             requireFulfillment,
             trustedOpHash,
-            invertBidValue
+            invertBidValue,
+            exPostBids
         );
     }
 }

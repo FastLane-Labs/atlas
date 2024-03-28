@@ -127,18 +127,18 @@ contract ExecutionEnvironmentTest is BaseTest {
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
         preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
         vm.prank(address(0)); // Invalid sender
-        vm.expectRevert(bytes("ERR-EB01 InvalidSender"));
+        vm.expectRevert(AtlasErrors.OnlyAtlas.selector);
         (status,) = address(executionEnvironment).call(preOpsData);
-        assertTrue(status, "expectRevert ERR-EB01 InvalidSender: call did not revert");
+        assertTrue(status, "expectRevert OnlyAtlas: call did not revert");
 
         // WrongPhase
         escrowKey = escrowKey.holdUserLock(address(dAppControl)); // Invalid lock state
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
         preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EB02 WrongPhase"));
+        vm.expectRevert(AtlasErrors.WrongPhase.selector);
         (status,) = address(executionEnvironment).call(preOpsData);
-        assertTrue(status, "expectRevert ERR-EB02 WrongPhase: call did not revert");
+        assertTrue(status, "expectRevert WrongPhase: call did not revert");
 
         // NotDelegated and WrongDepth
         // Can't be reached with this setup.
@@ -361,7 +361,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverOp.value = 1; // Positive value but EE has no balance
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverGasLimit, solverOp, new bytes(0)
+            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0)
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -374,7 +374,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverOp.control = invalid; // Invalid control
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverGasLimit, solverOp, new bytes(0)
+            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0)
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -387,7 +387,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, true);
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverGasLimit, solverOp, new bytes(0)
+            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0)
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -400,7 +400,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverGasLimit, solverOp, new bytes(0)
+            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0)
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -414,7 +414,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverGasLimit, solverOp, new bytes(0)
+            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0)
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -430,7 +430,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         // PreSolverFailed
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverGasLimit, solverOp, abi.encode(true, false)
+            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, abi.encode(true, false)
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -441,7 +441,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         // PreSolverFailed 2
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverGasLimit, solverOp, abi.encode(false, false)
+            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, abi.encode(false, false)
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -459,7 +459,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverGasLimit, solverOp, abi.encode(true, false)
+            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, abi.encode(true, false)
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -471,7 +471,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverGasLimit, solverOp, abi.encode(false, false)
+            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, abi.encode(false, false)
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));

@@ -3,33 +3,51 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
+import { Atlas } from "src/contracts/atlas/Atlas.sol";
+import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
 import { DAppIntegration } from "src/contracts/atlas/DAppIntegration.sol";
-// import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import { DummyDAppControl, CallConfigBuilder } from "./base/DummyDAppControl.sol";
-
-import "src/contracts/types/GovernanceTypes.sol";
 
 contract MockDAppIntegration is DAppIntegration {
     constructor(address _atlas) DAppIntegration(_atlas) { }
 }
 
 contract DAppIntegrationTest is Test {
+    Atlas public atlas;
     MockDAppIntegration public dAppIntegration;
     DummyDAppControl public dAppControl;
 
+    address atlasDeployer = makeAddr("atlas deployer");
     address governance = makeAddr("governance");
     address signatory = makeAddr("signatory");
     address invalid = makeAddr("invalid");
 
     function setUp() public {
-        dAppIntegration = new MockDAppIntegration(address(0));
-        dAppControl = new DummyDAppControl(address(0), governance, CallConfigBuilder.allFalseCallConfig());
+    
+        vm.startPrank(atlasDeployer);
+        // Computes the addresses at which AtlasVerification will be deployed
+        address expectedAtlasAddr = vm.computeCreateAddress(atlasDeployer, vm.getNonce(atlasDeployer) + 1);
+        address expectedAtlasVerificationAddr = vm.computeCreateAddress(atlasDeployer, vm.getNonce(atlasDeployer) + 2);
+        bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedAtlasAddr, "AtlasFactory 1.0"));
+        ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
+
+        atlas = new Atlas({
+            _escrowDuration: 64,
+            _verification: expectedAtlasVerificationAddr,
+            _simulator: address(0),
+            _executionTemplate: address(execEnvTemplate),
+            _surchargeRecipient: atlasDeployer
+        });
+        dAppIntegration = new MockDAppIntegration(expectedAtlasAddr);
+        vm.stopPrank();
+
+        dAppControl = new DummyDAppControl(expectedAtlasAddr, governance, CallConfigBuilder.allFalseCallConfig());
     }
 
     function test_initializeGovernance_successfullyInitialized() public {
-        bytes32 signatoryKey = keccak256(abi.encodePacked(governance, address(dAppControl), governance));
+        bytes32 signatoryKey = keccak256(abi.encodePacked(address(dAppControl), governance));
         vm.prank(governance);
         dAppIntegration.initializeGovernance(address(dAppControl));
         assertTrue(
@@ -38,7 +56,7 @@ contract DAppIntegrationTest is Test {
     }
 
     function test_initializeGovernance_notInitialized() public {
-        bytes32 signatoryKey = keccak256(abi.encodePacked(governance, address(dAppControl), governance));
+        bytes32 signatoryKey = keccak256(abi.encodePacked(address(dAppControl), governance));
         assertFalse(
             dAppIntegration.signatories(signatoryKey), "signatories[signatoryKey] should be false when not initialized"
         );
@@ -59,7 +77,7 @@ contract DAppIntegrationTest is Test {
     }
 
     function test_addSignatory_successfullyAdded() public {
-        bytes32 signatoryKey = keccak256(abi.encodePacked(governance, address(dAppControl), signatory));
+        bytes32 signatoryKey = keccak256(abi.encodePacked(address(dAppControl), signatory));
 
         vm.startPrank(governance);
         dAppIntegration.initializeGovernance(address(dAppControl));
@@ -72,7 +90,7 @@ contract DAppIntegrationTest is Test {
         vm.prank(governance);
         dAppIntegration.initializeGovernance(address(dAppControl));
 
-        bytes32 signatoryKey = keccak256(abi.encodePacked(governance, address(dAppControl), signatory));
+        bytes32 signatoryKey = keccak256(abi.encodePacked(address(dAppControl), signatory));
         assertFalse(
             dAppIntegration.signatories(signatoryKey), "signatories[signatoryKey] should be false when not added"
         );
@@ -97,7 +115,7 @@ contract DAppIntegrationTest is Test {
     }
 
     function test_removeSignatory_successfullyRemovedByGovernance() public {
-        bytes32 signatoryKey = keccak256(abi.encodePacked(governance, address(dAppControl), signatory));
+        bytes32 signatoryKey = keccak256(abi.encodePacked(address(dAppControl), signatory));
 
         vm.startPrank(governance);
         dAppIntegration.initializeGovernance(address(dAppControl));
@@ -112,7 +130,7 @@ contract DAppIntegrationTest is Test {
     }
 
     function test_removeSignatory_successfullyRemovedBySignatoryItself() public {
-        bytes32 signatoryKey = keccak256(abi.encodePacked(governance, address(dAppControl), signatory));
+        bytes32 signatoryKey = keccak256(abi.encodePacked(address(dAppControl), signatory));
 
         vm.startPrank(governance);
         dAppIntegration.initializeGovernance(address(dAppControl));
@@ -139,28 +157,16 @@ contract DAppIntegrationTest is Test {
         dAppIntegration.removeSignatory(address(dAppControl), signatory);
     }
 
-    function test_removeSignatory_invalidSignatoryKey() public {
-        vm.startPrank(governance);
-        dAppIntegration.initializeGovernance(address(dAppControl));
-        dAppIntegration.addSignatory(address(dAppControl), signatory);
-        dAppIntegration.removeSignatory(address(dAppControl), signatory);
-        // signatoryKey is now invalid
-        vm.expectRevert(AtlasErrors.InvalidDAppControl.selector);
-        dAppIntegration.removeSignatory(address(dAppControl), signatory);
-        vm.stopPrank();
-    }
-
     function test_disableDApp_successfullyDisabled() public {
+        assertEq(dAppIntegration.isDAppSignatory(address(dAppControl), governance), false);
+
         vm.startPrank(governance);
         dAppIntegration.initializeGovernance(address(dAppControl));
+        assertEq(dAppIntegration.isDAppSignatory(address(dAppControl), governance), true);
         dAppIntegration.disableDApp(address(dAppControl));
         vm.stopPrank();
 
-        (address gov, uint32 callConfig, uint64 lastUpdate) = dAppIntegration.governance(address(dAppControl));
-
-        assertTrue(gov == address(0), "gov should be address(0)");
-        assertTrue(callConfig == 0, "callConfig should be 0");
-        assertTrue(lastUpdate == 0, "lastUpdate should be 0");
+        assertEq(dAppIntegration.isDAppSignatory(address(dAppControl), governance), false);
     }
 
     function test_disableDApp_onlyGovernanceAllowed() public {

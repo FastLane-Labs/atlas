@@ -16,6 +16,9 @@ contract AtlasErrors {
     error UserUnexpectedSuccess();
     error UserNotFulfilled();
 
+    error BidFindSuccessful(uint256 bidAmount);
+    error UnexpectedNonRevert();
+
     error SolverBidUnpaid();
     error BalanceNotReconciled();
     error SolverOperationReverted();
@@ -60,6 +63,7 @@ contract AtlasErrors {
     error InvalidCaller();
     error InvalidDAppControl();
     error DAppNotEnabled();
+    error AtlasLockActive();
 
     // Permit69
     error InvalidEnvironment();
@@ -87,4 +91,15 @@ contract AtlasErrors {
     // AtlasVerification
     error NoUnusedNonceInBitmap();
     error OnlyAccount();
+
+    // DAppControl
+    error BothUserAndDAppNoncesCannotBeSequenced();
+    error InvalidControl();
+    error NoDelegatecall();
+    error MustBeDelegatecalled();
+    error OnlyAtlas();
+    error WrongPhase();
+    error WrongDepth();
+    error InsufficientLocalFunds();
+    error NotImplemented();
 }

@@ -11,7 +11,7 @@ import { SolverOperation } from "../types/SolverCallTypes.sol";
 
 import { EscrowBits } from "../libraries/EscrowBits.sol";
 
-import "forge-std/Test.sol"; //TODO remove
+// import "forge-std/Test.sol"; //TODO remove
 
 abstract contract GasAccounting is SafetyLocks {
     using EscrowBits for uint256;
@@ -125,9 +125,9 @@ abstract contract GasAccounting is SafetyLocks {
 
     // Takes AtlETH from 1) owner's bonded balance, and if more needed, also from 2) owner's unbonding balance
     // and increases transient solver deposits by this amount
-    function _assign(address owner, uint256 amount, bool solverWon) internal returns (bool isDeficit) {
+    function _assign(address owner, uint256 amount, bool solverWon, bool bidFind) internal returns (bool isDeficit) {
         if (amount == 0) {
-            accessData[owner].lastAccessedBlock = uint32(block.number);
+            accessData[owner].lastAccessedBlock = uint32(block.number); // still save on bidFind
         } else {
             if (amount > type(uint112).max) revert ValueTooLarge();
             uint112 amt = uint112(amount);
@@ -150,13 +150,15 @@ abstract contract GasAccounting is SafetyLocks {
                 aData.bonded -= amt;
             }
 
-            aData.lastAccessedBlock = uint32(block.number);
+            if (!bidFind) {
+                aData.lastAccessedBlock = uint32(block.number);
+            }
 
             // Reputation Analytics: Track total gas used, solver wins, and failures
             aData.totalGasUsed += uint64(amount / GAS_USED_DECIMALS_TO_DROP);
             if (solverWon) {
                 aData.auctionWins++;
-            } else {
+            } else if (!bidFind) {
                 aData.auctionFails++;
             }
 
@@ -191,14 +193,27 @@ abstract contract GasAccounting is SafetyLocks {
         }
     }
 
-    function _releaseSolverLock(SolverOperation calldata solverOp, uint256 gasWaterMark, uint256 result) internal {
+    function _releaseSolverLock(
+        SolverOperation calldata solverOp,
+        uint256 gasWaterMark,
+        uint256 result,
+        bool bidFind,
+        bool includeCalldata
+    )
+        internal
+    {
         // Calculate what the solver owes if they failed
         // NOTE: This will cause an error if you are simulating with a gasPrice of 0
-        if (!result.updateEscrow()) return;
+        if (!bidFind && !result.updateEscrow()) return;
 
-        uint256 gasUsed = gasWaterMark - gasleft() + 5000 + (solverOp.data.length * CALLDATA_LENGTH_PREMIUM);
-        gasUsed = (gasUsed + ((gasUsed * SURCHARGE) / SURCHARGE_BASE)) * tx.gasprice;
-        _assign(solverOp.from, gasUsed, false);
+        uint256 gasUsed = (gasWaterMark - gasleft() + 5000) * tx.gasprice;
+
+        if (includeCalldata) {
+            gasUsed += _getCalldataCost(solverOp.data.length);
+        }
+
+        gasUsed = (gasUsed + ((gasUsed * SURCHARGE) / 10_000_000));
+        _assign(solverOp.from, gasUsed, false, bidFind);
     }
 
     function _settle(address winningSolver, address bundler) internal {
@@ -214,13 +229,13 @@ abstract contract GasAccounting is SafetyLocks {
         // Remove any unused gas from the bundler's claim.
         // TODO: consider penalizing bundler for too much unused gas (to prevent high escrow requirements for solvers)
         uint256 gasRemainder = (gasleft() * tx.gasprice);
-        gasRemainder += ((gasRemainder * SURCHARGE) / SURCHARGE_BASE);
+        gasRemainder += ((gasRemainder * SURCHARGE) / 10_000_000);
         _claims -= gasRemainder;
 
         if (_deposits < _claims + _withdrawals) {
             // CASE: in deficit, subtract from bonded balance
             uint256 amountOwed = _claims + _withdrawals - _deposits;
-            if (_assign(winningSolver, amountOwed, true)) {
+            if (_assign(winningSolver, amountOwed, true, false)) {
                 revert InsufficientTotalBalance((_claims + _withdrawals) - deposits);
             }
         } else {
@@ -230,7 +245,7 @@ abstract contract GasAccounting is SafetyLocks {
             _credit(winningSolver, amountCredited);
         }
 
-        uint256 netGasSurcharge = (_claims * SURCHARGE) / SURCHARGE_BASE;
+        uint256 netGasSurcharge = (_claims * SURCHARGE) / 10_000_000;
 
         _claims -= netGasSurcharge;
 
@@ -238,5 +253,12 @@ abstract contract GasAccounting is SafetyLocks {
 
         SafeTransferLib.safeTransferETH(bundler, _claims);
         emit GasRefundSettled(bundler, _claims);
+    }
+
+    function _getCalldataCost(uint256 calldataLength) internal view returns (uint256 calldataCost) {
+        // NOTE: Alter this for L2s.
+
+        // SolverOperation calldata length is 608 (excluding solverOp.data)
+        calldataCost = (calldataLength + 608) * _CALLDATA_LENGTH_PREMIUM * tx.gasprice;
     }
 }

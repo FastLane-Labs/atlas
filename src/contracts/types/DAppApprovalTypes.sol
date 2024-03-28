@@ -23,6 +23,7 @@ struct DAppConfig {
     address to;
     uint32 callConfig;
     address bidToken;
+    uint32 solverGasLimit;
 }
 
 struct CallConfig {
@@ -45,6 +46,7 @@ struct CallConfig {
     bool requireFulfillment;
     bool trustedOpHash;
     bool invertBidValue;
+    bool exPostBids;
 }
 
 enum CallConfigIndex {
@@ -67,5 +69,6 @@ enum CallConfigIndex {
     ForwardReturnData,
     RequireFulfillment,
     TrustedOpHash,
-    invertBidValue
+    InvertBidValue,
+    ExPostBids
 }

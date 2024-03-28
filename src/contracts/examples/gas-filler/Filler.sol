@@ -91,7 +91,8 @@ contract Filler is DAppControl {
                 forwardReturnData: true,
                 requireFulfillment: true,
                 trustedOpHash: false,
-                invertBidValue: true
+                invertBidValue: true,
+                exPostBids: false
             })
         )
     { }
@@ -204,9 +205,9 @@ contract Filler is DAppControl {
         require(address(this).balance == 0, "ERR - EXISTING GAS BALANCE");
 
         // TODO: use assembly (current impl is a lazy way to grab the approval tx data)
-        bytes memory data = abi.encodeWithSelector(this.approve.selector, bytes.concat(approvalTx.data, data));
+        bytes memory mData = abi.encodeWithSelector(this.approve.selector, bytes.concat(approvalTx.data, data));
 
-        (bool success, bytes memory returnData) = _control().call(forward(data));
+        (bool success, bytes memory returnData) = _control().call(forward(mData));
         // NOTE: approvalTx.data includes func selector
 
         require(success, "ERR - REJECTED");

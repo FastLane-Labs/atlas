@@ -905,7 +905,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     //
     function test_validCalls_InvalidUserOpControl_UserSignatureInvalid() public {
         defaultAtlasEnvironment();
-        DAppConfig memory config = DAppConfig({ to: address(dAppControl), callConfig: CallBits.encodeCallConfig(defaultCallConfig().build()), bidToken: address(0) });
+        DAppConfig memory config = DAppConfig({ to: address(dAppControl), callConfig: CallBits.encodeCallConfig(defaultCallConfig().build()), bidToken: address(0), solverGasLimit: 1_000_000 });
 
         UserOperation memory userOp = validUserOperation().withControl(address(0)).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
