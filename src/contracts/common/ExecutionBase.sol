@@ -1,12 +1,12 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { IPermit69 } from "../interfaces/IPermit69.sol";
-import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
-import { IEscrow } from "../interfaces/IEscrow.sol";
+import { IPermit69 } from "src/contracts/interfaces/IPermit69.sol";
+import { ISafetyLocks } from "src/contracts/interfaces/ISafetyLocks.sol";
+import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
-import { ExecutionPhase, BaseLock } from "../types/LockTypes.sol";
-import { EXECUTION_PHASE_OFFSET, SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "../libraries/SafetyBits.sol";
+import { ExecutionPhase, BaseLock } from "src/contracts/types/LockTypes.sol";
+import { EXECUTION_PHASE_OFFSET, SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "src/contracts/libraries/SafetyBits.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 contract Base {
