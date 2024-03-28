@@ -430,7 +430,11 @@ contract ExecutionEnvironmentTest is BaseTest {
         // PreSolverFailed
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, abi.encode(true, false)
+            executionEnvironment.solverMetaTryCatch.selector,
+            solverOp.bidAmount,
+            solverGasLimit,
+            solverOp,
+            abi.encode(true, false)
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -441,7 +445,11 @@ contract ExecutionEnvironmentTest is BaseTest {
         // PreSolverFailed 2
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, abi.encode(false, false)
+            executionEnvironment.solverMetaTryCatch.selector,
+            solverOp.bidAmount,
+            solverGasLimit,
+            solverOp,
+            abi.encode(false, false)
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -459,7 +467,11 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, abi.encode(true, false)
+            executionEnvironment.solverMetaTryCatch.selector,
+            solverOp.bidAmount,
+            solverGasLimit,
+            solverOp,
+            abi.encode(true, false)
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -471,7 +483,11 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, abi.encode(false, false)
+            executionEnvironment.solverMetaTryCatch.selector,
+            solverOp.bidAmount,
+            solverGasLimit,
+            solverOp,
+            abi.encode(false, false)
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -701,13 +717,29 @@ contract MockDAppControl is DAppControl {
         return returnValue;
     }
 
-    function _preSolverCall(SolverOperation calldata, bytes calldata returnData) internal pure override returns (bool) {
+    function _preSolverCall(
+        SolverOperation calldata,
+        bytes calldata returnData
+    )
+        internal
+        pure
+        override
+        returns (bool)
+    {
         (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
         require(!shouldRevert, "_preSolverCall revert requested");
         return returnValue;
     }
 
-    function _postSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal pure override returns (bool) {
+    function _postSolverCall(
+        SolverOperation calldata solverOp,
+        bytes calldata returnData
+    )
+        internal
+        pure
+        override
+        returns (bool)
+    {
         (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
         require(!shouldRevert, "_postSolverCall revert requested");
         return returnValue;
