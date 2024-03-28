@@ -57,18 +57,6 @@ contract Base {
         return bytes.concat(data, appendedBytes);
     }
 
-    function forwardInternal(bytes memory data) internal pure returns (bytes memory) {
-        // Bypasses the user address, control address, and other data that's appended by the mimic fallback
-
-        bytes memory appendedBytes = new bytes(32);
-
-        assembly {
-            calldatacopy(add(appendedBytes, 32), sub(calldatasize(), 108), 32)
-            mstore8(add(appendedBytes, 63), add(shr(248, calldataload(sub(calldatasize(), 77))), 1))
-        }
-        return bytes.concat(data, appendedBytes);
-    }
-
     function forwardSpecial(bytes memory data, ExecutionPhase phase) internal pure returns (bytes memory) {
         // Handles switching the phase between PreSolver, Solver, and PostSolver inside of a single
         // ExecutionEnvironment function.
