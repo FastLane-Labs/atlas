@@ -695,7 +695,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         MockExecutionEnvironment mockEE = new MockExecutionEnvironment(address(atlas));
 
         bytes memory data = "0x1234";
-
         bytes memory firstSet = abi.encodePacked(
             mockEE.addressPointer(),
             mockEE.solverSuccessful(),
@@ -718,13 +717,46 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertEq(result, expected);
     }
 
-    function test_forwardSpecial() public {
+    function test_forwardSpecial_standard() public {
         vm.prank(user);
         MockExecutionEnvironment mockEE = new MockExecutionEnvironment(address(atlas));
 
         bytes memory data = "0x1234";
-        ExecutionPhase phase = ExecutionPhase.PreSolver;
+        bytes memory firstSetSpecial = forwardSpecialFirstSet(mockEE, ExecutionPhase.Uninitialized);
+        bytes memory secondSet =
+            abi.encodePacked(mockEE.user(), mockEE.control(), mockEE.config(), mockEE.controlCodeHash());
 
+        bytes memory expected = bytes.concat(data, firstSetSpecial, secondSet);
+        bytes memory result = mockEE.forwardSpecialUninitializedPhase_(data);
+
+        assertEq(result, expected);
+    }
+
+    function test_forwardSpecial_phaseSwitch() public {
+        vm.prank(user);
+        MockExecutionEnvironment mockEE = new MockExecutionEnvironment(address(atlas));
+
+        // TODO: need to be in depth 1
+
+        bytes memory data = "0x1234";
+        bytes memory firstSetSpecial = forwardSpecialFirstSet(mockEE, ExecutionPhase.PreSolver);
+        bytes memory secondSet =
+            abi.encodePacked(mockEE.user(), mockEE.control(), mockEE.config(), mockEE.controlCodeHash());
+
+        bytes memory expected = bytes.concat(data, firstSetSpecial, secondSet);
+        bytes memory result = mockEE.forwardSpecialPreSolverPhase_(data);
+
+        assertEq(result, expected);
+    }
+
+    function forwardSpecialFirstSet(
+        MockExecutionEnvironment mockEE,
+        ExecutionPhase phase
+    )
+        public
+        pure
+        returns (bytes memory)
+    {
         uint8 depth = mockEE.depth();
         uint16 lockState = mockEE.lockState();
 
@@ -734,7 +766,7 @@ contract ExecutionEnvironmentTest is BaseTest {
             }
         }
 
-        bytes memory firstSetSpecial = abi.encodePacked(
+        return abi.encodePacked(
             mockEE.addressPointer(),
             mockEE.solverSuccessful(),
             mockEE.paymentsSuccessful(),
@@ -746,14 +778,6 @@ contract ExecutionEnvironmentTest is BaseTest {
             mockEE.simulation(),
             depth + 1
         );
-
-        bytes memory secondSet =
-            abi.encodePacked(mockEE.user(), mockEE.control(), mockEE.config(), mockEE.controlCodeHash());
-
-        bytes memory expected = bytes.concat(data, firstSetSpecial, secondSet);
-        bytes memory result = mockEE.forwardSpecial_(data, phase);
-
-        assertEq(result, expected);
     }
 }
 
@@ -867,8 +891,12 @@ contract MockExecutionEnvironment is ExecutionEnvironment {
         return forward(data);
     }
 
-    function forwardSpecial_(bytes memory data, ExecutionPhase phase) external pure returns (bytes memory) {
-        return forwardSpecial(data, phase);
+    function forwardSpecialUninitializedPhase_(bytes memory data) external view returns (bytes memory) {
+        return forwardSpecial(data, ExecutionPhase.Uninitialized);
+    }
+
+    function forwardSpecialPreSolverPhase_(bytes memory data) external view returns (bytes memory) {
+        return forwardSpecial(data, ExecutionPhase.Uninitialized);
     }
 
     function controlCodeHash() external pure returns (bytes32) {
