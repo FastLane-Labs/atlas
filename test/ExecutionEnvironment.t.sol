@@ -17,6 +17,8 @@ import { ERC20 } from "solmate/tokens/ERC20.sol";
 
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
+import { EXECUTION_PHASE_OFFSET } from "src/contracts/libraries/SafetyBits.sol";
+
 import "src/contracts/types/DAppApprovalTypes.sol";
 import "src/contracts/types/UserCallTypes.sol";
 import "src/contracts/types/SolverCallTypes.sol";
@@ -430,7 +432,11 @@ contract ExecutionEnvironmentTest is BaseTest {
         // PreSolverFailed
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, abi.encode(true, false)
+            executionEnvironment.solverMetaTryCatch.selector,
+            solverOp.bidAmount,
+            solverGasLimit,
+            solverOp,
+            abi.encode(true, false)
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -441,7 +447,11 @@ contract ExecutionEnvironmentTest is BaseTest {
         // PreSolverFailed 2
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, abi.encode(false, false)
+            executionEnvironment.solverMetaTryCatch.selector,
+            solverOp.bidAmount,
+            solverGasLimit,
+            solverOp,
+            abi.encode(false, false)
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -459,7 +469,11 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, abi.encode(true, false)
+            executionEnvironment.solverMetaTryCatch.selector,
+            solverOp.bidAmount,
+            solverGasLimit,
+            solverOp,
+            abi.encode(true, false)
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -471,7 +485,11 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, abi.encode(false, false)
+            executionEnvironment.solverMetaTryCatch.selector,
+            solverOp.bidAmount,
+            solverGasLimit,
+            solverOp,
+            abi.encode(false, false)
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -656,20 +674,86 @@ contract ExecutionEnvironmentTest is BaseTest {
         executionEnvironment.factoryWithdrawEther(user, 2e18);
     }
 
-    function test_getUser() public {
+    function test_getUser() public view {
         assertEq(executionEnvironment.getUser(), user);
     }
 
-    function test_getControl() public {
+    function test_getControl() public view {
         assertEq(executionEnvironment.getControl(), address(dAppControl));
     }
 
-    function test_getConfig() public {
+    function test_getConfig() public view {
         assertEq(executionEnvironment.getConfig(), CallBits.encodeCallConfig(callConfig));
     }
 
-    function test_getEscrow() public {
+    function test_getEscrow() public view {
         assertEq(executionEnvironment.getEscrow(), address(atlas));
+    }
+
+    function test_forward() public {
+        vm.prank(user);
+        MockExecutionEnvironment mockEE = new MockExecutionEnvironment(address(atlas));
+
+        bytes memory data = "0x1234";
+
+        bytes memory firstSet = abi.encodePacked(
+            mockEE.addressPointer(),
+            mockEE.solverSuccessful(),
+            mockEE.paymentsSuccessful(),
+            mockEE.callIndex(),
+            mockEE.callCount(),
+            mockEE.lockState(),
+            mockEE.solverOutcome(),
+            mockEE.bidFind(),
+            mockEE.simulation(),
+            mockEE.depth() + 1
+        );
+
+        bytes memory secondSet =
+            abi.encodePacked(mockEE.user(), mockEE.control(), mockEE.config(), mockEE.controlCodeHash());
+
+        bytes memory expected = bytes.concat(data, firstSet, secondSet);
+        bytes memory result = mockEE.forward_(data);
+
+        assertEq(result, expected);
+    }
+
+    function test_forwardSpecial() public {
+        vm.prank(user);
+        MockExecutionEnvironment mockEE = new MockExecutionEnvironment(address(atlas));
+
+        bytes memory data = "0x1234";
+        ExecutionPhase phase = ExecutionPhase.PreSolver;
+
+        uint8 depth = mockEE.depth();
+        uint16 lockState = mockEE.lockState();
+
+        if (depth == 1 && lockState & 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations)) != 0) {
+            if (phase == ExecutionPhase.PreSolver || phase == ExecutionPhase.PostSolver) {
+                lockState = uint16(1) << uint16(BaseLock.Active) | uint16(1) << (EXECUTION_PHASE_OFFSET + uint16(phase));
+            }
+        }
+
+        bytes memory firstSetSpecial = abi.encodePacked(
+            mockEE.addressPointer(),
+            mockEE.solverSuccessful(),
+            mockEE.paymentsSuccessful(),
+            mockEE.callIndex(),
+            mockEE.callCount(),
+            lockState,
+            mockEE.solverOutcome(),
+            mockEE.bidFind(),
+            mockEE.simulation(),
+            depth + 1
+        );
+
+        bytes memory secondSet =
+            abi.encodePacked(mockEE.user(), mockEE.control(), mockEE.config(), mockEE.controlCodeHash());
+
+        bytes memory expected = bytes.concat(data, firstSetSpecial, secondSet);
+        bytes memory result = mockEE.forwardSpecial_(data, phase);
+
+        assertEq(result, expected);
     }
 }
 
@@ -701,13 +785,29 @@ contract MockDAppControl is DAppControl {
         return returnValue;
     }
 
-    function _preSolverCall(SolverOperation calldata, bytes calldata returnData) internal pure override returns (bool) {
+    function _preSolverCall(
+        SolverOperation calldata,
+        bytes calldata returnData
+    )
+        internal
+        pure
+        override
+        returns (bool)
+    {
         (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
         require(!shouldRevert, "_preSolverCall revert requested");
         return returnValue;
     }
 
-    function _postSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal pure override returns (bool) {
+    function _postSolverCall(
+        SolverOperation calldata,
+        bytes calldata returnData
+    )
+        internal
+        pure
+        override
+        returns (bool)
+    {
         (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
         require(!shouldRevert, "_postSolverCall revert requested");
         return returnValue;
@@ -757,5 +857,73 @@ contract MockSolverContract {
 
     function solverMockOperation(bool shouldRevert) public pure {
         require(!shouldRevert, "solverMockOperation revert requested");
+    }
+}
+
+contract MockExecutionEnvironment is ExecutionEnvironment {
+    constructor(address _atlas) ExecutionEnvironment(_atlas) { }
+
+    function forward_(bytes memory data) external pure returns (bytes memory) {
+        return forward(data);
+    }
+
+    function forwardSpecial_(bytes memory data, ExecutionPhase phase) external pure returns (bytes memory) {
+        return forwardSpecial(data, phase);
+    }
+
+    function controlCodeHash() external pure returns (bytes32) {
+        return _controlCodeHash();
+    }
+
+    function config() external pure returns (uint32) {
+        return _config();
+    }
+
+    function control() external pure returns (address) {
+        return _control();
+    }
+
+    function user() external pure returns (address) {
+        return _user();
+    }
+
+    function depth() external pure returns (uint8) {
+        return _depth();
+    }
+
+    function simulation() external pure returns (bool) {
+        return _simulation();
+    }
+
+    function bidFind() external pure returns (bool) {
+        return _bidFind();
+    }
+
+    function solverOutcome() external pure returns (uint24) {
+        return _solverOutcome();
+    }
+
+    function lockState() external pure returns (uint16) {
+        return _lockState();
+    }
+
+    function callCount() external pure returns (uint8) {
+        return _callCount();
+    }
+
+    function callIndex() external pure returns (uint8) {
+        return _callIndex();
+    }
+
+    function paymentsSuccessful() external pure returns (bool) {
+        return _paymentsSuccessful();
+    }
+
+    function solverSuccessful() external pure returns (bool) {
+        return _solverSuccessful();
+    }
+
+    function addressPointer() external pure returns (address) {
+        return _addressPointer();
     }
 }

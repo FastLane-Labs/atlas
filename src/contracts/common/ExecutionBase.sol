@@ -9,8 +9,6 @@ import { ExecutionPhase, BaseLock } from "../types/LockTypes.sol";
 import { EXECUTION_PHASE_OFFSET, SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "../libraries/SafetyBits.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
-import "forge-std/Test.sol";
-
 contract Base {
     address public immutable atlas;
     address public immutable source;
