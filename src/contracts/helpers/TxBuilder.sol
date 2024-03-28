@@ -17,6 +17,7 @@ import { CallBits } from "../libraries/CallBits.sol";
 import "forge-std/Test.sol";
 
 contract TxBuilder {
+    using CallBits for uint32;
     using CallVerification for UserOperation;
 
     address public immutable control;
@@ -65,7 +66,6 @@ contract TxBuilder {
         view
         returns (UserOperation memory userOp)
     {
-        userOp.to = atlas;
         userOp = UserOperation({
             from: from,
             to: atlas,
@@ -94,6 +94,11 @@ contract TxBuilder {
         view
         returns (SolverOperation memory solverOp)
     {
+        // generate userOpHash depending on CallConfig.trustedOpHash allowed or not
+        DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
+        bytes32 userOpHash =
+            dConfig.callConfig.allowsTrustedOpHash() ? userOp.getAltOperationHash() : userOp.getUserOperationHash();
+
         solverOp = SolverOperation({
             from: solverEOA,
             to: atlas,
@@ -103,7 +108,7 @@ contract TxBuilder {
             deadline: userOp.deadline,
             solver: solverContract,
             control: userOp.control,
-            userOpHash: userOp.getUserOperationHash(),
+            userOpHash: userOpHash,
             bidToken: IDAppControl(control).getBidFormat(userOp),
             bidAmount: bidAmount,
             data: solverOpData,
@@ -122,7 +127,9 @@ contract TxBuilder {
     {
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
 
-        bytes32 userOpHash = userOp.getUserOperationHash();
+        // generate userOpHash depending on CallConfig.trustedOpHash allowed or not
+        bytes32 userOpHash =
+            dConfig.callConfig.allowsTrustedOpHash() ? userOp.getAltOperationHash() : userOp.getUserOperationHash();
         bytes32 callChainHash = CallVerification.getCallChainHash(dConfig, userOp, solverOps);
 
         dAppOp = DAppOperation({

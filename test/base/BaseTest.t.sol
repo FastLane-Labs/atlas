@@ -14,6 +14,10 @@ import { Simulator } from "src/contracts/helpers/Simulator.sol";
 
 import { Solver } from "src/contracts/solver/src/TestSolver.sol";
 
+import { V2ExPost } from "src/contracts/examples/ex-post-mev-example/V2ExPost.sol";
+
+import { SolverExPost } from "src/contracts/solver/src/TestSolverExPost.sol";
+
 import { V2DAppControl } from "src/contracts/examples/v2-example/V2DAppControl.sol";
 
 import { TestConstants } from "./TestConstants.sol";
@@ -48,6 +52,9 @@ contract BaseTest is Test, TestConstants {
     Solver public solverOne;
     Solver public solverTwo;
 
+    SolverExPost public solverOneXP;
+    SolverExPost public solverTwoXP;
+
     V2DAppControl public control;
 
     V2Helper public helper;
@@ -78,9 +85,6 @@ contract BaseTest is Test, TestConstants {
         bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedAtlasAddr, "AtlasFactory 1.0"));
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
 
-        console.log("Test salt:");
-        console.logBytes32(salt);
-
         atlas = new Atlas({
             _escrowDuration: 64,
             _verification: expectedAtlasVerificationAddr,
@@ -89,13 +93,6 @@ contract BaseTest is Test, TestConstants {
             _surchargeRecipient: payee
         });
         atlasVerification = new AtlasVerification(address(atlas));
-
-        console.log("atlas real:", address(atlas));
-        console.log("atlas expected:", expectedAtlasAddr);
-
-        console.log("verification real:", address(atlasVerification));
-        console.log("verification expected:", expectedAtlasVerificationAddr);
-
         simulator.setAtlas(address(atlas));
         sorter = new Sorter(address(atlas));
 
@@ -112,22 +109,32 @@ contract BaseTest is Test, TestConstants {
         vm.startPrank(solverOneEOA);
 
         solverOne = new Solver(WETH_ADDRESS, address(atlas), solverOneEOA);
+        solverOneXP = new SolverExPost(WETH_ADDRESS, address(atlas), solverOneEOA, 60);
         atlas.deposit{ value: 1e18 }();
+
+        vm.stopPrank();
 
         deal(TOKEN_ZERO, address(solverOne), 10e24);
         deal(TOKEN_ONE, address(solverOne), 10e24);
+
+        deal(TOKEN_ZERO, address(solverOneXP), 10e24);
+        deal(TOKEN_ONE, address(solverOneXP), 10e24);
 
         vm.deal(solverTwoEOA, 100e18);
 
         vm.startPrank(solverTwoEOA);
 
         solverTwo = new Solver(WETH_ADDRESS, address(atlas), solverTwoEOA);
+        solverTwoXP = new SolverExPost(WETH_ADDRESS, address(atlas), solverTwoEOA, 80);
         atlas.deposit{ value: 1e18 }();
 
         vm.stopPrank();
 
         deal(TOKEN_ZERO, address(solverTwo), 10e24);
         deal(TOKEN_ONE, address(solverTwo), 10e24);
+
+        deal(TOKEN_ZERO, address(solverTwoXP), 10e24);
+        deal(TOKEN_ONE, address(solverTwoXP), 10e24);
 
         helper = new V2Helper(address(control), address(atlas), address(atlasVerification));
         u = new Utilities();

@@ -333,7 +333,7 @@ contract MainTest is BaseTest {
             IExecutionEnvironment(newEnvironment).getControl() == address(control), "Mimic Error - Control Mismatch"
         );
         assertTrue(
-            IExecutionEnvironment(newEnvironment).getConfig() == control.callConfig(),
+            IExecutionEnvironment(newEnvironment).getConfig() == control.CALL_CONFIG(),
             "Mimic Error - CallConfig Mismatch"
         );
         assertTrue(

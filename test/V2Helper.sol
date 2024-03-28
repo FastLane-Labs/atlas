@@ -51,8 +51,8 @@ contract V2Helper is Test, TestConstants, TxBuilder {
 
         // get the smaller one
         bool flip = token0 == tokenIn;
-        token0Balance = flip ? 0 : uint256(token0Balance_a > token0Balance_b ? token0Balance_b : token0Balance_a) / 4;
-        token1Balance = flip ? uint256(token1Balance_a > token1Balance_b ? token1Balance_b : token1Balance_a) / 4 : 0;
+        token0Balance = flip ? 0 : uint256(token0Balance_a > token0Balance_b ? token0Balance_b : token0Balance_a) / 3;
+        token1Balance = flip ? uint256(token1Balance_a > token1Balance_b ? token1Balance_b : token1Balance_a) / 3 : 0;
     }
 
     function buildUserOperation(

@@ -9,7 +9,6 @@ import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 contract Storage is AtlasEvents, AtlasErrors {
     // Atlas constants
-    uint256 internal constant _MAX_GAS = 1_500_000;
     uint256 internal constant GAS_USED_DECIMALS_TO_DROP = 1000;
     address internal constant UNLOCKED = address(1);
     uint256 internal constant _UNLOCKED_UINT = 1;
@@ -38,8 +37,8 @@ contract Storage is AtlasEvents, AtlasErrors {
     mapping(bytes32 => bool) internal _solverOpHashes; // NOTE: Only used for when allowTrustedOpHash is enabled
 
     // Gas Accounting constants
-    uint256 public constant SURCHARGE_BASE = 100;
-    uint256 public constant SURCHARGE = 10;
+    uint256 public constant SURCHARGE = 1_000_000; // Out of 10_000_000
+    uint256 internal constant _CALLDATA_LENGTH_PREMIUM = 32; // 16 (default) * 2
 
     // atlETH GasAccounting storage
 

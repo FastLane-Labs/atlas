@@ -31,19 +31,8 @@ interface IWETH {
     function withdraw(uint256 wad) external;
 }
 
-contract V2DAppControl is DAppControl {
-    uint256 public constant CONTROL_GAS_USAGE = 250_000;
-
+contract V2ExPost is DAppControl {
     address public constant WETH = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-    address public constant GOVERNANCE_TOKEN = address(0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984);
-    address public constant WETH_X_GOVERNANCE_POOL = address(0xd3d2E2692501A5c9Ca623199D38826e513033a17);
-
-    address public constant BURN_ADDRESS =
-        address(uint160(uint256(keccak256(abi.encodePacked("GOVERNANCE TOKEN BURN ADDRESS")))));
-
-    bytes4 public constant SWAP = bytes4(IUniswapV2Pair.swap.selector);
-
-    bool public immutable govIsTok0;
 
     event GiftedGovernanceToken(address indexed user, address indexed token, uint256 amount);
 
@@ -71,20 +60,13 @@ contract V2DAppControl is DAppControl {
                 requireFulfillment: false,
                 trustedOpHash: false,
                 invertBidValue: false,
-                exPostBids: false
+                exPostBids: true
             })
         )
-    {
-        govIsTok0 = (IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token0() == GOVERNANCE_TOKEN);
-        if (govIsTok0) {
-            require(IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token1() == WETH, "INVALID TOKEN PAIR");
-        } else {
-            require(IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token0() == WETH, "INVALID TOKEN PAIR");
-        }
-    }
+    { }
 
-    function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory) {
-        require(bytes4(userOp.data) == SWAP, "ERR-H10 InvalidFunction");
+    function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory returnData) {
+        require(bytes4(userOp.data) == IUniswapV2Pair.swap.selector, "ERR-H10 InvalidFunction");
 
         (
             uint256 amount0Out,
@@ -101,15 +83,12 @@ contract V2DAppControl is DAppControl {
             amount0Out == 0 ? 0 : SwapMath.getAmountIn(amount0Out, uint256(token1Balance), uint256(token0Balance));
 
         // This is a V2 swap, so optimistically transfer the tokens
-        // NOTE: The user should have approved the ExecutionEnvironment for token transfers
+        // NOTE: The user should have approved Atlas for token transfers
         _transferUserERC20(
             amount0Out > amount1Out ? IUniswapV2Pair(userOp.dapp).token1() : IUniswapV2Pair(userOp.dapp).token0(),
             userOp.dapp,
             amount0In > amount1In ? amount0In : amount1In
         );
-
-        bytes memory emptyData;
-        return emptyData;
     }
 
     // This occurs after a Solver has successfully paid their bid, which is
@@ -119,27 +98,7 @@ contract V2DAppControl is DAppControl {
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
 
-        address user = _user();
-
-        (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).getReserves();
-
-        ERC20(WETH).transfer(WETH_X_GOVERNANCE_POOL, bidAmount);
-
-        uint256 amount0Out;
-        uint256 amount1Out;
-
-        if (govIsTok0) {
-            amount0Out = ((997_000 * bidAmount) * uint256(token0Balance))
-                / ((uint256(token1Balance) * 1_000_000) + (997_000 * bidAmount));
-        } else {
-            amount1Out = ((997_000 * bidAmount) * uint256(token1Balance))
-                / (((uint256(token0Balance) * 1_000_000) + (997_000 * bidAmount)));
-        }
-
-        bytes memory nullBytes;
-        IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).swap(amount0Out, amount1Out, user, nullBytes);
-
-        emit GiftedGovernanceToken(user, GOVERNANCE_TOKEN, govIsTok0 ? amount0Out : amount1Out);
+        SafeTransferLib.safeTransfer(ERC20(WETH), _user(), ERC20(WETH).balanceOf(address(this)));
 
         /*
         // ENABLE FOR FOUNDRY TESTING

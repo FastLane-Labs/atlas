@@ -7,8 +7,6 @@ import { CallBits } from "../libraries/CallBits.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
-import "../types/GovernanceTypes.sol";
-
 import "../types/DAppApprovalTypes.sol";
 import "../types/EscrowTypes.sol";
 import "../types/ValidCallsTypes.sol";
@@ -124,7 +122,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
             }
 
             // msgSender must be userOp.from or userOp.sessionKey / dappOp.from
-            if ((msgSender != dAppOp.from || msgSender != userOp.from) && !isSimulation) {
+            if (!(msgSender == dAppOp.from || msgSender == userOp.from) && !isSimulation) {
                 return (userOpHash, ValidCallsResult.InvalidBundler);
             }
         } else {
@@ -344,11 +342,9 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // users not having to trust the front end at all - a huge
         // improvement over the current experience.
 
-        GovernanceData memory govData = governance[dConfig.to];
-
         // Check bundler matches dAppOp bundler
         if (dAppOp.bundler != address(0) && msgSender != dAppOp.bundler) {
-            if (!signatories[keccak256(abi.encodePacked(govData.governance, dAppOp.control, msgSender))]) {
+            if (!signatories[keccak256(abi.encodePacked(dAppOp.control, msgSender))]) {
                 bool bypassSignatoryCheck = isSimulation && dAppOp.from == address(0);
                 if (!isSimulation) {
                     return (false, ValidCallsResult.InvalidBundler);
@@ -357,7 +353,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         }
 
         // Make sure the signer is currently enabled by dapp owner
-        if (!signatories[keccak256(abi.encodePacked(govData.governance, dAppOp.control, dAppOp.from))]) {
+        if (!signatories[keccak256(abi.encodePacked(dAppOp.control, dAppOp.from))]) {
             bool bypassSignatoryCheck = isSimulation && dAppOp.from == address(0);
             if (!bypassSignatoryCheck) {
                 return (false, ValidCallsResult.DAppSignatureInvalid);
