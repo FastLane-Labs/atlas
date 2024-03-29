@@ -369,8 +369,6 @@ contract GasAccountingTest is Test {
         // Deficit, but solver has enough balance to cover it
         mockGasAccounting.increaseBondedBalance(solverOp.from, initialClaims);
         (bondedBefore,,,,) = mockGasAccounting.accessData(solverOp.from);
-        vm.expectEmit(true, true, true, false);
-        emit AtlasEvents.GasRefundSettled(bundler, 0);
         mockGasAccounting.settle(solverOp.from, bundler);
         (bondedAfter,,,,) = mockGasAccounting.accessData(solverOp.from);
         assertLt(bondedAfter, bondedBefore);
@@ -380,8 +378,6 @@ contract GasAccountingTest is Test {
         vm.prank(executionEnvironment);
         mockGasAccounting.contribute{ value: initialClaims }();
         (bondedBefore,,,,) = mockGasAccounting.accessData(solverOp.from);
-        vm.expectEmit(true, true, true, false);
-        emit AtlasEvents.GasRefundSettled(bundler, 0);
         mockGasAccounting.settle(solverOp.from, bundler);
         (bondedAfter,,,,) = mockGasAccounting.accessData(solverOp.from);
         assertGt(bondedAfter, bondedBefore);

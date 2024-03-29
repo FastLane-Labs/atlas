@@ -22,9 +22,6 @@ contract AtlasEvents {
     // Factory events
     event ExecutionEnvironmentCreated(address indexed user, address indexed executionEnvironment);
 
-    // GasAccounting events
-    event GasRefundSettled(address indexed bundler, uint256 refundedETH);
-
     // Surcharge events
     event SurchargeWithdrawn(address to, uint256 amount);
     event SurchargeRecipientTransferStarted(address currentRecipient, address newRecipient);
