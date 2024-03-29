@@ -24,6 +24,7 @@ contract AtlasErrors {
     error SolverOperationReverted();
     error AlteredControl();
     error InvalidEntry();
+    error CallbackNotCalled();
     error IntentUnfulfilled();
     error PreSolverFailed();
     error PostSolverFailed();

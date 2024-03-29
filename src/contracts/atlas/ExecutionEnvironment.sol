@@ -206,13 +206,13 @@ contract ExecutionEnvironment is Base {
             revert AtlasErrors.SolverOperationReverted();
         }
 
-        // Verify that the solver contract hit the callback
-        // NOTE The balance may still be unfulfilled and handled by the PostSolver hook.
-        (, success,) = IEscrow(atlas).solverLockData();
-        if (!success) revert AtlasErrors.BalanceNotReconciled();
-
         // If this was a user intent, handle and verify fulfillment
         if (config.needsSolverPostCall()) {
+            // Verify that the solver contract hit the callback before handing over to PostSolver hook
+            // NOTE The balance may still be unfulfilled and handled by the PostSolver hook.
+            (, success,) = IEscrow(atlas).solverLockData();
+            if (!success) revert AtlasErrors.CallbackNotCalled();
+
             bytes memory data = forwardSpecial(
                 abi.encodeWithSelector(IDAppControl.postSolverCall.selector, solverOp, returnData),
                 ExecutionPhase.PostSolver
@@ -260,7 +260,8 @@ contract ExecutionEnvironment is Base {
             }
 
             // Verify payback
-            (, success) = IEscrow(atlas).validateBalances();
+            bool calledBack;
+            (calledBack, success) = IEscrow(atlas).validateBalances();
             if (!success) revert AtlasErrors.BalanceNotReconciled();
 
             // Solver bid was successful, revert with highest amount.

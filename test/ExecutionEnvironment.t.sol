@@ -3,11 +3,13 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
+import { MockSafetyLocks } from "./SafetyLocks.t.sol";
 
 import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
 import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 
 import { IFactory } from "src/contracts/interfaces/IFactory.sol";
+import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
 
 import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 
@@ -42,7 +44,10 @@ contract ExecutionEnvironmentTest is BaseTest {
     address public invalid = makeAddr("invalid");
 
     uint256 public lockSlot;
+    uint256 public solverLockSlot;
     uint256 public depositsSlot;
+    uint256 public claimsSlot;
+    uint256 public withdrawalsSlot;
 
     CallConfig private callConfig;
 
@@ -54,7 +59,29 @@ contract ExecutionEnvironmentTest is BaseTest {
         setupDAppControl(callConfig);
 
         lockSlot = stdstore.target(address(atlas)).sig("lock()").find();
+        solverLockSlot = lockSlot + 1;
         depositsSlot = stdstore.target(address(atlas)).sig("deposits()").find();
+        claimsSlot = stdstore.target(address(atlas)).sig("claims()").find();
+        withdrawalsSlot = stdstore.target(address(atlas)).sig("withdrawals()").find();
+    }
+
+    function _setLocks() internal {
+        uint256 rawClaims = (gasleft() + 1) * tx.gasprice;
+        rawClaims += ((rawClaims * 1_000_000) / 10_000_000);
+
+        vm.store(address(atlas), bytes32(lockSlot), bytes32(uint256(uint160(address(executionEnvironment)))));
+        vm.store(address(atlas), bytes32(solverLockSlot), bytes32(uint256(uint160(address(solver)))));
+        vm.store(address(atlas), bytes32(depositsSlot), bytes32(uint256(msg.value)));
+        vm.store(address(atlas), bytes32(claimsSlot), bytes32(uint256(rawClaims)));
+        vm.store(address(atlas), bytes32(withdrawalsSlot), bytes32(uint256(0)));
+    }
+
+    function _unsetLocks() internal {
+        vm.store(address(atlas), bytes32(lockSlot), bytes32(uint256(uint160(address(1)))));
+        vm.store(address(atlas), bytes32(solverLockSlot), bytes32(uint256(1)));
+        vm.store(address(atlas), bytes32(depositsSlot), bytes32(uint256(type(uint256).max)));
+        vm.store(address(atlas), bytes32(claimsSlot), bytes32(uint256(type(uint256).max)));
+        vm.store(address(atlas), bytes32(withdrawalsSlot), bytes32(uint256(type(uint256).max)));
     }
 
     function setupDAppControl(CallConfig memory customCallConfig) internal {
@@ -358,6 +385,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         uint256 solverGasLimit = 1_000_000;
 
         // IncorrectValue
+        _setLocks();
         solverOp.value = 1; // Positive value but EE has no balance
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
@@ -369,8 +397,10 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert ERR-CE05 IncorrectValue: call did not revert");
         solverOp.value = 0;
+        _unsetLocks();
 
         // AlteredControl
+        _setLocks();
         solverOp.control = invalid; // Invalid control
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
@@ -382,8 +412,10 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert AlteredControl: call did not revert");
         solverOp.control = address(dAppControl);
+        _unsetLocks();
 
         // SolverOperationReverted
+        _setLocks();
         solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, true);
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
@@ -394,8 +426,10 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.expectRevert(AtlasErrors.SolverOperationReverted.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert SolverOperationReverted: call did not revert");
+        _unsetLocks();
 
         // SolverBidUnpaid
+        _setLocks();
         solverOp.bidAmount = 1; // Bid won't be paid
         solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
@@ -408,9 +442,12 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert SolverBidUnpaid: call did not revert");
         solverOp.bidAmount = 0;
+        _unsetLocks();
 
         // BalanceNotReconciled
         // Solver's contract does not call reconcile
+        _setLocks();
+        solverContract.setReconcile(false);
         solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
@@ -421,6 +458,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.expectRevert(AtlasErrors.BalanceNotReconciled.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert BalanceNotReconciled: call did not revert");
+        solverContract.setReconcile(true);
+        _unsetLocks();
 
         // Change of config
         callConfig.preSolver = true;
@@ -428,6 +467,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverOp.control = address(dAppControl);
 
         // PreSolverFailed
+        _setLocks();
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
             executionEnvironment.solverMetaTryCatch.selector,
@@ -441,8 +481,10 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.expectRevert(AtlasErrors.PreSolverFailed.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert PreSolverFailed: call did not revert");
+        _unsetLocks();
 
         // PreSolverFailed 2
+        _setLocks();
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
             executionEnvironment.solverMetaTryCatch.selector,
@@ -456,6 +498,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.expectRevert(AtlasErrors.PreSolverFailed.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert PreSolverFailed 2: call did not revert");
+        _unsetLocks();
 
         // Change of config
         callConfig.preSolver = false;
@@ -464,6 +507,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverOp.control = address(dAppControl);
 
         // PostSolverFailed
+        _setLocks();
         solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
@@ -478,8 +522,10 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.expectRevert(AtlasErrors.PostSolverFailed.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert PostSolverFailed: call did not revert");
+        _unsetLocks();
 
         // IntentUnfulfilled
+        _setLocks();
         solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
         solverMetaData = abi.encodeWithSelector(
@@ -494,6 +540,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.expectRevert(AtlasErrors.IntentUnfulfilled.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         assertTrue(status, "expectRevert IntentUnfulfilled: call did not revert");
+        _unsetLocks();
     }
 
     function test_allocateValue() public {
@@ -766,6 +813,7 @@ contract MockDAppControl is DAppControl {
 contract MockSolverContract {
     address public immutable WETH_ADDRESS;
     address private immutable _atlas;
+    bool public shouldReconcile = true;
 
     constructor(address weth, address atlas) {
         WETH_ADDRESS = weth;
@@ -773,7 +821,7 @@ contract MockSolverContract {
     }
 
     function atlasSolverCall(
-        address,
+        address sender,
         address,
         uint256,
         bytes calldata solverOpData,
@@ -785,9 +833,16 @@ contract MockSolverContract {
     {
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
         require(success, "atlasSolverCall call reverted");
+        if (shouldReconcile) {
+            IEscrow(address(_atlas)).reconcile(msg.sender, sender, type(uint256).max);
+        }
     }
 
     function solverMockOperation(bool shouldRevert) public pure {
         require(!shouldRevert, "solverMockOperation revert requested");
+    }
+
+    function setReconcile(bool _shouldReconcile) external {
+        shouldReconcile = _shouldReconcile;
     }
 }

@@ -11,7 +11,7 @@ import { SolverOperation } from "../types/SolverCallTypes.sol";
 
 import { EscrowBits } from "../libraries/EscrowBits.sol";
 
-// import "forge-std/Test.sol"; //TODO remove
+import "forge-std/Test.sol"; //TODO remove
 
 abstract contract GasAccounting is SafetyLocks {
     using EscrowBits for uint256;
@@ -33,7 +33,11 @@ abstract contract GasAccounting is SafetyLocks {
     function validateBalances() external view returns (bool calledBack, bool fulfilled) {
         (, calledBack, fulfilled) = solverLockData();
         if (!fulfilled) {
-            fulfilled = deposits >= claims + withdrawals;
+            uint256 _deposits = deposits;
+            // Check if locked. 
+            if (_deposits != type(uint256).max) {
+                fulfilled = deposits >= claims + withdrawals;
+            }
         }
     }
 
