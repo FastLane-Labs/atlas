@@ -260,8 +260,7 @@ contract ExecutionEnvironment is Base {
             }
 
             // Verify payback
-            bool calledBack;
-            (calledBack, success) = IEscrow(atlas).validateBalances();
+            (, success) = IEscrow(atlas).validateBalances();
             if (!success) revert AtlasErrors.BalanceNotReconciled();
 
             // Solver bid was successful, revert with highest amount.
