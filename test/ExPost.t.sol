@@ -134,7 +134,7 @@ contract ExPostTest is BaseTest {
         uint256 solverTwoAtlEthBalance = atlas.balanceOf(solverTwoEOA);
 
         vm.expectEmit(true, true, true, true);
-        emit AtlasEvents.MetacallResult(userEOA, userEOA, solverOps[0].from);
+        emit AtlasEvents.MetacallResult(userEOA, userEOA, solverOps[0].from, 1409582790000000, 156620310000000);
         (bool success,) =
             address(atlas).call(abi.encodeWithSelector(atlas.metacall.selector, userOp, solverOps, dAppOp));
 
