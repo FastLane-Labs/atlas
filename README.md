@@ -16,7 +16,7 @@ A frontend or API wishing to participate can integrate with Atlas by completing 
 ### Network Overview
 
 Atlas is infrastructure-agnostic; each app may choose how the User Operations and Solver Operations are aggregated. Examples include:
-1. **On Chain**: When gas cost is not an issue, Solver Operations may be sent on-chain, and then aggregated by any party.
+1. **On Chain**: When gas cost is not an issue, Solver Operations may be sent on-chain, and then aggregated by any party, including a smart contract.
 2. **On Another Chain**:  Solver Operations may be posted and aggregated on another chain, and the output can be used to settle the atlas transaction on the settlement chain.
 3. **BloXroute**: When Atlas is launched, BloXroute's BDN will support the aggregation of User and Solver Operations for rapid bundling. 
 4. **SUAVE**: Once live, Operations can be sent to the SUAVE network, bundled into a transaction by the SUAVE Atlas implementation, and then made available for use by bundlers. 
