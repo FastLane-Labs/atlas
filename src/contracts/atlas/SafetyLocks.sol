@@ -1,20 +1,19 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { SafetyBits } from "../libraries/SafetyBits.sol";
-import { CallBits } from "../libraries/CallBits.sol";
-
-import "../types/SolverCallTypes.sol";
-import "../types/UserCallTypes.sol";
-import "../types/DAppApprovalTypes.sol";
-import "../types/EscrowTypes.sol";
-
-import "../types/LockTypes.sol";
-
 import { Storage } from "./Storage.sol";
+import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
+import { CallBits } from "src/contracts/libraries/CallBits.sol";
+import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/UserCallTypes.sol";
+import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/EscrowTypes.sol";
+import "src/contracts/types/LockTypes.sol";
 
-// import "forge-std/Test.sol";
-
+/// @title SafetyLocks
+/// @author FastLane Labs
+/// @notice SafetyLocks manages the locking and unlocking of the Atlas environment during the execution of a metacall
+/// transaction.
 abstract contract SafetyLocks is Storage {
     using CallBits for uint32;
 
@@ -27,8 +26,14 @@ abstract contract SafetyLocks is Storage {
         Storage(_escrowDuration, _verification, _simulator, _surchargeRecipient)
     { }
 
+    /// @notice Sets the Atlas lock to the specified execution environment, and tracks gas used, ETH borrowed by the
+    /// UserOperation, and ETH deposited.
+    /// @param executionEnvironment The address of the execution environment to set the lock to.
+    /// @param gasMarker Initial `gasleft()` measured at the start of `metacall`.
+    /// @param userOpValue Amount of ETH required by the UserOperation.
     function _setAtlasLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) internal {
-        _checkIfUnlocked();
+        if (lock != UNLOCKED) revert AlreadyInitialized();
+
         // Initialize the Lock
         lock = executionEnvironment;
 
@@ -41,11 +46,15 @@ abstract contract SafetyLocks is Storage {
         deposits = msg.value;
     }
 
-    // Used in AtlETH
-    function _checkIfUnlocked() internal view {
-        if (lock != UNLOCKED) revert AlreadyInitialized();
-    }
-
+    /// @notice Builds an EscrowKey struct with the specified parameters, called at the start of
+    /// `_preOpsUserExecutionIteration`.
+    /// @param dConfig The DAppConfig of the current DAppControl contract.
+    /// @param executionEnvironment The address of the current Execution Environment.
+    /// @param userOpHash The UserOperation hash.
+    /// @param bundler The address of the bundler.
+    /// @param solverOpCount The count of SolverOperations.
+    /// @param isSimulation Boolean indicating whether the call is a simulation or not.
+    /// @return An EscrowKey struct initialized with the provided parameters.
     function _buildEscrowLock(
         DAppConfig calldata dConfig,
         address executionEnvironment,
@@ -75,6 +84,8 @@ abstract contract SafetyLocks is Storage {
         });
     }
 
+    /// @notice Releases the Atlas lock, and resets the associated transient storage variables. Called at the end of
+    /// `metacall`.
     function _releaseAtlasLock() internal {
         if (lock == UNLOCKED) revert NotInitialized();
         lock = UNLOCKED;
@@ -84,10 +95,13 @@ abstract contract SafetyLocks is Storage {
         deposits = type(uint256).max;
     }
 
+    /// @notice Returns the address of the currently active Execution Environment, if any.
     function activeEnvironment() external view returns (address) {
         return lock;
     }
 
+    /// @notice Returns the current lock state of Atlas.
+    /// @return Boolean indicating whether Atlas is in a locked state or not.
     function isUnlocked() external view returns (bool) {
         return lock == UNLOCKED;
     }

@@ -1,18 +1,16 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { SafetyLocks } from "../atlas/SafetyLocks.sol";
-
 import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
+import { SafetyLocks } from "src/contracts/atlas/SafetyLocks.sol";
+import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
+import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/EscrowTypes.sol";
+import "src/contracts/types/LockTypes.sol";
 
-import "../types/EscrowTypes.sol";
-import "../types/LockTypes.sol";
-import { SolverOperation } from "../types/SolverCallTypes.sol";
-
-import { EscrowBits } from "../libraries/EscrowBits.sol";
-
-// import "forge-std/Test.sol"; //TODO remove
-
+/// @title GasAccounting
+/// @author FastLane Labs
+/// @notice GasAccounting manages the accounting of gas surcharges and escrow balances for the Atlas protocol.
 abstract contract GasAccounting is SafetyLocks {
     using EscrowBits for uint256;
 
@@ -25,28 +23,28 @@ abstract contract GasAccounting is SafetyLocks {
         SafetyLocks(_escrowDuration, _verification, _simulator, _surchargeRecipient)
     { }
 
-    // ---------------------------------------
-    //          EXTERNAL FUNCTIONS
-    // ---------------------------------------
-
-    // Returns true if Solver status is Finalized and the caller (Execution Environment) is in surplus
-    function validateBalances() external view returns (bool valid) {
-        (, bool calledBack, bool fulfilled) = solverLockData();
-        if (!calledBack) {
-            return false;
-        }
-
+    /// @notice Validates the balances to determine if the caller (Execution Environment) is in surplus.
+    /// @return calledBack A boolean indicating whether the solver has called back via `reconcile`.
+    /// @return fulfilled A boolean indicating whether the solver's outstanding debt has been repaid.
+    function validateBalances() external view returns (bool calledBack, bool fulfilled) {
+        (, calledBack, fulfilled) = solverLockData();
         if (!fulfilled) {
-            return (deposits >= claims + withdrawals);
+            uint256 _deposits = deposits;
+            // Check if locked.
+            if (_deposits != type(uint256).max) {
+                fulfilled = deposits >= claims + withdrawals;
+            }
         }
-        return true;
     }
 
+    /// @notice Contributes ETH to the contract, increasing the deposits if a non-zero value is sent.
     function contribute() external payable {
         if (lock != msg.sender) revert InvalidExecutionEnvironment(lock);
         _contribute();
     }
 
+    /// @notice Borrows ETH from the contract, transferring the specified amount to the caller if available.
+    /// @param amount The amount of ETH to borrow.
     function borrow(uint256 amount) external payable {
         if (lock != msg.sender) revert InvalidExecutionEnvironment(lock);
         if (_borrow(amount)) {
@@ -56,12 +54,22 @@ abstract contract GasAccounting is SafetyLocks {
         }
     }
 
+    /// @notice Calculates the current shortfall between deficit (claims + withdrawals) and deposits.
+    /// @return The current shortfall amount, if any.
     function shortfall() external view returns (uint256) {
         uint256 deficit = claims + withdrawals;
         uint256 _deposits = deposits;
         return (deficit > _deposits) ? (deficit - _deposits) : 0;
     }
 
+    /// @notice Reconciles the escrow balances and gas surcharge between the Execution Environment and the solver. This
+    /// function adjusts the solver's bonded balance based on the actual gas spent and any additional payments or
+    /// deductions.
+    /// @param environment The Execution Environment contract address involved in the reconciliation.
+    /// @param solverFrom The address of the solver from which the reconciliation is initiated.
+    /// @param maxApprovedGasSpend The maximum amount of gas spend approved by the solver for covering transaction
+    /// costs.
+    /// @return owed The amount owed, if any, by the solver after reconciliation.
     function reconcile(
         address environment,
         address solverFrom,
@@ -82,6 +90,8 @@ abstract contract GasAccounting is SafetyLocks {
         if (lock != environment) revert InvalidExecutionEnvironment(lock);
 
         (address currentSolver, bool calledBack, bool fulfilled) = solverLockData();
+
+        if (calledBack) revert DoubleReconcile();
 
         if (solverFrom != currentSolver) revert InvalidSolverFrom(currentSolver);
 
@@ -108,14 +118,14 @@ abstract contract GasAccounting is SafetyLocks {
         return 0;
     }
 
-    // ---------------------------------------
-    //          INTERNAL FUNCTIONS
-    // ---------------------------------------
-
+    /// @notice Internal function to handle ETH contribution, increasing deposits if a non-zero value is sent.
     function _contribute() internal {
         if (msg.value != 0) deposits += msg.value;
     }
 
+    /// @notice Borrows ETH from the contract, transferring the specified amount to the caller if available.
+    /// @param amount The amount of ETH to borrow.
+    /// @return valid A boolean indicating whether the borrowing operation was successful.
     function _borrow(uint256 amount) internal returns (bool valid) {
         if (amount == 0) return true;
         if (address(this).balance < amount + claims + withdrawals) return false;
@@ -123,8 +133,13 @@ abstract contract GasAccounting is SafetyLocks {
         return true;
     }
 
-    // Takes AtlETH from 1) owner's bonded balance, and if more needed, also from 2) owner's unbonding balance
-    // and increases transient solver deposits by this amount
+    /// @notice Takes AtlETH from the owner's bonded balance and, if necessary, from the owner's unbonding balance to
+    /// increase transient solver deposits.
+    /// @param owner The address of the owner from whom AtlETH is taken.
+    /// @param amount The amount of AtlETH to be taken.
+    /// @param solverWon A boolean indicating whether the solver won the bid.
+    /// @param bidFind A boolean indicating whether the bid was found.
+    /// @return isDeficit A boolean indicating whether there is a deficit after the assignment.
     function _assign(address owner, uint256 amount, bool solverWon, bool bidFind) internal returns (bool isDeficit) {
         if (amount == 0) {
             accessData[owner].lastAccessedBlock = uint32(block.number); // still save on bidFind
@@ -169,7 +184,9 @@ abstract contract GasAccounting is SafetyLocks {
         }
     }
 
-    // Increases owner's bonded balance by amount
+    /// @notice Increases the owner's bonded balance by the specified amount.
+    /// @param owner The address of the owner whose bonded balance will be increased.
+    /// @param amount The amount by which to increase the owner's bonded balance.
     function _credit(address owner, uint256 amount) internal {
         if (amount > type(uint112).max) revert ValueTooLarge();
         uint112 amt = uint112(amount);
@@ -184,6 +201,10 @@ abstract contract GasAccounting is SafetyLocks {
         accessData[owner] = aData;
     }
 
+    /// @notice Attempts to lock the solver's operation by borrowing AtlETH.
+    /// @dev If borrowing AtlETH is successful, sets the solver lock and returns true; otherwise, returns false.
+    /// @param solverOp The SolverOperation data for the borrowing solver.
+    /// @return valid True if the solver lock is successfully set, otherwise false.
     function _trySolverLock(SolverOperation calldata solverOp) internal returns (bool valid) {
         if (_borrow(solverOp.value)) {
             _solverLock = uint256(uint160(solverOp.from));
@@ -193,6 +214,14 @@ abstract contract GasAccounting is SafetyLocks {
         }
     }
 
+    /// @notice Releases the solver lock and adjusts the solver's escrow balance based on the gas used and other
+    /// factors.
+    /// @dev Calculates the gas used for the SovlerOperation and adjusts the solver's escrow balance accordingly.
+    /// @param solverOp The current SovlerOperation for which to account
+    /// @param gasWaterMark The `gasleft()` watermark taken at the start of executing the SolverOperation.
+    /// @param result The result bitmap of the SolverOperation execution.
+    /// @param bidFind Indicates if called in the context of `_getBidAmount` in Escrow.sol.
+    /// @param includeCalldata Whether to include calldata cost in the gas calculation.
     function _releaseSolverLock(
         SolverOperation calldata solverOp,
         uint256 gasWaterMark,
@@ -216,7 +245,19 @@ abstract contract GasAccounting is SafetyLocks {
         _assign(solverOp.from, gasUsed, false, bidFind);
     }
 
-    function _settle(address winningSolver, address bundler) internal {
+    /// @notice Settles the transaction after execution, determining the final distribution of funds between the winning
+    /// solver and the bundler based on the outcome.
+    /// @dev This function adjusts the claims, withdrawals, deposits, and surcharges based on the gas used by the
+    /// transaction.
+    /// @param winningSolver The address of the winning solver.
+    /// @param bundler The address of the bundler, who is refunded for the gas used during the transaction execution.
+    function _settle(
+        address winningSolver,
+        address bundler
+    )
+        internal
+        returns (uint256 claimsPaidToBundler, uint256 netGasSurcharge)
+    {
         // NOTE: If there is no winningSolver but the dApp config allows unfulfilled 'successes,' the bundler
         // is treated as the Solver.
 
@@ -252,9 +293,13 @@ abstract contract GasAccounting is SafetyLocks {
         surcharge = _surcharge + netGasSurcharge;
 
         SafeTransferLib.safeTransferETH(bundler, _claims);
-        emit GasRefundSettled(bundler, _claims);
+
+        return (_claims, netGasSurcharge);
     }
 
+    /// @notice Calculates the gas cost of the calldata used to execute a SolverOperation.
+    /// @param calldataLength The length of the `data` field in the SolverOperation.
+    /// @return calldataCost The gas cost of the calldata used to execute the SolverOperation.
     function _getCalldataCost(uint256 calldataLength) internal view returns (uint256 calldataCost) {
         // NOTE: Alter this for L2s.
 

@@ -1,12 +1,14 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import "../types/EscrowTypes.sol";
-import "../types/LockTypes.sol";
-
+import "src/contracts/types/EscrowTypes.sol";
+import "src/contracts/types/LockTypes.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
+/// @title Storage
+/// @author FastLane Labs
+/// @notice Storage manages all storage variables and constants for the Atlas smart contract.
 contract Storage is AtlasEvents, AtlasErrors {
     // Atlas constants
     uint256 internal constant GAS_USED_DECIMALS_TO_DROP = 1000;
@@ -75,6 +77,7 @@ contract Storage is AtlasEvents, AtlasErrors {
         surcharge = msg.value;
         surchargeRecipient = _surchargeRecipient;
 
+        // TODO remove these when transient storage behaviour is implemented
         // Gas Accounting - transient storage (delete this from constructor post dencun)
         lock = UNLOCKED;
         _solverLock = _UNLOCKED_UINT;
@@ -85,6 +88,10 @@ contract Storage is AtlasEvents, AtlasErrors {
         emit SurchargeRecipientTransferred(_surchargeRecipient);
     }
 
+    /// @notice Returns information about the current state of the solver lock.
+    /// @return currentSolver Address of the current solver.
+    /// @return calledBack Boolean indicating whether the solver has called back via `reconcile`.
+    /// @return fulfilled Boolean indicating whether the solver's outstanding debt has been repaid via `reconcile`.
     function solverLockData() public view returns (address currentSolver, bool calledBack, bool fulfilled) {
         uint256 solverLock = _solverLock;
         currentSolver = address(uint160(solverLock));
@@ -92,9 +99,13 @@ contract Storage is AtlasEvents, AtlasErrors {
         fulfilled = solverLock & _solverFulfilled != 0;
     }
 
+    /// @notice Returns the address of the current solver.
+    /// @return Address of the current solver.
     function solver() public view returns (address) {
         return address(uint160(_solverLock));
     }
 
+    /// @notice Returns the EIP-712 domain separator for permit signatures, implemented in AtlETH.
+    /// @return bytes32 Domain separator hash.
     function _computeDomainSeparator() internal view virtual returns (bytes32) { }
 }

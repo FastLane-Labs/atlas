@@ -8,6 +8,7 @@ import { DAppConfig, DAppOperation, CallConfig } from "src/contracts/types/DAppA
 import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
 import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
 import { ValidCallsResult } from "src/contracts/types/ValidCallsTypes.sol";
+import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { DummyDAppControl } from "./base/DummyDAppControl.sol";
 import { AtlasBaseTest } from "./base/AtlasBaseTest.t.sol";
 import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
@@ -387,7 +388,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         DAppConfig memory config = dAppControl.getDAppConfig(userOp);
-        vm.expectRevert(AtlasVerification.InvalidCaller.selector);
+        vm.expectRevert(AtlasErrors.InvalidCaller.selector);
         atlasVerification.validateCalls(config, userOp, solverOps, dappOp, 0, userEOA, false);
     }
 
@@ -1408,7 +1409,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     function testGetDomainSeparatorInAtlasVerification() public {
         bytes32 hashedName = keccak256(bytes("AtlasVerification"));
-        bytes32 hashedVersion = keccak256(bytes("0.0.1"));
+        bytes32 hashedVersion = keccak256(bytes("1.0"));
         bytes32 typeHash = keccak256(
             "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
         );

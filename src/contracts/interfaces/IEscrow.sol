@@ -2,7 +2,7 @@
 pragma solidity 0.8.22;
 
 interface IEscrow {
-    function validateBalances() external view returns (bool valid);
+    function validateBalances() external view returns (bool calledBack, bool fulfilled);
     function reconcile(
         address environment,
         address solverFrom,
@@ -14,4 +14,5 @@ interface IEscrow {
     function contribute() external payable;
     function borrow(uint256 amount) external payable;
     function shortfall() external view returns (uint256);
+    function solverLockData() external view returns (address currentSolver, bool calledBack, bool fulfilled);
 }
