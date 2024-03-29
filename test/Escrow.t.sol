@@ -39,7 +39,6 @@ contract EscrowTest is AtlasBaseTest {
     uint256 private constant _FASTLANE_GAS_BUFFER = 125_000; // integer amount
 
     event MEVPaymentSuccess(address bidToken, uint256 bidAmount);
-    event MEVPaymentFailure(address indexed controller, uint32 callConfig, address bidToken, uint256 bidAmount);
     event SolverTxResult(
         address indexed solverTo, address indexed solverFrom, bool executed, bool success, uint256 result
     );
@@ -227,8 +226,6 @@ contract EscrowTest is AtlasBaseTest {
             .build();
         defaultAtlasWithCallConfig(callConfig);
 
-        vm.expectEmit(false, false, false, true, address(atlas));
-        emit MEVPaymentFailure(address(dAppControl), callConfig.encodeCallConfig(), address(0), defaultBidAmount);
         this.executeHookCase(false, 1, noError);
     }
 

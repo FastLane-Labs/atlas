@@ -168,9 +168,7 @@ abstract contract Escrow is AtlETH {
         );
         data = abi.encodePacked(data, key.pack());
         (bool success,) = key.executionEnvironment.call(data);
-        if (!success) {
-            emit MEVPaymentFailure(dConfig.to, dConfig.callConfig, dConfig.bidToken, winningBidAmount);
-        } else {
+        if (success) {
             key.paymentsSuccessful = true;
         }
 
