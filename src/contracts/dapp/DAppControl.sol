@@ -2,20 +2,21 @@
 pragma solidity 0.8.22;
 
 import { DAppControlTemplate } from "./ControlTemplate.sol";
-import { ExecutionBase } from "../common/ExecutionBase.sol";
-import { EXECUTION_PHASE_OFFSET } from "../libraries/SafetyBits.sol";
-import { ExecutionPhase } from "../types/LockTypes.sol";
-import { CallBits } from "../libraries/CallBits.sol";
-import "../types/SolverCallTypes.sol";
-import "../types/UserCallTypes.sol";
-import "../types/DAppApprovalTypes.sol";
+import { ExecutionBase } from "src/contracts/common/ExecutionBase.sol";
+import { EXECUTION_PHASE_OFFSET } from "src/contracts/libraries/SafetyBits.sol";
+import { ExecutionPhase } from "src/contracts/types/LockTypes.sol";
+import { CallBits } from "src/contracts/libraries/CallBits.sol";
+import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/UserCallTypes.sol";
+import "src/contracts/types/DAppApprovalTypes.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 import { IDAppIntegration } from "src/contracts/interfaces/IDAppIntegration.sol";
 
-import "forge-std/Test.sol";
-
+/// @title DAppControl
+/// @author FastLane Labs
+/// @notice DAppControl is the base contract which should be inherited by any Atlas dApps.
 abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     uint8 private constant _CONTROL_DEPTH = 1 << 2;
 
@@ -52,7 +53,9 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         _;
     }
 
-    // Functions
+    /// @notice The preOpsCall hook which may be called before the UserOperation is executed.
+    /// @param userOp The UserOperation struct.
+    /// @return data Data to be passed to the next call phase.
     function preOpsCall(UserOperation calldata userOp)
         external
         payable
@@ -63,6 +66,10 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         return _preOpsCall(userOp);
     }
 
+    /// @notice The preSolverCall hook which may be called before the SolverOperation is executed.
+    /// @param solverOp The SolverOperation to be executed after this hook has been called.
+    /// @param returnData Data returned from the previous call phase.
+    /// @return Boolean indicating whether the preSolverCall was successful.
     function preSolverCall(
         SolverOperation calldata solverOp,
         bytes calldata returnData
@@ -76,6 +83,10 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         return _preSolverCall(solverOp, returnData);
     }
 
+    /// @notice The postSolverCall hook which may be called after the SolverOperation has been executed.
+    /// @param solverOp The SolverOperation struct that was executed just before this hook was called.
+    /// @param returnData Data returned from the previous call phase.
+    /// @return Boolean indicating whether the postSolverCall was successful.
     function postSolverCall(
         SolverOperation calldata solverOp,
         bytes calldata returnData
@@ -89,6 +100,10 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         return _postSolverCall(solverOp, returnData);
     }
 
+    /// @notice The allocateValueCall hook which is called after a successful SolverOperation.
+    /// @param bidToken The address of the token used for the winning SolverOperation's bid.
+    /// @param bidAmount The winning bid amount.
+    /// @param data Data returned from the previous call phase.
     function allocateValueCall(
         address bidToken,
         uint256 bidAmount,
@@ -101,6 +116,10 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         _allocateValueCall(bidToken, bidAmount, data);
     }
 
+    /// @notice The postOpsCall hook which may be called as the last phase of a `metacall` transaction.
+    /// @param solved Boolean indicating whether a winning SolverOperation was executed successfully.
+    /// @param data Data returned from the previous call phase.
+    /// @return Boolean indicating whether the postOpsCall was successful.
     function postOpsCall(
         bool solved,
         bytes calldata data
@@ -114,7 +133,6 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         return _postOpsCall(solved, data);
     }
 
-    // View functions
     function userDelegated() external view returns (bool delegated) {
         delegated = CallBits.needsDelegateUser(CALL_CONFIG);
     }
@@ -127,6 +145,9 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         isSequenced = CallBits.needsSequencedDAppNonces(CALL_CONFIG);
     }
 
+    /// @notice Returns the DAppConfig struct of this DAppControl contract.
+    /// @param userOp The UserOperation struct.
+    /// @return dConfig The DAppConfig struct of this DAppControl contract.
     function getDAppConfig(UserOperation calldata userOp)
         external
         view
@@ -141,6 +162,8 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         });
     }
 
+    /// @notice Returns the CallConfig struct of this DAppControl contract.
+    /// @return The CallConfig struct of this DAppControl contract.
     function getCallConfig() external view returns (CallConfig memory) {
         return _getCallConfig();
     }
@@ -149,12 +172,14 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         return CallBits.decodeCallConfig(CALL_CONFIG);
     }
 
+    /// @notice Returns the current governance address of this DAppControl contract.
+    /// @return The address of the current governance account of this DAppControl contract.
     function getDAppSignatory() external view returns (address) {
         return governance;
     }
 
-    // Governance functions
-
+    /// @notice Starts the transfer of governance to a new address. Only callable by the current governance address.
+    /// @param newGovernance The address of the new governance.
     function transferGovernance(address newGovernance) external {
         if (msg.sender != governance) {
             revert AtlasErrors.OnlyGovernance();
@@ -163,6 +188,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         emit AtlasEvents.GovernanceTransferStarted(governance, newGovernance);
     }
 
+    /// @notice Accepts the transfer of governance to a new address. Only callable by the new governance address.
     function acceptGovernance() external {
         address newGovernance = pendingGovernance;
         if (msg.sender != newGovernance) {
