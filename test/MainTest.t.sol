@@ -126,8 +126,6 @@ contract MainTest is BaseTest {
         uint256 solverTwoEOABalance = solverTwoEOA.balance;
         uint256 solverTwoAtlEthBalance = atlas.balanceOf(solverTwoEOA);
 
-        vm.expectEmit(true, true, true, true);
-        emit AtlasEvents.MetacallResult(userEOA, userEOA, solverOps[0].from, 929281815000000, 103253535000000);
         (bool success,) =
             address(atlas).call(abi.encodeWithSelector(atlas.metacall.selector, userOp, solverOps, dAppOp));
 

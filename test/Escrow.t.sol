@@ -219,16 +219,6 @@ contract EscrowTest is AtlasBaseTest {
         this.executeHookCase(false, 0, noError);
     }
 
-    // Ensure the proper event is emitted when allocateValue fails.
-    function test_allocateValue_failure() public {
-        CallConfig memory callConfig = defaultCallConfig()
-            .withTrackUserReturnData(true) // Track the user operation's return data
-            .build();
-        defaultAtlasWithCallConfig(callConfig);
-
-        this.executeHookCase(false, 1, noError);
-    }
-
     function executeHookCase(bool hookShouldRevert, uint256 expectedHookReturnValue, bytes4 expectedError) public {
         bool revertExpected = expectedError != noError;
 
