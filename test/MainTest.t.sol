@@ -128,7 +128,6 @@ contract MainTest is BaseTest {
 
         vm.expectEmit(true, true, true, true);
         emit AtlasEvents.MetacallResult(userEOA, userEOA, solverOps[0].from);
-        emit AtlasEvents.SolverExecution(solverOps[0].from, 0, true);
         (bool success,) =
             address(atlas).call(abi.encodeWithSelector(atlas.metacall.selector, userOp, solverOps, dAppOp));
 

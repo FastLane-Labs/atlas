@@ -4,7 +4,6 @@ pragma solidity 0.8.22;
 contract AtlasEvents {
     // Metacall
     event MetacallResult(address indexed bundler, address indexed user, address indexed winningSolver);
-    event SolverExecution(address indexed solver, uint256 index, bool isWin);
 
     // AtlETH
     event Bond(address indexed owner, uint256 amount);

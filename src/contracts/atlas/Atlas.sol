@@ -291,14 +291,10 @@ contract Atlas is Escrow, Factory {
             if (auctionWon) {
                 key = _allocateValue(dConfig, solverOp, solverOp.bidAmount, returnData, key);
 
-                emit SolverExecution(solverOp.from, i, true);
-
                 key.solverOutcome = uint24(i);
 
                 return (auctionWon, key);
             }
-
-            emit SolverExecution(solverOp.from, i, false);
 
             unchecked {
                 ++i;
