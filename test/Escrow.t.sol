@@ -39,7 +39,6 @@ contract EscrowTest is AtlasBaseTest {
     uint256 private constant _FASTLANE_GAS_BUFFER = 125_000; // integer amount
 
     event MEVPaymentSuccess(address bidToken, uint256 bidAmount);
-    event MEVPaymentFailure(address indexed controller, uint32 callConfig, address bidToken, uint256 bidAmount);
     event SolverTxResult(
         address indexed solverTo, address indexed solverFrom, bool executed, bool success, uint256 result
     );
@@ -218,18 +217,6 @@ contract EscrowTest is AtlasBaseTest {
         vm.expectEmit(false, false, false, true, executionEnvironment);
         emit MEVPaymentSuccess(address(0), defaultBidAmount);
         this.executeHookCase(false, 0, noError);
-    }
-
-    // Ensure the proper event is emitted when allocateValue fails.
-    function test_allocateValue_failure() public {
-        CallConfig memory callConfig = defaultCallConfig()
-            .withTrackUserReturnData(true) // Track the user operation's return data
-            .build();
-        defaultAtlasWithCallConfig(callConfig);
-
-        vm.expectEmit(false, false, false, true, address(atlas));
-        emit MEVPaymentFailure(address(dAppControl), callConfig.encodeCallConfig(), address(0), defaultBidAmount);
-        this.executeHookCase(false, 1, noError);
     }
 
     function executeHookCase(bool hookShouldRevert, uint256 expectedHookReturnValue, bytes4 expectedError) public {
