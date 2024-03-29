@@ -9,16 +9,17 @@ Atlas is a permissionless and modular smart contract framework for Execution Abs
 A frontend or API wishing to participate can integrate with Atlas by completing three steps:
 
 1. Embed the Atlas SDK into their frontend or API.
-2. Create and publish a DAppControl contract.
-3. Interact with the Atlas contract to initialize the DAppControl contract and link it to the Atlas SDK on their frontend or API.
+2. Choose an Operations Relay.
+3. Create and publish a DAppControl contract.
+4. Interact with the Atlas contract to initialize the DAppControl contract and link it to the Atlas SDK on their frontend or API.
 
 ### Network Overview
 
-Atlas is infrastructure-agnostic; each app may choose how the app-designated bundler may aggregate the User Operations and Solver Operations. Examples include:
-1. **On Chain**: When gas cost is not an issue, the entire auction can take place on chain (or rollup).
-2. **On Another Chain**: So many decentralized networks - it'd be a shame to use only one.
+Atlas is infrastructure-agnostic; each app may choose how the User Operations and Solver Operations are aggregated. Examples include:
+1. **On Chain**: When gas cost is not an issue, Solver Operations may be sent on-chain, and then aggregated by any party.
+2. **On Another Chain**:  Solver Operations may be posted and aggregated on another chain, and the output can be used to settle the atlas transaction on the settlement chain.
 3. **BloXroute**: When Atlas is launched, BloXroute's BDN will support the aggregation of User and Solver Operations for rapid bundling. 
-4. **SUAVE**: Once live, Operations can be sent to the SUAVE network, bundled into a transaction by the SUAVE Atlas implementation, and then made available for use by builders. 
+4. **SUAVE**: Once live, Operations can be sent to the SUAVE network, bundled into a transaction by the SUAVE Atlas implementation, and then made available for use by bundlers. 
 
 ### Auctioneer Overview
 
@@ -33,7 +34,7 @@ The auctioneer is tasked with signing a **DAppOperation** that includes a **Call
 3. The frontend receives SolverOperations back via the BDN.
 4. After a set period of time, the frontend calls the *getCallChainHash()* view function via the User's wallet's RPC.
 5. The frontend then uses the session key from step 1 to sign the **DAppOperation**, which includes the **CallChainHash**.
-6. The frontend then propagates the DAppOperation over the BDN to designated bundler.
+6. The frontend then propagates the DAppOperation over the BDN to a designated bundler, if the user themselves is not the bundler.
 
 Note that any bundler who tampers with the order of the SolverOperations will cause the transaction to revert, thereby blocking any gas reimbursement from Atlas.
 
@@ -69,6 +70,9 @@ The DAppControl contract has the option to define functions that execute at the 
 
 *These functions are executed by the Execution Environment via "delegatecall."
 
+#### Ex-Post Bids
+When bid amounts are known ahead of time by solvers the _bidKnownIteration() function is called and bids are sorted by bid amount, and executed until one is successful. If bid amounts are not known beforehand, such as when they are doing blind on-chain solving, the _bidFindingIteration() function is called to calculate the bid amounts on-chain. This is done by calling the same _executeSolverOperation() used in the _bidKnownIteration() for each solverOp, and checking the balance of the contract before and after to calculate the bid amounts for each aolverOp.
+
 #### Permit69
 A user must have an Execution Environment (EE) instance for each DApp they would like to use, and the user address is used as a salt for the create2 deterministic deployment of it. If one is not already available, EEs can be deployed during execution of a user order since their address is known beforehand, this gas cost is covered by the solver so UX is never impacted. The EE performs ops via delegateCalls, so it needs to be able to initiate token transfers from the user. Users only have to approve the Atlas contract once because Permit69 allows Atlas to transfer funds from the user if the request is from a valid EE for that user (checked by verifying the user address is one of the salts for the EE address). Permit69 is also used by DApps, but instead transfers tokens that have accumulated in the DAppControl contract, this function performs the same verification of the EE. 
 
@@ -97,4 +101,4 @@ A user must have an Execution Environment (EE) instance for each DApp they would
 
 ### Notes:
 
-Note that the auctioneer (typically the frontend) may want to use a reputation system for solver bids in order to not take up too much space in the block.  The further down the solverOps[], the higher the reputation requirement for inclusion by the backend. This isnt necessarily required - it's not an economic issue - it's just that it's important to be a good member of the ecosystem and not waste too much precious blockspace by filling it with probabalistic solver txs that have a low success rate but a high profit-to-cost ratio. 
+Note that the auctioneer (typically the frontend) and/or the Operations relay may want to use a reputation system for solver bids to efficiently use the space in the solverOps[]. This isnt necessarily required - it's not an economic issue - it's just that it's important to be a good member of the ecosystem and not waste too much precious blockspace by filling it with probabalistic solver txs that have a low success rate but a high profit-to-cost ratio.
