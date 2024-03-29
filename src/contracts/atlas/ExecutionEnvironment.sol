@@ -1,27 +1,25 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { ISolverContract } from "../interfaces/ISolverContract.sol";
-import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
-import { IDAppControl } from "../interfaces/IDAppControl.sol";
-import { IEscrow } from "../interfaces/IEscrow.sol";
-
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { Base } from "src/contracts/common/ExecutionBase.sol";
 
-import "../types/SolverCallTypes.sol";
-import "../types/UserCallTypes.sol";
-import "../types/DAppApprovalTypes.sol";
-
-import { ExecutionPhase } from "../types/LockTypes.sol";
-
-import { Base } from "../common/ExecutionBase.sol";
-
-import { CallBits } from "../libraries/CallBits.sol";
+import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
+import { ISafetyLocks } from "src/contracts/interfaces/ISafetyLocks.sol";
+import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
+import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
 
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import { CallBits } from "src/contracts/libraries/CallBits.sol";
+import { ExecutionPhase } from "src/contracts/types/LockTypes.sol";
+import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/UserCallTypes.sol";
+import "src/contracts/types/DAppApprovalTypes.sol";
 
-import "forge-std/Test.sol";
-
+/// @title ExecutionEnvironment
+/// @author FastLane Labs
+/// @notice An Execution Environment contract is deployed for each unique combination of User address x DAppControl
+/// address that interacts with the Atlas protocol via a metacall transaction.
 contract ExecutionEnvironment is Base {
     using CallBits for uint32;
 
@@ -59,15 +57,18 @@ contract ExecutionEnvironment is Base {
     //////////////////////////////////
     ///    CORE CALL FUNCTIONS     ///
     //////////////////////////////////
+
+    /// @notice The preOpsWrapper function may be called by Atlas before the UserOperation is executed.
+    /// @dev This contract is called by the Atlas contract, and delegatecalls the DAppControl contract via the
+    /// corresponding `preOpsCall` function.
+    /// @param userOp The UserOperation struct.
+    /// @return preOpsData Data to be passed to the next call phase.
     function preOpsWrapper(UserOperation calldata userOp)
         external
         validUser(userOp)
         onlyAtlasEnvironment(ExecutionPhase.PreOps, _ENVIRONMENT_DEPTH)
         returns (bytes memory)
     {
-        // msg.sender = atlas
-        // address(this) = ExecutionEnvironment
-
         bytes memory preOpsData = forward(abi.encodeWithSelector(IDAppControl.preOpsCall.selector, userOp));
 
         bool success;
@@ -79,6 +80,11 @@ contract ExecutionEnvironment is Base {
         return preOpsData;
     }
 
+    /// @notice The userWrapper function is called by Atlas to execute the UserOperation.
+    /// @dev This contract is called by the Atlas contract, and either delegatecalls or calls the DAppControl contract
+    /// with `userOp.data` as calldata, depending on the the needsDelegateUser flag.
+    /// @param userOp The UserOperation struct.
+    /// @return returnData Data to be passed to the next call phase.
     function userWrapper(UserOperation calldata userOp)
         external
         payable
@@ -88,9 +94,6 @@ contract ExecutionEnvironment is Base {
         contributeSurplus
         returns (bytes memory returnData)
     {
-        // msg.sender = atlas
-        // address(this) = ExecutionEnvironment
-
         uint32 config = _config();
 
         require(address(this).balance >= userOp.value, "ERR-CE01 ValueExceedsBalance");
@@ -107,6 +110,11 @@ contract ExecutionEnvironment is Base {
         }
     }
 
+    /// @notice The postOpsWrapper function may be called by Atlas as the last phase of a `metacall` transaction.
+    /// @dev This contract is called by the Atlas contract, and delegatecalls the DAppControl contract via the
+    /// corresponding `postOpsCall` function.
+    /// @param solved Boolean indicating whether a winning SolverOperation was executed successfully.
+    /// @param returnData Data returned from the previous call phase.
     function postOpsWrapper(
         bool solved,
         bytes calldata returnData
@@ -114,9 +122,6 @@ contract ExecutionEnvironment is Base {
         external
         onlyAtlasEnvironment(ExecutionPhase.PostOps, _ENVIRONMENT_DEPTH)
     {
-        // msg.sender = atlas
-        // address(this) = ExecutionEnvironment
-
         bytes memory data = forward(abi.encodeWithSelector(IDAppControl.postOpsCall.selector, solved, returnData));
 
         bool success;
@@ -126,6 +131,14 @@ contract ExecutionEnvironment is Base {
         require(abi.decode(data, (bool)), "ERR-EC03a DelegateUnsuccessful");
     }
 
+    /// @notice The solverMetaTryCatch function is called by Atlas to execute the SolverOperation, as well as any
+    /// preSolver or postSolver hooks that the DAppControl contract may require.
+    /// @dev This contract is called by the Atlas contract, delegatecalls the preSolver and postSolver hooks if
+    /// required, and executes the SolverOperation by calling the `solverOp.solver` address.
+    /// @param bidAmount The Solver's bid amount.
+    /// @param gasLimit The gas limit for the SolverOperation.
+    /// @param solverOp The SolverOperation struct.
+    /// @param returnData Data returned from the previous call phase.
     function solverMetaTryCatch(
         uint256 bidAmount,
         uint256 gasLimit,
@@ -136,8 +149,6 @@ contract ExecutionEnvironment is Base {
         payable
         onlyAtlasEnvironment(ExecutionPhase.SolverOperations, _ENVIRONMENT_DEPTH)
     {
-        // msg.sender = atlas
-        // address(this) = ExecutionEnvironment
         require(address(this).balance == solverOp.value, "ERR-CE05 IncorrectValue");
 
         uint32 config = _config();
@@ -295,6 +306,12 @@ contract ExecutionEnvironment is Base {
         }
     }
 
+    /// @notice The allocateValue function is called by Atlas after a successful SolverOperation.
+    /// @dev This contract is called by the Atlas contract, and delegatecalls the DAppControl contract via the
+    /// corresponding `allocateValueCall` function.
+    /// @param bidToken The address of the token used for the winning SolverOperation's bid.
+    /// @param bidAmount The winning bid amount.
+    /// @param allocateData Data returned from the previous call phase.
     function allocateValue(
         address bidToken,
         uint256 bidAmount,
@@ -304,9 +321,6 @@ contract ExecutionEnvironment is Base {
         onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _ENVIRONMENT_DEPTH)
         contributeSurplus
     {
-        // msg.sender = atlas
-        // address(this) = ExecutionEnvironment
-
         allocateData =
             forward(abi.encodeWithSelector(IDAppControl.allocateValueCall.selector, bidToken, bidAmount, allocateData));
 
@@ -317,6 +331,12 @@ contract ExecutionEnvironment is Base {
     ///////////////////////////////////////
     //  USER SUPPORT / ACCESS FUNCTIONS  //
     ///////////////////////////////////////
+
+    /// @notice The withdrawERC20 function allows the environment owner to withdraw ERC20 tokens from this Execution
+    /// Environment.
+    /// @dev This function is only callable by the environment owner and only when Atlas is in an unlocked state.
+    /// @param token The address of the ERC20 token to withdraw.
+    /// @param amount The amount of the ERC20 token to withdraw.
     function withdrawERC20(address token, uint256 amount) external {
         require(msg.sender == _user(), "ERR-EC01 NotEnvironmentOwner");
         require(ISafetyLocks(atlas).isUnlocked(), "ERR-EC15 EscrowLocked");
@@ -328,6 +348,12 @@ contract ExecutionEnvironment is Base {
         }
     }
 
+    /// @notice The factoryWithdrawERC20 function allows Atlas to withdraw ERC20 tokens from this Execution Environment,
+    /// to the original user of this environment.
+    /// @dev This function is only callable by the Atlas contract and only when Atlas is in an unlocked state.
+    /// @param msgSender The address of the original user of this environment.
+    /// @param token The address of the ERC20 token to withdraw.
+    /// @param amount The amount of the ERC20 token to withdraw.
     function factoryWithdrawERC20(address msgSender, address token, uint256 amount) external {
         require(msg.sender == atlas, "ERR-EC10 NotFactory");
         require(msgSender == _user(), "ERR-EC11 NotEnvironmentOwner");
@@ -340,6 +366,10 @@ contract ExecutionEnvironment is Base {
         }
     }
 
+    /// @notice The withdrawEther function allows the environment owner to withdraw Ether from this Execution
+    /// Environment.
+    /// @dev This function is only callable by the environment owner and only when Atlas is in an unlocked state.
+    /// @param amount The amount of Ether to withdraw.
     function withdrawEther(uint256 amount) external {
         require(msg.sender == _user(), "ERR-EC01 NotEnvironmentOwner");
         require(ISafetyLocks(atlas).isUnlocked(), "ERR-EC15 EscrowLocked");
@@ -351,6 +381,11 @@ contract ExecutionEnvironment is Base {
         }
     }
 
+    /// @notice The factoryWithdrawEther function allows Atlas to withdraw Ether from this Execution Environment, to the
+    /// original user of this environment.
+    /// @dev This function is only callable by the Atlas contract and only when Atlas is in an unlocked state.
+    /// @param msgSender The address of the original user of this environment.
+    /// @param amount The amount of Ether to withdraw.
     function factoryWithdrawEther(address msgSender, uint256 amount) external {
         require(msg.sender == atlas, "ERR-EC10 NotFactory");
         require(msgSender == _user(), "ERR-EC11 NotEnvironmentOwner");
@@ -363,18 +398,27 @@ contract ExecutionEnvironment is Base {
         }
     }
 
+    /// @notice The getUser function returns the address of the user of this Execution Environment.
+    /// @return user The address of the user of this Execution Environment.
     function getUser() external pure returns (address user) {
         user = _user();
     }
 
+    /// @notice The getControl function returns the address of the DAppControl contract of the current metacall
+    /// transaction.
+    /// @return control The address of the DAppControl contract of the current metacall transaction.
     function getControl() external pure returns (address control) {
         control = _control();
     }
 
+    /// @notice The getConfig function returns the CallConfig of the current metacall transaction.
+    /// @return config The CallConfig in uint32 form of the current metacall transaction.
     function getConfig() external pure returns (uint32 config) {
         config = _config();
     }
 
+    /// @notice The getEscrow function returns the address of the Atlas/Escrow contract.
+    /// @return escrow The address of the Atlas/Escrow contract.
     function getEscrow() external view returns (address escrow) {
         escrow = atlas;
     }

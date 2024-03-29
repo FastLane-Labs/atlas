@@ -1,27 +1,25 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
-
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+
+import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
 
 import { Escrow } from "./Escrow.sol";
 import { Factory } from "./Factory.sol";
 
-// import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
-// import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/UserCallTypes.sol";
+import "src/contracts/types/LockTypes.sol";
+import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/ValidCallsTypes.sol";
 
-import "../types/SolverCallTypes.sol";
-import "../types/UserCallTypes.sol";
-import "../types/LockTypes.sol";
-import "../types/DAppApprovalTypes.sol";
-import "../types/ValidCallsTypes.sol";
+import { CallBits } from "src/contracts/libraries/CallBits.sol";
+import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 
-import { CallBits } from "../libraries/CallBits.sol";
-import { SafetyBits } from "../libraries/SafetyBits.sol";
-
-// import "forge-std/Test.sol";
-
+/// @title Atlas V1
+/// @author FastLane Labs
+/// @notice The Execution Abstraction protocol.
 contract Atlas is Escrow, Factory {
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
@@ -37,7 +35,11 @@ contract Atlas is Escrow, Factory {
         Factory(_executionTemplate)
     { }
 
-    function metacall( // <- Entrypoint Function
+    /// @notice metacall is the entrypoint function for the Atlas transactions.
+    /// @param userOp The UserOperation struct containing the user's transaction data.
+    /// @param solverOps The SolverOperation array containing the solvers' transaction data.
+    /// @param dAppOp The DAppOperation struct containing the DApp's transaction data.
+    function metacall(
         UserOperation calldata userOp, // set by user
         SolverOperation[] calldata solverOps, // supplied by ops relay
         DAppOperation calldata dAppOp // supplied by front end via atlas SDK
@@ -49,17 +51,15 @@ contract Atlas is Escrow, Factory {
         uint256 gasMarker = gasleft(); // + 21_000 + (msg.data.length * _CALLDATA_LENGTH_PREMIUM);
         bool isSimulation = msg.sender == SIMULATOR;
 
-        // Get or create the execution environment
         (address executionEnvironment, DAppConfig memory dConfig) = _getOrCreateExecutionEnvironment(userOp);
 
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
-        // NOTE: Currently reverting instead of graceful return to help w/ testing.
+        // NOTE: Currently reverting instead of graceful return to help w/ testing. TODO - still reverting?
         (bytes32 userOpHash, ValidCallsResult validCallsResult) = IAtlasVerification(VERIFICATION).validateCalls(
             dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, isSimulation
         );
         if (validCallsResult != ValidCallsResult.Valid) {
-            // TODO group lines below into single revert line?
             if (isSimulation) revert VerificationSimFail(uint256(validCallsResult));
             else revert ValidCalls(validCallsResult);
         }
@@ -93,10 +93,17 @@ contract Atlas is Escrow, Factory {
 
         // Release the lock
         _releaseAtlasLock();
-
-        // console.log("total gas used", gasMarker - gasleft());
     }
 
+    /// @notice execute is called above, in a try-catch block in metacall.
+    /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
+    /// @param userOp UserOperation struct of the current metacall tx.
+    /// @param solverOps SolverOperation array of the current metacall tx.
+    /// @param executionEnvironment Address of the execution environment contract of the current metacall tx.
+    /// @param bundler Address of the bundler of the current metacall tx.
+    /// @param userOpHash Hash of the userOp struct of the current metacall tx.
+    /// @return auctionWon Boolean indicating whether the auction was won
+    /// @return uint256 The solver outcome bitmap
     function execute(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
@@ -143,6 +150,15 @@ contract Atlas is Escrow, Factory {
         return (auctionWon, uint256(key.solverOutcome));
     }
 
+    /// @notice Called above in `execute`, this function executes the preOps and userOp calls.
+    /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
+    /// @param userOp UserOperation struct of the current metacall tx.
+    /// @param solverOps SolverOperation array of the current metacall tx.
+    /// @param executionEnvironment Address of the execution environment contract of the current metacall tx.
+    /// @param bundler Address of the bundler of the current metacall tx.
+    /// @param userOpHash Hash of the userOp struct of the current metacall tx.
+    /// @return bytes returnData returned from the preOps and/or userOp calls.
+    /// @return EscrowKey struct containing the current state of the escrow lock.
     function _preOpsUserExecutionIteration(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
@@ -209,6 +225,15 @@ contract Atlas is Escrow, Factory {
         return (returnData, key);
     }
 
+    /// @notice Called above in `execute` if the DAppConfig requires ex post bids. Sorts solverOps by bid amount and
+    /// executes them in descending order until a successful winner is found.
+    /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
+    /// @param userOp UserOperation struct of the current metacall tx.
+    /// @param solverOps SolverOperation array of the current metacall tx.
+    /// @param returnData Return data from the preOps and userOp calls.
+    /// @param key EscrowKey struct containing the current state of the escrow lock.
+    /// @return auctionWon bool indicating whether a winning solver was found or not.
+    /// @return EscrowKey struct containing the current state of the escrow lock.
     function _bidFindingIteration(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
@@ -228,12 +253,6 @@ contract Atlas is Escrow, Factory {
 
         for (uint256 i; i < solverOps.length; i++) {
             bidPlaceholder = _getBidAmount(dConfig, userOp, solverOps[i], returnData, key);
-            /*
-                console.log("----");
-                console.log("bidFind for", solverOps[i].solver);
-                console.log("bid Amount ", bidPlaceholder);
-                console.log("---");
-            */
 
             if (bidPlaceholder == 0) {
                 unchecked {
@@ -245,7 +264,6 @@ contract Atlas is Escrow, Factory {
 
                 for (uint256 k = i - j + 1; k > 0; k--) {
                     if (bidPlaceholder > bidAmounts[sortedOps[k - 1]]) {
-                        // should be >= ?
                         sortedOps[k] = sortedOps[k - 1];
                         sortedOps[k - 1] = i;
                     } else {
@@ -276,6 +294,15 @@ contract Atlas is Escrow, Factory {
         return (auctionWon, key);
     }
 
+    /// @notice Called above in `execute` as an alternative to `_bidFindingIteration`, if solverOps have already been
+    /// reliably sorted. Executes solverOps in order until a successful winner is found.
+    /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
+    /// @param userOp UserOperation struct of the current metacall tx.
+    /// @param solverOps SolverOperation array of the current metacall tx.
+    /// @param returnData Return data from the preOps and userOp calls.
+    /// @param key EscrowKey struct containing the current state of the escrow lock.
+    /// @return auctionWon bool indicating whether a winning solver was found or not.
+    /// @return EscrowKey struct containing the current state of the escrow lock.
     function _bidKnownIteration(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
@@ -313,6 +340,9 @@ contract Atlas is Escrow, Factory {
         return (auctionWon, key);
     }
 
+    /// @notice Called at the end of `metacall` to bubble up specific error info in a revert.
+    /// @param revertData Revert data from a failure during the execution of the metacall.
+    /// @param callConfig The CallConfig of the current metacall tx.
     function _handleErrors(bytes memory revertData, uint32 callConfig) internal view {
         bytes4 errorSwitch = bytes4(revertData);
         if (msg.sender == SIMULATOR) {
@@ -344,6 +374,10 @@ contract Atlas is Escrow, Factory {
         }
     }
 
+    /// @notice Reverts if the caller is not the execution environment address expected from the set of inputs.
+    /// @param user User address
+    /// @param controller DAppControl contract address
+    /// @param callConfig CallConfig of the current metacall tx.
     function _verifyCallerIsExecutionEnv(address user, address controller, uint32 callConfig) internal view override {
         if (msg.sender != _getExecutionEnvironmentCustom(user, controller.codehash, controller, callConfig)) {
             revert EnvironmentMismatch();

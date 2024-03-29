@@ -2,71 +2,22 @@
 pragma solidity 0.8.22;
 
 import "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
-
-import { CallBits } from "../libraries/CallBits.sol";
-
-import "../types/SolverCallTypes.sol";
-import "../types/UserCallTypes.sol";
-import "../types/DAppApprovalTypes.sol";
-import "../types/EscrowTypes.sol";
-import "../types/ValidCallsTypes.sol";
-
-import { EscrowBits } from "../libraries/EscrowBits.sol";
-import { CallVerification } from "../libraries/CallVerification.sol";
-
 import { DAppIntegration } from "./DAppIntegration.sol";
+
+import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
+import { CallBits } from "src/contracts/libraries/CallBits.sol";
+import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/UserCallTypes.sol";
+import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/EscrowTypes.sol";
+import "src/contracts/types/ValidCallsTypes.sol";
 
-import "forge-std/Test.sol"; // TODO remove
-
-// FROM ETH-INFINITISM REPO:
-// https://github.com/eth-infinitism/account-abstraction/blob/develop/contracts/interfaces/IAccount.sol
-
-interface IAccount {
-    /**
-     * Validate user's signature and nonce
-     * the entryPoint will make the call to the recipient only if this validation call returns successfully.
-     * signature failure should be reported by returning SIG_VALIDATION_FAILED (1).
-     * This allows making a "simulation call" without a valid signature
-     * Other failures (e.g. nonce mismatch, or invalid signature format) should still revert to signal failure.
-     *
-     * @dev Must validate caller is the entryPoint.
-     *      Must validate the signature and nonce
-     * @param userOp              - The operation that is about to be executed.
-     * @param userOpHash          - Hash of the user's request data. can be used as the basis for signature.
-     * @param missingAccountFunds - Missing funds on the account's deposit in the entrypoint.
-     *                              This is the minimum amount to transfer to the sender(entryPoint) to be
-     *                              able to make the call. The excess is left as a deposit in the entrypoint
-     *                              for future calls. Can be withdrawn anytime using "entryPoint.withdrawTo()".
-     *                              In case there is a paymaster in the request (or the current deposit is high
-     *                              enough), this value will be zero.
-     * @return validationData       - Packaged ValidationData structure. use `_packValidationData` and
-     *                              `_unpackValidationData` to encode and decode.
-     *                              <20-byte> sigAuthorizer - 0 for valid signature, 1 to mark signature failure,
-     *                                 otherwise, an address of an "authorizer" contract.
-     *                              <6-byte> validUntil - Last timestamp this operation is valid. 0 for "indefinite"
-     *                              <6-byte> validAfter - First timestamp this operation is valid
-     *                                                    If an account doesn't use time-range, it is enough to
-     *                                                    return SIG_VALIDATION_FAILED value (1) for signature failure.
-     *                              Note that the validation code cannot use block.timestamp (or block.number) directly.
-     */
-    function validateUserOp(
-        UserOperation calldata userOp,
-        bytes32 userOpHash,
-        uint256 missingAccountFunds
-    )
-        external
-        returns (uint256 validationData);
-}
-
-// NOTE: AtlasVerification is the separate contract version of the DappVerification/DAppIntegration
-// inheritance slice of the original Atlas design
-
-// This contract exists so that dapp frontends can sign and confirm the
-// calldata for users.  Users already trust the frontends to build and verify
-// their calldata.  This allows users to know that any CallData sourced via
-// an external relay (such as FastLane) has been verified by the already-trusted
-// frontend
+/// @title AtlasVerification
+/// @author FastLane Labs
+/// @notice AtlasVerification handles the verification of DAppConfigs, UserOperations, SolverOperations, and
+/// DAppOperations within a metacall to ensure that calldata sourced from various parties is safe and valid.
 contract AtlasVerification is EIP712, DAppIntegration {
     using ECDSA for bytes32;
     using CallBits for uint32;
@@ -77,10 +28,18 @@ contract AtlasVerification is EIP712, DAppIntegration {
     uint256 internal constant FIRST_4_BITS_FULL = uint256(0xF);
     uint8 internal constant MAX_SOLVERS = type(uint8).max - 2;
 
-    error InvalidCaller();
+    constructor(address _atlas) EIP712("AtlasVerification", "1.0") DAppIntegration(_atlas) { }
 
-    constructor(address _atlas) EIP712("AtlasVerification", "0.0.1") DAppIntegration(_atlas) { }
-
+    /// @notice The validateCalls function verifies the validity of the metacall calldata components.
+    /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
+    /// @param userOp The UserOperation struct of the metacall.
+    /// @param solverOps An array of SolverOperation structs.
+    /// @param dAppOp The DAppOperation struct of the metacall.
+    /// @param msgValue The ETH value sent with the metacall transaction.
+    /// @param msgSender The forwarded msg.sender of the original metacall transaction in the Atlas contract.
+    /// @param isSimulation A boolean indicating if the call is a simulation.
+    /// @return userOpHash The hash of the UserOperation struct.
+    /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
     function validateCalls(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
@@ -97,6 +56,17 @@ contract AtlasVerification is EIP712, DAppIntegration {
         return _validCalls(dConfig, userOp, solverOps, dAppOp, msgValue, msgSender, isSimulation);
     }
 
+    /// @notice The internal _validCalls function verifies the validity of the metacall calldata components, and is
+    /// called by validateCalls.
+    /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
+    /// @param userOp The UserOperation struct of the metacall.
+    /// @param solverOps An array of SolverOperation structs.
+    /// @param dAppOp The DAppOperation struct of the metacall.
+    /// @param msgValue The ETH value sent with the metacall transaction.
+    /// @param msgSender The forwarded msg.sender of the original metacall transaction in the Atlas contract.
+    /// @param isSimulation A boolean indicating if the call is a simulation.
+    /// @return userOpHash The hash of the UserOperation struct.
+    /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
     function _validCalls(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
@@ -206,6 +176,12 @@ contract AtlasVerification is EIP712, DAppIntegration {
         return (userOpHash, ValidCallsResult.Valid);
     }
 
+    /// @notice The verifySolverOp function verifies the validity of a SolverOperation.
+    /// @param solverOp The SolverOperation struct to verify.
+    /// @param userOpHash The hash of the associated UserOperation struct.
+    /// @param userMaxFeePerGas The maximum fee per gas the user is willing to pay.
+    /// @param bundler The address of the bundler.
+    /// @return result The result of the SolverOperation verification, containing SolverOutcome info in a bitmap.
     function verifySolverOp(
         SolverOperation calldata solverOp,
         bytes32 userOpHash,
@@ -244,6 +220,14 @@ contract AtlasVerification is EIP712, DAppIntegration {
         }
     }
 
+    /// @notice The _verifyAuctioneer internal function is called by _validCalls to verify that the auctioneer of the
+    /// metacall is valid according to the rules set in the DAppConfig.
+    /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
+    /// @param userOp The UserOperation struct of the metacall.
+    /// @param solverOps An array of SolverOperation structs.
+    /// @param dAppOp The DAppOperation struct of the metacall.
+    /// @return valid A boolean indicating if the auctioneer is valid.
+    /// @return bypassSignatoryApproval A boolean indicating if the signatory approval check should be bypassed.
     function _verifyAuctioneer(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
@@ -268,16 +252,24 @@ contract AtlasVerification is EIP712, DAppIntegration {
         return (true, false);
     }
 
+    /// @notice The getSolverPayload function returns the hash of a SolverOperation struct.
+    /// @param solverOp The SolverOperation struct to hash.
     function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload) {
         payload = _hashTypedDataV4(_getSolverHash(solverOp));
     }
 
+    /// @notice The internal _verifySolverSignature function verifies the signature of a SolverOperation.
+    /// @param solverOp The SolverOperation struct to verify.
+    /// @return A boolean indicating if the signature is valid.
     function _verifySolverSignature(SolverOperation calldata solverOp) internal view returns (bool) {
         if (solverOp.signature.length == 0) return false;
         address signer = _hashTypedDataV4(_getSolverHash(solverOp)).recover(solverOp.signature);
         return signer == solverOp.from;
     }
 
+    /// @notice The _getSolverHash internal function returns the hash of a SolverOperation struct.
+    /// @param solverOp The SolverOperation struct to hash.
+    /// @return solverHash The hash of the SolverOperation struct.
     function _getSolverHash(SolverOperation calldata solverOp) internal pure returns (bytes32 solverHash) {
         return keccak256(
             abi.encode(
@@ -302,14 +294,16 @@ contract AtlasVerification is EIP712, DAppIntegration {
     // DAPP VERIFICATION
     //
 
-    // Verify that the dapp's front end generated the preOps
-    // information and that it matches the on-chain data.
-    // Verify that the dapp's front end's data is based on
-    // the data submitted by the user and by the solvers.
-    // NOTE: the dapp's front end is the last party in
-    // the supply chain to submit data.  If any other party
-    // (user, solver, FastLane,  or a collusion between
-    // all of them) attempts to alter it, this check will fail
+    /// @notice Verifies that the dapp's data matches the data submitted by the user and solvers. NOTE: The dapp's front
+    /// end is the last party in the supply chain to submit data.  If any other party (user, solver, FastLane,  or a
+    /// collusion between all of them) attempts to alter it, this check will fail.
+    /// @param dConfig The DAppConfig containing configuration details.
+    /// @param dAppOp The DAppOperation struct of the metacall.
+    /// @param msgSender The forwarded msg.sender of the original metacall transaction in the Atlas contract.
+    /// @param bypassSignatoryApproval Boolean indicating whether to bypass signatory approval.
+    /// @param isSimulation Boolean indicating whether the execution is a simulation.
+    /// @return A boolean indicating if the DAppOperation is valid.
+    /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
     function _verifyDApp(
         DAppConfig memory dConfig,
         DAppOperation calldata dAppOp,
@@ -382,7 +376,13 @@ contract AtlasVerification is EIP712, DAppIntegration {
         return (true, ValidCallsResult.Valid);
     }
 
-    // Returns true if nonce is valid, otherwise returns false
+    /// @notice The _handleNonces internal function handles the verification of nonces for both sequenced and async
+    /// nonce systems.
+    /// @param account The address of the account to verify the nonce for.
+    /// @param nonce The nonce to verify.
+    /// @param async A boolean indicating if the nonce is async (true) or sequential (false).
+    /// @param isSimulation A boolean indicating if the execution is a simulation.
+    /// @return A boolean indicating if the nonce is valid.
     function _handleNonces(address account, uint256 nonce, bool async, bool isSimulation) internal returns (bool) {
         if (nonce > type(uint128).max - 1) {
             return false;
@@ -446,6 +446,14 @@ contract AtlasVerification is EIP712, DAppIntegration {
         return true;
     }
 
+    /// @notice Increments the `highestFullAsyncBitmap` of a given `nonceTracker` for the specified `account` until a
+    /// non-fully utilized bitmap is found.
+    /// @param nonceTracker The `NonceTracker` memory structure representing the current state of nonce tracking for a
+    /// specific account.
+    /// @param account The address of the account for which the nonce tracking is being updated. This is used to
+    /// generate a unique key for accessing the correct bitmap from a mapping.
+    /// @return nonceTracker The updated `NonceTracker` structure with the `highestFullAsyncBitmap` field modified to
+    /// reflect the highest index of a bitmap that is not fully utilized.
     function _incrementHighestFullAsyncBitmap(
         NonceTracker memory nonceTracker,
         address account
@@ -467,6 +475,9 @@ contract AtlasVerification is EIP712, DAppIntegration {
         return nonceTracker;
     }
 
+    /// @notice Generates the hash of a DAppOperation struct.
+    /// @param approval The DAppOperation struct to hash.
+    /// @return proofHash The hash of the DAppOperation struct.
     function _getProofHash(DAppOperation memory approval) internal pure returns (bytes32 proofHash) {
         proofHash = keccak256(
             abi.encode(
@@ -485,6 +496,9 @@ contract AtlasVerification is EIP712, DAppIntegration {
         );
     }
 
+    /// @notice Verifies the signature of a DAppOperation struct.
+    /// @param dAppOp The DAppOperation struct to verify.
+    /// @return A boolean indicating if the signature is valid.
     function _verifyDAppSignature(DAppOperation calldata dAppOp) internal view returns (bool) {
         if (dAppOp.signature.length == 0) return false;
         address signer = _hashTypedDataV4(_getProofHash(dAppOp)).recover(dAppOp.signature);
@@ -492,10 +506,15 @@ contract AtlasVerification is EIP712, DAppIntegration {
         return signer == dAppOp.from;
     }
 
+    /// @notice Generates the hash of a DAppOperation struct.
+    /// @param dAppOp The DAppOperation struct to hash.
+    /// @return payload The hash of the DAppOperation struct.
     function getDAppOperationPayload(DAppOperation memory dAppOp) public view returns (bytes32 payload) {
         payload = _hashTypedDataV4(_getProofHash(dAppOp));
     }
 
+    /// @notice Returns the domain separator for the EIP712 signature scheme.
+    /// @return domainSeparator The domain separator for the EIP712 signature scheme.
     function getDomainSeparator() external view returns (bytes32 domainSeparator) {
         domainSeparator = _domainSeparatorV4();
     }
@@ -504,7 +523,12 @@ contract AtlasVerification is EIP712, DAppIntegration {
     // USER VERIFICATION
     //
 
-    // Verify the user's meta transaction
+    /// @notice Verifies the validity of a UserOperation struct.
+    /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
+    /// @param userOp The UserOperation struct to verify.
+    /// @param msgSender The forwarded msg.sender of the original metacall transaction in the Atlas contract.
+    /// @param isSimulation A boolean indicating if the call is a simulation.
+    /// @return A boolean indicating if the UserOperation is valid.
     function _verifyUser(
         DAppConfig memory dConfig,
         UserOperation calldata userOp,
@@ -550,6 +574,9 @@ contract AtlasVerification is EIP712, DAppIntegration {
         return true;
     }
 
+    /// @notice Generates the hash of a UserOperation struct.
+    /// @param userOp The UserOperation struct to hash.
+    /// @return proofHash The hash of the UserOperation struct.
     function _getProofHash(UserOperation memory userOp) internal pure returns (bytes32 proofHash) {
         proofHash = keccak256(
             abi.encode(
@@ -569,6 +596,9 @@ contract AtlasVerification is EIP712, DAppIntegration {
         );
     }
 
+    /// @notice Verifies the signature of a UserOperation struct.
+    /// @param userOp The UserOperation struct to verify.
+    /// @return A boolean indicating if the signature is valid.
     function _verifyUserSignature(UserOperation calldata userOp) internal view returns (bool) {
         if (userOp.signature.length == 0) return false;
         address signer = _hashTypedDataV4(_getProofHash(userOp)).recover(userOp.signature);
@@ -576,11 +606,17 @@ contract AtlasVerification is EIP712, DAppIntegration {
         return signer == userOp.from;
     }
 
+    /// @notice Generates the hash of a UserOperation struct.
+    /// @param userOp The UserOperation struct to hash.
+    /// @return payload The hash of the UserOperation struct.
     function getUserOperationPayload(UserOperation memory userOp) public view returns (bytes32 payload) {
         payload = _hashTypedDataV4(_getProofHash(userOp));
     }
 
-    // Returns the next nonce for the given account, in sequential or async mode
+    /// @notice Returns the next nonce for the given account, in sequential or async mode.
+    /// @param account The address of the account for which to retrieve the next nonce.
+    /// @param sequenced A boolean indicating if the nonce should be sequential (true) or async (false).
+    /// @return The next nonce for the given account.
     function getNextNonce(address account, bool sequenced) external view returns (uint256) {
         NonceTracker memory nonceTracker = nonceTrackers[account];
 
@@ -604,7 +640,9 @@ contract AtlasVerification is EIP712, DAppIntegration {
         }
     }
 
-    // Call if highestFullAsyncBitmap doesn't reflect real full bitmap of an account
+    /// @notice Manually updates the highestFullAsyncBitmap of an account to reflect the real full bitmap.
+    /// @dev Only the owner of the account whose nonce tracker is being updated can call this function.
+    /// @param account The address of the account for which to update the highestFullAsyncBitmap.
     function manuallyUpdateNonceTracker(address account) external {
         if (msg.sender != account) revert AtlasErrors.OnlyAccount();
 
@@ -626,13 +664,21 @@ contract AtlasVerification is EIP712, DAppIntegration {
         nonceTrackers[account] = nonceTracker;
     }
 
-    // Only accurate for nonces 1 - 240 within a 256-bit bitmap
+    /// @notice Checks if a nonce is used in a 256-bit bitmap.
+    /// @dev Only accurate for nonces 1 - 240 within a 256-bit bitmap.
+    /// @param bitmap The 256-bit bitmap to check.
+    /// @param nonce The nonce to check.
+    /// @return A boolean indicating if the nonce is used in the bitmap.
     function _nonceUsedInBitmap(uint256 bitmap, uint256 nonce) internal pure returns (bool) {
         return (bitmap & (1 << nonce)) != 0;
     }
 
-    // Returns the first unused nonce in the given bitmap.
-    // Returned nonce is 1-indexed. If 0 returned, bitmap is full.
+    /// @notice Returns the first unused nonce in a 256-bit bitmap.
+    /// @dev Finds the first unused nonce within a given 240-bit bitmap, checking 16 bits and then 4 bits at a time for
+    /// efficiency.
+    /// @param bitmap A uint256 where the first 240 bits are used to represent the used/unused status of nonces.
+    /// @return The 1-indexed position of the first unused nonce within the bitmap, or 0 if all nonces represented by
+    /// the bitmap are used.
     function _getFirstUnusedNonceInBitmap(uint256 bitmap) internal pure returns (uint256) {
         // Check the 240-bit bitmap, 16 bits at a time, if a 16 bit chunk is not full.
         // Then check the located 16-bit chunk, 4 bits at a time, for an unused 4-bit chunk.
@@ -662,4 +708,44 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         return 0;
     }
+}
+
+// FROM ETH-INFINITISM REPO:
+// https://github.com/eth-infinitism/account-abstraction/blob/develop/contracts/interfaces/IAccount.sol
+
+interface IAccount {
+    /**
+     * Validate user's signature and nonce
+     * the entryPoint will make the call to the recipient only if this validation call returns successfully.
+     * signature failure should be reported by returning SIG_VALIDATION_FAILED (1).
+     * This allows making a "simulation call" without a valid signature
+     * Other failures (e.g. nonce mismatch, or invalid signature format) should still revert to signal failure.
+     *
+     * @dev Must validate caller is the entryPoint.
+     *      Must validate the signature and nonce
+     * @param userOp              - The operation that is about to be executed.
+     * @param userOpHash          - Hash of the user's request data. can be used as the basis for signature.
+     * @param missingAccountFunds - Missing funds on the account's deposit in the entrypoint.
+     *                              This is the minimum amount to transfer to the sender(entryPoint) to be
+     *                              able to make the call. The excess is left as a deposit in the entrypoint
+     *                              for future calls. Can be withdrawn anytime using "entryPoint.withdrawTo()".
+     *                              In case there is a paymaster in the request (or the current deposit is high
+     *                              enough), this value will be zero.
+     * @return validationData       - Packaged ValidationData structure. use `_packValidationData` and
+     *                              `_unpackValidationData` to encode and decode.
+     *                              <20-byte> sigAuthorizer - 0 for valid signature, 1 to mark signature failure,
+     *                                 otherwise, an address of an "authorizer" contract.
+     *                              <6-byte> validUntil - Last timestamp this operation is valid. 0 for "indefinite"
+     *                              <6-byte> validAfter - First timestamp this operation is valid
+     *                                                    If an account doesn't use time-range, it is enough to
+     *                                                    return SIG_VALIDATION_FAILED value (1) for signature failure.
+     *                              Note that the validation code cannot use block.timestamp (or block.number) directly.
+     */
+    function validateUserOp(
+        UserOperation calldata userOp,
+        bytes32 userOpHash,
+        uint256 missingAccountFunds
+    )
+        external
+        returns (uint256 validationData);
 }
