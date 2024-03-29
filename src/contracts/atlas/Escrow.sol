@@ -463,6 +463,11 @@ abstract contract Escrow is AtlETH {
             return 1 << uint256(SolverOutcome.BidNotPaid);
         } else if (errorSwitch == BalanceNotReconciled.selector) {
             return 1 << uint256(SolverOutcome.BalanceNotReconciled);
+        } else if (errorSwitch == InvalidEntry.selector) {
+            // DAppControl is attacking solver contract - treat as AlteredControl
+            return 1 << uint256(SolverOutcome.AlteredControl);
+        } else if (errorSwitch == CallbackNotCalled.selector) {
+            return 1 << uint256(SolverOutcome.SolverOpReverted);
         } else {
             return 1 << uint256(SolverOutcome.EVMError);
         }

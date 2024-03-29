@@ -90,12 +90,16 @@ contract GasAccountingTest is Test {
     }
 
     function test_validateBalances() public {
-        assertFalse(mockGasAccounting.validateBalances());
+        (bool calledBack, bool fulfilled) = mockGasAccounting.validateBalances();
+        assertFalse(calledBack);
+        assertFalse(fulfilled);
 
         mockGasAccounting.trySolverLock(solverOp);
         mockGasAccounting.reconcile{ value: initialClaims }(executionEnvironment, solverOp.from, 0);
 
-        assertTrue(mockGasAccounting.validateBalances());
+        (calledBack, fulfilled) = mockGasAccounting.validateBalances();
+        assertTrue(calledBack);
+        assertTrue(fulfilled);
     }
 
     function test_contribute() public {
@@ -149,7 +153,7 @@ contract GasAccountingTest is Test {
         assertEq(mockGasAccounting.shortfall(), 0);
     }
 
-    function test_reconcile() public {
+    function test_reconcileFail() public {
         vm.expectRevert(
             abi.encodeWithSelector(AtlasErrors.InvalidExecutionEnvironment.selector, executionEnvironment)
         );
@@ -160,8 +164,10 @@ contract GasAccountingTest is Test {
         mockGasAccounting.reconcile(executionEnvironment, makeAddr("wrongSolver"), 0);
 
         assertTrue(mockGasAccounting.reconcile(executionEnvironment, solverOp.from, 0) > 0);
+    }
 
-        assertEq(mockGasAccounting.solver(), solverOp.from);
+    function test_reconcile() public {
+        mockGasAccounting.trySolverLock(solverOp);
         assertTrue(mockGasAccounting.reconcile{ value: initialClaims }(executionEnvironment, solverOp.from, 0) == 0);
         (address currentSolver, bool verified, bool fulfilled) = mockGasAccounting.solverLockData();
         assertTrue(verified && fulfilled);
