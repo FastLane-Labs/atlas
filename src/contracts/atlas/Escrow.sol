@@ -57,7 +57,6 @@ abstract contract Escrow is AtlETH {
         if (success) {
             preOpsData = abi.decode(preOpsData, (bytes));
         }
-        emit PreOpsCall(environment, success, preOpsData);
     }
 
     /// @notice Executes the user operation logic defined in the Execution Environment.
@@ -82,8 +81,6 @@ abstract contract Escrow is AtlETH {
         if (success) {
             userData = abi.decode(userData, (bytes));
         }
-
-        emit UserCall(environment, success, userData);
     }
 
     /// @notice Attempts to execute a SovlerOperation and determine if it wins the auction.
@@ -201,9 +198,7 @@ abstract contract Escrow is AtlETH {
         );
         data = abi.encodePacked(data, key.pack());
         (bool success,) = key.executionEnvironment.call(data);
-        if (!success) {
-            emit MEVPaymentFailure(dConfig.to, dConfig.callConfig, dConfig.bidToken, winningBidAmount);
-        } else {
+        if (success) {
             key.paymentsSuccessful = true;
         }
 
@@ -229,7 +224,6 @@ abstract contract Escrow is AtlETH {
             abi.encodeWithSelector(IExecutionEnvironment.postOpsWrapper.selector, solved, returnData);
         postOpsData = abi.encodePacked(postOpsData, key.pack());
         (success,) = key.executionEnvironment.call(postOpsData);
-        emit PostOpsCall(key.executionEnvironment, success);
     }
 
     /// @notice Validates a SolverOperation's gas requirements and deadline against the current block and escrow state.

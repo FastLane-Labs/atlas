@@ -249,7 +249,13 @@ abstract contract GasAccounting is SafetyLocks {
     /// transaction.
     /// @param winningSolver The address of the winning solver.
     /// @param bundler The address of the bundler, who is refunded for the gas used during the transaction execution.
-    function _settle(address winningSolver, address bundler) internal {
+    function _settle(
+        address winningSolver,
+        address bundler
+    )
+        internal
+        returns (uint256 claimsPaidToBundler, uint256 netGasSurcharge)
+    {
         // NOTE: If there is no winningSolver but the dApp config allows unfulfilled 'successes,' the bundler
         // is treated as the Solver.
 
@@ -285,7 +291,8 @@ abstract contract GasAccounting is SafetyLocks {
         surcharge = _surcharge + netGasSurcharge;
 
         SafeTransferLib.safeTransferETH(bundler, _claims);
-        emit GasRefundSettled(bundler, _claims);
+
+        return (_claims, netGasSurcharge);
     }
 
     /// @notice Calculates the gas cost of the calldata used to execute a SolverOperation.

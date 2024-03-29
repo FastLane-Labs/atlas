@@ -71,9 +71,18 @@ contract Atlas is Escrow, Factory {
         returns (bool _auctionWon, uint256 winningSolverIndex) {
             auctionWon = _auctionWon;
             // Gas Refund to sender only if execution is successful
-            _settle({ winningSolver: auctionWon ? solverOps[winningSolverIndex].from : msg.sender, bundler: msg.sender });
+            (uint256 ethPaidToBundler, uint256 netGasSurcharge) = _settle({
+                winningSolver: auctionWon ? solverOps[winningSolverIndex].from : msg.sender,
+                bundler: msg.sender
+            });
 
-            emit MetacallResult(msg.sender, userOp.from, auctionWon ? solverOps[winningSolverIndex].from : address(0));
+            emit MetacallResult(
+                msg.sender,
+                userOp.from,
+                auctionWon ? solverOps[winningSolverIndex].from : address(0),
+                ethPaidToBundler,
+                netGasSurcharge
+            );
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
             _handleErrors(revertData, dConfig.callConfig);
@@ -318,14 +327,10 @@ contract Atlas is Escrow, Factory {
             if (auctionWon) {
                 key = _allocateValue(dConfig, solverOp, solverOp.bidAmount, returnData, key);
 
-                emit SolverExecution(solverOp.from, i, true);
-
                 key.solverOutcome = uint24(i);
 
                 return (auctionWon, key);
             }
-
-            emit SolverExecution(solverOp.from, i, false);
 
             unchecked {
                 ++i;
