@@ -52,7 +52,6 @@ abstract contract Escrow is AtlETH {
         if (success) {
             preOpsData = abi.decode(preOpsData, (bytes));
         }
-        emit PreOpsCall(environment, success, preOpsData);
     }
 
     function _executeUserOperation(
@@ -72,8 +71,6 @@ abstract contract Escrow is AtlETH {
         if (success) {
             userData = abi.decode(userData, (bytes));
         }
-
-        emit UserCall(environment, success, userData);
     }
 
     // Returns (bool auctionWon, EscrowKey key)
@@ -192,7 +189,6 @@ abstract contract Escrow is AtlETH {
             abi.encodeWithSelector(IExecutionEnvironment.postOpsWrapper.selector, solved, returnData);
         postOpsData = abi.encodePacked(postOpsData, key.pack());
         (success,) = key.executionEnvironment.call(postOpsData);
-        emit PostOpsCall(key.executionEnvironment, success);
     }
 
     // TODO Revisit the EscrowAccountBalance memory solverEscrow arg. Needs to be passed through from Atlas, through

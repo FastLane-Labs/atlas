@@ -14,9 +14,6 @@ contract AtlasEvents {
     event Approval(address indexed owner, address indexed spender, uint256 amount);
 
     // Escrow events
-    event PreOpsCall(address environment, bool success, bytes returnData);
-    event UserCall(address environment, bool success, bytes returnData);
-    event PostOpsCall(address environment, bool success);
     event SolverTxResult(
         address indexed solverTo, address indexed solverFrom, bool executed, bool success, uint256 result
     );
