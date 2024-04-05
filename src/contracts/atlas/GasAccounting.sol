@@ -216,8 +216,8 @@ abstract contract GasAccounting is SafetyLocks {
 
     /// @notice Releases the solver lock and adjusts the solver's escrow balance based on the gas used and other
     /// factors.
-    /// @dev Calculates the gas used for the SovlerOperation and adjusts the solver's escrow balance accordingly.
-    /// @param solverOp The current SovlerOperation for which to account
+    /// @dev Calculates the gas used for the SolverOperation and adjusts the solver's escrow balance accordingly.
+    /// @param solverOp The current SolverOperation for which to account
     /// @param gasWaterMark The `gasleft()` watermark taken at the start of executing the SolverOperation.
     /// @param result The result bitmap of the SolverOperation execution.
     /// @param bidFind Indicates if called in the context of `_getBidAmount` in Escrow.sol.

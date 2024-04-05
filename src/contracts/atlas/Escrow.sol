@@ -83,7 +83,7 @@ abstract contract Escrow is AtlETH {
         }
     }
 
-    /// @notice Attempts to execute a SovlerOperation and determine if it wins the auction.
+    /// @notice Attempts to execute a SolverOperation and determine if it wins the auction.
     /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
     /// @param userOp UserOperation struct containing the user's transaction data relevant to this SolverOperation.
     /// @param solverOp SolverOperation struct containing the solver's bid and execution data.
