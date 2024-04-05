@@ -81,7 +81,7 @@ contract SafetyLocksTest is Test {
         safetyLocks.initializeEscrowLock{ value: msgValue }(executionEnvironment, gasMarker, userOpValue);
 
         uint256 rawClaims = (gasMarker + 1) * tx.gasprice;
-        uint256 expectedClaims = rawClaims + ((rawClaims * safetyLocks.SURCHARGE_RATE()) / 10_000_000);
+        uint256 expectedClaims = rawClaims + ((rawClaims * safetyLocks.SURCHARGE_RATE()) / safetyLocks.SURCHARGE_SCALE());
 
         assertEq(safetyLocks.lock(), executionEnvironment);
         assertEq(safetyLocks.claims(), expectedClaims);
