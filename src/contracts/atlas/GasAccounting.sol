@@ -286,7 +286,7 @@ abstract contract GasAccounting is SafetyLocks {
             _credit(winningSolver, amountCredited);
         }
 
-        uint256 netGasSurcharge = (_claims * SURCHARGE_RATE) / SURCHARGE_SCALE;
+        netGasSurcharge = (_claims * SURCHARGE_RATE) / SURCHARGE_SCALE;
 
         _claims -= netGasSurcharge;
 
