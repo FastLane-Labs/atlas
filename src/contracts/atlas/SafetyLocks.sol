@@ -39,7 +39,7 @@ abstract contract SafetyLocks is Storage {
 
         // Set the claimed amount
         uint256 rawClaims = (gasMarker + 1) * tx.gasprice;
-        claims = rawClaims + ((rawClaims * SURCHARGE) / 10_000_000);
+        claims = rawClaims + ((rawClaims * SURCHARGE_RATE) / 10_000_000);
 
         // Set any withdraws or deposits
         withdrawals = userOpValue;

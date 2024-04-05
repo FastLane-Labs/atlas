@@ -39,7 +39,7 @@ contract Storage is AtlasEvents, AtlasErrors {
     mapping(bytes32 => bool) internal _solverOpHashes; // NOTE: Only used for when allowTrustedOpHash is enabled
 
     // Gas Accounting constants
-    uint256 public constant SURCHARGE = 1_000_000; // Out of 10_000_000
+    uint256 public constant SURCHARGE_RATE = 1_000_000; // 1_000_000 / 10_000_000 = 10%
     uint256 internal constant _CALLDATA_LENGTH_PREMIUM = 32; // 16 (default) * 2
 
     // atlETH GasAccounting storage
