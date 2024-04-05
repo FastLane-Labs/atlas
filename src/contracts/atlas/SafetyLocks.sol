@@ -2,7 +2,6 @@
 pragma solidity 0.8.22;
 
 import { Storage } from "./Storage.sol";
-import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import "src/contracts/types/SolverCallTypes.sol";
 import "src/contracts/types/UserCallTypes.sol";
