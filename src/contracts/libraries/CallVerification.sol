@@ -32,7 +32,7 @@ library CallVerification {
                 abi.encodePacked(
                     callSequenceHash, // initial hash = null
                     dConfig.to,
-                    abi.encodeWithSelector(IDAppControl.preOpsCall.selector, userOp),
+                    abi.encodeCall(IDAppControl.preOpsCall, userOp),
                     i++
                 )
             );

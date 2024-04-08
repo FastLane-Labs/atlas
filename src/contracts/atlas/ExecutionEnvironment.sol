@@ -69,7 +69,7 @@ contract ExecutionEnvironment is Base {
         onlyAtlasEnvironment(ExecutionPhase.PreOps, _ENVIRONMENT_DEPTH)
         returns (bytes memory)
     {
-        bytes memory preOpsData = forward(abi.encodeWithSelector(IDAppControl.preOpsCall.selector, userOp));
+        bytes memory preOpsData = forward(abi.encodeCall(IDAppControl.preOpsCall, userOp));
 
         bool success;
         (success, preOpsData) = _control().delegatecall(preOpsData);
@@ -122,7 +122,7 @@ contract ExecutionEnvironment is Base {
         external
         onlyAtlasEnvironment(ExecutionPhase.PostOps, _ENVIRONMENT_DEPTH)
     {
-        bytes memory data = forward(abi.encodeWithSelector(IDAppControl.postOpsCall.selector, solved, returnData));
+        bytes memory data = forward(abi.encodeCall(IDAppControl.postOpsCall, (solved, returnData)));
 
         bool success;
         (success, data) = _control().delegatecall(data);
@@ -180,8 +180,7 @@ contract ExecutionEnvironment is Base {
         // Handle any solver preOps, if necessary
         if (config.needsPreSolver()) {
             bytes memory data = forwardSpecial(
-                abi.encodeWithSelector(IDAppControl.preSolverCall.selector, solverOp, returnData),
-                ExecutionPhase.PreSolver
+                abi.encodeCall(IDAppControl.preSolverCall, (solverOp, returnData)), ExecutionPhase.PreSolver
             );
 
             (success, data) = control.delegatecall(data);
@@ -202,13 +201,15 @@ contract ExecutionEnvironment is Base {
         }
 
         // Execute the solver call.
-        bytes memory solverCallData = abi.encodeWithSelector(
-            ISolverContract.atlasSolverCall.selector,
-            solverOp.from,
-            solverOp.bidToken,
-            bidAmount,
-            solverOp.data,
-            config.forwardReturnData() ? returnData : new bytes(0)
+        bytes memory solverCallData = abi.encodeCall(
+            ISolverContract.atlasSolverCall,
+            (
+                solverOp.from,
+                solverOp.bidToken,
+                bidAmount,
+                solverOp.data,
+                config.forwardReturnData() ? returnData : new bytes(0)
+            )
         );
         (success,) = solverOp.solver.call{ gas: gasLimit, value: solverOp.value }(solverCallData);
 
@@ -225,8 +226,7 @@ contract ExecutionEnvironment is Base {
             if (!success) revert AtlasErrors.CallbackNotCalled();
 
             bytes memory data = forwardSpecial(
-                abi.encodeWithSelector(IDAppControl.postSolverCall.selector, solverOp, returnData),
-                ExecutionPhase.PostSolver
+                abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData)), ExecutionPhase.PostSolver
             );
 
             (success, data) = control.delegatecall(data);
@@ -331,8 +331,7 @@ contract ExecutionEnvironment is Base {
         onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _ENVIRONMENT_DEPTH)
         contributeSurplus
     {
-        allocateData =
-            forward(abi.encodeWithSelector(IDAppControl.allocateValueCall.selector, bidToken, bidAmount, allocateData));
+        allocateData = forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, bidAmount, allocateData)));
 
         (bool success,) = _control().delegatecall(allocateData);
         require(success, "ERR-EC02 DelegateRevert");
