@@ -53,14 +53,14 @@ contract V2RewardDAppControl is DAppControl {
                 zeroSolvers: true,
                 reuseUserOp: false,
                 userAuctioneer: true,
-                solverAuctioneer: true,
+                solverAuctioneer: false,
                 unknownAuctioneer: true,
                 verifyCallChainHash: true,
                 forwardReturnData: false,
                 requireFulfillment: false,
                 trustedOpHash: false,
                 invertBidValue: false,
-                exPostBids: false
+                exPostBids: true
             })
         )
     {
