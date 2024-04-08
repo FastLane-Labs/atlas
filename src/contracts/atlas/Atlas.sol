@@ -183,7 +183,7 @@ contract Atlas is Escrow, Factory {
             // CASE: Need PreOps Call
             key = key.holdPreOpsLock(dConfig.to);
 
-            if (CallBits.needsPreOpsReturnData(dConfig.callConfig)) {
+            if (dConfig.callConfig.needsPreOpsReturnData()) {
                 // CASE: Need PreOps return data
                 usePreOpsReturnData = true;
                 (callSuccessful, returnData) = _executePreOpsCall(userOp, executionEnvironment, key.pack());
@@ -200,7 +200,7 @@ contract Atlas is Escrow, Factory {
 
         key = key.holdUserLock(userOp.dapp);
 
-        if (CallBits.needsUserReturnData(dConfig.callConfig)) {
+        if (dConfig.callConfig.needsUserReturnData()) {
             // CASE: Need User return data
 
             if (usePreOpsReturnData) {
