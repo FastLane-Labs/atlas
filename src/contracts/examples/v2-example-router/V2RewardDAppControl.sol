@@ -13,17 +13,6 @@ import "../../types/SolverCallTypes.sol";
 // Uniswap Imports
 import { IUniswapV2Router01, IUniswapV2Router02 } from "./interfaces/IUniswapV2Router.sol";
 
-/* --- TODO TODO TODO TODO TODO TODO TODO TODO TODO ---
-Question: When the user is selling ETH, they must bundle their own operation because they must send their ETH. Could the
-    Atlas flashloan system help here (assumption is no)?
-
-Question: When the user is selling ETH and bundling their own operation, should userOp.value be set to msg.value? Is
-    that a hard requirement?
-
-Question: When the user is selling ETH and bundling their own operation, they are not required to sign their operation,
-    is that correct? (important for UX)
-/* --- TODO TODO TODO TODO TODO TODO TODO TODO TODO --- */
-
 /*
 * @title V2RewardDAppControl
 * @notice This contract is a Uniswap v2 "backrun" module that rewards users with an arbitrary ERC20 token (or ETH) for
@@ -52,8 +41,8 @@ contract V2RewardDAppControl is DAppControl {
             _atlas,
             msg.sender,
             CallConfig({
-                userNoncesSequenced: false, // --- TODO TODO TODO --- should this be set? or dappNonce? or none?
-                dappNoncesSequenced: false, // --- TODO TODO TODO --- should this be set? or userNonce? or none?
+                userNoncesSequenced: false,
+                dappNoncesSequenced: false,
                 requirePreOps: true,
                 trackPreOpsReturnData: true,
                 trackUserReturnData: false,
@@ -64,7 +53,7 @@ contract V2RewardDAppControl is DAppControl {
                 zeroSolvers: true,
                 reuseUserOp: false,
                 userAuctioneer: true,
-                solverAuctioneer: true, // --- TODO TODO TODO --- should this be set?
+                solverAuctioneer: true,
                 unknownAuctioneer: true,
                 verifyCallChainHash: true,
                 forwardReturnData: false,
