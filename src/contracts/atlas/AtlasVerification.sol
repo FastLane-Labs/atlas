@@ -1,7 +1,8 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
+import { EIP712 } from "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
+import { ECDSA } from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import { DAppIntegration } from "./DAppIntegration.sol";
 
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
@@ -263,7 +264,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @return A boolean indicating if the signature is valid.
     function _verifySolverSignature(SolverOperation calldata solverOp) internal view returns (bool) {
         if (solverOp.signature.length == 0) return false;
-        address signer = _hashTypedDataV4(_getSolverHash(solverOp)).recover(solverOp.signature);
+        (address signer,) = _hashTypedDataV4(_getSolverHash(solverOp)).tryRecover(solverOp.signature);
         return signer == solverOp.from;
     }
 
@@ -501,7 +502,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @return A boolean indicating if the signature is valid.
     function _verifyDAppSignature(DAppOperation calldata dAppOp) internal view returns (bool) {
         if (dAppOp.signature.length == 0) return false;
-        address signer = _hashTypedDataV4(_getProofHash(dAppOp)).recover(dAppOp.signature);
+        (address signer,) = _hashTypedDataV4(_getProofHash(dAppOp)).tryRecover(dAppOp.signature);
 
         return signer == dAppOp.from;
     }
@@ -601,7 +602,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @return A boolean indicating if the signature is valid.
     function _verifyUserSignature(UserOperation calldata userOp) internal view returns (bool) {
         if (userOp.signature.length == 0) return false;
-        address signer = _hashTypedDataV4(_getProofHash(userOp)).recover(userOp.signature);
+        (address signer,) = _hashTypedDataV4(_getProofHash(userOp)).tryRecover(userOp.signature);
 
         return signer == userOp.from;
     }
