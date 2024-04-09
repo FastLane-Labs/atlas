@@ -132,7 +132,7 @@ contract Atlas is Escrow, Factory {
         if (!auctionWon) {
             if (key.isSimulation) revert SolverSimFail(uint256(key.solverOutcome));
             if (dConfig.callConfig.needsFulfillment()) {
-                revert UserNotFulfilled(); // revert("ERR-E003 SolverFulfillmentFailure");
+                revert UserNotFulfilled();
             }
         }
 

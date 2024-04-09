@@ -37,6 +37,9 @@ contract AtlasErrors {
     error ValidCalls(ValidCallsResult);
 
     // Execution Environment
+    error InvalidUser();
+    error InvalidTo();
+    error InvalidCodeHash();
     error PreOpsDelegatecallFail();
     error UserOpValueExceedsBalance();
     error UserWrapperDelegatecallFail();

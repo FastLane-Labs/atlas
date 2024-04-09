@@ -117,9 +117,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
         preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-CE02 InvalidUser"));
+        vm.expectRevert(AtlasErrors.InvalidUser.selector);
         (status,) = address(executionEnvironment).call(preOpsData);
-        assertTrue(status, "expectRevert ERR-CE02 InvalidUser: call did not revert");
 
         // InvalidTo
         userOp.from = user;
@@ -128,9 +127,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
         preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EV007 InvalidTo"));
+        vm.expectRevert(AtlasErrors.InvalidTo.selector);
         (status,) = address(executionEnvironment).call(preOpsData);
-        assertTrue(status, "expectRevert ERR-EV007 InvalidTo: call did not revert");
     }
 
     function test_modifier_onlyAtlasEnvironment() public {
@@ -196,9 +194,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
         userData = abi.encodePacked(userData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EV008 InvalidCodeHash"));
+        vm.expectRevert(AtlasErrors.InvalidCodeHash.selector);
         (status,) = address(executionEnvironment).call(userData);
-        assertTrue(status, "expectRevert ERR-EV008 InvalidCodeHash: call did not revert");
     }
 
     function test_modifier_contributeSurplus() public {

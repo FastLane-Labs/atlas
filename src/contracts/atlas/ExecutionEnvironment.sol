@@ -28,19 +28,13 @@ contract ExecutionEnvironment is Base {
     constructor(address _atlas) Base(_atlas) { }
 
     modifier validUser(UserOperation calldata userOp) {
-        if (userOp.from != _user()) {
-            revert("ERR-CE02 InvalidUser");
-        }
-        if (userOp.to != atlas || userOp.dapp == atlas) {
-            revert("ERR-EV007 InvalidTo");
-        }
+        if (userOp.from != _user()) revert AtlasErrors.InvalidUser();
+        if (userOp.to != atlas || userOp.dapp == atlas) revert AtlasErrors.InvalidTo();
         _;
     }
 
     modifier validControlHash() {
-        if (_control().codehash != _controlCodeHash()) {
-            revert("ERR-EV008 InvalidCodeHash");
-        }
+        if (_control().codehash != _controlCodeHash()) revert AtlasErrors.InvalidCodeHash();
         _;
     }
 
