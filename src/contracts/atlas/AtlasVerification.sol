@@ -479,7 +479,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @notice Generates the hash of a DAppOperation struct.
     /// @param approval The DAppOperation struct to hash.
     /// @return dappOpHash The hash of the DAppOperation struct.
-    function _getDAppOpHash(DAppOperation memory approval) internal pure returns (bytes32 dappOpHash) {
+    function _getDAppOpHash(DAppOperation calldata approval) internal pure returns (bytes32 dappOpHash) {
         dappOpHash = keccak256(
             abi.encode(
                 DAPP_TYPE_HASH,
@@ -510,7 +510,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @notice Generates the hash of a DAppOperation struct.
     /// @param dAppOp The DAppOperation struct to hash.
     /// @return payload The hash of the DAppOperation struct.
-    function getDAppOperationPayload(DAppOperation memory dAppOp) public view returns (bytes32 payload) {
+    function getDAppOperationPayload(DAppOperation calldata dAppOp) public view returns (bytes32 payload) {
         payload = _hashTypedDataV4(_getDAppOpHash(dAppOp));
     }
 
@@ -578,7 +578,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @notice Generates the hash of a UserOperation struct.
     /// @param userOp The UserOperation struct to hash.
     /// @return userOpHash The hash of the UserOperation struct.
-    function _getUserOpHash(UserOperation memory userOp) internal pure returns (bytes32 userOpHash) {
+    function _getUserOpHash(UserOperation calldata userOp) internal pure returns (bytes32 userOpHash) {
         userOpHash = keccak256(
             abi.encode(
                 USER_TYPE_HASH,
@@ -610,7 +610,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @notice Generates the hash of a UserOperation struct.
     /// @param userOp The UserOperation struct to hash.
     /// @return payload The hash of the UserOperation struct.
-    function getUserOperationPayload(UserOperation memory userOp) public view returns (bytes32 payload) {
+    function getUserOperationPayload(UserOperation calldata userOp) public view returns (bytes32 payload) {
         payload = _hashTypedDataV4(_getUserOpHash(userOp));
     }
 
