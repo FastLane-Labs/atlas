@@ -30,9 +30,9 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     address public pendingGovernance;
 
     constructor(address _atlas, address _governance, CallConfig memory _callConfig) ExecutionBase(_atlas) {
-        if (_callConfig.userNoncesSequenced && _callConfig.dappNoncesSequenced) {
-            // Max one of user or dapp nonces can be sequenced, not both
-            revert AtlasErrors.BothUserAndDAppNoncesCannotBeSequenced();
+        if (_callConfig.userNoncesSequential && _callConfig.dappNoncesSequential) {
+            // Max one of user or dapp nonces can be sequential, not both
+            revert AtlasErrors.BothUserAndDAppNoncesCannotBeSequential();
         }
         CALL_CONFIG = CallBits.encodeCallConfig(_callConfig);
         CONTROL = address(this);
@@ -139,12 +139,12 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         delegated = CALL_CONFIG.needsDelegateUser();
     }
 
-    function requireSequencedUserNonces() external view returns (bool isSequenced) {
-        isSequenced = CALL_CONFIG.needsSequencedUserNonces();
+    function requireSequentialUserNonces() external view returns (bool isSequential) {
+        isSequential = CALL_CONFIG.needsSequentialUserNonces();
     }
 
-    function requireSequencedDAppNonces() external view returns (bool isSequenced) {
-        isSequenced = CALL_CONFIG.needsSequencedDAppNonces();
+    function requireSequentialDAppNonces() external view returns (bool isSequential) {
+        isSequential = CALL_CONFIG.needsSequentialDAppNonces();
     }
 
     /// @notice Returns the DAppConfig struct of this DAppControl contract.

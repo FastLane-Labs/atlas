@@ -36,14 +36,15 @@ contract TxBuilder {
     function governanceNextNonce(address signatory) public view returns (uint256) {
         // Assume sequenced = false if control is not set
         if (control == address(0)) return IAtlasVerification(verification).getNextNonce(signatory, false);
-        return
-            IAtlasVerification(verification).getNextNonce(signatory, IDAppControl(control).requireSequencedDAppNonces());
+        return IAtlasVerification(verification).getNextNonce(
+            signatory, IDAppControl(control).requireSequentialDAppNonces()
+        );
     }
 
     function userNextNonce(address user) public view returns (uint256) {
         // Assume sequenced = false if control is not set
         if (control == address(0)) return IAtlasVerification(verification).getNextNonce(user, false);
-        return IAtlasVerification(verification).getNextNonce(user, IDAppControl(control).requireSequencedUserNonces());
+        return IAtlasVerification(verification).getNextNonce(user, IDAppControl(control).requireSequentialUserNonces());
     }
 
     function getControlCodeHash(address dAppControl) external view returns (bytes32) {

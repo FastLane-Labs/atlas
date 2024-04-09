@@ -12,22 +12,22 @@ import { AtlasVerificationBase } from "./AtlasVerification.t.sol";
 
 contract AtlasVerificationNoncesTest is AtlasVerificationBase {
 
-    function testGetNextNonceReturnsOneForNewAccount_Sequenced() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
+    function testGetNextNonceReturnsOneForNewAccount_Sequential() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
         assertEq(atlasVerification.getNextNonce(userEOA, true), 1, "User seq next nonce should be 1");
         assertEq(atlasVerification.getNextNonce(governanceEOA, true), 1, "Gov seq next nonce should be 1");
     }
 
-    function testGetNextNonceReturnsOneForNewAccount_Async() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(false).build());
-        assertEq(atlasVerification.getNextNonce(userEOA, false), 1, "User async next nonce should be 1");
-        assertEq(atlasVerification.getNextNonce(governanceEOA, false), 1, "Gov async next nonce should be 1");
+    function testGetNextNonceReturnsOneForNewAccount_NonSeq() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(false).build());
+        assertEq(atlasVerification.getNextNonce(userEOA, false), 1, "User non-seq next nonce should be 1");
+        assertEq(atlasVerification.getNextNonce(governanceEOA, false), 1, "Gov non-seq next nonce should be 1");
     }
 
-    function testUsingSeqNoncesDoNotChangeNextAsyncNonce() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
+    function testUsingSeqNoncesDoNotChangeNextNonSeqNonce() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
         assertEq(atlasVerification.getNextNonce(userEOA, true), 1, "User next seq nonce should be 1");
-        assertEq(atlasVerification.getNextNonce(userEOA, false), 1, "User next async nonce should be 1");
+        assertEq(atlasVerification.getNextNonce(userEOA, false), 1, "User next non-seq nonce should be 1");
 
         UserOperation memory userOp = validUserOperation().withNonce(1).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -36,13 +36,13 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
         assertEq(atlasVerification.getNextNonce(userEOA, true), 2, "User next seq nonce should now be 2");
-        assertEq(atlasVerification.getNextNonce(userEOA, false), 1, "User next async nonce should still be 1");
+        assertEq(atlasVerification.getNextNonce(userEOA, false), 1, "User next non-seq nonce should still be 1");
     }
 
-    function testUsingAsyncNoncesDoNotChangeNextSeqNonce() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(false).build());
+    function testUsingNonSeqNoncesDoNotChangeNextSeqNonce() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(false).build());
         assertEq(atlasVerification.getNextNonce(userEOA, true), 1, "User next seq nonce should be 1");
-        assertEq(atlasVerification.getNextNonce(userEOA, false), 1, "User next async nonce should be 1");
+        assertEq(atlasVerification.getNextNonce(userEOA, false), 1, "User next non-seq nonce should be 1");
 
         UserOperation memory userOp = validUserOperation().withNonce(1).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -51,11 +51,11 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
         assertEq(atlasVerification.getNextNonce(userEOA, true), 1, "User next seq nonce should still be 1");
-        assertEq(atlasVerification.getNextNonce(userEOA, false), 2, "User next async nonce should now be 2");
+        assertEq(atlasVerification.getNextNonce(userEOA, false), 2, "User next non-seq nonce should now be 2");
     }
 
-    function testSameNonceCannotBeUsedTwice_UserSequenced_DAppAsync() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).withDappNoncesSequenced(false).build());
+    function testSameNonceCannotBeUsedTwice_UserSequential_DAppNonSeq() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).withDappNoncesSequential(false).build());
 
         UserOperation memory userOp = validUserOperation().withNonce(1).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -81,9 +81,9 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         ), ValidCallsResult.InvalidDAppNonce);
     }
 
-    function testSameNonceValidForSeqAndAsyncDApps() public {
+    function testSameNonceValidForSeqAndNonSeqDApps() public {
         // Set up DApp with sequenced user nonces
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
 
         // In Sequential DApp: User nonces 1 and 2 are valid
         UserOperation memory userOp = validUserOperation().withNonce(1).build();
@@ -100,10 +100,10 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
 
-        // Set up DApp with async user nonces
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(false).build());
+        // Set up DApp with non-seq user nonces
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(false).build());
 
-        // In Async DApp: User nonces 1 and 2 are valid even though already used in sequential dapp
+        // In NonSeq DApp: User nonces 1 and 2 are valid even though already used in sequential dapp
         userOp = validUserOperation().withNonce(1).build();
         solverOps = validSolverOperations(userOp);
         dappOp = validDAppOperation(userOp, solverOps).withNonce(3).signAndBuild(address(atlasVerification), governancePK);
@@ -120,7 +120,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
     }
 
     function testSeqNoncesMustBePerfectlySequential() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
 
         UserOperation memory userOp = validUserOperation().withNonce(1).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -162,8 +162,8 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         ), ValidCallsResult.Valid);
     }
 
-    function testAsyncNoncesAreValidEvenIfNotSequential() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(false).build());
+    function testNonSeqNoncesAreValidEvenIfNotSequential() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(false).build());
 
         UserOperation memory userOp = validUserOperation().withNonce(1).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -172,7 +172,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
 
-        // Valid if using the async user nonce
+        // Valid if using the non-seq user nonce
         userOp = validUserOperation().withNonce(100).build();
         solverOps = validSolverOperations(userOp);
         dappOp = validDAppOperation(userOp, solverOps).withNonce(2).signAndBuild(address(atlasVerification), governancePK);
@@ -180,7 +180,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, isSimulation: false, msgValue: 0, msgSender: userEOA}
         ), ValidCallsResult.Valid);
 
-        // Valid if using the async user nonce
+        // Valid if using the non-seq user nonce
         userOp = validUserOperation().withNonce(500).build();
         solverOps = validSolverOperations(userOp);
         dappOp = validDAppOperation(userOp, solverOps).withNonce(3).signAndBuild(address(atlasVerification), governancePK);
@@ -188,7 +188,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, isSimulation: false, msgValue: 0, msgSender: userEOA}
         ), ValidCallsResult.Valid);
 
-        // Valid if using the async user nonce
+        // Valid if using the non-seq user nonce
         userOp = validUserOperation().withNonce(2).build();
         solverOps = validSolverOperations(userOp);
         dappOp = validDAppOperation(userOp, solverOps).withNonce(4).signAndBuild(address(atlasVerification), governancePK);
@@ -197,8 +197,8 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         ), ValidCallsResult.Valid);
     }
 
-    function testFirstEightNonces_DAppSequenced() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequenced(true).build());
+    function testFirstEightNonces_DAppSequential() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequential(true).build());
         
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -223,7 +223,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         assertEq(atlasVerification.getNextNonce(governanceEOA, true), 9, "Next nonce should be 9 after 8 seq nonces used");
     }
 
-    function testHighestFullBitmapIncreasesWhenFilled_Async() public {
+    function testHighestFullBitmapIncreasesWhenFilled_NonSeq() public {
         // To avoid doing 240 calls, we just modify the relevant storage slot
         // such that the bitmap at index 1 has 239 of 240 nonces used.
         // We test the 240th nonce properly from that point.
@@ -235,8 +235,8 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         uint256 nonceBitmapSlot = highestUsedNonceInBitmap | bitmap;
         bytes32 bitmapKey = keccak256(abi.encode(userEOA, 1));
 
-        // Only concerned with async user nonces in this test
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(false).withDappNoncesSequenced(true).build());
+        // Only concerned with non-seq user nonces in this test
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(false).withDappNoncesSequential(true).build());
         
         // Modifying storage slot to have 239 nonces used
         vm.record();
@@ -259,7 +259,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
 
-        // The next recommended async nonce should be 241 and the highest full bitmap should have increased from 0 to 1
+        // The next recommended non-seq nonce should be 241 and the highest full bitmap should have increased from 0 to 1
         (, highestFullBitmap) = atlasVerification.nonceTrackers(userEOA);
         assertEq(highestFullBitmap, 1, "Highest full bitmap should be 1 after 240 nonces used");
         assertEq(atlasVerification.getNextNonce(userEOA, false), 241, "Next nonce should be 241 after 240 nonces used");
@@ -295,12 +295,12 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
     }
 
     function testIncrementFullBitmapEdgeCase() public {
-        // For edge cases when highestFullAsyncBitmap needs to be re-synced. Example:
+        // For edge cases when highestFullNonSeqBitmap needs to be re-synced. Example:
         // Bitmap 4 is full
         // Bitmap 3 is full
         // Bitmap 2 only has last nonce unused
         // Bitmap 1 is full
-        // ^ in the example above, once last bitmap 2 nonce is used, highestFullAsyncBitmap will be set to 2 but should be 4
+        // ^ in the example above, once last bitmap 2 nonce is used, highestFullNonSeqBitmap will be set to 2 but should be 4
 
         uint128 highestFullBitmap;
         uint8 highestUsedNonce;
@@ -313,8 +313,8 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         bytes32 bitmap3Key = keccak256(abi.encode(userEOA, 3));
         bytes32 bitmap4Key = keccak256(abi.encode(userEOA, 4));
 
-        // Only concerned with async user nonces in this test
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(false).withDappNoncesSequenced(true).build());
+        // Only concerned with non-seq user nonces in this test
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(false).withDappNoncesSequential(true).build());
         
         // Modify bitmaps 3 and 4 to be full
         vm.record();
@@ -332,11 +332,11 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         vm.store(address(atlasVerification), reads[0], bytes32(almostFullBitmapSlot));
         vm.store(address(atlasVerification), reads[1], bytes32(almostFullBitmapSlot));
 
-        // Check highestFullAsyncBitmap is still 0
+        // Check highestFullNonSeqBitmap is still 0
         (, highestFullBitmap) = atlasVerification.nonceTrackers(userEOA);
         assertEq(highestFullBitmap, 0, "Highest full bitmap should 0 if 239 nonces used");
 
-        // Now use nonce 240, which should set highestFullAsyncBitmap to 1
+        // Now use nonce 240, which should set highestFullNonSeqBitmap to 1
         UserOperation memory userOp = validUserOperation().withNonce(240).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(1).signAndBuild(address(atlasVerification), governancePK);
@@ -344,7 +344,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
 
-        // Check highestFullAsyncBitmap is now 1
+        // Check highestFullNonSeqBitmap is now 1
         (, highestFullBitmap) = atlasVerification.nonceTrackers(userEOA);
         assertEq(highestFullBitmap, 1, "Highest full bitmap value should be 1");
 
@@ -359,18 +359,18 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, isSimulation: false, msgValue: 0, msgSender: userEOA}
         ), ValidCallsResult.Valid);
 
-        // Check highestFullAsyncBitmap is now 4
+        // Check highestFullNonSeqBitmap is now 4
         (, highestFullBitmap) = atlasVerification.nonceTrackers(userEOA);
         assertEq(highestFullBitmap, 4, "Highest full bitmap value should be 4");
 
         // getNextNonce should return the correct next nonce = 240 * 4 + 1 = 961
         assertEq(atlasVerification.getNextNonce(userEOA, false), 961, "Next unused nonce should be 961");
 
-        // MAIN PART OF TEST: Call manuallyUpdateNonceTracker to set highestFullAsyncBitmap to 4
+        // MAIN PART OF TEST: Call manuallyUpdateNonSeqNonceTracker to set highestFullNonSeqBitmap to 4
         vm.prank(userEOA);
-        atlasVerification.manuallyUpdateNonceTracker(userEOA);
+        atlasVerification.manuallyUpdateNonSeqNonceTracker();
 
-        // Check highestFullAsyncBitmap is now 4 and getNextNonce returns 240 * 4 + 1 = 961
+        // Check highestFullNonSeqBitmap is now 4 and getNextNonce returns 240 * 4 + 1 = 961
         (, highestFullBitmap) = atlasVerification.nonceTrackers(userEOA);
         assertEq(highestFullBitmap, 4, "Highest full bitmap should be 4 after manually updating");
         assertEq(atlasVerification.getNextNonce(userEOA, false), 961, "Next unused nonce should be 961");
@@ -386,8 +386,8 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         bytes32 bitmap3Key = keccak256(abi.encode(userEOA, 3));
         bytes32 bitmap4Key = keccak256(abi.encode(userEOA, 4));
 
-        // Only concerned with async user nonces in this test
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(false).withDappNoncesSequenced(true).build());
+        // Only concerned with non-seq user nonces in this test
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(false).withDappNoncesSequential(true).build());
         
         // Modify bitmaps 1 - 4 to be full
         vm.record();
@@ -401,15 +401,15 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         vm.store(address(atlasVerification), reads[2], bytes32(fullBitmapSlot));
         vm.store(address(atlasVerification), reads[3], bytes32(fullBitmapSlot));
 
-        // Check highestFullAsyncBitmap is still 0
+        // Check highestFullNonSeqBitmap is still 0
         (, highestFullBitmap) = atlasVerification.nonceTrackers(userEOA);
         assertEq(highestFullBitmap, 0, "Highest full bitmap should 0 because not updated yet");
 
-        // MAIN PART OF TEST: Call manuallyUpdateNonceTracker to update highestFullAsyncBitmap to 4
+        // MAIN PART OF TEST: Call manuallyUpdateNonSeqNonceTracker to update highestFullNonSeqBitmap to 4
         vm.prank(userEOA);
-        atlasVerification.manuallyUpdateNonceTracker(userEOA);
+        atlasVerification.manuallyUpdateNonSeqNonceTracker();
 
-        // Check highestFullAsyncBitmap is now 4
+        // Check highestFullNonSeqBitmap is now 4
         (, highestFullBitmap) = atlasVerification.nonceTrackers(userEOA);
         assertEq(highestFullBitmap, 4, "Highest full bitmap should be 4 after manually updating");
 

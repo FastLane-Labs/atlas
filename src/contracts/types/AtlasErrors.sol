@@ -108,10 +108,9 @@ contract AtlasErrors {
 
     // AtlasVerification
     error NoUnusedNonceInBitmap();
-    error OnlyAccount();
 
     // DAppControl
-    error BothUserAndDAppNoncesCannotBeSequenced();
+    error BothUserAndDAppNoncesCannotBeSequential();
     error InvalidControl();
     error NoDelegatecall();
     error MustBeDelegatecalled();

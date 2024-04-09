@@ -19,8 +19,8 @@ contract DAppIntegration {
     }
 
     struct NonceTracker {
-        uint128 lastUsedSeqNonce; // Sequenced nonces tracked using only this value
-        uint128 highestFullAsyncBitmap; // Async nonces tracked using bitmaps
+        uint128 lastUsedSeqNonce; // Sequential nonces tracked using only this value
+        uint128 highestFullNonSeqBitmap; // Non-sequential nonces tracked using bitmaps
     }
 
     address public immutable ATLAS;

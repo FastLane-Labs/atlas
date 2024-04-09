@@ -702,8 +702,8 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     // because one is the first valid nonce for sequenced calls
     //  and this is the first call for the user
     //
-    function test_validCalls_SequencedNonceIsOne_Valid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequenced(true).build());
+    function test_validCalls_SequentialNonceIsOne_Valid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequential(true).build());
 
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -724,8 +724,8 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     // because one is the first valid nonce for sequenced calls
     //  and this is the first call for the user
     //
-    function test_validCalls_SequencedNonceIsTwo_DAppSignatureInvalid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequenced(true).build());
+    function test_validCalls_SequentialNonceIsTwo_DAppSignatureInvalid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequential(true).build());
 
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -755,8 +755,8 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     // because one is the first valid nonce for sequenced calls
     //  and this is the first call for the user
     //
-    function test_validCalls_SequencedNonceWasOneIsNowTwo_Valid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
+    function test_validCalls_SequentialNonceWasOneIsNowTwo_Valid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
 
         // these first ops are to increment the nonce to 1
         UserOperation memory userOp = validUserOperation().build();
@@ -787,8 +787,8 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     // because the current nonce for the user is 1
     //  and the next valid nonce is 2
     //
-    function test_validCalls_SequencedNonceWasOneIsNowThree_DAppSignatureInvalid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequenced(true).build());
+    function test_validCalls_SequentialNonceWasOneIsNowThree_DAppSignatureInvalid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequential(true).build());
 
         // these first ops are to increment the nonce to 1
         UserOperation memory userOp = validUserOperation().build();
@@ -1017,8 +1017,8 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     // because one is the first valid nonce for sequenced calls
     //  and this is the first call for the user
     //
-    function test_validCalls_SequencedUserOpNonceIsOne_Valid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
+    function test_validCalls_SequentialUserOpNonceIsOne_Valid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
 
         UserOperation memory userOp = validUserOperation().withNonce(1).signAndBuild(address(atlasVerification), userPK);
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -1047,8 +1047,8 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     // because one is the first valid nonce for sequenced calls
     //  and this is the first call for the user
     //
-    function test_validCalls_SequencedUserOpNonceIsTwo_UserSignatureInvalid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
+    function test_validCalls_SequentialUserOpNonceIsTwo_UserSignatureInvalid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
 
         UserOperation memory userOp = validUserOperation().withNonce(2).signAndBuild(address(atlasVerification), userPK);
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -1070,8 +1070,8 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     // because the current nonce for the user is 1
     //  and the next valid nonce is 2
     //
-    function test_validCalls_SequencedUserOpNonceIsTwo_Valid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
+    function test_validCalls_SequentialUserOpNonceIsTwo_Valid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
 
         // increment the nonce to 1
         UserOperation memory userOp = validUserOperation().signAndBuild(address(atlasVerification), userPK);
@@ -1110,8 +1110,8 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     // because the current nonce for the user is 1
     //   and the next valid nonce is 2
     //
-    function test_validCalls_SequencedUserOpNonceIsThree_UserSignatureInvalid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
+    function test_validCalls_SequentialUserOpNonceIsThree_UserSignatureInvalid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
 
         // increment the nonce to 1
         UserOperation memory userOp = validUserOperation().signAndBuild(address(atlasVerification), userPK);

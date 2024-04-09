@@ -365,36 +365,44 @@ contract AtlasVerification is EIP712, DAppIntegration {
             return (true, ValidCallsResult.Valid);
         }
 
-        // If the dapp indicated that they only accept sequenced nonces
+        // If the dapp indicated that they only accept sequential nonces
         // (IE for FCFS execution), check and make sure the order is correct
-        // NOTE: allowing only sequenced nonces could create a scenario in
+        // NOTE: allowing only sequential nonces could create a scenario in
         // which builders or validators may be able to profit via censorship.
         // DApps are encouraged to rely on the deadline parameter.
-        if (!_handleNonces(dAppOp.from, dAppOp.nonce, !dConfig.callConfig.needsSequencedDAppNonces(), isSimulation)) {
+        if (!_handleNonces(dAppOp.from, dAppOp.nonce, dConfig.callConfig.needsSequentialDAppNonces(), isSimulation)) {
             return (false, ValidCallsResult.InvalidDAppNonce);
         }
 
         return (true, ValidCallsResult.Valid);
     }
 
-    /// @notice The _handleNonces internal function handles the verification of nonces for both sequenced and async
-    /// nonce systems.
+    /// @notice The _handleNonces internal function handles the verification of nonces for both sequential and
+    /// non-sequential nonce systems.
     /// @param account The address of the account to verify the nonce for.
     /// @param nonce The nonce to verify.
-    /// @param async A boolean indicating if the nonce is async (true) or sequential (false).
+    /// @param sequential A boolean indicating if the nonce mode is sequential (true) or not (false)
     /// @param isSimulation A boolean indicating if the execution is a simulation.
     /// @return A boolean indicating if the nonce is valid.
-    function _handleNonces(address account, uint256 nonce, bool async, bool isSimulation) internal returns (bool) {
+    function _handleNonces(
+        address account,
+        uint256 nonce,
+        bool sequential,
+        bool isSimulation
+    )
+        internal
+        returns (bool)
+    {
         if (nonce > type(uint128).max - 1) {
             return false;
         }
 
-        // 0 Nonces are not allowed. Nonces start at 1 for both sequenced and async.
+        // 0 Nonces are not allowed. Nonces start at 1 for both sequential and non-sequential.
         if (nonce == 0) return false;
 
         NonceTracker memory nonceTracker = nonceTrackers[account];
 
-        if (!async) {
+        if (sequential) {
             // SEQUENTIAL NONCES
 
             // Nonces must increase by 1 if sequential
@@ -405,7 +413,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
             ++nonceTracker.lastUsedSeqNonce;
         } else {
-            // ASYNC NONCES
+            // NON-SEQUENTIAL NONCES
 
             uint256 bitmapIndex = ((nonce - 1) / 240) + 1; // +1 because highestFullBitmap initializes at 0
             uint256 bitmapNonce = ((nonce - 1) % 240); // 1 -> 0, 240 -> 239. Needed for shifts in bitmap.
@@ -434,9 +442,9 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
             // Mark bitmap as full if necessary
             if (bitmap == FULL_BITMAP) {
-                // Update highestFullAsyncBitmap if necessary
-                if (bitmapIndex == nonceTracker.highestFullAsyncBitmap + 1) {
-                    nonceTracker = _incrementHighestFullAsyncBitmap(nonceTracker, account);
+                // Update highestFullNonSeqBitmap if necessary
+                if (bitmapIndex == nonceTracker.highestFullNonSeqBitmap + 1) {
+                    nonceTracker = _incrementHighestFullNonSeqBitmap(nonceTracker, account);
                 }
             }
 
@@ -447,15 +455,15 @@ contract AtlasVerification is EIP712, DAppIntegration {
         return true;
     }
 
-    /// @notice Increments the `highestFullAsyncBitmap` of a given `nonceTracker` for the specified `account` until a
+    /// @notice Increments the `highestFullNonSeqBitmap` of a given `nonceTracker` for the specified `account` until a
     /// non-fully utilized bitmap is found.
     /// @param nonceTracker The `NonceTracker` memory structure representing the current state of nonce tracking for a
     /// specific account.
     /// @param account The address of the account for which the nonce tracking is being updated. This is used to
     /// generate a unique key for accessing the correct bitmap from a mapping.
-    /// @return nonceTracker The updated `NonceTracker` structure with the `highestFullAsyncBitmap` field modified to
+    /// @return nonceTracker The updated `NonceTracker` structure with the `highestFullNonSeqBitmap` field modified to
     /// reflect the highest index of a bitmap that is not fully utilized.
-    function _incrementHighestFullAsyncBitmap(
+    function _incrementHighestFullNonSeqBitmap(
         NonceTracker memory nonceTracker,
         address account
     )
@@ -466,9 +474,9 @@ contract AtlasVerification is EIP712, DAppIntegration {
         uint256 bitmap;
         do {
             unchecked {
-                ++nonceTracker.highestFullAsyncBitmap;
+                ++nonceTracker.highestFullNonSeqBitmap;
             }
-            uint256 bitmapIndex = uint256(nonceTracker.highestFullAsyncBitmap) + 1;
+            uint256 bitmapIndex = uint256(nonceTracker.highestFullNonSeqBitmap) + 1;
             bytes32 bitmapKey = keccak256(abi.encode(account, bitmapIndex));
             bitmap = uint256(nonceBitmaps[bitmapKey].bitmap);
         } while (bitmap == FULL_BITMAP);
@@ -562,13 +570,13 @@ contract AtlasVerification is EIP712, DAppIntegration {
             return false;
         }
 
-        // If the dapp indicated that they only accept sequenced userNonces
+        // If the dapp indicated that they only accept sequential userNonces
         // (IE for FCFS execution), check and make sure the order is correct
-        // NOTE: allowing only sequenced userNonces could create a scenario in
+        // NOTE: allowing only sequential userNonces could create a scenario in
         // which builders or validators may be able to profit via censorship.
         // DApps are encouraged to rely on the deadline parameter
         // to prevent replay attacks.
-        if (!_handleNonces(userOp.from, userOp.nonce, !dConfig.callConfig.needsSequencedUserNonces(), isSimulation)) {
+        if (!_handleNonces(userOp.from, userOp.nonce, dConfig.callConfig.needsSequentialUserNonces(), isSimulation)) {
             return false;
         }
 
@@ -614,14 +622,14 @@ contract AtlasVerification is EIP712, DAppIntegration {
         payload = _hashTypedDataV4(_getUserOpHash(userOp));
     }
 
-    /// @notice Returns the next nonce for the given account, in sequential or async mode.
+    /// @notice Returns the next nonce for the given account, in sequential or non-sequential mode.
     /// @param account The address of the account for which to retrieve the next nonce.
-    /// @param sequenced A boolean indicating if the nonce should be sequential (true) or async (false).
+    /// @param sequential A boolean indicating if the nonce should be sequential (true) or non-sequential (false).
     /// @return The next nonce for the given account.
-    function getNextNonce(address account, bool sequenced) external view returns (uint256) {
+    function getNextNonce(address account, bool sequential) external view returns (uint256) {
         NonceTracker memory nonceTracker = nonceTrackers[account];
 
-        if (sequenced) {
+        if (sequential) {
             return nonceTracker.lastUsedSeqNonce + 1;
         } else {
             uint256 n;
@@ -630,39 +638,35 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 unchecked {
                     ++n;
                 }
-                // Async bitmaps start at index 1. I.e. accounts start with bitmap 0 = HighestFullAsyncBitmap
-                bytes32 bitmapKey = keccak256(abi.encode(account, nonceTracker.highestFullAsyncBitmap + n));
+                // Non-sequential bitmaps start at index 1. I.e. accounts start with bitmap 0 = HighestFullNonSeqBitmap
+                bytes32 bitmapKey = keccak256(abi.encode(account, nonceTracker.highestFullNonSeqBitmap + n));
                 NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
                 bitmap256 = uint256(nonceBitmap.bitmap);
             } while (bitmap256 == FULL_BITMAP);
 
             uint256 remainder = _getFirstUnusedNonceInBitmap(bitmap256);
-            return ((nonceTracker.highestFullAsyncBitmap + n - 1) * 240) + remainder;
+            return ((nonceTracker.highestFullNonSeqBitmap + n - 1) * 240) + remainder;
         }
     }
 
-    /// @notice Manually updates the highestFullAsyncBitmap of an account to reflect the real full bitmap.
-    /// @dev Only the owner of the account whose nonce tracker is being updated can call this function.
-    /// @param account The address of the account for which to update the highestFullAsyncBitmap.
-    function manuallyUpdateNonceTracker(address account) external {
-        if (msg.sender != account) revert AtlasErrors.OnlyAccount();
-
-        NonceTracker memory nonceTracker = nonceTrackers[account];
+    /// @notice Manually updates the highestFullNonSeqBitmap of the caller to reflect the real full bitmap.
+    function manuallyUpdateNonSeqNonceTracker() external {
+        NonceTracker memory nonceTracker = nonceTrackers[msg.sender];
         NonceBitmap memory nonceBitmap;
 
         // Checks the next 10 bitmaps for a higher full bitmap
-        uint128 nonceIndexToCheck = nonceTracker.highestFullAsyncBitmap + 10;
-        for (; nonceIndexToCheck > nonceTracker.highestFullAsyncBitmap; nonceIndexToCheck--) {
-            bytes32 bitmapKey = keccak256(abi.encode(account, nonceIndexToCheck));
+        uint128 nonceIndexToCheck = nonceTracker.highestFullNonSeqBitmap + 10;
+        for (; nonceIndexToCheck > nonceTracker.highestFullNonSeqBitmap; nonceIndexToCheck--) {
+            bytes32 bitmapKey = keccak256(abi.encode(msg.sender, nonceIndexToCheck));
             nonceBitmap = nonceBitmaps[bitmapKey];
 
             if (nonceBitmap.bitmap == FULL_BITMAP) {
-                nonceTracker.highestFullAsyncBitmap = nonceIndexToCheck;
+                nonceTracker.highestFullNonSeqBitmap = nonceIndexToCheck;
                 break;
             }
         }
 
-        nonceTrackers[account] = nonceTracker;
+        nonceTrackers[msg.sender] = nonceTracker;
     }
 
     /// @notice Checks if a nonce is used in a 256-bit bitmap.
