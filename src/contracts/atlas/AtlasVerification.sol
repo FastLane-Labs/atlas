@@ -256,7 +256,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @notice The getSolverPayload function returns the hash of a SolverOperation struct.
     /// @param solverOp The SolverOperation struct to hash.
     function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload) {
-        payload = _hashTypedDataV4(_getSolverHash(solverOp));
+        payload = _hashTypedDataV4(_getSolverOpHash(solverOp));
     }
 
     /// @notice The internal _verifySolverSignature function verifies the signature of a SolverOperation.
@@ -264,14 +264,14 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @return A boolean indicating if the signature is valid.
     function _verifySolverSignature(SolverOperation calldata solverOp) internal view returns (bool) {
         if (solverOp.signature.length == 0) return false;
-        (address signer,) = _hashTypedDataV4(_getSolverHash(solverOp)).tryRecover(solverOp.signature);
+        (address signer,) = _hashTypedDataV4(_getSolverOpHash(solverOp)).tryRecover(solverOp.signature);
         return signer == solverOp.from;
     }
 
-    /// @notice The _getSolverHash internal function returns the hash of a SolverOperation struct.
+    /// @notice The _getSolverOpHash internal function returns the hash of a SolverOperation struct.
     /// @param solverOp The SolverOperation struct to hash.
-    /// @return solverHash The hash of the SolverOperation struct.
-    function _getSolverHash(SolverOperation calldata solverOp) internal pure returns (bytes32 solverHash) {
+    /// @return solverOpHash The hash of the SolverOperation struct.
+    function _getSolverOpHash(SolverOperation calldata solverOp) internal pure returns (bytes32 solverOpHash) {
         return keccak256(
             abi.encode(
                 SOLVER_TYPE_HASH,
@@ -478,9 +478,9 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
     /// @notice Generates the hash of a DAppOperation struct.
     /// @param approval The DAppOperation struct to hash.
-    /// @return proofHash The hash of the DAppOperation struct.
-    function _getProofHash(DAppOperation memory approval) internal pure returns (bytes32 proofHash) {
-        proofHash = keccak256(
+    /// @return dappOpHash The hash of the DAppOperation struct.
+    function _getDAppOpHash(DAppOperation memory approval) internal pure returns (bytes32 dappOpHash) {
+        dappOpHash = keccak256(
             abi.encode(
                 DAPP_TYPE_HASH,
                 approval.from,
@@ -502,7 +502,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @return A boolean indicating if the signature is valid.
     function _verifyDAppSignature(DAppOperation calldata dAppOp) internal view returns (bool) {
         if (dAppOp.signature.length == 0) return false;
-        (address signer,) = _hashTypedDataV4(_getProofHash(dAppOp)).tryRecover(dAppOp.signature);
+        (address signer,) = _hashTypedDataV4(_getDAppOpHash(dAppOp)).tryRecover(dAppOp.signature);
 
         return signer == dAppOp.from;
     }
@@ -511,7 +511,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @param dAppOp The DAppOperation struct to hash.
     /// @return payload The hash of the DAppOperation struct.
     function getDAppOperationPayload(DAppOperation memory dAppOp) public view returns (bytes32 payload) {
-        payload = _hashTypedDataV4(_getProofHash(dAppOp));
+        payload = _hashTypedDataV4(_getDAppOpHash(dAppOp));
     }
 
     /// @notice Returns the domain separator for the EIP712 signature scheme.
@@ -548,7 +548,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 return false;
             }
             bool validSmartWallet =
-                IAccount(userOp.from).validateUserOp{ gas: 30_000 }(userOp, _getProofHash(userOp), 0) == 0;
+                IAccount(userOp.from).validateUserOp{ gas: 30_000 }(userOp, _getUserOpHash(userOp), 0) == 0;
             return (isSimulation || validSmartWallet);
         }
 
@@ -577,9 +577,9 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
     /// @notice Generates the hash of a UserOperation struct.
     /// @param userOp The UserOperation struct to hash.
-    /// @return proofHash The hash of the UserOperation struct.
-    function _getProofHash(UserOperation memory userOp) internal pure returns (bytes32 proofHash) {
-        proofHash = keccak256(
+    /// @return userOpHash The hash of the UserOperation struct.
+    function _getUserOpHash(UserOperation memory userOp) internal pure returns (bytes32 userOpHash) {
+        userOpHash = keccak256(
             abi.encode(
                 USER_TYPE_HASH,
                 userOp.from,
@@ -602,7 +602,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @return A boolean indicating if the signature is valid.
     function _verifyUserSignature(UserOperation calldata userOp) internal view returns (bool) {
         if (userOp.signature.length == 0) return false;
-        (address signer,) = _hashTypedDataV4(_getProofHash(userOp)).tryRecover(userOp.signature);
+        (address signer,) = _hashTypedDataV4(_getUserOpHash(userOp)).tryRecover(userOp.signature);
 
         return signer == userOp.from;
     }
@@ -611,7 +611,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @param userOp The UserOperation struct to hash.
     /// @return payload The hash of the UserOperation struct.
     function getUserOperationPayload(UserOperation memory userOp) public view returns (bytes32 payload) {
-        payload = _hashTypedDataV4(_getProofHash(userOp));
+        payload = _hashTypedDataV4(_getUserOpHash(userOp));
     }
 
     /// @notice Returns the next nonce for the given account, in sequential or async mode.
