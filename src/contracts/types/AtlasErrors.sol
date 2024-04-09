@@ -36,6 +36,18 @@ contract AtlasErrors {
     error PostOpsSimFail();
     error ValidCalls(ValidCallsResult);
 
+    // Execution Environment
+    error PreOpsDelegatecallFail();
+    error UserOpValueExceedsBalance();
+    error UserWrapperDelegatecallFail();
+    error UserWrapperCallFail();
+    error PostOpsDelegatecallFail();
+    error PostOpsDelegatecallReturnedFalse();
+    error SolverMetaTryCatchIncorrectValue();
+    error AllocateValueDelegatecallFail();
+    error NotEnvironmentOwner();
+    error ExecutionEnvironmentBalanceTooLow();
+
     // Atlas
     error PreOpsFail();
     error UserOpFail();

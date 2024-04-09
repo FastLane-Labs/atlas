@@ -23,7 +23,6 @@ contract DAppIntegration {
         uint128 highestFullAsyncBitmap; // Async nonces tracked using bitmaps
     }
 
-    address internal constant UNLOCKED = address(1);
     address public immutable ATLAS;
 
     // from => nonceTracker
@@ -161,7 +160,7 @@ contract DAppIntegration {
 
     /// @notice Checks if the Atlas protocol is in an unlocked state. Will revert if not.
     function _checkAtlasIsUnlocked() internal view {
-        if (IAtlas(ATLAS).lock() != UNLOCKED) revert AtlasErrors.AtlasLockActive();
+        if (!IAtlas(ATLAS).isUnlocked()) revert AtlasErrors.AtlasLockActive();
     }
 
     // ---------------------------------------------------- //

@@ -259,9 +259,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
         preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC02 DelegateRevert"));
+        vm.expectRevert(AtlasErrors.PreOpsDelegatecallFail.selector);
         (status,) = address(executionEnvironment).call(preOpsData);
-        assertTrue(status, "expectRevert ERR-EC02 DelegateRevert: call did not revert");
     }
 
     function test_userWrapper() public {
@@ -281,9 +280,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
         userData = abi.encodePacked(userData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-CE01 ValueExceedsBalance"));
+        vm.expectRevert(AtlasErrors.UserOpValueExceedsBalance.selector);
         (status,) = address(executionEnvironment).call(userData);
-        assertTrue(status, "expectRevert ERR-CE01 ValueExceedsBalance: call did not revert");
         userOp.value = 0;
 
         // Valid (needsDelegateUser=false)
@@ -303,9 +301,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
         userData = abi.encodePacked(userData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC04a CallRevert"));
+        vm.expectRevert(AtlasErrors.UserWrapperCallFail.selector);
         (status,) = address(executionEnvironment).call(userData);
-        assertTrue(status, "expectRevert ERR-EC04a CallRevert: call did not revert");
 
         // Change of config
         callConfig.delegateUser = true;
@@ -329,9 +326,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
         userData = abi.encodePacked(userData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC02 DelegateRevert"));
+        vm.expectRevert(AtlasErrors.UserWrapperDelegatecallFail.selector);
         (status,) = address(executionEnvironment).call(userData);
-        assertTrue(status, "expectRevert ERR-EC02 DelegateRevert: call did not revert");
     }
 
     function test_postOpsWrapper() public {
@@ -355,9 +351,8 @@ contract ExecutionEnvironmentTest is BaseTest {
             abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, false, abi.encode(true, false));
         postOpsData = abi.encodePacked(postOpsData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC02 DelegateRevert"));
+        vm.expectRevert(AtlasErrors.PostOpsDelegatecallFail.selector);
         (status,) = address(executionEnvironment).call(postOpsData);
-        assertTrue(status, "expectRevert ERR-EC02 DelegateRevert: call did not revert");
 
         // DelegateUnsuccessful
         escrowKey = escrowKey.holdPostOpsLock();
@@ -365,9 +360,8 @@ contract ExecutionEnvironmentTest is BaseTest {
             abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, false, abi.encode(false, false));
         postOpsData = abi.encodePacked(postOpsData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC03a DelegateUnsuccessful"));
+        vm.expectRevert(AtlasErrors.PostOpsDelegatecallReturnedFalse.selector);
         (status,) = address(executionEnvironment).call(postOpsData);
-        assertTrue(status, "expectRevert ERR-EC03a DelegateUnsuccessful: call did not revert");
     }
 
     function test_solverMetaTryCatch() public {
@@ -393,9 +387,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-CE05 IncorrectValue"));
+        vm.expectRevert(AtlasErrors.SolverMetaTryCatchIncorrectValue.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
-        assertTrue(status, "expectRevert ERR-CE05 IncorrectValue: call did not revert");
         solverOp.value = 0;
         _unsetLocks();
 
@@ -410,7 +403,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.AlteredControl.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
-        assertTrue(status, "expectRevert AlteredControl: call did not revert");
         solverOp.control = address(dAppControl);
         _unsetLocks();
 
@@ -425,7 +417,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.SolverOperationReverted.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
-        assertTrue(status, "expectRevert SolverOperationReverted: call did not revert");
         _unsetLocks();
 
         // SolverBidUnpaid
@@ -440,7 +431,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.SolverBidUnpaid.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
-        assertTrue(status, "expectRevert SolverBidUnpaid: call did not revert");
         solverOp.bidAmount = 0;
         _unsetLocks();
 
@@ -457,7 +447,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.BalanceNotReconciled.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
-        assertTrue(status, "expectRevert BalanceNotReconciled: call did not revert");
         solverContract.setReconcile(true);
         _unsetLocks();
 
@@ -480,7 +469,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PreSolverFailed.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
-        assertTrue(status, "expectRevert PreSolverFailed: call did not revert");
         _unsetLocks();
 
         // PreSolverFailed 2
@@ -497,7 +485,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PreSolverFailed.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
-        assertTrue(status, "expectRevert PreSolverFailed 2: call did not revert");
         _unsetLocks();
 
         // Change of config
@@ -521,7 +508,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PostSolverFailed.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
-        assertTrue(status, "expectRevert PostSolverFailed: call did not revert");
         _unsetLocks();
 
         // IntentUnfulfilled
@@ -539,7 +525,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.IntentUnfulfilled.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
-        assertTrue(status, "expectRevert IntentUnfulfilled: call did not revert");
         _unsetLocks();
     }
 
@@ -564,9 +549,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         allocateData = abi.encodePacked(allocateData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC02 DelegateRevert"));
+        vm.expectRevert(AtlasErrors.AllocateValueDelegatecallFail.selector);
         (status,) = address(executionEnvironment).call(allocateData);
-        assertTrue(status, "expectRevert ERR-EC02 DelegateRevert: call did not revert");
     }
 
     function test_withdrawERC20() public {
@@ -581,12 +565,12 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // NotEnvironmentOwner
         vm.prank(invalid); // Invalid caller
-        vm.expectRevert(bytes("ERR-EC01 NotEnvironmentOwner"));
+        vm.expectRevert(AtlasErrors.NotEnvironmentOwner.selector);
         executionEnvironment.withdrawERC20(chain.weth, 2e18);
 
         // BalanceTooLow
         vm.prank(user);
-        vm.expectRevert(bytes("ERR-EC02 BalanceTooLow"));
+        vm.expectRevert(AtlasErrors.ExecutionEnvironmentBalanceTooLow.selector);
         executionEnvironment.withdrawERC20(chain.weth, 2e18);
 
         // The following line changes an Atlas storage value in order to make the test succeed.
@@ -600,7 +584,7 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // EscrowLocked
         vm.prank(user);
-        vm.expectRevert(bytes("ERR-EC15 EscrowLocked"));
+        vm.expectRevert(AtlasErrors.AtlasLockActive.selector);
         executionEnvironment.withdrawERC20(chain.weth, 2e18);
     }
 
@@ -616,12 +600,12 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // NotEnvironmentOwner
         vm.prank(address(0)); // Invalid caller
-        vm.expectRevert(bytes("ERR-EC01 NotEnvironmentOwner"));
+        vm.expectRevert(AtlasErrors.NotEnvironmentOwner.selector);
         executionEnvironment.withdrawEther(2e18);
 
         // BalanceTooLow
         vm.prank(user);
-        vm.expectRevert(bytes("ERR-EC03 BalanceTooLow"));
+        vm.expectRevert(AtlasErrors.ExecutionEnvironmentBalanceTooLow.selector);
         executionEnvironment.withdrawEther(2e18);
 
         // The following line changes an Atlas storage value in order to make the test succeed.
@@ -635,7 +619,7 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // EscrowLocked
         vm.prank(user);
-        vm.expectRevert(bytes("ERR-EC15 EscrowLocked"));
+        vm.expectRevert(AtlasErrors.AtlasLockActive.selector);
         executionEnvironment.withdrawEther(2e18);
     }
 
@@ -651,17 +635,17 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // NotFactory
         vm.prank(invalid); // Invalid caller
-        vm.expectRevert(bytes("ERR-EC10 NotFactory"));
+        vm.expectRevert(AtlasErrors.OnlyAtlas.selector);
         executionEnvironment.factoryWithdrawERC20(user, chain.weth, 2e18);
 
         // NotEnvironmentOwner
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC11 NotEnvironmentOwner"));
+        vm.expectRevert(AtlasErrors.NotEnvironmentOwner.selector);
         executionEnvironment.factoryWithdrawERC20(invalid, chain.weth, 2e18); // Invalid user
 
         // BalanceTooLow
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC02 BalanceTooLow"));
+        vm.expectRevert(AtlasErrors.ExecutionEnvironmentBalanceTooLow.selector);
         executionEnvironment.factoryWithdrawERC20(user, chain.weth, 2e18);
 
         // The following line changes an Atlas storage value in order to make the test succeed.
@@ -675,7 +659,7 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // EscrowLocked
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC15 EscrowLocked"));
+        vm.expectRevert(AtlasErrors.AtlasLockActive.selector);
         executionEnvironment.factoryWithdrawERC20(user, chain.weth, 2e18);
     }
 
@@ -691,17 +675,17 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // NotFactory
         vm.prank(invalid); // Invalid caller
-        vm.expectRevert(bytes("ERR-EC10 NotFactory"));
+        vm.expectRevert(AtlasErrors.OnlyAtlas.selector);
         executionEnvironment.factoryWithdrawEther(user, 2e18);
 
         // NotEnvironmentOwner
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC11 NotEnvironmentOwner"));
+        vm.expectRevert(AtlasErrors.NotEnvironmentOwner.selector);
         executionEnvironment.factoryWithdrawEther(invalid, 2e18); // Invalid user
 
         // BalanceTooLow
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC03 BalanceTooLow"));
+        vm.expectRevert(AtlasErrors.ExecutionEnvironmentBalanceTooLow.selector);
         executionEnvironment.factoryWithdrawEther(user, 2e18);
 
         // The following line changes an Atlas storage value in order to make the test succeed.
@@ -715,7 +699,7 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // EscrowLocked
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC15 EscrowLocked"));
+        vm.expectRevert(AtlasErrors.AtlasLockActive.selector);
         executionEnvironment.factoryWithdrawEther(user, 2e18);
     }
 
