@@ -633,7 +633,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
             return nonceTracker.lastUsedSeqNonce + 1;
         } else {
             uint256 n;
-            uint256 bitmap256;
+            uint256 bitmap;
             do {
                 unchecked {
                     ++n;
@@ -641,10 +641,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 // Non-sequential bitmaps start at index 1. I.e. accounts start with bitmap 0 = HighestFullNonSeqBitmap
                 bytes32 bitmapKey = keccak256(abi.encode(account, nonceTracker.highestFullNonSeqBitmap + n));
                 NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
-                bitmap256 = uint256(nonceBitmap.bitmap);
-            } while (bitmap256 == FULL_BITMAP);
+                bitmap = uint256(nonceBitmap.bitmap);
+            } while (bitmap == FULL_BITMAP);
 
-            uint256 remainder = _getFirstUnusedNonceInBitmap(bitmap256);
+            uint256 remainder = _getFirstUnusedNonceInBitmap(bitmap);
             return ((nonceTracker.highestFullNonSeqBitmap + n - 1) * 240) + remainder;
         }
     }
