@@ -221,7 +221,7 @@ abstract contract AtlETH is Permit69 {
     function _deduct(address account, uint256 amount) internal {
         uint112 amt = uint112(amount);
 
-        EscrowAccountBalance memory aData = _balanceOf[account];
+        EscrowAccountBalance storage aData = _balanceOf[account];
 
         uint112 balance = aData.balance;
 
@@ -231,7 +231,6 @@ abstract contract AtlETH is Permit69 {
             uint112 _shortfall = amt - balance;
             aData.balance = 0;
             aData.unbonding -= _shortfall; // underflow here to revert if insufficient balance
-            _balanceOf[account] = aData;
 
             uint256 shortfall256 = uint256(_shortfall);
             totalSupply += shortfall256; // add the released supply back to atleth.
@@ -311,11 +310,10 @@ abstract contract AtlETH is Permit69 {
         // unbonding amount as bonded total supply since it is still inaccessible
         // for atomic xfer.
 
-        EscrowAccountAccessData memory aData = accessData[owner];
+        EscrowAccountAccessData storage aData = accessData[owner];
 
         aData.bonded -= amt;
         aData.lastAccessedBlock = uint32(block.number);
-        accessData[owner] = aData;
 
         _balanceOf[owner].unbonding += amt;
 
@@ -336,15 +334,13 @@ abstract contract AtlETH is Permit69 {
 
         uint112 amt = uint112(amount);
 
-        EscrowAccountBalance memory bData = _balanceOf[owner];
+        EscrowAccountBalance storage bData = _balanceOf[owner];
 
         bData.unbonding -= amt;
         bondedTotalSupply -= amount;
 
         bData.balance += amt;
         totalSupply += amount;
-
-        _balanceOf[owner] = bData;
 
         emit Redeem(owner, amount);
     }
