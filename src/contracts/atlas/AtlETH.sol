@@ -388,8 +388,8 @@ abstract contract AtlETH is Permit69 {
             revert InvalidAccess();
         }
 
-        surchargeRecipient = pendingSurchargeRecipient;
+        surchargeRecipient = msg.sender;
         pendingSurchargeRecipient = address(0);
-        emit SurchargeRecipientTransferred(surchargeRecipient);
+        emit SurchargeRecipientTransferred(msg.sender);
     }
 }
