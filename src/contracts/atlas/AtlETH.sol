@@ -2,8 +2,9 @@
 pragma solidity 0.8.22;
 
 import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
-import "src/contracts/types/EscrowTypes.sol";
+import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 import { Permit69 } from "src/contracts/common/Permit69.sol";
+import "src/contracts/types/EscrowTypes.sol";
 
 /// @notice Modified Solmate ERC20 with some Atlas-specific modifications.
 /// @author FastLane Labs
@@ -219,7 +220,7 @@ abstract contract AtlETH is Permit69 {
     /// @param account The address from which to deduct atlETH tokens.
     /// @param amount The amount of atlETH tokens to deduct from the specified account.
     function _deduct(address account, uint256 amount) internal {
-        uint112 amt = uint112(amount);
+        uint112 amt = SafeCast.toUint112(amount);
 
         EscrowAccountBalance storage aData = _balanceOf[account];
 
@@ -286,7 +287,7 @@ abstract contract AtlETH is Permit69 {
     /// @param owner The address of the account to put a hold on AtlETH tokens for.
     /// @param amount The amount of AtlETH tokens to put a hold on.
     function _bond(address owner, uint256 amount) internal {
-        uint112 amt = uint112(amount);
+        uint112 amt = SafeCast.toUint112(amount);
 
         _balanceOf[owner].balance -= amt;
         totalSupply -= amount;
@@ -304,7 +305,7 @@ abstract contract AtlETH is Permit69 {
     /// @param owner The address of the account to start the unbonding wait time for.
     /// @param amount The amount of AtlETH tokens to start the unbonding wait time for.
     function _unbond(address owner, uint256 amount) internal {
-        uint112 amt = uint112(amount);
+        uint112 amt = SafeCast.toUint112(amount);
 
         // totalSupply and totalBondedSupply are unaffected; continue to count the
         // unbonding amount as bonded total supply since it is still inaccessible
@@ -332,7 +333,7 @@ abstract contract AtlETH is Permit69 {
             revert EscrowLockActive();
         }
 
-        uint112 amt = uint112(amount);
+        uint112 amt = SafeCast.toUint112(amount);
 
         EscrowAccountBalance storage bData = _balanceOf[owner];
 
