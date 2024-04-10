@@ -670,12 +670,12 @@ contract AtlasVerification is EIP712, DAppIntegration {
     }
 
     /// @notice Checks if a nonce is used in a 256-bit bitmap.
-    /// @dev Only accurate for nonces 1 - 240 within a 256-bit bitmap.
+    /// @dev Only accurate for the bitmap nonce range (0 - 239) within a 256-bit bitmap.
     /// @param bitmap The 256-bit bitmap to check.
-    /// @param nonce The nonce to check.
+    /// @param bitmapNonce The nonce (in the range 0 - 239) to check.
     /// @return A boolean indicating if the nonce is used in the bitmap.
-    function _nonceUsedInBitmap(uint256 bitmap, uint256 nonce) internal pure returns (bool) {
-        return (bitmap & (1 << nonce)) != 0;
+    function _nonceUsedInBitmap(uint256 bitmap, uint256 bitmapNonce) internal pure returns (bool) {
+        return (bitmap & (1 << bitmapNonce)) != 0;
     }
 
     /// @notice Returns the first unused nonce in a 256-bit bitmap.
