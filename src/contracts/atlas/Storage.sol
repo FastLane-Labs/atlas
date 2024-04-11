@@ -44,20 +44,22 @@ contract Storage is AtlasEvents, AtlasErrors {
     uint256 internal constant _CALLDATA_LENGTH_PREMIUM = 32; // 16 (default) * 2
 
     // atlETH GasAccounting storage
-
     uint256 public surcharge; // Atlas gas surcharges
     address public surchargeRecipient; // Fastlane surcharge recipient
     address public pendingSurchargeRecipient; // For 2-step transfer process
 
     // Atlas SafetyLocks (transient storage)
     address public lock; // transient storage
-    uint256 internal _solverLock; // transient storage
     uint256 public claims; // transient storage
     uint256 public withdrawals; // transient storage
     uint256 public deposits; // transient storage
+    uint256 internal _solverLock; // transient storage
 
-    uint256 internal _solverCalledBack = 1 << 161;
-    uint256 internal _solverFulfilled = 1 << 162;
+    // First 160 bits of _solverLock are the address of the current solver.
+    // The 161st bit represents whether the solver has called back via `reconcile`.
+    // The 162nd bit represents whether the solver's outstanding debt has been repaid via `reconcile`.
+    uint256 internal constant SOLVER_CALLED_BACK_MASK = 1 << 161;
+    uint256 internal constant SOLVER_FULFILLED_MASK = 1 << 162;
 
     constructor(
         uint256 _escrowDuration,
@@ -96,8 +98,8 @@ contract Storage is AtlasEvents, AtlasErrors {
     function solverLockData() public view returns (address currentSolver, bool calledBack, bool fulfilled) {
         uint256 solverLock = _solverLock;
         currentSolver = address(uint160(solverLock));
-        calledBack = solverLock & _solverCalledBack != 0;
-        fulfilled = solverLock & _solverFulfilled != 0;
+        calledBack = solverLock & SOLVER_CALLED_BACK_MASK != 0;
+        fulfilled = solverLock & SOLVER_FULFILLED_MASK != 0;
     }
 
     /// @notice Returns the address of the current solver.

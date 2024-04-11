@@ -415,6 +415,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
         } else {
             // NON-SEQUENTIAL NONCES
 
+            // Only 240 nonces per bitmap because uint240 used to track nonces,
+            // while an additional uint8 used to track the highest used nonce in the bitmap.
+            // Both the uint240 and uint8 are packed into a single storage slot.
+
             uint256 bitmapIndex = ((nonce - 1) / 240) + 1; // +1 because highestFullBitmap initializes at 0
             uint256 bitmapNonce = ((nonce - 1) % 240); // 1 -> 0, 240 -> 239. Needed for shifts in bitmap.
 
@@ -670,7 +674,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
     }
 
     /// @notice Checks if a nonce is used in a 256-bit bitmap.
-    /// @dev Only accurate for the bitmap nonce range (0 - 239) within a 256-bit bitmap.
+    /// @dev Only accurate for the bitmap nonce range (0 - 239) within a 256-bit bitmap. This allows space in the slot
+    /// for a uint8 representing the highest used nonce in the current bitmap.
     /// @param bitmap The 256-bit bitmap to check.
     /// @param bitmapNonce The nonce (in the range 0 - 239) to check.
     /// @return A boolean indicating if the nonce is used in the bitmap.
@@ -678,7 +683,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         return (bitmap & (1 << bitmapNonce)) != 0;
     }
 
-    /// @notice Returns the first unused nonce in a 256-bit bitmap.
+    /// @notice Returns the first unused nonce in a 240-bit bitmap.
     /// @dev Finds the first unused nonce within a given 240-bit bitmap, checking 16 bits and then 4 bits at a time for
     /// efficiency.
     /// @param bitmap A uint256 where the first 240 bits are used to represent the used/unused status of nonces.
