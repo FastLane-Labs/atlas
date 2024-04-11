@@ -273,7 +273,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     function _getSolverOpHash(SolverOperation calldata solverOp) internal pure returns (bytes32 solverOpHash) {
         return keccak256(
             abi.encode(
-                SOLVER_TYPE_HASH,
+                SOLVER_TYPEHASH,
                 solverOp.from,
                 solverOp.to,
                 solverOp.value,
@@ -493,7 +493,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     function _getDAppOpHash(DAppOperation calldata approval) internal pure returns (bytes32 dappOpHash) {
         dappOpHash = keccak256(
             abi.encode(
-                DAPP_TYPE_HASH,
+                DAPP_TYPEHASH,
                 approval.from,
                 approval.to,
                 approval.value,
@@ -590,7 +590,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     function _getUserOpHash(UserOperation calldata userOp) internal pure returns (bytes32 userOpHash) {
         userOpHash = keccak256(
             abi.encode(
-                USER_TYPE_HASH,
+                USER_TYPEHASH,
                 userOp.from,
                 userOp.to,
                 userOp.value,
