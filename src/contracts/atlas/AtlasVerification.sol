@@ -263,7 +263,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @param solverOp The SolverOperation struct to verify.
     /// @return A boolean indicating if the signature is valid.
     function _verifySolverSignature(SolverOperation calldata solverOp) internal view returns (bool) {
-        if (solverOp.signature.length == 0) return false;
         (address signer,) = _hashTypedDataV4(_getSolverOpHash(solverOp)).tryRecover(solverOp.signature);
         return signer == solverOp.from;
     }
@@ -513,9 +512,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @param dAppOp The DAppOperation struct to verify.
     /// @return A boolean indicating if the signature is valid.
     function _verifyDAppSignature(DAppOperation calldata dAppOp) internal view returns (bool) {
-        if (dAppOp.signature.length == 0) return false;
         (address signer,) = _hashTypedDataV4(_getDAppOpHash(dAppOp)).tryRecover(dAppOp.signature);
-
         return signer == dAppOp.from;
     }
 
@@ -613,9 +610,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @param userOp The UserOperation struct to verify.
     /// @return A boolean indicating if the signature is valid.
     function _verifyUserSignature(UserOperation calldata userOp) internal view returns (bool) {
-        if (userOp.signature.length == 0) return false;
         (address signer,) = _hashTypedDataV4(_getUserOpHash(userOp)).tryRecover(userOp.signature);
-
         return signer == userOp.from;
     }
 
