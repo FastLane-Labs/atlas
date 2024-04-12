@@ -190,7 +190,7 @@ abstract contract AtlETH is Permit69 {
     /// @param amount The amount of atlETH tokens to mint and assign to the specified account.
     function _mint(address to, uint256 amount) internal {
         totalSupply += amount;
-        _balanceOf[to].balance += uint112(amount);
+        _balanceOf[to].balance += SafeCast.toUint112(amount);
         emit Transfer(address(0), to, amount);
     }
 
