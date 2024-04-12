@@ -105,14 +105,13 @@ abstract contract GasAccounting is SafetyLocks {
 
         // CASE: Callback verified but insufficient balance
         if (deficit > surplus) {
-            if (!calledBack) {
-                _solverLock = uint256(uint160(currentSolver)) | SOLVER_CALLED_BACK_MASK;
-            }
+            _solverLock = uint256(uint160(currentSolver)) | SOLVER_CALLED_BACK_MASK;
+
             return deficit - surplus;
         }
 
         // CASE: Callback verified and solver duty fulfilled
-        if (!calledBack || !fulfilled) {
+        if (!fulfilled) {
             _solverLock = uint256(uint160(currentSolver)) | SOLVER_CALLED_BACK_MASK | SOLVER_FULFILLED_MASK;
         }
         return 0;
