@@ -67,8 +67,9 @@ contract Atlas is Escrow, Factory {
         // Initialize the lock
         _setAtlasLock(executionEnvironment, gasMarker, userOp.value);
 
-        try this.execute{ value: msg.value }(dConfig, userOp, solverOps, executionEnvironment, msg.sender, userOpHash)
-        returns (bool _auctionWon, uint256 winningSolverIndex) {
+        try this.execute(dConfig, userOp, solverOps, executionEnvironment, msg.sender, userOpHash) returns (
+            bool _auctionWon, uint256 winningSolverIndex
+        ) {
             auctionWon = _auctionWon;
             // Gas Refund to sender only if execution is successful
             (uint256 ethPaidToBundler, uint256 netGasSurcharge) = _settle({
