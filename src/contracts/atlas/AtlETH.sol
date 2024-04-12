@@ -230,7 +230,7 @@ abstract contract AtlETH is Permit69 {
             bondedTotalSupply -= shortfall256; // subtract the unbonded, freed amount
         } else {
             // Reverts because amount > account's balance
-            revert InsufficientBalanceForDeduction(_balanceOf[account].balance, amount);
+            revert InsufficientBalanceForDeduction(uint256(balance), amount);
         }
     }
 
