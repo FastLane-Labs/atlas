@@ -340,7 +340,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         if (dAppOp.bundler != address(0) && msgSender != dAppOp.bundler) {
             if (!signatories[keccak256(abi.encodePacked(dAppOp.control, msgSender))]) {
                 bool bypassSignatoryCheck = isSimulation && dAppOp.from == address(0);
-                if (!isSimulation) {
+                if (!bypassSignatoryCheck) {
                     return (false, ValidCallsResult.InvalidBundler);
                 }
             }
