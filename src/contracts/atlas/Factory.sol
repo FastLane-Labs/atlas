@@ -53,7 +53,7 @@ abstract contract Factory {
     {
         callConfig = IDAppControl(dAppControl).CALL_CONFIG();
         executionEnvironment = _getExecutionEnvironmentCustom(user, dAppControl.codehash, dAppControl, callConfig);
-        exists = executionEnvironment.codehash != bytes32(0);
+        exists = executionEnvironment.code.length != 0;
     }
 
     /// @notice Gets an existing execution environment or creates a new one if it does not exist for the specified user
