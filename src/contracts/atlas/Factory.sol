@@ -103,7 +103,7 @@ abstract contract Factory {
             )
         );
 
-        if (executionEnvironment.codehash == bytes32(0)) {
+        if (executionEnvironment.code.length == 0) {
             bytes32 memSalt = _salt;
             assembly {
                 executionEnvironment := create2(0, add(creationCode, 32), mload(creationCode), memSalt)
