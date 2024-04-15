@@ -268,8 +268,8 @@ abstract contract GasAccounting is SafetyLocks {
 
         // Remove any unused gas from the bundler's claim.
         // TODO: consider penalizing bundler for too much unused gas (to prevent high escrow requirements for solvers)
-        uint256 gasRemainder = (gasleft() * tx.gasprice);
-        gasRemainder += ((gasRemainder * SURCHARGE_RATE) / SURCHARGE_SCALE);
+        uint256 gasRemainder = gasleft() * tx.gasprice;
+        gasRemainder = gasRemainder * (SURCHARGE_SCALE + SURCHARGE_RATE) / SURCHARGE_SCALE;
         _claims -= gasRemainder;
 
         if (_deposits < _claims + _withdrawals) {
