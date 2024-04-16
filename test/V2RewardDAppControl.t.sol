@@ -53,23 +53,17 @@ contract V2RewardDAppControlTest is BaseTest {
 
     // Swap 1 WETH for 1830 DAI
     function test_V2RewardDApp_swapWETHForDAI() public {
-
         UserOperation memory userOp;
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         DAppOperation memory dAppOp;
+
+        // USER STUFF
 
         vm.startPrank(userEOA);
         address executionEnvironment = atlas.createExecutionEnvironment(address(v2RewardControl));
         console.log("Execution Environment:", executionEnvironment);
         vm.stopPrank();
         vm.label(address(executionEnvironment), "EXECUTION ENV");
-
-
-        // uint256 amountIn,
-        // uint256 amountOutMin,
-        // address[] calldata path,
-        // address to,
-        // uint256 deadline
 
         address[] memory path = new address[](2);
         path[0] = WETH_ADDRESS;
@@ -133,6 +127,8 @@ contract V2RewardDAppControlTest is BaseTest {
         atlas.deposit{ value: 1e18 }();
         atlas.bond(1e18);
         vm.stopPrank();
+
+        // METACALL STUFF
 
         console.log("\nBEFORE METACALL");
         console.log("User WETH balance", WETH.balanceOf(userEOA));
