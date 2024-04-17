@@ -49,12 +49,21 @@ contract DeployDemoTokensScript is DeployBaseScript {
         address daiWethPool = IUniswapV2Factory(UNISWAP_V2_FACTORY).createPair(address(dai), address(weth));
         address usdaWethPool = IUniswapV2Factory(UNISWAP_V2_FACTORY).createPair(address(usda), address(weth));
         address usdbWethPool = IUniswapV2Factory(UNISWAP_V2_FACTORY).createPair(address(usdb), address(weth));
+        address daiUsdaPool = IUniswapV2Factory(UNISWAP_V2_FACTORY).createPair(address(dai), address(usda));
+        address daiUsdbPool = IUniswapV2Factory(UNISWAP_V2_FACTORY).createPair(address(dai), address(usdb));
+        address usdaUsdbPool = IUniswapV2Factory(UNISWAP_V2_FACTORY).createPair(address(usda), address(usdb));
 
-        // Add liquidity to each pool: 3_000_000 Stablecoin / 1_000 WETH = $3000 per WETH
-        console.log("Adding liquidity to pools...\n");
+        // Add liquidity to stablecoin/weth pools: 3_000_000 Stablecoin / 1_000 WETH = $3000 per WETH
+        console.log("Adding liquidity to STABLE/WETH pools...\n");
         mintApproveAndAddLiquidity(dai, weth, 3_000_000 ether, 1000 ether, deployer);
         mintApproveAndAddLiquidity(usda, weth, 3_000_000 ether, 1000 ether, deployer);
         mintApproveAndAddLiquidity(usdb, weth, 3_000_000 ether, 1000 ether, deployer);
+
+        // Add liquidity to stablecoin/stablecoin pools: 3_000_000 Stablecoin / 3_000_000 Stablecoin = 1:1
+        console.log("Adding liquidity to STABLE/STABLE pools...\n");
+        mintApproveAndAddLiquidity(dai, usda, 3_000_000 ether, 3_000_000 ether, deployer);
+        mintApproveAndAddLiquidity(dai, usdb, 3_000_000 ether, 3_000_000 ether, deployer);
+        mintApproveAndAddLiquidity(usda, usdb, 3_000_000 ether, 3_000_000 ether, deployer);
 
         vm.stopBroadcast();
 
@@ -67,6 +76,9 @@ contract DeployDemoTokensScript is DeployBaseScript {
         console.log("DAI/WETH Pool: \t\t", daiWethPool);
         console.log("USDA/WETH Pool: \t\t", usdaWethPool);
         console.log("USDB/WETH Pool: \t\t", usdbWethPool);
+        console.log("DAI/USDA Pool: \t\t", daiUsdaPool);
+        console.log("DAI/USDB Pool: \t\t", daiUsdbPool);
+        console.log("USDA/USDB Pool: \t\t", usdaUsdbPool);
         console.log("\n");
     }
 
