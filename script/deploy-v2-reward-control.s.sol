@@ -17,17 +17,19 @@ contract DeployV2RewardControlScript is DeployBaseScript {
     address public constant UNISWAP_V2_ROUTER = 0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008; // on Sepolia
     // NOTE: Reward token must be the bidToken in the DAppControl. So it should be very accessible to solvers on the
     // target chain.
-    address public constant REWARD_TOKEN = address(1); // TODO Set to WETH used in an active pair on the v2 Router on Sepolia
+    address public constant REWARD_TOKEN = 0x5419De9E37659Dec6F1CAAE245bcddADcbf3d087; // Our custom WETH on Sepolia
 
     function run() external {
         console.log("\n=== DEPLOYING V2Reward DAppControl ===\n");
         console.log("And setting up with initializeGovernance\n");
 
-        uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
+        uint256 deployerPrivateKey = vm.envUint("DAPP_GOV_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
 
-        atlas = Atlas(payable(_getAddressFromDeploymentsJson("ATLAS")));
-        atlasVerification = AtlasVerification(payable(_getAddressFromDeploymentsJson("ATLAS_VERIFICATION")));
+        // atlas = Atlas(payable(_getAddressFromDeploymentsJson("ATLAS")));
+        atlas = Atlas(payable(0xa892eb9F79E0D1b6277B3456b0a8FE770386f6DB));
+        // atlasVerification = AtlasVerification(payable(_getAddressFromDeploymentsJson("ATLAS_VERIFICATION")));
+        atlasVerification = AtlasVerification(payable(0xeeB91b2d317e3A747E88c1CA542ae31E32B87FDF));
 
         console.log("Deployer address: \t\t\t\t", deployer);
 
