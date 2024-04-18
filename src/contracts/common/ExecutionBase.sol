@@ -97,92 +97,137 @@ contract Base {
         );
     }
 
-    // Returns the address(DAppControl).codehash for the calling
-    // ExecutionEnvironment's DAppControl
+    /// @notice Extracts and returns the codehash of the current DAppControl contract, from calldata.
+    /// @return controlCodeHash The codehash of the current DAppControl contract.
     function _controlCodeHash() internal pure returns (bytes32 controlCodeHash) {
         assembly {
             controlCodeHash := calldataload(sub(calldatasize(), 32))
         }
     }
 
+    /// @notice Extracts and returns the CallConfig of the current DAppControl contract, from calldata.
+    /// @return config The CallConfig of the current DAppControl contract, in uint32 form.
     function _config() internal pure returns (uint32 config) {
         assembly {
             config := shr(224, calldataload(sub(calldatasize(), 36)))
         }
     }
 
+    /// @notice Extracts and returns the address of the current DAppControl contract, from calldata.
+    /// @return control The address of the current DAppControl contract.
     function _control() internal pure returns (address control) {
         assembly {
             control := shr(96, calldataload(sub(calldatasize(), 56)))
         }
     }
 
+    /// @notice Extracts and returns the address of the user of the current metacall tx, from calldata.
+    /// @return user The address of the user of the current metacall tx.
     function _user() internal pure returns (address user) {
         assembly {
             user := shr(96, calldataload(sub(calldatasize(), 76)))
         }
     }
 
+    /// @notice Extracts and returns the call depth within the current metacall tx, from calldata.
+    /// @dev The call depth starts at 1 with the first call of each step in the metacall, from Atlas to the Execution
+    /// Environment, and is incremented with each call/delegatecall within that step.
+    /// @return callDepth The call depth of the current step in the current metacall tx.
     function _depth() internal pure returns (uint8 callDepth) {
         assembly {
             callDepth := shr(248, calldataload(sub(calldatasize(), 77)))
         }
     }
 
+    /// @notice Extracts and returns the boolean indicating whether the current metacall tx is a simulation or not, from
+    /// calldata.
+    /// @return simulation The boolean indicating whether the current metacall tx is a simulation or not.
     function _simulation() internal pure returns (bool simulation) {
         assembly {
             simulation := shr(248, calldataload(sub(calldatasize(), 78)))
         }
     }
 
+    /// @notice Extracts and returns the boolean indicating whether the current metacall tx uses on-chain bid-finding,
+    /// or not, from calldata.
+    /// @return bidFind The boolean indicating whether the current metacall tx uses on-chain bid-finding, or not.
     function _bidFind() internal pure returns (bool bidFind) {
         assembly {
             bidFind := shr(248, calldataload(sub(calldatasize(), 79)))
         }
     }
 
+    /// @notice Extracts and returns the solver outcome bitmap in its current status during a metacall tx, from
+    /// calldata.
+    /// @return solverOutcome The solver outcome bitmap in its current status, in uint24 form.
     function _solverOutcome() internal pure returns (uint24 solverOutcome) {
         assembly {
             solverOutcome := shr(232, calldataload(sub(calldatasize(), 82)))
         }
     }
 
+    /// @notice Extracts and returns the lock state bitmap of the current metacall tx, from calldata.
+    /// @return lockState The lock state bitmap of the current metacall tx, in uint16 form.
     function _lockState() internal pure returns (uint16 lockState) {
         assembly {
             lockState := shr(240, calldataload(sub(calldatasize(), 84)))
         }
     }
 
+    /// @notice Extracts and returns the call count of the current metacall tx, from calldata.
+    /// @dev Call count is calculated as number of solverOps + 3. This represents 1 call for preOps, userOp, and postOps
+    /// each, then 1 call for each of the solverOps.
+    /// @return callCount The call count of the current metacall tx.
     function _callCount() internal pure returns (uint8 callCount) {
         assembly {
             callCount := shr(248, calldataload(sub(calldatasize(), 85)))
         }
     }
 
+    /// @notice Extracts and returns the call index of the current metacall tx, from calldata.
+    /// @dev Call index is the index of the current call within the total calls (see `_callCount()`) of a metacall tx.
+    /// I.e. preOpsCall has an index of 0, userOp has an index of 1, the first solverOp has an index of 2, subsequent
+    /// solverOps have indices of 3, 4, 5, etc, and postOpsCall has an index of `callCount - 1`.
+    /// @return callIndex The call index of the current metacall tx.
     function _callIndex() internal pure returns (uint8 callIndex) {
         assembly {
             callIndex := shr(248, calldataload(sub(calldatasize(), 86)))
         }
     }
 
+    /// @notice Extracts and returns the boolean indicating whether the payments were successful after the allocateValue
+    /// step in the current metacall tx, from calldata.
+    /// @return paymentsSuccessful The boolean indicating whether the payments were successful after the allocateValue
+    /// step in the current metacall tx.
     function _paymentsSuccessful() internal pure returns (bool paymentsSuccessful) {
         assembly {
             paymentsSuccessful := shr(248, calldataload(sub(calldatasize(), 87)))
         }
     }
 
+    /// @notice Extracts and returns the boolean indicating whether the winning solverOp was executed successfully in
+    /// the current metacall tx, from calldata.
+    /// @return solverSuccessful The boolean indicating whether the winning solverOp was executed successfully in the
+    /// current metacall tx.
     function _solverSuccessful() internal pure returns (bool solverSuccessful) {
         assembly {
             solverSuccessful := shr(248, calldataload(sub(calldatasize(), 88)))
         }
     }
 
+    /// @notice Extracts and returns the current value of the addressPointer of the current metacall tx, from calldata.
+    /// @dev The addressPointer is either the address of the current DAppControl contract (in preOps and userOp steps),
+    /// the current solverOp.solver address (during solverOps steps), or the winning solverOp.from address (during
+    /// allocateValue step).
+    /// @return addressPointer The current value of the addressPointer of the current metacall tx.
     function _addressPointer() internal pure returns (address addressPointer) {
         assembly {
             addressPointer := shr(96, calldataload(sub(calldatasize(), 108)))
         }
     }
 
+    /// @notice Returns the address of the currently active Execution Environment, if any.
+    /// @return activeEnvironment The address of the currently active Execution Environment.
     function _activeEnvironment() internal view returns (address activeEnvironment) {
         activeEnvironment = ISafetyLocks(atlas).activeEnvironment();
     }
