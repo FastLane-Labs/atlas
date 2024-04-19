@@ -66,8 +66,9 @@ struct CallConfig {
     // auctioneer then their solverOp must be the only one. More than one auctioneer option can be set to true for the
     // same DAppControl.
     bool solverAuctioneer;
-    // unknownAuctioneer: Anyone is allowed to be the auctioneer - dAppOp signature not checked. More than one
-    // auctioneer option can be set to true for the same DAppControl.
+    // unknownAuctioneer: Anyone is allowed to be the auctioneer - dAppOp.from must be the signer of the dAppOp, but the
+    // usual signatory[] checks are skipped. More than one auctioneer option can be set to true for the same
+    // DAppControl.
     bool unknownAuctioneer;
     // verifyCallChainHash: Check that the dAppOp callChainHash matches the actual callChainHash as calculated in
     // AtlasVerification.
