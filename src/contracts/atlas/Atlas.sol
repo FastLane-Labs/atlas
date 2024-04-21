@@ -281,7 +281,7 @@ contract Atlas is Escrow, Factory {
                 // The array is filled with non-zero bids from the right. This causes all zero bids to be on the left -
                 // in their sorted position, so fewer operations are needed in the sorting step below.
                 bidsAndIndices[bidsAndIndicesLastIndex - (i - zeroBidCount)] =
-                    uint256(uint240(bidAmountFound) << BITS_FOR_INDEX | uint16(i));
+                    uint256(bidAmountFound << BITS_FOR_INDEX | uint16(i));
             }
         }
 
