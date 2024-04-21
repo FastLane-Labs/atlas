@@ -270,14 +270,13 @@ contract Atlas is Escrow, Factory {
         for (uint256 i; i < solverOps.length; ++i) {
             bidAmountFound = _getBidAmount(dConfig, userOp, solverOps[i], returnData, key);
 
-            if (bidAmountFound == 0) {
+            if (bidAmountFound == 0 || bidAmountFound > type(uint240).max) {
                 // Zero bids are ignored: increment zeroBidCount offset
+                // Bids that would cause an overflow are also ignored
                 unchecked {
                     ++zeroBidCount;
                 }
             } else {
-                if (bidAmountFound > type(uint240).max) revert BidTooHigh(i, bidAmountFound);
-
                 // Non-zero bids are packed with their original solverOps index.
                 // The array is filled with non-zero bids from the right. This causes all zero bids to be on the left -
                 // in their sorted position, so fewer operations are needed in the sorting step below.
