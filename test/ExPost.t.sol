@@ -8,6 +8,8 @@ import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnviro
 
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
 
+import { Result } from "src/contracts/helpers/Simulator.sol";
+
 import { V2ExPost } from "src/contracts/examples/ex-post-mev-example/V2ExPost.sol";
 
 import { SolverExPost } from "src/contracts/solver/src/TestSolverExPost.sol";
@@ -117,6 +119,16 @@ contract ExPostTest is BaseTest {
         ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
 
         vm.stopPrank();
+
+        // Check in simulator that UserOp is valid
+        (bool simSuccess, Result simResult,) = simulator.simUserOperation(userOp);
+        assertTrue(simSuccess, "userOp fails in simulator");
+
+        (simSuccess, simResult,) = simulator.simSolverCall(userOp, solverOps[0], dAppOp);
+        // assertTrue(simSuccess, "solverOp[0] fails in simulator"); // TODO this fails - should it?
+
+        (simSuccess, simResult,) = simulator.simSolverCall(userOp, solverOps[1], dAppOp);
+        assertTrue(simSuccess, "solverOp[1] fails in simulator");
 
         // address bundler = userEOA;
         vm.startPrank(userEOA);
