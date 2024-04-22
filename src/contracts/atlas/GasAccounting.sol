@@ -79,8 +79,8 @@ abstract contract GasAccounting is SafetyLocks {
         payable
         returns (uint256 owed)
     {
-        // NOTE: approvedAmount is the amount of the solver's atlETH that the solver is allowing
-        // to be used to cover what they owe.  This will be subtracted later - tx will revert here if there isn't
+        // NOTE: maxApprovedGasSpend is the amount of the solver's atlETH that the solver is allowing
+        // to be used to cover what they owe. This will be subtracted later - tx will revert here if there isn't
         // enough.
 
         uint256 bondedBalance = uint256(accessData[solverFrom].bonded);
