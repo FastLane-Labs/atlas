@@ -488,22 +488,22 @@ contract AtlasVerification is EIP712, DAppIntegration {
     }
 
     /// @notice Generates the hash of a DAppOperation struct.
-    /// @param approval The DAppOperation struct to hash.
+    /// @param dAppOp The DAppOperation struct to hash.
     /// @return dappOpHash The hash of the DAppOperation struct.
-    function _getDAppOpHash(DAppOperation calldata approval) internal pure returns (bytes32 dappOpHash) {
+    function _getDAppOpHash(DAppOperation calldata dAppOp) internal pure returns (bytes32 dappOpHash) {
         dappOpHash = keccak256(
             abi.encode(
                 DAPP_TYPEHASH,
-                approval.from,
-                approval.to,
-                approval.value,
-                approval.gas,
-                approval.nonce,
-                approval.deadline,
-                approval.control,
-                approval.bundler,
-                approval.userOpHash,
-                approval.callChainHash
+                dAppOp.from,
+                dAppOp.to,
+                dAppOp.value,
+                dAppOp.gas,
+                dAppOp.nonce,
+                dAppOp.deadline,
+                dAppOp.control,
+                dAppOp.bundler,
+                dAppOp.userOpHash,
+                dAppOp.callChainHash
             )
         );
     }
