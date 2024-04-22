@@ -58,7 +58,7 @@ contract V2RewardDAppControl is DAppControl {
                 verifyCallChainHash: true,
                 forwardReturnData: false,
                 requireFulfillment: false,
-                trustedOpHash: false,
+                trustedOpHash: true,
                 invertBidValue: false,
                 exPostBids: true
             })

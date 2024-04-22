@@ -87,6 +87,7 @@ contract V2RewardDAppControlTest is BaseTest {
 
         // Exec Env calls swapExactTokensForTokens on Uni V2 Router directly
         userOp.dapp = V2_ROUTER;
+        userOp.sessionKey = governanceEOA;
 
         // User signs UserOperation data
         (sig.v, sig.r, sig.s) = vm.sign(userPK, atlasVerification.getUserOperationPayload(userOp));
