@@ -32,7 +32,7 @@ contract DAppIntegration {
     mapping(bytes32 => NonceBitmap) public nonceBitmaps;
 
     // NOTE: To prevent builder censorship, dApp nonces can be
-    // processed in any order so long as they arent duplicated and
+    // processed in any order so long as they aren't duplicated and
     // as long as the dApp opts in to it
 
     // map for tracking which EOAs are approved for a given dApp
