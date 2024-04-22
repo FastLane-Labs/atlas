@@ -317,9 +317,7 @@ contract Atlas is Escrow, Factory {
         uint256 k = solverOps.length;
         uint256 i;
 
-        for (; i < k;) {
-            // valid solverOps are packed from left of array - break at first invalid solverOp
-
+        for (; i < k; ++i) {
             SolverOperation calldata solverOp = solverOps[i];
 
             (auctionWon, key) =
@@ -331,10 +329,6 @@ contract Atlas is Escrow, Factory {
                 key.solverOutcome = uint24(i);
 
                 return (auctionWon, key);
-            }
-
-            unchecked {
-                ++i;
             }
         }
 
