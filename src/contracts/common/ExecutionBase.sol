@@ -12,12 +12,10 @@ import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 contract Base {
     address public immutable atlas;
     address public immutable source;
-    bytes32 public immutable salt;
 
     constructor(address _atlas) {
         atlas = _atlas;
         source = address(this);
-        salt = keccak256(abi.encodePacked(block.chainid, atlas, "Atlas 1.0"));
     }
 
     // These functions only work inside of the ExecutionEnvironment (mimic)
