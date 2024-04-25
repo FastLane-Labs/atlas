@@ -245,6 +245,9 @@ contract Atlas is Escrow, Factory {
         internal
         returns (bool auctionWon, EscrowKey memory)
     {
+        // Return early if no solverOps (e.g. in simUserOperation)
+        if (solverOps.length == 0) return (false, key);
+
         key.bidFind = true;
 
         uint256[] memory bidsAndIndices = new uint256[](solverOps.length);
@@ -291,7 +294,7 @@ contract Atlas is Escrow, Factory {
         key.bidFind = false;
 
         // Finally, iterate through sorted bidsAndIndices array in descending order of bidAmount.
-        for (uint256 i = bidsAndIndices.length - 1; i >= 0; --i) {
+        for (uint256 i = bidsAndIndicesLastIndex; i >= 0; --i) {
             // Isolate the bidAmount from the packed uint256 value
             bidAmountFound = (bidsAndIndices[i] >> BITS_FOR_INDEX) & FIRST_240_BITS_MASK;
 
@@ -310,6 +313,8 @@ contract Atlas is Escrow, Factory {
                 key.solverOutcome = uint24(solverOpsIndex);
                 return (auctionWon, key);
             }
+
+            if (i == 0) break; // break to prevent underflow in next loop
         }
 
         return (auctionWon, key);
