@@ -43,7 +43,7 @@ struct SwapData {
     address auctionBaseCurrency; // NOTE: Typically will be address(0) / ETH for gas refund
 }
 
-contract SwapIntentController is DAppControl {
+contract SwapIntentControl is DAppControl {
     using SafeTransferLib for ERC20;
 
     uint256 public constant USER_CONDITION_GAS_LIMIT = 20_000;

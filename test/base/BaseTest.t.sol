@@ -55,7 +55,7 @@ contract BaseTest is Test, TestConstants {
     SolverExPost public solverOneXP;
     SolverExPost public solverTwoXP;
 
-    V2DAppControl public control;
+    V2DAppControl public v2DAppControl;
 
     V2Helper public helper;
 
@@ -99,8 +99,8 @@ contract BaseTest is Test, TestConstants {
         vm.stopPrank();
         vm.startPrank(governanceEOA);
 
-        control = new V2DAppControl(address(atlas));
-        atlasVerification.initializeGovernance(address(control));
+        v2DAppControl = new V2DAppControl(address(atlas));
+        atlasVerification.initializeGovernance(address(v2DAppControl));
 
         vm.stopPrank();
 
@@ -136,7 +136,7 @@ contract BaseTest is Test, TestConstants {
         deal(TOKEN_ZERO, address(solverTwoXP), 10e24);
         deal(TOKEN_ONE, address(solverTwoXP), 10e24);
 
-        helper = new V2Helper(address(control), address(atlas), address(atlasVerification));
+        helper = new V2Helper(address(v2DAppControl), address(atlas), address(atlasVerification));
         u = new Utilities();
 
         deal(TOKEN_ZERO, address(atlas), 1);
@@ -144,6 +144,6 @@ contract BaseTest is Test, TestConstants {
 
         vm.label(userEOA, "USER");
         vm.label(address(atlas), "ATLAS");
-        vm.label(address(control), "DAPP CONTROL");
+        vm.label(address(v2DAppControl), "V2 DAPP CONTROL");
     }
 }

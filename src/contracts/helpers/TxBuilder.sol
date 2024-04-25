@@ -26,9 +26,9 @@ contract TxBuilder {
 
     uint256 public immutable gas;
 
-    constructor(address controller, address atlasAddress, address _verification) {
-        control = controller;
-        atlas = atlasAddress;
+    constructor(address _control, address _atlas, address _verification) {
+        control = _control;
+        atlas = _atlas;
         verification = _verification;
         gas = 1_000_000;
     }

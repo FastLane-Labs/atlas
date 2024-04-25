@@ -40,9 +40,9 @@ abstract contract Permit69 is GasAccounting {
     /// token transfers are performed within the context of Atlas's controlled environment. The implementation of this
     /// function can be found in Atlas.sol
     /// @param user The address of the user invoking the function.
-    /// @param controller The address of the current DAppControl contract.
+    /// @param control The address of the current DAppControl contract.
     /// @param callConfig The CallConfig of the DAppControl contract of the current transaction.
-    function _verifyCallerIsExecutionEnv(address user, address controller, uint32 callConfig) internal virtual { }
+    function _verifyCallerIsExecutionEnv(address user, address control, uint32 callConfig) internal virtual { }
 
     /// @notice Transfers ERC20 tokens from a user to a destination address, only callable by the expected Execution
     /// Environment.
@@ -50,7 +50,7 @@ abstract contract Permit69 is GasAccounting {
     /// @param destination The address to which the tokens will be transferred.
     /// @param amount The amount of tokens to transfer.
     /// @param user The address of the user invoking the function.
-    /// @param controller The address of the current DAppControl contract.
+    /// @param control The address of the current DAppControl contract.
     /// @param callConfig The CallConfig of the current DAppControl contract.
     /// @param lockState The lock state indicating the safe execution phase for the token transfer.
     function transferUserERC20(
@@ -58,7 +58,7 @@ abstract contract Permit69 is GasAccounting {
         address destination,
         uint256 amount,
         address user,
-        address controller,
+        address control,
         uint32 callConfig,
         uint16 lockState
     )
@@ -67,7 +67,7 @@ abstract contract Permit69 is GasAccounting {
         // Verify that the caller is legitimate
         // NOTE: Use the *current* DAppControl's codehash to help mitigate social engineering bamboozles if, for
         // example, a DAO is having internal issues.
-        _verifyCallerIsExecutionEnv(user, controller, callConfig);
+        _verifyCallerIsExecutionEnv(user, control, callConfig);
 
         // Verify the lock state
         _verifyLockState({ lockState: lockState, safeExecutionPhaseSet: SAFE_USER_TRANSFER });
@@ -82,7 +82,7 @@ abstract contract Permit69 is GasAccounting {
     /// @param destination The address to which the tokens will be transferred.
     /// @param amount The amount of tokens to transfer.
     /// @param user The address of the user invoking the function.
-    /// @param controller The address of the current DAppControl contract.
+    /// @param control The address of the current DAppControl contract.
     /// @param callConfig The CallConfig of the current DAppControl contract.
     /// @param lockState The lock state indicating the safe execution phase for the token transfer.
     function transferDAppERC20(
@@ -90,20 +90,20 @@ abstract contract Permit69 is GasAccounting {
         address destination,
         uint256 amount,
         address user,
-        address controller,
+        address control,
         uint32 callConfig,
         uint16 lockState
     )
         external
     {
         // Verify that the caller is legitimate
-        _verifyCallerIsExecutionEnv(user, controller, callConfig);
+        _verifyCallerIsExecutionEnv(user, control, callConfig);
 
         // Verify the lock state
         _verifyLockState({ lockState: lockState, safeExecutionPhaseSet: SAFE_DAPP_TRANSFER });
 
         // Transfer token
-        ERC20(token).safeTransferFrom(controller, destination, amount);
+        ERC20(token).safeTransferFrom(control, destination, amount);
     }
 
     /// @notice Verifies whether the lock state allows execution in the specified safe execution phase.

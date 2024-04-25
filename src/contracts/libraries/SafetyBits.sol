@@ -66,9 +66,9 @@ library SafetyBits {
         );
     }
 
-    function holdPreOpsLock(EscrowKey memory self, address controller) internal pure returns (EscrowKey memory) {
+    function holdPreOpsLock(EscrowKey memory self, address control) internal pure returns (EscrowKey memory) {
         self.lockState = _LOCKED_X_PRE_OPS_X_UNSET;
-        self.addressPointer = controller;
+        self.addressPointer = control;
         unchecked {
             ++self.callIndex;
         }

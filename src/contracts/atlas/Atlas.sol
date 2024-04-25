@@ -371,10 +371,10 @@ contract Atlas is Escrow, Factory {
 
     /// @notice Reverts if the caller is not the execution environment address expected from the set of inputs.
     /// @param user User address
-    /// @param controller DAppControl contract address
+    /// @param control DAppControl contract address
     /// @param callConfig CallConfig of the current metacall tx.
-    function _verifyCallerIsExecutionEnv(address user, address controller, uint32 callConfig) internal view override {
-        if (msg.sender != _getExecutionEnvironmentCustom(user, controller.codehash, controller, callConfig)) {
+    function _verifyCallerIsExecutionEnv(address user, address control, uint32 callConfig) internal view override {
+        if (msg.sender != _getExecutionEnvironmentCustom(user, control.codehash, control, callConfig)) {
             revert EnvironmentMismatch();
         }
     }

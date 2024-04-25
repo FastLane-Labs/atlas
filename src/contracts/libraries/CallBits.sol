@@ -8,8 +8,8 @@ import "../types/DAppApprovalTypes.sol";
 library CallBits {
     uint32 internal constant _ONE = uint32(1);
 
-    function buildCallConfig(address controller) internal view returns (uint32 callConfig) {
-        callConfig = IDAppControl(controller).CALL_CONFIG();
+    function buildCallConfig(address control) internal view returns (uint32 callConfig) {
+        callConfig = IDAppControl(control).CALL_CONFIG();
     }
 
     function encodeCallConfig(CallConfig memory callConfig) internal pure returns (uint32 encodedCallConfig) {

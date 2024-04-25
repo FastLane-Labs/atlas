@@ -9,7 +9,7 @@ import { ERC20 } from "solmate/tokens/ERC20.sol";
 
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
-import { SwapIntentController } from "src/contracts/examples/intents-example/SwapIntent.sol";
+import { SwapIntentControl } from "src/contracts/examples/intents-example/SwapIntent.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 import { Simulator } from "src/contracts/helpers/Simulator.sol";
 import { Sorter } from "src/contracts/helpers/Sorter.sol";
@@ -27,7 +27,7 @@ contract DeployBaseScript is Script {
     AtlasVerification public atlasVerification;
     Simulator public simulator;
     Sorter public sorter;
-    SwapIntentController public swapIntentControl;
+    SwapIntentControl public swapIntentControl;
     TxBuilder public txBuilder;
     SimpleRFQSolver public rfqSolver;
 

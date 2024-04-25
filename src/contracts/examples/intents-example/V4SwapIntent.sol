@@ -26,7 +26,7 @@ struct SwapData {
     address recipient;
 }
 
-contract V4SwapIntentController is DAppControl {
+contract V4SwapIntentControl is DAppControl {
     using SafeTransferLib for ERC20;
 
     address immutable V4_POOL; // TODO: set for test v4 pool

@@ -315,8 +315,8 @@ contract MockAtlasForPermit69Tests is Permit69 {
     }
 
     // Exposing above overridden function for testing and Permit69 coverage
-    function verifyCallerIsExecutionEnv(address user, address controller, uint32 callConfig) public returns (bool) {
-        _verifyCallerIsExecutionEnv(user, controller, callConfig);
+    function verifyCallerIsExecutionEnv(address user, address control, uint32 callConfig) public view returns (bool) {
+        _verifyCallerIsExecutionEnv(user, control, callConfig);
         return true; // Added to test lack of revert
     }
 

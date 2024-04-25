@@ -16,7 +16,7 @@ import "src/contracts/types/LockTypes.sol";
 
 import { TestUtils } from "./base/TestUtils.sol";
 
-import { SwapIntentController, SwapIntent, Condition } from "src/contracts/examples/intents-example/SwapIntent.sol";
+import { SwapIntentControl, SwapIntent, Condition } from "src/contracts/examples/intents-example/SwapIntent.sol";
 
 import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
@@ -24,7 +24,7 @@ import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
 
 // TODO Check if this is tested in more contract-specific tests, then delete this if true.
 contract AccountingTest is BaseTest {
-    SwapIntentController public swapIntentController;
+    SwapIntentControl public swapIntentControl;
     TxBuilder public txBuilder;
     Sig public sig;
 
@@ -44,19 +44,19 @@ contract AccountingTest is BaseTest {
     function setUp() public virtual override {
         BaseTest.setUp();
 
-        // Creating new gov address (ERR-V49 OwnerActive if already registered with controller)
+        // Creating new gov address (ERR-V49 OwnerActive if already registered with control)
         governancePK = 11_112;
         governanceEOA = vm.addr(governancePK);
 
-        // Deploy new SwapIntent Controller from new gov and initialize in Atlas
+        // Deploy new SwapIntent Control from new gov and initialize in Atlas
         vm.startPrank(governanceEOA);
-        swapIntentController = new SwapIntentController(address(atlas));
-        atlasVerification.initializeGovernance(address(swapIntentController));
+        swapIntentControl = new SwapIntentControl(address(atlas));
+        atlasVerification.initializeGovernance(address(swapIntentControl));
         vm.stopPrank();
 
         txBuilder = new TxBuilder({
-            controller: address(swapIntentController),
-            atlasAddress: address(atlas),
+            _control: address(swapIntentControl),
+            _atlas: address(atlas),
             _verification: address(atlasVerification)
         });
     }
@@ -144,12 +144,12 @@ contract AccountingTest is BaseTest {
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
         // swap(SwapIntent calldata) selector = 0x98434997
-        bytes memory userCallData = abi.encodeWithSelector(SwapIntentController.swap.selector, swapIntent);
+        bytes memory userCallData = abi.encodeWithSelector(SwapIntentControl.swap.selector, swapIntent);
 
         // Builds the metaTx and to parts of userCall, signature still to be set
         userOp = txBuilder.buildUserOperation({
             from: userEOA,
-            to: address(swapIntentController),
+            to: address(swapIntentControl),
             maxFeePerGas: tx.gasprice + 1,
             value: 0,
             deadline: block.number + 2,

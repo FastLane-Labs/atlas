@@ -12,7 +12,7 @@ import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
 import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
 import { DAppOperation, DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 
-import { SwapIntentController, SwapIntent, Condition } from "src/contracts/examples/intents-example/SwapIntent.sol";
+import { SwapIntentControl, SwapIntent, Condition } from "src/contracts/examples/intents-example/SwapIntent.sol";
 import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
 interface IUniV2Router02 {
@@ -28,7 +28,7 @@ interface IUniV2Router02 {
 }
 
 contract SwapIntentTest is BaseTest {
-    SwapIntentController public swapIntentController;
+    SwapIntentControl public swapIntentControl;
     TxBuilder public txBuilder;
     Sig public sig;
 
@@ -44,19 +44,19 @@ contract SwapIntentTest is BaseTest {
     function setUp() public virtual override {
         BaseTest.setUp();
 
-        // Creating new gov address (ERR-V49 OwnerActive if already registered with controller)
+        // Creating new gov address (ERR-V49 OwnerActive if already registered with control)
         governancePK = 11_112;
         governanceEOA = vm.addr(governancePK);
 
-        // Deploy new SwapIntent Controller from new gov and initialize in Atlas
+        // Deploy new SwapIntent Control from new gov and initialize in Atlas
         vm.startPrank(governanceEOA);
-        swapIntentController = new SwapIntentController(address(atlas));
-        atlasVerification.initializeGovernance(address(swapIntentController));
+        swapIntentControl = new SwapIntentControl(address(atlas));
+        atlasVerification.initializeGovernance(address(swapIntentControl));
         vm.stopPrank();
 
         txBuilder = new TxBuilder({
-            controller: address(swapIntentController),
-            atlasAddress: address(atlas),
+            _control: address(swapIntentControl),
+            _atlas: address(atlas),
             _verification: address(atlasVerification)
         });
 
@@ -117,12 +117,12 @@ contract SwapIntentTest is BaseTest {
         // rest of data is "userData" param
 
         // swap(SwapIntent calldata) selector = 0x98434997
-        bytes memory userOpData = abi.encodeWithSelector(SwapIntentController.swap.selector, swapIntent);
+        bytes memory userOpData = abi.encodeWithSelector(SwapIntentControl.swap.selector, swapIntent);
 
         // Builds the metaTx and to parts of userOp, signature still to be set
         userOp = txBuilder.buildUserOperation({
             from: userEOA,
-            to: address(swapIntentController),
+            to: address(swapIntentControl),
             maxFeePerGas: tx.gasprice + 1,
             value: 0,
             deadline: block.number + 2,
@@ -239,12 +239,12 @@ contract SwapIntentTest is BaseTest {
         // rest of data is "userData" param
 
         // swap(SwapIntent calldata) selector = 0x98434997
-        bytes memory userOpData = abi.encodeWithSelector(SwapIntentController.swap.selector, swapIntent);
+        bytes memory userOpData = abi.encodeWithSelector(SwapIntentControl.swap.selector, swapIntent);
 
         // Builds the metaTx and to parts of userOp, signature still to be set
         userOp = txBuilder.buildUserOperation({
             from: userEOA, // NOTE: Would from ever not be user?
-            to: address(swapIntentController),
+            to: address(swapIntentControl),
             maxFeePerGas: tx.gasprice + 1, // TODO update
             value: 0,
             deadline: block.number + 2,

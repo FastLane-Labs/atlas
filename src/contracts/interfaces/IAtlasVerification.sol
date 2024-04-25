@@ -35,8 +35,8 @@ interface IAtlasVerification {
     function getDAppOperationPayload(DAppOperation memory dAppOp) external view returns (bytes32 payload);
     function getNextNonce(address account, bool sequenced) external view returns (uint256 nextNonce);
 
-    function initializeGovernance(address controller) external;
-    function addSignatory(address controller, address signatory) external;
-    function removeSignatory(address controller, address signatory) external;
+    function initializeGovernance(address control) external;
+    function addSignatory(address control, address signatory) external;
+    function removeSignatory(address control, address signatory) external;
     function disableDApp(address dAppControl) external;
 }

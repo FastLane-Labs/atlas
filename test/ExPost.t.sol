@@ -109,7 +109,7 @@ contract ExPostTest is BaseTest {
 
         console.log("userEOA", userEOA);
         console.log("atlas", address(atlas));
-        console.log("control", address(control));
+        console.log("v2 ExPost Control", address(v2ExPost));
         console.log("executionEnvironment", executionEnvironment);
 
         // User must approve Atlas

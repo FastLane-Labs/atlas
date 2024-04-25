@@ -8,7 +8,7 @@ import { DeployBaseScript } from "script/base/deploy-base.s.sol";
 
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
-import { SwapIntentController } from "src/contracts/examples/intents-example/SwapIntent.sol";
+import { SwapIntentControl } from "src/contracts/examples/intents-example/SwapIntent.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 import { Simulator } from "src/contracts/helpers/Simulator.sol";
 
@@ -30,8 +30,8 @@ contract DeployTxBuilderScript is DeployBaseScript {
         vm.startBroadcast(deployerPrivateKey);
 
         txBuilder = new TxBuilder({
-            controller: swapIntentControlAddress,
-            atlasAddress: atlasAddress,
+            _control: swapIntentControlAddress,
+            _atlas: atlasAddress,
             _verification: atlasVerificationAddress
         });
 
