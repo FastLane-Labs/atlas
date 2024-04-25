@@ -104,7 +104,7 @@ contract Atlas is Escrow, Factory {
     /// @param bundler Address of the bundler of the current metacall tx.
     /// @param userOpHash Hash of the userOp struct of the current metacall tx.
     /// @return auctionWon Boolean indicating whether the auction was won
-    /// @return uint256 The solver outcome bitmap
+    /// @return uint256 The winningSolverIndex (stored in key.solverOutcome to prevent Stack Too Deep errors)
     function execute(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
