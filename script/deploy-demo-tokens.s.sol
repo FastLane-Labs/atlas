@@ -12,9 +12,10 @@ import { V2RewardDAppControl } from "src/contracts/examples/v2-example-router/V2
 import { IUniswapV2Router02 } from "src/contracts/examples/v2-example-router/interfaces/IUniswapV2Router.sol";
 
 import { Token } from "src/contracts/helpers/DemoToken.sol";
+import { DemoWETH } from "src/contracts/helpers/DemoWETH.sol";
 
 // Deploy 3 stablecoin tokens (DAI, USDA, USDB) - all 18 decimals
-// Deploy a WETH token
+// Deploy a WETH token (with deposit/withdraw functions)
 // Make WETH/Stable pools on Uniswap V2 for each stablecoin
 // Add liquidity to each pool: 3_000_000 Stablecoin / 1_000 WETH = $3000 per WETH
 
@@ -25,7 +26,7 @@ contract DeployDemoTokensScript is DeployBaseScript {
     Token dai;
     Token usda;
     Token usdb;
-    Token weth;
+    DemoWETH weth;
 
     function run() external {
         console.log("\n=== DEPLOYING DEMO TOKENS ===\n");
@@ -42,7 +43,7 @@ contract DeployDemoTokensScript is DeployBaseScript {
         dai = new Token("DAI Stablecoin", "DAI", 18);
         usda = new Token("USDA Stablecoin", "USDA", 18);
         usdb = new Token("USDB Stablecoin", "USDB", 18);
-        weth = new Token("Wrapped Ether", "WETH", 18);
+        weth = new DemoWETH();
 
         // Create WETH/Stablecoin pools on Uniswap V2
         console.log("Creating Uniswap V2 Pools...\n");
@@ -55,9 +56,9 @@ contract DeployDemoTokensScript is DeployBaseScript {
 
         // Add liquidity to stablecoin/weth pools: 3_000_000 Stablecoin / 1_000 WETH = $3000 per WETH
         console.log("Adding liquidity to STABLE/WETH pools...\n");
-        mintApproveAndAddLiquidity(dai, weth, 3_000_000 ether, 1000 ether, deployer);
-        mintApproveAndAddLiquidity(usda, weth, 3_000_000 ether, 1000 ether, deployer);
-        mintApproveAndAddLiquidity(usdb, weth, 3_000_000 ether, 1000 ether, deployer);
+        mintApproveAndAddLiquidity(dai, Token(address(weth)), 3_000_000 ether, 1000 ether, deployer);
+        mintApproveAndAddLiquidity(usda, Token(address(weth)), 3_000_000 ether, 1000 ether, deployer);
+        mintApproveAndAddLiquidity(usdb, Token(address(weth)), 3_000_000 ether, 1000 ether, deployer);
 
         // Add liquidity to stablecoin/stablecoin pools: 3_000_000 Stablecoin / 3_000_000 Stablecoin = 1:1
         console.log("Adding liquidity to STABLE/STABLE pools...\n");
@@ -98,7 +99,7 @@ contract DeployDemoTokensScript is DeployBaseScript {
         tokenB.approve(UNISWAP_V2_ROUTER, amountB);
 
         IUniswapV2Router02(UNISWAP_V2_ROUTER).addLiquidity(
-            address(tokenA), address(tokenB), amountA, amountB, amountA, amountB, deployer, block.timestamp + 50
+            address(tokenA), address(tokenB), amountA, amountB, amountA, amountB, deployer, block.timestamp + 900
         );
     }
 }

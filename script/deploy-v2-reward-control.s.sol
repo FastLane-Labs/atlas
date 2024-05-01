@@ -17,7 +17,8 @@ contract DeployV2RewardControlScript is DeployBaseScript {
     address public constant UNISWAP_V2_ROUTER = 0xC532a74256D3Db42D0Bf7a0400fEFDbad7694008; // on Sepolia
     // NOTE: Reward token must be the bidToken in the DAppControl. So it should be very accessible to solvers on the
     // target chain.
-    address public constant REWARD_TOKEN = 0x5419De9E37659Dec6F1CAAE245bcddADcbf3d087; // Our custom WETH on Sepolia
+    // TODO check this is the latest WETH address when deploying
+    address public constant REWARD_TOKEN = 0xe015b7B255438ff0Fe57B46594549A87e4915235; // Our custom WETH on Sepolia
 
     function run() external {
         console.log("\n=== DEPLOYING V2Reward DAppControl ===\n");
