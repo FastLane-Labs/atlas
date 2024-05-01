@@ -94,7 +94,6 @@ contract SwapIntentTest is BaseTest {
         SimpleRFQSolver rfqSolver = new SimpleRFQSolver(WETH_ADDRESS, address(atlas));
         atlas.deposit{ value: 1e18 }();
         atlas.bond(1 ether);
-
         vm.stopPrank();
 
         // Give 20 DAI to RFQ solver contract
