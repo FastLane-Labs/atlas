@@ -91,8 +91,9 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 return (userOpHash, ValidCallsResult.InvalidAuctioneer);
             }
 
-            // msgSender must be userOp.from or userOp.sessionKey / dappOp.from
-            if (!(msgSender == dAppOp.from || msgSender == userOp.from) && !isSimulation) {
+            // msgSender (the bundler) must be userOp.from, userOp.sessionKey / dappOp.from, or dappOp.bundler
+            if (!(msgSender == dAppOp.from || msgSender == dAppOp.bundler || msgSender == userOp.from) && !isSimulation)
+            {
                 return (userOpHash, ValidCallsResult.InvalidBundler);
             }
         } else {
