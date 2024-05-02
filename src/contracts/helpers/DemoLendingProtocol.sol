@@ -88,6 +88,12 @@ contract DemoLendingProtocol is Ownable {
         emit Liquidation(account, recipient, position.amount);
     }
 
+    // Helper view function for solvers to check if a position is liquidatable
+    function isLiquidatable(address account) external view returns (bool) {
+        Position storage position = positions[account];
+        return position.amount > 0 && position.liquidationPrice < uint256(chainlinkFeed.latestAnswer());
+    }
+
     // ---------------------------------------------------- //
     //                     Owner Functions                  //
     // ---------------------------------------------------- //
