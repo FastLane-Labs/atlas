@@ -4,8 +4,8 @@ pragma solidity 0.8.22;
 import { SafeERC20, IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Ownable } from "openzeppelin-contracts/contracts/access/Ownable.sol";
 
-// A super basic Demo Lending Protocol to illustrate OEV (Oracle Extractable Value) captured through liquidations with
-// Atlas.
+// A super basic Demo Lending Protocol to illustrate Atlas' OEV (Oracle Extractable Value) capturing abilities during
+// oracle price update events, e.g. when triggering lending protocol liquidations.
 //
 // In a real lending protocol, collateral is deposited and borrowed against. If the "health factor" (ratio of borrowed
 // value to collateral value) falls below a certain threshold, the position is liquidatable. Liquidations are performed
@@ -15,7 +15,7 @@ import { Ownable } from "openzeppelin-contracts/contracts/access/Ownable.sol";
 // the oracle is at or below the liquidation price, the account can be liquidated simply by calling `liquidate()` - the
 // liquidator does not need to return any assets, and will receive the entire amount deposited by the targeted account.
 //
-// These simplifications let us focus on the core OEV capture mechanics of Atlas - .
+// These simplifications let us focus on the core OEV capture mechanics of Atlas.
 
 struct Position {
     uint256 amount; // amount of deposit token in the position
