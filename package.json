@@ -63,6 +63,9 @@
       "snapshot": "source .env && forge snapshot -vvv --gas-report",
       "sizes": "forge build --sizes",
       "solc": "solc-select install 0.8.18 && solc-select use 0.8.18"
+    },
+    "devDependencies": {
+      "@sphinx-labs/plugins": "^0.31.12"
     }
   }
   

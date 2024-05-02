@@ -22,19 +22,22 @@ contract DeployOEVDemoScript is DeployBaseScript {
     ChainlinkDAppControl chainlinkDAppControl;
     ChainlinkAtlasWrapper lendingProtocolChainlinkWrapper;
 
-    function run() external {
+    function run() external sphinx {
         console.log("\n=== DEPLOY OEV DEMO ===\n");
 
-        uint256 deployerPrivateKey = vm.envUint("DAPP_GOV_PRIVATE_KEY");
-        address deployer = vm.addr(deployerPrivateKey);
+        // Your deployment is executed by a Gnosis Safe that you own. Sphinx automatically deploys
+        // a Gnosis Safe at identical addresses across chains via Create2.
+        address deployer = safeAddress();
 
         console.log("Deployer address: \t\t\t\t", deployer);
 
-        vm.startBroadcast(deployerPrivateKey);
-
-        // TODO
-
-        vm.stopBroadcast();
+        // Deploy some contracts for demo purposes
+        Atlas atlas = new Atlas(0, address(0), address(0), address(0), address(0));
+        new AtlasVerification(address(atlas));
+        dai = new Token("Token", "T", 18);
+        lendingProtocol = new DemoLendingProtocol(address(dai));
+        chainlinkDAppControl = new ChainlinkDAppControl(address(atlas));
+        lendingProtocolChainlinkWrapper = new ChainlinkAtlasWrapper(address(atlas), CHAINLINK_ETH_USD, deployer);
 
         console.log("\n");
         console.log("Demo Lending Protocol: \t\t", address(lendingProtocol));

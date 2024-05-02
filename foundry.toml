@@ -9,6 +9,7 @@
   evm_version = 'paris'
   gas_reports = ["Atlas", "AtlasVerification", "Simulator", "Sorter", "ExecutionEnvironment"]
   fs_permissions = [{ access = "read-write", path = "./"}]
+  extra_output = ['storageLayout']
 
 [profile.ci]
   fuzz = { runs = 10_000 }
@@ -24,3 +25,6 @@
   tab_width = 4
   wrap_comments = true
   ignore = ["./**/*.t.sol"]
+
+[rpc_endpoints]
+  sepolia = "${SEPOLIA_RPC_URL}"

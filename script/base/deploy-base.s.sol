@@ -4,6 +4,7 @@ pragma solidity 0.8.22;
 import "forge-std/Script.sol";
 import "forge-std/Test.sol";
 import "forge-std/StdJson.sol";
+import "@sphinx-labs/contracts/SphinxPlugin.sol";
 
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 
@@ -17,7 +18,7 @@ import { SimpleRFQSolver } from "test/SwapIntent.t.sol";
 
 import { Utilities } from "src/contracts/helpers/Utilities.sol";
 
-contract DeployBaseScript is Script {
+contract DeployBaseScript is Script, Sphinx {
     using stdJson for string;
 
     ERC20 WETH = ERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
@@ -32,6 +33,13 @@ contract DeployBaseScript is Script {
     SimpleRFQSolver public rfqSolver;
 
     Utilities public u;
+
+    function configureSphinx() public override {
+        sphinxConfig.owners = [YOUR_EOA_ADDRESS];
+        sphinxConfig.orgId = <YOUR_ORG_ID_STRING>;
+        sphinxConfig.projectName = "OEV_Demo";
+        sphinxConfig.threshold = 1;
+    }
 
     function _getDeployChain() internal view returns (string memory) {
         // OPTIONS: LOCAL, SEPOLIA, MAINNET
