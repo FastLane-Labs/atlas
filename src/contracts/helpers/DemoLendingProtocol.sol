@@ -12,7 +12,7 @@ import { Ownable } from "openzeppelin-contracts/contracts/access/Ownable.sol";
 // by a liquidator returning the borrowed asset in exchange for the collateral + a liquidation fee.
 //
 // In this demo protocol, collateral is deposited and a liquidation price is set, per account. If the price reported by
-// the oracle is at or below the liquidation price, the account can be liquidated simply by calling `liquidate()` - the
+// the oracle is below the liquidation price, the account can be liquidated simply by calling `liquidate()` - the
 // liquidator does not need to return any assets, and will receive the entire amount deposited by the targeted account.
 //
 // These simplifications let us focus on the core OEV capture mechanics of Atlas.
@@ -80,7 +80,7 @@ contract DemoLendingProtocol is Ownable {
         Position memory position = positions[account];
 
         if (position.amount == 0) revert PositionNotFound();
-        if (position.liquidationPrice < uint256(chainlinkFeed.latestAnswer())) revert PositionNotLiquidatable();
+        if (position.liquidationPrice <= uint256(chainlinkFeed.latestAnswer())) revert PositionNotLiquidatable();
 
         // Send liquidated amount to solver's recipient, and delete the account's position
         DEPOSIT_TOKEN.safeTransfer(recipient, position.amount);
