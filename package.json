@@ -27,6 +27,8 @@
 
       "deploy-v2-reward-dapp-sepolia": "source .env && forge script script/deploy-v2-reward-control.s.sol:DeployV2RewardControlScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
 
+      "deploy-oev-demo-sepolia": "source .env && forge script script/deploy-oev-demo.s.sol:DeployOEVDemoScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
+
       "deploy-sorter-sepolia": "source .env && forge script script/deploy-sorter.s.sol:DeploySorterScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
       "deploy-sorter-local": "source .env && forge script script/deploy-sorter.s.sol:DeploySorterScript --fork-url http://localhost:8545 --broadcast",
 
