@@ -101,12 +101,12 @@ contract DeployOEVDemoScript is DeployBaseScript {
 
         // Set Chainlink Gov's Execution Environment as transmitter in Lending Protocol's ChainlinkAtlasWrapper
         lendingProtocolChainlinkWrapper.setTransmitterStatus(chainlinkExecutionEnv, true);
-        
+
         vm.stopBroadcast();
 
         // EXTRA STEP: Lending Gov creates liquidatable position in Demo Lending Protocol
         createLiquidatablePosition(lendingGovPrivateKey, lendingGovPrivateKey, 100e18, 3000e8);
-        
+
         console.log("Contracts deployed by Lending Gov:");
         console.log("DAI Token: \t\t\t\t\t", address(dai));
         console.log("Demo Lending Protocol: \t\t\t", address(lendingProtocol));
