@@ -47,6 +47,8 @@ contract DemoLendingProtocol is Ownable {
     // ---------------------------------------------------- //
 
     // Deposits `amount` of deposit token into caller's position, setting the liquidation price to `liquidationPrice`.
+    // NOTE: `liquidationPrice` is specified with 8 decimals, as this is the price format reported by Chainlink oracles.
+    // e.g. $5 = 500000000.
     function deposit(uint256 amount, uint256 liquidationPrice) external {
         Position memory position = positions[msg.sender];
 
