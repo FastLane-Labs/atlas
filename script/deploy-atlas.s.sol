@@ -11,6 +11,7 @@ import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import { SwapIntentController } from "src/contracts/examples/intents-example/SwapIntent.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 import { Simulator } from "src/contracts/helpers/Simulator.sol";
+import { Sorter } from "src/contracts/helpers/Sorter.sol";
 import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
 
 contract DeployAtlasScript is DeployBaseScript {
@@ -22,7 +23,6 @@ contract DeployAtlasScript is DeployBaseScript {
         uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
 
-        // TODO check all pre-computed addresses are correct - changes made since last deploy
         // Computes the addresses at which AtlasVerification will be deployed
         address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
         address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
@@ -46,6 +46,8 @@ contract DeployAtlasScript is DeployBaseScript {
         simulator = new Simulator();
         simulator.setAtlas(address(atlas));
 
+        sorter = new Sorter(address(atlas));
+
         vm.stopBroadcast();
 
         if (address(atlas) != simulator.atlas() || address(atlas) != atlasVerification.ATLAS()) {
@@ -61,11 +63,13 @@ contract DeployAtlasScript is DeployBaseScript {
         _writeAddressToDeploymentsJson("ATLAS", address(atlas));
         _writeAddressToDeploymentsJson("ATLAS_VERIFICATION", address(atlasVerification));
         _writeAddressToDeploymentsJson("SIMULATOR", address(simulator));
+        _writeAddressToDeploymentsJson("SORTER", address(sorter));
 
         console.log("\n");
         console.log("Atlas deployed at: \t\t\t\t", address(atlas));
         console.log("AtlasVerification deployed at: \t\t", address(atlasVerification));
         console.log("Simulator deployed at: \t\t\t", address(simulator));
+        console.log("Sorter deployed at: \t\t\t", address(sorter));
         console.log("\n");
         console.log("You can find a list of contract addresses from the latest deployment in deployments.json");
     }
