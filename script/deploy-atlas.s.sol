@@ -69,7 +69,7 @@ contract DeployAtlasScript is DeployBaseScript {
         console.log("Atlas deployed at: \t\t\t\t", address(atlas));
         console.log("AtlasVerification deployed at: \t\t", address(atlasVerification));
         console.log("Simulator deployed at: \t\t\t", address(simulator));
-        console.log("Sorter deployed at: \t\t\t", address(sorter));
+        console.log("Sorter deployed at: \t\t\t\t", address(sorter));
         console.log("\n");
         console.log("You can find a list of contract addresses from the latest deployment in deployments.json");
     }
