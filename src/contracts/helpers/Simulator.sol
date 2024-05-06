@@ -12,11 +12,10 @@ import "../types/DAppApprovalTypes.sol";
 import "../types/ValidCallsTypes.sol";
 import "../types/EscrowTypes.sol";
 
-import { CallVerification } from "../libraries/CallVerification.sol";
 import { CallBits } from "../libraries/CallBits.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
 
-import "forge-std/Test.sol";
+import "forge-std/Test.sol"; // TODO remove
 
 enum Result {
     Unknown,
@@ -29,7 +28,6 @@ enum Result {
 }
 
 contract Simulator is AtlasErrors {
-    using CallVerification for UserOperation;
     using CallBits for uint32;
 
     address public immutable deployer;
