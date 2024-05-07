@@ -45,7 +45,7 @@ contract Storage is AtlasEvents, AtlasErrors {
     uint256 internal constant _SOLVER_OP_BASE_CALLDATA = 608; // SolverOperation calldata length excluding solverOp.data
 
     // atlETH GasAccounting storage
-    uint256 public surcharge; // Atlas gas surcharges
+    uint256 public cumulativeSurcharge; // Cumulative gas surcharges collected
     address public surchargeRecipient; // Fastlane surcharge recipient
     address public pendingSurchargeRecipient; // For 2-step transfer process
 
@@ -78,7 +78,7 @@ contract Storage is AtlasEvents, AtlasErrors {
 
         // Gas Accounting
         // Initialized with msg.value to seed flash loan liquidity
-        surcharge = msg.value;
+        cumulativeSurcharge = msg.value;
         surchargeRecipient = _surchargeRecipient;
 
         // TODO remove these when transient storage behaviour is implemented

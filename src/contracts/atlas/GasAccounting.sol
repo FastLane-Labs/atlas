@@ -262,7 +262,7 @@ abstract contract GasAccounting is SafetyLocks {
         // is treated as the Solver.
 
         // Load what we can from storage so that it shows up in the gasleft() calc
-        uint256 _surcharge = surcharge;
+        uint256 _surcharge = cumulativeSurcharge;
         uint256 _claims = claims;
         uint256 _withdrawals = withdrawals;
         uint256 _deposits = deposits;
@@ -290,7 +290,7 @@ abstract contract GasAccounting is SafetyLocks {
 
         _claims -= netGasSurcharge;
 
-        surcharge = _surcharge + netGasSurcharge;
+        cumulativeSurcharge = _surcharge + netGasSurcharge;
 
         SafeTransferLib.safeTransferETH(bundler, _claims);
 

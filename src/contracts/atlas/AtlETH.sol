@@ -346,8 +346,8 @@ abstract contract AtlETH is Permit69 {
             revert InvalidAccess();
         }
 
-        uint256 paymentAmount = surcharge;
-        surcharge = 0; // Clear before transfer to prevent reentrancy
+        uint256 paymentAmount = cumulativeSurcharge;
+        cumulativeSurcharge = 0; // Clear before transfer to prevent reentrancy
         SafeTransferLib.safeTransferETH(msg.sender, paymentAmount);
         emit SurchargeWithdrawn(msg.sender, paymentAmount);
     }
