@@ -12,9 +12,6 @@ import "../types/DAppApprovalTypes.sol";
 import "../types/ValidCallsTypes.sol";
 import "../types/EscrowTypes.sol";
 
-import { CallBits } from "../libraries/CallBits.sol";
-import { SafetyBits } from "../libraries/SafetyBits.sol";
-
 import "forge-std/Test.sol"; // TODO remove
 
 enum Result {
@@ -28,8 +25,6 @@ enum Result {
 }
 
 contract Simulator is AtlasErrors {
-    using CallBits for uint32;
-
     address public immutable deployer;
     address public atlas;
 
