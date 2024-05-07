@@ -10,8 +10,6 @@ import "src/contracts/types/LockTypes.sol";
 import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 import { ChainlinkAtlasWrapper } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapperAlt.sol";
 
-import "forge-std/Test.sol";
-
 // Role enum as per Chainlink's OffchainAggregatorBilling.sol contract
 enum Role {
     // No oracle role has been set for address a
@@ -171,7 +169,6 @@ contract ChainlinkDAppControl is DAppControl {
 
         _removeAllSignersOfBaseFeed(baseChainlinkFeed); // Removes any existing signers first
         VerificationVars storage vars = verificationVars[baseChainlinkFeed];
-        Oracle memory currentOracle;
 
         for (uint256 i = 0; i < signers.length; ++i) {
             if (vars.oracles[signers[i]].role != Role.Unset) revert DuplicateSigner(signers[i]);
