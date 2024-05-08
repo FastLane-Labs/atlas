@@ -28,9 +28,9 @@ contract DeployV2RewardControlScript is DeployBaseScript {
         address deployer = vm.addr(deployerPrivateKey);
 
         // atlas = Atlas(payable(_getAddressFromDeploymentsJson("ATLAS")));
-        atlas = Atlas(payable(0xa892eb9F79E0D1b6277B3456b0a8FE770386f6DB));
+        atlas = Atlas(payable(0xab654945B45D32465f83bC8B1a13F075c89F7246));
         // atlasVerification = AtlasVerification(payable(_getAddressFromDeploymentsJson("ATLAS_VERIFICATION")));
-        atlasVerification = AtlasVerification(payable(0xeeB91b2d317e3A747E88c1CA542ae31E32B87FDF));
+        atlasVerification = AtlasVerification(payable(0x95c8B9Cff6c3ff7E119B1D70C8E10c07D5160AD6));
 
         console.log("Deployer address: \t\t\t\t", deployer);
 
