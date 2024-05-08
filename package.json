@@ -29,6 +29,7 @@
 
       "deploy-oev-demo-sepolia": "source .env && forge script script/deploy-oev-demo.s.sol:DeployOEVDemoScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
       "set-oev-demo-signers-sepolia": "source .env && forge script script/set-oev-demo-signers.s.sol:SetOEVDemoSignersScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast",
+      "create-oev-demo-positions-sepolia": "source .env && forge script script/create-oev-demo-positions.s.sol:CreateOEVDemoPositionsScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast",
 
       "deploy-sorter-sepolia": "source .env && forge script script/deploy-sorter.s.sol:DeploySorterScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
       "deploy-sorter-local": "source .env && forge script script/deploy-sorter.s.sol:DeploySorterScript --fork-url http://localhost:8545 --broadcast",
