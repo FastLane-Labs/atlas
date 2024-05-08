@@ -1,0 +1,173 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.22;
+
+import "forge-std/Script.sol";
+import "forge-std/Test.sol";
+
+import { DeployBaseScript } from "script/base/deploy-base.s.sol";
+
+import { ChainlinkDAppControl } from "src/contracts/examples/oev-example/ChainlinkDAppControl.sol";
+import { ChainlinkAtlasWrapper } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapper.sol";
+
+import { Token } from "src/contracts/helpers/DemoToken.sol";
+import { DemoLendingProtocol } from "src/contracts/helpers/DemoLendingProtocol.sol";
+
+// For the Chainlink OEV demo, when its difficult to find a real `transmit()` tx with a low enough ETH price.
+// We replace the real Sepolia Chainlink ETH/USD signers with a set of test signers, in ChainlinkDAppControl.
+// Then, we create the `transmit()` calldata with a useful price update, signed by the test signers.
+contract SetOEVDemoSignersScript is DeployBaseScript {
+    address public constant CHAINLINK_ETH_USD = 0x694AA1769357215DE4FAC081bf1f309aDC325306; // on Sepolia
+
+    // Existing contracts - owned by Chainlink Gov address
+    ChainlinkDAppControl chainlinkDAppControl = ChainlinkDAppControl(0x3952bF1A206595381dA7322803bB322B14C964b6);
+
+    // Existing contracts - owned by Lending Gov address
+    ChainlinkAtlasWrapper lendingProtocolChainlinkWrapper =
+        ChainlinkAtlasWrapper(payable(0x2d17fae534eb635e6A8f7733Cc9e83042A14dDB8));
+    DemoLendingProtocol lendingProtocol = DemoLendingProtocol(0x145Be20fb2E37AA57c082DddEE04933ecedD1509);
+    Token dai = Token(0x5989c008695e955f8048E7972dd40B5960999002);
+
+    // Amount of DAI to deposit into the Lending Protocol, creating liquidatable position
+    uint256 public constant POSITION_AMOUNT = 100e18;
+    // Price at which the position in Lending Protocol will be liquidatable. Should be below real ETH/USD price but
+    // above the mock ETH/USD price set below.
+    uint256 public constant LIQUIDATION_PRICE = 2500e8;
+    // ETH/USD Price (8 decimals) that will be extracted from the `transmit()` data
+    uint256 public constant ETH_USD_PRICE = 2000e8;
+
+    // Mock Signers and PKs
+    address alice;
+    address bob;
+    uint256 alicePK;
+    uint256 bobPK;
+
+    function run() external {
+        console.log("\n=== SET OEV DEMO SIGNERS ===\n");
+
+        _setMockSigners();
+
+        uint256 chainlinkGovPrivateKey = vm.envUint("DAPP_GOV_PRIVATE_KEY");
+        address chainlinkGov = vm.addr(chainlinkGovPrivateKey);
+
+        uint256 lendingGovPrivateKey = vm.envUint("LENDING_GOV_PRIVATE_KEY");
+        address lendingGov = vm.addr(lendingGovPrivateKey);
+
+        console.log("Chainlink Gov address: \t\t\t\t", chainlinkGov);
+        console.log("Lending Gov address: \t\t\t\t\t", lendingGov);
+
+        // ---------------------------------------------------- //
+        //                   Chainlink Gov Txs                  //
+        // ---------------------------------------------------- //
+
+        console.log("\nTxs from Chainlink Gov Account...\n");
+        vm.startBroadcast(chainlinkGovPrivateKey);
+
+        // Set mock signers in ChainlinkDAppControl
+        _setMockSignersInChainlinkDAppControl();
+        console.log("Set mock signers in ChainlinkDAppControl");
+
+        vm.stopBroadcast();
+
+        // ---------------------------------------------------- //
+        //                    Lending Gov Txs                   //
+        // ---------------------------------------------------- //
+
+        console.log("\nTxs from Lending Gov Account...\n");
+        vm.startBroadcast(lendingGovPrivateKey);
+
+        // If Lending Gov already has position, withdraw before creating new one
+        (uint256 prevAmount,) = lendingProtocol.positions(lendingGov);
+        if (prevAmount > 0) {
+            lendingProtocol.withdraw();
+            console.log("Withdrew Lending Gov's previous position");
+        } else {
+            console.log("No Lending Gov previous position found");
+        }
+
+        // Create a new liquidatable position in the Lending Protocol
+        dai.mint(lendingGov, POSITION_AMOUNT);
+        dai.approve(address(lendingProtocol), POSITION_AMOUNT);
+        lendingProtocol.deposit(POSITION_AMOUNT, LIQUIDATION_PRICE);
+        vm.stopBroadcast();
+
+        console.log("\n");
+        console.log("Created new liquidatable position:");
+        console.log("DAI Amount: \t\t\t\t\t\t", POSITION_AMOUNT / 1e18);
+        console.log("Liquidation Price (ETH/USD): \t\t\t\t", LIQUIDATION_PRICE / 1e8);
+        console.log("\n");
+
+        console.log("Building transmit calldata...");
+
+        // Lastly, create the `transmit()` calldata with mock signers to set the ETH/USD price
+        (bytes memory report, bytes32[] memory rs, bytes32[] memory ss, bytes32 rawVs) = _buildTransmitCalldataParams();
+
+        // Check that the calldata built above verifies correctly in the ChainlinkDAppControl
+        bool verified = chainlinkDAppControl.verifyTransmitSigners(CHAINLINK_ETH_USD, report, rs, ss, rawVs);
+        if (verified) {
+            console.log("Transmit calldata verified successfully!");
+        } else {
+            console.log("Transmit calldata verification failed!");
+        }
+
+        console.log("\n");
+        console.log("userOp.data to set ETH/USD price to: \t\t\t", ETH_USD_PRICE);
+        console.log("\n");
+        console.logBytes(_convertTransmitParamsToUserOpData(report, rs, ss, rawVs));
+    }
+
+    function _setMockSigners() internal {
+        (alice, alicePK) = makeAddrAndKey("ALICE");
+        (bob, bobPK) = makeAddrAndKey("BOB");
+    }
+
+    function _setMockSignersInChainlinkDAppControl() internal {
+        address[] memory signers = new address[](2);
+        signers[0] = alice;
+        signers[1] = bob;
+        chainlinkDAppControl.setSignersForBaseFeed(CHAINLINK_ETH_USD, signers);
+    }
+
+    function _buildTransmitCalldataParams()
+        internal
+        view
+        returns (bytes memory report, bytes32[] memory rs, bytes32[] memory ss, bytes32 rawVs)
+    {
+        int192[] memory observations = new int192[](2);
+        observations[0] = int192(int256(ETH_USD_PRICE));
+        observations[1] = int192(int256(ETH_USD_PRICE));
+
+        report = abi.encodePacked(
+            bytes32(0), // padding
+            bytes32(0), // padding
+            observations
+        );
+
+        bytes32 reportHash = keccak256(report);
+
+        rs = new bytes32[](2);
+        ss = new bytes32[](2);
+        rawVs = bytes32(0);
+        uint8 tempV = 0;
+
+        (tempV, rs[0], ss[0]) = vm.sign(alicePK, reportHash);
+        rawVs |= bytes32(uint256(tempV - 27) << (31 * 8));
+
+        (tempV, rs[1], ss[1]) = vm.sign(bobPK, reportHash);
+        rawVs |= bytes32(uint256(tempV - 27) << (30 * 8));
+
+        return (report, rs, ss, rawVs);
+    }
+
+    function _convertTransmitParamsToUserOpData(
+        bytes memory report,
+        bytes32[] memory rs,
+        bytes32[] memory ss,
+        bytes32 rawVs
+    )
+        internal
+        view
+        returns (bytes memory userOpData)
+    {
+        userOpData = abi.encodeCall(ChainlinkAtlasWrapper.transmit, (report, rs, ss, rawVs));
+    }
+}
