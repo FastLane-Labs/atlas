@@ -1,12 +1,11 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
+import { ECDSA } from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import { CallConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 import "src/contracts/types/UserCallTypes.sol";
 import "src/contracts/types/SolverCallTypes.sol";
 import "src/contracts/types/LockTypes.sol";
-
-// Atlas DApp-Control Imports
 import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 import { ChainlinkAtlasWrapper } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapper.sol";
 
@@ -147,7 +146,7 @@ contract ChainlinkDAppControl is DAppControl {
         Oracle memory currentOracle;
 
         for (uint256 i = 0; i < rs.length; ++i) {
-            address signer = ecrecover(reportHash, uint8(rawVs[i]) + 27, rs[i], ss[i]);
+            (address signer,) = ECDSA.tryRecover(reportHash, uint8(rawVs[i]) + 27, rs[i], ss[i]);
             currentOracle = verificationVars[baseChainlinkFeed].oracles[signer];
 
             // Signer must be pre-approved and only 1 observation per signer
