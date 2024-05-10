@@ -90,7 +90,11 @@ contract CreateOEVDemoPositionsScript is DeployBaseScript {
         console.log("\n");
         console.log("Accounts with new liquidatable positions:\n");
         for (uint256 i = 0; i < signerNames.length; i++) {
-            console.log(makeAddr(signerNames[i]));
+            (signerAddress, signerPK) = makeAddrAndKey(signerNames[i]);
+            console.log(signerNames[i]);
+            console.log("Address: \t", signerAddress);
+            console.log("Private Key: \t", signerPK);
+            console.log("\n");
         }
     }
 }
