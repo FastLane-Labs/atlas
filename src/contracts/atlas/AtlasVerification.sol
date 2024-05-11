@@ -336,11 +336,13 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // users not having to trust the front end at all - a huge
         // improvement over the current experience.
 
+        // Some checks skipped if call is simUserOperation and the dAppOp data is not available.
+        bool skipDAppOpChecks = isSimulation && dAppOp.from == address(0);
+
         // Check bundler matches dAppOp bundler
         if (dAppOp.bundler != address(0) && msgSender != dAppOp.bundler) {
             if (!signatories[keccak256(abi.encodePacked(dAppOp.control, msgSender))]) {
-                bool bypassSignatoryCheck = isSimulation && dAppOp.from == address(0);
-                if (!bypassSignatoryCheck) {
+                if (!skipDAppOpChecks) {
                     return (false, ValidCallsResult.InvalidBundler);
                 }
             }
@@ -348,8 +350,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         // Make sure the signer is currently enabled by dapp owner
         if (!signatories[keccak256(abi.encodePacked(dAppOp.control, dAppOp.from))]) {
-            bool bypassSignatoryCheck = isSimulation && dAppOp.from == address(0);
-            if (!bypassSignatoryCheck) {
+            if (!skipDAppOpChecks) {
                 return (false, ValidCallsResult.DAppSignatureInvalid);
             }
         }
@@ -360,7 +361,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         // If dAppOp.from is left blank and sim = true,
         // implies a simUserOp call, so dapp nonce check is skipped.
-        if (dAppOp.from == address(0) && isSimulation) {
+        if (skipDAppOpChecks) {
             return (true, ValidCallsResult.Valid);
         }
 
