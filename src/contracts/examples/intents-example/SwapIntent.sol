@@ -150,15 +150,11 @@ contract SwapIntentControl is DAppControl {
             uint256 maxUserConditions = swapIntent.conditions.length;
             bytes memory conditionData;
 
-            for (; i < maxUserConditions;) {
+            for (; i < maxUserConditions; ++i) {
                 (valid, conditionData) = swapIntent.conditions[i].antecedent.staticcall{ gas: USER_CONDITION_GAS_LIMIT }(
                     swapIntent.conditions[i].context
                 );
                 require(valid && abi.decode(conditionData, (bool)), "ERR-PI021 ConditionUnsound");
-
-                unchecked {
-                    ++i;
-                }
             }
         }
 

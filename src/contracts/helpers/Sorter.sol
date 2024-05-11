@@ -42,11 +42,8 @@ contract Sorter {
         count -= invalid;
         uint256 i = 0;
 
-        for (; i < count;) {
+        for (; i < count; ++i) {
             solverOpsSorted[i] = solverOps[sorted[i]];
-            unchecked {
-                ++i;
-            }
         }
 
         return solverOpsSorted;
@@ -112,7 +109,7 @@ contract Sorter {
 
         uint256 i;
         uint256 invalid;
-        for (; i < count;) {
+        for (; i < count; ++i) {
             if (_verifyBidFormat(bidToken, solverOps[i]) && _verifySolverEligibility(dConfig, userOp, solverOps[i])) {
                 sortingData[i] =
                     SortingData({ amount: IDAppControl(dConfig.to).getBidValue(solverOps[i]), valid: true });
@@ -121,9 +118,6 @@ contract Sorter {
                 unchecked {
                     ++invalid;
                 }
-            }
-            unchecked {
-                ++i;
             }
         }
 
@@ -149,25 +143,19 @@ contract Sorter {
         uint256 i;
         uint256 j;
 
-        for (; i < sorted.length;) {
+        for (; i < sorted.length; ++i) {
             topBidAmount = 0;
             topBidIndex = 0;
 
-            for (j = 0; j < count;) {
+            for (j = 0; j < count; ++j) {
                 if (sortingData[j].valid && sortingData[j].amount >= topBidAmount) {
                     topBidAmount = sortingData[j].amount;
                     topBidIndex = j;
-                }
-                unchecked {
-                    ++j;
                 }
             }
 
             sortingData[topBidIndex].valid = false;
             sorted[i] = topBidIndex;
-            unchecked {
-                ++i;
-            }
         }
 
         return sorted;

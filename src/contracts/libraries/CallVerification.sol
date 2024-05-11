@@ -50,7 +50,7 @@ library CallVerification {
         // then solver calls
         uint256 count = solverOps.length;
         uint256 n;
-        for (; n < count;) {
+        for (; n < count; ++n) {
             callSequenceHash = keccak256(
                 abi.encodePacked(
                     callSequenceHash, // reference previous hash
@@ -58,9 +58,6 @@ library CallVerification {
                     i++
                 )
             );
-            unchecked {
-                ++n;
-            }
         }
     }
 }
