@@ -3,6 +3,7 @@ pragma solidity 0.8.22;
 
 import { IAtlETH } from "../interfaces/IAtlETH.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
+import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { CallVerification } from "../libraries/CallVerification.sol";
 
 import "../types/SolverCallTypes.sol";
@@ -10,6 +11,9 @@ import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
 contract Sorter {
+    using CallBits for uint32;
+    using CallVerification for UserOperation;
+
     address public immutable atlas;
 
     struct SortingData {
@@ -65,8 +69,15 @@ contract Sorter {
         view
         returns (bool)
     {
-        // Verify that the solver submitted the correct callhash
-        bytes32 userOpHash = CallVerification.getUserOperationHash(userOp);
+        // Verify that the solver submitted the correct userOpHash
+        bytes32 userOpHash;
+
+        if (dConfig.callConfig.allowsTrustedOpHash()) {
+            userOpHash = userOp.getAltOperationHash();
+        } else {
+            userOpHash = userOp.getUserOperationHash();
+        }
+
         if (solverOp.userOpHash != userOpHash) {
             return false;
         }
