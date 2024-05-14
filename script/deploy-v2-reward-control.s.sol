@@ -27,10 +27,8 @@ contract DeployV2RewardControlScript is DeployBaseScript {
         uint256 deployerPrivateKey = vm.envUint("DAPP_GOV_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
 
-        // atlas = Atlas(payable(_getAddressFromDeploymentsJson("ATLAS")));
-        atlas = Atlas(payable(0xab654945B45D32465f83bC8B1a13F075c89F7246));
-        // atlasVerification = AtlasVerification(payable(_getAddressFromDeploymentsJson("ATLAS_VERIFICATION")));
-        atlasVerification = AtlasVerification(payable(0x95c8B9Cff6c3ff7E119B1D70C8E10c07D5160AD6));
+        atlas = Atlas(payable(_getAddressFromDeploymentsJson("ATLAS")));
+        atlasVerification = AtlasVerification(payable(_getAddressFromDeploymentsJson("ATLAS_VERIFICATION")));
 
         console.log("Deployer address: \t\t\t\t", deployer);
 
