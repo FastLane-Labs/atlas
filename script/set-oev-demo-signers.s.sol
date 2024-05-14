@@ -19,13 +19,13 @@ contract SetOEVDemoSignersScript is DeployBaseScript {
     address public constant CHAINLINK_ETH_USD = 0x694AA1769357215DE4FAC081bf1f309aDC325306; // on Sepolia
 
     // Existing contracts - owned by Chainlink Gov address
-    ChainlinkDAppControl chainlinkDAppControl = ChainlinkDAppControl(0x3952bF1A206595381dA7322803bB322B14C964b6);
+    ChainlinkDAppControl chainlinkDAppControl = ChainlinkDAppControl(0x1fD3aC12c1953497d36e09c6913d68341f5D254f);
 
     // Existing contracts - owned by Lending Gov address
     ChainlinkAtlasWrapper lendingProtocolChainlinkWrapper =
-        ChainlinkAtlasWrapper(payable(0x2d17fae534eb635e6A8f7733Cc9e83042A14dDB8));
-    DemoLendingProtocol lendingProtocol = DemoLendingProtocol(0x145Be20fb2E37AA57c082DddEE04933ecedD1509);
-    Token dai = Token(0x5989c008695e955f8048E7972dd40B5960999002);
+        ChainlinkAtlasWrapper(payable(0xCeE84a9495E7A8496963E7c305cAff7139D72e13));
+    DemoLendingProtocol lendingProtocol = DemoLendingProtocol(0xd9f3e8Df1Af528ECA41c3C78e3aE939015505278);
+    Token dai = Token(0x89D9eF51dbF7aCFFcD0b3E430acE2471608a088c);
 
     // Amount of DAI to deposit into the Lending Protocol, creating liquidatable position
     uint256 public constant POSITION_AMOUNT = 100e18;

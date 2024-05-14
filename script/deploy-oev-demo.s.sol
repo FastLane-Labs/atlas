@@ -27,7 +27,7 @@ contract DeployOEVDemoScript is DeployBaseScript {
     ChainlinkAtlasWrapper lendingProtocolChainlinkWrapper;
 
     function run() external {
-        console.log("\n=== DEPLOY OEV DEMO ===\n");
+        console.log("\n=== DEPLOYING OEV DEMO ===\n");
 
         // Chainlink Gov actions:
         // - Deploy Chainlink DAppControl and initialize with Atlas
@@ -106,7 +106,8 @@ contract DeployOEVDemoScript is DeployBaseScript {
         vm.stopBroadcast();
 
         // EXTRA STEP: Lending Gov creates liquidatable position in Demo Lending Protocol
-        createLiquidatablePosition(lendingGovPrivateKey, lendingGovPrivateKey, 100e18, 3000e8);
+        // NOTE: Liquidatable positions created in other scripts now
+        // createLiquidatablePosition(lendingGovPrivateKey, lendingGovPrivateKey, 100e18, 3000e8);
 
         console.log("Contracts deployed by Lending Gov:");
         console.log("DAI Token: \t\t\t\t\t", address(dai));

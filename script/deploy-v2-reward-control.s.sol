@@ -23,7 +23,6 @@ contract DeployV2RewardControlScript is DeployBaseScript {
 
     function run() external {
         console.log("\n=== DEPLOYING V2Reward DAppControl ===\n");
-        console.log("And setting up with initializeGovernance\n");
 
         uint256 deployerPrivateKey = vm.envUint("DAPP_GOV_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
@@ -32,8 +31,9 @@ contract DeployV2RewardControlScript is DeployBaseScript {
         atlasVerification = AtlasVerification(payable(_getAddressFromDeploymentsJson("ATLAS_VERIFICATION")));
 
         console.log("Deployer address: \t\t\t\t", deployer);
+        console.log("Using Atlas deployed at: \t\t\t", address(atlas));
+        console.log("Using AtlasVerification deployed at: \t\t", address(atlasVerification));
 
-        vm.txGasPrice(220);
         vm.startBroadcast(deployerPrivateKey);
 
         // Deploy the DAppControl contract
