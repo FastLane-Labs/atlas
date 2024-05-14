@@ -68,7 +68,8 @@ contract DeployOEVDemoScript is DeployBaseScript {
         atlasVerification.initializeGovernance(address(chainlinkDAppControl));
 
         // Set Chainlink ETH/USD signers in DAppControl
-        chainlinkDAppControl.setSignersForBaseFeed(CHAINLINK_ETH_USD, getETHUSDSigners_Sepolia());
+        // TODO uncomment line below to use real Chainlink ETH/USD signers on Sepolia
+        // chainlinkDAppControl.setSignersForBaseFeed(CHAINLINK_ETH_USD, getETHUSDSigners_Sepolia());
 
         // Create Execution Environment for Chainlink OEV Metacalls
         chainlinkExecutionEnv = atlas.createExecutionEnvironment(address(chainlinkDAppControl));
