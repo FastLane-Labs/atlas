@@ -65,8 +65,9 @@ contract SetOEVDemoSignersScript is DeployBaseScript {
         // Set mock signers in ChainlinkDAppControl
         _setMockSignersInChainlinkDAppControl();
         console.log("Set mock signers in ChainlinkDAppControl");
-
         vm.stopBroadcast();
+
+        _logMockSigners();
 
         // ---------------------------------------------------- //
         //                    Lending Gov Txs                   //
@@ -110,14 +111,26 @@ contract SetOEVDemoSignersScript is DeployBaseScript {
         }
 
         console.log("\n");
-        console.log("userOp.data to set ETH/USD price to: \t\t\t", ETH_USD_PRICE);
+        console.log("Calldata to set ETH/USD price to: \t\t\t", ETH_USD_PRICE);
         console.log("\n");
+
+        _logTransmitParams(report, rs, ss, rawVs);
+
+        console.log("userOp.data form:");
         console.logBytes(_convertTransmitParamsToUserOpData(report, rs, ss, rawVs));
     }
 
     function _setMockSigners() internal {
         (alice, alicePK) = makeAddrAndKey("ALICE");
         (bob, bobPK) = makeAddrAndKey("BOB");
+    }
+
+    function _logMockSigners() internal {
+        (alice, alicePK) = makeAddrAndKey("ALICE");
+        (bob, bobPK) = makeAddrAndKey("BOB");
+        console.log("Mock Signers:");
+        console.log("Alice: \t\t\t\t\t\t", alice);
+        console.log("Bob: \t\t\t\t\t\t\t", bob);
     }
 
     function _setMockSignersInChainlinkDAppControl() internal {
@@ -136,9 +149,10 @@ contract SetOEVDemoSignersScript is DeployBaseScript {
         observations[0] = int192(int256(ETH_USD_PRICE));
         observations[1] = int192(int256(ETH_USD_PRICE));
 
-        report = abi.encodePacked(
-            bytes32(0), // padding
-            bytes32(0), // padding
+        // NOTE: Must be `abi.encode()` and not `abi.encodePacked()` otherwise decode breaks
+        report = abi.encode(
+            bytes32(uint256(0)), // padding
+            bytes32(uint256(0)), // padding
             observations
         );
 
@@ -169,5 +183,33 @@ contract SetOEVDemoSignersScript is DeployBaseScript {
         returns (bytes memory userOpData)
     {
         userOpData = abi.encodeCall(ChainlinkAtlasWrapper.transmit, (report, rs, ss, rawVs));
+    }
+
+    function _logTransmitParams(
+        bytes memory report,
+        bytes32[] memory rs,
+        bytes32[] memory ss,
+        bytes32 rawVs
+    )
+        internal
+    {
+        console.log("Transmit Params:");
+        console.log("report: ");
+        console.logBytes(report);
+        console.log("rs: ");
+
+        for (uint256 i = 0; i < rs.length; i++) {
+            console.logBytes32(rs[i]);
+        }
+
+        console.log("ss: ");
+
+        for (uint256 i = 0; i < ss.length; i++) {
+            console.logBytes32(ss[i]);
+        }
+
+        console.log("rawVs: ");
+        console.logBytes32(rawVs);
+        console.log("\n");
     }
 }
