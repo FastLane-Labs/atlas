@@ -24,10 +24,11 @@ contract AtlasVerification is EIP712, DAppIntegration {
     using CallBits for uint32;
     using CallVerification for UserOperation;
 
-    uint256 internal constant FULL_BITMAP = uint256(0x0000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF);
-    uint256 internal constant FIRST_16_BITS_FULL = uint256(0xFFFF);
-    uint256 internal constant FIRST_4_BITS_FULL = uint256(0xF);
-    uint8 internal constant MAX_SOLVERS = type(uint8).max - 2;
+    uint256 internal constant _FULL_BITMAP = uint256(0x0000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF);
+    uint256 internal constant _FIRST_16_BITS_FULL = uint256(0xFFFF);
+    uint256 internal constant _FIRST_4_BITS_FULL = uint256(0xF);
+    uint256 internal constant _NONCES_PER_BITMAP = 240;
+    uint8 internal constant _MAX_SOLVERS = type(uint8).max - 2;
 
     constructor(address _atlas) EIP712("AtlasVerification", "1.0") DAppIntegration(_atlas) { }
 
@@ -124,7 +125,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
             }
 
             // Check solvers not over the max (253)
-            if (solverOpCount > MAX_SOLVERS) {
+            if (solverOpCount > _MAX_SOLVERS) {
                 return (userOpHash, ValidCallsResult.TooManySolverOps);
             }
 
@@ -419,8 +420,11 @@ contract AtlasVerification is EIP712, DAppIntegration {
             // while an additional uint8 used to track the highest used nonce in the bitmap.
             // Both the uint240 and uint8 are packed into a single storage slot.
 
-            uint256 bitmapIndex = ((nonce - 1) / 240) + 1; // +1 because highestFullBitmap initializes at 0
-            uint256 bitmapNonce = ((nonce - 1) % 240); // 1 -> 0, 240 -> 239. Needed for shifts in bitmap.
+            // `nonce` is passed as 1-indexed, but adjusted to 0-indexed for bitmap shift operations.
+            // Then `bitmapIndex` is adjusted to be 1-indexed because `highestFullBitmap` initializes at 0, which
+            // implies that the first non-full bitmap is at index 1.
+            uint256 bitmapIndex = ((nonce - 1) / _NONCES_PER_BITMAP) + 1;
+            uint256 bitmapNonce = ((nonce - 1) % _NONCES_PER_BITMAP);
 
             bytes32 bitmapKey = keccak256(abi.encode(account, bitmapIndex));
             NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
@@ -445,7 +449,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
             }
 
             // Mark bitmap as full if necessary
-            if (bitmap == FULL_BITMAP) {
+            if (bitmap == _FULL_BITMAP) {
                 // Update highestFullNonSeqBitmap if necessary
                 if (bitmapIndex == nonceTracker.highestFullNonSeqBitmap + 1) {
                     nonceTracker = _incrementHighestFullNonSeqBitmap(nonceTracker, account);
@@ -483,7 +487,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
             uint256 bitmapIndex = uint256(nonceTracker.highestFullNonSeqBitmap) + 1;
             bytes32 bitmapKey = keccak256(abi.encode(account, bitmapIndex));
             bitmap = uint256(nonceBitmaps[bitmapKey].bitmap);
-        } while (bitmap == FULL_BITMAP);
+        } while (bitmap == _FULL_BITMAP);
 
         return nonceTracker;
     }
@@ -642,7 +646,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 bytes32 bitmapKey = keccak256(abi.encode(account, nonceTracker.highestFullNonSeqBitmap + n));
                 NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
                 bitmap = uint256(nonceBitmap.bitmap);
-            } while (bitmap == FULL_BITMAP);
+            } while (bitmap == _FULL_BITMAP);
 
             uint256 remainder = _getFirstUnusedNonceInBitmap(bitmap);
             return ((nonceTracker.highestFullNonSeqBitmap + n - 1) * 240) + remainder;
@@ -660,7 +664,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
             bytes32 bitmapKey = keccak256(abi.encode(msg.sender, nonceIndexToCheck));
             nonceBitmap = nonceBitmaps[bitmapKey];
 
-            if (nonceBitmap.bitmap == FULL_BITMAP) {
+            if (nonceBitmap.bitmap == _FULL_BITMAP) {
                 nonceTracker.highestFullNonSeqBitmap = nonceIndexToCheck;
                 break;
             }
@@ -692,14 +696,14 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         for (uint256 i = 0; i < 240; i += 16) {
             // Isolate the next 16 bits to check
-            uint256 chunk16 = (bitmap >> i) & FIRST_16_BITS_FULL;
+            uint256 chunk16 = (bitmap >> i) & _FIRST_16_BITS_FULL;
             // Find non-full 16-bit chunk
-            if (chunk16 != FIRST_16_BITS_FULL) {
+            if (chunk16 != _FIRST_16_BITS_FULL) {
                 for (uint256 j = 0; j < 16; j += 4) {
                     // Isolate the next 4 bits within the 16-bit chunk to check
-                    uint256 chunk4 = (chunk16 >> j) & FIRST_4_BITS_FULL;
+                    uint256 chunk4 = (chunk16 >> j) & _FIRST_4_BITS_FULL;
                     // Find non-full 4-bit chunk
-                    if (chunk4 != FIRST_4_BITS_FULL) {
+                    if (chunk4 != _FIRST_4_BITS_FULL) {
                         for (uint256 k = 0; k < 4; k++) {
                             // Find first unused bit
                             if ((chunk4 >> k) & 0x1 == 0) {
