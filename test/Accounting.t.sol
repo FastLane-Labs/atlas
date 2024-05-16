@@ -147,7 +147,7 @@ contract AccountingTest is BaseTest {
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
         // swap(SwapIntent calldata) selector = 0x98434997
-        bytes memory userCallData = abi.encodeWithSelector(SwapIntentDAppControl.swap.selector, swapIntent);
+        bytes memory userCallData = abi.encodeCall(SwapIntentDAppControl.swap, swapIntent);
 
         // Builds the metaTx and to parts of userCall, signature still to be set
         userOp = txBuilder.buildUserOperation({
@@ -167,7 +167,7 @@ contract AccountingTest is BaseTest {
 
         // Build solver calldata (function selector on solver contract and its params)
         bytes memory solverOpData =
-            abi.encodeWithSelector(HonestRFQSolver.fulfillRFQ.selector, swapIntent, executionEnvironment);
+            abi.encodeCall(HonestRFQSolver.fulfillRFQ, (swapIntent, executionEnvironment));
 
         vm.prank(address(solverOneEOA));
         atlas.bond(1 ether);

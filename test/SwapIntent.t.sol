@@ -76,11 +76,11 @@ contract SwapIntentTest is BaseTest {
         Condition[] memory conditions = new Condition[](2);
         conditions[0] = Condition({
             antecedent: address(userCondition),
-            context: abi.encodeWithSelector(UserCondition.isLessThanFive.selector, 3)
+            context: abi.encodeCall(UserCondition.isLessThanFive, 3)
         });
         conditions[1] = Condition({
             antecedent: address(userCondition),
-            context: abi.encodeWithSelector(UserCondition.isLessThanFive.selector, 4)
+            context: abi.encodeCall(UserCondition.isLessThanFive, 4)
         });
 
         SwapIntent memory swapIntent = SwapIntent({
@@ -119,7 +119,7 @@ contract SwapIntentTest is BaseTest {
         // rest of data is "userData" param
 
         // swap(SwapIntent calldata) selector = 0x98434997
-        bytes memory userOpData = abi.encodeWithSelector(SwapIntentDAppControl.swap.selector, swapIntent);
+        bytes memory userOpData = abi.encodeCall(SwapIntentDAppControl.swap, swapIntent);
 
         // Builds the metaTx and to parts of userOp, signature still to be set
         userOp = txBuilder.buildUserOperation({
@@ -139,7 +139,7 @@ contract SwapIntentTest is BaseTest {
 
         // Build solver calldata (function selector on solver contract and its params)
         bytes memory solverOpData =
-            abi.encodeWithSelector(SimpleRFQSolver.fulfillRFQ.selector, swapIntent, executionEnvironment);
+            abi.encodeCall(SimpleRFQSolver.fulfillRFQ, (swapIntent, executionEnvironment));
 
         // Builds the SolverOperation
         solverOps[0] = txBuilder.buildSolverOperation({
@@ -241,7 +241,7 @@ contract SwapIntentTest is BaseTest {
         // rest of data is "userData" param
 
         // swap(SwapIntent calldata) selector = 0x98434997
-        bytes memory userOpData = abi.encodeWithSelector(SwapIntentDAppControl.swap.selector, swapIntent);
+        bytes memory userOpData = abi.encodeCall(SwapIntentDAppControl.swap, swapIntent);
 
         // Builds the metaTx and to parts of userOp, signature still to be set
         userOp = txBuilder.buildUserOperation({
@@ -261,7 +261,7 @@ contract SwapIntentTest is BaseTest {
 
         // Build solver calldata (function selector on solver contract and its params)
         bytes memory solverOpData =
-            abi.encodeWithSelector(UniswapIntentSolver.fulfillWithSwap.selector, swapIntent, executionEnvironment);
+            abi.encodeCall(UniswapIntentSolver.fulfillWithSwap, (swapIntent, executionEnvironment));
 
         // Builds the SolverOperation
         solverOps[0] = txBuilder.buildSolverOperation({
