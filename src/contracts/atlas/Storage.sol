@@ -38,11 +38,18 @@ contract Storage is AtlasEvents, AtlasErrors {
     mapping(address => EscrowAccountAccessData) public accessData;
     mapping(bytes32 => bool) internal _solverOpHashes; // NOTE: Only used for when allowTrustedOpHash is enabled
 
+    // Escrow constants
+    uint256 internal constant _VALIDATION_GAS_LIMIT = 500_000;
+    uint256 internal constant _SOLVER_GAS_LIMIT_BUFFER_PERCENTAGE = 5; // out of 100 = 5%
+    uint256 internal constant _SOLVER_GAS_LIMIT_SCALE = 100; // out of 100 = 100%
+    uint256 internal constant _FASTLANE_GAS_BUFFER = 125_000; // integer amount
+
     // Gas Accounting constants
     uint256 public constant SURCHARGE_RATE = 1_000_000; // 1_000_000 / 10_000_000 = 10%
     uint256 public constant SURCHARGE_SCALE = 10_000_000; // 10_000_000 / 10_000_000 = 100%
     uint256 internal constant _CALLDATA_LENGTH_PREMIUM = 32; // 16 (default) * 2
     uint256 internal constant _SOLVER_OP_BASE_CALLDATA = 608; // SolverOperation calldata length excluding solverOp.data
+    uint256 internal constant _SOLVER_LOCK_GAS_BUFFER = 5000; // Base gas charged to solver in `_releaseSolverLock()`
 
     // atlETH GasAccounting storage
     uint256 public cumulativeSurcharge; // Cumulative gas surcharges collected

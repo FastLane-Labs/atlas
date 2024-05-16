@@ -235,7 +235,7 @@ abstract contract GasAccounting is SafetyLocks {
         // NOTE: This will cause an error if you are simulating with a gasPrice of 0
         if (!bidFind && !result.updateEscrow()) return;
 
-        uint256 gasUsed = (gasWaterMark - gasleft() + 5000) * tx.gasprice;
+        uint256 gasUsed = (gasWaterMark - gasleft() + _SOLVER_LOCK_GAS_BUFFER) * tx.gasprice;
 
         if (includeCalldata) {
             gasUsed += _getCalldataCost(solverOp.data.length);

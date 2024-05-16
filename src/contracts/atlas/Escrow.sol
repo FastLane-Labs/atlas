@@ -24,10 +24,6 @@ abstract contract Escrow is AtlETH {
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
-    uint256 private constant _VALIDATION_GAS_LIMIT = 500_000;
-    uint256 private constant _SOLVER_GAS_BUFFER = 5; // out of 100
-    uint256 private constant _FASTLANE_GAS_BUFFER = 125_000; // integer amount
-
     constructor(
         uint256 _escrowDuration,
         address _verification,
@@ -264,8 +260,9 @@ abstract contract Escrow is AtlETH {
             );
         }
 
-        gasLimit = (100) * (solverOp.gas < dConfig.solverGasLimit ? solverOp.gas : dConfig.solverGasLimit)
-            / (100 + _SOLVER_GAS_BUFFER) + _FASTLANE_GAS_BUFFER;
+        gasLimit = _SOLVER_GAS_LIMIT_SCALE
+            * (solverOp.gas < dConfig.solverGasLimit ? solverOp.gas : dConfig.solverGasLimit)
+            / (_SOLVER_GAS_LIMIT_SCALE + _SOLVER_GAS_LIMIT_BUFFER_PERCENTAGE) + _FASTLANE_GAS_BUFFER;
 
         uint256 gasCost = (tx.gasprice * gasLimit) + _getCalldataCost(solverOp.data.length);
 
