@@ -31,7 +31,7 @@ abstract contract SafetyLocks is Storage {
     /// @param gasMarker Initial `gasleft()` measured at the start of `metacall`.
     /// @param userOpValue Amount of ETH required by the UserOperation.
     function _setAtlasLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) internal {
-        if (lock != UNLOCKED) revert AlreadyInitialized();
+        if (lock != _UNLOCKED) revert AlreadyInitialized();
 
         // Initialize the Lock
         lock = executionEnvironment;
@@ -86,8 +86,8 @@ abstract contract SafetyLocks is Storage {
     /// @notice Releases the Atlas lock, and resets the associated transient storage variables. Called at the end of
     /// `metacall`.
     function _releaseAtlasLock() internal {
-        if (lock == UNLOCKED) revert NotInitialized();
-        lock = UNLOCKED;
+        if (lock == _UNLOCKED) revert NotInitialized();
+        lock = _UNLOCKED;
         _solverLock = _UNLOCKED_UINT;
         claims = type(uint256).max;
         withdrawals = type(uint256).max;
@@ -102,6 +102,6 @@ abstract contract SafetyLocks is Storage {
     /// @notice Returns the current lock state of Atlas.
     /// @return Boolean indicating whether Atlas is in a locked state or not.
     function isUnlocked() external view returns (bool) {
-        return lock == UNLOCKED;
+        return lock == _UNLOCKED;
     }
 }

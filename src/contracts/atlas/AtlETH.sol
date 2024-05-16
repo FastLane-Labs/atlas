@@ -164,7 +164,7 @@ abstract contract AtlETH is Permit69 {
     /// @notice Computes or reads the stored EIP-712 domain separator for permit signatures.
     /// @return The domain separator bytes32 value.
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
-        return block.chainid == INITIAL_CHAIN_ID ? INITIAL_DOMAIN_SEPARATOR : _computeDomainSeparator();
+        return block.chainid == _INITIAL_CHAIN_ID ? _INITIAL_DOMAIN_SEPARATOR : _computeDomainSeparator();
     }
 
     /// @notice Computes the EIP-712 domain separator for permit signatures.

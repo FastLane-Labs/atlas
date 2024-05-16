@@ -105,14 +105,14 @@ abstract contract GasAccounting is SafetyLocks {
 
         // CASE: Callback verified but insufficient balance
         if (deficit > surplus) {
-            _solverLock = uint256(uint160(currentSolver)) | SOLVER_CALLED_BACK_MASK;
+            _solverLock = uint256(uint160(currentSolver)) | _SOLVER_CALLED_BACK_MASK;
 
             return deficit - surplus;
         }
 
         // CASE: Callback verified and solver duty fulfilled
         if (!fulfilled) {
-            _solverLock = uint256(uint160(currentSolver)) | SOLVER_CALLED_BACK_MASK | SOLVER_FULFILLED_MASK;
+            _solverLock = uint256(uint160(currentSolver)) | _SOLVER_CALLED_BACK_MASK | _SOLVER_FULFILLED_MASK;
         }
         return 0;
     }
@@ -170,7 +170,7 @@ abstract contract GasAccounting is SafetyLocks {
             }
 
             // Reputation Analytics: Track total gas used, solver wins, and failures
-            aData.totalGasUsed += uint64(amount / GAS_USED_DECIMALS_TO_DROP);
+            aData.totalGasUsed += uint64(amount / _GAS_USED_DECIMALS_TO_DROP);
             if (solverWon) {
                 aData.auctionWins++;
             } else if (!bidFind) {
