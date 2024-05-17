@@ -15,11 +15,21 @@
       "anvil": "anvil",
       "anvil-mainnet-fork": "source .env && anvil --fork-url ${MAINNET_RPC_URL} --fork-block-number ${MAINNET_FORK_BLOCK_NUMBER} --code-size-limit ${CODE_SIZE_LIMIT}",
       
-      "deploy-atlas-sepolia": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
+      "deploy-atlas-sepolia": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --rpc-url ${SEPOLIA_RPC_URL} --legacy --gas-estimate-multiplier 150 --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify --delay 30",
       "deploy-atlas-local": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --fork-url http://localhost:8545 --broadcast",
 
       "deploy-swap-intent-sepolia": "source .env && forge script script/deploy-swap-intent-control.s.sol:DeploySwapIntentControlScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
       "deploy-swap-intent-local": "source .env && forge script script/deploy-swap-intent-control.s.sol:DeploySwapIntentControlScript --fork-url http://localhost:8545 --broadcast",
+
+      "deploy-demo-tokens-sepolia": "source .env && forge script script/deploy-demo-tokens.s.sol:DeployDemoTokensScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
+
+      "mint-demo-tokens-sepolia": "source .env && forge script script/mint-demo-tokens.s.sol:MintDemoTokensScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
+
+      "deploy-v2-reward-dapp-sepolia": "source .env && forge script script/deploy-v2-reward-control.s.sol:DeployV2RewardControlScript --rpc-url ${SEPOLIA_RPC_URL} --legacy --gas-estimate-multiplier 150 --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify --delay 30",
+
+      "deploy-oev-demo-sepolia": "source .env && forge script script/deploy-oev-demo.s.sol:DeployOEVDemoScript --rpc-url ${SEPOLIA_RPC_URL} --legacy --gas-estimate-multiplier 150 --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify --delay 30",
+      "set-oev-demo-signers-sepolia": "source .env && forge script script/set-oev-demo-signers.s.sol:SetOEVDemoSignersScript --rpc-url ${SEPOLIA_RPC_URL} --legacy --gas-estimate-multiplier 150 --broadcast",
+      "create-oev-demo-positions-sepolia": "source .env && forge script script/create-oev-demo-positions.s.sol:CreateOEVDemoPositionsScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast",
 
       "deploy-sorter-sepolia": "source .env && forge script script/deploy-sorter.s.sol:DeploySorterScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
       "deploy-sorter-local": "source .env && forge script script/deploy-sorter.s.sol:DeploySorterScript --fork-url http://localhost:8545 --broadcast",
