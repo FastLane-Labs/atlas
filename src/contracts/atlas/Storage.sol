@@ -15,6 +15,12 @@ contract Storage is AtlasEvents, AtlasErrors {
     address internal constant _UNLOCKED = address(1);
     uint256 internal constant _UNLOCKED_UINT = 1;
 
+    // Atlas constants used in `_bidFindingIteration()`
+    uint256 internal constant BITS_FOR_INDEX = 16;
+    uint256 internal constant FIRST_16_BITS_MASK = uint256(0xFFFF);
+    uint256 internal constant FIRST_240_BITS_MASK =
+        uint256(0x0000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF);
+
     uint256 public immutable ESCROW_DURATION;
     address public immutable VERIFICATION;
     address public immutable SIMULATOR;

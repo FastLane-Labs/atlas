@@ -16,7 +16,11 @@ import "src/contracts/types/LockTypes.sol";
 
 import { TestUtils } from "./base/TestUtils.sol";
 
-import { SwapIntentControl, SwapIntent, Condition } from "src/contracts/examples/intents-example/SwapIntent.sol";
+import {
+    SwapIntentDAppControl,
+    SwapIntent,
+    Condition
+} from "src/contracts/examples/intents-example/SwapIntentDAppControl.sol";
 
 import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
@@ -24,7 +28,7 @@ import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
 
 // TODO Check if this is tested in more contract-specific tests, then delete this if true.
 contract AccountingTest is BaseTest {
-    SwapIntentControl public swapIntentControl;
+    SwapIntentDAppControl public swapIntentController;
     TxBuilder public txBuilder;
     Sig public sig;
 
@@ -50,8 +54,8 @@ contract AccountingTest is BaseTest {
 
         // Deploy new SwapIntent Control from new gov and initialize in Atlas
         vm.startPrank(governanceEOA);
-        swapIntentControl = new SwapIntentControl(address(atlas));
-        atlasVerification.initializeGovernance(address(swapIntentControl));
+        swapIntentController = new SwapIntentDAppControl(address(atlas));
+        atlasVerification.initializeGovernance(address(swapIntentController));
         vm.stopPrank();
 
         txBuilder = new TxBuilder({
@@ -122,7 +126,6 @@ contract AccountingTest is BaseTest {
             tokenUserSells: WETH_ADDRESS,
             amountUserSells: 10e18,
             auctionBaseCurrency: address(0),
-            solverMustReimburseGas: false,
             conditions: new Condition[](0)
         });
 
@@ -144,7 +147,7 @@ contract AccountingTest is BaseTest {
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
         // swap(SwapIntent calldata) selector = 0x98434997
-        bytes memory userCallData = abi.encodeWithSelector(SwapIntentControl.swap.selector, swapIntent);
+        bytes memory userCallData = abi.encodeCall(SwapIntentDAppControl.swap, swapIntent);
 
         // Builds the metaTx and to parts of userCall, signature still to be set
         userOp = txBuilder.buildUserOperation({
@@ -155,6 +158,7 @@ contract AccountingTest is BaseTest {
             deadline: block.number + 2,
             data: userCallData
         });
+        userOp.sessionKey = governanceEOA;
 
         // User signs the userCall
         // user doees NOT sign the userOp when they are bundling
@@ -163,7 +167,7 @@ contract AccountingTest is BaseTest {
 
         // Build solver calldata (function selector on solver contract and its params)
         bytes memory solverOpData =
-            abi.encodeWithSelector(HonestRFQSolver.fulfillRFQ.selector, swapIntent, executionEnvironment);
+            abi.encodeCall(HonestRFQSolver.fulfillRFQ, (swapIntent, executionEnvironment));
 
         vm.prank(address(solverOneEOA));
         atlas.bond(1 ether);
@@ -212,7 +216,7 @@ contract AccountingTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        (bool simResult,, ) = simulator.simUserOperation(userOp);
+        (bool simResult,,) = simulator.simUserOperation(userOp);
         assertFalse(simResult, "metasimUserOperationcall tested true a");
 
         WETH.approve(address(atlas), swapIntent.amountUserSells);

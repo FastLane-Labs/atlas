@@ -154,7 +154,7 @@ contract Simulator is AtlasErrors {
         payable
     {
         if (msg.sender != address(this)) revert InvalidEntryFunction();
-        if (!IAtlas(atlas).metacall(userOp, solverOps, dAppOp)) {
+        if (!IAtlas(atlas).metacall{ value: msg.value }(userOp, solverOps, dAppOp)) {
             revert NoAuctionWinner(); // should be unreachable
         }
         revert SimulationPassed();
