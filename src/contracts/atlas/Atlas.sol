@@ -2,6 +2,7 @@
 pragma solidity 0.8.22;
 
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { LibSort } from "solady/utils/LibSort.sol";
 
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
 
@@ -244,51 +245,76 @@ contract Atlas is Escrow, Factory {
         internal
         returns (bool auctionWon, EscrowKey memory)
     {
+        // Return early if no solverOps (e.g. in simUserOperation)
+        if (solverOps.length == 0) return (false, key);
+
         key.bidFind = true;
 
-        uint256[] memory sortedOps = new uint256[](solverOps.length);
-        uint256[] memory bidAmounts = new uint256[](solverOps.length);
-        uint256 j;
-        uint256 bidPlaceholder;
+        uint256[] memory bidsAndIndices = new uint256[](solverOps.length);
+        uint256 zeroBidCount;
+        uint256 bidAmountFound;
+        uint256 bidsAndIndicesLastIndex = bidsAndIndices.length - 1; // computed once for efficiency
 
-        for (uint256 i; i < solverOps.length; i++) {
-            bidPlaceholder = _getBidAmount(dConfig, userOp, solverOps[i], returnData, key);
+        // First, get all bid amounts. Bids of zero are ignored by only storing non-zero bids in the array, from right
+        // to left. If there are any zero bids they will end up on the left as uint(0) values - in their sorted
+        // position. This reduces operations needed later when sorting the array in ascending order.
+        // Each non-zero bid amount is packed with its original solverOps array index, to fit into a uint256 value. The
+        // order of bidAmount and index is important - with bidAmount using the most significant bits, and considering
+        // we do not store zero bids in the array, the index values within the uint256 should not impact the sorting.
 
-            if (bidPlaceholder == 0) {
+        // |<------------------------- uint256 (256 bits) ------------------------->|
+        // |                                                                        |
+        // |<------------------ uint240 ----------------->|<-------- uint16 ------->|
+        // |                                              |                         |
+        // |                    bidAmount                 |          index          |
+        // |                                              |                         |
+        // |<------------------ 240 bits ---------------->|<------- 16 bits ------->|
+
+        for (uint256 i; i < solverOps.length; ++i) {
+            bidAmountFound = _getBidAmount(dConfig, userOp, solverOps[i], returnData, key);
+
+            if (bidAmountFound == 0 || bidAmountFound > type(uint240).max) {
+                // Zero bids are ignored: increment zeroBidCount offset
+                // Bids that would cause an overflow are also ignored
                 unchecked {
-                    ++j;
+                    ++zeroBidCount;
                 }
-                continue;
             } else {
-                bidAmounts[i] = bidPlaceholder;
-
-                for (uint256 k = i - j + 1; k > 0; k--) {
-                    if (bidPlaceholder > bidAmounts[sortedOps[k - 1]]) {
-                        sortedOps[k] = sortedOps[k - 1];
-                        sortedOps[k - 1] = i;
-                    } else {
-                        sortedOps[k] = i;
-                        break;
-                    }
-                }
+                // Non-zero bids are packed with their original solverOps index.
+                // The array is filled with non-zero bids from the right. This causes all zero bids to be on the left -
+                // in their sorted position, so fewer operations are needed in the sorting step below.
+                bidsAndIndices[bidsAndIndicesLastIndex - (i - zeroBidCount)] =
+                    uint256(bidAmountFound << BITS_FOR_INDEX | uint16(i));
             }
         }
 
-        key.bidFind = false;
-        j = solverOps.length - j;
+        // Then, sorts the uint256 array in-place, in ascending order.
+        LibSort.insertionSort(bidsAndIndices);
 
-        for (uint256 i; i < j; i++) {
-            bidPlaceholder = sortedOps[i];
+        key.bidFind = false;
+
+        // Finally, iterate through sorted bidsAndIndices array in descending order of bidAmount.
+        for (uint256 i = bidsAndIndicesLastIndex; i >= 0; --i) {
+            // Isolate the bidAmount from the packed uint256 value
+            bidAmountFound = (bidsAndIndices[i] >> BITS_FOR_INDEX) & FIRST_240_BITS_MASK;
+
+            // If we reach the zero bids on the left of array, break as all valid bids already checked.
+            if (bidAmountFound == 0) break;
+
+            // Isolate the original solverOps index from the packed uint256 value
+            uint256 solverOpsIndex = bidsAndIndices[i] & FIRST_16_BITS_MASK;
 
             (auctionWon, key) = _executeSolverOperation(
-                dConfig, userOp, solverOps[bidPlaceholder], returnData, bidAmounts[bidPlaceholder], true, key
+                dConfig, userOp, solverOps[solverOpsIndex], returnData, bidAmountFound, true, key
             );
 
             if (auctionWon) {
-                key = _allocateValue(dConfig, solverOps[bidPlaceholder], bidAmounts[bidPlaceholder], returnData, key);
-                key.solverOutcome = uint24(bidPlaceholder);
+                key = _allocateValue(dConfig, solverOps[solverOpsIndex], bidAmountFound, returnData, key);
+                key.solverOutcome = uint24(solverOpsIndex);
                 return (auctionWon, key);
             }
+
+            if (i == 0) break; // break to prevent underflow in next loop
         }
 
         return (auctionWon, key);
