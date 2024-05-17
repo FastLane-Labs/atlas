@@ -400,7 +400,7 @@ contract Atlas is Escrow, Factory {
     /// @param control DAppControl contract address
     /// @param callConfig CallConfig of the current metacall tx.
     function _verifyCallerIsExecutionEnv(address user, address control, uint32 callConfig) internal view override {
-        if (msg.sender != _getExecutionEnvironmentCustom(user, control.codehash, control, callConfig)) {
+        if (msg.sender != _getExecutionEnvironmentCustom(user, control, callConfig)) {
             revert EnvironmentMismatch();
         }
     }

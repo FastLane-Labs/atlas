@@ -26,7 +26,7 @@ contract MockFactory is Factory, Test {
     }
 
     function salt() external returns (bytes32) {
-        return _salt;
+        return _FACTORY_BASE_SALT;
     }
 }
 
@@ -70,7 +70,7 @@ contract FactoryTest is Test {
     function test_createExecutionEnvironment() public {
         uint32 callConfig = dAppControl.CALL_CONFIG();
         bytes memory creationCode = TestUtils._getMimicCreationCode(
-            address(dAppControl), callConfig, mockFactory.executionTemplate(), user, address(dAppControl).codehash
+            address(dAppControl), callConfig, mockFactory.EXECUTION_ENV_TEMPLATE(), user, address(dAppControl).codehash
         );
         address expectedExecutionEnvironment = address(
             uint160(
