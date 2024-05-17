@@ -28,7 +28,7 @@ import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
 
 // TODO Check if this is tested in more contract-specific tests, then delete this if true.
 contract AccountingTest is BaseTest {
-    SwapIntentDAppControl public swapIntentController;
+    SwapIntentDAppControl public swapIntentControl;
     TxBuilder public txBuilder;
     Sig public sig;
 
@@ -54,8 +54,8 @@ contract AccountingTest is BaseTest {
 
         // Deploy new SwapIntent Control from new gov and initialize in Atlas
         vm.startPrank(governanceEOA);
-        swapIntentController = new SwapIntentDAppControl(address(atlas));
-        atlasVerification.initializeGovernance(address(swapIntentController));
+        swapIntentControl = new SwapIntentDAppControl(address(atlas));
+        atlasVerification.initializeGovernance(address(swapIntentControl));
         vm.stopPrank();
 
         txBuilder = new TxBuilder({

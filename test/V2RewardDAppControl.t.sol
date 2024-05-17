@@ -45,8 +45,8 @@ contract V2RewardDAppControlTest is BaseTest {
         vm.stopPrank();
 
         txBuilder = new TxBuilder({
-            controller: address(v2RewardControl),
-            atlasAddress: address(atlas),
+            _control: address(v2RewardControl),
+            _atlas: address(atlas),
             _verification: address(atlasVerification)
         });
     }

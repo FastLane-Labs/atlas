@@ -82,7 +82,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
     }
 
     function testSameNonceValidForSeqAndNonSeqDApps() public {
-        // Set up DApp with sequenced user nonces
+        // Set up DApp with sequential user nonces
         defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
 
         // In Sequential DApp: User nonces 1 and 2 are valid

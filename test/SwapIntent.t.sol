@@ -32,7 +32,7 @@ interface IUniV2Router02 {
 }
 
 contract SwapIntentTest is BaseTest {
-    SwapIntentDAppControl public swapIntentController;
+    SwapIntentDAppControl public swapIntentControl;
     TxBuilder public txBuilder;
     Sig public sig;
 
@@ -54,8 +54,8 @@ contract SwapIntentTest is BaseTest {
 
         // Deploy new SwapIntent Control from new gov and initialize in Atlas
         vm.startPrank(governanceEOA);
-        swapIntentController = new SwapIntentDAppControl(address(atlas));
-        atlasVerification.initializeGovernance(address(swapIntentController));
+        swapIntentControl = new SwapIntentDAppControl(address(atlas));
+        atlasVerification.initializeGovernance(address(swapIntentControl));
         vm.stopPrank();
 
         txBuilder = new TxBuilder({

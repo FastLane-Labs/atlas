@@ -41,8 +41,8 @@ contract V2RewardDAppControl is DAppControl {
             _atlas,
             msg.sender,
             CallConfig({
-                userNoncesSequenced: false,
-                dappNoncesSequenced: false,
+                userNoncesSequential: false,
+                dappNoncesSequential: false,
                 requirePreOps: true,
                 trackPreOpsReturnData: true,
                 trackUserReturnData: false,

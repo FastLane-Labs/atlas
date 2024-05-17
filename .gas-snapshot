@@ -58,7 +58,7 @@ AtlasVerificationTest:test_validCalls_SolverWithGasPriceBelowTxprice_NoSolverOp(
 AtlasVerificationTest:test_validCalls_SolverWithNoSignature_NoSolverOp() (gas: 23660934)
 AtlasVerificationTest:test_validCalls_TooManySolverOps() (gas: 27728042)
 AtlasVerificationTest:test_validCalls_TxValueLowerThanCallValue() (gas: 23765543)
-AtlasVerificationTest:test_validCalls_UnsequencedNonceIsOne_Valid() (gas: 23757868)
+AtlasVerificationTest:test_validCalls_NonSeqNonceIsOne_Valid() (gas: 23757868)
 AtlasVerificationTest:test_validCalls_UserDeadlineReached() (gas: 23735544)
 AtlasVerificationTest:test_validCalls_UserOpNonceIsOne_Valid() (gas: 23758788)
 AtlasVerificationTest:test_validCalls_UserOpNonceIsZero_Simulated_UserSignatureInvalid() (gas: 23681624)
