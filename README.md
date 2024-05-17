@@ -8,22 +8,22 @@ Atlas is a permissionless and modular smart contract framework for Execution Abs
 
 A frontend or API wishing to participate can integrate with Atlas by completing three steps:
 
-1. Embed the Atlas SDK into their frontend or API.
-2. Choose an Operations Relay.
-3. Create and publish a DAppControl contract.
+1. Embed the Atlas SDK into their frontend or API to generate userOps.
+2. Choose an Operations Relay to facilitate communication between users and solvers.
+3. Create and publish a DAppControl contract that contains the logic specific to your application.
 4. Interact with the Atlas contract to initialize the DAppControl contract and link it to the Atlas SDK on their frontend or API.
 
 ### Network Overview
 
-Atlas is infrastructure-agnostic; each app may choose how the User Operations and Solver Operations are aggregated. Examples include:
-1. **On Chain**: When gas cost is not an issue, Solver Operations may be sent on-chain, and then aggregated by any party, including a smart contract.
-2. **On Another Chain**:  Solver Operations may be posted and aggregated on another chain, and the output can be used to settle the atlas transaction on the settlement chain.
-3. **BloXroute**: When Atlas is launched, BloXroute's BDN will support the aggregation of User and Solver Operations for rapid bundling. 
-4. **SUAVE**: Once live, Operations can be sent to the SUAVE network, bundled into a transaction by the SUAVE Atlas implementation, and then made available for use by bundlers. 
+Atlas is infrastructure-agnostic; each app may choose how the User Operations and Solver Operations are aggregated by their choice of Operations Relay. Examples include:
+1. **BloXroute**: When Atlas is launched, BloXroute's BDN will support the low latency aggregation of User and Solver Operations. 
+2. **SUAVE**: Once live, Operations can be sent to the SUAVE network, aggregated into a transaction by the SUAVE Atlas implementation, and then made available for use by bundlers.
+3. **On Chain**: When gas costs and throughput are not an issue, Solver Operations may be sent on-chain, and then aggregated by any party, including a smart contract. 
+4. **On Another Chain**:  Solver Operations may be posted and aggregated on another chain, and the output can be used to settle the atlas transaction on the settlement chain.
 
 ### Auctioneer Overview
 
-Each frontend may choose a party to act as the auctioneer.  **It is strongly recommended to select the auction beneficiary act as the auctioneer.**  The beneficiary can always trust themselves and this prevents adding new, trusted parties.  We expect most -but not all- frontends to select the User as the auctioneer and to handle the auctioneer duties without User input via session keys through the frontend, which the User already trusts explicitly.
+Each frontend may choose a party to act as the auctioneer.  **It is strongly recommended to select the auction beneficiary act as the auctioneer.**  This is the most teust-minimized solution because he beneficiary can always trust themselves.  We expect most -but not all- frontends to select the user as the auctioneer and to handle the auctioneer duties without user input through the Atlas SDK in the frontend/API, as the user also explicity trusts the frontent/API.
 
 The auctioneer is tasked with signing a **DAppOperation** that includes a **CallChainHash**.  This hash guarantees that the bundler cannot tamper with the execution order of the **SolverOperation**s.  Any party can easily generate this hash by making a view call to the *getCallChainHash(SolverOperations[])* function. Note that infrastructure networks with programmable guarantees such as SUAVE will not require this as it can be handled trustlessly in-network. 
 
@@ -32,7 +32,7 @@ The auctioneer is tasked with signing a **DAppOperation** that includes a **Call
 1. User connects to a frontend and receives a session key.
 2. User signs their UserOperation, which is propagated over the bloXroute BDN to solvers.
 3. The frontend receives SolverOperations back via the BDN.
-4. After a set period of time, the frontend calls the *getCallChainHash()* view function via the User's wallet's RPC.
+4. The frontend calls the *getCallChainHash()* view function via the User's wallet's RPC.
 5. The frontend then uses the session key from step 1 to sign the **DAppOperation**, which includes the **CallChainHash**.
 6. The frontend then propagates the DAppOperation over the BDN to a designated bundler, if the user themselves is not the bundler.
 
@@ -75,6 +75,17 @@ When bid amounts are known ahead of time by solvers the _bidKnownIteration() fun
 
 #### Permit69
 A user must have an Execution Environment (EE) instance for each DApp they would like to use, and the user address is used as a salt for the create2 deterministic deployment of it. If one is not already available, EEs can be deployed during execution of a user order since their address is known beforehand, this gas cost is covered by the solver so UX is never impacted. The EE performs ops via delegateCalls, so it needs to be able to initiate token transfers from the user. Users only have to approve the Atlas contract once because Permit69 allows Atlas to transfer funds from the user if the request is from a valid EE for that user (checked by verifying the user address is one of the salts for the EE address). Permit69 is also used by DApps, but instead transfers tokens that have accumulated in the DAppControl contract, this function performs the same verification of the EE. 
+
+#### ExecutionBase
+_availableFundsERC20() is used to check the approved balance of users and dapps to atlas that can be withdrawn via permit69.
+
+_transferDAppERC20() and _transferUserERC20() are functions that can be implemented by Atlas module developers in DappControl to access the user or dapp funds referenced in _availableFundsERC20().
+
+Module developers can access useful information about the atlas transaction by initializing an escrowKey struct in their DappControl and accessing these fields: addressPointer, solverSuccessful, paymentsSuccessful, callIndex, callCount, lockState, solverOutcome, bidFind, isSimulation.
+
+The _contribute() function allows actors to sponsor the gas of the transaction by donating ETH to the Atlas Escrow balance. This contribution to the balance is available first to bundlers, with the surplus going to solvers.
+
+The _borrow() function makes flash loans available from the Atlas Escrow balance. The balance must be repaid by the end of the Atlas transaction by the solver or the borrower.
 
 ### Atlas Frontend / Infrastructure Flow
 
