@@ -12,7 +12,11 @@ import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
 import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
 import { DAppOperation, DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 
-import { SwapIntentController, SwapIntent, Condition } from "src/contracts/examples/intents-example/SwapIntent.sol";
+import {
+    SwapIntentDAppControl,
+    SwapIntent,
+    Condition
+} from "src/contracts/examples/intents-example/SwapIntentDAppControl.sol";
 import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
 interface IUniV2Router02 {
@@ -28,7 +32,7 @@ interface IUniV2Router02 {
 }
 
 contract SwapIntentTest is BaseTest {
-    SwapIntentController public swapIntentController;
+    SwapIntentDAppControl public swapIntentController;
     TxBuilder public txBuilder;
     Sig public sig;
 
@@ -50,7 +54,7 @@ contract SwapIntentTest is BaseTest {
 
         // Deploy new SwapIntent Controller from new gov and initialize in Atlas
         vm.startPrank(governanceEOA);
-        swapIntentController = new SwapIntentController(address(atlas));
+        swapIntentController = new SwapIntentDAppControl(address(atlas));
         atlasVerification.initializeGovernance(address(swapIntentController));
         vm.stopPrank();
 
@@ -72,11 +76,11 @@ contract SwapIntentTest is BaseTest {
         Condition[] memory conditions = new Condition[](2);
         conditions[0] = Condition({
             antecedent: address(userCondition),
-            context: abi.encodeWithSelector(UserCondition.isLessThanFive.selector, 3)
+            context: abi.encodeCall(UserCondition.isLessThanFive, 3)
         });
         conditions[1] = Condition({
             antecedent: address(userCondition),
-            context: abi.encodeWithSelector(UserCondition.isLessThanFive.selector, 4)
+            context: abi.encodeCall(UserCondition.isLessThanFive, 4)
         });
 
         SwapIntent memory swapIntent = SwapIntent({
@@ -85,7 +89,6 @@ contract SwapIntentTest is BaseTest {
             tokenUserSells: WETH_ADDRESS,
             amountUserSells: 10e18,
             auctionBaseCurrency: address(0),
-            solverMustReimburseGas: false,
             conditions: conditions
         });
 
@@ -94,7 +97,6 @@ contract SwapIntentTest is BaseTest {
         SimpleRFQSolver rfqSolver = new SimpleRFQSolver(WETH_ADDRESS, address(atlas));
         atlas.deposit{ value: 1e18 }();
         atlas.bond(1 ether);
-
         vm.stopPrank();
 
         // Give 20 DAI to RFQ solver contract
@@ -117,7 +119,7 @@ contract SwapIntentTest is BaseTest {
         // rest of data is "userData" param
 
         // swap(SwapIntent calldata) selector = 0x98434997
-        bytes memory userOpData = abi.encodeWithSelector(SwapIntentController.swap.selector, swapIntent);
+        bytes memory userOpData = abi.encodeCall(SwapIntentDAppControl.swap, swapIntent);
 
         // Builds the metaTx and to parts of userOp, signature still to be set
         userOp = txBuilder.buildUserOperation({
@@ -128,6 +130,7 @@ contract SwapIntentTest is BaseTest {
             deadline: block.number + 2,
             data: userOpData
         });
+        userOp.sessionKey = governanceEOA;
 
         // User signs the userOp
         // user doees NOT sign the userOp for when they are bundling
@@ -136,7 +139,7 @@ contract SwapIntentTest is BaseTest {
 
         // Build solver calldata (function selector on solver contract and its params)
         bytes memory solverOpData =
-            abi.encodeWithSelector(SimpleRFQSolver.fulfillRFQ.selector, swapIntent, executionEnvironment);
+            abi.encodeCall(SimpleRFQSolver.fulfillRFQ, (swapIntent, executionEnvironment));
 
         // Builds the SolverOperation
         solverOps[0] = txBuilder.buildSolverOperation({
@@ -177,7 +180,7 @@ contract SwapIntentTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        (bool simResult,, ) = simulator.simUserOperation(userOp);
+        (bool simResult,,) = simulator.simUserOperation(userOp);
         assertFalse(simResult, "metasimUserOperationcall tested true a");
 
         WETH.approve(address(atlas), swapIntent.amountUserSells);
@@ -211,7 +214,6 @@ contract SwapIntentTest is BaseTest {
             tokenUserSells: WETH_ADDRESS,
             amountUserSells: 10e18,
             auctionBaseCurrency: address(0),
-            solverMustReimburseGas: false,
             conditions: conditions
         });
 
@@ -239,7 +241,7 @@ contract SwapIntentTest is BaseTest {
         // rest of data is "userData" param
 
         // swap(SwapIntent calldata) selector = 0x98434997
-        bytes memory userOpData = abi.encodeWithSelector(SwapIntentController.swap.selector, swapIntent);
+        bytes memory userOpData = abi.encodeCall(SwapIntentDAppControl.swap, swapIntent);
 
         // Builds the metaTx and to parts of userOp, signature still to be set
         userOp = txBuilder.buildUserOperation({
@@ -250,6 +252,7 @@ contract SwapIntentTest is BaseTest {
             deadline: block.number + 2,
             data: userOpData
         });
+        userOp.sessionKey = governanceEOA;
 
         // User signs the userOp
         // user doees NOT sign the userOp when they are bundling
@@ -258,7 +261,7 @@ contract SwapIntentTest is BaseTest {
 
         // Build solver calldata (function selector on solver contract and its params)
         bytes memory solverOpData =
-            abi.encodeWithSelector(UniswapIntentSolver.fulfillWithSwap.selector, swapIntent, executionEnvironment);
+            abi.encodeCall(UniswapIntentSolver.fulfillWithSwap, (swapIntent, executionEnvironment));
 
         // Builds the SolverOperation
         solverOps[0] = txBuilder.buildSolverOperation({
@@ -299,7 +302,7 @@ contract SwapIntentTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        (bool simResult,, ) = simulator.simUserOperation(userOp);
+        (bool simResult,,) = simulator.simUserOperation(userOp);
         assertFalse(simResult, "metasimUserOperationcall tested true a");
 
         WETH.approve(address(atlas), swapIntent.amountUserSells);

@@ -8,7 +8,7 @@ import { DeployBaseScript } from "script/base/deploy-base.s.sol";
 
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
-import { SwapIntentController } from "src/contracts/examples/intents-example/SwapIntent.sol";
+import { SwapIntentDAppControl } from "src/contracts/examples/intents-example/SwapIntentDAppControl.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 import { Simulator } from "src/contracts/helpers/Simulator.sol";
 
@@ -28,7 +28,7 @@ contract DeploySwapIntentControlScript is DeployBaseScript {
         vm.startBroadcast(deployerPrivateKey);
 
         // Deploy the SwapIntent DAppControl contract
-        swapIntentControl = new SwapIntentController(address(atlas));
+        swapIntentControl = new SwapIntentDAppControl(address(atlas));
 
         // Integrate SwapIntent with Atlas
         atlasVerification.initializeGovernance(address(swapIntentControl));

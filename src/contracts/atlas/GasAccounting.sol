@@ -138,7 +138,7 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param owner The address of the owner from whom AtlETH is taken.
     /// @param amount The amount of AtlETH to be taken.
     /// @param solverWon A boolean indicating whether the solver won the bid.
-    /// @param bidFind A boolean indicating whether the bid was found.
+    /// @param bidFind Indicates if called in the context of `_getBidAmount` in Escrow.sol (true) or not (false).
     /// @return isDeficit A boolean indicating whether there is a deficit after the assignment.
     function _assign(address owner, uint256 amount, bool solverWon, bool bidFind) internal returns (bool isDeficit) {
         if (amount == 0) {
@@ -220,7 +220,7 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param solverOp The current SovlerOperation for which to account
     /// @param gasWaterMark The `gasleft()` watermark taken at the start of executing the SolverOperation.
     /// @param result The result bitmap of the SolverOperation execution.
-    /// @param bidFind Indicates if called in the context of `_getBidAmount` in Escrow.sol.
+    /// @param bidFind Indicates if called in the context of `_getBidAmount` in Escrow.sol (true) or not (false).
     /// @param includeCalldata Whether to include calldata cost in the gas calculation.
     function _releaseSolverLock(
         SolverOperation calldata solverOp,
