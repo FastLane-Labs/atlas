@@ -19,11 +19,10 @@ contract DAppIntegration {
     }
 
     struct NonceTracker {
-        uint128 lastUsedSeqNonce; // Sequenced nonces tracked using only this value
-        uint128 highestFullAsyncBitmap; // Async nonces tracked using bitmaps
+        uint128 lastUsedSeqNonce; // Sequential nonces tracked using only this value
+        uint128 highestFullNonSeqBitmap; // Non-sequential nonces tracked using bitmaps
     }
 
-    address internal constant UNLOCKED = address(1);
     address public immutable ATLAS;
 
     // from => nonceTracker
@@ -33,15 +32,15 @@ contract DAppIntegration {
     mapping(bytes32 => NonceBitmap) public nonceBitmaps;
 
     // NOTE: To prevent builder censorship, dApp nonces can be
-    // processed in any order so long as they arent duplicated and
+    // processed in any order so long as they aren't duplicated and
     // as long as the dApp opts in to it
 
     // map for tracking which EOAs are approved for a given dApp
-    //  keccak256(governance, signor)  => enabled
+    // keccak256(governance, signor)  => enabled
     mapping(bytes32 => bool) public signatories;
 
     // map that lists all signatories for a given dApp
-    // controller => signatories
+    // DAppControl => signatories
     mapping(address => address[]) public dAppSignatories;
 
     constructor(address _atlas) {
@@ -53,51 +52,51 @@ contract DAppIntegration {
     // ---------------------------------------------------- //
 
     /// @notice Permissionlessly integrates a new dApp into the Atlas protocol.
-    /// @param controller The address of the DAppControl contract.
-    function initializeGovernance(address controller) external {
+    /// @param control The address of the DAppControl contract.
+    function initializeGovernance(address control) external {
         _checkAtlasIsUnlocked();
-        address govAddress = IDAppControl(controller).getDAppSignatory();
+        address govAddress = IDAppControl(control).getDAppSignatory();
         if (msg.sender != govAddress) revert AtlasErrors.OnlyGovernance();
 
         // Add DAppControl gov as a signatory
-        bytes32 signatoryKey = keccak256(abi.encodePacked(controller, msg.sender));
+        bytes32 signatoryKey = keccak256(abi.encodePacked(control, msg.sender));
 
         if (signatories[signatoryKey]) revert AtlasErrors.OwnerActive();
 
         signatories[signatoryKey] = true;
-        dAppSignatories[controller].push(msg.sender);
+        dAppSignatories[control].push(msg.sender);
 
-        uint32 callConfig = IDAppControl(controller).CALL_CONFIG();
-        emit AtlasEvents.NewDAppSignatory(controller, govAddress, msg.sender, callConfig);
+        uint32 callConfig = IDAppControl(control).CALL_CONFIG();
+        emit AtlasEvents.NewDAppSignatory(control, govAddress, msg.sender, callConfig);
     }
 
     /// @notice Adds a new signatory to a dApp's list of approved signatories.
-    /// @param controller The address of the DAppControl contract.
+    /// @param control The address of the DAppControl contract.
     /// @param signatory The address of the new signatory.
-    function addSignatory(address controller, address signatory) external {
+    function addSignatory(address control, address signatory) external {
         _checkAtlasIsUnlocked();
-        address dAppGov = IDAppControl(controller).getDAppSignatory();
+        address dAppGov = IDAppControl(control).getDAppSignatory();
         if (msg.sender != dAppGov) revert AtlasErrors.OnlyGovernance();
 
-        _addSignatory(controller, signatory);
+        _addSignatory(control, signatory);
 
-        uint32 callConfig = IDAppControl(controller).CALL_CONFIG();
-        emit AtlasEvents.NewDAppSignatory(controller, dAppGov, signatory, callConfig);
+        uint32 callConfig = IDAppControl(control).CALL_CONFIG();
+        emit AtlasEvents.NewDAppSignatory(control, dAppGov, signatory, callConfig);
     }
 
     /// @notice Removes a signatory from a dApp's list of approved signatories.
-    /// @param controller The address of the DAppControl contract.
-    function removeSignatory(address controller, address signatory) external {
+    /// @param control The address of the DAppControl contract.
+    function removeSignatory(address control, address signatory) external {
         _checkAtlasIsUnlocked();
-        address dAppGov = IDAppControl(controller).getDAppSignatory();
+        address dAppGov = IDAppControl(control).getDAppSignatory();
         if (msg.sender != dAppGov && msg.sender != signatory) {
             revert AtlasErrors.InvalidCaller();
         }
 
-        _removeSignatory(controller, signatory);
+        _removeSignatory(control, signatory);
 
-        uint32 callConfig = IDAppControl(controller).CALL_CONFIG();
-        emit AtlasEvents.RemovedDAppSignatory(controller, dAppGov, signatory, callConfig);
+        uint32 callConfig = IDAppControl(control).CALL_CONFIG();
+        emit AtlasEvents.RemovedDAppSignatory(control, dAppGov, signatory, callConfig);
     }
 
     /// @notice Called by the DAppControl contract on acceptGovernance when governance is transferred.
@@ -106,15 +105,15 @@ contract DAppIntegration {
     /// @param newGovernance The address of the new governance.
     function changeDAppGovernance(address oldGovernance, address newGovernance) external {
         _checkAtlasIsUnlocked();
-        address controller = msg.sender;
-        bytes32 signatoryKey = keccak256(abi.encodePacked(controller, oldGovernance));
+        address control = msg.sender;
+        bytes32 signatoryKey = keccak256(abi.encodePacked(control, oldGovernance));
         if (!signatories[signatoryKey]) revert AtlasErrors.DAppNotEnabled();
 
-        _removeSignatory(controller, oldGovernance);
-        _addSignatory(controller, newGovernance);
+        _removeSignatory(control, oldGovernance);
+        _addSignatory(control, newGovernance);
 
-        uint32 callConfig = IDAppControl(controller).CALL_CONFIG();
-        emit AtlasEvents.DAppGovernanceChanged(controller, oldGovernance, newGovernance, callConfig);
+        uint32 callConfig = IDAppControl(control).CALL_CONFIG();
+        emit AtlasEvents.DAppGovernanceChanged(control, oldGovernance, newGovernance, callConfig);
     }
 
     /// @notice Disables a dApp from the Atlas protocol.
@@ -135,25 +134,25 @@ contract DAppIntegration {
     // ---------------------------------------------------- //
 
     /// @notice Adds a new signatory to a dApp's list of approved signatories.
-    /// @param controller The address of the DAppControl contract.
+    /// @param control The address of the DAppControl contract.
     /// @param signatory The address of the new signatory.
-    function _addSignatory(address controller, address signatory) internal {
-        bytes32 signatoryKey = keccak256(abi.encodePacked(controller, signatory));
+    function _addSignatory(address control, address signatory) internal {
+        bytes32 signatoryKey = keccak256(abi.encodePacked(control, signatory));
         if (signatories[signatoryKey]) revert AtlasErrors.SignatoryActive();
         signatories[signatoryKey] = true;
-        dAppSignatories[controller].push(signatory);
+        dAppSignatories[control].push(signatory);
     }
 
     /// @notice Removes a signatory from a dApp's list of approved signatories.
-    /// @param controller The address of the DAppControl contract.
+    /// @param control The address of the DAppControl contract.
     /// @param signatory The address of the signatory to be removed.
-    function _removeSignatory(address controller, address signatory) internal {
-        bytes32 signatoryKey = keccak256(abi.encodePacked(controller, signatory));
+    function _removeSignatory(address control, address signatory) internal {
+        bytes32 signatoryKey = keccak256(abi.encodePacked(control, signatory));
         delete signatories[signatoryKey];
-        for (uint256 i = 0; i < dAppSignatories[controller].length; i++) {
-            if (dAppSignatories[controller][i] == signatory) {
-                dAppSignatories[controller][i] = dAppSignatories[controller][dAppSignatories[controller].length - 1];
-                dAppSignatories[controller].pop();
+        for (uint256 i = 0; i < dAppSignatories[control].length; i++) {
+            if (dAppSignatories[control][i] == signatory) {
+                dAppSignatories[control][i] = dAppSignatories[control][dAppSignatories[control].length - 1];
+                dAppSignatories[control].pop();
                 break;
             }
         }
@@ -161,7 +160,7 @@ contract DAppIntegration {
 
     /// @notice Checks if the Atlas protocol is in an unlocked state. Will revert if not.
     function _checkAtlasIsUnlocked() internal view {
-        if (IAtlas(ATLAS).lock() != UNLOCKED) revert AtlasErrors.AtlasLockActive();
+        if (!IAtlas(ATLAS).isUnlocked()) revert AtlasErrors.AtlasLockActive();
     }
 
     // ---------------------------------------------------- //

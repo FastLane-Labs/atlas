@@ -2,14 +2,18 @@
 pragma solidity 0.8.22;
 
 import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
-import "src/contracts/types/EscrowTypes.sol";
+import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 import { Permit69 } from "src/contracts/common/Permit69.sol";
+import "src/contracts/types/EscrowTypes.sol";
 
 /// @notice Modified Solmate ERC20 with some Atlas-specific modifications.
 /// @author FastLane Labs
 /// @author Modified from Solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC20.sol)
 /// @dev Do not manually set balances without updating totalSupply, as the sum of all user balances must not exceed it.
 abstract contract AtlETH is Permit69 {
+    bytes32 private constant PERMIT_TYPEHASH =
+        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+
     constructor(
         uint256 _escrowDuration,
         address _verification,
@@ -144,18 +148,7 @@ abstract contract AtlETH is Permit69 {
                     abi.encodePacked(
                         "\x19\x01",
                         DOMAIN_SEPARATOR(),
-                        keccak256(
-                            abi.encode(
-                                keccak256(
-                                    "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
-                                ),
-                                owner,
-                                spender,
-                                value,
-                                nonces[owner]++,
-                                deadline
-                            )
-                        )
+                        keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, value, nonces[owner]++, deadline))
                     )
                 ),
                 v,
@@ -171,7 +164,7 @@ abstract contract AtlETH is Permit69 {
     /// @notice Computes or reads the stored EIP-712 domain separator for permit signatures.
     /// @return The domain separator bytes32 value.
     function DOMAIN_SEPARATOR() public view returns (bytes32) {
-        return block.chainid == INITIAL_CHAIN_ID ? INITIAL_DOMAIN_SEPARATOR : _computeDomainSeparator();
+        return block.chainid == _INITIAL_CHAIN_ID ? _INITIAL_DOMAIN_SEPARATOR : _computeDomainSeparator();
     }
 
     /// @notice Computes the EIP-712 domain separator for permit signatures.
@@ -197,7 +190,7 @@ abstract contract AtlETH is Permit69 {
     /// @param amount The amount of atlETH tokens to mint and assign to the specified account.
     function _mint(address to, uint256 amount) internal {
         totalSupply += amount;
-        _balanceOf[to].balance += uint112(amount);
+        _balanceOf[to].balance += SafeCast.toUint112(amount);
         emit Transfer(address(0), to, amount);
     }
 
@@ -219,9 +212,9 @@ abstract contract AtlETH is Permit69 {
     /// @param account The address from which to deduct atlETH tokens.
     /// @param amount The amount of atlETH tokens to deduct from the specified account.
     function _deduct(address account, uint256 amount) internal {
-        uint112 amt = uint112(amount);
+        uint112 amt = SafeCast.toUint112(amount);
 
-        EscrowAccountBalance memory aData = _balanceOf[account];
+        EscrowAccountBalance storage aData = _balanceOf[account];
 
         uint112 balance = aData.balance;
 
@@ -231,14 +224,13 @@ abstract contract AtlETH is Permit69 {
             uint112 _shortfall = amt - balance;
             aData.balance = 0;
             aData.unbonding -= _shortfall; // underflow here to revert if insufficient balance
-            _balanceOf[account] = aData;
 
             uint256 shortfall256 = uint256(_shortfall);
             totalSupply += shortfall256; // add the released supply back to atleth.
             bondedTotalSupply -= shortfall256; // subtract the unbonded, freed amount
         } else {
             // Reverts because amount > account's balance
-            revert InsufficientBalanceForDeduction(_balanceOf[account].balance, amount);
+            revert InsufficientBalanceForDeduction(uint256(balance), amount);
         }
     }
 
@@ -287,7 +279,7 @@ abstract contract AtlETH is Permit69 {
     /// @param owner The address of the account to put a hold on AtlETH tokens for.
     /// @param amount The amount of AtlETH tokens to put a hold on.
     function _bond(address owner, uint256 amount) internal {
-        uint112 amt = uint112(amount);
+        uint112 amt = SafeCast.toUint112(amount);
 
         _balanceOf[owner].balance -= amt;
         totalSupply -= amount;
@@ -305,17 +297,16 @@ abstract contract AtlETH is Permit69 {
     /// @param owner The address of the account to start the unbonding wait time for.
     /// @param amount The amount of AtlETH tokens to start the unbonding wait time for.
     function _unbond(address owner, uint256 amount) internal {
-        uint112 amt = uint112(amount);
+        uint112 amt = SafeCast.toUint112(amount);
 
         // totalSupply and totalBondedSupply are unaffected; continue to count the
         // unbonding amount as bonded total supply since it is still inaccessible
         // for atomic xfer.
 
-        EscrowAccountAccessData memory aData = accessData[owner];
+        EscrowAccountAccessData storage aData = accessData[owner];
 
         aData.bonded -= amt;
         aData.lastAccessedBlock = uint32(block.number);
-        accessData[owner] = aData;
 
         _balanceOf[owner].unbonding += amt;
 
@@ -334,17 +325,15 @@ abstract contract AtlETH is Permit69 {
             revert EscrowLockActive();
         }
 
-        uint112 amt = uint112(amount);
+        uint112 amt = SafeCast.toUint112(amount);
 
-        EscrowAccountBalance memory bData = _balanceOf[owner];
+        EscrowAccountBalance storage bData = _balanceOf[owner];
 
         bData.unbonding -= amt;
         bondedTotalSupply -= amount;
 
         bData.balance += amt;
         totalSupply += amount;
-
-        _balanceOf[owner] = bData;
 
         emit Redeem(owner, amount);
     }
@@ -357,8 +346,8 @@ abstract contract AtlETH is Permit69 {
             revert InvalidAccess();
         }
 
-        uint256 paymentAmount = surcharge;
-        surcharge = 0; // Clear before transfer to prevent reentrancy
+        uint256 paymentAmount = cumulativeSurcharge;
+        cumulativeSurcharge = 0; // Clear before transfer to prevent reentrancy
         SafeTransferLib.safeTransferETH(msg.sender, paymentAmount);
         emit SurchargeWithdrawn(msg.sender, paymentAmount);
     }
@@ -388,8 +377,8 @@ abstract contract AtlETH is Permit69 {
             revert InvalidAccess();
         }
 
-        surchargeRecipient = pendingSurchargeRecipient;
+        surchargeRecipient = msg.sender;
         pendingSurchargeRecipient = address(0);
-        emit SurchargeRecipientTransferred(surchargeRecipient);
+        emit SurchargeRecipientTransferred(msg.sender);
     }
 }

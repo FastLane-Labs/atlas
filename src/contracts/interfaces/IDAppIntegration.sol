@@ -2,11 +2,11 @@
 pragma solidity 0.8.22;
 
 interface IDAppIntegration {
-    function initializeGovernance(address controller) external;
+    function initializeGovernance(address control) external;
 
-    function addSignatory(address controller, address signatory) external;
+    function addSignatory(address control, address signatory) external;
 
-    function removeSignatory(address controller, address signatory) external;
+    function removeSignatory(address control, address signatory) external;
 
     function changeDAppGovernance(address oldGovernance, address newGovernance) external;
 

@@ -61,11 +61,6 @@ contract SolverBase is Test {
     }
 
     modifier payBids(address bidToken, uint256 bidAmount) {
-        // Track starting balances
-
-        uint256 bidBalance =
-            bidToken == address(0) ? address(this).balance - msg.value : ERC20(bidToken).balanceOf(address(this));
-
         _;
 
         // Handle bid payment

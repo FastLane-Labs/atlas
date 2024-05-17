@@ -68,8 +68,9 @@ contract Atlas is Escrow, Factory {
         // Initialize the lock
         _setAtlasLock(executionEnvironment, gasMarker, userOp.value);
 
-        try this.execute{ value: msg.value }(dConfig, userOp, solverOps, executionEnvironment, msg.sender, userOpHash)
-        returns (bool _auctionWon, uint256 winningSolverIndex) {
+        try this.execute(dConfig, userOp, solverOps, executionEnvironment, msg.sender, userOpHash) returns (
+            bool _auctionWon, uint256 winningSolverIndex
+        ) {
             auctionWon = _auctionWon;
             // Gas Refund to sender only if execution is successful
             (uint256 ethPaidToBundler, uint256 netGasSurcharge) = _settle({
@@ -104,7 +105,7 @@ contract Atlas is Escrow, Factory {
     /// @param bundler Address of the bundler of the current metacall tx.
     /// @param userOpHash Hash of the userOp struct of the current metacall tx.
     /// @return auctionWon Boolean indicating whether the auction was won
-    /// @return uint256 The solver outcome bitmap
+    /// @return uint256 The winningSolverIndex (stored in key.solverOutcome to prevent Stack Too Deep errors)
     function execute(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
@@ -133,7 +134,7 @@ contract Atlas is Escrow, Factory {
         if (!auctionWon) {
             if (key.isSimulation) revert SolverSimFail(uint256(key.solverOutcome));
             if (dConfig.callConfig.needsFulfillment()) {
-                revert UserNotFulfilled(); // revert("ERR-E003 SolverFulfillmentFailure");
+                revert UserNotFulfilled();
             }
         }
 
@@ -184,7 +185,7 @@ contract Atlas is Escrow, Factory {
             // CASE: Need PreOps Call
             key = key.holdPreOpsLock(dConfig.to);
 
-            if (CallBits.needsPreOpsReturnData(dConfig.callConfig)) {
+            if (dConfig.callConfig.needsPreOpsReturnData()) {
                 // CASE: Need PreOps return data
                 usePreOpsReturnData = true;
                 (callSuccessful, returnData) = _executePreOpsCall(userOp, executionEnvironment, key.pack());
@@ -201,7 +202,7 @@ contract Atlas is Escrow, Factory {
 
         key = key.holdUserLock(userOp.dapp);
 
-        if (CallBits.needsUserReturnData(dConfig.callConfig)) {
+        if (dConfig.callConfig.needsUserReturnData()) {
             // CASE: Need User return data
 
             if (usePreOpsReturnData) {
@@ -342,9 +343,7 @@ contract Atlas is Escrow, Factory {
         uint256 k = solverOps.length;
         uint256 i;
 
-        for (; i < k;) {
-            // valid solverOps are packed from left of array - break at first invalid solverOp
-
+        for (; i < k; ++i) {
             SolverOperation calldata solverOp = solverOps[i];
 
             (auctionWon, key) =
@@ -356,10 +355,6 @@ contract Atlas is Escrow, Factory {
                 key.solverOutcome = uint24(i);
 
                 return (auctionWon, key);
-            }
-
-            unchecked {
-                ++i;
             }
         }
 
@@ -402,10 +397,10 @@ contract Atlas is Escrow, Factory {
 
     /// @notice Reverts if the caller is not the execution environment address expected from the set of inputs.
     /// @param user User address
-    /// @param controller DAppControl contract address
+    /// @param control DAppControl contract address
     /// @param callConfig CallConfig of the current metacall tx.
-    function _verifyCallerIsExecutionEnv(address user, address controller, uint32 callConfig) internal view override {
-        if (msg.sender != _getExecutionEnvironmentCustom(user, controller.codehash, controller, callConfig)) {
+    function _verifyCallerIsExecutionEnv(address user, address control, uint32 callConfig) internal view override {
+        if (msg.sender != _getExecutionEnvironmentCustom(user, control.codehash, control, callConfig)) {
             revert EnvironmentMismatch();
         }
     }

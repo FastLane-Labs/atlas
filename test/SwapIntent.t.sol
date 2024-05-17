@@ -32,7 +32,7 @@ interface IUniV2Router02 {
 }
 
 contract SwapIntentTest is BaseTest {
-    SwapIntentDAppControl public swapIntentController;
+    SwapIntentDAppControl public swapIntentControl;
     TxBuilder public txBuilder;
     Sig public sig;
 
@@ -48,19 +48,19 @@ contract SwapIntentTest is BaseTest {
     function setUp() public virtual override {
         BaseTest.setUp();
 
-        // Creating new gov address (ERR-V49 OwnerActive if already registered with controller)
+        // Creating new gov address (ERR-V49 OwnerActive if already registered with control)
         governancePK = 11_112;
         governanceEOA = vm.addr(governancePK);
 
-        // Deploy new SwapIntent Controller from new gov and initialize in Atlas
+        // Deploy new SwapIntent Control from new gov and initialize in Atlas
         vm.startPrank(governanceEOA);
-        swapIntentController = new SwapIntentDAppControl(address(atlas));
-        atlasVerification.initializeGovernance(address(swapIntentController));
+        swapIntentControl = new SwapIntentDAppControl(address(atlas));
+        atlasVerification.initializeGovernance(address(swapIntentControl));
         vm.stopPrank();
 
         txBuilder = new TxBuilder({
-            controller: address(swapIntentController),
-            atlasAddress: address(atlas),
+            _control: address(swapIntentControl),
+            _atlas: address(atlas),
             _verification: address(atlasVerification)
         });
 
@@ -124,7 +124,7 @@ contract SwapIntentTest is BaseTest {
         // Builds the metaTx and to parts of userOp, signature still to be set
         userOp = txBuilder.buildUserOperation({
             from: userEOA,
-            to: address(swapIntentController),
+            to: address(swapIntentControl),
             maxFeePerGas: tx.gasprice + 1,
             value: 0,
             deadline: block.number + 2,
@@ -246,7 +246,7 @@ contract SwapIntentTest is BaseTest {
         // Builds the metaTx and to parts of userOp, signature still to be set
         userOp = txBuilder.buildUserOperation({
             from: userEOA, // NOTE: Would from ever not be user?
-            to: address(swapIntentController),
+            to: address(swapIntentControl),
             maxFeePerGas: tx.gasprice + 1, // TODO update
             value: 0,
             deadline: block.number + 2,

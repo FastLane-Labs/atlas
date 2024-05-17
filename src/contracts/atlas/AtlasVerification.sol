@@ -1,7 +1,8 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
+import { EIP712 } from "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
+import { ECDSA } from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import { DAppIntegration } from "./DAppIntegration.sol";
 
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
@@ -23,10 +24,11 @@ contract AtlasVerification is EIP712, DAppIntegration {
     using CallBits for uint32;
     using CallVerification for UserOperation;
 
-    uint256 internal constant FULL_BITMAP = uint256(0x0000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF);
-    uint256 internal constant FIRST_16_BITS_FULL = uint256(0xFFFF);
-    uint256 internal constant FIRST_4_BITS_FULL = uint256(0xF);
-    uint8 internal constant MAX_SOLVERS = type(uint8).max - 2;
+    uint256 internal constant _FULL_BITMAP = uint256(0x0000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF);
+    uint256 internal constant _FIRST_16_BITS_FULL = uint256(0xFFFF);
+    uint256 internal constant _FIRST_4_BITS_FULL = uint256(0xF);
+    uint256 internal constant _NONCES_PER_BITMAP = 240;
+    uint8 internal constant _MAX_SOLVERS = type(uint8).max - 2;
 
     constructor(address _atlas) EIP712("AtlasVerification", "1.0") DAppIntegration(_atlas) { }
 
@@ -124,7 +126,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
             }
 
             // Check solvers not over the max (253)
-            if (solverOpCount > MAX_SOLVERS) {
+            if (solverOpCount > _MAX_SOLVERS) {
                 return (userOpHash, ValidCallsResult.TooManySolverOps);
             }
 
@@ -256,25 +258,24 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @notice The getSolverPayload function returns the hash of a SolverOperation struct.
     /// @param solverOp The SolverOperation struct to hash.
     function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload) {
-        payload = _hashTypedDataV4(_getSolverHash(solverOp));
+        payload = _hashTypedDataV4(_getSolverOpHash(solverOp));
     }
 
     /// @notice The internal _verifySolverSignature function verifies the signature of a SolverOperation.
     /// @param solverOp The SolverOperation struct to verify.
     /// @return A boolean indicating if the signature is valid.
     function _verifySolverSignature(SolverOperation calldata solverOp) internal view returns (bool) {
-        if (solverOp.signature.length == 0) return false;
-        address signer = _hashTypedDataV4(_getSolverHash(solverOp)).recover(solverOp.signature);
+        (address signer,) = _hashTypedDataV4(_getSolverOpHash(solverOp)).tryRecover(solverOp.signature);
         return signer == solverOp.from;
     }
 
-    /// @notice The _getSolverHash internal function returns the hash of a SolverOperation struct.
+    /// @notice The _getSolverOpHash internal function returns the hash of a SolverOperation struct.
     /// @param solverOp The SolverOperation struct to hash.
-    /// @return solverHash The hash of the SolverOperation struct.
-    function _getSolverHash(SolverOperation calldata solverOp) internal pure returns (bytes32 solverHash) {
+    /// @return solverOpHash The hash of the SolverOperation struct.
+    function _getSolverOpHash(SolverOperation calldata solverOp) internal pure returns (bytes32 solverOpHash) {
         return keccak256(
             abi.encode(
-                SOLVER_TYPE_HASH,
+                SOLVER_TYPEHASH,
                 solverOp.from,
                 solverOp.to,
                 solverOp.value,
@@ -337,11 +338,13 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // users not having to trust the front end at all - a huge
         // improvement over the current experience.
 
+        // Some checks skipped if call is simUserOperation and the dAppOp data is not available.
+        bool skipDAppOpChecks = isSimulation && dAppOp.from == address(0);
+
         // Check bundler matches dAppOp bundler
         if (dAppOp.bundler != address(0) && msgSender != dAppOp.bundler) {
             if (!signatories[keccak256(abi.encodePacked(dAppOp.control, msgSender))]) {
-                bool bypassSignatoryCheck = isSimulation && dAppOp.from == address(0);
-                if (!isSimulation) {
+                if (!skipDAppOpChecks) {
                     return (false, ValidCallsResult.InvalidBundler);
                 }
             }
@@ -349,8 +352,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         // Make sure the signer is currently enabled by dapp owner
         if (!signatories[keccak256(abi.encodePacked(dAppOp.control, dAppOp.from))]) {
-            bool bypassSignatoryCheck = isSimulation && dAppOp.from == address(0);
-            if (!bypassSignatoryCheck) {
+            if (!skipDAppOpChecks) {
                 return (false, ValidCallsResult.DAppSignatureInvalid);
             }
         }
@@ -361,40 +363,48 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         // If dAppOp.from is left blank and sim = true,
         // implies a simUserOp call, so dapp nonce check is skipped.
-        if (dAppOp.from == address(0) && isSimulation) {
+        if (skipDAppOpChecks) {
             return (true, ValidCallsResult.Valid);
         }
 
-        // If the dapp indicated that they only accept sequenced nonces
+        // If the dapp indicated that they only accept sequential nonces
         // (IE for FCFS execution), check and make sure the order is correct
-        // NOTE: allowing only sequenced nonces could create a scenario in
+        // NOTE: allowing only sequential nonces could create a scenario in
         // which builders or validators may be able to profit via censorship.
         // DApps are encouraged to rely on the deadline parameter.
-        if (!_handleNonces(dAppOp.from, dAppOp.nonce, !dConfig.callConfig.needsSequencedDAppNonces(), isSimulation)) {
+        if (!_handleNonces(dAppOp.from, dAppOp.nonce, dConfig.callConfig.needsSequentialDAppNonces(), isSimulation)) {
             return (false, ValidCallsResult.InvalidDAppNonce);
         }
 
         return (true, ValidCallsResult.Valid);
     }
 
-    /// @notice The _handleNonces internal function handles the verification of nonces for both sequenced and async
-    /// nonce systems.
+    /// @notice The _handleNonces internal function handles the verification of nonces for both sequential and
+    /// non-sequential nonce systems.
     /// @param account The address of the account to verify the nonce for.
     /// @param nonce The nonce to verify.
-    /// @param async A boolean indicating if the nonce is async (true) or sequential (false).
+    /// @param sequential A boolean indicating if the nonce mode is sequential (true) or not (false)
     /// @param isSimulation A boolean indicating if the execution is a simulation.
     /// @return A boolean indicating if the nonce is valid.
-    function _handleNonces(address account, uint256 nonce, bool async, bool isSimulation) internal returns (bool) {
+    function _handleNonces(
+        address account,
+        uint256 nonce,
+        bool sequential,
+        bool isSimulation
+    )
+        internal
+        returns (bool)
+    {
         if (nonce > type(uint128).max - 1) {
             return false;
         }
 
-        // 0 Nonces are not allowed. Nonces start at 1 for both sequenced and async.
+        // 0 Nonces are not allowed. Nonces start at 1 for both sequential and non-sequential.
         if (nonce == 0) return false;
 
         NonceTracker memory nonceTracker = nonceTrackers[account];
 
-        if (!async) {
+        if (sequential) {
             // SEQUENTIAL NONCES
 
             // Nonces must increase by 1 if sequential
@@ -405,10 +415,17 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
             ++nonceTracker.lastUsedSeqNonce;
         } else {
-            // ASYNC NONCES
+            // NON-SEQUENTIAL NONCES
 
-            uint256 bitmapIndex = ((nonce - 1) / 240) + 1; // +1 because highestFullBitmap initializes at 0
-            uint256 bitmapNonce = ((nonce - 1) % 240); // 1 -> 0, 240 -> 239. Needed for shifts in bitmap.
+            // Only 240 nonces per bitmap because uint240 used to track nonces,
+            // while an additional uint8 used to track the highest used nonce in the bitmap.
+            // Both the uint240 and uint8 are packed into a single storage slot.
+
+            // `nonce` is passed as 1-indexed, but adjusted to 0-indexed for bitmap shift operations.
+            // Then `bitmapIndex` is adjusted to be 1-indexed because `highestFullBitmap` initializes at 0, which
+            // implies that the first non-full bitmap is at index 1.
+            uint256 bitmapIndex = ((nonce - 1) / _NONCES_PER_BITMAP) + 1;
+            uint256 bitmapNonce = ((nonce - 1) % _NONCES_PER_BITMAP);
 
             bytes32 bitmapKey = keccak256(abi.encode(account, bitmapIndex));
             NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
@@ -433,10 +450,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
             }
 
             // Mark bitmap as full if necessary
-            if (bitmap == FULL_BITMAP) {
-                // Update highestFullAsyncBitmap if necessary
-                if (bitmapIndex == nonceTracker.highestFullAsyncBitmap + 1) {
-                    nonceTracker = _incrementHighestFullAsyncBitmap(nonceTracker, account);
+            if (bitmap == _FULL_BITMAP) {
+                // Update highestFullNonSeqBitmap if necessary
+                if (bitmapIndex == nonceTracker.highestFullNonSeqBitmap + 1) {
+                    nonceTracker = _incrementHighestFullNonSeqBitmap(nonceTracker, account);
                 }
             }
 
@@ -447,15 +464,15 @@ contract AtlasVerification is EIP712, DAppIntegration {
         return true;
     }
 
-    /// @notice Increments the `highestFullAsyncBitmap` of a given `nonceTracker` for the specified `account` until a
+    /// @notice Increments the `highestFullNonSeqBitmap` of a given `nonceTracker` for the specified `account` until a
     /// non-fully utilized bitmap is found.
     /// @param nonceTracker The `NonceTracker` memory structure representing the current state of nonce tracking for a
     /// specific account.
     /// @param account The address of the account for which the nonce tracking is being updated. This is used to
     /// generate a unique key for accessing the correct bitmap from a mapping.
-    /// @return nonceTracker The updated `NonceTracker` structure with the `highestFullAsyncBitmap` field modified to
+    /// @return nonceTracker The updated `NonceTracker` structure with the `highestFullNonSeqBitmap` field modified to
     /// reflect the highest index of a bitmap that is not fully utilized.
-    function _incrementHighestFullAsyncBitmap(
+    function _incrementHighestFullNonSeqBitmap(
         NonceTracker memory nonceTracker,
         address account
     )
@@ -466,33 +483,33 @@ contract AtlasVerification is EIP712, DAppIntegration {
         uint256 bitmap;
         do {
             unchecked {
-                ++nonceTracker.highestFullAsyncBitmap;
+                ++nonceTracker.highestFullNonSeqBitmap;
             }
-            uint256 bitmapIndex = uint256(nonceTracker.highestFullAsyncBitmap) + 1;
+            uint256 bitmapIndex = uint256(nonceTracker.highestFullNonSeqBitmap) + 1;
             bytes32 bitmapKey = keccak256(abi.encode(account, bitmapIndex));
             bitmap = uint256(nonceBitmaps[bitmapKey].bitmap);
-        } while (bitmap == FULL_BITMAP);
+        } while (bitmap == _FULL_BITMAP);
 
         return nonceTracker;
     }
 
     /// @notice Generates the hash of a DAppOperation struct.
-    /// @param approval The DAppOperation struct to hash.
-    /// @return proofHash The hash of the DAppOperation struct.
-    function _getProofHash(DAppOperation memory approval) internal pure returns (bytes32 proofHash) {
-        proofHash = keccak256(
+    /// @param dAppOp The DAppOperation struct to hash.
+    /// @return dappOpHash The hash of the DAppOperation struct.
+    function _getDAppOpHash(DAppOperation calldata dAppOp) internal pure returns (bytes32 dappOpHash) {
+        dappOpHash = keccak256(
             abi.encode(
-                DAPP_TYPE_HASH,
-                approval.from,
-                approval.to,
-                approval.value,
-                approval.gas,
-                approval.nonce,
-                approval.deadline,
-                approval.control,
-                approval.bundler,
-                approval.userOpHash,
-                approval.callChainHash
+                DAPP_TYPEHASH,
+                dAppOp.from,
+                dAppOp.to,
+                dAppOp.value,
+                dAppOp.gas,
+                dAppOp.nonce,
+                dAppOp.deadline,
+                dAppOp.control,
+                dAppOp.bundler,
+                dAppOp.userOpHash,
+                dAppOp.callChainHash
             )
         );
     }
@@ -501,17 +518,15 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @param dAppOp The DAppOperation struct to verify.
     /// @return A boolean indicating if the signature is valid.
     function _verifyDAppSignature(DAppOperation calldata dAppOp) internal view returns (bool) {
-        if (dAppOp.signature.length == 0) return false;
-        address signer = _hashTypedDataV4(_getProofHash(dAppOp)).recover(dAppOp.signature);
-
+        (address signer,) = _hashTypedDataV4(_getDAppOpHash(dAppOp)).tryRecover(dAppOp.signature);
         return signer == dAppOp.from;
     }
 
     /// @notice Generates the hash of a DAppOperation struct.
     /// @param dAppOp The DAppOperation struct to hash.
     /// @return payload The hash of the DAppOperation struct.
-    function getDAppOperationPayload(DAppOperation memory dAppOp) public view returns (bytes32 payload) {
-        payload = _hashTypedDataV4(_getProofHash(dAppOp));
+    function getDAppOperationPayload(DAppOperation calldata dAppOp) public view returns (bytes32 payload) {
+        payload = _hashTypedDataV4(_getDAppOpHash(dAppOp));
     }
 
     /// @notice Returns the domain separator for the EIP712 signature scheme.
@@ -548,7 +563,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 return false;
             }
             bool validSmartWallet =
-                IAccount(userOp.from).validateUserOp{ gas: 30_000 }(userOp, _getProofHash(userOp), 0) == 0;
+                IAccount(userOp.from).validateUserOp{ gas: 30_000 }(userOp, _getUserOpHash(userOp), 0) == 0;
             return (isSimulation || validSmartWallet);
         }
 
@@ -562,13 +577,13 @@ contract AtlasVerification is EIP712, DAppIntegration {
             return false;
         }
 
-        // If the dapp indicated that they only accept sequenced userNonces
+        // If the dapp indicated that they only accept sequential userNonces
         // (IE for FCFS execution), check and make sure the order is correct
-        // NOTE: allowing only sequenced userNonces could create a scenario in
+        // NOTE: allowing only sequential userNonces could create a scenario in
         // which builders or validators may be able to profit via censorship.
         // DApps are encouraged to rely on the deadline parameter
         // to prevent replay attacks.
-        if (!_handleNonces(userOp.from, userOp.nonce, !dConfig.callConfig.needsSequencedUserNonces(), isSimulation)) {
+        if (!_handleNonces(userOp.from, userOp.nonce, dConfig.callConfig.needsSequentialUserNonces(), isSimulation)) {
             return false;
         }
 
@@ -577,11 +592,11 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
     /// @notice Generates the hash of a UserOperation struct.
     /// @param userOp The UserOperation struct to hash.
-    /// @return proofHash The hash of the UserOperation struct.
-    function _getProofHash(UserOperation memory userOp) internal pure returns (bytes32 proofHash) {
-        proofHash = keccak256(
+    /// @return userOpHash The hash of the UserOperation struct.
+    function _getUserOpHash(UserOperation calldata userOp) internal pure returns (bytes32 userOpHash) {
+        userOpHash = keccak256(
             abi.encode(
-                USER_TYPE_HASH,
+                USER_TYPEHASH,
                 userOp.from,
                 userOp.to,
                 userOp.value,
@@ -601,80 +616,75 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @param userOp The UserOperation struct to verify.
     /// @return A boolean indicating if the signature is valid.
     function _verifyUserSignature(UserOperation calldata userOp) internal view returns (bool) {
-        if (userOp.signature.length == 0) return false;
-        address signer = _hashTypedDataV4(_getProofHash(userOp)).recover(userOp.signature);
-
+        (address signer,) = _hashTypedDataV4(_getUserOpHash(userOp)).tryRecover(userOp.signature);
         return signer == userOp.from;
     }
 
     /// @notice Generates the hash of a UserOperation struct.
     /// @param userOp The UserOperation struct to hash.
     /// @return payload The hash of the UserOperation struct.
-    function getUserOperationPayload(UserOperation memory userOp) public view returns (bytes32 payload) {
-        payload = _hashTypedDataV4(_getProofHash(userOp));
+    function getUserOperationPayload(UserOperation calldata userOp) public view returns (bytes32 payload) {
+        payload = _hashTypedDataV4(_getUserOpHash(userOp));
     }
 
-    /// @notice Returns the next nonce for the given account, in sequential or async mode.
+    /// @notice Returns the next nonce for the given account, in sequential or non-sequential mode.
     /// @param account The address of the account for which to retrieve the next nonce.
-    /// @param sequenced A boolean indicating if the nonce should be sequential (true) or async (false).
+    /// @param sequential A boolean indicating if the nonce should be sequential (true) or non-sequential (false).
     /// @return The next nonce for the given account.
-    function getNextNonce(address account, bool sequenced) external view returns (uint256) {
+    function getNextNonce(address account, bool sequential) external view returns (uint256) {
         NonceTracker memory nonceTracker = nonceTrackers[account];
 
-        if (sequenced) {
+        if (sequential) {
             return nonceTracker.lastUsedSeqNonce + 1;
         } else {
             uint256 n;
-            uint256 bitmap256;
+            uint256 bitmap;
             do {
                 unchecked {
                     ++n;
                 }
-                // Async bitmaps start at index 1. I.e. accounts start with bitmap 0 = HighestFullAsyncBitmap
-                bytes32 bitmapKey = keccak256(abi.encode(account, nonceTracker.highestFullAsyncBitmap + n));
+                // Non-sequential bitmaps start at index 1. I.e. accounts start with bitmap 0 = HighestFullNonSeqBitmap
+                bytes32 bitmapKey = keccak256(abi.encode(account, nonceTracker.highestFullNonSeqBitmap + n));
                 NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
-                bitmap256 = uint256(nonceBitmap.bitmap);
-            } while (bitmap256 == FULL_BITMAP);
+                bitmap = uint256(nonceBitmap.bitmap);
+            } while (bitmap == _FULL_BITMAP);
 
-            uint256 remainder = _getFirstUnusedNonceInBitmap(bitmap256);
-            return ((nonceTracker.highestFullAsyncBitmap + n - 1) * 240) + remainder;
+            uint256 remainder = _getFirstUnusedNonceInBitmap(bitmap);
+            return ((nonceTracker.highestFullNonSeqBitmap + n - 1) * 240) + remainder;
         }
     }
 
-    /// @notice Manually updates the highestFullAsyncBitmap of an account to reflect the real full bitmap.
-    /// @dev Only the owner of the account whose nonce tracker is being updated can call this function.
-    /// @param account The address of the account for which to update the highestFullAsyncBitmap.
-    function manuallyUpdateNonceTracker(address account) external {
-        if (msg.sender != account) revert AtlasErrors.OnlyAccount();
-
-        NonceTracker memory nonceTracker = nonceTrackers[account];
+    /// @notice Manually updates the highestFullNonSeqBitmap of the caller to reflect the real full bitmap.
+    function manuallyUpdateNonSeqNonceTracker() external {
+        NonceTracker memory nonceTracker = nonceTrackers[msg.sender];
         NonceBitmap memory nonceBitmap;
 
         // Checks the next 10 bitmaps for a higher full bitmap
-        uint128 nonceIndexToCheck = nonceTracker.highestFullAsyncBitmap + 10;
-        for (; nonceIndexToCheck > nonceTracker.highestFullAsyncBitmap; nonceIndexToCheck--) {
-            bytes32 bitmapKey = keccak256(abi.encode(account, nonceIndexToCheck));
+        uint128 nonceIndexToCheck = nonceTracker.highestFullNonSeqBitmap + 10;
+        for (; nonceIndexToCheck > nonceTracker.highestFullNonSeqBitmap; nonceIndexToCheck--) {
+            bytes32 bitmapKey = keccak256(abi.encode(msg.sender, nonceIndexToCheck));
             nonceBitmap = nonceBitmaps[bitmapKey];
 
-            if (nonceBitmap.bitmap == FULL_BITMAP) {
-                nonceTracker.highestFullAsyncBitmap = nonceIndexToCheck;
+            if (nonceBitmap.bitmap == _FULL_BITMAP) {
+                nonceTracker.highestFullNonSeqBitmap = nonceIndexToCheck;
                 break;
             }
         }
 
-        nonceTrackers[account] = nonceTracker;
+        nonceTrackers[msg.sender] = nonceTracker;
     }
 
     /// @notice Checks if a nonce is used in a 256-bit bitmap.
-    /// @dev Only accurate for nonces 1 - 240 within a 256-bit bitmap.
+    /// @dev Only accurate for the bitmap nonce range (0 - 239) within a 256-bit bitmap. This allows space in the slot
+    /// for a uint8 representing the highest used nonce in the current bitmap.
     /// @param bitmap The 256-bit bitmap to check.
-    /// @param nonce The nonce to check.
+    /// @param bitmapNonce The nonce (in the range 0 - 239) to check.
     /// @return A boolean indicating if the nonce is used in the bitmap.
-    function _nonceUsedInBitmap(uint256 bitmap, uint256 nonce) internal pure returns (bool) {
-        return (bitmap & (1 << nonce)) != 0;
+    function _nonceUsedInBitmap(uint256 bitmap, uint256 bitmapNonce) internal pure returns (bool) {
+        return (bitmap & (1 << bitmapNonce)) != 0;
     }
 
-    /// @notice Returns the first unused nonce in a 256-bit bitmap.
+    /// @notice Returns the first unused nonce in a 240-bit bitmap.
     /// @dev Finds the first unused nonce within a given 240-bit bitmap, checking 16 bits and then 4 bits at a time for
     /// efficiency.
     /// @param bitmap A uint256 where the first 240 bits are used to represent the used/unused status of nonces.
@@ -687,14 +697,14 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         for (uint256 i = 0; i < 240; i += 16) {
             // Isolate the next 16 bits to check
-            uint256 chunk16 = (bitmap >> i) & FIRST_16_BITS_FULL;
+            uint256 chunk16 = (bitmap >> i) & _FIRST_16_BITS_FULL;
             // Find non-full 16-bit chunk
-            if (chunk16 != FIRST_16_BITS_FULL) {
+            if (chunk16 != _FIRST_16_BITS_FULL) {
                 for (uint256 j = 0; j < 16; j += 4) {
                     // Isolate the next 4 bits within the 16-bit chunk to check
-                    uint256 chunk4 = (chunk16 >> j) & FIRST_4_BITS_FULL;
+                    uint256 chunk4 = (chunk16 >> j) & _FIRST_4_BITS_FULL;
                     // Find non-full 4-bit chunk
-                    if (chunk4 != FIRST_4_BITS_FULL) {
+                    if (chunk4 != _FIRST_4_BITS_FULL) {
                         for (uint256 k = 0; k < 4; k++) {
                             // Find first unused bit
                             if ((chunk4 >> k) & 0x1 == 0) {

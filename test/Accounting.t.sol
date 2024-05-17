@@ -28,7 +28,7 @@ import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
 
 // TODO Check if this is tested in more contract-specific tests, then delete this if true.
 contract AccountingTest is BaseTest {
-    SwapIntentDAppControl public swapIntentController;
+    SwapIntentDAppControl public swapIntentControl;
     TxBuilder public txBuilder;
     Sig public sig;
 
@@ -48,19 +48,19 @@ contract AccountingTest is BaseTest {
     function setUp() public virtual override {
         BaseTest.setUp();
 
-        // Creating new gov address (ERR-V49 OwnerActive if already registered with controller)
+        // Creating new gov address (ERR-V49 OwnerActive if already registered with control)
         governancePK = 11_112;
         governanceEOA = vm.addr(governancePK);
 
-        // Deploy new SwapIntent Controller from new gov and initialize in Atlas
+        // Deploy new SwapIntent Control from new gov and initialize in Atlas
         vm.startPrank(governanceEOA);
-        swapIntentController = new SwapIntentDAppControl(address(atlas));
-        atlasVerification.initializeGovernance(address(swapIntentController));
+        swapIntentControl = new SwapIntentDAppControl(address(atlas));
+        atlasVerification.initializeGovernance(address(swapIntentControl));
         vm.stopPrank();
 
         txBuilder = new TxBuilder({
-            controller: address(swapIntentController),
-            atlasAddress: address(atlas),
+            _control: address(swapIntentControl),
+            _atlas: address(atlas),
             _verification: address(atlasVerification)
         });
     }
@@ -152,7 +152,7 @@ contract AccountingTest is BaseTest {
         // Builds the metaTx and to parts of userCall, signature still to be set
         userOp = txBuilder.buildUserOperation({
             from: userEOA,
-            to: address(swapIntentController),
+            to: address(swapIntentControl),
             maxFeePerGas: tx.gasprice + 1,
             value: 0,
             deadline: block.number + 2,

@@ -1,16 +1,13 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
+import { ECDSA } from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import { CallConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 import "src/contracts/types/UserCallTypes.sol";
 import "src/contracts/types/SolverCallTypes.sol";
 import "src/contracts/types/LockTypes.sol";
-
-// Atlas DApp-Control Imports
 import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 import { ChainlinkAtlasWrapper } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapper.sol";
-
-import "forge-std/Test.sol";
 
 // Role enum as per Chainlink's OffchainAggregatorBilling.sol contract
 enum Role {
@@ -56,8 +53,8 @@ contract ChainlinkDAppControl is DAppControl {
             _atlas,
             msg.sender,
             CallConfig({
-                userNoncesSequenced: false,
-                dappNoncesSequenced: false,
+                userNoncesSequential: false,
+                dappNoncesSequential: false,
                 requirePreOps: false,
                 trackPreOpsReturnData: false,
                 trackUserReturnData: true,
@@ -149,7 +146,7 @@ contract ChainlinkDAppControl is DAppControl {
         Oracle memory currentOracle;
 
         for (uint256 i = 0; i < rs.length; ++i) {
-            address signer = ecrecover(reportHash, uint8(rawVs[i]) + 27, rs[i], ss[i]);
+            (address signer,) = ECDSA.tryRecover(reportHash, uint8(rawVs[i]) + 27, rs[i], ss[i]);
             currentOracle = verificationVars[baseChainlinkFeed].oracles[signer];
 
             // Signer must be pre-approved and only 1 observation per signer
@@ -171,7 +168,6 @@ contract ChainlinkDAppControl is DAppControl {
 
         _removeAllSignersOfBaseFeed(baseChainlinkFeed); // Removes any existing signers first
         VerificationVars storage vars = verificationVars[baseChainlinkFeed];
-        Oracle memory currentOracle;
 
         for (uint256 i = 0; i < signers.length; ++i) {
             if (vars.oracles[signers[i]].role != Role.Unset) revert DuplicateSigner(signers[i]);

@@ -62,11 +62,11 @@ contract MockStorageTests is Storage {
     { }
 
     function getInitialChainId() public view returns (uint256) {
-        return INITIAL_CHAIN_ID;
+        return _INITIAL_CHAIN_ID;
     }
 
     function getInitialDomainSeparator() public view returns (bytes32) {
-        return INITIAL_DOMAIN_SEPARATOR;
+        return _INITIAL_DOMAIN_SEPARATOR;
     }
 
     function _computeDomainSeparator() internal view virtual override returns (bytes32) {

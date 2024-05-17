@@ -673,14 +673,14 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     //
     // given a default atlas environment
-    //   and callConfig.sequenced = false
+    //   and callConfig.userNoncesSequential = false
     //   and otherwise valid user, solver and dapp operations
     //     where the dapp operation nonce is one
     // when validCalls is called from the userEOA
     // then it should return Valid
     // because one has not been used before
     //
-    function test_validCalls_UnsequencedNonceIsOne_Valid() public {
+    function test_validCalls_NonSeqNonceIsOne_Valid() public {
         defaultAtlasEnvironment();
 
         UserOperation memory userOp = validUserOperation().build();
@@ -694,16 +694,16 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     //
     // given a default atlas environment
-    //   and callConfig.sequenced = true
+    //   and callConfig.dappNoncesSequential = true
     //   and otherwise valid user, solver and dapp operations
     //     where the dapp operation nonce is one
     // when validCalls is called from the userEOA
     // then it should return Valid
-    // because one is the first valid nonce for sequenced calls
+    // because one is the first valid nonce for sequential calls
     //  and this is the first call for the user
     //
-    function test_validCalls_SequencedNonceIsOne_Valid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequenced(true).build());
+    function test_validCalls_SequentialNonceIsOne_Valid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequential(true).build());
 
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -716,16 +716,16 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     //
     // given a default atlas environment
-    //   and callConfig.sequenced = true
+    //   and callConfig.dappNoncesSequential = true
     //   and otherwise valid user, solver and dapp operations
     //     where the dapp operation nonce is two
     // when validCalls is called from the userEOA
     // then it should return DAppSignatureInvalid
-    // because one is the first valid nonce for sequenced calls
+    // because one is the first valid nonce for sequential calls
     //  and this is the first call for the user
     //
-    function test_validCalls_SequencedNonceIsTwo_DAppSignatureInvalid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequenced(true).build());
+    function test_validCalls_SequentialNonceIsTwo_DAppSignatureInvalid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequential(true).build());
 
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -738,7 +738,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     //
     // given an otherwise valid atlas transaction with a dAppOp.nonce of 2
-    //   and the callConfig.sequenced = true
+    //   and the callConfig.userNoncesSequential = true
     //   and the last dAppOp.nonce for the user is 1
     // when validCalls is called
     // then it should return Valid
@@ -746,17 +746,17 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     //
     // given a default atlas environment
-    //   and callConfig.sequenced = true
+    //   and callConfig.userNoncesSequential = true
     //   and otherwise valid user, solver and dapp operations
     //     where the dapp operation nonce is two
     //   and the last dapp operation nonce for the user is one
     // when validCalls is called from the userEOA
     // then it should return Valid
-    // because one is the first valid nonce for sequenced calls
+    // because one is the first valid nonce for sequential calls
     //  and this is the first call for the user
     //
-    function test_validCalls_SequencedNonceWasOneIsNowTwo_Valid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
+    function test_validCalls_SequentialNonceWasOneIsNowTwo_Valid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
 
         // these first ops are to increment the nonce to 1
         UserOperation memory userOp = validUserOperation().build();
@@ -778,7 +778,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     // 
     // given a default atlas environment
-    //   and callConfig.sequenced = true
+    //   and callConfig.dappNoncesSequential = true
     //   and otherwise valid user, solver and dapp operations
     //     where the dapp operation nonce is three
     //   and the last dapp operation nonce for the user is one
@@ -787,8 +787,8 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     // because the current nonce for the user is 1
     //  and the next valid nonce is 2
     //
-    function test_validCalls_SequencedNonceWasOneIsNowThree_DAppSignatureInvalid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequenced(true).build());
+    function test_validCalls_SequentialNonceWasOneIsNowThree_DAppSignatureInvalid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequential(true).build());
 
         // these first ops are to increment the nonce to 1
         UserOperation memory userOp = validUserOperation().build();
@@ -1009,16 +1009,16 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     //
     // given a default atlas environment
-    //   and callConfig.sequenced = true
+    //   and callConfig.userNoncesSequential = true
     //   and otherwise valid user, solver and dapp operations
     //     where the user operation nonce is one
     // when validCalls is called from the userEOA
     // then it should return Valid
-    // because one is the first valid nonce for sequenced calls
+    // because one is the first valid nonce for sequential calls
     //  and this is the first call for the user
     //
-    function test_validCalls_SequencedUserOpNonceIsOne_Valid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
+    function test_validCalls_SequentialUserOpNonceIsOne_Valid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
 
         UserOperation memory userOp = validUserOperation().withNonce(1).signAndBuild(address(atlasVerification), userPK);
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -1031,7 +1031,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     //
     // given an otherwise valid atlas transaction with a userOp.nonce of 2
-    //   and the callConfig.sequenced = true
+    //   and the callConfig.userNoncesSequential = true
     //   and the nonce is uninitialized for the user
     // when validCalls is called
     // then it should return DAppSignatureInvalid
@@ -1039,16 +1039,16 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     //
     // given a default atlas environment
-    //   and callConfig.sequenced = true
+    //   and callConfig.userNoncesSequential = true
     //   and otherwise valid user, solver and dapp operations
     //     where the user operation nonce is two
     // when validCalls is called from the userEOA
     // then it should return DAppSignatureInvalid
-    // because one is the first valid nonce for sequenced calls
+    // because one is the first valid nonce for sequential calls
     //  and this is the first call for the user
     //
-    function test_validCalls_SequencedUserOpNonceIsTwo_UserSignatureInvalid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
+    function test_validCalls_SequentialUserOpNonceIsTwo_UserSignatureInvalid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
 
         UserOperation memory userOp = validUserOperation().withNonce(2).signAndBuild(address(atlasVerification), userPK);
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -1061,7 +1061,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     //
     // given a default atlas environment
-    //   and callConfig.sequenced = true
+    //   and callConfig.userNoncesSequential = true
     //   and otherwise valid user, solver and dapp operations
     //     where the user operation nonce is two
     //  and the last user operation nonce for the user is one
@@ -1070,8 +1070,8 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     // because the current nonce for the user is 1
     //  and the next valid nonce is 2
     //
-    function test_validCalls_SequencedUserOpNonceIsTwo_Valid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
+    function test_validCalls_SequentialUserOpNonceIsTwo_Valid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
 
         // increment the nonce to 1
         UserOperation memory userOp = validUserOperation().signAndBuild(address(atlasVerification), userPK);
@@ -1093,7 +1093,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     //
     // given an otherwise valid atlas transaction with a userOp.nonce of 3
-    //   and the callConfig.sequenced = true
+    //   and the callConfig.userNoncesSequential = true
     //   and the last nonce for the user is 1
     // when validCalls is called
     // then it should return DAppSignatureInvalid
@@ -1101,7 +1101,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     //
     // given a default atlas environment
-    //   and callConfig.sequenced = true
+    //   and callConfig.userNoncesSequential = true
     //   and otherwise valid user, solver and dapp operations
     //     where the user operation nonce is three
     //   and the last user operation nonce for the user is one
@@ -1110,8 +1110,8 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     // because the current nonce for the user is 1
     //   and the next valid nonce is 2
     //
-    function test_validCalls_SequencedUserOpNonceIsThree_UserSignatureInvalid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
+    function test_validCalls_SequentialUserOpNonceIsThree_UserSignatureInvalid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
 
         // increment the nonce to 1
         UserOperation memory userOp = validUserOperation().signAndBuild(address(atlasVerification), userPK);

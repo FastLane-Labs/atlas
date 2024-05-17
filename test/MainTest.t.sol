@@ -102,7 +102,7 @@ contract MainTest is BaseTest {
 
         console.log("userEOA", userEOA);
         console.log("atlas", address(atlas));
-        console.log("control", address(control));
+        console.log("v2DAppControl", address(v2DAppControl));
         console.log("executionEnvironment", executionEnvironment);
 
         // User must approve Atlas
@@ -321,16 +321,16 @@ contract MainTest is BaseTest {
         */
 
         vm.startPrank(userEOA);
-        atlas.createExecutionEnvironment(address(control));
-        address newEnvironment = atlas.createExecutionEnvironment(address(control));
+        atlas.createExecutionEnvironment(address(v2DAppControl));
+        address newEnvironment = atlas.createExecutionEnvironment(address(v2DAppControl));
         vm.stopPrank();
 
         assertTrue(IExecutionEnvironment(newEnvironment).getUser() == userEOA, "Mimic Error - User Mismatch");
         assertTrue(
-            IExecutionEnvironment(newEnvironment).getControl() == address(control), "Mimic Error - Control Mismatch"
+            IExecutionEnvironment(newEnvironment).getControl() == address(v2DAppControl), "Mimic Error - Control Mismatch"
         );
         assertTrue(
-            IExecutionEnvironment(newEnvironment).getConfig() == control.CALL_CONFIG(),
+            IExecutionEnvironment(newEnvironment).getConfig() == v2DAppControl.CALL_CONFIG(),
             "Mimic Error - CallConfig Mismatch"
         );
         assertTrue(
@@ -361,7 +361,7 @@ contract MainTest is BaseTest {
         dAppOp.signature = abi.encodePacked(r, s, v);
 
         // Execution environment should not exist yet
-        (,, bool exists) = atlas.getExecutionEnvironment(userEOA, address(control));
+        (,, bool exists) = atlas.getExecutionEnvironment(userEOA, address(v2DAppControl));
         assertFalse(exists, "ExecutionEnvironment already exists");
 
         vm.startPrank(userEOA);
@@ -370,7 +370,7 @@ contract MainTest is BaseTest {
         vm.stopPrank();
 
         // Execution environment should exist now
-        (,, exists) = atlas.getExecutionEnvironment(userEOA, address(control));
+        (,, exists) = atlas.getExecutionEnvironment(userEOA, address(v2DAppControl));
         assertTrue(exists, "ExecutionEnvironment wasn't created");
     }
 

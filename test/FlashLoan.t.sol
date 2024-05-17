@@ -26,7 +26,7 @@ interface IWETH {
 }
 
 contract FlashLoanTest is BaseTest {
-    DummyDAppControlBuilder public controller;
+    DummyDAppControlBuilder public control;
 
     struct Sig {
         uint8 v;
@@ -39,15 +39,15 @@ contract FlashLoanTest is BaseTest {
     function setUp() public virtual override {
         BaseTest.setUp();
 
-        // Creating new gov address (ERR-V49 OwnerActive if already registered with controller)
+        // Creating new gov address (ERR-V49 OwnerActive if already registered with control)
         governancePK = 11_112;
         governanceEOA = vm.addr(governancePK);
 
         // Deploy
         vm.startPrank(governanceEOA);
 
-        controller = new DummyDAppControlBuilder(address(atlas), WETH_ADDRESS);
-        atlasVerification.initializeGovernance(address(controller));
+        control = new DummyDAppControlBuilder(address(atlas), WETH_ADDRESS);
+        atlasVerification.initializeGovernance(address(control));
         vm.stopPrank();
     }
 
@@ -71,8 +71,8 @@ contract FlashLoanTest is BaseTest {
             .withGas(1_000_000)
             .withMaxFeePerGas(tx.gasprice + 1)
             .withNonce(address(atlasVerification))
-            .withDapp(address(controller))
-            .withControl(address(controller))
+            .withDapp(address(control))
+            .withControl(address(control))
             .withDeadline(block.number + 2)
             .withData(new bytes(0))
             .build();
@@ -85,7 +85,7 @@ contract FlashLoanTest is BaseTest {
             .withMaxFeePerGas(userOp.maxFeePerGas)
             .withDeadline(userOp.deadline)
             .withSolver(address(solver))
-            .withControl(address(controller))
+            .withControl(address(control))
             .withUserOpHash(userOp)
             .withBidToken(userOp)
             .withBidAmount(1e18)
@@ -105,7 +105,7 @@ contract FlashLoanTest is BaseTest {
             .withGas(2_000_000)
             .withNonce(address(atlasVerification), governanceEOA)
             .withDeadline(userOp.deadline)
-            .withControl(address(controller))
+            .withControl(address(control))
             .withUserOpHash(userOp)
             .withCallChainHash(userOp, solverOps)
             .sign(address(atlasVerification), governancePK)
@@ -132,7 +132,7 @@ contract FlashLoanTest is BaseTest {
             .withMaxFeePerGas(userOp.maxFeePerGas)
             .withDeadline(userOp.deadline)
             .withSolver(address(solver))
-            .withControl(address(controller))
+            .withControl(address(control))
             .withUserOpHash(userOp)
             .withBidToken(userOp)
             .withBidAmount(1e18)
@@ -150,7 +150,7 @@ contract FlashLoanTest is BaseTest {
             .withGas(2_000_000)
             .withNonce(address(atlasVerification), governanceEOA)
             .withDeadline(userOp.deadline)
-            .withControl(address(controller))
+            .withControl(address(control))
             .withUserOpHash(userOp)
             .withCallChainHash(userOp, solverOps)
             .sign(address(atlasVerification), governancePK)
@@ -177,7 +177,7 @@ contract FlashLoanTest is BaseTest {
             .withMaxFeePerGas(userOp.maxFeePerGas)
             .withDeadline(userOp.deadline)
             .withSolver(address(solver))
-            .withControl(address(controller))
+            .withControl(address(control))
             .withUserOpHash(userOp)
             .withBidToken(userOp)
             .withBidAmount(1e18)
@@ -195,7 +195,7 @@ contract FlashLoanTest is BaseTest {
             .withGas(2_000_000)
             .withNonce(address(atlasVerification), governanceEOA)
             .withDeadline(userOp.deadline)
-            .withControl(address(controller))
+            .withControl(address(control))
             .withUserOpHash(userOp)
             .withCallChainHash(userOp, solverOps)
             .sign(address(atlasVerification), governancePK)
@@ -249,8 +249,8 @@ contract DummyDAppControlBuilder is DAppControl {
             _atlas,
             msg.sender,
             CallConfig({
-                userNoncesSequenced: false,
-                dappNoncesSequenced: false,
+                userNoncesSequential: false,
+                dappNoncesSequential: false,
                 requirePreOps: false,
                 trackPreOpsReturnData: false,
                 trackUserReturnData: false,

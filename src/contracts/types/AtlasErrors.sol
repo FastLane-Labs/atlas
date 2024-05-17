@@ -36,6 +36,21 @@ contract AtlasErrors {
     error PostOpsSimFail();
     error ValidCalls(ValidCallsResult);
 
+    // Execution Environment
+    error InvalidUser();
+    error InvalidTo();
+    error InvalidCodeHash();
+    error PreOpsDelegatecallFail();
+    error UserOpValueExceedsBalance();
+    error UserWrapperDelegatecallFail();
+    error UserWrapperCallFail();
+    error PostOpsDelegatecallFail();
+    error PostOpsDelegatecallReturnedFalse();
+    error SolverMetaTryCatchIncorrectValue();
+    error AllocateValueDelegatecallFail();
+    error NotEnvironmentOwner();
+    error ExecutionEnvironmentBalanceTooLow();
+
     // Atlas
     error PreOpsFail();
     error UserOpFail();
@@ -94,10 +109,9 @@ contract AtlasErrors {
 
     // AtlasVerification
     error NoUnusedNonceInBitmap();
-    error OnlyAccount();
 
     // DAppControl
-    error BothUserAndDAppNoncesCannotBeSequenced();
+    error BothUserAndDAppNoncesCannotBeSequential();
     error InvalidControl();
     error NoDelegatecall();
     error MustBeDelegatecalled();

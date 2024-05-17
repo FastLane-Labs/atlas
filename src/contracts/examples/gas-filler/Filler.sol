@@ -73,8 +73,8 @@ contract Filler is DAppControl {
             _atlas,
             msg.sender,
             CallConfig({
-                userNoncesSequenced: false,
-                dappNoncesSequenced: false,
+                userNoncesSequential: false,
+                dappNoncesSequential: false,
                 requirePreOps: false,
                 trackPreOpsReturnData: false,
                 trackUserReturnData: true,
@@ -141,7 +141,7 @@ contract Filler is DAppControl {
 
         require(address(this).balance >= gasNeeded, "ERR - EXISTING GAS BALANCE");
 
-        bytes memory data = abi.encodeWithSelector(this.postOpBalancing.selector, maxTokenAmount - solverOp.bidAmount);
+        bytes memory data = abi.encodeCall(this.postOpBalancing, maxTokenAmount - solverOp.bidAmount);
 
         (bool success,) = _control().call(forward(data));
         require(success, "HITTING THIS = JOB OFFER");
@@ -205,7 +205,7 @@ contract Filler is DAppControl {
         require(address(this).balance == 0, "ERR - EXISTING GAS BALANCE");
 
         // TODO: use assembly (current impl is a lazy way to grab the approval tx data)
-        bytes memory mData = abi.encodeWithSelector(this.approve.selector, bytes.concat(approvalTx.data, data));
+        bytes memory mData = abi.encodeCall(this.approve, bytes.concat(approvalTx.data, data));
 
         (bool success, bytes memory returnData) = _control().call(forward(mData));
         // NOTE: approvalTx.data includes func selector

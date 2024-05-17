@@ -11,8 +11,8 @@ import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 /// @notice Storage manages all storage variables and constants for the Atlas smart contract.
 contract Storage is AtlasEvents, AtlasErrors {
     // Atlas constants
-    uint256 internal constant GAS_USED_DECIMALS_TO_DROP = 1000;
-    address internal constant UNLOCKED = address(1);
+    uint256 internal constant _GAS_USED_DECIMALS_TO_DROP = 1000;
+    address internal constant _UNLOCKED = address(1);
     uint256 internal constant _UNLOCKED_UINT = 1;
 
     // Atlas constants used in `_bidFindingIteration()`
@@ -31,8 +31,8 @@ contract Storage is AtlasEvents, AtlasErrors {
     uint8 public constant decimals = 18;
 
     // AtlETH EIP-2612 constants
-    uint256 internal immutable INITIAL_CHAIN_ID;
-    bytes32 internal immutable INITIAL_DOMAIN_SEPARATOR;
+    uint256 internal immutable _INITIAL_CHAIN_ID;
+    bytes32 internal immutable _INITIAL_DOMAIN_SEPARATOR;
 
     // AtlETH ERC-20 storage
     uint256 public totalSupply;
@@ -44,25 +44,36 @@ contract Storage is AtlasEvents, AtlasErrors {
     mapping(address => EscrowAccountAccessData) public accessData;
     mapping(bytes32 => bool) internal _solverOpHashes; // NOTE: Only used for when allowTrustedOpHash is enabled
 
+    // Escrow constants
+    uint256 internal constant _VALIDATION_GAS_LIMIT = 500_000;
+    uint256 internal constant _SOLVER_GAS_LIMIT_BUFFER_PERCENTAGE = 5; // out of 100 = 5%
+    uint256 internal constant _SOLVER_GAS_LIMIT_SCALE = 100; // out of 100 = 100%
+    uint256 internal constant _FASTLANE_GAS_BUFFER = 125_000; // integer amount
+
     // Gas Accounting constants
-    uint256 public constant SURCHARGE = 1_000_000; // Out of 10_000_000
+    uint256 public constant SURCHARGE_RATE = 1_000_000; // 1_000_000 / 10_000_000 = 10%
+    uint256 public constant SURCHARGE_SCALE = 10_000_000; // 10_000_000 / 10_000_000 = 100%
     uint256 internal constant _CALLDATA_LENGTH_PREMIUM = 32; // 16 (default) * 2
+    uint256 internal constant _SOLVER_OP_BASE_CALLDATA = 608; // SolverOperation calldata length excluding solverOp.data
+    uint256 internal constant _SOLVER_LOCK_GAS_BUFFER = 5000; // Base gas charged to solver in `_releaseSolverLock()`
 
     // atlETH GasAccounting storage
-
-    uint256 public surcharge; // Atlas gas surcharges
+    uint256 public cumulativeSurcharge; // Cumulative gas surcharges collected
     address public surchargeRecipient; // Fastlane surcharge recipient
     address public pendingSurchargeRecipient; // For 2-step transfer process
 
     // Atlas SafetyLocks (transient storage)
     address public lock; // transient storage
-    uint256 internal _solverLock; // transient storage
     uint256 public claims; // transient storage
     uint256 public withdrawals; // transient storage
     uint256 public deposits; // transient storage
+    uint256 internal _solverLock; // transient storage
 
-    uint256 internal _solverCalledBack = 1 << 161;
-    uint256 internal _solverFulfilled = 1 << 162;
+    // First 160 bits of _solverLock are the address of the current solver.
+    // The 161st bit represents whether the solver has called back via `reconcile`.
+    // The 162nd bit represents whether the solver's outstanding debt has been repaid via `reconcile`.
+    uint256 internal constant _SOLVER_CALLED_BACK_MASK = 1 << 161;
+    uint256 internal constant _SOLVER_FULFILLED_MASK = 1 << 162;
 
     constructor(
         uint256 _escrowDuration,
@@ -75,17 +86,17 @@ contract Storage is AtlasEvents, AtlasErrors {
         ESCROW_DURATION = _escrowDuration;
         VERIFICATION = _verification;
         SIMULATOR = _simulator;
-        INITIAL_CHAIN_ID = block.chainid;
-        INITIAL_DOMAIN_SEPARATOR = _computeDomainSeparator();
+        _INITIAL_CHAIN_ID = block.chainid;
+        _INITIAL_DOMAIN_SEPARATOR = _computeDomainSeparator();
 
         // Gas Accounting
         // Initialized with msg.value to seed flash loan liquidity
-        surcharge = msg.value;
+        cumulativeSurcharge = msg.value;
         surchargeRecipient = _surchargeRecipient;
 
         // TODO remove these when transient storage behaviour is implemented
         // Gas Accounting - transient storage (delete this from constructor post dencun)
-        lock = UNLOCKED;
+        lock = _UNLOCKED;
         _solverLock = _UNLOCKED_UINT;
         claims = type(uint256).max;
         withdrawals = type(uint256).max;
@@ -101,8 +112,8 @@ contract Storage is AtlasEvents, AtlasErrors {
     function solverLockData() public view returns (address currentSolver, bool calledBack, bool fulfilled) {
         uint256 solverLock = _solverLock;
         currentSolver = address(uint160(solverLock));
-        calledBack = solverLock & _solverCalledBack != 0;
-        fulfilled = solverLock & _solverFulfilled != 0;
+        calledBack = solverLock & _SOLVER_CALLED_BACK_MASK != 0;
+        fulfilled = solverLock & _SOLVER_FULFILLED_MASK != 0;
     }
 
     /// @notice Returns the address of the current solver.

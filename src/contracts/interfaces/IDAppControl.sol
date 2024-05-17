@@ -38,9 +38,9 @@ interface IDAppControl {
 
     function getDAppSignatory() external view returns (address governanceAddress);
 
-    function requireSequencedUserNonces() external view returns (bool isSequenced);
+    function requireSequentialUserNonces() external view returns (bool isSequential);
 
-    function requireSequencedDAppNonces() external view returns (bool isSequenced);
+    function requireSequentialDAppNonces() external view returns (bool isSequential);
 
     function preOpsDelegated() external view returns (bool delegated);
 

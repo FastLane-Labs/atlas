@@ -21,13 +21,7 @@ import "forge-std/Test.sol";
 contract V2Helper is Test, TestConstants, TxBuilder {
     uint256 public immutable maxFeePerGas;
 
-    constructor(
-        address controller,
-        address atlasAddress,
-        address verification
-    )
-        TxBuilder(controller, atlasAddress, verification)
-    {
+    constructor(address _control, address _atlas, address _verification) TxBuilder(_control, _atlas, _verification) {
         maxFeePerGas = tx.gasprice * 2;
     }
 

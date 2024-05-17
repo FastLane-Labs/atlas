@@ -18,6 +18,8 @@ import { IDAppIntegration } from "src/contracts/interfaces/IDAppIntegration.sol"
 /// @author FastLane Labs
 /// @notice DAppControl is the base contract which should be inherited by any Atlas dApps.
 abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
+    using CallBits for uint32;
+
     uint8 private constant _CONTROL_DEPTH = 1 << 2;
 
     uint32 public immutable CALL_CONFIG;
@@ -28,9 +30,9 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     address public pendingGovernance;
 
     constructor(address _atlas, address _governance, CallConfig memory _callConfig) ExecutionBase(_atlas) {
-        if (_callConfig.userNoncesSequenced && _callConfig.dappNoncesSequenced) {
-            // Max one of user or dapp nonces can be sequenced, not both
-            revert AtlasErrors.BothUserAndDAppNoncesCannotBeSequenced();
+        if (_callConfig.userNoncesSequential && _callConfig.dappNoncesSequential) {
+            // Max one of user or dapp nonces can be sequential, not both
+            revert AtlasErrors.BothUserAndDAppNoncesCannotBeSequential();
         }
         CALL_CONFIG = CallBits.encodeCallConfig(_callConfig);
         CONTROL = address(this);
@@ -134,15 +136,15 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     }
 
     function userDelegated() external view returns (bool delegated) {
-        delegated = CallBits.needsDelegateUser(CALL_CONFIG);
+        delegated = CALL_CONFIG.needsDelegateUser();
     }
 
-    function requireSequencedUserNonces() external view returns (bool isSequenced) {
-        isSequenced = CallBits.needsSequencedUserNonces(CALL_CONFIG);
+    function requireSequentialUserNonces() external view returns (bool isSequential) {
+        isSequential = CALL_CONFIG.needsSequentialUserNonces();
     }
 
-    function requireSequencedDAppNonces() external view returns (bool isSequenced) {
-        isSequenced = CallBits.needsSequencedDAppNonces(CALL_CONFIG);
+    function requireSequentialDAppNonces() external view returns (bool isSequential) {
+        isSequential = CALL_CONFIG.needsSequentialDAppNonces();
     }
 
     /// @notice Returns the DAppConfig struct of this DAppControl contract.
@@ -169,7 +171,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     }
 
     function _getCallConfig() internal view returns (CallConfig memory) {
-        return CallBits.decodeCallConfig(CALL_CONFIG);
+        return CALL_CONFIG.decodeCallConfig();
     }
 
     /// @notice Returns the current governance address of this DAppControl contract.

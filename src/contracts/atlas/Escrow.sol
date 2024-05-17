@@ -24,10 +24,6 @@ abstract contract Escrow is AtlETH {
     using CallBits for uint32;
     using SafetyBits for EscrowKey;
 
-    uint256 private constant _VALIDATION_GAS_LIMIT = 500_000;
-    uint256 private constant _SOLVER_GAS_BUFFER = 5; // out of 100
-    uint256 private constant _FASTLANE_GAS_BUFFER = 125_000; // integer amount
-
     constructor(
         uint256 _escrowDuration,
         address _verification,
@@ -51,7 +47,7 @@ abstract contract Escrow is AtlETH {
         internal
         returns (bool success, bytes memory preOpsData)
     {
-        preOpsData = abi.encodeWithSelector(IExecutionEnvironment.preOpsWrapper.selector, userOp);
+        preOpsData = abi.encodeCall(IExecutionEnvironment.preOpsWrapper, userOp);
         preOpsData = abi.encodePacked(preOpsData, lockBytes);
         (success, preOpsData) = environment.call(preOpsData);
         if (success) {
@@ -73,7 +69,7 @@ abstract contract Escrow is AtlETH {
         internal
         returns (bool success, bytes memory userData)
     {
-        userData = abi.encodeWithSelector(IExecutionEnvironment.userWrapper.selector, userOp);
+        userData = abi.encodeCall(IExecutionEnvironment.userWrapper, userOp);
         userData = abi.encodePacked(userData, lockBytes);
 
         (success, userData) = environment.call{ value: userOp.value }(userData);
@@ -83,7 +79,7 @@ abstract contract Escrow is AtlETH {
         }
     }
 
-    /// @notice Attempts to execute a SovlerOperation and determine if it wins the auction.
+    /// @notice Attempts to execute a SolverOperation and determine if it wins the auction.
     /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
     /// @param userOp UserOperation struct containing the user's transaction data relevant to this SolverOperation.
     /// @param solverOp SolverOperation struct containing the solver's bid and execution data.
@@ -193,9 +189,8 @@ abstract contract Escrow is AtlETH {
         // process dApp payments
         key = key.holdAllocateValueLock(solverOp.from);
 
-        bytes memory data = abi.encodeWithSelector(
-            IExecutionEnvironment.allocateValue.selector, dConfig.bidToken, winningBidAmount, returnData
-        );
+        bytes memory data =
+            abi.encodeCall(IExecutionEnvironment.allocateValue, (dConfig.bidToken, winningBidAmount, returnData));
         data = abi.encodePacked(data, key.pack());
         (bool success,) = key.executionEnvironment.call(data);
         if (success) {
@@ -220,8 +215,7 @@ abstract contract Escrow is AtlETH {
         internal
         returns (bool success)
     {
-        bytes memory postOpsData =
-            abi.encodeWithSelector(IExecutionEnvironment.postOpsWrapper.selector, solved, returnData);
+        bytes memory postOpsData = abi.encodeCall(IExecutionEnvironment.postOpsWrapper, (solved, returnData));
         postOpsData = abi.encodePacked(postOpsData, key.pack());
         (success,) = key.executionEnvironment.call(postOpsData);
     }
@@ -266,8 +260,9 @@ abstract contract Escrow is AtlETH {
             );
         }
 
-        gasLimit = (100) * (solverOp.gas < dConfig.solverGasLimit ? solverOp.gas : dConfig.solverGasLimit)
-            / (100 + _SOLVER_GAS_BUFFER) + _FASTLANE_GAS_BUFFER;
+        gasLimit = _SOLVER_GAS_LIMIT_SCALE
+            * (solverOp.gas < dConfig.solverGasLimit ? solverOp.gas : dConfig.solverGasLimit)
+            / (_SOLVER_GAS_LIMIT_SCALE + _SOLVER_GAS_LIMIT_BUFFER_PERCENTAGE) + _FASTLANE_GAS_BUFFER;
 
         uint256 gasCost = (tx.gasprice * gasLimit) + _getCalldataCost(solverOp.data.length);
 
@@ -350,13 +345,7 @@ abstract contract Escrow is AtlETH {
         // If there are no errors, attempt to execute
         if (!result.canExecute() || !_trySolverLock(solverOp)) return 0;
 
-        data = abi.encodeWithSelector(
-            IExecutionEnvironment(key.executionEnvironment).solverMetaTryCatch.selector,
-            solverOp.bidAmount,
-            gasLimit,
-            solverOp,
-            data
-        );
+        data = abi.encodeCall(IExecutionEnvironment.solverMetaTryCatch, (solverOp.bidAmount, gasLimit, solverOp, data));
 
         data = abi.encodePacked(data, key.holdSolverLock(solverOp.solver).pack());
 
@@ -432,13 +421,8 @@ abstract contract Escrow is AtlETH {
         returns (uint256)
     {
         bool success;
-        bytes memory data = abi.encodeWithSelector(
-            IExecutionEnvironment(environment).solverMetaTryCatch.selector,
-            bidAmount,
-            gasLimit,
-            solverOp,
-            dAppReturnData
-        );
+        bytes memory data =
+            abi.encodeCall(IExecutionEnvironment.solverMetaTryCatch, (bidAmount, gasLimit, solverOp, dAppReturnData));
 
         data = abi.encodePacked(data, lockBytes);
 

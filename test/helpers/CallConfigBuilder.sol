@@ -6,8 +6,8 @@ import { CallConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 import "forge-std/Test.sol";
 
 contract CallConfigBuilder is Test {
-    bool userNoncesSequenced;
-    bool dappNoncesSequenced;
+    bool userNoncesSequential;
+    bool dappNoncesSequential;
     bool requirePreOps;
     bool trackPreOpsReturnData;
     bool trackUserReturnData;
@@ -27,13 +27,13 @@ contract CallConfigBuilder is Test {
     bool invertBidValue;
     bool exPostBids;
 
-    function withUserNoncesSequenced(bool _sequenced) public returns (CallConfigBuilder) {
-        userNoncesSequenced = _sequenced;
+    function withUserNoncesSequential(bool _sequential) public returns (CallConfigBuilder) {
+        userNoncesSequential = _sequential;
         return this;
     }
 
-    function withDappNoncesSequenced(bool _sequenced) public returns (CallConfigBuilder) {
-        dappNoncesSequenced = _sequenced;
+    function withDappNoncesSequential(bool _sequential) public returns (CallConfigBuilder) {
+        dappNoncesSequential = _sequential;
         return this;
     }
 
@@ -129,8 +129,8 @@ contract CallConfigBuilder is Test {
 
     function build() public view returns (CallConfig memory) {
         return CallConfig(
-            userNoncesSequenced,
-            dappNoncesSequenced,
+            userNoncesSequential,
+            dappNoncesSequential,
             requirePreOps,
             trackPreOpsReturnData,
             trackUserReturnData,

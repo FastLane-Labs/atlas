@@ -64,8 +64,8 @@ library EscrowBits {
     }
 
     function updateEscrow(uint256 result) internal pure returns (bool) {
-        // dont update solver escrow if they don't need to refund gas
-        // returns true is solver doesn't get to bypass the refund.
+        // Only update solver escrow if they need to refund gas
+        // returns true if solver has to do the refund.
         return (result & _NO_REFUND == 0);
     }
 }

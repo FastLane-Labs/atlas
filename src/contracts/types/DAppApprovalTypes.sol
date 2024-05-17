@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-bytes32 constant DAPP_TYPE_HASH = keccak256(
+bytes32 constant DAPP_TYPEHASH = keccak256(
     "DAppApproval(address from,address to,uint256 value,uint256 gas,uint256 nonce,uint256 deadline,address control,address bundler,bytes32 userOpHash,bytes32 callChainHash)"
 );
 
@@ -29,10 +29,10 @@ struct DAppConfig {
 struct CallConfig {
     // userNoncesSequential: The userOp nonce must be the next sequential nonce for that user’s address in Atlas’
     // nonce system
-    bool userNoncesSequenced;
-    // dappNoncesSequenced: The dappOp nonce must be the next sequential nonce for that dapp signer’s address in
+    bool userNoncesSequential;
+    // dappNoncesSequential: The dappOp nonce must be the next sequential nonce for that dapp signer’s address in
     // Atlas’ nonce system
-    bool dappNoncesSequenced;
+    bool dappNoncesSequential;
     // requirePreOps: The preOps hook is executed before the userOp is executed. If false, the preOps hook is skipped.
     bool requirePreOps;
     // trackPreOpsReturnData: The return data from the preOps hook is passed to the next call phase. If false preOps
@@ -90,8 +90,8 @@ struct CallConfig {
 }
 
 enum CallConfigIndex {
-    UserNoncesSequenced,
-    DAppNoncesSequenced,
+    UserNoncesSequential,
+    DAppNoncesSequential,
     RequirePreOps,
     TrackPreOpsReturnData,
     TrackUserReturnData,

@@ -29,8 +29,8 @@ contract DeployTxBuilderScript is DeployBaseScript {
         vm.startBroadcast(deployerPrivateKey);
 
         txBuilder = new TxBuilder({
-            controller: swapIntentControlAddress,
-            atlasAddress: atlasAddress,
+            _control: swapIntentControlAddress,
+            _atlas: atlasAddress,
             _verification: atlasVerificationAddress
         });
 

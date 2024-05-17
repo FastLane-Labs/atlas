@@ -26,7 +26,7 @@ struct SwapData {
     address recipient;
 }
 
-contract V4SwapIntentController is DAppControl {
+contract V4SwapIntentControl is DAppControl {
     using SafeTransferLib for ERC20;
 
     address immutable V4_POOL; // TODO: set for test v4 pool
@@ -41,8 +41,8 @@ contract V4SwapIntentController is DAppControl {
             _atlas,
             msg.sender,
             CallConfig({
-                userNoncesSequenced: false,
-                dappNoncesSequenced: false,
+                userNoncesSequential: false,
+                dappNoncesSequential: false,
                 requirePreOps: false,
                 trackPreOpsReturnData: false,
                 trackUserReturnData: true,

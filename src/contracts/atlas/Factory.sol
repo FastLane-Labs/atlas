@@ -53,7 +53,7 @@ abstract contract Factory {
     {
         callConfig = IDAppControl(dAppControl).CALL_CONFIG();
         executionEnvironment = _getExecutionEnvironmentCustom(user, dAppControl.codehash, dAppControl, callConfig);
-        exists = executionEnvironment.codehash != bytes32(0);
+        exists = executionEnvironment.code.length != 0;
     }
 
     /// @notice Gets an existing execution environment or creates a new one if it does not exist for the specified user
@@ -103,7 +103,7 @@ abstract contract Factory {
             )
         );
 
-        if (executionEnvironment.codehash == bytes32(0)) {
+        if (executionEnvironment.code.length == 0) {
             bytes32 memSalt = _salt;
             assembly {
                 executionEnvironment := create2(0, add(creationCode, 32), mload(creationCode), memSalt)
@@ -114,18 +114,18 @@ abstract contract Factory {
 
     /// @notice Generates the address of a user's execution environment affected by deprecated callConfig changes in the
     /// DAppControl.
-    /// @dev Calculates the deterministic address of the execution environment based on the user, controller,
+    /// @dev Calculates the deterministic address of the execution environment based on the user, control,
     /// callConfig, and controlCodeHash, ensuring consistency across changes in callConfig.
     /// @param user The address of the user for whom the execution environment's address is being generated.
     /// @param controlCodeHash The hash of the DAppControl contract's bytecode, contributing to the uniqueness of the
     /// creation code.
-    /// @param controller The address of the DAppControl contract associated with the execution environment.
+    /// @param control The address of the DAppControl contract associated with the execution environment.
     /// @param callConfig The configuration flags defining the behavior of the execution environment.
     /// @return executionEnvironment The address of the user's execution environment.
     function _getExecutionEnvironmentCustom(
         address user,
         bytes32 controlCodeHash,
-        address controller,
+        address control,
         uint32 callConfig
     )
         internal
@@ -141,7 +141,7 @@ abstract contract Factory {
                             address(this),
                             _salt,
                             keccak256(
-                                abi.encodePacked(_getMimicCreationCode(controller, callConfig, user, controlCodeHash))
+                                abi.encodePacked(_getMimicCreationCode(control, callConfig, user, controlCodeHash))
                             )
                         )
                     )
@@ -151,14 +151,14 @@ abstract contract Factory {
     }
 
     /// @notice Generates the creation code for the execution environment contract.
-    /// @param controller The address of the DAppControl contract associated with the execution environment.
+    /// @param control The address of the DAppControl contract associated with the execution environment.
     /// @param callConfig The configuration flags defining the behavior of the execution environment.
     /// @param user The address of the user for whom the execution environment is being created, contributing to the
     /// uniqueness of the creation code.
     /// @param controlCodeHash The hash of the bytecode of the DAppControl contract
     /// @return creationCode The bytecode representing the creation code of the execution environment contract.
     function _getMimicCreationCode(
-        address controller,
+        address control,
         uint32 callConfig,
         address user,
         bytes32 controlCodeHash
@@ -196,7 +196,7 @@ abstract contract Factory {
                         mload(add(creationCode, 139)),
                         not(shl(56, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00FFFFFFFF))
                     ),
-                    add(shl(96, controller), add(shl(88, 0x63), shl(56, callConfig)))
+                    add(shl(96, control), add(shl(88, 0x63), shl(56, callConfig)))
                 )
             )
 

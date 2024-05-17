@@ -86,7 +86,7 @@ contract GasAccountingTest is Test {
 
     function getInitialClaims(uint256 gasMarker) public view returns (uint256 claims) {
         uint256 rawClaims = (gasMarker + 1) * tx.gasprice;
-        claims = rawClaims + ((rawClaims * mockGasAccounting.SURCHARGE()) / 10_000_000);
+        claims = rawClaims + ((rawClaims * mockGasAccounting.SURCHARGE_RATE()) / mockGasAccounting.SURCHARGE_SCALE());
     }
 
     function test_validateBalances() public {
@@ -334,7 +334,7 @@ contract GasAccountingTest is Test {
         // FULL_REFUND
         result = EscrowBits._FULL_REFUND;
         maxGasUsed = gasWaterMark + calldataCost;
-        maxGasUsed = (maxGasUsed + ((maxGasUsed * mockGasAccounting.SURCHARGE()) / 10_000_000))
+        maxGasUsed = (maxGasUsed + ((maxGasUsed * mockGasAccounting.SURCHARGE_RATE()) / mockGasAccounting.SURCHARGE_RATE()))
             * tx.gasprice;
         mockGasAccounting.increaseBondedBalance(solverOp.from, maxGasUsed);
         (bondedBefore,,,,) = mockGasAccounting.accessData(solverOp.from);
@@ -342,7 +342,7 @@ contract GasAccountingTest is Test {
         (bondedAfter,,,,) = mockGasAccounting.accessData(solverOp.from);
         assertGt(
             bondedBefore - bondedAfter,
-            (calldataCost + ((calldataCost * mockGasAccounting.SURCHARGE()) / 10_000_000))
+            (calldataCost + ((calldataCost * mockGasAccounting.SURCHARGE_RATE()) / mockGasAccounting.SURCHARGE_RATE()))
                 * tx.gasprice
         ); // Must be greater than calldataCost
         assertLt(bondedBefore - bondedAfter, maxGasUsed); // Must be less than maxGasUsed

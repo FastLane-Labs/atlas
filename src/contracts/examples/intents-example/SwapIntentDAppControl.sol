@@ -46,8 +46,8 @@ contract SwapIntentDAppControl is DAppControl {
             _atlas,
             msg.sender,
             CallConfig({
-                userNoncesSequenced: false,
-                dappNoncesSequenced: false,
+                userNoncesSequential: false,
+                dappNoncesSequential: false,
                 requirePreOps: false,
                 trackPreOpsReturnData: false,
                 trackUserReturnData: true,

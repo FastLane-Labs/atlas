@@ -8,16 +8,16 @@ import "../types/DAppApprovalTypes.sol";
 library CallBits {
     uint32 internal constant _ONE = uint32(1);
 
-    function buildCallConfig(address controller) internal view returns (uint32 callConfig) {
-        callConfig = IDAppControl(controller).CALL_CONFIG();
+    function buildCallConfig(address control) internal view returns (uint32 callConfig) {
+        callConfig = IDAppControl(control).CALL_CONFIG();
     }
 
     function encodeCallConfig(CallConfig memory callConfig) internal pure returns (uint32 encodedCallConfig) {
-        if (callConfig.userNoncesSequenced) {
-            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.UserNoncesSequenced);
+        if (callConfig.userNoncesSequential) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.UserNoncesSequential);
         }
-        if (callConfig.dappNoncesSequenced) {
-            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.DAppNoncesSequenced);
+        if (callConfig.dappNoncesSequential) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.DAppNoncesSequential);
         }
         if (callConfig.requirePreOps) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.RequirePreOps);
@@ -77,8 +77,8 @@ library CallBits {
 
     function decodeCallConfig(uint32 encodedCallConfig) internal pure returns (CallConfig memory callConfig) {
         callConfig = CallConfig({
-            userNoncesSequenced: needsSequencedUserNonces(encodedCallConfig),
-            dappNoncesSequenced: needsSequencedDAppNonces(encodedCallConfig),
+            userNoncesSequential: needsSequentialUserNonces(encodedCallConfig),
+            dappNoncesSequential: needsSequentialDAppNonces(encodedCallConfig),
             requirePreOps: needsPreOpsCall(encodedCallConfig),
             trackPreOpsReturnData: needsPreOpsReturnData(encodedCallConfig),
             trackUserReturnData: needsUserReturnData(encodedCallConfig),
@@ -100,12 +100,12 @@ library CallBits {
         });
     }
 
-    function needsSequencedUserNonces(uint32 callConfig) internal pure returns (bool sequenced) {
-        sequenced = (callConfig & 1 << uint32(CallConfigIndex.UserNoncesSequenced) != 0);
+    function needsSequentialUserNonces(uint32 callConfig) internal pure returns (bool sequential) {
+        sequential = (callConfig & 1 << uint32(CallConfigIndex.UserNoncesSequential) != 0);
     }
 
-    function needsSequencedDAppNonces(uint32 callConfig) internal pure returns (bool sequenced) {
-        sequenced = (callConfig & 1 << uint32(CallConfigIndex.DAppNoncesSequenced) != 0);
+    function needsSequentialDAppNonces(uint32 callConfig) internal pure returns (bool sequential) {
+        sequential = (callConfig & 1 << uint32(CallConfigIndex.DAppNoncesSequential) != 0);
     }
 
     function needsPreOpsCall(uint32 callConfig) internal pure returns (bool needsPreOps) {

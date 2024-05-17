@@ -28,19 +28,13 @@ contract ExecutionEnvironment is Base {
     constructor(address _atlas) Base(_atlas) { }
 
     modifier validUser(UserOperation calldata userOp) {
-        if (userOp.from != _user()) {
-            revert("ERR-CE02 InvalidUser");
-        }
-        if (userOp.to != atlas || userOp.dapp == atlas) {
-            revert("ERR-EV007 InvalidTo");
-        }
+        if (userOp.from != _user()) revert AtlasErrors.InvalidUser();
+        if (userOp.to != atlas || userOp.dapp == atlas) revert AtlasErrors.InvalidTo();
         _;
     }
 
     modifier validControlHash() {
-        if (_control().codehash != _controlCodeHash()) {
-            revert("ERR-EV008 InvalidCodeHash");
-        }
+        if (_control().codehash != _controlCodeHash()) revert AtlasErrors.InvalidCodeHash();
         _;
     }
 
@@ -69,12 +63,12 @@ contract ExecutionEnvironment is Base {
         onlyAtlasEnvironment(ExecutionPhase.PreOps, _ENVIRONMENT_DEPTH)
         returns (bytes memory)
     {
-        bytes memory preOpsData = forward(abi.encodeWithSelector(IDAppControl.preOpsCall.selector, userOp));
+        bytes memory preOpsData = forward(abi.encodeCall(IDAppControl.preOpsCall, userOp));
 
         bool success;
         (success, preOpsData) = _control().delegatecall(preOpsData);
 
-        require(success, "ERR-EC02 DelegateRevert");
+        if (!success) revert AtlasErrors.PreOpsDelegatecallFail();
 
         preOpsData = abi.decode(preOpsData, (bytes));
         return preOpsData;
@@ -96,17 +90,17 @@ contract ExecutionEnvironment is Base {
     {
         uint32 config = _config();
 
-        require(address(this).balance >= userOp.value, "ERR-CE01 ValueExceedsBalance");
+        if (userOp.value > address(this).balance) revert AtlasErrors.UserOpValueExceedsBalance();
 
         bool success;
 
         if (config.needsDelegateUser()) {
             (success, returnData) = userOp.dapp.delegatecall(forward(userOp.data));
-            require(success, "ERR-EC02 DelegateRevert");
+            if (!success) revert AtlasErrors.UserWrapperDelegatecallFail();
         } else {
             // regular user call - executed at regular destination and not performed locally
             (success, returnData) = userOp.dapp.call{ value: userOp.value }(forward(userOp.data));
-            require(success, "ERR-EC04a CallRevert");
+            if (!success) revert AtlasErrors.UserWrapperCallFail();
         }
     }
 
@@ -122,13 +116,13 @@ contract ExecutionEnvironment is Base {
         external
         onlyAtlasEnvironment(ExecutionPhase.PostOps, _ENVIRONMENT_DEPTH)
     {
-        bytes memory data = forward(abi.encodeWithSelector(IDAppControl.postOpsCall.selector, solved, returnData));
+        bytes memory data = forward(abi.encodeCall(IDAppControl.postOpsCall, (solved, returnData)));
 
         bool success;
         (success, data) = _control().delegatecall(data);
 
-        require(success, "ERR-EC02 DelegateRevert");
-        require(abi.decode(data, (bool)), "ERR-EC03a DelegateUnsuccessful");
+        if (!success) revert AtlasErrors.PostOpsDelegatecallFail();
+        if (!abi.decode(data, (bool))) revert AtlasErrors.PostOpsDelegatecallReturnedFalse();
     }
 
     /// @notice The solverMetaTryCatch function is called by Atlas to execute the SolverOperation, as well as any
@@ -149,7 +143,7 @@ contract ExecutionEnvironment is Base {
         payable
         onlyAtlasEnvironment(ExecutionPhase.SolverOperations, _ENVIRONMENT_DEPTH)
     {
-        require(address(this).balance == solverOp.value, "ERR-CE05 IncorrectValue");
+        if (address(this).balance != solverOp.value) revert AtlasErrors.SolverMetaTryCatchIncorrectValue();
 
         uint32 config = _config();
         address control = _control();
@@ -180,8 +174,7 @@ contract ExecutionEnvironment is Base {
         // Handle any solver preOps, if necessary
         if (config.needsPreSolver()) {
             bytes memory data = forwardSpecial(
-                abi.encodeWithSelector(IDAppControl.preSolverCall.selector, solverOp, returnData),
-                ExecutionPhase.PreSolver
+                abi.encodeCall(IDAppControl.preSolverCall, (solverOp, returnData)), ExecutionPhase.PreSolver
             );
 
             (success, data) = control.delegatecall(data);
@@ -202,13 +195,15 @@ contract ExecutionEnvironment is Base {
         }
 
         // Execute the solver call.
-        bytes memory solverCallData = abi.encodeWithSelector(
-            ISolverContract.atlasSolverCall.selector,
-            solverOp.from,
-            solverOp.bidToken,
-            bidAmount,
-            solverOp.data,
-            config.forwardReturnData() ? returnData : new bytes(0)
+        bytes memory solverCallData = abi.encodeCall(
+            ISolverContract.atlasSolverCall,
+            (
+                solverOp.from,
+                solverOp.bidToken,
+                bidAmount,
+                solverOp.data,
+                config.forwardReturnData() ? returnData : new bytes(0)
+            )
         );
         (success,) = solverOp.solver.call{ gas: gasLimit, value: solverOp.value }(solverCallData);
 
@@ -225,8 +220,7 @@ contract ExecutionEnvironment is Base {
             if (!success) revert AtlasErrors.CallbackNotCalled();
 
             bytes memory data = forwardSpecial(
-                abi.encodeWithSelector(IDAppControl.postSolverCall.selector, solverOp, returnData),
-                ExecutionPhase.PostSolver
+                abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData)), ExecutionPhase.PostSolver
             );
 
             (success, data) = control.delegatecall(data);
@@ -331,11 +325,10 @@ contract ExecutionEnvironment is Base {
         onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _ENVIRONMENT_DEPTH)
         contributeSurplus
     {
-        allocateData =
-            forward(abi.encodeWithSelector(IDAppControl.allocateValueCall.selector, bidToken, bidAmount, allocateData));
+        allocateData = forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, bidAmount, allocateData)));
 
         (bool success,) = _control().delegatecall(allocateData);
-        require(success, "ERR-EC02 DelegateRevert");
+        if (!success) revert AtlasErrors.AllocateValueDelegatecallFail();
     }
 
     ///////////////////////////////////////
@@ -348,13 +341,13 @@ contract ExecutionEnvironment is Base {
     /// @param token The address of the ERC20 token to withdraw.
     /// @param amount The amount of the ERC20 token to withdraw.
     function withdrawERC20(address token, uint256 amount) external {
-        require(msg.sender == _user(), "ERR-EC01 NotEnvironmentOwner");
-        require(ISafetyLocks(atlas).isUnlocked(), "ERR-EC15 EscrowLocked");
+        if (msg.sender != _user()) revert AtlasErrors.NotEnvironmentOwner();
+        if (!ISafetyLocks(atlas).isUnlocked()) revert AtlasErrors.AtlasLockActive();
 
         if (ERC20(token).balanceOf(address(this)) >= amount) {
             SafeTransferLib.safeTransfer(ERC20(token), msg.sender, amount);
         } else {
-            revert("ERR-EC02 BalanceTooLow");
+            revert AtlasErrors.ExecutionEnvironmentBalanceTooLow();
         }
     }
 
@@ -365,14 +358,14 @@ contract ExecutionEnvironment is Base {
     /// @param token The address of the ERC20 token to withdraw.
     /// @param amount The amount of the ERC20 token to withdraw.
     function factoryWithdrawERC20(address msgSender, address token, uint256 amount) external {
-        require(msg.sender == atlas, "ERR-EC10 NotFactory");
-        require(msgSender == _user(), "ERR-EC11 NotEnvironmentOwner");
-        require(ISafetyLocks(atlas).isUnlocked(), "ERR-EC15 EscrowLocked");
+        if (msg.sender != atlas) revert AtlasErrors.OnlyAtlas();
+        if (msgSender != _user()) revert AtlasErrors.NotEnvironmentOwner();
+        if (!ISafetyLocks(atlas).isUnlocked()) revert AtlasErrors.AtlasLockActive();
 
         if (ERC20(token).balanceOf(address(this)) >= amount) {
             SafeTransferLib.safeTransfer(ERC20(token), _user(), amount);
         } else {
-            revert("ERR-EC02 BalanceTooLow");
+            revert AtlasErrors.ExecutionEnvironmentBalanceTooLow();
         }
     }
 
@@ -381,13 +374,13 @@ contract ExecutionEnvironment is Base {
     /// @dev This function is only callable by the environment owner and only when Atlas is in an unlocked state.
     /// @param amount The amount of Ether to withdraw.
     function withdrawEther(uint256 amount) external {
-        require(msg.sender == _user(), "ERR-EC01 NotEnvironmentOwner");
-        require(ISafetyLocks(atlas).isUnlocked(), "ERR-EC15 EscrowLocked");
+        if (msg.sender != _user()) revert AtlasErrors.NotEnvironmentOwner();
+        if (!ISafetyLocks(atlas).isUnlocked()) revert AtlasErrors.AtlasLockActive();
 
         if (address(this).balance >= amount) {
             SafeTransferLib.safeTransferETH(msg.sender, amount);
         } else {
-            revert("ERR-EC03 BalanceTooLow");
+            revert AtlasErrors.ExecutionEnvironmentBalanceTooLow();
         }
     }
 
@@ -397,14 +390,14 @@ contract ExecutionEnvironment is Base {
     /// @param msgSender The address of the original user of this environment.
     /// @param amount The amount of Ether to withdraw.
     function factoryWithdrawEther(address msgSender, uint256 amount) external {
-        require(msg.sender == atlas, "ERR-EC10 NotFactory");
-        require(msgSender == _user(), "ERR-EC11 NotEnvironmentOwner");
-        require(ISafetyLocks(atlas).isUnlocked(), "ERR-EC15 EscrowLocked");
+        if (msg.sender != atlas) revert AtlasErrors.OnlyAtlas();
+        if (msgSender != _user()) revert AtlasErrors.NotEnvironmentOwner();
+        if (!ISafetyLocks(atlas).isUnlocked()) revert AtlasErrors.AtlasLockActive();
 
         if (address(this).balance >= amount) {
             SafeTransferLib.safeTransferETH(_user(), amount);
         } else {
-            revert("ERR-EC03 BalanceTooLow");
+            revert AtlasErrors.ExecutionEnvironmentBalanceTooLow();
         }
     }
 

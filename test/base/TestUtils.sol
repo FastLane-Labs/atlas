@@ -75,7 +75,7 @@ library TestUtils {
     }
 
     function _getMimicCreationCode(
-        address controller,
+        address control,
         uint32 callConfig,
         address executionLib,
         address user,
@@ -113,7 +113,7 @@ library TestUtils {
                         mload(add(creationCode, 139)),
                         not(shl(56, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00FFFFFFFF))
                     ),
-                    add(shl(96, controller), add(shl(88, 0x63), shl(56, callConfig)))
+                    add(shl(96, control), add(shl(88, 0x63), shl(56, callConfig)))
                 )
             )
 
@@ -155,7 +155,7 @@ library TestUtils {
         // then solver calls
         uint256 count = solverOps.length;
         uint256 n;
-        for (; n < count;) {
+        for (; n < count; ++n) {
             callSequenceHash = keccak256(
                 abi.encodePacked(
                     callSequenceHash, // reference previous hash
@@ -163,9 +163,6 @@ library TestUtils {
                     i++
                 )
             );
-            unchecked {
-                ++n;
-            }
         }
     }
 }
