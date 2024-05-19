@@ -10,12 +10,12 @@ import { EXECUTION_PHASE_OFFSET, SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 contract Base {
-    address public immutable atlas;
-    address public immutable source;
+    address public immutable ATLAS;
+    address public immutable SOURCE;
 
     constructor(address _atlas) {
-        atlas = _atlas;
-        source = address(this);
+        ATLAS = _atlas;
+        SOURCE = address(this);
     }
 
     // These functions only work inside of the ExecutionEnvironment (mimic)
@@ -28,10 +28,10 @@ contract Base {
     }
 
     function _onlyAtlasEnvironment(ExecutionPhase phase, uint8 acceptableDepths) internal view {
-        if (address(this) == source) {
+        if (address(this) == SOURCE) {
             revert AtlasErrors.MustBeDelegatecalled();
         }
-        if (msg.sender != atlas) {
+        if (msg.sender != ATLAS) {
             revert AtlasErrors.OnlyAtlas();
         }
         if (uint16(1 << (EXECUTION_PHASE_OFFSET + uint16(phase))) & _lockState() == 0) {
@@ -196,41 +196,42 @@ contract Base {
     /// @notice Returns the address of the currently active Execution Environment, if any.
     /// @return activeEnvironment The address of the currently active Execution Environment.
     function _activeEnvironment() internal view returns (address activeEnvironment) {
-        activeEnvironment = ISafetyLocks(atlas).activeEnvironment();
+        activeEnvironment = ISafetyLocks(ATLAS).activeEnvironment();
     }
 }
 
+// ExecutionBase is inherited by DAppControl. It inherits Base to as a common root contract shared between ExecutionEnvironment and DAppControl. ExecutionBase then adds utility functions which make it easier for custom DAppControls to interact with Atlas. 
 contract ExecutionBase is Base {
     constructor(address _atlas) Base(_atlas) { }
 
     // Deposit local funds to the transient Atlas balance
     // NOTE that this will go towards the Bundler, with the surplus going to the Solver.
     function _contribute(uint256 amt) internal {
-        if (msg.sender != atlas) revert AtlasErrors.OnlyAtlas();
+        if (msg.sender != ATLAS) revert AtlasErrors.OnlyAtlas();
         if (amt > address(this).balance) revert AtlasErrors.InsufficientLocalFunds();
 
-        IEscrow(atlas).contribute{ value: amt }();
+        IEscrow(ATLAS).contribute{ value: amt }();
     }
 
     // Borrow funds from the transient Atlas balance that will be repaid by the Solver (or self via another deposit)
     function _borrow(uint256 amt) internal {
-        if (msg.sender != atlas) revert AtlasErrors.OnlyAtlas();
+        if (msg.sender != ATLAS) revert AtlasErrors.OnlyAtlas();
 
-        IEscrow(atlas).borrow(amt);
+        IEscrow(ATLAS).borrow(amt);
     }
 
     function _transferUserERC20(address token, address destination, uint256 amount) internal {
-        if (msg.sender != atlas) {
+        if (msg.sender != ATLAS) {
             revert AtlasErrors.OnlyAtlas();
         }
-        IPermit69(atlas).transferUserERC20(token, destination, amount, _user(), _control(), _config(), _lockState());
+        IPermit69(ATLAS).transferUserERC20(token, destination, amount, _user(), _control(), _config(), _lockState());
     }
 
     function _transferDAppERC20(address token, address destination, uint256 amount) internal {
-        if (msg.sender != atlas) {
+        if (msg.sender != ATLAS) {
             revert AtlasErrors.OnlyAtlas();
         }
-        IPermit69(atlas).transferDAppERC20(token, destination, amount, _user(), _control(), _config(), _lockState());
+        IPermit69(ATLAS).transferDAppERC20(token, destination, amount, _user(), _control(), _config(), _lockState());
     }
 
     function _availableFundsERC20(
@@ -256,7 +257,7 @@ contract ExecutionBase is Base {
             if (shiftedPhase & SAFE_USER_TRANSFER == 0) {
                 return false;
             }
-            if (ERC20(_token).allowance(user, atlas) < _amount) {
+            if (ERC20(_token).allowance(user, ATLAS) < _amount) {
                 return false;
             }
             return true;
@@ -264,7 +265,7 @@ contract ExecutionBase is Base {
             if (shiftedPhase & SAFE_DAPP_TRANSFER == 0) {
                 return false;
             }
-            if (ERC20(_token).allowance(dapp, atlas) < _amount) {
+            if (ERC20(_token).allowance(dapp, ATLAS) < _amount) {
                 return false;
             }
             return true;
