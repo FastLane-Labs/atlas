@@ -125,7 +125,7 @@ contract ChainlinkDAppControl is DAppControl {
     // OEV-generating protocol.
     function createNewChainlinkAtlasWrapper(address baseChainlinkFeed) external returns (address) {
         if (IChainlinkFeed(baseChainlinkFeed).latestAnswer() == 0) revert InvalidBaseFeed();
-        address newWrapper = address(new ChainlinkAtlasWrapper(atlas, baseChainlinkFeed, msg.sender));
+        address newWrapper = address(new ChainlinkAtlasWrapper(ATLAS, baseChainlinkFeed, msg.sender));
         emit NewChainlinkWrapperCreated(newWrapper, baseChainlinkFeed, msg.sender);
         return newWrapper;
     }

@@ -100,7 +100,7 @@ contract V4DAppControl is DAppControl {
 
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that DAppControl supplied a valid signature
-        require(msg.sender == atlas, "ERR-H00 InvalidCaller");
+        require(msg.sender == ATLAS, "ERR-H00 InvalidCaller");
 
         (IPoolManager.PoolKey memory key, IPoolManager.SwapParams memory params) =
             abi.decode(userOp.data[4:], (IPoolManager.PoolKey, IPoolManager.SwapParams));
@@ -203,7 +203,7 @@ contract V4DAppControl is DAppControl {
         // address(this) = hook
         // msg.sender = ExecutionEnvironment
 
-        EscrowKey memory escrowKey = ISafetyLocks(atlas).getLockState();
+        EscrowKey memory escrowKey = ISafetyLocks(ATLAS).getLockState();
 
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that DAppControl supplied a valid signature
@@ -221,7 +221,7 @@ contract V4DAppControl is DAppControl {
         // address(this) = hook
         // msg.sender = ExecutionEnvironment
 
-        EscrowKey memory escrowKey = ISafetyLocks(atlas).getLockState();
+        EscrowKey memory escrowKey = ISafetyLocks(ATLAS).getLockState();
 
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that DAppControl supplied a valid signature

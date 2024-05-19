@@ -115,7 +115,7 @@ contract Filler is DAppControl {
         returns (bool)
     {
         address solverTo = solverOp.solver;
-        if (solverTo == address(this) || solverTo == _control() || solverTo == atlas) {
+        if (solverTo == address(this) || solverTo == _control() || solverTo == ATLAS) {
             return false;
         }
 
@@ -168,7 +168,7 @@ contract Filler is DAppControl {
     ///////////////////// DAPP STUFF ///////////////////////
 
     function postOpBalancing(uint256 prepaidAmount) external {
-        require(msg.sender == ISafetyLocks(atlas).activeEnvironment(), "ERR - INVALID SENDER");
+        require(msg.sender == ISafetyLocks(ATLAS).activeEnvironment(), "ERR - INVALID SENDER");
         require(address(this) == _control(), "ERR - INVALID CONTROL");
         require(_depth() == 2, "ERR - INVALID DEPTH");
 
@@ -179,12 +179,12 @@ contract Filler is DAppControl {
     // (BUT IT HELPS WITH MENTALLY GROKKING THE FLOW)
     function approve(bytes calldata data) external returns (bytes memory) {
         // CASE: Base call
-        if (msg.sender == atlas) {
+        if (msg.sender == ATLAS) {
             require(address(this) != _control(), "ERR - NOT DELEGATED");
             return _innerApprove(data);
 
             // CASE: Nested call from Atlas EE
-        } else if (msg.sender == ISafetyLocks(atlas).activeEnvironment()) {
+        } else if (msg.sender == ISafetyLocks(ATLAS).activeEnvironment()) {
             require(address(this) == _control(), "ERR - INVALID CONTROL");
             return _outerApprove(data);
 
@@ -228,7 +228,7 @@ contract Filler is DAppControl {
 
         require(spender == address(this), "ERR - INVALID SPENDER");
         require(IERC20(approvalToken).allowance(user, address(this)) == 0, "ERR - EXISTING APPROVAL");
-        require(IERC20(approvalToken).allowance(address(this), atlas) >= amount, "ERR - TOKEN UNAPPROVED");
+        require(IERC20(approvalToken).allowance(address(this), ATLAS) >= amount, "ERR - TOKEN UNAPPROVED");
         require(amount <= IERC20(approvalToken).balanceOf(address(this)), "ERR - POOL BALANCE TOO LOW");
         require(amount <= IERC20(approvalToken).balanceOf(user), "ERR - USER BALANCE TOO LOW");
         require(userLock == address(0), "ERR - USER ALREADY LOCKED");

@@ -76,7 +76,7 @@ contract UniV4Hook is V4DAppControl {
         require(address(this) == hook, "ERR-H00 InvalidCallee");
         require(msg.sender == v4Singleton, "ERR-H01 InvalidCaller"); // TODO: Confirm this
 
-        EscrowKey memory escrowKey = ISafetyLocks(atlas).getLockState();
+        EscrowKey memory escrowKey = ISafetyLocks(ATLAS).getLockState();
 
         if (escrowKey.lockState == SafetyBits._LOCKED_X_USER_X_UNSET) {
             // Case: User call

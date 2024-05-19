@@ -28,7 +28,7 @@ contract ExecutionEnvironment is Base {
     constructor(address _atlas) Base(_atlas) { }
 
     modifier validUser(UserOperation calldata userOp) {
-        if (userOp.to != atlas || userOp.dapp == atlas) revert AtlasErrors.InvalidTo();
+        if (userOp.to != ATLAS || userOp.dapp == ATLAS) revert AtlasErrors.InvalidTo();
         _;
     }
 
@@ -37,7 +37,7 @@ contract ExecutionEnvironment is Base {
         {
             uint256 balance = address(this).balance;
             if (balance > 0) {
-                IEscrow(atlas).contribute{ value: balance }();
+                IEscrow(ATLAS).contribute{ value: balance }();
             }
         }
     }
@@ -183,7 +183,7 @@ contract ExecutionEnvironment is Base {
 
             // Verify that the hook didn't illegally enter the Solver contract
             // success = "calledBack"
-            (, success,) = IEscrow(atlas).solverLockData();
+            (, success,) = IEscrow(ATLAS).solverLockData();
             if (success) revert AtlasErrors.InvalidEntry();
         }
 
@@ -209,7 +209,7 @@ contract ExecutionEnvironment is Base {
         if (config.needsSolverPostCall()) {
             // Verify that the solver contract hit the callback before handing over to PostSolver hook
             // NOTE The balance may still be unfulfilled and handled by the PostSolver hook.
-            (, success,) = IEscrow(atlas).solverLockData();
+            (, success,) = IEscrow(ATLAS).solverLockData();
             if (!success) revert AtlasErrors.CallbackNotCalled();
 
             bytes memory data = forwardSpecial(
@@ -254,11 +254,11 @@ contract ExecutionEnvironment is Base {
 
             // Contribute any surplus balance
             if (endBalance > 0) {
-                IEscrow(atlas).contribute{ value: endBalance }();
+                IEscrow(ATLAS).contribute{ value: endBalance }();
             }
 
             // Verify payback
-            (, success) = IEscrow(atlas).validateBalances();
+            (, success) = IEscrow(ATLAS).validateBalances();
             if (!success) revert AtlasErrors.BalanceNotReconciled();
 
             // Solver bid was successful, revert with highest amount.
@@ -293,11 +293,11 @@ contract ExecutionEnvironment is Base {
 
         // Contribute any surplus back - this may be used to validate balance.
         if (endBalance > 0) {
-            IEscrow(atlas).contribute{ value: endBalance }();
+            IEscrow(ATLAS).contribute{ value: endBalance }();
         }
 
         // Verify that the solver repaid their msg.value
-        (, success) = IEscrow(atlas).validateBalances();
+        (, success) = IEscrow(ATLAS).validateBalances();
         if (!success) {
             revert AtlasErrors.BalanceNotReconciled();
         }
@@ -335,7 +335,7 @@ contract ExecutionEnvironment is Base {
     /// @param amount The amount of the ERC20 token to withdraw.
     function withdrawERC20(address token, uint256 amount) external {
         if (msg.sender != _user()) revert AtlasErrors.NotEnvironmentOwner();
-        if (!ISafetyLocks(atlas).isUnlocked()) revert AtlasErrors.AtlasLockActive();
+        if (!ISafetyLocks(ATLAS).isUnlocked()) revert AtlasErrors.AtlasLockActive();
 
         if (ERC20(token).balanceOf(address(this)) >= amount) {
             SafeTransferLib.safeTransfer(ERC20(token), msg.sender, amount);
@@ -350,7 +350,7 @@ contract ExecutionEnvironment is Base {
     /// @param amount The amount of Ether to withdraw.
     function withdrawEther(uint256 amount) external {
         if (msg.sender != _user()) revert AtlasErrors.NotEnvironmentOwner();
-        if (!ISafetyLocks(atlas).isUnlocked()) revert AtlasErrors.AtlasLockActive();
+        if (!ISafetyLocks(ATLAS).isUnlocked()) revert AtlasErrors.AtlasLockActive();
 
         if (address(this).balance >= amount) {
             SafeTransferLib.safeTransferETH(msg.sender, amount);
@@ -379,9 +379,9 @@ contract ExecutionEnvironment is Base {
     }
 
     /// @notice The getEscrow function returns the address of the Atlas/Escrow contract.
-    /// @return escrow The address of the Atlas/Escrow contract.
-    function getEscrow() external view returns (address escrow) {
-        escrow = atlas;
+    /// @return The address of the Atlas/Escrow contract.
+    function getEscrow() external view returns (address) {
+        return ATLAS;
     }
 
     receive() external payable { }
