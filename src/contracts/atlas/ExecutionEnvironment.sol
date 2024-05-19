@@ -28,13 +28,7 @@ contract ExecutionEnvironment is Base {
     constructor(address _atlas) Base(_atlas) { }
 
     modifier validUser(UserOperation calldata userOp) {
-        if (userOp.from != _user()) revert AtlasErrors.InvalidUser();
         if (userOp.to != atlas || userOp.dapp == atlas) revert AtlasErrors.InvalidTo();
-        _;
-    }
-
-    modifier validControlHash() {
-        if (_control().codehash != _controlCodeHash()) revert AtlasErrors.InvalidCodeHash();
         _;
     }
 
@@ -84,7 +78,6 @@ contract ExecutionEnvironment is Base {
         payable
         validUser(userOp)
         onlyAtlasEnvironment(ExecutionPhase.UserOperation, _ENVIRONMENT_DEPTH)
-        validControlHash
         contributeSurplus
         returns (bytes memory returnData)
     {
