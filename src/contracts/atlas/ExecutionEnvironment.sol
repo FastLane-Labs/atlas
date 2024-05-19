@@ -351,24 +351,6 @@ contract ExecutionEnvironment is Base {
         }
     }
 
-    /// @notice The factoryWithdrawERC20 function allows Atlas to withdraw ERC20 tokens from this Execution Environment,
-    /// to the original user of this environment.
-    /// @dev This function is only callable by the Atlas contract and only when Atlas is in an unlocked state.
-    /// @param msgSender The address of the original user of this environment.
-    /// @param token The address of the ERC20 token to withdraw.
-    /// @param amount The amount of the ERC20 token to withdraw.
-    function factoryWithdrawERC20(address msgSender, address token, uint256 amount) external {
-        if (msg.sender != atlas) revert AtlasErrors.OnlyAtlas();
-        if (msgSender != _user()) revert AtlasErrors.NotEnvironmentOwner();
-        if (!ISafetyLocks(atlas).isUnlocked()) revert AtlasErrors.AtlasLockActive();
-
-        if (ERC20(token).balanceOf(address(this)) >= amount) {
-            SafeTransferLib.safeTransfer(ERC20(token), _user(), amount);
-        } else {
-            revert AtlasErrors.ExecutionEnvironmentBalanceTooLow();
-        }
-    }
-
     /// @notice The withdrawEther function allows the environment owner to withdraw Ether from this Execution
     /// Environment.
     /// @dev This function is only callable by the environment owner and only when Atlas is in an unlocked state.
@@ -379,23 +361,6 @@ contract ExecutionEnvironment is Base {
 
         if (address(this).balance >= amount) {
             SafeTransferLib.safeTransferETH(msg.sender, amount);
-        } else {
-            revert AtlasErrors.ExecutionEnvironmentBalanceTooLow();
-        }
-    }
-
-    /// @notice The factoryWithdrawEther function allows Atlas to withdraw Ether from this Execution Environment, to the
-    /// original user of this environment.
-    /// @dev This function is only callable by the Atlas contract and only when Atlas is in an unlocked state.
-    /// @param msgSender The address of the original user of this environment.
-    /// @param amount The amount of Ether to withdraw.
-    function factoryWithdrawEther(address msgSender, uint256 amount) external {
-        if (msg.sender != atlas) revert AtlasErrors.OnlyAtlas();
-        if (msgSender != _user()) revert AtlasErrors.NotEnvironmentOwner();
-        if (!ISafetyLocks(atlas).isUnlocked()) revert AtlasErrors.AtlasLockActive();
-
-        if (address(this).balance >= amount) {
-            SafeTransferLib.safeTransferETH(_user(), amount);
         } else {
             revert AtlasErrors.ExecutionEnvironmentBalanceTooLow();
         }
