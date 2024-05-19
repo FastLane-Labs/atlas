@@ -20,7 +20,6 @@ contract ExecutionBaseTest is BaseTest {
     address user;
     address dAppControl;
     uint32 callConfig;
-    bytes32 controlCodeHash;
     bytes randomData;
 
     function setUp() public override {
@@ -30,13 +29,12 @@ contract ExecutionBaseTest is BaseTest {
         user = address(0x2222);
         dAppControl = address(0x3333);
         callConfig = 888;
-        controlCodeHash = bytes32(uint256(666));
         randomData = "0x1234";
     }
 
     function test_forward() public {
         (bytes memory firstSet, EscrowKey memory _escrowKey) = forwardGetFirstSet(SafetyBits._LOCKED_X_PRE_OPS_X_UNSET);
-        bytes memory secondSet = abi.encodePacked(user, dAppControl, callConfig, controlCodeHash);
+        bytes memory secondSet = abi.encodePacked(user, dAppControl, callConfig);
 
         bytes memory expected = bytes.concat(randomData, firstSet, secondSet);
 
@@ -46,7 +44,7 @@ contract ExecutionBaseTest is BaseTest {
 
     function test_forwardSpecial_standard() public {
         (bytes memory firstSet, EscrowKey memory _escrowKey) = forwardGetFirstSet(SafetyBits._LOCKED_X_PRE_OPS_X_UNSET);
-        bytes memory secondSet = abi.encodePacked(user, dAppControl, callConfig, controlCodeHash);
+        bytes memory secondSet = abi.encodePacked(user, dAppControl, callConfig);
 
         bytes memory expected = bytes.concat(randomData, firstSet, secondSet);
 
@@ -57,7 +55,7 @@ contract ExecutionBaseTest is BaseTest {
     function test_forwardSpecial_phaseSwitch() public {
         (bytes memory firstSet, EscrowKey memory _escrowKey) =
             forwardGetFirstSet(SafetyBits._LOCKED_X_SOLVERS_X_REQUESTED);
-        bytes memory secondSet = abi.encodePacked(user, dAppControl, callConfig, controlCodeHash);
+        bytes memory secondSet = abi.encodePacked(user, dAppControl, callConfig);
 
         bytes memory expected = bytes.concat(randomData, firstSet, secondSet);
 
@@ -76,7 +74,7 @@ contract ExecutionBaseTest is BaseTest {
         data = abi.encodePacked(data, escrowKey.pack());
 
         // Mimic the Mimic
-        data = abi.encodePacked(data, user, dAppControl, callConfig, controlCodeHash);
+        data = abi.encodePacked(data, user, dAppControl, callConfig);
 
         (, bytes memory result) = address(mockExecutionEnvironment).call(data);
         result = abi.decode(result, (bytes));

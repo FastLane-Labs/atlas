@@ -44,7 +44,7 @@ contract FactoryTest is Test {
         address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 0);
         address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
         address expectedFactoryAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
-        bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedFactoryAddr, "AtlasFactory 1.0"));
+        bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedFactoryAddr));
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedFactoryAddr);
         
         vm.startPrank(deployer);
@@ -70,7 +70,7 @@ contract FactoryTest is Test {
     function test_createExecutionEnvironment() public {
         uint32 callConfig = dAppControl.CALL_CONFIG();
         bytes memory creationCode = TestUtils._getMimicCreationCode(
-            address(dAppControl), callConfig, mockFactory.EXECUTION_ENV_TEMPLATE(), user, address(dAppControl).codehash
+            address(dAppControl), callConfig, mockFactory.EXECUTION_ENV_TEMPLATE(), user
         );
         address expectedExecutionEnvironment = address(
             uint160(
@@ -136,7 +136,7 @@ contract FactoryTest is Test {
     }
 
     function test_FactorySaltSetCorrectly() public {
-        bytes32 expectedSalt = keccak256(abi.encodePacked(block.chainid, address(mockFactory), "AtlasFactory 1.0"));
+        bytes32 expectedSalt = keccak256(abi.encodePacked(block.chainid, address(mockFactory)));
         assertEq(expectedSalt, mockFactory.salt(), "Factory salt not set correctly");
     }
 }

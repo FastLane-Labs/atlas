@@ -44,12 +44,12 @@ contract Base {
 
     function forward(bytes memory data) internal pure returns (bytes memory) {
         // TODO: simplify this into just the bytes
-        return bytes.concat(data, _firstSet());
+        return bytes.concat(data, _firstSet(), _secondSet());
     }
 
     function forwardSpecial(bytes memory data, ExecutionPhase phase) internal pure returns (bytes memory) {
         // TODO: simplify this into just the bytes
-        return bytes.concat(data, _firstSetSpecial(phase));
+        return bytes.concat(data, _firstSetSpecial(phase), _secondSet());
     }
 
     function _firstSet() internal pure returns (bytes memory data) {
@@ -66,11 +66,6 @@ contract Base {
             _depth() + 1
         );
     }
-
-    // TODO remove after Mimic optimization is done
-    // function _secondSet() internal pure returns (bytes memory data) {
-    //     data = abi.encodePacked(_user(), _control(), _config(), _controlCodeHash());
-    // }
 
     function _firstSetSpecial(ExecutionPhase phase) internal pure returns (bytes memory data) {
         uint8 depth = _depth();
@@ -96,13 +91,41 @@ contract Base {
         );
     }
 
+    function _secondSet() internal pure returns (bytes memory data) {
+        data = abi.encodePacked(_user(), _control(), _config());
+    }
+
+    /// @notice Extracts and returns the CallConfig of the current DAppControl contract, from calldata.
+    /// @return config The CallConfig of the current DAppControl contract, in uint32 form.
+    function _config() internal pure returns (uint32 config) {
+        assembly {
+            config := shr(224, calldataload(sub(calldatasize(), 4)))
+        }
+    }
+
+    /// @notice Extracts and returns the address of the current DAppControl contract, from calldata.
+    /// @return control The address of the current DAppControl contract.
+    function _control() internal pure returns (address control) {
+        assembly {
+            control := shr(96, calldataload(sub(calldatasize(), 24)))
+        }
+    }
+
+    /// @notice Extracts and returns the address of the user of the current metacall tx, from calldata.
+    /// @return user The address of the user of the current metacall tx.
+    function _user() internal pure returns (address user) {
+        assembly {
+            user := shr(96, calldataload(sub(calldatasize(), 44)))
+        }
+    }
+
     /// @notice Extracts and returns the call depth within the current metacall tx, from calldata.
     /// @dev The call depth starts at 1 with the first call of each step in the metacall, from Atlas to the Execution
     /// Environment, and is incremented with each call/delegatecall within that step.
     /// @return callDepth The call depth of the current step in the current metacall tx.
     function _depth() internal pure returns (uint8 callDepth) {
         assembly {
-            callDepth := shr(248, calldataload(sub(calldatasize(), 77)))
+            callDepth := shr(248, calldataload(sub(calldatasize(), 45)))
         }
     }
 
@@ -111,7 +134,7 @@ contract Base {
     /// @return simulation The boolean indicating whether the current metacall tx is a simulation or not.
     function _simulation() internal pure returns (bool simulation) {
         assembly {
-            simulation := shr(248, calldataload(sub(calldatasize(), 78)))
+            simulation := shr(248, calldataload(sub(calldatasize(), 46)))
         }
     }
 
@@ -120,7 +143,7 @@ contract Base {
     /// @return bidFind The boolean indicating whether the current metacall tx uses on-chain bid-finding, or not.
     function _bidFind() internal pure returns (bool bidFind) {
         assembly {
-            bidFind := shr(248, calldataload(sub(calldatasize(), 79)))
+            bidFind := shr(248, calldataload(sub(calldatasize(), 47)))
         }
     }
 
@@ -129,7 +152,7 @@ contract Base {
     /// @return solverOutcome The solver outcome bitmap in its current status, in uint24 form.
     function _solverOutcome() internal pure returns (uint24 solverOutcome) {
         assembly {
-            solverOutcome := shr(232, calldataload(sub(calldatasize(), 82)))
+            solverOutcome := shr(232, calldataload(sub(calldatasize(), 50)))
         }
     }
 
@@ -137,7 +160,7 @@ contract Base {
     /// @return lockState The lock state bitmap of the current metacall tx, in uint16 form.
     function _lockState() internal pure returns (uint16 lockState) {
         assembly {
-            lockState := shr(240, calldataload(sub(calldatasize(), 84)))
+            lockState := shr(240, calldataload(sub(calldatasize(), 52)))
         }
     }
 
@@ -147,7 +170,7 @@ contract Base {
     /// @return callCount The call count of the current metacall tx.
     function _callCount() internal pure returns (uint8 callCount) {
         assembly {
-            callCount := shr(248, calldataload(sub(calldatasize(), 85)))
+            callCount := shr(248, calldataload(sub(calldatasize(), 53)))
         }
     }
 
@@ -158,7 +181,7 @@ contract Base {
     /// @return callIndex The call index of the current metacall tx.
     function _callIndex() internal pure returns (uint8 callIndex) {
         assembly {
-            callIndex := shr(248, calldataload(sub(calldatasize(), 86)))
+            callIndex := shr(248, calldataload(sub(calldatasize(), 54)))
         }
     }
 
@@ -168,7 +191,7 @@ contract Base {
     /// step in the current metacall tx.
     function _paymentsSuccessful() internal pure returns (bool paymentsSuccessful) {
         assembly {
-            paymentsSuccessful := shr(248, calldataload(sub(calldatasize(), 87)))
+            paymentsSuccessful := shr(248, calldataload(sub(calldatasize(), 55)))
         }
     }
 
@@ -178,7 +201,7 @@ contract Base {
     /// current metacall tx.
     function _solverSuccessful() internal pure returns (bool solverSuccessful) {
         assembly {
-            solverSuccessful := shr(248, calldataload(sub(calldatasize(), 88)))
+            solverSuccessful := shr(248, calldataload(sub(calldatasize(), 56)))
         }
     }
 
@@ -189,7 +212,7 @@ contract Base {
     /// @return addressPointer The current value of the addressPointer of the current metacall tx.
     function _addressPointer() internal pure returns (address addressPointer) {
         assembly {
-            addressPointer := shr(96, calldataload(sub(calldatasize(), 108)))
+            addressPointer := shr(96, calldataload(sub(calldatasize(), 76)))
         }
     }
 
@@ -200,7 +223,9 @@ contract Base {
     }
 }
 
-// ExecutionBase is inherited by DAppControl. It inherits Base to as a common root contract shared between ExecutionEnvironment and DAppControl. ExecutionBase then adds utility functions which make it easier for custom DAppControls to interact with Atlas. 
+// ExecutionBase is inherited by DAppControl. It inherits Base to as a common root contract shared between
+// ExecutionEnvironment and DAppControl. ExecutionBase then adds utility functions which make it easier for custom
+// DAppControls to interact with Atlas.
 contract ExecutionBase is Base {
     constructor(address _atlas) Base(_atlas) { }
 

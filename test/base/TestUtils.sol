@@ -78,8 +78,7 @@ library TestUtils {
         address control,
         uint32 callConfig,
         address executionLib,
-        address user,
-        bytes32 controlCodeHash
+        address user
     )
         internal
         pure
@@ -116,8 +115,6 @@ library TestUtils {
                     add(shl(96, control), add(shl(88, 0x63), shl(56, callConfig)))
                 )
             )
-
-            mstore(add(creationCode, 165), controlCodeHash)
         }
     }
 
