@@ -44,7 +44,12 @@ contract Base {
 
     function forward(bytes memory data) internal pure returns (bytes memory) {
         // TODO: simplify this into just the bytes
-        return bytes.concat(data, _firstSet(), _secondSet());
+        return bytes.concat(data, _firstSet());
+    }
+
+    function forwardSpecial(bytes memory data, ExecutionPhase phase) internal pure returns (bytes memory) {
+        // TODO: simplify this into just the bytes
+        return bytes.concat(data, _firstSetSpecial(phase));
     }
 
     function _firstSet() internal pure returns (bytes memory data) {
@@ -62,14 +67,10 @@ contract Base {
         );
     }
 
-    function _secondSet() internal pure returns (bytes memory data) {
-        data = abi.encodePacked(_user(), _control(), _config(), _controlCodeHash());
-    }
-
-    function forwardSpecial(bytes memory data, ExecutionPhase phase) internal pure returns (bytes memory) {
-        // TODO: simplify this into just the bytes
-        return bytes.concat(data, _firstSetSpecial(phase), _secondSet());
-    }
+    // TODO remove after Mimic optimization is done
+    // function _secondSet() internal pure returns (bytes memory data) {
+    //     data = abi.encodePacked(_user(), _control(), _config(), _controlCodeHash());
+    // }
 
     function _firstSetSpecial(ExecutionPhase phase) internal pure returns (bytes memory data) {
         uint8 depth = _depth();
@@ -93,38 +94,6 @@ contract Base {
             _simulation(),
             depth + 1
         );
-    }
-
-    /// @notice Extracts and returns the codehash of the current DAppControl contract, from calldata.
-    /// @return controlCodeHash The codehash of the current DAppControl contract.
-    function _controlCodeHash() internal pure returns (bytes32 controlCodeHash) {
-        assembly {
-            controlCodeHash := calldataload(sub(calldatasize(), 32))
-        }
-    }
-
-    /// @notice Extracts and returns the CallConfig of the current DAppControl contract, from calldata.
-    /// @return config The CallConfig of the current DAppControl contract, in uint32 form.
-    function _config() internal pure returns (uint32 config) {
-        assembly {
-            config := shr(224, calldataload(sub(calldatasize(), 36)))
-        }
-    }
-
-    /// @notice Extracts and returns the address of the current DAppControl contract, from calldata.
-    /// @return control The address of the current DAppControl contract.
-    function _control() internal pure returns (address control) {
-        assembly {
-            control := shr(96, calldataload(sub(calldatasize(), 56)))
-        }
-    }
-
-    /// @notice Extracts and returns the address of the user of the current metacall tx, from calldata.
-    /// @return user The address of the user of the current metacall tx.
-    function _user() internal pure returns (address user) {
-        assembly {
-            user := shr(96, calldataload(sub(calldatasize(), 76)))
-        }
     }
 
     /// @notice Extracts and returns the call depth within the current metacall tx, from calldata.
