@@ -133,27 +133,26 @@ contract FactoryTest is Test {
         userOp.from = user;
         userOp.control = address(dAppControl);
 
-        address executionEnvironment;
+        address predictedEE;
+        address actualEE;
         bool exists;
 
-        (executionEnvironment,, exists) = mockFactory.getExecutionEnvironment(user, address(dAppControl));
+        (predictedEE,, exists) = mockFactory.getExecutionEnvironment(user, address(dAppControl));
         assertFalse(exists, "Execution environment should not exist");
-        assertTrue(executionEnvironment.code.length == 0, "Execution environment should not exist");
+        assertTrue(predictedEE.code.length == 0, "Execution environment should not exist");
 
-        console.log("predicted:", executionEnvironment);
+        // Actually deploy the EE
+        (actualEE,) = mockFactory.getOrCreateExecutionEnvironment(userOp);
+        assertEq(predictedEE, actualEE, "Predicted and actual EE addrs should match 2");
 
-        (executionEnvironment,) = mockFactory.getOrCreateExecutionEnvironment(userOp);
-
-        console.log("actual 1:", executionEnvironment);
-
-        (executionEnvironment,, exists) = mockFactory.getExecutionEnvironment(user, address(dAppControl));
-        console.log("actual 2:", executionEnvironment);
+        (predictedEE,, exists) = mockFactory.getExecutionEnvironment(user, address(dAppControl));
         
         assertTrue(exists, "Execution environment should exist - exist should return true");
-        assertFalse(executionEnvironment.code.length == 0, "Execution environment should exist - code at addr");
+        assertFalse(predictedEE.code.length == 0, "Execution environment should exist - code at addr");
+        assertEq(predictedEE, actualEE, "Predicted and actual EE addrs should match 2");
     }
 
-    function test_FactorySaltSetCorrectly() public {
+    function test_factoryBaseAndComputedSalts() public {
         bytes32 baseSalt = keccak256(abi.encodePacked(block.chainid, address(mockFactory)));
         assertEq(baseSalt, mockFactory.baseSalt(), "Factory base salt not set correctly");
 
