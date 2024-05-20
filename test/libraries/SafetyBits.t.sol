@@ -152,7 +152,7 @@ contract SafetyBitsTest is Test {
         EscrowKey memory key = initializeEscrowLock(CallConfigIndex.RequirePostOpsCall);
         key = key.holdUserLock(address(1));
         bytes32 want = 0x0000000000000000000000000000000000000001000002040048000000000001;
-        bytes32 packed = key.pack();
+        bytes32 packed = bytes32(key.pack());
         // console.logBytes32(want);
         // console.logBytes32(packed);
         assertTrue(packed == want);
