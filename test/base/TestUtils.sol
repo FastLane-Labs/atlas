@@ -74,53 +74,6 @@ library TestUtils {
         return string(output);
     }
 
-    function _getMimicCreationCode(
-        address control,
-        uint32 callConfig,
-        address executionLib,
-        address user,
-        bytes32 controlCodeHash
-    )
-        internal
-        pure
-        returns (bytes memory creationCode)
-    {
-        // NOTE: Changing compiler settings or solidity versions can break this.
-        creationCode = type(Mimic).creationCode;
-
-        // TODO: unpack the SHL and reorient
-        assembly {
-            mstore(
-                add(creationCode, 85),
-                or(
-                    and(mload(add(creationCode, 85)), not(shl(96, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF))),
-                    shl(96, executionLib)
-                )
-            )
-
-            mstore(
-                add(creationCode, 118),
-                or(
-                    and(mload(add(creationCode, 118)), not(shl(96, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF))),
-                    shl(96, user)
-                )
-            )
-
-            mstore(
-                add(creationCode, 139),
-                or(
-                    and(
-                        mload(add(creationCode, 139)),
-                        not(shl(56, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00FFFFFFFF))
-                    ),
-                    add(shl(96, control), add(shl(88, 0x63), shl(56, callConfig)))
-                )
-            )
-
-            mstore(add(creationCode, 165), controlCodeHash)
-        }
-    }
-
     function computeCallChainHash(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,

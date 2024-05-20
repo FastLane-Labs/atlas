@@ -83,7 +83,7 @@ contract SwapIntentDAppControl is DAppControl {
     * @return swapData The SwapData struct
     */
     function swap(SwapIntent calldata swapIntent) external payable returns (SwapData memory) {
-        require(msg.sender == atlas, "SwapIntentDAppControl: InvalidSender");
+        require(msg.sender == ATLAS, "SwapIntentDAppControl: InvalidSender");
         require(_addressPointer() == CONTROL, "SwapIntentDAppControl: InvalidLockState");
         require(address(this) != CONTROL, "SwapIntentDAppControl: MustBeDelegated");
         require(swapIntent.tokenUserSells != swapIntent.auctionBaseCurrency, "SwapIntentDAppControl: SellIsSurplus");
@@ -138,7 +138,7 @@ contract SwapIntentDAppControl is DAppControl {
         returns (bool)
     {
         address solverTo = solverOp.solver;
-        if (solverTo == address(this) || solverTo == _control() || solverTo == atlas) {
+        if (solverTo == address(this) || solverTo == _control() || solverTo == ATLAS) {
             return false;
         }
 
