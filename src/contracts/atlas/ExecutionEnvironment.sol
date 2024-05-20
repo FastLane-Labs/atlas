@@ -57,7 +57,7 @@ contract ExecutionEnvironment is Base {
         onlyAtlasEnvironment(ExecutionPhase.PreOps, _ENVIRONMENT_DEPTH)
         returns (bytes memory)
     {
-        bytes memory preOpsData = forward(abi.encodeCall(IDAppControl.preOpsCall, userOp));
+        bytes memory preOpsData = _forward(abi.encodeCall(IDAppControl.preOpsCall, userOp));
 
         bool success;
         (success, preOpsData) = _control().delegatecall(preOpsData);
@@ -88,11 +88,11 @@ contract ExecutionEnvironment is Base {
         bool success;
 
         if (config.needsDelegateUser()) {
-            (success, returnData) = userOp.dapp.delegatecall(forward(userOp.data));
+            (success, returnData) = userOp.dapp.delegatecall(_forward(userOp.data));
             if (!success) revert AtlasErrors.UserWrapperDelegatecallFail();
         } else {
             // regular user call - executed at regular destination and not performed locally
-            (success, returnData) = userOp.dapp.call{ value: userOp.value }(forward(userOp.data));
+            (success, returnData) = userOp.dapp.call{ value: userOp.value }(_forward(userOp.data));
             if (!success) revert AtlasErrors.UserWrapperCallFail();
         }
     }
@@ -109,7 +109,7 @@ contract ExecutionEnvironment is Base {
         external
         onlyAtlasEnvironment(ExecutionPhase.PostOps, _ENVIRONMENT_DEPTH)
     {
-        bytes memory data = forward(abi.encodeCall(IDAppControl.postOpsCall, (solved, returnData)));
+        bytes memory data = _forward(abi.encodeCall(IDAppControl.postOpsCall, (solved, returnData)));
 
         bool success;
         (success, data) = _control().delegatecall(data);
@@ -166,7 +166,7 @@ contract ExecutionEnvironment is Base {
 
         // Handle any solver preOps, if necessary
         if (config.needsPreSolver()) {
-            bytes memory data = forwardSpecial(
+            bytes memory data = _forwardSpecial(
                 abi.encodeCall(IDAppControl.preSolverCall, (solverOp, returnData)), ExecutionPhase.PreSolver
             );
 
@@ -212,7 +212,7 @@ contract ExecutionEnvironment is Base {
             (, success,) = IEscrow(ATLAS).solverLockData();
             if (!success) revert AtlasErrors.CallbackNotCalled();
 
-            bytes memory data = forwardSpecial(
+            bytes memory data = _forwardSpecial(
                 abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData)), ExecutionPhase.PostSolver
             );
 
@@ -318,7 +318,7 @@ contract ExecutionEnvironment is Base {
         onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _ENVIRONMENT_DEPTH)
         contributeSurplus
     {
-        allocateData = forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, bidAmount, allocateData)));
+        allocateData = _forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, bidAmount, allocateData)));
 
         (bool success,) = _control().delegatecall(allocateData);
         if (!success) revert AtlasErrors.AllocateValueDelegatecallFail();

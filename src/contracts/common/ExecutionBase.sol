@@ -42,13 +42,11 @@ contract Base {
         }
     }
 
-    function forward(bytes memory data) internal pure returns (bytes memory) {
-        // TODO: simplify this into just the bytes
+    function _forward(bytes memory data) internal pure returns (bytes memory) {
         return bytes.concat(data, _firstSet(), _secondSet());
     }
 
-    function forwardSpecial(bytes memory data, ExecutionPhase phase) internal pure returns (bytes memory) {
-        // TODO: simplify this into just the bytes
+    function _forwardSpecial(bytes memory data, ExecutionPhase phase) internal pure returns (bytes memory) {
         return bytes.concat(data, _firstSetSpecial(phase), _secondSet());
     }
 
