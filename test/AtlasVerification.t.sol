@@ -547,6 +547,30 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         ), ValidCallsResult.Valid);
     }
 
+    // 
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    //   and the governanceEOA is not a valid signatory
+    //   and callConfig.solverAuctioneer = true
+    // when validCalls is called from the solverOneEOA
+    // when there is more than 1 solver (must be exactly 1 solver if solver == auctioneer)
+    // then it should return Invalid
+    //
+    function test_validCalls_SolverAuctioneer_TwoSolvers_InvalidAuctioneer() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withSolverAuctioneer(true).build());
+        vm.prank(governanceEOA);
+        atlasVerification.removeSignatory(address(dAppControl), governanceEOA);
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = new SolverOperation[](2);
+        solverOps[0] = validSolverOperation(userOp).build();
+        solverOps[1] = validSolverOperation(userOp).build();
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withFrom(solverOneEOA).signAndBuild(address(atlasVerification), governancePK);
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+        ), ValidCallsResult.InvalidAuctioneer);
+    }
+
     //
     // given a default atlas environment
     //   and otherwise valid user, solver and dapp operations
