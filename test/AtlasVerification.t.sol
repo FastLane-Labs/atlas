@@ -59,6 +59,7 @@ contract AtlasVerificationBase is AtlasBaseTest {
             .withNonce(address(atlasVerification), userEOA)
             .withDeadline(block.number + 2)
             .withControl(address(dAppControl))
+            .withCallConfig(dAppControl.CALL_CONFIG())
             .withSessionKey(address(0))
             .withData("")
             .sign(address(atlasVerification), userPK);
@@ -163,6 +164,11 @@ contract AtlasVerificationBase is AtlasBaseTest {
 
 contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
     using CallVerification for UserOperation;
+
+    function setUp() public override {
+        AtlasBaseTest.setUp();
+        dAppControl = defaultDAppControl().buildAndIntegrate(atlasVerification);
+    }
 
     function test_verifySolverOp_InvalidSignature() public {
         UserOperation memory userOp = validUserOperation().build();

@@ -77,6 +77,7 @@ contract TxBuilder {
             deadline: deadline,
             dapp: to,
             control: control,
+            callConfig: IDAppControl(control).CALL_CONFIG(),
             sessionKey: address(0),
             data: data,
             signature: new bytes(0)

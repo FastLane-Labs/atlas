@@ -56,6 +56,7 @@ contract ExPostTest is BaseTest {
 
         UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
         userOp.control = address(v2ExPost);
+        userOp.callConfig = v2ExPost.CALL_CONFIG();
 
         // user does not sign their own operation when bundling
         // (v, r, s) = vm.sign(userPK, atlasVerification.getUserOperationPayload(userOp));
@@ -283,6 +284,7 @@ contract ExPostTest is BaseTest {
         uint256 NUM_SOLVE_OPS = 3;
         UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
         userOp.control = address(v2ExPost);
+        userOp.callConfig = v2ExPost.CALL_CONFIG();
         SolverOperation[] memory solverOps = new SolverOperation[](NUM_SOLVE_OPS);
         bytes memory solverOpData;
         address[] memory solverEOAs = new address[](NUM_SOLVE_OPS);

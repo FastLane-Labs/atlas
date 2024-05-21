@@ -4,10 +4,14 @@ pragma solidity 0.8.22;
 import "forge-std/Test.sol";
 
 import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
+import { CallConfig } from "src/contracts/types/DAppApprovalTypes.sol";
+import { CallBits } from "src/contracts/libraries/CallBits.sol";
 
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
 
 contract UserOperationBuilder is Test {
+    using CallBits for uint32;
+
     UserOperation userOperation;
 
     function withFrom(address from) public returns (UserOperationBuilder) {
@@ -81,6 +85,16 @@ contract UserOperationBuilder is Test {
 
     function withControl(address control) public returns (UserOperationBuilder) {
         userOperation.control = control;
+        return this;
+    }
+
+    function withCallConfig(CallConfig memory callConfig) public returns (UserOperationBuilder) {
+        userOperation.callConfig = CallBits.encodeCallConfig(callConfig);
+        return this;
+    }
+
+    function withCallConfig(uint32 callConfig) public returns (UserOperationBuilder) {
+        userOperation.callConfig = callConfig;
         return this;
     }
 

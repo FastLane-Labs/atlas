@@ -15,6 +15,7 @@ struct UserOperation {
     uint256 deadline;
     address dapp; // nested "to" for user's call
     address control; // address for preOps / validation funcs
+    uint32 callConfig;
     address sessionKey;
     bytes data;
     bytes signature;

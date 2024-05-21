@@ -1,11 +1,11 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { IDAppControl } from "../interfaces/IDAppControl.sol";
+import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 
-import "../types/SolverCallTypes.sol";
-import "../types/UserCallTypes.sol";
-import "../types/DAppApprovalTypes.sol";
+import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/UserCallTypes.sol";
+import "src/contracts/types/DAppApprovalTypes.sol";
 
 library CallVerification {
     function getUserOperationHash(UserOperation memory userOp) internal pure returns (bytes32 userOpHash) {
@@ -13,7 +13,9 @@ library CallVerification {
     }
 
     function getAltOperationHash(UserOperation memory userOp) internal pure returns (bytes32 altOpHash) {
-        altOpHash = keccak256(abi.encodePacked(userOp.from, userOp.to, userOp.dapp, userOp.control, userOp.sessionKey));
+        altOpHash = keccak256(
+            abi.encodePacked(userOp.from, userOp.to, userOp.dapp, userOp.control, userOp.callConfig, userOp.sessionKey)
+        );
     }
 
     function getCallChainHash(
