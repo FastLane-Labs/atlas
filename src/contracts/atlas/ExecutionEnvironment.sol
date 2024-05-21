@@ -85,14 +85,17 @@ contract ExecutionEnvironment is Base {
 
         if (userOp.value > address(this).balance) revert AtlasErrors.UserOpValueExceedsBalance();
 
+        // Do not attach extra calldata via `_forward()` if contract called is not dAppControl, as the additional
+        // calldata may cause unexpected behaviour in third-party protocols
+        bytes memory callData = (userOp.dapp != userOp.control) ? userOp.data : _forward(userOp.data);
         bool success;
 
         if (config.needsDelegateUser()) {
-            (success, returnData) = userOp.dapp.delegatecall(_forward(userOp.data));
+            (success, returnData) = userOp.dapp.delegatecall(callData);
             if (!success) revert AtlasErrors.UserWrapperDelegatecallFail();
         } else {
             // regular user call - executed at regular destination and not performed locally
-            (success, returnData) = userOp.dapp.call{ value: userOp.value }(_forward(userOp.data));
+            (success, returnData) = userOp.dapp.call{ value: userOp.value }(callData);
             if (!success) revert AtlasErrors.UserWrapperCallFail();
         }
     }
