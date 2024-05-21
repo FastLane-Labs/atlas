@@ -42,7 +42,7 @@ abstract contract Escrow is AtlETH {
     function _executePreOpsCall(
         UserOperation calldata userOp,
         address environment,
-        bytes32 lockBytes
+        bytes memory lockBytes
     )
         internal
         returns (bool success, bytes memory preOpsData)
@@ -64,7 +64,7 @@ abstract contract Escrow is AtlETH {
     function _executeUserOperation(
         UserOperation calldata userOp,
         address environment,
-        bytes32 lockBytes
+        bytes memory lockBytes
     )
         internal
         returns (bool success, bytes memory userData)
@@ -415,7 +415,7 @@ abstract contract Escrow is AtlETH {
         address environment,
         SolverOperation calldata solverOp,
         bytes memory dAppReturnData,
-        bytes32 lockBytes
+        bytes memory lockBytes
     )
         internal
         returns (uint256)

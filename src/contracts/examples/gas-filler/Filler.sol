@@ -143,7 +143,7 @@ contract Filler is DAppControl {
 
         bytes memory data = abi.encodeCall(this.postOpBalancing, maxTokenAmount - solverOp.bidAmount);
 
-        (bool success,) = _control().call(forward(data));
+        (bool success,) = _control().call(_forward(data));
         require(success, "HITTING THIS = JOB OFFER");
 
         return true;
@@ -207,7 +207,7 @@ contract Filler is DAppControl {
         // TODO: use assembly (current impl is a lazy way to grab the approval tx data)
         bytes memory mData = abi.encodeCall(this.approve, bytes.concat(approvalTx.data, data));
 
-        (bool success, bytes memory returnData) = _control().call(forward(mData));
+        (bool success, bytes memory returnData) = _control().call(_forward(mData));
         // NOTE: approvalTx.data includes func selector
 
         require(success, "ERR - REJECTED");

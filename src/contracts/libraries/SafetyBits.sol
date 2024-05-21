@@ -49,20 +49,18 @@ library SafetyBits {
     uint16 internal constant _LOCKED_X_VERIFICATION_X_UNSET = 0x0808; // 2056
         // uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps)));
 
-    function pack(EscrowKey memory self) internal pure returns (bytes32 packedKey) {
-        packedKey = bytes32(
-            abi.encodePacked(
-                self.addressPointer,
-                self.solverSuccessful,
-                self.paymentsSuccessful,
-                self.callIndex,
-                self.callCount,
-                self.lockState,
-                self.solverOutcome,
-                self.bidFind,
-                self.isSimulation,
-                uint8(1) // callDepth
-            )
+    function pack(EscrowKey memory self) internal pure returns (bytes memory packedKey) {
+        packedKey = abi.encodePacked(
+            self.addressPointer,
+            self.solverSuccessful,
+            self.paymentsSuccessful,
+            self.callIndex,
+            self.callCount,
+            self.lockState,
+            self.solverOutcome,
+            self.bidFind,
+            self.isSimulation,
+            uint8(1) // callDepth
         );
     }
 
