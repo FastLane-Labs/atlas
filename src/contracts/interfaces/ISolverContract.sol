@@ -6,6 +6,7 @@ import "../types/SolverCallTypes.sol";
 interface ISolverContract {
     function atlasSolverCall(
         address sender,
+        address bidRecipient,
         address bidToken,
         uint256 bidAmount,
         bytes calldata solverOpData,

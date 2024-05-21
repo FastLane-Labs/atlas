@@ -24,3 +24,11 @@ struct SolverOperation {
     bytes data;
     bytes signature;
 }
+
+struct SolverTracker {
+    uint256 bidAmount;
+    uint256 floor;
+    uint256 ceiling;
+    bool etherIsBidToken;
+    bool invertsBidValue;
+}

@@ -85,7 +85,6 @@ contract ExecutionEnvironment is Base {
         validUser(userOp)
         onlyAtlasEnvironment(ExecutionPhase.UserOperation, _ENVIRONMENT_DEPTH)
         validControlHash
-        contributeSurplus
         returns (bytes memory returnData)
     {
         uint32 config = _config();
@@ -133,94 +132,89 @@ contract ExecutionEnvironment is Base {
     /// @param gasLimit The gas limit for the SolverOperation.
     /// @param solverOp The SolverOperation struct.
     /// @param returnData Data returned from the previous call phase.
-    function solverMetaTryCatch(
+    function solverPreTryCatch(
         uint256 bidAmount,
-        uint256 gasLimit,
         SolverOperation calldata solverOp,
         bytes calldata returnData
     )
         external
         payable
-        onlyAtlasEnvironment(ExecutionPhase.SolverOperations, _ENVIRONMENT_DEPTH)
+        onlyAtlasEnvironment(ExecutionPhase.PreSolver, _ENVIRONMENT_DEPTH)
+        returns (SolverTracker memory sTracker)
     {
-        if (address(this).balance != solverOp.value) revert AtlasErrors.SolverMetaTryCatchIncorrectValue();
-
-        uint32 config = _config();
-        address control = _control();
-
-        // Track token balance to measure if the bid amount is paid.
-        bool etherIsBidToken;
-        uint256 startBalance;
-
-        if (solverOp.bidToken == address(0)) {
-            startBalance = 0; // address(this).balance - solverOp.value;
-            etherIsBidToken = true;
-            // ERC20 balance
-        } else {
-            startBalance = ERC20(solverOp.bidToken).balanceOf(address(this));
-        }
-
-        ////////////////////////////
-        // SOLVER SAFETY CHECKS //
-        ////////////////////////////
-
         // Verify that the DAppControl contract matches the solver's expectations
-        if (solverOp.control != control) {
+        if (solverOp.control != _control()) {
             revert AtlasErrors.AlteredControl();
         }
 
-        bool success;
+        sTracker.bidAmount = bidAmount;
+        sTracker.etherIsBidToken = solverOp.bidToken == address(0);
+
+        // bidValue is inverted; Lower bids are better; solver must withdraw <= bidAmount
+        if (config.invertsBidValue()) {
+            sTracker.invertsBidValue = true;
+            // if invertsBidValue, record ceiling now
+            // inventory to send to solver must have been transferred in by userOp or preOp call
+            sTracker.ceiling = sTracker.etherIsBidToken ? 
+                address(this).balance :
+                ERC20(solverOp.bidToken).balanceOf(address(this));
+        } 
 
         // Handle any solver preOps, if necessary
-        if (config.needsPreSolver()) {
-            bytes memory data = forwardSpecial(
-                abi.encodeCall(IDAppControl.preSolverCall, (solverOp, returnData)), ExecutionPhase.PreSolver
+        if (_config().needsPreSolver()) {
+            bool success;
+            bytes memory data = forward(
+                abi.encodeCall(IDAppControl.preSolverCall, (solverOp, returnData))
             );
 
-            (success, data) = control.delegatecall(data);
+            (success, data) = _control().delegatecall(data);
 
             if (!success) {
                 revert AtlasErrors.PreSolverFailed();
             }
-
-            success = abi.decode(data, (bool));
-            if (!success) {
-                revert AtlasErrors.PreSolverFailed();
-            }
-
-            // Verify that the hook didn't illegally enter the Solver contract
-            // success = "calledBack"
-            (, success,) = IEscrow(atlas).solverLockData();
-            if (success) revert AtlasErrors.InvalidEntry();
         }
 
-        // Execute the solver call.
-        bytes memory solverCallData = abi.encodeCall(
-            ISolverContract.atlasSolverCall,
-            (
-                solverOp.from,
-                solverOp.bidToken,
-                bidAmount,
-                solverOp.data,
-                config.forwardReturnData() ? returnData : new bytes(0)
-            )
-        );
-        (success,) = solverOp.solver.call{ gas: gasLimit, value: solverOp.value }(solverCallData);
-
-        // Verify that it was successful
-        if (!success) {
-            revert AtlasErrors.SolverOperationReverted();
+        // bidValue is not inverted; Higher bids are better; solver must deposit >= bidAmount
+        if (!sTracker.invertsBidValue) {
+            // if invertsBidValue, record floor now
+            sTracker.floor = sTracker.etherIsBidToken ? 
+                address(this).balance :
+                ERC20(solverOp.bidToken).balanceOf(address(this));
         }
+    }
 
+    /// @notice The solverPostTryCatch function is called by Atlas to execute the SolverOperation, as well as any
+    /// preSolver or postSolver hooks that the DAppControl contract may require.
+    /// @dev This contract is called by the Atlas contract, delegatecalls the preSolver and postSolver hooks if
+    /// required, and executes the SolverOperation by calling the `solverOp.solver` address.
+    /// @param solverOp The SolverOperation struct.
+    /// @param returnData Data returned from the previous call phase.
+    /// @param sTracker Bid tracking information for this solver.
+    function solverPostTryCatch(
+        SolverOperation calldata solverOp,
+        bytes calldata returnData,
+        SolverTracker memory sTracker
+    )
+        external
+        payable
+        onlyAtlasEnvironment(ExecutionPhase.PostSolver, _ENVIRONMENT_DEPTH)
+        returns (SolverTracker memory)
+    {
         // If this was a user intent, handle and verify fulfillment
-        if (config.needsSolverPostCall()) {
-            // Verify that the solver contract hit the callback before handing over to PostSolver hook
-            // NOTE The balance may still be unfulfilled and handled by the PostSolver hook.
-            (, success,) = IEscrow(atlas).solverLockData();
-            if (!success) revert AtlasErrors.CallbackNotCalled();
 
-            bytes memory data = forwardSpecial(
-                abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData)), ExecutionPhase.PostSolver
+        // bidValue is inverted; Lower bids are better; solver must withdraw <= bidAmount
+        if (sTracker.invertsBidValue) {
+            // if invertsBidValue, record floor now
+            sTracker.floor = sTracker.etherIsBidToken ? 
+                address(this).balance :
+                ERC20(solverOp.bidToken).balanceOf(address(this));
+        }
+
+        bool success;
+        if (config.needsSolverPostCall()) {
+           
+            bytes memory data = forward(
+                abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData))
             );
 
             (success, data) = control.delegatecall(data);
@@ -228,86 +222,31 @@ contract ExecutionEnvironment is Base {
             if (!success) {
                 revert AtlasErrors.PostSolverFailed();
             }
-
-            success = abi.decode(data, (bool));
-            if (!success) {
-                revert AtlasErrors.IntentUnfulfilled();
-            }
         }
 
-        uint256 endBalance = etherIsBidToken ? address(this).balance : ERC20(solverOp.bidToken).balanceOf(address(this));
-
-        // Check if this is an on-chain, ex post bid search
-        if (_bidFind()) {
-            uint256 netBid;
-
-            if (!config.invertsBidValue()) {
-                netBid = endBalance - startBalance; // intentionally underflow on fail
-                if (solverOp.bidAmount != 0 && netBid > solverOp.bidAmount) {
-                    netBid = solverOp.bidAmount;
-                    endBalance = etherIsBidToken ? netBid - solverOp.bidAmount : address(this).balance;
-                } else {
-                    endBalance = 0;
-                }
-            } else {
-                netBid = startBalance - endBalance; // intentionally underflow on fail
-                if (solverOp.bidAmount != 0 && netBid < solverOp.bidAmount) {
-                    netBid = solverOp.bidAmount;
-                    endBalance = etherIsBidToken ? solverOp.bidAmount - netBid : address(this).balance;
-                } else {
-                    endBalance = 0;
-                }
-            }
-
-            // Contribute any surplus balance
-            if (endBalance > 0) {
-                IEscrow(atlas).contribute{ value: endBalance }();
-            }
-
-            // Verify payback
-            (, success) = IEscrow(atlas).validateBalances();
-            if (!success) revert AtlasErrors.BalanceNotReconciled();
-
-            // Solver bid was successful, revert with highest amount.
-            revert AtlasErrors.BidFindSuccessful(netBid);
+        // bidValue is not inverted; Higher bids are better; solver must deposit >= bidAmount
+        if (!sTracker.invertsBidValue) {
+            // if not invertsBidValue, record ceiling now
+            sTracker.ceiling = sTracker.etherIsBidToken ? 
+                address(this).balance :
+                ERC20(solverOp.bidToken).balanceOf(address(this));
         }
 
-        // Verify that the solver paid what they bid
-        if (!config.invertsBidValue()) {
-            // CASE: higher bids are desired by beneficiary (E.G. amount transferred in by solver)
+        // Make sure the numbers add up and that the bid was paid
+        if (sTracker.floor > sTracker.ceiling) revert AtlasErrors.SolverBidUnpaid();
+        
+        uint256 netBid = sTracker.ceiling - sTracker.floor; 
 
-            // Use bidAmount arg instead of solverOp element to ensure that ex ante bid results
-            // aren't tampered with or otherwise altered the second time around.
-            if (endBalance < startBalance + bidAmount) {
-                revert AtlasErrors.SolverBidUnpaid();
-            }
+        // If bids aren't inverted, revert if net amount received is less than the bid
+        if (!sTracker.invertsBidValue && netBid < sTracker.bidAmount) revert AtlasErrors.SolverBidUnpaid();
+        
+        // If bids are inverted, revert if the net amount sent is more than the bid
+        if (sTracker.invertsBidValue && netBid > sTracker.bidAmount) revert AtlasErrors.SolverBidUnpaid();
 
-            // Get ending eth balance
-            endBalance = etherIsBidToken ? endBalance - bidAmount : address(this).balance;
-        } else {
-            // CASE: lower bids are desired by beneficiary (E.G. amount transferred out to solver)
-
-            // Use bidAmount arg instead of solverOp element to ensure that ex ante bid results
-            // aren't tampered with or otherwise altered the second time around.
-            if (endBalance < startBalance - bidAmount) {
-                // underflow -> revert = intended
-                revert AtlasErrors.SolverBidUnpaid();
-            }
-
-            // Get ending eth balance
-            endBalance = etherIsBidToken ? endBalance : address(this).balance;
-        }
-
-        // Contribute any surplus back - this may be used to validate balance.
-        if (endBalance > 0) {
-            IEscrow(atlas).contribute{ value: endBalance }();
-        }
-
-        // Verify that the solver repaid their msg.value
-        (, success) = IEscrow(atlas).validateBalances();
-        if (!success) {
-            revert AtlasErrors.BalanceNotReconciled();
-        }
+        // Update the bidAmount to the bid received
+        sTracker.bidAmount = netBid;
+        
+        return sTracker;
     }
 
     /// @notice The allocateValue function is called by Atlas after a successful SolverOperation.
@@ -318,14 +257,14 @@ contract ExecutionEnvironment is Base {
     /// @param allocateData Data returned from the previous call phase.
     function allocateValue(
         address bidToken,
-        uint256 bidAmount,
+        SolverTracker memory sTracker,
         bytes memory allocateData
     )
         external
         onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _ENVIRONMENT_DEPTH)
         contributeSurplus
     {
-        allocateData = forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, bidAmount, allocateData)));
+        allocateData = forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, sTracker.bidAmount, allocateData)));
 
         (bool success,) = _control().delegatecall(allocateData);
         if (!success) revert AtlasErrors.AllocateValueDelegatecallFail();

@@ -345,12 +345,13 @@ contract Atlas is Escrow, Factory {
 
         for (; i < k; ++i) {
             SolverOperation calldata solverOp = solverOps[i];
+            SolverTracker memory sTracker;
 
-            (auctionWon, key) =
+            (auctionWon, key, sTracker) =
                 _executeSolverOperation(dConfig, userOp, solverOp, returnData, solverOp.bidAmount, false, key);
 
             if (auctionWon) {
-                key = _allocateValue(dConfig, solverOp, solverOp.bidAmount, returnData, key);
+                key = _allocateValue(dConfig, solverOp, sTracker, returnData, key);
 
                 key.solverOutcome = uint24(i);
 

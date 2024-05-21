@@ -27,6 +27,13 @@ abstract contract GasAccounting is SafetyLocks {
     /// @return calledBack A boolean indicating whether the solver has called back via `reconcile`.
     /// @return fulfilled A boolean indicating whether the solver's outstanding debt has been repaid.
     function validateBalances() external view returns (bool calledBack, bool fulfilled) {
+        (calledBack, fulfilled) = _validateBalances();
+    }
+
+    /// @notice Validates the balances to determine if the caller (Execution Environment) is in surplus.
+    /// @return calledBack A boolean indicating whether the solver has called back via `reconcile`.
+    /// @return fulfilled A boolean indicating whether the solver's outstanding debt has been repaid.
+    function _validateBalances() internal view returns (bool calledBack, bool fulfilled) {
         (, calledBack, fulfilled) = solverLockData();
         if (!fulfilled) {
             uint256 _deposits = deposits;

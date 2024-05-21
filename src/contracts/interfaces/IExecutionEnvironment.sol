@@ -12,16 +12,23 @@ interface IExecutionEnvironment {
 
     function postOpsWrapper(bool solved, bytes calldata returnData) external;
 
-    function solverMetaTryCatch(
+    function solverPreTryCatch(
         uint256 bidAmount,
-        uint256 gasLimit,
         SolverOperation calldata solverOp,
-        bytes calldata dAppReturnData
+        bytes calldata returnData
     )
         external
-        payable;
+        returns (SolverTracker memory sTracker);
 
-    function allocateValue(address bidToken, uint256 bidAmount, bytes memory returnData) external;
+    function solverPostTryCatch(
+        SolverOperation calldata solverOp,
+        bytes calldata returnData,
+        SolverTracker memory sTracker
+    )
+        external
+        returns (SolverTracker memory);
+
+    function allocateValue(address bidToken, SolverTracker memory sTracker, bytes memory returnData) external;
 
     function getUser() external pure returns (address user);
     function getControl() external pure returns (address control);
