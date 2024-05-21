@@ -109,6 +109,7 @@ abstract contract Escrow is AtlETH {
             result = IAtlasVerification(VERIFICATION).verifySolverOp(
                 solverOp, key.userOpHash, userOp.maxFeePerGas, key.bundler
             );
+            result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, result);
         }
 
         // Verify the transaction.
@@ -327,8 +328,11 @@ abstract contract Escrow is AtlETH {
 
         bool success;
         uint256 gasWaterMark = gasleft();
+
         uint256 result =
             IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, key.userOpHash, userOp.maxFeePerGas, key.bundler);
+
+        result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, result);
 
         // Verify the transaction.
         if (!result.canExecute()) return 0;
@@ -397,6 +401,24 @@ abstract contract Escrow is AtlETH {
         }
         _solverOpHashes[hashId] = true;
         return true;
+    }
+
+    // NOTE: This logic should be inside `verifySolverOp()` in AtlasVerification, but we hit Stack Too Deep errors when
+    // trying to do this check there, as an additional param (dConfig.bidToken) is needed. This logic should be moved to
+    // that function when a larger refactor is done to get around Stack Too Deep.
+    function _checkSolverBidToken(
+        address solverBidToken,
+        address dConfigBidToken,
+        uint256 result
+    )
+        internal
+        view
+        returns (uint256)
+    {
+        if (solverBidToken != dConfigBidToken) {
+            return result | 1 << uint256(SolverOutcome.InvalidBidToken);
+        }
+        return result;
     }
 
     /// @notice Wraps the execution of a SolverOperation and handles potential errors.
