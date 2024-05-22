@@ -626,9 +626,9 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     //   and otherwise valid user, solver and dapp operations
     //     where the dapp operation control address is different to the dapp config to address
     // when validCalls is called from the userEOA
-    // then it should return DAppSignatureInvalid
+    // then it should return InvalidControl
     //
-    function test_validCalls_ControlConfigMismatch_DAppSignatureInvalid() public {
+    function test_validCalls_ControlConfigMismatch_InvalidControl() public {
         defaultAtlasEnvironment();
 
         UserOperation memory userOp = validUserOperation().build();
@@ -637,7 +637,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.DAppSignatureInvalid);
+        ), ValidCallsResult.InvalidControl);
     }
 
     //
