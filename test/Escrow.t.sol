@@ -65,6 +65,7 @@ contract EscrowTest is AtlasBaseTest {
             .withDeadline(block.number + 2)
             .withDapp(address(dAppControl))
             .withControl(address(dAppControl))
+            .withCallConfig(dAppControl.CALL_CONFIG())
             .withSessionKey(address(0))
             .withData("")
             .sign(address(atlasVerification), userPK);

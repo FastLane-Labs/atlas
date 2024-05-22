@@ -154,6 +154,11 @@ contract AtlasVerification is EIP712, DAppIntegration {
             if (msgValue < userOp.value) {
                 return (userOpHash, ValidCallsResult.TxValueLowerThanCallValue);
             }
+
+            // Check the call config read at the start of the metacall is same as user expected (as set in userOp)
+            if (dConfig.callConfig != userOp.callConfig) {
+                return (userOpHash, ValidCallsResult.CallConfigMismatch);
+            }
         }
 
         // Some checks are only needed when call is not a simulation
@@ -625,6 +630,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 userOp.deadline,
                 userOp.dapp,
                 userOp.control,
+                userOp.callConfig,
                 userOp.sessionKey,
                 keccak256(userOp.data)
             )
