@@ -107,7 +107,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
         {
             // bypassSignatoryApproval still verifies signature match, but does not check
             // if dApp approved the signor.
-            (bool validAuctioneer, bool bypassSignatoryApproval) = _verifyAuctioneer(dConfig, userOp, solverOps, dAppOp);
+            (bool validAuctioneer, bool bypassSignatoryApproval) =
+                _verifyAuctioneer(dConfig, userOp, solverOps, dAppOp, msgSender);
 
             if (!validAuctioneer && !isSimulation) {
                 return (userOpHash, ValidCallsResult.InvalidAuctioneer);
@@ -229,13 +230,15 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @param userOp The UserOperation struct of the metacall.
     /// @param solverOps An array of SolverOperation structs.
     /// @param dAppOp The DAppOperation struct of the metacall.
+    /// @param msgSender The bundler (msg.sender) of the metacall transaction in the Atlas contract.
     /// @return valid A boolean indicating if the auctioneer is valid.
     /// @return bypassSignatoryApproval A boolean indicating if the signatory approval check should be bypassed.
     function _verifyAuctioneer(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
-        DAppOperation calldata dAppOp
+        DAppOperation calldata dAppOp,
+        address msgSender
     )
         internal
         pure
@@ -248,7 +251,23 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         if (dConfig.callConfig.allowsUserAuctioneer() && dAppOp.from == userOp.sessionKey) return (true, true);
 
-        if (dConfig.callConfig.allowsSolverAuctioneer() && dAppOp.from == solverOps[0].from) return (true, true);
+        if (dConfig.callConfig.allowsSolverAuctioneer() && solverOps.length > 0) {
+            // If the solver is the auctioneer, there must be exactly 1 solver
+            if (dAppOp.from == solverOps[0].from) {
+                if (solverOps.length != 1) {
+                    // If not exactly one solver and first solver is auctioneer
+                    // => invalid
+                    return (false, false);
+                } else if (msgSender == solverOps[0].from) {
+                    // If exactly one solver AND that solver is auctioneer,
+                    // AND the solver is also the bundler,
+                    // => valid AND bypass sig approval
+                    return (true, true);
+                }
+            }
+            // If first solver is not the auctioneer,
+            // => valid BUT do not bypass sig approval
+        }
 
         if (dConfig.callConfig.allowsUnknownAuctioneer()) return (true, true);
 
