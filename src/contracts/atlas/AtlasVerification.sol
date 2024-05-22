@@ -311,7 +311,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 solverOp.userOpHash,
                 solverOp.bidToken,
                 solverOp.bidAmount,
-                keccak256(solverOp.data)
+                solverOp.data
             )
         );
     }
@@ -340,6 +340,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
         internal
         returns (bool, ValidCallsResult)
     {
+        if (dAppOp.to != ATLAS) return (false, ValidCallsResult.DAppToInvalid);
+
         bool bypassSignature = msgSender == dAppOp.from || (isSimulation && dAppOp.signature.length == 0);
 
         if (!bypassSignature && !_verifyDAppSignature(dAppOp)) {
@@ -509,8 +511,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 DAPP_TYPEHASH,
                 dAppOp.from,
                 dAppOp.to,
-                dAppOp.value,
-                dAppOp.gas,
                 dAppOp.nonce,
                 dAppOp.deadline,
                 dAppOp.control,
@@ -615,7 +615,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 userOp.control,
                 userOp.callConfig,
                 userOp.sessionKey,
-                keccak256(userOp.data)
+                userOp.data
             )
         );
     }

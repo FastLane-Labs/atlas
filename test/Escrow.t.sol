@@ -98,8 +98,6 @@ contract EscrowTest is AtlasBaseTest {
         return new DAppOperationBuilder()
             .withFrom(governanceEOA)
             .withTo(address(atlas))
-            .withValue(0)
-            .withGas(2_000_000)
             .withNonce(address(atlasVerification), governanceEOA)
             .withDeadline(userOp.deadline)
             .withControl(userOp.control)
