@@ -106,7 +106,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         {
             // bypassSignatoryApproval still verifies signature match, but does not check
-            // if dApp approved the signor.
+            // if dApp owner approved the signor.
             (bool validAuctioneer, bool bypassSignatoryApproval) =
                 _verifyAuctioneer(dConfig, userOp, solverOps, dAppOp, msgSender);
 
@@ -342,64 +342,47 @@ contract AtlasVerification is EIP712, DAppIntegration {
     {
         if (dAppOp.to != ATLAS) return (false, ValidCallsResult.DAppToInvalid);
 
-        // Verify the signature before storing any data to avoid
-        // spoof transactions clogging up dapp nonces
-
         bool bypassSignature = msgSender == dAppOp.from || (isSimulation && dAppOp.signature.length == 0);
 
         if (!bypassSignature && !_verifyDAppSignature(dAppOp)) {
             return (false, ValidCallsResult.DAppSignatureInvalid);
         }
 
-        if (bypassSignatoryApproval) return (true, ValidCallsResult.Valid); // If bypass, return true after signature
-            // verification
-
-        // NOTE: to avoid replay attacks arising from key management errors,
-        // the state changes below must be *saved* even if they render the
-        // transaction invalid.
-        // TODO: consider dapp-owned gas escrow.  Enshrined account
-        // abstraction may render that redundant at a large scale, but
-        // allocating different parts of the tx to different parties
-        // will allow for optimized trustlessness. This could lead to
-        // users not having to trust the front end at all - a huge
-        // improvement over the current experience.
-
-        // Some checks skipped if call is simUserOperation and the dAppOp data is not available.
-        bool skipDAppOpChecks = isSimulation && dAppOp.from == address(0);
-
-        // Check bundler matches dAppOp bundler
-        if (dAppOp.bundler != address(0) && msgSender != dAppOp.bundler) {
-            if (!signatories[keccak256(abi.encodePacked(dAppOp.control, msgSender))]) {
-                if (!skipDAppOpChecks) {
-                    return (false, ValidCallsResult.InvalidBundler);
-                }
-            }
-        }
-
-        // Make sure the signer is currently enabled by dapp owner
-        if (!signatories[keccak256(abi.encodePacked(dAppOp.control, dAppOp.from))]) {
-            if (!skipDAppOpChecks) {
-                return (false, ValidCallsResult.DAppSignatureInvalid);
-            }
-        }
-
         if (dAppOp.control != dConfig.to) {
             return (false, ValidCallsResult.InvalidControl);
         }
 
-        // If dAppOp.from is left blank and sim = true,
-        // implies a simUserOp call, so dapp nonce check is skipped.
-        if (skipDAppOpChecks) {
-            return (true, ValidCallsResult.Valid);
-        }
+        // Some checks skipped if call is `simUserOperation()`, because the dAppOp struct is not available.
+        bool skipDAppOpChecks = isSimulation && dAppOp.from == address(0);
 
         // If the dapp indicated that they only accept sequential nonces
         // (IE for FCFS execution), check and make sure the order is correct
         // NOTE: allowing only sequential nonces could create a scenario in
         // which builders or validators may be able to profit via censorship.
         // DApps are encouraged to rely on the deadline parameter.
-        if (!_handleNonces(dAppOp.from, dAppOp.nonce, dConfig.callConfig.needsSequentialDAppNonces(), isSimulation)) {
-            return (false, ValidCallsResult.InvalidDAppNonce);
+        if (!skipDAppOpChecks) {
+            // When not in a simulation, nonces are stored even if the metacall fails, to prevent replay attacks.
+            if (!_handleNonces(dAppOp.from, dAppOp.nonce, dConfig.callConfig.needsSequentialDAppNonces(), isSimulation))
+            {
+                return (false, ValidCallsResult.InvalidDAppNonce);
+            }
+        }
+
+        // If `_verifyAuctioneer()` allows bypassing signatory approval, the checks below are skipped and we can return
+        // Valid here, considering the checks above have all passed.
+        if (bypassSignatoryApproval) return (true, ValidCallsResult.Valid);
+
+        // Check actual bundler matches the dApp's intended `dAppOp.bundler`
+        // If bundler and auctioneer are the same address, this check is skipped
+        if (dAppOp.bundler != address(0) && msgSender != dAppOp.bundler) {
+            if (!skipDAppOpChecks && !signatories[keccak256(abi.encodePacked(dAppOp.control, msgSender))]) {
+                return (false, ValidCallsResult.InvalidBundler);
+            }
+        }
+
+        // Make sure the signer is currently enabled by dapp owner
+        if (!skipDAppOpChecks && !signatories[keccak256(abi.encodePacked(dAppOp.control, dAppOp.from))]) {
+            return (false, ValidCallsResult.DAppSignatureInvalid);
         }
 
         return (true, ValidCallsResult.Valid);
