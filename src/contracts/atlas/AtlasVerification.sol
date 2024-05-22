@@ -340,6 +340,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
         internal
         returns (bool, ValidCallsResult)
     {
+        if (dAppOp.to != ATLAS) return (false, ValidCallsResult.DAppToInvalid);
+
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp nonces
 
