@@ -137,8 +137,6 @@ contract TxBuilder {
         dAppOp = DAppOperation({
             from: governanceEOA,
             to: atlas,
-            value: 0,
-            gas: 2_000_000,
             nonce: governanceNextNonce(governanceEOA),
             deadline: userOp.deadline,
             control: userOp.control,

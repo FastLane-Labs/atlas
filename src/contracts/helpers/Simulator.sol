@@ -44,6 +44,7 @@ contract Simulator is AtlasErrors {
     {
         SolverOperation[] memory solverOps = new SolverOperation[](0);
         DAppOperation memory dAppOp;
+        dAppOp.to = atlas;
         dAppOp.control = userOp.control;
 
         (Result result, uint256 validCallsResult) = _errorCatcher(userOp, solverOps, dAppOp);
