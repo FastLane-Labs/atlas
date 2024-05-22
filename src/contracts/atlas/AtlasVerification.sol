@@ -526,8 +526,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 DAPP_TYPEHASH,
                 dAppOp.from,
                 dAppOp.to,
-                dAppOp.value,
-                dAppOp.gas,
                 dAppOp.nonce,
                 dAppOp.deadline,
                 dAppOp.control,
