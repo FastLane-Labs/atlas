@@ -2,7 +2,7 @@
 pragma solidity 0.8.22;
 
 bytes32 constant SOLVER_TYPEHASH = keccak256(
-    "SolverOperation(address from,address to,uint256 value,uint256 gas,uint256 maxFeePerGas,uint256 deadline,address dapp,address control,bytes32 userOpHash,address bidToken,uint256 bidAmount,bytes data)"
+    "SolverOperation(address from,address to,uint256 value,uint256 gas,uint256 maxFeePerGas,uint256 deadline,address solver,address control,bytes32 userOpHash,address bidToken,uint256 bidAmount,bytes data)"
 );
 
 // NOTE: The calldata length of this SolverOperation struct is 608 bytes when the `data` field is excluded. This value
