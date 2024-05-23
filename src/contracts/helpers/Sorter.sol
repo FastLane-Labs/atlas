@@ -44,9 +44,8 @@ contract Sorter {
         SolverOperation[] memory solverOpsSorted = new SolverOperation[](count - invalid);
 
         count -= invalid;
-        uint256 i = 0;
 
-        for (; i < count; ++i) {
+        for (uint256 i = 0; i < count; ++i) {
             solverOpsSorted[i] = solverOps[sorted[i]];
         }
 
@@ -118,9 +117,8 @@ contract Sorter {
 
         SortingData[] memory sortingData = new SortingData[](count);
 
-        uint256 i;
         uint256 invalid;
-        for (; i < count; ++i) {
+        for (uint256 i; i < count; ++i) {
             if (_verifyBidFormat(bidToken, solverOps[i]) && _verifySolverEligibility(dConfig, userOp, solverOps[i])) {
                 sortingData[i] =
                     SortingData({ amount: IDAppControl(dConfig.to).getBidValue(solverOps[i]), valid: true });
@@ -151,14 +149,12 @@ contract Sorter {
 
         uint256 topBidAmount;
         uint256 topBidIndex;
-        uint256 i;
-        uint256 j;
 
-        for (; i < sorted.length; ++i) {
+        for (uint256 i; i < sorted.length; ++i) {
             topBidAmount = 0;
             topBidIndex = 0;
 
-            for (j = 0; j < count; ++j) {
+            for (uint256 j; j < count; ++j) {
                 if (sortingData[j].valid && sortingData[j].amount >= topBidAmount) {
                     topBidAmount = sortingData[j].amount;
                     topBidIndex = j;

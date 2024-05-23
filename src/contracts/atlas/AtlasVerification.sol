@@ -664,8 +664,11 @@ contract AtlasVerification is EIP712, DAppIntegration {
         NonceBitmap memory nonceBitmap;
 
         // Checks the next 10 bitmaps for a higher full bitmap
-        uint128 nonceIndexToCheck = nonceTracker.highestFullNonSeqBitmap + 10;
-        for (; nonceIndexToCheck > nonceTracker.highestFullNonSeqBitmap; nonceIndexToCheck--) {
+        for (
+            uint128 nonceIndexToCheck = nonceTracker.highestFullNonSeqBitmap + 10;
+            nonceIndexToCheck > nonceTracker.highestFullNonSeqBitmap;
+            nonceIndexToCheck--
+        ) {
             bytes32 bitmapKey = keccak256(abi.encode(msg.sender, nonceIndexToCheck));
             nonceBitmap = nonceBitmaps[bitmapKey];
 

@@ -341,9 +341,8 @@ contract Atlas is Escrow, Factory {
         returns (bool auctionWon, EscrowKey memory)
     {
         uint256 k = solverOps.length;
-        uint256 i;
 
-        for (; i < k; ++i) {
+        for (uint256 i = 0; i < k; ++i) {
             SolverOperation calldata solverOp = solverOps[i];
 
             (auctionWon, key) =
