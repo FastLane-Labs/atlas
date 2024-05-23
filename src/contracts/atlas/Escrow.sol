@@ -481,8 +481,4 @@ abstract contract Escrow is AtlETH {
     }
 
     receive() external payable { }
-
-    fallback() external payable {
-        revert();
-    }
 }
