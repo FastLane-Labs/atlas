@@ -371,13 +371,13 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // Check actual bundler matches the dApp's intended `dAppOp.bundler`
         // If bundler and auctioneer are the same address, this check is skipped
         if (dAppOp.bundler != address(0) && msgSender != dAppOp.bundler) {
-            if (!skipDAppOpChecks && !signatories[keccak256(abi.encodePacked(dAppOp.control, msgSender))]) {
+            if (!skipDAppOpChecks && !_isDAppSignatory(dAppOp.control, msgSender)) {
                 return (false, ValidCallsResult.InvalidBundler);
             }
         }
 
         // Make sure the signer is currently enabled by dapp owner
-        if (!skipDAppOpChecks && !signatories[keccak256(abi.encodePacked(dAppOp.control, dAppOp.from))]) {
+        if (!skipDAppOpChecks && !_isDAppSignatory(dAppOp.control, dAppOp.from)) {
             return (false, ValidCallsResult.DAppSignatureInvalid);
         }
 
