@@ -248,7 +248,7 @@ abstract contract Escrow is AtlETH {
             return (result | 1 << uint256(SolverOutcome.UserOutOfGas), gasLimit);
         }
 
-        if (block.number > solverOp.deadline) {
+        if (solverOp.deadline != 0 && block.number > solverOp.deadline) {
             return (
                 result
                     | 1
@@ -392,7 +392,10 @@ abstract contract Escrow is AtlETH {
         returns (bool)
     {
         // These failures should be attributed to bundler maliciousness
-        if (solverOp.deadline != userOp.deadline || solverOp.control != userOp.control) {
+        if (userOp.control != solverOp.control) {
+            return false;
+        }
+        if (userOp.deadline != 0 && solverOp.deadline != 0 && solverOp.deadline != userOp.deadline) {
             return false;
         }
         bytes32 hashId = keccak256(abi.encodePacked(solverOp.userOpHash, solverOp.from, solverOp.deadline));
