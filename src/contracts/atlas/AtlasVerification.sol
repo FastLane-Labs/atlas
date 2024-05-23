@@ -132,17 +132,13 @@ contract AtlasVerification is EIP712, DAppIntegration {
             }
 
             // Check if past user's deadline
-            if (block.number > userOp.deadline) {
-                if (userOp.deadline != 0 && !isSimulation) {
-                    return (userOpHash, ValidCallsResult.UserDeadlineReached);
-                }
+            if (userOp.deadline != 0 && block.number > userOp.deadline) {
+                return (userOpHash, ValidCallsResult.UserDeadlineReached);
             }
 
             // Check if past dapp's deadline
-            if (block.number > dAppOp.deadline) {
-                if (dAppOp.deadline != 0 && !isSimulation) {
-                    return (userOpHash, ValidCallsResult.DAppDeadlineReached);
-                }
+            if (dAppOp.deadline != 0 && block.number > dAppOp.deadline) {
+                return (userOpHash, ValidCallsResult.DAppDeadlineReached);
             }
 
             // Check gas price is within user's limit
