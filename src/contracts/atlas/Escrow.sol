@@ -245,7 +245,7 @@ abstract contract Escrow is AtlETH {
     {
         if (gasWaterMark < _VALIDATION_GAS_LIMIT + dConfig.solverGasLimit) {
             // Make sure to leave enough gas for dApp validation calls
-            return (result | 1 << uint256(SolverOutcome.UserOutOfGas), gasLimit);
+            return (result | 1 << uint256(SolverOutcome.UserOutOfGas), gasLimit); // gasLimit = 0
         }
 
         if (solverOp.deadline != 0 && block.number > solverOp.deadline) {
@@ -257,7 +257,7 @@ abstract contract Escrow is AtlETH {
                                 ? uint256(SolverOutcome.DeadlinePassedAlt)
                                 : uint256(SolverOutcome.DeadlinePassed)
                         ),
-                0
+                gasLimit // gasLimit = 0
             );
         }
 
