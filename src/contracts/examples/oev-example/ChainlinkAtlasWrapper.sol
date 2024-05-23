@@ -122,6 +122,11 @@ contract ChainlinkAtlasWrapper is Ownable, IChainlinkAtlasWrapper {
         }
     }
 
+    // TODO implement epoch and round logic to prevent outdated transmissions
+    function latestRound() external view override returns (uint256) {
+        return BASE_FEED.latestRound();
+    }
+
     // Fallback to base oracle's latestRoundData, unless this contract's latestTimestamp and latestAnswer are more
     // recent, in which case return those values as well as the other round data from the base oracle.
     function latestRoundData()
@@ -136,24 +141,40 @@ contract ChainlinkAtlasWrapper is Ownable, IChainlinkAtlasWrapper {
         }
     }
 
-    function latestRound() external view override returns (uint256) { }
+    // Pass-through call to base oracle's `getAnswer()` function
+    function getAnswer(uint256 roundId) external view override returns (int256) {
+        return BASE_FEED.getAnswer(roundId);
+    }
 
-    function getAnswer(uint256 roundId) external view override returns (int256) { }
+    // Pass-through call to base oracle's `getTimestamp()` function
+    function getTimestamp(uint256 roundId) external view override returns (uint256) {
+        return BASE_FEED.getTimestamp(roundId);
+    }
 
-    function getTimestamp(uint256 roundId) external view override returns (uint256) { }
-
-    function decimals() external view override returns (uint8) { }
-
-    function description() external view override returns (string memory) { }
-
-    function version() external view override returns (uint256) { }
-
+    // Pass-through call to base oracle's `getRoundData()` function
     function getRoundData(uint80 _roundId)
         external
         view
         override
         returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)
-    { }
+    {
+        return BASE_FEED.getRoundData(_roundId);
+    }
+
+    // Pass-through calls to base oracle's `decimals()` functions
+    function decimals() external view override returns (uint8) {
+        return BASE_FEED.decimals();
+    }
+
+    // Pass-through calls to base oracle's `description()` functions
+    function description() external view override returns (string memory) {
+        return BASE_FEED.description();
+    }
+
+    // Pass-through calls to base oracle's `version()` functions
+    function version() external view override returns (uint256) {
+        return BASE_FEED.version();
+    }
 
     // ---------------------------------------------------- //
     //                     Owner Functions                  //
@@ -181,9 +202,9 @@ contract ChainlinkAtlasWrapper is Ownable, IChainlinkAtlasWrapper {
     receive() external payable { }
 }
 
-// -----------------------------------------------
-// Structs and interface for Chainlink Aggregator
-// -----------------------------------------------
+// ---------------------------------------------------- //
+//             Chainlink Aggregator Structs             //
+// ---------------------------------------------------- //
 
 struct ReportData {
     HotVars hotVars; // Only read from storage once
