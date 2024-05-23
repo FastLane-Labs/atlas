@@ -9,8 +9,6 @@ import {
 } from "src/contracts/examples/oev-example/IChainlinkAtlasWrapper.sol";
 import { IChainlinkDAppControl } from "src/contracts/examples/oev-example/IChainlinkDAppControl.sol";
 
-import "forge-std/Test.sol"; //TODO remove
-
 // A wrapper contract for a specific Chainlink price feed, used by Atlas to capture Oracle Extractable Value (OEV).
 // Each MEV-generating protocol needs their own wrapper for each Chainlink price feed they use.
 contract ChainlinkAtlasWrapper is Ownable, IChainlinkAtlasWrapper {
@@ -127,8 +125,11 @@ contract ChainlinkAtlasWrapper is Ownable, IChainlinkAtlasWrapper {
         return BASE_FEED.latestRound();
     }
 
-    // Fallback to base oracle's latestRoundData, unless this contract's latestTimestamp and latestAnswer are more
+    // Fallback to base oracle's latestRoundData, unless this contract's `latestTimestamp` and `latestAnswer` are more
     // recent, in which case return those values as well as the other round data from the base oracle.
+    // NOTE: This may break some integrations as it implies a `roundId` has multiple answers (the canonical answer from
+    // the base feed, and the `atlasLatestAnswer` if more recent), which deviates from the expected behaviour of the
+    // base Chainlink feeds. Be aware of this tradeoff when integrating ChainlinkAtlasWrappers as your price feed.
     function latestRoundData()
         public
         view
