@@ -257,7 +257,7 @@ abstract contract Escrow is AtlETH {
                                 ? uint256(SolverOutcome.DeadlinePassedAlt)
                                 : uint256(SolverOutcome.DeadlinePassed)
                         ),
-                0
+                gasLimit
             );
         }
 
