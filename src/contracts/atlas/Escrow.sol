@@ -136,8 +136,6 @@ abstract contract Escrow is AtlETH {
                     bidAmount, gasLimit, key.executionEnvironment, solverOp, dAppReturnData, key.pack()
                 );
 
-                key.solverOutcome = uint24(result);
-
                 if (result.executionSuccessful()) {
                     // first successful solver call that paid what it bid
 
@@ -145,6 +143,8 @@ abstract contract Escrow is AtlETH {
 
                     key.solverSuccessful = true;
                     // auctionWon = true
+
+                    key.solverOutcome = uint24(result);
                     return (true, key);
                 }
             }
