@@ -567,7 +567,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
             }
             bool validSmartWallet =
                 IAccount(userOp.from).validateUserOp{ gas: 30_000 }(userOp, _getUserOpHash(userOp), 0) == 0;
-            return (isSimulation || validSmartWallet);
+            return validSmartWallet;
         }
 
         bool bypassSignature = msgSender == userOp.from || (isSimulation && userOp.signature.length == 0);
