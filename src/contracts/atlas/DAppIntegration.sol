@@ -122,8 +122,11 @@ contract DAppIntegration {
         _checkAtlasIsUnlocked();
         address dAppGov = IDAppControl(dAppControl).getDAppSignatory();
         if (msg.sender != dAppGov) revert AtlasErrors.OnlyGovernance();
+
         bytes32 signatoryKey = keccak256(abi.encodePacked(dAppControl, dAppGov));
-        signatories[signatoryKey] = false;
+        if (!signatories[signatoryKey]) revert AtlasErrors.DAppNotEnabled();
+
+        _removeSignatory(dAppControl, dAppGov);
 
         uint32 callConfig = IDAppControl(dAppControl).CALL_CONFIG();
         emit AtlasEvents.DAppDisabled(dAppControl, dAppGov, callConfig);
