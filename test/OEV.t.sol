@@ -119,6 +119,8 @@ contract OEVTest is BaseTest {
         atlas.bond(1e18);
         vm.stopPrank();
 
+        assertTrue(chainlinkDAppControl.isChainlinkWrapper(address(chainlinkAtlasWrapper)), "Wrapper should be registered on DAppControl - otherwise will revert in allocateValue");
+
         // Basic userOp created but excludes oracle price update data
         userOp = txBuilder.buildUserOperation({
             from: userEOA,

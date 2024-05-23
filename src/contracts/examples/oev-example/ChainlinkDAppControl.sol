@@ -35,6 +35,7 @@ contract ChainlinkDAppControl is DAppControl {
     uint256 public constant MAX_NUM_ORACLES = 31;
 
     mapping(address baseChainlinkFeed => VerificationVars) internal verificationVars;
+    mapping(address chainlinkWrapper => bool isWrapper) public isChainlinkWrapper;
 
     error InvalidBaseFeed();
     error FailedToAllocateOEV();
@@ -42,6 +43,7 @@ contract ChainlinkDAppControl is DAppControl {
     error SignerNotFound();
     error TooManySigners();
     error DuplicateSigner(address signer);
+    error InvalidChainlinkAtlasWrapper();
 
     event NewChainlinkWrapperCreated(address indexed wrapper, address indexed baseFeed, address indexed owner);
     event SignersSetForBaseFeed(address indexed baseFeed, address[] signers);
@@ -83,6 +85,9 @@ contract ChainlinkDAppControl is DAppControl {
 
     function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) internal virtual override {
         address chainlinkWrapper = abi.decode(data, (address));
+        if (!ChainlinkDAppControl(_control()).isChainlinkWrapper(chainlinkWrapper)) {
+            revert InvalidChainlinkAtlasWrapper();
+        }
         (bool success,) = chainlinkWrapper.call{ value: bidAmount }("");
         if (!success) revert FailedToAllocateOEV();
     }
@@ -125,6 +130,7 @@ contract ChainlinkDAppControl is DAppControl {
     function createNewChainlinkAtlasWrapper(address baseChainlinkFeed) external returns (address) {
         if (IChainlinkFeed(baseChainlinkFeed).latestAnswer() == 0) revert InvalidBaseFeed();
         address newWrapper = address(new ChainlinkAtlasWrapper(ATLAS, baseChainlinkFeed, msg.sender));
+        isChainlinkWrapper[newWrapper] = true;
         emit NewChainlinkWrapperCreated(newWrapper, baseChainlinkFeed, msg.sender);
         return newWrapper;
     }
