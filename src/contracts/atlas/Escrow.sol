@@ -132,7 +132,7 @@ abstract contract Escrow is AtlETH {
 
                 // Execute the solver call
                 // _solverOpsWrapper returns a SolverOutcome enum value
-                result |= _solverOpWrapper(
+                result = _solverOpWrapper(
                     bidAmount, gasLimit, key.executionEnvironment, solverOp, dAppReturnData, key.pack()
                 );
 
@@ -272,7 +272,7 @@ abstract contract Escrow is AtlETH {
             solverOp.value
                 > address(this).balance - (gasLimit * tx.gasprice > address(this).balance ? 0 : gasLimit * tx.gasprice)
         ) {
-            return (result |= 1 << uint256(SolverOutcome.CallValueTooHigh), gasLimit);
+            return (result | 1 << uint256(SolverOutcome.CallValueTooHigh), gasLimit);
         }
 
         // subtract out the gas buffer since the solver's metaTx won't use it
