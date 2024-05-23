@@ -136,8 +136,6 @@ abstract contract Escrow is AtlETH {
                     bidAmount, gasLimit, key.executionEnvironment, solverOp, dAppReturnData, key.pack()
                 );
 
-                key.solverOutcome = uint24(result);
-
                 if (result.executionSuccessful()) {
                     // first successful solver call that paid what it bid
 
@@ -145,6 +143,8 @@ abstract contract Escrow is AtlETH {
 
                     key.solverSuccessful = true;
                     // auctionWon = true
+
+                    key.solverOutcome = uint24(result);
                     return (true, key);
                 }
             }
@@ -244,10 +244,10 @@ abstract contract Escrow is AtlETH {
     {
         if (gasWaterMark < _VALIDATION_GAS_LIMIT + dConfig.solverGasLimit) {
             // Make sure to leave enough gas for dApp validation calls
-            return (1 << uint256(SolverOutcome.UserOutOfGas), gasLimit);
+            return (1 << uint256(SolverOutcome.UserOutOfGas), gasLimit); // gasLimit = 0
         }
 
-        if (block.number > solverOp.deadline) {
+        if (solverOp.deadline != 0 && block.number > solverOp.deadline) {
             return (
                 1
                     << uint256(
@@ -255,7 +255,7 @@ abstract contract Escrow is AtlETH {
                             ? uint256(SolverOutcome.DeadlinePassedAlt)
                             : uint256(SolverOutcome.DeadlinePassed)
                     ),
-                0
+                gasLimit // gasLimit = 0
             );
         }
 
@@ -390,7 +390,10 @@ abstract contract Escrow is AtlETH {
         returns (bool)
     {
         // These failures should be attributed to bundler maliciousness
-        if (solverOp.deadline != userOp.deadline || solverOp.control != userOp.control) {
+        if (userOp.control != solverOp.control) {
+            return false;
+        }
+        if (userOp.deadline != 0 && solverOp.deadline != 0 && solverOp.deadline != userOp.deadline) {
             return false;
         }
         bytes32 hashId = keccak256(abi.encodePacked(solverOp.userOpHash, solverOp.from, solverOp.deadline));
