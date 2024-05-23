@@ -1,8 +1,6 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
-
 import "src/contracts/types/SolverCallTypes.sol";
 import "src/contracts/types/UserCallTypes.sol";
 import "src/contracts/types/DAppApprovalTypes.sol";
@@ -27,39 +25,15 @@ library CallVerification {
         pure
         returns (bytes32 callSequenceHash)
     {
-        uint256 i;
+        bytes memory callSequence;
+
         if (dConfig.callConfig & 1 << uint32(CallConfigIndex.RequirePreOps) != 0) {
             // Start with preOps call if preOps is needed
-            callSequenceHash = keccak256(
-                abi.encodePacked(
-                    callSequenceHash, // initial hash = null
-                    dConfig.to,
-                    abi.encodeCall(IDAppControl.preOpsCall, userOp),
-                    i++
-                )
-            );
+            callSequence = abi.encodePacked(dConfig.to);
         }
 
-        // then user call
-        callSequenceHash = keccak256(
-            abi.encodePacked(
-                callSequenceHash, // always reference previous hash
-                abi.encode(userOp),
-                i++
-            )
-        );
-
-        // then solver calls
-        uint256 count = solverOps.length;
-        uint256 n;
-        for (; n < count; ++n) {
-            callSequenceHash = keccak256(
-                abi.encodePacked(
-                    callSequenceHash, // reference previous hash
-                    abi.encode(solverOps[n]), // solver op
-                    i++
-                )
-            );
-        }
+        // Then user and solver call
+        callSequence = abi.encodePacked(callSequence, abi.encode(userOp), abi.encode(solverOps));
+        callSequenceHash = keccak256(callSequence);
     }
 }
