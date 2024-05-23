@@ -34,6 +34,8 @@ struct VerificationVars {
 contract ChainlinkDAppControl is DAppControl {
     uint256 public constant MAX_NUM_ORACLES = 31;
 
+    uint256 public observationsQuorum = 1;
+
     mapping(address baseChainlinkFeed => VerificationVars) internal verificationVars;
     mapping(address chainlinkWrapper => bool isWrapper) public isChainlinkWrapper;
 
@@ -49,6 +51,7 @@ contract ChainlinkDAppControl is DAppControl {
     event SignersSetForBaseFeed(address indexed baseFeed, address[] signers);
     event SignerAddedForBaseFeed(address indexed baseFeed, address indexed signer);
     event SignerRemovedForBaseFeed(address indexed baseFeed, address indexed signer);
+    event ObservationsQuorumSet(uint256 oldQuorum, uint256 newQuorum);
 
     constructor(address _atlas)
         DAppControl(
@@ -149,11 +152,15 @@ contract ChainlinkDAppControl is DAppControl {
     {
         bool[] memory signed = new bool[](MAX_NUM_ORACLES);
         bytes32 reportHash = keccak256(report);
+        uint256 observations = rs.length;
 
         VerificationVars storage verificationVar = verificationVars[baseChainlinkFeed];
         Oracle memory currentOracle;
 
-        for (uint256 i = 0; i < rs.length; ++i) {
+        // Check if the number of observations is enough to reach quorum
+        if (observations < observationsQuorum) return false;
+
+        for (uint256 i = 0; i < observations; ++i) {
             (address signer,) = ECDSA.tryRecover(reportHash, uint8(rawVs[i]) + 27, rs[i], ss[i]);
             currentOracle = verificationVar.oracles[signer];
 
@@ -169,6 +176,12 @@ contract ChainlinkDAppControl is DAppControl {
     // ---------------------------------------------------- //
     //                    OnlyGov Functions                 //
     // ---------------------------------------------------- //
+
+    function setObservationsQuorum(uint256 newQuorum) external onlyGov {
+        uint256 oldQuorum = observationsQuorum;
+        observationsQuorum = newQuorum;
+        emit ObservationsQuorumSet(oldQuorum, newQuorum);
+    }
 
     // Clears any existing signers and adds a new set of signers for a specific Chainlink feed.
     function setSignersForBaseFeed(address baseChainlinkFeed, address[] calldata signers) external onlyGov {

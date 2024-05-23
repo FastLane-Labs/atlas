@@ -295,6 +295,11 @@ contract OEVTest is BaseTest {
 
         assertEq(chainlinkAtlasWrapper.atlasLatestAnswer(), 0, "Wrapper stored latestAnswer should still be 0");
 
+        // Check that transmit reverts if quorum is not met (uses rs array length for sig count)
+        vm.prank(executionEnvironment);
+        vm.expectRevert(ChainlinkAtlasWrapper.SignerVerificationFailed.selector);
+        chainlinkAtlasWrapper.transmit(transmitData.report, new bytes32[](0), transmitData.ss, transmitData.rawVs);
+
         vm.prank(executionEnvironment);
         chainlinkAtlasWrapper.transmit(transmitData.report, transmitData.rs, transmitData.ss, transmitData.rawVs);
 
@@ -468,6 +473,23 @@ contract OEVTest is BaseTest {
         assertEq(uint(oracle.role), uint(Role.Unset));
     }
 
+    function test_ChainlinkDAppControl_setObservationsQuorum() public {
+        uint256 expectedDefaultQuorum = 1;
+        uint256 newQuorum = 3;
+
+        assertEq(chainlinkDAppControl.observationsQuorum(), expectedDefaultQuorum, "Default starting observations quorum not as expected");
+
+        vm.expectRevert(ChainlinkDAppControl.OnlyGovernance.selector);
+        chainlinkDAppControl.setObservationsQuorum(newQuorum);
+
+        vm.prank(chainlinkGovEOA);
+        vm.expectEmit(true, false, false, true);
+        emit ChainlinkDAppControl.ObservationsQuorumSet(expectedDefaultQuorum, newQuorum);
+        chainlinkDAppControl.setObservationsQuorum(newQuorum);
+
+        assertEq(chainlinkDAppControl.observationsQuorum(), newQuorum, "Observations quorum not updated as expected");
+    }
+
     function test_ChainlinkDAppControl_verifyTransmitSigners() public {
         // 3rd signer in the ETHUSD transmit example tx used
         address signerToRemove = 0xCc1b49B86F79C7E50E294D3e3734fe94DB9A42F0;
@@ -478,6 +500,11 @@ contract OEVTest is BaseTest {
 
         // All signers should be verified
         assertEq(chainlinkDAppControl.verifyTransmitSigners(chainlinkETHUSD, report, rs, ss, rawVs), true);
+
+        // If quorum is not met, should return false
+        uint256 quorum = chainlinkDAppControl.observationsQuorum();
+        require(quorum > 0, "TEST: Quorum cant be 0 for this check");
+        assertEq(chainlinkDAppControl.verifyTransmitSigners(chainlinkETHUSD, report, new bytes32[](0), ss, rawVs), false);
 
         // If a verified signer is removed from DAppControl, should return false
         vm.prank(chainlinkGovEOA);
@@ -540,7 +567,6 @@ contract OEVTest is BaseTest {
         console.log("\n");
         console.logBytes(getTransmitPayload_Sepolia());
     }
-
 
     // ---------------------------------------------------- //
     //                     OEV Test Utils                   //
