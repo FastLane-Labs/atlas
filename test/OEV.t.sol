@@ -15,7 +15,8 @@ import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
 import { DAppOperation, DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 
 import { ChainlinkDAppControl, Oracle, Role } from "src/contracts/examples/oev-example/ChainlinkDAppControl.sol";
-import {ChainlinkAtlasWrapper, IChainlinkFeed } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapper.sol";
+import { ChainlinkAtlasWrapper } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapper.sol";
+import { AggregatorV2V3Interface } from "src/contracts/examples/oev-example/IChainlinkAtlasWrapper.sol";
 import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
 
@@ -157,7 +158,7 @@ contract OEVTest is BaseTest {
 
         assertEq(mockLiquidatable.canLiquidate(), false);
         assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) !=  targetOracleAnswer, "Wrapper answer should not be target yet");
-        assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), uint(IChainlinkFeed(chainlinkETHUSD).latestAnswer()), "Wrapper and base feed should report same answer");
+        assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), uint(AggregatorV2V3Interface(chainlinkETHUSD).latestAnswer()), "Wrapper and base feed should report same answer");
         assertEq(address(chainlinkAtlasWrapper).balance, 0, "Wrapper should not have any ETH");
 
         // To show the signer verification checks cause metacall to pass/fail:
@@ -172,7 +173,7 @@ contract OEVTest is BaseTest {
         vm.prank(userEOA);
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
 
-        assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), uint(IChainlinkFeed(chainlinkETHUSD).latestAnswer()), "Metacall unexpectedly succeeded");
+        assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), uint(AggregatorV2V3Interface(chainlinkETHUSD).latestAnswer()), "Metacall unexpectedly succeeded");
 
         // Go back to before removing the signer
         vm.revertTo(snapshot);
@@ -182,7 +183,7 @@ contract OEVTest is BaseTest {
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
 
         assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), targetOracleAnswer, "Wrapper did not update as expected");
-        assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) != uint(IChainlinkFeed(chainlinkETHUSD).latestAnswer()), "Wrapper and base feed should report different answers");
+        assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) != uint(AggregatorV2V3Interface(chainlinkETHUSD).latestAnswer()), "Wrapper and base feed should report different answers");
         assertEq(address(chainlinkAtlasWrapper).balance, solverWinningBid, "Wrapper should hold winning bid as OEV");
     }
 
@@ -193,16 +194,16 @@ contract OEVTest is BaseTest {
     function testChainlinkAtlasWrapperViewFunctions() public {
         // Check wrapper and base start as expected
         assertEq(chainlinkAtlasWrapper.atlasLatestAnswer(), 0, "Wrapper stored latestAnswer should be 0");
-        assertTrue(IChainlinkFeed(chainlinkETHUSD).latestAnswer() != 0, "Base latestAnswer should not be 0");
+        assertTrue(AggregatorV2V3Interface(chainlinkETHUSD).latestAnswer() != 0, "Base latestAnswer should not be 0");
         assertEq(chainlinkAtlasWrapper.atlasLatestTimestamp(), 0, "Wrapper stored latestTimestamp should be 0");
-        assertTrue(IChainlinkFeed(chainlinkETHUSD).latestTimestamp() != 0, "Base latestTimestamp should not be 0");
+        assertTrue(AggregatorV2V3Interface(chainlinkETHUSD).latestTimestamp() != 0, "Base latestTimestamp should not be 0");
 
         (uint80 roundIdAtlas, int256 answerAtlas, uint256 startedAtAtlas, uint256 updatedAtAtlas, uint80 answeredInRoundAtlas) = chainlinkAtlasWrapper.latestRoundData();
-        (uint80 roundIdBase, int256 answerBase, uint256 startedAtBase, uint256 updatedAtBase, uint80 answeredInRoundBase) = IChainlinkFeed(chainlinkETHUSD).latestRoundData();
+        (uint80 roundIdBase, int256 answerBase, uint256 startedAtBase, uint256 updatedAtBase, uint80 answeredInRoundBase) = AggregatorV2V3Interface(chainlinkETHUSD).latestRoundData();
 
         // Before Atlas price update, all view functions should fall back to base oracle
-        assertEq(chainlinkAtlasWrapper.latestAnswer(), IChainlinkFeed(chainlinkETHUSD).latestAnswer(), "latestAnswer should be same as base");
-        assertEq(chainlinkAtlasWrapper.latestTimestamp(), IChainlinkFeed(chainlinkETHUSD).latestTimestamp(), "latestTimestamp should be same as base");
+        assertEq(chainlinkAtlasWrapper.latestAnswer(), AggregatorV2V3Interface(chainlinkETHUSD).latestAnswer(), "latestAnswer should be same as base");
+        assertEq(chainlinkAtlasWrapper.latestTimestamp(), AggregatorV2V3Interface(chainlinkETHUSD).latestTimestamp(), "latestTimestamp should be same as base");
         assertEq(roundIdAtlas, roundIdBase, "roundId should be same as base");
         assertEq(answerAtlas, answerBase, "answer should be same as base");
         assertEq(startedAtAtlas, startedAtBase, "startedAt should be same as base");
@@ -217,12 +218,12 @@ contract OEVTest is BaseTest {
 
         // After Atlas price update, latestAnswer and latestTimestamp should be different to base oracle
         assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), targetOracleAnswer, "latestAnswer should be updated");
-        assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) != uint(IChainlinkFeed(chainlinkETHUSD).latestAnswer()), "latestAnswer should be different to base");
+        assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) != uint(AggregatorV2V3Interface(chainlinkETHUSD).latestAnswer()), "latestAnswer should be different to base");
         assertEq(chainlinkAtlasWrapper.latestTimestamp(), block.timestamp, "latestTimestamp should be updated");
-        assertTrue(chainlinkAtlasWrapper.latestTimestamp() > IChainlinkFeed(chainlinkETHUSD).latestTimestamp(), "latestTimestamp should be later than base");
+        assertTrue(chainlinkAtlasWrapper.latestTimestamp() > AggregatorV2V3Interface(chainlinkETHUSD).latestTimestamp(), "latestTimestamp should be later than base");
 
         (roundIdAtlas, answerAtlas, startedAtAtlas, updatedAtAtlas, answeredInRoundAtlas) = chainlinkAtlasWrapper.latestRoundData();
-        (roundIdBase, answerBase, startedAtBase, updatedAtBase, answeredInRoundBase) = IChainlinkFeed(chainlinkETHUSD).latestRoundData();
+        (roundIdBase, answerBase, startedAtBase, updatedAtBase, answeredInRoundBase) = AggregatorV2V3Interface(chainlinkETHUSD).latestRoundData();
 
         assertEq(roundIdAtlas, roundIdBase, "roundId should still be same as base");
         assertTrue(answerAtlas == int(targetOracleAnswer) && answerAtlas != answerBase, "answer should be updated");
@@ -723,7 +724,7 @@ contract MockLiquidatable {
 
     // Can only liquidate if the oracle price is exactly the liquidation price
     function canLiquidate() public view returns (bool) {
-        return uint256(IChainlinkFeed(oracle).latestAnswer()) == liquidationPrice;
+        return uint256(AggregatorV2V3Interface(oracle).latestAnswer()) == liquidationPrice;
     }
 }
 
