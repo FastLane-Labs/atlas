@@ -305,6 +305,11 @@ contract OEVTest is BaseTest {
         chainlinkAtlasWrapper.transmit(transmitData.report, transmitData.rs, transmitData.ss, transmitData.rawVs);
 
         assertEq(uint(chainlinkAtlasWrapper.atlasLatestAnswer()), targetOracleAnswer, "Wrapper stored latestAnswer should be updated");
+
+        // Check that transmit reverts if called again with same data
+        vm.prank(executionEnvironment);
+        vm.expectRevert(ChainlinkAtlasWrapper.CannotReuseReport.selector);
+        chainlinkAtlasWrapper.transmit(transmitData.report, transmitData.rs, transmitData.ss, transmitData.rawVs);
     }
 
     function testChainlinkAtlasWrapperCanReceiveETH() public {

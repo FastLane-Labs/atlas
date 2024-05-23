@@ -16,21 +16,22 @@ contract ChainlinkAtlasWrapper is Ownable, IChainlinkAtlasWrapper {
     AggregatorV2V3Interface public immutable BASE_FEED; // Base Chainlink Feed
     IChainlinkDAppControl public immutable DAPP_CONTROL; // Chainlink Atlas DAppControl
 
+    // Vars below hold values from the most recent successful `transmit()` call to this wrapper.
     int256 public atlasLatestAnswer;
     uint256 public atlasLatestTimestamp;
+    uint40 public atlasLatestEpochAndRound;
 
     // Trusted ExecutionEnvironments
     mapping(address transmitter => bool trusted) public transmitters;
 
     error TransmitterNotTrusted(address transmitter);
-    error InvalidTransmitMsgDataLength();
+    error CannotReuseReport();
     error ObservationsNotOrdered();
     error AnswerMustBeAboveZero();
     error SignerVerificationFailed();
     error WithdrawETHFailed();
 
     event TransmitterStatusChanged(address indexed transmitter, bool trusted);
-    event SignerStatusChanged(address indexed account, bool isSigner);
 
     constructor(address atlas, address baseChainlinkFeed, address _owner) {
         ATLAS = atlas;
@@ -57,10 +58,11 @@ contract ChainlinkAtlasWrapper is Ownable, IChainlinkAtlasWrapper {
     {
         if (!transmitters[msg.sender]) revert TransmitterNotTrusted(msg.sender);
 
-        int256 answer = _verifyTransmitData(report, rs, ss, rawVs);
+        (int256 answer, uint40 epochAndRound) = _verifyTransmitData(report, rs, ss, rawVs);
 
         atlasLatestAnswer = answer;
         atlasLatestTimestamp = block.timestamp;
+        atlasLatestEpochAndRound = epochAndRound;
 
         return address(this);
     }
@@ -74,25 +76,30 @@ contract ChainlinkAtlasWrapper is Ownable, IChainlinkAtlasWrapper {
     )
         internal
         view
-        returns (int256)
+        returns (int256, uint40)
     {
         ReportData memory r;
-        (,, r.observations) = abi.decode(report, (bytes32, bytes32, int192[]));
+        (r.rawReportContext,, r.observations) = abi.decode(report, (bytes32, bytes32, int192[]));
 
-        // Check observations are ordered, then take median observation
+        // Check report data has not already been used in this wrapper
+        uint40 epochAndRound = uint40(uint256(r.rawReportContext));
+        if (epochAndRound <= atlasLatestEpochAndRound) revert CannotReuseReport();
+
+        // Check observations are ordered
         for (uint256 i = 0; i < r.observations.length - 1; ++i) {
             bool inOrder = r.observations[i] <= r.observations[i + 1];
             if (!inOrder) revert ObservationsNotOrdered();
         }
-        int192 median = r.observations[r.observations.length / 2];
 
+        // Calculate median from observations, cannot be 0
+        int192 median = r.observations[r.observations.length / 2];
         if (median <= 0) revert AnswerMustBeAboveZero();
 
         bool signersVerified =
             IChainlinkDAppControl(DAPP_CONTROL).verifyTransmitSigners(address(BASE_FEED), report, rs, ss, rawVs);
         if (!signersVerified) revert SignerVerificationFailed();
 
-        return int256(median);
+        return (int256(median), epochAndRound);
     }
 
     // ---------------------------------------------------- //
@@ -120,7 +127,7 @@ contract ChainlinkAtlasWrapper is Ownable, IChainlinkAtlasWrapper {
         }
     }
 
-    // TODO implement epoch and round logic to prevent outdated transmissions
+    // Pass-through call to base oracle's `latestRound()` function
     function latestRound() external view override returns (uint256) {
         return BASE_FEED.latestRound();
     }
