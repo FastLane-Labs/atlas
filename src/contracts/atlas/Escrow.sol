@@ -372,9 +372,9 @@ abstract contract Escrow is AtlETH {
                     )
             }
             return bidAmount;
-        } else {
-            return 0;
         }
+
+        return 0;
     }
 
     /// @notice Validates UserOp hashes provided by the SolverOperation, using the alternative set of hashed parameters.
@@ -475,9 +475,8 @@ abstract contract Escrow is AtlETH {
             return 1 << uint256(SolverOutcome.AlteredControl);
         } else if (errorSwitch == CallbackNotCalled.selector) {
             return 1 << uint256(SolverOutcome.SolverOpReverted);
-        } else {
-            return 1 << uint256(SolverOutcome.EVMError);
         }
+        return 1 << uint256(SolverOutcome.EVMError);
     }
 
     receive() external payable { }

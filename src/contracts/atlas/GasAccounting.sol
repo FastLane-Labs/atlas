@@ -209,9 +209,9 @@ abstract contract GasAccounting is SafetyLocks {
         if (_borrow(solverOp.value)) {
             _solverLock = uint256(uint160(solverOp.from));
             return true;
-        } else {
-            return false;
         }
+
+        return false;
     }
 
     /// @notice Releases the solver lock and adjusts the solver's escrow balance based on the gas used and other

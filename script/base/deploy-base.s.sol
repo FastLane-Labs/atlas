@@ -42,9 +42,8 @@ contract DeployBaseScript is Script {
                 || keccak256(bytes(deployChain)) == keccak256(bytes("LOCAL"))
         ) {
             return deployChain;
-        } else {
-            revert("Error: Set DEPLOY_TO in .env to LOCAL, SEPOLIA, or MAINNET");
         }
+        revert("Error: Set DEPLOY_TO in .env to LOCAL, SEPOLIA, or MAINNET");
     }
 
     // NOTE: When handling JSON with StdJson, prefix keys with '.' e.g. '.ATLAS'
