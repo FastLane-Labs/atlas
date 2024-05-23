@@ -143,11 +143,13 @@ contract ChainlinkDAppControl is DAppControl {
     {
         bool[] memory signed = new bool[](MAX_NUM_ORACLES);
         bytes32 reportHash = keccak256(report);
+
+        VerificationVars storage verificationVar = verificationVars[baseChainlinkFeed];
         Oracle memory currentOracle;
 
         for (uint256 i = 0; i < rs.length; ++i) {
             (address signer,) = ECDSA.tryRecover(reportHash, uint8(rawVs[i]) + 27, rs[i], ss[i]);
-            currentOracle = verificationVars[baseChainlinkFeed].oracles[signer];
+            currentOracle = verificationVar.oracles[signer];
 
             // Signer must be pre-approved and only 1 observation per signer
             if (currentOracle.role != Role.Signer || signed[currentOracle.index]) {
@@ -169,7 +171,8 @@ contract ChainlinkDAppControl is DAppControl {
         _removeAllSignersOfBaseFeed(baseChainlinkFeed); // Removes any existing signers first
         VerificationVars storage vars = verificationVars[baseChainlinkFeed];
 
-        for (uint256 i = 0; i < signers.length; ++i) {
+        uint256 signersLength = signers.length;
+        for (uint256 i = 0; i < signersLength; ++i) {
             if (vars.oracles[signers[i]].role != Role.Unset) revert DuplicateSigner(signers[i]);
             vars.oracles[signers[i]] = Oracle({ index: uint8(i), role: Role.Signer });
         }
@@ -199,8 +202,9 @@ contract ChainlinkDAppControl is DAppControl {
         if (oracle.role != Role.Signer) revert SignerNotFound();
 
         if (oracle.index < signers.length - 1) {
-            signers[oracle.index] = signers[signers.length - 1];
-            verificationVars[baseChainlinkFeed].oracles[signers[oracle.index]].index = oracle.index;
+            address lastSigner = signers[signers.length - 1];
+            signers[oracle.index] = lastSigner;
+            verificationVars[baseChainlinkFeed].oracles[lastSigner].index = oracle.index;
         }
         signers.pop();
         delete verificationVars[baseChainlinkFeed].oracles[signer];
@@ -211,8 +215,9 @@ contract ChainlinkDAppControl is DAppControl {
     function _removeAllSignersOfBaseFeed(address baseChainlinkFeed) internal {
         VerificationVars storage vars = verificationVars[baseChainlinkFeed];
         address[] storage signers = vars.signers;
-        if (signers.length == 0) return;
-        for (uint256 i = 0; i < signers.length; ++i) {
+        uint256 signersLength = signers.length;
+        if (signersLength == 0) return;
+        for (uint256 i = 0; i < signersLength; ++i) {
             delete vars.oracles[signers[i]];
         }
         delete vars.signers;

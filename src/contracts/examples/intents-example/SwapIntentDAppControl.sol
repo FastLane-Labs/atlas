@@ -95,13 +95,14 @@ contract SwapIntentDAppControl is DAppControl {
             "SwapIntentDAppControl: SellFundsUnavailable"
         );
 
-        if (swapIntent.conditions.length > 0) {
-            require(swapIntent.conditions.length <= MAX_USER_CONDITIONS, "SwapIntentDAppControl: TooManyConditions");
+        uint256 conditionsLength = swapIntent.conditions.length;
+        if (conditionsLength > 0) {
+            require(conditionsLength <= MAX_USER_CONDITIONS, "SwapIntentDAppControl: TooManyConditions");
 
             bool valid;
             bytes memory conditionData;
 
-            for (uint256 i; i < swapIntent.conditions.length; ++i) {
+            for (uint256 i; i < conditionsLength; ++i) {
                 (valid, conditionData) = swapIntent.conditions[i].antecedent.staticcall{ gas: USER_CONDITION_GAS_LIMIT }(
                     swapIntent.conditions[i].context
                 );
