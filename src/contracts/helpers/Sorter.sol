@@ -41,9 +41,8 @@ contract Sorter {
 
         uint256[] memory sorted = _sort(sortingData, count, invalid);
 
-        SolverOperation[] memory solverOpsSorted = new SolverOperation[](count - invalid);
-
         count -= invalid;
+        SolverOperation[] memory solverOpsSorted = new SolverOperation[](count);
 
         for (uint256 i = 0; i < count; ++i) {
             solverOpsSorted[i] = solverOps[sorted[i]];

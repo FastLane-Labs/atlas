@@ -7,7 +7,11 @@ import "src/contracts/types/SolverCallTypes.sol";
 import "src/contracts/types/UserCallTypes.sol";
 import "src/contracts/types/DAppApprovalTypes.sol";
 
+import { CallBits } from "src/contracts/libraries/CallBits.sol";
+
 library CallVerification {
+    using CallBits for uint32;
+
     function getUserOperationHash(UserOperation memory userOp) internal pure returns (bytes32 userOpHash) {
         userOpHash = keccak256(abi.encode(userOp));
     }
@@ -28,7 +32,7 @@ library CallVerification {
         returns (bytes32 callSequenceHash)
     {
         uint256 i;
-        if (dConfig.callConfig & 1 << uint32(CallConfigIndex.RequirePreOps) != 0) {
+        if (dConfig.callConfig.needsPreOpsCall()) {
             // Start with preOps call if preOps is needed
             callSequenceHash = keccak256(
                 abi.encodePacked(
