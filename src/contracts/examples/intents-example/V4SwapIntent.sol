@@ -237,9 +237,9 @@ contract V4SwapIntentControl is DAppControl {
                 ERC20(swapData.tokenOut).safeTransfer(swapData.recipient, amountUserBuys);
             }
             return true;
-        } else {
-            return false;
         }
+
+        return false;
     }
 
     // This occurs after a Solver has successfully paid their bid, which is

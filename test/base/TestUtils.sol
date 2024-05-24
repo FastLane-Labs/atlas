@@ -21,8 +21,7 @@ library TestUtils {
 
         bytes memory output = new bytes(16);
 
-        uint256 i = 0;
-        for (; i < 16; i++) {
+        for (uint256 i = 0; i < 16; i++) {
             if (newN == 0) {
                 // Now that we've filled in the last 1, fill rest of 0s in
                 for (; i < 16; i++) {
@@ -44,8 +43,7 @@ library TestUtils {
 
         bytes memory output = new bytes(32);
 
-        uint256 i = 0;
-        for (; i < 32; i++) {
+        for (uint256 i = 0; i < 32; i++) {
             if (newN == 0) {
                 // Now that we've filled in the last 1, fill rest of 0s in
                 for (; i < 32; i++) {
@@ -63,8 +61,7 @@ library TestUtils {
     function uint256ToBinaryString(uint256 n) public pure returns (string memory) {
         bytes memory output = new bytes(256);
 
-        uint256 i = 0;
-        for (; i < 256; i++) {
+        for (uint256 i = 0; i < 256; i++) {
             if (n == 0) {
                 // Now that we've filled in the last 1, fill rest of 0s in
                 for (; i < 256; i++) {

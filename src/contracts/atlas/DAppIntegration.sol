@@ -117,16 +117,19 @@ contract DAppIntegration {
     }
 
     /// @notice Disables a dApp from the Atlas protocol.
-    /// @param dAppControl The address of the DAppControl contract.
-    function disableDApp(address dAppControl) external {
+    /// @param control The address of the DAppControl contract.
+    function disableDApp(address control) external {
         _checkAtlasIsUnlocked();
-        address dAppGov = IDAppControl(dAppControl).getDAppSignatory();
+        address dAppGov = IDAppControl(control).getDAppSignatory();
         if (msg.sender != dAppGov) revert AtlasErrors.OnlyGovernance();
-        bytes32 signatoryKey = keccak256(abi.encodePacked(dAppControl, dAppGov));
-        signatories[signatoryKey] = false;
 
-        uint32 callConfig = IDAppControl(dAppControl).CALL_CONFIG();
-        emit AtlasEvents.DAppDisabled(dAppControl, dAppGov, callConfig);
+        bytes32 signatoryKey = keccak256(abi.encodePacked(control, dAppGov));
+        if (!signatories[signatoryKey]) revert AtlasErrors.DAppNotEnabled();
+
+        _removeSignatory(control, dAppGov);
+
+        uint32 callConfig = IDAppControl(control).CALL_CONFIG();
+        emit AtlasEvents.DAppDisabled(control, dAppGov, callConfig);
     }
 
     // ---------------------------------------------------- //

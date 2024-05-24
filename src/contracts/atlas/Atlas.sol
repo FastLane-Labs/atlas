@@ -62,7 +62,7 @@ contract Atlas is Escrow, Factory {
         );
         if (validCallsResult != ValidCallsResult.Valid) {
             if (isSimulation) revert VerificationSimFail(uint256(validCallsResult));
-            else revert ValidCalls(validCallsResult);
+            revert ValidCalls(validCallsResult);
         }
 
         // Initialize the lock
@@ -146,7 +146,7 @@ contract Atlas is Escrow, Factory {
             bool callSuccessful = _executePostOpsCall(auctionWon, returnData, key);
             if (!callSuccessful) {
                 if (key.isSimulation) revert PostOpsSimFail();
-                else revert PostOpsFail();
+                revert PostOpsFail();
             }
         }
         return (auctionWon, uint256(key.solverOutcome));
@@ -196,7 +196,7 @@ contract Atlas is Escrow, Factory {
 
             if (!callSuccessful) {
                 if (key.isSimulation) revert PreOpsSimFail();
-                else revert PreOpsFail();
+                revert PreOpsFail();
             }
         }
 
@@ -221,7 +221,7 @@ contract Atlas is Escrow, Factory {
 
         if (!callSuccessful) {
             if (key.isSimulation) revert UserOpSimFail();
-            else revert UserOpFail();
+            revert UserOpFail();
         }
 
         return (returnData, key);
@@ -341,9 +341,8 @@ contract Atlas is Escrow, Factory {
         returns (bool auctionWon, EscrowKey memory)
     {
         uint256 k = solverOps.length;
-        uint256 i;
 
-        for (; i < k; ++i) {
+        for (uint256 i = 0; i < k; ++i) {
             SolverOperation calldata solverOp = solverOps[i];
 
             (auctionWon, key) =

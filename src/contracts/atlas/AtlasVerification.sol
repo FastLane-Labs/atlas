@@ -640,22 +640,22 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         if (sequential) {
             return nonceTracker.lastUsedSeqNonce + 1;
-        } else {
-            uint256 n;
-            uint256 bitmap;
-            do {
-                unchecked {
-                    ++n;
-                }
-                // Non-sequential bitmaps start at index 1. I.e. accounts start with bitmap 0 = HighestFullNonSeqBitmap
-                bytes32 bitmapKey = keccak256(abi.encode(account, nonceTracker.highestFullNonSeqBitmap + n));
-                NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
-                bitmap = uint256(nonceBitmap.bitmap);
-            } while (bitmap == _FULL_BITMAP);
-
-            uint256 remainder = _getFirstUnusedNonceInBitmap(bitmap);
-            return ((nonceTracker.highestFullNonSeqBitmap + n - 1) * 240) + remainder;
         }
+
+        uint256 n;
+        uint256 bitmap;
+        do {
+            unchecked {
+                ++n;
+            }
+            // Non-sequential bitmaps start at index 1. I.e. accounts start with bitmap 0 = HighestFullNonSeqBitmap
+            bytes32 bitmapKey = keccak256(abi.encode(account, nonceTracker.highestFullNonSeqBitmap + n));
+            NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
+            bitmap = uint256(nonceBitmap.bitmap);
+        } while (bitmap == _FULL_BITMAP);
+
+        uint256 remainder = _getFirstUnusedNonceInBitmap(bitmap);
+        return ((nonceTracker.highestFullNonSeqBitmap + n - 1) * 240) + remainder;
     }
 
     /// @notice Manually updates the highestFullNonSeqBitmap of the caller to reflect the real full bitmap.
@@ -664,8 +664,11 @@ contract AtlasVerification is EIP712, DAppIntegration {
         NonceBitmap memory nonceBitmap;
 
         // Checks the next 10 bitmaps for a higher full bitmap
-        uint128 nonceIndexToCheck = nonceTracker.highestFullNonSeqBitmap + 10;
-        for (; nonceIndexToCheck > nonceTracker.highestFullNonSeqBitmap; nonceIndexToCheck--) {
+        for (
+            uint128 nonceIndexToCheck = nonceTracker.highestFullNonSeqBitmap + 10;
+            nonceIndexToCheck > nonceTracker.highestFullNonSeqBitmap;
+            nonceIndexToCheck--
+        ) {
             bytes32 bitmapKey = keccak256(abi.encode(msg.sender, nonceIndexToCheck));
             nonceBitmap = nonceBitmaps[bitmapKey];
 

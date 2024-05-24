@@ -284,7 +284,9 @@ contract ExecutionBase is Base {
                 return false;
             }
             return true;
-        } else if (_source == dapp) {
+        }
+
+        if (_source == dapp) {
             if (shiftedPhase & SAFE_DAPP_TRANSFER == 0) {
                 return false;
             }
@@ -293,6 +295,7 @@ contract ExecutionBase is Base {
             }
             return true;
         }
+
         return false;
     }
 }

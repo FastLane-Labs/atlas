@@ -276,9 +276,9 @@ contract DummyDAppControlBuilder is DAppControl {
     function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
         if (bidToken != address(0)) {
             revert("not supported");
-        } else {
-            SafeTransferLib.safeTransferETH(_user(), address(this).balance);
         }
+        
+        SafeTransferLib.safeTransferETH(_user(), address(this).balance);
     }
 
     function getBidFormat(UserOperation calldata) public view override returns (address bidToken) {

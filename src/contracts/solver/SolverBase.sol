@@ -8,14 +8,12 @@ import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
 
 import "../types/SolverCallTypes.sol";
 
-import "forge-std/Test.sol";
-
 interface IWETH9 {
     function deposit() external payable;
     function withdraw(uint256 wad) external payable;
 }
 
-contract SolverBase is Test {
+contract SolverBase {
     address public immutable WETH_ADDRESS;
     address internal immutable _owner;
     address internal immutable _atlas;
