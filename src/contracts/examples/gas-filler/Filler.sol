@@ -182,18 +182,18 @@ contract Filler is DAppControl {
         if (msg.sender == ATLAS) {
             require(address(this) != _control(), "ERR - NOT DELEGATED");
             return _innerApprove(data);
+        }
 
-            // CASE: Nested call from Atlas EE
-        } else if (msg.sender == ISafetyLocks(ATLAS).activeEnvironment()) {
+        // CASE: Nested call from Atlas EE
+        if (msg.sender == ISafetyLocks(ATLAS).activeEnvironment()) {
             require(address(this) == _control(), "ERR - INVALID CONTROL");
             return _outerApprove(data);
-
-            // CASE: Non-Atlas external call
-        } else {
-            require(address(this) == _control(), "ERR - INVALID CONTROL");
-            _externalApprove(data);
-            return new bytes(0);
         }
+
+        // CASE: Non-Atlas external call
+        require(address(this) == _control(), "ERR - INVALID CONTROL");
+        _externalApprove(data);
+        return new bytes(0);
     }
 
     function _innerApprove(bytes calldata data) internal returns (bytes memory) {

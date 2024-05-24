@@ -43,9 +43,9 @@ contract ChainlinkAtlasWrapper is Ownable {
     function latestAnswer() public view returns (int256) {
         if (BASE_FEED.latestTimestamp() >= atlasLatestTimestamp) {
             return BASE_FEED.latestAnswer();
-        } else {
-            return atlasLatestAnswer;
         }
+
+        return atlasLatestAnswer;
     }
 
     // Use this contract's latestTimestamp if more recent than base oracle's.
@@ -53,9 +53,9 @@ contract ChainlinkAtlasWrapper is Ownable {
     function latestTimestamp() public view returns (uint256) {
         if (BASE_FEED.latestTimestamp() >= atlasLatestTimestamp) {
             return BASE_FEED.latestTimestamp();
-        } else {
-            return atlasLatestTimestamp;
         }
+
+        return atlasLatestTimestamp;
     }
 
     // Fallback to base oracle's latestRoundData, unless this contract's latestTimestamp and latestAnswer are more

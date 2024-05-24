@@ -139,9 +139,8 @@ contract ArbitrageTest is BaseTest {
         } else if (revenue1 > revenue2) {
             if (c == m) return (revenue1, mid1);
             return ternarySearch(tokenIn, tokenOut, routerIn, routerOut, left, mid2, c + 1, m);
-        } else {
-            if (c == m) return (revenue2, mid2);
-            return ternarySearch(tokenIn, tokenOut, routerIn, routerOut, mid1, right, c + 1, m);
         }
+        if (c == m) return (revenue2, mid2);
+        return ternarySearch(tokenIn, tokenOut, routerIn, routerOut, mid1, right, c + 1, m);
     }
 }
