@@ -136,6 +136,16 @@ contract DAppIntegration {
     //                   Internal Functions                 //
     // ---------------------------------------------------- //
 
+    /// @notice Returns whether a specified address is a signatory for a specified DAppControl contract.
+    /// @param dAppControl The address of the DAppControl contract.
+    /// @param signatory The address to check.
+    /// @return A boolean indicating whether the specified address is a signatory for the specified DAppControl
+    /// contract.
+    function _isDAppSignatory(address dAppControl, address signatory) internal view returns (bool) {
+        bytes32 signatoryKey = keccak256(abi.encodePacked(dAppControl, signatory));
+        return signatories[signatoryKey];
+    }
+
     /// @notice Adds a new signatory to a dApp's list of approved signatories.
     /// @param control The address of the DAppControl contract.
     /// @param signatory The address of the new signatory.
@@ -186,8 +196,7 @@ contract DAppIntegration {
     /// @return A boolean indicating whether the specified address is a signatory for the specified DAppControl
     /// contract.
     function isDAppSignatory(address dAppControl, address signatory) external view returns (bool) {
-        bytes32 signatoryKey = keccak256(abi.encodePacked(dAppControl, signatory));
-        return signatories[signatoryKey];
+        return _isDAppSignatory(dAppControl, signatory);
     }
 
     /// @notice Returns an array of signatories for a specified DAppControl contract.
