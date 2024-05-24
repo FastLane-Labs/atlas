@@ -37,7 +37,7 @@ abstract contract DAppControlTemplate {
     //
     // DApp exposure: Trustless
     // User exposure: Trustless
-    function _preOpsCall(UserOperation calldata) internal virtual returns (bytes memory) {
+    function _preOpsCall(UserOperation calldata userOp) internal virtual returns (bytes memory) {
         revert AtlasErrors.NotImplemented();
     }
 
@@ -55,7 +55,14 @@ abstract contract DAppControlTemplate {
     //
     // DApp exposure: Trustless
     // User exposure: Trustless
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) internal virtual;
+    function _allocateValueCall(
+        UserOperation calldata userOp,
+        address bidToken,
+        uint256 bidAmount,
+        bytes calldata data
+    )
+        internal
+        virtual;
 
     /////////////////////////////////////////////////////////
     //              INTENT FULFILLMENT                     //
@@ -78,7 +85,15 @@ abstract contract DAppControlTemplate {
     //      and is designed to give the solver everything they need to fulfill
     //      the user's 'intent.'
 
-    function _preSolverCall(SolverOperation calldata, bytes calldata) internal virtual returns (bool) {
+    function _preSolverCall(
+        UserOperation calldata userOp,
+        SolverOperation calldata solverOp,
+        bytes calldata returnData
+    )
+        internal
+        virtual
+        returns (bool)
+    {
         revert AtlasErrors.NotImplemented();
     }
 
@@ -100,7 +115,15 @@ abstract contract DAppControlTemplate {
     //      and is designed to make sure that the solver is fulfilling
     //      the user's 'intent.'
 
-    function _postSolverCall(SolverOperation calldata, bytes calldata) internal virtual returns (bool) {
+    function _postSolverCall(
+        UserOperation calldata userOp,
+        SolverOperation calldata solverOp,
+        bytes calldata returnData
+    )
+        internal
+        virtual
+        returns (bool)
+    {
         revert AtlasErrors.NotImplemented();
     }
 
@@ -120,7 +143,15 @@ abstract contract DAppControlTemplate {
     //      Function: Executing the function set by DAppControl
     //      Container: Inside of the FastLane ExecutionEnvironment
     //      Access: Storage access (read+write) to the ExecutionEnvironment contract
-    function _postOpsCall(bool, bytes calldata) internal virtual returns (bool) {
+    function _postOpsCall(
+        UserOperation calldata userOp,
+        bool solved,
+        bytes calldata data
+    )
+        internal
+        virtual
+        returns (bool)
+    {
         revert AtlasErrors.NotImplemented();
     }
 

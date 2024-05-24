@@ -9,6 +9,7 @@ interface IDAppControl {
     function preOpsCall(UserOperation calldata userOp) external payable returns (bytes memory);
 
     function preSolverCall(
+        UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         bytes calldata returnData
     )
@@ -17,6 +18,7 @@ interface IDAppControl {
         returns (bool);
 
     function postSolverCall(
+        UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         bytes calldata returnData
     )
@@ -24,9 +26,22 @@ interface IDAppControl {
         payable
         returns (bool);
 
-    function postOpsCall(bool solved, bytes calldata data) external payable returns (bytes memory);
+    function postOpsCall(
+        UserOperation calldata userOp,
+        bool solved,
+        bytes calldata data
+    )
+        external
+        payable
+        returns (bytes memory);
 
-    function allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) external;
+    function allocateValueCall(
+        UserOperation calldata userOp,
+        address bidToken,
+        uint256 bidAmount,
+        bytes calldata data
+    )
+        external;
 
     function getDAppConfig(UserOperation calldata userOp) external view returns (DAppConfig memory dConfig);
 

@@ -86,7 +86,16 @@ contract ChainlinkDAppControl is DAppControl {
     //                  Atlas Hook Overrides                //
     // ---------------------------------------------------- //
 
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) internal virtual override {
+    function _allocateValueCall(
+        UserOperation calldata userOp,
+        address bidToken,
+        uint256 bidAmount,
+        bytes calldata data
+    )
+        internal
+        virtual
+        override
+    {
         address chainlinkWrapper = abi.decode(data, (address));
         if (!ChainlinkDAppControl(_control()).isChainlinkWrapper(chainlinkWrapper)) {
             revert InvalidChainlinkAtlasWrapper();

@@ -4,6 +4,7 @@ pragma solidity 0.8.22;
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 import { Base } from "src/contracts/common/ExecutionBase.sol";
 
+import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
 import { ISafetyLocks } from "src/contracts/interfaces/ISafetyLocks.sol";
 import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
@@ -20,7 +21,7 @@ import "src/contracts/types/DAppApprovalTypes.sol";
 /// @author FastLane Labs
 /// @notice An Execution Environment contract is deployed for each unique combination of User address x DAppControl
 /// address that interacts with the Atlas protocol via a metacall transaction.
-contract ExecutionEnvironment is Base {
+contract ExecutionEnvironment is Base, IExecutionEnvironment {
     using CallBits for uint32;
 
     uint8 private constant _ENVIRONMENT_DEPTH = 1 << 1;
@@ -28,7 +29,9 @@ contract ExecutionEnvironment is Base {
     constructor(address _atlas) Base(_atlas) { }
 
     modifier validUser(UserOperation calldata userOp) {
-        if (userOp.to != ATLAS || userOp.dapp == ATLAS) revert AtlasErrors.InvalidTo();
+        if (userOp.to != ATLAS || userOp.dapp == ATLAS) {
+            revert AtlasErrors.InvalidTo();
+        }
         _;
     }
 
@@ -83,7 +86,9 @@ contract ExecutionEnvironment is Base {
     {
         uint32 config = _config();
 
-        if (userOp.value > address(this).balance) revert AtlasErrors.UserOpValueExceedsBalance();
+        if (userOp.value > address(this).balance) {
+            revert AtlasErrors.UserOpValueExceedsBalance();
+        }
 
         // Do not attach extra calldata via `_forward()` if contract called is not dAppControl, as the additional
         // calldata may cause unexpected behaviour in third-party protocols
@@ -106,19 +111,22 @@ contract ExecutionEnvironment is Base {
     /// @param solved Boolean indicating whether a winning SolverOperation was executed successfully.
     /// @param returnData Data returned from the previous call phase.
     function postOpsWrapper(
+        UserOperation calldata userOp,
         bool solved,
         bytes calldata returnData
     )
         external
         onlyAtlasEnvironment(ExecutionPhase.PostOps, _ENVIRONMENT_DEPTH)
     {
-        bytes memory data = _forward(abi.encodeCall(IDAppControl.postOpsCall, (solved, returnData)));
+        bytes memory data = _forward(abi.encodeCall(IDAppControl.postOpsCall, (userOp, solved, returnData)));
 
         bool success;
         (success, data) = _control().delegatecall(data);
 
         if (!success) revert AtlasErrors.PostOpsDelegatecallFail();
-        if (!abi.decode(data, (bool))) revert AtlasErrors.PostOpsDelegatecallReturnedFalse();
+        if (!abi.decode(data, (bool))) {
+            revert AtlasErrors.PostOpsDelegatecallReturnedFalse();
+        }
     }
 
     /// @notice The solverMetaTryCatch function is called by Atlas to execute the SolverOperation, as well as any
@@ -132,6 +140,7 @@ contract ExecutionEnvironment is Base {
     function solverMetaTryCatch(
         uint256 bidAmount,
         uint256 gasLimit,
+        UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         bytes calldata returnData
     )
@@ -139,7 +148,9 @@ contract ExecutionEnvironment is Base {
         payable
         onlyAtlasEnvironment(ExecutionPhase.SolverOperations, _ENVIRONMENT_DEPTH)
     {
-        if (address(this).balance != solverOp.value) revert AtlasErrors.SolverMetaTryCatchIncorrectValue();
+        if (address(this).balance != solverOp.value) {
+            revert AtlasErrors.SolverMetaTryCatchIncorrectValue();
+        }
 
         uint32 config = _config();
         address control = _control();
@@ -170,7 +181,7 @@ contract ExecutionEnvironment is Base {
         // Handle any solver preOps, if necessary
         if (config.needsPreSolver()) {
             bytes memory data = _forwardSpecial(
-                abi.encodeCall(IDAppControl.preSolverCall, (solverOp, returnData)), ExecutionPhase.PreSolver
+                abi.encodeCall(IDAppControl.preSolverCall, (userOp, solverOp, returnData)), ExecutionPhase.PreSolver
             );
 
             (success, data) = control.delegatecall(data);
@@ -216,7 +227,7 @@ contract ExecutionEnvironment is Base {
             if (!success) revert AtlasErrors.CallbackNotCalled();
 
             bytes memory data = _forwardSpecial(
-                abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData)), ExecutionPhase.PostSolver
+                abi.encodeCall(IDAppControl.postSolverCall, (userOp, solverOp, returnData)), ExecutionPhase.PostSolver
             );
 
             (success, data) = control.delegatecall(data);
@@ -313,6 +324,7 @@ contract ExecutionEnvironment is Base {
     /// @param bidAmount The winning bid amount.
     /// @param allocateData Data returned from the previous call phase.
     function allocateValue(
+        UserOperation calldata userOp,
         address bidToken,
         uint256 bidAmount,
         bytes memory allocateData
@@ -321,7 +333,8 @@ contract ExecutionEnvironment is Base {
         onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _ENVIRONMENT_DEPTH)
         contributeSurplus
     {
-        allocateData = _forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, bidAmount, allocateData)));
+        allocateData =
+            _forward(abi.encodeCall(IDAppControl.allocateValueCall, (userOp, bidToken, bidAmount, allocateData)));
 
         (bool success,) = _control().delegatecall(allocateData);
         if (!success) revert AtlasErrors.AllocateValueDelegatecallFail();
@@ -338,7 +351,9 @@ contract ExecutionEnvironment is Base {
     /// @param amount The amount of the ERC20 token to withdraw.
     function withdrawERC20(address token, uint256 amount) external {
         if (msg.sender != _user()) revert AtlasErrors.NotEnvironmentOwner();
-        if (!ISafetyLocks(ATLAS).isUnlocked()) revert AtlasErrors.AtlasLockActive();
+        if (!ISafetyLocks(ATLAS).isUnlocked()) {
+            revert AtlasErrors.AtlasLockActive();
+        }
 
         if (ERC20(token).balanceOf(address(this)) >= amount) {
             SafeTransferLib.safeTransfer(ERC20(token), msg.sender, amount);
@@ -353,7 +368,9 @@ contract ExecutionEnvironment is Base {
     /// @param amount The amount of Ether to withdraw.
     function withdrawEther(uint256 amount) external {
         if (msg.sender != _user()) revert AtlasErrors.NotEnvironmentOwner();
-        if (!ISafetyLocks(ATLAS).isUnlocked()) revert AtlasErrors.AtlasLockActive();
+        if (!ISafetyLocks(ATLAS).isUnlocked()) {
+            revert AtlasErrors.AtlasLockActive();
+        }
 
         if (address(this).balance >= amount) {
             SafeTransferLib.safeTransferETH(msg.sender, amount);

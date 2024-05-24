@@ -104,7 +104,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         userOp.from = user;
         userOp.to = address(atlas);
         escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
-        preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
+        preOpsData = abi.encodeCall(ExecutionEnvironment.preOpsWrapper, userOp);
         preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(preOpsData);
@@ -114,7 +114,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         userOp.from = invalid; // Invalid from
         userOp.to = address(atlas);
         escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
-        preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
+        preOpsData = abi.encodeCall(ExecutionEnvironment.preOpsWrapper, userOp);
         preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.InvalidUser.selector);
@@ -124,7 +124,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         userOp.from = user;
         userOp.to = invalid; // Invalid to
         escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
-        preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
+        preOpsData = abi.encodeCall(ExecutionEnvironment.preOpsWrapper, userOp);
         preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.InvalidTo.selector);
@@ -141,7 +141,7 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // Valid
         escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
-        preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
+        preOpsData = abi.encodeCall(ExecutionEnvironment.preOpsWrapper, userOp);
         preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(preOpsData);
@@ -149,7 +149,7 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // InvalidSender
         escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
-        preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
+        preOpsData = abi.encodeCall(ExecutionEnvironment.preOpsWrapper, userOp);
         preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
         vm.prank(address(0)); // Invalid sender
         vm.expectRevert(AtlasErrors.OnlyAtlas.selector);
@@ -158,7 +158,7 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // WrongPhase
         escrowKey = escrowKey.holdUserLock(address(dAppControl)); // Invalid lock state
-        preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
+        preOpsData = abi.encodeCall(ExecutionEnvironment.preOpsWrapper, userOp);
         preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.WrongPhase.selector);
@@ -180,7 +180,8 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // Valid
         escrowKey = escrowKey.holdUserLock(address(dAppControl));
-        userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
+        userData = abi.encodeCall(
+            ExecutionEnvironment.userWrapper, userOp);
         userData = abi.encodePacked(userData, escrowKey.pack());
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(userData);
@@ -191,7 +192,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.etch(address(dAppControl), address(atlas).code);
 
         escrowKey = escrowKey.holdUserLock(address(dAppControl));
-        userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
+        userData = abi.encodeCall(
+            ExecutionEnvironment.userWrapper, userOp);
         userData = abi.encodePacked(userData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.InvalidCodeHash.selector);
@@ -221,7 +223,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         uint256 surplusAmount = 50_000;
 
         escrowKey = escrowKey.holdUserLock(address(dAppControl));
-        userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
+        userData = abi.encodeCall(
+            ExecutionEnvironment.userWrapper, userOp);
         userData = abi.encodePacked(userData, escrowKey.pack());
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call{ value: surplusAmount }(userData);
@@ -241,9 +244,9 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // Valid
         uint256 expectedReturnValue = 123;
-        userOp.data = abi.encodeWithSelector(dAppControl.mockOperation.selector, false, expectedReturnValue);
+        userOp.data = abi.encodeCall(MockDAppControl.mockOperation, (false, expectedReturnValue));
         escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
-        preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
+        preOpsData = abi.encodeCall(ExecutionEnvironment.preOpsWrapper, userOp);
         preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         (status, data) = address(executionEnvironment).call(preOpsData);
@@ -251,9 +254,9 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertEq(abi.decode(abi.decode(data, (bytes)), (uint256)), expectedReturnValue);
 
         // DelegateRevert
-        userOp.data = abi.encodeWithSelector(dAppControl.mockOperation.selector, true, uint256(0));
+        userOp.data = abi.encodeCall(MockDAppControl.mockOperation, (true, uint256(0)));
         escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
-        preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
+        preOpsData = abi.encodeCall(ExecutionEnvironment.preOpsWrapper, userOp);
         preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PreOpsDelegatecallFail.selector);
@@ -274,7 +277,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         // ValueExceedsBalance
         userOp.value = 1; // Positive value but EE has no balance
         escrowKey = escrowKey.holdUserLock(address(dAppControl));
-        userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
+        userData = abi.encodeCall(
+            ExecutionEnvironment.userWrapper, userOp);
         userData = abi.encodePacked(userData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.UserOpValueExceedsBalance.selector);
@@ -283,9 +287,10 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // Valid (needsDelegateUser=false)
         expectedReturnValue = 987;
-        userOp.data = abi.encodeWithSelector(dAppControl.mockOperation.selector, false, expectedReturnValue);
+        userOp.data = abi.encodeCall(MockDAppControl.mockOperation, (false, expectedReturnValue));
         escrowKey = escrowKey.holdUserLock(address(dAppControl));
-        userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
+        userData = abi.encodeCall(
+            ExecutionEnvironment.userWrapper, userOp);
         userData = abi.encodePacked(userData, escrowKey.pack());
         vm.prank(address(atlas));
         (status, data) = address(executionEnvironment).call(userData);
@@ -293,9 +298,10 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertEq(abi.decode(abi.decode(data, (bytes)), (uint256)), expectedReturnValue);
 
         // CallRevert (needsDelegateUser=false)
-        userOp.data = abi.encodeWithSelector(dAppControl.mockOperation.selector, true, 0);
+        userOp.data = abi.encodeCall(MockDAppControl.mockOperation, (true, 0));
         escrowKey = escrowKey.holdUserLock(address(dAppControl));
-        userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
+        userData = abi.encodeCall(
+            ExecutionEnvironment.userWrapper, userOp);
         userData = abi.encodePacked(userData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.UserWrapperCallFail.selector);
@@ -308,9 +314,10 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // Valid (needsDelegateUser=true)
         expectedReturnValue = 277;
-        userOp.data = abi.encodeWithSelector(dAppControl.mockOperation.selector, false, expectedReturnValue);
+        userOp.data = abi.encodeCall(MockDAppControl.mockOperation, (false, expectedReturnValue));
         escrowKey = escrowKey.holdUserLock(address(dAppControl));
-        userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
+        userData = abi.encodeCall(
+            ExecutionEnvironment.userWrapper, userOp);
         userData = abi.encodePacked(userData, escrowKey.pack());
         vm.prank(address(atlas));
         (status, data) = address(executionEnvironment).call(userData);
@@ -318,9 +325,10 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertEq(abi.decode(abi.decode(data, (bytes)), (uint256)), expectedReturnValue);
 
         // DelegateRevert (needsDelegateUser=true)
-        userOp.data = abi.encodeWithSelector(dAppControl.mockOperation.selector, true, 0);
+        userOp.data = abi.encodeCall(MockDAppControl.mockOperation, (true, 0));
         escrowKey = escrowKey.holdUserLock(address(dAppControl));
-        userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
+        userData = abi.encodeCall(
+            ExecutionEnvironment.userWrapper, userOp);
         userData = abi.encodePacked(userData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.UserWrapperDelegatecallFail.selector);
@@ -328,6 +336,7 @@ contract ExecutionEnvironmentTest is BaseTest {
     }
 
     function test_postOpsWrapper() public {
+        UserOperation memory userOp;
         bytes memory postOpsData;
         bool status;
 
@@ -336,7 +345,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         escrowKey.callCount = 4;
         escrowKey = escrowKey.holdPostOpsLock();
         postOpsData =
-            abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, false, abi.encode(false, true));
+            abi.encodeCall(
+            ExecutionEnvironment.postOpsWrapper, (userOp, false, abi.encode(false, true)));
         postOpsData = abi.encodePacked(postOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(postOpsData);
@@ -345,7 +355,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         // DelegateRevert
         escrowKey = escrowKey.holdPostOpsLock();
         postOpsData =
-            abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, false, abi.encode(true, false));
+            abi.encodeCall(
+            ExecutionEnvironment.postOpsWrapper, (userOp, false, abi.encode(true, false)));
         postOpsData = abi.encodePacked(postOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PostOpsDelegatecallFail.selector);
@@ -354,7 +365,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         // DelegateUnsuccessful
         escrowKey = escrowKey.holdPostOpsLock();
         postOpsData =
-            abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, false, abi.encode(false, false));
+            abi.encodeCall(
+            ExecutionEnvironment.postOpsWrapper, (userOp, false, abi.encode(false, false)));
         postOpsData = abi.encodePacked(postOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PostOpsDelegatecallReturnedFalse.selector);
@@ -368,6 +380,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.prank(solver);
         MockSolverContract solverContract = new MockSolverContract(chain.weth, address(atlas));
 
+        UserOperation memory userOp;
+
         SolverOperation memory solverOp;
         solverOp.from = solver;
         solverOp.control = address(dAppControl);
@@ -379,8 +393,9 @@ contract ExecutionEnvironmentTest is BaseTest {
         _setLocks();
         solverOp.value = 1; // Positive value but EE has no balance
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0)
+        solverMetaData = abi.encodeCall(
+            ExecutionEnvironment.solverMetaTryCatch,
+            (solverOp.bidAmount, solverGasLimit, userOp, solverOp, new bytes(0))
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -393,8 +408,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         _setLocks();
         solverOp.control = invalid; // Invalid control
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0)
+        solverMetaData = abi.encodeCall(
+            ExecutionEnvironment.solverMetaTryCatch, (solverOp.bidAmount, solverGasLimit, userOp, solverOp, new bytes(0))
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -405,10 +420,10 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // SolverOperationReverted
         _setLocks();
-        solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, true);
+        solverOp.data = abi.encodeCall(MockSolverContract.solverMockOperation, true);
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0)
+        solverMetaData = abi.encodeCall(
+            ExecutionEnvironment.solverMetaTryCatch, (solverOp.bidAmount, solverGasLimit, userOp, solverOp, new bytes(0))
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -419,10 +434,10 @@ contract ExecutionEnvironmentTest is BaseTest {
         // SolverBidUnpaid
         _setLocks();
         solverOp.bidAmount = 1; // Bid won't be paid
-        solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
+        solverOp.data = abi.encodeCall(MockSolverContract.solverMockOperation, false);
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0)
+        solverMetaData = abi.encodeCall(
+            ExecutionEnvironment.solverMetaTryCatch, (solverOp.bidAmount, solverGasLimit, userOp, solverOp, new bytes(0))
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -435,10 +450,10 @@ contract ExecutionEnvironmentTest is BaseTest {
         // Solver's contract does not call reconcile
         _setLocks();
         solverContract.setReconcile(false);
-        solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
+        solverOp.data = abi.encodeCall(MockSolverContract.solverMockOperation, false);
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0)
+        solverMetaData = abi.encodeCall(
+            ExecutionEnvironment.solverMetaTryCatch, (solverOp.bidAmount, solverGasLimit, userOp, solverOp, new bytes(0))
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -455,12 +470,13 @@ contract ExecutionEnvironmentTest is BaseTest {
         // PreSolverFailed
         _setLocks();
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector,
+        solverMetaData = abi.encodeCall(
+            ExecutionEnvironment.solverMetaTryCatch,(
             solverOp.bidAmount,
             solverGasLimit,
+            userOp,
             solverOp,
-            abi.encode(true, false)
+            abi.encode(true, false))
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -471,12 +487,13 @@ contract ExecutionEnvironmentTest is BaseTest {
         // PreSolverFailed 2
         _setLocks();
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector,
-            solverOp.bidAmount,
+        solverMetaData = abi.encodeCall(
+            ExecutionEnvironment.solverMetaTryCatch,
+            (solverOp.bidAmount,
             solverGasLimit,
+            userOp,
             solverOp,
-            abi.encode(false, false)
+            abi.encode(false, false))
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -492,14 +509,15 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // PostSolverFailed
         _setLocks();
-        solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
+        solverOp.data = abi.encodeCall(MockSolverContract.solverMockOperation, false);
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector,
-            solverOp.bidAmount,
+        solverMetaData = abi.encodeCall(
+            ExecutionEnvironment.solverMetaTryCatch,
+            (solverOp.bidAmount,
             solverGasLimit,
+            userOp,
             solverOp,
-            abi.encode(true, false)
+            abi.encode(true, false))
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -509,14 +527,15 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // IntentUnfulfilled
         _setLocks();
-        solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
+        solverOp.data = abi.encodeCall(MockSolverContract.solverMockOperation, false);
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector,
-            solverOp.bidAmount,
+        solverMetaData = abi.encodeCall(
+            ExecutionEnvironment.solverMetaTryCatch,
+            (solverOp.bidAmount,
             solverGasLimit,
+            userOp,
             solverOp,
-            abi.encode(false, false)
+            abi.encode(false, false))
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -526,13 +545,14 @@ contract ExecutionEnvironmentTest is BaseTest {
     }
 
     function test_allocateValue() public {
+        UserOperation memory userOp;
         bytes memory allocateData;
         bool status;
 
         // Valid
         escrowKey = escrowKey.holdAllocateValueLock(address(dAppControl));
-        allocateData = abi.encodeWithSelector(
-            executionEnvironment.allocateValue.selector, address(0), uint256(0), abi.encode(false)
+        allocateData = abi.encodeCall(
+            ExecutionEnvironment.allocateValue, (userOp, address(0), uint256(0), abi.encode(false))
         );
         allocateData = abi.encodePacked(allocateData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -541,8 +561,8 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // DelegateRevert
         escrowKey = escrowKey.holdAllocateValueLock(address(dAppControl));
-        allocateData = abi.encodeWithSelector(
-            executionEnvironment.allocateValue.selector, address(0), uint256(0), abi.encode(true)
+        allocateData = abi.encodeCall(
+            ExecutionEnvironment.allocateValue, (userOp, address(0), uint256(0), abi.encode(true))
         );
         allocateData = abi.encodePacked(allocateData, escrowKey.pack());
         vm.prank(address(atlas));
@@ -659,13 +679,14 @@ contract MockDAppControl is DAppControl {
         return new bytes(0);
     }
 
-    function _postOpsCall(bool, bytes calldata data) internal pure override returns (bool) {
+    function _postOpsCall(UserOperation calldata userOp, bool, bytes calldata data) internal pure override returns (bool) {
         (bool shouldRevert, bool returnValue) = abi.decode(data, (bool, bool));
         require(!shouldRevert, "_postSolverCall revert requested");
         return returnValue;
     }
 
     function _preSolverCall(
+        UserOperation calldata userOp,
         SolverOperation calldata,
         bytes calldata returnData
     )
@@ -680,6 +701,7 @@ contract MockDAppControl is DAppControl {
     }
 
     function _postSolverCall(
+        UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         bytes calldata returnData
     )
@@ -693,7 +715,7 @@ contract MockDAppControl is DAppControl {
         return returnValue;
     }
 
-    function _allocateValueCall(address, uint256, bytes calldata data) internal virtual override {
+    function _allocateValueCall(UserOperation calldata userOp, address, uint256, bytes calldata data) internal virtual override {
         (bool shouldRevert) = abi.decode(data, (bool));
         require(!shouldRevert, "_allocateValueCall revert requested");
     }
