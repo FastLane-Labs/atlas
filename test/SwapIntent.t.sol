@@ -188,7 +188,11 @@ contract SwapIntentTest is BaseTest {
         (simResult,,) = simulator.simUserOperation(userOp);
         assertTrue(simResult, "metasimUserOperationcall tested false c");
 
+        uint256 gasLeftBefore = gasleft();
+
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
+
+        console.log("OEV Metacall Gas Cost:", gasLeftBefore - gasleft());
         vm.stopPrank();
 
         console.log("\nAFTER METACALL");
