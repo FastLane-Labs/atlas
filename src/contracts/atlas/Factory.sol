@@ -30,30 +30,30 @@ abstract contract Factory {
 
     // TODO update comments
     /// @notice Creates a new Execution Environment for the caller, given a DAppControl contract address.
-    /// @param dAppControl The address of the DAppControl contract for which the execution environment is being created.
+    /// @param control The address of the DAppControl contract for which the execution environment is being created.
     /// @return executionEnvironment The address of the newly created Execution Environment instance.
-    function createExecutionEnvironment(address dAppControl) external returns (address executionEnvironment) {
-        executionEnvironment = _getOrCreateExecutionEnvironment(msg.sender, dAppControl);
+    function createExecutionEnvironment(address control) external returns (address executionEnvironment) {
+        executionEnvironment = _getOrCreateExecutionEnvironment({ user: msg.sender, control: control });
     }
 
     /// @notice Retrieves the address and configuration of an existing execution environment for a given user and DApp
     /// control contract.
     /// @param user The address of the user for whom the execution environment is being queried.
-    /// @param dAppControl The address of the DApp control contract associated with the execution environment.
+    /// @param control The address of the DAppControl contract associated with the execution environment.
     /// @return executionEnvironment The address of the queried execution environment.
     /// @return callConfig The call configuration used by the execution environment, retrieved from the DApp control
     /// contract.
     /// @return exists A boolean indicating whether the execution environment already exists (true) or not (false).
     function getExecutionEnvironment(
         address user,
-        address dAppControl
+        address control
     )
         external
         view
         returns (address executionEnvironment, uint32 callConfig, bool exists)
     {
-        callConfig = IDAppControl(dAppControl).CALL_CONFIG();
-        executionEnvironment = _getExecutionEnvironmentCustom(user, dAppControl, callConfig);
+        callConfig = IDAppControl(control).CALL_CONFIG();
+        executionEnvironment = _getExecutionEnvironmentCustom({ user: user, control: control, callConfig: callConfig });
         exists = executionEnvironment.code.length != 0;
     }
 
@@ -67,7 +67,7 @@ abstract contract Factory {
         returns (address executionEnvironment, DAppConfig memory dAppConfig)
     {
         dAppConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
-        executionEnvironment = _getOrCreateExecutionEnvironment(msg.sender, userOp.control);
+        executionEnvironment = _getOrCreateExecutionEnvironment({ user: userOp.from, control: userOp.control });
     }
 
     function _getOrCreateExecutionEnvironment(
