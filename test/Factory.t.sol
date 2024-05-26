@@ -32,18 +32,6 @@ contract MockFactory is Factory, Test {
     function baseSalt() external view returns (bytes32) {
         return _FACTORY_BASE_SALT;
     }
-
-    function getMimicCreationCode(
-        address user,
-        address control,
-        uint32 callConfig
-    )
-        external
-        view
-        returns (bytes memory creationCode) {
-            require(EXECUTION_ENV_TEMPLATE != address(0), "TEST: Execution environment template not set");
-            return _getMimicCreationCode(user, control, callConfig);
-        }
 }
 
 contract FactoryTest is Test {
@@ -81,24 +69,10 @@ contract FactoryTest is Test {
     }
 
     function test_createExecutionEnvironment() public {
-        uint32 callConfig = dAppControl.CALL_CONFIG();
-        bytes memory creationCode = mockFactory.getMimicCreationCode(user, address(dAppControl), callConfig);
-        address expectedExecutionEnvironment = address(
-            uint160(
-                uint256(
-                    keccak256(
-                        abi.encodePacked(
-                            bytes1(0xff),
-                            address(mockFactory),
-                            mockFactory.computeSalt(user, address(dAppControl), callConfig),
-                            keccak256(abi.encodePacked(creationCode))
-                        )
-                    )
-                )
-            )
-        );
+        (address expectedExecutionEnvironment,, bool exists) = mockFactory.getExecutionEnvironment(user, address(dAppControl));
 
         assertTrue(expectedExecutionEnvironment.code.length == 0, "Execution environment should not exist");
+        assertFalse(exists, "Execution environment should not yet exist");
 
         vm.startPrank(user);
         vm.expectEmit(true, true, true, true);
