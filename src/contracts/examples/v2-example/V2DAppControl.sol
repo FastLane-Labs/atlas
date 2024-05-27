@@ -145,7 +145,7 @@ contract V2DAppControl is DAppControl {
         // ENABLE FOR FOUNDRY TESTING
         console.log("----====++++====----");
         console.log("DApp Control");
-        console.log("Governance Tokens Burned:", govIsTok0 ? amount0Out : amount1Out);
+        console.log("Governance Tokens Sent to user:", govIsTok0 ? amount0Out : amount1Out);
         console.log("----====++++====----");
         */
     }
