@@ -20,6 +20,7 @@ import { DAppControl } from "../../dapp/DAppControl.sol";
 
 // Uni V2 Imports
 import { IUniswapV2Pair } from "./interfaces/IUniswapV2Pair.sol";
+import { IUniswapV2Factory } from "./interfaces/IUniswapV2Factory.sol";
 
 // Misc
 import { SwapMath } from "./SwapMath.sol";
@@ -86,12 +87,16 @@ contract V2DAppControl is DAppControl {
     function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory) {
         require(bytes4(userOp.data) == SWAP, "ERR-H10 InvalidFunction");
 
+        require(IUniswapV2Factory(IUniswapV2Pair(userOp.dapp).factory()).
+            getPair(IUniswapV2Pair(userOp.dapp).token0(), IUniswapV2Pair(userOp.dapp).token1()) == userOp.dapp, 
+            "ERR-H11 Invalid pair");
         (
             uint256 amount0Out,
             uint256 amount1Out,
             , // address recipient // Unused
                 // bytes memory swapData // Unused
         ) = abi.decode(userOp.data[4:], (uint256, uint256, address, bytes));
+
 
         (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(userOp.dapp).getReserves();
 
