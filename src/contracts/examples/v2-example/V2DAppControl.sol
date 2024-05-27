@@ -123,7 +123,7 @@ contract V2DAppControl is DAppControl {
 
         (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).getReserves();
 
-        ERC20(WETH).transfer(WETH_X_GOVERNANCE_POOL, bidAmount);
+        SafeTransferLib.safeTransfer(ERC20(WETH), WETH_X_GOVERNANCE_POOL, bidAmount);
 
         uint256 amount0Out;
         uint256 amount1Out;
