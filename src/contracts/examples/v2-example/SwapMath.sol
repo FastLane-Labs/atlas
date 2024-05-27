@@ -19,4 +19,19 @@ library SwapMath {
         uint256 denominator = reservesOut.sub(amountOut).mul(997);
         amountIn = (numerator / denominator).add(1);
     }
+
+    function getAmountOut(
+        uint amountIn,
+        uint reserveIn,
+        uint reserveOut
+    ) 
+        internal
+        pure
+        returns (uint256 amountOut)
+    {
+        uint amountInWithFee = amountIn * 997;
+        uint numerator = amountInWithFee * reserveOut;
+        uint denominator = (reserveIn * 1000) + amountInWithFee;
+        amountOut = numerator / denominator;
+    }
 }
