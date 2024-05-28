@@ -153,6 +153,7 @@ contract ChainlinkDAppControl is DAppControl {
         bool[] memory signed = new bool[](MAX_NUM_ORACLES);
         bytes32 reportHash = keccak256(report);
         uint256 observations = rs.length;
+        require(rs.length <= MAX_NUM_ORACLES, "rs.length > MAX_NUM_ORACLES");
 
         VerificationVars storage verificationVar = verificationVars[baseChainlinkFeed];
         Oracle memory currentOracle;

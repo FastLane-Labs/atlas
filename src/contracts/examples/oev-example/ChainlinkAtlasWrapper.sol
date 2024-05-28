@@ -57,6 +57,7 @@ contract ChainlinkAtlasWrapper is Ownable, IChainlinkAtlasWrapper {
         returns (address)
     {
         if (!transmitters[msg.sender]) revert TransmitterNotTrusted(msg.sender);
+        require(rs.length == ss.length, "rs.length != ss.length");
 
         (int256 answer, uint40 epochAndRound) = _verifyTransmitData(report, rs, ss, rawVs);
 
@@ -86,6 +87,7 @@ contract ChainlinkAtlasWrapper is Ownable, IChainlinkAtlasWrapper {
         if (epochAndRound <= atlasLatestEpochAndRound) revert CannotReuseReport();
 
         // Check observations are ordered
+        require(r.observations.length > 0, "no observations");
         for (uint256 i = 0; i < r.observations.length - 1; ++i) {
             bool inOrder = r.observations[i] <= r.observations[i + 1];
             if (!inOrder) revert ObservationsNotOrdered();
