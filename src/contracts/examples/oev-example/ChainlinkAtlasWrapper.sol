@@ -120,8 +120,9 @@ contract ChainlinkAtlasWrapper is Ownable, IChainlinkAtlasWrapper {
     // Use this contract's latestTimestamp if more recent than base oracle's.
     // Otherwise fallback to base oracle's latestTimestamp
     function latestTimestamp() public view returns (uint256) {
-        if (BASE_FEED.latestTimestamp() >= atlasLatestTimestamp) {
-            return BASE_FEED.latestTimestamp();
+        uint256 baseFeedLatestTimestamp = BASE_FEED.latestTimestamp();
+        if (baseFeedLatestTimestamp >= atlasLatestTimestamp) {
+            return baseFeedLatestTimestamp;
         }
 
         return atlasLatestTimestamp;
