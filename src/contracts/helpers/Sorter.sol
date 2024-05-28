@@ -64,19 +64,6 @@ contract Sorter {
         view
         returns (bool)
     {
-        // Verify that the solver submitted the correct userOpHash
-        bytes32 userOpHash;
-
-        if (dConfig.callConfig.allowsTrustedOpHash()) {
-            userOpHash = userOp.getAltOperationHash();
-        } else {
-            userOpHash = userOp.getUserOperationHash();
-        }
-
-        if (solverOp.userOpHash != userOpHash) {
-            return false;
-        }
-
         // Make sure the solver has enough funds bonded
         uint256 solverBalance = IAtlETH(atlas).balanceOfBonded(solverOp.from);
         if (solverBalance < solverOp.maxFeePerGas * solverOp.gas) {
@@ -116,11 +103,17 @@ contract Sorter {
 
         SortingData[] memory sortingData = new SortingData[](count);
 
+        bytes32 userOpHash = dConfig.callConfig.allowsTrustedOpHash() ? userOp.getAltOperationHash() : userOp.getUserOperationHash();
+
         uint256 invalid;
         for (uint256 i; i < count; ++i) {
-            if (_verifyBidFormat(bidToken, solverOps[i]) && _verifySolverEligibility(dConfig, userOp, solverOps[i])) {
-                sortingData[i] =
-                    SortingData({ amount: IDAppControl(dConfig.to).getBidValue(solverOps[i]), valid: true });
+            if (
+                solverOps[i].userOpHash == userOpHash && 
+                _verifyBidFormat(bidToken, solverOps[i]) && 
+                _verifySolverEligibility(dConfig, userOp, solverOps[i])
+                ) {
+                    sortingData[i] =
+                        SortingData({ amount: IDAppControl(dConfig.to).getBidValue(solverOps[i]), valid: true });
             } else {
                 sortingData[i] = SortingData({ amount: 0, valid: false });
                 unchecked {
