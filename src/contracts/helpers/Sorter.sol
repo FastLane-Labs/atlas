@@ -146,22 +146,26 @@ contract Sorter {
             return sorted;
         }
 
-        uint256 topBidAmount;
-        uint256 topBidIndex;
+        int256 topBidAmount;
+        int256 topBidIndex;
 
         for (uint256 i; i < sorted.length; ++i) {
-            topBidAmount = 0;
-            topBidIndex = 0;
+            topBidAmount = -1;
+            topBidIndex = -1;
 
             for (uint256 j; j < count; ++j) {
-                if (sortingData[j].valid && sortingData[j].amount >= topBidAmount) {
-                    topBidAmount = sortingData[j].amount;
-                    topBidIndex = j;
+                if (sortingData[j].valid && int256(sortingData[j].amount) > topBidAmount) {
+                    topBidAmount = int256(sortingData[j].amount);
+                    topBidIndex = int256(j);
                 }
             }
 
-            sortingData[topBidIndex].valid = false;
-            sorted[i] = topBidIndex;
+            if (topBidIndex == -1) { // all indices in sorting data are invalid
+                break;
+            }
+
+            sortingData[uint256(topBidIndex)].valid = false;
+            sorted[i] = uint256(topBidIndex);
         }
 
         return sorted;
