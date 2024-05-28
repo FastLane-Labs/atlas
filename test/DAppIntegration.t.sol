@@ -71,7 +71,7 @@ contract DAppIntegrationTest is Test {
     function test_initializeGovernance_alreadyInitialized() public {
         vm.startPrank(governance);
         dAppIntegration.initializeGovernance(address(dAppControl));
-        vm.expectRevert(AtlasErrors.OwnerActive.selector);
+        vm.expectRevert(AtlasErrors.SignatoryActive.selector);
         dAppIntegration.initializeGovernance(address(dAppControl));
         vm.stopPrank();
     }

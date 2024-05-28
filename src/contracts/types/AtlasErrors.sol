@@ -76,7 +76,6 @@ contract AtlasErrors {
 
     // DAppIntegration
     error OnlyGovernance();
-    error OwnerActive();
     error SignatoryActive();
     error InvalidCaller();
     error InvalidDAppControl();
