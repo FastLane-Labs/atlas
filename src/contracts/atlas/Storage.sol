@@ -5,11 +5,12 @@ import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import { AtlasConstants } from "src/contracts/types/AtlasConstants.sol";
 
 /// @title Storage
 /// @author FastLane Labs
 /// @notice Storage manages all storage variables and constants for the Atlas smart contract.
-contract Storage is AtlasEvents, AtlasErrors {
+contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     // Atlas constants
     uint256 internal constant _GAS_USED_DECIMALS_TO_DROP = 1000;
     address internal constant _UNLOCKED = address(1);

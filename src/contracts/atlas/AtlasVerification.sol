@@ -3,12 +3,13 @@ pragma solidity 0.8.22;
 
 import { EIP712 } from "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 import { ECDSA } from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
-import { DAppIntegration } from "./DAppIntegration.sol";
+import { DAppIntegration } from "src/contracts/atlas/DAppIntegration.sol";
 
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import { AtlasConstants } from "src/contracts/types/AtlasConstants.sol";
 import "src/contracts/types/SolverCallTypes.sol";
 import "src/contracts/types/UserCallTypes.sol";
 import "src/contracts/types/DAppApprovalTypes.sol";
@@ -19,7 +20,7 @@ import "src/contracts/types/ValidCallsTypes.sol";
 /// @author FastLane Labs
 /// @notice AtlasVerification handles the verification of DAppConfigs, UserOperations, SolverOperations, and
 /// DAppOperations within a metacall to ensure that calldata sourced from various parties is safe and valid.
-contract AtlasVerification is EIP712, DAppIntegration {
+contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
     using ECDSA for bytes32;
     using CallBits for uint32;
     using CallVerification for UserOperation;
@@ -28,7 +29,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
     uint256 internal constant _FIRST_16_BITS_FULL = uint256(0xFFFF);
     uint256 internal constant _FIRST_4_BITS_FULL = uint256(0xF);
     uint256 internal constant _NONCES_PER_BITMAP = 240;
-    uint8 internal constant _MAX_SOLVERS = type(uint8).max - 2;
 
     constructor(address _atlas) EIP712("AtlasVerification", "1.0") DAppIntegration(_atlas) { }
 
@@ -126,7 +126,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 return (userOpHash, ValidCallsResult.UserSignatureInvalid);
             }
 
-            // Check solvers not over the max (253)
+            // Check number of solvers not greater than max, to prevent overflows in `callIndex`
             if (solverOpCount > _MAX_SOLVERS) {
                 return (userOpHash, ValidCallsResult.TooManySolverOps);
             }
