@@ -25,11 +25,6 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
     using CallBits for uint32;
     using CallVerification for UserOperation;
 
-    uint256 internal constant _FULL_BITMAP = uint256(0x0000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF);
-    uint256 internal constant _FIRST_16_BITS_FULL = uint256(0xFFFF);
-    uint256 internal constant _FIRST_4_BITS_FULL = uint256(0xF);
-    uint256 internal constant _NONCES_PER_BITMAP = 240;
-
     constructor(address _atlas) EIP712("AtlasVerification", "1.0") DAppIntegration(_atlas) { }
 
     /// @notice The validateCalls function verifies the validity of the metacall calldata components.
@@ -704,14 +699,14 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
 
         for (uint256 i = 0; i < 240; i += 16) {
             // Isolate the next 16 bits to check
-            uint256 chunk16 = (bitmap >> i) & _FIRST_16_BITS_FULL;
+            uint256 chunk16 = (bitmap >> i) & _FIRST_16_BITS_TRUE_MASK;
             // Find non-full 16-bit chunk
-            if (chunk16 != _FIRST_16_BITS_FULL) {
+            if (chunk16 != _FIRST_16_BITS_TRUE_MASK) {
                 for (uint256 j = 0; j < 16; j += 4) {
                     // Isolate the next 4 bits within the 16-bit chunk to check
-                    uint256 chunk4 = (chunk16 >> j) & _FIRST_4_BITS_FULL;
+                    uint256 chunk4 = (chunk16 >> j) & _FIRST_4_BITS_TRUE_MASK;
                     // Find non-full 4-bit chunk
-                    if (chunk4 != _FIRST_4_BITS_FULL) {
+                    if (chunk4 != _FIRST_4_BITS_TRUE_MASK) {
                         for (uint256 k = 0; k < 4; k++) {
                             // Find first unused bit
                             if ((chunk4 >> k) & 0x1 == 0) {
