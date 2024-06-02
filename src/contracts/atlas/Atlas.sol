@@ -285,7 +285,7 @@ contract Atlas is Escrow, Factory {
                 // The array is filled with non-zero bids from the right. This causes all zero bids to be on the left -
                 // in their sorted position, so fewer operations are needed in the sorting step below.
                 bidsAndIndices[bidsAndIndicesLastIndex - (i - zeroBidCount)] =
-                    uint256(bidAmountFound << BITS_FOR_INDEX | uint16(i));
+                    uint256(bidAmountFound << _BITS_FOR_INDEX | uint16(i));
             }
         }
 
@@ -297,13 +297,13 @@ contract Atlas is Escrow, Factory {
         // Finally, iterate through sorted bidsAndIndices array in descending order of bidAmount.
         for (uint256 i = bidsAndIndicesLastIndex; i >= 0; --i) {
             // Isolate the bidAmount from the packed uint256 value
-            bidAmountFound = (bidsAndIndices[i] >> BITS_FOR_INDEX) & FIRST_240_BITS_MASK;
+            bidAmountFound = (bidsAndIndices[i] >> _BITS_FOR_INDEX) & _FIRST_240_BITS_TRUE_MASK;
 
             // If we reach the zero bids on the left of array, break as all valid bids already checked.
             if (bidAmountFound == 0) break;
 
             // Isolate the original solverOps index from the packed uint256 value
-            uint256 solverOpsIndex = bidsAndIndices[i] & FIRST_16_BITS_MASK;
+            uint256 solverOpsIndex = bidsAndIndices[i] & _FIRST_16_BITS_TRUE_MASK;
 
             (auctionWon, key) = _executeSolverOperation(
                 dConfig, userOp, solverOps[solverOpsIndex], returnData, bidAmountFound, true, key

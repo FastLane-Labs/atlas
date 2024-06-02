@@ -74,7 +74,7 @@ abstract contract SafetyLocks is Storage {
             solverSuccessful: false,
             paymentsSuccessful: false,
             callIndex: dConfig.callConfig.needsPreOpsCall() ? 0 : 1,
-            callCount: solverOpCount + 4,
+            callCount: solverOpCount + _CALL_COUNT_EXCL_SOLVER_CALLS,
             lockState: 0,
             solverOutcome: 0,
             bidFind: false,
