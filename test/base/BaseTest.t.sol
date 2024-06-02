@@ -108,8 +108,9 @@ contract BaseTest is Test, TestConstants {
 
         vm.startPrank(solverOneEOA);
 
-        solverOne = new Solver(WETH_ADDRESS, address(atlas), solverOneEOA);
-        solverOneXP = new SolverExPost(WETH_ADDRESS, address(atlas), solverOneEOA, 60);
+        // Salt to avoid clashes caused by vm.rollFork() in other tests
+        solverOne = new Solver{ salt: keccak256("1") }(WETH_ADDRESS, address(atlas), solverOneEOA);
+        solverOneXP = new SolverExPost{ salt: keccak256("2") }(WETH_ADDRESS, address(atlas), solverOneEOA, 60);
         atlas.deposit{ value: 1e18 }();
 
         vm.stopPrank();
