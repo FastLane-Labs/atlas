@@ -129,11 +129,9 @@ contract V2DAppControl is DAppControl {
         uint256 amount1Out;
 
         if (govIsTok0) {
-            amount0Out = ((997_000 * bidAmount) * uint256(token0Balance))
-                / ((uint256(token1Balance) * 1_000_000) + (997_000 * bidAmount));
+            SwapMath.getAmountOut(bidAmount, uint256(token1Balance), uint256(token0Balance));
         } else {
-            amount1Out = ((997_000 * bidAmount) * uint256(token1Balance))
-                / (((uint256(token0Balance) * 1_000_000) + (997_000 * bidAmount)));
+            SwapMath.getAmountOut(bidAmount, uint256(token0Balance), uint256(token1Balance));
         }
 
         bytes memory nullBytes;
