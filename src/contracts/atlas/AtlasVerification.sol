@@ -3,12 +3,13 @@ pragma solidity 0.8.22;
 
 import { EIP712 } from "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 import { ECDSA } from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
-import { DAppIntegration } from "./DAppIntegration.sol";
+import { DAppIntegration } from "src/contracts/atlas/DAppIntegration.sol";
 
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import { AtlasConstants } from "src/contracts/types/AtlasConstants.sol";
 import "src/contracts/types/SolverCallTypes.sol";
 import "src/contracts/types/UserCallTypes.sol";
 import "src/contracts/types/DAppApprovalTypes.sol";
@@ -19,16 +20,10 @@ import "src/contracts/types/ValidCallsTypes.sol";
 /// @author FastLane Labs
 /// @notice AtlasVerification handles the verification of DAppConfigs, UserOperations, SolverOperations, and
 /// DAppOperations within a metacall to ensure that calldata sourced from various parties is safe and valid.
-contract AtlasVerification is EIP712, DAppIntegration {
+contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
     using ECDSA for bytes32;
     using CallBits for uint32;
     using CallVerification for UserOperation;
-
-    uint256 internal constant _FULL_BITMAP = uint256(0x0000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF);
-    uint256 internal constant _FIRST_16_BITS_FULL = uint256(0xFFFF);
-    uint256 internal constant _FIRST_4_BITS_FULL = uint256(0xF);
-    uint256 internal constant _NONCES_PER_BITMAP = 240;
-    uint8 internal constant _MAX_SOLVERS = type(uint8).max - 2;
 
     constructor(address _atlas) EIP712("AtlasVerification", "1.0") DAppIntegration(_atlas) { }
 
@@ -126,7 +121,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 return (userOpHash, ValidCallsResult.UserSignatureInvalid);
             }
 
-            // Check solvers not over the max (253)
+            // Check number of solvers not greater than max, to prevent overflows in `callIndex`
             if (solverOpCount > _MAX_SOLVERS) {
                 return (userOpHash, ValidCallsResult.TooManySolverOps);
             }
@@ -704,14 +699,14 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         for (uint256 i = 0; i < 240; i += 16) {
             // Isolate the next 16 bits to check
-            uint256 chunk16 = (bitmap >> i) & _FIRST_16_BITS_FULL;
+            uint256 chunk16 = (bitmap >> i) & _FIRST_16_BITS_TRUE_MASK;
             // Find non-full 16-bit chunk
-            if (chunk16 != _FIRST_16_BITS_FULL) {
+            if (chunk16 != _FIRST_16_BITS_TRUE_MASK) {
                 for (uint256 j = 0; j < 16; j += 4) {
                     // Isolate the next 4 bits within the 16-bit chunk to check
-                    uint256 chunk4 = (chunk16 >> j) & _FIRST_4_BITS_FULL;
+                    uint256 chunk4 = (chunk16 >> j) & _FIRST_4_BITS_TRUE_MASK;
                     // Find non-full 4-bit chunk
-                    if (chunk4 != _FIRST_4_BITS_FULL) {
+                    if (chunk4 != _FIRST_4_BITS_TRUE_MASK) {
                         for (uint256 k = 0; k < 4; k++) {
                             // Find first unused bit
                             if ((chunk4 >> k) & 0x1 == 0) {
