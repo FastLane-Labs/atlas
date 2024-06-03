@@ -21,17 +21,17 @@ library SwapMath {
     }
 
     function getAmountOut(
-        uint amountIn,
-        uint reserveIn,
-        uint reserveOut
-    ) 
+        uint256 amountIn,
+        uint256 reserveIn,
+        uint256 reserveOut
+    )
         internal
         pure
         returns (uint256 amountOut)
     {
-        uint amountInWithFee = amountIn * 997;
-        uint numerator = amountInWithFee * reserveOut;
-        uint denominator = (reserveIn * 1000) + amountInWithFee;
+        uint256 amountInWithFee = amountIn * 997;
+        uint256 numerator = amountInWithFee * reserveOut;
+        uint256 denominator = (reserveIn * 1000) + amountInWithFee;
         amountOut = numerator / denominator;
     }
 }
