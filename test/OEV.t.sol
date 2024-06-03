@@ -61,7 +61,7 @@ contract OEVTest is BaseTest {
         BaseTest.setUp();
         vm.rollFork(forkBlock);
 
-        // Creating new gov address (ERR-V49 OwnerActive if already registered with control)
+        // Creating new gov address (SignatoryActive error if already registered with control)
         uint256 chainlinkGovPK = 11_112;
         uint256 aaveGovPK = 11_113;
         chainlinkGovEOA = vm.addr(chainlinkGovPK);

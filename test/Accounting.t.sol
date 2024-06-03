@@ -48,7 +48,7 @@ contract AccountingTest is BaseTest {
     function setUp() public virtual override {
         BaseTest.setUp();
 
-        // Creating new gov address (ERR-V49 OwnerActive if already registered with control)
+        // Creating new gov address (SignatoryActive error if already registered with control)
         governancePK = 11_112;
         governanceEOA = vm.addr(governancePK);
 

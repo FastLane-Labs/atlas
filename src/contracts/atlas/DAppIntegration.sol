@@ -59,12 +59,7 @@ contract DAppIntegration {
         if (msg.sender != govAddress) revert AtlasErrors.OnlyGovernance();
 
         // Add DAppControl gov as a signatory
-        bytes32 signatoryKey = keccak256(abi.encodePacked(control, msg.sender));
-
-        if (signatories[signatoryKey]) revert AtlasErrors.OwnerActive();
-
-        signatories[signatoryKey] = true;
-        dAppSignatories[control].push(msg.sender);
+        _addSignatory(control, msg.sender);
 
         uint32 callConfig = IDAppControl(control).CALL_CONFIG();
         emit AtlasEvents.NewDAppSignatory(control, govAddress, msg.sender, callConfig);
