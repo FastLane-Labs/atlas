@@ -103,17 +103,17 @@ contract Sorter {
 
         SortingData[] memory sortingData = new SortingData[](count);
 
-        bytes32 userOpHash = dConfig.callConfig.allowsTrustedOpHash() ? userOp.getAltOperationHash() : userOp.getUserOperationHash();
+        bytes32 userOpHash =
+            dConfig.callConfig.allowsTrustedOpHash() ? userOp.getAltOperationHash() : userOp.getUserOperationHash();
 
         uint256 invalid;
         for (uint256 i; i < count; ++i) {
             if (
-                solverOps[i].userOpHash == userOpHash && 
-                _verifyBidFormat(bidToken, solverOps[i]) && 
-                _verifySolverEligibility(dConfig, userOp, solverOps[i])
-                ) {
-                    sortingData[i] =
-                        SortingData({ amount: IDAppControl(dConfig.to).getBidValue(solverOps[i]), valid: true });
+                solverOps[i].userOpHash == userOpHash && _verifyBidFormat(bidToken, solverOps[i])
+                    && _verifySolverEligibility(dConfig, userOp, solverOps[i])
+            ) {
+                sortingData[i] =
+                    SortingData({ amount: IDAppControl(dConfig.to).getBidValue(solverOps[i]), valid: true });
             } else {
                 sortingData[i] = SortingData({ amount: 0, valid: false });
                 unchecked {
