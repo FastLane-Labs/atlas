@@ -348,7 +348,10 @@ abstract contract Escrow is AtlETH {
         // If there are no errors, attempt to execute
         if (!result.canExecute() || !_trySolverLock(solverOp)) return 0;
 
-        data = abi.encodeCall(IExecutionEnvironment.solverMetaTryCatch, (IDAppControl(dConfig.to).getBidValue(solverOp), gasLimit, solverOp, data));
+        data = abi.encodeCall(
+            IExecutionEnvironment.solverMetaTryCatch,
+            (IDAppControl(dConfig.to).getBidValue(solverOp), gasLimit, solverOp, data)
+        );
 
         data = abi.encodePacked(data, key.holdSolverLock(solverOp.solver).pack());
 
