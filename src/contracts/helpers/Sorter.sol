@@ -160,7 +160,8 @@ contract Sorter {
                 }
             }
 
-            if (topBidIndex == -1) { // all indices in sorting data are invalid
+            if (topBidIndex == -1) {
+                // all indices in sorting data are invalid
                 break;
             }
 
