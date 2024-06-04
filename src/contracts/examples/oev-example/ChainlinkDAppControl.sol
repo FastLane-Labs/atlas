@@ -153,13 +153,13 @@ contract ChainlinkDAppControl is DAppControl {
         bool[] memory signed = new bool[](MAX_NUM_ORACLES);
         bytes32 reportHash = keccak256(report);
         uint256 observations = rs.length;
-        require(rs.length <= MAX_NUM_ORACLES, "rs.length > MAX_NUM_ORACLES");
 
         VerificationVars storage verificationVar = verificationVars[baseChainlinkFeed];
         Oracle memory currentOracle;
 
-        // Check if the number of observations is enough to reach quorum
-        if (observations < observationsQuorum) return false;
+        // Check number of observations is enough to reach quorum, but not more than max allowed otherwise will cause
+        // array out-of-bounds error
+        if (observations < observationsQuorum || observations > MAX_NUM_ORACLES) return false;
 
         for (uint256 i = 0; i < observations; ++i) {
             (address signer,) = ECDSA.tryRecover(reportHash, uint8(rawVs[i]) + 27, rs[i], ss[i]);
