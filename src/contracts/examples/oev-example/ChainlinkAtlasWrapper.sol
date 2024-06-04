@@ -25,7 +25,9 @@ contract ChainlinkAtlasWrapper is Ownable, IChainlinkAtlasWrapper {
     mapping(address transmitter => bool trusted) public transmitters;
 
     error TransmitterNotTrusted(address transmitter);
+    error ArrayLengthMismatch();
     error CannotReuseReport();
+    error ZeroObservations();
     error ObservationsNotOrdered();
     error AnswerMustBeAboveZero();
     error SignerVerificationFailed();
@@ -57,7 +59,7 @@ contract ChainlinkAtlasWrapper is Ownable, IChainlinkAtlasWrapper {
         returns (address)
     {
         if (!transmitters[msg.sender]) revert TransmitterNotTrusted(msg.sender);
-        require(rs.length == ss.length, "rs.length != ss.length");
+        if (rs.length != ss.length) revert ArrayLengthMismatch();
 
         (int256 answer, uint40 epochAndRound) = _verifyTransmitData(report, rs, ss, rawVs);
 
@@ -79,23 +81,30 @@ contract ChainlinkAtlasWrapper is Ownable, IChainlinkAtlasWrapper {
         view
         returns (int256, uint40)
     {
+        int192 median;
+        uint40 epochAndRound;
         ReportData memory r;
         (r.rawReportContext,, r.observations) = abi.decode(report, (bytes32, bytes32, int192[]));
 
-        // Check report data has not already been used in this wrapper
-        uint40 epochAndRound = uint40(uint256(r.rawReportContext));
-        if (epochAndRound <= atlasLatestEpochAndRound) revert CannotReuseReport();
+        // New stack frame required here to avoid Stack Too Deep error
+        {
+            uint256 observationCount = r.observations.length;
+            if (observationCount == 0) revert ZeroObservations();
 
-        // Check observations are ordered
-        require(r.observations.length > 0, "no observations");
-        for (uint256 i = 0; i < r.observations.length - 1; ++i) {
-            bool inOrder = r.observations[i] <= r.observations[i + 1];
-            if (!inOrder) revert ObservationsNotOrdered();
+            // Check report data has not already been used in this wrapper
+            epochAndRound = uint40(uint256(r.rawReportContext));
+            if (epochAndRound <= atlasLatestEpochAndRound) revert CannotReuseReport();
+
+            // Check observations are ordered
+            for (uint256 i = 0; i < observationCount - 1; ++i) {
+                bool inOrder = r.observations[i] <= r.observations[i + 1];
+                if (!inOrder) revert ObservationsNotOrdered();
+            }
+
+            // Calculate median from observations, cannot be 0
+            median = r.observations[observationCount / 2];
+            if (median <= 0) revert AnswerMustBeAboveZero();
         }
-
-        // Calculate median from observations, cannot be 0
-        int192 median = r.observations[r.observations.length / 2];
-        if (median <= 0) revert AnswerMustBeAboveZero();
 
         bool signersVerified =
             IChainlinkDAppControl(DAPP_CONTROL).verifyTransmitSigners(address(BASE_FEED), report, rs, ss, rawVs);
