@@ -5,6 +5,7 @@ import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 import { LibSort } from "solady/utils/LibSort.sol";
 
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
+import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
 import { Escrow } from "./Escrow.sol";
 import { Factory } from "./Factory.sol";
@@ -345,11 +346,13 @@ contract Atlas is Escrow, Factory {
         for (uint256 i = 0; i < k; ++i) {
             SolverOperation calldata solverOp = solverOps[i];
 
+            uint256 solverBidAmount = IDAppControl(dConfig.to).getBidValue(solverOp);
+
             (auctionWon, key) =
-                _executeSolverOperation(dConfig, userOp, solverOp, returnData, solverOp.bidAmount, false, key);
+                _executeSolverOperation(dConfig, userOp, solverOp, returnData, solverBidAmount, false, key);
 
             if (auctionWon) {
-                key = _allocateValue(dConfig, solverOp, solverOp.bidAmount, returnData, key);
+                key = _allocateValue(dConfig, solverOp, solverBidAmount, returnData, key);
 
                 key.solverOutcome = uint24(i);
 
