@@ -251,7 +251,9 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 && dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps)
         ) return (ValidCallsResult.InvalidCallChainHash, false);
 
-        if (dConfig.callConfig.allowsUserAuctioneer() && dAppOp.from == userOp.sessionKey) return (ValidCallsResult.Valid, true);
+        if (dConfig.callConfig.allowsUserAuctioneer() && dAppOp.from == userOp.sessionKey) {
+            return (ValidCallsResult.Valid, true);
+        }
 
         if (dConfig.callConfig.allowsSolverAuctioneer() && solverOps.length > 0) {
             // If the solver is the auctioneer, there must be exactly 1 solver
