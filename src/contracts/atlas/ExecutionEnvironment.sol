@@ -232,11 +232,10 @@ contract ExecutionEnvironment is Base {
         }
 
         uint256 endBalance = etherIsBidToken ? address(this).balance : ERC20(solverOp.bidToken).balanceOf(address(this));
+        uint256 netBid;
 
         // Check if this is an on-chain, ex post bid search
         if (_bidFind()) {
-            uint256 netBid;
-
             if (!config.invertsBidValue()) {
                 netBid = endBalance - startBalance; // intentionally underflow on fail
                 if (solverOp.bidAmount != 0 && netBid > solverOp.bidAmount) {
@@ -254,44 +253,32 @@ contract ExecutionEnvironment is Base {
                     endBalance = 0;
                 }
             }
-
-            // Contribute any surplus balance
-            if (endBalance > 0) {
-                IEscrow(ATLAS).contribute{ value: endBalance }();
-            }
-
-            // Verify payback
-            (, success) = IEscrow(ATLAS).validateBalances();
-            if (!success) revert AtlasErrors.BalanceNotReconciled();
-
-            // Solver bid was successful, revert with highest amount.
-            revert AtlasErrors.BidFindSuccessful(netBid);
-        }
-
-        // Verify that the solver paid what they bid
-        if (!config.invertsBidValue()) {
-            // CASE: higher bids are desired by beneficiary (E.G. amount transferred in by solver)
-
-            // Use bidAmount arg instead of solverOp element to ensure that ex ante bid results
-            // aren't tampered with or otherwise altered the second time around.
-            if (endBalance < startBalance + bidAmount) {
-                revert AtlasErrors.SolverBidUnpaid();
-            }
-
-            // Get ending eth balance
-            endBalance = etherIsBidToken ? endBalance - bidAmount : address(this).balance;
         } else {
-            // CASE: lower bids are desired by beneficiary (E.G. amount transferred out to solver)
+            // Verify that the solver paid what they bid
+            if (!config.invertsBidValue()) {
+                // CASE: higher bids are desired by beneficiary (E.G. amount transferred in by solver)
 
-            // Use bidAmount arg instead of solverOp element to ensure that ex ante bid results
-            // aren't tampered with or otherwise altered the second time around.
-            if (endBalance < startBalance - bidAmount) {
-                // underflow -> revert = intended
-                revert AtlasErrors.SolverBidUnpaid();
+                // Use bidAmount arg instead of solverOp element to ensure that ex ante bid results
+                // aren't tampered with or otherwise altered the second time around.
+                if (endBalance < startBalance + bidAmount) {
+                    revert AtlasErrors.SolverBidUnpaid();
+                }
+
+                // Get ending eth balance
+                endBalance = etherIsBidToken ? endBalance - bidAmount : address(this).balance;
+            } else {
+                // CASE: lower bids are desired by beneficiary (E.G. amount transferred out to solver)
+
+                // Use bidAmount arg instead of solverOp element to ensure that ex ante bid results
+                // aren't tampered with or otherwise altered the second time around.
+                if (endBalance < startBalance - bidAmount) {
+                    // underflow -> revert = intended
+                    revert AtlasErrors.SolverBidUnpaid();
+                }
+
+                // Get ending eth balance
+                endBalance = etherIsBidToken ? endBalance : address(this).balance;
             }
-
-            // Get ending eth balance
-            endBalance = etherIsBidToken ? endBalance : address(this).balance;
         }
 
         // Contribute any surplus back - this may be used to validate balance.
@@ -301,8 +288,11 @@ contract ExecutionEnvironment is Base {
 
         // Verify that the solver repaid their msg.value
         (, success) = IEscrow(ATLAS).validateBalances();
-        if (!success) {
-            revert AtlasErrors.BalanceNotReconciled();
+        if (!success) revert AtlasErrors.BalanceNotReconciled();
+
+        if (_bidFind()) {
+            // Solver bid was successful, revert with highest amount.
+            revert AtlasErrors.BidFindSuccessful(netBid);
         }
     }
 
