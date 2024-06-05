@@ -582,7 +582,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         }
 
         if (userOp.control != dConfig.to) {
-            return ValidCallsResult.UserControlInvalid;
+            return ValidCallsResult.ControlMismatch;
         }
 
         // If the dapp indicated that they only accept sequential userNonces
