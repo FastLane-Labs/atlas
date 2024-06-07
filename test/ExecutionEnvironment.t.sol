@@ -78,14 +78,11 @@ contract ExecutionEnvironmentTest is BaseTest {
         depositsSlot = lockSlot + 6;
         solverLockSlot = lockSlot + 7;
 
-        console.log("MAX NUM", type(uint256).max);
-
         // Checks to ensure slots identified correctly:
         assertEq(uint256(vm.load(address(atlas), bytes32(lockSlot))), 1, "lockSlot is wrong");
         assertEq(uint256(vm.load(address(atlas), bytes32(activeUserSlot))), 1, "activeUserSlot is wrong");
         assertEq(uint256(vm.load(address(atlas), bytes32(activeControlSlot))), 1, "activeControlSlot is wrong");
         assertEq(uint256(vm.load(address(atlas), bytes32(activeCallConfigSlot))), 1, "activeCallConfigSlot is wrong");
-
         assertEq(uint256(vm.load(address(atlas), bytes32(claimsSlot))), type(uint256).max, "claimsSlot is wrong");
         assertEq(uint256(vm.load(address(atlas), bytes32(withdrawalsSlot))), type(uint256).max, "withdrawalsSlot is wrong");
         assertEq(uint256(vm.load(address(atlas), bytes32(depositsSlot))), type(uint256).max, "depositsSlot is wrong");

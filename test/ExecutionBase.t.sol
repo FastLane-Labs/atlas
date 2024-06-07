@@ -32,13 +32,13 @@ contract ExecutionBaseTest is BaseTest {
         randomData = "0x1234";
     }
 
-    function test_forward() public {
+    function test_forward_normal() public {
         (bytes memory firstSet, EscrowKey memory _escrowKey) = forwardGetFirstSet(SafetyBits._LOCKED_X_PRE_OPS_X_UNSET);
         bytes memory secondSet = abi.encodePacked(user, dAppControl, callConfig);
 
         bytes memory expected = bytes.concat(randomData, firstSet, secondSet);
 
-        bytes memory data = abi.encodeWithSelector(MockExecutionEnvironment.forward.selector, randomData);
+        bytes memory data = abi.encodeCall(MockExecutionEnvironment.forward, randomData);
         executeForwardCase("forward", data, _escrowKey, expected);
     }
 
