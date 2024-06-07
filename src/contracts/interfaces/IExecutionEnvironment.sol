@@ -10,25 +10,18 @@ interface IExecutionEnvironment {
 
     function userWrapper(UserOperation calldata userOp) external payable returns (bytes memory userReturnData);
 
-    function postOpsWrapper(UserOperation calldata userOp, bool solved, bytes calldata returnData) external;
+    function postOpsWrapper(bool solved, bytes calldata returnData) external;
 
     function solverMetaTryCatch(
         uint256 bidAmount,
         uint256 gasLimit,
-        UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         bytes calldata dAppReturnData
     )
         external
         payable;
 
-    function allocateValue(
-        UserOperation calldata userOp,
-        address bidToken,
-        uint256 bidAmount,
-        bytes memory returnData
-    )
-        external;
+    function allocateValue(address bidToken, uint256 bidAmount, bytes memory returnData) external;
 
     // function getUser() external pure returns (address user);
     // function getControl() external pure returns (address control);

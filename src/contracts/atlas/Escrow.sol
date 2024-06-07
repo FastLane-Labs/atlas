@@ -133,7 +133,7 @@ abstract contract Escrow is AtlETH {
                 // Execute the solver call
                 // _solverOpsWrapper returns a SolverOutcome enum value
                 result = _solverOpWrapper(
-                    bidAmount, gasLimit, key.executionEnvironment, userOp, solverOp, dAppReturnData, key.pack()
+                    bidAmount, gasLimit, key.executionEnvironment, solverOp, dAppReturnData, key.pack()
                 );
 
                 if (result.executionSuccessful()) {
@@ -179,7 +179,6 @@ abstract contract Escrow is AtlETH {
     /// allocation.
     function _allocateValue(
         DAppConfig calldata dConfig,
-        UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         uint256 winningBidAmount,
         bytes memory returnData,
@@ -191,9 +190,8 @@ abstract contract Escrow is AtlETH {
         // process dApp payments
         key = key.holdAllocateValueLock(solverOp.from);
 
-        bytes memory data = abi.encodeCall(
-            IExecutionEnvironment.allocateValue, (userOp, dConfig.bidToken, winningBidAmount, returnData)
-        );
+        bytes memory data =
+            abi.encodeCall(IExecutionEnvironment.allocateValue, (dConfig.bidToken, winningBidAmount, returnData));
         data = abi.encodePacked(data, key.pack());
         (bool success,) = key.executionEnvironment.call(data);
         if (success) {
@@ -211,7 +209,6 @@ abstract contract Escrow is AtlETH {
     /// @param key EscrowKey struct containing the current state of the escrow lock.
     /// @return success Boolean indicating whether the postOps logic was executed successfully.
     function _executePostOpsCall(
-        UserOperation calldata userOp,
         bool solved,
         bytes memory returnData,
         EscrowKey memory key
@@ -219,7 +216,7 @@ abstract contract Escrow is AtlETH {
         internal
         returns (bool success)
     {
-        bytes memory postOpsData = abi.encodeCall(IExecutionEnvironment.postOpsWrapper, (userOp, solved, returnData));
+        bytes memory postOpsData = abi.encodeCall(IExecutionEnvironment.postOpsWrapper, (solved, returnData));
         postOpsData = abi.encodePacked(postOpsData, key.pack());
         (success,) = key.executionEnvironment.call(postOpsData);
     }
@@ -350,9 +347,7 @@ abstract contract Escrow is AtlETH {
         // If there are no errors, attempt to execute
         if (!result.canExecute() || !_trySolverLock(solverOp)) return 0;
 
-        data = abi.encodeCall(
-            IExecutionEnvironment.solverMetaTryCatch, (solverOp.bidAmount, gasLimit, userOp, solverOp, data)
-        );
+        data = abi.encodeCall(IExecutionEnvironment.solverMetaTryCatch, (solverOp.bidAmount, gasLimit, solverOp, data));
 
         data = abi.encodePacked(data, key.holdSolverLock(solverOp.solver).pack());
 
@@ -441,7 +436,6 @@ abstract contract Escrow is AtlETH {
         uint256 bidAmount,
         uint256 gasLimit,
         address environment,
-        UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         bytes memory dAppReturnData,
         bytes memory lockBytes
@@ -450,9 +444,8 @@ abstract contract Escrow is AtlETH {
         returns (uint256)
     {
         bool success;
-        bytes memory data = abi.encodeCall(
-            IExecutionEnvironment.solverMetaTryCatch, (bidAmount, gasLimit, userOp, solverOp, dAppReturnData)
-        );
+        bytes memory data =
+            abi.encodeCall(IExecutionEnvironment.solverMetaTryCatch, (bidAmount, gasLimit, solverOp, dAppReturnData));
 
         data = abi.encodePacked(data, lockBytes);
 

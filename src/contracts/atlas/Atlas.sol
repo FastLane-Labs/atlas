@@ -143,7 +143,7 @@ contract Atlas is Escrow, Factory {
             // TODO: point key.addressPointer at bundler if all fail.
             key = key.holdPostOpsLock(); // preserves addressPointer of winning solver
 
-            bool callSuccessful = _executePostOpsCall(userOp, auctionWon, returnData, key);
+            bool callSuccessful = _executePostOpsCall(auctionWon, returnData, key);
             if (!callSuccessful) {
                 if (key.isSimulation) revert PostOpsSimFail();
                 revert PostOpsFail();
@@ -310,7 +310,7 @@ contract Atlas is Escrow, Factory {
             );
 
             if (auctionWon) {
-                key = _allocateValue(dConfig, userOp, solverOps[solverOpsIndex], bidAmountFound, returnData, key);
+                key = _allocateValue(dConfig, solverOps[solverOpsIndex], bidAmountFound, returnData, key);
                 key.solverOutcome = uint24(solverOpsIndex);
                 return (auctionWon, key);
             }
@@ -349,7 +349,7 @@ contract Atlas is Escrow, Factory {
                 _executeSolverOperation(dConfig, userOp, solverOp, returnData, solverOp.bidAmount, false, key);
 
             if (auctionWon) {
-                key = _allocateValue(dConfig, userOp, solverOp, solverOp.bidAmount, returnData, key);
+                key = _allocateValue(dConfig, solverOp, solverOp.bidAmount, returnData, key);
 
                 key.solverOutcome = uint24(i);
 

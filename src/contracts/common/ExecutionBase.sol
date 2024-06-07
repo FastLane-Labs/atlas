@@ -91,42 +91,32 @@ contract Base {
         );
     }
 
-    // function _secondSet() internal pure returns (bytes memory data) {
-    //     data = abi.encodePacked(_user(), _control(), _config());
-    // }
-
-    // /// @notice Extracts and returns the CallConfig of the current DAppControl contract, from calldata.
-    // /// @return config The CallConfig of the current DAppControl contract, in uint32 form.
-    // function _config() internal pure returns (uint32 config) {
-    //     assembly {
-    //         config := shr(224, calldataload(sub(calldatasize(), 4)))
-    //     }
-    // }
-
-    // /// @notice Extracts and returns the address of the current DAppControl contract, from calldata.
-    // /// @return control The address of the current DAppControl contract.
-    // function _control() internal pure returns (address control) {
-    //     assembly {
-    //         control := shr(96, calldataload(sub(calldatasize(), 24)))
-    //     }
-    // }
-
-    // /// @notice Extracts and returns the address of the user of the current metacall tx, from calldata.
-    // /// @return user The address of the user of the current metacall tx.
-    // function _user() internal pure returns (address user) {
-    //     assembly {
-    //         user := shr(96, calldataload(sub(calldatasize(), 44)))
-    //     }
-    // }
-
-    // Alternative to prev _control() above ^
-    function _control() internal view returns (address) {
-        return IAtlas(ATLAS).activeControl();
+    function _secondSet() internal pure returns (bytes memory data) {
+        data = abi.encodePacked(_user(), _control(), _config());
     }
 
-    // Alternative to prev _user() above ^
-    function _user() internal view returns (address) {
-        return IAtlas(ATLAS).activeUser();
+    /// @notice Extracts and returns the CallConfig of the current DAppControl contract, from calldata.
+    /// @return config The CallConfig of the current DAppControl contract, in uint32 form.
+    function _config() internal pure returns (uint32 config) {
+        assembly {
+            config := shr(224, calldataload(sub(calldatasize(), 4)))
+        }
+    }
+
+    /// @notice Extracts and returns the address of the current DAppControl contract, from calldata.
+    /// @return control The address of the current DAppControl contract.
+    function _control() internal pure returns (address control) {
+        assembly {
+            control := shr(96, calldataload(sub(calldatasize(), 24)))
+        }
+    }
+
+    /// @notice Extracts and returns the address of the user of the current metacall tx, from calldata.
+    /// @return user The address of the user of the current metacall tx.
+    function _user() internal pure returns (address user) {
+        assembly {
+            user := shr(96, calldataload(sub(calldatasize(), 44)))
+        }
     }
 
     /// @notice Extracts and returns the call depth within the current metacall tx, from calldata.
@@ -285,8 +275,8 @@ contract ExecutionBase is Base {
         }
 
         uint16 shiftedPhase = uint16(1 << (EXECUTION_PHASE_OFFSET + uint16(phase)));
-        address user = IAtlas(ATLAS).activeUser();
-        address dapp = IAtlas(ATLAS).activeControl();
+        address user = _user();
+        address dapp = _control();
 
         if (_source == user) {
             if (shiftedPhase & SAFE_USER_TRANSFER == 0) {

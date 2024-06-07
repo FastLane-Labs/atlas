@@ -111,14 +111,13 @@ contract ExecutionEnvironment is Base, IExecutionEnvironment {
     /// @param solved Boolean indicating whether a winning SolverOperation was executed successfully.
     /// @param returnData Data returned from the previous call phase.
     function postOpsWrapper(
-        UserOperation calldata userOp,
         bool solved,
         bytes calldata returnData
     )
         external
         onlyAtlasEnvironment(ExecutionPhase.PostOps, _ENVIRONMENT_DEPTH)
     {
-        bytes memory data = _forward(abi.encodeCall(IDAppControl.postOpsCall, (userOp, solved, returnData)));
+        bytes memory data = _forward(abi.encodeCall(IDAppControl.postOpsCall, (solved, returnData)));
 
         bool success;
         (success, data) = _control().delegatecall(data);
@@ -140,7 +139,6 @@ contract ExecutionEnvironment is Base, IExecutionEnvironment {
     function solverMetaTryCatch(
         uint256 bidAmount,
         uint256 gasLimit,
-        UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         bytes calldata returnData
     )
@@ -152,8 +150,8 @@ contract ExecutionEnvironment is Base, IExecutionEnvironment {
             revert AtlasErrors.SolverMetaTryCatchIncorrectValue();
         }
 
-        uint32 config = userOp.callConfig;
-        address control = userOp.control;
+        uint32 config = _config();
+        address control = _control();
 
         // Track token balance to measure if the bid amount is paid.
         bool etherIsBidToken;
@@ -181,7 +179,7 @@ contract ExecutionEnvironment is Base, IExecutionEnvironment {
         // Handle any solver preOps, if necessary
         if (config.needsPreSolver()) {
             bytes memory data = _forwardSpecial(
-                abi.encodeCall(IDAppControl.preSolverCall, (userOp, solverOp, returnData)), ExecutionPhase.PreSolver
+                abi.encodeCall(IDAppControl.preSolverCall, (solverOp, returnData)), ExecutionPhase.PreSolver
             );
 
             (success, data) = control.delegatecall(data);
@@ -227,7 +225,7 @@ contract ExecutionEnvironment is Base, IExecutionEnvironment {
             if (!success) revert AtlasErrors.CallbackNotCalled();
 
             bytes memory data = _forwardSpecial(
-                abi.encodeCall(IDAppControl.postSolverCall, (userOp, solverOp, returnData)), ExecutionPhase.PostSolver
+                abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData)), ExecutionPhase.PostSolver
             );
 
             (success, data) = control.delegatecall(data);
@@ -324,7 +322,6 @@ contract ExecutionEnvironment is Base, IExecutionEnvironment {
     /// @param bidAmount The winning bid amount.
     /// @param allocateData Data returned from the previous call phase.
     function allocateValue(
-        UserOperation calldata userOp,
         address bidToken,
         uint256 bidAmount,
         bytes memory allocateData
@@ -333,10 +330,9 @@ contract ExecutionEnvironment is Base, IExecutionEnvironment {
         onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _ENVIRONMENT_DEPTH)
         contributeSurplus
     {
-        allocateData =
-            _forward(abi.encodeCall(IDAppControl.allocateValueCall, (userOp, bidToken, bidAmount, allocateData)));
+        allocateData = _forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, bidAmount, allocateData)));
 
-        (bool success,) = userOp.control.delegatecall(allocateData);
+        (bool success,) = _control().delegatecall(allocateData);
         if (!success) revert AtlasErrors.AllocateValueDelegatecallFail();
     }
 
