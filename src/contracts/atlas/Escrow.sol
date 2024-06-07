@@ -48,7 +48,7 @@ abstract contract Escrow is AtlETH {
         returns (bool success, bytes memory preOpsData)
     {
         preOpsData = abi.encodeCall(IExecutionEnvironment.preOpsWrapper, userOp);
-        preOpsData = abi.encodePacked(preOpsData, lockBytes);
+        preOpsData = _appendPackedCalldata(preOpsData, lockBytes);
         (success, preOpsData) = environment.call(preOpsData);
         if (success) {
             preOpsData = abi.decode(preOpsData, (bytes));
@@ -70,7 +70,7 @@ abstract contract Escrow is AtlETH {
         returns (bool success, bytes memory userData)
     {
         userData = abi.encodeCall(IExecutionEnvironment.userWrapper, userOp);
-        userData = abi.encodePacked(userData, lockBytes);
+        userData = _appendPackedCalldata(userData, lockBytes);
 
         (success, userData) = environment.call{ value: userOp.value }(userData);
 
@@ -192,7 +192,7 @@ abstract contract Escrow is AtlETH {
 
         bytes memory data =
             abi.encodeCall(IExecutionEnvironment.allocateValue, (dConfig.bidToken, winningBidAmount, returnData));
-        data = abi.encodePacked(data, key.pack());
+        data = _appendPackedCalldata(data, key.pack());
         (bool success,) = key.executionEnvironment.call(data);
         if (success) {
             key.paymentsSuccessful = true;
@@ -217,7 +217,7 @@ abstract contract Escrow is AtlETH {
         returns (bool success)
     {
         bytes memory postOpsData = abi.encodeCall(IExecutionEnvironment.postOpsWrapper, (solved, returnData));
-        postOpsData = abi.encodePacked(postOpsData, key.pack());
+        postOpsData = _appendPackedCalldata(postOpsData, key.pack());
         (success,) = key.executionEnvironment.call(postOpsData);
     }
 
@@ -349,7 +349,7 @@ abstract contract Escrow is AtlETH {
 
         data = abi.encodeCall(IExecutionEnvironment.solverMetaTryCatch, (solverOp.bidAmount, gasLimit, solverOp, data));
 
-        data = abi.encodePacked(data, key.holdSolverLock(solverOp.solver).pack());
+        data = _appendPackedCalldata(data, key.holdSolverLock(solverOp.solver).pack());
 
         (success, data) = key.executionEnvironment.call{ value: solverOp.value }(data);
 
@@ -413,13 +413,20 @@ abstract contract Escrow is AtlETH {
         uint256 result
     )
         internal
-        view
+        pure
         returns (uint256)
     {
         if (solverBidToken != dConfigBidToken) {
             return result | 1 << uint256(SolverOutcome.InvalidBidToken);
         }
         return result;
+    }
+
+    /// @notice Appends lockBytes, user, control, and callConfig to base hook calldata.
+    /// @param data Base hook calldata.
+    /// @param lockBytes The packed bytes form of the current EscrowKey state.
+    function _appendPackedCalldata(bytes memory data, bytes memory lockBytes) internal view returns (bytes memory) {
+        return abi.encodePacked(data, lockBytes, activeUser, activeControl, activeCallConfig);
     }
 
     /// @notice Wraps the execution of a SolverOperation and handles potential errors.
@@ -447,7 +454,7 @@ abstract contract Escrow is AtlETH {
         bytes memory data =
             abi.encodeCall(IExecutionEnvironment.solverMetaTryCatch, (bidAmount, gasLimit, solverOp, dAppReturnData));
 
-        data = abi.encodePacked(data, lockBytes);
+        data = _appendPackedCalldata(data, lockBytes);
 
         (success, data) = environment.call{ value: solverOp.value }(data);
 
