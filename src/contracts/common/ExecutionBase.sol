@@ -1,6 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 import { IPermit69 } from "src/contracts/interfaces/IPermit69.sol";
 import { ISafetyLocks } from "src/contracts/interfaces/ISafetyLocks.sol";
 import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
@@ -8,6 +9,7 @@ import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 import { ExecutionPhase, BaseLock } from "src/contracts/types/LockTypes.sol";
 import { EXECUTION_PHASE_OFFSET, SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "src/contracts/libraries/SafetyBits.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import "src/contracts/types/UserCallTypes.sol";
 
 contract Base {
     address public immutable ATLAS;
@@ -43,11 +45,11 @@ contract Base {
     }
 
     function _forward(bytes memory data) internal pure returns (bytes memory) {
-        return bytes.concat(data, _firstSet(), _secondSet());
+        return bytes.concat(data, _firstSet());
     }
 
     function _forwardSpecial(bytes memory data, ExecutionPhase phase) internal pure returns (bytes memory) {
-        return bytes.concat(data, _firstSetSpecial(phase), _secondSet());
+        return bytes.concat(data, _firstSetSpecial(phase));
     }
 
     function _firstSet() internal pure returns (bytes memory data) {
@@ -89,32 +91,42 @@ contract Base {
         );
     }
 
-    function _secondSet() internal pure returns (bytes memory data) {
-        data = abi.encodePacked(_user(), _control(), _config());
+    // function _secondSet() internal pure returns (bytes memory data) {
+    //     data = abi.encodePacked(_user(), _control(), _config());
+    // }
+
+    // /// @notice Extracts and returns the CallConfig of the current DAppControl contract, from calldata.
+    // /// @return config The CallConfig of the current DAppControl contract, in uint32 form.
+    // function _config() internal pure returns (uint32 config) {
+    //     assembly {
+    //         config := shr(224, calldataload(sub(calldatasize(), 4)))
+    //     }
+    // }
+
+    // /// @notice Extracts and returns the address of the current DAppControl contract, from calldata.
+    // /// @return control The address of the current DAppControl contract.
+    // function _control() internal pure returns (address control) {
+    //     assembly {
+    //         control := shr(96, calldataload(sub(calldatasize(), 24)))
+    //     }
+    // }
+
+    // /// @notice Extracts and returns the address of the user of the current metacall tx, from calldata.
+    // /// @return user The address of the user of the current metacall tx.
+    // function _user() internal pure returns (address user) {
+    //     assembly {
+    //         user := shr(96, calldataload(sub(calldatasize(), 44)))
+    //     }
+    // }
+
+    // Alternative to prev _control() above ^
+    function _control() internal view returns (address) {
+        return IAtlas(ATLAS).activeControl();
     }
 
-    /// @notice Extracts and returns the CallConfig of the current DAppControl contract, from calldata.
-    /// @return config The CallConfig of the current DAppControl contract, in uint32 form.
-    function _config() internal pure returns (uint32 config) {
-        assembly {
-            config := shr(224, calldataload(sub(calldatasize(), 4)))
-        }
-    }
-
-    /// @notice Extracts and returns the address of the current DAppControl contract, from calldata.
-    /// @return control The address of the current DAppControl contract.
-    function _control() internal pure returns (address control) {
-        assembly {
-            control := shr(96, calldataload(sub(calldatasize(), 24)))
-        }
-    }
-
-    /// @notice Extracts and returns the address of the user of the current metacall tx, from calldata.
-    /// @return user The address of the user of the current metacall tx.
-    function _user() internal pure returns (address user) {
-        assembly {
-            user := shr(96, calldataload(sub(calldatasize(), 44)))
-        }
+    // Alternative to prev _user() above ^
+    function _user() internal view returns (address) {
+        return IAtlas(ATLAS).activeUser();
     }
 
     /// @notice Extracts and returns the call depth within the current metacall tx, from calldata.
@@ -247,14 +259,14 @@ contract ExecutionBase is Base {
         if (msg.sender != ATLAS) {
             revert AtlasErrors.OnlyAtlas();
         }
-        IPermit69(ATLAS).transferUserERC20(token, destination, amount, _user(), _control(), _config(), _lockState());
+        IPermit69(ATLAS).transferUserERC20(token, destination, amount, _lockState());
     }
 
     function _transferDAppERC20(address token, address destination, uint256 amount) internal {
         if (msg.sender != ATLAS) {
             revert AtlasErrors.OnlyAtlas();
         }
-        IPermit69(ATLAS).transferDAppERC20(token, destination, amount, _user(), _control(), _config(), _lockState());
+        IPermit69(ATLAS).transferDAppERC20(token, destination, amount, _lockState());
     }
 
     function _availableFundsERC20(
@@ -273,8 +285,8 @@ contract ExecutionBase is Base {
         }
 
         uint16 shiftedPhase = uint16(1 << (EXECUTION_PHASE_OFFSET + uint16(phase)));
-        address user = _user();
-        address dapp = _control();
+        address user = IAtlas(ATLAS).activeUser();
+        address dapp = IAtlas(ATLAS).activeControl();
 
         if (_source == user) {
             if (shiftedPhase & SAFE_USER_TRANSFER == 0) {

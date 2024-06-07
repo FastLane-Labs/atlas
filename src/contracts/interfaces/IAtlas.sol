@@ -20,4 +20,8 @@ interface IAtlas {
     function VERIFICATION() external view returns (address);
 
     function isUnlocked() external view returns (bool);
+
+    function activeUser() external view returns (address);
+
+    function activeControl() external view returns (address);
 }

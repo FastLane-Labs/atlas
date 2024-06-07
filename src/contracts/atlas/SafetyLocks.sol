@@ -30,11 +30,21 @@ abstract contract SafetyLocks is Storage {
     /// @param executionEnvironment The address of the execution environment to set the lock to.
     /// @param gasMarker Initial `gasleft()` measured at the start of `metacall`.
     /// @param userOpValue Amount of ETH required by the UserOperation.
-    function _setAtlasLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) internal {
+    function _setAtlasLock(
+        address executionEnvironment,
+        address userFrom,
+        address control,
+        uint256 gasMarker,
+        uint256 userOpValue
+    )
+        internal
+    {
         if (lock != _UNLOCKED) revert AlreadyInitialized();
 
         // Initialize the Lock
         lock = executionEnvironment;
+        activeUser = userFrom;
+        activeControl = control;
 
         // Set the claimed amount
         uint256 rawClaims = (gasMarker + 1) * tx.gasprice;
@@ -88,6 +98,8 @@ abstract contract SafetyLocks is Storage {
     function _releaseAtlasLock() internal {
         if (lock == _UNLOCKED) revert NotInitialized();
         lock = _UNLOCKED;
+        activeUser = _UNLOCKED;
+        activeControl = _UNLOCKED;
         _solverLock = _UNLOCKED_UINT;
         claims = type(uint256).max;
         withdrawals = type(uint256).max;

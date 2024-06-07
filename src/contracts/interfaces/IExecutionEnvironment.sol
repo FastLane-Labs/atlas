@@ -30,9 +30,9 @@ interface IExecutionEnvironment {
     )
         external;
 
-    function getUser() external pure returns (address user);
-    function getControl() external pure returns (address control);
-    function getConfig() external pure returns (uint32 config);
+    // function getUser() external pure returns (address user);
+    // function getControl() external pure returns (address control);
+    // function getConfig() external pure returns (uint32 config);
     function getEscrow() external view returns (address escrow);
 
     function withdrawERC20(address token, uint256 amount) external;

@@ -12,25 +12,7 @@ interface IPermit69 {
     // token approval to the Atlas main contract, and only during specific phases
     // of the Atlas execution process.
 
-    function transferUserERC20(
-        address token,
-        address destination,
-        uint256 amount,
-        address user,
-        address control,
-        uint32 callConfig,
-        uint16 lockState
-    )
-        external;
+    function transferUserERC20(address token, address destination, uint256 amount, uint16 lockState) external;
 
-    function transferDAppERC20(
-        address token,
-        address destination,
-        uint256 amount,
-        address user,
-        address control,
-        uint32 callConfig,
-        uint16 lockState
-    )
-        external;
+    function transferDAppERC20(address token, address destination, uint256 amount, uint16 lockState) external;
 }

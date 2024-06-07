@@ -59,7 +59,7 @@ contract Permit69Test is BaseTest {
         vm.prank(solverOneEOA);
         vm.expectRevert(AtlasErrors.EnvironmentMismatch.selector);
         mockAtlas.transferUserERC20(
-            WETH_ADDRESS, solverOneEOA, 10e18, userEOA, address(0), uint16(0), escrowKey.lockState
+            WETH_ADDRESS, solverOneEOA, 10e18, escrowKey.lockState
         );
     }
 
@@ -72,7 +72,7 @@ contract Permit69Test is BaseTest {
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(AtlasErrors.InvalidLockState.selector);
         mockAtlas.transferUserERC20(
-            WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState
+            WETH_ADDRESS, solverOneEOA, 10e18, escrowKey.lockState
         );
 
         // HandlingPayments
@@ -81,7 +81,7 @@ contract Permit69Test is BaseTest {
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(AtlasErrors.InvalidLockState.selector);
         mockAtlas.transferUserERC20(
-            WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState
+            WETH_ADDRESS, solverOneEOA, 10e18, escrowKey.lockState
         );
 
         // Releasing
@@ -89,7 +89,7 @@ contract Permit69Test is BaseTest {
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(AtlasErrors.InvalidLockState.selector);
         mockAtlas.transferUserERC20(
-            WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState
+            WETH_ADDRESS, solverOneEOA, 10e18, escrowKey.lockState
         );
 
         vm.stopPrank();
@@ -106,7 +106,7 @@ contract Permit69Test is BaseTest {
 
         vm.prank(mockExecutionEnvAddress);
         mockAtlas.transferUserERC20(
-            WETH_ADDRESS, solverOneEOA, wethTransferred, userEOA, mockDAppControl, uint16(0), escrowKey.lockState
+            WETH_ADDRESS, solverOneEOA, wethTransferred, escrowKey.lockState
         );
 
         assertEq(WETH.balanceOf(userEOA), userWethBefore - wethTransferred, "User did not lose WETH");
@@ -119,7 +119,7 @@ contract Permit69Test is BaseTest {
         vm.prank(solverOneEOA);
         vm.expectRevert(AtlasErrors.EnvironmentMismatch.selector);
         mockAtlas.transferDAppERC20(
-            WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState
+            WETH_ADDRESS, solverOneEOA, 10e18, escrowKey.lockState
         );
     }
 
@@ -132,7 +132,7 @@ contract Permit69Test is BaseTest {
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(AtlasErrors.InvalidLockState.selector);
         mockAtlas.transferDAppERC20(
-            WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState
+            WETH_ADDRESS, solverOneEOA, 10e18, escrowKey.lockState
         );
 
         // UserOperation
@@ -140,7 +140,7 @@ contract Permit69Test is BaseTest {
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(AtlasErrors.InvalidLockState.selector);
         mockAtlas.transferDAppERC20(
-            WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState
+            WETH_ADDRESS, solverOneEOA, 10e18, escrowKey.lockState
         );
 
         // SolverOperations
@@ -149,7 +149,7 @@ contract Permit69Test is BaseTest {
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(AtlasErrors.InvalidLockState.selector);
         mockAtlas.transferDAppERC20(
-            WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState
+            WETH_ADDRESS, solverOneEOA, 10e18, escrowKey.lockState
         );
 
         // Releasing
@@ -157,7 +157,7 @@ contract Permit69Test is BaseTest {
         mockAtlas.setEscrowKey(escrowKey);
         vm.expectRevert(AtlasErrors.InvalidLockState.selector);
         mockAtlas.transferDAppERC20(
-            WETH_ADDRESS, solverOneEOA, 10e18, userEOA, mockDAppControl, uint16(0), escrowKey.lockState
+            WETH_ADDRESS, solverOneEOA, 10e18, escrowKey.lockState
         );
 
         vm.stopPrank();
@@ -174,7 +174,7 @@ contract Permit69Test is BaseTest {
 
         vm.prank(mockExecutionEnvAddress);
         mockAtlas.transferDAppERC20(
-            WETH_ADDRESS, solverOneEOA, wethTransferred, userEOA, mockDAppControl, uint16(0), escrowKey.lockState
+            WETH_ADDRESS, solverOneEOA, wethTransferred, escrowKey.lockState
         );
 
         assertEq(WETH.balanceOf(mockDAppControl), dAppWethBefore - wethTransferred, "DApp did not lose WETH");

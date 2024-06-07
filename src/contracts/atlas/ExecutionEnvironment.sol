@@ -63,7 +63,7 @@ contract ExecutionEnvironment is Base, IExecutionEnvironment {
         bytes memory preOpsData = _forward(abi.encodeCall(IDAppControl.preOpsCall, userOp));
 
         bool success;
-        (success, preOpsData) = _control().delegatecall(preOpsData);
+        (success, preOpsData) = userOp.control.delegatecall(preOpsData);
 
         if (!success) revert AtlasErrors.PreOpsDelegatecallFail();
 
@@ -84,7 +84,7 @@ contract ExecutionEnvironment is Base, IExecutionEnvironment {
         contributeSurplus
         returns (bytes memory returnData)
     {
-        uint32 config = _config();
+        uint32 config = userOp.callConfig;
 
         if (userOp.value > address(this).balance) {
             revert AtlasErrors.UserOpValueExceedsBalance();
@@ -152,8 +152,8 @@ contract ExecutionEnvironment is Base, IExecutionEnvironment {
             revert AtlasErrors.SolverMetaTryCatchIncorrectValue();
         }
 
-        uint32 config = _config();
-        address control = _control();
+        uint32 config = userOp.callConfig;
+        address control = userOp.control;
 
         // Track token balance to measure if the bid amount is paid.
         bool etherIsBidToken;
@@ -336,7 +336,7 @@ contract ExecutionEnvironment is Base, IExecutionEnvironment {
         allocateData =
             _forward(abi.encodeCall(IDAppControl.allocateValueCall, (userOp, bidToken, bidAmount, allocateData)));
 
-        (bool success,) = _control().delegatecall(allocateData);
+        (bool success,) = userOp.control.delegatecall(allocateData);
         if (!success) revert AtlasErrors.AllocateValueDelegatecallFail();
     }
 
@@ -381,22 +381,22 @@ contract ExecutionEnvironment is Base, IExecutionEnvironment {
 
     /// @notice The getUser function returns the address of the user of this Execution Environment.
     /// @return user The address of the user of this Execution Environment.
-    function getUser() external pure returns (address user) {
-        user = _user();
-    }
+    // function getUser() external pure returns (address user) {
+    //     user = _user();
+    // }
 
-    /// @notice The getControl function returns the address of the DAppControl contract of the current metacall
-    /// transaction.
-    /// @return control The address of the DAppControl contract of the current metacall transaction.
-    function getControl() external pure returns (address control) {
-        control = _control();
-    }
+    // /// @notice The getControl function returns the address of the DAppControl contract of the current metacall
+    // /// transaction.
+    // /// @return control The address of the DAppControl contract of the current metacall transaction.
+    // function getControl() external pure returns (address control) {
+    //     control = _control();
+    // }
 
-    /// @notice The getConfig function returns the CallConfig of the current metacall transaction.
-    /// @return config The CallConfig in uint32 form of the current metacall transaction.
-    function getConfig() external pure returns (uint32 config) {
-        config = _config();
-    }
+    // /// @notice The getConfig function returns the CallConfig of the current metacall transaction.
+    // /// @return config The CallConfig in uint32 form of the current metacall transaction.
+    // function getConfig() external pure returns (uint32 config) {
+    //     config = _config();
+    // }
 
     /// @notice The getEscrow function returns the address of the Atlas/Escrow contract.
     /// @return The address of the Atlas/Escrow contract.

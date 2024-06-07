@@ -34,6 +34,8 @@ abstract contract Permit69 is GasAccounting {
         GasAccounting(_escrowDuration, _verification, _simulator, _surchargeRecipient)
     { }
 
+    // TODO read lockState from Atlas transient storage var rather than allowing caller to pass in value
+
     /// @notice Verifies that the caller is an authorized Execution Environment contract.
     /// @dev This function is called internally to ensure that the caller is a legitimate Execution Environment contract
     /// controlled by the current DAppControl contract. It helps prevent unauthorized access and ensures that
@@ -44,66 +46,38 @@ abstract contract Permit69 is GasAccounting {
     /// @param callConfig The CallConfig of the DAppControl contract of the current transaction.
     function _verifyCallerIsExecutionEnv(address user, address control, uint32 callConfig) internal virtual { }
 
-    /// @notice Transfers ERC20 tokens from a user to a destination address, only callable by the expected Execution
-    /// Environment.
+    /// @notice Transfers ERC20 tokens from the `currentUserFrom` address set at the start of the current metacall tx,
+    /// to a destination address, only callable by the expected Execution Environment.
     /// @param token The address of the ERC20 token contract.
     /// @param destination The address to which the tokens will be transferred.
     /// @param amount The amount of tokens to transfer.
-    /// @param user The address of the user invoking the function.
-    /// @param control The address of the current DAppControl contract.
-    /// @param callConfig The CallConfig of the current DAppControl contract.
     /// @param lockState The lock state indicating the safe execution phase for the token transfer.
-    function transferUserERC20(
-        address token,
-        address destination,
-        uint256 amount,
-        address user,
-        address control,
-        uint32 callConfig,
-        uint16 lockState
-    )
-        external
-    {
-        // Verify that the caller is legitimate
-        // NOTE: Use the *current* DAppControl's codehash to help mitigate social engineering bamboozles if, for
-        // example, a DAO is having internal issues.
-        _verifyCallerIsExecutionEnv(user, control, callConfig);
+    function transferUserERC20(address token, address destination, uint256 amount, uint16 lockState) external {
+        // Only the expected, currently active Execution Environment can call this function.
+        _verifyCallerIsActiveExecutionEnv();
 
         // Verify the lock state
         _verifyLockState({ lockState: lockState, safeExecutionPhaseSet: SAFE_USER_TRANSFER });
 
         // Transfer token
-        ERC20(token).safeTransferFrom(user, destination, amount);
+        ERC20(token).safeTransferFrom(activeUser, destination, amount);
     }
 
-    /// @notice Transfers ERC20 tokens from the DAppControl contract to a destination address, only callable by the
-    /// expected Execution Environment.
+    /// @notice Transfers ERC20 tokens from the `activeControl` address set at the start of the current metacall tx, to
+    /// a destination address, only callable by the expected Execution Environment.
     /// @param token The address of the ERC20 token contract.
     /// @param destination The address to which the tokens will be transferred.
     /// @param amount The amount of tokens to transfer.
-    /// @param user The address of the user invoking the function.
-    /// @param control The address of the current DAppControl contract.
-    /// @param callConfig The CallConfig of the current DAppControl contract.
     /// @param lockState The lock state indicating the safe execution phase for the token transfer.
-    function transferDAppERC20(
-        address token,
-        address destination,
-        uint256 amount,
-        address user,
-        address control,
-        uint32 callConfig,
-        uint16 lockState
-    )
-        external
-    {
-        // Verify that the caller is legitimate
-        _verifyCallerIsExecutionEnv(user, control, callConfig);
+    function transferDAppERC20(address token, address destination, uint256 amount, uint16 lockState) external {
+        // Only the expected, currently active Execution Environment can call this function.
+        _verifyCallerIsActiveExecutionEnv();
 
         // Verify the lock state
         _verifyLockState({ lockState: lockState, safeExecutionPhaseSet: SAFE_DAPP_TRANSFER });
 
         // Transfer token
-        ERC20(token).safeTransferFrom(control, destination, amount);
+        ERC20(token).safeTransferFrom(activeControl, destination, amount);
     }
 
     /// @notice Verifies whether the lock state allows execution in the specified safe execution phase.
@@ -112,6 +86,16 @@ abstract contract Permit69 is GasAccounting {
     function _verifyLockState(uint16 lockState, uint16 safeExecutionPhaseSet) internal pure {
         if (lockState & safeExecutionPhaseSet == 0) {
             revert InvalidLockState();
+        }
+    }
+
+    /// @notice Verifies that the caller is the currently active Execution Environment.
+    /// @dev Because user, control, and callConfig are used in the salt when creating the Execution Environment,
+    /// we know that the user and DAppControl addresses associated with the calling EE are the same as the `userOp.from`
+    /// and `userOp.control` addresses passed in the beginning of the current `metacall()` tx.
+    function _verifyCallerIsActiveExecutionEnv() internal view {
+        if (msg.sender != lock) {
+            revert NotActiveExecutionEnv();
         }
     }
 }

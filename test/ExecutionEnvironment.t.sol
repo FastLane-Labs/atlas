@@ -640,17 +640,19 @@ contract ExecutionEnvironmentTest is BaseTest {
         executionEnvironment.withdrawEther(2e18);
     }
 
-    function test_getUser() public {
-        assertEq(executionEnvironment.getUser(), user);
-    }
+    // TODO remove if these functions are removed from EE - due to not forwarded with removal of Mimic
+    
+    // function test_getUser() public {
+    //     assertEq(executionEnvironment.getUser(), user);
+    // }
 
-    function test_getControl() public {
-        assertEq(executionEnvironment.getControl(), address(dAppControl));
-    }
+    // function test_getControl() public {
+    //     assertEq(executionEnvironment.getControl(), address(dAppControl));
+    // }
 
-    function test_getConfig() public {
-        assertEq(executionEnvironment.getConfig(), CallBits.encodeCallConfig(callConfig));
-    }
+    // function test_getConfig() public {
+    //     assertEq(executionEnvironment.getConfig(), CallBits.encodeCallConfig(callConfig));
+    // }
 
     function test_getEscrow() public {
         assertEq(executionEnvironment.getEscrow(), address(atlas));

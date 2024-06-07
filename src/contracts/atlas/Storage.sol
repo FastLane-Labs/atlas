@@ -64,6 +64,8 @@ contract Storage is AtlasEvents, AtlasErrors {
 
     // Atlas SafetyLocks (transient storage)
     address public lock; // transient storage
+    address public activeUser; // transient storage
+    address public activeControl; // transient storage
     uint256 public claims; // transient storage
     uint256 public withdrawals; // transient storage
     uint256 public deposits; // transient storage
@@ -96,7 +98,9 @@ contract Storage is AtlasEvents, AtlasErrors {
 
         // TODO remove these when transient storage behaviour is implemented
         // Gas Accounting - transient storage (delete this from constructor post dencun)
-        lock = _UNLOCKED;
+        lock = _UNLOCKED; // TODO rename to activeExecutionEnvironment for clarity
+        activeUser = _UNLOCKED;
+        activeControl = _UNLOCKED;
         _solverLock = _UNLOCKED_UINT;
         claims = type(uint256).max;
         withdrawals = type(uint256).max;

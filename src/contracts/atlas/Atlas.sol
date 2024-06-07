@@ -66,7 +66,7 @@ contract Atlas is Escrow, Factory {
         }
 
         // Initialize the lock
-        _setAtlasLock(executionEnvironment, gasMarker, userOp.value);
+        _setAtlasLock(executionEnvironment, userOp.from, userOp.control, gasMarker, userOp.value);
 
         try this.execute(dConfig, userOp, solverOps, executionEnvironment, msg.sender, userOpHash) returns (
             bool _auctionWon, uint256 winningSolverIndex
@@ -394,6 +394,8 @@ contract Atlas is Escrow, Factory {
         }
     }
 
+    // TODO remove this if not used for EE token withdraw functions to verify user
+    // NOTE: this is no longer used by Permit69
     /// @notice Reverts if the caller is not the execution environment address expected from the set of inputs.
     /// @param user User address
     /// @param control DAppControl contract address

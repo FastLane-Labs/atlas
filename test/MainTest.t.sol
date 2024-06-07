@@ -288,7 +288,8 @@ contract MainTest is BaseTest {
         */
     }
 
-    function testMimic() public {
+    // TODO remove if Mimic is fully removed
+    // function testMimic() public {
         // uncomment to debug if this test is broken
         /*
         address aaaaa = atlas.executionTemplate();
@@ -320,24 +321,24 @@ contract MainTest is BaseTest {
         console.log("----");
         */
 
-        vm.startPrank(userEOA);
-        atlas.createExecutionEnvironment(address(v2DAppControl));
-        address newEnvironment = atlas.createExecutionEnvironment(address(v2DAppControl));
-        vm.stopPrank();
+        // vm.startPrank(userEOA);
+        // atlas.createExecutionEnvironment(address(v2DAppControl));
+        // address newEnvironment = atlas.createExecutionEnvironment(address(v2DAppControl));
+        // vm.stopPrank();
 
-        assertTrue(IExecutionEnvironment(newEnvironment).getUser() == userEOA, "Mimic Error - User Mismatch");
-        assertTrue(
-            IExecutionEnvironment(newEnvironment).getControl() == address(v2DAppControl), "Mimic Error - Control Mismatch"
-        );
-        assertTrue(
-            IExecutionEnvironment(newEnvironment).getConfig() == v2DAppControl.CALL_CONFIG(),
-            "Mimic Error - CallConfig Mismatch"
-        );
-        assertTrue(
-            IExecutionEnvironment(newEnvironment).getEscrow() == address(atlas),
-            "Mimic Error - Escrow/Atlas Address Mismatch"
-        );
-    }
+        // assertTrue(IExecutionEnvironment(newEnvironment).getUser() == userEOA, "Mimic Error - User Mismatch");
+        // assertTrue(
+        //     IExecutionEnvironment(newEnvironment).getControl() == address(v2DAppControl), "Mimic Error - Control Mismatch"
+        // );
+        // assertTrue(
+        //     IExecutionEnvironment(newEnvironment).getConfig() == v2DAppControl.CALL_CONFIG(),
+        //     "Mimic Error - CallConfig Mismatch"
+        // );
+        // assertTrue(
+        //     IExecutionEnvironment(newEnvironment).getEscrow() == address(atlas),
+        //     "Mimic Error - Escrow/Atlas Address Mismatch"
+        // );
+    // }
 
     function testExecutionEnvironmentAutoCreation() public {
         uint8 v;
