@@ -296,7 +296,7 @@ contract Filler is DAppControl {
 
     function _decodeRawData(bytes calldata data)
         internal
-        pure
+        view
         returns (uint256 gasNeeded, ApprovalTx memory approvalTx)
     {
         // BELOW HERE IS WRONG - TODO: COMPLETE
