@@ -9,8 +9,9 @@ import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import { EscrowBits } from "../src/contracts/libraries/EscrowBits.sol";
 
-import "../src/contracts/types/EscrowTypes.sol";
-import "../src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/EscrowTypes.sol";
+import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/UserCallTypes.sol";
 
 contract MockGasAccounting is GasAccounting, Test {
     constructor(
@@ -26,14 +27,13 @@ contract MockGasAccounting is GasAccounting, Test {
         return (_balanceOf[account].balance, _balanceOf[account].unbonding);
     }
 
-    function initializeEscrowLock(
+    function initializeAtlasLock(
+        UserOperation calldata userOp,
         address executionEnvironment,
-        address userFrom,
-        address control,
-        uint256 gasMarker,
-        uint256 userOpValue
+        uint32 callConfig,
+        uint256 gasMarker
     ) external {
-        _setAtlasLock(executionEnvironment, userFrom, control, gasMarker, userOpValue);
+        _setAtlasLock(userOp, executionEnvironment, callConfig, gasMarker);
     }
 
     function assign(address owner, uint256 value, bool solverWon) external returns (bool) {
@@ -84,7 +84,9 @@ contract GasAccountingTest is Test {
         mockGasAccounting = new MockGasAccounting(0, address(0), address(0), address(0));
         uint256 gasMarker = gasleft();
 
-        mockGasAccounting.initializeEscrowLock(executionEnvironment, address(0), address(0), gasMarker, 0);
+        UserOperation memory userOp;
+
+        mockGasAccounting.initializeAtlasLock(userOp, executionEnvironment, 0, gasMarker);
 
         initialClaims = getInitialClaims(gasMarker);
         solverOp.from = makeAddr("solver");

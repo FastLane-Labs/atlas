@@ -9,21 +9,18 @@ import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import "src/contracts/types/DAppApprovalTypes.sol";
 import "src/contracts/types/LockTypes.sol";
+import "src/contracts/types/UserCallTypes.sol";
 
 contract MockSafetyLocks is SafetyLocks {
     constructor() SafetyLocks(0, address(0), address(0), address(0)) { }
 
-    function initializeEscrowLock(
+    function initializeAtlasLock(
+        UserOperation calldata userOp,
         address executionEnvironment,
-        address userFrom,
-        address control,
-        uint256 gasMarker,
-        uint256 userOpValue
-    )
-        external
-        payable
-    {
-        _setAtlasLock(executionEnvironment, userFrom, control, gasMarker, userOpValue);
+        uint32 callConfig,
+        uint256 gasMarker
+    ) external payable {
+        _setAtlasLock(userOp, executionEnvironment, callConfig, gasMarker);
     }
 
     function buildEscrowLock(
@@ -77,13 +74,19 @@ contract SafetyLocksTest is Test {
 
         address userAddr = address(3456);
         address controlAddr = address(4567);
+        uint32 callConfig = 5678;
+
+        UserOperation memory userOp;
+        userOp.from = userAddr;
+        userOp.control = controlAddr;
+        userOp.value = userOpValue;
 
         safetyLocks.setLock(address(2));
         vm.expectRevert(AtlasErrors.AlreadyInitialized.selector);
-        safetyLocks.initializeEscrowLock{ value: msgValue }(executionEnvironment, userAddr, controlAddr, gasMarker, userOpValue);
+        safetyLocks.initializeAtlasLock{ value: msgValue }(userOp, executionEnvironment, callConfig, gasMarker);
         safetyLocks.setLock(address(1)); // Reset to UNLOCKED
 
-        safetyLocks.initializeEscrowLock{ value: msgValue }(executionEnvironment, userAddr, controlAddr, gasMarker, userOpValue);
+        safetyLocks.initializeAtlasLock{ value: msgValue }(userOp, executionEnvironment, callConfig, gasMarker);
 
         uint256 rawClaims = (gasMarker + 1) * tx.gasprice;
         uint256 expectedClaims = rawClaims + ((rawClaims * safetyLocks.SURCHARGE_RATE()) / safetyLocks.SURCHARGE_SCALE());
@@ -96,18 +99,21 @@ contract SafetyLocksTest is Test {
 
     function test_buildEscrowLock() public {
         DAppConfig memory dConfig = DAppConfig({ to: address(10), callConfig: 0, bidToken: address(0), solverGasLimit: 1_000_000});
+        UserOperation memory userOp;
 
-        safetyLocks.initializeEscrowLock(executionEnvironment, address(0), address(0), 0, 0);
+        safetyLocks.initializeAtlasLock(userOp, executionEnvironment, 0, 0);
         EscrowKey memory key = safetyLocks.buildEscrowLock(dConfig, executionEnvironment, bytes32(0), address(0), 0, false);
         assertEq(executionEnvironment, key.executionEnvironment);
         assertEq(executionEnvironment, key.addressPointer);
     }
 
     function test_releaseAtlasLock() public {
+        UserOperation memory userOp;
+
         vm.expectRevert(AtlasErrors.NotInitialized.selector);
         safetyLocks.releaseEscrowLock();
 
-        safetyLocks.initializeEscrowLock(executionEnvironment, address(0), address(0), 0, 0);
+        safetyLocks.initializeAtlasLock(userOp, executionEnvironment, 0, 0);
         safetyLocks.releaseEscrowLock();
         assertEq(safetyLocks.lock(), address(1));
         assertEq(safetyLocks.solver(), address(1));
@@ -117,7 +123,8 @@ contract SafetyLocksTest is Test {
     }
 
     function test_activeEnvironment() public {
-        safetyLocks.initializeEscrowLock(executionEnvironment, address(0), address(0), 0, 0);
+        UserOperation memory userOp;
+        safetyLocks.initializeAtlasLock(userOp, executionEnvironment, 0, 0);
         assertEq(safetyLocks.activeEnvironment(), executionEnvironment);
     }
 }

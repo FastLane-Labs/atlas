@@ -27,15 +27,15 @@ abstract contract SafetyLocks is Storage {
 
     /// @notice Sets the Atlas lock to the specified execution environment, and tracks gas used, ETH borrowed by the
     /// UserOperation, and ETH deposited.
+    /// @param userOp The UserOperation struct, specifically to access `from`, `control`, and `value` properties.
     /// @param executionEnvironment The address of the execution environment to set the lock to.
+    /// @param callConfig The CallConfig of the current DAppControl contract.
     /// @param gasMarker Initial `gasleft()` measured at the start of `metacall`.
-    /// @param userOpValue Amount of ETH required by the UserOperation.
     function _setAtlasLock(
+        UserOperation calldata userOp,
         address executionEnvironment,
-        address userFrom,
-        address control,
-        uint256 gasMarker,
-        uint256 userOpValue
+        uint32 callConfig,
+        uint256 gasMarker
     )
         internal
     {
@@ -43,15 +43,16 @@ abstract contract SafetyLocks is Storage {
 
         // Initialize the Lock
         lock = executionEnvironment;
-        activeUser = userFrom;
-        activeControl = control;
+        activeUser = userOp.from;
+        activeControl = userOp.control;
+        activeCallConfig = callConfig;
 
         // Set the claimed amount
         uint256 rawClaims = (gasMarker + 1) * tx.gasprice;
         claims = rawClaims * (SURCHARGE_SCALE + SURCHARGE_RATE) / SURCHARGE_SCALE;
 
         // Set any withdraws or deposits
-        withdrawals = userOpValue;
+        withdrawals = userOp.value;
         deposits = msg.value;
     }
 
