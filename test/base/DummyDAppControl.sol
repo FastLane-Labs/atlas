@@ -36,17 +36,7 @@ contract DummyDAppControl is DAppControl {
         return data;
     }
 
-    function _postOpsCall(
-        UserOperation calldata userOp,
-        bool,
-        bytes calldata data
-    )
-        internal
-        pure
-        virtual
-        override
-        returns (bool)
-    {
+    function _postOpsCall(bool, bytes calldata data) internal pure virtual override returns (bool) {
         if (data.length == 0) {
             return true;
         }
@@ -57,7 +47,6 @@ contract DummyDAppControl is DAppControl {
     }
 
     function _preSolverCall(
-        UserOperation calldata userOp,
         SolverOperation calldata,
         bytes calldata returnData
     )
@@ -77,7 +66,6 @@ contract DummyDAppControl is DAppControl {
     }
 
     function _postSolverCall(
-        UserOperation calldata userOp,
         SolverOperation calldata,
         bytes calldata returnData
     )
@@ -97,7 +85,6 @@ contract DummyDAppControl is DAppControl {
     }
 
     function _allocateValueCall(
-        UserOperation calldata userOp,
         address bidToken,
         uint256 winningAmount,
         bytes calldata data

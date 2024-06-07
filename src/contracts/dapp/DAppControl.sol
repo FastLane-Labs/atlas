@@ -73,7 +73,6 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     /// @param returnData Data returned from the previous call phase.
     /// @return Boolean indicating whether the preSolverCall was successful.
     function preSolverCall(
-        UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         bytes calldata returnData
     )
@@ -83,7 +82,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         onlyAtlasEnvironment(ExecutionPhase.PreSolver, _CONTROL_DEPTH)
         returns (bool)
     {
-        return _preSolverCall(userOp, solverOp, returnData);
+        return _preSolverCall(solverOp, returnData);
     }
 
     /// @notice The postSolverCall hook which may be called after the SolverOperation has been executed.
@@ -91,7 +90,6 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     /// @param returnData Data returned from the previous call phase.
     /// @return Boolean indicating whether the postSolverCall was successful.
     function postSolverCall(
-        UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         bytes calldata returnData
     )
@@ -101,7 +99,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         onlyAtlasEnvironment(ExecutionPhase.PostSolver, _CONTROL_DEPTH)
         returns (bool)
     {
-        return _postSolverCall(userOp, solverOp, returnData);
+        return _postSolverCall(solverOp, returnData);
     }
 
     /// @notice The allocateValueCall hook which is called after a successful SolverOperation.
@@ -109,7 +107,6 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     /// @param bidAmount The winning bid amount.
     /// @param data Data returned from the previous call phase.
     function allocateValueCall(
-        UserOperation calldata userOp,
         address bidToken,
         uint256 bidAmount,
         bytes calldata data
@@ -118,7 +115,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         validControl
         onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _CONTROL_DEPTH)
     {
-        _allocateValueCall(userOp, bidToken, bidAmount, data);
+        _allocateValueCall(bidToken, bidAmount, data);
     }
 
     /// @notice The postOpsCall hook which may be called as the last phase of a `metacall` transaction.
@@ -126,7 +123,6 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     /// @param data Data returned from the previous call phase.
     /// @return Boolean indicating whether the postOpsCall was successful.
     function postOpsCall(
-        UserOperation calldata userOp,
         bool solved,
         bytes calldata data
     )
@@ -136,7 +132,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         onlyAtlasEnvironment(ExecutionPhase.PostOps, _CONTROL_DEPTH)
         returns (bool)
     {
-        return _postOpsCall(userOp, solved, data);
+        return _postOpsCall(solved, data);
     }
 
     function userDelegated() external view returns (bool delegated) {

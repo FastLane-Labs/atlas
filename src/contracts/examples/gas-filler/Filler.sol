@@ -99,15 +99,7 @@ contract Filler is DAppControl {
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(
-        UserOperation calldata userOp,
-        address,
-        uint256 bidAmount,
-        bytes calldata
-    )
-        internal
-        override
-    {
+    function _allocateValueCall(address, uint256 bidAmount, bytes calldata) internal override {
         // NOTE: gas value xferred to user in postSolverCall
         // Pay the solver (since auction is reversed)
         // Address Pointer = winning solver.
@@ -115,7 +107,6 @@ contract Filler is DAppControl {
     }
 
     function _preSolverCall(
-        UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         bytes calldata returnData
     )
@@ -139,7 +130,6 @@ contract Filler is DAppControl {
     }
 
     function _postSolverCall(
-        UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         bytes calldata returnData
     )

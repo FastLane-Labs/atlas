@@ -154,15 +154,7 @@ contract V4DAppControl is DAppControl {
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(
-        UserOperation calldata userOp,
-        address bidToken,
-        uint256 bidAmount,
-        bytes calldata
-    )
-        internal
-        override
-    {
+    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
@@ -187,15 +179,7 @@ contract V4DAppControl is DAppControl {
         sequenceLock[sequenceKey] = true;
     }
 
-    function _postOpsCall(
-        UserOperation calldata userOp,
-        bool solved,
-        bytes calldata data
-    )
-        internal
-        override
-        returns (bool)
-    {
+    function _postOpsCall(bool solved, bytes calldata data) internal override returns (bool) {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow

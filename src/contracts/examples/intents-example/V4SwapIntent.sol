@@ -154,7 +154,6 @@ contract V4SwapIntentControl is DAppControl {
     //////////////////////////////////
 
     function _preSolverCall(
-        UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         bytes calldata returnData
     )
@@ -190,7 +189,6 @@ contract V4SwapIntentControl is DAppControl {
 
     // Checking intent was fulfilled, and user has received their tokens, happens here
     function _postSolverCall(
-        UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         bytes calldata returnData
     )
@@ -246,15 +244,7 @@ contract V4SwapIntentControl is DAppControl {
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(
-        UserOperation calldata userOp,
-        address bidToken,
-        uint256 bidAmount,
-        bytes calldata
-    )
-        internal
-        override
-    {
+    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Atlas

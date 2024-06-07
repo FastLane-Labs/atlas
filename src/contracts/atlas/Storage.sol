@@ -57,6 +57,12 @@ contract Storage is AtlasEvents, AtlasErrors {
     uint256 internal constant _SOLVER_OP_BASE_CALLDATA = 608; // SolverOperation calldata length excluding solverOp.data
     uint256 internal constant _SOLVER_LOCK_GAS_BUFFER = 5000; // Base gas charged to solver in `_releaseSolverLock()`
 
+    // First 160 bits of `_solverLock` below are the address of the current solver.
+    // The 161st bit represents whether the solver has called back via `reconcile`.
+    // The 162nd bit represents whether the solver's outstanding debt has been repaid via `reconcile`.
+    uint256 internal constant _SOLVER_CALLED_BACK_MASK = 1 << 161;
+    uint256 internal constant _SOLVER_FULFILLED_MASK = 1 << 162;
+
     // atlETH GasAccounting storage
     uint256 public cumulativeSurcharge; // Cumulative gas surcharges collected
     address public surchargeRecipient; // Fastlane surcharge recipient
@@ -66,18 +72,12 @@ contract Storage is AtlasEvents, AtlasErrors {
     address public lock; // transient storage
     address public activeUser; // transient storage
     address public activeControl; // transient storage
-    uint32 public activeCallConfig; // transient storage
+    uint256 public activeCallConfig; // transient storage
 
     uint256 public claims; // transient storage
     uint256 public withdrawals; // transient storage
     uint256 public deposits; // transient storage
     uint256 internal _solverLock; // transient storage
-
-    // First 160 bits of _solverLock are the address of the current solver.
-    // The 161st bit represents whether the solver has called back via `reconcile`.
-    // The 162nd bit represents whether the solver's outstanding debt has been repaid via `reconcile`.
-    uint256 internal constant _SOLVER_CALLED_BACK_MASK = 1 << 161;
-    uint256 internal constant _SOLVER_FULFILLED_MASK = 1 << 162;
 
     constructor(
         uint256 _escrowDuration,
@@ -103,11 +103,12 @@ contract Storage is AtlasEvents, AtlasErrors {
         lock = _UNLOCKED; // TODO rename to activeExecutionEnvironment for clarity
         activeUser = _UNLOCKED;
         activeControl = _UNLOCKED;
-        activeCallConfig = uint32(_UNLOCKED_UINT);
-        _solverLock = _UNLOCKED_UINT;
+        activeCallConfig = _UNLOCKED_UINT;
+
         claims = type(uint256).max;
         withdrawals = type(uint256).max;
         deposits = type(uint256).max;
+        _solverLock = _UNLOCKED_UINT;
 
         emit SurchargeRecipientTransferred(_surchargeRecipient);
     }

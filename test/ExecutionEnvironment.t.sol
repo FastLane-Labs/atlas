@@ -10,6 +10,7 @@ import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 
 import { IFactory } from "src/contracts/interfaces/IFactory.sol";
 import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
 import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 
@@ -40,14 +41,21 @@ contract ExecutionEnvironmentTest is BaseTest {
 
     address public governance = makeAddr("governance");
     address public user = makeAddr("user");
+    address public control = makeAddr("control");
+    uint32 public callConfigNum = 0;
+
     address public solver = makeAddr("solver");
     address public invalid = makeAddr("invalid");
 
     uint256 public lockSlot;
-    uint256 public solverLockSlot;
+    uint256 public activeUserSlot;
+    uint256 public activeControlSlot;
+    uint256 public activeCallConfigSlot;
+    
     uint256 public depositsSlot;
     uint256 public claimsSlot;
     uint256 public withdrawalsSlot;
+    uint256 public solverLockSlot;
 
     CallConfig private callConfig;
 
@@ -58,11 +66,30 @@ contract ExecutionEnvironmentTest is BaseTest {
         // For custom scenarios, set the needed flags and call setupDAppControl.
         setupDAppControl(callConfig);
 
-        lockSlot = stdstore.target(address(atlas)).sig("lock()").find();
-        solverLockSlot = lockSlot + 1;
-        depositsSlot = stdstore.target(address(atlas)).sig("deposits()").find();
-        claimsSlot = stdstore.target(address(atlas)).sig("claims()").find();
-        withdrawalsSlot = stdstore.target(address(atlas)).sig("withdrawals()").find();
+        // NOTE: Seems to be some Foundry bug preventing us from using `stdstore...find()` on the later slots.
+        // Be careful that they reflect the slot order in Storage.sol
+
+        lockSlot = stdstore.target(address(atlas)).sig(atlas.lock.selector).find();
+        activeUserSlot = lockSlot + 1;
+        activeControlSlot = lockSlot + 2;
+        activeCallConfigSlot = lockSlot + 3;
+        claimsSlot = lockSlot + 4;
+        withdrawalsSlot = lockSlot + 5;
+        depositsSlot = lockSlot + 6;
+        solverLockSlot = lockSlot + 7;
+
+        console.log("MAX NUM", type(uint256).max);
+
+        // Checks to ensure slots identified correctly:
+        assertEq(uint256(vm.load(address(atlas), bytes32(lockSlot))), 1, "lockSlot is wrong");
+        assertEq(uint256(vm.load(address(atlas), bytes32(activeUserSlot))), 1, "activeUserSlot is wrong");
+        assertEq(uint256(vm.load(address(atlas), bytes32(activeControlSlot))), 1, "activeControlSlot is wrong");
+        assertEq(uint256(vm.load(address(atlas), bytes32(activeCallConfigSlot))), 1, "activeCallConfigSlot is wrong");
+
+        assertEq(uint256(vm.load(address(atlas), bytes32(claimsSlot))), type(uint256).max, "claimsSlot is wrong");
+        assertEq(uint256(vm.load(address(atlas), bytes32(withdrawalsSlot))), type(uint256).max, "withdrawalsSlot is wrong");
+        assertEq(uint256(vm.load(address(atlas), bytes32(depositsSlot))), type(uint256).max, "depositsSlot is wrong");
+        assertEq(uint256(vm.load(address(atlas), bytes32(solverLockSlot))), 1, "solverLockSlot is wrong");
     }
 
     function _setLocks() internal {
@@ -70,6 +97,10 @@ contract ExecutionEnvironmentTest is BaseTest {
         rawClaims += ((rawClaims * 1_000_000) / 10_000_000);
 
         vm.store(address(atlas), bytes32(lockSlot), bytes32(uint256(uint160(address(executionEnvironment)))));
+        vm.store(address(atlas), bytes32(activeUserSlot), bytes32(uint256(uint160(user))));
+        vm.store(address(atlas), bytes32(activeControlSlot), bytes32(uint256(uint160(address(control)))));
+        vm.store(address(atlas), bytes32(activeCallConfigSlot), bytes32(uint256(callConfigNum)));
+
         vm.store(address(atlas), bytes32(solverLockSlot), bytes32(uint256(uint160(address(solver)))));
         vm.store(address(atlas), bytes32(depositsSlot), bytes32(uint256(msg.value)));
         vm.store(address(atlas), bytes32(claimsSlot), bytes32(uint256(rawClaims)));
@@ -78,6 +109,10 @@ contract ExecutionEnvironmentTest is BaseTest {
 
     function _unsetLocks() internal {
         vm.store(address(atlas), bytes32(lockSlot), bytes32(uint256(uint160(address(1)))));
+        vm.store(address(atlas), bytes32(activeUserSlot), bytes32(uint256(uint160(address(1)))));
+        vm.store(address(atlas), bytes32(activeControlSlot), bytes32(uint256(uint160(address(1)))));
+        vm.store(address(atlas), bytes32(activeCallConfigSlot), bytes32(uint256(1)));
+
         vm.store(address(atlas), bytes32(solverLockSlot), bytes32(uint256(1)));
         vm.store(address(atlas), bytes32(depositsSlot), bytes32(uint256(type(uint256).max)));
         vm.store(address(atlas), bytes32(claimsSlot), bytes32(uint256(type(uint256).max)));
@@ -91,8 +126,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.stopPrank();
 
         vm.prank(user);
-        executionEnvironment =
-            ExecutionEnvironment(payable(IFactory(address(atlas)).createExecutionEnvironment(address(dAppControl))));
+        executionEnvironment = ExecutionEnvironment(payable(atlas.createExecutionEnvironment(address(dAppControl))));
     }
 
     function test_modifier_validUser() public {
@@ -105,10 +139,10 @@ contract ExecutionEnvironmentTest is BaseTest {
         userOp.to = address(atlas);
         escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
         preOpsData = abi.encodeCall(ExecutionEnvironment.preOpsWrapper, userOp);
-        preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
+        preOpsData = abi.encodePacked(preOpsData, escrowKey.pack(), user, address(dAppControl), callConfigNum); //TODO improve
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(preOpsData);
-        assertTrue(status);
+        assertTrue(status, "Not valid as expected");
 
         // InvalidUser
         userOp.from = invalid; // Invalid from
@@ -677,14 +711,13 @@ contract MockDAppControl is DAppControl {
         return new bytes(0);
     }
 
-    function _postOpsCall(UserOperation calldata userOp, bool, bytes calldata data) internal pure override returns (bool) {
+    function _postOpsCall(bool, bytes calldata data) internal pure override returns (bool) {
         (bool shouldRevert, bool returnValue) = abi.decode(data, (bool, bool));
         require(!shouldRevert, "_postSolverCall revert requested");
         return returnValue;
     }
 
     function _preSolverCall(
-        UserOperation calldata userOp,
         SolverOperation calldata,
         bytes calldata returnData
     )
@@ -699,7 +732,6 @@ contract MockDAppControl is DAppControl {
     }
 
     function _postSolverCall(
-        UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         bytes calldata returnData
     )
@@ -713,7 +745,7 @@ contract MockDAppControl is DAppControl {
         return returnValue;
     }
 
-    function _allocateValueCall(UserOperation calldata userOp, address, uint256, bytes calldata data) internal virtual override {
+    function _allocateValueCall(address, uint256, bytes calldata data) internal virtual override {
         (bool shouldRevert) = abi.decode(data, (bool));
         require(!shouldRevert, "_allocateValueCall revert requested");
     }

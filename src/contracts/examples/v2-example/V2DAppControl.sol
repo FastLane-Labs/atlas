@@ -114,15 +114,7 @@ contract V2DAppControl is DAppControl {
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(
-        UserOperation calldata userOp,
-        address,
-        uint256 bidAmount,
-        bytes calldata
-    )
-        internal
-        override
-    {
+    function _allocateValueCall(address, uint256 bidAmount, bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow

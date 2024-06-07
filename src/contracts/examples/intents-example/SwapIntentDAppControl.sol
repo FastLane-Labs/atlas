@@ -131,7 +131,6 @@ contract SwapIntentDAppControl is DAppControl {
     * @return true if the transfer was successful, false otherwise
     */
     function _preSolverCall(
-        UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         bytes calldata returnData
     )
@@ -160,15 +159,7 @@ contract SwapIntentDAppControl is DAppControl {
     * @param returnData The return data from the user operation (swap data)
     * @return true if the transfer was successful, false otherwise
     */
-    function _postSolverCall(
-        UserOperation calldata userOp,
-        SolverOperation calldata,
-        bytes calldata returnData
-    )
-        internal
-        override
-        returns (bool)
-    {
+    function _postSolverCall(SolverOperation calldata, bytes calldata returnData) internal override returns (bool) {
         SwapData memory swapData = abi.decode(returnData, (SwapData));
         uint256 buyTokenBalance = ERC20(swapData.tokenUserBuys).balanceOf(address(this));
 
@@ -196,15 +187,7 @@ contract SwapIntentDAppControl is DAppControl {
     * @param _
     * @param _
     */
-    function _allocateValueCall(
-        UserOperation calldata userOp,
-        address bidToken,
-        uint256,
-        bytes calldata
-    )
-        internal
-        override
-    {
+    function _allocateValueCall(address bidToken, uint256, bytes calldata) internal override {
         if (bidToken != address(0)) {
             ERC20(bidToken).safeTransfer(_user(), ERC20(bidToken).balanceOf(address(this)));
         } else {

@@ -164,15 +164,7 @@ contract V2RewardDAppControl is DAppControl {
     * @param bidToken The address of the token used for the winning SolverOperation's bid
     * @param bidAmount The winning bid amount
     */
-    function _allocateValueCall(
-        UserOperation calldata userOp,
-        address bidToken,
-        uint256 bidAmount,
-        bytes calldata
-    )
-        internal
-        override
-    {
+    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
         require(bidToken == REWARD_TOKEN, "V2RewardDAppControl: InvalidBidToken");
 
         if (bidAmount == 0) {
@@ -199,7 +191,7 @@ contract V2RewardDAppControl is DAppControl {
         _preOpsCall hook
     * @return Boolean indicating whether the postOpsCall was successful
     */
-    function _postOpsCall(UserOperation calldata userOp, bool, bytes calldata data) internal override returns (bool) {
+    function _postOpsCall(bool, bytes calldata data) internal override returns (bool) {
         address tokenSold = abi.decode(data, (address));
         uint256 balance;
 

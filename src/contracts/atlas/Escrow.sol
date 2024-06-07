@@ -426,7 +426,7 @@ abstract contract Escrow is AtlETH {
     /// @param data Base hook calldata.
     /// @param lockBytes The packed bytes form of the current EscrowKey state.
     function _appendPackedCalldata(bytes memory data, bytes memory lockBytes) internal view returns (bytes memory) {
-        return abi.encodePacked(data, lockBytes, activeUser, activeControl, activeCallConfig);
+        return abi.encodePacked(data, lockBytes, activeUser, activeControl, uint32(activeCallConfig));
     }
 
     /// @notice Wraps the execution of a SolverOperation and handles potential errors.
