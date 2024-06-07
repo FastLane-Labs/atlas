@@ -169,7 +169,7 @@ abstract contract GasAccounting is SafetyLocks {
                 aData.lastAccessedBlock = uint32(block.number);
             }
 
-            _updateAnalytics(aData, amount, solverWon, bidFind);
+            _updateAnalytics(aData, amt, solverWon, bidFind);
 
             accessData[owner] = aData;
 
