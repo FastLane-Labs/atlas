@@ -60,8 +60,9 @@ contract OEVTest is BaseTest {
     function setUp() public virtual override {
         BaseTest.setUp();
         vm.rollFork(forkBlock);
+        vm.deal(solverOneEOA, 100e18);
 
-        // Creating new gov address (ERR-V49 OwnerActive if already registered with control)
+        // Creating new gov address (SignatoryActive error if already registered with control)
         uint256 chainlinkGovPK = 11_112;
         uint256 aaveGovPK = 11_113;
         chainlinkGovEOA = vm.addr(chainlinkGovPK);
@@ -300,10 +301,15 @@ contract OEVTest is BaseTest {
 
         assertEq(chainlinkAtlasWrapper.atlasLatestAnswer(), 0, "Wrapper stored latestAnswer should still be 0");
 
+        // Check transmit reverts if rs and ss arrays are not the same length
+        vm.prank(executionEnvironment);
+        vm.expectRevert(ChainlinkAtlasWrapper.ArrayLengthMismatch.selector);
+        chainlinkAtlasWrapper.transmit(transmitData.report, new bytes32[](0), transmitData.ss, transmitData.rawVs);
+
         // Check that transmit reverts if quorum is not met (uses rs array length for sig count)
         vm.prank(executionEnvironment);
         vm.expectRevert(ChainlinkAtlasWrapper.SignerVerificationFailed.selector);
-        chainlinkAtlasWrapper.transmit(transmitData.report, new bytes32[](0), transmitData.ss, transmitData.rawVs);
+        chainlinkAtlasWrapper.transmit(transmitData.report, new bytes32[](0), new bytes32[](0), transmitData.rawVs);
 
         vm.prank(executionEnvironment);
         chainlinkAtlasWrapper.transmit(transmitData.report, transmitData.rs, transmitData.ss, transmitData.rawVs);

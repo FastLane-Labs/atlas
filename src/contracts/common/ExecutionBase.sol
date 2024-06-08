@@ -232,7 +232,6 @@ contract ExecutionBase is Base {
     // Deposit local funds to the transient Atlas balance
     // NOTE that this will go towards the Bundler, with the surplus going to the Solver.
     function _contribute(uint256 amt) internal {
-        if (msg.sender != ATLAS) revert AtlasErrors.OnlyAtlas();
         if (amt > address(this).balance) revert AtlasErrors.InsufficientLocalFunds();
 
         IEscrow(ATLAS).contribute{ value: amt }();
@@ -240,22 +239,14 @@ contract ExecutionBase is Base {
 
     // Borrow funds from the transient Atlas balance that will be repaid by the Solver (or self via another deposit)
     function _borrow(uint256 amt) internal {
-        if (msg.sender != ATLAS) revert AtlasErrors.OnlyAtlas();
-
         IEscrow(ATLAS).borrow(amt);
     }
 
     function _transferUserERC20(address token, address destination, uint256 amount) internal {
-        if (msg.sender != ATLAS) {
-            revert AtlasErrors.OnlyAtlas();
-        }
         IPermit69(ATLAS).transferUserERC20(token, destination, amount, _lockState());
     }
 
     function _transferDAppERC20(address token, address destination, uint256 amount) internal {
-        if (msg.sender != ATLAS) {
-            revert AtlasErrors.OnlyAtlas();
-        }
         IPermit69(ATLAS).transferDAppERC20(token, destination, amount, _lockState());
     }
 

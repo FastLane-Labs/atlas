@@ -64,19 +64,6 @@ contract Sorter {
         view
         returns (bool)
     {
-        // Verify that the solver submitted the correct userOpHash
-        bytes32 userOpHash;
-
-        if (dConfig.callConfig.allowsTrustedOpHash()) {
-            userOpHash = userOp.getAltOperationHash();
-        } else {
-            userOpHash = userOp.getUserOperationHash();
-        }
-
-        if (solverOp.userOpHash != userOpHash) {
-            return false;
-        }
-
         // Make sure the solver has enough funds bonded
         uint256 solverBalance = IAtlETH(atlas).balanceOfBonded(solverOp.from);
         if (solverBalance < solverOp.maxFeePerGas * solverOp.gas) {
@@ -116,9 +103,15 @@ contract Sorter {
 
         SortingData[] memory sortingData = new SortingData[](count);
 
+        bytes32 userOpHash =
+            dConfig.callConfig.allowsTrustedOpHash() ? userOp.getAltOperationHash() : userOp.getUserOperationHash();
+
         uint256 invalid;
         for (uint256 i; i < count; ++i) {
-            if (_verifyBidFormat(bidToken, solverOps[i]) && _verifySolverEligibility(dConfig, userOp, solverOps[i])) {
+            if (
+                solverOps[i].userOpHash == userOpHash && _verifyBidFormat(bidToken, solverOps[i])
+                    && _verifySolverEligibility(dConfig, userOp, solverOps[i])
+            ) {
                 sortingData[i] =
                     SortingData({ amount: IDAppControl(dConfig.to).getBidValue(solverOps[i]), valid: true });
             } else {
@@ -146,22 +139,27 @@ contract Sorter {
             return sorted;
         }
 
-        uint256 topBidAmount;
-        uint256 topBidIndex;
+        int256 topBidAmount;
+        int256 topBidIndex;
 
         for (uint256 i; i < sorted.length; ++i) {
-            topBidAmount = 0;
-            topBidIndex = 0;
+            topBidAmount = -1;
+            topBidIndex = -1;
 
             for (uint256 j; j < count; ++j) {
-                if (sortingData[j].valid && sortingData[j].amount >= topBidAmount) {
-                    topBidAmount = sortingData[j].amount;
-                    topBidIndex = j;
+                if (sortingData[j].valid && int256(sortingData[j].amount) > topBidAmount) {
+                    topBidAmount = int256(sortingData[j].amount);
+                    topBidIndex = int256(j);
                 }
             }
 
-            sortingData[topBidIndex].valid = false;
-            sorted[i] = topBidIndex;
+            if (topBidIndex == -1) {
+                // all indices in sorting data are invalid
+                break;
+            }
+
+            sortingData[uint256(topBidIndex)].valid = false;
+            sorted[i] = uint256(topBidIndex);
         }
 
         return sorted;

@@ -60,8 +60,9 @@ contract OEVTest is BaseTest {
     function setUp() public virtual override {
         BaseTest.setUp();
         vm.rollFork(forkBlock);
+        vm.deal(solverOneEOA, 100e18);
 
-        // Creating new gov address (ERR-V49 OwnerActive if already registered with control)
+        // Creating new gov address (SignatoryActive error if already registered with control)
         uint256 chainlinkGovPK = 11_112;
         uint256 aaveGovPK = 11_113;
         chainlinkGovEOA = vm.addr(chainlinkGovPK);

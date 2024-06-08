@@ -135,7 +135,7 @@ contract ExPostTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
         (simSuccess, simResult,) = simulator.simSolverCall(userOp, solverOps[0], dAppOp);
-        assertTrue(simSuccess, "solverOps[0] should succeed in simulator");
+        assertEq(simSuccess, false, "solverOps[0] should fail in sim due to swap path");
 
         // Simulate the second SolverOp
         tempSolverOps[0] = solverOps[1];
@@ -143,7 +143,7 @@ contract ExPostTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
         (simSuccess, simResult,) = simulator.simSolverCall(userOp, solverOps[1], dAppOp);
-        assertEq(simSuccess, false, "solverOps[1] should fail in sim due to swap path");
+        assertEq(simSuccess, true, "solverOps[1] should succeed in simulator");
 
         // Simulate all SolverOps together
         dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);

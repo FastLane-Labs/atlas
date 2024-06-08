@@ -3,12 +3,13 @@ pragma solidity 0.8.22;
 
 import { EIP712 } from "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 import { ECDSA } from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
-import { DAppIntegration } from "./DAppIntegration.sol";
+import { DAppIntegration } from "src/contracts/atlas/DAppIntegration.sol";
 
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import { AtlasConstants } from "src/contracts/types/AtlasConstants.sol";
 import "src/contracts/types/SolverCallTypes.sol";
 import "src/contracts/types/UserCallTypes.sol";
 import "src/contracts/types/DAppApprovalTypes.sol";
@@ -19,16 +20,10 @@ import "src/contracts/types/ValidCallsTypes.sol";
 /// @author FastLane Labs
 /// @notice AtlasVerification handles the verification of DAppConfigs, UserOperations, SolverOperations, and
 /// DAppOperations within a metacall to ensure that calldata sourced from various parties is safe and valid.
-contract AtlasVerification is EIP712, DAppIntegration {
+contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
     using ECDSA for bytes32;
     using CallBits for uint32;
     using CallVerification for UserOperation;
-
-    uint256 internal constant _FULL_BITMAP = uint256(0x0000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF);
-    uint256 internal constant _FIRST_16_BITS_FULL = uint256(0xFFFF);
-    uint256 internal constant _FIRST_4_BITS_FULL = uint256(0xF);
-    uint256 internal constant _NONCES_PER_BITMAP = 240;
-    uint8 internal constant _MAX_SOLVERS = type(uint8).max - 2;
 
     constructor(address _atlas) EIP712("AtlasVerification", "1.0") DAppIntegration(_atlas) { }
 
@@ -107,26 +102,27 @@ contract AtlasVerification is EIP712, DAppIntegration {
         {
             // bypassSignatoryApproval still verifies signature match, but does not check
             // if dApp owner approved the signor.
-            (bool validAuctioneer, bool bypassSignatoryApproval) =
+            (ValidCallsResult verifyAuctioneerResult, bool bypassSignatoryApproval) =
                 _verifyAuctioneer(dConfig, userOp, solverOps, dAppOp, msgSender);
 
-            if (!validAuctioneer && !isSimulation) {
-                return (userOpHash, ValidCallsResult.InvalidAuctioneer);
+            if (verifyAuctioneerResult != ValidCallsResult.Valid && !isSimulation) {
+                return (userOpHash, verifyAuctioneerResult);
             }
 
             // Check dapp signature
-            (bool validDAppOp, ValidCallsResult result) =
+            ValidCallsResult verifyDappResult =
                 _verifyDApp(dConfig, dAppOp, msgSender, bypassSignatoryApproval, isSimulation);
-            if (!validDAppOp) {
-                return (userOpHash, result);
+            if (verifyDappResult != ValidCallsResult.Valid) {
+                return (userOpHash, verifyDappResult);
             }
 
             // Check user signature
-            if (!_verifyUser(dConfig, userOp, msgSender, isSimulation)) {
-                return (userOpHash, ValidCallsResult.UserSignatureInvalid);
+            ValidCallsResult verifyUserResult = _verifyUser(dConfig, userOp, msgSender, isSimulation);
+            if (verifyUserResult != ValidCallsResult.Valid) {
+                return (userOpHash, verifyUserResult);
             }
 
-            // Check solvers not over the max (253)
+            // Check number of solvers not greater than max, to prevent overflows in `callIndex`
             if (solverOpCount > _MAX_SOLVERS) {
                 return (userOpHash, ValidCallsResult.TooManySolverOps);
             }
@@ -232,7 +228,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @param solverOps An array of SolverOperation structs.
     /// @param dAppOp The DAppOperation struct of the metacall.
     /// @param msgSender The bundler (msg.sender) of the metacall transaction in the Atlas contract.
-    /// @return valid A boolean indicating if the auctioneer is valid.
+    /// @return validCallsResult The result of the ValidCalls check, in enum ValidCallsResult form.
     /// @return bypassSignatoryApproval A boolean indicating if the signatory approval check should be bypassed.
     function _verifyAuctioneer(
         DAppConfig calldata dConfig,
@@ -243,14 +239,16 @@ contract AtlasVerification is EIP712, DAppIntegration {
     )
         internal
         pure
-        returns (bool valid, bool bypassSignatoryApproval)
+        returns (ValidCallsResult validCallsResult, bool bypassSignatoryApproval)
     {
         if (
             dConfig.callConfig.verifyCallChainHash()
                 && dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps)
-        ) return (false, false);
+        ) return (ValidCallsResult.InvalidCallChainHash, false);
 
-        if (dConfig.callConfig.allowsUserAuctioneer() && dAppOp.from == userOp.sessionKey) return (true, true);
+        if (dConfig.callConfig.allowsUserAuctioneer() && dAppOp.from == userOp.sessionKey) {
+            return (ValidCallsResult.Valid, true);
+        }
 
         if (dConfig.callConfig.allowsSolverAuctioneer() && solverOps.length > 0) {
             // If the solver is the auctioneer, there must be exactly 1 solver
@@ -258,21 +256,21 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 if (solverOps.length != 1) {
                     // If not exactly one solver and first solver is auctioneer
                     // => invalid
-                    return (false, false);
+                    return (ValidCallsResult.TooManySolverOps, false);
                 } else if (msgSender == solverOps[0].from) {
                     // If exactly one solver AND that solver is auctioneer,
                     // AND the solver is also the bundler,
                     // => valid AND bypass sig approval
-                    return (true, true);
+                    return (ValidCallsResult.Valid, true);
                 }
             }
             // If first solver is not the auctioneer,
             // => valid BUT do not bypass sig approval
         }
 
-        if (dConfig.callConfig.allowsUnknownAuctioneer()) return (true, true);
+        if (dConfig.callConfig.allowsUnknownAuctioneer()) return (ValidCallsResult.Valid, true);
 
-        return (true, false);
+        return (ValidCallsResult.Valid, false);
     }
 
     /// @notice The getSolverPayload function returns the hash of a SolverOperation struct.
@@ -324,7 +322,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @param msgSender The forwarded msg.sender of the original metacall transaction in the Atlas contract.
     /// @param bypassSignatoryApproval Boolean indicating whether to bypass signatory approval.
     /// @param isSimulation Boolean indicating whether the execution is a simulation.
-    /// @return A boolean indicating if the DAppOperation is valid.
     /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
     function _verifyDApp(
         DAppConfig memory dConfig,
@@ -334,18 +331,18 @@ contract AtlasVerification is EIP712, DAppIntegration {
         bool isSimulation
     )
         internal
-        returns (bool, ValidCallsResult)
+        returns (ValidCallsResult)
     {
-        if (dAppOp.to != ATLAS) return (false, ValidCallsResult.DAppToInvalid);
+        if (dAppOp.to != ATLAS) return ValidCallsResult.DAppToInvalid;
 
         bool bypassSignature = msgSender == dAppOp.from || (isSimulation && dAppOp.signature.length == 0);
 
         if (!bypassSignature && !_verifyDAppSignature(dAppOp)) {
-            return (false, ValidCallsResult.DAppSignatureInvalid);
+            return ValidCallsResult.DAppSignatureInvalid;
         }
 
         if (dAppOp.control != dConfig.to) {
-            return (false, ValidCallsResult.InvalidControl);
+            return ValidCallsResult.InvalidControl;
         }
 
         // Some checks skipped if call is `simUserOperation()`, because the dAppOp struct is not available.
@@ -360,28 +357,28 @@ contract AtlasVerification is EIP712, DAppIntegration {
             // When not in a simulation, nonces are stored even if the metacall fails, to prevent replay attacks.
             if (!_handleNonces(dAppOp.from, dAppOp.nonce, dConfig.callConfig.needsSequentialDAppNonces(), isSimulation))
             {
-                return (false, ValidCallsResult.InvalidDAppNonce);
+                return ValidCallsResult.InvalidDAppNonce;
             }
         }
 
         // If `_verifyAuctioneer()` allows bypassing signatory approval, the checks below are skipped and we can return
         // Valid here, considering the checks above have all passed.
-        if (bypassSignatoryApproval) return (true, ValidCallsResult.Valid);
+        if (bypassSignatoryApproval) return ValidCallsResult.Valid;
 
         // Check actual bundler matches the dApp's intended `dAppOp.bundler`
         // If bundler and auctioneer are the same address, this check is skipped
         if (dAppOp.bundler != address(0) && msgSender != dAppOp.bundler) {
             if (!skipDAppOpChecks && !_isDAppSignatory(dAppOp.control, msgSender)) {
-                return (false, ValidCallsResult.InvalidBundler);
+                return ValidCallsResult.InvalidBundler;
             }
         }
 
         // Make sure the signer is currently enabled by dapp owner
         if (!skipDAppOpChecks && !_isDAppSignatory(dAppOp.control, dAppOp.from)) {
-            return (false, ValidCallsResult.DAppSignatureInvalid);
+            return ValidCallsResult.DAppSignatureInvalid;
         }
 
-        return (true, ValidCallsResult.Valid);
+        return ValidCallsResult.Valid;
     }
 
     /// @notice The _handleNonces internal function handles the verification of nonces for both sequential and
@@ -547,7 +544,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @param userOp The UserOperation struct to verify.
     /// @param msgSender The forwarded msg.sender of the original metacall transaction in the Atlas contract.
     /// @param isSimulation A boolean indicating if the call is a simulation.
-    /// @return A boolean indicating if the UserOperation is valid.
+    /// @return The result of the UserOperation verification, in enum ValidCallsResult form.
     function _verifyUser(
         DAppConfig memory dConfig,
         UserOperation calldata userOp,
@@ -555,7 +552,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
         bool isSimulation
     )
         internal
-        returns (bool)
+        returns (ValidCallsResult)
     {
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp userNonces
@@ -563,21 +560,24 @@ contract AtlasVerification is EIP712, DAppIntegration {
         if (userOp.from.code.length > 0) {
             // TODO: not sure if 30k gas limit is accurate
             if (userOp.from == address(this) || userOp.from == ATLAS || userOp.from == userOp.control) {
-                return false;
+                return ValidCallsResult.UserFromInvalid;
             }
             bool validSmartWallet =
                 IAccount(userOp.from).validateUserOp{ gas: 30_000 }(userOp, _getUserOpHash(userOp), 0) == 0;
-            return validSmartWallet;
+            if (!validSmartWallet) {
+                return ValidCallsResult.UserSmartWalletInvalid;
+            }
+            return ValidCallsResult.Valid;
         }
 
         bool bypassSignature = msgSender == userOp.from || (isSimulation && userOp.signature.length == 0);
 
         if (!bypassSignature && !_verifyUserSignature(userOp)) {
-            return false;
+            return ValidCallsResult.UserSignatureInvalid;
         }
 
         if (userOp.control != dConfig.to) {
-            return false;
+            return ValidCallsResult.ControlMismatch;
         }
 
         // If the dapp indicated that they only accept sequential userNonces
@@ -587,10 +587,10 @@ contract AtlasVerification is EIP712, DAppIntegration {
         // DApps are encouraged to rely on the deadline parameter
         // to prevent replay attacks.
         if (!_handleNonces(userOp.from, userOp.nonce, dConfig.callConfig.needsSequentialUserNonces(), isSimulation)) {
-            return false;
+            return ValidCallsResult.UserNonceInvalid;
         }
 
-        return true;
+        return ValidCallsResult.Valid;
     }
 
     /// @notice Generates the hash of a UserOperation struct.
@@ -704,14 +704,14 @@ contract AtlasVerification is EIP712, DAppIntegration {
 
         for (uint256 i = 0; i < 240; i += 16) {
             // Isolate the next 16 bits to check
-            uint256 chunk16 = (bitmap >> i) & _FIRST_16_BITS_FULL;
+            uint256 chunk16 = (bitmap >> i) & _FIRST_16_BITS_TRUE_MASK;
             // Find non-full 16-bit chunk
-            if (chunk16 != _FIRST_16_BITS_FULL) {
+            if (chunk16 != _FIRST_16_BITS_TRUE_MASK) {
                 for (uint256 j = 0; j < 16; j += 4) {
                     // Isolate the next 4 bits within the 16-bit chunk to check
-                    uint256 chunk4 = (chunk16 >> j) & _FIRST_4_BITS_FULL;
+                    uint256 chunk4 = (chunk16 >> j) & _FIRST_4_BITS_TRUE_MASK;
                     // Find non-full 4-bit chunk
-                    if (chunk4 != _FIRST_4_BITS_FULL) {
+                    if (chunk4 != _FIRST_4_BITS_TRUE_MASK) {
                         for (uint256 k = 0; k < 4; k++) {
                             // Find first unused bit
                             if ((chunk4 >> k) & 0x1 == 0) {

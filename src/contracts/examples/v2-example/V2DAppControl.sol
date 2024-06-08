@@ -20,6 +20,7 @@ import { DAppControl } from "../../dapp/DAppControl.sol";
 
 // Uni V2 Imports
 import { IUniswapV2Pair } from "./interfaces/IUniswapV2Pair.sol";
+import { IUniswapV2Factory } from "./interfaces/IUniswapV2Factory.sol";
 
 // Misc
 import { SwapMath } from "./SwapMath.sol";
@@ -86,6 +87,12 @@ contract V2DAppControl is DAppControl {
     function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory) {
         require(bytes4(userOp.data) == SWAP, "ERR-H10 InvalidFunction");
 
+        require(
+            IUniswapV2Factory(IUniswapV2Pair(userOp.dapp).factory()).getPair(
+                IUniswapV2Pair(userOp.dapp).token0(), IUniswapV2Pair(userOp.dapp).token1()
+            ) == userOp.dapp,
+            "ERR-H11 Invalid pair"
+        );
         (
             uint256 amount0Out,
             uint256 amount1Out,
@@ -123,17 +130,15 @@ contract V2DAppControl is DAppControl {
 
         (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).getReserves();
 
-        ERC20(WETH).transfer(WETH_X_GOVERNANCE_POOL, bidAmount);
+        SafeTransferLib.safeTransfer(ERC20(WETH), WETH_X_GOVERNANCE_POOL, bidAmount);
 
         uint256 amount0Out;
         uint256 amount1Out;
 
         if (govIsTok0) {
-            amount0Out = ((997_000 * bidAmount) * uint256(token0Balance))
-                / ((uint256(token1Balance) * 1_000_000) + (997_000 * bidAmount));
+            SwapMath.getAmountOut(bidAmount, uint256(token1Balance), uint256(token0Balance));
         } else {
-            amount1Out = ((997_000 * bidAmount) * uint256(token1Balance))
-                / (((uint256(token0Balance) * 1_000_000) + (997_000 * bidAmount)));
+            SwapMath.getAmountOut(bidAmount, uint256(token0Balance), uint256(token1Balance));
         }
 
         bytes memory nullBytes;
@@ -145,7 +150,7 @@ contract V2DAppControl is DAppControl {
         // ENABLE FOR FOUNDRY TESTING
         console.log("----====++++====----");
         console.log("DApp Control");
-        console.log("Governance Tokens Burned:", govIsTok0 ? amount0Out : amount1Out);
+        console.log("Governance Tokens Sent to user:", govIsTok0 ? amount0Out : amount1Out);
         console.log("----====++++====----");
         */
     }

@@ -101,6 +101,9 @@ library SafetyBits {
     {
         self.lockState = _LOCK_PAYMENTS;
         self.addressPointer = addressPointer;
+        unchecked {
+            ++self.callIndex;
+        }
         return self;
     }
 
