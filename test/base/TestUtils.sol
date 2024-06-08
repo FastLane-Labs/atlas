@@ -2,7 +2,6 @@
 pragma solidity 0.8.22;
 
 import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
-import { Mimic } from "src/contracts/atlas/Mimic.sol";
 
 import "src/contracts/types/UserCallTypes.sol";
 import "src/contracts/types/SolverCallTypes.sol";

@@ -185,7 +185,7 @@ contract OEVTest is BaseTest {
         vm.prank(userEOA);
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
 
-        console.log("OEV Metacall Gas Cost:", gasLeftBefore - gasleft());
+        console.log("Metacall Tx Gas Cost:", gasLeftBefore - gasleft());
 
         assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), targetOracleAnswer, "Wrapper did not update as expected");
         assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) != uint(AggregatorV2V3Interface(chainlinkETHUSD).latestAnswer()), "Wrapper and base feed should report different answers");

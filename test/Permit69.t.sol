@@ -9,7 +9,6 @@ import { BaseTest } from "./base/BaseTest.t.sol";
 import "./base/TestUtils.sol";
 
 import { Permit69 } from "src/contracts/common/Permit69.sol";
-import { Mimic } from "src/contracts/atlas/Mimic.sol";
 
 import { EXECUTION_PHASE_OFFSET } from "src/contracts/libraries/SafetyBits.sol";
 import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "src/contracts/common/Permit69.sol";

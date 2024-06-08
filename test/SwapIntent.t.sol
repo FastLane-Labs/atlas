@@ -192,7 +192,7 @@ contract SwapIntentTest is BaseTest {
 
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
 
-        console.log("OEV Metacall Gas Cost:", gasLeftBefore - gasleft());
+        console.log("Metacall Tx Gas Cost:", gasLeftBefore - gasleft());
         vm.stopPrank();
 
         console.log("\nAFTER METACALL");
