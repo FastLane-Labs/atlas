@@ -23,11 +23,8 @@ interface IExecutionEnvironment {
 
     function allocateValue(address bidToken, uint256 bidAmount, bytes memory returnData) external;
 
-    // function getUser() external pure returns (address user);
-    // function getControl() external pure returns (address control);
-    // function getConfig() external pure returns (uint32 config);
     function getEscrow() external view returns (address escrow);
 
-    function withdrawERC20(address token, uint256 amount) external;
-    function withdrawEther(uint256 amount) external;
+    function withdrawERC20(address token, uint256 amount, address control, uint32 callConfig) external;
+    function withdrawEther(uint256 amount, address control, uint32 callConfig) external;
 }

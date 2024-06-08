@@ -109,7 +109,7 @@ contract OEVTest is BaseTest {
     //                  Full OEV Capture Test               //
     // ---------------------------------------------------- //
 
-    function testChainlinkOEV() public {
+    function testChainlinkOEV_StandardVersion() public {
         UserOperation memory userOp;
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         DAppOperation memory dAppOp;

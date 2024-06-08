@@ -366,7 +366,6 @@ contract ExecutionEnvironmentTest is BaseTest {
     }
 
     function test_postOpsWrapper() public {
-        UserOperation memory userOp;
         bytes memory postOpsData;
         bool status;
 
@@ -409,8 +408,6 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         vm.prank(solver);
         MockSolverContract solverContract = new MockSolverContract(chain.weth, address(atlas));
-
-        UserOperation memory userOp;
 
         SolverOperation memory solverOp;
         solverOp.from = solver;
@@ -571,7 +568,6 @@ contract ExecutionEnvironmentTest is BaseTest {
     }
 
     function test_allocateValue() public {
-        UserOperation memory userOp;
         bytes memory allocateData;
         bool status;
 
@@ -602,19 +598,29 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertEq(ERC20(chain.weth).balanceOf(address(executionEnvironment)), 2e18);
         assertEq(ERC20(chain.weth).balanceOf(user), 0);
         vm.prank(user);
-        executionEnvironment.withdrawERC20(chain.weth, 2e18);
+        executionEnvironment.withdrawERC20(chain.weth, 2e18, address(dAppControl), 0);
         assertEq(ERC20(chain.weth).balanceOf(address(executionEnvironment)), 0);
         assertEq(ERC20(chain.weth).balanceOf(user), 2e18);
 
         // NotEnvironmentOwner
         vm.prank(invalid); // Invalid caller
         vm.expectRevert(AtlasErrors.NotEnvironmentOwner.selector);
-        executionEnvironment.withdrawERC20(chain.weth, 2e18);
+        executionEnvironment.withdrawERC20(chain.weth, 2e18, address(dAppControl), 0);
+
+        // Incorrect DAppControl address
+        vm.prank(user);
+        vm.expectRevert(AtlasErrors.NotEnvironmentOwner.selector);
+        executionEnvironment.withdrawERC20(chain.weth, 2e18, address(1), 0);
+
+        // Incorrect CallConfig
+        vm.prank(user);
+        vm.expectRevert(AtlasErrors.NotEnvironmentOwner.selector);
+        executionEnvironment.withdrawERC20(chain.weth, 2e18, address(dAppControl), 123);
 
         // BalanceTooLow
         vm.prank(user);
         vm.expectRevert(AtlasErrors.ExecutionEnvironmentBalanceTooLow.selector);
-        executionEnvironment.withdrawERC20(chain.weth, 2e18);
+        executionEnvironment.withdrawERC20(chain.weth, 2e18, address(dAppControl), 0);
 
         // The following line changes an Atlas storage value in order to make the test succeed.
         // lock value is normally initialized in the _initializeEscrowLock function,
@@ -628,7 +634,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         // EscrowLocked
         vm.prank(user);
         vm.expectRevert(AtlasErrors.AtlasLockActive.selector);
-        executionEnvironment.withdrawERC20(chain.weth, 2e18);
+        executionEnvironment.withdrawERC20(chain.weth, 2e18, address(dAppControl), 0);
     }
 
     function test_withdrawEther() public {
@@ -637,19 +643,29 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertEq(address(executionEnvironment).balance, 2e18);
         assertEq(user.balance, 0);
         vm.prank(user);
-        executionEnvironment.withdrawEther(2e18);
+        executionEnvironment.withdrawEther(2e18, address(dAppControl), 0);
         assertEq(address(executionEnvironment).balance, 0);
         assertEq(user.balance, 2e18);
 
         // NotEnvironmentOwner
         vm.prank(address(0)); // Invalid caller
         vm.expectRevert(AtlasErrors.NotEnvironmentOwner.selector);
-        executionEnvironment.withdrawEther(2e18);
+        executionEnvironment.withdrawEther(2e18, address(dAppControl), 0);
+
+        // Incorrect DAppControl address
+        vm.prank(user);
+        vm.expectRevert(AtlasErrors.NotEnvironmentOwner.selector);
+        executionEnvironment.withdrawEther(2e18, address(1), 0);
+
+        // Incorrect CallConfig
+        vm.prank(user);
+        vm.expectRevert(AtlasErrors.NotEnvironmentOwner.selector);
+        executionEnvironment.withdrawEther(2e18, address(dAppControl), 123);
 
         // BalanceTooLow
         vm.prank(user);
         vm.expectRevert(AtlasErrors.ExecutionEnvironmentBalanceTooLow.selector);
-        executionEnvironment.withdrawEther(2e18);
+        executionEnvironment.withdrawEther(2e18, address(dAppControl), 0);
 
         // The following line changes an Atlas storage value in order to make the test succeed.
         // lock value is normally initialized in the _initializeEscrowLock function,
@@ -663,13 +679,12 @@ contract ExecutionEnvironmentTest is BaseTest {
         // EscrowLocked
         vm.prank(user);
         vm.expectRevert(AtlasErrors.AtlasLockActive.selector);
-        executionEnvironment.withdrawEther(2e18);
+        executionEnvironment.withdrawEther(2e18, address(dAppControl), 0);
     }
 
     function test_getEscrow() public {
         assertEq(executionEnvironment.getEscrow(), address(atlas));
     }
-
 
     // Packs lockBytes, user address, control address, and callConfig to normal hook calldata the same way as done in Escrow.sol when calling an ExecutionEnvironment hook from Atlas.
     function _appendPackedCalldata(bytes memory data, bytes memory lockBytes) internal view returns (bytes memory) {

@@ -85,7 +85,6 @@ contract AtlasErrors {
 
     // Permit69
     error InvalidEnvironment();
-    error EnvironmentMismatch();
     error NotActiveExecutionEnv();
     error InvalidLockState();
 

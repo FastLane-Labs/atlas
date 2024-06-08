@@ -394,15 +394,24 @@ contract Atlas is Escrow, Factory {
         }
     }
 
-    // TODO remove this if not used for EE token withdraw functions to verify user
-    // NOTE: this is no longer used by Permit69
-    /// @notice Reverts if the caller is not the execution environment address expected from the set of inputs.
-    /// @param user User address
-    /// @param control DAppControl contract address
-    /// @param callConfig CallConfig of the current metacall tx.
-    function _verifyCallerIsExecutionEnv(address user, address control, uint32 callConfig) internal view override {
-        if (msg.sender != _getExecutionEnvironmentCustom(user, control, callConfig)) {
-            revert EnvironmentMismatch();
-        }
+    /// @notice Verifies that the caller is an Execution Environment deployed using Atlas, given specific salt inputs.
+    /// @dev Used by Execution Environments to ensure that only the original user can withdraw ETH or tokens from that
+    /// particular Execution Environment.
+    /// @param user The original `UserOperation.from` address when the Execution Environment was created
+    /// @param control The address of the DAppControl contract associated with the Execution Environment
+    /// @param callConfig The CallConfig of the DAppControl associated with the Execution Environment. NOTE: Must match
+    /// the CallConfig settings as they were when the Execution Environment was created.
+    /// @return bool Indicating whether the caller is the correct Execution Environment (true) or not (false).
+    function verifyCallerIsExecutionEnv(
+        address user,
+        address control,
+        uint32 callConfig
+    )
+        external
+        view
+        override
+        returns (bool)
+    {
+        return msg.sender == _getExecutionEnvironmentCustom(user, control, callConfig);
     }
 }

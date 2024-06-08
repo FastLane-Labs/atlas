@@ -24,4 +24,6 @@ interface IAtlas {
     function activeUser() external view returns (address);
 
     function activeControl() external view returns (address);
+
+    function verifyCallerIsExecutionEnv(address user, address control, uint32 callConfig) external returns (bool);
 }

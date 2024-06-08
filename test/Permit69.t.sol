@@ -31,7 +31,7 @@ contract Permit69Test is BaseTest {
         BaseTest.setUp();
 
         escrowKey = EscrowKey({
-            executionEnvironment: address(0),
+            executionEnvironment: mockExecutionEnvAddress,
             userOpHash: bytes32(0),
             bundler: address(0),
             addressPointer: address(0),
@@ -49,6 +49,8 @@ contract Permit69Test is BaseTest {
         mockAtlas = new MockAtlasForPermit69Tests(10, address(0), address(0), address(0));
         mockAtlas.setEscrowKey(escrowKey);
         mockAtlas.setEnvironment(mockExecutionEnvAddress);
+        mockAtlas.setActiveControl(mockDAppControl);
+        mockAtlas.setActiveUser(userEOA);
 
         deal(WETH_ADDRESS, mockDAppControl, 100e18);
     }
@@ -57,7 +59,7 @@ contract Permit69Test is BaseTest {
 
     function testTransferUserERC20RevertsIsCallerNotExecutionEnv() public {
         vm.prank(solverOneEOA);
-        vm.expectRevert(AtlasErrors.EnvironmentMismatch.selector);
+        vm.expectRevert(AtlasErrors.NotActiveExecutionEnv.selector);
         mockAtlas.transferUserERC20(
             WETH_ADDRESS, solverOneEOA, 10e18, escrowKey.lockState
         );
@@ -117,7 +119,7 @@ contract Permit69Test is BaseTest {
 
     function testTransferDAppERC20RevertsIsCallerNotExecutionEnv() public {
         vm.prank(solverOneEOA);
-        vm.expectRevert(AtlasErrors.EnvironmentMismatch.selector);
+        vm.expectRevert(AtlasErrors.NotActiveExecutionEnv.selector);
         mockAtlas.transferDAppERC20(
             WETH_ADDRESS, solverOneEOA, 10e18, escrowKey.lockState
         );
@@ -258,14 +260,17 @@ contract Permit69Test is BaseTest {
         );
     }
 
-    function testVerifyCallerIsExecutionEnv() public {
-        vm.prank(solverOneEOA);
-        vm.expectRevert(AtlasErrors.EnvironmentMismatch.selector);
-        mockAtlas.verifyCallerIsExecutionEnv(solverOneEOA, userEOA, 0);
+    function testVerifyCallerIsActiveExecutionEnv() public {
+        assertEq(mockAtlas.lock(), mockExecutionEnvAddress, "mockEE must be set as active EE");
 
+        // Should revert when not called by active EE
+        vm.expectRevert(AtlasErrors.NotActiveExecutionEnv.selector);
+        mockAtlas.verifyCallerIsActiveExecutionEnv();
+
+        // Should succeed when called by active EE
         vm.prank(mockExecutionEnvAddress);
-        bool res = mockAtlas.verifyCallerIsExecutionEnv(solverOneEOA, userEOA, 0);
-        assertTrue(res, "Should return true and not revert");
+        bool res = mockAtlas.verifyCallerIsActiveExecutionEnv();
+        assertTrue(res, "Did not return true as expected in success case");
     }
 }
 
@@ -277,8 +282,13 @@ contract MockAtlasForPermit69Tests is Permit69 {
         address _simulator,
         address _surchargeRecipient
     )
-        Permit69(_escrowDuration, _verification, _simulator, _surchargeRecipient)
-    { }
+        Permit69(
+            _escrowDuration,
+            _verification,
+            _simulator,
+            _surchargeRecipient
+        )
+    {}
 
     // Declared in SafetyLocks.sol in the canonical Atlas system
     // The only property relevant to testing Permit69 is _escrowKey.lockState (bitwise uint16)
@@ -305,18 +315,20 @@ contract MockAtlasForPermit69Tests is Permit69 {
 
     function setEnvironment(address _activeEnvironment) public {
         _environment = _activeEnvironment;
+        lock = _activeEnvironment;
     }
 
-    // Overriding the virtual functions in Permit69
-    function _verifyCallerIsExecutionEnv(address, address, uint32) internal view override {
-        if (msg.sender != _environment) {
-            revert AtlasErrors.EnvironmentMismatch();
-        }
+    function setActiveControl(address _activeControl) public {
+        activeControl = _activeControl;
+    }
+
+    function setActiveUser(address _activeUser) public {
+        activeUser = _activeUser;
     }
 
     // Exposing above overridden function for testing and Permit69 coverage
-    function verifyCallerIsExecutionEnv(address user, address control, uint32 callConfig) public view returns (bool) {
-        _verifyCallerIsExecutionEnv(user, control, callConfig);
+    function verifyCallerIsActiveExecutionEnv() public view returns (bool) {
+        _verifyCallerIsActiveExecutionEnv();
         return true; // Added to test lack of revert
     }
 
@@ -324,4 +336,11 @@ contract MockAtlasForPermit69Tests is Permit69 {
     function _getLockState() internal view virtual returns (EscrowKey memory) {
         return _escrowKey;
     }
+
+    // NOTE: this is tested in ExecutionEnvironment.t.sol tests as it pertains to the withdraw functions on EE.
+    function verifyCallerIsExecutionEnv(
+        address user,
+        address control,
+        uint32 callConfig
+    ) external virtual override returns (bool) {}
 }

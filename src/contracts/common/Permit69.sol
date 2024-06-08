@@ -36,15 +36,23 @@ abstract contract Permit69 is GasAccounting {
 
     // TODO read lockState from Atlas transient storage var rather than allowing caller to pass in value
 
-    /// @notice Verifies that the caller is an authorized Execution Environment contract.
-    /// @dev This function is called internally to ensure that the caller is a legitimate Execution Environment contract
-    /// controlled by the current DAppControl contract. It helps prevent unauthorized access and ensures that
-    /// token transfers are performed within the context of Atlas's controlled environment. The implementation of this
-    /// function can be found in Atlas.sol
-    /// @param user The address of the user invoking the function.
-    /// @param control The address of the current DAppControl contract.
-    /// @param callConfig The CallConfig of the DAppControl contract of the current transaction.
-    function _verifyCallerIsExecutionEnv(address user, address control, uint32 callConfig) internal virtual { }
+    /// @notice Verifies that the caller is an Execution Environment deployed using Atlas, given specific salt inputs.
+    /// @dev Used by Execution Environments to ensure that only the original user can withdraw ETH or tokens from that
+    /// particular Execution Environment.
+    /// @dev The implementation of this function can be found in Atlas.sol
+    /// @param user The original `UserOperation.from` address when the Execution Environment was created
+    /// @param control The address of the DAppControl contract associated with the Execution Environment
+    /// @param callConfig The CallConfig of the DAppControl associated with the Execution Environment. NOTE: Must match
+    /// the CallConfig settings as they were when the Execution Environment was created.
+    /// @return bool Indicating whether the caller is the correct Execution Environment (true) or not (false).
+    function verifyCallerIsExecutionEnv(
+        address user,
+        address control,
+        uint32 callConfig
+    )
+        external
+        virtual
+        returns (bool);
 
     /// @notice Transfers ERC20 tokens from the `currentUserFrom` address set at the start of the current metacall tx,
     /// to a destination address, only callable by the expected Execution Environment.

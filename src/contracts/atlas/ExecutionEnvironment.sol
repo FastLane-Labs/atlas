@@ -7,6 +7,7 @@ import { Base } from "src/contracts/common/ExecutionBase.sol";
 import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
 import { ISafetyLocks } from "src/contracts/interfaces/ISafetyLocks.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
 
@@ -345,8 +346,12 @@ contract ExecutionEnvironment is Base, IExecutionEnvironment {
     /// @dev This function is only callable by the environment owner and only when Atlas is in an unlocked state.
     /// @param token The address of the ERC20 token to withdraw.
     /// @param amount The amount of the ERC20 token to withdraw.
-    function withdrawERC20(address token, uint256 amount) external {
-        if (msg.sender != _user()) revert AtlasErrors.NotEnvironmentOwner();
+    /// @param control The DAppControl address associated with this Execution Environment.
+    /// @param callConfig The original CallConfig of the DAppControl at the time this Execution Environment was created.
+    function withdrawERC20(address token, uint256 amount, address control, uint32 callConfig) external {
+        if (!IAtlas(ATLAS).verifyCallerIsExecutionEnv(msg.sender, control, callConfig)) {
+            revert AtlasErrors.NotEnvironmentOwner();
+        }
         if (!ISafetyLocks(ATLAS).isUnlocked()) {
             revert AtlasErrors.AtlasLockActive();
         }
@@ -362,13 +367,12 @@ contract ExecutionEnvironment is Base, IExecutionEnvironment {
     /// Environment.
     /// @dev This function is only callable by the environment owner and only when Atlas is in an unlocked state.
     /// @param amount The amount of Ether to withdraw.
-    function withdrawEther(uint256 amount) external {
-        if (msg.sender != _user()) revert AtlasErrors.NotEnvironmentOwner();
-
-        // TODO security call to Atlas/Permit69 to check if user(msg.sender)/control/callConfig combo given results in
-        // this address using Clones.predictDeterministicAddress
-        // TODO same thing for withdrawERC20
-
+    /// @param control The DAppControl address associated with this Execution Environment.
+    /// @param callConfig The original CallConfig of the DAppControl at the time this Execution Environment was created.
+    function withdrawEther(uint256 amount, address control, uint32 callConfig) external {
+        if (!IAtlas(ATLAS).verifyCallerIsExecutionEnv(msg.sender, control, callConfig)) {
+            revert AtlasErrors.NotEnvironmentOwner();
+        }
         if (!ISafetyLocks(ATLAS).isUnlocked()) {
             revert AtlasErrors.AtlasLockActive();
         }
