@@ -63,7 +63,7 @@ contract ExecutionEnvironment is Base, IExecutionEnvironment {
         bytes memory preOpsData = _forward(abi.encodeCall(IDAppControl.preOpsCall, userOp));
 
         bool success;
-        (success, preOpsData) = userOp.control.delegatecall(preOpsData);
+        (success, preOpsData) = _control().delegatecall(preOpsData);
 
         if (!success) revert AtlasErrors.PreOpsDelegatecallFail();
 
@@ -364,6 +364,11 @@ contract ExecutionEnvironment is Base, IExecutionEnvironment {
     /// @param amount The amount of Ether to withdraw.
     function withdrawEther(uint256 amount) external {
         if (msg.sender != _user()) revert AtlasErrors.NotEnvironmentOwner();
+
+        // TODO security call to Atlas/Permit69 to check if user(msg.sender)/control/callConfig combo given results in
+        // this address using Clones.predictDeterministicAddress
+        // TODO same thing for withdrawERC20
+
         if (!ISafetyLocks(ATLAS).isUnlocked()) {
             revert AtlasErrors.AtlasLockActive();
         }
@@ -374,25 +379,6 @@ contract ExecutionEnvironment is Base, IExecutionEnvironment {
             revert AtlasErrors.ExecutionEnvironmentBalanceTooLow();
         }
     }
-
-    /// @notice The getUser function returns the address of the user of this Execution Environment.
-    /// @return user The address of the user of this Execution Environment.
-    // function getUser() external pure returns (address user) {
-    //     user = _user();
-    // }
-
-    // /// @notice The getControl function returns the address of the DAppControl contract of the current metacall
-    // /// transaction.
-    // /// @return control The address of the DAppControl contract of the current metacall transaction.
-    // function getControl() external pure returns (address control) {
-    //     control = _control();
-    // }
-
-    // /// @notice The getConfig function returns the CallConfig of the current metacall transaction.
-    // /// @return config The CallConfig in uint32 form of the current metacall transaction.
-    // function getConfig() external pure returns (uint32 config) {
-    //     config = _config();
-    // }
 
     /// @notice The getEscrow function returns the address of the Atlas/Escrow contract.
     /// @return The address of the Atlas/Escrow contract.

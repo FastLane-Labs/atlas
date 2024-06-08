@@ -136,7 +136,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         userOp.to = address(atlas);
         escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
         preOpsData = abi.encodeCall(ExecutionEnvironment.preOpsWrapper, userOp);
-        preOpsData = abi.encodePacked(preOpsData, escrowKey.pack(), user, address(dAppControl), callConfigNum); //TODO improve
+        preOpsData = _appendPackedCalldata(preOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(preOpsData);
         assertTrue(status, "Not valid as expected");
@@ -146,7 +146,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         userOp.to = address(atlas);
         escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
         preOpsData = abi.encodeCall(ExecutionEnvironment.preOpsWrapper, userOp);
-        preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
+        preOpsData = _appendPackedCalldata(preOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.InvalidUser.selector);
         (status,) = address(executionEnvironment).call(preOpsData);
@@ -156,7 +156,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         userOp.to = invalid; // Invalid to
         escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
         preOpsData = abi.encodeCall(ExecutionEnvironment.preOpsWrapper, userOp);
-        preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
+        preOpsData = _appendPackedCalldata(preOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.InvalidTo.selector);
         (status,) = address(executionEnvironment).call(preOpsData);
@@ -173,15 +173,15 @@ contract ExecutionEnvironmentTest is BaseTest {
         // Valid
         escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
         preOpsData = abi.encodeCall(ExecutionEnvironment.preOpsWrapper, userOp);
-        preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
+        preOpsData = _appendPackedCalldata(preOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(preOpsData);
-        assertTrue(status);
+        assertTrue(status, "Not valid as expected");
 
         // InvalidSender
         escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
         preOpsData = abi.encodeCall(ExecutionEnvironment.preOpsWrapper, userOp);
-        preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
+        preOpsData = _appendPackedCalldata(preOpsData, escrowKey.pack());
         vm.prank(address(0)); // Invalid sender
         vm.expectRevert(AtlasErrors.OnlyAtlas.selector);
         (status,) = address(executionEnvironment).call(preOpsData);
@@ -190,7 +190,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         // WrongPhase
         escrowKey = escrowKey.holdUserLock(address(dAppControl)); // Invalid lock state
         preOpsData = abi.encodeCall(ExecutionEnvironment.preOpsWrapper, userOp);
-        preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
+        preOpsData = _appendPackedCalldata(preOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.WrongPhase.selector);
         (status,) = address(executionEnvironment).call(preOpsData);
@@ -213,7 +213,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         escrowKey = escrowKey.holdUserLock(address(dAppControl));
         userData = abi.encodeCall(
             ExecutionEnvironment.userWrapper, userOp);
-        userData = abi.encodePacked(userData, escrowKey.pack());
+        userData = _appendPackedCalldata(userData, escrowKey.pack());
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(userData);
         assertTrue(status);
@@ -225,7 +225,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         escrowKey = escrowKey.holdUserLock(address(dAppControl));
         userData = abi.encodeCall(
             ExecutionEnvironment.userWrapper, userOp);
-        userData = abi.encodePacked(userData, escrowKey.pack());
+        userData = _appendPackedCalldata(userData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.InvalidCodeHash.selector);
         (status,) = address(executionEnvironment).call(userData);
@@ -254,9 +254,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         uint256 surplusAmount = 50_000;
 
         escrowKey = escrowKey.holdUserLock(address(dAppControl));
-        userData = abi.encodeCall(
-            ExecutionEnvironment.userWrapper, userOp);
-        userData = abi.encodePacked(userData, escrowKey.pack());
+        userData = abi.encodeCall(ExecutionEnvironment.userWrapper, userOp);
+        userData = _appendPackedCalldata(userData, escrowKey.pack());
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call{ value: surplusAmount }(userData);
         assertTrue(status);
@@ -278,7 +277,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         userOp.data = abi.encodeCall(MockDAppControl.mockOperation, (false, expectedReturnValue));
         escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
         preOpsData = abi.encodeCall(ExecutionEnvironment.preOpsWrapper, userOp);
-        preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
+        preOpsData = _appendPackedCalldata(preOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         (status, data) = address(executionEnvironment).call(preOpsData);
         assertTrue(status);
@@ -288,7 +287,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         userOp.data = abi.encodeCall(MockDAppControl.mockOperation, (true, uint256(0)));
         escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
         preOpsData = abi.encodeCall(ExecutionEnvironment.preOpsWrapper, userOp);
-        preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
+        preOpsData = _appendPackedCalldata(preOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PreOpsDelegatecallFail.selector);
         (status,) = address(executionEnvironment).call(preOpsData);
@@ -310,7 +309,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         escrowKey = escrowKey.holdUserLock(address(dAppControl));
         userData = abi.encodeCall(
             ExecutionEnvironment.userWrapper, userOp);
-        userData = abi.encodePacked(userData, escrowKey.pack());
+        userData = _appendPackedCalldata(userData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.UserOpValueExceedsBalance.selector);
         (status,) = address(executionEnvironment).call(userData);
@@ -322,7 +321,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         escrowKey = escrowKey.holdUserLock(address(dAppControl));
         userData = abi.encodeCall(
             ExecutionEnvironment.userWrapper, userOp);
-        userData = abi.encodePacked(userData, escrowKey.pack());
+        userData = _appendPackedCalldata(userData, escrowKey.pack());
         vm.prank(address(atlas));
         (status, data) = address(executionEnvironment).call(userData);
         assertTrue(status);
@@ -333,7 +332,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         escrowKey = escrowKey.holdUserLock(address(dAppControl));
         userData = abi.encodeCall(
             ExecutionEnvironment.userWrapper, userOp);
-        userData = abi.encodePacked(userData, escrowKey.pack());
+        userData = _appendPackedCalldata(userData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.UserWrapperCallFail.selector);
         (status,) = address(executionEnvironment).call(userData);
@@ -349,7 +348,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         escrowKey = escrowKey.holdUserLock(address(dAppControl));
         userData = abi.encodeCall(
             ExecutionEnvironment.userWrapper, userOp);
-        userData = abi.encodePacked(userData, escrowKey.pack());
+        userData = _appendPackedCalldata(userData, escrowKey.pack());
         vm.prank(address(atlas));
         (status, data) = address(executionEnvironment).call(userData);
         assertTrue(status);
@@ -360,7 +359,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         escrowKey = escrowKey.holdUserLock(address(dAppControl));
         userData = abi.encodeCall(
             ExecutionEnvironment.userWrapper, userOp);
-        userData = abi.encodePacked(userData, escrowKey.pack());
+        userData = _appendPackedCalldata(userData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.UserWrapperDelegatecallFail.selector);
         (status,) = address(executionEnvironment).call(userData);
@@ -378,7 +377,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         postOpsData =
             abi.encodeCall(
             ExecutionEnvironment.postOpsWrapper, (false, abi.encode(false, true)));
-        postOpsData = abi.encodePacked(postOpsData, escrowKey.pack());
+        postOpsData = _appendPackedCalldata(postOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(postOpsData);
         assertTrue(status);
@@ -388,7 +387,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         postOpsData =
             abi.encodeCall(
             ExecutionEnvironment.postOpsWrapper, (false, abi.encode(true, false)));
-        postOpsData = abi.encodePacked(postOpsData, escrowKey.pack());
+        postOpsData = _appendPackedCalldata(postOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PostOpsDelegatecallFail.selector);
         (status,) = address(executionEnvironment).call(postOpsData);
@@ -398,7 +397,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         postOpsData =
             abi.encodeCall(
             ExecutionEnvironment.postOpsWrapper, (false, abi.encode(false, false)));
-        postOpsData = abi.encodePacked(postOpsData, escrowKey.pack());
+        postOpsData = _appendPackedCalldata(postOpsData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PostOpsDelegatecallReturnedFalse.selector);
         (status,) = address(executionEnvironment).call(postOpsData);
@@ -428,7 +427,7 @@ contract ExecutionEnvironmentTest is BaseTest {
             ExecutionEnvironment.solverMetaTryCatch,
             (solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0))
         );
-        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        solverMetaData = _appendPackedCalldata(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.SolverMetaTryCatchIncorrectValue.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
@@ -442,7 +441,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverMetaData = abi.encodeCall(
             ExecutionEnvironment.solverMetaTryCatch, (solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0))
         );
-        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        solverMetaData = _appendPackedCalldata(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.AlteredControl.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
@@ -456,7 +455,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverMetaData = abi.encodeCall(
             ExecutionEnvironment.solverMetaTryCatch, (solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0))
         );
-        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        solverMetaData = _appendPackedCalldata(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.SolverOperationReverted.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
@@ -470,7 +469,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverMetaData = abi.encodeCall(
             ExecutionEnvironment.solverMetaTryCatch, (solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0))
         );
-        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        solverMetaData = _appendPackedCalldata(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.SolverBidUnpaid.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
@@ -486,7 +485,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverMetaData = abi.encodeCall(
             ExecutionEnvironment.solverMetaTryCatch, (solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0))
         );
-        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        solverMetaData = _appendPackedCalldata(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.BalanceNotReconciled.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
@@ -508,7 +507,7 @@ contract ExecutionEnvironmentTest is BaseTest {
             solverOp,
             abi.encode(true, false))
         );
-        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        solverMetaData = _appendPackedCalldata(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PreSolverFailed.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
@@ -524,7 +523,7 @@ contract ExecutionEnvironmentTest is BaseTest {
             solverOp,
             abi.encode(false, false))
         );
-        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        solverMetaData = _appendPackedCalldata(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PreSolverFailed.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
@@ -547,7 +546,7 @@ contract ExecutionEnvironmentTest is BaseTest {
             solverOp,
             abi.encode(true, false))
         );
-        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        solverMetaData = _appendPackedCalldata(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PostSolverFailed.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
@@ -564,7 +563,7 @@ contract ExecutionEnvironmentTest is BaseTest {
             solverOp,
             abi.encode(false, false))
         );
-        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        solverMetaData = _appendPackedCalldata(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.IntentUnfulfilled.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
@@ -581,7 +580,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         allocateData = abi.encodeCall(
             ExecutionEnvironment.allocateValue, (address(0), uint256(0), abi.encode(false))
         );
-        allocateData = abi.encodePacked(allocateData, escrowKey.pack());
+        allocateData = _appendPackedCalldata(allocateData, escrowKey.pack());
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(allocateData);
         assertTrue(status);
@@ -591,7 +590,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         allocateData = abi.encodeCall(
             ExecutionEnvironment.allocateValue, (address(0), uint256(0), abi.encode(true))
         );
-        allocateData = abi.encodePacked(allocateData, escrowKey.pack());
+        allocateData = _appendPackedCalldata(allocateData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.AllocateValueDelegatecallFail.selector);
         (status,) = address(executionEnvironment).call(allocateData);
@@ -667,22 +666,14 @@ contract ExecutionEnvironmentTest is BaseTest {
         executionEnvironment.withdrawEther(2e18);
     }
 
-    // TODO remove if these functions are removed from EE - due to not forwarded with removal of Mimic
-    
-    // function test_getUser() public {
-    //     assertEq(executionEnvironment.getUser(), user);
-    // }
-
-    // function test_getControl() public {
-    //     assertEq(executionEnvironment.getControl(), address(dAppControl));
-    // }
-
-    // function test_getConfig() public {
-    //     assertEq(executionEnvironment.getConfig(), CallBits.encodeCallConfig(callConfig));
-    // }
-
     function test_getEscrow() public {
         assertEq(executionEnvironment.getEscrow(), address(atlas));
+    }
+
+
+    // Packs lockBytes, user address, control address, and callConfig to normal hook calldata the same way as done in Escrow.sol when calling an ExecutionEnvironment hook from Atlas.
+    function _appendPackedCalldata(bytes memory data, bytes memory lockBytes) internal view returns (bytes memory) {
+        return abi.encodePacked(data, lockBytes, user, address(dAppControl), callConfigNum);
     }
 }
 
