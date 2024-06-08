@@ -3,8 +3,9 @@ pragma solidity 0.8.22;
 
 import { Ownable } from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import { SafeERC20, IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
-import "forge-std/Test.sol"; //TODO remove
+// import "forge-std/Test.sol";
 
 // A wrapper contract for a specific Chainlink price feed, used by Atlas to capture Oracle Extractable Value (OEV).
 // Each MEV-generating protocol needs their own wrapper for each Chainlink price feed they use.
@@ -57,9 +58,6 @@ contract ChainlinkAtlasWrapper is Ownable {
         gasUsed = gasleft();
         IOffchainAggregator(aggregator).oracleObservationCount{ gas: 10_000 }(transmitter);
         gasUsed -= gasleft();
-
-        console.log("gasUsed:", gasUsed);
-        console.log("_GAS_THRESHOLD", _GAS_THRESHOLD);
 
         require(gasUsed > _GAS_THRESHOLD, "invalid gas threshold");
     }
@@ -145,10 +143,8 @@ contract ChainlinkAtlasWrapper is Ownable {
         for (uint256 i = 0; i < rs.length; ++i) {
             address signer = ecrecover(reportHash, uint8(rawVs[i]) + 27, rs[i], ss[i]);
             if (!_isSigner(validTransmitters, aggregator, signer)) {
-                // console.log("invalid signer:", signer);
                 revert();
             }
-            // console.log("__valid signer:", signer);
         }
 
         int192 median = r.observations[r.observations.length / 2];
@@ -161,7 +157,7 @@ contract ChainlinkAtlasWrapper is Ownable {
     function _validateTransmitter() internal view returns (address[] memory validTransmitters, address aggregator) {
         // Get the user from the EE
         // NOTE: technically we can pull this from calldata, including full function here for readability
-        address transmitter = IExecutionEnvironment(msg.sender).getUser();
+        address transmitter = IAtlas(ATLAS).activeUser();
 
         // Verify that the execution environment (msg.sender) is genuine
         // NOTE: Technically we can skip this too since the activeEnvironment check below also validates this
