@@ -709,10 +709,10 @@ contract LiquidationOEVSolver is SolverBase {
         payable(msg.sender).call{value: address(this).balance}("");
     }
 
-    // This ensures a function can only be called through metaFlashCall
+    // This ensures a function can only be called through atlasSolverCall
     // which includes security checks to work safely with Atlas
     modifier onlySelf() {
-        require(msg.sender == address(this), "Not called via metaFlashCall");
+        require(msg.sender == address(this), "Not called via atlasSolverCall");
         _;
     }
 
