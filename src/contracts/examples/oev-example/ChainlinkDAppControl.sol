@@ -161,7 +161,7 @@ contract ChainlinkDAppControl is DAppControl {
         // array out-of-bounds error
         if (observations < observationsQuorum || observations > MAX_NUM_ORACLES) return false;
 
-        for (uint256 i = 0; i < observations; ++i) {
+        for (uint256 i; i < observations; ++i) {
             (address signer,) = ECDSA.tryRecover(reportHash, uint8(rawVs[i]) + 27, rs[i], ss[i]);
             currentOracle = verificationVar.oracles[signer];
 
@@ -192,7 +192,7 @@ contract ChainlinkDAppControl is DAppControl {
         VerificationVars storage vars = verificationVars[baseChainlinkFeed];
 
         uint256 signersLength = signers.length;
-        for (uint256 i = 0; i < signersLength; ++i) {
+        for (uint256 i; i < signersLength; ++i) {
             if (vars.oracles[signers[i]].role != Role.Unset) revert DuplicateSigner(signers[i]);
             vars.oracles[signers[i]] = Oracle({ index: uint8(i), role: Role.Signer });
         }
@@ -237,7 +237,7 @@ contract ChainlinkDAppControl is DAppControl {
         address[] storage signers = vars.signers;
         uint256 signersLength = signers.length;
         if (signersLength == 0) return;
-        for (uint256 i = 0; i < signersLength; ++i) {
+        for (uint256 i; i < signersLength; ++i) {
             delete vars.oracles[signers[i]];
         }
         delete vars.signers;
