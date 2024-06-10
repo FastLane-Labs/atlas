@@ -14,6 +14,7 @@ contract AtlasConstants {
     uint256 internal constant _GAS_USED_DECIMALS_TO_DROP = 1000;
     address internal constant _UNLOCKED = address(1);
     uint256 internal constant _UNLOCKED_UINT = 1;
+    uint256 internal constant _UNLOCKED_CALL_CONFIG = type(uint32).max;
 
     // Atlas constants used in `_bidFindingIteration()`
     uint256 internal constant _BITS_FOR_INDEX = 16;

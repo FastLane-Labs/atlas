@@ -78,7 +78,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         lock = _UNLOCKED; // TODO rename to activeExecutionEnvironment for clarity
         activeUser = _UNLOCKED;
         activeControl = _UNLOCKED;
-        activeCallConfig = _UNLOCKED_UINT;
+        activeCallConfig = _UNLOCKED_CALL_CONFIG;
 
         claims = type(uint256).max;
         withdrawals = type(uint256).max;

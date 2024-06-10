@@ -59,6 +59,12 @@ contract ExecutionEnvironmentTest is BaseTest {
 
     CallConfig private callConfig;
 
+    // Expected unlocked states
+    uint256 public unlockedAddressVarAsUint = 1;
+    uint256 public unlockedCallConfig = type(uint32).max;
+    uint256 public unlockedAccountingVar = type(uint256).max;
+    uint256 public unlockedSolverLock = 1;
+
     function setUp() public override {
         super.setUp();
 
@@ -79,14 +85,14 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverLockSlot = lockSlot + 7;
 
         // Checks to ensure slots identified correctly:
-        assertEq(uint256(vm.load(address(atlas), bytes32(lockSlot))), 1, "lockSlot is wrong");
-        assertEq(uint256(vm.load(address(atlas), bytes32(activeUserSlot))), 1, "activeUserSlot is wrong");
-        assertEq(uint256(vm.load(address(atlas), bytes32(activeControlSlot))), 1, "activeControlSlot is wrong");
-        assertEq(uint256(vm.load(address(atlas), bytes32(activeCallConfigSlot))), 1, "activeCallConfigSlot is wrong");
-        assertEq(uint256(vm.load(address(atlas), bytes32(claimsSlot))), type(uint256).max, "claimsSlot is wrong");
-        assertEq(uint256(vm.load(address(atlas), bytes32(withdrawalsSlot))), type(uint256).max, "withdrawalsSlot is wrong");
-        assertEq(uint256(vm.load(address(atlas), bytes32(depositsSlot))), type(uint256).max, "depositsSlot is wrong");
-        assertEq(uint256(vm.load(address(atlas), bytes32(solverLockSlot))), 1, "solverLockSlot is wrong");
+        assertEq(uint256(vm.load(address(atlas), bytes32(lockSlot))), unlockedAddressVarAsUint, "lockSlot is wrong");
+        assertEq(uint256(vm.load(address(atlas), bytes32(activeUserSlot))), unlockedAddressVarAsUint, "activeUserSlot is wrong");
+        assertEq(uint256(vm.load(address(atlas), bytes32(activeControlSlot))), unlockedAddressVarAsUint, "activeControlSlot is wrong");
+        assertEq(uint256(vm.load(address(atlas), bytes32(activeCallConfigSlot))), unlockedCallConfig, "activeCallConfigSlot is wrong");
+        assertEq(uint256(vm.load(address(atlas), bytes32(claimsSlot))), unlockedAccountingVar, "claimsSlot is wrong");
+        assertEq(uint256(vm.load(address(atlas), bytes32(withdrawalsSlot))), unlockedAccountingVar, "withdrawalsSlot is wrong");
+        assertEq(uint256(vm.load(address(atlas), bytes32(depositsSlot))), unlockedAccountingVar, "depositsSlot is wrong");
+        assertEq(uint256(vm.load(address(atlas), bytes32(solverLockSlot))), unlockedSolverLock, "solverLockSlot is wrong");
     }
 
     function _setLocks() internal {

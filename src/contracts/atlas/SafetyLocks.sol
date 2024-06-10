@@ -101,6 +101,8 @@ abstract contract SafetyLocks is Storage {
         lock = _UNLOCKED;
         activeUser = _UNLOCKED;
         activeControl = _UNLOCKED;
+        activeCallConfig = _UNLOCKED_CALL_CONFIG;
+
         _solverLock = _UNLOCKED_UINT;
         claims = type(uint256).max;
         withdrawals = type(uint256).max;
