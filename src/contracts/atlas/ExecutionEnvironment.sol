@@ -6,7 +6,6 @@ import { Base } from "src/contracts/common/ExecutionBase.sol";
 
 import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
-import { ISafetyLocks } from "src/contracts/interfaces/ISafetyLocks.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
@@ -331,46 +330,89 @@ contract ExecutionEnvironment is Base, IExecutionEnvironment {
     //  USER SUPPORT / ACCESS FUNCTIONS  //
     ///////////////////////////////////////
 
-    /// @notice The withdrawERC20 function allows the environment owner to withdraw ERC20 tokens from this Execution
-    /// Environment.
+    /// @notice A withdrawEther function which takes only the amount and control address as arguments. The required
+    /// `callConfig` param is read from the DAppControl. NOTE: This function will revert if the `CALL_CONFIG` variable
+    /// on the DAppControl contract has changed since the Execution Environment was created.
+    /// @dev This function is only callable by the environment owner and only when Atlas is in an unlocked state.
+    /// @param amount The amount of Ether to withdraw.
+    /// @param control The DAppControl address associated with this Execution Environment.
+    function withdrawEther(uint256 amount, address control) external {
+        uint32 callConfig = IDAppControl(control).CALL_CONFIG();
+        _withdrawEther(amount, control, callConfig);
+    }
+
+    /// @notice A withdrawEther function which allows the caller to pass a custom `callConfig` value, in case the
+    /// `CALL_CONFIG` variable on the DAppControl contract has changed since the Execution Environment was created.
+    /// @dev This function is only callable by the environment owner and only when Atlas is in an unlocked state.
+    /// @param amount The amount of Ether to withdraw.
+    /// @param control The DAppControl address associated with this Execution Environment.
+    /// @param callConfig The original CallConfig of the DAppControl at the time this Execution Environment was created.
+    function withdrawEther(uint256 amount, address control, uint32 callConfig) external {
+        _withdrawEther(amount, control, callConfig);
+    }
+
+    /// @notice A withdrawERC20 function which takes only the token address and amount as arguments, and reads the
+    /// `callConfig` value from the DAppControl contract. NOTE: This function will revert if the `CALL_CONFIG` variable
+    /// on the DAppControl contract has changed since the Execution Environment was created.
+    /// @dev This function is only callable by the environment owner and only when Atlas is in an unlocked state.
+    /// @param token The address of the ERC20 token to withdraw.
+    /// @param amount The amount of the ERC20 token to withdraw.
+    /// @param control The DAppControl address associated with this Execution Environment.
+    function withdrawERC20(address token, uint256 amount, address control) external {
+        uint32 callConfig = IDAppControl(control).CALL_CONFIG();
+        _withdrawERC20(token, amount, control, callConfig);
+    }
+
+    /// @notice A withdrawERC20 function which allows the caller to pass a custom `callConfig` value, in case the
+    /// `CALL_CONFIG` variable on the DAppControl contract has changed since the Execution Environment was created.
     /// @dev This function is only callable by the environment owner and only when Atlas is in an unlocked state.
     /// @param token The address of the ERC20 token to withdraw.
     /// @param amount The amount of the ERC20 token to withdraw.
     /// @param control The DAppControl address associated with this Execution Environment.
     /// @param callConfig The original CallConfig of the DAppControl at the time this Execution Environment was created.
     function withdrawERC20(address token, uint256 amount, address control, uint32 callConfig) external {
-        if (!IAtlas(ATLAS).verifyCallerIsExecutionEnv(msg.sender, control, callConfig)) {
-            revert AtlasErrors.NotEnvironmentOwner();
-        }
-        if (!ISafetyLocks(ATLAS).isUnlocked()) {
-            revert AtlasErrors.AtlasLockActive();
-        }
-
-        if (ERC20(token).balanceOf(address(this)) >= amount) {
-            SafeTransferLib.safeTransfer(ERC20(token), msg.sender, amount);
-        } else {
-            revert AtlasErrors.ExecutionEnvironmentBalanceTooLow();
-        }
+        _withdrawERC20(token, amount, control, callConfig);
     }
 
-    /// @notice The withdrawEther function allows the environment owner to withdraw Ether from this Execution
-    /// Environment.
-    /// @dev This function is only callable by the environment owner and only when Atlas is in an unlocked state.
+    /// @notice Internal function for both `withdrawEther` functions.
     /// @param amount The amount of Ether to withdraw.
     /// @param control The DAppControl address associated with this Execution Environment.
     /// @param callConfig The original CallConfig of the DAppControl at the time this Execution Environment was created.
-    function withdrawEther(uint256 amount, address control, uint32 callConfig) external {
+    function _withdrawEther(uint256 amount, address control, uint32 callConfig) internal {
+        _assetWithdrawalSecurityChecks(control, callConfig);
+
+        if (amount > address(this).balance) {
+            revert AtlasErrors.ExecutionEnvironmentBalanceTooLow();
+        }
+
+        SafeTransferLib.safeTransferETH(msg.sender, amount);
+    }
+
+    /// @notice Internal function for both `withdrawERC20` functions.
+    /// @dev This function is only callable by the environment owner and only when Atlas is in an unlocked state.
+    /// @param token The address of the ERC20 token to withdraw.
+    /// @param amount The amount of the ERC20 token to withdraw.
+    /// @param control The DAppControl address associated with this Execution Environment.
+    /// @param callConfig The original CallConfig of the DAppControl at the time this Execution Environment was created.
+    function _withdrawERC20(address token, uint256 amount, address control, uint32 callConfig) internal {
+        _assetWithdrawalSecurityChecks(control, callConfig);
+
+        if (amount > ERC20(token).balanceOf(address(this))) {
+            revert AtlasErrors.ExecutionEnvironmentBalanceTooLow();
+        }
+
+        SafeTransferLib.safeTransfer(ERC20(token), msg.sender, amount);
+    }
+
+    /// @notice Checks that the caller is the expected Execution Environment and that Atlas is in an unlocked state.
+    /// @param control The DAppControl address associated with this Execution Environment.
+    /// @param callConfig The original CallConfig of the DAppControl at the time this Execution Environment was created.
+    function _assetWithdrawalSecurityChecks(address control, uint32 callConfig) internal view {
         if (!IAtlas(ATLAS).verifyCallerIsExecutionEnv(msg.sender, control, callConfig)) {
             revert AtlasErrors.NotEnvironmentOwner();
         }
-        if (!ISafetyLocks(ATLAS).isUnlocked()) {
+        if (!IAtlas(ATLAS).isUnlocked()) {
             revert AtlasErrors.AtlasLockActive();
-        }
-
-        if (address(this).balance >= amount) {
-            SafeTransferLib.safeTransferETH(msg.sender, amount);
-        } else {
-            revert AtlasErrors.ExecutionEnvironmentBalanceTooLow();
         }
     }
 
