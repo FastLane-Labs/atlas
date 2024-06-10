@@ -227,27 +227,50 @@ contract Base {
 contract ExecutionBase is Base {
     constructor(address _atlas) Base(_atlas) { }
 
-    // Deposit local funds to the transient Atlas balance
-    // NOTE that this will go towards the Bundler, with the surplus going to the Solver.
+    /// @notice Deposits local funds from this Execution Environment, to the transient Atlas balance. These funds go
+    /// towards the bundler, with any surplus going to the Solver.
+    /// @param amt The amount of funds to deposit.
     function _contribute(uint256 amt) internal {
         if (amt > address(this).balance) revert AtlasErrors.InsufficientLocalFunds();
 
         IEscrow(ATLAS).contribute{ value: amt }();
     }
 
-    // Borrow funds from the transient Atlas balance that will be repaid by the Solver (or self via another deposit)
+    /// @notice Borrows funds from the transient Atlas balance that will be repaid by the Solver or this Execution
+    /// Environment via `_contribute()`
+    /// @param amt The amount of funds to borrow.
     function _borrow(uint256 amt) internal {
         IEscrow(ATLAS).borrow(amt);
     }
 
+    /// @notice Transfers ERC20 tokens from the user of the current metacall tx, via Atlas, to a specified destination.
+    /// @dev This will only succeed if Atlas is in a phase included in `SAFE_USER_TRANSFER`. See SafetyBits.sol.
+    /// @param token The address of the ERC20 token contract.
+    /// @param destination The address to which the tokens will be transferred.
+    /// @param amount The amount of tokens to transfer.
     function _transferUserERC20(address token, address destination, uint256 amount) internal {
         IPermit69(ATLAS).transferUserERC20(token, destination, amount, _user(), _control(), _config(), _lockState());
     }
 
+    /// @notice Transfers ERC20 tokens from the DApp of the current metacall tx, via Atlas, to a specified destination.
+    /// @dev This will only succeed if Atlas is in a phase included in `SAFE_DAPP_TRANSFER`. See SafetyBits.sol.
+    /// @param token The address of the ERC20 token contract.
+    /// @param destination The address to which the tokens will be transferred.
+    /// @param amount The amount of tokens to transfer.
     function _transferDAppERC20(address token, address destination, uint256 amount) internal {
         IPermit69(ATLAS).transferDAppERC20(token, destination, amount, _user(), _control(), _config(), _lockState());
     }
 
+    /// @notice Returns a bool indicating whether a source address has approved the Atlas contract to transfer a certain
+    /// amount of a certain token, and whether Atlas is in the correct phase to transfer the token. Note: this is just
+    /// for convenience - transfers via `_transferDAppERC20()` and `_transferUserERC20()` will independently ensure all
+    /// necessary checks are made.
+    /// @param _token The address of the ERC20 token contract.
+    /// @param _source The address of the source of the tokens.
+    /// @param _amount The amount of tokens to transfer.
+    /// @param phase The phase of the current metacall tx.
+    /// @return available A bool indicating whether a transfer from the source, via Atlas, of the specified amount of
+    /// the specified token, will succeed.
     function _availableFundsERC20(
         address _token,
         address _source,
