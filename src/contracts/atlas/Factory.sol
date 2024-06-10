@@ -2,7 +2,6 @@
 pragma solidity 0.8.22;
 
 import { Clones } from "openzeppelin-contracts/contracts/proxy/Clones.sol";
-
 import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 import { DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
@@ -28,7 +27,6 @@ abstract contract Factory {
         _FACTORY_BASE_SALT = keccak256(abi.encodePacked(block.chainid, address(this)));
     }
 
-    // TODO update comments
     /// @notice Creates a new Execution Environment for the caller, given a DAppControl contract address.
     /// @param control The address of the DAppControl contract for which the execution environment is being created.
     /// @return executionEnvironment The address of the newly created Execution Environment instance.
@@ -94,15 +92,13 @@ abstract contract Factory {
         }
     }
 
-    // TODO update comments - note callConfig passed instead of read off control to support mutable controls
-    /// @notice Generates the address of a user's execution environment affected by deprecated callConfig changes in the
-    /// DAppControl.
-    /// @dev Calculates the deterministic address of the execution environment based on the user, control,
-    /// callConfig, and controlCodeHash, ensuring consistency across changes in callConfig.
-    /// @param user The address of the user for whom the execution environment's address is being generated.
+    /// @notice Predicts the address of a user's execution environment given the user, control, and callConfig salt
+    /// inputs. NOTE: This is useful when the control contract is mutable and the callConfig may have changed, as the
+    /// callConfig passed must match that of the control contract when the Execution Environment was created.
+    /// @param user The address of the user who created the execution environment.
     /// @param control The address of the DAppControl contract associated with the execution environment.
-    /// @param callConfig The configuration flags defining the behavior of the execution environment.
-    /// @return executionEnvironment The address of the user's execution environment.
+    /// @param callConfig The CallConfig settings of the DAppControl contract associated with the execution environment.
+    /// @return executionEnvironment The predicted address of the user's execution environment.
     function _getExecutionEnvironmentCustom(
         address user,
         address control,
@@ -119,6 +115,12 @@ abstract contract Factory {
         });
     }
 
+    /// @notice Computes the salt for deterministic deployment of Execution Environments based on the user, control, and
+    /// callConfig inputs.
+    /// @param user The address of the user creating the execution environment.
+    /// @param control The address of the DAppControl contract associated with the execution environment.
+    /// @param callConfig The CallConfig settings of the DAppControl contract associated with the execution environment.
+    /// @return salt The computed salt for deterministic deployment of the Execution Environment.
     function _computeSalt(address user, address control, uint32 callConfig) internal view returns (bytes32) {
         return keccak256(abi.encodePacked(_FACTORY_BASE_SALT, user, control, callConfig));
     }

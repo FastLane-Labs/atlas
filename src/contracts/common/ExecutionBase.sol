@@ -20,9 +20,8 @@ contract Base {
         SOURCE = address(this);
     }
 
-    // These functions only work inside of the ExecutionEnvironment (mimic)
-    // via delegatecall, but can be added to DAppControl as funcs that
-    // can be used during DAppControl's delegated funcs
+    // These functions only work inside of the ExecutionEnvironment via delegatecall, but can be added to DAppControl as
+    // funcs that can be used during DAppControl's delegated funcs
 
     modifier onlyAtlasEnvironment(ExecutionPhase phase, uint8 acceptableDepths) {
         _onlyAtlasEnvironment(phase, acceptableDepths);

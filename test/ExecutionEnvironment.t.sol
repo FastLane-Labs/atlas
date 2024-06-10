@@ -27,9 +27,9 @@ import "src/contracts/types/LockTypes.sol";
 
 import "src/contracts/libraries/CallBits.sol";
 
-/// @notice ExecutionEnvironmentTest tests deploy ExecutionEnvironment contracts through the factory. Because all calls
-/// are delegated through the mimic contract, the reported coverage is at 0%, but the actual coverage is close to 100%.
-/// Non covered parts are explicitly mentioned in the comments, with the reason it couldn't be covered.
+// ExecutionEnvironmentTest tests deploy ExecutionEnvironment contracts through the factory. Because all calls are
+// delegated through the Clones proxy contract, the reported coverage is at 0%, but the actual coverage is close to
+// 100%. Non covered parts are explicitly mentioned in the comments, with the reason it couldn't be covered.
 contract ExecutionEnvironmentTest is BaseTest {
     using stdStorage for StdStorage;
     using SafetyBits for EscrowKey;

@@ -84,7 +84,7 @@ contract ExecutionEnvironment is Base, IExecutionEnvironment {
         contributeSurplus
         returns (bytes memory returnData)
     {
-        uint32 config = userOp.callConfig;
+        uint32 config = _config();
 
         if (userOp.value > address(this).balance) {
             revert AtlasErrors.UserOpValueExceedsBalance();

@@ -287,58 +287,6 @@ contract MainTest is BaseTest {
         */
     }
 
-    // TODO remove if Mimic is fully removed
-    // function testMimic() public {
-        // uncomment to debug if this test is broken
-        /*
-        address aaaaa = atlas.executionTemplate();
-        address bbbbb = msg.sender;
-        address ccccc = address(this);
-        uint32 ddddd = uint32(0x11111111);
-        bytes32 eeeee = keccak256(abi.encodePacked(uint256(0x2222)));
-        // Mimic mimic = new Mimic();
-        //console.log("----");
-        //console.log("runtime code:");
-        //console.logBytes(address(mimic).code);
-        
-        console.log("aaaaa", aaaaa);
-        console.log("bbbbb", bbbbb);
-        console.log("ccccc", ccccc);
-        console.logBytes32(eeeee);
-        console.log("----");
-        console.log("creation code:");
-        console.logBytes(type(Mimic).creationCode);
-        console.log("----");
-
-        bytes memory creationCode = type(Mimic).creationCode;
-        //bytes memory creationCode = new bytes(790);
-        creationCode = atlas.getMimicCreationCode(aaaaa, ddddd, bbbbb, eeeee);
-        
-        
-        console.log("assembly modified code:");
-        console.logBytes(creationCode);
-        console.log("----");
-        */
-
-        // vm.startPrank(userEOA);
-        // atlas.createExecutionEnvironment(address(v2DAppControl));
-        // address newEnvironment = atlas.createExecutionEnvironment(address(v2DAppControl));
-        // vm.stopPrank();
-
-        // assertTrue(IExecutionEnvironment(newEnvironment).getUser() == userEOA, "Mimic Error - User Mismatch");
-        // assertTrue(
-        //     IExecutionEnvironment(newEnvironment).getControl() == address(v2DAppControl), "Mimic Error - Control Mismatch"
-        // );
-        // assertTrue(
-        //     IExecutionEnvironment(newEnvironment).getConfig() == v2DAppControl.CALL_CONFIG(),
-        //     "Mimic Error - CallConfig Mismatch"
-        // );
-        // assertTrue(
-        //     IExecutionEnvironment(newEnvironment).getEscrow() == address(atlas),
-        //     "Mimic Error - Escrow/Atlas Address Mismatch"
-        // );
-    // }
-
     function testExecutionEnvironmentAutoCreation() public {
         uint8 v;
         bytes32 r;

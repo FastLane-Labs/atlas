@@ -72,8 +72,6 @@ contract ExecutionBaseTest is BaseTest {
         internal
     {
         data = abi.encodePacked(data, escrowKey.pack());
-
-        // Mimic the Mimic
         data = abi.encodePacked(data, user, dAppControl, callConfig);
 
         (, bytes memory result) = address(mockExecutionEnvironment).call(data);
