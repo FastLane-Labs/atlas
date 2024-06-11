@@ -127,8 +127,10 @@ abstract contract GasAccounting is SafetyLocks {
     /// @return valid A boolean indicating whether the borrowing operation was successful.
     function _borrow(uint256 amount) internal returns (bool valid) {
         if (amount == 0) return true;
+
         uint256 _withdrawals = withdrawals + amount;
-        if (address(this).balance < claims + _withdrawals) return false;
+        if (address(this).balance < _withdrawals) return false;
+
         withdrawals = _withdrawals;
         return true;
     }
