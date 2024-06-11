@@ -157,7 +157,7 @@ contract DAppIntegration {
     function _removeSignatory(address control, address signatory) internal {
         bytes32 signatoryKey = keccak256(abi.encodePacked(control, signatory));
         delete signatories[signatoryKey];
-        for (uint256 i = 0; i < dAppSignatories[control].length; i++) {
+        for (uint256 i; i < dAppSignatories[control].length; i++) {
             if (dAppSignatories[control][i] == signatory) {
                 dAppSignatories[control][i] = dAppSignatories[control][dAppSignatories[control].length - 1];
                 dAppSignatories[control].pop();

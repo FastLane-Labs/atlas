@@ -146,7 +146,7 @@ contract ChainlinkDAppControl is DAppControl {
         bytes32 reportHash = keccak256(report);
         Oracle memory currentOracle;
 
-        for (uint256 i = 0; i < rs.length; ++i) {
+        for (uint256 i; i < rs.length; ++i) {
             address signer = ecrecover(reportHash, uint8(rawVs[i]) + 27, rs[i], ss[i]);
             currentOracle = verificationVars[baseChainlinkFeed].oracles[signer];
 
@@ -170,7 +170,7 @@ contract ChainlinkDAppControl is DAppControl {
         _removeAllSignersOfBaseFeed(baseChainlinkFeed); // Removes any existing signers first
         VerificationVars storage vars = verificationVars[baseChainlinkFeed];
 
-        for (uint256 i = 0; i < signers.length; ++i) {
+        for (uint256 i; i < signers.length; ++i) {
             if (vars.oracles[signers[i]].role != Role.Unset) revert DuplicateSigner(signers[i]);
             vars.oracles[signers[i]] = Oracle({ index: uint8(i), role: Role.Signer });
         }
@@ -213,7 +213,7 @@ contract ChainlinkDAppControl is DAppControl {
         VerificationVars storage vars = verificationVars[baseChainlinkFeed];
         address[] storage signers = vars.signers;
         if (signers.length == 0) return;
-        for (uint256 i = 0; i < signers.length; ++i) {
+        for (uint256 i; i < signers.length; ++i) {
             delete vars.oracles[signers[i]];
         }
         delete vars.signers;

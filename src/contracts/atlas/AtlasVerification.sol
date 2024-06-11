@@ -702,17 +702,17 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         // Then check the located 16-bit chunk, 4 bits at a time, for an unused 4-bit chunk.
         // Then loop normally from the start of the 4-bit chunk to find the first unused bit.
 
-        for (uint256 i = 0; i < 240; i += 16) {
+        for (uint256 i; i < 240; i += 16) {
             // Isolate the next 16 bits to check
             uint256 chunk16 = (bitmap >> i) & _FIRST_16_BITS_TRUE_MASK;
             // Find non-full 16-bit chunk
             if (chunk16 != _FIRST_16_BITS_TRUE_MASK) {
-                for (uint256 j = 0; j < 16; j += 4) {
+                for (uint256 j; j < 16; j += 4) {
                     // Isolate the next 4 bits within the 16-bit chunk to check
                     uint256 chunk4 = (chunk16 >> j) & _FIRST_4_BITS_TRUE_MASK;
                     // Find non-full 4-bit chunk
                     if (chunk4 != _FIRST_4_BITS_TRUE_MASK) {
-                        for (uint256 k = 0; k < 4; k++) {
+                        for (uint256 k; k < 4; k++) {
                             // Find first unused bit
                             if ((chunk4 >> k) & 0x1 == 0) {
                                 // Returns 1-indexed nonce

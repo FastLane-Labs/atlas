@@ -96,7 +96,7 @@ contract ChainlinkAtlasWrapper is Ownable, IChainlinkAtlasWrapper {
             if (epochAndRound <= atlasLatestEpochAndRound) revert CannotReuseReport();
 
             // Check observations are ordered
-            for (uint256 i = 0; i < observationCount - 1; ++i) {
+            for (uint256 i; i < observationCount - 1; ++i) {
                 bool inOrder = r.observations[i] <= r.observations[i + 1];
                 if (!inOrder) revert ObservationsNotOrdered();
             }
