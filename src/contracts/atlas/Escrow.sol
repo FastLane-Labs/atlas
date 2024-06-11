@@ -501,7 +501,7 @@ abstract contract Escrow is AtlETH {
                 dAppReturnData
             )
         );
-        (success,) = solverOp.solver.call{ value: msg.value, gas: gasLimit }(data);
+        (success,) = solverOp.solver.call{ value: solverOp.value, gas: gasLimit }(data);
 
         if (!success) revert SolverOperationReverted();
 

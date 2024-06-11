@@ -39,7 +39,7 @@ abstract contract GasAccounting is SafetyLocks {
             uint256 _deposits = deposits;
             // Check if locked.
             if (_deposits != type(uint256).max) {
-                fulfilled = deposits >= claims + withdrawals;
+                fulfilled = _deposits >= claims + withdrawals;
             }
         }
     }
