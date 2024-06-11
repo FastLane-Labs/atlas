@@ -16,6 +16,8 @@ import "src/contracts/types/SolverCallTypes.sol";
 import "src/contracts/types/UserCallTypes.sol";
 import "src/contracts/types/DAppApprovalTypes.sol";
 
+import "forge-std/Test.sol";
+
 /// @title ExecutionEnvironment
 /// @author FastLane Labs
 /// @notice An Execution Environment contract is deployed for each unique combination of User address x DAppControl
@@ -36,16 +38,6 @@ contract ExecutionEnvironment is Base {
     modifier validControlHash() {
         if (_control().codehash != _controlCodeHash()) revert AtlasErrors.InvalidCodeHash();
         _;
-    }
-
-    modifier contributeSurplus() {
-        _;
-        {
-            uint256 balance = address(this).balance;
-            if (balance > 0) {
-                IEscrow(atlas).contribute{ value: balance }();
-            }
-        }
     }
 
     //////////////////////////////////
@@ -252,21 +244,26 @@ contract ExecutionEnvironment is Base {
     /// @dev This contract is called by the Atlas contract, and delegatecalls the DAppControl contract via the
     /// corresponding `allocateValueCall` function.
     /// @param bidToken The address of the token used for the winning SolverOperation's bid.
-    /// @param sTracker Struct trackign bid data including the winning bid amount.
+    /// @param bidAmount The winning bid amount.
     /// @param allocateData Data returned from the previous call phase.
     function allocateValue(
         address bidToken,
-        SolverTracker memory sTracker,
+        uint256 bidAmount,
         bytes memory allocateData
     )
         external
         onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _ENVIRONMENT_DEPTH)
-        contributeSurplus
     {
-        allocateData = forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, sTracker.bidAmount, allocateData)));
+        
+        allocateData = forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, bidAmount, allocateData)));
 
         (bool success,) = _control().delegatecall(allocateData);
         if (!success) revert AtlasErrors.AllocateValueDelegatecallFail();
+
+        uint256 balance = address(this).balance;
+        if (balance > 0) {
+            IEscrow(atlas).contribute{ value: balance }();
+        }
     }
 
     ///////////////////////////////////////

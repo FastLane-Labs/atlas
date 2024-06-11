@@ -198,37 +198,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(userData);
     }
 
-    function test_modifier_contributeSurplus() public {
-        UserOperation memory userOp;
-        bytes memory userData;
-        bool status;
-
-        userOp.from = user;
-        userOp.to = address(atlas);
-
-        // The following 2 lines change Atlas' storage values in order to make the test succeed.
-        // lock and deposits values are normally initialized in the _initializeEscrowLock function,
-        // but we can't call it in the current setup.
-        // Any changes in the Storage contract could make this test fail, feel free to skip it until
-        // the contract's layout is finalized.
-
-        // Set lock address to the execution environment
-        vm.store(address(atlas), bytes32(lockSlot), bytes32(uint256(uint160(address(executionEnvironment)))));
-        // Set deposits to 0
-        vm.store(address(atlas), bytes32(depositsSlot), bytes32(uint256(0)));
-
-        uint256 depositsBefore = atlas.deposits();
-        uint256 surplusAmount = 50_000;
-
-        escrowKey = escrowKey.holdUserLock(address(dAppControl));
-        userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
-        userData = abi.encodePacked(userData, escrowKey.pack());
-        vm.prank(address(atlas));
-        (status,) = address(executionEnvironment).call{ value: surplusAmount }(userData);
-        assertTrue(status);
-        assertEq(atlas.deposits(), depositsBefore + surplusAmount);
-    }
-
     function test_preOpsWrapper() public {
         UserOperation memory userOp;
         bytes memory preOpsData;

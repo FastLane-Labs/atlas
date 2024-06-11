@@ -330,14 +330,14 @@ contract Atlas is Escrow, Factory {
         EscrowKey memory key
     ) internal returns (bool auctionWon, EscrowKey memory) {
 
-        SolverTracker memory sTracker;
+        uint256 bidAmount;
 
-        (auctionWon, key, sTracker) = _executeSolverOperation(
+        (auctionWon, key, bidAmount) = _executeSolverOperation(
             dConfig, userOp, solverOp, returnData, bidAmountFound, true, key
         );
 
         if (auctionWon) {
-            key = _allocateValue(dConfig, solverOp, sTracker, returnData, key);
+            key = _allocateValue(dConfig, solverOp, bidAmount, returnData, key);
         }
 
         return (auctionWon, key);
@@ -364,16 +364,17 @@ contract Atlas is Escrow, Factory {
     {
         uint256 k = solverOps.length;
         uint256 i;
-
+        uint256 bidAmount;
+        
         for (; i < k; ++i) {
             SolverOperation calldata solverOp = solverOps[i];
             SolverTracker memory sTracker;
 
-            (auctionWon, key, sTracker) =
+            (auctionWon, key, bidAmount) =
                 _executeSolverOperation(dConfig, userOp, solverOp, returnData, solverOp.bidAmount, false, key);
 
             if (auctionWon) {
-                key = _allocateValue(dConfig, solverOp, sTracker, returnData, key);
+                key = _allocateValue(dConfig, solverOp, bidAmount, returnData, key);
 
                 key.solverOutcome = uint24(i);
 

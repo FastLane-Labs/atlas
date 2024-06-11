@@ -102,7 +102,7 @@ abstract contract Escrow is AtlETH {
         EscrowKey memory key
     )
         internal
-        returns (bool, EscrowKey memory, SolverTracker memory sTracker)
+        returns (bool, EscrowKey memory, uint256)
     {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
@@ -124,13 +124,15 @@ abstract contract Escrow is AtlETH {
             if (dConfig.callConfig.allowsTrustedOpHash()) {
                 if (!prevalidated && !_handleAltOpHash(userOp, solverOp)) {
                     key.solverOutcome = uint24(result);
-                    return (false, key, sTracker);
+                    return (false, key, 0);
                 }
             }
 
             // If there are no errors, attempt to execute
             if (result.canExecute()) {
        
+                SolverTracker memory sTracker;
+
                 // Execute the solver call
                 // _solverOpsWrapper returns a SolverOutcome enum value
                 (result, sTracker) = _solverOpWrapper(
@@ -145,7 +147,7 @@ abstract contract Escrow is AtlETH {
 
                     key.solverSuccessful = true;
                     // auctionWon = true
-                    return (true, key, sTracker);
+                    return (true, key, sTracker.bidAmount);
                 }
             }
         }
@@ -158,7 +160,7 @@ abstract contract Escrow is AtlETH {
         emit SolverTxResult(solverOp.solver, solverOp.from, result.executedWithError(), false, result);
 
         // auctionWon = false
-        return (false, key, sTracker);
+        return (false, key, 0);
     }
 
     /// @notice Allocates the winning bid amount after a successful SolverOperation execution.
@@ -168,7 +170,7 @@ abstract contract Escrow is AtlETH {
     /// issues in the DAppControl contract, not the execution environment itself.
     /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
     /// @param solverOp SolverOperation struct containing the solver's bid and execution data.
-    /// @param sTracker Bid tracking data, including the winning solver's bid amount, to be allocated.
+    /// @param bidAmount The winning solver's bid amount, to be allocated.
     /// @param returnData Data returned from the execution of the UserOperation, which may influence how the bid amount
     /// is allocated.
     /// @param key EscrowKey struct containing the current state of the escrow lock.
@@ -177,7 +179,7 @@ abstract contract Escrow is AtlETH {
     function _allocateValue(
         DAppConfig calldata dConfig,
         SolverOperation calldata solverOp,
-        SolverTracker memory sTracker,
+        uint256 bidAmount,
         bytes memory returnData,
         EscrowKey memory key
     )
@@ -188,7 +190,7 @@ abstract contract Escrow is AtlETH {
         key = key.holdAllocateValueLock(solverOp.from);
 
         bytes memory data =
-            abi.encodeCall(IExecutionEnvironment.allocateValue, (dConfig.bidToken, sTracker, returnData));
+            abi.encodeCall(IExecutionEnvironment.allocateValue, (dConfig.bidToken, bidAmount, returnData));
         data = abi.encodePacked(data, key.pack());
         (bool success,) = key.executionEnvironment.call(data);
         if (success) {
