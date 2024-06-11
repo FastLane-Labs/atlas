@@ -30,6 +30,7 @@ contract SolverExPost is SolverBase, BlindBackrun {
 
     function atlasSolverCall(
         address sender,
+        address bidRecipient,
         address bidToken,
         uint256 bidAmount,
         bytes calldata solverOpData,
@@ -38,8 +39,8 @@ contract SolverExPost is SolverBase, BlindBackrun {
         external
         payable
         override(SolverBase)
-        safetyFirst(sender)
-        findAndPayBids(bidToken, bidAmount)
+        safetyFirst(bidRecipient, sender)
+        findAndPayBids(bidRecipient, bidToken, bidAmount)
         returns (bool success, bytes memory data)
     {
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
@@ -47,7 +48,7 @@ contract SolverExPost is SolverBase, BlindBackrun {
         require(success, "CALL UNSUCCESSFUL");
     }
 
-    modifier findAndPayBids(address bidToken, uint256 bidAmount) {
+    modifier findAndPayBids(address bidRecipient, address bidToken, uint256 bidAmount) {
         // Track starting balances
 
         // Starting Balance
@@ -76,7 +77,7 @@ contract SolverExPost is SolverBase, BlindBackrun {
                 IWETH9(WETH_ADDRESS).withdraw(ethOwed - address(this).balance);
             }
 
-            SafeTransferLib.safeTransferETH(msg.sender, ethOwed);
+            SafeTransferLib.safeTransferETH(bidRecipient, ethOwed);
         } else {
             // ERC20 balance
 
@@ -85,9 +86,9 @@ contract SolverExPost is SolverBase, BlindBackrun {
             }
 
             if (bidAmount == 0) {
-                SafeTransferLib.safeTransfer(ERC20(bidToken), msg.sender, (balance * _bidPayPercent / 100));
+                SafeTransferLib.safeTransfer(ERC20(bidToken), bidRecipient, (balance * _bidPayPercent / 100));
             } else {
-                SafeTransferLib.safeTransfer(ERC20(bidToken), msg.sender, bidAmount);
+                SafeTransferLib.safeTransfer(ERC20(bidToken), bidRecipient, bidAmount);
             }
         }
     }

@@ -129,7 +129,6 @@ contract ExecutionEnvironment is Base {
     /// @dev This contract is called by the Atlas contract, delegatecalls the preSolver and postSolver hooks if
     /// required, and executes the SolverOperation by calling the `solverOp.solver` address.
     /// @param bidAmount The Solver's bid amount.
-    /// @param gasLimit The gas limit for the SolverOperation.
     /// @param solverOp The SolverOperation struct.
     /// @param returnData Data returned from the previous call phase.
     function solverPreTryCatch(
@@ -151,7 +150,7 @@ contract ExecutionEnvironment is Base {
         sTracker.etherIsBidToken = solverOp.bidToken == address(0);
 
         // bidValue is inverted; Lower bids are better; solver must withdraw <= bidAmount
-        if (config.invertsBidValue()) {
+        if (_config().invertsBidValue()) {
             sTracker.invertsBidValue = true;
             // if invertsBidValue, record ceiling now
             // inventory to send to solver must have been transferred in by userOp or preOp call
@@ -211,13 +210,13 @@ contract ExecutionEnvironment is Base {
         }
 
         bool success;
-        if (config.needsSolverPostCall()) {
+        if (_config().needsSolverPostCall()) {
            
             bytes memory data = forward(
                 abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData))
             );
 
-            (success, data) = control.delegatecall(data);
+            (success, data) = _control().delegatecall(data);
 
             if (!success) {
                 revert AtlasErrors.PostSolverFailed();
@@ -253,7 +252,7 @@ contract ExecutionEnvironment is Base {
     /// @dev This contract is called by the Atlas contract, and delegatecalls the DAppControl contract via the
     /// corresponding `allocateValueCall` function.
     /// @param bidToken The address of the token used for the winning SolverOperation's bid.
-    /// @param bidAmount The winning bid amount.
+    /// @param sTracker Struct trackign bid data including the winning bid amount.
     /// @param allocateData Data returned from the previous call phase.
     function allocateValue(
         address bidToken,

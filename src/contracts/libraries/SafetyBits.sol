@@ -33,11 +33,11 @@ uint16 constant SAFE_DAPP_TRANSFER = 0x0ca0; // 3232
 
 library SafetyBits {
 
-    uint16 internal constant _LOCKED_X_PRESOLVERS_X_REQUESTED = 0x0108;  
+    uint16 internal constant _LOCKED_X_PRESOLVERS_X_REQUESTED = // 
         uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET +
         uint16(ExecutionPhase.PreSolver)));
 
-    uint16 internal constant _LOCKED_X_POSTSOLVERS_X_REQUESTED = 0x0108;  
+    uint16 internal constant _LOCKED_X_POSTSOLVERS_X_REQUESTED = // 
         uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET +
         uint16(ExecutionPhase.PostSolver)));
 
@@ -93,17 +93,15 @@ library SafetyBits {
         return self;
     }
 
-    lockState = uint16(1) << uint16(BaseLock.Active) | uint16(1) << (EXECUTION_PHASE_OFFSET + uint16(phase));
-
     function holdPreSolverLock(EscrowKey memory self) internal pure returns (EscrowKey memory) {
         self.lockState = _LOCKED_X_PRESOLVERS_X_REQUESTED;
-        self.addressPointer = self.environment;
+        self.addressPointer = self.executionEnvironment;
         return self;
     }
 
     function holdPostSolverLock(EscrowKey memory self) internal pure returns (EscrowKey memory) {
         self.lockState = _LOCKED_X_POSTSOLVERS_X_REQUESTED;
-        self.addressPointer = self.environment;
+        self.addressPointer = self.executionEnvironment;
         return self;
     }
 

@@ -434,6 +434,7 @@ contract DummySolver {
 
     function atlasSolverCall(
         address sender,
+        address bidRecipient,
         address,
         uint256 bidAmount,
         bytes calldata solverOpData,
@@ -451,13 +452,13 @@ contract DummySolver {
 
         // Pay bid
         if (address(this).balance >= bidAmount) {
-            SafeTransferLib.safeTransferETH(msg.sender, bidAmount);
+            SafeTransferLib.safeTransferETH(bidRecipient, bidAmount);
         }
 
         // Pay gas
         if (bidAmount != noGasPayBack) {
             uint256 shortfall = IEscrow(_atlas).shortfall();
-            IEscrow(_atlas).reconcile(msg.sender, sender, shortfall);
+            IEscrow(_atlas).reconcile(bidRecipient, sender, shortfall);
         }
 
         return (true, new bytes(0));

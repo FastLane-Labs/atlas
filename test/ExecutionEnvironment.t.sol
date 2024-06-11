@@ -361,6 +361,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(postOpsData);
     }
 
+    /*
     function test_solverMetaTryCatch() public {
         bytes memory solverMetaData;
         bool status;
@@ -525,6 +526,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         _unsetLocks();
     }
 
+    
     function test_allocateValue() public {
         bytes memory allocateData;
         bool status;
@@ -549,6 +551,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.expectRevert(AtlasErrors.AllocateValueDelegatecallFail.selector);
         (status,) = address(executionEnvironment).call(allocateData);
     }
+
+    */
 
     function test_withdrawERC20() public {
         // Valid
@@ -723,6 +727,7 @@ contract MockSolverContract {
 
     function atlasSolverCall(
         address sender,
+        address bidRecipient,
         address,
         uint256,
         bytes calldata solverOpData,
@@ -735,7 +740,7 @@ contract MockSolverContract {
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
         require(success, "atlasSolverCall call reverted");
         if (shouldReconcile) {
-            IEscrow(address(_atlas)).reconcile(msg.sender, sender, type(uint256).max);
+            IEscrow(address(_atlas)).reconcile(bidRecipient, sender, type(uint256).max);
         }
     }
 

@@ -28,6 +28,7 @@ contract SolverBase is Test {
 
     function atlasSolverCall(
         address sender,
+        address bidRecipient,
         address bidToken,
         uint256 bidAmount,
         bytes calldata solverOpData,
@@ -36,8 +37,8 @@ contract SolverBase is Test {
         external
         payable
         virtual
-        safetyFirst(sender)
-        payBids(bidToken, bidAmount)
+        safetyFirst(bidRecipient, sender)
+        payBids(bidRecipient, bidToken, bidAmount)
         returns (bool success, bytes memory data)
     {
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
@@ -45,8 +46,9 @@ contract SolverBase is Test {
         require(success, "CALL UNSUCCESSFUL");
     }
 
-    modifier safetyFirst(address sender) {
+    modifier safetyFirst(address bidRecipient, address sender) {
         // Safety checks
+        require(msg.sender == _atlas, "INVALID_ENTRY");
         require(sender == _owner, "INVALID CALLER");
         // uint256 msgValueOwed = msg.value;
 
@@ -57,10 +59,10 @@ contract SolverBase is Test {
         if (shortfall < msg.value) shortfall = 0;
         else shortfall -= msg.value;
 
-        IEscrow(_atlas).reconcile{ value: msg.value }(msg.sender, sender, shortfall);
+        IEscrow(_atlas).reconcile{ value: msg.value }(bidRecipient, sender, shortfall);
     }
 
-    modifier payBids(address bidToken, uint256 bidAmount) {
+    modifier payBids(address bidRecipient, address bidToken, uint256 bidAmount) {
         _;
 
         // Handle bid payment
@@ -73,7 +75,7 @@ contract SolverBase is Test {
                 IWETH9(WETH_ADDRESS).withdraw(ethOwed - address(this).balance);
             }
 
-            SafeTransferLib.safeTransferETH(msg.sender, bidAmount);
+            SafeTransferLib.safeTransferETH(bidRecipient, bidAmount);
         } else {
             // ERC20 balance
 
@@ -81,7 +83,7 @@ contract SolverBase is Test {
                 IWETH9(WETH_ADDRESS).withdraw(msg.value - address(this).balance);
             }
 
-            SafeTransferLib.safeTransfer(ERC20(bidToken), msg.sender, bidAmount);
+            SafeTransferLib.safeTransfer(ERC20(bidToken), bidRecipient, bidAmount);
         }
     }
 }
