@@ -275,15 +275,27 @@ contract EscrowTest is AtlasBaseTest {
     function test_executeSolverOperation_validateSolverOperation_insufficientEscrow() public {
         // Solver only has 1 ETH escrowed
         vm.txGasPrice(10e18); // Set a gas price that will cause the solver to run out of escrow
+        uint256 solverGasLimit = 1_000_000;
+        uint256 maxSolverGasCost = solverGasLimit * tx.gasprice;
+        assertTrue(maxSolverGasCost > atlas.balanceOfBonded(solverOneEOA), "maxSolverGasCost must be greater than solver bonded AtlETH to trigger InsufficientEscrow");
 
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
+        solverOps[0] = validSolverOperation(userOp)
+            .withBidAmount(defaultBidAmount)
+            .withGas(solverGasLimit)
+            .signAndBuild(address(atlasVerification), solverOnePK);
+
         executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.InsufficientEscrow), true);
     }
 
     function test_executeSolverOperation_validateSolverOperation_callValueTooHigh() public {
+        // Will revert with CallValueTooHigh if more ETH than held in Atlas requested
+        uint256 solverOpValue = 100 ether;
+        assertTrue(solverOpValue > address(atlas).balance, "solverOpValue must be greater than Atlas balance to trigger CallValueTooHigh");
+
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
         solverOps[0] = validSolverOperation(userOp)
-            .withValue(100 ether) // Set a call value that is too high
+            .withValue(solverOpValue) // Set a call value that is too high
             .withBidAmount(defaultBidAmount)
             .signAndBuild(address(atlasVerification), solverOnePK);
         executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.CallValueTooHigh), true);
@@ -381,6 +393,31 @@ contract EscrowTest is AtlasBaseTest {
         executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
+
+    function test_executeSolverOperation_solverBorrowsAndRepaysFullAtlasBalance() public {
+        // Solver borrows and repays the full Atlas balance
+        DummySolverContributor solver = new DummySolverContributor(address(atlas));
+
+        uint256 solverOpValue = address(atlas).balance;
+        assertTrue(solverOpValue > 0, "solverOpValue must be greater than 0");
+        
+
+        deal(address(solver), 10e18); // plenty of ETH to repay what solver owes
+
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
+        solverOps[0] = validSolverOperation(userOp)
+            .withSolver(address(solver))
+            .withValue(solverOpValue)
+            .withBidAmount(defaultBidAmount)
+            .signAndBuild(address(atlasVerification), solverOnePK);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        console.log(solverOps[0].bidToken);
+
+        vm.prank(userEOA);
+        atlas.metacall(userOp, solverOps, dappOp);
+    }
+
     function test_executeSolverOperation_solverOpWrapper_defaultCase() public {
         // Can't find a way to reach the default case (which is a good thing)
         vm.skip(true);
@@ -458,6 +495,37 @@ contract DummySolver {
             uint256 shortfall = IEscrow(_atlas).shortfall();
             IEscrow(_atlas).reconcile(msg.sender, sender, shortfall);
         }
+
+        return (true, new bytes(0));
+    }
+}
+
+contract DummySolverContributor {
+    address private _atlas;
+
+    constructor(address atlas) {
+        _atlas = atlas;
+    }
+
+    function atlasSolverCall(
+        address sender,
+        address,
+        uint256 bidAmount,
+        bytes calldata solverOpData,
+        bytes calldata extraReturnData
+    )
+        external
+        payable
+        returns (bool, bytes memory)
+    {
+        // Pay bid
+        if (address(this).balance >= bidAmount) {
+            SafeTransferLib.safeTransferETH(msg.sender, bidAmount);
+        }
+
+        // Pay borrowed ETH + gas used
+        uint256 shortfall = IEscrow(_atlas).shortfall();
+        IEscrow(_atlas).reconcile{value: address(this).balance}(msg.sender, sender, shortfall);
 
         return (true, new bytes(0));
     }
