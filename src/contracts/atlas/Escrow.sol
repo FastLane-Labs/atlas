@@ -351,7 +351,7 @@ abstract contract Escrow is AtlETH {
 
         data = abi.encodeCall(IAtlas.solverCall, (solverOp.bidAmount, gasLimit, key, solverOp, data));
 
-        (success, data) = key.executionEnvironment.call(data);
+        (success, data) = address(this).call(data);
 
         if (success) {
             revert();
