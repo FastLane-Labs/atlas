@@ -20,7 +20,6 @@ contract ExecutionBaseTest is BaseTest {
     address user;
     address dAppControl;
     uint32 callConfig;
-    bytes32 controlCodeHash;
     bytes randomData;
 
     function setUp() public override {
@@ -30,38 +29,37 @@ contract ExecutionBaseTest is BaseTest {
         user = address(0x2222);
         dAppControl = address(0x3333);
         callConfig = 888;
-        controlCodeHash = bytes32(uint256(666));
         randomData = "0x1234";
     }
 
     function test_forward() public {
         (bytes memory firstSet, EscrowKey memory _escrowKey) = forwardGetFirstSet(SafetyBits._LOCKED_X_PRE_OPS_X_UNSET);
-        bytes memory secondSet = abi.encodePacked(user, dAppControl, callConfig, controlCodeHash);
+        bytes memory secondSet = abi.encodePacked(user, dAppControl, callConfig);
 
         bytes memory expected = bytes.concat(randomData, firstSet, secondSet);
 
-        bytes memory data = abi.encodeWithSelector(MockExecutionEnvironment.forward_.selector, randomData);
+        bytes memory data = abi.encodeWithSelector(MockExecutionEnvironment.forward.selector, randomData);
         executeForwardCase("forward", data, _escrowKey, expected);
     }
 
     function test_forwardSpecial_standard() public {
         (bytes memory firstSet, EscrowKey memory _escrowKey) = forwardGetFirstSet(SafetyBits._LOCKED_X_PRE_OPS_X_UNSET);
-        bytes memory secondSet = abi.encodePacked(user, dAppControl, callConfig, controlCodeHash);
+        bytes memory secondSet = abi.encodePacked(user, dAppControl, callConfig);
 
         bytes memory expected = bytes.concat(randomData, firstSet, secondSet);
 
-        bytes memory data = abi.encodeWithSelector(MockExecutionEnvironment.forwardSpecial_.selector, randomData);
+        bytes memory data = abi.encodeWithSelector(MockExecutionEnvironment.forwardSpecial.selector, randomData);
         executeForwardCase("forwardSpecial_standard", data, _escrowKey, expected);
     }
 
     function test_forwardSpecial_phaseSwitch() public {
         (bytes memory firstSet, EscrowKey memory _escrowKey) =
             forwardGetFirstSet(SafetyBits._LOCKED_X_SOLVERS_X_REQUESTED);
-        bytes memory secondSet = abi.encodePacked(user, dAppControl, callConfig, controlCodeHash);
+        bytes memory secondSet = abi.encodePacked(user, dAppControl, callConfig);
 
         bytes memory expected = bytes.concat(randomData, firstSet, secondSet);
 
-        bytes memory data = abi.encodeWithSelector(MockExecutionEnvironment.forwardSpecial_.selector, randomData);
+        bytes memory data = abi.encodeWithSelector(MockExecutionEnvironment.forwardSpecial.selector, randomData);
         executeForwardCase("forwardSpecial_phaseSwitch", data, _escrowKey, expected);
     }
 
@@ -76,7 +74,7 @@ contract ExecutionBaseTest is BaseTest {
         data = abi.encodePacked(data, escrowKey.pack());
 
         // Mimic the Mimic
-        data = abi.encodePacked(data, user, dAppControl, callConfig, controlCodeHash);
+        data = abi.encodePacked(data, user, dAppControl, callConfig);
 
         (, bytes memory result) = address(mockExecutionEnvironment).call(data);
         result = abi.decode(result, (bytes));
@@ -128,11 +126,11 @@ contract ExecutionBaseTest is BaseTest {
 contract MockExecutionEnvironment is Base {
     constructor(address _atlas) Base(_atlas) { }
 
-    function forward_(bytes memory data) external pure returns (bytes memory) {
-        return forward(data);
+    function forward(bytes memory data) external pure returns (bytes memory) {
+        return _forward(data);
     }
 
-    function forwardSpecial_(bytes memory data) external pure returns (bytes memory) {
-        return forwardSpecial(data, ExecutionPhase.PreSolver);
+    function forwardSpecial(bytes memory data) external pure returns (bytes memory) {
+        return _forwardSpecial(data, ExecutionPhase.PreSolver);
     }
 }

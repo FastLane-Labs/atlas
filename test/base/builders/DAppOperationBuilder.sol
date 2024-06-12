@@ -29,16 +29,6 @@ contract DAppOperationBuilder is Test {
         return this;
     }
 
-    function withValue(uint256 value) public returns (DAppOperationBuilder) {
-        dappOperation.value = value;
-        return this;
-    }
-
-    function withGas(uint256 gas) public returns (DAppOperationBuilder) {
-        dappOperation.gas = gas;
-        return this;
-    }
-
     function withNonce(uint256 nonce) public returns (DAppOperationBuilder) {
         dappOperation.nonce = nonce;
         return this;

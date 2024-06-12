@@ -64,15 +64,15 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
 
-        // Fails with UserSignatureInvalid due to re-used user nonce
+        // Fails with UserNonceInvalid due to re-used user nonce
         userOp = validUserOperation().withNonce(1).build();
         solverOps = validSolverOperations(userOp);
         dappOp = validDAppOperation(userOp, solverOps).withNonce(5).signAndBuild(address(atlasVerification), governancePK);
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.UserSignatureInvalid);
+        ), ValidCallsResult.UserNonceInvalid);
 
-        // Fails with DAppSignatureInvalid due to re-used dapp nonce
+        // Fails with InvalidDAppNonce due to re-used dapp nonce
         userOp = validUserOperation().withNonce(2).build();
         solverOps = validSolverOperations(userOp);
         dappOp = validDAppOperation(userOp, solverOps).withNonce(1).signAndBuild(address(atlasVerification), governancePK);

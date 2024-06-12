@@ -10,12 +10,12 @@ import { EXECUTION_PHASE_OFFSET, SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 contract Base {
-    address public immutable atlas;
-    address public immutable source;
+    address public immutable ATLAS;
+    address public immutable SOURCE;
 
     constructor(address _atlas) {
-        atlas = _atlas;
-        source = address(this);
+        ATLAS = _atlas;
+        SOURCE = address(this);
     }
 
     // These functions only work inside of the ExecutionEnvironment (mimic)
@@ -28,10 +28,10 @@ contract Base {
     }
 
     function _onlyAtlasEnvironment(ExecutionPhase phase, uint8 acceptableDepths) internal view {
-        if (address(this) == source) {
+        if (address(this) == SOURCE) {
             revert AtlasErrors.MustBeDelegatecalled();
         }
-        if (msg.sender != atlas) {
+        if (msg.sender != ATLAS) {
             revert AtlasErrors.OnlyAtlas();
         }
         if (uint16(1 << (EXECUTION_PHASE_OFFSET + uint16(phase))) & _lockState() == 0) {
@@ -42,9 +42,12 @@ contract Base {
         }
     }
 
-    function forward(bytes memory data) internal pure returns (bytes memory) {
-        // TODO: simplify this into just the bytes
+    function _forward(bytes memory data) internal pure returns (bytes memory) {
         return bytes.concat(data, _firstSet(), _secondSet());
+    }
+
+    function _forwardSpecial(bytes memory data, ExecutionPhase phase) internal pure returns (bytes memory) {
+        return bytes.concat(data, _firstSetSpecial(phase), _secondSet());
     }
 
     function _firstSet() internal pure returns (bytes memory data) {
@@ -60,15 +63,6 @@ contract Base {
             _simulation(),
             _depth() + 1
         );
-    }
-
-    function _secondSet() internal pure returns (bytes memory data) {
-        data = abi.encodePacked(_user(), _control(), _config(), _controlCodeHash());
-    }
-
-    function forwardSpecial(bytes memory data, ExecutionPhase phase) internal pure returns (bytes memory) {
-        // TODO: simplify this into just the bytes
-        return bytes.concat(data, _firstSetSpecial(phase), _secondSet());
     }
 
     function _firstSetSpecial(ExecutionPhase phase) internal pure returns (bytes memory data) {
@@ -95,19 +89,15 @@ contract Base {
         );
     }
 
-    /// @notice Extracts and returns the codehash of the current DAppControl contract, from calldata.
-    /// @return controlCodeHash The codehash of the current DAppControl contract.
-    function _controlCodeHash() internal pure returns (bytes32 controlCodeHash) {
-        assembly {
-            controlCodeHash := calldataload(sub(calldatasize(), 32))
-        }
+    function _secondSet() internal pure returns (bytes memory data) {
+        data = abi.encodePacked(_user(), _control(), _config());
     }
 
     /// @notice Extracts and returns the CallConfig of the current DAppControl contract, from calldata.
     /// @return config The CallConfig of the current DAppControl contract, in uint32 form.
     function _config() internal pure returns (uint32 config) {
         assembly {
-            config := shr(224, calldataload(sub(calldatasize(), 36)))
+            config := shr(224, calldataload(sub(calldatasize(), 4)))
         }
     }
 
@@ -115,7 +105,7 @@ contract Base {
     /// @return control The address of the current DAppControl contract.
     function _control() internal pure returns (address control) {
         assembly {
-            control := shr(96, calldataload(sub(calldatasize(), 56)))
+            control := shr(96, calldataload(sub(calldatasize(), 24)))
         }
     }
 
@@ -123,7 +113,7 @@ contract Base {
     /// @return user The address of the user of the current metacall tx.
     function _user() internal pure returns (address user) {
         assembly {
-            user := shr(96, calldataload(sub(calldatasize(), 76)))
+            user := shr(96, calldataload(sub(calldatasize(), 44)))
         }
     }
 
@@ -133,7 +123,7 @@ contract Base {
     /// @return callDepth The call depth of the current step in the current metacall tx.
     function _depth() internal pure returns (uint8 callDepth) {
         assembly {
-            callDepth := shr(248, calldataload(sub(calldatasize(), 77)))
+            callDepth := shr(248, calldataload(sub(calldatasize(), 45)))
         }
     }
 
@@ -142,7 +132,7 @@ contract Base {
     /// @return simulation The boolean indicating whether the current metacall tx is a simulation or not.
     function _simulation() internal pure returns (bool simulation) {
         assembly {
-            simulation := shr(248, calldataload(sub(calldatasize(), 78)))
+            simulation := shr(248, calldataload(sub(calldatasize(), 46)))
         }
     }
 
@@ -151,7 +141,7 @@ contract Base {
     /// @return bidFind The boolean indicating whether the current metacall tx uses on-chain bid-finding, or not.
     function _bidFind() internal pure returns (bool bidFind) {
         assembly {
-            bidFind := shr(248, calldataload(sub(calldatasize(), 79)))
+            bidFind := shr(248, calldataload(sub(calldatasize(), 47)))
         }
     }
 
@@ -160,7 +150,7 @@ contract Base {
     /// @return solverOutcome The solver outcome bitmap in its current status, in uint24 form.
     function _solverOutcome() internal pure returns (uint24 solverOutcome) {
         assembly {
-            solverOutcome := shr(232, calldataload(sub(calldatasize(), 82)))
+            solverOutcome := shr(232, calldataload(sub(calldatasize(), 50)))
         }
     }
 
@@ -168,7 +158,7 @@ contract Base {
     /// @return lockState The lock state bitmap of the current metacall tx, in uint16 form.
     function _lockState() internal pure returns (uint16 lockState) {
         assembly {
-            lockState := shr(240, calldataload(sub(calldatasize(), 84)))
+            lockState := shr(240, calldataload(sub(calldatasize(), 52)))
         }
     }
 
@@ -178,7 +168,7 @@ contract Base {
     /// @return callCount The call count of the current metacall tx.
     function _callCount() internal pure returns (uint8 callCount) {
         assembly {
-            callCount := shr(248, calldataload(sub(calldatasize(), 85)))
+            callCount := shr(248, calldataload(sub(calldatasize(), 53)))
         }
     }
 
@@ -189,7 +179,7 @@ contract Base {
     /// @return callIndex The call index of the current metacall tx.
     function _callIndex() internal pure returns (uint8 callIndex) {
         assembly {
-            callIndex := shr(248, calldataload(sub(calldatasize(), 86)))
+            callIndex := shr(248, calldataload(sub(calldatasize(), 54)))
         }
     }
 
@@ -199,7 +189,7 @@ contract Base {
     /// step in the current metacall tx.
     function _paymentsSuccessful() internal pure returns (bool paymentsSuccessful) {
         assembly {
-            paymentsSuccessful := shr(248, calldataload(sub(calldatasize(), 87)))
+            paymentsSuccessful := shr(248, calldataload(sub(calldatasize(), 55)))
         }
     }
 
@@ -209,7 +199,7 @@ contract Base {
     /// current metacall tx.
     function _solverSuccessful() internal pure returns (bool solverSuccessful) {
         assembly {
-            solverSuccessful := shr(248, calldataload(sub(calldatasize(), 88)))
+            solverSuccessful := shr(248, calldataload(sub(calldatasize(), 56)))
         }
     }
 
@@ -220,50 +210,67 @@ contract Base {
     /// @return addressPointer The current value of the addressPointer of the current metacall tx.
     function _addressPointer() internal pure returns (address addressPointer) {
         assembly {
-            addressPointer := shr(96, calldataload(sub(calldatasize(), 108)))
+            addressPointer := shr(96, calldataload(sub(calldatasize(), 76)))
         }
     }
 
     /// @notice Returns the address of the currently active Execution Environment, if any.
     /// @return activeEnvironment The address of the currently active Execution Environment.
     function _activeEnvironment() internal view returns (address activeEnvironment) {
-        activeEnvironment = ISafetyLocks(atlas).activeEnvironment();
+        activeEnvironment = ISafetyLocks(ATLAS).activeEnvironment();
     }
 }
 
+// ExecutionBase is inherited by DAppControl. It inherits Base to as a common root contract shared between
+// ExecutionEnvironment and DAppControl. ExecutionBase then adds utility functions which make it easier for custom
+// DAppControls to interact with Atlas.
 contract ExecutionBase is Base {
     constructor(address _atlas) Base(_atlas) { }
 
-    // Deposit local funds to the transient Atlas balance
-    // NOTE that this will go towards the Bundler, with the surplus going to the Solver.
+    /// @notice Deposits local funds from this Execution Environment, to the transient Atlas balance. These funds go
+    /// towards the bundler, with any surplus going to the Solver.
+    /// @param amt The amount of funds to deposit.
     function _contribute(uint256 amt) internal {
-        if (msg.sender != atlas) revert AtlasErrors.OnlyAtlas();
         if (amt > address(this).balance) revert AtlasErrors.InsufficientLocalFunds();
 
-        IEscrow(atlas).contribute{ value: amt }();
+        IEscrow(ATLAS).contribute{ value: amt }();
     }
 
-    // Borrow funds from the transient Atlas balance that will be repaid by the Solver (or self via another deposit)
+    /// @notice Borrows funds from the transient Atlas balance that will be repaid by the Solver or this Execution
+    /// Environment via `_contribute()`
+    /// @param amt The amount of funds to borrow.
     function _borrow(uint256 amt) internal {
-        if (msg.sender != atlas) revert AtlasErrors.OnlyAtlas();
-
-        IEscrow(atlas).borrow(amt);
+        IEscrow(ATLAS).borrow(amt);
     }
 
+    /// @notice Transfers ERC20 tokens from the user of the current metacall tx, via Atlas, to a specified destination.
+    /// @dev This will only succeed if Atlas is in a phase included in `SAFE_USER_TRANSFER`. See SafetyBits.sol.
+    /// @param token The address of the ERC20 token contract.
+    /// @param destination The address to which the tokens will be transferred.
+    /// @param amount The amount of tokens to transfer.
     function _transferUserERC20(address token, address destination, uint256 amount) internal {
-        if (msg.sender != atlas) {
-            revert AtlasErrors.OnlyAtlas();
-        }
-        IPermit69(atlas).transferUserERC20(token, destination, amount, _user(), _control(), _config(), _lockState());
+        IPermit69(ATLAS).transferUserERC20(token, destination, amount, _user(), _control(), _config(), _lockState());
     }
 
+    /// @notice Transfers ERC20 tokens from the DApp of the current metacall tx, via Atlas, to a specified destination.
+    /// @dev This will only succeed if Atlas is in a phase included in `SAFE_DAPP_TRANSFER`. See SafetyBits.sol.
+    /// @param token The address of the ERC20 token contract.
+    /// @param destination The address to which the tokens will be transferred.
+    /// @param amount The amount of tokens to transfer.
     function _transferDAppERC20(address token, address destination, uint256 amount) internal {
-        if (msg.sender != atlas) {
-            revert AtlasErrors.OnlyAtlas();
-        }
-        IPermit69(atlas).transferDAppERC20(token, destination, amount, _user(), _control(), _config(), _lockState());
+        IPermit69(ATLAS).transferDAppERC20(token, destination, amount, _user(), _control(), _config(), _lockState());
     }
 
+    /// @notice Returns a bool indicating whether a source address has approved the Atlas contract to transfer a certain
+    /// amount of a certain token, and whether Atlas is in the correct phase to transfer the token. Note: this is just
+    /// for convenience - transfers via `_transferDAppERC20()` and `_transferUserERC20()` will independently ensure all
+    /// necessary checks are made.
+    /// @param _token The address of the ERC20 token contract.
+    /// @param _source The address of the source of the tokens.
+    /// @param _amount The amount of tokens to transfer.
+    /// @param phase The phase of the current metacall tx.
+    /// @return available A bool indicating whether a transfer from the source, via Atlas, of the specified amount of
+    /// the specified token, will succeed.
     function _availableFundsERC20(
         address _token,
         address _source,
@@ -287,19 +294,22 @@ contract ExecutionBase is Base {
             if (shiftedPhase & SAFE_USER_TRANSFER == 0) {
                 return false;
             }
-            if (ERC20(_token).allowance(user, atlas) < _amount) {
-                return false;
-            }
-            return true;
-        } else if (_source == dapp) {
-            if (shiftedPhase & SAFE_DAPP_TRANSFER == 0) {
-                return false;
-            }
-            if (ERC20(_token).allowance(dapp, atlas) < _amount) {
+            if (ERC20(_token).allowance(user, ATLAS) < _amount) {
                 return false;
             }
             return true;
         }
+
+        if (_source == dapp) {
+            if (shiftedPhase & SAFE_DAPP_TRANSFER == 0) {
+                return false;
+            }
+            if (ERC20(_token).allowance(dapp, ATLAS) < _amount) {
+                return false;
+            }
+            return true;
+        }
+
         return false;
     }
 }

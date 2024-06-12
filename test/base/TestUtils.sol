@@ -8,7 +8,11 @@ import "src/contracts/types/UserCallTypes.sol";
 import "src/contracts/types/SolverCallTypes.sol";
 import "src/contracts/types/DAppApprovalTypes.sol";
 
+import { CallBits } from "src/contracts/libraries/CallBits.sol";
+
 library TestUtils {
+    using CallBits for uint32;
+
     // String <> uint16 binary Converter Utility
     function uint16ToBinaryString(uint16 n) public pure returns (string memory) {
         uint256 newN = uint256(n);
@@ -17,8 +21,7 @@ library TestUtils {
 
         bytes memory output = new bytes(16);
 
-        uint256 i = 0;
-        for (; i < 16; i++) {
+        for (uint256 i = 0; i < 16; i++) {
             if (newN == 0) {
                 // Now that we've filled in the last 1, fill rest of 0s in
                 for (; i < 16; i++) {
@@ -40,8 +43,7 @@ library TestUtils {
 
         bytes memory output = new bytes(32);
 
-        uint256 i = 0;
-        for (; i < 32; i++) {
+        for (uint256 i = 0; i < 32; i++) {
             if (newN == 0) {
                 // Now that we've filled in the last 1, fill rest of 0s in
                 for (; i < 32; i++) {
@@ -59,8 +61,7 @@ library TestUtils {
     function uint256ToBinaryString(uint256 n) public pure returns (string memory) {
         bytes memory output = new bytes(256);
 
-        uint256 i = 0;
-        for (; i < 256; i++) {
+        for (uint256 i = 0; i < 256; i++) {
             if (n == 0) {
                 // Now that we've filled in the last 1, fill rest of 0s in
                 for (; i < 256; i++) {
@@ -74,53 +75,6 @@ library TestUtils {
         return string(output);
     }
 
-    function _getMimicCreationCode(
-        address control,
-        uint32 callConfig,
-        address executionLib,
-        address user,
-        bytes32 controlCodeHash
-    )
-        internal
-        pure
-        returns (bytes memory creationCode)
-    {
-        // NOTE: Changing compiler settings or solidity versions can break this.
-        creationCode = type(Mimic).creationCode;
-
-        // TODO: unpack the SHL and reorient
-        assembly {
-            mstore(
-                add(creationCode, 85),
-                or(
-                    and(mload(add(creationCode, 85)), not(shl(96, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF))),
-                    shl(96, executionLib)
-                )
-            )
-
-            mstore(
-                add(creationCode, 118),
-                or(
-                    and(mload(add(creationCode, 118)), not(shl(96, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF))),
-                    shl(96, user)
-                )
-            )
-
-            mstore(
-                add(creationCode, 139),
-                or(
-                    and(
-                        mload(add(creationCode, 139)),
-                        not(shl(56, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00FFFFFFFF))
-                    ),
-                    add(shl(96, control), add(shl(88, 0x63), shl(56, callConfig)))
-                )
-            )
-
-            mstore(add(creationCode, 165), controlCodeHash)
-        }
-    }
-
     function computeCallChainHash(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
@@ -130,39 +84,15 @@ library TestUtils {
         pure
         returns (bytes32 callSequenceHash)
     {
-        uint256 i;
-        if (dConfig.callConfig & 1 << uint32(CallConfigIndex.RequirePreOps) != 0) {
+        bytes memory callSequence;
+
+        if (dConfig.callConfig.needsPreOpsCall()) {
             // Start with preOps call if preOps is needed
-            callSequenceHash = keccak256(
-                abi.encodePacked(
-                    callSequenceHash, // initial hash = null
-                    dConfig.to,
-                    abi.encodeWithSelector(IDAppControl.preOpsCall.selector, userOp),
-                    i++
-                )
-            );
+            callSequence = abi.encodePacked(dConfig.to);
         }
 
-        // then user call
-        callSequenceHash = keccak256(
-            abi.encodePacked(
-                callSequenceHash, // always reference previous hash
-                abi.encode(userOp),
-                i++
-            )
-        );
-
-        // then solver calls
-        uint256 count = solverOps.length;
-        uint256 n;
-        for (; n < count; ++n) {
-            callSequenceHash = keccak256(
-                abi.encodePacked(
-                    callSequenceHash, // reference previous hash
-                    abi.encode(solverOps[n]), // solver call
-                    i++
-                )
-            );
-        }
+        // Then user and solver call
+        callSequence = abi.encodePacked(callSequence, abi.encode(userOp), abi.encode(solverOps));
+        callSequenceHash = keccak256(callSequence);
     }
 }

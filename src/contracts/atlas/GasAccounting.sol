@@ -176,13 +176,7 @@ abstract contract GasAccounting is SafetyLocks {
                 aData.lastAccessedBlock = uint32(block.number);
             }
 
-            // Reputation Analytics: Track total gas used, solver wins, and failures
-            aData.totalGasUsed += uint64(amount / _GAS_USED_DECIMALS_TO_DROP);
-            if (solverWon) {
-                aData.auctionWins++;
-            } else if (!bidFind) {
-                aData.auctionFails++;
-            }
+            _updateAnalytics(aData, amt, solverWon, bidFind);
 
             accessData[owner] = aData;
 
@@ -205,6 +199,8 @@ abstract contract GasAccounting is SafetyLocks {
 
         bondedTotalSupply += amount;
 
+        _updateAnalytics(aData, 0, true, false);
+
         accessData[owner] = aData;
     }
 
@@ -216,9 +212,9 @@ abstract contract GasAccounting is SafetyLocks {
         if (_borrow(solverOp.value)) {
             _solverLock = uint256(uint160(solverOp.from));
             return true;
-        } else {
-            return false;
         }
+
+        return false;
     }
 
     /// @notice Releases the solver lock and adjusts the solver's escrow balance based on the gas used and other
@@ -312,5 +308,28 @@ abstract contract GasAccounting is SafetyLocks {
 
         // _SOLVER_OP_BASE_CALLDATA = SolverOperation calldata length excluding solverOp.data
         calldataCost = (calldataLength + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM * tx.gasprice;
+    }
+
+    /// @notice Reputation Analytics: Track total gas used, solver wins, and failures.
+    /// @dev The aData struct is passed by reference. The calling function is responsible for updating the storage.
+    /// @param aData The EscrowAccountAccessData for the solver.
+    /// @param gasUsed The gas charged to the solver.
+    /// @param solverWon A boolean indicating whether the solver won the auction.
+    /// @param bidFind Indicates if called in the context of `_getBidAmount` in Escrow.sol (true) or not (false).
+    function _updateAnalytics(
+        EscrowAccountAccessData memory aData,
+        uint256 gasUsed,
+        bool solverWon,
+        bool bidFind
+    )
+        internal
+        pure
+    {
+        if (gasUsed > 0) aData.totalGasUsed += uint64(gasUsed / _GAS_USED_DECIMALS_TO_DROP);
+        if (solverWon) {
+            aData.auctionWins++;
+        } else if (!bidFind) {
+            aData.auctionFails++;
+        }
     }
 }

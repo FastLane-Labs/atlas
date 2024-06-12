@@ -56,6 +56,7 @@ contract ExPostTest is BaseTest {
 
         UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
         userOp.control = address(v2ExPost);
+        userOp.callConfig = v2ExPost.CALL_CONFIG();
 
         // user does not sign their own operation when bundling
         // (v, r, s) = vm.sign(userPK, atlasVerification.getUserOperationPayload(userOp));
@@ -134,7 +135,7 @@ contract ExPostTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
         (simSuccess, simResult,) = simulator.simSolverCall(userOp, solverOps[0], dAppOp);
-        assertTrue(simSuccess, "solverOps[0] should succeed in simulator");
+        assertEq(simSuccess, false, "solverOps[0] should fail in sim due to swap path");
 
         // Simulate the second SolverOp
         tempSolverOps[0] = solverOps[1];
@@ -142,7 +143,7 @@ contract ExPostTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
         (simSuccess, simResult,) = simulator.simSolverCall(userOp, solverOps[1], dAppOp);
-        assertEq(simSuccess, false, "solverOps[1] should fail in sim due to swap path");
+        assertEq(simSuccess, true, "solverOps[1] should succeed in simulator");
 
         // Simulate all SolverOps together
         dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
@@ -283,6 +284,7 @@ contract ExPostTest is BaseTest {
         uint256 NUM_SOLVE_OPS = 3;
         UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
         userOp.control = address(v2ExPost);
+        userOp.callConfig = v2ExPost.CALL_CONFIG();
         SolverOperation[] memory solverOps = new SolverOperation[](NUM_SOLVE_OPS);
         bytes memory solverOpData;
         address[] memory solverEOAs = new address[](NUM_SOLVE_OPS);

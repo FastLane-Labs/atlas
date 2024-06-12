@@ -20,5 +20,12 @@ enum ValidCallsResult {
     DeadlineMismatch,
     InvalidControl,
     InvalidSolverGasLimit,
-    InvalidDAppNonce
+    InvalidDAppNonce,
+    CallConfigMismatch,
+    DAppToInvalid,
+    UserFromInvalid,
+    UserSmartWalletInvalid,
+    ControlMismatch,
+    UserNonceInvalid,
+    InvalidCallChainHash
 }

@@ -27,6 +27,7 @@ enum SolverOutcome {
     DeadlinePassed,
     GasPriceOverCap,
     InvalidSolver,
+    InvalidBidToken,
     PerBlockLimit, // solvers can only send one tx per block
     // if they sent two we wouldn't be able to flag builder censorship
     InsufficientEscrow,

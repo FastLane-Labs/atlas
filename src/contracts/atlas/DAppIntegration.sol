@@ -59,12 +59,7 @@ contract DAppIntegration {
         if (msg.sender != govAddress) revert AtlasErrors.OnlyGovernance();
 
         // Add DAppControl gov as a signatory
-        bytes32 signatoryKey = keccak256(abi.encodePacked(control, msg.sender));
-
-        if (signatories[signatoryKey]) revert AtlasErrors.OwnerActive();
-
-        signatories[signatoryKey] = true;
-        dAppSignatories[control].push(msg.sender);
+        _addSignatory(control, msg.sender);
 
         uint32 callConfig = IDAppControl(control).CALL_CONFIG();
         emit AtlasEvents.NewDAppSignatory(control, govAddress, msg.sender, callConfig);
@@ -117,21 +112,34 @@ contract DAppIntegration {
     }
 
     /// @notice Disables a dApp from the Atlas protocol.
-    /// @param dAppControl The address of the DAppControl contract.
-    function disableDApp(address dAppControl) external {
+    /// @param control The address of the DAppControl contract.
+    function disableDApp(address control) external {
         _checkAtlasIsUnlocked();
-        address dAppGov = IDAppControl(dAppControl).getDAppSignatory();
+        address dAppGov = IDAppControl(control).getDAppSignatory();
         if (msg.sender != dAppGov) revert AtlasErrors.OnlyGovernance();
-        bytes32 signatoryKey = keccak256(abi.encodePacked(dAppControl, dAppGov));
-        signatories[signatoryKey] = false;
 
-        uint32 callConfig = IDAppControl(dAppControl).CALL_CONFIG();
-        emit AtlasEvents.DAppDisabled(dAppControl, dAppGov, callConfig);
+        bytes32 signatoryKey = keccak256(abi.encodePacked(control, dAppGov));
+        if (!signatories[signatoryKey]) revert AtlasErrors.DAppNotEnabled();
+
+        _removeSignatory(control, dAppGov);
+
+        uint32 callConfig = IDAppControl(control).CALL_CONFIG();
+        emit AtlasEvents.DAppDisabled(control, dAppGov, callConfig);
     }
 
     // ---------------------------------------------------- //
     //                   Internal Functions                 //
     // ---------------------------------------------------- //
+
+    /// @notice Returns whether a specified address is a signatory for a specified DAppControl contract.
+    /// @param dAppControl The address of the DAppControl contract.
+    /// @param signatory The address to check.
+    /// @return A boolean indicating whether the specified address is a signatory for the specified DAppControl
+    /// contract.
+    function _isDAppSignatory(address dAppControl, address signatory) internal view returns (bool) {
+        bytes32 signatoryKey = keccak256(abi.encodePacked(dAppControl, signatory));
+        return signatories[signatoryKey];
+    }
 
     /// @notice Adds a new signatory to a dApp's list of approved signatories.
     /// @param control The address of the DAppControl contract.
@@ -149,7 +157,7 @@ contract DAppIntegration {
     function _removeSignatory(address control, address signatory) internal {
         bytes32 signatoryKey = keccak256(abi.encodePacked(control, signatory));
         delete signatories[signatoryKey];
-        for (uint256 i = 0; i < dAppSignatories[control].length; i++) {
+        for (uint256 i; i < dAppSignatories[control].length; i++) {
             if (dAppSignatories[control][i] == signatory) {
                 dAppSignatories[control][i] = dAppSignatories[control][dAppSignatories[control].length - 1];
                 dAppSignatories[control].pop();
@@ -183,8 +191,7 @@ contract DAppIntegration {
     /// @return A boolean indicating whether the specified address is a signatory for the specified DAppControl
     /// contract.
     function isDAppSignatory(address dAppControl, address signatory) external view returns (bool) {
-        bytes32 signatoryKey = keccak256(abi.encodePacked(dAppControl, signatory));
-        return signatories[signatoryKey];
+        return _isDAppSignatory(dAppControl, signatory);
     }
 
     /// @notice Returns an array of signatories for a specified DAppControl contract.

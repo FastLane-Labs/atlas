@@ -70,9 +70,9 @@ contract ChainlinkAtlasWrapper is Ownable {
     function latestAnswer() public view returns (int256) {
         if (BASE_FEED.latestTimestamp() >= atlasLatestTimestamp) {
             return BASE_FEED.latestAnswer();
-        } else {
-            return atlasLatestAnswer;
         }
+
+        return atlasLatestAnswer;
     }
 
     // Use this contract's latestTimestamp if more recent than base oracle's.
@@ -80,9 +80,9 @@ contract ChainlinkAtlasWrapper is Ownable {
     function latestTimestamp() public view returns (uint256) {
         if (BASE_FEED.latestTimestamp() >= atlasLatestTimestamp) {
             return BASE_FEED.latestTimestamp();
-        } else {
-            return atlasLatestTimestamp;
         }
+
+        return atlasLatestTimestamp;
     }
 
     // Fallback to base oracle's latestRoundData, unless this contract's latestTimestamp and latestAnswer are more
@@ -133,7 +133,7 @@ contract ChainlinkAtlasWrapper is Ownable {
         (,, r.observations) = abi.decode(report, (bytes32, bytes32, int192[]));
 
         // Check observations are ordered, then take median observation
-        for (uint256 i = 0; i < r.observations.length - 1; ++i) {
+        for (uint256 i; i < r.observations.length - 1; ++i) {
             bool inOrder = r.observations[i] <= r.observations[i + 1];
             if (!inOrder) revert ObservationsNotOrdered();
         }
@@ -142,7 +142,7 @@ contract ChainlinkAtlasWrapper is Ownable {
 
         bytes32 reportHash = keccak256(report);
 
-        for (uint256 i = 0; i < rs.length; ++i) {
+        for (uint256 i; i < rs.length; ++i) {
             address signer = ecrecover(reportHash, uint8(rawVs[i]) + 27, rs[i], ss[i]);
             if (!_isSigner(validTransmitters, aggregator, signer)) {
                 // console.log("invalid signer:", signer);

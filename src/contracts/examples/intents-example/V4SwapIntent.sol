@@ -72,7 +72,7 @@ contract V4SwapIntentControl is DAppControl {
     //////////////////////////////////
 
     modifier verifyCall(address tokenIn, address tokenOut, uint256 amount) {
-        require(msg.sender == atlas, "ERR-PI002 InvalidSender");
+        require(msg.sender == ATLAS, "ERR-PI002 InvalidSender");
         require(_addressPointer() == CONTROL, "ERR-PI003 InvalidLockState");
         require(address(this) != CONTROL, "ERR-PI004 MustBeDelegated");
 
@@ -162,7 +162,7 @@ contract V4SwapIntentControl is DAppControl {
         returns (bool)
     {
         address solverTo = solverOp.solver;
-        if (solverTo == address(this) || solverTo == _control() || solverTo == atlas) {
+        if (solverTo == address(this) || solverTo == _control() || solverTo == ATLAS) {
             return false;
         }
 
@@ -237,9 +237,9 @@ contract V4SwapIntentControl is DAppControl {
                 ERC20(swapData.tokenOut).safeTransfer(swapData.recipient, amountUserBuys);
             }
             return true;
-        } else {
-            return false;
         }
+
+        return false;
     }
 
     // This occurs after a Solver has successfully paid their bid, which is

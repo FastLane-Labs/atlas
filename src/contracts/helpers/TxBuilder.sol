@@ -77,6 +77,7 @@ contract TxBuilder {
             deadline: deadline,
             dapp: to,
             control: control,
+            callConfig: IDAppControl(control).CALL_CONFIG(),
             sessionKey: address(0),
             data: data,
             signature: new bytes(0)
@@ -136,8 +137,6 @@ contract TxBuilder {
         dAppOp = DAppOperation({
             from: governanceEOA,
             to: atlas,
-            value: 0,
-            gas: 2_000_000,
             nonce: governanceNextNonce(governanceEOA),
             deadline: userOp.deadline,
             control: userOp.control,

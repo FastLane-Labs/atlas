@@ -65,6 +65,7 @@ contract EscrowTest is AtlasBaseTest {
             .withDeadline(block.number + 2)
             .withDapp(address(dAppControl))
             .withControl(address(dAppControl))
+            .withCallConfig(dAppControl.CALL_CONFIG())
             .withSessionKey(address(0))
             .withData("")
             .sign(address(atlasVerification), userPK);
@@ -97,8 +98,6 @@ contract EscrowTest is AtlasBaseTest {
         return new DAppOperationBuilder()
             .withFrom(governanceEOA)
             .withTo(address(atlas))
-            .withValue(0)
-            .withGas(2_000_000)
             .withNonce(address(atlasVerification), governanceEOA)
             .withDeadline(userOp.deadline)
             .withControl(userOp.control)

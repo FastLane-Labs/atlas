@@ -83,7 +83,7 @@ contract SwapIntentDAppControl is DAppControl {
     * @return swapData The SwapData struct
     */
     function swap(SwapIntent calldata swapIntent) external payable returns (SwapData memory) {
-        require(msg.sender == atlas, "SwapIntentDAppControl: InvalidSender");
+        require(msg.sender == ATLAS, "SwapIntentDAppControl: InvalidSender");
         require(_addressPointer() == CONTROL, "SwapIntentDAppControl: InvalidLockState");
         require(address(this) != CONTROL, "SwapIntentDAppControl: MustBeDelegated");
         require(swapIntent.tokenUserSells != swapIntent.auctionBaseCurrency, "SwapIntentDAppControl: SellIsSurplus");
@@ -95,13 +95,14 @@ contract SwapIntentDAppControl is DAppControl {
             "SwapIntentDAppControl: SellFundsUnavailable"
         );
 
-        if (swapIntent.conditions.length > 0) {
-            require(swapIntent.conditions.length <= MAX_USER_CONDITIONS, "SwapIntentDAppControl: TooManyConditions");
+        uint256 conditionsLength = swapIntent.conditions.length;
+        if (conditionsLength > 0) {
+            require(conditionsLength <= MAX_USER_CONDITIONS, "SwapIntentDAppControl: TooManyConditions");
 
             bool valid;
             bytes memory conditionData;
 
-            for (uint256 i; i < swapIntent.conditions.length; ++i) {
+            for (uint256 i; i < conditionsLength; ++i) {
                 (valid, conditionData) = swapIntent.conditions[i].antecedent.staticcall{ gas: USER_CONDITION_GAS_LIMIT }(
                     swapIntent.conditions[i].context
                 );
@@ -138,7 +139,7 @@ contract SwapIntentDAppControl is DAppControl {
         returns (bool)
     {
         address solverTo = solverOp.solver;
-        if (solverTo == address(this) || solverTo == _control() || solverTo == atlas) {
+        if (solverTo == address(this) || solverTo == _control() || solverTo == ATLAS) {
             return false;
         }
 

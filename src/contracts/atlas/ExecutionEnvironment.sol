@@ -28,13 +28,7 @@ contract ExecutionEnvironment is Base {
     constructor(address _atlas) Base(_atlas) { }
 
     modifier validUser(UserOperation calldata userOp) {
-        if (userOp.from != _user()) revert AtlasErrors.InvalidUser();
-        if (userOp.to != atlas || userOp.dapp == atlas) revert AtlasErrors.InvalidTo();
-        _;
-    }
-
-    modifier validControlHash() {
-        if (_control().codehash != _controlCodeHash()) revert AtlasErrors.InvalidCodeHash();
+        if (userOp.to != ATLAS || userOp.dapp == ATLAS) revert AtlasErrors.InvalidTo();
         _;
     }
 
@@ -53,7 +47,7 @@ contract ExecutionEnvironment is Base {
         onlyAtlasEnvironment(ExecutionPhase.PreOps, _ENVIRONMENT_DEPTH)
         returns (bytes memory)
     {
-        bytes memory preOpsData = forward(abi.encodeCall(IDAppControl.preOpsCall, userOp));
+        bytes memory preOpsData = _forward(abi.encodeCall(IDAppControl.preOpsCall, userOp));
 
         bool success;
         (success, preOpsData) = _control().delegatecall(preOpsData);
@@ -74,21 +68,23 @@ contract ExecutionEnvironment is Base {
         payable
         validUser(userOp)
         onlyAtlasEnvironment(ExecutionPhase.UserOperation, _ENVIRONMENT_DEPTH)
-        validControlHash
         returns (bytes memory returnData)
     {
         uint32 config = _config();
 
         if (userOp.value > address(this).balance) revert AtlasErrors.UserOpValueExceedsBalance();
 
+        // Do not attach extra calldata via `_forward()` if contract called is not dAppControl, as the additional
+        // calldata may cause unexpected behaviour in third-party protocols
+        bytes memory callData = (userOp.dapp != userOp.control) ? userOp.data : _forward(userOp.data);
         bool success;
 
         if (config.needsDelegateUser()) {
-            (success, returnData) = userOp.dapp.delegatecall(forward(userOp.data));
+            (success, returnData) = userOp.dapp.delegatecall(callData);
             if (!success) revert AtlasErrors.UserWrapperDelegatecallFail();
         } else {
             // regular user call - executed at regular destination and not performed locally
-            (success, returnData) = userOp.dapp.call{ value: userOp.value }(forward(userOp.data));
+            (success, returnData) = userOp.dapp.call{ value: userOp.value }(callData);
             if (!success) revert AtlasErrors.UserWrapperCallFail();
         }
     }
@@ -105,7 +101,7 @@ contract ExecutionEnvironment is Base {
         external
         onlyAtlasEnvironment(ExecutionPhase.PostOps, _ENVIRONMENT_DEPTH)
     {
-        bytes memory data = forward(abi.encodeCall(IDAppControl.postOpsCall, (solved, returnData)));
+        bytes memory data = _forward(abi.encodeCall(IDAppControl.postOpsCall, (solved, returnData)));
 
         bool success;
         (success, data) = _control().delegatecall(data);
@@ -144,17 +140,14 @@ contract ExecutionEnvironment is Base {
             sTracker.invertsBidValue = true;
             // if invertsBidValue, record ceiling now
             // inventory to send to solver must have been transferred in by userOp or preOp call
-            sTracker.ceiling = sTracker.etherIsBidToken ? 
-                address(this).balance :
-                ERC20(solverOp.bidToken).balanceOf(address(this));
-        } 
+            sTracker.ceiling =
+                sTracker.etherIsBidToken ? address(this).balance : ERC20(solverOp.bidToken).balanceOf(address(this));
+        }
 
         // Handle any solver preOps, if necessary
         if (_config().needsPreSolver()) {
             bool success;
-            bytes memory data = forward(
-                abi.encodeCall(IDAppControl.preSolverCall, (solverOp, returnData))
-            );
+            bytes memory data = _forward(abi.encodeCall(IDAppControl.preSolverCall, (solverOp, returnData)));
 
             (success, data) = _control().delegatecall(data);
 
@@ -166,9 +159,8 @@ contract ExecutionEnvironment is Base {
         // bidValue is not inverted; Higher bids are better; solver must deposit >= bidAmount
         if (!sTracker.invertsBidValue) {
             // if invertsBidValue, record floor now
-            sTracker.floor = sTracker.etherIsBidToken ? 
-                address(this).balance :
-                ERC20(solverOp.bidToken).balanceOf(address(this));
+            sTracker.floor =
+                sTracker.etherIsBidToken ? address(this).balance : ERC20(solverOp.bidToken).balanceOf(address(this));
         }
     }
 
@@ -189,22 +181,16 @@ contract ExecutionEnvironment is Base {
         onlyAtlasEnvironment(ExecutionPhase.PostSolver, _ENVIRONMENT_DEPTH)
         returns (SolverTracker memory)
     {
-        // If this was a user intent, handle and verify fulfillment
-
         // bidValue is inverted; Lower bids are better; solver must withdraw <= bidAmount
         if (sTracker.invertsBidValue) {
             // if invertsBidValue, record floor now
-            sTracker.floor = sTracker.etherIsBidToken ? 
-                address(this).balance :
-                ERC20(solverOp.bidToken).balanceOf(address(this));
+            sTracker.floor =
+                sTracker.etherIsBidToken ? address(this).balance : ERC20(solverOp.bidToken).balanceOf(address(this));
         }
 
         bool success;
         if (_config().needsSolverPostCall()) {
-           
-            bytes memory data = forward(
-                abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData))
-            );
+            bytes memory data = _forward(abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData)));
 
             (success, data) = _control().delegatecall(data);
 
@@ -220,25 +206,24 @@ contract ExecutionEnvironment is Base {
         // bidValue is not inverted; Higher bids are better; solver must deposit >= bidAmount
         if (!sTracker.invertsBidValue) {
             // if not invertsBidValue, record ceiling now
-            sTracker.ceiling = sTracker.etherIsBidToken ? 
-                address(this).balance :
-                ERC20(solverOp.bidToken).balanceOf(address(this));
+            sTracker.ceiling =
+                sTracker.etherIsBidToken ? address(this).balance : ERC20(solverOp.bidToken).balanceOf(address(this));
         }
 
         // Make sure the numbers add up and that the bid was paid
         if (sTracker.floor > sTracker.ceiling) revert AtlasErrors.SolverBidUnpaid();
-        
-        uint256 netBid = sTracker.ceiling - sTracker.floor; 
+
+        uint256 netBid = sTracker.ceiling - sTracker.floor;
 
         // If bids aren't inverted, revert if net amount received is less than the bid
         if (!sTracker.invertsBidValue && netBid < sTracker.bidAmount) revert AtlasErrors.SolverBidUnpaid();
-        
+
         // If bids are inverted, revert if the net amount sent is more than the bid
         if (sTracker.invertsBidValue && netBid > sTracker.bidAmount) revert AtlasErrors.SolverBidUnpaid();
 
         // Update the bidAmount to the bid received
         sTracker.bidAmount = netBid;
-        
+
         return sTracker;
     }
 
@@ -256,15 +241,14 @@ contract ExecutionEnvironment is Base {
         external
         onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _ENVIRONMENT_DEPTH)
     {
-        
-        allocateData = forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, bidAmount, allocateData)));
+        allocateData = _forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, bidAmount, allocateData)));
 
         (bool success,) = _control().delegatecall(allocateData);
         if (!success) revert AtlasErrors.AllocateValueDelegatecallFail();
 
         uint256 balance = address(this).balance;
         if (balance > 0) {
-            IEscrow(atlas).contribute{ value: balance }();
+            IEscrow(ATLAS).contribute{ value: balance }();
         }
     }
 
@@ -279,7 +263,7 @@ contract ExecutionEnvironment is Base {
     /// @param amount The amount of the ERC20 token to withdraw.
     function withdrawERC20(address token, uint256 amount) external {
         if (msg.sender != _user()) revert AtlasErrors.NotEnvironmentOwner();
-        if (!ISafetyLocks(atlas).isUnlocked()) revert AtlasErrors.AtlasLockActive();
+        if (!ISafetyLocks(ATLAS).isUnlocked()) revert AtlasErrors.AtlasLockActive();
 
         if (ERC20(token).balanceOf(address(this)) >= amount) {
             SafeTransferLib.safeTransfer(ERC20(token), msg.sender, amount);
@@ -294,7 +278,7 @@ contract ExecutionEnvironment is Base {
     /// @param amount The amount of Ether to withdraw.
     function withdrawEther(uint256 amount) external {
         if (msg.sender != _user()) revert AtlasErrors.NotEnvironmentOwner();
-        if (!ISafetyLocks(atlas).isUnlocked()) revert AtlasErrors.AtlasLockActive();
+        if (!ISafetyLocks(ATLAS).isUnlocked()) revert AtlasErrors.AtlasLockActive();
 
         if (address(this).balance >= amount) {
             SafeTransferLib.safeTransferETH(msg.sender, amount);
@@ -323,9 +307,9 @@ contract ExecutionEnvironment is Base {
     }
 
     /// @notice The getEscrow function returns the address of the Atlas/Escrow contract.
-    /// @return escrow The address of the Atlas/Escrow contract.
-    function getEscrow() external view returns (address escrow) {
-        escrow = atlas;
+    /// @return The address of the Atlas/Escrow contract.
+    function getEscrow() external view returns (address) {
+        return ATLAS;
     }
 
     receive() external payable { }

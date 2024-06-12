@@ -25,9 +25,25 @@ contract MockFactory is Factory, Test {
         return _getOrCreateExecutionEnvironment(userOp);
     }
 
-    function salt() external returns (bytes32) {
-        return _salt;
+    function computeSalt(address user, address control, uint32 callConfig) external view returns (bytes32) {
+        return _computeSalt(user, control, callConfig);
     }
+
+    function baseSalt() external view returns (bytes32) {
+        return _FACTORY_BASE_SALT;
+    }
+
+    function getMimicCreationCode(
+        address user,
+        address control,
+        uint32 callConfig
+    )
+        external
+        view
+        returns (bytes memory creationCode) {
+            require(EXECUTION_ENV_TEMPLATE != address(0), "TEST: Execution environment template not set");
+            return _getMimicCreationCode(user, control, callConfig);
+        }
 }
 
 contract FactoryTest is Test {
@@ -44,7 +60,7 @@ contract FactoryTest is Test {
         address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 0);
         address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
         address expectedFactoryAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
-        bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedFactoryAddr, "AtlasFactory 1.0"));
+        bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedFactoryAddr));
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedFactoryAddr);
         
         vm.startPrank(deployer);
@@ -62,16 +78,11 @@ contract FactoryTest is Test {
         assertEq(address(mockFactory), expectedFactoryAddr, "Factory address mismatch");
         dAppControl = new DummyDAppControl(expectedAtlasAddr, deployer, CallConfigBuilder.allFalseCallConfig());
         vm.stopPrank();
-        
-        console.log("Factory address: ", address(mockFactory));
-        console.log("Factory expected address: ", expectedFactoryAddr);
     }
 
     function test_createExecutionEnvironment() public {
         uint32 callConfig = dAppControl.CALL_CONFIG();
-        bytes memory creationCode = TestUtils._getMimicCreationCode(
-            address(dAppControl), callConfig, mockFactory.executionTemplate(), user, address(dAppControl).codehash
-        );
+        bytes memory creationCode = mockFactory.getMimicCreationCode(user, address(dAppControl), callConfig);
         address expectedExecutionEnvironment = address(
             uint160(
                 uint256(
@@ -79,7 +90,7 @@ contract FactoryTest is Test {
                         abi.encodePacked(
                             bytes1(0xff),
                             address(mockFactory),
-                            mockFactory.salt(),
+                            mockFactory.computeSalt(user, address(dAppControl), callConfig),
                             keccak256(abi.encodePacked(creationCode))
                         )
                     )
@@ -87,14 +98,15 @@ contract FactoryTest is Test {
             )
         );
 
-        assertTrue(expectedExecutionEnvironment.codehash == bytes32(0), "Execution environment should not exist");
+        assertTrue(expectedExecutionEnvironment.code.length == 0, "Execution environment should not exist");
 
-        vm.prank(user);
+        vm.startPrank(user);
         vm.expectEmit(true, true, true, true);
         emit AtlasEvents.ExecutionEnvironmentCreated(user, expectedExecutionEnvironment);
         address actualExecutionEnvironment = mockFactory.createExecutionEnvironment(address(dAppControl));
+        vm.stopPrank();
 
-        assertFalse(expectedExecutionEnvironment.codehash == bytes32(0), "Execution environment should exist");
+        assertFalse(actualExecutionEnvironment.code.length == 0, "Execution environment should exist");
         assertEq(
             expectedExecutionEnvironment, actualExecutionEnvironment, "Execution environment not the same as predicted"
         );
@@ -121,22 +133,34 @@ contract FactoryTest is Test {
         userOp.from = user;
         userOp.control = address(dAppControl);
 
-        address executionEnvironment;
+        address predictedEE;
+        address actualEE;
         bool exists;
 
-        (executionEnvironment,, exists) = mockFactory.getExecutionEnvironment(user, address(dAppControl));
+        (predictedEE,, exists) = mockFactory.getExecutionEnvironment(user, address(dAppControl));
         assertFalse(exists, "Execution environment should not exist");
-        assertTrue(executionEnvironment.codehash == bytes32(0), "Execution environment should not exist");
+        assertTrue(predictedEE.code.length == 0, "Execution environment should not exist");
 
-        mockFactory.getOrCreateExecutionEnvironment(userOp);
+        // Actually deploy the EE
+        (actualEE,) = mockFactory.getOrCreateExecutionEnvironment(userOp);
+        assertEq(predictedEE, actualEE, "Predicted and actual EE addrs should match 2");
 
-        (executionEnvironment,, exists) = mockFactory.getExecutionEnvironment(user, address(dAppControl));
-        assertTrue(exists, "Execution environment should exist");
-        assertFalse(executionEnvironment.codehash == bytes32(0), "Execution environment should exist");
+        (predictedEE,, exists) = mockFactory.getExecutionEnvironment(user, address(dAppControl));
+        
+        assertTrue(exists, "Execution environment should exist - exist should return true");
+        assertFalse(predictedEE.code.length == 0, "Execution environment should exist - code at addr");
+        assertEq(predictedEE, actualEE, "Predicted and actual EE addrs should match 2");
     }
 
-    function test_FactorySaltSetCorrectly() public {
-        bytes32 expectedSalt = keccak256(abi.encodePacked(block.chainid, address(mockFactory), "AtlasFactory 1.0"));
-        assertEq(expectedSalt, mockFactory.salt(), "Factory salt not set correctly");
+    function test_factoryBaseAndComputedSalts() public {
+        bytes32 baseSalt = keccak256(abi.encodePacked(block.chainid, address(mockFactory)));
+        assertEq(baseSalt, mockFactory.baseSalt(), "Factory base salt not set correctly");
+
+        address _user = address(123);
+        address _control = address(456);
+        uint32 _callConfig = 789;
+
+        bytes32 expectedComputeSalt = keccak256(abi.encodePacked(baseSalt, _user, _control, _callConfig));
+        assertEq(expectedComputeSalt, mockFactory.computeSalt(_user, _control, _callConfig), "user salt not computed correctly - depends on base salt");
     }
 }

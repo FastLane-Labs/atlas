@@ -115,7 +115,7 @@ contract Filler is DAppControl {
         returns (bool)
     {
         address solverTo = solverOp.solver;
-        if (solverTo == address(this) || solverTo == _control() || solverTo == atlas) {
+        if (solverTo == address(this) || solverTo == _control() || solverTo == ATLAS) {
             return false;
         }
 
@@ -143,7 +143,7 @@ contract Filler is DAppControl {
 
         bytes memory data = abi.encodeCall(this.postOpBalancing, maxTokenAmount - solverOp.bidAmount);
 
-        (bool success,) = _control().call(forward(data));
+        (bool success,) = _control().call(_forward(data));
         require(success, "HITTING THIS = JOB OFFER");
 
         return true;
@@ -168,7 +168,7 @@ contract Filler is DAppControl {
     ///////////////////// DAPP STUFF ///////////////////////
 
     function postOpBalancing(uint256 prepaidAmount) external {
-        require(msg.sender == ISafetyLocks(atlas).activeEnvironment(), "ERR - INVALID SENDER");
+        require(msg.sender == ISafetyLocks(ATLAS).activeEnvironment(), "ERR - INVALID SENDER");
         require(address(this) == _control(), "ERR - INVALID CONTROL");
         require(_depth() == 2, "ERR - INVALID DEPTH");
 
@@ -179,21 +179,21 @@ contract Filler is DAppControl {
     // (BUT IT HELPS WITH MENTALLY GROKKING THE FLOW)
     function approve(bytes calldata data) external returns (bytes memory) {
         // CASE: Base call
-        if (msg.sender == atlas) {
+        if (msg.sender == ATLAS) {
             require(address(this) != _control(), "ERR - NOT DELEGATED");
             return _innerApprove(data);
+        }
 
-            // CASE: Nested call from Atlas EE
-        } else if (msg.sender == ISafetyLocks(atlas).activeEnvironment()) {
+        // CASE: Nested call from Atlas EE
+        if (msg.sender == ISafetyLocks(ATLAS).activeEnvironment()) {
             require(address(this) == _control(), "ERR - INVALID CONTROL");
             return _outerApprove(data);
-
-            // CASE: Non-Atlas external call
-        } else {
-            require(address(this) == _control(), "ERR - INVALID CONTROL");
-            _externalApprove(data);
-            return new bytes(0);
         }
+
+        // CASE: Non-Atlas external call
+        require(address(this) == _control(), "ERR - INVALID CONTROL");
+        _externalApprove(data);
+        return new bytes(0);
     }
 
     function _innerApprove(bytes calldata data) internal returns (bytes memory) {
@@ -207,7 +207,7 @@ contract Filler is DAppControl {
         // TODO: use assembly (current impl is a lazy way to grab the approval tx data)
         bytes memory mData = abi.encodeCall(this.approve, bytes.concat(approvalTx.data, data));
 
-        (bool success, bytes memory returnData) = _control().call(forward(mData));
+        (bool success, bytes memory returnData) = _control().call(_forward(mData));
         // NOTE: approvalTx.data includes func selector
 
         require(success, "ERR - REJECTED");
@@ -228,7 +228,7 @@ contract Filler is DAppControl {
 
         require(spender == address(this), "ERR - INVALID SPENDER");
         require(IERC20(approvalToken).allowance(user, address(this)) == 0, "ERR - EXISTING APPROVAL");
-        require(IERC20(approvalToken).allowance(address(this), atlas) >= amount, "ERR - TOKEN UNAPPROVED");
+        require(IERC20(approvalToken).allowance(address(this), ATLAS) >= amount, "ERR - TOKEN UNAPPROVED");
         require(amount <= IERC20(approvalToken).balanceOf(address(this)), "ERR - POOL BALANCE TOO LOW");
         require(amount <= IERC20(approvalToken).balanceOf(user), "ERR - USER BALANCE TOO LOW");
         require(userLock == address(0), "ERR - USER ALREADY LOCKED");

@@ -39,7 +39,7 @@ contract FlashLoanTest is BaseTest {
     function setUp() public virtual override {
         BaseTest.setUp();
 
-        // Creating new gov address (ERR-V49 OwnerActive if already registered with control)
+        // Creating new gov address (SignatoryActive error if already registered with control)
         governancePK = 11_112;
         governanceEOA = vm.addr(governancePK);
 
@@ -73,6 +73,7 @@ contract FlashLoanTest is BaseTest {
             .withNonce(address(atlasVerification))
             .withDapp(address(control))
             .withControl(address(control))
+            .withCallConfig(control.CALL_CONFIG())
             .withDeadline(block.number + 2)
             .withData(new bytes(0))
             .build();
@@ -102,7 +103,6 @@ contract FlashLoanTest is BaseTest {
         DAppOperation memory dAppOp = new DAppOperationBuilder()
             .withFrom(governanceEOA)
             .withTo(address(atlas))
-            .withGas(2_000_000)
             .withNonce(address(atlasVerification), governanceEOA)
             .withDeadline(userOp.deadline)
             .withControl(address(control))
@@ -147,7 +147,6 @@ contract FlashLoanTest is BaseTest {
         dAppOp = new DAppOperationBuilder()
             .withFrom(governanceEOA)
             .withTo(address(atlas))
-            .withGas(2_000_000)
             .withNonce(address(atlasVerification), governanceEOA)
             .withDeadline(userOp.deadline)
             .withControl(address(control))
@@ -192,7 +191,6 @@ contract FlashLoanTest is BaseTest {
         dAppOp = new DAppOperationBuilder()
             .withFrom(governanceEOA)
             .withTo(address(atlas))
-            .withGas(2_000_000)
             .withNonce(address(atlasVerification), governanceEOA)
             .withDeadline(userOp.deadline)
             .withControl(address(control))
@@ -278,9 +276,9 @@ contract DummyDAppControlBuilder is DAppControl {
     function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
         if (bidToken != address(0)) {
             revert("not supported");
-        } else {
-            SafeTransferLib.safeTransferETH(_user(), address(this).balance);
         }
+        
+        SafeTransferLib.safeTransferETH(_user(), address(this).balance);
     }
 
     function getBidFormat(UserOperation calldata) public view override returns (address bidToken) {

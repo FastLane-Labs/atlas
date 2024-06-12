@@ -5,6 +5,7 @@ import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 import { LibSort } from "solady/utils/LibSort.sol";
 
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
+import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
 import { Escrow } from "./Escrow.sol";
 import { Factory } from "./Factory.sol";
@@ -62,7 +63,7 @@ contract Atlas is Escrow, Factory {
         );
         if (validCallsResult != ValidCallsResult.Valid) {
             if (isSimulation) revert VerificationSimFail(uint256(validCallsResult));
-            else revert ValidCalls(validCallsResult);
+            revert ValidCalls(validCallsResult);
         }
 
         // Initialize the lock
@@ -146,7 +147,7 @@ contract Atlas is Escrow, Factory {
             bool callSuccessful = _executePostOpsCall(auctionWon, returnData, key);
             if (!callSuccessful) {
                 if (key.isSimulation) revert PostOpsSimFail();
-                else revert PostOpsFail();
+                revert PostOpsFail();
             }
         }
         return (auctionWon, uint256(key.solverOutcome));
@@ -196,7 +197,7 @@ contract Atlas is Escrow, Factory {
 
             if (!callSuccessful) {
                 if (key.isSimulation) revert PreOpsSimFail();
-                else revert PreOpsFail();
+                revert PreOpsFail();
             }
         }
 
@@ -221,7 +222,7 @@ contract Atlas is Escrow, Factory {
 
         if (!callSuccessful) {
             if (key.isSimulation) revert UserOpSimFail();
-            else revert UserOpFail();
+            revert UserOpFail();
         }
 
         return (returnData, key);
@@ -285,7 +286,7 @@ contract Atlas is Escrow, Factory {
                 // The array is filled with non-zero bids from the right. This causes all zero bids to be on the left -
                 // in their sorted position, so fewer operations are needed in the sorting step below.
                 bidsAndIndices[bidsAndIndicesLastIndex - (i - zeroBidCount)] =
-                    uint256(bidAmountFound << BITS_FOR_INDEX | uint16(i));
+                    uint256(bidAmountFound << _BITS_FOR_INDEX | uint16(i));
             }
         }
 
@@ -298,17 +299,16 @@ contract Atlas is Escrow, Factory {
         // Finally, iterate through sorted bidsAndIndices array in descending order of bidAmount.
         for (uint256 i = bidsAndIndicesLastIndex; i >= 0; --i) {
             // Isolate the bidAmount from the packed uint256 value
-            bidAmountFound = (bidsAndIndices[i] >> BITS_FOR_INDEX) & FIRST_240_BITS_MASK;
+            bidAmountFound = (bidsAndIndices[i] >> _BITS_FOR_INDEX) & _FIRST_240_BITS_TRUE_MASK;
 
             // If we reach the zero bids on the left of array, break as all valid bids already checked.
             if (bidAmountFound == 0) break;
 
             // Isolate the original solverOps index from the packed uint256 value
-            uint256 solverOpsIndex = bidsAndIndices[i] & FIRST_16_BITS_MASK;
+            uint256 solverOpsIndex = bidsAndIndices[i] & _FIRST_16_BITS_TRUE_MASK;
 
-            (auctionWon, key) = _executeExPostBid(
-                dConfig, userOp, solverOps[solverOpsIndex], returnData, bidAmountFound, key
-            );
+            (auctionWon, key) =
+                _executeExPostBid(dConfig, userOp, solverOps[solverOpsIndex], returnData, bidAmountFound, key);
 
             if (auctionWon) {
                 key.solverOutcome = uint24(solverOpsIndex);
@@ -328,13 +328,14 @@ contract Atlas is Escrow, Factory {
         bytes memory returnData,
         uint256 bidAmountFound,
         EscrowKey memory key
-    ) internal returns (bool auctionWon, EscrowKey memory) {
-
+    )
+        internal
+        returns (bool auctionWon, EscrowKey memory)
+    {
         uint256 bidAmount;
 
-        (auctionWon, key, bidAmount) = _executeSolverOperation(
-            dConfig, userOp, solverOp, returnData, bidAmountFound, true, key
-        );
+        (auctionWon, key, bidAmount) =
+            _executeSolverOperation(dConfig, userOp, solverOp, returnData, bidAmountFound, true, key);
 
         if (auctionWon) {
             key = _allocateValue(dConfig, solverOp, bidAmount, returnData, key);
@@ -362,11 +363,10 @@ contract Atlas is Escrow, Factory {
         internal
         returns (bool auctionWon, EscrowKey memory)
     {
-        uint256 k = solverOps.length;
-        uint256 i;
         uint256 bidAmount;
-        
-        for (; i < k; ++i) {
+        uint256 k = solverOps.length;
+
+        for (uint256 i; i < k; ++i) {
             SolverOperation calldata solverOp = solverOps[i];
             SolverTracker memory sTracker;
 
@@ -424,7 +424,7 @@ contract Atlas is Escrow, Factory {
     /// @param control DAppControl contract address
     /// @param callConfig CallConfig of the current metacall tx.
     function _verifyCallerIsExecutionEnv(address user, address control, uint32 callConfig) internal view override {
-        if (msg.sender != _getExecutionEnvironmentCustom(user, control.codehash, control, callConfig)) {
+        if (msg.sender != _getExecutionEnvironmentCustom(user, control, callConfig)) {
             revert EnvironmentMismatch();
         }
     }

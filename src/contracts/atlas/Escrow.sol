@@ -7,6 +7,7 @@ import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnviro
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
+import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
@@ -44,7 +45,7 @@ abstract contract Escrow is AtlETH {
     function _executePreOpsCall(
         UserOperation calldata userOp,
         address environment,
-        bytes32 lockBytes
+        bytes memory lockBytes
     )
         internal
         returns (bool success, bytes memory preOpsData)
@@ -66,7 +67,7 @@ abstract contract Escrow is AtlETH {
     function _executeUserOperation(
         UserOperation calldata userOp,
         address environment,
-        bytes32 lockBytes
+        bytes memory lockBytes
     )
         internal
         returns (bool success, bytes memory userData)
@@ -111,15 +112,18 @@ abstract contract Escrow is AtlETH {
             result = IAtlasVerification(VERIFICATION).verifySolverOp(
                 solverOp, key.userOpHash, userOp.maxFeePerGas, key.bundler
             );
+            result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, result);
         }
 
-        unchecked { ++key.callIndex; }
+        unchecked {
+            ++key.callIndex;
+        }
 
         // Verify the transaction.
         if (result.canExecute()) {
             uint256 gasLimit;
             // Verify gasLimit again
-            (result, gasLimit) = _validateSolverOperation(dConfig, solverOp, gasWaterMark, result);
+            (result, gasLimit) = _validateSolverOperation(dConfig, solverOp, gasWaterMark);
 
             if (dConfig.callConfig.allowsTrustedOpHash()) {
                 if (!prevalidated && !_handleAltOpHash(userOp, solverOp)) {
@@ -130,15 +134,11 @@ abstract contract Escrow is AtlETH {
 
             // If there are no errors, attempt to execute
             if (result.canExecute()) {
-       
                 SolverTracker memory sTracker;
 
                 // Execute the solver call
                 // _solverOpsWrapper returns a SolverOutcome enum value
-                (result, sTracker) = _solverOpWrapper(
-                    bidAmount, gasLimit, key, solverOp, dAppReturnData);
-
-                key.solverOutcome = uint24(result);
+                (result, sTracker) = _solverOpWrapper(bidAmount, gasLimit, key, solverOp, dAppReturnData);
 
                 if (result.executionSuccessful()) {
                     // first successful solver call that paid what it bid
@@ -146,8 +146,8 @@ abstract contract Escrow is AtlETH {
                     emit SolverTxResult(solverOp.solver, solverOp.from, true, true, result);
 
                     key.solverSuccessful = true;
-                    // auctionWon = true
-                    return (true, key, sTracker.bidAmount);
+                    key.solverOutcome = uint24(result);
+                    return (true, key, sTracker.bidAmount); // auctionWon = true
                 }
             }
         }
@@ -228,35 +228,33 @@ abstract contract Escrow is AtlETH {
     /// @param solverOp The SolverOperation being validated.
     /// @param gasWaterMark The initial gas measurement before validation begins, used to ensure enough gas remains for
     /// validation logic.
-    /// @param result The current validation result flags, to which new validation results will be bitwise OR'd.
-    /// @return Updated result flags after performing the validation checks, including any new errors encountered.
+    /// @return result Updated result flags after performing the validation checks, including any new errors
+    /// encountered.
     /// @return gasLimit The calculated gas limit for the SolverOperation, considering the operation's gas usage and
     /// the protocol's gas buffers.
     function _validateSolverOperation(
         DAppConfig calldata dConfig,
         SolverOperation calldata solverOp,
-        uint256 gasWaterMark,
-        uint256 result
+        uint256 gasWaterMark
     )
         internal
         view
-        returns (uint256, uint256 gasLimit)
+        returns (uint256 result, uint256 gasLimit)
     {
         if (gasWaterMark < _VALIDATION_GAS_LIMIT + dConfig.solverGasLimit) {
             // Make sure to leave enough gas for dApp validation calls
-            return (result | 1 << uint256(SolverOutcome.UserOutOfGas), gasLimit);
+            return (1 << uint256(SolverOutcome.UserOutOfGas), gasLimit); // gasLimit = 0
         }
 
-        if (block.number > solverOp.deadline) {
+        if (solverOp.deadline != 0 && block.number > solverOp.deadline) {
             return (
-                result
-                    | 1
-                        << uint256(
-                            dConfig.callConfig.allowsTrustedOpHash()
-                                ? uint256(SolverOutcome.DeadlinePassedAlt)
-                                : uint256(SolverOutcome.DeadlinePassed)
-                        ),
-                0
+                1
+                    << uint256(
+                        dConfig.callConfig.allowsTrustedOpHash()
+                            ? uint256(SolverOutcome.DeadlinePassedAlt)
+                            : uint256(SolverOutcome.DeadlinePassed)
+                    ),
+                gasLimit // gasLimit = 0
             );
         }
 
@@ -271,7 +269,7 @@ abstract contract Escrow is AtlETH {
             solverOp.value
                 > address(this).balance - (gasLimit * tx.gasprice > address(this).balance ? 0 : gasLimit * tx.gasprice)
         ) {
-            return (result |= 1 << uint256(SolverOutcome.CallValueTooHigh), gasLimit);
+            return (1 << uint256(SolverOutcome.CallValueTooHigh), gasLimit);
         }
 
         // subtract out the gas buffer since the solver's metaTx won't use it
@@ -284,7 +282,7 @@ abstract contract Escrow is AtlETH {
 
         // NOTE: Turn this into time stamp check for FCFS L2s?
         if (lastAccessedBlock == block.number) {
-            result |= 1 << uint256(SolverOutcome.PerBlockLimit);
+            result = 1 << uint256(SolverOutcome.PerBlockLimit);
         }
 
         // see if solver's escrow can afford tx gascost
@@ -327,29 +325,23 @@ abstract contract Escrow is AtlETH {
 
         bool success;
         uint256 gasWaterMark = gasleft();
+
         uint256 result =
             IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, key.userOpHash, userOp.maxFeePerGas, key.bundler);
+
+        result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, result);
 
         // Verify the transaction.
         if (!result.canExecute()) return 0;
 
         uint256 gasLimit;
-        (result, gasLimit) = _validateSolverOperation(dConfig, solverOp, gasWaterMark, result);
+        (result, gasLimit) = _validateSolverOperation(dConfig, solverOp, gasWaterMark);
 
         if (dConfig.callConfig.allowsTrustedOpHash()) {
             if (!_handleAltOpHash(userOp, solverOp)) {
                 return (0);
             }
         }
-
-        /*
-        function solverCall(
-        uint256 bidAmount,
-        uint256 gasLimit,
-        EscrowKey calldata key,
-        SolverOperation calldata solverOp,
-        bytes calldata dAppReturnData
-        */
 
         data = abi.encodeCall(IAtlas.solverCall, (solverOp.bidAmount, gasLimit, key, solverOp, data));
 
@@ -372,9 +364,9 @@ abstract contract Escrow is AtlETH {
                     )
             }
             return bidAmount;
-        } else {
-            return 0;
         }
+
+        return 0;
     }
 
     /// @notice Validates UserOp hashes provided by the SolverOperation, using the alternative set of hashed parameters.
@@ -390,7 +382,10 @@ abstract contract Escrow is AtlETH {
         returns (bool)
     {
         // These failures should be attributed to bundler maliciousness
-        if (solverOp.deadline != userOp.deadline || solverOp.control != userOp.control) {
+        if (userOp.control != solverOp.control) {
+            return false;
+        }
+        if (userOp.deadline != 0 && solverOp.deadline != 0 && solverOp.deadline != userOp.deadline) {
             return false;
         }
         bytes32 hashId = keccak256(abi.encodePacked(solverOp.userOpHash, solverOp.from, solverOp.deadline));
@@ -401,6 +396,24 @@ abstract contract Escrow is AtlETH {
         return true;
     }
 
+    // NOTE: This logic should be inside `verifySolverOp()` in AtlasVerification, but we hit Stack Too Deep errors when
+    // trying to do this check there, as an additional param (dConfig.bidToken) is needed. This logic should be moved to
+    // that function when a larger refactor is done to get around Stack Too Deep.
+    function _checkSolverBidToken(
+        address solverBidToken,
+        address dConfigBidToken,
+        uint256 result
+    )
+        internal
+        view
+        returns (uint256)
+    {
+        if (solverBidToken != dConfigBidToken) {
+            return result | 1 << uint256(SolverOutcome.InvalidBidToken);
+        }
+        return result;
+    }
+
     /// @notice Wraps the execution of a SolverOperation and handles potential errors.
     /// @param bidAmount The bid amount associated with the SolverOperation.
     /// @param gasLimit The gas limit for executing the SolverOperation, calculated based on the operation's
@@ -409,7 +422,8 @@ abstract contract Escrow is AtlETH {
     /// @param solverOp The SolverOperation struct containing the operation's execution data.
     /// @param dAppReturnData Data returned from the execution of the associated UserOperation, which may be required
     /// for the SolverOperation's logic.
-    /// @return result SolverOutcome enum value encoded as a uint256 bitmap, representing the result of the SolverOperation
+    /// @return result SolverOutcome enum value encoded as a uint256 bitmap, representing the result of the
+    /// SolverOperation
     /// @return sTracker Tracking data for the solver's bid
     function _solverOpWrapper(
         uint256 bidAmount,
@@ -423,20 +437,15 @@ abstract contract Escrow is AtlETH {
     {
         bool success;
 
-        bytes memory data = abi.encodeCall(
-            IAtlas.solverCall, 
-            (bidAmount, gasLimit, key, solverOp, dAppReturnData)
-        );
+        bytes memory data = abi.encodeCall(IAtlas.solverCall, (bidAmount, gasLimit, key, solverOp, dAppReturnData));
 
         (success, data) = address(this).call(data);
 
         if (success) {
             sTracker = abi.decode(data, (SolverTracker));
             result = uint256(0);
-
         } else {
             bytes4 errorSwitch = bytes4(data);
-
             if (errorSwitch == AlteredControl.selector) {
                 result = 1 << uint256(SolverOutcome.AlteredControl);
             } else if (errorSwitch == PreSolverFailed.selector) {
@@ -468,7 +477,11 @@ abstract contract Escrow is AtlETH {
         EscrowKey calldata key,
         SolverOperation calldata solverOp,
         bytes calldata dAppReturnData
-    ) external payable returns (SolverTracker memory sTracker) {
+    )
+        external
+        payable
+        returns (SolverTracker memory sTracker)
+    {
         if (msg.sender != address(this)) revert InvalidEntry();
 
         bool success;
@@ -494,14 +507,7 @@ abstract contract Escrow is AtlETH {
 
         data = abi.encodeCall(
             ISolverContract.atlasSolverCall,
-            (
-                solverOp.from,
-                key.executionEnvironment,
-                solverOp.bidToken,
-                bidAmount,
-                solverOp.data,
-                dAppReturnData
-            )
+            (solverOp.from, key.executionEnvironment, solverOp.bidToken, bidAmount, solverOp.data, dAppReturnData)
         );
         (success,) = solverOp.solver.call{ value: solverOp.value, gas: gasLimit }(data);
 
@@ -524,15 +530,11 @@ abstract contract Escrow is AtlETH {
         (, success) = _validateBalances();
         if (!success) {
             revert BalanceNotReconciled();
-        }       
+        }
 
         // Check if this is an on-chain, ex post bid search
         if (key.bidFind) revert BidFindSuccessful(sTracker.bidAmount);
     }
 
     receive() external payable { }
-
-    fallback() external payable {
-        revert();
-    }
 }

@@ -48,7 +48,7 @@ contract SwapIntentTest is BaseTest {
     function setUp() public virtual override {
         BaseTest.setUp();
 
-        // Creating new gov address (ERR-V49 OwnerActive if already registered with control)
+        // Creating new gov address (SignatoryActive error if already registered with control)
         governancePK = 11_112;
         governanceEOA = vm.addr(governancePK);
 
@@ -188,7 +188,11 @@ contract SwapIntentTest is BaseTest {
         (simResult,,) = simulator.simUserOperation(userOp);
         assertTrue(simResult, "metasimUserOperationcall tested false c");
 
+        uint256 gasLeftBefore = gasleft();
+
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
+
+        console.log("OEV Metacall Gas Cost:", gasLeftBefore - gasleft());
         vm.stopPrank();
 
         console.log("\nAFTER METACALL");
@@ -348,10 +352,10 @@ contract SimpleRFQSolver is SolverBase {
         ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
     }
 
-    // This ensures a function can only be called through metaFlashCall
+    // This ensures a function can only be called through atlasSolverCall
     // which includes security checks to work safely with Atlas
     modifier onlySelf() {
-        require(msg.sender == address(this), "Not called via metaFlashCall");
+        require(msg.sender == address(this), "Not called via atlasSolverCall");
         _;
     }
 

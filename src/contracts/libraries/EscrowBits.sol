@@ -18,12 +18,13 @@ library EscrowBits {
     */
 
     // Solver's Fault - solver *does* owe gas refund, SolverOp isn't executed
-    uint256 internal constant _PARTIAL_REFUND = 0x0000000000000000000000000000000000000000000000000000000000003fc0; // 16320
+    uint256 internal constant _PARTIAL_REFUND = 0x0000000000000000000000000000000000000000000000000000000000007fc0; // 32704
     /*
         (
             1 << uint256(SolverOutcome.DeadlinePassed) // <- detected by escrow
                 | 1 << uint256(SolverOutcome.GasPriceOverCap) // <- detected by verification
                 | 1 << uint256(SolverOutcome.InvalidSolver) // <- detected by verification
+                | 1 << uint256(SolverOutcome.InvalidBidToken) // <- detected by escrow
                 | 1 << uint256(SolverOutcome.PerBlockLimit) // <- detected by escrow
                 | 1 << uint256(SolverOutcome.InsufficientEscrow) // <- detected by escrow
                 | 1 << uint256(SolverOutcome.GasPriceBelowUsers) // <- detected by verification
@@ -33,7 +34,7 @@ library EscrowBits {
     */
 
     // Solver's Fault - solver *does* owe gas refund, SolverOp *was* executed
-    uint256 internal constant _FULL_REFUND = 0x00000000000000000000000000000000000000000000000000000000000fc000; // 1032192
+    uint256 internal constant _FULL_REFUND = 0x00000000000000000000000000000000000000000000000000000000001f8000; // 2064384
     /*
         (
             1 << uint256(SolverOutcome.SolverOpReverted) // <- detected by EE
