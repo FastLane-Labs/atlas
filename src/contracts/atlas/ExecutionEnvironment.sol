@@ -16,8 +16,6 @@ import "src/contracts/types/SolverCallTypes.sol";
 import "src/contracts/types/UserCallTypes.sol";
 import "src/contracts/types/DAppApprovalTypes.sol";
 
-import "forge-std/Test.sol";
-
 /// @title ExecutionEnvironment
 /// @author FastLane Labs
 /// @notice An Execution Environment contract is deployed for each unique combination of User address x DAppControl
@@ -160,7 +158,7 @@ contract ExecutionEnvironment is Base {
 
             (success, data) = _control().delegatecall(data);
 
-            if (!success) {
+            if (!success || !abi.decode(data, (bool))) {
                 revert AtlasErrors.PreSolverFailed();
             }
         }
@@ -212,6 +210,10 @@ contract ExecutionEnvironment is Base {
 
             if (!success) {
                 revert AtlasErrors.PostSolverFailed();
+            }
+
+            if (!abi.decode(data, (bool))) {
+                revert AtlasErrors.IntentUnfulfilled();
             }
         }
 
