@@ -32,14 +32,11 @@ uint16 constant SAFE_DAPP_TRANSFER = 0x0ca0; // 3232
         */
 
 library SafetyBits {
+    uint16 internal constant _LOCKED_X_PRESOLVERS_X_REQUESTED = //
+     uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreSolver)));
 
-    uint16 internal constant _LOCKED_X_PRESOLVERS_X_REQUESTED = // 
-        uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET +
-        uint16(ExecutionPhase.PreSolver)));
-
-    uint16 internal constant _LOCKED_X_POSTSOLVERS_X_REQUESTED = // 
-        uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET +
-        uint16(ExecutionPhase.PostSolver)));
+    uint16 internal constant _LOCKED_X_POSTSOLVERS_X_REQUESTED = //
+     uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostSolver)));
 
     uint16 internal constant _LOCKED_X_SOLVERS_X_REQUESTED = 0x0108; // 264
         // uint16(1 << uint16(BaseLock.Locked) | 1 << (EXECUTION_PHASE_OFFSET +
