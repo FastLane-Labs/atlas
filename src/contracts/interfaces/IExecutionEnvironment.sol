@@ -18,12 +18,12 @@ interface IExecutionEnvironment {
         bytes calldata returnData
     )
         external
-        returns (SolverTracker memory sTracker);
+        returns (SolverTracker memory solverTracker);
 
     function solverPostTryCatch(
         SolverOperation calldata solverOp,
         bytes calldata returnData,
-        SolverTracker memory sTracker
+        SolverTracker memory solverTracker
     )
         external
         returns (SolverTracker memory);

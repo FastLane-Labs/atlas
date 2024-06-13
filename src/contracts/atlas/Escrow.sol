@@ -93,6 +93,8 @@ abstract contract Escrow is AtlETH {
     /// @param key EscrowKey struct containing the current state of the escrow lock.
     /// @return auctionWon Boolean indicating whether the SolverOperation was successful and won the auction.
     /// @return key Updated EscrowKey struct, reflecting the new state after attempting the SolverOperation.
+    /// @return bidAmount The determined bid amount for the SolverOperation if all validations pass and the operation is
+    /// executed successfully; otherwise, returns 0.
     function _executeSolverOperation(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
@@ -134,11 +136,11 @@ abstract contract Escrow is AtlETH {
 
             // If there are no errors, attempt to execute
             if (result.canExecute()) {
-                SolverTracker memory sTracker;
+                SolverTracker memory solverTracker;
 
                 // Execute the solver call
                 // _solverOpsWrapper returns a SolverOutcome enum value
-                (result, sTracker) = _solverOpWrapper(bidAmount, gasLimit, key, solverOp, dAppReturnData);
+                (result, solverTracker) = _solverOpWrapper(bidAmount, gasLimit, key, solverOp, dAppReturnData);
 
                 if (result.executionSuccessful()) {
                     // first successful solver call that paid what it bid
@@ -147,7 +149,7 @@ abstract contract Escrow is AtlETH {
 
                     key.solverSuccessful = true;
                     key.solverOutcome = uint24(result);
-                    return (true, key, sTracker.bidAmount); // auctionWon = true
+                    return (true, key, solverTracker.bidAmount); // auctionWon = true
                 }
             }
         }
@@ -405,7 +407,7 @@ abstract contract Escrow is AtlETH {
         uint256 result
     )
         internal
-        view
+        pure
         returns (uint256)
     {
         if (solverBidToken != dConfigBidToken) {
@@ -424,7 +426,7 @@ abstract contract Escrow is AtlETH {
     /// for the SolverOperation's logic.
     /// @return result SolverOutcome enum value encoded as a uint256 bitmap, representing the result of the
     /// SolverOperation
-    /// @return sTracker Tracking data for the solver's bid
+    /// @return solverTracker Tracking data for the solver's bid
     function _solverOpWrapper(
         uint256 bidAmount,
         uint256 gasLimit,
@@ -433,18 +435,21 @@ abstract contract Escrow is AtlETH {
         bytes memory dAppReturnData
     )
         internal
-        returns (uint256 result, SolverTracker memory sTracker)
+        returns (uint256 result, SolverTracker memory solverTracker)
     {
         bool success;
 
-        bytes memory data = abi.encodeCall(IAtlas.solverCall, (bidAmount, gasLimit, key, solverOp, dAppReturnData));
-
+        // Calls the solverCall function, just below this function, which will handle calling solverPreTryCatch and
+        // solverPostTryCatch via the ExecutionEnvironment, and in between those two hooks, the actual solver call
+        // directly from Atlas to the solver contract (not via the ExecutionEnvironment).
+        bytes memory data = abi.encodeCall(this.solverCall, (bidAmount, gasLimit, key, solverOp, dAppReturnData));
         (success, data) = address(this).call(data);
 
         if (success) {
-            sTracker = abi.decode(data, (SolverTracker));
-            result = uint256(0);
+            // If solverCall() was successful, intentionally leave result unset as 0 indicates success
+            solverTracker = abi.decode(data, (SolverTracker));
         } else {
+            // If solverCall() failed, catch the error and encode the failure case in the result uint accordingly.
             bytes4 errorSwitch = bytes4(data);
             if (errorSwitch == AlteredControl.selector) {
                 result = 1 << uint256(SolverOutcome.AlteredControl);
@@ -471,6 +476,14 @@ abstract contract Escrow is AtlETH {
         }
     }
 
+    /// @notice Executes the SolverOperation logic, including preSolver and postSolver hooks via the Execution
+    /// Environment, as well as the actual solver call directly from Atlas to the solver contract.
+    /// @param bidAmount The bid amount associated with the SolverOperation.
+    /// @param gasLimit The gas limit for executing the SolverOperation.
+    /// @param key The EscrowKey struct containing lock data and the Execution Environment address.
+    /// @param solverOp The SolverOperation to be executed.
+    /// @param dAppReturnData Data returned from previous call phases.
+    /// @return solverTracker Additional data for handling the solver's bid in different scenarios.
     function solverCall(
         uint256 bidAmount,
         uint256 gasLimit,
@@ -480,29 +493,36 @@ abstract contract Escrow is AtlETH {
     )
         external
         payable
-        returns (SolverTracker memory sTracker)
+        returns (SolverTracker memory solverTracker)
     {
         if (msg.sender != address(this)) revert InvalidEntry();
 
         bool success;
 
+        // ------------------------------------- //
+        //             Pre-Solver Call           //
+        // ------------------------------------- //
+
         bytes memory data =
             abi.encodeCall(IExecutionEnvironment.solverPreTryCatch, (bidAmount, solverOp, dAppReturnData));
-
         (success, data) = key.executionEnvironment.call(abi.encodePacked(data, key.holdPreSolverLock().pack()));
+
+        // If ExecutionEnvironment.solverPreTryCatch() failed, bubble up the error
         if (!success) {
             assembly {
                 revert(add(data, 32), mload(data))
             }
         }
 
-        // decode the bid tracker
-        sTracker = abi.decode(data, (SolverTracker));
+        // Update solverTracker with returned data
+        solverTracker = abi.decode(data, (SolverTracker));
 
-        // Execute the solver call.
-        // Set the solver lock
-        // NOTE This is inside a try/catch - borrowed .value will revert if tx reverts
+        // ------------------------------------- //
+        //              Solver Call              //
+        // ------------------------------------- //
 
+        // Set the solver lock - will perform accounting checks if value borrowed. If `_trySolverLock()` returns false,
+        // we revert here and catch the error in `_solverOpWrapper()` above
         if (!_trySolverLock(solverOp)) revert SolverMetaTryCatchIncorrectValue();
 
         data = abi.encodeCall(
@@ -513,27 +533,31 @@ abstract contract Escrow is AtlETH {
 
         if (!success) revert SolverOperationReverted();
 
-        // Execute the post solver call
-        data = abi.encodeCall(IExecutionEnvironment.solverPostTryCatch, (solverOp, dAppReturnData, sTracker));
+        // ------------------------------------- //
+        //            Post-Solver Call           //
+        // ------------------------------------- //
 
+        data = abi.encodeCall(IExecutionEnvironment.solverPostTryCatch, (solverOp, dAppReturnData, solverTracker));
         (success, data) = key.executionEnvironment.call(abi.encodePacked(data, key.holdPostSolverLock().pack()));
+
+        // If ExecutionEnvironment.solverPostTryCatch() failed, bubble up the error
         if (!success) {
             assembly {
                 revert(add(data, 32), mload(data))
             }
         }
 
-        // Updated sTracker
-        sTracker = abi.decode(data, (SolverTracker));
+        // Update solverTracker with returned data
+        solverTracker = abi.decode(data, (SolverTracker));
 
-        // Verify that the solver repaid their msg.value
+        // Verify that the solver repaid their borrowed solverOp.value
         (, success) = _validateBalances();
         if (!success) {
             revert BalanceNotReconciled();
         }
 
         // Check if this is an on-chain, ex post bid search
-        if (key.bidFind) revert BidFindSuccessful(sTracker.bidAmount);
+        if (key.bidFind) revert BidFindSuccessful(solverTracker.bidAmount);
     }
 
     receive() external payable { }

@@ -294,7 +294,6 @@ contract Atlas is Escrow, Factory {
         LibSort.insertionSort(bidsAndIndices);
 
         key.bidFind = false;
-        SolverTracker memory sTracker;
 
         // Finally, iterate through sorted bidsAndIndices array in descending order of bidAmount.
         for (uint256 i = bidsAndIndicesLastIndex; i >= 0; --i) {
@@ -307,38 +306,20 @@ contract Atlas is Escrow, Factory {
             // Isolate the original solverOps index from the packed uint256 value
             uint256 solverOpsIndex = bidsAndIndices[i] & _FIRST_16_BITS_TRUE_MASK;
 
-            (auctionWon, key) =
-                _executeExPostBid(dConfig, userOp, solverOps[solverOpsIndex], returnData, bidAmountFound, key);
+            // Execute the solver operation. If solver won, allocate value and return. Otherwise continue looping.
+            (auctionWon, key, bidAmountFound) = _executeSolverOperation(
+                dConfig, userOp, solverOps[solverOpsIndex], returnData, bidAmountFound, true, key
+            );
 
             if (auctionWon) {
+                key = _allocateValue(dConfig, solverOps[solverOpsIndex], bidAmountFound, returnData, key);
+
                 key.solverOutcome = uint24(solverOpsIndex);
+
                 return (auctionWon, key);
             }
 
             if (i == 0) break; // break to prevent underflow in next loop
-        }
-
-        return (auctionWon, key);
-    }
-
-    function _executeExPostBid(
-        DAppConfig calldata dConfig,
-        UserOperation calldata userOp,
-        SolverOperation calldata solverOp,
-        bytes memory returnData,
-        uint256 bidAmountFound,
-        EscrowKey memory key
-    )
-        internal
-        returns (bool auctionWon, EscrowKey memory)
-    {
-        uint256 bidAmount;
-
-        (auctionWon, key, bidAmount) =
-            _executeSolverOperation(dConfig, userOp, solverOp, returnData, bidAmountFound, true, key);
-
-        if (auctionWon) {
-            key = _allocateValue(dConfig, solverOp, bidAmount, returnData, key);
         }
 
         return (auctionWon, key);
@@ -368,7 +349,6 @@ contract Atlas is Escrow, Factory {
 
         for (uint256 i; i < k; ++i) {
             SolverOperation calldata solverOp = solverOps[i];
-            SolverTracker memory sTracker;
 
             (auctionWon, key, bidAmount) =
                 _executeSolverOperation(dConfig, userOp, solverOp, returnData, solverOp.bidAmount, false, key);

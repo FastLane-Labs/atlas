@@ -18,7 +18,7 @@ interface IAtlas {
     )
         external
         payable
-        returns (SolverTracker memory sTracker);
+        returns (SolverTracker memory solverTracker);
 
     function metacall(
         UserOperation calldata userOp,

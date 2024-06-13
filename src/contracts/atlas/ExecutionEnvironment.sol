@@ -125,23 +125,24 @@ contract ExecutionEnvironment is Base {
         external
         payable
         onlyAtlasEnvironment(ExecutionPhase.PreSolver, _ENVIRONMENT_DEPTH)
-        returns (SolverTracker memory sTracker)
+        returns (SolverTracker memory solverTracker)
     {
         // Verify that the DAppControl contract matches the solver's expectations
         if (solverOp.control != _control()) {
             revert AtlasErrors.AlteredControl();
         }
 
-        sTracker.bidAmount = bidAmount;
-        sTracker.etherIsBidToken = solverOp.bidToken == address(0);
+        solverTracker.bidAmount = bidAmount;
+        solverTracker.etherIsBidToken = solverOp.bidToken == address(0);
 
         // bidValue is inverted; Lower bids are better; solver must withdraw <= bidAmount
         if (_config().invertsBidValue()) {
-            sTracker.invertsBidValue = true;
+            solverTracker.invertsBidValue = true;
             // if invertsBidValue, record ceiling now
             // inventory to send to solver must have been transferred in by userOp or preOp call
-            sTracker.ceiling =
-                sTracker.etherIsBidToken ? address(this).balance : ERC20(solverOp.bidToken).balanceOf(address(this));
+            solverTracker.ceiling = solverTracker.etherIsBidToken
+                ? address(this).balance
+                : ERC20(solverOp.bidToken).balanceOf(address(this));
         }
 
         // Handle any solver preOps, if necessary
@@ -157,10 +158,11 @@ contract ExecutionEnvironment is Base {
         }
 
         // bidValue is not inverted; Higher bids are better; solver must deposit >= bidAmount
-        if (!sTracker.invertsBidValue) {
+        if (!solverTracker.invertsBidValue) {
             // if invertsBidValue, record floor now
-            sTracker.floor =
-                sTracker.etherIsBidToken ? address(this).balance : ERC20(solverOp.bidToken).balanceOf(address(this));
+            solverTracker.floor = solverTracker.etherIsBidToken
+                ? address(this).balance
+                : ERC20(solverOp.bidToken).balanceOf(address(this));
         }
     }
 
@@ -170,11 +172,11 @@ contract ExecutionEnvironment is Base {
     /// required, and executes the SolverOperation by calling the `solverOp.solver` address.
     /// @param solverOp The SolverOperation struct.
     /// @param returnData Data returned from the previous call phase.
-    /// @param sTracker Bid tracking information for this solver.
+    /// @param solverTracker Bid tracking information for this solver.
     function solverPostTryCatch(
         SolverOperation calldata solverOp,
         bytes calldata returnData,
-        SolverTracker memory sTracker
+        SolverTracker memory solverTracker
     )
         external
         payable
@@ -182,10 +184,11 @@ contract ExecutionEnvironment is Base {
         returns (SolverTracker memory)
     {
         // bidValue is inverted; Lower bids are better; solver must withdraw <= bidAmount
-        if (sTracker.invertsBidValue) {
+        if (solverTracker.invertsBidValue) {
             // if invertsBidValue, record floor now
-            sTracker.floor =
-                sTracker.etherIsBidToken ? address(this).balance : ERC20(solverOp.bidToken).balanceOf(address(this));
+            solverTracker.floor = solverTracker.etherIsBidToken
+                ? address(this).balance
+                : ERC20(solverOp.bidToken).balanceOf(address(this));
         }
 
         bool success;
@@ -204,27 +207,28 @@ contract ExecutionEnvironment is Base {
         }
 
         // bidValue is not inverted; Higher bids are better; solver must deposit >= bidAmount
-        if (!sTracker.invertsBidValue) {
+        if (!solverTracker.invertsBidValue) {
             // if not invertsBidValue, record ceiling now
-            sTracker.ceiling =
-                sTracker.etherIsBidToken ? address(this).balance : ERC20(solverOp.bidToken).balanceOf(address(this));
+            solverTracker.ceiling = solverTracker.etherIsBidToken
+                ? address(this).balance
+                : ERC20(solverOp.bidToken).balanceOf(address(this));
         }
 
         // Make sure the numbers add up and that the bid was paid
-        if (sTracker.floor > sTracker.ceiling) revert AtlasErrors.SolverBidUnpaid();
+        if (solverTracker.floor > solverTracker.ceiling) revert AtlasErrors.SolverBidUnpaid();
 
-        uint256 netBid = sTracker.ceiling - sTracker.floor;
+        uint256 netBid = solverTracker.ceiling - solverTracker.floor;
 
         // If bids aren't inverted, revert if net amount received is less than the bid
-        if (!sTracker.invertsBidValue && netBid < sTracker.bidAmount) revert AtlasErrors.SolverBidUnpaid();
+        if (!solverTracker.invertsBidValue && netBid < solverTracker.bidAmount) revert AtlasErrors.SolverBidUnpaid();
 
         // If bids are inverted, revert if the net amount sent is more than the bid
-        if (sTracker.invertsBidValue && netBid > sTracker.bidAmount) revert AtlasErrors.SolverBidUnpaid();
+        if (solverTracker.invertsBidValue && netBid > solverTracker.bidAmount) revert AtlasErrors.SolverBidUnpaid();
 
         // Update the bidAmount to the bid received
-        sTracker.bidAmount = netBid;
+        solverTracker.bidAmount = netBid;
 
-        return sTracker;
+        return solverTracker;
     }
 
     /// @notice The allocateValue function is called by Atlas after a successful SolverOperation.

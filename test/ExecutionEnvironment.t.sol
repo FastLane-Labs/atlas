@@ -695,8 +695,8 @@ contract MockSolverContract {
     }
 
     function atlasSolverCall(
-        address sender,
-        address bidRecipient,
+        address solverOpFrom,
+        address executionEnvironment,
         address,
         uint256,
         bytes calldata solverOpData,
@@ -709,7 +709,7 @@ contract MockSolverContract {
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
         require(success, "atlasSolverCall call reverted");
         if (shouldReconcile) {
-            IEscrow(address(_atlas)).reconcile(bidRecipient, sender, type(uint256).max);
+            IEscrow(address(_atlas)).reconcile(executionEnvironment, solverOpFrom, type(uint256).max);
         }
     }
 

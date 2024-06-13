@@ -303,8 +303,8 @@ contract SimpleSolver {
     }
 
     function atlasSolverCall(
-        address sender,
-        address bidRecipient,
+        address solverOpFrom,
+        address executionEnvironment,
         address bidToken,
         uint256 bidAmount,
         bytes calldata solverOpData,
@@ -314,7 +314,7 @@ contract SimpleSolver {
         payable
         returns (bool success, bytes memory data)
     {
-        environment = bidRecipient;
+        environment = executionEnvironment;
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
 
         if (bytes4(solverOpData[:4]) == SimpleSolver.payback.selector) {
@@ -323,7 +323,7 @@ contract SimpleSolver {
             if (shortfall < msg.value) shortfall = 0;
             else shortfall -= msg.value;
 
-            IEscrow(atlas).reconcile{ value: msg.value }(bidRecipient, sender, shortfall);
+            IEscrow(atlas).reconcile{ value: msg.value }(executionEnvironment, solverOpFrom, shortfall);
         }
     }
 
