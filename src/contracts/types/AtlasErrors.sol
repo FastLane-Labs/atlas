@@ -28,6 +28,7 @@ contract AtlasErrors {
     error IntentUnfulfilled();
     error PreSolverFailed();
     error PostSolverFailed();
+    error InsufficientEscrow();
 
     error VerificationSimFail(uint256 validCallsResult);
     error PreOpsSimFail();

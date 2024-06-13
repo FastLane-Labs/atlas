@@ -454,6 +454,8 @@ abstract contract Escrow is AtlETH {
             bytes4 errorSwitch = bytes4(data);
             if (errorSwitch == AlteredControl.selector) {
                 result = 1 << uint256(SolverOutcome.AlteredControl);
+            } else if (errorSwitch == InsufficientEscrow.selector) {
+                result = 1 << uint256(SolverOutcome.InsufficientEscrow);
             } else if (errorSwitch == PreSolverFailed.selector) {
                 result = 1 << uint256(SolverOutcome.PreSolverFailed);
             } else if (errorSwitch == SolverOperationReverted.selector) {
@@ -524,7 +526,7 @@ abstract contract Escrow is AtlETH {
 
         // Set the solver lock - will perform accounting checks if value borrowed. If `_trySolverLock()` returns false,
         // we revert here and catch the error in `_solverOpWrapper()` above
-        if (!_trySolverLock(solverOp)) revert SolverMetaTryCatchIncorrectValue();
+        if (!_trySolverLock(solverOp)) revert InsufficientEscrow();
 
         data = abi.encodeCall(
             ISolverContract.atlasSolverCall,
