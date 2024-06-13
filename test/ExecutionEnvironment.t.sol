@@ -494,6 +494,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(solverMetaData);
         _unsetLocks();
     }
+    */
 
     
     function test_allocateValue() public {
@@ -521,7 +522,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(allocateData);
     }
 
-    */
 
     function test_withdrawERC20() public {
         // Valid

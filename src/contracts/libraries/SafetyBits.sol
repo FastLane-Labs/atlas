@@ -87,12 +87,6 @@ library SafetyBits {
         return self;
     }
 
-    function holdSolverLock(EscrowKey memory self, address nextSolver) internal pure returns (EscrowKey memory) {
-        self.lockState = _LOCKED_X_SOLVERS_X_REQUESTED;
-        self.addressPointer = nextSolver;
-        return self;
-    }
-
     function holdPostSolverLock(EscrowKey memory self) internal pure returns (EscrowKey memory) {
         self.lockState = _LOCKED_X_POSTSOLVERS_X_REQUESTED;
         self.addressPointer = self.executionEnvironment;

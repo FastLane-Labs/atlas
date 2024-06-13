@@ -185,13 +185,6 @@ contract SafetyBitsTest is Test {
         assertTrue(key.addressPointer == address(1));
     }
 
-    function testHoldSolverLock() public {
-        EscrowKey memory key = initializeEscrowLock(CallConfigIndex.RequireFulfillment);
-        key = key.holdSolverLock(address(1));
-        assertTrue(key.lockState == SafetyBits._LOCKED_X_SOLVERS_X_REQUESTED);
-        assertTrue(key.addressPointer == address(1));
-    }
-
     function testHoldUserLock() public {
         EscrowKey memory key = initializeEscrowLock(CallConfigIndex.RequirePreOps);
         key = key.holdUserLock(address(1));
