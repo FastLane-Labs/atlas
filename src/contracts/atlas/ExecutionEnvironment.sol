@@ -110,7 +110,9 @@ contract ExecutionEnvironment is Base {
         if (!abi.decode(data, (bool))) revert AtlasErrors.PostOpsDelegatecallReturnedFalse();
     }
 
-    /// @notice The solverPreTryCatch function is called by Atlas to execute the preSolverCall part of each SolverOperation. A SolverTracker struct is also returned, containing bid info needed to handle the difference in logic between inverted and non-inverted bids.
+    /// @notice The solverPreTryCatch function is called by Atlas to execute the preSolverCall part of each
+    /// SolverOperation. A SolverTracker struct is also returned, containing bid info needed to handle the difference in
+    /// logic between inverted and non-inverted bids.
     /// @param bidAmount The Solver's bid amount.
     /// @param solverOp The SolverOperation struct.
     /// @param returnData Data returned from the previous call phase.
@@ -164,7 +166,9 @@ contract ExecutionEnvironment is Base {
         }
     }
 
-    /// @notice The solverPostTryCatch function is called by Atlas to execute the postSolverCall part of each SolverOperation. The different logic scenarios depending on the value of invertsBidValue are also handled, and the SolverTracker struct is updated accordingly.
+    /// @notice The solverPostTryCatch function is called by Atlas to execute the postSolverCall part of each
+    /// SolverOperation. The different logic scenarios depending on the value of invertsBidValue are also handled, and
+    /// the SolverTracker struct is updated accordingly.
     /// @param solverOp The SolverOperation struct.
     /// @param returnData Data returned from the previous call phase.
     /// @param solverTracker Bid tracking information for the current solver.
