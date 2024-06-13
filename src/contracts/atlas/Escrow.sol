@@ -117,6 +117,7 @@ abstract contract Escrow is AtlETH {
             result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, result);
         }
 
+        // Increment the call index once per solverOp
         unchecked {
             ++key.callIndex;
         }
