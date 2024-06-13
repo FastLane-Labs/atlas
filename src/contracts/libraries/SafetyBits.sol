@@ -21,6 +21,7 @@ uint16 constant SAFE_USER_TRANSFER = uint16(
 uint16 constant SAFE_DAPP_TRANSFER = uint16(
     1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps))
         | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreSolver))
+        | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostSolver))
         | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.HandlingPayments))
         | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
 );
