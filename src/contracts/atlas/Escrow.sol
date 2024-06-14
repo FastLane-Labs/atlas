@@ -346,10 +346,11 @@ abstract contract Escrow is AtlETH {
             }
         }
 
-        data = abi.encodeCall(IAtlas.solverCall, (solverOp.bidAmount, gasLimit, key, solverOp, data));
-
+        data = abi.encodeCall(this.solverCall, (solverOp.bidAmount, gasLimit, key, solverOp, data));
         (success, data) = address(this).call(data);
 
+        // The `solverCall()` above should always revert as key.bidFind is always true when it's called in the context
+        // of this function. Therefore `success` should always be false below, and the revert should be unreachable.
         if (success) {
             revert();
         }
