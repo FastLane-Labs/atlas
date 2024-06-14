@@ -10,7 +10,9 @@ import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { EscrowBits } from "../src/contracts/libraries/EscrowBits.sol";
 
 import "../src/contracts/types/EscrowTypes.sol";
+import "../src/contracts/types/LockTypes.sol";
 import "../src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/DAppApprovalTypes.sol";
 
 contract MockGasAccounting is GasAccounting, Test {
     constructor(
@@ -27,7 +29,12 @@ contract MockGasAccounting is GasAccounting, Test {
     }
 
     function initializeLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) external {
-        _setAccountingLock(executionEnvironment, gasMarker, userOpValue);
+        DAppConfig memory dConfig;
+        _setAccountingLock(dConfig, executionEnvironment, gasMarker, userOpValue);
+    }
+
+    function setPhase(ExecutionPhase phase) external {
+        lock.phase = phase;
     }
 
     function assign(address owner, uint256 value, bool solverWon) external returns (bool) {
@@ -95,6 +102,10 @@ contract GasAccountingTest is Test {
         assertFalse(fulfilled);
 
         mockGasAccounting.trySolverLock(solverOp);
+        vm.expectRevert(AtlasErrors.WrongPhase.selector);
+        mockGasAccounting.reconcile{ value: initialClaims }(executionEnvironment, solverOp.from, 0);
+
+        mockGasAccounting.setPhase(ExecutionPhase.SolverOperations);
         mockGasAccounting.reconcile{ value: initialClaims }(executionEnvironment, solverOp.from, 0);
 
         (calledBack, fulfilled) = mockGasAccounting.validateBalances();
@@ -160,6 +171,12 @@ contract GasAccountingTest is Test {
         mockGasAccounting.reconcile(makeAddr("wrongExecutionEnvironment"), solverOp.from, 0);
 
         mockGasAccounting.trySolverLock(solverOp);
+        vm.expectRevert(AtlasErrors.WrongPhase.selector);
+        mockGasAccounting.reconcile(executionEnvironment, solverOp.from, 0);
+
+        mockGasAccounting.setPhase(ExecutionPhase.SolverOperations);
+
+        //mockGasAccounting.trySolverLock(solverOp);
         vm.expectRevert(abi.encodeWithSelector(AtlasErrors.InvalidSolverFrom.selector, solverOp.from));
         mockGasAccounting.reconcile(executionEnvironment, makeAddr("wrongSolver"), 0);
 
@@ -167,6 +184,7 @@ contract GasAccountingTest is Test {
     }
 
     function test_reconcile() public {
+        mockGasAccounting.setPhase(ExecutionPhase.SolverOperations);
         mockGasAccounting.trySolverLock(solverOp);
         assertTrue(mockGasAccounting.reconcile{ value: initialClaims }(executionEnvironment, solverOp.from, 0) == 0);
         (address currentSolver, bool verified, bool fulfilled) = mockGasAccounting.solverLockData();

@@ -46,14 +46,14 @@ abstract contract GasAccounting is SafetyLocks {
 
     /// @notice Contributes ETH to the contract, increasing the deposits if a non-zero value is sent.
     function contribute() external payable {
-        if (lock != msg.sender) revert InvalidExecutionEnvironment(lock);
+        if (lock.activeEnvironment != msg.sender) revert InvalidExecutionEnvironment(lock.activeEnvironment);
         _contribute();
     }
 
     /// @notice Borrows ETH from the contract, transferring the specified amount to the caller if available.
     /// @param amount The amount of ETH to borrow.
     function borrow(uint256 amount) external payable {
-        if (lock != msg.sender) revert InvalidExecutionEnvironment(lock);
+        if (lock.activeEnvironment != msg.sender) revert InvalidExecutionEnvironment(lock.activeEnvironment);
         if (_borrow(amount)) {
             SafeTransferLib.safeTransferETH(msg.sender, amount);
         } else {
@@ -94,7 +94,14 @@ abstract contract GasAccounting is SafetyLocks {
 
         if (maxApprovedGasSpend > bondedBalance) maxApprovedGasSpend = bondedBalance;
 
-        if (lock != environment) revert InvalidExecutionEnvironment(lock);
+        Lock memory _lock = lock;
+
+        if (_lock.activeEnvironment != environment) {
+            revert InvalidExecutionEnvironment(_lock.activeEnvironment);
+        }
+        if (_lock.phase != ExecutionPhase.SolverOperations) {
+            revert WrongPhase();
+        }
 
         (address currentSolver, bool calledBack, bool fulfilled) = solverLockData();
 

@@ -22,27 +22,17 @@ contract Base {
     // via delegatecall, but can be added to DAppControl as funcs that
     // can be used during DAppControl's delegated funcs
 
-    modifier onlyAtlasEnvironment(ExecutionPhase phase, uint8 acceptableDepths) {
-        _onlyAtlasEnvironment(phase, acceptableDepths);
+    modifier onlyAtlasEnvironment() {
+        _onlyAtlasEnvironment();
         _;
     }
 
-    function _onlyAtlasEnvironment(ExecutionPhase phase, uint8 acceptableDepths) internal view {
+    function _onlyAtlasEnvironment() internal view {
         if (address(this) == SOURCE) {
             revert AtlasErrors.MustBeDelegatecalled();
         }
         if (msg.sender != ATLAS) {
             revert AtlasErrors.OnlyAtlas();
-        }
-
-        // This check can be spoofed by the DAppControl module authors
-        // Users implicitly trust the DAppControl contract and inherit
-        // the risk of any delegatecalls it makes.
-        if (uint8(phase) != _phase()) {
-            revert AtlasErrors.WrongPhase();
-        }
-        if (1 << _depth() & acceptableDepths == 0) {
-            revert AtlasErrors.WrongDepth();
         }
     }
 
@@ -52,7 +42,7 @@ contract Base {
 
     function _firstSet() internal pure returns (bytes memory data) {
         data = abi.encodePacked(
-            _addressPointer(),
+            _bundler(),
             _solverSuccessful(),
             _paymentsSuccessful(),
             _callIndex(),
@@ -131,11 +121,13 @@ contract Base {
         }
     }
 
+    // EMPTY 8BIT PLACEHOLDER AT shr(248, calldataload(sub(calldatasize(), 51)))
+
     /// @notice Extracts and returns the lock state bitmap of the current metacall tx, from calldata.
     /// @return phase The lock state bitmap of the current metacall tx, in uint16 form.
     function _phase() internal pure returns (uint8 phase) {
         assembly {
-            phase := shr(248, calldataload(sub(calldatasize(), 51)))
+            phase := shr(248, calldataload(sub(calldatasize(), 52)))
         }
     }
 
@@ -180,14 +172,14 @@ contract Base {
         }
     }
 
-    /// @notice Extracts and returns the current value of the addressPointer of the current metacall tx, from calldata.
-    /// @dev The addressPointer is either the address of the current DAppControl contract (in preOps and userOp steps),
+    /// @notice Extracts and returns the current value of the bundler of the current metacall tx, from calldata.
+    /// @dev The bundler is either the address of the current DAppControl contract (in preOps and userOp steps),
     /// the current solverOp.solver address (during solverOps steps), or the winning solverOp.from address (during
     /// allocateValue step).
-    /// @return addressPointer The current value of the addressPointer of the current metacall tx.
-    function _addressPointer() internal pure returns (address addressPointer) {
+    /// @return bundler The current value of the bundler of the current metacall tx.
+    function _bundler() internal pure returns (address bundler) {
         assembly {
-            addressPointer := shr(96, calldataload(sub(calldatasize(), 76)))
+            bundler := shr(96, calldataload(sub(calldatasize(), 76)))
         }
     }
 
@@ -263,7 +255,7 @@ contract ExecutionBase is Base {
             return false;
         }
 
-        uint8 phase_bitwise = uint8(1<<uint8(phase));
+        uint8 phase_bitwise = uint8(1 << uint8(phase));
         address user = _user();
         address dapp = _control();
 

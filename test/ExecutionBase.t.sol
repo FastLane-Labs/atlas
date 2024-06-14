@@ -32,16 +32,18 @@ contract ExecutionBaseTest is BaseTest {
     }
 
     function test_forward() public {
-        (bytes memory firstSet, Context memory _ctx) = forwardGetFirstSet(ExecutionPhase.PreOps);
+        ExecutionPhase phase = ExecutionPhase.PreOps;
+        (bytes memory firstSet, Context memory _ctx) = forwardGetFirstSet(phase);
         bytes memory secondSet = abi.encodePacked(user, dAppControl, callConfig);
 
         bytes memory expected = bytes.concat(randomData, firstSet, secondSet);
 
         bytes memory data = abi.encodeWithSelector(MockExecutionEnvironment.forward.selector, randomData);
-        executeForwardCase("forward", data, _ctx, expected);
+        executeForwardCase(phase, "forward", data, _ctx, expected);
     }
 
     function executeForwardCase(
+        ExecutionPhase phase,
         string memory testName,
         bytes memory data,
         Context memory ctx,
@@ -49,7 +51,7 @@ contract ExecutionBaseTest is BaseTest {
     )
         internal
     {
-        data = abi.encodePacked(data, ctx.pack());
+        data = abi.encodePacked(data, ctx.setAndPack(phase, false));
 
         // Mimic the Mimic
         data = abi.encodePacked(data, user, dAppControl, callConfig);
@@ -69,7 +71,6 @@ contract ExecutionBaseTest is BaseTest {
             executionEnvironment: address(0),
             userOpHash: bytes32(0),
             bundler: address(0),
-            addressPointer: address(0x1111),
             solverSuccessful: false,
             paymentsSuccessful: true,
             callIndex: 0,
@@ -82,7 +83,7 @@ contract ExecutionBaseTest is BaseTest {
         });
 
         firstSet = abi.encodePacked(
-            _ctx.addressPointer,
+            _ctx.bundler,
             _ctx.solverSuccessful,
             _ctx.paymentsSuccessful,
             _ctx.callIndex,

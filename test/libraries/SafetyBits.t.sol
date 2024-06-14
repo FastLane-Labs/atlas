@@ -40,7 +40,6 @@ contract SafetyBitsTest is Test {
             executionEnvironment: executionEnvironment,
             userOpHash: userOpHash,
             bundler: bundler,
-            addressPointer: executionEnvironment,
             solverSuccessful: false,
             paymentsSuccessful: false,
             callIndex: callConfig.needsPreOpsCall() ? 0 : 1,
@@ -55,65 +54,11 @@ contract SafetyBitsTest is Test {
 
     function testInitializeEscrowLock() public {
         Context memory ctx = initializeContext(CallConfigIndex.RequirePreOps);
-        assertTrue(ctx.addressPointer == address(0));
         assertTrue(ctx.solverSuccessful == false);
         assertTrue(ctx.paymentsSuccessful == false);
         assertTrue(ctx.callIndex == 0);
         assertTrue(ctx.callCount == 4);
         assertTrue(ctx.phase == ExecutionPhase.Uninitialized);
         assertTrue(ctx.solverOutcome == 0);
-    }
-
-    function testPack() public {
-        Context memory ctx = initializeContext(CallConfigIndex.RequirePostOpsCall);
-        ctx = ctx.setUserPhase(address(1));
-        bytes32 want = 0x0000000000000000000000000000000000000001000002040048000000000001;
-        bytes32 packed = bytes32(ctx.pack());
-        // console.logBytes32(want);
-        // console.logBytes32(packed);
-        assertTrue(packed == want);
-    }
-
-    function testHoldDAppOperationLock() public {
-        Context memory ctx = initializeContext(CallConfigIndex.RequirePostOpsCall);
-        ctx.addressPointer = address(1);
-        ctx.callCount = 4;
-        ctx.callIndex = 2;
-        ctx = ctx.setPostOpsPhase();
-        assertTrue(ctx.phase == ExecutionPhase.PostOps);
-        assertFalse(ctx.addressPointer == address(1));
-        assertTrue(ctx.callIndex == 3);
-
-        Context memory newCtx = initializeContext(CallConfigIndex.RequirePostOpsCall);
-        newCtx.addressPointer = address(1);
-        newCtx.solverSuccessful = true;
-        newCtx.callCount = 4;
-        newCtx.callIndex = 2;
-        newCtx = newCtx.setPostOpsPhase();
-        assertTrue(newCtx.addressPointer == address(1));
-        assertTrue(newCtx.callIndex == 3);
-    }
-
-    function testTurnSolverLockPayments() public {
-        Context memory ctx = initializeContext(CallConfigIndex.RequireFulfillment);
-        ctx = ctx.setAllocateValuePhase(address(1));
-        assertTrue(ctx.phase == ExecutionPhase.AllocateValue);
-        assertTrue(ctx.addressPointer == address(1));
-    }
-
-    function testHoldUserLock() public {
-        Context memory ctx = initializeContext(CallConfigIndex.RequirePreOps);
-        ctx = ctx.setUserPhase(address(1));
-        assertTrue(ctx.phase == ExecutionPhase.UserOperation);
-        assertTrue(ctx.addressPointer == address(1));
-        assertTrue(ctx.callIndex == 1);
-    }
-
-    function testHoldPreOpsLock() public {
-        Context memory ctx = initializeContext(CallConfigIndex.RequirePreOps);
-        ctx = ctx.setPreOpsPhase(address(1));
-        assertTrue(ctx.phase == ExecutionPhase.PreOps);
-        assertTrue(ctx.addressPointer == address(1));
-        assertTrue(ctx.callIndex == 1);
     }
 }

@@ -21,7 +21,8 @@ contract MockSafetyLocks is SafetyLocks {
         external
         payable
     {
-        _setAccountingLock(executionEnvironment, gasMarker, userOpValue);
+        DAppConfig memory dConfig;
+        _setAccountingLock(dConfig, executionEnvironment, gasMarker, userOpValue);
     }
 
     function buildEscrowLock(
@@ -43,8 +44,12 @@ contract MockSafetyLocks is SafetyLocks {
         _releaseAccountingLock();
     }
 
-    function setLock(address _lock) external {
-        lock = _lock;
+    function setLock(address activeEnvironment) external {
+        lock = Lock({
+            activeEnvironment: activeEnvironment,
+            phase: ExecutionPhase.Uninitialized,
+            callConfig: uint32(0)
+        });
     }
 
     function setClaims(uint256 _claims) external {
@@ -83,7 +88,7 @@ contract SafetyLocksTest is Test {
         uint256 rawClaims = (gasMarker + 1) * tx.gasprice;
         uint256 expectedClaims = rawClaims + ((rawClaims * safetyLocks.SURCHARGE_RATE()) / safetyLocks.SURCHARGE_SCALE());
 
-        assertEq(safetyLocks.lock(), executionEnvironment);
+        assertEq(safetyLocks.activeEnvironment(), executionEnvironment);
         assertEq(safetyLocks.claims(), expectedClaims);
         assertEq(safetyLocks.withdrawals(), userOpValue);
         assertEq(safetyLocks.deposits(), msgValue);
@@ -95,16 +100,13 @@ contract SafetyLocksTest is Test {
         safetyLocks.initializeLock(executionEnvironment, 0, 0);
         Context memory ctx = safetyLocks.buildEscrowLock(dConfig, executionEnvironment, bytes32(0), address(0), 0, false);
         assertEq(executionEnvironment, ctx.executionEnvironment);
-        assertEq(executionEnvironment, ctx.addressPointer);
     }
 
     function test_releaseAccountingLock() public {
-        vm.expectRevert(AtlasErrors.NotInitialized.selector);
-        safetyLocks.releaseEscrowLock();
 
         safetyLocks.initializeLock(executionEnvironment, 0, 0);
         safetyLocks.releaseEscrowLock();
-        assertEq(safetyLocks.lock(), address(1));
+        assertEq(safetyLocks.activeEnvironment(), address(1));
         assertEq(safetyLocks.solver(), address(1));
         assertEq(safetyLocks.claims(), type(uint256).max);
         assertEq(safetyLocks.withdrawals(), type(uint256).max);

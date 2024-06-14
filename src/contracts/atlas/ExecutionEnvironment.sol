@@ -32,6 +32,17 @@ contract ExecutionEnvironment is Base {
         _;
     }
 
+    modifier validSolver(SolverOperation calldata solverOp) {
+        if (solverOp.solver == ATLAS || solverOp.solver == _control() || solverOp.solver == address(this)) {
+            revert AtlasErrors.InvalidSolver();
+        }
+        // Verify that the DAppControl contract matches the solver's expectations
+        if (solverOp.control != _control()) {
+            revert AtlasErrors.AlteredControl();
+        }
+        _;
+    }
+
     //////////////////////////////////
     ///    CORE CALL FUNCTIONS     ///
     //////////////////////////////////
@@ -44,7 +55,7 @@ contract ExecutionEnvironment is Base {
     function preOpsWrapper(UserOperation calldata userOp)
         external
         validUser(userOp)
-        onlyAtlasEnvironment(ExecutionPhase.PreOps, _ENVIRONMENT_DEPTH)
+        onlyAtlasEnvironment
         returns (bytes memory)
     {
         bytes memory preOpsData = _forward(abi.encodeCall(IDAppControl.preOpsCall, userOp));
@@ -67,7 +78,7 @@ contract ExecutionEnvironment is Base {
         external
         payable
         validUser(userOp)
-        onlyAtlasEnvironment(ExecutionPhase.UserOperation, _ENVIRONMENT_DEPTH)
+        onlyAtlasEnvironment
         returns (bytes memory returnData)
     {
         uint32 config = _config();
@@ -94,13 +105,7 @@ contract ExecutionEnvironment is Base {
     /// corresponding `postOpsCall` function.
     /// @param solved Boolean indicating whether a winning SolverOperation was executed successfully.
     /// @param returnData Data returned from the previous call phase.
-    function postOpsWrapper(
-        bool solved,
-        bytes calldata returnData
-    )
-        external
-        onlyAtlasEnvironment(ExecutionPhase.PostOps, _ENVIRONMENT_DEPTH)
-    {
+    function postOpsWrapper(bool solved, bytes calldata returnData) external onlyAtlasEnvironment {
         bytes memory data = _forward(abi.encodeCall(IDAppControl.postOpsCall, (solved, returnData)));
 
         bool success;
@@ -124,14 +129,10 @@ contract ExecutionEnvironment is Base {
     )
         external
         payable
-        onlyAtlasEnvironment(ExecutionPhase.PreSolver, _ENVIRONMENT_DEPTH)
+        onlyAtlasEnvironment
+        validSolver(solverOp)
         returns (SolverTracker memory solverTracker)
     {
-        // Verify that the DAppControl contract matches the solver's expectations
-        if (solverOp.control != _control()) {
-            revert AtlasErrors.AlteredControl();
-        }
-
         solverTracker.bidAmount = bidAmount;
         solverTracker.etherIsBidToken = solverOp.bidToken == address(0);
 
@@ -180,7 +181,7 @@ contract ExecutionEnvironment is Base {
     )
         external
         payable
-        onlyAtlasEnvironment(ExecutionPhase.PostSolver, _ENVIRONMENT_DEPTH)
+        onlyAtlasEnvironment
         returns (SolverTracker memory)
     {
         // bidValue is inverted; Lower bids are better; solver must withdraw <= bidAmount
@@ -243,7 +244,7 @@ contract ExecutionEnvironment is Base {
         bytes memory allocateData
     )
         external
-        onlyAtlasEnvironment(ExecutionPhase.AllocateValue, _ENVIRONMENT_DEPTH)
+        onlyAtlasEnvironment
     {
         allocateData = _forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, bidAmount, allocateData)));
 

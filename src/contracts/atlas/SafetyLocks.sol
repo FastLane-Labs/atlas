@@ -30,11 +30,22 @@ abstract contract SafetyLocks is Storage {
     /// @param executionEnvironment The address of the execution environment to set the lock to.
     /// @param gasMarker Initial `gasleft()` measured at the start of `metacall`.
     /// @param userOpValue Amount of ETH required by the UserOperation.
-    function _setAccountingLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) internal {
-        if (lock != _UNLOCKED) revert AlreadyInitialized();
+    function _setAccountingLock(
+        DAppConfig memory dConfig,
+        address executionEnvironment,
+        uint256 gasMarker,
+        uint256 userOpValue
+    )
+        internal
+    {
+        if (lock.activeEnvironment != _UNLOCKED) revert AlreadyInitialized();
 
         // Initialize the Lock
-        lock = executionEnvironment;
+        lock = Lock({
+            activeEnvironment: executionEnvironment,
+            phase: dConfig.callConfig.needsPreOpsCall() ? ExecutionPhase.PreOps : ExecutionPhase.UserOperation,
+            callConfig: dConfig.callConfig
+        });
 
         // Set the claimed amount
         uint256 rawClaims = (gasMarker + 1) * tx.gasprice;
@@ -43,6 +54,11 @@ abstract contract SafetyLocks is Storage {
         // Set any withdraws or deposits
         withdrawals = userOpValue;
         deposits = msg.value;
+    }
+
+    modifier withLockPhase(ExecutionPhase phase) {
+        lock.phase = phase;
+        _;
     }
 
     /// @notice Builds an Context struct with the specified parameters, called at the start of
@@ -70,7 +86,6 @@ abstract contract SafetyLocks is Storage {
             executionEnvironment: executionEnvironment,
             userOpHash: userOpHash,
             bundler: bundler,
-            addressPointer: executionEnvironment,
             solverSuccessful: false,
             paymentsSuccessful: false,
             callIndex: dConfig.callConfig.needsPreOpsCall() ? 0 : 1,
@@ -86,8 +101,7 @@ abstract contract SafetyLocks is Storage {
     /// @notice Releases the Atlas lock, and resets the associated transient storage variables. Called at the end of
     /// `metacall`.
     function _releaseAccountingLock() internal {
-        if (lock == _UNLOCKED) revert NotInitialized();
-        lock = _UNLOCKED;
+        lock = Lock({ activeEnvironment: _UNLOCKED, phase: ExecutionPhase.Uninitialized, callConfig: uint32(0) });
         _solverLock = _UNLOCKED_UINT;
         claims = type(uint256).max;
         withdrawals = type(uint256).max;
@@ -96,12 +110,16 @@ abstract contract SafetyLocks is Storage {
 
     /// @notice Returns the address of the currently active Execution Environment, if any.
     function activeEnvironment() external view returns (address) {
-        return lock;
+        return lock.activeEnvironment;
+    }
+
+    function phase() external view returns (ExecutionPhase) {
+        return lock.phase;
     }
 
     /// @notice Returns the current lock state of Atlas.
     /// @return Boolean indicating whether Atlas is in a locked state or not.
     function isUnlocked() external view returns (bool) {
-        return lock == _UNLOCKED;
+        return lock.activeEnvironment == _UNLOCKED;
     }
 }

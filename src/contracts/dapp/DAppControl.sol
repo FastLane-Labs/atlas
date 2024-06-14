@@ -61,7 +61,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         external
         payable
         validControl
-        onlyAtlasEnvironment(ExecutionPhase.PreOps, _CONTROL_DEPTH)
+        onlyAtlasEnvironment
         returns (bytes memory)
     {
         return _preOpsCall(userOp);
@@ -78,7 +78,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         external
         payable
         validControl
-        onlyAtlasEnvironment(ExecutionPhase.PreSolver, _CONTROL_DEPTH)
+        onlyAtlasEnvironment
         returns (bool)
     {
         return _preSolverCall(solverOp, returnData);
@@ -95,7 +95,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         external
         payable
         validControl
-        onlyAtlasEnvironment(ExecutionPhase.PostSolver, _CONTROL_DEPTH)
+        onlyAtlasEnvironment
         returns (bool)
     {
         return _postSolverCall(solverOp, returnData);
@@ -112,7 +112,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     )
         external
         validControl
-        onlyAtlasEnvironment(ExecutionPhase.AllocateValue, _CONTROL_DEPTH)
+        onlyAtlasEnvironment
     {
         _allocateValueCall(bidToken, bidAmount, data);
     }
@@ -128,7 +128,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         external
         payable
         validControl
-        onlyAtlasEnvironment(ExecutionPhase.PostOps, _CONTROL_DEPTH)
+        onlyAtlasEnvironment
         returns (bool)
     {
         return _postOpsCall(solved, data);

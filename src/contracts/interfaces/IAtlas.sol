@@ -10,10 +10,10 @@ import "../types/LockTypes.sol";
 
 interface IAtlas {
     function solverCall(
-        uint256 bidAmount,
-        uint256 gasLimit,
         Context calldata ctx,
         SolverOperation calldata solverOp,
+        uint256 bidAmount,
+        uint256 gasLimit,
         bytes calldata dAppReturnData
     )
         external

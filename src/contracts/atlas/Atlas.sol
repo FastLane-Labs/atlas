@@ -67,7 +67,7 @@ contract Atlas is Escrow, Factory {
         }
 
         // Initialize the lock
-        _setAccountingLock(executionEnvironment, gasMarker, userOp.value);
+        _setAccountingLock(dConfig, executionEnvironment, gasMarker, userOp.value);
 
         try this.execute(dConfig, userOp, solverOps, executionEnvironment, msg.sender, userOpHash) returns (
             bool _auctionWon, uint256 winningSolverIndex
@@ -122,133 +122,58 @@ contract Atlas is Escrow, Factory {
         // This is a self.call made externally so that it can be used with try/catch
         if (msg.sender != address(this)) revert InvalidAccess();
 
-        (bytes memory returnData, Context memory ctx) =
-            _preOpsUserExecutionIteration(dConfig, userOp, solverOps, executionEnvironment, bundler, userOpHash);
-
-        if (dConfig.callConfig.exPostBids()) {
-            (auctionWon, ctx) = _bidFindingIteration(dConfig, userOp, solverOps, returnData, ctx);
-        } else {
-            (auctionWon, ctx) = _bidKnownIteration(dConfig, userOp, solverOps, returnData, ctx);
-        }
-
-        // If no solver was successful, handle revert decision
-        if (!auctionWon) {
-            if (ctx.isSimulation) revert SolverSimFail(uint256(ctx.solverOutcome));
-            if (dConfig.callConfig.needsFulfillment()) {
-                revert UserNotFulfilled();
-            }
-        }
-
-        if (dConfig.callConfig.needsPostOpsCall()) {
-            // NOTE: ctx.addressPointer currently points at address(0) if all solvers fail.
-            // TODO: point ctx.addressPointer at bundler if all fail.
-            ctx = ctx.setPostOpsPhase(); // preserves addressPointer of winning solver
-
-            bool callSuccessful = _executePostOpsCall(auctionWon, returnData, ctx);
-            if (!callSuccessful) {
-                if (ctx.isSimulation) revert PostOpsSimFail();
-                revert PostOpsFail();
-            }
-        }
-        return (auctionWon, uint256(ctx.solverOutcome));
-    }
-
-    /// @notice Called above in `execute`, this function executes the preOps and userOp calls.
-    /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
-    /// @param userOp UserOperation struct of the current metacall tx.
-    /// @param solverOps SolverOperation array of the current metacall tx.
-    /// @param executionEnvironment Address of the execution environment contract of the current metacall tx.
-    /// @param bundler Address of the bundler of the current metacall tx.
-    /// @param userOpHash Hash of the userOp struct of the current metacall tx.
-    /// @return bytes returnData returned from the preOps and/or userOp calls.
-    /// @return Context struct containing the current state of the escrow lock.
-    function _preOpsUserExecutionIteration(
-        DAppConfig calldata dConfig,
-        UserOperation calldata userOp,
-        SolverOperation[] calldata solverOps,
-        address executionEnvironment,
-        address bundler,
-        bytes32 userOpHash
-    )
-        internal
-        returns (bytes memory, Context memory)
-    {
-        bool callSuccessful;
-        bool usePreOpsReturnData;
-        bytes memory returnData;
-
         // Build the memory lock
         Context memory ctx = _buildContext(
             dConfig, executionEnvironment, userOpHash, bundler, uint8(solverOps.length), bundler == SIMULATOR
         );
 
+        bytes memory returnData;
+
+        // PreOps Call
         if (dConfig.callConfig.needsPreOpsCall()) {
-            // CASE: Need PreOps Call
-            ctx = ctx.setPreOpsPhase(dConfig.to);
-
-            if (dConfig.callConfig.needsPreOpsReturnData()) {
-                // CASE: Need PreOps return data
-                usePreOpsReturnData = true;
-                (callSuccessful, returnData) = _executePreOpsCall(userOp, executionEnvironment, ctx.pack());
-            } else {
-                // CASE: Ignore PreOps return data
-                (callSuccessful,) = _executePreOpsCall(userOp, executionEnvironment, ctx.pack());
-            }
-
-            if (!callSuccessful) {
-                if (ctx.isSimulation) revert PreOpsSimFail();
-                revert PreOpsFail();
-            }
+            (ctx, returnData) = _executePreOpsCall(ctx, dConfig, userOp);
         }
 
-        ctx = ctx.setUserPhase(userOp.dapp);
+        // UserOp Call
+        (ctx, returnData) = _executeUserOperation(ctx, dConfig, userOp, returnData);
 
-        if (dConfig.callConfig.needsUserReturnData()) {
-            // CASE: Need User return data
+        // SolverOps Calls
+        ctx = dConfig.callConfig.exPostBids()
+            ? _bidFindingIteration(ctx, dConfig, userOp, solverOps, returnData)
+            : _bidKnownIteration(ctx, dConfig, userOp, solverOps, returnData);
 
-            if (usePreOpsReturnData) {
-                // CASE: Need PreOps return Data, Need User return data
-                bytes memory userReturnData;
-                (callSuccessful, userReturnData) = _executeUserOperation(userOp, executionEnvironment, ctx.pack());
-                returnData = bytes.concat(returnData, userReturnData);
-            } else {
-                // CASE: Ignore PreOps return data, Need User return data
-                (callSuccessful, returnData) = _executeUserOperation(userOp, executionEnvironment, ctx.pack());
-            }
-        } else {
-            // CASE: Ignore User return data
-            (callSuccessful,) = _executeUserOperation(userOp, executionEnvironment, ctx.pack());
+        // PostOp Call
+        if (dConfig.callConfig.needsPostOpsCall()) {
+            ctx = _executePostOpsCall(ctx, auctionWon, returnData);
         }
 
-        if (!callSuccessful) {
-            if (ctx.isSimulation) revert UserOpSimFail();
-            revert UserOpFail();
-        }
-
-        return (returnData, ctx);
+        return (ctx.solverSuccessful, uint256(ctx.solverOutcome));
     }
 
     /// @notice Called above in `execute` if the DAppConfig requires ex post bids. Sorts solverOps by bid amount and
     /// executes them in descending order until a successful winner is found.
+    /// @param ctx Context struct containing the current state of the escrow lock.
     /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param returnData Return data from the preOps and userOp calls.
-    /// @param ctx Context struct containing the current state of the escrow lock.
-    /// @return auctionWon bool indicating whether a winning solver was found or not.
-    /// @return Context struct containing the current state of the escrow lock.
+    /// @return ctx Updated Context struct, reflecting the new state after attempting the SolverOperation.
     function _bidFindingIteration(
+        Context memory ctx,
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
-        bytes memory returnData,
-        Context memory ctx
+        bytes memory returnData
     )
         internal
-        returns (bool auctionWon, Context memory)
+        returns (Context memory)
     {
         // Return early if no solverOps (e.g. in simUserOperation)
-        if (solverOps.length == 0) return (false, ctx);
+        if (solverOps.length == 0) {
+            if (ctx.isSimulation) revert SolverSimFail(0);
+            if (dConfig.callConfig.needsFulfillment()) revert UserNotFulfilled();
+            return ctx;
+        }
 
         ctx.bidFind = true;
 
@@ -273,7 +198,7 @@ contract Atlas is Escrow, Factory {
         // |<------------------ 240 bits ---------------->|<------- 16 bits ------->|
 
         for (uint256 i; i < solverOps.length; ++i) {
-            bidAmountFound = _getBidAmount(dConfig, userOp, solverOps[i], returnData, ctx);
+            bidAmountFound = _getBidAmount(ctx, dConfig, userOp, solverOps[i], returnData);
 
             if (bidAmountFound == 0 || bidAmountFound > type(uint240).max) {
                 // Zero bids are ignored: increment zeroBidCount offset
@@ -304,65 +229,57 @@ contract Atlas is Escrow, Factory {
             if (bidAmountFound == 0) break;
 
             // Isolate the original solverOps index from the packed uint256 value
-            uint256 solverOpsIndex = bidsAndIndices[i] & _FIRST_16_BITS_TRUE_MASK;
+            uint256 solverIndex = bidsAndIndices[i] & _FIRST_16_BITS_TRUE_MASK;
 
             // Execute the solver operation. If solver won, allocate value and return. Otherwise continue looping.
-            (auctionWon, ctx, bidAmountFound) = _executeSolverOperation(
-                dConfig, userOp, solverOps[solverOpsIndex], returnData, bidAmountFound, true, ctx
-            );
+            (ctx, bidAmountFound) =
+                _executeSolverOperation(ctx, dConfig, userOp, solverOps[solverIndex], bidAmountFound, true, returnData);
 
-            if (auctionWon) {
-                ctx = _allocateValue(dConfig, solverOps[solverOpsIndex], bidAmountFound, returnData, ctx);
-
-                ctx.solverOutcome = uint24(solverOpsIndex);
-
-                return (auctionWon, ctx);
+            if (ctx.solverSuccessful) {
+                return _allocateValue(ctx, dConfig, solverOps[solverIndex], bidAmountFound, solverIndex, returnData);
             }
 
             if (i == 0) break; // break to prevent underflow in next loop
         }
-
-        return (auctionWon, ctx);
+        if (ctx.isSimulation) revert SolverSimFail(uint256(ctx.solverOutcome));
+        if (dConfig.callConfig.needsFulfillment()) revert UserNotFulfilled();
+        return ctx;
     }
 
     /// @notice Called above in `execute` as an alternative to `_bidFindingIteration`, if solverOps have already been
     /// reliably sorted. Executes solverOps in order until a successful winner is found.
+    /// @param ctx Context struct containing the current state of the escrow lock.
     /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param returnData Return data from the preOps and userOp calls.
-    /// @param ctx Context struct containing the current state of the escrow lock.
-    /// @return auctionWon bool indicating whether a winning solver was found or not.
-    /// @return Context struct containing the current state of the escrow lock.
+    /// @return Context Updated Context struct, reflecting the new state after attempting the SolverOperation.
     function _bidKnownIteration(
+        Context memory ctx,
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
-        bytes memory returnData,
-        Context memory ctx
+        bytes memory returnData
     )
         internal
-        returns (bool auctionWon, Context memory)
+        returns (Context memory)
     {
         uint256 bidAmount;
         uint256 k = solverOps.length;
 
-        for (uint256 i; i < k; ++i) {
-            SolverOperation calldata solverOp = solverOps[i];
+        for (uint256 solverIndex; solverIndex < k; ++solverIndex) {
+            SolverOperation calldata solverOp = solverOps[solverIndex];
 
-            (auctionWon, ctx, bidAmount) =
-                _executeSolverOperation(dConfig, userOp, solverOp, returnData, solverOp.bidAmount, false, ctx);
+            (ctx, bidAmount) =
+                _executeSolverOperation(ctx, dConfig, userOp, solverOp, solverOp.bidAmount, false, returnData);
 
-            if (auctionWon) {
-                ctx = _allocateValue(dConfig, solverOp, bidAmount, returnData, ctx);
-
-                ctx.solverOutcome = uint24(i);
-
-                return (auctionWon, ctx);
+            if (ctx.solverSuccessful) {
+                return _allocateValue(ctx, dConfig, solverOp, bidAmount, solverIndex, returnData);
             }
         }
-
-        return (auctionWon, ctx);
+        if (ctx.isSimulation) revert SolverSimFail(uint256(ctx.solverOutcome));
+        if (dConfig.callConfig.needsFulfillment()) revert UserNotFulfilled();
+        return ctx;
     }
 
     /// @notice Called at the end of `metacall` to bubble up specific error info in a revert.
@@ -399,13 +316,22 @@ contract Atlas is Escrow, Factory {
         }
     }
 
-    /// @notice Reverts if the caller is not the execution environment address expected from the set of inputs.
+    /// @notice Returns whether or not the execution environment address matches what's expected from the set of inputs.
+    /// @param environment ExecutionEnvironment address
     /// @param user User address
     /// @param control DAppControl contract address
     /// @param callConfig CallConfig of the current metacall tx.
-    function _verifyCallerIsExecutionEnv(address user, address control, uint32 callConfig) internal view override {
-        if (msg.sender != _getExecutionEnvironmentCustom(user, control, callConfig)) {
-            revert EnvironmentMismatch();
-        }
+    function _verifyUserControlExecutionEnv(
+        address environment,
+        address user,
+        address control,
+        uint32 callConfig
+    )
+        internal
+        view
+        override
+        returns (bool)
+    {
+        return environment == _getExecutionEnvironmentCustom(user, control, callConfig);
     }
 }

@@ -84,7 +84,6 @@ contract SwapIntentDAppControl is DAppControl {
     */
     function swap(SwapIntent calldata swapIntent) external payable returns (SwapData memory) {
         require(msg.sender == ATLAS, "SwapIntentDAppControl: InvalidSender");
-        require(_addressPointer() == CONTROL, "SwapIntentDAppControl: InvalidLockState");
         require(address(this) != CONTROL, "SwapIntentDAppControl: MustBeDelegated");
         require(swapIntent.tokenUserSells != swapIntent.auctionBaseCurrency, "SwapIntentDAppControl: SellIsSurplus");
 

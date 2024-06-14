@@ -121,7 +121,7 @@ contract V4DAppControl is DAppControl {
                 params.zeroForOne
                     ? IPoolManager.Currency.unwrap(key.currency0)
                     : IPoolManager.Currency.unwrap(key.currency1)
-            ),
+                ),
             poolKey: key
         });
 
@@ -208,7 +208,7 @@ contract V4DAppControl is DAppControl {
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that DAppControl supplied a valid signature
         require(address(this) == hook, "ERR-H00 InvalidCallee");
-        require(hook == ctx.addressPointer, "ERR-H01 InvalidCaller");
+        require(hook == _control(), "ERR-H01 InvalidCaller");
         require(ctx.phase == ExecutionPhase.PreOps, "ERR-H02 InvalidLockStage");
         require(hashLock == bytes32(0), "ERR-H03 AlreadyActive");
 
@@ -226,7 +226,7 @@ contract V4DAppControl is DAppControl {
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that DAppControl supplied a valid signature
         require(address(this) == hook, "ERR-H20 InvalidCallee");
-        require(hook == ctx.addressPointer, "ERR-H21 InvalidCaller");
+        require(hook == _control(), "ERR-H21 InvalidCaller");
         require(ctx.phase == ExecutionPhase.PostOps, "ERR-H22 InvalidLockStage");
         require(hashLock == keccak256(abi.encode(key, msg.sender)), "ERR-H23 InvalidKey");
 
