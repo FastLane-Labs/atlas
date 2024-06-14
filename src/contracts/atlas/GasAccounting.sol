@@ -23,27 +23,6 @@ abstract contract GasAccounting is SafetyLocks {
         SafetyLocks(_escrowDuration, _verification, _simulator, _surchargeRecipient)
     { }
 
-    /// @notice Validates the balances to determine if the caller (Execution Environment) is in surplus.
-    /// @return calledBack A boolean indicating whether the solver has called back via `reconcile`.
-    /// @return fulfilled A boolean indicating whether the solver's outstanding debt has been repaid.
-    function validateBalances() external view returns (bool calledBack, bool fulfilled) {
-        (calledBack, fulfilled) = _validateBalances();
-    }
-
-    /// @notice Validates the balances to determine if the caller (Execution Environment) is in surplus.
-    /// @return calledBack A boolean indicating whether the solver has called back via `reconcile`.
-    /// @return fulfilled A boolean indicating whether the solver's outstanding debt has been repaid.
-    function _validateBalances() internal view returns (bool calledBack, bool fulfilled) {
-        (, calledBack, fulfilled) = solverLockData();
-        if (!fulfilled) {
-            uint256 _deposits = deposits;
-            // Check if locked.
-            if (_deposits != type(uint256).max) {
-                fulfilled = _deposits >= claims + withdrawals;
-            }
-        }
-    }
-
     /// @notice Contributes ETH to the contract, increasing the deposits if a non-zero value is sent.
     function contribute() external payable {
         if (lock != msg.sender) revert InvalidExecutionEnvironment(lock);

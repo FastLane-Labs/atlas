@@ -89,19 +89,6 @@ contract GasAccountingTest is Test {
         claims = rawClaims + ((rawClaims * mockGasAccounting.SURCHARGE_RATE()) / mockGasAccounting.SURCHARGE_SCALE());
     }
 
-    function test_validateBalances() public {
-        (bool calledBack, bool fulfilled) = mockGasAccounting.validateBalances();
-        assertFalse(calledBack);
-        assertFalse(fulfilled);
-
-        mockGasAccounting.trySolverLock(solverOp);
-        mockGasAccounting.reconcile{ value: initialClaims }(executionEnvironment, solverOp.from, 0);
-
-        (calledBack, fulfilled) = mockGasAccounting.validateBalances();
-        assertTrue(calledBack);
-        assertTrue(fulfilled);
-    }
-
     function test_contribute() public {
         vm.expectRevert(
             abi.encodeWithSelector(AtlasErrors.InvalidExecutionEnvironment.selector, executionEnvironment)

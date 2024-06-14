@@ -554,8 +554,8 @@ abstract contract Escrow is AtlETH {
         // Update solverTracker with returned data
         solverTracker = abi.decode(data, (SolverTracker));
 
-        // Verify that the solver repaid their borrowed solverOp.value
-        (, success) = _validateBalances();
+        // Verify that the solver repaid their borrowed solverOp.value by calling `reconcile()`
+        (,, success) = _solverLockData();
         if (!success) {
             revert BalanceNotReconciled();
         }
