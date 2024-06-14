@@ -346,13 +346,13 @@ abstract contract Escrow is AtlETH {
             }
         }
 
-        data = abi.encodeCall(this.solverCall, (solverOp.bidAmount, gasLimit, key, solverOp, data));
+        data = abi.encodeCall(IAtlas.solverCall, (solverOp.bidAmount, gasLimit, key, solverOp, data));
         (success, data) = address(this).call(data);
 
         // The `solverCall()` above should always revert as key.bidFind is always true when it's called in the context
         // of this function. Therefore `success` should always be false below, and the revert should be unreachable.
         if (success) {
-            revert();
+            revert Unreachable();
         }
 
         if (bytes4(data) == BidFindSuccessful.selector) {
@@ -444,7 +444,7 @@ abstract contract Escrow is AtlETH {
         // Calls the solverCall function, just below this function, which will handle calling solverPreTryCatch and
         // solverPostTryCatch via the ExecutionEnvironment, and in between those two hooks, the actual solver call
         // directly from Atlas to the solver contract (not via the ExecutionEnvironment).
-        bytes memory data = abi.encodeCall(this.solverCall, (bidAmount, gasLimit, key, solverOp, dAppReturnData));
+        bytes memory data = abi.encodeCall(IAtlas.solverCall, (bidAmount, gasLimit, key, solverOp, dAppReturnData));
         (success, data) = address(this).call(data);
 
         if (success) {
