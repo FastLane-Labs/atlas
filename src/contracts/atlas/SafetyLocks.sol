@@ -30,7 +30,7 @@ abstract contract SafetyLocks is Storage {
     /// @param executionEnvironment The address of the execution environment to set the lock to.
     /// @param gasMarker Initial `gasleft()` measured at the start of `metacall`.
     /// @param userOpValue Amount of ETH required by the UserOperation.
-    function _setAtlasLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) internal {
+    function _setAccountingLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) internal {
         if (lock != _UNLOCKED) revert AlreadyInitialized();
 
         // Initialize the Lock
@@ -45,7 +45,7 @@ abstract contract SafetyLocks is Storage {
         deposits = msg.value;
     }
 
-    /// @notice Builds an EscrowKey struct with the specified parameters, called at the start of
+    /// @notice Builds an Context struct with the specified parameters, called at the start of
     /// `_preOpsUserExecutionIteration`.
     /// @param dConfig The DAppConfig of the current DAppControl contract.
     /// @param executionEnvironment The address of the current Execution Environment.
@@ -53,8 +53,8 @@ abstract contract SafetyLocks is Storage {
     /// @param bundler The address of the bundler.
     /// @param solverOpCount The count of SolverOperations.
     /// @param isSimulation Boolean indicating whether the call is a simulation or not.
-    /// @return An EscrowKey struct initialized with the provided parameters.
-    function _buildEscrowLock(
+    /// @return An Context struct initialized with the provided parameters.
+    function _buildContext(
         DAppConfig calldata dConfig,
         address executionEnvironment,
         bytes32 userOpHash,
@@ -64,9 +64,9 @@ abstract contract SafetyLocks is Storage {
     )
         internal
         pure
-        returns (EscrowKey memory)
+        returns (Context memory)
     {
-        return EscrowKey({
+        return Context({
             executionEnvironment: executionEnvironment,
             userOpHash: userOpHash,
             bundler: bundler,
@@ -75,7 +75,7 @@ abstract contract SafetyLocks is Storage {
             paymentsSuccessful: false,
             callIndex: dConfig.callConfig.needsPreOpsCall() ? 0 : 1,
             callCount: solverOpCount + _CALL_COUNT_EXCL_SOLVER_CALLS,
-            lockState: 0,
+            phase: ExecutionPhase.Uninitialized,
             solverOutcome: 0,
             bidFind: false,
             isSimulation: isSimulation,
@@ -85,7 +85,7 @@ abstract contract SafetyLocks is Storage {
 
     /// @notice Releases the Atlas lock, and resets the associated transient storage variables. Called at the end of
     /// `metacall`.
-    function _releaseAtlasLock() internal {
+    function _releaseAccountingLock() internal {
         if (lock == _UNLOCKED) revert NotInitialized();
         lock = _UNLOCKED;
         _solverLock = _UNLOCKED_UINT;

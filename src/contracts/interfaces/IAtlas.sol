@@ -12,7 +12,7 @@ interface IAtlas {
     function solverCall(
         uint256 bidAmount,
         uint256 gasLimit,
-        EscrowKey calldata key,
+        Context calldata ctx,
         SolverOperation calldata solverOp,
         bytes calldata dAppReturnData
     )

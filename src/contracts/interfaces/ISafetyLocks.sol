@@ -18,7 +18,7 @@ interface ISafetyLocks {
 
     function isUnlocked() external view returns (bool);
 
-    function getLockState() external view returns (EscrowKey memory);
+    function getLockState() external view returns (Context memory);
 
     function confirmSafetyCallback() external view returns (bool);
 }

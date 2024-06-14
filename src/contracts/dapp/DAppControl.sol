@@ -3,7 +3,6 @@ pragma solidity 0.8.22;
 
 import { DAppControlTemplate } from "./ControlTemplate.sol";
 import { ExecutionBase } from "src/contracts/common/ExecutionBase.sol";
-import { EXECUTION_PHASE_OFFSET } from "src/contracts/libraries/SafetyBits.sol";
 import { ExecutionPhase } from "src/contracts/types/LockTypes.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import "src/contracts/types/SolverCallTypes.sol";
@@ -113,7 +112,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     )
         external
         validControl
-        onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _CONTROL_DEPTH)
+        onlyAtlasEnvironment(ExecutionPhase.AllocateValue, _CONTROL_DEPTH)
     {
         _allocateValueCall(bidToken, bidAmount, data);
     }

@@ -5,8 +5,8 @@ import { IPermit69 } from "src/contracts/interfaces/IPermit69.sol";
 import { ISafetyLocks } from "src/contracts/interfaces/ISafetyLocks.sol";
 import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
-import { ExecutionPhase, BaseLock } from "src/contracts/types/LockTypes.sol";
-import { EXECUTION_PHASE_OFFSET, SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "src/contracts/libraries/SafetyBits.sol";
+import { ExecutionPhase } from "src/contracts/types/LockTypes.sol";
+import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "src/contracts/libraries/SafetyBits.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 contract Base {
@@ -34,7 +34,11 @@ contract Base {
         if (msg.sender != ATLAS) {
             revert AtlasErrors.OnlyAtlas();
         }
-        if (uint16(1 << (EXECUTION_PHASE_OFFSET + uint16(phase))) & _lockState() == 0) {
+
+        // This check can be spoofed by the DAppControl module authors
+        // Users implicitly trust the DAppControl contract and inherit
+        // the risk of any delegatecalls it makes.
+        if (uint8(phase) != _phase()) {
             revert AtlasErrors.WrongPhase();
         }
         if (1 << _depth() & acceptableDepths == 0) {
@@ -46,10 +50,6 @@ contract Base {
         return bytes.concat(data, _firstSet(), _secondSet());
     }
 
-    function _forwardSpecial(bytes memory data, ExecutionPhase phase) internal pure returns (bytes memory) {
-        return bytes.concat(data, _firstSetSpecial(phase), _secondSet());
-    }
-
     function _firstSet() internal pure returns (bytes memory data) {
         data = abi.encodePacked(
             _addressPointer(),
@@ -57,35 +57,12 @@ contract Base {
             _paymentsSuccessful(),
             _callIndex(),
             _callCount(),
-            _lockState(),
+            _phase(),
+            uint8(0),
             _solverOutcome(),
             _bidFind(),
             _simulation(),
             _depth() + 1
-        );
-    }
-
-    function _firstSetSpecial(ExecutionPhase phase) internal pure returns (bytes memory data) {
-        uint8 depth = _depth();
-        uint16 lockState = _lockState();
-
-        if (depth == 1 && lockState & 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.SolverOperations)) != 0) {
-            if (phase == ExecutionPhase.PreSolver || phase == ExecutionPhase.PostSolver) {
-                lockState = uint16(1) << uint16(BaseLock.Active) | uint16(1) << (EXECUTION_PHASE_OFFSET + uint16(phase));
-            }
-        }
-
-        data = abi.encodePacked(
-            _addressPointer(),
-            _solverSuccessful(),
-            _paymentsSuccessful(),
-            _callIndex(),
-            _callCount(),
-            lockState,
-            _solverOutcome(),
-            _bidFind(),
-            _simulation(),
-            depth + 1
         );
     }
 
@@ -155,10 +132,10 @@ contract Base {
     }
 
     /// @notice Extracts and returns the lock state bitmap of the current metacall tx, from calldata.
-    /// @return lockState The lock state bitmap of the current metacall tx, in uint16 form.
-    function _lockState() internal pure returns (uint16 lockState) {
+    /// @return phase The lock state bitmap of the current metacall tx, in uint16 form.
+    function _phase() internal pure returns (uint8 phase) {
         assembly {
-            lockState := shr(240, calldataload(sub(calldatasize(), 52)))
+            phase := shr(248, calldataload(sub(calldatasize(), 51)))
         }
     }
 
@@ -249,7 +226,7 @@ contract ExecutionBase is Base {
     /// @param destination The address to which the tokens will be transferred.
     /// @param amount The amount of tokens to transfer.
     function _transferUserERC20(address token, address destination, uint256 amount) internal {
-        IPermit69(ATLAS).transferUserERC20(token, destination, amount, _user(), _control(), _config(), _lockState());
+        IPermit69(ATLAS).transferUserERC20(token, destination, amount, _user(), _control(), _config(), _phase());
     }
 
     /// @notice Transfers ERC20 tokens from the DApp of the current metacall tx, via Atlas, to a specified destination.
@@ -258,7 +235,7 @@ contract ExecutionBase is Base {
     /// @param destination The address to which the tokens will be transferred.
     /// @param amount The amount of tokens to transfer.
     function _transferDAppERC20(address token, address destination, uint256 amount) internal {
-        IPermit69(ATLAS).transferDAppERC20(token, destination, amount, _user(), _control(), _config(), _lockState());
+        IPermit69(ATLAS).transferDAppERC20(token, destination, amount, _user(), _control(), _config(), _phase());
     }
 
     /// @notice Returns a bool indicating whether a source address has approved the Atlas contract to transfer a certain
@@ -286,12 +263,12 @@ contract ExecutionBase is Base {
             return false;
         }
 
-        uint16 shiftedPhase = uint16(1 << (EXECUTION_PHASE_OFFSET + uint16(phase)));
+        uint8 phase_bitwise = uint8(1<<uint8(phase));
         address user = _user();
         address dapp = _control();
 
         if (_source == user) {
-            if (shiftedPhase & SAFE_USER_TRANSFER == 0) {
+            if (phase_bitwise & SAFE_USER_TRANSFER == 0) {
                 return false;
             }
             if (ERC20(_token).allowance(user, ATLAS) < _amount) {
@@ -301,7 +278,7 @@ contract ExecutionBase is Base {
         }
 
         if (_source == dapp) {
-            if (shiftedPhase & SAFE_DAPP_TRANSFER == 0) {
+            if (phase_bitwise & SAFE_DAPP_TRANSFER == 0) {
                 return false;
             }
             if (ERC20(_token).allowance(dapp, ATLAS) < _amount) {

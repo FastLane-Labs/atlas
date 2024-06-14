@@ -52,7 +52,7 @@ abstract contract Permit69 is GasAccounting {
     /// @param user The address of the user invoking the function.
     /// @param control The address of the current DAppControl contract.
     /// @param callConfig The CallConfig of the current DAppControl contract.
-    /// @param lockState The lock state indicating the safe execution phase for the token transfer.
+    /// @param phase The lock state indicating the safe execution phase for the token transfer.
     function transferUserERC20(
         address token,
         address destination,
@@ -60,7 +60,7 @@ abstract contract Permit69 is GasAccounting {
         address user,
         address control,
         uint32 callConfig,
-        uint16 lockState
+        uint8 phase
     )
         external
     {
@@ -70,7 +70,7 @@ abstract contract Permit69 is GasAccounting {
         _verifyCallerIsExecutionEnv(user, control, callConfig);
 
         // Verify the lock state
-        _verifyLockState({ lockState: lockState, safeExecutionPhaseSet: SAFE_USER_TRANSFER });
+        _verifyLockState({ phase: phase, safeExecutionPhaseSet: SAFE_USER_TRANSFER });
 
         // Transfer token
         ERC20(token).safeTransferFrom(user, destination, amount);
@@ -84,7 +84,7 @@ abstract contract Permit69 is GasAccounting {
     /// @param user The address of the user invoking the function.
     /// @param control The address of the current DAppControl contract.
     /// @param callConfig The CallConfig of the current DAppControl contract.
-    /// @param lockState The lock state indicating the safe execution phase for the token transfer.
+    /// @param phase The lock state indicating the safe execution phase for the token transfer.
     function transferDAppERC20(
         address token,
         address destination,
@@ -92,7 +92,7 @@ abstract contract Permit69 is GasAccounting {
         address user,
         address control,
         uint32 callConfig,
-        uint16 lockState
+        uint8 phase
     )
         external
     {
@@ -100,17 +100,17 @@ abstract contract Permit69 is GasAccounting {
         _verifyCallerIsExecutionEnv(user, control, callConfig);
 
         // Verify the lock state
-        _verifyLockState({ lockState: lockState, safeExecutionPhaseSet: SAFE_DAPP_TRANSFER });
+        _verifyLockState({ phase: phase, safeExecutionPhaseSet: SAFE_DAPP_TRANSFER });
 
         // Transfer token
         ERC20(token).safeTransferFrom(control, destination, amount);
     }
 
     /// @notice Verifies whether the lock state allows execution in the specified safe execution phase.
-    /// @param lockState The lock state to be checked.
+    /// @param phase The lock state to be checked.
     /// @param safeExecutionPhaseSet The set of safe execution phases.
-    function _verifyLockState(uint16 lockState, uint16 safeExecutionPhaseSet) internal pure {
-        if (lockState & safeExecutionPhaseSet == 0) {
+    function _verifyLockState(uint8 phase, uint8 safeExecutionPhaseSet) internal pure {
+        if (1<<phase & safeExecutionPhaseSet == 0) {
             revert InvalidLockState();
         }
     }

@@ -76,25 +76,25 @@ contract UniV4Hook is V4DAppControl {
         require(address(this) == hook, "ERR-H00 InvalidCallee");
         require(msg.sender == v4Singleton, "ERR-H01 InvalidCaller"); // TODO: Confirm this
 
-        EscrowKey memory escrowKey = ISafetyLocks(ATLAS).getLockState();
+        Context memory ctx = ISafetyLocks(ATLAS).getLockState();
 
-        if (escrowKey.lockState == SafetyBits._LOCKED_X_USER_X_UNSET) {
+        if (ctx.phase == ExecutionPhase.UserOperation) {
             // Case: User call
             // Sender = ExecutionEnvironment
 
             // Verify that the pool is valid for the user to trade in.
             require(keccak256(abi.encode(key, sender)) == hashLock, "ERR-H02 InvalidSwapper");
-        } else if (escrowKey.lockState == SafetyBits._LOCKED_X_SOLVERS_X_REQUESTED) {
+        } else if (ctx.phase == ExecutionPhase.SolverOperations) {
             // Case: Solver call
             // Sender = Solver contract
-            // NOTE: This lockState verifies that the user's transaction has already
+            // NOTE: This phase verifies that the user's transaction has already
             // been executed.
             // NOTE: Solvers must have triggered the safetyCallback on the ExecutionEnvironment
             // *before* swapping.  The safetyCallback sets the ExecutionEnvironment as the
-            // escrowKey.addressPointer.
+            // ctx.addressPointer.
 
             // Verify that the pool is valid for a solver to trade in.
-            require(hashLock == keccak256(abi.encode(key, escrowKey.addressPointer)), "ERR-H04 InvalidPoolKey");
+            require(hashLock == keccak256(abi.encode(key, ctx.addressPointer)), "ERR-H04 InvalidPoolKey");
         } else {
             // Case: Other call
             // Determine if the sequenced order was processed earlier in the block

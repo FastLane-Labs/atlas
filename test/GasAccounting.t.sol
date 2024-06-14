@@ -26,8 +26,8 @@ contract MockGasAccounting is GasAccounting, Test {
         return (_balanceOf[account].balance, _balanceOf[account].unbonding);
     }
 
-    function initializeEscrowLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) external {
-        _setAtlasLock(executionEnvironment, gasMarker, userOpValue);
+    function initializeLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) external {
+        _setAccountingLock(executionEnvironment, gasMarker, userOpValue);
     }
 
     function assign(address owner, uint256 value, bool solverWon) external returns (bool) {
@@ -78,7 +78,7 @@ contract GasAccountingTest is Test {
         mockGasAccounting = new MockGasAccounting(0, address(0), address(0), address(0));
         uint256 gasMarker = gasleft();
 
-        mockGasAccounting.initializeEscrowLock(executionEnvironment, gasMarker, 0);
+        mockGasAccounting.initializeLock(executionEnvironment, gasMarker, 0);
 
         initialClaims = getInitialClaims(gasMarker);
         solverOp.from = makeAddr("solver");

@@ -243,7 +243,7 @@ contract ExecutionEnvironment is Base {
         bytes memory allocateData
     )
         external
-        onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _ENVIRONMENT_DEPTH)
+        onlyAtlasEnvironment(ExecutionPhase.AllocateValue, _ENVIRONMENT_DEPTH)
     {
         allocateData = _forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, bidAmount, allocateData)));
 

@@ -145,8 +145,8 @@ contract MockAtlas is Atlas {
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         bytes memory returnData,
-        EscrowKey memory key
-    ) public returns (bool auctionWon, EscrowKey memory) {
-        return _bidFindingIteration(dConfig, userOp, solverOps, returnData, key);
+        Context memory ctx
+    ) public returns (bool auctionWon, Context memory) {
+        return _bidFindingIteration(dConfig, userOp, solverOps, returnData, ctx);
     }
 }
