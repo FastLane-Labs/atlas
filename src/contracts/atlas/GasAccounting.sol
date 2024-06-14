@@ -150,18 +150,27 @@ abstract contract GasAccounting is SafetyLocks {
             EscrowAccountAccessData memory aData = accessData[owner];
 
             if (aData.bonded < amt) {
-                // CASE: Not enough bonded balance to cover amount owed
+                // The bonded balance does not cover the amount owed. Check if there is enough unbonding balance to
+                // make up for the missing difference. If not, there is a deficit. Atlas does not consider drawing from
+                // the regular AtlETH balance (not bonded nor unbonding) to cover the remaining deficit because it is
+                // not meant to be used within an Atlas transaction, and must remain independent.
                 EscrowAccountBalance memory bData = _balanceOf[owner];
                 if (bData.unbonding + aData.bonded < amt) {
+                    // The unbonding balance is insufficient to cover the remaining amount owed. There is a deficit. Set
+                    // both bonded and unbonding balances to 0 and adjust the "amount" variable to reflect the amount
+                    // that was actually deducted.
                     isDeficit = true;
                     amount = uint256(bData.unbonding + aData.bonded); // contribute less to deposits ledger
                     _balanceOf[owner].unbonding = 0;
                     aData.bonded = 0;
                 } else {
+                    // The unbonding balance is sufficient to cover the remaining amount owed. Draw everything from the
+                    // bonded balance, and adjust the unbonding balance accordingly.
                     _balanceOf[owner].unbonding = bData.unbonding + aData.bonded - amt;
                     aData.bonded = 0;
                 }
             } else {
+                // The bonded balance is sufficient to cover the amount owed.
                 aData.bonded -= amt;
             }
 
