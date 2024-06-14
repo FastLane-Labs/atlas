@@ -150,11 +150,9 @@ contract ExecutionEnvironment is Base {
             bool success;
             bytes memory data = _forward(abi.encodeCall(IDAppControl.preSolverCall, (solverOp, returnData)));
 
-            (success, data) = _control().delegatecall(data);
+            (success,) = _control().delegatecall(data);
 
-            if (!success || !abi.decode(data, (bool))) {
-                revert AtlasErrors.PreSolverFailed();
-            }
+            if (!success) revert AtlasErrors.PreSolverFailed();
         }
 
         // bidValue is not inverted; Higher bids are better; solver must deposit >= bidAmount
@@ -195,15 +193,9 @@ contract ExecutionEnvironment is Base {
         if (_config().needsSolverPostCall()) {
             bytes memory data = _forward(abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData)));
 
-            (success, data) = _control().delegatecall(data);
+            (success,) = _control().delegatecall(data);
 
-            if (!success) {
-                revert AtlasErrors.PostSolverFailed();
-            }
-
-            if (!abi.decode(data, (bool))) {
-                revert AtlasErrors.IntentUnfulfilled();
-            }
+            if (!success) revert AtlasErrors.PostSolverFailed();
         }
 
         // bidValue is not inverted; Higher bids are better; solver must deposit >= bidAmount

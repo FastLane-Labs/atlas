@@ -153,17 +153,10 @@ contract V4SwapIntentControl is DAppControl {
     //   ATLAS OVERRIDE FUNCTIONS   //
     //////////////////////////////////
 
-    function _preSolverCall(
-        SolverOperation calldata solverOp,
-        bytes calldata returnData
-    )
-        internal
-        override
-        returns (bool)
-    {
+    function _preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
         address solverTo = solverOp.solver;
         if (solverTo == address(this) || solverTo == _control() || solverTo == ATLAS) {
-            return false;
+            revert(); // revert instead of returning false - changed during audit fixes
         }
 
         SwapData memory swapData = abi.decode(returnData, (SwapData));
@@ -184,18 +177,10 @@ contract V4SwapIntentControl is DAppControl {
 
         // TODO: Permit69 is currently enabled during solver phase, but there is low conviction that this
         // does not enable an attack vector. Consider enabling to save gas on a transfer?
-        return true;
     }
 
     // Checking intent was fulfilled, and user has received their tokens, happens here
-    function _postSolverCall(
-        SolverOperation calldata solverOp,
-        bytes calldata returnData
-    )
-        internal
-        override
-        returns (bool)
-    {
+    function _postSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
         SwapData memory swapData = abi.decode(returnData, (SwapData));
 
         uint256 buyTokenBalance = ERC20(swapData.tokenOut).balanceOf(address(this));
@@ -208,20 +193,20 @@ contract V4SwapIntentControl is DAppControl {
         // c) PoolManager's balances increased by the provided input amount
         if (swapData.requestedAmount > 0) {
             if (buyTokenBalance < swapData.limitAmount) {
-                return false; // insufficient amount out
+                revert(); // insufficient amount out
             }
             if (buyTokenBalance < solverOp.bidAmount) {
-                return false; // does not meet solver bid
+                revert(); // does not meet solver bid
             }
             uint256 endingBalance = ERC20(swapData.tokenIn).balanceOf(V4_POOL);
             if ((endingBalance - startingBalance) < uint256(swapData.requestedAmount)) {
-                return false; // pool manager balances did not increase by the provided input amount
+                revert(); // pool manager balances did not increase by the provided input amount
             }
         } else {
             // Exact output swap - check the output amount was transferred out by pool
             uint256 endingBalance = ERC20(swapData.tokenOut).balanceOf(V4_POOL);
             if ((startingBalance - endingBalance) < amountUserBuys) {
-                return false; // pool manager balances did not decrease by the provided output amount
+                revert(); // pool manager balances did not decrease by the provided output amount
             }
         }
         // no need to check for exact output, since the max is whatever the user transferred
@@ -236,10 +221,10 @@ contract V4SwapIntentControl is DAppControl {
             } else {
                 ERC20(swapData.tokenOut).safeTransfer(swapData.recipient, amountUserBuys);
             }
-            return true;
+            return; // only success case of this hook
         }
 
-        return false;
+        revert();
     }
 
     // This occurs after a Solver has successfully paid their bid, which is
