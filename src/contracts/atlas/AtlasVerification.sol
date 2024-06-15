@@ -375,7 +375,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
 
         // Make sure the signer is currently enabled by dapp owner
         if (!skipDAppOpChecks && !_isDAppSignatory(dAppOp.control, dAppOp.from)) {
-            return ValidCallsResult.DAppSignatureInvalid;
+            return ValidCallsResult.DAppNotEnabled;
         }
 
         return ValidCallsResult.Valid;

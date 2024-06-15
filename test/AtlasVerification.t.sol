@@ -600,10 +600,11 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     // given a default atlas environment
     //   and otherwise valid user, solver and dapp operations
     //   and the governanceEOA is not a valid signatory
+    //   and the dAppControl is not enabled
     // when validCalls is called from the userEOA
     // then it should return DAppSignatureInvalid
     //
-    function test_validCalls_SignerNotEnabled_DAppSignatureInvalid() public {
+    function test_validCalls_SignerNotEnabled_DAppNotEnabled() public {
         defaultAtlasEnvironment();
         vm.prank(governanceEOA);
         atlasVerification.removeSignatory(address(dAppControl), governanceEOA);
@@ -614,7 +615,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.DAppSignatureInvalid);
+        ), ValidCallsResult.DAppNotEnabled);
     }
 
     //

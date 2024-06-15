@@ -27,5 +27,6 @@ enum ValidCallsResult {
     UserSmartWalletInvalid,
     ControlMismatch,
     UserNonceInvalid,
-    InvalidCallChainHash
+    InvalidCallChainHash,
+    DAppNotEnabled
 }
