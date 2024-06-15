@@ -557,22 +557,22 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp userNonces
 
-        if (userOp.from.code.length > 0) {
-            // TODO: not sure if 30k gas limit is accurate
+        bool isFromContract = userOp.from.code.length > 0;
+
+        bool signatureValid = false;
+        if (isFromContract) {
             if (userOp.from == address(this) || userOp.from == ATLAS || userOp.from == userOp.control) {
                 return ValidCallsResult.UserFromInvalid;
             }
-            bool validSmartWallet =
-                IAccount(userOp.from).validateUserOp{ gas: 30_000 }(userOp, _getUserOpHash(userOp), 0) == 0;
-            if (!validSmartWallet) {
-                return ValidCallsResult.UserSmartWalletInvalid;
-            }
-            return ValidCallsResult.Valid;
+            signatureValid = IAccount(userOp.from).validateUserOp(userOp, _getUserOpHash(userOp), 0) == 0;
+        } else {
+            // user is an EOA
+            signatureValid = _verifyUserSignature(userOp);
         }
 
-        bool bypassSignature = msgSender == userOp.from || (isSimulation && userOp.signature.length == 0);
+        bool userIsBundler = userOp.from == msgSender;
 
-        if (!bypassSignature && !_verifyUserSignature(userOp)) {
+        if (!(signatureValid || userIsBundler || isSimulation)) {
             return ValidCallsResult.UserSignatureInvalid;
         }
 

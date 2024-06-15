@@ -413,13 +413,14 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     // to prevent abusive behavior
     //
     function test_verifyUserOp_UserFromInvalid_WhenFromInvalidSmartContract() public {
+        defaultAtlasEnvironment();
+
         address[] memory invalidFroms = new address[](3);
         invalidFroms[0] = address(atlas);
         invalidFroms[1] = address(atlasVerification);
         invalidFroms[2] = address(dAppControl);
 
         for (uint256 i = 0; i < invalidFroms.length; i++) {
-            defaultAtlasEnvironment();
             UserOperation memory userOp = validUserOperation()
                 .withFrom(invalidFroms[i])
                 .withSignature("")
@@ -490,7 +491,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
-        ), ValidCallsResult.UserSmartWalletInvalid);
+        ), ValidCallsResult.UserSignatureInvalid);
     }
 
     //
@@ -531,7 +532,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     // to prevent replay attacks
     //
     function test_verifyUserOp_UserNonceInvalid_FromSmartWallet() public {
-        defaultAtlasEnvironment();
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
 
         DummySmartWallet smartWallet = new DummySmartWallet();
 
@@ -546,6 +547,8 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
+
+        dappOp = validDAppOperation(userOp, solverOps).build(); // increment dappOp so we can hit _verifyUser
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
