@@ -62,7 +62,7 @@ contract MockGasAccounting is GasAccounting, Test {
         bondedTotalSupply += amount;
     }
 
-    function calldataLengthPremium() external returns (uint256) {
+    function calldataLengthPremium() external pure returns (uint256) {
         return _CALLDATA_LENGTH_PREMIUM;
     }
 }
