@@ -18,6 +18,7 @@ import { CallConfigBuilder } from "./helpers/CallConfigBuilder.sol";
 import { UserOperationBuilder } from "./base/builders/UserOperationBuilder.sol";
 import { SolverOperationBuilder } from "./base/builders/SolverOperationBuilder.sol";
 import { DAppOperationBuilder } from "./base/builders/DAppOperationBuilder.sol";
+import { GasSponsorDAppControl } from "./base/GasSponsorDAppControl.sol";
 
 import "src/contracts/types/UserCallTypes.sol";
 import "src/contracts/types/SolverCallTypes.sol";
@@ -317,8 +318,6 @@ contract EscrowTest is AtlasBaseTest {
         executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
-    
-
     function test_executeSolverOperation_solverOpWrapper_solverOperationReverted() public {
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
             defaultCallConfig()
@@ -370,6 +369,62 @@ contract EscrowTest is AtlasBaseTest {
         executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
+    function test_executeSolverOperation_solverOpWrapper_BalanceNotReconciled_ifPartialRepayment() public {
+        uint256 bidAmount = dummySolver.partialGasPayBack(); // solver only pays half of shortfall
+        deal(address(dummySolver), bidAmount);
+
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
+        solverOps[0] = validSolverOperation(userOp)
+            .withBidAmount(bidAmount)
+            .signAndBuild(address(atlasVerification), solverOnePK);
+        uint256 expectedResult = (1 << uint256(SolverOutcome.BalanceNotReconciled));
+        executeSolverOperationCase(userOp, solverOps, true, false, expectedResult, true);
+    }
+
+    function test_executeSolverOperation_solverOpWrapper_Success_ifPartialRepaymentAndDappCoversTheRest() public {
+        uint256 bidAmount = dummySolver.partialGasPayBack(); // solver only pays half of shortfall
+        deal(address(dummySolver), bidAmount);
+
+        GasSponsorDAppControl gasSponsorControl = new GasSponsorDAppControl(
+            address(atlas),
+            address(governanceEOA),
+            defaultCallConfig()
+                .withTrackPreOpsReturnData(true)
+                .withTrackUserReturnData(true)
+                .withRequirePreOps(true)
+                .withPostSolver(true)
+                .build());
+    
+        // Give dapp control enough funds to cover the shortfall
+        deal(address(gasSponsorControl), 1 ether);
+
+        vm.prank(governanceEOA);
+        atlasVerification.initializeGovernance(address(gasSponsorControl));
+
+        UserOperation memory userOp = new UserOperationBuilder()
+            .withFrom(userEOA)
+            .withTo(address(atlas))
+            .withValue(0)
+            .withGas(1_000_000)
+            .withMaxFeePerGas(tx.gasprice + 1)
+            .withNonce(address(atlasVerification), userEOA)
+            .withDeadline(block.number + 2)
+            .withDapp(address(gasSponsorControl))
+            .withControl(address(gasSponsorControl))
+            .withCallConfig(gasSponsorControl.CALL_CONFIG())
+            .withSessionKey(address(0))
+            .withData(abi.encodeWithSelector(gasSponsorControl.userOperationCall.selector, false, 0))
+            .signAndBuild(address(atlasVerification), userPK);
+        
+        SolverOperation[] memory solverOps = new SolverOperation[](1);
+        solverOps[0] = validSolverOperation(userOp)
+            .withBidAmount(bidAmount)
+            .signAndBuild(address(atlasVerification), solverOnePK);
+
+        uint256 expectedResult = 0; // Success expected
+        executeSolverOperationCase(userOp, solverOps, true, true, expectedResult, false);
+    }
+
     function test_executeSolverOperation_solverOpWrapper_defaultCase() public {
         // Can't find a way to reach the default case (which is a good thing)
         vm.skip(true);
@@ -414,6 +469,7 @@ contract EscrowTest is AtlasBaseTest {
 
 contract DummySolver {
     uint256 public noGasPayBack = 123456789;
+    uint256 public partialGasPayBack = 987654321;
     address private _atlas;
 
     constructor(address atlas) {
@@ -443,12 +499,20 @@ contract DummySolver {
             SafeTransferLib.safeTransferETH(executionEnvironment, bidAmount);
         }
 
-        // Pay gas
-        if (bidAmount != noGasPayBack) {
-            uint256 shortfall = IEscrow(_atlas).shortfall();
-            IEscrow(_atlas).reconcile(executionEnvironment, solverOpFrom, shortfall);
+        
+        if (bidAmount == noGasPayBack) {
+            // Don't pay gas
+            return (true, new bytes(0));
+        } else if (bidAmount == partialGasPayBack) {
+            // Only pay half of shortfall owed - expect postSolverCall hook in DAppControl to pay the rest
+            uint256 _shortfall = IEscrow(_atlas).shortfall();
+            IEscrow(_atlas).reconcile(executionEnvironment, solverOpFrom, _shortfall / 2);
+            return (true, new bytes(0));
         }
-
+        
+        // Default: Pay gas
+        uint256 shortfall = IEscrow(_atlas).shortfall();
+        IEscrow(_atlas).reconcile(executionEnvironment, solverOpFrom, shortfall);
         return (true, new bytes(0));
     }
 }

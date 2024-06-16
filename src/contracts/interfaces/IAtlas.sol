@@ -32,4 +32,10 @@ interface IAtlas {
     function VERIFICATION() external view returns (address);
 
     function isUnlocked() external view returns (bool);
+
+    function lock() external returns (address);
+
+    function shortfall() external view returns (uint256);
+
+    function contribute() external payable;
 }
