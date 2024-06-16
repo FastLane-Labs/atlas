@@ -33,7 +33,7 @@ contract MockSafetyLocks is SafetyLocks {
         bool isSimulation
     )
         external
-        view
+        pure
         returns (EscrowKey memory escrowKey)
     {
         return _buildEscrowLock(dConfig, executionEnvironment, userOpHash, bundler, solverOpCount, isSimulation);
@@ -80,7 +80,7 @@ contract SafetyLocksTest is Test {
 
         safetyLocks.initializeEscrowLock{ value: msgValue }(executionEnvironment, gasMarker, userOpValue);
 
-        uint256 rawClaims = (gasMarker + 1) * tx.gasprice;
+        uint256 rawClaims = (gasMarker + safetyLocks.FINAL_GAS_USAGE_OFFSET() + 1) * tx.gasprice;
         uint256 expectedClaims = rawClaims + ((rawClaims * safetyLocks.SURCHARGE_RATE()) / safetyLocks.SURCHARGE_SCALE());
 
         assertEq(safetyLocks.lock(), executionEnvironment);

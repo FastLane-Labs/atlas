@@ -38,6 +38,8 @@ abstract contract SafetyLocks is Storage {
 
         // Set the claimed amount
         uint256 rawClaims = (gasMarker + 1) * tx.gasprice;
+        // Add a fixed offset to account for the gas usage after the final gasleft() checkpoint (in _settle function)
+        rawClaims += FINAL_GAS_USAGE_OFFSET * tx.gasprice;
         claims = rawClaims * (SURCHARGE_SCALE + SURCHARGE_RATE) / SURCHARGE_SCALE;
 
         // Set any withdraws or deposits
