@@ -2,7 +2,6 @@ pragma solidity ^0.8.0;
 
 import "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "openzeppelin-contracts/contracts/access/Ownable.sol";
-import "openzeppelin-contracts/contracts/utils/math/SafeMath.sol";
 
 interface IWETH is IERC20 {
     function deposit() external payable;
@@ -19,8 +18,6 @@ interface IUniswapV2Pair {
 import "forge-std/Test.sol";
 
 contract BlindBackrun is Ownable {
-    using SafeMath for uint256;
-
     struct PairReserves {
         uint256 reserve0;
         uint256 reserve1;
@@ -113,13 +110,11 @@ contract BlindBackrun is Ownable {
         returns (uint256)
     {
         uint256 uniswappyFee = 997;
-        uint256 numerator =
-            sqrt(uniswappyFee.mul(uniswappyFee).mul(firstPairData.price).mul(secondPairData.price)).sub(1e18);
-        uint256 denominatorPart1 = (uniswappyFee.mul(1e18)).div(firstPairData.reserve1);
-        uint256 denominatorPart2 =
-            (uniswappyFee.mul(uniswappyFee).mul(firstPairData.price)).div(secondPairData.reserve1);
-        uint256 denominator = denominatorPart1.add(denominatorPart2);
-        uint256 amountIn = numerator.div(denominator);
+        uint256 numerator = sqrt(uniswappyFee * uniswappyFee * firstPairData.price * secondPairData.price) - 1e18;
+        uint256 denominatorPart1 = (uniswappyFee * 1e18) / firstPairData.reserve1;
+        uint256 denominatorPart2 = (uniswappyFee * uniswappyFee * firstPairData.price) / secondPairData.reserve1;
+        uint256 denominator = denominatorPart1 + denominatorPart2;
+        uint256 amountIn = numerator / denominator;
         return amountIn;
     }
 
@@ -132,10 +127,10 @@ contract BlindBackrun is Ownable {
 
         bool isWETHZero = false;
         if (pair.token0() == _WETH_ADDRESS) {
-            price = reserve1.mul(1e18).div(reserve0);
+            price = (reserve1 * 1e18) / reserve0;
             isWETHZero = true;
         } else {
-            price = reserve0.mul(1e18).div(reserve1);
+            price = (reserve0 * 1e18) / reserve1;
         }
 
         return PairReserves(reserve0, reserve1, price, isWETHZero);
@@ -146,11 +141,11 @@ contract BlindBackrun is Ownable {
     /// @return y: The square root of the given number.
     function sqrt(uint256 x) private pure returns (uint256) {
         if (x == 0) return 0;
-        uint256 z = x.add(1).div(2);
+        uint256 z = (x + 1) / 2;
         uint256 y = x;
         while (z < y) {
             y = z;
-            z = ((x.div(z)).add(z)).div(2);
+            z = ((x / z) + z) / 2;
         }
         return y;
     }
@@ -169,9 +164,9 @@ contract BlindBackrun is Ownable {
         pure
         returns (uint256 amountOut)
     {
-        uint256 amountInWithFee = amountIn.mul(997);
-        uint256 numerator = amountInWithFee.mul(reserveOut);
-        uint256 denominator = reserveIn.mul(1000).add(amountInWithFee);
+        uint256 amountInWithFee = amountIn * 997;
+        uint256 numerator = amountInWithFee * reserveOut;
+        uint256 denominator = (reserveIn * 1000) + amountInWithFee;
         amountOut = numerator / denominator;
         return amountOut;
     }
