@@ -4,6 +4,7 @@ pragma solidity 0.8.22;
 import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 import { Permit69 } from "src/contracts/common/Permit69.sol";
+import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import "src/contracts/types/EscrowTypes.sol";
 
 /// @notice Modified Solmate ERC20 with some Atlas-specific modifications.
@@ -16,7 +17,7 @@ abstract contract AtlETH is Permit69 {
 
     constructor(
         uint256 _escrowDuration,
-        address _verification,
+        AtlasVerification _verification,
         address _simulator,
         address _surchargeRecipient
     )

@@ -6,6 +6,7 @@ import "forge-std/Test.sol";
 import { GasAccounting } from "../src/contracts/atlas/GasAccounting.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 
 import { EscrowBits } from "../src/contracts/libraries/EscrowBits.sol";
 
@@ -15,7 +16,7 @@ import "../src/contracts/types/SolverCallTypes.sol";
 contract MockGasAccounting is GasAccounting, Test {
     constructor(
         uint256 _escrowDuration,
-        address _verification,
+        AtlasVerification _verification,
         address _simulator,
         address _surchargeRecipient
     )
@@ -75,7 +76,7 @@ contract GasAccountingTest is Test {
     SolverOperation solverOp;
 
     function setUp() public {
-        mockGasAccounting = new MockGasAccounting(0, address(0), address(0), address(0));
+        mockGasAccounting = new MockGasAccounting(0, AtlasVerification(address(0)), address(0), address(0));
         uint256 gasMarker = gasleft();
 
         mockGasAccounting.initializeEscrowLock(executionEnvironment, gasMarker, 0);

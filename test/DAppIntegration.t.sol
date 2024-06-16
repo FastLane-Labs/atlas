@@ -7,6 +7,7 @@ import { Atlas } from "src/contracts/atlas/Atlas.sol";
 import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
 import { DAppIntegration } from "src/contracts/atlas/DAppIntegration.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 
 import { DummyDAppControl, CallConfigBuilder } from "./base/DummyDAppControl.sol";
 
@@ -35,7 +36,7 @@ contract DAppIntegrationTest is Test {
 
         atlas = new Atlas({
             _escrowDuration: 64,
-            _verification: expectedAtlasVerificationAddr,
+            _verification: AtlasVerification(expectedAtlasVerificationAddr),
             _simulator: address(0),
             _executionTemplate: address(execEnvTemplate),
             _surchargeRecipient: atlasDeployer

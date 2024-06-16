@@ -73,7 +73,7 @@ contract AtlasBaseTest is Test, TestConstants {
 
         atlas = new Atlas({
             _escrowDuration: 64,
-            _verification: expectedAtlasVerificationAddr,
+            _verification: AtlasVerification(expectedAtlasVerificationAddr),
             _simulator: address(simulator),
             _executionTemplate: address(execEnvTemplate),
             _surchargeRecipient: payee

@@ -4,6 +4,7 @@ pragma solidity 0.8.22;
 import "forge-std/Test.sol";
 
 import { Storage } from "src/contracts/atlas/Storage.sol";
+import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 
 using stdStorage for StdStorage;
 
@@ -11,13 +12,13 @@ contract StorageTest is Test {
     function testNewStorage() public {
         MockStorageTests s = new MockStorageTests(
             1, // _escrowDuration
-            address(1), // _verification
+            AtlasVerification(address(1)), // _verification
             address(2), // _simulator
             address(3) // _surchargeRecipient
         );
 
         assertEq(s.ESCROW_DURATION(), 1);
-        assertEq(s.VERIFICATION(), address(1));
+        assertEq(address(s.VERIFICATION()), address(1));
         assertEq(s.SIMULATOR(), address(2));
         assertEq(s.getInitialChainId(), block.chainid);
         assertEq(s.getInitialDomainSeparator(), bytes32("SEPARATOR"));
@@ -54,7 +55,7 @@ contract StorageTest is Test {
 contract MockStorageTests is Storage {
     constructor(
         uint256 _escrowDuration,
-        address _verification,
+        AtlasVerification _verification,
         address _simulator,
         address _surchargeRecipient
     )

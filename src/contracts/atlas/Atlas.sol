@@ -9,6 +9,7 @@ import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
 import { Escrow } from "./Escrow.sol";
 import { Factory } from "./Factory.sol";
+import { AtlasVerification } from "./AtlasVerification.sol";
 
 import "src/contracts/types/SolverCallTypes.sol";
 import "src/contracts/types/UserCallTypes.sol";
@@ -28,7 +29,7 @@ contract Atlas is Escrow, Factory {
 
     constructor(
         uint256 _escrowDuration,
-        address _verification,
+        AtlasVerification _verification,
         address _simulator,
         address _surchargeRecipient,
         address _executionTemplate
@@ -58,7 +59,7 @@ contract Atlas is Escrow, Factory {
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
         // NOTE: Currently reverting instead of graceful return to help w/ testing. TODO - still reverting?
-        (bytes32 userOpHash, ValidCallsResult validCallsResult) = IAtlasVerification(VERIFICATION).validateCalls(
+        (bytes32 userOpHash, ValidCallsResult validCallsResult) = VERIFICATION.validateCalls(
             dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, isSimulation
         );
         if (validCallsResult != ValidCallsResult.Valid) {

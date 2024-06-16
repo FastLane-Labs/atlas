@@ -3,6 +3,7 @@ pragma solidity 0.8.22;
 
 import { Storage } from "./Storage.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
+import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import "src/contracts/types/SolverCallTypes.sol";
 import "src/contracts/types/UserCallTypes.sol";
 import "src/contracts/types/DAppApprovalTypes.sol";
@@ -18,7 +19,7 @@ abstract contract SafetyLocks is Storage {
 
     constructor(
         uint256 _escrowDuration,
-        address _verification,
+        AtlasVerification _verification,
         address _simulator,
         address _surchargeRecipient
     )

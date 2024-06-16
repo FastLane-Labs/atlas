@@ -35,7 +35,7 @@ contract DeployAtlasScript is DeployBaseScript {
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
         atlas = new Atlas({
             _escrowDuration: 64,
-            _verification: expectedAtlasVerificationAddr,
+            _verification: AtlasVerification(expectedAtlasVerificationAddr),
             _simulator: expectedSimulatorAddr,
             _executionTemplate: address(execEnvTemplate),
             _surchargeRecipient: deployer
@@ -52,7 +52,7 @@ contract DeployAtlasScript is DeployBaseScript {
         if (address(atlas) != simulator.atlas() || address(atlas) != atlasVerification.ATLAS()) {
             console.log("ERROR: Atlas address not set correctly in Simulator, AtlasVerification");
         }
-        if (address(atlasVerification) != atlas.VERIFICATION()) {
+        if (atlasVerification != atlas.VERIFICATION()) {
             console.log("ERROR: AtlasVerification address not set correctly in Atlas");
         }
         if (address(simulator) != atlas.SIMULATOR()) {

@@ -5,6 +5,7 @@ import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 import { SafetyLocks } from "src/contracts/atlas/SafetyLocks.sol";
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
+import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
 
@@ -16,7 +17,7 @@ abstract contract GasAccounting is SafetyLocks {
 
     constructor(
         uint256 _escrowDuration,
-        address _verification,
+        AtlasVerification _verification,
         address _simulator,
         address _surchargeRecipient
     )

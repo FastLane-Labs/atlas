@@ -11,6 +11,7 @@ import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 import { DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
+import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import "src/contracts/types/SolverCallTypes.sol";
 import "src/contracts/types/UserCallTypes.sol";
 import "src/contracts/types/EscrowTypes.sol";
@@ -27,7 +28,7 @@ abstract contract Escrow is AtlETH {
 
     constructor(
         uint256 _escrowDuration,
-        address _verification,
+        AtlasVerification _verification,
         address _simulator,
         address _surchargeRecipient
     )
@@ -107,7 +108,7 @@ abstract contract Escrow is AtlETH {
         uint256 gasWaterMark = gasleft();
         uint256 result;
         if (!prevalidated) {
-            result = IAtlasVerification(VERIFICATION).verifySolverOp(
+            result = VERIFICATION.verifySolverOp(
                 solverOp, key.userOpHash, userOp.maxFeePerGas, key.bundler
             );
             result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, result);
@@ -329,7 +330,7 @@ abstract contract Escrow is AtlETH {
         uint256 gasWaterMark = gasleft();
 
         uint256 result =
-            IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, key.userOpHash, userOp.maxFeePerGas, key.bundler);
+            VERIFICATION.verifySolverOp(solverOp, key.userOpHash, userOp.maxFeePerGas, key.bundler);
 
         result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, result);
 

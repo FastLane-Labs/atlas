@@ -15,6 +15,7 @@ import { EXECUTION_PHASE_OFFSET } from "src/contracts/libraries/SafetyBits.sol";
 import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "src/contracts/common/Permit69.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 
 import "src/contracts/types/LockTypes.sol";
 
@@ -46,7 +47,7 @@ contract Permit69Test is BaseTest {
             callDepth: 0
         });
 
-        mockAtlas = new MockAtlasForPermit69Tests(10, address(0), address(0), address(0));
+        mockAtlas = new MockAtlasForPermit69Tests(10, AtlasVerification(address(0)), address(0), address(0));
         mockAtlas.setEscrowKey(escrowKey);
         mockAtlas.setEnvironment(mockExecutionEnvAddress);
 
@@ -273,7 +274,7 @@ contract Permit69Test is BaseTest {
 contract MockAtlasForPermit69Tests is Permit69 {
     constructor(
         uint256 _escrowDuration,
-        address _verification,
+        AtlasVerification _verification,
         address _simulator,
         address _surchargeRecipient
     )
