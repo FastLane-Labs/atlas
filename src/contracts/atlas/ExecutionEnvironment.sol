@@ -157,7 +157,7 @@ contract ExecutionEnvironment is Base {
 
         // bidValue is not inverted; Higher bids are better; solver must deposit >= bidAmount
         if (!solverTracker.invertsBidValue) {
-            // if invertsBidValue, record floor now
+            // if not invertsBidValue, record floor now
             solverTracker.floor = solverTracker.etherIsBidToken
                 ? address(this).balance
                 : ERC20(solverOp.bidToken).balanceOf(address(this));
