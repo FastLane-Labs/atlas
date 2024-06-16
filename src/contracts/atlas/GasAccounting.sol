@@ -27,13 +27,11 @@ abstract contract GasAccounting is SafetyLocks {
     /// @return calledBack A boolean indicating whether the solver has called back via `reconcile`.
     /// @return fulfilled A boolean indicating whether the solver's outstanding debt has been repaid.
     function validateBalances() external view returns (bool calledBack, bool fulfilled) {
-        (, calledBack, fulfilled) = solverLockData();
-        if (!fulfilled) {
-            uint256 _deposits = deposits;
-            // Check if locked.
-            if (_deposits != type(uint256).max) {
-                fulfilled = _deposits >= claims + withdrawals;
-            }
+        (, calledBack,) = solverLockData();
+        uint256 _deposits = deposits;
+        // Check if locked.
+        if (_deposits != type(uint256).max) {
+            fulfilled = _deposits >= claims + withdrawals;
         }
     }
 
