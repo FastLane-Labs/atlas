@@ -571,8 +571,9 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         }
 
         bool userIsBundler = userOp.from == msgSender;
+        bool hasNoSignature = userOp.signature.length == 0;
 
-        if (!(signatureValid || userIsBundler || isSimulation)) {
+        if (!(signatureValid || userIsBundler || (isSimulation && hasNoSignature))) {
             return ValidCallsResult.UserSignatureInvalid;
         }
 

@@ -383,7 +383,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     //
     // given a default atlas environment
     //   and otherwise valid user, solver and dapp operations
-    // where the user operation is not signed properly
+    // where the user operation is not
     // when validCalls is called
     //   and the bundler is not the user
     //   and isSimulation = true
@@ -401,6 +401,30 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: true}
         ), ValidCallsResult.Valid);
+    }
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    // where the user operation has a bad signature
+    // when validCalls is called
+    //   and the bundler is not the user
+    //   and isSimulation = true
+    // then it should return UserSignatureInvalid
+    // because the user operation doesn't need to be signed if it's a simulation
+    //
+    function test_verifyUserOp_Valid_WhenOpHasBadSignatureIfIsSimulation() public {
+        defaultAtlasEnvironment();
+
+        UserOperation memory userOp = validUserOperation()
+            .withSignature("bad signature")
+            .build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: true}
+        ), ValidCallsResult.UserSignatureInvalid);
     }
 
     //
