@@ -101,8 +101,6 @@ contract DAppIntegration {
     function changeDAppGovernance(address oldGovernance, address newGovernance) external {
         _checkAtlasIsUnlocked();
         address control = msg.sender;
-        bytes32 signatoryKey = keccak256(abi.encodePacked(control, oldGovernance));
-        if (!signatories[signatoryKey]) revert AtlasErrors.DAppNotEnabled();
 
         _removeSignatory(control, oldGovernance);
         _addSignatory(control, newGovernance);
