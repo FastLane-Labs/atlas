@@ -6,6 +6,7 @@ import "forge-std/Test.sol";
 import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 
 import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
+import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
@@ -55,7 +56,7 @@ contract EscrowTest is AtlasBaseTest {
             .withCallConfig(defaultCallConfig().build());
     }
 
-    function validUserOperation() public returns (UserOperationBuilder) {
+    function validUserOperation(address _control) public returns (UserOperationBuilder) {
         return new UserOperationBuilder()
             .withFrom(userEOA)
             .withTo(address(atlas))
@@ -64,9 +65,9 @@ contract EscrowTest is AtlasBaseTest {
             .withMaxFeePerGas(tx.gasprice + 1)
             .withNonce(address(atlasVerification), userEOA)
             .withDeadline(block.number + 2)
-            .withDapp(address(dAppControl))
-            .withControl(address(dAppControl))
-            .withCallConfig(dAppControl.CALL_CONFIG())
+            .withDapp(_control)
+            .withControl(_control)
+            .withCallConfig(IDAppControl(_control).CALL_CONFIG())
             .withSessionKey(address(0))
             .withData("")
             .sign(address(atlasVerification), userPK);
@@ -222,7 +223,7 @@ contract EscrowTest is AtlasBaseTest {
     function executeHookCase(bool hookShouldRevert, uint256 expectedHookReturnValue, bytes4 expectedError) public {
         bool revertExpected = expectedError != noError;
 
-        UserOperation memory userOp = validUserOperation()
+        UserOperation memory userOp = validUserOperation(address(dAppControl))
             .withData(
                 abi.encodeWithSelector(
                     dAppControl.userOperationCall.selector,
@@ -357,7 +358,7 @@ contract EscrowTest is AtlasBaseTest {
                 .build()
         );
 
-        UserOperation memory userOp = validUserOperation()
+        UserOperation memory userOp = validUserOperation(address(dAppControl))
             .withData(abi.encodeWithSelector(dAppControl.userOperationCall.selector, false, 1))
             .signAndBuild(address(atlasVerification), userPK);
         
@@ -403,18 +404,7 @@ contract EscrowTest is AtlasBaseTest {
         vm.prank(governanceEOA);
         atlasVerification.initializeGovernance(address(gasSponsorControl));
 
-        UserOperation memory userOp = new UserOperationBuilder()
-            .withFrom(userEOA)
-            .withTo(address(atlas))
-            .withValue(0)
-            .withGas(1_000_000)
-            .withMaxFeePerGas(tx.gasprice + 1)
-            .withNonce(address(atlasVerification), userEOA)
-            .withDeadline(block.number + 2)
-            .withDapp(address(gasSponsorControl))
-            .withControl(address(gasSponsorControl))
-            .withCallConfig(gasSponsorControl.CALL_CONFIG())
-            .withSessionKey(address(0))
+        UserOperation memory userOp = validUserOperation(address(gasSponsorControl))
             .withData(abi.encodeWithSelector(gasSponsorControl.userOperationCall.selector, false, 0))
             .signAndBuild(address(atlasVerification), userPK);
         
@@ -438,7 +428,7 @@ contract EscrowTest is AtlasBaseTest {
     {
         defaultAtlasWithCallConfig(callConfig);
 
-        userOp = validUserOperation()
+        userOp = validUserOperation(address(dAppControl))
             .withData(abi.encodeWithSelector(dAppControl.userOperationCall.selector, false, 0))
             .signAndBuild(address(atlasVerification), userPK);
         
