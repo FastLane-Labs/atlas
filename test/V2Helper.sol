@@ -68,22 +68,20 @@ contract V2Helper is Test, TestConstants, TxBuilder {
         console.log("-");
 
         return TxBuilder.buildUserOperation(
-            from, firstPool, maxFeePerGas, 0, block.number + 2, buildV2SwapCalldata(token0Balance, token1Balance, type(uint256).max, type(uint256).max, from)
+            from, firstPool, maxFeePerGas, 0, block.number + 2, buildV2SwapCalldata(token0Balance, token1Balance, from)
         );
     }
 
     function buildV2SwapCalldata(
         uint256 amount0Out,
         uint256 amount1Out,
-        uint256 maxAmount0In,
-        uint256 maxAmount1In,
         address recipient
     )
         public
         pure
         returns (bytes memory data)
     {
-        data = abi.encodeWithSelector(IUniswapV2Pair.swap.selector, amount0Out, amount1Out, maxAmount0In, maxAmount1In, recipient, data);
+        data = abi.encodeWithSelector(IUniswapV2Pair.swap.selector, amount0Out, amount1Out, recipient, data);
     }
 
     function buildV2SolverOperationData(address poolOne, address poolTwo) public pure returns (bytes memory data) {

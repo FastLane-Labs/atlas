@@ -96,11 +96,9 @@ contract V2DAppControl is DAppControl {
         (
             uint256 amount0Out,
             uint256 amount1Out,
-            uint256 maxAmount0In,
-            uint256 maxAmount1In,
             , // address recipient // Unused
                 // bytes memory swapData // Unused
-        ) = abi.decode(userOp.data[4:], (uint256, uint256, uint256, uint256, address, bytes));
+        ) = abi.decode(userOp.data[4:], (uint256, uint256, address, bytes));
 
         require(amount0Out == 0 || amount1Out == 0, "ERR-H12 InvalidAmountOuts");
         require(amount0Out > 0 || amount1Out > 0, "ERR-H13 InvalidAmountOuts");
@@ -111,12 +109,6 @@ contract V2DAppControl is DAppControl {
             amount1Out == 0 ? 0 : SwapMath.getAmountIn(amount1Out, uint256(token0Balance), uint256(token1Balance));
         uint256 amount1In =
             amount0Out == 0 ? 0 : SwapMath.getAmountIn(amount0Out, uint256(token1Balance), uint256(token0Balance));
-
-        if (amount0Out > 0){
-            require(amount1In <= maxAmount1In, "ERR-H14 ExceedsMaxAmountIn");
-        } else {
-            require(amount0In <= maxAmount0In, "ERR-H15 ExceedsMaxAmountIn");
-        }
 
         // This is a V2 swap, so optimistically transfer the tokens
         // NOTE: The user should have approved the ExecutionEnvironment for token transfers
