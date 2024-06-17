@@ -331,6 +331,7 @@ contract ExecutionEnvironmentTest is BaseTest {
     }
 
     /*
+    // TODO refactor this into 2 tests: test_solverPreTryCatch and test_solverPostTryCatch
     function test_solverMetaTryCatch() public {
         bytes memory solverMetaData;
         bool status;
@@ -373,7 +374,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverOp.control = address(dAppControl);
         _unsetLocks();
 
-        // SolverOperationReverted
+        // SolverOpReverted
         _setLocks();
         solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, true);
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
@@ -382,11 +383,11 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.SolverOperationReverted.selector);
+        vm.expectRevert(AtlasErrors.SolverOpReverted.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         _unsetLocks();
 
-        // SolverBidUnpaid
+        // BidNotPaid
         _setLocks();
         solverOp.bidAmount = 1; // Bid won't be paid
         solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
@@ -396,7 +397,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.SolverBidUnpaid.selector);
+        vm.expectRevert(AtlasErrors.BidNotPaid.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         solverOp.bidAmount = 0;
         _unsetLocks();
@@ -474,23 +475,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PostSolverFailed.selector);
-        (status,) = address(executionEnvironment).call(solverMetaData);
-        _unsetLocks();
-
-        // IntentUnfulfilled
-        _setLocks();
-        solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
-        escrowKey = escrowKey.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector,
-            solverOp.bidAmount,
-            solverGasLimit,
-            solverOp,
-            abi.encode(false, false)
-        );
-        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
-        vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.IntentUnfulfilled.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         _unsetLocks();
     }

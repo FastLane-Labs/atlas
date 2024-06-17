@@ -207,15 +207,15 @@ contract ExecutionEnvironment is Base {
         }
 
         // Make sure the numbers add up and that the bid was paid
-        if (solverTracker.floor > solverTracker.ceiling) revert AtlasErrors.SolverBidUnpaid();
+        if (solverTracker.floor > solverTracker.ceiling) revert AtlasErrors.BidNotPaid();
 
         uint256 netBid = solverTracker.ceiling - solverTracker.floor;
 
         // If bids aren't inverted, revert if net amount received is less than the bid
-        if (!solverTracker.invertsBidValue && netBid < solverTracker.bidAmount) revert AtlasErrors.SolverBidUnpaid();
+        if (!solverTracker.invertsBidValue && netBid < solverTracker.bidAmount) revert AtlasErrors.BidNotPaid();
 
         // If bids are inverted, revert if the net amount sent is more than the bid
-        if (solverTracker.invertsBidValue && netBid > solverTracker.bidAmount) revert AtlasErrors.SolverBidUnpaid();
+        if (solverTracker.invertsBidValue && netBid > solverTracker.bidAmount) revert AtlasErrors.BidNotPaid();
 
         // Update the bidAmount to the bid received
         solverTracker.bidAmount = netBid;

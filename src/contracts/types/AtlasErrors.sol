@@ -19,13 +19,12 @@ contract AtlasErrors {
     error BidFindSuccessful(uint256 bidAmount);
     error UnexpectedNonRevert();
 
-    error SolverBidUnpaid();
+    error BidNotPaid();
     error BalanceNotReconciled();
-    error SolverOperationReverted();
+    error SolverOpReverted();
     error AlteredControl();
     error InvalidEntry();
     error CallbackNotCalled();
-    error IntentUnfulfilled();
     error PreSolverFailed();
     error PostSolverFailed();
     error InsufficientEscrow();

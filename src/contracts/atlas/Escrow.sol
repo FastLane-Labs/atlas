@@ -459,21 +459,19 @@ abstract contract Escrow is AtlETH {
                 result = 1 << uint256(SolverOutcome.InsufficientEscrow);
             } else if (errorSwitch == PreSolverFailed.selector) {
                 result = 1 << uint256(SolverOutcome.PreSolverFailed);
-            } else if (errorSwitch == SolverOperationReverted.selector) {
+            } else if (errorSwitch == SolverOpReverted.selector) {
                 result = 1 << uint256(SolverOutcome.SolverOpReverted);
             } else if (errorSwitch == PostSolverFailed.selector) {
                 result = 1 << uint256(SolverOutcome.PostSolverFailed);
-            } else if (errorSwitch == IntentUnfulfilled.selector) {
-                result = 1 << uint256(SolverOutcome.IntentUnfulfilled);
-            } else if (errorSwitch == SolverBidUnpaid.selector) {
+            } else if (errorSwitch == BidNotPaid.selector) {
                 result = 1 << uint256(SolverOutcome.BidNotPaid);
             } else if (errorSwitch == BalanceNotReconciled.selector) {
                 result = 1 << uint256(SolverOutcome.BalanceNotReconciled);
+            } else if (errorSwitch == CallbackNotCalled.selector) {
+                result = 1 << uint256(SolverOutcome.CallbackNotCalled);
             } else if (errorSwitch == InvalidEntry.selector) {
                 // DAppControl is attacking solver contract - treat as AlteredControl
                 result = 1 << uint256(SolverOutcome.AlteredControl);
-            } else if (errorSwitch == CallbackNotCalled.selector) {
-                result = 1 << uint256(SolverOutcome.SolverOpReverted);
             } else {
                 result = 1 << uint256(SolverOutcome.EVMError);
             }
@@ -536,7 +534,7 @@ abstract contract Escrow is AtlETH {
         );
         (success,) = solverOp.solver.call{ value: solverOp.value, gas: gasLimit }(data);
 
-        if (!success) revert SolverOperationReverted();
+        if (!success) revert SolverOpReverted();
 
         // ------------------------------------- //
         //            Post-Solver Call           //
@@ -559,9 +557,9 @@ abstract contract Escrow is AtlETH {
         // repay via `reconcile()`, the postSolverCall may still have covered the outstanding debt via `contribute()` so
         // we do a final repayment check here.
         (, calledback, success) = _solverLockData();
-        if (!calledback || (!success && deposits < claims + withdrawals)) {
-            revert BalanceNotReconciled();
-        }
+
+        if (!calledback) revert CallbackNotCalled();
+        if (!success && deposits < claims + withdrawals) revert BalanceNotReconciled();
 
         // Check if this is an on-chain, ex post bid search
         if (key.bidFind) revert BidFindSuccessful(solverTracker.bidAmount);

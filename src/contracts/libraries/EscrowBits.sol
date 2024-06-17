@@ -29,11 +29,11 @@ library EscrowBits {
 
     // Solver's Fault - solver *does* owe gas refund, SolverOp *was* executed
     uint256 internal constant _FULL_REFUND = (
-        1 << uint256(SolverOutcome.SolverOpReverted) // <- detected by EE
+        1 << uint256(SolverOutcome.SolverOpReverted) // <- detected by Escrow
             | 1 << uint256(SolverOutcome.PostSolverFailed) // <- detected by EE
-            | 1 << uint256(SolverOutcome.IntentUnfulfilled) // <- detected by EE
             | 1 << uint256(SolverOutcome.BidNotPaid) // <- detected by EE
-            | 1 << uint256(SolverOutcome.BalanceNotReconciled) // <- detected by EE
+            | 1 << uint256(SolverOutcome.BalanceNotReconciled) // <- detected by Escrow
+            | 1 << uint256(SolverOutcome.CallbackNotCalled) // <- detected by Escrow
             | 1 << uint256(SolverOutcome.EVMError)
     ); // <- default if err by EE
 

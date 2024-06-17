@@ -297,7 +297,7 @@ contract EscrowTest is AtlasBaseTest {
         );
     }
 
-    function test_executeSolverOperation_solverOpWrapper_solverBidUnpaid() public {
+    function test_executeSolverOperation_solverOpWrapper_BidNotPaid() public {
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
         solverOps[0] = validSolverOperation(userOp)
             .withBidAmount(defaultBidAmount * 2) // Solver's contract doesn't have that much
@@ -306,7 +306,8 @@ contract EscrowTest is AtlasBaseTest {
         executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
-    function test_executeSolverOperation_solverOpWrapper_BalanceNotReconciled() public {
+    function test_executeSolverOperation_solverOpWrapper_CallbackNotCalled() public {
+        // Fails because solver doesn't call reconcile() at all
         uint256 bidAmount = dummySolver.noGasPayBack(); // Special bid value that will cause the solver to not call reconcile
         deal(address(dummySolver), bidAmount);
 
@@ -314,11 +315,11 @@ contract EscrowTest is AtlasBaseTest {
         solverOps[0] = validSolverOperation(userOp)
             .withBidAmount(bidAmount)
             .signAndBuild(address(atlasVerification), solverOnePK);
-        uint256 result = (1 << uint256(SolverOutcome.BalanceNotReconciled));
+        uint256 result = (1 << uint256(SolverOutcome.CallbackNotCalled));
         executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
-    function test_executeSolverOperation_solverOpWrapper_solverOperationReverted() public {
+    function test_executeSolverOperation_solverOpWrapper_SolverOpReverted() public {
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
             defaultCallConfig()
                 .withTrackUserReturnData(true)
@@ -370,6 +371,7 @@ contract EscrowTest is AtlasBaseTest {
     }
 
     function test_executeSolverOperation_solverOpWrapper_BalanceNotReconciled_ifPartialRepayment() public {
+        // Fails because solver calls reconcile but doesn't fully repay the shortfall
         uint256 bidAmount = dummySolver.partialGasPayBack(); // solver only pays half of shortfall
         deal(address(dummySolver), bidAmount);
 
