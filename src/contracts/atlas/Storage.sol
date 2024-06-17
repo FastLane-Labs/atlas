@@ -84,7 +84,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     /// @return currentSolver Address of the current solver.
     /// @return calledBack Boolean indicating whether the solver has called back via `reconcile`.
     /// @return fulfilled Boolean indicating whether the solver's outstanding debt has been repaid via `reconcile`.
-    function solverLockData() public view returns (address currentSolver, bool calledBack, bool fulfilled) {
+    function solverLockData() external view returns (address currentSolver, bool calledBack, bool fulfilled) {
         return _solverLockData();
     }
 

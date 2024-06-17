@@ -75,7 +75,7 @@ abstract contract GasAccounting is SafetyLocks {
 
         if (lock != environment) revert InvalidExecutionEnvironment(lock);
 
-        (address currentSolver, bool calledBack, bool fulfilled) = solverLockData();
+        (address currentSolver, bool calledBack, bool fulfilled) = _solverLockData();
 
         if (calledBack) revert DoubleReconcile();
 
