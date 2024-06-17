@@ -156,7 +156,7 @@ contract V4SwapIntentControl is DAppControl {
     function _preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
         address solverTo = solverOp.solver;
         if (solverTo == address(this) || solverTo == _control() || solverTo == ATLAS) {
-            revert(); // revert instead of returning false - changed during audit fixes
+            revert();
         }
 
         SwapData memory swapData = abi.decode(returnData, (SwapData));
