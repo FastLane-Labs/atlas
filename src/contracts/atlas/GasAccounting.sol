@@ -141,50 +141,46 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param bidFind Indicates if called in the context of `_getBidAmount` in Escrow.sol (true) or not (false).
     /// @return isDeficit A boolean indicating whether there is a deficit after the assignment.
     function _assign(address owner, uint256 amount, bool solverWon, bool bidFind) internal returns (bool isDeficit) {
-        if (amount == 0) {
-            accessData[owner].lastAccessedBlock = uint32(block.number); // still save on bidFind
-        } else {
-            if (amount > type(uint112).max) revert ValueTooLarge();
-            uint112 amt = uint112(amount);
+        if (amount > type(uint112).max) revert ValueTooLarge();
+        uint112 amt = uint112(amount);
 
-            EscrowAccountAccessData memory aData = accessData[owner];
+        EscrowAccountAccessData memory aData = accessData[owner];
 
-            if (aData.bonded < amt) {
-                // The bonded balance does not cover the amount owed. Check if there is enough unbonding balance to
-                // make up for the missing difference. If not, there is a deficit. Atlas does not consider drawing from
-                // the regular AtlETH balance (not bonded nor unbonding) to cover the remaining deficit because it is
-                // not meant to be used within an Atlas transaction, and must remain independent.
-                EscrowAccountBalance memory bData = _balanceOf[owner];
-                if (bData.unbonding + aData.bonded < amt) {
-                    // The unbonding balance is insufficient to cover the remaining amount owed. There is a deficit. Set
-                    // both bonded and unbonding balances to 0 and adjust the "amount" variable to reflect the amount
-                    // that was actually deducted.
-                    isDeficit = true;
-                    amount = uint256(bData.unbonding + aData.bonded); // contribute less to deposits ledger
-                    _balanceOf[owner].unbonding = 0;
-                    aData.bonded = 0;
-                } else {
-                    // The unbonding balance is sufficient to cover the remaining amount owed. Draw everything from the
-                    // bonded balance, and adjust the unbonding balance accordingly.
-                    _balanceOf[owner].unbonding = bData.unbonding + aData.bonded - amt;
-                    aData.bonded = 0;
-                }
+        if (aData.bonded < amt) {
+            // The bonded balance does not cover the amount owed. Check if there is enough unbonding balance to
+            // make up for the missing difference. If not, there is a deficit. Atlas does not consider drawing from
+            // the regular AtlETH balance (not bonded nor unbonding) to cover the remaining deficit because it is
+            // not meant to be used within an Atlas transaction, and must remain independent.
+            EscrowAccountBalance memory bData = _balanceOf[owner];
+            if (bData.unbonding + aData.bonded < amt) {
+                // The unbonding balance is insufficient to cover the remaining amount owed. There is a deficit. Set
+                // both bonded and unbonding balances to 0 and adjust the "amount" variable to reflect the amount
+                // that was actually deducted.
+                isDeficit = true;
+                amount = uint256(bData.unbonding + aData.bonded); // contribute less to deposits ledger
+                _balanceOf[owner].unbonding = 0;
+                aData.bonded = 0;
             } else {
-                // The bonded balance is sufficient to cover the amount owed.
-                aData.bonded -= amt;
+                // The unbonding balance is sufficient to cover the remaining amount owed. Draw everything from the
+                // bonded balance, and adjust the unbonding balance accordingly.
+                _balanceOf[owner].unbonding = bData.unbonding + aData.bonded - amt;
+                aData.bonded = 0;
             }
-
-            if (!bidFind) {
-                aData.lastAccessedBlock = uint32(block.number);
-            }
-
-            _updateAnalytics(aData, amt, solverWon, bidFind);
-
-            accessData[owner] = aData;
-
-            bondedTotalSupply -= amount;
-            deposits += amount;
+        } else {
+            // The bonded balance is sufficient to cover the amount owed.
+            aData.bonded -= amt;
         }
+
+        if (!bidFind) {
+            aData.lastAccessedBlock = uint32(block.number);
+        }
+
+        _updateAnalytics(aData, amt, solverWon, bidFind);
+
+        accessData[owner] = aData;
+
+        bondedTotalSupply -= amount;
+        deposits += amount;
     }
 
     /// @notice Increases the owner's bonded balance by the specified amount.
