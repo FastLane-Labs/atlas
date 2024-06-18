@@ -81,6 +81,7 @@ contract V2DAppControl is DAppControl {
             require(IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token1() == WETH, "INVALID TOKEN PAIR");
         } else {
             require(IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token0() == WETH, "INVALID TOKEN PAIR");
+            require(IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token1() == GOVERNANCE_TOKEN, "INVALID TOKEN PAIR");
         }
     }
 
