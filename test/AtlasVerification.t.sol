@@ -30,14 +30,23 @@ contract DummyNotSmartWallet {
 }
 
 contract DummySmartWallet {
-    uint256 public validationData = 0;
+    bytes4 constant internal EIP1271_MAGIC_VALUE = 0x1626ba7e;
+    bool public isValidResult = true;
 
-    function validateUserOp(UserOperation calldata userOp, bytes32 userOpHash, uint256 gas) external returns (uint256) {
-        return validationData;
+    function isValidSignature(
+        bytes32 hash,
+        bytes memory signature
+    ) public view returns (bytes4) {
+        console.log("DummySmartWallet.isValidSignature called, isValidResult: ", isValidResult);
+        if (isValidResult) {
+            return EIP1271_MAGIC_VALUE;
+        } else {
+            return 0;
+        }
     }
 
-    function setValidationData(uint256 data) external {
-        validationData = data;
+    function setIsValidResult(bool data) external {
+        isValidResult = data;
     }
 }
 
@@ -503,7 +512,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         defaultAtlasEnvironment();
 
         DummySmartWallet smartWallet = new DummySmartWallet();
-        smartWallet.setValidationData(1); // Set validationData to 1 to fail validation
+        smartWallet.setIsValidResult(false); // Set validationData to 1 to fail validation
 
         UserOperation memory userOp = validUserOperation()
             .withFrom(address(smartWallet))

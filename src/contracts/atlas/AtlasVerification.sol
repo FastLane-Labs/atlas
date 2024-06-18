@@ -1,8 +1,6 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import "forge-std/Test.sol";
-
 import { EIP712 } from "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 import { ECDSA } from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import { SignatureChecker } from "openzeppelin-contracts/contracts/utils/cryptography/SignatureChecker.sol";
@@ -558,22 +556,14 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         internal
         returns (ValidCallsResult)
     {
+        if (userOp.from == address(this) || userOp.from == ATLAS || userOp.from == userOp.control) {
+            return ValidCallsResult.UserFromInvalid;
+        }
+
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp userNonces
 
-        // bool isFromContract = userOp.from.code.length > 0;
-
         bool signatureValid = SignatureChecker.isValidSignatureNow(userOp.from, _hashTypedDataV4(_getUserOpHash(userOp)), userOp.signature);
-        console.log("signatureValid: %s", signatureValid);
-        // if (isFromContract) {
-        //     if (userOp.from == address(this) || userOp.from == ATLAS || userOp.from == userOp.control) {
-        //         return ValidCallsResult.UserFromInvalid;
-        //     }
-        //     signatureValid = SignatureChecker.isValidSignatureNow(userOp.from, userOpHash, userOp.signature);
-        // } else {
-        //     // user is an EOA
-        //     signatureValid = _verifyUserSignature(userOp);
-        // }
 
         bool userIsBundler = userOp.from == msgSender;
         bool hasNoSignature = userOp.signature.length == 0;
@@ -620,14 +610,6 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
                 userOp.data
             )
         );
-    }
-
-    /// @notice Verifies the signature of a UserOperation struct.
-    /// @param userOp The UserOperation struct to verify.
-    /// @return A boolean indicating if the signature is valid.
-    function _verifyUserSignature(UserOperation calldata userOp) internal view returns (bool) {
-        (address signer,) = _hashTypedDataV4(_getUserOpHash(userOp)).tryRecover(userOp.signature);
-        return signer == userOp.from;
     }
 
     /// @notice Generates the hash of a UserOperation struct.
