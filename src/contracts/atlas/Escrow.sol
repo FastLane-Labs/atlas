@@ -200,6 +200,9 @@ abstract contract Escrow is AtlETH {
             key.paymentsSuccessful = true;
         }
 
+        // emit event
+        emit AllocationResult(dConfig.to, solverOp.userOpHash, key.paymentsSuccessful);
+
         return key;
     }
 

@@ -22,6 +22,7 @@ contract AtlasEvents {
     event SolverTxResult(
         address indexed solverTo, address indexed solverFrom, bool executed, bool success, uint256 result
     );
+    event AllocationResult(address indexed control, bytes32 userOpHash, bool paymentsSuccessful);
 
     // Factory events
     event ExecutionEnvironmentCreated(address indexed user, address indexed executionEnvironment);
