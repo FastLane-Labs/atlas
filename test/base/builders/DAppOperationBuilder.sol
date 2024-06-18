@@ -7,7 +7,7 @@ import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
 import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
 import { DAppOperation } from "src/contracts/types/DAppApprovalTypes.sol";
 
-import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
+import { CallVerification, UserOperationHashType } from "src/contracts/libraries/CallVerification.sol";
 
 import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
@@ -73,7 +73,7 @@ contract DAppOperationBuilder is Test {
     }
 
     function withUserOpHash(UserOperation memory userOperation) public returns (DAppOperationBuilder) {
-        dappOperation.userOpHash = userOperation.getUserOperationHash();
+        dappOperation.userOpHash = userOperation.getUserOperationHash(UserOperationHashType.DEFAULT);
         return this;
     }
 
@@ -82,8 +82,9 @@ contract DAppOperationBuilder is Test {
         return this;
     }
 
+    // TODO: refactor callers
     function withAltUserOpHash(UserOperation memory userOperation) public returns (DAppOperationBuilder) {
-        dappOperation.userOpHash = userOperation.getAltOperationHash();
+        dappOperation.userOpHash = userOperation.getUserOperationHash(UserOperationHashType.TRUSTED);
         return this;
     }
 

@@ -6,7 +6,7 @@ import "forge-std/Test.sol";
 import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
 import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
 
-import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
+import { CallVerification, UserOperationHashType } from "src/contracts/libraries/CallVerification.sol";
 
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
 import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
@@ -63,7 +63,7 @@ contract SolverOperationBuilder is Test {
     }
 
     function withUserOpHash(UserOperation memory userOperation) public returns (SolverOperationBuilder) {
-        solverOperation.userOpHash = userOperation.getUserOperationHash();
+        solverOperation.userOpHash = userOperation.getUserOperationHash(UserOperationHashType.DEFAULT);
         return this;
     }
 
@@ -72,8 +72,9 @@ contract SolverOperationBuilder is Test {
         return this;
     }
 
+    // TODO: refactor callers
     function withAltUserOpHash(UserOperation memory userOperation) public returns (SolverOperationBuilder) {
-        solverOperation.userOpHash = userOperation.getAltOperationHash();
+        solverOperation.userOpHash = userOperation.getUserOperationHash(UserOperationHashType.TRUSTED);
         return this;
     }
 

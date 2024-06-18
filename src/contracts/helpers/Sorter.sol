@@ -4,7 +4,7 @@ pragma solidity 0.8.22;
 import { IAtlETH } from "../interfaces/IAtlETH.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
-import { CallVerification } from "../libraries/CallVerification.sol";
+import { CallVerification, UserOperationHashType } from "../libraries/CallVerification.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
@@ -103,8 +103,8 @@ contract Sorter {
 
         SortingData[] memory sortingData = new SortingData[](count);
 
-        bytes32 userOpHash =
-            dConfig.callConfig.allowsTrustedOpHash() ? userOp.getAltOperationHash() : userOp.getUserOperationHash();
+        UserOperationHashType hashType = dConfig.callConfig.allowsTrustedOpHash() ? UserOperationHashType.TRUSTED : UserOperationHashType.DEFAULT;
+        bytes32 userOpHash = userOp.getUserOperationHash(hashType);
 
         uint256 invalid;
         for (uint256 i; i < count; ++i) {

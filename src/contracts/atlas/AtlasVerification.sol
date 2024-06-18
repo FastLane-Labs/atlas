@@ -1,6 +1,8 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
+import "forge-std/Test.sol";
+
 import { EIP712 } from "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 import { ECDSA } from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import { SignatureChecker } from "openzeppelin-contracts/contracts/utils/cryptography/SignatureChecker.sol";
@@ -8,7 +10,7 @@ import { DAppIntegration } from "src/contracts/atlas/DAppIntegration.sol";
 
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
-import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
+import { CallVerification, UserOperationHashType } from "src/contracts/libraries/CallVerification.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { AtlasConstants } from "src/contracts/types/AtlasConstants.sol";
 import "src/contracts/types/SolverCallTypes.sol";
@@ -82,7 +84,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
 
         // CASE: Solvers trust app to update content of UserOp after submission of solverOp
         if (dConfig.callConfig.allowsTrustedOpHash()) {
-            userOpHash = userOp.getAltOperationHash();
+            userOpHash = userOp.getUserOperationHash(UserOperationHashType.TRUSTED);
 
             // SessionKey must match explicitly - cannot be skipped
             if (userOp.sessionKey != dAppOp.from && !isSimulation) {
@@ -95,7 +97,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
                 return (userOpHash, ValidCallsResult.InvalidBundler);
             }
         } else {
-            userOpHash = userOp.getUserOperationHash();
+            userOpHash = userOp.getUserOperationHash(UserOperationHashType.DEFAULT);
         }
 
         uint256 solverOpCount = solverOps.length;
@@ -563,10 +565,14 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp userNonces
 
-        bool signatureValid = SignatureChecker.isValidSignatureNow(userOp.from, _hashTypedDataV4(_getUserOpHash(userOp)), userOp.signature);
+        bool signatureValid = SignatureChecker.isValidSignatureNow(userOp.from, _hashTypedDataV4(userOp.getUserOperationHash(UserOperationHashType.DEFAULT)), userOp.signature);
+        console.log("signatureValid: %s", signatureValid);
 
         bool userIsBundler = userOp.from == msgSender;
         bool hasNoSignature = userOp.signature.length == 0;
+        console.log("userIsBundler: %s", userIsBundler);
+        console.log("hasNoSignature: %s", hasNoSignature);
+        console.log("isSimulation: %s", isSimulation);
 
         if (!(signatureValid || userIsBundler || (isSimulation && hasNoSignature))) {
             return ValidCallsResult.UserSignatureInvalid;
@@ -591,32 +597,9 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
 
     /// @notice Generates the hash of a UserOperation struct.
     /// @param userOp The UserOperation struct to hash.
-    /// @return userOpHash The hash of the UserOperation struct.
-    function _getUserOpHash(UserOperation calldata userOp) internal pure returns (bytes32 userOpHash) {
-        userOpHash = keccak256(
-            abi.encode(
-                USER_TYPEHASH,
-                userOp.from,
-                userOp.to,
-                userOp.value,
-                userOp.gas,
-                userOp.maxFeePerGas,
-                userOp.nonce,
-                userOp.deadline,
-                userOp.dapp,
-                userOp.control,
-                userOp.callConfig,
-                userOp.sessionKey,
-                userOp.data
-            )
-        );
-    }
-
-    /// @notice Generates the hash of a UserOperation struct.
-    /// @param userOp The UserOperation struct to hash.
     /// @return payload The hash of the UserOperation struct.
     function getUserOperationPayload(UserOperation calldata userOp) public view returns (bytes32 payload) {
-        payload = _hashTypedDataV4(_getUserOpHash(userOp));
+        payload = _hashTypedDataV4(userOp.getUserOperationHash(UserOperationHashType.DEFAULT));
     }
 
     /// @notice Returns the next nonce for the given account, in sequential or non-sequential mode.

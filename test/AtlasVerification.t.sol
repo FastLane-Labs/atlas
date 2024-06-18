@@ -11,7 +11,7 @@ import { ValidCallsResult } from "src/contracts/types/ValidCallsTypes.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { DummyDAppControl } from "./base/DummyDAppControl.sol";
 import { AtlasBaseTest } from "./base/AtlasBaseTest.t.sol";
-import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
+import { CallVerification, UserOperationHashType } from "src/contracts/libraries/CallVerification.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { SolverOutcome } from "src/contracts/types/EscrowTypes.sol";
 import { DummyDAppControlBuilder } from "./helpers/DummyDAppControlBuilder.sol";
@@ -199,7 +199,7 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         solverOps[0] = validSolverOperation(userOp).signAndBuild(address(atlasVerification), userPK);
         uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            userOp.getUserOperationHash(UserOperationHashType.DEFAULT),
             userOp.maxFeePerGas,
             bundler
         );
@@ -209,7 +209,7 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         solverOps[0].signature = "";
         result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            userOp.getUserOperationHash(UserOperationHashType.DEFAULT),
             userOp.maxFeePerGas,
             bundler
         );
@@ -225,7 +225,7 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         solverOps[0].userOpHash = keccak256(abi.encodePacked("Not the userOp"));
         uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            userOp.getUserOperationHash(UserOperationHashType.DEFAULT),
             userOp.maxFeePerGas,
             bundler
         );
@@ -241,7 +241,7 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         solverOps[0].to = address(0);
         uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            userOp.getUserOperationHash(UserOperationHashType.DEFAULT),
             userOp.maxFeePerGas,
             bundler
         );
@@ -257,7 +257,7 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         vm.txGasPrice(solverOps[0].maxFeePerGas + 1); // Increase gas price above solver's max
         uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            userOp.getUserOperationHash(UserOperationHashType.DEFAULT),
             userOp.maxFeePerGas,
             bundler
         );
@@ -273,7 +273,7 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         // maxFeePerGas is below user's = SolverOutcome.GasPriceBelowUsers
         uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            userOp.getUserOperationHash(UserOperationHashType.DEFAULT),
             userOp.maxFeePerGas + 1,
             bundler
         );
@@ -289,7 +289,7 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         solverOps[0].solver = address(atlas);
         uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            userOp.getUserOperationHash(UserOperationHashType.DEFAULT),
             userOp.maxFeePerGas,
             bundler
         );
@@ -306,7 +306,7 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         vm.prank(solverOneEOA);
         uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            userOp.getUserOperationHash(UserOperationHashType.DEFAULT),
             userOp.maxFeePerGas,
             bundler
         );
@@ -317,7 +317,7 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         bundler = userEOA;
         result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            userOp.getUserOperationHash(UserOperationHashType.DEFAULT),
             userOp.maxFeePerGas,
             bundler
         );

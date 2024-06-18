@@ -11,7 +11,7 @@ import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
-import { CallVerification } from "../libraries/CallVerification.sol";
+import { CallVerification, UserOperationHashType } from "../libraries/CallVerification.sol";
 import { CallBits } from "../libraries/CallBits.sol";
 
 import "forge-std/Test.sol";
@@ -98,8 +98,8 @@ contract TxBuilder {
     {
         // generate userOpHash depending on CallConfig.trustedOpHash allowed or not
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
-        bytes32 userOpHash =
-            dConfig.callConfig.allowsTrustedOpHash() ? userOp.getAltOperationHash() : userOp.getUserOperationHash();
+        UserOperationHashType hashType = dConfig.callConfig.allowsTrustedOpHash() ? UserOperationHashType.TRUSTED : UserOperationHashType.DEFAULT;
+        bytes32 userOpHash = userOp.getUserOperationHash(hashType);
 
         solverOp = SolverOperation({
             from: solverEOA,
@@ -130,8 +130,8 @@ contract TxBuilder {
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
 
         // generate userOpHash depending on CallConfig.trustedOpHash allowed or not
-        bytes32 userOpHash =
-            dConfig.callConfig.allowsTrustedOpHash() ? userOp.getAltOperationHash() : userOp.getUserOperationHash();
+        UserOperationHashType hashType = dConfig.callConfig.allowsTrustedOpHash() ? UserOperationHashType.TRUSTED : UserOperationHashType.DEFAULT;
+        bytes32 userOpHash = userOp.getUserOperationHash(hashType);
         bytes32 callChainHash = CallVerification.getCallChainHash(dConfig, userOp, solverOps);
 
         dAppOp = DAppOperation({
