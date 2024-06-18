@@ -4,10 +4,22 @@ pragma solidity 0.8.22;
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
+import "../types/LockTypes.sol";
 
 // TODO add all Atlas functions here
 
 interface IAtlas {
+    function solverCall(
+        uint256 bidAmount,
+        uint256 gasLimit,
+        EscrowKey calldata key,
+        SolverOperation calldata solverOp,
+        bytes calldata dAppReturnData
+    )
+        external
+        payable
+        returns (SolverTracker memory solverTracker);
+
     function metacall(
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
@@ -20,4 +32,10 @@ interface IAtlas {
     function VERIFICATION() external view returns (address);
 
     function isUnlocked() external view returns (bool);
+
+    function lock() external returns (address);
+
+    function shortfall() external view returns (uint256);
+
+    function contribute() external payable;
 }

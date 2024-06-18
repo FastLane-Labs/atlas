@@ -306,13 +306,16 @@ contract Atlas is Escrow, Factory {
             // Isolate the original solverOps index from the packed uint256 value
             uint256 solverOpsIndex = bidsAndIndices[i] & _FIRST_16_BITS_TRUE_MASK;
 
-            (auctionWon, key) = _executeSolverOperation(
+            // Execute the solver operation. If solver won, allocate value and return. Otherwise continue looping.
+            (auctionWon, key, bidAmountFound) = _executeSolverOperation(
                 dConfig, userOp, solverOps[solverOpsIndex], returnData, bidAmountFound, true, key
             );
 
             if (auctionWon) {
                 key = _allocateValue(dConfig, solverOps[solverOpsIndex], bidAmountFound, returnData, key);
+
                 key.solverOutcome = uint24(solverOpsIndex);
+
                 return (auctionWon, key);
             }
 
@@ -341,18 +344,17 @@ contract Atlas is Escrow, Factory {
         internal
         returns (bool auctionWon, EscrowKey memory)
     {
+        uint256 bidAmount;
         uint256 k = solverOps.length;
 
         for (uint256 i; i < k; ++i) {
             SolverOperation calldata solverOp = solverOps[i];
 
-            uint256 solverBidAmount = IDAppControl(dConfig.to).getBidValue(solverOp);
-
-            (auctionWon, key) =
-                _executeSolverOperation(dConfig, userOp, solverOp, returnData, solverBidAmount, false, key);
+            (auctionWon, key, bidAmount) =
+                _executeSolverOperation(dConfig, userOp, solverOp, returnData, solverOp.bidAmount, false, key);
 
             if (auctionWon) {
-                key = _allocateValue(dConfig, solverOp, solverBidAmount, returnData, key);
+                key = _allocateValue(dConfig, solverOp, bidAmount, returnData, key);
 
                 key.solverOutcome = uint24(i);
 

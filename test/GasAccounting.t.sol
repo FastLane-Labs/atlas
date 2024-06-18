@@ -62,7 +62,7 @@ contract MockGasAccounting is GasAccounting, Test {
         bondedTotalSupply += amount;
     }
 
-    function calldataLengthPremium() external returns (uint256) {
+    function calldataLengthPremium() external pure returns (uint256) {
         return _CALLDATA_LENGTH_PREMIUM;
     }
 }
@@ -87,19 +87,6 @@ contract GasAccountingTest is Test {
     function getInitialClaims(uint256 gasMarker) public view returns (uint256 claims) {
         uint256 rawClaims = (gasMarker + 1) * tx.gasprice;
         claims = rawClaims + ((rawClaims * mockGasAccounting.SURCHARGE_RATE()) / mockGasAccounting.SURCHARGE_SCALE());
-    }
-
-    function test_validateBalances() public {
-        (bool calledBack, bool fulfilled) = mockGasAccounting.validateBalances();
-        assertFalse(calledBack);
-        assertFalse(fulfilled);
-
-        mockGasAccounting.trySolverLock(solverOp);
-        mockGasAccounting.reconcile{ value: initialClaims }(executionEnvironment, solverOp.from, 0);
-
-        (calledBack, fulfilled) = mockGasAccounting.validateBalances();
-        assertTrue(calledBack);
-        assertTrue(fulfilled);
     }
 
     function test_contribute() public {
@@ -141,6 +128,23 @@ contract GasAccountingTest is Test {
         mockGasAccounting.borrow(borrowedAmount);
 
         assertEq(executionEnvironment.balance, borrowedAmount);
+    }
+
+    function test_multipleBorrows() public {
+        uint256 atlasBalance = 100 ether;
+        uint256 borrow1 = 75 ether;
+        uint256 borrow2 = 10 ether;
+        uint256 borrow3 = 15 ether;
+
+        deal(address(mockGasAccounting), initialClaims + atlasBalance);
+
+        vm.startPrank(executionEnvironment);
+        mockGasAccounting.borrow(borrow1);
+        mockGasAccounting.borrow(borrow2);
+        mockGasAccounting.borrow(borrow3);
+        vm.stopPrank();
+
+        assertEq(executionEnvironment.balance, borrow1 + borrow2 + borrow3);
     }
 
     function test_shortfall() public {

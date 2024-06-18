@@ -338,7 +338,9 @@ abstract contract AtlETH is Permit69 {
         emit Redeem(owner, amount);
     }
 
-    /// @notice Allows the current surcharge recipient to withdraw the accumulated surcharge.
+    /// @notice Allows the current surcharge recipient to withdraw the accumulated surcharge. NOTE: If the only ETH in
+    /// Atlas is the surcharge, be mindful that withdrawing this ETH may limit solvers' liquidity to flashloan ETH from
+    /// Atlas in their solverOps.
     /// @dev This function can only be called by the current surcharge recipient.
     /// It transfers the accumulated surcharge amount to the surcharge recipient's address.
     function withdrawSurcharge() external {
