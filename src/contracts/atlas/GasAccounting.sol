@@ -204,6 +204,7 @@ abstract contract GasAccounting is SafetyLocks {
         _updateAnalytics(aData, 0, true, false);
 
         accessData[owner] = aData;
+        withdrawals += amount;
     }
 
     /// @notice Attempts to lock the solver's operation by borrowing AtlETH.
