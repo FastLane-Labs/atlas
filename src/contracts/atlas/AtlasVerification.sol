@@ -1,8 +1,6 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import "forge-std/Test.sol";
-
 import { EIP712 } from "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 import { ECDSA } from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import { SignatureChecker } from "openzeppelin-contracts/contracts/utils/cryptography/SignatureChecker.sol";
@@ -540,13 +538,9 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         // spoof transactions clogging up dapp userNonces
 
         bool signatureValid = SignatureChecker.isValidSignatureNow(userOp.from, _hashTypedDataV4(userOp.getUserOperationHash(UserOperationHashType.DEFAULT)), userOp.signature);
-        console.log("signatureValid: %s", signatureValid);
 
         bool userIsBundler = userOp.from == msgSender;
         bool hasNoSignature = userOp.signature.length == 0;
-        console.log("userIsBundler: %s", userIsBundler);
-        console.log("hasNoSignature: %s", hasNoSignature);
-        console.log("isSimulation: %s", isSimulation);
 
         if (!(signatureValid || userIsBundler || (isSimulation && hasNoSignature))) {
             return ValidCallsResult.UserSignatureInvalid;
