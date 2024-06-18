@@ -42,7 +42,7 @@ library CallVerification {
     function getUserOperationHash(UserOperation memory userOp, UserOperationHashType hashType) internal pure returns (bytes32 userOpHash) {
         if (hashType == UserOperationHashType.TRUSTED) {
             userOpHash = keccak256(
-                abi.encodePacked(
+                abi.encode(
                     USER_TYPEHASH_TRUSTED,
                     userOp.from,
                     userOp.to,

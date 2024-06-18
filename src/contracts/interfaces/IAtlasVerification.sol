@@ -18,7 +18,7 @@ interface IAtlasVerification {
         bool isSimulation
     )
         external
-        returns (bytes32 userOpHash, ValidCallsResult);
+        returns (ValidCallsResult);
 
     function verifySolverOp(
         SolverOperation calldata solverOp,
