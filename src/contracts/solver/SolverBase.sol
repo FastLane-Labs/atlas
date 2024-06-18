@@ -56,7 +56,7 @@ contract SolverBase is ISolverContract {
 
         if (shortfall < msg.value) shortfall = 0;
         else shortfall -= msg.value;
-        
+
         if (msg.value > address(this).balance) {
             IWETH9(WETH_ADDRESS).withdraw(msg.value - address(this).balance);
         }
