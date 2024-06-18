@@ -139,7 +139,7 @@ contract AtlasVerificationBase is AtlasBaseTest {
     function doValidateCalls(ValidCallsCall memory call) public returns (ValidCallsResult result) {
         DAppConfig memory config = dAppControl.getDAppConfig(call.userOp);
         vm.startPrank(address(atlas));
-        (, result) = atlasVerification.validateCalls(
+        result = atlasVerification.validateCalls(
             config,
             call.userOp,
             call.solverOps,
@@ -1221,7 +1221,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
         ValidCallsResult result;
         vm.startPrank(address(atlas));
-        (, result) = atlasVerification.validateCalls(
+        result = atlasVerification.validateCalls(
             config,
             userOp,
             solverOps,
