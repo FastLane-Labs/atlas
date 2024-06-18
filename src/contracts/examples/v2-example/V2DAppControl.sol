@@ -101,6 +101,9 @@ contract V2DAppControl is DAppControl {
                 // bytes memory swapData // Unused
         ) = abi.decode(userOp.data[4:], (uint256, uint256, address, bytes));
 
+        require(amount0Out == 0 || amount1Out == 0, "ERR-H12 InvalidAmountOuts");
+        require(amount0Out > 0 || amount1Out > 0, "ERR-H13 InvalidAmountOuts");
+
         (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(userOp.dapp).getReserves();
 
         uint256 amount0In =
