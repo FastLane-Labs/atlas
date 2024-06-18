@@ -81,6 +81,7 @@ contract AtlasErrors {
     error InvalidDAppControl();
     error DAppNotEnabled();
     error AtlasLockActive();
+    error InvalidSignatory();
 
     // Permit69
     error InvalidEnvironment();
