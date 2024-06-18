@@ -268,10 +268,7 @@ abstract contract Escrow is AtlETH {
         uint256 gasCost = (tx.gasprice * gasLimit) + _getCalldataCost(solverOp.data.length);
 
         // Verify that we can lend the solver their tx value
-        if (
-            solverOp.value
-                > address(this).balance - (gasLimit * tx.gasprice > address(this).balance ? 0 : gasLimit * tx.gasprice)
-        ) {
+        if (solverOp.value > address(this).balance) {
             return (1 << uint256(SolverOutcome.CallValueTooHigh), gasLimit);
         }
 
