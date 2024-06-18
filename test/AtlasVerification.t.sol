@@ -330,6 +330,7 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
 //
 
 contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
+    using CallVerification for UserOperation;
 
     // Default Everything Valid Test Case
 
@@ -596,7 +597,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         UserOperation memory userOp = validUserOperation().withSessionKey(address(0)).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
-        solverOps[0] = validSolverOperation(userOp).withAltUserOpHash(userOp).build();
+        solverOps[0] = validSolverOperation(userOp).withUserOpHash(userOp.getUserOperationHash(UserOperationHashType.TRUSTED)).build();
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
@@ -609,8 +610,8 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
         UserOperation memory userOp = validUserOperation().withSessionKey(governanceEOA).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
-        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withAltUserOpHash(userOp).build();
-        solverOps[0] = validSolverOperation(userOp).withAltUserOpHash(userOp).build();
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withUserOpHash(userOp.getUserOperationHash(UserOperationHashType.TRUSTED)).build();
+        solverOps[0] = validSolverOperation(userOp).withUserOpHash(userOp.getUserOperationHash(UserOperationHashType.TRUSTED)).build();
 
         // If msgSender in _validCalls is neither dAppOp.from nor userOp.from,
         // and trustedOpHash is true --> return InvalidBundler

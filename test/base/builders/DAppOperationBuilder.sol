@@ -77,17 +77,6 @@ contract DAppOperationBuilder is Test {
         return this;
     }
 
-    function withAltUserOpHash(bytes32 altUserOpHash) public returns (DAppOperationBuilder) {
-        dappOperation.userOpHash = altUserOpHash;
-        return this;
-    }
-
-    // TODO: refactor callers
-    function withAltUserOpHash(UserOperation memory userOperation) public returns (DAppOperationBuilder) {
-        dappOperation.userOpHash = userOperation.getUserOperationHash(UserOperationHashType.TRUSTED);
-        return this;
-    }
-
     function withCallChainHash(bytes32 callChainHash) public returns (DAppOperationBuilder) {
         dappOperation.callChainHash = callChainHash;
         return this;

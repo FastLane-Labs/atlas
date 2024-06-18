@@ -63,18 +63,15 @@ contract SolverOperationBuilder is Test {
     }
 
     function withUserOpHash(UserOperation memory userOperation) public returns (SolverOperationBuilder) {
-        solverOperation.userOpHash = userOperation.getUserOperationHash(UserOperationHashType.DEFAULT);
+        withUserOpHashType(userOperation, UserOperationHashType.DEFAULT);
         return this;
     }
 
-    function withAltUserOpHash(bytes32 altUserOpHash) public returns (SolverOperationBuilder) {
-        solverOperation.userOpHash = altUserOpHash;
-        return this;
-    }
-
-    // TODO: refactor callers
-    function withAltUserOpHash(UserOperation memory userOperation) public returns (SolverOperationBuilder) {
-        solverOperation.userOpHash = userOperation.getUserOperationHash(UserOperationHashType.TRUSTED);
+    function withUserOpHashType(UserOperation memory userOperation, UserOperationHashType hashType)
+        public
+        returns (SolverOperationBuilder)
+    {
+        solverOperation.userOpHash = userOperation.getUserOperationHash(hashType);
         return this;
     }
 
