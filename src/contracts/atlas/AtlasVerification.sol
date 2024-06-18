@@ -79,24 +79,6 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         // Verify that the calldata injection came from the dApp frontend
         // and that the signatures are valid.
 
-        // CASE: Solvers trust app to update content of UserOp after submission of solverOp
-        if (dConfig.callConfig.allowsTrustedOpHash()) {
-            userOpHash = userOp.getAltOperationHash();
-
-            // SessionKey must match explicitly - cannot be skipped
-            if (userOp.sessionKey != dAppOp.from && !isSimulation) {
-                return (userOpHash, ValidCallsResult.InvalidAuctioneer);
-            }
-
-            // msgSender (the bundler) must be userOp.from, userOp.sessionKey / dappOp.from, or dappOp.bundler
-            if (!(msgSender == dAppOp.from || msgSender == dAppOp.bundler || msgSender == userOp.from) && !isSimulation)
-            {
-                return (userOpHash, ValidCallsResult.InvalidBundler);
-            }
-        } else {
-            userOpHash = userOp.getUserOperationHash();
-        }
-
         uint256 solverOpCount = solverOps.length;
 
         {
@@ -151,6 +133,24 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
             if (dConfig.callConfig != userOp.callConfig) {
                 return (userOpHash, ValidCallsResult.CallConfigMismatch);
             }
+        }
+
+        // CASE: Solvers trust app to update content of UserOp after submission of solverOp
+        if (dConfig.callConfig.allowsTrustedOpHash()) {
+            userOpHash = userOp.getAltOperationHash();
+
+            // SessionKey must match explicitly - cannot be skipped
+            if (userOp.sessionKey != dAppOp.from && !isSimulation) {
+                return (userOpHash, ValidCallsResult.InvalidAuctioneer);
+            }
+
+            // msgSender (the bundler) must be userOp.from, userOp.sessionKey / dappOp.from, or dappOp.bundler
+            if (!(msgSender == dAppOp.from || msgSender == dAppOp.bundler || msgSender == userOp.from) && !isSimulation)
+            {
+                return (userOpHash, ValidCallsResult.InvalidBundler);
+            }
+        } else {
+            userOpHash = userOp.getUserOperationHash();
         }
 
         // Some checks are only needed when call is not a simulation
