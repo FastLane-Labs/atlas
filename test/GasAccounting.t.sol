@@ -87,21 +87,6 @@ contract GasAccountingTest is Test {
         initialClaims = rawClaims + ((rawClaims * mockGasAccounting.SURCHARGE_RATE()) / mockGasAccounting.SURCHARGE_SCALE());
     }
 
-    function test_validateBalances() public {
-        initEscrowLock(0);
-
-        (bool calledBack, bool fulfilled) = mockGasAccounting.validateBalances();
-        assertFalse(calledBack);
-        assertFalse(fulfilled);
-
-        mockGasAccounting.trySolverLock(solverOp);
-        mockGasAccounting.reconcile{ value: initialClaims }(executionEnvironment, solverOp.from, 0);
-
-        (calledBack, fulfilled) = mockGasAccounting.validateBalances();
-        assertTrue(calledBack);
-        assertTrue(fulfilled);
-    }
-
     function test_contribute() public {
         initEscrowLock(0);
 

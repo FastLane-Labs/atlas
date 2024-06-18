@@ -24,3 +24,12 @@ struct SolverOperation {
     bytes data;
     bytes signature;
 }
+
+// Additional struct to avoid Stack Too Deep while tracking variables related to the solver call.
+struct SolverTracker {
+    uint256 bidAmount;
+    uint256 floor;
+    uint256 ceiling;
+    bool etherIsBidToken;
+    bool invertsBidValue;
+}

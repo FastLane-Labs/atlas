@@ -37,8 +37,8 @@ enum SolverOutcome {
     PreSolverFailed,
     SolverOpReverted,
     PostSolverFailed,
-    IntentUnfulfilled,
     BidNotPaid,
     BalanceNotReconciled,
+    CallbackNotCalled,
     EVMError
 }

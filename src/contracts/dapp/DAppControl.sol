@@ -69,9 +69,9 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     }
 
     /// @notice The preSolverCall hook which may be called before the SolverOperation is executed.
+    /// @dev Should revert if any DApp-specific checks fail to indicate non-fulfillment.
     /// @param solverOp The SolverOperation to be executed after this hook has been called.
     /// @param returnData Data returned from the previous call phase.
-    /// @return Boolean indicating whether the preSolverCall was successful.
     function preSolverCall(
         SolverOperation calldata solverOp,
         bytes calldata returnData
@@ -80,15 +80,14 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         payable
         validControl
         onlyAtlasEnvironment(ExecutionPhase.PreSolver, _CONTROL_DEPTH)
-        returns (bool)
     {
-        return _preSolverCall(solverOp, returnData);
+        _preSolverCall(solverOp, returnData);
     }
 
     /// @notice The postSolverCall hook which may be called after the SolverOperation has been executed.
+    /// @dev Should revert if any DApp-specific checks fail to indicate non-fulfillment.
     /// @param solverOp The SolverOperation struct that was executed just before this hook was called.
     /// @param returnData Data returned from the previous call phase.
-    /// @return Boolean indicating whether the postSolverCall was successful.
     function postSolverCall(
         SolverOperation calldata solverOp,
         bytes calldata returnData
@@ -97,9 +96,8 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         payable
         validControl
         onlyAtlasEnvironment(ExecutionPhase.PostSolver, _CONTROL_DEPTH)
-        returns (bool)
     {
-        return _postSolverCall(solverOp, returnData);
+        _postSolverCall(solverOp, returnData);
     }
 
     /// @notice The allocateValueCall hook which is called after a successful SolverOperation.

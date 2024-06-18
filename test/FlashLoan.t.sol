@@ -294,7 +294,7 @@ contract DummyDAppControlBuilder is DAppControl {
 
 contract SimpleSolver {
     address weth;
-    address msgSender;
+    address environment;
     address atlas;
 
     constructor(address _weth, address _atlas) {
@@ -303,7 +303,8 @@ contract SimpleSolver {
     }
 
     function atlasSolverCall(
-        address sender,
+        address solverOpFrom,
+        address executionEnvironment,
         address bidToken,
         uint256 bidAmount,
         bytes calldata solverOpData,
@@ -313,7 +314,7 @@ contract SimpleSolver {
         payable
         returns (bool success, bytes memory data)
     {
-        msgSender = msg.sender;
+        environment = executionEnvironment;
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
 
         if (bytes4(solverOpData[:4]) == SimpleSolver.payback.selector) {
@@ -322,7 +323,7 @@ contract SimpleSolver {
             if (shortfall < msg.value) shortfall = 0;
             else shortfall -= msg.value;
 
-            IEscrow(atlas).reconcile{ value: msg.value }(msg.sender, sender, shortfall);
+            IEscrow(atlas).reconcile{ value: msg.value }(executionEnvironment, solverOpFrom, shortfall);
         }
     }
 
@@ -332,13 +333,13 @@ contract SimpleSolver {
 
     function onlyPayBid(uint256 bidAmount) external payable {
         IWETH(weth).withdraw(bidAmount);
-        payable(msgSender).transfer(bidAmount); // pay back to atlas
+        payable(environment).transfer(bidAmount); // pay back to atlas
         address(0).call{ value: msg.value }(""); // do something with the remaining eth
     }
 
     function payback(uint256 bidAmount) external payable {
         IWETH(weth).withdraw(bidAmount);
-        payable(msgSender).transfer(bidAmount); // pay back to atlas
+        payable(environment).transfer(bidAmount); // pay back to atlas
     }
 
     receive() external payable { }

@@ -198,37 +198,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(userData);
     }
 
-    function test_modifier_contributeSurplus() public {
-        UserOperation memory userOp;
-        bytes memory userData;
-        bool status;
-
-        userOp.from = user;
-        userOp.to = address(atlas);
-
-        // The following 2 lines change Atlas' storage values in order to make the test succeed.
-        // lock and deposits values are normally initialized in the _initializeEscrowLock function,
-        // but we can't call it in the current setup.
-        // Any changes in the Storage contract could make this test fail, feel free to skip it until
-        // the contract's layout is finalized.
-
-        // Set lock address to the execution environment
-        vm.store(address(atlas), bytes32(lockSlot), bytes32(uint256(uint160(address(executionEnvironment)))));
-        // Set deposits to 0
-        vm.store(address(atlas), bytes32(depositsSlot), bytes32(uint256(0)));
-
-        uint256 depositsBefore = atlas.deposits();
-        uint256 surplusAmount = 50_000;
-
-        escrowKey = escrowKey.holdUserLock(address(dAppControl));
-        userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
-        userData = abi.encodePacked(userData, escrowKey.pack());
-        vm.prank(address(atlas));
-        (status,) = address(executionEnvironment).call{ value: surplusAmount }(userData);
-        assertTrue(status);
-        assertEq(atlas.deposits(), depositsBefore + surplusAmount);
-    }
-
     function test_preOpsWrapper() public {
         UserOperation memory userOp;
         bytes memory preOpsData;
@@ -361,6 +330,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(postOpsData);
     }
 
+    /*
+    // TODO refactor this into 2 tests: test_solverPreTryCatch and test_solverPostTryCatch
     function test_solverMetaTryCatch() public {
         bytes memory solverMetaData;
         bool status;
@@ -403,7 +374,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverOp.control = address(dAppControl);
         _unsetLocks();
 
-        // SolverOperationReverted
+        // SolverOpReverted
         _setLocks();
         solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, true);
         escrowKey = escrowKey.holdSolverLock(solverOp.solver);
@@ -412,11 +383,11 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.SolverOperationReverted.selector);
+        vm.expectRevert(AtlasErrors.SolverOpReverted.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         _unsetLocks();
 
-        // SolverBidUnpaid
+        // BidNotPaid
         _setLocks();
         solverOp.bidAmount = 1; // Bid won't be paid
         solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
@@ -426,7 +397,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         );
         solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
         vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.SolverBidUnpaid.selector);
+        vm.expectRevert(AtlasErrors.BidNotPaid.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         solverOp.bidAmount = 0;
         _unsetLocks();
@@ -506,25 +477,10 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.expectRevert(AtlasErrors.PostSolverFailed.selector);
         (status,) = address(executionEnvironment).call(solverMetaData);
         _unsetLocks();
-
-        // IntentUnfulfilled
-        _setLocks();
-        solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
-        escrowKey = escrowKey.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector,
-            solverOp.bidAmount,
-            solverGasLimit,
-            solverOp,
-            abi.encode(false, false)
-        );
-        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
-        vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.IntentUnfulfilled.selector);
-        (status,) = address(executionEnvironment).call(solverMetaData);
-        _unsetLocks();
     }
+    */
 
+    
     function test_allocateValue() public {
         bytes memory allocateData;
         bool status;
@@ -549,6 +505,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.expectRevert(AtlasErrors.AllocateValueDelegatecallFail.selector);
         (status,) = address(executionEnvironment).call(allocateData);
     }
+
 
     function test_withdrawERC20() public {
         // Valid
@@ -672,11 +629,10 @@ contract MockDAppControl is DAppControl {
         internal
         pure
         override
-        returns (bool)
     {
         (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
         require(!shouldRevert, "_preSolverCall revert requested");
-        return returnValue;
+        if (!returnValue) revert("_preSolverCall returned false");
     }
 
     function _postSolverCall(
@@ -686,11 +642,10 @@ contract MockDAppControl is DAppControl {
         internal
         pure
         override
-        returns (bool)
     {
         (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
         require(!shouldRevert, "_postSolverCall revert requested");
-        return returnValue;
+        if (!returnValue) revert("_postSolverCall returned false");
     }
 
     function _allocateValueCall(address, uint256, bytes calldata data) internal virtual override {
@@ -722,7 +677,8 @@ contract MockSolverContract {
     }
 
     function atlasSolverCall(
-        address sender,
+        address solverOpFrom,
+        address executionEnvironment,
         address,
         uint256,
         bytes calldata solverOpData,
@@ -735,7 +691,7 @@ contract MockSolverContract {
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
         require(success, "atlasSolverCall call reverted");
         if (shouldReconcile) {
-            IEscrow(address(_atlas)).reconcile(msg.sender, sender, type(uint256).max);
+            IEscrow(address(_atlas)).reconcile(executionEnvironment, solverOpFrom, type(uint256).max);
         }
     }
 
