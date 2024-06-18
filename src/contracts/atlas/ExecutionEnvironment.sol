@@ -72,7 +72,7 @@ contract ExecutionEnvironment is Base {
     {
         uint32 config = _config();
 
-        if (userOp.value > address(this).balance) revert AtlasErrors.UserOpValueExceedsBalance();
+        if (userOp.value > msg.value) revert AtlasErrors.UserOpValueExceedsBalance();
 
         // Do not attach extra calldata via `_forward()` if contract called is not dAppControl, as the additional
         // calldata may cause unexpected behaviour in third-party protocols
