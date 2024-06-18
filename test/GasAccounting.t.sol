@@ -296,6 +296,7 @@ contract GasAccountingTest is Test {
         uint256 lastAccessedBlock;
 
         uint256 bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
+        uint256 withdrawalsBefore = mockGasAccounting.withdrawals();
         (uint112 bondedBefore,,,,) = mockGasAccounting.accessData(solverOp.from);
         (, lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
         assertEq(lastAccessedBlock, 0);
@@ -308,6 +309,7 @@ contract GasAccountingTest is Test {
         assertEq(lastAccessedBlock, uint32(block.number));
         assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore + creditedAmount);
         assertEq(bondedAfter, bondedBefore + uint112(creditedAmount));
+        assertEq(mockGasAccounting.withdrawals(), withdrawalsBefore + creditedAmount);
 
         // Testing uint112 boundary values for casting from uint256 to uint112 in _credit()
         uint256 overflowAmount = uint256(type(uint112).max) + 1;
