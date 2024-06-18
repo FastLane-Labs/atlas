@@ -69,7 +69,7 @@ contract Atlas is Escrow, Factory {
         // Initialize the lock
         _setAtlasLock(executionEnvironment, gasMarker, userOp.value);
 
-        try this.execute(dConfig, userOp, solverOps, executionEnvironment, msg.sender, userOpHash) returns (
+        try this.execute(dConfig, userOp, solverOps, executionEnvironment, msg.sender, dAppOp.userOpHash) returns (
             bool _auctionWon, uint256 winningSolverIndex
         ) {
             auctionWon = _auctionWon;
