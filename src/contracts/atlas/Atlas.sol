@@ -329,9 +329,9 @@ contract Atlas is Escrow, Factory {
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param returnData Return data from the preOps and userOp calls.
-    /// @param key EscrowKey struct containing the current state of the escrow lock.
-    /// @return auctionWon bool indicating whether a winning solver was found or not. key.solverOutcome is the index of
+    /// @param key EscrowKey struct containing the current state of the escrow lock. key.solverOutcome is the index of
     /// the winning solver. When no winner is found, key.solverOutcome is the error code of the last solver.
+    /// @return auctionWon bool indicating whether a winning solver was found or not.
     /// @return EscrowKey struct containing the current state of the escrow lock.
     function _bidKnownIteration(
         DAppConfig calldata dConfig,
