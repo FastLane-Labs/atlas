@@ -47,6 +47,7 @@ contract SafetyBitsTest is Test {
     uint16 constant SAFE_DAPP_TRANSFER = uint16(
         1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreOps))
             | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PreSolver))
+            | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostSolver))
             | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.HandlingPayments))
             | 1 << (EXECUTION_PHASE_OFFSET + uint16(ExecutionPhase.PostOps))
     );
@@ -182,13 +183,6 @@ contract SafetyBitsTest is Test {
         EscrowKey memory key = initializeEscrowLock(CallConfigIndex.RequireFulfillment);
         key = key.holdAllocateValueLock(address(1));
         assertTrue(key.lockState == SafetyBits._LOCK_PAYMENTS);
-        assertTrue(key.addressPointer == address(1));
-    }
-
-    function testHoldSolverLock() public {
-        EscrowKey memory key = initializeEscrowLock(CallConfigIndex.RequireFulfillment);
-        key = key.holdSolverLock(address(1));
-        assertTrue(key.lockState == SafetyBits._LOCKED_X_SOLVERS_X_REQUESTED);
         assertTrue(key.addressPointer == address(1));
     }
 

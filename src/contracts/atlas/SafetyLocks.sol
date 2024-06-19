@@ -38,7 +38,7 @@ abstract contract SafetyLocks is Storage {
         lock = executionEnvironment;
 
         // Set the claimed amount
-        uint256 rawClaims = (gasMarker + 1) * tx.gasprice;
+        uint256 rawClaims = (FIXED_GAS_OFFSET + gasMarker) * tx.gasprice;
         claims = rawClaims * (SURCHARGE_SCALE + SURCHARGE_RATE) / SURCHARGE_SCALE;
 
         // Set any withdraws or deposits
