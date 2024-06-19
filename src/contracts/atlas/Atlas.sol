@@ -58,9 +58,8 @@ contract Atlas is Escrow, Factory {
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
         // NOTE: Currently reverting instead of graceful return to help w/ testing. TODO - still reverting?
-        (bytes32 userOpHash, ValidCallsResult validCallsResult) = VERIFICATION.validateCalls(
-            dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, isSimulation
-        );
+        (bytes32 userOpHash, ValidCallsResult validCallsResult) =
+            VERIFICATION.validateCalls(dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, isSimulation);
         if (validCallsResult != ValidCallsResult.Valid) {
             if (isSimulation) revert VerificationSimFail(uint256(validCallsResult));
             revert ValidCalls(validCallsResult);
