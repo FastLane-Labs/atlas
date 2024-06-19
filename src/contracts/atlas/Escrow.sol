@@ -92,17 +92,10 @@ abstract contract Escrow is AtlETH {
 
         if (success) {
             // Handle formatting of returnData
-            if (dConfig.callConfig.needsPreOpsReturnData()) {
-                if (dConfig.callConfig.needsUserReturnData()) {
-                    data = abi.decode(data, (bytes));
-                    return (ctx, bytes.concat(returnData, data));
-                } else {
-                    return (ctx, returnData);
-                }
-            } else if (dConfig.callConfig.needsUserReturnData()) {
+            if (dConfig.callConfig.needsUserReturnData()) {
                 return (ctx, abi.decode(data, (bytes)));
             } else {
-                return (ctx, new bytes(0));
+                return (ctx, returnData);
             }
         } else {
             if (ctx.isSimulation) revert UserOpSimFail();
