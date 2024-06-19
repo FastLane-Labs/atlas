@@ -29,7 +29,7 @@ contract Atlas is Escrow, Factory {
 
     constructor(
         uint256 _escrowDuration,
-        AtlasVerification _verification,
+        address _verification,
         address _simulator,
         address _surchargeRecipient,
         address _executionTemplate

@@ -54,14 +54,14 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
 
     constructor(
         uint256 _escrowDuration,
-        AtlasVerification _verification,
+        address _verification,
         address _simulator,
         address _surchargeRecipient
     )
         payable
     {
         ESCROW_DURATION = _escrowDuration;
-        VERIFICATION = _verification;
+        VERIFICATION = AtlasVerification(_verification);
         SIMULATOR = _simulator;
         _INITIAL_CHAIN_ID = block.chainid;
         _INITIAL_DOMAIN_SEPARATOR = _computeDomainSeparator();

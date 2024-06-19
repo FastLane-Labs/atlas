@@ -12,7 +12,7 @@ contract StorageTest is Test {
     function testNewStorage() public {
         MockStorageTests s = new MockStorageTests(
             1, // _escrowDuration
-            AtlasVerification(address(1)), // _verification
+            address(1), // _verification
             address(2), // _simulator
             address(3) // _surchargeRecipient
         );
@@ -55,7 +55,7 @@ contract StorageTest is Test {
 contract MockStorageTests is Storage {
     constructor(
         uint256 _escrowDuration,
-        AtlasVerification _verification,
+        address _verification,
         address _simulator,
         address _surchargeRecipient
     )

@@ -12,7 +12,7 @@ import "src/contracts/types/DAppApprovalTypes.sol";
 import "src/contracts/types/LockTypes.sol";
 
 contract MockSafetyLocks is SafetyLocks {
-    constructor() SafetyLocks(0, AtlasVerification(address(0)), address(0), address(0)) { }
+    constructor() SafetyLocks(0, address(0), address(0), address(0)) { }
 
     function initializeEscrowLock(
         address executionEnvironment,

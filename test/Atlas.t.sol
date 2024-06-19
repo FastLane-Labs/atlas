@@ -132,7 +132,7 @@ contract AtlasTest is BaseTest {
 contract MockAtlas is Atlas {
     constructor(
         uint256 _escrowDuration,
-        AtlasVerification _verification,
+        address _verification,
         address _simulator,
         address _surchargeRecipient,
         address _executionTemplate

@@ -16,7 +16,7 @@ import "../src/contracts/types/SolverCallTypes.sol";
 contract MockGasAccounting is GasAccounting, Test {
     constructor(
         uint256 _escrowDuration,
-        AtlasVerification _verification,
+        address _verification,
         address _simulator,
         address _surchargeRecipient
     )
@@ -76,7 +76,7 @@ contract GasAccountingTest is Test {
     SolverOperation solverOp;
 
     function setUp() public {
-        mockGasAccounting = new MockGasAccounting(0, AtlasVerification(address(0)), address(0), address(0));
+        mockGasAccounting = new MockGasAccounting(0, address(0), address(0), address(0));
         uint256 gasMarker = gasleft();
 
         mockGasAccounting.initializeEscrowLock(executionEnvironment, gasMarker, 0);

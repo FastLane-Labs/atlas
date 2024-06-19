@@ -17,7 +17,7 @@ abstract contract GasAccounting is SafetyLocks {
 
     constructor(
         uint256 _escrowDuration,
-        AtlasVerification _verification,
+        address _verification,
         address _simulator,
         address _surchargeRecipient
     )

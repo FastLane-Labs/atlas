@@ -66,7 +66,7 @@ contract FactoryTest is Test {
         vm.startPrank(deployer);
         atlas = new Atlas({
             _escrowDuration: 64,
-            _verification: AtlasVerification(expectedAtlasVerificationAddr),
+            _verification: expectedAtlasVerificationAddr,
             _simulator: address(0),
             _executionTemplate: address(execEnvTemplate),
             _surchargeRecipient: deployer

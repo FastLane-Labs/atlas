@@ -19,7 +19,7 @@ abstract contract SafetyLocks is Storage {
 
     constructor(
         uint256 _escrowDuration,
-        AtlasVerification _verification,
+        address _verification,
         address _simulator,
         address _surchargeRecipient
     )

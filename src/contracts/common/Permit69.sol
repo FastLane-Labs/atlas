@@ -28,7 +28,7 @@ abstract contract Permit69 is GasAccounting {
 
     constructor(
         uint256 _escrowDuration,
-        AtlasVerification _verification,
+        address _verification,
         address _simulator,
         address _surchargeRecipient
     )
