@@ -135,10 +135,12 @@ contract Atlas is Escrow, Factory {
 
         // PostOp Call
         if (dConfig.callConfig.needsPostOpsCall()) {
-            ctx = _executePostOpsCall(ctx, auctionWon, returnData);
+            // TODO LOCK PR - not sure where to get solverWon for 2nd param
+            ctx = _executePostOpsCall(ctx, ctx.solverSuccessful, returnData);
         }
 
-        return (ctx.solverSuccessful, uint256(ctx.solverOutcome));
+        // TODO LOCK PR - check return types issue is still resolved
+        winningSolver = ctx.solverSuccessful ? solverOps[uint256(ctx.solverOutcome)].from : address(0);
     }
 
     /// @notice Called above in `execute` if the DAppConfig requires ex post bids. Sorts solverOps by bid amount and

@@ -53,7 +53,6 @@ contract DummyDAppControl is DAppControl {
 
         (bool shouldRevert) = abi.decode(returnData, (bool));
         require(!shouldRevert, "_preSolverCall revert requested");
-        if (!returnValue) revert("_preSolverCall returned false");
     }
 
     function _postSolverCall(SolverOperation calldata, bytes calldata returnData) internal pure virtual override {
@@ -64,7 +63,6 @@ contract DummyDAppControl is DAppControl {
         //(bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
         (bool shouldRevert) = abi.decode(returnData, (bool));
         require(!shouldRevert, "_postSolverCall revert requested");
-        if (!returnValue) revert("_postSolverCall returned false");
     }
 
     function _allocateValueCall(

@@ -121,7 +121,7 @@ contract V4DAppControl is DAppControl {
                 params.zeroForOne
                     ? IPoolManager.Currency.unwrap(key.currency0)
                     : IPoolManager.Currency.unwrap(key.currency1)
-                ),
+            ),
             poolKey: key
         });
 
