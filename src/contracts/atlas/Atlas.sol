@@ -9,7 +9,6 @@ import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
 import { Escrow } from "./Escrow.sol";
 import { Factory } from "./Factory.sol";
-import { AtlasVerification } from "./AtlasVerification.sol";
 
 import "src/contracts/types/SolverCallTypes.sol";
 import "src/contracts/types/UserCallTypes.sol";

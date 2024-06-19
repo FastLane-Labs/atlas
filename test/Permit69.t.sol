@@ -15,7 +15,6 @@ import { EXECUTION_PHASE_OFFSET } from "src/contracts/libraries/SafetyBits.sol";
 import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "src/contracts/common/Permit69.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
-import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 
 import "src/contracts/types/LockTypes.sol";
 

@@ -6,7 +6,6 @@ import "forge-std/Test.sol";
 import { SafetyLocks } from "src/contracts/atlas/SafetyLocks.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
-import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 
 import "src/contracts/types/DAppApprovalTypes.sol";
 import "src/contracts/types/LockTypes.sol";

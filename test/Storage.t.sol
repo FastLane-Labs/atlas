@@ -4,7 +4,6 @@ pragma solidity 0.8.22;
 import "forge-std/Test.sol";
 
 import { Storage } from "src/contracts/atlas/Storage.sol";
-import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 
 using stdStorage for StdStorage;
 

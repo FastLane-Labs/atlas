@@ -6,7 +6,6 @@ import "forge-std/Test.sol";
 import { GasAccounting } from "../src/contracts/atlas/GasAccounting.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
-import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 
 import { EscrowBits } from "../src/contracts/libraries/EscrowBits.sol";
 

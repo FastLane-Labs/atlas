@@ -5,7 +5,6 @@ import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
 import { SafetyLocks } from "src/contracts/atlas/SafetyLocks.sol";
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
-import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
 

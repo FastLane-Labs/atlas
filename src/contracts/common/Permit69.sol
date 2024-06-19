@@ -3,7 +3,6 @@ pragma solidity 0.8.22;
 
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
 import { GasAccounting } from "src/contracts/atlas/GasAccounting.sol";
-import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 
 import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "src/contracts/libraries/SafetyBits.sol";
 import "src/contracts/types/LockTypes.sol";
