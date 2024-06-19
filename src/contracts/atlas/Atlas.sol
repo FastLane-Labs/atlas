@@ -62,7 +62,7 @@ contract Atlas is Escrow, Factory {
             dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, isSimulation
         );
         if (validCallsResult != ValidCallsResult.Valid) {
-            if (isSimulation) revert VerificationSimFail(uint256(validCallsResult));
+            if (isSimulation) revert VerificationSimFail(validCallsResult);
             revert ValidCalls(validCallsResult);
         }
 

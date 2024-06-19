@@ -29,7 +29,7 @@ contract AtlasErrors {
     error PostSolverFailed();
     error InsufficientEscrow();
 
-    error VerificationSimFail(uint256 validCallsResult);
+    error VerificationSimFail(ValidCallsResult);
     error PreOpsSimFail();
     error UserOpSimFail();
     error SolverSimFail(uint256 solverOutcomeResult); // uint param is result returned in `verifySolverOp`
