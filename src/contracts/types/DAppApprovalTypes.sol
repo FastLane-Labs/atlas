@@ -6,7 +6,7 @@ bytes32 constant DAPP_TYPEHASH = keccak256(
 );
 
 struct DAppOperation {
-    address from; // EOA of signer of the DAppOperation (SessionKey)
+    address from; // EOA of signer of the DAppOperation
     address to; // Atlas address
     uint256 nonce; // Atlas nonce of the DAppOperation available in the AtlasVerification contract
     uint256 deadline; // block.number deadline for the DAppOperation
@@ -14,7 +14,7 @@ struct DAppOperation {
     address bundler; // Signer of the atlas tx (msg.sender)
     bytes32 userOpHash; // keccak256 of userOp.to, userOp.data
     bytes32 callChainHash; // keccak256 of the solvers' txs
-    bytes signature; // DAppOperation signed by DAppOperation.from(SessionKey)
+    bytes signature; // DAppOperation signed by DAppOperation.from
 }
 
 struct DAppConfig {
