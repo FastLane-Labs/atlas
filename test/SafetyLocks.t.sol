@@ -34,7 +34,7 @@ contract MockSafetyLocks is SafetyLocks {
         bool isSimulation
     )
         external
-        view
+        pure
         returns (Context memory ctx)
     {
         return _buildContext(dConfig, executionEnvironment, userOpHash, bundler, solverOpCount, isSimulation);
@@ -44,9 +44,9 @@ contract MockSafetyLocks is SafetyLocks {
         _releaseAccountingLock();
     }
 
-    function setLock(address activeEnvironment) external {
+    function setLock(address _activeEnvironment) external {
         lock = Lock({
-            activeEnvironment: activeEnvironment,
+            activeEnvironment: _activeEnvironment,
             phase: ExecutionPhase.Uninitialized,
             callConfig: uint32(0)
         });
@@ -85,7 +85,7 @@ contract SafetyLocksTest is Test {
 
         safetyLocks.initializeLock{ value: msgValue }(executionEnvironment, gasMarker, userOpValue);
 
-        uint256 rawClaims = (gasMarker + 1) * tx.gasprice;
+        uint256 rawClaims = (gasMarker + safetyLocks.FIXED_GAS_OFFSET()) * tx.gasprice;
         uint256 expectedClaims = rawClaims + ((rawClaims * safetyLocks.SURCHARGE_RATE()) / safetyLocks.SURCHARGE_SCALE());
 
         assertEq(safetyLocks.activeEnvironment(), executionEnvironment);

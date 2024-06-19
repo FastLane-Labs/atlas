@@ -129,17 +129,10 @@ contract SwapIntentDAppControl is DAppControl {
     * @param solverOp The SolverOperation that is about to execute
     * @return true if the transfer was successful, false otherwise
     */
-    function _preSolverCall(
-        SolverOperation calldata solverOp,
-        bytes calldata returnData
-    )
-        internal
-        override
-        returns (bool)
-    {
+    function _preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
         address solverTo = solverOp.solver;
         if (solverTo == address(this) || solverTo == _control() || solverTo == ATLAS) {
-            return false;
+            revert();
         }
 
         SwapData memory swapData = abi.decode(returnData, (SwapData));
@@ -147,7 +140,7 @@ contract SwapIntentDAppControl is DAppControl {
         // Optimistically transfer to the solver contract the tokens that the user is selling
         _transferUserERC20(swapData.tokenUserSells, solverTo, swapData.amountUserSells);
 
-        return true;
+        return; // success
     }
 
     /*
@@ -158,12 +151,12 @@ contract SwapIntentDAppControl is DAppControl {
     * @param returnData The return data from the user operation (swap data)
     * @return true if the transfer was successful, false otherwise
     */
-    function _postSolverCall(SolverOperation calldata, bytes calldata returnData) internal override returns (bool) {
+    function _postSolverCall(SolverOperation calldata, bytes calldata returnData) internal override {
         SwapData memory swapData = abi.decode(returnData, (SwapData));
         uint256 buyTokenBalance = ERC20(swapData.tokenUserBuys).balanceOf(address(this));
 
         if (buyTokenBalance < swapData.amountUserBuys) {
-            return false;
+            revert();
         }
 
         // Transfer exactly the amount the user is buying, the bid amount will be transferred
@@ -174,7 +167,7 @@ contract SwapIntentDAppControl is DAppControl {
             ERC20(swapData.tokenUserBuys).safeTransfer(_user(), swapData.amountUserBuys);
         }
 
-        return true;
+        return; // success
     }
 
     /*

@@ -235,7 +235,7 @@ abstract contract Escrow is AtlETH {
             )
         );
 
-        if (!success) revert SolverOperationReverted();
+        if (!success) revert SolverOpReverted();
     }
 
     function _postSolverOpInner(
@@ -380,10 +380,7 @@ abstract contract Escrow is AtlETH {
         uint256 gasCost = (tx.gasprice * gasLimit) + _getCalldataCost(solverOp.data.length);
 
         // Verify that we can lend the solver their tx value
-        if (
-            solverOp.value
-                > address(this).balance - (gasLimit * tx.gasprice > address(this).balance ? 0 : gasLimit * tx.gasprice)
-        ) {
+        if (solverOp.value > address(this).balance) {
             return (1 << uint256(SolverOutcome.CallValueTooHigh), gasLimit);
         }
 
@@ -457,12 +454,14 @@ abstract contract Escrow is AtlETH {
             }
         }
 
-        (bool success, bytes memory data) = address(this).call{gas: gasLimit}(
+        (bool success, bytes memory data) = address(this).call{ gas: gasLimit }(
             abi.encodeCall(IAtlas.solverCall, (ctx, solverOp, solverOp.bidAmount, gasLimit, returnData))
         );
 
+        // The `solverCall()` above should always revert as key.bidFind is always true when it's called in the context
+        // of this function. Therefore `success` should always be false below, and the revert should be unreachable.
         if (success) {
-            revert();
+            revert Unreachable();
         }
 
         if (bytes4(data) == BidFindSuccessful.selector) {
@@ -552,8 +551,9 @@ abstract contract Escrow is AtlETH {
         // Calls the solverCall function, just below this function, which will handle calling solverPreTryCatch and
         // solverPostTryCatch via the ExecutionEnvironment, and in between those two hooks, the actual solver call
         // directly from Atlas to the solver contract (not via the ExecutionEnvironment).
-        (bool success, bytes memory data) =
-            address(this).call{gas : gasLimit}(abi.encodeCall(this.solverCall, (ctx, solverOp, bidAmount, gasLimit, returnData)));
+        (bool success, bytes memory data) = address(this).call{ gas: gasLimit }(
+            abi.encodeCall(this.solverCall, (ctx, solverOp, bidAmount, gasLimit, returnData))
+        );
 
         if (success) {
             // If solverCall() was successful, intentionally leave result unset as 0 indicates success
@@ -567,23 +567,21 @@ abstract contract Escrow is AtlETH {
                 result = 1 << uint256(SolverOutcome.InsufficientEscrow);
             } else if (errorSwitch == PreSolverFailed.selector) {
                 result = 1 << uint256(SolverOutcome.PreSolverFailed);
-            } else if (errorSwitch == SolverOperationReverted.selector) {
+            } else if (errorSwitch == SolverOpReverted.selector) {
                 result = 1 << uint256(SolverOutcome.SolverOpReverted);
             } else if (errorSwitch == PostSolverFailed.selector) {
                 result = 1 << uint256(SolverOutcome.PostSolverFailed);
-            } else if (errorSwitch == IntentUnfulfilled.selector) {
-                result = 1 << uint256(SolverOutcome.IntentUnfulfilled);
-            } else if (errorSwitch == SolverBidUnpaid.selector) {
+            } else if (errorSwitch == BidNotPaid.selector) {
                 result = 1 << uint256(SolverOutcome.BidNotPaid);
             } else if (errorSwitch == InvalidSolver.selector) {
                 result = 1 << uint256(SolverOutcome.InvalidSolver);
             } else if (errorSwitch == BalanceNotReconciled.selector) {
                 result = 1 << uint256(SolverOutcome.BalanceNotReconciled);
+            } else if (errorSwitch == CallbackNotCalled.selector) {
+                result = 1 << uint256(SolverOutcome.CallbackNotCalled);
             } else if (errorSwitch == InvalidEntry.selector) {
                 // DAppControl is attacking solver contract - treat as AlteredControl
                 result = 1 << uint256(SolverOutcome.AlteredControl);
-            } else if (errorSwitch == CallbackNotCalled.selector) {
-                result = 1 << uint256(SolverOutcome.SolverOpReverted);
             } else {
                 result = 1 << uint256(SolverOutcome.EVMError);
             }
@@ -611,26 +609,33 @@ abstract contract Escrow is AtlETH {
     {
         if (msg.sender != address(this)) revert InvalidEntry();
 
+        bool success;
+        bool calledback;
+
         // ------------------------------------- //
         //             Pre-Solver Call           //
         // ------------------------------------- //
+
         solverTracker = _preSolverOpInner(ctx, solverOp, bidAmount, returnData);
 
         // ------------------------------------- //
         //              Solver Call              //
         // ------------------------------------- //
+
         _solverOpInner(ctx, solverOp, bidAmount, gasLimit, returnData);
 
         // ------------------------------------- //
         //            Post-Solver Call           //
         // ------------------------------------- //
+
         solverTracker = _postSolverOpInner(ctx, solverOp, returnData, solverTracker);
 
-        // Verify that the solver repaid their borrowed solverOp.value
-        (, bool success) = _validateBalances();
-        if (!success) {
-            revert BalanceNotReconciled();
-        }
+        // Verify that the solver repaid their borrowed solverOp.value by calling `reconcile()`. If solver did not fully
+        // repay via `reconcile()`, the postSolverCall may still have covered the outstanding debt via `contribute()` so
+        // we do a final repayment check here.
+        (, calledback, success) = _solverLockData();
+        if (!calledback) revert CallbackNotCalled();
+        if (!success && deposits < claims + withdrawals) revert BalanceNotReconciled();
 
         // Check if this is an on-chain, ex post bid search
         if (ctx.bidFind) revert BidFindSuccessful(solverTracker.bidAmount);

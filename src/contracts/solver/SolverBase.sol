@@ -57,6 +57,10 @@ contract SolverBase is ISolverContract {
         if (shortfall < msg.value) shortfall = 0;
         else shortfall -= msg.value;
 
+        if (msg.value > address(this).balance) {
+            IWETH9(WETH_ADDRESS).withdraw(msg.value - address(this).balance);
+        }
+
         IEscrow(_atlas).reconcile{ value: msg.value }(executionEnvironment, solverOpFrom, shortfall);
     }
 
@@ -69,10 +73,8 @@ contract SolverBase is ISolverContract {
         if (bidToken == address(0)) {
             // Pay bid in ETH
 
-            uint256 ethOwed = bidAmount + msg.value;
-
-            if (ethOwed > address(this).balance) {
-                IWETH9(WETH_ADDRESS).withdraw(ethOwed - address(this).balance);
+            if (bidAmount > address(this).balance) {
+                IWETH9(WETH_ADDRESS).withdraw(bidAmount - address(this).balance);
             }
 
             SafeTransferLib.safeTransferETH(executionEnvironment, bidAmount);

@@ -2,6 +2,8 @@
 pragma solidity 0.8.22;
 
 import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
+import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 
 import "src/contracts/types/DAppApprovalTypes.sol";
 import "src/contracts/types/UserCallTypes.sol";
@@ -11,7 +13,7 @@ library CallConfigBuilder {
     function allFalseCallConfig() internal pure returns (CallConfig memory) { }
 }
 
-contract DummyDAppControl is DAppControl {
+contract GasSponsorDAppControl is DAppControl {
     event MEVPaymentSuccess(address bidToken, uint256 bidAmount);
 
     constructor(
@@ -51,20 +53,26 @@ contract DummyDAppControl is DAppControl {
             return;
         }
 
-        (bool shouldRevert) = abi.decode(returnData, (bool));
+        (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
         require(!shouldRevert, "_preSolverCall revert requested");
         if (!returnValue) revert("_preSolverCall returned false");
     }
 
-    function _postSolverCall(SolverOperation calldata, bytes calldata returnData) internal pure virtual override {
+    function _postSolverCall(SolverOperation calldata, bytes calldata returnData) internal virtual override {
         if (returnData.length == 0) {
             return;
         }
 
-        //(bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
-        (bool shouldRevert) = abi.decode(returnData, (bool));
+        uint256 _solverShortfall = IAtlas(ATLAS).shortfall();
+
+        GasSponsorDAppControl(CONTROL).sponsorETHViaExecutionEnvironment(_solverShortfall);
+
+        require(address(this).balance >= _solverShortfall, "Not enough ETH in DAppControl to pay solver shortfall");
+        IAtlas(ATLAS).contribute{ value: _solverShortfall }();
+
+        (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
         require(!shouldRevert, "_postSolverCall revert requested");
-        if (!returnValue) revert("_postSolverCall returned false");
+        return; // success if it gets here
     }
 
     function _allocateValueCall(
@@ -98,5 +106,16 @@ contract DummyDAppControl is DAppControl {
     function userOperationCall(bool shouldRevert, uint256 returnValue) public pure returns (uint256) {
         require(!shouldRevert, "userOperationCall revert requested");
         return returnValue;
+    }
+
+    function sponsorETHViaExecutionEnvironment(uint256 amount) public {
+        // Check caller is active execution environment and this contract is active dapp on atlas
+        require(IAtlas(ATLAS).lock() == msg.sender, "Caller isn't active EE");
+        require(
+            IExecutionEnvironment(msg.sender).getControl() == CONTROL, "Calling EE's control is not this DAppControl"
+        );
+
+        // Send caller requested ETH
+        payable(msg.sender).transfer(amount);
     }
 }

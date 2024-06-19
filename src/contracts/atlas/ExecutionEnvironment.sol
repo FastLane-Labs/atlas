@@ -83,7 +83,7 @@ contract ExecutionEnvironment is Base {
     {
         uint32 config = _config();
 
-        if (userOp.value > address(this).balance) revert AtlasErrors.UserOpValueExceedsBalance();
+        if (userOp.value > msg.value) revert AtlasErrors.UserOpValueExceedsBalance();
 
         // Do not attach extra calldata via `_forward()` if contract called is not dAppControl, as the additional
         // calldata may cause unexpected behaviour in third-party protocols
@@ -151,16 +151,14 @@ contract ExecutionEnvironment is Base {
             bool success;
             bytes memory data = _forward(abi.encodeCall(IDAppControl.preSolverCall, (solverOp, returnData)));
 
-            (success, data) = _control().delegatecall(data);
+            (success,) = _control().delegatecall(data);
 
-            if (!success || !abi.decode(data, (bool))) {
-                revert AtlasErrors.PreSolverFailed();
-            }
+            if (!success) revert AtlasErrors.PreSolverFailed();
         }
 
         // bidValue is not inverted; Higher bids are better; solver must deposit >= bidAmount
         if (!solverTracker.invertsBidValue) {
-            // if invertsBidValue, record floor now
+            // if not invertsBidValue, record floor now
             solverTracker.floor = solverTracker.etherIsBidToken
                 ? address(this).balance
                 : ERC20(solverOp.bidToken).balanceOf(address(this));
@@ -196,15 +194,9 @@ contract ExecutionEnvironment is Base {
         if (_config().needsSolverPostCall()) {
             bytes memory data = _forward(abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData)));
 
-            (success, data) = _control().delegatecall(data);
+            (success,) = _control().delegatecall(data);
 
-            if (!success) {
-                revert AtlasErrors.PostSolverFailed();
-            }
-
-            if (!abi.decode(data, (bool))) {
-                revert AtlasErrors.IntentUnfulfilled();
-            }
+            if (!success) revert AtlasErrors.PostSolverFailed();
         }
 
         // bidValue is not inverted; Higher bids are better; solver must deposit >= bidAmount
@@ -216,15 +208,15 @@ contract ExecutionEnvironment is Base {
         }
 
         // Make sure the numbers add up and that the bid was paid
-        if (solverTracker.floor > solverTracker.ceiling) revert AtlasErrors.SolverBidUnpaid();
+        if (solverTracker.floor > solverTracker.ceiling) revert AtlasErrors.BidNotPaid();
 
         uint256 netBid = solverTracker.ceiling - solverTracker.floor;
 
         // If bids aren't inverted, revert if net amount received is less than the bid
-        if (!solverTracker.invertsBidValue && netBid < solverTracker.bidAmount) revert AtlasErrors.SolverBidUnpaid();
+        if (!solverTracker.invertsBidValue && netBid < solverTracker.bidAmount) revert AtlasErrors.BidNotPaid();
 
         // If bids are inverted, revert if the net amount sent is more than the bid
-        if (solverTracker.invertsBidValue && netBid > solverTracker.bidAmount) revert AtlasErrors.SolverBidUnpaid();
+        if (solverTracker.invertsBidValue && netBid > solverTracker.bidAmount) revert AtlasErrors.BidNotPaid();
 
         // Update the bidAmount to the bid received
         solverTracker.bidAmount = netBid;

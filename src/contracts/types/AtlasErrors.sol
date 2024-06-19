@@ -20,13 +20,12 @@ contract AtlasErrors {
     error UnexpectedNonRevert();
 
     error InvalidSolver();
-    error SolverBidUnpaid();
+    error BidNotPaid();
     error BalanceNotReconciled();
-    error SolverOperationReverted();
+    error SolverOpReverted();
     error AlteredControl();
     error InvalidEntry();
     error CallbackNotCalled();
-    error IntentUnfulfilled();
     error PreSolverFailed();
     error PostSolverFailed();
     error InsufficientEscrow();
@@ -83,6 +82,7 @@ contract AtlasErrors {
     error InvalidDAppControl();
     error DAppNotEnabled();
     error AtlasLockActive();
+    error InvalidSignatory();
 
     // Permit69
     error InvalidEnvironment();

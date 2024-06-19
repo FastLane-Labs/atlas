@@ -23,27 +23,6 @@ abstract contract GasAccounting is SafetyLocks {
         SafetyLocks(_escrowDuration, _verification, _simulator, _surchargeRecipient)
     { }
 
-    /// @notice Validates the balances to determine if the caller (Execution Environment) is in surplus.
-    /// @return calledBack A boolean indicating whether the solver has called back via `reconcile`.
-    /// @return fulfilled A boolean indicating whether the solver's outstanding debt has been repaid.
-    function validateBalances() external view returns (bool calledBack, bool fulfilled) {
-        (calledBack, fulfilled) = _validateBalances();
-    }
-
-    /// @notice Validates the balances to determine if the caller (Execution Environment) is in surplus.
-    /// @return calledBack A boolean indicating whether the solver has called back via `reconcile`.
-    /// @return fulfilled A boolean indicating whether the solver's outstanding debt has been repaid.
-    function _validateBalances() internal view returns (bool calledBack, bool fulfilled) {
-        (, calledBack, fulfilled) = solverLockData();
-        if (!fulfilled) {
-            uint256 _deposits = deposits;
-            // Check if locked.
-            if (_deposits != type(uint256).max) {
-                fulfilled = _deposits >= claims + withdrawals;
-            }
-        }
-    }
-
     /// @notice Contributes ETH to the contract, increasing the deposits if a non-zero value is sent.
     function contribute() external payable {
         if (lock.activeEnvironment != msg.sender) revert InvalidExecutionEnvironment(lock.activeEnvironment);
@@ -103,7 +82,7 @@ abstract contract GasAccounting is SafetyLocks {
             revert WrongPhase();
         }
 
-        (address currentSolver, bool calledBack, bool fulfilled) = solverLockData();
+        (address currentSolver, bool calledBack, bool fulfilled) = _solverLockData();
 
         if (calledBack) revert DoubleReconcile();
 
@@ -141,9 +120,10 @@ abstract contract GasAccounting is SafetyLocks {
     /// @return valid A boolean indicating whether the borrowing operation was successful.
     function _borrow(uint256 amount) internal returns (bool valid) {
         if (amount == 0) return true;
-        uint256 _withdrawals = withdrawals + amount;
-        if (address(this).balance < claims + _withdrawals) return false;
-        withdrawals = _withdrawals;
+        if (address(this).balance < amount) return false;
+
+        withdrawals += amount;
+
         return true;
     }
 
@@ -153,8 +133,8 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param amount The amount of AtlETH to be taken.
     /// @param solverWon A boolean indicating whether the solver won the bid.
     /// @param bidFind Indicates if called in the context of `_getBidAmount` in Escrow.sol (true) or not (false).
-    /// @return isDeficit A boolean indicating whether there is a deficit after the assignment.
-    function _assign(address owner, uint256 amount, bool solverWon, bool bidFind) internal returns (bool isDeficit) {
+    /// @return deficit The amount of AtlETH that was not repaid, if any.
+    function _assign(address owner, uint256 amount, bool solverWon, bool bidFind) internal returns (uint256 deficit) {
         if (amount == 0) {
             accessData[owner].lastAccessedBlock = uint32(block.number); // still save on bidFind
         } else {
@@ -164,18 +144,27 @@ abstract contract GasAccounting is SafetyLocks {
             EscrowAccountAccessData memory aData = accessData[owner];
 
             if (aData.bonded < amt) {
-                // CASE: Not enough bonded balance to cover amount owed
+                // The bonded balance does not cover the amount owed. Check if there is enough unbonding balance to
+                // make up for the missing difference. If not, there is a deficit. Atlas does not consider drawing from
+                // the regular AtlETH balance (not bonded nor unbonding) to cover the remaining deficit because it is
+                // not meant to be used within an Atlas transaction, and must remain independent.
                 EscrowAccountBalance memory bData = _balanceOf[owner];
                 if (bData.unbonding + aData.bonded < amt) {
-                    isDeficit = true;
+                    // The unbonding balance is insufficient to cover the remaining amount owed. There is a deficit. Set
+                    // both bonded and unbonding balances to 0 and adjust the "amount" variable to reflect the amount
+                    // that was actually deducted.
                     amount = uint256(bData.unbonding + aData.bonded); // contribute less to deposits ledger
+                    deficit = uint256(amt) - amount;
                     _balanceOf[owner].unbonding = 0;
                     aData.bonded = 0;
                 } else {
+                    // The unbonding balance is sufficient to cover the remaining amount owed. Draw everything from the
+                    // bonded balance, and adjust the unbonding balance accordingly.
                     _balanceOf[owner].unbonding = bData.unbonding + aData.bonded - amt;
                     aData.bonded = 0;
                 }
             } else {
+                // The bonded balance is sufficient to cover the amount owed.
                 aData.bonded -= amt;
             }
 
@@ -286,8 +275,9 @@ abstract contract GasAccounting is SafetyLocks {
         if (_deposits < _claims + _withdrawals) {
             // CASE: in deficit, subtract from bonded balance
             uint256 amountOwed = _claims + _withdrawals - _deposits;
-            if (_assign(winningSolver, amountOwed, true, false)) {
-                revert InsufficientTotalBalance((_claims + _withdrawals) - deposits);
+            uint256 deficit = _assign(winningSolver, amountOwed, true, false);
+            if (deficit > 0) {
+                revert InsufficientTotalBalance(deficit);
             }
         } else {
             // CASE: in surplus, add to bonded balance
