@@ -85,7 +85,7 @@ contract GasAccountingTest is Test {
     }
 
     function getInitialClaims(uint256 gasMarker) public view returns (uint256 claims) {
-        uint256 rawClaims = (gasMarker + 1) * tx.gasprice;
+        uint256 rawClaims = (gasMarker + mockGasAccounting.FIXED_GAS_OFFSET()) * tx.gasprice;
         claims = rawClaims + ((rawClaims * mockGasAccounting.SURCHARGE_RATE()) / mockGasAccounting.SURCHARGE_SCALE());
     }
 
