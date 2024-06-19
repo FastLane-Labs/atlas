@@ -29,7 +29,7 @@ contract DAppIntegration {
     mapping(address => NonceTracker) public userNonceTrackers;
     mapping(address => NonceTracker) public dAppNonceTrackers;
 
-    // keccak256(from, bitmapNonceIndex) => nonceBitmap
+    // keccak256(from, isUser, bitmapNonceIndex) => nonceBitmap
     mapping(bytes32 => NonceBitmap) public nonceBitmaps;
 
     // NOTE: To prevent builder censorship, dApp nonces can be

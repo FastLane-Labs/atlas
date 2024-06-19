@@ -233,7 +233,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         uint256 bitmap = (2 ** noncesUsed - 1) << 8;
         uint256 highestUsedNonceInBitmap = uint256(noncesUsed);
         uint256 nonceBitmapSlot = highestUsedNonceInBitmap | bitmap;
-        bytes32 bitmapKey = keccak256(abi.encode(userEOA, 1));
+        bytes32 bitmapKey = keccak256(abi.encode(userEOA, true, 1));
 
         // Only concerned with non-seq user nonces in this test
         defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(false).withDappNoncesSequential(true).build());
@@ -308,10 +308,10 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         uint256 almostFullBitmapSlot = uint256(239) | (uint256(type(uint240).max - (2 ** 239)) << 8);
         uint256 fullBitmapSlot = uint256(240) | (uint256(type(uint240).max) << 8);
 
-        bytes32 bitmap1Key = keccak256(abi.encode(userEOA, 1));
-        bytes32 bitmap2Key = keccak256(abi.encode(userEOA, 2));
-        bytes32 bitmap3Key = keccak256(abi.encode(userEOA, 3));
-        bytes32 bitmap4Key = keccak256(abi.encode(userEOA, 4));
+        bytes32 bitmap1Key = keccak256(abi.encode(userEOA, true, 1));
+        bytes32 bitmap2Key = keccak256(abi.encode(userEOA, true, 2));
+        bytes32 bitmap3Key = keccak256(abi.encode(userEOA, true, 3));
+        bytes32 bitmap4Key = keccak256(abi.encode(userEOA, true, 4));
 
         // Only concerned with non-seq user nonces in this test
         defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(false).withDappNoncesSequential(true).build());
@@ -381,10 +381,10 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         uint8 highestUsedNonce;
 
         uint256 fullBitmapSlot = uint256(240) | (uint256(type(uint240).max) << 8);
-        bytes32 bitmap1Key = keccak256(abi.encode(userEOA, 1));
-        bytes32 bitmap2Key = keccak256(abi.encode(userEOA, 2));
-        bytes32 bitmap3Key = keccak256(abi.encode(userEOA, 3));
-        bytes32 bitmap4Key = keccak256(abi.encode(userEOA, 4));
+        bytes32 bitmap1Key = keccak256(abi.encode(userEOA, true, 1));
+        bytes32 bitmap2Key = keccak256(abi.encode(userEOA, true, 2));
+        bytes32 bitmap3Key = keccak256(abi.encode(userEOA, true, 3));
+        bytes32 bitmap4Key = keccak256(abi.encode(userEOA, true, 4));
 
         // Only concerned with non-seq user nonces in this test
         defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(false).withDappNoncesSequential(true).build());

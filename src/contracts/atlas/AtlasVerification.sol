@@ -401,7 +401,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         returns (bool validNonce)
     {
         NonceTracker memory nonceTracker = userNonceTrackers[user];
-        (validNonce, nonceTracker) = _handleNonces(nonceTracker, user, nonce, sequential);
+        (validNonce, nonceTracker) = _handleNonces(nonceTracker, user, true, nonce, sequential);
         if (validNonce && !isSimulation) {
             // Update storage only if valid and not in simulation
             userNonceTrackers[user] = nonceTracker;
@@ -425,7 +425,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         returns (bool validNonce)
     {
         NonceTracker memory nonceTracker = dAppNonceTrackers[dAppSignatory];
-        (validNonce, nonceTracker) = _handleNonces(nonceTracker, dAppSignatory, nonce, sequential);
+        (validNonce, nonceTracker) = _handleNonces(nonceTracker, dAppSignatory, false, nonce, sequential);
         if (validNonce && !isSimulation) {
             // Update storage only if valid and not in simulation
             dAppNonceTrackers[dAppSignatory] = nonceTracker;
@@ -436,6 +436,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
     /// non-sequential nonce systems.
     /// @param nonceTracker The NonceTracker of the account to verify the nonce for.
     /// @param account The address of the account to verify the nonce for.
+    /// @param isUser A boolean indicating if the account is a user (true) or a dApp (false).
     /// @param nonce The nonce to verify.
     /// @param sequential A boolean indicating if the nonce mode is sequential (true) or not (false)
     /// @return A boolean indicating if the nonce is valid.
@@ -443,6 +444,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
     function _handleNonces(
         NonceTracker memory nonceTracker,
         address account,
+        bool isUser,
         uint256 nonce,
         bool sequential
     )
@@ -476,7 +478,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
             uint256 bitmapIndex = ((nonce - 1) / _NONCES_PER_BITMAP) + 1;
             uint256 bitmapNonce = ((nonce - 1) % _NONCES_PER_BITMAP);
 
-            bytes32 bitmapKey = keccak256(abi.encode(account, bitmapIndex));
+            bytes32 bitmapKey = keccak256(abi.encode(account, isUser, bitmapIndex));
             NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
             uint256 bitmap = uint256(nonceBitmap.bitmap);
 
@@ -499,7 +501,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
             if (bitmap == _FULL_BITMAP) {
                 // Update highestFullNonSeqBitmap if necessary
                 if (bitmapIndex == nonceTracker.highestFullNonSeqBitmap + 1) {
-                    nonceTracker = _incrementHighestFullNonSeqBitmap(nonceTracker, account);
+                    nonceTracker = _incrementHighestFullNonSeqBitmap(nonceTracker, account, isUser);
                 }
             }
 
@@ -515,11 +517,13 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
     /// specific account.
     /// @param account The address of the account for which the nonce tracking is being updated. This is used to
     /// generate a unique key for accessing the correct bitmap from a mapping.
+    /// @param isUser A boolean indicating if the account is a user (true) or a dApp (false).
     /// @return nonceTracker The updated `NonceTracker` structure with the `highestFullNonSeqBitmap` field modified to
     /// reflect the highest index of a bitmap that is not fully utilized.
     function _incrementHighestFullNonSeqBitmap(
         NonceTracker memory nonceTracker,
-        address account
+        address account,
+        bool isUser
     )
         internal
         view
@@ -531,7 +535,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
                 ++nonceTracker.highestFullNonSeqBitmap;
             }
             uint256 bitmapIndex = uint256(nonceTracker.highestFullNonSeqBitmap) + 1;
-            bytes32 bitmapKey = keccak256(abi.encode(account, bitmapIndex));
+            bytes32 bitmapKey = keccak256(abi.encode(account, isUser, bitmapIndex));
             bitmap = uint256(nonceBitmaps[bitmapKey].bitmap);
         } while (bitmap == _FULL_BITMAP);
 
@@ -682,7 +686,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
     /// @return The next nonce for the given user.
     function getUserNextNonce(address user, bool sequential) external view returns (uint256) {
         NonceTracker memory nonceTracker = userNonceTrackers[user];
-        return _getNextNonce(nonceTracker, user, sequential);
+        return _getNextNonce(nonceTracker, user, true, sequential);
     }
 
     /// @notice Returns the next nonce for the given dApp signatory, in sequential or non-sequential mode.
@@ -691,17 +695,19 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
     /// @return The next nonce for the given user.
     function getDAppNextNonce(address dApp, bool sequential) external view returns (uint256) {
         NonceTracker memory nonceTracker = dAppNonceTrackers[dApp];
-        return _getNextNonce(nonceTracker, dApp, sequential);
+        return _getNextNonce(nonceTracker, dApp, false, sequential);
     }
 
     /// @notice Returns the next nonce for the given account, in sequential or non-sequential mode.
     /// @param nonceTracker The NonceTracker of the account for which to retrieve the next nonce.
     /// @param account The address of the account for which to retrieve the next nonce.
+    /// @param isUser A boolean indicating if the account is a user (true) or a dApp (false).
     /// @param sequential A boolean indicating if the nonce should be sequential (true) or non-sequential (false).
     /// @return The next nonce for the given account.
     function _getNextNonce(
         NonceTracker memory nonceTracker,
         address account,
+        bool isUser,
         bool sequential
     )
         internal
@@ -719,7 +725,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
                 ++n;
             }
             // Non-sequential bitmaps start at index 1. I.e. accounts start with bitmap 0 = HighestFullNonSeqBitmap
-            bytes32 bitmapKey = keccak256(abi.encode(account, nonceTracker.highestFullNonSeqBitmap + n));
+            bytes32 bitmapKey = keccak256(abi.encode(account, isUser, nonceTracker.highestFullNonSeqBitmap + n));
             NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
             bitmap = uint256(nonceBitmap.bitmap);
         } while (bitmap == _FULL_BITMAP);
@@ -732,22 +738,24 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
     /// function is specific to user nonces.
     function manuallyUpdateUserNonSeqNonceTracker() external {
         NonceTracker memory nonceTracker = userNonceTrackers[msg.sender];
-        userNonceTrackers[msg.sender] = _manuallyUpdateNonSeqNonceTracker(nonceTracker, msg.sender);
+        userNonceTrackers[msg.sender] = _manuallyUpdateNonSeqNonceTracker(nonceTracker, msg.sender, true);
     }
 
     /// @notice Manually updates the highestFullNonSeqBitmap of the caller to reflect the real full bitmap. This
     /// function is specific to dApp nonces.
     function manuallyUpdateDAppNonSeqNonceTracker() external {
         NonceTracker memory nonceTracker = dAppNonceTrackers[msg.sender];
-        dAppNonceTrackers[msg.sender] = _manuallyUpdateNonSeqNonceTracker(nonceTracker, msg.sender);
+        dAppNonceTrackers[msg.sender] = _manuallyUpdateNonSeqNonceTracker(nonceTracker, msg.sender, false);
     }
 
     /// @notice Manually updates the highestFullNonSeqBitmap of an account to reflect the real full bitmap.
     /// @param nonceTracker The NonceTracker of the account for which the update should be made.
     /// @param account The address of the account for which the update should be made.
+    /// @param isUser A boolean indicating if the account is a user (true) or a dApp (false).
     function _manuallyUpdateNonSeqNonceTracker(
         NonceTracker memory nonceTracker,
-        address account
+        address account,
+        bool isUser
     )
         internal
         view
@@ -761,7 +769,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
             nonceIndexToCheck > nonceTracker.highestFullNonSeqBitmap;
             nonceIndexToCheck--
         ) {
-            bytes32 bitmapKey = keccak256(abi.encode(account, nonceIndexToCheck));
+            bytes32 bitmapKey = keccak256(abi.encode(account, isUser, nonceIndexToCheck));
             nonceBitmap = nonceBitmaps[bitmapKey];
 
             if (nonceBitmap.bitmap == _FULL_BITMAP) {
