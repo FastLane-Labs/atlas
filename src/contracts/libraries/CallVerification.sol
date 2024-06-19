@@ -15,18 +15,12 @@ bytes32 constant USER_TYPEHASH_TRUSTED = keccak256(
     "UserOperation(address from,address to,address dapp,address control,uint32 callConfig,address sessionKey)"
 );
 
-bytes32 constant USER_TYPEHASH_FULL = keccak256(
-    "UserOperation(address from,address to,uint256 value,uint256 gas,uint256 maxFeePerGas,uint256 nonce,uint256 deadline,address dapp,address control,uint32 callConfig,address sessionKey,bytes data,bytes signature)"
-);
-
 enum UserOperationHashType {
     // this is the default hash type, used for most purposes.
     DEFAULT,
     // this hash type is used when the user operation is trusted
     // and the user operation hash is used as a part of the call chain hash.
-    TRUSTED,
-    // this hash type is used for ERC-1271 signature verification.
-    FULL
+    TRUSTED
 }
 
 library CallVerification {
@@ -50,25 +44,6 @@ library CallVerification {
                     userOp.control,
                     userOp.callConfig,
                     userOp.sessionKey
-                )
-            );
-        } else if (hashType == UserOperationHashType.FULL) {
-            userOpHash = keccak256(
-                abi.encode(
-                    USER_TYPEHASH_FULL,
-                    userOp.from,
-                    userOp.to,
-                    userOp.value,
-                    userOp.gas,
-                    userOp.maxFeePerGas,
-                    userOp.nonce,
-                    userOp.deadline,
-                    userOp.dapp,
-                    userOp.control,
-                    userOp.callConfig,
-                    userOp.sessionKey,
-                    userOp.data,
-                    userOp.signature
                 )
             );
         } else {
