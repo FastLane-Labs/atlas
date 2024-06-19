@@ -125,7 +125,8 @@ contract Atlas is Escrow, Factory {
         }
 
         if (auctionWon) {
-            // when auctionWon, key.solverOutcome contains the index of the winning solver (to prevent Stack Too Deep errors)
+            // when auctionWon, key.solverOutcome contains the index of the winning solver (to prevent Stack Too Deep
+            // errors)
             winningSolver = solverOps[key.solverOutcome].from;
         } else {
             // when !auctionWon, key.solverOutcome contains the error code of the last solver
