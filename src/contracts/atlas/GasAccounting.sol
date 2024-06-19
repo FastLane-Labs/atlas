@@ -126,8 +126,8 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param amount The amount of AtlETH to be taken.
     /// @param solverWon A boolean indicating whether the solver won the bid.
     /// @param bidFind Indicates if called in the context of `_getBidAmount` in Escrow.sol (true) or not (false).
-    /// @return isDeficit A boolean indicating whether there is a deficit after the assignment.
-    function _assign(address owner, uint256 amount, bool solverWon, bool bidFind) internal returns (bool isDeficit) {
+    /// @return deficit The amount of AtlETH that was not repaid, if any.
+    function _assign(address owner, uint256 amount, bool solverWon, bool bidFind) internal returns (uint256 deficit) {
         if (amount == 0) {
             accessData[owner].lastAccessedBlock = uint32(block.number); // still save on bidFind
         } else {
@@ -146,8 +146,8 @@ abstract contract GasAccounting is SafetyLocks {
                     // The unbonding balance is insufficient to cover the remaining amount owed. There is a deficit. Set
                     // both bonded and unbonding balances to 0 and adjust the "amount" variable to reflect the amount
                     // that was actually deducted.
-                    isDeficit = true;
                     amount = uint256(bData.unbonding + aData.bonded); // contribute less to deposits ledger
+                    deficit = uint256(amt) - amount;
                     _balanceOf[owner].unbonding = 0;
                     aData.bonded = 0;
                 } else {
@@ -268,8 +268,9 @@ abstract contract GasAccounting is SafetyLocks {
         if (_deposits < _claims + _withdrawals) {
             // CASE: in deficit, subtract from bonded balance
             uint256 amountOwed = _claims + _withdrawals - _deposits;
-            if (_assign(winningSolver, amountOwed, true, false)) {
-                revert InsufficientTotalBalance((_claims + _withdrawals) - deposits);
+            uint256 deficit = _assign(winningSolver, amountOwed, true, false);
+            if (deficit > 0) {
+                revert InsufficientTotalBalance(deficit);
             }
         } else {
             // CASE: in surplus, add to bonded balance
