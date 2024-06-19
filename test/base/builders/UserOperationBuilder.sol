@@ -46,18 +46,18 @@ contract UserOperationBuilder is Test {
 
     function withNonce(address atlasVerification) public returns (UserOperationBuilder) {
         // Assumes sequential = false. Use withNonce(address, bool) to specify sequential.
-        userOperation.nonce = IAtlasVerification(atlasVerification).getNextNonce(userOperation.from, false);
+        userOperation.nonce = IAtlasVerification(atlasVerification).getUserNextNonce(userOperation.from, false);
         return this;
     }
 
     function withNonce(address atlasVerification, bool sequential) public returns (UserOperationBuilder) {
-        userOperation.nonce = IAtlasVerification(atlasVerification).getNextNonce(userOperation.from, sequential);
+        userOperation.nonce = IAtlasVerification(atlasVerification).getUserNextNonce(userOperation.from, sequential);
         return this;
     }
 
     function withNonce(address atlasVerification, address account) public returns (UserOperationBuilder) {
         // Assumes sequential = false. Use withNonce(address, address, bool) to specify sequential.
-        userOperation.nonce = IAtlasVerification(atlasVerification).getNextNonce(account, false);
+        userOperation.nonce = IAtlasVerification(atlasVerification).getUserNextNonce(account, false);
         return this;
     }
 
@@ -69,7 +69,7 @@ contract UserOperationBuilder is Test {
         public
         returns (UserOperationBuilder)
     {
-        userOperation.nonce = IAtlasVerification(atlasVerification).getNextNonce(account, sequential);
+        userOperation.nonce = IAtlasVerification(atlasVerification).getUserNextNonce(account, sequential);
         return this;
     }
 
@@ -120,7 +120,7 @@ contract UserOperationBuilder is Test {
         return this;
     }
 
-    function build() public returns (UserOperation memory) {
+    function build() public view returns (UserOperation memory) {
         return userOperation;
     }
 

@@ -355,8 +355,11 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         // DApps are encouraged to rely on the deadline parameter.
         if (!skipDAppOpChecks) {
             // When not in a simulation, nonces are stored even if the metacall fails, to prevent replay attacks.
-            if (!_handleNonces(dAppOp.from, dAppOp.nonce, dConfig.callConfig.needsSequentialDAppNonces(), isSimulation))
-            {
+            if (
+                !_handleDAppNonces(
+                    dAppOp.from, dAppOp.nonce, dConfig.callConfig.needsSequentialDAppNonces(), isSimulation
+                )
+            ) {
                 return ValidCallsResult.InvalidDAppNonce;
             }
         }
@@ -381,39 +384,83 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         return ValidCallsResult.Valid;
     }
 
-    /// @notice The _handleNonces internal function handles the verification of nonces for both sequential and
+    /// @notice The _handleUserNonces internal function handles the verification of user nonces for both sequential and
     /// non-sequential nonce systems.
-    /// @param account The address of the account to verify the nonce for.
+    /// @param user The address of the user to verify the nonce for.
     /// @param nonce The nonce to verify.
     /// @param sequential A boolean indicating if the nonce mode is sequential (true) or not (false)
     /// @param isSimulation A boolean indicating if the execution is a simulation.
-    /// @return A boolean indicating if the nonce is valid.
-    function _handleNonces(
-        address account,
+    /// @return validNonce A boolean indicating if the nonce is valid.
+    function _handleUserNonces(
+        address user,
         uint256 nonce,
         bool sequential,
         bool isSimulation
     )
         internal
-        returns (bool)
+        returns (bool validNonce)
+    {
+        NonceTracker memory nonceTracker = userNonceTrackers[user];
+        (validNonce, nonceTracker) = _handleNonces(nonceTracker, user, nonce, sequential);
+        if (validNonce && !isSimulation) {
+            // Update storage only if valid and not in simulation
+            userNonceTrackers[user] = nonceTracker;
+        }
+    }
+
+    /// @notice The _handleDAppNonces internal function handles the verification of dApp signatory nonces for both
+    /// sequential and non-sequential nonce systems.
+    /// @param dAppSignatory The address of the dApp to verify the nonce for.
+    /// @param nonce The nonce to verify.
+    /// @param sequential A boolean indicating if the nonce mode is sequential (true) or not (false)
+    /// @param isSimulation A boolean indicating if the execution is a simulation.
+    /// @return validNonce A boolean indicating if the nonce is valid.
+    function _handleDAppNonces(
+        address dAppSignatory,
+        uint256 nonce,
+        bool sequential,
+        bool isSimulation
+    )
+        internal
+        returns (bool validNonce)
+    {
+        NonceTracker memory nonceTracker = dAppNonceTrackers[dAppSignatory];
+        (validNonce, nonceTracker) = _handleNonces(nonceTracker, dAppSignatory, nonce, sequential);
+        if (validNonce && !isSimulation) {
+            // Update storage only if valid and not in simulation
+            dAppNonceTrackers[dAppSignatory] = nonceTracker;
+        }
+    }
+
+    /// @notice The _handleNonces internal function handles the verification of nonces for both sequential and
+    /// non-sequential nonce systems.
+    /// @param nonceTracker The NonceTracker of the account to verify the nonce for.
+    /// @param account The address of the account to verify the nonce for.
+    /// @param nonce The nonce to verify.
+    /// @param sequential A boolean indicating if the nonce mode is sequential (true) or not (false)
+    /// @return A boolean indicating if the nonce is valid.
+    /// @return The updated NonceTracker.
+    function _handleNonces(
+        NonceTracker memory nonceTracker,
+        address account,
+        uint256 nonce,
+        bool sequential
+    )
+        internal
+        returns (bool, NonceTracker memory)
     {
         if (nonce > type(uint128).max - 1) {
-            return false;
+            return (false, nonceTracker);
         }
 
         // 0 Nonces are not allowed. Nonces start at 1 for both sequential and non-sequential.
-        if (nonce == 0) return false;
-
-        NonceTracker memory nonceTracker = nonceTrackers[account];
+        if (nonce == 0) return (false, nonceTracker);
 
         if (sequential) {
             // SEQUENTIAL NONCES
 
             // Nonces must increase by 1 if sequential
-            if (nonce != nonceTracker.lastUsedSeqNonce + 1) return false;
-
-            // Return true here if simulation to avoid storing nonce updates
-            if (isSimulation) return true;
+            if (nonce != nonceTracker.lastUsedSeqNonce + 1) return (false, nonceTracker);
 
             ++nonceTracker.lastUsedSeqNonce;
         } else {
@@ -435,11 +482,8 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
 
             // Check if nonce has already been used
             if (_nonceUsedInBitmap(bitmap, bitmapNonce)) {
-                return false;
+                return (false, nonceTracker);
             }
-
-            // Return true here if simulation to avoid storing nonce updates
-            if (isSimulation) return true;
 
             // Mark nonce as used in bitmap
             bitmap |= 1 << bitmapNonce;
@@ -462,8 +506,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
             nonceBitmaps[bitmapKey] = nonceBitmap;
         }
 
-        nonceTrackers[account] = nonceTracker;
-        return true;
+        return (true, nonceTracker);
     }
 
     /// @notice Increments the `highestFullNonSeqBitmap` of a given `nonceTracker` for the specified `account` until a
@@ -587,7 +630,8 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         // which builders or validators may be able to profit via censorship.
         // DApps are encouraged to rely on the deadline parameter
         // to prevent replay attacks.
-        if (!_handleNonces(userOp.from, userOp.nonce, dConfig.callConfig.needsSequentialUserNonces(), isSimulation)) {
+        if (!_handleUserNonces(userOp.from, userOp.nonce, dConfig.callConfig.needsSequentialUserNonces(), isSimulation))
+        {
             return ValidCallsResult.UserNonceInvalid;
         }
 
@@ -632,13 +676,38 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         payload = _hashTypedDataV4(_getUserOpHash(userOp));
     }
 
+    /// @notice Returns the next nonce for the given user, in sequential or non-sequential mode.
+    /// @param user The address of the account for which to retrieve the next nonce.
+    /// @param sequential A boolean indicating if the nonce should be sequential (true) or non-sequential (false).
+    /// @return The next nonce for the given user.
+    function getUserNextNonce(address user, bool sequential) external view returns (uint256) {
+        NonceTracker memory nonceTracker = userNonceTrackers[user];
+        return _getNextNonce(nonceTracker, user, sequential);
+    }
+
+    /// @notice Returns the next nonce for the given dApp signatory, in sequential or non-sequential mode.
+    /// @param dApp The address of the dApp for which to retrieve the next nonce.
+    /// @param sequential A boolean indicating if the nonce should be sequential (true) or non-sequential (false).
+    /// @return The next nonce for the given user.
+    function getDAppNextNonce(address dApp, bool sequential) external view returns (uint256) {
+        NonceTracker memory nonceTracker = dAppNonceTrackers[dApp];
+        return _getNextNonce(nonceTracker, dApp, sequential);
+    }
+
     /// @notice Returns the next nonce for the given account, in sequential or non-sequential mode.
+    /// @param nonceTracker The NonceTracker of the account for which to retrieve the next nonce.
     /// @param account The address of the account for which to retrieve the next nonce.
     /// @param sequential A boolean indicating if the nonce should be sequential (true) or non-sequential (false).
     /// @return The next nonce for the given account.
-    function getNextNonce(address account, bool sequential) external view returns (uint256) {
-        NonceTracker memory nonceTracker = nonceTrackers[account];
-
+    function _getNextNonce(
+        NonceTracker memory nonceTracker,
+        address account,
+        bool sequential
+    )
+        internal
+        view
+        returns (uint256)
+    {
         if (sequential) {
             return nonceTracker.lastUsedSeqNonce + 1;
         }
@@ -659,9 +728,31 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         return ((nonceTracker.highestFullNonSeqBitmap + n - 1) * 240) + remainder;
     }
 
-    /// @notice Manually updates the highestFullNonSeqBitmap of the caller to reflect the real full bitmap.
-    function manuallyUpdateNonSeqNonceTracker() external {
-        NonceTracker memory nonceTracker = nonceTrackers[msg.sender];
+    /// @notice Manually updates the highestFullNonSeqBitmap of the caller to reflect the real full bitmap. This
+    /// function is specific to user nonces.
+    function manuallyUpdateUserNonSeqNonceTracker() external {
+        NonceTracker memory nonceTracker = userNonceTrackers[msg.sender];
+        userNonceTrackers[msg.sender] = _manuallyUpdateNonSeqNonceTracker(nonceTracker, msg.sender);
+    }
+
+    /// @notice Manually updates the highestFullNonSeqBitmap of the caller to reflect the real full bitmap. This
+    /// function is specific to dApp nonces.
+    function manuallyUpdateDAppNonSeqNonceTracker() external {
+        NonceTracker memory nonceTracker = dAppNonceTrackers[msg.sender];
+        dAppNonceTrackers[msg.sender] = _manuallyUpdateNonSeqNonceTracker(nonceTracker, msg.sender);
+    }
+
+    /// @notice Manually updates the highestFullNonSeqBitmap of an account to reflect the real full bitmap.
+    /// @param nonceTracker The NonceTracker of the account for which the update should be made.
+    /// @param account The address of the account for which the update should be made.
+    function _manuallyUpdateNonSeqNonceTracker(
+        NonceTracker memory nonceTracker,
+        address account
+    )
+        internal
+        view
+        returns (NonceTracker memory)
+    {
         NonceBitmap memory nonceBitmap;
 
         // Checks the next 10 bitmaps for a higher full bitmap
@@ -670,7 +761,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
             nonceIndexToCheck > nonceTracker.highestFullNonSeqBitmap;
             nonceIndexToCheck--
         ) {
-            bytes32 bitmapKey = keccak256(abi.encode(msg.sender, nonceIndexToCheck));
+            bytes32 bitmapKey = keccak256(abi.encode(account, nonceIndexToCheck));
             nonceBitmap = nonceBitmaps[bitmapKey];
 
             if (nonceBitmap.bitmap == _FULL_BITMAP) {
@@ -679,7 +770,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
             }
         }
 
-        nonceTrackers[msg.sender] = nonceTracker;
+        return nonceTracker;
     }
 
     /// @notice Checks if a nonce is used in a 256-bit bitmap.

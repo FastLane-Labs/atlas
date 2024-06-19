@@ -26,7 +26,8 @@ contract DAppIntegration {
     address public immutable ATLAS;
 
     // from => nonceTracker
-    mapping(address => NonceTracker) public nonceTrackers;
+    mapping(address => NonceTracker) public userNonceTrackers;
+    mapping(address => NonceTracker) public dAppNonceTrackers;
 
     // keccak256(from, bitmapNonceIndex) => nonceBitmap
     mapping(bytes32 => NonceBitmap) public nonceBitmaps;
