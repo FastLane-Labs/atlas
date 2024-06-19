@@ -69,6 +69,9 @@ contract Atlas is Escrow, Factory {
         // Initialize the lock
         _setAtlasLock(executionEnvironment, gasMarker, userOp.value);
 
+        // userOpHash has already been calculated and verified in validateCalls at this point, so rather
+        // than re-calculate it, we can simply take it from the dAppOp here. It's worth noting that this will
+        // be either a TRUSTED or DEFAULT hash, depending on the allowsTrustedOpHash setting.
         try this.execute(dConfig, userOp, solverOps, executionEnvironment, msg.sender, dAppOp.userOpHash) returns (
             bool _auctionWon, uint256 winningSolverIndex
         ) {
