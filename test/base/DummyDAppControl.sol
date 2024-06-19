@@ -60,9 +60,9 @@ contract DummyDAppControl is DAppControl {
             return true;
         }
 
-        (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
+        (bool shouldRevert) = abi.decode(returnData, (bool));
         require(!shouldRevert, "_preSolverCall revert requested");
-        return returnValue;
+        return shouldRevert;
     }
 
     function _postSolverCall(
@@ -79,9 +79,10 @@ contract DummyDAppControl is DAppControl {
             return true;
         }
 
-        (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
+        //(bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
+        (bool shouldRevert) = abi.decode(returnData, (bool));
         require(!shouldRevert, "_postSolverCall revert requested");
-        return returnValue;
+        return shouldRevert;
     }
 
     function _allocateValueCall(

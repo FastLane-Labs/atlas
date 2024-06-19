@@ -321,9 +321,10 @@ contract EscrowTest is AtlasBaseTest {
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
             defaultCallConfig()
                 .withTrackPreOpsReturnData(true)
-                .withTrackUserReturnData(true)
+                .withTrackUserReturnData(false)
                 .withRequirePreOps(true)
                 .withPostSolver(true)
+                .withRequireFulfillment(true)
                 .build()
         );
         uint256 result = (1 << uint256(SolverOutcome.IntentUnfulfilled));

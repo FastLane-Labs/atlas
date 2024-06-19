@@ -457,7 +457,7 @@ abstract contract Escrow is AtlETH {
             }
         }
 
-        (bool success, bytes memory data) = address(this).call(
+        (bool success, bytes memory data) = address(this).call{gas: gasLimit}(
             abi.encodeCall(IAtlas.solverCall, (ctx, solverOp, solverOp.bidAmount, gasLimit, returnData))
         );
 
@@ -553,7 +553,7 @@ abstract contract Escrow is AtlETH {
         // solverPostTryCatch via the ExecutionEnvironment, and in between those two hooks, the actual solver call
         // directly from Atlas to the solver contract (not via the ExecutionEnvironment).
         (bool success, bytes memory data) =
-            address(this).call(abi.encodeCall(this.solverCall, (ctx, solverOp, bidAmount, gasLimit, returnData)));
+            address(this).call{gas : gasLimit}(abi.encodeCall(this.solverCall, (ctx, solverOp, bidAmount, gasLimit, returnData)));
 
         if (success) {
             // If solverCall() was successful, intentionally leave result unset as 0 indicates success
