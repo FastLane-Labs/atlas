@@ -563,7 +563,9 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp userNonces
 
-        bool signatureValid = SignatureChecker.isValidSignatureNow(userOp.from, _hashTypedDataV4(_getUserOpHash(userOp)), userOp.signature);
+        bool signatureValid = SignatureChecker.isValidSignatureNow(
+            userOp.from, _hashTypedDataV4(_getUserOpHash(userOp)), userOp.signature
+        );
 
         bool userIsBundler = userOp.from == msgSender;
         bool hasNoSignature = userOp.signature.length == 0;
