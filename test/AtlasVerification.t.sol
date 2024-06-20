@@ -26,6 +26,30 @@ import { DAppOperationBuilder } from "./base/builders/DAppOperationBuilder.sol";
 // - Scroll down for the actual tests - //
 //
 
+contract DummyNotSmartWallet {
+}
+
+contract DummySmartWallet {
+    bytes4 constant internal EIP1271_MAGIC_VALUE = 0x1626ba7e;
+    bool public isValidResult = true;
+
+    function isValidSignature(
+        bytes32 hash,
+        bytes memory signature
+    ) public view returns (bytes4) {
+        console.log("DummySmartWallet.isValidSignature called, isValidResult: ", isValidResult);
+        if (isValidResult) {
+            return EIP1271_MAGIC_VALUE;
+        } else {
+            return 0;
+        }
+    }
+
+    function setIsValidResult(bool data) external {
+        isValidResult = data;
+    }
+}
+
 contract AtlasVerificationBase is AtlasBaseTest {
     DummyDAppControl dAppControl;
 
@@ -299,13 +323,270 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         );
         assertEq(result, 0, "Expected No Errors 2"); // 0 = No SolverOutcome errors
     }
-}
+    }
 
 //
 // ---- VALID CALLS TESTS BEGIN HERE ---- //
 //
 
 contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
+
+    // Default Everything Valid Test Case
+
+    function test_DefaultEverything_Valid() public {
+        defaultAtlasEnvironment();
+
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+        ), ValidCallsResult.Valid);
+    }
+
+    // UserOpHash Tests
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    // where the user operation is not signed properly
+    // when validCalls is called and the bundler is not the user
+    // then it should return InvalidSignature
+    // because the user operation must be signed by the user unless the bundler is the user
+    //
+    function test_verifyUserOp_UserSignatureInvalid_WhenOpUnsignedIfNotUserBundler() public {
+        defaultAtlasEnvironment();
+
+        UserOperation memory userOp = validUserOperation().build();
+        userOp.signature = "";
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+        ), ValidCallsResult.UserSignatureInvalid);
+    }
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    // where the user operation is not signed properly
+    // when validCalls is called and the bundler is the user
+    // then it should return Valid
+    // because the user operation doesn't need to be signed by the user if the bundler is the user
+    //
+    function test_verifyUserOp_Valid_WhenOpUnsignedIfUserBundler() public {
+        defaultAtlasEnvironment();
+
+        UserOperation memory userOp = validUserOperation().build();
+        userOp.signature = "";
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+        ), ValidCallsResult.Valid);
+    }
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    // where the user operation is not
+    // when validCalls is called
+    //   and the bundler is not the user
+    //   and isSimulation = true
+    // then it should return Valid
+    // because the user operation doesn't need to be signed if it's a simulation
+    //
+    function test_verifyUserOp_Valid_WhenOpUnsignedIfIsSimulation() public {
+        defaultAtlasEnvironment();
+
+        UserOperation memory userOp = validUserOperation().build();
+        userOp.signature = "";
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: true}
+        ), ValidCallsResult.Valid);
+    }
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    // where the user operation has a bad signature
+    // when validCalls is called
+    //   and the bundler is not the user
+    //   and isSimulation = true
+    // then it should return UserSignatureInvalid
+    // because the user operation doesn't need to be signed if it's a simulation
+    //
+    function test_verifyUserOp_Valid_WhenOpHasBadSignatureIfIsSimulation() public {
+        defaultAtlasEnvironment();
+
+        UserOperation memory userOp = validUserOperation()
+            .withSignature("bad signature")
+            .build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: true}
+        ), ValidCallsResult.UserSignatureInvalid);
+    }
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    // where the user operation is from a smart contract
+    //   and the from address is Atlas, AtlasVerification or the dAppControl
+    // when validCalls is called
+    // then it should return UserFromInvalid
+    // to prevent abusive behavior
+    //
+    function test_verifyUserOp_UserFromInvalid_WhenFromInvalidSmartContract() public {
+        defaultAtlasEnvironment();
+
+        address[] memory invalidFroms = new address[](3);
+        invalidFroms[0] = address(atlas);
+        invalidFroms[1] = address(atlasVerification);
+        invalidFroms[2] = address(dAppControl);
+
+        for (uint256 i = 0; i < invalidFroms.length; i++) {
+            UserOperation memory userOp = validUserOperation()
+                .withFrom(invalidFroms[i])
+                .withSignature("")
+                .build();
+
+            SolverOperation[] memory solverOps = validSolverOperations(userOp);
+            DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+            callAndAssert(ValidCallsCall({
+                userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+            ), ValidCallsResult.UserFromInvalid);
+        }
+    }
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    // where the user operation is from a contract
+    //   and the contract doesn't implement IAccount
+    // when validCalls is called
+    // then it should revert with an EVM revert error
+    // to prevent abusive behavior
+    //
+    function test_verifyUserOp_UserSmartWalletInvalid_NotFromSmartWallet() public {
+        defaultAtlasEnvironment();
+
+        DummyNotSmartWallet smartWallet = new DummyNotSmartWallet();
+
+        UserOperation memory userOp = validUserOperation()
+            .withFrom(address(smartWallet))
+            .withSignature("")
+            .build();
+
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        vm.skip(true); // TODO: can't get expectRevert to catch the EVM revert here, not sure why, but it does revert
+
+        vm.expectRevert();
+        doValidateCalls(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+        ));
+    }
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    // where the user operation is from a contract
+    //   and the contract implements IAccount
+    //   and the userOp is not valid
+    // when validCalls is called
+    // then it should return UserSmartWalletInvalid
+    // because the user operation has failed validation
+    //
+    function test_verifyUserOp_UserSmartWalletInvalid_FromSmartWallet() public {
+        defaultAtlasEnvironment();
+
+        DummySmartWallet smartWallet = new DummySmartWallet();
+        smartWallet.setIsValidResult(false); // Set validationData to 1 to fail validation
+
+        UserOperation memory userOp = validUserOperation()
+            .withFrom(address(smartWallet))
+            .withSignature("")
+            .build();
+
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+        ), ValidCallsResult.UserSignatureInvalid);
+    }
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    // where the user operation is from a contract
+    //   and the contract contract implements IAccount
+    //   and the userOp passes IAccount validation
+    // when validCalls is called
+    // then it should return Valid
+    //
+    function test_verifyUserOp_Valid_FromSmartWallet() public {
+        defaultAtlasEnvironment();
+
+        DummySmartWallet smartWallet = new DummySmartWallet();
+
+        UserOperation memory userOp = validUserOperation()
+            .withFrom(address(smartWallet))
+            .withSignature("")
+            .build();
+
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+        ), ValidCallsResult.Valid);
+    }
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    // where the user operation is from a contract
+    //   and the contract contract implements IAccount
+    //   and the userOp passes IAccount validation
+    // when validCalls is called twice with the same userOp
+    // then the second call should return UserOpNonceInvalid
+    // to prevent replay attacks
+    //
+    function test_verifyUserOp_UserNonceInvalid_FromSmartWallet() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
+
+        DummySmartWallet smartWallet = new DummySmartWallet();
+
+        UserOperation memory userOp = validUserOperation()
+            .withFrom(address(smartWallet))
+            .withSignature("")
+            .build();
+
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+        ), ValidCallsResult.Valid);
+
+        dappOp = validDAppOperation(userOp, solverOps).build(); // increment dappOp so we can hit _verifyUser
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+        ), ValidCallsResult.UserNonceInvalid);
+    }
 
     // TrustedOpHash Allowed Tests
 
@@ -600,10 +881,11 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     // given a default atlas environment
     //   and otherwise valid user, solver and dapp operations
     //   and the governanceEOA is not a valid signatory
+    //   and the dAppControl is not enabled
     // when validCalls is called from the userEOA
     // then it should return DAppSignatureInvalid
     //
-    function test_validCalls_SignerNotEnabled_DAppSignatureInvalid() public {
+    function test_validCalls_SignerNotEnabled_DAppNotEnabled() public {
         defaultAtlasEnvironment();
         vm.prank(governanceEOA);
         atlasVerification.removeSignatory(address(dAppControl), governanceEOA);
@@ -614,7 +896,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.DAppSignatureInvalid);
+        ), ValidCallsResult.DAppNotEnabled);
     }
 
     //

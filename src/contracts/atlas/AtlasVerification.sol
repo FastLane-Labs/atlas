@@ -3,6 +3,7 @@ pragma solidity 0.8.22;
 
 import { EIP712 } from "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 import { ECDSA } from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
+import { SignatureChecker } from "openzeppelin-contracts/contracts/utils/cryptography/SignatureChecker.sol";
 import { DAppIntegration } from "src/contracts/atlas/DAppIntegration.sol";
 
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
@@ -117,7 +118,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
             }
 
             // Check user signature
-            ValidCallsResult verifyUserResult = _verifyUser(dConfig, userOp, msgSender, isSimulation);
+            ValidCallsResult verifyUserResult = _verifyUser(dConfig, userOp, userOpHash, msgSender, isSimulation);
             if (verifyUserResult != ValidCallsResult.Valid) {
                 return (userOpHash, verifyUserResult);
             }
@@ -375,7 +376,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
 
         // Make sure the signer is currently enabled by dapp owner
         if (!skipDAppOpChecks && !_isDAppSignatory(dAppOp.control, dAppOp.from)) {
-            return ValidCallsResult.DAppSignatureInvalid;
+            return ValidCallsResult.DAppNotEnabled;
         }
 
         return ValidCallsResult.Valid;
@@ -548,31 +549,28 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
     function _verifyUser(
         DAppConfig memory dConfig,
         UserOperation calldata userOp,
+        bytes32 userOpHash,
         address msgSender,
         bool isSimulation
     )
         internal
         returns (ValidCallsResult)
     {
+        if (userOp.from == address(this) || userOp.from == ATLAS || userOp.from == userOp.control) {
+            return ValidCallsResult.UserFromInvalid;
+        }
+
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp userNonces
 
-        if (userOp.from.code.length > 0) {
-            // TODO: not sure if 30k gas limit is accurate
-            if (userOp.from == address(this) || userOp.from == ATLAS || userOp.from == userOp.control) {
-                return ValidCallsResult.UserFromInvalid;
-            }
-            bool validSmartWallet =
-                IAccount(userOp.from).validateUserOp{ gas: 30_000 }(userOp, _getUserOpHash(userOp), 0) == 0;
-            if (!validSmartWallet) {
-                return ValidCallsResult.UserSmartWalletInvalid;
-            }
-            return ValidCallsResult.Valid;
-        }
+        bool signatureValid = SignatureChecker.isValidSignatureNow(
+            userOp.from, _hashTypedDataV4(_getUserOpHash(userOp)), userOp.signature
+        );
 
-        bool bypassSignature = msgSender == userOp.from || (isSimulation && userOp.signature.length == 0);
+        bool userIsBundler = userOp.from == msgSender;
+        bool hasNoSignature = userOp.signature.length == 0;
 
-        if (!bypassSignature && !_verifyUserSignature(userOp)) {
+        if (!(signatureValid || userIsBundler || (isSimulation && hasNoSignature))) {
             return ValidCallsResult.UserSignatureInvalid;
         }
 
@@ -614,14 +612,6 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
                 userOp.data
             )
         );
-    }
-
-    /// @notice Verifies the signature of a UserOperation struct.
-    /// @param userOp The UserOperation struct to verify.
-    /// @return A boolean indicating if the signature is valid.
-    function _verifyUserSignature(UserOperation calldata userOp) internal view returns (bool) {
-        (address signer,) = _hashTypedDataV4(_getUserOpHash(userOp)).tryRecover(userOp.signature);
-        return signer == userOp.from;
     }
 
     /// @notice Generates the hash of a UserOperation struct.
@@ -726,44 +716,4 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
 
         return 0;
     }
-}
-
-// FROM ETH-INFINITISM REPO:
-// https://github.com/eth-infinitism/account-abstraction/blob/develop/contracts/interfaces/IAccount.sol
-
-interface IAccount {
-    /**
-     * Validate user's signature and nonce
-     * the entryPoint will make the call to the recipient only if this validation call returns successfully.
-     * signature failure should be reported by returning SIG_VALIDATION_FAILED (1).
-     * This allows making a "simulation call" without a valid signature
-     * Other failures (e.g. nonce mismatch, or invalid signature format) should still revert to signal failure.
-     *
-     * @dev Must validate caller is the entryPoint.
-     *      Must validate the signature and nonce
-     * @param userOp              - The operation that is about to be executed.
-     * @param userOpHash          - Hash of the user's request data. can be used as the basis for signature.
-     * @param missingAccountFunds - Missing funds on the account's deposit in the entrypoint.
-     *                              This is the minimum amount to transfer to the sender(entryPoint) to be
-     *                              able to make the call. The excess is left as a deposit in the entrypoint
-     *                              for future calls. Can be withdrawn anytime using "entryPoint.withdrawTo()".
-     *                              In case there is a paymaster in the request (or the current deposit is high
-     *                              enough), this value will be zero.
-     * @return validationData       - Packaged ValidationData structure. use `_packValidationData` and
-     *                              `_unpackValidationData` to encode and decode.
-     *                              <20-byte> sigAuthorizer - 0 for valid signature, 1 to mark signature failure,
-     *                                 otherwise, an address of an "authorizer" contract.
-     *                              <6-byte> validUntil - Last timestamp this operation is valid. 0 for "indefinite"
-     *                              <6-byte> validAfter - First timestamp this operation is valid
-     *                                                    If an account doesn't use time-range, it is enough to
-     *                                                    return SIG_VALIDATION_FAILED value (1) for signature failure.
-     *                              Note that the validation code cannot use block.timestamp (or block.number) directly.
-     */
-    function validateUserOp(
-        UserOperation calldata userOp,
-        bytes32 userOpHash,
-        uint256 missingAccountFunds
-    )
-        external
-        returns (uint256 validationData);
 }

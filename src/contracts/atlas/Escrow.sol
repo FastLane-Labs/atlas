@@ -4,6 +4,8 @@ pragma solidity 0.8.22;
 import { AtlETH } from "./AtlETH.sol";
 
 import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
+import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
@@ -91,6 +93,8 @@ abstract contract Escrow is AtlETH {
     /// @param key EscrowKey struct containing the current state of the escrow lock.
     /// @return auctionWon Boolean indicating whether the SolverOperation was successful and won the auction.
     /// @return key Updated EscrowKey struct, reflecting the new state after attempting the SolverOperation.
+    /// @return bidAmount The determined bid amount for the SolverOperation if all validations pass and the operation is
+    /// executed successfully; otherwise, returns 0.
     function _executeSolverOperation(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
@@ -101,7 +105,7 @@ abstract contract Escrow is AtlETH {
         EscrowKey memory key
     )
         internal
-        returns (bool, EscrowKey memory)
+        returns (bool, EscrowKey memory, uint256)
     {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
@@ -113,6 +117,11 @@ abstract contract Escrow is AtlETH {
             result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, result);
         }
 
+        // Increment the call index once per solverOp
+        unchecked {
+            ++key.callIndex;
+        }
+
         // Verify the transaction.
         if (result.canExecute()) {
             uint256 gasLimit;
@@ -122,20 +131,17 @@ abstract contract Escrow is AtlETH {
             if (dConfig.callConfig.allowsTrustedOpHash()) {
                 if (!prevalidated && !_handleAltOpHash(userOp, solverOp)) {
                     key.solverOutcome = uint24(result);
-                    return (false, key);
+                    return (false, key, 0);
                 }
             }
 
             // If there are no errors, attempt to execute
-            if (result.canExecute() && _trySolverLock(solverOp)) {
-                // Open the solver lock
-                key = key.holdSolverLock(solverOp.solver);
+            if (result.canExecute()) {
+                SolverTracker memory solverTracker;
 
                 // Execute the solver call
                 // _solverOpsWrapper returns a SolverOutcome enum value
-                result = _solverOpWrapper(
-                    bidAmount, gasLimit, key.executionEnvironment, solverOp, dAppReturnData, key.pack()
-                );
+                (result, solverTracker) = _solverOpWrapper(bidAmount, gasLimit, key, solverOp, dAppReturnData);
 
                 if (result.executionSuccessful()) {
                     // first successful solver call that paid what it bid
@@ -143,10 +149,8 @@ abstract contract Escrow is AtlETH {
                     emit SolverTxResult(solverOp.solver, solverOp.from, true, true, result);
 
                     key.solverSuccessful = true;
-                    // auctionWon = true
-
                     key.solverOutcome = uint24(result);
-                    return (true, key);
+                    return (true, key, solverTracker.bidAmount); // auctionWon = true
                 }
             }
         }
@@ -155,14 +159,11 @@ abstract contract Escrow is AtlETH {
 
         _releaseSolverLock(solverOp, gasWaterMark, result, false, !prevalidated);
 
-        unchecked {
-            ++key.callIndex;
-        }
         // emit event
         emit SolverTxResult(solverOp.solver, solverOp.from, result.executedWithError(), false, result);
 
         // auctionWon = false
-        return (false, key);
+        return (false, key, 0);
     }
 
     /// @notice Allocates the winning bid amount after a successful SolverOperation execution.
@@ -172,7 +173,7 @@ abstract contract Escrow is AtlETH {
     /// issues in the DAppControl contract, not the execution environment itself.
     /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
     /// @param solverOp SolverOperation struct containing the solver's bid and execution data.
-    /// @param winningBidAmount The winning solver's bid amount, to be allocated.
+    /// @param bidAmount The winning solver's bid amount, to be allocated.
     /// @param returnData Data returned from the execution of the UserOperation, which may influence how the bid amount
     /// is allocated.
     /// @param key EscrowKey struct containing the current state of the escrow lock.
@@ -181,7 +182,7 @@ abstract contract Escrow is AtlETH {
     function _allocateValue(
         DAppConfig calldata dConfig,
         SolverOperation calldata solverOp,
-        uint256 winningBidAmount,
+        uint256 bidAmount,
         bytes memory returnData,
         EscrowKey memory key
     )
@@ -192,7 +193,7 @@ abstract contract Escrow is AtlETH {
         key = key.holdAllocateValueLock(solverOp.from);
 
         bytes memory data =
-            abi.encodeCall(IExecutionEnvironment.allocateValue, (dConfig.bidToken, winningBidAmount, returnData));
+            abi.encodeCall(IExecutionEnvironment.allocateValue, (dConfig.bidToken, bidAmount, returnData));
         data = abi.encodePacked(data, key.pack());
         (bool success,) = key.executionEnvironment.call(data);
         if (success) {
@@ -267,10 +268,7 @@ abstract contract Escrow is AtlETH {
         uint256 gasCost = (tx.gasprice * gasLimit) + _getCalldataCost(solverOp.data.length);
 
         // Verify that we can lend the solver their tx value
-        if (
-            solverOp.value
-                > address(this).balance - (gasLimit * tx.gasprice > address(this).balance ? 0 : gasLimit * tx.gasprice)
-        ) {
+        if (solverOp.value > address(this).balance) {
             return (1 << uint256(SolverOutcome.CallValueTooHigh), gasLimit);
         }
 
@@ -345,22 +343,13 @@ abstract contract Escrow is AtlETH {
             }
         }
 
-        // If there are no errors, attempt to execute
-        if (!result.canExecute() || !_trySolverLock(solverOp)) return 0;
+        data = abi.encodeCall(IAtlas.solverCall, (solverOp.bidAmount, gasLimit, key, solverOp, data));
+        (success, data) = address(this).call(data);
 
-        data = abi.encodeCall(
-            IExecutionEnvironment.solverMetaTryCatch,
-            (IDAppControl(dConfig.to).getBidValue(solverOp), gasLimit, solverOp, data)
-        );
-
-        data = abi.encodePacked(data, key.holdSolverLock(solverOp.solver).pack());
-
-        (success, data) = key.executionEnvironment.call{ value: solverOp.value }(data);
-
-        _releaseSolverLock(solverOp, gasWaterMark, result, true, true);
-
+        // The `solverCall()` above should always revert as key.bidFind is always true when it's called in the context
+        // of this function. Therefore `success` should always be false below, and the revert should be unreachable.
         if (success) {
-            revert();
+            revert Unreachable();
         }
 
         if (bytes4(data) == BidFindSuccessful.selector) {
@@ -417,7 +406,7 @@ abstract contract Escrow is AtlETH {
         uint256 result
     )
         internal
-        view
+        pure
         returns (uint256)
     {
         if (solverBidToken != dConfigBidToken) {
@@ -430,57 +419,147 @@ abstract contract Escrow is AtlETH {
     /// @param bidAmount The bid amount associated with the SolverOperation.
     /// @param gasLimit The gas limit for executing the SolverOperation, calculated based on the operation's
     /// requirements and protocol buffers.
-    /// @param environment The execution environment address where the SolverOperation will be executed.
+    /// @param key The current lock data.
     /// @param solverOp The SolverOperation struct containing the operation's execution data.
     /// @param dAppReturnData Data returned from the execution of the associated UserOperation, which may be required
     /// for the SolverOperation's logic.
-    /// @param lockBytes The packed bytes form of the current EscrowKey state.
-    /// @return A SolverOutcome enum value encoded as a uint256 bitmap, representing the result of the SolverOperation
+    /// @return result SolverOutcome enum value encoded as a uint256 bitmap, representing the result of the
+    /// SolverOperation
+    /// @return solverTracker Tracking data for the solver's bid
     function _solverOpWrapper(
         uint256 bidAmount,
         uint256 gasLimit,
-        address environment,
+        EscrowKey memory key,
         SolverOperation calldata solverOp,
-        bytes memory dAppReturnData,
-        bytes memory lockBytes
+        bytes memory dAppReturnData
     )
         internal
-        returns (uint256)
+        returns (uint256 result, SolverTracker memory solverTracker)
     {
         bool success;
-        bytes memory data =
-            abi.encodeCall(IExecutionEnvironment.solverMetaTryCatch, (bidAmount, gasLimit, solverOp, dAppReturnData));
 
-        data = abi.encodePacked(data, lockBytes);
-
-        (success, data) = environment.call{ value: solverOp.value }(data);
+        // Calls the solverCall function, just below this function, which will handle calling solverPreTryCatch and
+        // solverPostTryCatch via the ExecutionEnvironment, and in between those two hooks, the actual solver call
+        // directly from Atlas to the solver contract (not via the ExecutionEnvironment).
+        bytes memory data = abi.encodeCall(IAtlas.solverCall, (bidAmount, gasLimit, key, solverOp, dAppReturnData));
+        (success, data) = address(this).call(data);
 
         if (success) {
-            return uint256(0);
+            // If solverCall() was successful, intentionally leave result unset as 0 indicates success
+            solverTracker = abi.decode(data, (SolverTracker));
+        } else {
+            // If solverCall() failed, catch the error and encode the failure case in the result uint accordingly.
+            bytes4 errorSwitch = bytes4(data);
+            if (errorSwitch == AlteredControl.selector) {
+                result = 1 << uint256(SolverOutcome.AlteredControl);
+            } else if (errorSwitch == InsufficientEscrow.selector) {
+                result = 1 << uint256(SolverOutcome.InsufficientEscrow);
+            } else if (errorSwitch == PreSolverFailed.selector) {
+                result = 1 << uint256(SolverOutcome.PreSolverFailed);
+            } else if (errorSwitch == SolverOpReverted.selector) {
+                result = 1 << uint256(SolverOutcome.SolverOpReverted);
+            } else if (errorSwitch == PostSolverFailed.selector) {
+                result = 1 << uint256(SolverOutcome.PostSolverFailed);
+            } else if (errorSwitch == BidNotPaid.selector) {
+                result = 1 << uint256(SolverOutcome.BidNotPaid);
+            } else if (errorSwitch == BalanceNotReconciled.selector) {
+                result = 1 << uint256(SolverOutcome.BalanceNotReconciled);
+            } else if (errorSwitch == CallbackNotCalled.selector) {
+                result = 1 << uint256(SolverOutcome.CallbackNotCalled);
+            } else if (errorSwitch == InvalidEntry.selector) {
+                // DAppControl is attacking solver contract - treat as AlteredControl
+                result = 1 << uint256(SolverOutcome.AlteredControl);
+            } else {
+                result = 1 << uint256(SolverOutcome.EVMError);
+            }
         }
-        bytes4 errorSwitch = bytes4(data);
+    }
 
-        if (errorSwitch == AlteredControl.selector) {
-            return 1 << uint256(SolverOutcome.AlteredControl);
-        } else if (errorSwitch == PreSolverFailed.selector) {
-            return 1 << uint256(SolverOutcome.PreSolverFailed);
-        } else if (errorSwitch == SolverOperationReverted.selector) {
-            return 1 << uint256(SolverOutcome.SolverOpReverted);
-        } else if (errorSwitch == PostSolverFailed.selector) {
-            return 1 << uint256(SolverOutcome.PostSolverFailed);
-        } else if (errorSwitch == IntentUnfulfilled.selector) {
-            return 1 << uint256(SolverOutcome.IntentUnfulfilled);
-        } else if (errorSwitch == SolverBidUnpaid.selector) {
-            return 1 << uint256(SolverOutcome.BidNotPaid);
-        } else if (errorSwitch == BalanceNotReconciled.selector) {
-            return 1 << uint256(SolverOutcome.BalanceNotReconciled);
-        } else if (errorSwitch == InvalidEntry.selector) {
-            // DAppControl is attacking solver contract - treat as AlteredControl
-            return 1 << uint256(SolverOutcome.AlteredControl);
-        } else if (errorSwitch == CallbackNotCalled.selector) {
-            return 1 << uint256(SolverOutcome.SolverOpReverted);
+    /// @notice Executes the SolverOperation logic, including preSolver and postSolver hooks via the Execution
+    /// Environment, as well as the actual solver call directly from Atlas to the solver contract.
+    /// @param bidAmount The bid amount associated with the SolverOperation.
+    /// @param gasLimit The gas limit for executing the SolverOperation.
+    /// @param key The EscrowKey struct containing lock data and the Execution Environment address.
+    /// @param solverOp The SolverOperation to be executed.
+    /// @param dAppReturnData Data returned from previous call phases.
+    /// @return solverTracker Additional data for handling the solver's bid in different scenarios.
+    function solverCall(
+        uint256 bidAmount,
+        uint256 gasLimit,
+        EscrowKey calldata key,
+        SolverOperation calldata solverOp,
+        bytes calldata dAppReturnData
+    )
+        external
+        payable
+        returns (SolverTracker memory solverTracker)
+    {
+        if (msg.sender != address(this)) revert InvalidEntry();
+
+        bool success;
+        bool calledback;
+
+        // ------------------------------------- //
+        //             Pre-Solver Call           //
+        // ------------------------------------- //
+
+        bytes memory data =
+            abi.encodeCall(IExecutionEnvironment.solverPreTryCatch, (bidAmount, solverOp, dAppReturnData));
+        (success, data) = key.executionEnvironment.call(abi.encodePacked(data, key.holdPreSolverLock().pack()));
+
+        // If ExecutionEnvironment.solverPreTryCatch() failed, bubble up the error
+        if (!success) {
+            assembly {
+                revert(add(data, 32), mload(data))
+            }
         }
-        return 1 << uint256(SolverOutcome.EVMError);
+
+        // Update solverTracker with returned data
+        solverTracker = abi.decode(data, (SolverTracker));
+
+        // ------------------------------------- //
+        //              Solver Call              //
+        // ------------------------------------- //
+
+        // Set the solver lock - will perform accounting checks if value borrowed. If `_trySolverLock()` returns false,
+        // we revert here and catch the error in `_solverOpWrapper()` above
+        if (!_trySolverLock(solverOp)) revert InsufficientEscrow();
+
+        data = abi.encodeCall(
+            ISolverContract.atlasSolverCall,
+            (solverOp.from, key.executionEnvironment, solverOp.bidToken, bidAmount, solverOp.data, dAppReturnData)
+        );
+        (success,) = solverOp.solver.call{ value: solverOp.value, gas: gasLimit }(data);
+
+        if (!success) revert SolverOpReverted();
+
+        // ------------------------------------- //
+        //            Post-Solver Call           //
+        // ------------------------------------- //
+
+        data = abi.encodeCall(IExecutionEnvironment.solverPostTryCatch, (solverOp, dAppReturnData, solverTracker));
+        (success, data) = key.executionEnvironment.call(abi.encodePacked(data, key.holdPostSolverLock().pack()));
+
+        // If ExecutionEnvironment.solverPostTryCatch() failed, bubble up the error
+        if (!success) {
+            assembly {
+                revert(add(data, 32), mload(data))
+            }
+        }
+
+        // Update solverTracker with returned data
+        solverTracker = abi.decode(data, (SolverTracker));
+
+        // Verify that the solver repaid their borrowed solverOp.value by calling `reconcile()`. If solver did not fully
+        // repay via `reconcile()`, the postSolverCall may still have covered the outstanding debt via `contribute()` so
+        // we do a final repayment check here.
+        (, calledback, success) = _solverLockData();
+
+        if (!calledback) revert CallbackNotCalled();
+        if (!success && deposits < claims + withdrawals) revert BalanceNotReconciled();
+
+        // Check if this is an on-chain, ex post bid search
+        if (key.bidFind) revert BidFindSuccessful(solverTracker.bidAmount);
     }
 
     receive() external payable { }

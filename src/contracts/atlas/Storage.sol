@@ -23,6 +23,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     // Gas Accounting public constants
     uint256 public constant SURCHARGE_RATE = 1_000_000; // 1_000_000 / 10_000_000 = 10%
     uint256 public constant SURCHARGE_SCALE = 10_000_000; // 10_000_000 / 10_000_000 = 100%
+    uint256 public constant FIXED_GAS_OFFSET = 100_000;
 
     // AtlETH EIP-2612 constants
     uint256 internal immutable _INITIAL_CHAIN_ID;
@@ -84,7 +85,15 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     /// @return currentSolver Address of the current solver.
     /// @return calledBack Boolean indicating whether the solver has called back via `reconcile`.
     /// @return fulfilled Boolean indicating whether the solver's outstanding debt has been repaid via `reconcile`.
-    function solverLockData() public view returns (address currentSolver, bool calledBack, bool fulfilled) {
+    function solverLockData() external view returns (address currentSolver, bool calledBack, bool fulfilled) {
+        return _solverLockData();
+    }
+
+    /// @notice Returns information about the current state of the solver lock.
+    /// @return currentSolver Address of the current solver.
+    /// @return calledBack Boolean indicating whether the solver has called back via `reconcile`.
+    /// @return fulfilled Boolean indicating whether the solver's outstanding debt has been repaid via `reconcile`.
+    function _solverLockData() internal view returns (address currentSolver, bool calledBack, bool fulfilled) {
         uint256 solverLock = _solverLock;
         currentSolver = address(uint160(solverLock));
         calledBack = solverLock & _SOLVER_CALLED_BACK_MASK != 0;

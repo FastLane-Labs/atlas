@@ -8,21 +8,9 @@ import "../types/DAppApprovalTypes.sol";
 interface IDAppControl {
     function preOpsCall(UserOperation calldata userOp) external payable returns (bytes memory);
 
-    function preSolverCall(
-        SolverOperation calldata solverOp,
-        bytes calldata returnData
-    )
-        external
-        payable
-        returns (bool);
+    function preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) external payable;
 
-    function postSolverCall(
-        SolverOperation calldata solverOp,
-        bytes calldata returnData
-    )
-        external
-        payable
-        returns (bool);
+    function postSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) external payable;
 
     function postOpsCall(bool solved, bytes calldata data) external payable returns (bytes memory);
 
