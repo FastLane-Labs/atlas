@@ -170,7 +170,7 @@ abstract contract Escrow is AtlETH {
 
                     ctx.solverSuccessful = true;
                     ctx.solverOutcome = uint24(result);
-                    return (ctx, solverTracker.bidAmount); // auctionWon = true
+                    return (ctx, solverTracker.bidAmount);
                 }
             }
         }
@@ -182,7 +182,6 @@ abstract contract Escrow is AtlETH {
         // emit event
         emit SolverTxResult(solverOp.solver, solverOp.from, result.executedWithError(), false, result);
 
-        // auctionWon = false
         return (ctx, 0);
     }
 
@@ -298,6 +297,7 @@ abstract contract Escrow is AtlETH {
         ctx.paymentsSuccessful = success;
         ctx.callIndex = ctx.callCount - 1;
         ctx.solverOutcome = uint24(solverIndex);
+        // NOTE: we reuse ctx.solverOutcome to store the index of the winning solverOp, to avoid stack too deep.
 
         return ctx;
     }

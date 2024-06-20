@@ -135,11 +135,10 @@ contract Atlas is Escrow, Factory {
 
         // PostOp Call
         if (dConfig.callConfig.needsPostOpsCall()) {
-            // TODO LOCK PR - not sure where to get solverWon for 2nd param
             ctx = _executePostOpsCall(ctx, ctx.solverSuccessful, returnData);
         }
 
-        // TODO LOCK PR - check return types issue is still resolved
+        // NOTE: In _allocateValue, we reused ctx.solverOutcome to store the index of the winning solverOp.
         winningSolver = ctx.solverSuccessful ? solverOps[uint256(ctx.solverOutcome)].from : address(0);
     }
 
