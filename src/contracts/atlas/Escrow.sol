@@ -48,7 +48,7 @@ abstract contract Escrow is AtlETH {
     )
         internal
         withLockPhase(ExecutionPhase.PreOps)
-        returns (Context memory, bytes memory)
+        returns (bytes memory)
     {
         (bool success, bytes memory data) = ctx.executionEnvironment.call(
             abi.encodePacked(
@@ -58,9 +58,9 @@ abstract contract Escrow is AtlETH {
 
         if (success) {
             if (dConfig.callConfig.needsPreOpsReturnData()) {
-                return (ctx, abi.decode(data, (bytes)));
+                return abi.decode(data, (bytes));
             } else {
-                return (ctx, new bytes(0));
+                return new bytes(0);
             }
         } else {
             if (ctx.isSimulation) revert PreOpsSimFail();
@@ -81,7 +81,7 @@ abstract contract Escrow is AtlETH {
     )
         internal
         withLockPhase(ExecutionPhase.UserOperation)
-        returns (Context memory, bytes memory)
+        returns (bytes memory)
     {
         (bool success, bytes memory data) = ctx.executionEnvironment.call{ value: userOp.value }(
             abi.encodePacked(
@@ -93,9 +93,9 @@ abstract contract Escrow is AtlETH {
         if (success) {
             // Handle formatting of returnData
             if (dConfig.callConfig.needsUserReturnData()) {
-                return (ctx, abi.decode(data, (bytes)));
+                return abi.decode(data, (bytes));
             } else {
-                return (ctx, returnData);
+                return returnData;
             }
         } else {
             if (ctx.isSimulation) revert UserOpSimFail();
@@ -111,7 +111,6 @@ abstract contract Escrow is AtlETH {
     /// @param bidAmount The amount of bid submitted by the solver for this operation.
     /// @param prevalidated Boolean flag indicating whether the SolverOperation has been prevalidated to skip certain
     /// @param returnData Data returned from UserOp execution, used as input if necessary.
-    /// @return ctx Updated Context struct, reflecting the new state after attempting the SolverOperation.
     /// @return bidAmount The determined bid amount for the SolverOperation if all validations pass and the operation is
     /// executed successfully; otherwise, returns 0.
     function _executeSolverOperation(
@@ -124,7 +123,7 @@ abstract contract Escrow is AtlETH {
         bytes memory returnData
     )
         internal
-        returns (Context memory, uint256)
+        returns (uint256)
     {
         // Set the gas baseline
         uint256 gasWaterMark = gasleft();
@@ -150,7 +149,7 @@ abstract contract Escrow is AtlETH {
             if (dConfig.callConfig.allowsTrustedOpHash()) {
                 if (!prevalidated && !_handleAltOpHash(userOp, solverOp)) {
                     ctx.solverOutcome = uint24(result);
-                    return (ctx, 0);
+                    return 0;
                 }
             }
 
@@ -169,7 +168,7 @@ abstract contract Escrow is AtlETH {
 
                     ctx.solverSuccessful = true;
                     ctx.solverOutcome = uint24(result);
-                    return (ctx, solverTracker.bidAmount);
+                    return solverTracker.bidAmount;
                 }
             }
         }
@@ -181,7 +180,7 @@ abstract contract Escrow is AtlETH {
         // emit event
         emit SolverTxResult(solverOp.solver, solverOp.from, result.executedWithError(), false, result);
 
-        return (ctx, 0);
+        return 0;
     }
 
     function _preSolverOpInner(
@@ -274,7 +273,6 @@ abstract contract Escrow is AtlETH {
     /// @param bidAmount The winning solver's bid amount, to be allocated.
     /// @param returnData Data returned from the execution of the UserOperation, which may influence how the bid amount
     /// is allocated.
-    /// @return ctx Updated Context struct, reflecting the new state after attempting the SolverOperation.
     function _allocateValue(
         Context memory ctx,
         DAppConfig calldata dConfig,
@@ -284,7 +282,6 @@ abstract contract Escrow is AtlETH {
     )
         internal
         withLockPhase(ExecutionPhase.AllocateValue)
-        returns (Context memory)
     {
         (bool success,) = ctx.executionEnvironment.call(
             abi.encodePacked(
@@ -297,8 +294,6 @@ abstract contract Escrow is AtlETH {
         ctx.callIndex = ctx.callCount - 1;
         ctx.solverOutcome = uint24(solverIndex);
         // NOTE: we reuse ctx.solverOutcome to store the index of the winning solverOp, to avoid stack too deep.
-
-        return ctx;
     }
 
     /// @notice Executes post-operation logic after SolverOperation, depending on the outcome of the auction.
@@ -307,7 +302,6 @@ abstract contract Escrow is AtlETH {
     /// @param ctx Context struct containing the current state of the escrow lock.
     /// @param solved Boolean indicating whether a SolverOperation was successful and won the auction.
     /// @param returnData Data returned from execution of the UserOp call, which may be required for the postOps logic.
-    /// @return ctx Updated Context struct, reflecting the new state after attempting the SolverOperation.
     function _executePostOpsCall(
         Context memory ctx,
         bool solved,
@@ -315,7 +309,6 @@ abstract contract Escrow is AtlETH {
     )
         internal
         withLockPhase(ExecutionPhase.PostOps)
-        returns (Context memory)
     {
         (bool success,) = ctx.executionEnvironment.call(
             abi.encodePacked(
@@ -328,8 +321,6 @@ abstract contract Escrow is AtlETH {
             if (ctx.isSimulation) revert PostOpsSimFail();
             revert PostOpsFail();
         }
-
-        return ctx;
     }
 
     /// @notice Validates a SolverOperation's gas requirements and deadline against the current block and escrow state.
