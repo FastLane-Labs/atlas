@@ -34,16 +34,15 @@ contract SolverExPost is SolverBase, BlindBackrun {
         address bidToken,
         uint256 bidAmount,
         bytes calldata solverOpData,
-        bytes calldata //extraReturnData
+        bytes calldata
     )
         external
         payable
         override(SolverBase)
         safetyFirst(executionEnvironment, solverOpFrom)
         findAndPayBids(executionEnvironment, bidToken, bidAmount)
-        returns (bool success, bytes memory data)
     {
-        (success, data) = address(this).call{ value: msg.value }(solverOpData);
+        (bool success,) = address(this).call{ value: msg.value }(solverOpData);
 
         require(success, "CALL UNSUCCESSFUL");
     }

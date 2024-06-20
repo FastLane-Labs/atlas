@@ -111,7 +111,6 @@ abstract contract Escrow is AtlETH {
     /// @param bidAmount The amount of bid submitted by the solver for this operation.
     /// @param prevalidated Boolean flag indicating whether the SolverOperation has been prevalidated to skip certain
     /// @param returnData Data returned from UserOp execution, used as input if necessary.
-    /// checks for efficiency.
     /// @return ctx Updated Context struct, reflecting the new state after attempting the SolverOperation.
     /// @return bidAmount The determined bid amount for the SolverOperation if all validations pass and the operation is
     /// executed successfully; otherwise, returns 0.

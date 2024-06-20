@@ -13,6 +13,5 @@ interface ISolverContract {
         bytes calldata extraReturnData
     )
         external
-        payable
-        returns (bool, bytes memory);
+        payable;
 }

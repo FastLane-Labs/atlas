@@ -348,7 +348,7 @@ contract EscrowTest is AtlasBaseTest {
     }
 
     function test_executeSolverOperation_solverOpWrapper_preSolverFailed() public {
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
+        defaultAtlasWithCallConfig(
             defaultCallConfig()
                 .withTrackPreOpsReturnData(true)
                 .withTrackUserReturnData(true)
@@ -356,6 +356,16 @@ contract EscrowTest is AtlasBaseTest {
                 .withPreSolver(true)
                 .build()
         );
+
+        UserOperation memory userOp = validUserOperation(address(dAppControl))
+            .withData(abi.encodeWithSelector(dAppControl.userOperationCall.selector, false, 1))
+            .signAndBuild(address(atlasVerification), userPK);
+        
+        SolverOperation[] memory solverOps = new SolverOperation[](1);
+        solverOps[0] = validSolverOperation(userOp)
+            .withBidAmount(defaultBidAmount)
+            .signAndBuild(address(atlasVerification), solverOnePK);
+
         uint256 result = (1 << uint256(SolverOutcome.PreSolverFailed));
         executeSolverOperationCase(userOp, solverOps, false, false, result, true);
     }
@@ -417,13 +427,18 @@ contract EscrowTest is AtlasBaseTest {
         atlasVerification.initializeGovernance(address(gasSponsorControl));
 
         UserOperation memory userOp = validUserOperation(address(gasSponsorControl))
-            .withData(abi.encodeWithSelector(gasSponsorControl.userOperationCall.selector, false, 0))
+            .withData(abi.encodeCall(gasSponsorControl.userOperationCall, (false, 0)))
             .signAndBuild(address(atlasVerification), userPK);
         
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         solverOps[0] = validSolverOperation(userOp)
             .withBidAmount(bidAmount)
             .signAndBuild(address(atlasVerification), solverOnePK);
+
+        console.log("DApp control balance", address(gasSponsorControl).balance);
+        console.log("Solver balance", address(dummySolver).balance);
+        console.log("Bid amount (to trigger partial)", bidAmount);
+        console.log("Solver bonded amt", atlas.balanceOfBonded(solverOneEOA));
 
         uint256 expectedResult = 0; // Success expected
         executeSolverOperationCase(userOp, solverOps, true, true, expectedResult, false);
@@ -513,7 +528,6 @@ contract DummySolver {
     )
         external
         payable
-        returns (bool, bytes memory)
     {
         if (solverOpData.length > 0 && extraReturnData.length > 0) {
             (uint256 solverDataValue) = abi.decode(solverOpData, (uint256));
@@ -529,18 +543,18 @@ contract DummySolver {
         
         if (bidAmount == noGasPayBack) {
             // Don't pay gas
-            return (true, new bytes(0));
+            return;
         } else if (bidAmount == partialGasPayBack) {
             // Only pay half of shortfall owed - expect postSolverCall hook in DAppControl to pay the rest
             uint256 _shortfall = IEscrow(_atlas).shortfall();
             IEscrow(_atlas).reconcile(executionEnvironment, solverOpFrom, _shortfall / 2);
-            return (true, new bytes(0));
+            return;
         }
         
         // Default: Pay gas
         uint256 shortfall = IEscrow(_atlas).shortfall();
         IEscrow(_atlas).reconcile(executionEnvironment, solverOpFrom, shortfall);
-        return (true, new bytes(0));
+        return;
     }
 }
 
@@ -556,12 +570,11 @@ contract DummySolverContributor {
         address executionEnvironment,
         address,
         uint256 bidAmount,
-        bytes calldata solverOpData,
-        bytes calldata extraReturnData
+        bytes calldata,
+        bytes calldata
     )
         external
         payable
-        returns (bool, bytes memory)
     {
         // Pay bid
         if (address(this).balance >= bidAmount) {
@@ -572,6 +585,6 @@ contract DummySolverContributor {
         uint256 shortfall = IEscrow(_atlas).shortfall();
         IEscrow(_atlas).reconcile{value: shortfall}(executionEnvironment, solverOpFrom, shortfall);
 
-        return (true, new bytes(0));
+        return;
     }
 }

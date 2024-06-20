@@ -149,8 +149,8 @@ contract ExecutionEnvironment is Base {
         // Handle any solver preOps, if necessary
         if (_config().needsPreSolver()) {
             bool success;
-            bytes memory data = _forward(abi.encodeCall(IDAppControl.preSolverCall, (solverOp, returnData)));
 
+            bytes memory data = _forward(abi.encodeCall(IDAppControl.preSolverCall, (solverOp, returnData)));
             (success,) = _control().delegatecall(data);
 
             if (!success) revert AtlasErrors.PreSolverFailed();
@@ -190,10 +190,10 @@ contract ExecutionEnvironment is Base {
                 : ERC20(solverOp.bidToken).balanceOf(address(this));
         }
 
-        bool success;
         if (_config().needsSolverPostCall()) {
-            bytes memory data = _forward(abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData)));
+            bool success;
 
+            bytes memory data = _forward(abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData)));
             (success,) = _control().delegatecall(data);
 
             if (!success) revert AtlasErrors.PostSolverFailed();
