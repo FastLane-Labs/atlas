@@ -229,7 +229,7 @@ contract Atlas is Escrow, Factory {
                 _executeSolverOperation(ctx, dConfig, userOp, solverOps[solverIndex], bidAmountFound, true, returnData);
 
             if (ctx.solverSuccessful) {
-                return _allocateValue(ctx, dConfig, solverOps[solverIndex], bidAmountFound, solverIndex, returnData);
+                return _allocateValue(ctx, dConfig, bidAmountFound, solverIndex, returnData);
             }
 
             if (i == 0) break; // break to prevent underflow in next loop
@@ -267,7 +267,7 @@ contract Atlas is Escrow, Factory {
                 _executeSolverOperation(ctx, dConfig, userOp, solverOp, solverOp.bidAmount, false, returnData);
 
             if (ctx.solverSuccessful) {
-                return _allocateValue(ctx, dConfig, solverOp, bidAmount, solverIndex, returnData);
+                return _allocateValue(ctx, dConfig, bidAmount, solverIndex, returnData);
             }
         }
         if (ctx.isSimulation) revert SolverSimFail(uint256(ctx.solverOutcome));

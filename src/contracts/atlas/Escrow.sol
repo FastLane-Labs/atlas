@@ -273,7 +273,6 @@ abstract contract Escrow is AtlETH {
     /// issues in the DAppControl contract, not the execution environment itself.
     /// @param ctx Context struct containing the current state of the escrow lock.
     /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
-    /// @param solverOp SolverOperation struct containing the solver's bid and execution data.
     /// @param bidAmount The winning solver's bid amount, to be allocated.
     /// @param returnData Data returned from the execution of the UserOperation, which may influence how the bid amount
     /// is allocated.
@@ -281,7 +280,6 @@ abstract contract Escrow is AtlETH {
     function _allocateValue(
         Context memory ctx,
         DAppConfig calldata dConfig,
-        SolverOperation calldata solverOp,
         uint256 bidAmount,
         uint256 solverIndex,
         bytes memory returnData
