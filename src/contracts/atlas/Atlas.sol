@@ -125,9 +125,11 @@ contract Atlas is Escrow, Factory {
         }
 
         if (auctionWon) {
-            // key.solverOutcome contains the index of the winning solver (to prevent Stack Too Deep errors)
+            // when auctionWon, key.solverOutcome contains the index of the winning solver (to prevent Stack Too Deep
+            // errors)
             winningSolver = solverOps[key.solverOutcome].from;
         } else {
+            // when !auctionWon, key.solverOutcome contains the error code of the last solver
             // If no solver was successful, handle revert decision
             if (key.isSimulation) revert SolverSimFail(uint256(key.solverOutcome));
             if (dConfig.callConfig.needsFulfillment()) {
@@ -229,7 +231,8 @@ contract Atlas is Escrow, Factory {
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param returnData Return data from the preOps and userOp calls.
-    /// @param key EscrowKey struct containing the current state of the escrow lock.
+    /// @param key EscrowKey struct containing the current state of the escrow lock. key.solverOutcome is the index of
+    /// the winning solver. When no winner is found, key.solverOutcome is the error code of the last solver.
     /// @return auctionWon bool indicating whether a winning solver was found or not.
     /// @return EscrowKey struct containing the current state of the escrow lock.
     function _bidFindingIteration(
@@ -326,7 +329,8 @@ contract Atlas is Escrow, Factory {
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param returnData Return data from the preOps and userOp calls.
-    /// @param key EscrowKey struct containing the current state of the escrow lock.
+    /// @param key EscrowKey struct containing the current state of the escrow lock. key.solverOutcome is the index of
+    /// the winning solver. When no winner is found, key.solverOutcome is the error code of the last solver.
     /// @return auctionWon bool indicating whether a winning solver was found or not.
     /// @return EscrowKey struct containing the current state of the escrow lock.
     function _bidKnownIteration(
