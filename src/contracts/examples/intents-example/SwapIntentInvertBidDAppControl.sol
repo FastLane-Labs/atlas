@@ -36,7 +36,7 @@ struct SwapIntent {
 contract SwapIntentInvertBidDAppControl is DAppControl {
     using SafeTransferLib for ERC20;
 
-    bool _solverBidRetrievalRequired;
+    bool public immutable _solverBidRetrievalRequired;
 
     constructor(address _atlas, bool bidFind, bool solverBidRetrievalRequired)
         DAppControl(
@@ -122,9 +122,16 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
 
         // The solver must be bidding less than the intent's maxAmountUserSells
         require(solverOp.bidAmount <= swapData.maxAmountUserSells, "SwapIntentInvertBid: BidTooHigh");
-
-        // Optimistically transfer to the solver contract the amount that the solver is invert bidding
-        _transferUserERC20(swapData.tokenUserSells, solverTo, solverOp.bidAmount);
+        
+        if (_solverBidRetrievalRequired){
+            // Optimistically transfer to the execution environment the amount that the solver is invert bidding
+            _transferUserERC20(swapData.tokenUserSells, address(this), solverOp.bidAmount);
+            // Approve the solver to retrieve the bid amount from ee
+            ERC20(swapData.tokenUserSells).safeApprove(solverTo, solverOp.bidAmount);
+        } else {
+            // Optimistically transfer to the solver contract the amount that the solver is invert bidding
+            _transferUserERC20(swapData.tokenUserSells, solverTo, solverOp.bidAmount);
+        }
     }
 
     /*
