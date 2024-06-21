@@ -33,8 +33,8 @@ contract MockGasAccounting is GasAccounting, Test {
         _setAccountingLock(dConfig, executionEnvironment, gasMarker, userOpValue);
     }
 
-    function setPhase(ExecutionPhase phase) external {
-        lock.phase = phase;
+    function setPhase(ExecutionPhase _phase) external {
+        lock.phase = _phase;
     }
 
     function assign(address owner, uint256 value, bool solverWon) external returns (uint256) {
@@ -135,6 +135,61 @@ contract GasAccountingTest is Test {
         mockGasAccounting.borrow(borrowedAmount);
 
         assertEq(executionEnvironment.balance, borrowedAmount);
+    }
+
+    function test_borrow_phasesEnforced() public {
+        // borrow should revert if called in or after PostSolver phase
+
+        uint256 borrowedAmount = 1e18;
+        deal(address(mockGasAccounting), borrowedAmount);
+        assertEq(executionEnvironment.balance, 0, "EE should start with 0 ETH");
+        uint256 startState = vm.snapshot();
+
+        // Allowed borrowed phases: PreOps, UserOperation, PreSolver, SolverOperations
+
+        mockGasAccounting.setPhase(ExecutionPhase.PreOps);
+        vm.prank(executionEnvironment);
+        mockGasAccounting.borrow(borrowedAmount);
+        assertEq(executionEnvironment.balance, borrowedAmount);
+        vm.revertTo(startState);
+
+        mockGasAccounting.setPhase(ExecutionPhase.UserOperation);
+        vm.prank(executionEnvironment);
+        mockGasAccounting.borrow(borrowedAmount);
+        assertEq(executionEnvironment.balance, borrowedAmount);
+        vm.revertTo(startState);
+
+        mockGasAccounting.setPhase(ExecutionPhase.PreSolver);
+        vm.prank(executionEnvironment);
+        mockGasAccounting.borrow(borrowedAmount);
+        assertEq(executionEnvironment.balance, borrowedAmount);
+        vm.revertTo(startState);
+
+        mockGasAccounting.setPhase(ExecutionPhase.SolverOperations);
+        vm.prank(executionEnvironment);
+        mockGasAccounting.borrow(borrowedAmount);
+        assertEq(executionEnvironment.balance, borrowedAmount);
+        vm.revertTo(startState);
+
+        // Disallowed borrowed phases: PostSolver, AllocateValue, PostOps
+
+        mockGasAccounting.setPhase(ExecutionPhase.PostSolver);
+        vm.prank(executionEnvironment);
+        vm.expectRevert(AtlasErrors.WrongPhase.selector);
+        mockGasAccounting.borrow(borrowedAmount);
+        vm.revertTo(startState);
+
+        mockGasAccounting.setPhase(ExecutionPhase.AllocateValue);
+        vm.prank(executionEnvironment);
+        vm.expectRevert(AtlasErrors.WrongPhase.selector);
+        mockGasAccounting.borrow(borrowedAmount);
+        vm.revertTo(startState);
+
+        mockGasAccounting.setPhase(ExecutionPhase.PostOps);
+        vm.prank(executionEnvironment);
+        vm.expectRevert(AtlasErrors.WrongPhase.selector);
+        mockGasAccounting.borrow(borrowedAmount);
+        vm.revertTo(startState);
     }
 
     function test_multipleBorrows() public {
