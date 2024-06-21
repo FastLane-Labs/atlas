@@ -34,7 +34,9 @@ abstract contract Escrow is AtlETH {
         address _surchargeRecipient
     )
         AtlETH(_escrowDuration, _verification, _simulator, _surchargeRecipient)
-    { }
+    {
+        if (_escrowDuration == 0) revert InvalidEscrowDuration();
+    }
 
     /// @notice Executes the preOps logic defined in the Execution Environment.
     /// @param userOp UserOperation struct of the current metacall tx.
