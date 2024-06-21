@@ -205,10 +205,24 @@ contract NonceManager is AtlasConstants {
                 bitmap >>= bitPos;
             }
 
+            bool nextWord;
+
             // Find the first zero bit in the bitmap
             while (bitmap & 1 == 1) {
+                if (bitPos == type(uint8).max) {
+                    // End of the bitmap, move to the next word
+                    nextWord = true;
+                    ++word;
+                    bitPos = 0;
+                    break;
+                }
+
                 bitmap >>= 1;
                 ++bitPos;
+            }
+
+            if (nextWord) {
+                continue;
             }
 
             nextNonce = _nonceFromWordAndPos(word, bitPos);
@@ -230,7 +244,7 @@ contract NonceManager is AtlasConstants {
     function _nextNonceBitmapPositions(uint256 refNonce) internal pure returns (uint248 word, uint8 bitPos) {
         (word, bitPos) = _bitmapPositions(refNonce);
         if (bitPos == type(uint8).max) {
-            // Full bitmap, move to the next word
+            // End of the bitmap, move to the next word
             ++word;
             bitPos = 0;
         } else {
