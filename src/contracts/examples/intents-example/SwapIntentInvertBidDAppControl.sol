@@ -18,7 +18,7 @@ import { DAppControl } from "../../dapp/DAppControl.sol";
 import "forge-std/Test.sol";
 
 /**
- * @notice SwapIntent which wants exact amount of `tokenUserBuys` and is willing to sell up to `maxAmountUserSells` of
+ * @notice SwapIntent where user wants exact amount of `tokenUserBuys` and is willing to sell up to `maxAmountUserSells` of
  * `tokenUserSells` for it
  */
 struct SwapIntent {
@@ -111,7 +111,7 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
     function _preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
         address solverTo = solverOp.solver;
         if (solverTo == address(this) || solverTo == _control() || solverTo == ATLAS) {
-            revert();
+            revert("Invalid solver address - solverOp.solver cannot be execution environment, dapp control or atlas");
         }
 
         SwapIntent memory swapData = abi.decode(returnData, (SwapIntent));
@@ -121,8 +121,6 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
 
         // Optimistically transfer to the solver contract the amount that the solver is invert bidding
         _transferUserERC20(swapData.tokenUserSells, solverTo, solverOp.bidAmount);
-
-        return; // success
     }
 
     /*
@@ -138,13 +136,11 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
         uint256 buyTokenBalance = ERC20(swapIntent.tokenUserBuys).balanceOf(address(this));
 
         if (buyTokenBalance < swapIntent.amountUserBuys) {
-            revert();
+            revert("SwapIntentInvertBid: Intent Unfulfilled - buyTokenBalance < amountUserBuys");
         }
 
         // Transfer the tokens the user is buying to the user
         ERC20(swapIntent.tokenUserBuys).safeTransfer(_user(), swapIntent.amountUserBuys);
-
-        return; // success
     }
 
     /*

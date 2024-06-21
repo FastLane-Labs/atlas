@@ -2,30 +2,14 @@
 pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
-
 import { ERC20 } from "solmate/tokens/ERC20.sol";
-
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
-
 import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
 import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
 import { DAppOperation, DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
-
 import { SwapIntent, SwapIntentInvertBidDAppControl } from "src/contracts/examples/intents-example/SwapIntentInvertBidDAppControl.sol";
 import { SolverBaseInvertBid } from "src/contracts/solver/SolverBaseInvertBid.sol";
-
-interface IUniV2Router02 {
-    function swapExactTokensForTokens(
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    )
-        external
-        returns (uint256[] memory amounts);
-}
 
 contract SwapIntentTest is BaseTest {
     SwapIntentInvertBidDAppControl public swapIntentControl;
@@ -66,40 +50,72 @@ contract SwapIntentTest is BaseTest {
     }
 
     function testAtlasSwapIntentInvertBidWithBasicRFQ() public {
-        // Swap 10 WETH for 20 DAI
+        // Define hardcoded quantities
+        uint256 amountUserBuys = 20e18;
+        uint256 maxAmountUserSells = 10e18;
+        uint256 solverBidAmount = 1e18;
 
-        SwapIntent memory swapIntent = SwapIntent({
+        SwapIntent memory swapIntent = createSwapIntent(amountUserBuys, maxAmountUserSells);
+        SimpleRFQSolverInvertBid rfqSolver = deployAndFundRFQSolver(swapIntent);
+        address executionEnvironment = createExecutionEnvironment();
+        UserOperation memory userOp = buildUserOperation(swapIntent);
+        SolverOperation memory solverOp = buildSolverOperation(userOp, swapIntent, executionEnvironment, address(rfqSolver), solverBidAmount);
+        SolverOperation[] memory solverOps = new SolverOperation[](1);
+        solverOps[0] = solverOp;
+        DAppOperation memory dAppOp = buildDAppOperation(userOp, solverOps);
+
+        uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);
+        uint256 userDaiBalanceBefore = DAI.balanceOf(userEOA);
+
+        vm.prank(userEOA); 
+        WETH.transfer(address(1), userWethBalanceBefore - swapIntent.maxAmountUserSells);
+        userWethBalanceBefore = WETH.balanceOf(userEOA);
+        assertTrue(userWethBalanceBefore >= swapIntent.maxAmountUserSells, "Not enough starting WETH");
+
+        approveAtlasAndExecuteSwap(swapIntent, userOp, solverOps, dAppOp);
+
+        // Check user token balances after
+        assertEq(WETH.balanceOf(userEOA), userWethBalanceBefore - solverBidAmount, "Did not spend WETH == solverBidAmount");
+        assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + swapIntent.amountUserBuys, "Did not receive enough DAI");
+    }
+
+    function createSwapIntent(uint256 amountUserBuys, uint256 maxAmountUserSells) internal view returns (SwapIntent memory) {
+        return SwapIntent({
             tokenUserBuys: DAI_ADDRESS,
-            amountUserBuys: 20e18,
+            amountUserBuys: amountUserBuys,
             tokenUserSells: WETH_ADDRESS,
-            maxAmountUserSells: 10e18
+            maxAmountUserSells: maxAmountUserSells
         });
+    }
 
-        // Solver deploys the RFQ solver contract (defined at bottom of this file)
+    function deployAndFundRFQSolver(SwapIntent memory swapIntent) internal returns (SimpleRFQSolverInvertBid) {
         vm.startPrank(solverOneEOA);
         SimpleRFQSolverInvertBid rfqSolver = new SimpleRFQSolverInvertBid(WETH_ADDRESS, address(atlas));
         atlas.deposit{ value: 1e18 }();
         atlas.bond(1 ether);
         vm.stopPrank();
 
-        // Give 20 DAI to RFQ solver contract
         deal(DAI_ADDRESS, address(rfqSolver), swapIntent.amountUserBuys);
         assertEq(DAI.balanceOf(address(rfqSolver)), swapIntent.amountUserBuys, "Did not give enough DAI to solver");
 
-        // Input params for Atlas.metacall() - will be populated below
-        UserOperation memory userOp;
-        SolverOperation[] memory solverOps = new SolverOperation[](1);
-        DAppOperation memory dAppOp;
+        return rfqSolver;
+    }
 
+    function createExecutionEnvironment() internal returns (address){
         vm.startPrank(userEOA);
         address executionEnvironment = atlas.createExecutionEnvironment(txBuilder.control());
         console.log("executionEnvironment", executionEnvironment);
         vm.stopPrank();
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
+        return executionEnvironment;
+    }
+
+    function buildUserOperation(SwapIntent memory swapIntent) internal view returns (UserOperation memory) {
+        UserOperation memory userOp;
+
         bytes memory userOpData = abi.encodeCall(SwapIntentInvertBidDAppControl.swap, swapIntent);
 
-        // Builds the metaTx and to parts of userOp, signature still to be set
         userOp = txBuilder.buildUserOperation({
             from: userEOA,
             to: address(swapIntentControl),
@@ -110,54 +126,40 @@ contract SwapIntentTest is BaseTest {
         });
         userOp.sessionKey = governanceEOA;
 
-        // User signs the userOp
-        // user doees NOT sign the userOp for when they are bundling
-        // (sig.v, sig.r, sig.s) = vm.sign(userPK, atlas.getUserOperationPayload(userOp));
-        // userOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+        return userOp;
+    }
 
-        uint256 solverBidAmount = 1e18;
-
-        // Build solver calldata (function selector on solver contract and its params)
+    function buildSolverOperation(UserOperation memory userOp, SwapIntent memory swapIntent, address executionEnvironment,
+        address solverAddress, uint256 solverBidAmount) internal returns (SolverOperation memory) {
         bytes memory solverOpData =
             abi.encodeCall(SimpleRFQSolverInvertBid.fulfillRFQ, (swapIntent, executionEnvironment, solverBidAmount));
 
-        // Builds the SolverOperation
-        solverOps[0] = txBuilder.buildSolverOperation({
+        SolverOperation memory solverOp = txBuilder.buildSolverOperation({
             userOp: userOp,
             solverOpData: solverOpData,
             solverEOA: solverOneEOA,
-            solverContract: address(rfqSolver),
+            solverContract: solverAddress,
             bidAmount: solverBidAmount,
             value: 0
         });
 
-        // Solver signs the solverOp
-        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
-        solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
+        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOp));
+        solverOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-        // Frontend creates dAppOp calldata after seeing rest of data
-        dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
+        return solverOp;
+    }
 
-        // Frontend signs the dAppOp payload
+    function buildDAppOperation(UserOperation memory userOp, SolverOperation[] memory solverOps) 
+        internal returns (DAppOperation memory) {
+        DAppOperation memory dAppOp = txBuilder.buildDAppOperation(governanceEOA, userOp, solverOps);
+
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-        // Check user token balances before
-        uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);
-        uint256 userDaiBalanceBefore = DAI.balanceOf(userEOA);
+        return dAppOp;
+    }
 
-        vm.prank(userEOA); // Burn all users WETH except 10 so logs are more readable
-        WETH.transfer(address(1), userWethBalanceBefore - swapIntent.maxAmountUserSells);
-        userWethBalanceBefore = WETH.balanceOf(userEOA);
-
-        assertTrue(userWethBalanceBefore >= swapIntent.maxAmountUserSells, "Not enough starting WETH");
-
-        console.log("\nBEFORE METACALL");
-        console.log("User WETH balance", WETH.balanceOf(userEOA));
-        console.log("User DAI balance", DAI.balanceOf(userEOA));
-        console.log("Solver WETH balance", WETH.balanceOf(address(rfqSolver)));
-        console.log("Solver DAI balance", DAI.balanceOf(address(rfqSolver)));
-
+    function approveAtlasAndExecuteSwap(SwapIntent memory swapIntent, UserOperation memory userOp, SolverOperation[] memory solverOps, DAppOperation memory dAppOp) internal {
         vm.startPrank(userEOA);
 
         (bool simResult,,) = simulator.simUserOperation(userOp);
@@ -167,23 +169,13 @@ contract SwapIntentTest is BaseTest {
 
         (simResult,,) = simulator.simUserOperation(userOp);
         assertTrue(simResult, "metasimUserOperationcall tested false c");
-
         uint256 gasLeftBefore = gasleft();
 
+        vm.startPrank(userEOA);
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
 
-        console.log("OEV Metacall Gas Cost:", gasLeftBefore - gasleft());
+        console.log("Metacall Gas Cost:", gasLeftBefore - gasleft());
         vm.stopPrank();
-
-        console.log("\nAFTER METACALL");
-        console.log("User WETH balance", WETH.balanceOf(userEOA));
-        console.log("User DAI balance", DAI.balanceOf(userEOA));
-        console.log("Solver WETH balance", WETH.balanceOf(address(rfqSolver)));
-        console.log("Solver DAI balance", DAI.balanceOf(address(rfqSolver)));
-
-        // Check user token balances after
-        assertEq(WETH.balanceOf(userEOA), userWethBalanceBefore - solverBidAmount, "Did not spend WETH == solverBidAmount");
-        assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + swapIntent.amountUserBuys, "Did not receive enough DAI");
     }
 }
 
@@ -195,7 +187,7 @@ contract SimpleRFQSolverInvertBid is SolverBaseInvertBid {
     function fulfillRFQ(SwapIntent calldata swapIntent, address executionEnvironment, uint256 solverBidAmount) public {
         require(
             ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= solverBidAmount,
-            "Did"
+            "Did not receive enough tokenUserSells (=solverBidAmount) to fulfill swapIntent"
         );
         require(
             ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys,

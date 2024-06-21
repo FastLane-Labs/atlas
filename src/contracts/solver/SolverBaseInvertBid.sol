@@ -75,7 +75,7 @@ contract SolverBaseInvertBid is ISolverContract {
         // Environment
         if (_bidRetreivalRequired) {
             require(bidToken != address(0), "Solver cannot retrieve ETH from EE");
-            SafeTransferLib.safeTransferFrom(ERC20(bidToken), msg.sender, address(this), bidAmount);
+            SafeTransferLib.safeTransferFrom(ERC20(bidToken), executionEnvironment, address(this), bidAmount);
         }
         _;
     }
