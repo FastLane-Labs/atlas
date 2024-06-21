@@ -147,6 +147,7 @@ contract MockAtlas is Atlas {
         bytes memory returnData,
         Context memory ctx
     ) public returns (Context memory) {
-        return _bidFindingIteration(ctx, dConfig, userOp, solverOps, returnData);
+        _bidFindingIteration(ctx, dConfig, userOp, solverOps, returnData);
+        return ctx;
     }
 }

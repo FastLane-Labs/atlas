@@ -122,20 +122,22 @@ contract Atlas is Escrow, Factory {
 
         // PreOps Call
         if (dConfig.callConfig.needsPreOpsCall()) {
-            (ctx, returnData) = _executePreOpsCall(ctx, dConfig, userOp);
+            returnData = _executePreOpsCall(ctx, dConfig, userOp);
         }
 
         // UserOp Call
-        (ctx, returnData) = _executeUserOperation(ctx, dConfig, userOp, returnData);
+        returnData = _executeUserOperation(ctx, dConfig, userOp, returnData);
 
         // SolverOps Calls
-        ctx = dConfig.callConfig.exPostBids()
-            ? _bidFindingIteration(ctx, dConfig, userOp, solverOps, returnData)
-            : _bidKnownIteration(ctx, dConfig, userOp, solverOps, returnData);
+        if (dConfig.callConfig.exPostBids()) {
+            _bidFindingIteration(ctx, dConfig, userOp, solverOps, returnData);
+        } else {
+            _bidKnownIteration(ctx, dConfig, userOp, solverOps, returnData);
+        }
 
         // PostOp Call
         if (dConfig.callConfig.needsPostOpsCall()) {
-            ctx = _executePostOpsCall(ctx, ctx.solverSuccessful, returnData);
+            _executePostOpsCall(ctx, ctx.solverSuccessful, returnData);
         }
 
         // NOTE: In _allocateValue, we reused ctx.solverOutcome to store the index of the winning solverOp.
@@ -149,7 +151,6 @@ contract Atlas is Escrow, Factory {
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param returnData Return data from the preOps and userOp calls.
-    /// @return ctx Updated Context struct, reflecting the new state after attempting the SolverOperation.
     function _bidFindingIteration(
         Context memory ctx,
         DAppConfig calldata dConfig,
@@ -158,13 +159,12 @@ contract Atlas is Escrow, Factory {
         bytes memory returnData
     )
         internal
-        returns (Context memory)
     {
         // Return early if no solverOps (e.g. in simUserOperation)
         if (solverOps.length == 0) {
             if (ctx.isSimulation) revert SolverSimFail(0);
             if (dConfig.callConfig.needsFulfillment()) revert UserNotFulfilled();
-            return ctx;
+            return;
         }
 
         ctx.bidFind = true;
@@ -224,18 +224,18 @@ contract Atlas is Escrow, Factory {
             uint256 solverIndex = bidsAndIndices[i] & _FIRST_16_BITS_TRUE_MASK;
 
             // Execute the solver operation. If solver won, allocate value and return. Otherwise continue looping.
-            (ctx, bidAmountFound) =
+            bidAmountFound =
                 _executeSolverOperation(ctx, dConfig, userOp, solverOps[solverIndex], bidAmountFound, true, returnData);
 
             if (ctx.solverSuccessful) {
-                return _allocateValue(ctx, dConfig, bidAmountFound, solverIndex, returnData);
+                _allocateValue(ctx, dConfig, bidAmountFound, solverIndex, returnData);
+                return;
             }
 
             if (i == 0) break; // break to prevent underflow in next loop
         }
         if (ctx.isSimulation) revert SolverSimFail(uint256(ctx.solverOutcome));
         if (dConfig.callConfig.needsFulfillment()) revert UserNotFulfilled();
-        return ctx;
     }
 
     /// @notice Called above in `execute` as an alternative to `_bidFindingIteration`, if solverOps have already been
@@ -245,7 +245,6 @@ contract Atlas is Escrow, Factory {
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param returnData Return data from the preOps and userOp calls.
-    /// @return Context Updated Context struct, reflecting the new state after attempting the SolverOperation.
     function _bidKnownIteration(
         Context memory ctx,
         DAppConfig calldata dConfig,
@@ -254,7 +253,6 @@ contract Atlas is Escrow, Factory {
         bytes memory returnData
     )
         internal
-        returns (Context memory)
     {
         uint256 bidAmount;
         uint256 k = solverOps.length;
@@ -262,16 +260,15 @@ contract Atlas is Escrow, Factory {
         for (uint256 solverIndex; solverIndex < k; ++solverIndex) {
             SolverOperation calldata solverOp = solverOps[solverIndex];
 
-            (ctx, bidAmount) =
-                _executeSolverOperation(ctx, dConfig, userOp, solverOp, solverOp.bidAmount, false, returnData);
+            bidAmount = _executeSolverOperation(ctx, dConfig, userOp, solverOp, solverOp.bidAmount, false, returnData);
 
             if (ctx.solverSuccessful) {
-                return _allocateValue(ctx, dConfig, bidAmount, solverIndex, returnData);
+                _allocateValue(ctx, dConfig, bidAmount, solverIndex, returnData);
+                return;
             }
         }
         if (ctx.isSimulation) revert SolverSimFail(uint256(ctx.solverOutcome));
         if (dConfig.callConfig.needsFulfillment()) revert UserNotFulfilled();
-        return ctx;
     }
 
     /// @notice Called at the end of `metacall` to bubble up specific error info in a revert.

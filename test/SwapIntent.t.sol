@@ -69,7 +69,7 @@ contract SwapIntentTest is BaseTest {
         // atlas.deposit{value: 1e18}();
     }
 
-    function testAtlasSwapIntentWithBasicRFQ() public {
+    function testAtlasSwapIntentWithBasicRFQ_GasCheck() public {
         // Swap 10 WETH for 20 DAI
         UserCondition userCondition = new UserCondition();
 
@@ -192,7 +192,7 @@ contract SwapIntentTest is BaseTest {
 
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
 
-        console.log("OEV Metacall Gas Cost:", gasLeftBefore - gasleft());
+        console.log("Metacall Gas Cost:", gasLeftBefore - gasleft());
         vm.stopPrank();
 
         console.log("\nAFTER METACALL");
