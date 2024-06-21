@@ -111,9 +111,7 @@ abstract contract Escrow is AtlETH {
         uint256 gasWaterMark = gasleft();
         uint256 result;
         if (!prevalidated) {
-            result = IAtlasVerification(VERIFICATION).verifySolverOp(
-                solverOp, key.userOpHash, userOp.maxFeePerGas, key.bundler
-            );
+            result = VERIFICATION.verifySolverOp(solverOp, key.userOpHash, userOp.maxFeePerGas, key.bundler);
             result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, result);
         }
 
@@ -326,8 +324,7 @@ abstract contract Escrow is AtlETH {
         bool success;
         uint256 gasWaterMark = gasleft();
 
-        uint256 result =
-            IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, key.userOpHash, userOp.maxFeePerGas, key.bundler);
+        uint256 result = VERIFICATION.verifySolverOp(solverOp, key.userOpHash, userOp.maxFeePerGas, key.bundler);
 
         result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, result);
 
