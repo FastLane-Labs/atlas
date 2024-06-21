@@ -36,7 +36,9 @@ struct SwapIntent {
 contract SwapIntentInvertBidDAppControl is DAppControl {
     using SafeTransferLib for ERC20;
 
-    constructor(address _atlas)
+    bool _solverBidRetrievalRequired;
+
+    constructor(address _atlas, bool bidFind, bool solverBidRetrievalRequired)
         DAppControl(
             _atlas,
             msg.sender,
@@ -60,10 +62,12 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
                 requireFulfillment: true,
                 trustedOpHash: true,
                 invertBidValue: true,
-                exPostBids: false
+                exPostBids: bidFind
             })
         )
-    { }
+    { 
+        _solverBidRetrievalRequired = solverBidRetrievalRequired;
+    }
 
     // ---------------------------------------------------- //
     //                       Custom                         //
