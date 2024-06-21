@@ -113,6 +113,7 @@ contract AtlasErrors {
 
     // DAppControl
     error BothUserAndDAppNoncesCannotBeSequential();
+    error BothPreOpsAndUserReturnDataCannotBeTracked();
     error InvalidControl();
     error NoDelegatecall();
     error MustBeDelegatecalled();

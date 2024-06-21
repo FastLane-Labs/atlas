@@ -79,6 +79,11 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         // Verify that the calldata injection came from the dApp frontend
         // and that the signatures are valid.
 
+        if (dConfig.callConfig.needsPreOpsReturnData() && dConfig.callConfig.needsUserReturnData()) {
+            // Max one of preOps or userOp return data can be tracked, not both
+            return (userOpHash, ValidCallsResult.InvalidCallConfig);
+        }
+
         // CASE: Solvers trust app to update content of UserOp after submission of solverOp
         if (dConfig.callConfig.allowsTrustedOpHash()) {
             userOpHash = userOp.getAltOperationHash();
