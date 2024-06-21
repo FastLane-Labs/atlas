@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { SafetyLocks } from "src/contracts/atlas/SafetyLocks.sol";
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
