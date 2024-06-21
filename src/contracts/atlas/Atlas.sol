@@ -58,9 +58,8 @@ contract Atlas is Escrow, Factory {
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
         // NOTE: Currently reverting instead of graceful return to help w/ testing. TODO - still reverting?
-        (bytes32 userOpHash, ValidCallsResult validCallsResult) = IAtlasVerification(VERIFICATION).validateCalls(
-            dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, isSimulation
-        );
+        (bytes32 userOpHash, ValidCallsResult validCallsResult) =
+            VERIFICATION.validateCalls(dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, isSimulation);
         if (validCallsResult != ValidCallsResult.Valid) {
             if (isSimulation) revert VerificationSimFail(uint256(validCallsResult));
             revert ValidCalls(validCallsResult);
@@ -125,9 +124,11 @@ contract Atlas is Escrow, Factory {
         }
 
         if (auctionWon) {
-            // key.solverOutcome contains the index of the winning solver (to prevent Stack Too Deep errors)
+            // when auctionWon, key.solverOutcome contains the index of the winning solver (to prevent Stack Too Deep
+            // errors)
             winningSolver = solverOps[key.solverOutcome].from;
         } else {
+            // when !auctionWon, key.solverOutcome contains the error code of the last solver
             // If no solver was successful, handle revert decision
             if (key.isSimulation) revert SolverSimFail(uint256(key.solverOutcome));
             if (dConfig.callConfig.needsFulfillment()) {
@@ -229,7 +230,8 @@ contract Atlas is Escrow, Factory {
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param returnData Return data from the preOps and userOp calls.
-    /// @param key EscrowKey struct containing the current state of the escrow lock.
+    /// @param key EscrowKey struct containing the current state of the escrow lock. key.solverOutcome is the index of
+    /// the winning solver. When no winner is found, key.solverOutcome is the error code of the last solver.
     /// @return auctionWon bool indicating whether a winning solver was found or not.
     /// @return EscrowKey struct containing the current state of the escrow lock.
     function _bidFindingIteration(
@@ -326,7 +328,8 @@ contract Atlas is Escrow, Factory {
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param returnData Return data from the preOps and userOp calls.
-    /// @param key EscrowKey struct containing the current state of the escrow lock.
+    /// @param key EscrowKey struct containing the current state of the escrow lock. key.solverOutcome is the index of
+    /// the winning solver. When no winner is found, key.solverOutcome is the error code of the last solver.
     /// @return auctionWon bool indicating whether a winning solver was found or not.
     /// @return EscrowKey struct containing the current state of the escrow lock.
     function _bidKnownIteration(

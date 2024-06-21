@@ -607,9 +607,9 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     function test_validCalls_trustedOpHash_msgSenderWrong_InvalidBundler() public {
         defaultAtlasWithCallConfig(defaultCallConfig().withTrustedOpHash(true).build());
 
-        UserOperation memory userOp = validUserOperation().withSessionKey(governanceEOA).build();
+        UserOperation memory userOp = validUserOperation().withSessionKey(governanceEOA).sign(address(atlasVerification), userPK).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
-        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withAltUserOpHash(userOp).build();
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withAltUserOpHash(userOp).sign(address(atlasVerification), governancePK).build();
         solverOps[0] = validSolverOperation(userOp).withAltUserOpHash(userOp).build();
 
         // If msgSender in _validCalls is neither dAppOp.from nor userOp.from,
