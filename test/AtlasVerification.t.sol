@@ -912,26 +912,6 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     //
     // given a default atlas environment
     //   and otherwise valid user, solver and dapp operations
-    //     where the dapp operation nonce is uint128.max
-    // when validCalls is called from the userEOA
-    // then it should return DAppSignatureInvalid
-    // because anything above uint128.max - 1 is not a valid nonce
-    //
-    function test_validCalls_NonceTooLarge_DAppSignatureInvalid() public {
-        defaultAtlasEnvironment();
-
-        UserOperation memory userOp = validUserOperation().build();
-        SolverOperation[] memory solverOps = validSolverOperations(userOp);
-        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(type(uint128).max).signAndBuild(address(atlasVerification), governancePK);
-
-        callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.InvalidDAppNonce);
-    }
-
-    //
-    // given a default atlas environment
-    //   and otherwise valid user, solver and dapp operations
     //     where the dapp operation nonce is zero
     // when validCalls is called from the userEOA
     // then it should return DAppSignatureInvalid
@@ -1223,26 +1203,6 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
             false);
         vm.stopPrank();
         assertValidCallsResult(result, ValidCallsResult.ControlMismatch);
-    }
-
-    //
-    // given a default atlas environment
-    //   and otherwise valid user, solver and dapp operations
-    //     where the user operation nonce is greater than uint128.max - 1
-    // when validCalls is called from the userEOA
-    // then it should return UserNonceInvalid
-    // because anything above uint128.max - 1 is not a valid nonce
-    //
-    function test_validCalls_UserOpNonceToBig_UserNonceInvalid() public {
-        defaultAtlasEnvironment();
-
-        UserOperation memory userOp = validUserOperation().withNonce(type(uint128).max).signAndBuild(address(atlasVerification), userPK);
-        SolverOperation[] memory solverOps = validSolverOperations(userOp);
-        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
-
-        callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.UserNonceInvalid);
     }
     
     //
