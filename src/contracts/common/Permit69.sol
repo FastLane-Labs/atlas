@@ -62,7 +62,7 @@ abstract contract Permit69 is GasAccounting {
     /// @param user The address of the user invoking the function.
     /// @param control The address of the current DAppControl contract.
     /// @param callConfig The CallConfig of the current DAppControl contract.
-    /// @param phase The lock state indicating the safe execution phase for the token transfer.
+    /// @param currentPhase The lock state indicating the safe execution phase for the token transfer.
     function transferUserERC20(
         address token,
         address destination,
@@ -70,7 +70,7 @@ abstract contract Permit69 is GasAccounting {
         address user,
         address control,
         uint32 callConfig,
-        uint8 phase
+        uint8 currentPhase
     )
         external
     {
@@ -79,7 +79,7 @@ abstract contract Permit69 is GasAccounting {
             user: user,
             control: control,
             callConfig: callConfig,
-            phase: phase,
+            currentPhase: currentPhase,
             safeExecutionPhaseSet: SAFE_USER_TRANSFER
         });
 
@@ -95,7 +95,7 @@ abstract contract Permit69 is GasAccounting {
     /// @param user The address of the user invoking the function.
     /// @param control The address of the current DAppControl contract.
     /// @param callConfig The CallConfig of the current DAppControl contract.
-    /// @param phase The lock state indicating the safe execution phase for the token transfer.
+    /// @param currentPhase The lock state indicating the safe execution phase for the token transfer.
     function transferDAppERC20(
         address token,
         address destination,
@@ -103,7 +103,7 @@ abstract contract Permit69 is GasAccounting {
         address user,
         address control,
         uint32 callConfig,
-        uint8 phase
+        uint8 currentPhase
     )
         external
     {
@@ -112,7 +112,7 @@ abstract contract Permit69 is GasAccounting {
             user: user,
             control: control,
             callConfig: callConfig,
-            phase: phase,
+            currentPhase: currentPhase,
             safeExecutionPhaseSet: SAFE_DAPP_TRANSFER
         });
 
@@ -124,13 +124,13 @@ abstract contract Permit69 is GasAccounting {
     /// @param user The address of the user invoking the function.
     /// @param control The address of the current DAppControl contract.
     /// @param callConfig The CallConfig of the DAppControl contract of the current transaction.
-    /// @param phase The lock state to be checked.
+    /// @param currentPhase The lock state to be checked.
     /// @param safeExecutionPhaseSet The set of safe execution phases.
     function _validateTransfer(
         address user,
         address control,
         uint32 callConfig,
-        uint8 phase,
+        uint8 currentPhase,
         uint8 safeExecutionPhaseSet
     )
         internal
@@ -141,7 +141,7 @@ abstract contract Permit69 is GasAccounting {
         if (_lock.activeEnvironment != msg.sender) {
             revert InvalidEnvironment();
         }
-        if (uint8(_lock.phase) != phase) {
+        if (uint8(_lock.phase) != currentPhase) {
             revert WrongPhase();
         }
 
@@ -155,7 +155,7 @@ abstract contract Permit69 is GasAccounting {
         }
 
         // Verify that the current phase allows for transfers
-        if (1 << phase & safeExecutionPhaseSet == 0) {
+        if (1 << currentPhase & safeExecutionPhaseSet == 0) {
             revert InvalidLockState();
         }
     }

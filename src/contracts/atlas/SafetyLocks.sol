@@ -56,8 +56,8 @@ abstract contract SafetyLocks is Storage {
         deposits = msg.value;
     }
 
-    modifier withLockPhase(ExecutionPhase phase) {
-        lock.phase = phase;
+    modifier withLockPhase(ExecutionPhase _phase) {
+        lock.phase = _phase;
         _;
     }
 

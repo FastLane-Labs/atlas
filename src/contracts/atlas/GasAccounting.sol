@@ -25,7 +25,8 @@ abstract contract GasAccounting is SafetyLocks {
 
     /// @notice Contributes ETH to the contract, increasing the deposits if a non-zero value is sent.
     function contribute() external payable {
-        if (lock.activeEnvironment != msg.sender) revert InvalidExecutionEnvironment(lock.activeEnvironment);
+        address currentEnvironment = lock.activeEnvironment;
+        if (currentEnvironment != msg.sender) revert InvalidExecutionEnvironment(currentEnvironment);
         _contribute();
     }
 
@@ -33,11 +34,11 @@ abstract contract GasAccounting is SafetyLocks {
     /// @dev Borrowing is only available until the end of the SolverOperations phase, for solver protection.
     /// @param amount The amount of ETH to borrow.
     function borrow(uint256 amount) external payable {
-        Lock memory currentLock = lock;
-        if (currentLock.activeEnvironment != msg.sender) {
-            revert InvalidExecutionEnvironment(currentLock.activeEnvironment);
+        Lock memory _lock = lock;
+        if (_lock.activeEnvironment != msg.sender) {
+            revert InvalidExecutionEnvironment(_lock.activeEnvironment);
         }
-        if (currentLock.phase > ExecutionPhase.SolverOperations) revert WrongPhase();
+        if (_lock.phase > ExecutionPhase.SolverOperations) revert WrongPhase();
 
         if (_borrow(amount)) {
             SafeTransferLib.safeTransferETH(msg.sender, amount);
