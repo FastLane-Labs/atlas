@@ -1,7 +1,8 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { Base } from "src/contracts/common/ExecutionBase.sol";
 
 import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
@@ -142,7 +143,7 @@ contract ExecutionEnvironment is Base {
             // inventory to send to solver must have been transferred in by userOp or preOp call
             solverTracker.ceiling = solverTracker.etherIsBidToken
                 ? address(this).balance
-                : ERC20(solverOp.bidToken).balanceOf(address(this));
+                : IERC20(solverOp.bidToken).balanceOf(address(this));
         }
 
         // Handle any solver preOps, if necessary
@@ -160,7 +161,7 @@ contract ExecutionEnvironment is Base {
             // if not invertsBidValue, record floor now
             solverTracker.floor = solverTracker.etherIsBidToken
                 ? address(this).balance
-                : ERC20(solverOp.bidToken).balanceOf(address(this));
+                : IERC20(solverOp.bidToken).balanceOf(address(this));
         }
     }
 
@@ -186,7 +187,7 @@ contract ExecutionEnvironment is Base {
             // if invertsBidValue, record floor now
             solverTracker.floor = solverTracker.etherIsBidToken
                 ? address(this).balance
-                : ERC20(solverOp.bidToken).balanceOf(address(this));
+                : IERC20(solverOp.bidToken).balanceOf(address(this));
         }
 
         bool success;
@@ -203,7 +204,7 @@ contract ExecutionEnvironment is Base {
             // if not invertsBidValue, record ceiling now
             solverTracker.ceiling = solverTracker.etherIsBidToken
                 ? address(this).balance
-                : ERC20(solverOp.bidToken).balanceOf(address(this));
+                : IERC20(solverOp.bidToken).balanceOf(address(this));
         }
 
         // Make sure the numbers add up and that the bid was paid
@@ -261,8 +262,8 @@ contract ExecutionEnvironment is Base {
         if (msg.sender != _user()) revert AtlasErrors.NotEnvironmentOwner();
         if (!ISafetyLocks(ATLAS).isUnlocked()) revert AtlasErrors.AtlasLockActive();
 
-        if (ERC20(token).balanceOf(address(this)) >= amount) {
-            SafeTransferLib.safeTransfer(ERC20(token), msg.sender, amount);
+        if (IERC20(token).balanceOf(address(this)) >= amount) {
+            SafeTransferLib.safeTransfer(token, msg.sender, amount);
         } else {
             revert AtlasErrors.ExecutionEnvironmentBalanceTooLow();
         }
