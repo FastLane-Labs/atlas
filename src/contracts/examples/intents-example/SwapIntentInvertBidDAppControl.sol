@@ -18,7 +18,8 @@ import { DAppControl } from "../../dapp/DAppControl.sol";
 import "forge-std/Test.sol";
 
 /**
- * @notice SwapIntent where user wants exact amount of `tokenUserBuys` and is willing to sell up to `maxAmountUserSells` of
+ * @notice SwapIntent where user wants exact amount of `tokenUserBuys` and is willing to sell up to `maxAmountUserSells`
+ * of
  * `tokenUserSells` for it
  */
 struct SwapIntent {
@@ -38,7 +39,11 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
 
     bool public immutable _solverBidRetrievalRequired;
 
-    constructor(address _atlas, bool bidFind, bool solverBidRetrievalRequired)
+    constructor(
+        address _atlas,
+        bool bidFind,
+        bool solverBidRetrievalRequired
+    )
         DAppControl(
             _atlas,
             msg.sender,
@@ -65,7 +70,7 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
                 exPostBids: bidFind
             })
         )
-    { 
+    {
         _solverBidRetrievalRequired = solverBidRetrievalRequired;
     }
 
@@ -122,8 +127,8 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
 
         // The solver must be bidding less than the intent's maxAmountUserSells
         require(solverOp.bidAmount <= swapData.maxAmountUserSells, "SwapIntentInvertBid: BidTooHigh");
-        
-        if (_solverBidRetrievalRequired){
+
+        if (_solverBidRetrievalRequired) {
             // Optimistically transfer to the execution environment the amount that the solver is invert bidding
             _transferUserERC20(swapData.tokenUserSells, address(this), solverOp.bidAmount);
             // Approve the solver to retrieve the bid amount from ee
