@@ -41,7 +41,6 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
 
     constructor(
         address _atlas,
-        bool bidFind,
         bool solverBidRetrievalRequired
     )
         DAppControl(
@@ -67,7 +66,7 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
                 requireFulfillment: true,
                 trustedOpHash: true,
                 invertBidValue: true,
-                exPostBids: bidFind
+                exPostBids: false
             })
         )
     {

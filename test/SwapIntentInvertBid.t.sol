@@ -36,7 +36,7 @@ contract SwapIntentTest is BaseTest {
 
     function testAtlasSwapIntentInvertBid_solverBidRetreivalNotRequired() public {
         vm.startPrank(governanceEOA);
-        SwapIntentInvertBidDAppControl controlContract = new SwapIntentInvertBidDAppControl(address(atlas), false, false);
+        SwapIntentInvertBidDAppControl controlContract = new SwapIntentInvertBidDAppControl(address(atlas), false);
         address control = address(controlContract);
         atlasVerification.initializeGovernance(control);
         vm.stopPrank();
@@ -71,7 +71,7 @@ contract SwapIntentTest is BaseTest {
 
     function testAtlasSwapIntentInvertBid_solverBidRetreivalNotRequired_multipleSolvers() public {
         vm.startPrank(governanceEOA);
-        SwapIntentInvertBidDAppControl controlContract = new SwapIntentInvertBidDAppControl(address(atlas), false, false);
+        SwapIntentInvertBidDAppControl controlContract = new SwapIntentInvertBidDAppControl(address(atlas), false);
         address control = address(controlContract);
         atlasVerification.initializeGovernance(control);
         vm.stopPrank();
@@ -111,7 +111,7 @@ contract SwapIntentTest is BaseTest {
 
     function testAtlasSwapIntentInvertBid_solverBidRetreivalRequired() public {
         vm.startPrank(governanceEOA);
-        SwapIntentInvertBidDAppControl controlContract = new SwapIntentInvertBidDAppControl(address(atlas), false, true);
+        SwapIntentInvertBidDAppControl controlContract = new SwapIntentInvertBidDAppControl(address(atlas), true);
         address control = address(controlContract);
         atlasVerification.initializeGovernance(control);
         vm.stopPrank();
