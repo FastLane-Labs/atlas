@@ -3,7 +3,7 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { CallVerification, UserOperationHashType, USER_TYPEHASH_DEFAULT, USER_TYPEHASH_TRUSTED } from "src/contracts/libraries/CallVerification.sol";
+import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 import "src/contracts/types/UserCallTypes.sol";
 import "../base/TestUtils.sol";
 
@@ -44,36 +44,6 @@ contract CallVerificationTest is Test {
             data: "data",
             signature: "signature"
         });
-    }
-
-    function testGetUserCallHash() public {
-        UserOperation memory userOp = buildUserOperation();
-
-        assertEq(userOp.getUserOperationHash(UserOperationHashType.DEFAULT), keccak256(abi.encode(
-            USER_TYPEHASH_DEFAULT,
-            userOp.from,
-            userOp.to,
-            userOp.value,
-            userOp.gas,
-            userOp.maxFeePerGas,
-            userOp.nonce,
-            userOp.deadline,
-            userOp.dapp,
-            userOp.control,
-            userOp.callConfig,
-            userOp.sessionKey,
-            userOp.data
-        )), "UserOperationHashType.DEFAULT");
-    
-        assertEq(userOp.getUserOperationHash(UserOperationHashType.TRUSTED), keccak256(abi.encode(
-            USER_TYPEHASH_TRUSTED,
-            userOp.from,
-            userOp.to,
-            userOp.dapp,
-            userOp.control,
-            userOp.callConfig,
-            userOp.sessionKey
-        )), "UserOperationHashType.TRUSTED");
     }
 
     function testGetCallChainHash() public {

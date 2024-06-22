@@ -6,8 +6,9 @@ import "forge-std/Test.sol";
 import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
 import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
 
-import { CallVerification, UserOperationHashType } from "src/contracts/libraries/CallVerification.sol";
+import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
 import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 import { IAtlETH } from "src/contracts/interfaces/IAtlETH.sol";
@@ -63,15 +64,8 @@ contract SolverOperationBuilder is Test {
     }
 
     function withUserOpHash(UserOperation memory userOperation) public returns (SolverOperationBuilder) {
-        withUserOpHashType(userOperation, UserOperationHashType.DEFAULT);
-        return this;
-    }
-
-    function withUserOpHashType(UserOperation memory userOperation, UserOperationHashType hashType)
-        public
-        returns (SolverOperationBuilder)
-    {
-        solverOperation.userOpHash = userOperation.getUserOperationHash(hashType);
+        address verification = IAtlas(userOperation.to).VERIFICATION();
+        solverOperation.userOpHash = IAtlasVerification(verification).getUserOperationHash(userOperation);
         return this;
     }
 

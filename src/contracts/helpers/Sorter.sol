@@ -4,7 +4,9 @@ pragma solidity 0.8.22;
 import { IAtlETH } from "../interfaces/IAtlETH.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
-import { CallVerification, UserOperationHashType } from "../libraries/CallVerification.sol";
+import { CallVerification } from "../libraries/CallVerification.sol";
+import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
+import { IAtlas } from "../interfaces/IAtlas.sol";
 
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
@@ -103,8 +105,8 @@ contract Sorter {
 
         SortingData[] memory sortingData = new SortingData[](count);
 
-        UserOperationHashType hashType = dConfig.callConfig.allowsTrustedOpHash() ? UserOperationHashType.TRUSTED : UserOperationHashType.DEFAULT;
-        bytes32 userOpHash = userOp.getUserOperationHash(hashType);
+        address verification = IAtlas(userOp.to).VERIFICATION();
+        bytes32 userOpHash = IAtlasVerification(verification).getUserOperationHash(userOp);
 
         uint256 invalid;
         for (uint256 i; i < count; ++i) {

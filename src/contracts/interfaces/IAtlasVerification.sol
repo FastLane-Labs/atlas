@@ -31,6 +31,7 @@ interface IAtlasVerification {
         returns (uint256 result);
 
     function getUserOperationPayload(UserOperation memory userOp) external view returns (bytes32 payload);
+    function getUserOperationHash(UserOperation memory userOp) external view returns (bytes32 payload);
     function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload);
     function getDAppOperationPayload(DAppOperation memory dAppOp) external view returns (bytes32 payload);
     function getNextNonce(address account, bool sequential) external view returns (uint256 nextNonce);

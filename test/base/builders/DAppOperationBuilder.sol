@@ -7,10 +7,11 @@ import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
 import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
 import { DAppOperation } from "src/contracts/types/DAppApprovalTypes.sol";
 
-import { CallVerification, UserOperationHashType } from "src/contracts/libraries/CallVerification.sol";
+import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 
 import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
 import "src/contracts/types/DAppApprovalTypes.sol";
 
@@ -73,7 +74,8 @@ contract DAppOperationBuilder is Test {
     }
 
     function withUserOpHash(UserOperation memory userOperation) public returns (DAppOperationBuilder) {
-        dappOperation.userOpHash = userOperation.getUserOperationHash(UserOperationHashType.DEFAULT);
+        address verification = IAtlas(userOperation.to).VERIFICATION();
+        dappOperation.userOpHash = IAtlasVerification(verification).getUserOperationHash(userOperation);
         return this;
     }
 
