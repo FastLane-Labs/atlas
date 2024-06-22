@@ -264,7 +264,7 @@ contract ExecutionEnvironment is Base, ReentrancyGuard {
     /// @dev This function is only callable by the environment owner and only when Atlas is in an unlocked state.
     /// @param token The address of the ERC20 token to withdraw.
     /// @param amount The amount of the ERC20 token to withdraw.
-    function withdrawERC20(address token, uint256 amount) external {
+    function withdrawERC20(address token, uint256 amount) external nonReentrant {
         if (msg.sender != _user()) revert AtlasErrors.NotEnvironmentOwner();
         if (!ISafetyLocks(ATLAS).isUnlocked()) revert AtlasErrors.AtlasLockActive();
 
@@ -279,7 +279,7 @@ contract ExecutionEnvironment is Base, ReentrancyGuard {
     /// Environment.
     /// @dev This function is only callable by the environment owner and only when Atlas is in an unlocked state.
     /// @param amount The amount of Ether to withdraw.
-    function withdrawEther(uint256 amount) external {
+    function withdrawEther(uint256 amount) external nonReentrant {
         if (msg.sender != _user()) revert AtlasErrors.NotEnvironmentOwner();
         if (!ISafetyLocks(ATLAS).isUnlocked()) revert AtlasErrors.AtlasLockActive();
 
