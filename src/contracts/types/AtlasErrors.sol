@@ -120,4 +120,5 @@ contract AtlasErrors {
     error WrongDepth();
     error InsufficientLocalFunds();
     error NotImplemented();
+    error InvertBidValueCannotBeExPostBids();
 }
