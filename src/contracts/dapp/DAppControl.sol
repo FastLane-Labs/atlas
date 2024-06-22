@@ -16,6 +16,8 @@ import { IDAppIntegration } from "src/contracts/interfaces/IDAppIntegration.sol"
 /// @title DAppControl
 /// @author FastLane Labs
 /// @notice DAppControl is the base contract which should be inherited by any Atlas dApps.
+/// @notice Storage variables (except immutable) will be defaulted if accessed by delegatecalls.
+/// @notice If an extension DAppControl uses storage variables, those should not be accessed by delegatecalls.
 abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     using CallBits for uint32;
 
