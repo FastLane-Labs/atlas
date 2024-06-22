@@ -2,6 +2,7 @@
 pragma solidity 0.8.22;
 
 import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { ReentrancyGuard } from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import { Base } from "src/contracts/common/ExecutionBase.sol";
 
 import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
@@ -20,7 +21,7 @@ import "src/contracts/types/DAppApprovalTypes.sol";
 /// @author FastLane Labs
 /// @notice An Execution Environment contract is deployed for each unique combination of User address x DAppControl
 /// address that interacts with the Atlas protocol via a metacall transaction.
-contract ExecutionEnvironment is Base {
+contract ExecutionEnvironment is Base, ReentrancyGuard {
     using CallBits for uint32;
 
     uint8 private constant _ENVIRONMENT_DEPTH = 1 << 1;
@@ -54,6 +55,7 @@ contract ExecutionEnvironment is Base {
     /// @return preOpsData Data to be passed to the next call phase.
     function preOpsWrapper(UserOperation calldata userOp)
         external
+        nonReentrant
         validUser(userOp)
         onlyAtlasEnvironment
         returns (bytes memory)
@@ -77,6 +79,7 @@ contract ExecutionEnvironment is Base {
     function userWrapper(UserOperation calldata userOp)
         external
         payable
+        nonReentrant
         validUser(userOp)
         onlyAtlasEnvironment
         returns (bytes memory returnData)
@@ -105,7 +108,7 @@ contract ExecutionEnvironment is Base {
     /// corresponding `postOpsCall` function.
     /// @param solved Boolean indicating whether a winning SolverOperation was executed successfully.
     /// @param returnData Data returned from the previous call phase.
-    function postOpsWrapper(bool solved, bytes calldata returnData) external onlyAtlasEnvironment {
+    function postOpsWrapper(bool solved, bytes calldata returnData) external nonReentrant onlyAtlasEnvironment {
         bytes memory data = _forward(abi.encodeCall(IDAppControl.postOpsCall, (solved, returnData)));
 
         bool success;
@@ -129,6 +132,7 @@ contract ExecutionEnvironment is Base {
     )
         external
         payable
+        nonReentrant
         onlyAtlasEnvironment
         validSolver(solverOp)
         returns (SolverTracker memory solverTracker)
@@ -179,6 +183,7 @@ contract ExecutionEnvironment is Base {
     )
         external
         payable
+        nonReentrant
         onlyAtlasEnvironment
         returns (SolverTracker memory)
     {
@@ -236,6 +241,7 @@ contract ExecutionEnvironment is Base {
         bytes memory allocateData
     )
         external
+        nonReentrant
         onlyAtlasEnvironment
     {
         allocateData = _forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, bidAmount, allocateData)));
