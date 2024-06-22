@@ -533,7 +533,8 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp userNonces
 
-        bool signatureValid = SignatureChecker.isValidSignatureNow(userOp.from, getUserOperationPayload(userOp), userOp.signature);
+        bool signatureValid =
+            SignatureChecker.isValidSignatureNow(userOp.from, getUserOperationPayload(userOp), userOp.signature);
 
         bool userIsBundler = userOp.from == msgSender;
         bool hasNoSignature = userOp.signature.length == 0;
@@ -571,40 +572,51 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
     /// @return hash The hash of the UserOperation struct for in inter-operation references.
     function getUserOperationHash(UserOperation calldata userOp) public view returns (bytes32 hash) {
         uint32 callConfig = IDAppControl(userOp.control).CALL_CONFIG();
-        hash =  _getUserOperationHash(userOp, callConfig.allowsTrustedOpHash());
+        hash = _getUserOperationHash(userOp, callConfig.allowsTrustedOpHash());
     }
 
-    function _getUserOperationHash(UserOperation memory userOp, bool trusted) internal view returns (bytes32 userOpHash) {
+    function _getUserOperationHash(
+        UserOperation memory userOp,
+        bool trusted
+    )
+        internal
+        view
+        returns (bytes32 userOpHash)
+    {
         if (trusted) {
-            userOpHash = _hashTypedDataV4(keccak256(
-                abi.encode(
-                    USER_TYPEHASH_TRUSTED,
-                    userOp.from,
-                    userOp.to,
-                    userOp.dapp,
-                    userOp.control,
-                    userOp.callConfig,
-                    userOp.sessionKey
+            userOpHash = _hashTypedDataV4(
+                keccak256(
+                    abi.encode(
+                        USER_TYPEHASH_TRUSTED,
+                        userOp.from,
+                        userOp.to,
+                        userOp.dapp,
+                        userOp.control,
+                        userOp.callConfig,
+                        userOp.sessionKey
+                    )
                 )
-            ));
+            );
         } else {
-            userOpHash = _hashTypedDataV4(keccak256(
-                abi.encode(
-                    USER_TYPEHASH_DEFAULT,
-                    userOp.from,
-                    userOp.to,
-                    userOp.value,
-                    userOp.gas,
-                    userOp.maxFeePerGas,
-                    userOp.nonce,
-                    userOp.deadline,
-                    userOp.dapp,
-                    userOp.control,
-                    userOp.callConfig,
-                    userOp.sessionKey,
-                    userOp.data
+            userOpHash = _hashTypedDataV4(
+                keccak256(
+                    abi.encode(
+                        USER_TYPEHASH_DEFAULT,
+                        userOp.from,
+                        userOp.to,
+                        userOp.value,
+                        userOp.gas,
+                        userOp.maxFeePerGas,
+                        userOp.nonce,
+                        userOp.deadline,
+                        userOp.dapp,
+                        userOp.control,
+                        userOp.callConfig,
+                        userOp.sessionKey,
+                        userOp.data
+                    )
                 )
-            ));
+            );
         }
     }
 
