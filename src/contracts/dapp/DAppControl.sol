@@ -181,13 +181,13 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
 
     /// @notice Returns the current governance address of this DAppControl contract.
     /// @return The address of the current governance account of this DAppControl contract.
-    function getDAppSignatory() external view returns (address) {
+    function getDAppSignatory() external view mustBeCalled returns (address) {
         return governance;
     }
 
     /// @notice Starts the transfer of governance to a new address. Only callable by the current governance address.
     /// @param newGovernance The address of the new governance.
-    function transferGovernance(address newGovernance) external {
+    function transferGovernance(address newGovernance) external mustBeCalled {
         if (msg.sender != governance) {
             revert AtlasErrors.OnlyGovernance();
         }
@@ -196,7 +196,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     }
 
     /// @notice Accepts the transfer of governance to a new address. Only callable by the new governance address.
-    function acceptGovernance() external {
+    function acceptGovernance() external mustBeCalled {
         address newGovernance = pendingGovernance;
         if (msg.sender != newGovernance) {
             revert AtlasErrors.Unauthorized();
