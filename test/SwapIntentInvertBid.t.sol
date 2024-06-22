@@ -34,7 +34,7 @@ contract SwapIntentTest is BaseTest {
         governanceEOA = vm.addr(governancePK);
     }
 
-    function testAtlasSwapIntentInvertBid_bidKnown_solverBidRetreivalNotRequired() public {
+    function testAtlasSwapIntentInvertBid_solverBidRetreivalNotRequired() public {
         vm.startPrank(governanceEOA);
         SwapIntentInvertBidDAppControl controlContract = new SwapIntentInvertBidDAppControl(address(atlas), false, false);
         address control = address(controlContract);
@@ -69,7 +69,7 @@ contract SwapIntentTest is BaseTest {
         assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + swapIntent.amountUserBuys, "Did not receive enough DAI");
     }
 
-    function testAtlasSwapIntentInvertBid_bidKnown_solverBidRetreivalNotRequired_multipleSolvers() public {
+    function testAtlasSwapIntentInvertBid_solverBidRetreivalNotRequired_multipleSolvers() public {
         vm.startPrank(governanceEOA);
         SwapIntentInvertBidDAppControl controlContract = new SwapIntentInvertBidDAppControl(address(atlas), false, false);
         address control = address(controlContract);
@@ -109,7 +109,7 @@ contract SwapIntentTest is BaseTest {
         assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + swapIntent.amountUserBuys, "Did not receive enough DAI");
     }
 
-    function testAtlasSwapIntentInvertBid_bidKnown_solverBidRetreivalRequired() public {
+    function testAtlasSwapIntentInvertBid_solverBidRetreivalRequired() public {
         vm.startPrank(governanceEOA);
         SwapIntentInvertBidDAppControl controlContract = new SwapIntentInvertBidDAppControl(address(atlas), false, true);
         address control = address(controlContract);
@@ -122,41 +122,6 @@ contract SwapIntentTest is BaseTest {
 
         SwapIntent memory swapIntent = createSwapIntent(amountUserBuys, maxAmountUserSells);
         SimpleRFQSolverInvertBid rfqSolver = deployAndFundRFQSolver(swapIntent, true);
-        address executionEnvironment = createExecutionEnvironment(control);
-        UserOperation memory userOp = buildUserOperation(control, swapIntent);
-        SolverOperation memory solverOp = buildSolverOperation(control, userOp, swapIntent, executionEnvironment, address(rfqSolver), solverBidAmount);
-        SolverOperation[] memory solverOps = new SolverOperation[](1);
-        solverOps[0] = solverOp;
-        DAppOperation memory dAppOp = buildDAppOperation(control, userOp, solverOps);
-
-        uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);
-        uint256 userDaiBalanceBefore = DAI.balanceOf(userEOA);
-
-        vm.prank(userEOA); 
-        WETH.transfer(address(1), userWethBalanceBefore - swapIntent.maxAmountUserSells);
-        userWethBalanceBefore = WETH.balanceOf(userEOA);
-        assertTrue(userWethBalanceBefore >= swapIntent.maxAmountUserSells, "Not enough starting WETH");
-
-        approveAtlasAndExecuteSwap(swapIntent, userOp, solverOps, dAppOp);
-
-        // Check user token balances after
-        assertEq(WETH.balanceOf(userEOA), userWethBalanceBefore - solverBidAmount, "Did not spend WETH == solverBidAmount");
-        assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + swapIntent.amountUserBuys, "Did not receive enough DAI");
-    }
-
-    function testAtlasSwapIntentInvertBid_bidFind_solverBidRetreivalNotRequired() public {
-        vm.startPrank(governanceEOA);
-        SwapIntentInvertBidDAppControl controlContract = new SwapIntentInvertBidDAppControl(address(atlas), true, false);
-        address control = address(controlContract);
-        atlasVerification.initializeGovernance(control);
-        vm.stopPrank();
-
-        uint256 amountUserBuys = 20e18;
-        uint256 maxAmountUserSells = 10e18;
-        uint256 solverBidAmount = 1e18;
-
-        SwapIntent memory swapIntent = createSwapIntent(amountUserBuys, maxAmountUserSells);
-        SimpleRFQSolverInvertBid rfqSolver = deployAndFundRFQSolver(swapIntent, false);
         address executionEnvironment = createExecutionEnvironment(control);
         UserOperation memory userOp = buildUserOperation(control, swapIntent);
         SolverOperation memory solverOp = buildSolverOperation(control, userOp, swapIntent, executionEnvironment, address(rfqSolver), solverBidAmount);
