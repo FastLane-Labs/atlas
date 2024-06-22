@@ -350,9 +350,9 @@ contract EscrowTest is AtlasBaseTest {
     function test_executeSolverOperation_solverOpWrapper_preSolverFailed() public {
         defaultAtlasWithCallConfig(
             defaultCallConfig()
-                .withTrackPreOpsReturnData(true)
+                .withTrackPreOpsReturnData(false)
                 .withTrackUserReturnData(true)
-                .withRequirePreOps(true)
+                .withRequirePreOps(false)
                 .withPreSolver(true)
                 .build()
         );
@@ -373,9 +373,9 @@ contract EscrowTest is AtlasBaseTest {
     function test_executeSolverOperation_solverOpWrapper_postSolverFailed() public {
         defaultAtlasWithCallConfig(
             defaultCallConfig()
-                .withTrackPreOpsReturnData(true)
+                .withTrackPreOpsReturnData(false)
                 .withTrackUserReturnData(true)
-                .withRequirePreOps(true)
+                .withRequirePreOps(false)
                 .withPostSolver(true)
                 .build()
         );
@@ -414,9 +414,9 @@ contract EscrowTest is AtlasBaseTest {
             address(atlas),
             address(governanceEOA),
             defaultCallConfig()
-                .withTrackPreOpsReturnData(true)
+                .withTrackPreOpsReturnData(false)
                 .withTrackUserReturnData(true)
-                .withRequirePreOps(true)
+                .withRequirePreOps(false)
                 .withPostSolver(true)
                 .build());
     

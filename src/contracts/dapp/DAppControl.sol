@@ -33,6 +33,10 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
             // Max one of user or dapp nonces can be sequential, not both
             revert AtlasErrors.BothUserAndDAppNoncesCannotBeSequential();
         }
+        if (_callConfig.trackPreOpsReturnData && _callConfig.trackUserReturnData) {
+            // Max one of preOps or userOp return data can be tracked, not both
+            revert AtlasErrors.BothPreOpsAndUserReturnDataCannotBeTracked();
+        }
         CALL_CONFIG = CallBits.encodeCallConfig(_callConfig);
         CONTROL = address(this);
         ATLAS_VERIFICATION = IAtlas(_atlas).VERIFICATION();
