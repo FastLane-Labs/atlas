@@ -233,7 +233,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
     /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
     function _verifyCallConfig(uint32 callConfig) internal pure returns (ValidCallsResult) {
         CallConfig memory decodedCallConfig = CallBits.decodeCallConfig(callConfig);
-         if (decodedCallConfig.userNoncesSequential && decodedCallConfig.dappNoncesSequential) {
+        if (decodedCallConfig.userNoncesSequential && decodedCallConfig.dappNoncesSequential) {
             // Max one of user or dapp nonces can be sequential, not both
             return ValidCallsResult.BothUserAndDAppNoncesCannotBeSequential;
         }
