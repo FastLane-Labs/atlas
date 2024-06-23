@@ -5,7 +5,6 @@ import { EIP712 } from "openzeppelin-contracts/contracts/utils/cryptography/EIP7
 import { ECDSA } from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import { SignatureChecker } from "openzeppelin-contracts/contracts/utils/cryptography/SignatureChecker.sol";
 import { DAppIntegration } from "src/contracts/atlas/DAppIntegration.sol";
-import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
@@ -571,8 +570,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
     /// @param userOp The UserOperation struct to generate the hash for.
     /// @return hash The hash of the UserOperation struct for in inter-operation references.
     function getUserOperationHash(UserOperation calldata userOp) public view returns (bytes32 hash) {
-        uint32 callConfig = IDAppControl(userOp.control).CALL_CONFIG();
-        hash = _getUserOperationHash(userOp, callConfig.allowsTrustedOpHash());
+        hash = _getUserOperationHash(userOp, userOp.callConfig.allowsTrustedOpHash());
     }
 
     function _getUserOperationHash(
