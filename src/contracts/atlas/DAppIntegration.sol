@@ -101,8 +101,6 @@ contract DAppIntegration {
     function changeDAppGovernance(address oldGovernance, address newGovernance) external {
         _checkAtlasIsUnlocked();
         address control = msg.sender;
-        bytes32 signatoryKey = keccak256(abi.encodePacked(control, oldGovernance));
-        if (!signatories[signatoryKey]) revert AtlasErrors.DAppNotEnabled();
 
         _removeSignatory(control, oldGovernance);
         _addSignatory(control, newGovernance);
@@ -156,14 +154,16 @@ contract DAppIntegration {
     /// @param signatory The address of the signatory to be removed.
     function _removeSignatory(address control, address signatory) internal {
         bytes32 signatoryKey = keccak256(abi.encodePacked(control, signatory));
+        if (!signatories[signatoryKey]) revert AtlasErrors.InvalidSignatory();
         delete signatories[signatoryKey];
         for (uint256 i; i < dAppSignatories[control].length; i++) {
             if (dAppSignatories[control][i] == signatory) {
                 dAppSignatories[control][i] = dAppSignatories[control][dAppSignatories[control].length - 1];
                 dAppSignatories[control].pop();
-                break;
+                return;
             }
         }
+        revert();
     }
 
     /// @notice Checks if the Atlas protocol is in an unlocked state. Will revert if not.

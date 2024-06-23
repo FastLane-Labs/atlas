@@ -81,6 +81,7 @@ contract V2DAppControl is DAppControl {
             require(IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token1() == WETH, "INVALID TOKEN PAIR");
         } else {
             require(IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token0() == WETH, "INVALID TOKEN PAIR");
+            require(IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token1() == GOVERNANCE_TOKEN, "INVALID TOKEN PAIR");
         }
     }
 
@@ -99,6 +100,9 @@ contract V2DAppControl is DAppControl {
             , // address recipient // Unused
                 // bytes memory swapData // Unused
         ) = abi.decode(userOp.data[4:], (uint256, uint256, address, bytes));
+
+        require(amount0Out == 0 || amount1Out == 0, "ERR-H12 InvalidAmountOuts");
+        require(amount0Out > 0 || amount1Out > 0, "ERR-H13 InvalidAmountOuts");
 
         (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(userOp.dapp).getReserves();
 

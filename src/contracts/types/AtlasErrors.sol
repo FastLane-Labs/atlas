@@ -19,17 +19,17 @@ contract AtlasErrors {
     error BidFindSuccessful(uint256 bidAmount);
     error UnexpectedNonRevert();
 
-    error SolverBidUnpaid();
+    error BidNotPaid();
     error BalanceNotReconciled();
-    error SolverOperationReverted();
+    error SolverOpReverted();
     error AlteredControl();
     error InvalidEntry();
     error CallbackNotCalled();
-    error IntentUnfulfilled();
     error PreSolverFailed();
     error PostSolverFailed();
+    error InsufficientEscrow();
 
-    error VerificationSimFail(uint256 validCallsResult);
+    error VerificationSimFail(ValidCallsResult);
     error PreOpsSimFail();
     error UserOpSimFail();
     error SolverSimFail(uint256 solverOutcomeResult); // uint param is result returned in `verifySolverOp`
@@ -60,6 +60,7 @@ contract AtlasErrors {
 
     // Escrow
     error UncoveredResult();
+    error InvalidEscrowDuration();
 
     // AtlETH
     error InsufficientUnbondedBalance(uint256 balance, uint256 requested);
@@ -81,6 +82,7 @@ contract AtlasErrors {
     error InvalidDAppControl();
     error DAppNotEnabled();
     error AtlasLockActive();
+    error InvalidSignatory();
 
     // Permit69
     error InvalidEnvironment();

@@ -628,10 +628,10 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     function test_validCalls_trustedOpHash_msgSenderWrong_InvalidBundler() public {
         defaultAtlasWithCallConfig(defaultCallConfig().withTrustedOpHash(true).build());
 
-        UserOperation memory userOp = validUserOperation().withSessionKey(governanceEOA).build();
+        UserOperation memory userOp = validUserOperation().withSessionKey(governanceEOA).sign(address(atlasVerification), userPK).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
-        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withUserOpHash(atlasVerification.getUserOperationHash(userOp)).build();
-        solverOps[0] = validSolverOperation(userOp).withUserOpHash(atlasVerification.getUserOperationHash(userOp)).build();
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+        solverOps[0] = validSolverOperation(userOp).build();
 
         // If msgSender in _validCalls is neither dAppOp.from nor userOp.from,
         // and trustedOpHash is true --> return InvalidBundler
@@ -902,10 +902,11 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     // given a default atlas environment
     //   and otherwise valid user, solver and dapp operations
     //   and the governanceEOA is not a valid signatory
+    //   and the dAppControl is not enabled
     // when validCalls is called from the userEOA
     // then it should return DAppSignatureInvalid
     //
-    function test_validCalls_SignerNotEnabled_DAppSignatureInvalid() public {
+    function test_validCalls_SignerNotEnabled_DAppNotEnabled() public {
         defaultAtlasEnvironment();
         vm.prank(governanceEOA);
         atlasVerification.removeSignatory(address(dAppControl), governanceEOA);
@@ -916,7 +917,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.DAppSignatureInvalid);
+        ), ValidCallsResult.DAppNotEnabled);
     }
 
     //

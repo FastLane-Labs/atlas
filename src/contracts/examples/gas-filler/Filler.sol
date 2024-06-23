@@ -106,37 +106,23 @@ contract Filler is DAppControl {
         SafeTransferLib.safeTransferETH(_user(), bidAmount);
     }
 
-    function _preSolverCall(
-        SolverOperation calldata solverOp,
-        bytes calldata returnData
-    )
-        internal
-        override
-        returns (bool)
-    {
+    function _preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
         address solverTo = solverOp.solver;
         if (solverTo == address(this) || solverTo == _control() || solverTo == ATLAS) {
-            return false;
+            revert();
         }
 
         (address approvalToken, uint256 maxTokenAmount,) = abi.decode(returnData, (address, uint256, uint256));
 
-        if (solverOp.bidAmount > maxTokenAmount) return false;
-        if (solverOp.bidToken != approvalToken) return false;
+        if (solverOp.bidAmount > maxTokenAmount) revert();
+        if (solverOp.bidToken != approvalToken) revert();
 
         _transferDAppERC20(approvalToken, solverOp.solver, solverOp.bidAmount);
 
-        return true;
+        return; // success
     }
 
-    function _postSolverCall(
-        SolverOperation calldata solverOp,
-        bytes calldata returnData
-    )
-        internal
-        override
-        returns (bool)
-    {
+    function _postSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
         (, uint256 maxTokenAmount, uint256 gasNeeded) = abi.decode(returnData, (address, uint256, uint256));
 
         require(address(this).balance >= gasNeeded, "ERR - EXISTING GAS BALANCE");
@@ -146,7 +132,7 @@ contract Filler is DAppControl {
         (bool success,) = _control().call(_forward(data));
         require(success, "HITTING THIS = JOB OFFER");
 
-        return true;
+        return; // success
     }
 
     ///////////////// GETTERS & HELPERS // //////////////////

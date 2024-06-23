@@ -72,8 +72,6 @@ contract EscrowBitsTest is Test {
         assertEq(invalid.executionSuccessful(), false);
         invalid = 1 << uint256(SolverOutcome.BidNotPaid);
         assertEq(invalid.executionSuccessful(), false);
-        invalid = 1 << uint256(SolverOutcome.IntentUnfulfilled);
-        assertEq(invalid.executionSuccessful(), false);
         invalid = 1 << uint256(SolverOutcome.PreSolverFailed);
         assertEq(invalid.executionSuccessful(), false);
         invalid = 1 << uint256(SolverOutcome.CallValueTooHigh);
@@ -89,11 +87,11 @@ contract EscrowBitsTest is Test {
         assertEq(valid.executedWithError(), true);
         valid = 1 << uint256(SolverOutcome.CallValueTooHigh);
         assertEq(valid.executedWithError(), false);
-        valid = 1 << uint256(SolverOutcome.IntentUnfulfilled);
-        assertEq(valid.executedWithError(), true);
         valid = 1 << uint256(SolverOutcome.PreSolverFailed);
         assertEq(valid.executedWithError(), false);
         valid = 1 << uint256(SolverOutcome.BalanceNotReconciled);
+        assertEq(valid.executedWithError(), true);
+        valid = 1 << uint256(SolverOutcome.CallbackNotCalled);
         assertEq(valid.executedWithError(), true);
         valid = 1 << uint256(SolverOutcome.EVMError);
         assertEq(valid.executedWithError(), true);
@@ -128,8 +126,6 @@ contract EscrowBitsTest is Test {
         valid = 1 << uint256(SolverOutcome.SolverOpReverted);
         assertEq(valid.updateEscrow(), true);
         valid = 1 << uint256(SolverOutcome.BidNotPaid);
-        assertEq(valid.updateEscrow(), true);
-        valid = 1 << uint256(SolverOutcome.IntentUnfulfilled);
         assertEq(valid.updateEscrow(), true);
         valid = 1 << uint256(SolverOutcome.PreSolverFailed);
         assertEq(valid.updateEscrow(), true);
