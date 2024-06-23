@@ -136,6 +136,12 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
             }
         }
 
+        // Check if the call configuration is valid
+        ValidCallsResult verifyCallConfigResult = _verifyCallConfig(dConfig.callConfig);
+        if (verifyCallConfigResult != ValidCallsResult.Valid) {
+            return (userOpHash, verifyCallConfigResult);
+        }
+
         // CASE: Solvers trust app to update content of UserOp after submission of solverOp
         if (dConfig.callConfig.allowsTrustedOpHash()) {
             userOpHash = userOp.getAltOperationHash();
@@ -220,6 +226,22 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
             // No refund
             result |= (1 << uint256(SolverOutcome.InvalidSignature));
         }
+    }
+
+    /// @notice The _verifyCallConfig internal function verifies the validity of the call configuration.
+    /// @param callConfig The call configuration to verify.
+    /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
+    function _verifyCallConfig(uint32 callConfig) internal pure returns (ValidCallsResult) {
+        CallConfig memory decodedCallConfig = CallBits.decodeCallConfig(callConfig);
+        if (decodedCallConfig.userNoncesSequential && decodedCallConfig.dappNoncesSequential) {
+            // Max one of user or dapp nonces can be sequential, not both
+            return ValidCallsResult.BothUserAndDAppNoncesCannotBeSequential;
+        }
+        if (decodedCallConfig.invertBidValue && decodedCallConfig.exPostBids) {
+            // If both invertBidValue and exPostBids are true, solver's retreived bid cannot be determined
+            return ValidCallsResult.InvertBidValueCannotBeExPostBids;
+        }
+        return ValidCallsResult.Valid;
     }
 
     /// @notice The _verifyAuctioneer internal function is called by _validCalls to verify that the auctioneer of the
