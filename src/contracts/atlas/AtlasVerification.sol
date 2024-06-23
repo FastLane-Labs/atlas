@@ -440,7 +440,6 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
     /// @param nonce The nonce to verify.
     /// @param sequential A boolean indicating if the nonce mode is sequential (true) or not (false)
     /// @return A boolean indicating if the nonce is valid.
-    /// @return The updated NonceTracker.
     function _handleNonces(
         NonceTracker memory nonceTracker,
         address account,
