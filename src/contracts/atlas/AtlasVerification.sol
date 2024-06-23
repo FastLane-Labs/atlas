@@ -401,7 +401,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         returns (bool validNonce)
     {
         NonceTracker memory nonceTracker = userNonceTrackers[user];
-        (validNonce, nonceTracker) = _handleNonces(nonceTracker, user, true, nonce, sequential);
+        validNonce = _handleNonces(nonceTracker, user, true, nonce, sequential);
         if (validNonce && !isSimulation) {
             // Update storage only if valid and not in simulation
             userNonceTrackers[user] = nonceTracker;
@@ -425,7 +425,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         returns (bool validNonce)
     {
         NonceTracker memory nonceTracker = dAppNonceTrackers[dAppSignatory];
-        (validNonce, nonceTracker) = _handleNonces(nonceTracker, dAppSignatory, false, nonce, sequential);
+        validNonce = _handleNonces(nonceTracker, dAppSignatory, false, nonce, sequential);
         if (validNonce && !isSimulation) {
             // Update storage only if valid and not in simulation
             dAppNonceTrackers[dAppSignatory] = nonceTracker;
@@ -449,20 +449,20 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         bool sequential
     )
         internal
-        returns (bool, NonceTracker memory)
+        returns (bool)
     {
         if (nonce > type(uint128).max - 1) {
-            return (false, nonceTracker);
+            return false;
         }
 
         // 0 Nonces are not allowed. Nonces start at 1 for both sequential and non-sequential.
-        if (nonce == 0) return (false, nonceTracker);
+        if (nonce == 0) return false;
 
         if (sequential) {
             // SEQUENTIAL NONCES
 
             // Nonces must increase by 1 if sequential
-            if (nonce != nonceTracker.lastUsedSeqNonce + 1) return (false, nonceTracker);
+            if (nonce != nonceTracker.lastUsedSeqNonce + 1) return false;
 
             ++nonceTracker.lastUsedSeqNonce;
         } else {
@@ -484,7 +484,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
 
             // Check if nonce has already been used
             if (_nonceUsedInBitmap(bitmap, bitmapNonce)) {
-                return (false, nonceTracker);
+                return false;
             }
 
             // Mark nonce as used in bitmap
@@ -508,7 +508,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
             nonceBitmaps[bitmapKey] = nonceBitmap;
         }
 
-        return (true, nonceTracker);
+        return true;
     }
 
     /// @notice Increments the `highestFullNonSeqBitmap` of a given `nonceTracker` for the specified `account` until a
