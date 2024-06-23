@@ -60,6 +60,7 @@ contract AtlasErrors {
 
     // Escrow
     error UncoveredResult();
+    error InvalidEscrowDuration();
 
     // AtlETH
     error InsufficientUnbondedBalance(uint256 balance, uint256 requested);
