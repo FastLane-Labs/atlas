@@ -15,9 +15,8 @@ struct EscrowAccountAccessData {
     uint64 totalGasUsed;
 }
 
-enum SolverOutcome
-// no refund (relay error or hostile user)
-{
+enum SolverOutcome {
+    // no refund (relay error or hostile user)
     InvalidSignature,
     InvalidUserHash,
     DeadlinePassedAlt,
