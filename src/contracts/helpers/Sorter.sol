@@ -16,7 +16,8 @@ contract Sorter {
     using CallBits for uint32;
     using CallVerification for UserOperation;
 
-    address public immutable atlas;
+    IAtlas public immutable ATLAS;
+    IAtlasVerification public immutable VERIFICATION;
 
     struct SortingData {
         uint256 amount;
@@ -24,7 +25,8 @@ contract Sorter {
     }
 
     constructor(address _atlas) {
-        atlas = _atlas;
+        ATLAS = IAtlas(_atlas);
+        VERIFICATION = IAtlasVerification(ATLAS.VERIFICATION());
     }
 
     function sortBids(
@@ -67,13 +69,13 @@ contract Sorter {
         returns (bool)
     {
         // Make sure the solver has enough funds bonded
-        uint256 solverBalance = IAtlETH(atlas).balanceOfBonded(solverOp.from);
+        uint256 solverBalance = IAtlETH(address(ATLAS)).balanceOfBonded(solverOp.from);
         if (solverBalance < solverOp.maxFeePerGas * solverOp.gas) {
             return false;
         }
 
         // Solvers can only do one tx per block - this prevents double counting bonded balances
-        uint256 solverLastActiveBlock = IAtlETH(atlas).accountLastActiveBlock(solverOp.from);
+        uint256 solverLastActiveBlock = IAtlETH(address(ATLAS)).accountLastActiveBlock(solverOp.from);
         if (solverLastActiveBlock >= block.number) {
             return false;
         }
@@ -105,8 +107,7 @@ contract Sorter {
 
         SortingData[] memory sortingData = new SortingData[](count);
 
-        address verification = IAtlas(userOp.to).VERIFICATION();
-        bytes32 userOpHash = IAtlasVerification(verification).getUserOperationHash(userOp);
+        bytes32 userOpHash = VERIFICATION.getUserOperationHash(userOp);
 
         uint256 invalid;
         for (uint256 i; i < count; ++i) {
