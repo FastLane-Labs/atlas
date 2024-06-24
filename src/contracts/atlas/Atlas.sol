@@ -84,6 +84,8 @@ contract Atlas is Escrow, Factory {
             _handleErrors(revertData, dConfig.callConfig);
 
             // Refund the msg.value to sender if it errored
+            // WARNING: If msg.sender is a disposable address such as a session key, make sure to remove ETH from it
+            // before disposal
             if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
         }
 
