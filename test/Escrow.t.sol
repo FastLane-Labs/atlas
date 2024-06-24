@@ -139,6 +139,7 @@ contract EscrowTest is AtlasBaseTest {
                 .withRequirePreOps(true) // Execute the preOps hook
                 .withTrackPreOpsReturnData(true) // Track the preOps hook's return data
                 .withForwardReturnData(true) // Forward the preOps hook's return data to the solver call
+                .withAllowAllocateValueFailure(true) // Allow the value allocation to fail
                 .build()
         );
         executeHookCase(false, block.timestamp * 2, noError);
@@ -163,6 +164,7 @@ contract EscrowTest is AtlasBaseTest {
             defaultCallConfig()
                 .withTrackUserReturnData(true) // Track the user operation's return data
                 .withForwardReturnData(true) // Forward the user operation's return data to the solver call
+                .withAllowAllocateValueFailure(true) // Allow the value allocation to fail
                 .build()
         );
         executeHookCase(false, block.timestamp * 3, noError);
@@ -176,6 +178,19 @@ contract EscrowTest is AtlasBaseTest {
                 .build()
         );
         executeHookCase(true, 0, AtlasErrors.UserOpFail.selector);
+    }
+
+    // Ensure metacall reverts with the proper error when the allocateValue hook reverts.
+    function test_executeAllocateValueCall_failure() public {
+        defaultAtlasWithCallConfig(
+            defaultCallConfig()
+                .withTrackUserReturnData(true) // Track the user operation's return data
+                .withForwardReturnData(true) // Forward the user operation's return data to the solver call
+                .withReuseUserOp(true) // Allow metacall to revert
+                .withAllowAllocateValueFailure(false) // Do not allow the value allocation to fail
+                .build()
+        );
+        executeHookCase(false, 1, AtlasErrors.AllocateValueFail.selector);
     }
 
     // Ensure the postOps hook is successfully called. No return data is expected from the postOps hook, so we do not
@@ -197,6 +212,7 @@ contract EscrowTest is AtlasBaseTest {
                 .withForwardReturnData(true) // Forward the user operation's return data to the solver call
                 .withRequirePostOps(true) // Execute the postOps hook
                 .withReuseUserOp(true) // Allow metacall to revert
+                .withAllowAllocateValueFailure(true) // Allow the value allocation to fail
                 .build()
         );
         executeHookCase(false, 1, AtlasErrors.PostOpsFail.selector);

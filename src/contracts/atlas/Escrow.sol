@@ -196,12 +196,17 @@ abstract contract Escrow is AtlETH {
             abi.encodeCall(IExecutionEnvironment.allocateValue, (dConfig.bidToken, bidAmount, returnData));
         data = abi.encodePacked(data, key.pack());
         (bool success,) = key.executionEnvironment.call(data);
-        if (success) {
-            key.paymentsSuccessful = true;
+
+        if (!success && !dConfig.callConfig.allowAllocateValueFailure()) {
+            if (key.isSimulation) revert AllocateValueSimFail();
+            revert AllocateValueFail();
         }
 
-        // emit event
-        emit AllocationResult(dConfig.to, solverOp.userOpHash, key.paymentsSuccessful);
+        if (success) {
+            // paymentsSuccessful is part of the data forwarded to the postOps hook, dApps can easily check the value by
+            // calling _paymentsSuccessful()
+            key.paymentsSuccessful = true;
+        }
 
         return key;
     }

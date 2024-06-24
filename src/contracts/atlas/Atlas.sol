@@ -384,6 +384,8 @@ contract Atlas is Escrow, Factory {
                     solverOutcomeResult := mload(add(dataLocation, sub(mload(revertData), 32)))
                 }
                 revert SolverSimFail(solverOutcomeResult);
+            } else if (errorSwitch == AllocateValueSimFail.selector) {
+                revert AllocateValueSimFail();
             } else if (errorSwitch == PostOpsSimFail.selector) {
                 revert PostOpsSimFail();
             }

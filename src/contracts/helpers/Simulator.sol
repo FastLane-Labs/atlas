@@ -20,6 +20,7 @@ enum Result {
     PreOpsSimFail,
     UserOpSimFail,
     SolverSimFail,
+    AllocateValueSimFail,
     PostOpsSimFail,
     SimulationPassed
 }
@@ -131,6 +132,9 @@ contract Simulator is AtlasErrors {
                 additionalErrorCode = solverOutcomeResult;
                 console.log("Result.SolverSimFail");
                 console.log("solverOutcomeResult:", solverOutcomeResult);
+            } else if (errorSwitch == AllocateValueSimFail.selector) {
+                result = Result.AllocateValueSimFail;
+                console.log("Result.AllocateValueSimFail");
             } else if (errorSwitch == PostOpsSimFail.selector) {
                 result = Result.PostOpsSimFail;
                 console.log("Result.PostOpsSimFail");

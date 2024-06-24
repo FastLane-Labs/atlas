@@ -266,7 +266,8 @@ contract DummyDAppControlBuilder is DAppControl {
                 requireFulfillment: true,
                 trustedOpHash: false,
                 invertBidValue: false,
-                exPostBids: false
+                exPostBids: false,
+                allowAllocateValueFailure: false
             })
         )
     {
