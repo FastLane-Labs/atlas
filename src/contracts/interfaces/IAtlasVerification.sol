@@ -18,7 +18,7 @@ interface IAtlasVerification {
         bool isSimulation
     )
         external
-        returns (bytes32 userOpHash, ValidCallsResult);
+        returns (ValidCallsResult);
 
     function verifySolverOp(
         SolverOperation calldata solverOp,
@@ -30,13 +30,12 @@ interface IAtlasVerification {
         view
         returns (uint256 result);
 
-    function getUserOperationPayload(UserOperation memory userOp) external view returns (bytes32 payload);
+    function getUserOperationPayload(UserOperation calldata userOp) external view returns (bytes32 payload);
+    function getUserOperationHash(UserOperation calldata userOp) external view returns (bytes32 payload);
     function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload);
-    function getDAppOperationPayload(DAppOperation memory dAppOp) external view returns (bytes32 payload);
-
+    function getDAppOperationPayload(DAppOperation calldata dAppOp) external view returns (bytes32 payload);
     function getUserNextNonce(address user, bool sequential) external view returns (uint256 nextNonce);
     function getDAppNextNonce(address dApp, bool sequential) external view returns (uint256 nextNonce);
-
     function initializeGovernance(address control) external;
     function addSignatory(address control, address signatory) external;
     function removeSignatory(address control, address signatory) external;

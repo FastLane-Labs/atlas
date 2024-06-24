@@ -99,8 +99,7 @@ contract TxBuilder {
     {
         // generate userOpHash depending on CallConfig.trustedOpHash allowed or not
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
-        bytes32 userOpHash =
-            dConfig.callConfig.allowsTrustedOpHash() ? userOp.getAltOperationHash() : userOp.getUserOperationHash();
+        bytes32 userOpHash = IAtlasVerification(verification).getUserOperationHash(userOp);
 
         solverOp = SolverOperation({
             from: solverEOA,
@@ -131,8 +130,7 @@ contract TxBuilder {
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
 
         // generate userOpHash depending on CallConfig.trustedOpHash allowed or not
-        bytes32 userOpHash =
-            dConfig.callConfig.allowsTrustedOpHash() ? userOp.getAltOperationHash() : userOp.getUserOperationHash();
+        bytes32 userOpHash = IAtlasVerification(verification).getUserOperationHash(userOp);
         bytes32 callChainHash = CallVerification.getCallChainHash(dConfig, userOp, solverOps);
 
         dAppOp = DAppOperation({

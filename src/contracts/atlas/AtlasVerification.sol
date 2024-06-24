@@ -36,7 +36,6 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
     /// @param msgValue The ETH value sent with the metacall transaction.
     /// @param msgSender The forwarded msg.sender of the original metacall transaction in the Atlas contract.
     /// @param isSimulation A boolean indicating if the call is a simulation.
-    /// @return userOpHash The hash of the UserOperation struct.
     /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
     function validateCalls(
         DAppConfig calldata dConfig,
@@ -48,37 +47,26 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         bool isSimulation
     )
         external
-        returns (bytes32 userOpHash, ValidCallsResult)
+        returns (ValidCallsResult)
     {
         if (msg.sender != ATLAS) revert AtlasErrors.InvalidCaller();
-        return _validCalls(dConfig, userOp, solverOps, dAppOp, msgValue, msgSender, isSimulation);
-    }
-
-    /// @notice The internal _validCalls function verifies the validity of the metacall calldata components, and is
-    /// called by validateCalls.
-    /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
-    /// @param userOp The UserOperation struct of the metacall.
-    /// @param solverOps An array of SolverOperation structs.
-    /// @param dAppOp The DAppOperation struct of the metacall.
-    /// @param msgValue The ETH value sent with the metacall transaction.
-    /// @param msgSender The forwarded msg.sender of the original metacall transaction in the Atlas contract.
-    /// @param isSimulation A boolean indicating if the call is a simulation.
-    /// @return userOpHash The hash of the UserOperation struct.
-    /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
-    function _validCalls(
-        DAppConfig calldata dConfig,
-        UserOperation calldata userOp,
-        SolverOperation[] calldata solverOps,
-        DAppOperation calldata dAppOp,
-        uint256 msgValue,
-        address msgSender,
-        bool isSimulation
-    )
-        internal
-        returns (bytes32 userOpHash, ValidCallsResult)
-    {
         // Verify that the calldata injection came from the dApp frontend
         // and that the signatures are valid.
+
+        bytes32 userOpHash = _getUserOperationHash(userOp);
+        // CASE: Solvers trust app to update content of UserOp after submission of solverOp
+        if (dConfig.callConfig.allowsTrustedOpHash()) {
+            // SessionKey must match explicitly - cannot be skipped
+            if (userOp.sessionKey != dAppOp.from && !isSimulation) {
+                return ValidCallsResult.InvalidAuctioneer;
+            }
+
+            // msgSender (the bundler) must be userOp.from, userOp.sessionKey / dappOp.from, or dappOp.bundler
+            if (!(msgSender == dAppOp.from || msgSender == dAppOp.bundler || msgSender == userOp.from) && !isSimulation)
+            {
+                return ValidCallsResult.InvalidBundler;
+            }
+        }
 
         uint256 solverOpCount = solverOps.length;
 
@@ -89,99 +77,81 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
                 _verifyAuctioneer(dConfig, userOp, solverOps, dAppOp, msgSender);
 
             if (verifyAuctioneerResult != ValidCallsResult.Valid && !isSimulation) {
-                return (userOpHash, verifyAuctioneerResult);
+                return verifyAuctioneerResult;
             }
 
             // Check dapp signature
             ValidCallsResult verifyDappResult =
                 _verifyDApp(dConfig, dAppOp, msgSender, bypassSignatoryApproval, isSimulation);
             if (verifyDappResult != ValidCallsResult.Valid) {
-                return (userOpHash, verifyDappResult);
+                return verifyDappResult;
             }
 
             // Check user signature
             ValidCallsResult verifyUserResult = _verifyUser(dConfig, userOp, userOpHash, msgSender, isSimulation);
             if (verifyUserResult != ValidCallsResult.Valid) {
-                return (userOpHash, verifyUserResult);
+                return verifyUserResult;
             }
 
             // Check number of solvers not greater than max, to prevent overflows in `callIndex`
             if (solverOpCount > _MAX_SOLVERS) {
-                return (userOpHash, ValidCallsResult.TooManySolverOps);
+                return ValidCallsResult.TooManySolverOps;
             }
 
             // Check if past user's deadline
             if (userOp.deadline != 0 && block.number > userOp.deadline) {
-                return (userOpHash, ValidCallsResult.UserDeadlineReached);
+                return ValidCallsResult.UserDeadlineReached;
             }
 
             // Check if past dapp's deadline
             if (dAppOp.deadline != 0 && block.number > dAppOp.deadline) {
-                return (userOpHash, ValidCallsResult.DAppDeadlineReached);
+                return ValidCallsResult.DAppDeadlineReached;
             }
 
             // Check gas price is within user's limit
             if (tx.gasprice > userOp.maxFeePerGas) {
-                return (userOpHash, ValidCallsResult.GasPriceHigherThanMax);
+                return ValidCallsResult.GasPriceHigherThanMax;
             }
 
             // Check that the value of the tx is greater than or equal to the value specified
             if (msgValue < userOp.value) {
-                return (userOpHash, ValidCallsResult.TxValueLowerThanCallValue);
+                return ValidCallsResult.TxValueLowerThanCallValue;
             }
 
             // Check the call config read at the start of the metacall is same as user expected (as set in userOp)
             if (dConfig.callConfig != userOp.callConfig) {
-                return (userOpHash, ValidCallsResult.CallConfigMismatch);
+                return ValidCallsResult.CallConfigMismatch;
             }
         }
 
         // Check if the call configuration is valid
         ValidCallsResult verifyCallConfigResult = _verifyCallConfig(dConfig.callConfig);
         if (verifyCallConfigResult != ValidCallsResult.Valid) {
-            return (userOpHash, verifyCallConfigResult);
-        }
-
-        // CASE: Solvers trust app to update content of UserOp after submission of solverOp
-        if (dConfig.callConfig.allowsTrustedOpHash()) {
-            userOpHash = userOp.getAltOperationHash();
-
-            // SessionKey must match explicitly - cannot be skipped
-            if (userOp.sessionKey != dAppOp.from && !isSimulation) {
-                return (userOpHash, ValidCallsResult.InvalidAuctioneer);
-            }
-
-            // msgSender (the bundler) must be userOp.from, userOp.sessionKey / dappOp.from, or dappOp.bundler
-            if (!(msgSender == dAppOp.from || msgSender == dAppOp.bundler || msgSender == userOp.from) && !isSimulation)
-            {
-                return (userOpHash, ValidCallsResult.InvalidBundler);
-            }
-        } else {
-            userOpHash = userOp.getUserOperationHash();
+            return verifyCallConfigResult;
         }
 
         // Some checks are only needed when call is not a simulation
         if (isSimulation) {
             // Add all solver ops if simulation
-            return (userOpHash, ValidCallsResult.Valid);
+            return ValidCallsResult.Valid;
         }
 
         // Verify a solver was successfully verified.
         if (solverOpCount == 0) {
             if (!dConfig.callConfig.allowsZeroSolvers()) {
-                return (userOpHash, ValidCallsResult.NoSolverOp);
+                return ValidCallsResult.NoSolverOp;
             }
 
             if (dConfig.callConfig.needsFulfillment()) {
-                return (userOpHash, ValidCallsResult.NoSolverOp);
+                return ValidCallsResult.NoSolverOp;
             }
         }
 
         if (userOpHash != dAppOp.userOpHash) {
-            return (userOpHash, ValidCallsResult.OpHashMismatch);
+            return ValidCallsResult.OpHashMismatch;
         }
 
-        return (userOpHash, ValidCallsResult.Valid);
+        return ValidCallsResult.Valid;
     }
 
     /// @notice The verifySolverOp function verifies the validity of a SolverOperation.
@@ -296,7 +266,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         return (ValidCallsResult.Valid, false);
     }
 
-    /// @notice The getSolverPayload function returns the hash of a SolverOperation struct.
+    /// @notice The getSolverPayload function returns the hash of a SolverOperation struct for use in signatures.
     /// @param solverOp The SolverOperation struct to hash.
     function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload) {
         payload = _hashTypedDataV4(_getSolverOpHash(solverOp));
@@ -631,9 +601,10 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp userNonces
 
-        bool signatureValid = SignatureChecker.isValidSignatureNow(
-            userOp.from, _hashTypedDataV4(_getUserOpHash(userOp)), userOp.signature
-        );
+        // if (userOp.callConfig.allowsTrustedOpHash()) {
+        userOpHash = _getUserOperationPayload(userOp);
+        // }
+        bool signatureValid = SignatureChecker.isValidSignatureNow(userOp.from, userOpHash, userOp.signature);
 
         bool userIsBundler = userOp.from == msgSender;
         bool hasNoSignature = userOp.signature.length == 0;
@@ -660,34 +631,71 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         return ValidCallsResult.Valid;
     }
 
-    /// @notice Generates the hash of a UserOperation struct.
-    /// @param userOp The UserOperation struct to hash.
-    /// @return userOpHash The hash of the UserOperation struct.
-    function _getUserOpHash(UserOperation calldata userOp) internal pure returns (bytes32 userOpHash) {
-        userOpHash = keccak256(
-            abi.encode(
-                USER_TYPEHASH,
-                userOp.from,
-                userOp.to,
-                userOp.value,
-                userOp.gas,
-                userOp.maxFeePerGas,
-                userOp.nonce,
-                userOp.deadline,
-                userOp.dapp,
-                userOp.control,
-                userOp.callConfig,
-                userOp.sessionKey,
-                userOp.data
-            )
-        );
+    /// @notice Generates the payload hash of a UserOperation struct used in signatures.
+    /// @param userOp The UserOperation struct to generate the payload for.
+    /// @return payload The hash of the UserOperation struct for use in signatures.
+    function getUserOperationPayload(UserOperation calldata userOp) public view returns (bytes32 payload) {
+        payload = _getUserOperationPayload(userOp);
     }
 
-    /// @notice Generates the hash of a UserOperation struct.
-    /// @param userOp The UserOperation struct to hash.
-    /// @return payload The hash of the UserOperation struct.
-    function getUserOperationPayload(UserOperation calldata userOp) public view returns (bytes32 payload) {
-        payload = _hashTypedDataV4(_getUserOpHash(userOp));
+    function _getUserOperationPayload(UserOperation calldata userOp) internal view returns (bytes32 payload) {
+        payload = _getUserOperationHash(userOp, false);
+    }
+
+    /// @notice Generates the hash of a UserOperation struct used for inter-operation references.
+    /// @param userOp The UserOperation struct to generate the hash for.
+    /// @return hash The hash of the UserOperation struct for in inter-operation references.
+    function getUserOperationHash(UserOperation calldata userOp) public view returns (bytes32 hash) {
+        hash = _getUserOperationHash(userOp);
+    }
+
+    function _getUserOperationHash(UserOperation calldata userOp) internal view returns (bytes32 hash) {
+        hash = _getUserOperationHash(userOp, userOp.callConfig.allowsTrustedOpHash());
+    }
+
+    function _getUserOperationHash(
+        UserOperation memory userOp,
+        bool trusted
+    )
+        internal
+        view
+        returns (bytes32 userOpHash)
+    {
+        if (trusted) {
+            userOpHash = _hashTypedDataV4(
+                keccak256(
+                    abi.encode(
+                        USER_TYPEHASH_TRUSTED,
+                        userOp.from,
+                        userOp.to,
+                        userOp.dapp,
+                        userOp.control,
+                        userOp.callConfig,
+                        userOp.sessionKey
+                    )
+                )
+            );
+        } else {
+            userOpHash = _hashTypedDataV4(
+                keccak256(
+                    abi.encode(
+                        USER_TYPEHASH_DEFAULT,
+                        userOp.from,
+                        userOp.to,
+                        userOp.value,
+                        userOp.gas,
+                        userOp.maxFeePerGas,
+                        userOp.nonce,
+                        userOp.deadline,
+                        userOp.dapp,
+                        userOp.control,
+                        userOp.callConfig,
+                        userOp.sessionKey,
+                        userOp.data
+                    )
+                )
+            );
+        }
     }
 
     /// @notice Returns the next nonce for the given user, in sequential or non-sequential mode.

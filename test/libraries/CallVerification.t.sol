@@ -46,14 +46,6 @@ contract CallVerificationTest is Test {
         });
     }
 
-    function testGetUserCallHash() public {
-        this._testGetUserCallHash(buildUserOperation());
-    }
-
-    function _testGetUserCallHash(UserOperation calldata userOp) external {
-        assertEq(userOp.getUserOperationHash(), keccak256(abi.encode(userOp)));
-    }
-
     function testGetCallChainHash() public {
         DAppConfig memory dConfig = DAppConfig({ to: address(0x1), callConfig: 1, bidToken: address(0), solverGasLimit: 1_000_000 });
         UserOperation memory userOp = buildUserOperation();

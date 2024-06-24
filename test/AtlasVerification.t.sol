@@ -3,7 +3,7 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
+import { AtlasVerification, USER_TYPEHASH_DEFAULT, USER_TYPEHASH_TRUSTED } from "src/contracts/atlas/AtlasVerification.sol";
 import { DAppConfig, DAppOperation, CallConfig } from "src/contracts/types/DAppApprovalTypes.sol";
 import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
 import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
@@ -76,7 +76,7 @@ contract AtlasVerificationBase is AtlasBaseTest {
     function validUserOperation() public returns (UserOperationBuilder) {
         return new UserOperationBuilder()
             .withFrom(userEOA)
-            .withTo(address(dAppControl))
+            .withTo(address(atlas))
             .withValue(0)
             .withGas(1_000_000)
             .withMaxFeePerGas(tx.gasprice + 1)
@@ -139,7 +139,7 @@ contract AtlasVerificationBase is AtlasBaseTest {
     function doValidateCalls(ValidCallsCall memory call) public returns (ValidCallsResult result) {
         DAppConfig memory config = dAppControl.getDAppConfig(call.userOp);
         vm.startPrank(address(atlas));
-        (, result) = atlasVerification.validateCalls(
+        result = atlasVerification.validateCalls(
             config,
             call.userOp,
             call.solverOps,
@@ -199,7 +199,7 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         solverOps[0] = validSolverOperation(userOp).signAndBuild(address(atlasVerification), userPK);
         uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
             bundler
         );
@@ -209,7 +209,7 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         solverOps[0].signature = "";
         result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
             bundler
         );
@@ -225,7 +225,7 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         solverOps[0].userOpHash = keccak256(abi.encodePacked("Not the userOp"));
         uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
             bundler
         );
@@ -241,7 +241,7 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         solverOps[0].to = address(0);
         uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
             bundler
         );
@@ -257,7 +257,7 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         vm.txGasPrice(solverOps[0].maxFeePerGas + 1); // Increase gas price above solver's max
         uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
             bundler
         );
@@ -273,7 +273,7 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         // maxFeePerGas is below user's = SolverOutcome.GasPriceBelowUsers
         uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas + 1,
             bundler
         );
@@ -289,7 +289,7 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         solverOps[0].solver = address(atlas);
         uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
             bundler
         );
@@ -306,7 +306,7 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         vm.prank(solverOneEOA);
         uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
             bundler
         );
@@ -317,7 +317,7 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         bundler = userEOA;
         result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
             bundler
         );
@@ -330,6 +330,7 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
 //
 
 contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
+    using CallVerification for UserOperation;
 
     // Default Everything Valid Test Case
 
@@ -344,8 +345,6 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
         ), ValidCallsResult.Valid);
     }
-
-    // UserOpHash Tests
 
     //
     // given a default atlas environment
@@ -596,21 +595,43 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         UserOperation memory userOp = validUserOperation().withSessionKey(address(0)).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
-        solverOps[0] = validSolverOperation(userOp).withAltUserOpHash(userOp).build();
+        solverOps[0] = validSolverOperation(userOp).withUserOpHash(atlasVerification.getUserOperationHash(userOp)).build();
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.InvalidAuctioneer);
     }
 
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    // where the user operation is from a contract
+    //   and the contract contract implements IAccount
+    //   and the userOp passes IAccount validation
+    // when validCalls is called twice with the same userOp
+    // then the second call should return UserOpNonceInvalid
+    // to prevent replay attacks
+    //
+    function test_validCalls_trustedOpHash_userOpChangesButTrustedHashStillValid_Valid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withTrustedOpHash(true).build());
+
+        UserOperation memory userOp = validUserOperation().withSessionKey(governanceEOA).build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        userOp = validUserOperation().withSessionKey(governanceEOA).withDeadline(block.number + 3).build();
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+        ), ValidCallsResult.Valid);
+    }
 
     function test_validCalls_trustedOpHash_msgSenderWrong_InvalidBundler() public {
         defaultAtlasWithCallConfig(defaultCallConfig().withTrustedOpHash(true).build());
 
         UserOperation memory userOp = validUserOperation().withSessionKey(governanceEOA).sign(address(atlasVerification), userPK).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
-        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withAltUserOpHash(userOp).sign(address(atlasVerification), governancePK).build();
-        solverOps[0] = validSolverOperation(userOp).withAltUserOpHash(userOp).build();
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+        solverOps[0] = validSolverOperation(userOp).build();
 
         // If msgSender in _validCalls is neither dAppOp.from nor userOp.from,
         // and trustedOpHash is true --> return InvalidBundler
@@ -1214,24 +1235,15 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     //
     function test_validCalls_InvalidUserOpControl_ControlMismatch() public {
         defaultAtlasEnvironment();
-        DAppConfig memory config = DAppConfig({ to: address(dAppControl), callConfig: CallBits.encodeCallConfig(defaultCallConfig().build()), bidToken: address(0), solverGasLimit: 1_000_000 });
+        DummyDAppControl otherDappControl = defaultDAppControl().buildAndIntegrate(atlasVerification);
 
-        UserOperation memory userOp = validUserOperation().withControl(address(0)).build();
+        UserOperation memory userOp = validUserOperation().withControl(address(otherDappControl)).signAndBuild(address(atlasVerification), userPK);
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
-        DAppOperation memory dappOp = validDAppOperation(config, userOp, solverOps).withControl(address(dAppControl)).signAndBuild(address(atlasVerification), governancePK);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withControl(address(dAppControl)).signAndBuild(address(atlasVerification), governancePK);
 
-        ValidCallsResult result;
-        vm.startPrank(address(atlas));
-        (, result) = atlasVerification.validateCalls(
-            config,
-            userOp,
-            solverOps,
-            dappOp,
-            0,
-            userEOA,
-            false);
-        vm.stopPrank();
-        assertValidCallsResult(result, ValidCallsResult.ControlMismatch);
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: governanceEOA, isSimulation: true}
+        ), ValidCallsResult.ControlMismatch);
     }
 
     //
