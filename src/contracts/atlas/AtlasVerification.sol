@@ -3,6 +3,7 @@ pragma solidity 0.8.22;
 
 import { EIP712 } from "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 import { ECDSA } from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
+import { SignatureChecker } from "openzeppelin-contracts/contracts/utils/cryptography/SignatureChecker.sol";
 import { DAppIntegration } from "src/contracts/atlas/DAppIntegration.sol";
 
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
@@ -35,7 +36,6 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
     /// @param msgValue The ETH value sent with the metacall transaction.
     /// @param msgSender The forwarded msg.sender of the original metacall transaction in the Atlas contract.
     /// @param isSimulation A boolean indicating if the call is a simulation.
-    /// @return userOpHash The hash of the UserOperation struct.
     /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
     function validateCalls(
         DAppConfig calldata dConfig,
@@ -47,59 +47,30 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         bool isSimulation
     )
         external
-        returns (bytes32 userOpHash, ValidCallsResult)
+        returns (ValidCallsResult)
     {
         if (msg.sender != ATLAS) revert AtlasErrors.InvalidCaller();
-        return _validCalls(dConfig, userOp, solverOps, dAppOp, msgValue, msgSender, isSimulation);
-    }
-
-    /// @notice The internal _validCalls function verifies the validity of the metacall calldata components, and is
-    /// called by validateCalls.
-    /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
-    /// @param userOp The UserOperation struct of the metacall.
-    /// @param solverOps An array of SolverOperation structs.
-    /// @param dAppOp The DAppOperation struct of the metacall.
-    /// @param msgValue The ETH value sent with the metacall transaction.
-    /// @param msgSender The forwarded msg.sender of the original metacall transaction in the Atlas contract.
-    /// @param isSimulation A boolean indicating if the call is a simulation.
-    /// @return userOpHash The hash of the UserOperation struct.
-    /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
-    function _validCalls(
-        DAppConfig calldata dConfig,
-        UserOperation calldata userOp,
-        SolverOperation[] calldata solverOps,
-        DAppOperation calldata dAppOp,
-        uint256 msgValue,
-        address msgSender,
-        bool isSimulation
-    )
-        internal
-        returns (bytes32 userOpHash, ValidCallsResult)
-    {
         // Verify that the calldata injection came from the dApp frontend
         // and that the signatures are valid.
 
         if (dConfig.callConfig.needsPreOpsReturnData() && dConfig.callConfig.needsUserReturnData()) {
             // Max one of preOps or userOp return data can be tracked, not both
-            return (userOpHash, ValidCallsResult.InvalidCallConfig);
+            return ValidCallsResult.InvalidCallConfig;
         }
 
+        bytes32 userOpHash = _getUserOperationHash(userOp);
         // CASE: Solvers trust app to update content of UserOp after submission of solverOp
         if (dConfig.callConfig.allowsTrustedOpHash()) {
-            userOpHash = userOp.getAltOperationHash();
-
             // SessionKey must match explicitly - cannot be skipped
             if (userOp.sessionKey != dAppOp.from && !isSimulation) {
-                return (userOpHash, ValidCallsResult.InvalidAuctioneer);
+                return ValidCallsResult.InvalidAuctioneer;
             }
 
             // msgSender (the bundler) must be userOp.from, userOp.sessionKey / dappOp.from, or dappOp.bundler
             if (!(msgSender == dAppOp.from || msgSender == dAppOp.bundler || msgSender == userOp.from) && !isSimulation)
             {
-                return (userOpHash, ValidCallsResult.InvalidBundler);
+                return ValidCallsResult.InvalidBundler;
             }
-        } else {
-            userOpHash = userOp.getUserOperationHash();
         }
 
         uint256 solverOpCount = solverOps.length;
@@ -111,75 +82,81 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
                 _verifyAuctioneer(dConfig, userOp, solverOps, dAppOp, msgSender);
 
             if (verifyAuctioneerResult != ValidCallsResult.Valid && !isSimulation) {
-                return (userOpHash, verifyAuctioneerResult);
+                return verifyAuctioneerResult;
             }
 
             // Check dapp signature
             ValidCallsResult verifyDappResult =
                 _verifyDApp(dConfig, dAppOp, msgSender, bypassSignatoryApproval, isSimulation);
             if (verifyDappResult != ValidCallsResult.Valid) {
-                return (userOpHash, verifyDappResult);
+                return verifyDappResult;
             }
 
             // Check user signature
-            ValidCallsResult verifyUserResult = _verifyUser(dConfig, userOp, msgSender, isSimulation);
+            ValidCallsResult verifyUserResult = _verifyUser(dConfig, userOp, userOpHash, msgSender, isSimulation);
             if (verifyUserResult != ValidCallsResult.Valid) {
-                return (userOpHash, verifyUserResult);
+                return verifyUserResult;
             }
 
             // Check number of solvers not greater than max, to prevent overflows in `callIndex`
             if (solverOpCount > _MAX_SOLVERS) {
-                return (userOpHash, ValidCallsResult.TooManySolverOps);
+                return ValidCallsResult.TooManySolverOps;
             }
 
             // Check if past user's deadline
             if (userOp.deadline != 0 && block.number > userOp.deadline) {
-                return (userOpHash, ValidCallsResult.UserDeadlineReached);
+                return ValidCallsResult.UserDeadlineReached;
             }
 
             // Check if past dapp's deadline
             if (dAppOp.deadline != 0 && block.number > dAppOp.deadline) {
-                return (userOpHash, ValidCallsResult.DAppDeadlineReached);
+                return ValidCallsResult.DAppDeadlineReached;
             }
 
             // Check gas price is within user's limit
             if (tx.gasprice > userOp.maxFeePerGas) {
-                return (userOpHash, ValidCallsResult.GasPriceHigherThanMax);
+                return ValidCallsResult.GasPriceHigherThanMax;
             }
 
             // Check that the value of the tx is greater than or equal to the value specified
             if (msgValue < userOp.value) {
-                return (userOpHash, ValidCallsResult.TxValueLowerThanCallValue);
+                return ValidCallsResult.TxValueLowerThanCallValue;
             }
 
             // Check the call config read at the start of the metacall is same as user expected (as set in userOp)
             if (dConfig.callConfig != userOp.callConfig) {
-                return (userOpHash, ValidCallsResult.CallConfigMismatch);
+                return ValidCallsResult.CallConfigMismatch;
             }
+        }
+
+        // Check if the call configuration is valid
+        ValidCallsResult verifyCallConfigResult = _verifyCallConfig(dConfig.callConfig);
+        if (verifyCallConfigResult != ValidCallsResult.Valid) {
+            return verifyCallConfigResult;
         }
 
         // Some checks are only needed when call is not a simulation
         if (isSimulation) {
             // Add all solver ops if simulation
-            return (userOpHash, ValidCallsResult.Valid);
+            return ValidCallsResult.Valid;
         }
 
         // Verify a solver was successfully verified.
         if (solverOpCount == 0) {
             if (!dConfig.callConfig.allowsZeroSolvers()) {
-                return (userOpHash, ValidCallsResult.NoSolverOp);
+                return ValidCallsResult.NoSolverOp;
             }
 
             if (dConfig.callConfig.needsFulfillment()) {
-                return (userOpHash, ValidCallsResult.NoSolverOp);
+                return ValidCallsResult.NoSolverOp;
             }
         }
 
         if (userOpHash != dAppOp.userOpHash) {
-            return (userOpHash, ValidCallsResult.OpHashMismatch);
+            return ValidCallsResult.OpHashMismatch;
         }
 
-        return (userOpHash, ValidCallsResult.Valid);
+        return ValidCallsResult.Valid;
     }
 
     /// @notice The verifySolverOp function verifies the validity of a SolverOperation.
@@ -224,6 +201,22 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
             // No refund
             result |= (1 << uint256(SolverOutcome.InvalidSignature));
         }
+    }
+
+    /// @notice The _verifyCallConfig internal function verifies the validity of the call configuration.
+    /// @param callConfig The call configuration to verify.
+    /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
+    function _verifyCallConfig(uint32 callConfig) internal pure returns (ValidCallsResult) {
+        CallConfig memory decodedCallConfig = CallBits.decodeCallConfig(callConfig);
+        if (decodedCallConfig.userNoncesSequential && decodedCallConfig.dappNoncesSequential) {
+            // Max one of user or dapp nonces can be sequential, not both
+            return ValidCallsResult.BothUserAndDAppNoncesCannotBeSequential;
+        }
+        if (decodedCallConfig.invertBidValue && decodedCallConfig.exPostBids) {
+            // If both invertBidValue and exPostBids are true, solver's retreived bid cannot be determined
+            return ValidCallsResult.InvertBidValueCannotBeExPostBids;
+        }
+        return ValidCallsResult.Valid;
     }
 
     /// @notice The _verifyAuctioneer internal function is called by _validCalls to verify that the auctioneer of the
@@ -278,7 +271,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         return (ValidCallsResult.Valid, false);
     }
 
-    /// @notice The getSolverPayload function returns the hash of a SolverOperation struct.
+    /// @notice The getSolverPayload function returns the hash of a SolverOperation struct for use in signatures.
     /// @param solverOp The SolverOperation struct to hash.
     function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload) {
         payload = _hashTypedDataV4(_getSolverOpHash(solverOp));
@@ -360,8 +353,11 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         // DApps are encouraged to rely on the deadline parameter.
         if (!skipDAppOpChecks) {
             // When not in a simulation, nonces are stored even if the metacall fails, to prevent replay attacks.
-            if (!_handleNonces(dAppOp.from, dAppOp.nonce, dConfig.callConfig.needsSequentialDAppNonces(), isSimulation))
-            {
+            if (
+                !_handleDAppNonces(
+                    dAppOp.from, dAppOp.nonce, dConfig.callConfig.needsSequentialDAppNonces(), isSimulation
+                )
+            ) {
                 return ValidCallsResult.InvalidDAppNonce;
             }
         }
@@ -386,18 +382,68 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         return ValidCallsResult.Valid;
     }
 
-    /// @notice The _handleNonces internal function handles the verification of nonces for both sequential and
+    /// @notice The _handleUserNonces internal function handles the verification of user nonces for both sequential and
     /// non-sequential nonce systems.
-    /// @param account The address of the account to verify the nonce for.
+    /// @param user The address of the user to verify the nonce for.
     /// @param nonce The nonce to verify.
     /// @param sequential A boolean indicating if the nonce mode is sequential (true) or not (false)
     /// @param isSimulation A boolean indicating if the execution is a simulation.
-    /// @return A boolean indicating if the nonce is valid.
-    function _handleNonces(
-        address account,
+    /// @return validNonce A boolean indicating if the nonce is valid.
+    function _handleUserNonces(
+        address user,
         uint256 nonce,
         bool sequential,
         bool isSimulation
+    )
+        internal
+        returns (bool validNonce)
+    {
+        NonceTracker memory nonceTracker = userNonceTrackers[user];
+        validNonce = _handleNonces(nonceTracker, user, true, nonce, sequential);
+        if (validNonce && !isSimulation) {
+            // Update storage only if valid and not in simulation
+            userNonceTrackers[user] = nonceTracker;
+        }
+    }
+
+    /// @notice The _handleDAppNonces internal function handles the verification of dApp signatory nonces for both
+    /// sequential and non-sequential nonce systems.
+    /// @param dAppSignatory The address of the dApp to verify the nonce for.
+    /// @param nonce The nonce to verify.
+    /// @param sequential A boolean indicating if the nonce mode is sequential (true) or not (false)
+    /// @param isSimulation A boolean indicating if the execution is a simulation.
+    /// @return validNonce A boolean indicating if the nonce is valid.
+    function _handleDAppNonces(
+        address dAppSignatory,
+        uint256 nonce,
+        bool sequential,
+        bool isSimulation
+    )
+        internal
+        returns (bool validNonce)
+    {
+        NonceTracker memory nonceTracker = dAppNonceTrackers[dAppSignatory];
+        validNonce = _handleNonces(nonceTracker, dAppSignatory, false, nonce, sequential);
+        if (validNonce && !isSimulation) {
+            // Update storage only if valid and not in simulation
+            dAppNonceTrackers[dAppSignatory] = nonceTracker;
+        }
+    }
+
+    /// @notice The _handleNonces internal function handles the verification of nonces for both sequential and
+    /// non-sequential nonce systems.
+    /// @param nonceTracker The NonceTracker of the account to verify the nonce for.
+    /// @param account The address of the account to verify the nonce for.
+    /// @param isUser A boolean indicating if the account is a user (true) or a dApp (false).
+    /// @param nonce The nonce to verify.
+    /// @param sequential A boolean indicating if the nonce mode is sequential (true) or not (false)
+    /// @return A boolean indicating if the nonce is valid.
+    function _handleNonces(
+        NonceTracker memory nonceTracker,
+        address account,
+        bool isUser,
+        uint256 nonce,
+        bool sequential
     )
         internal
         returns (bool)
@@ -409,16 +455,11 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         // 0 Nonces are not allowed. Nonces start at 1 for both sequential and non-sequential.
         if (nonce == 0) return false;
 
-        NonceTracker memory nonceTracker = nonceTrackers[account];
-
         if (sequential) {
             // SEQUENTIAL NONCES
 
             // Nonces must increase by 1 if sequential
             if (nonce != nonceTracker.lastUsedSeqNonce + 1) return false;
-
-            // Return true here if simulation to avoid storing nonce updates
-            if (isSimulation) return true;
 
             ++nonceTracker.lastUsedSeqNonce;
         } else {
@@ -434,7 +475,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
             uint256 bitmapIndex = ((nonce - 1) / _NONCES_PER_BITMAP) + 1;
             uint256 bitmapNonce = ((nonce - 1) % _NONCES_PER_BITMAP);
 
-            bytes32 bitmapKey = keccak256(abi.encode(account, bitmapIndex));
+            bytes32 bitmapKey = keccak256(abi.encode(account, isUser, bitmapIndex));
             NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
             uint256 bitmap = uint256(nonceBitmap.bitmap);
 
@@ -442,9 +483,6 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
             if (_nonceUsedInBitmap(bitmap, bitmapNonce)) {
                 return false;
             }
-
-            // Return true here if simulation to avoid storing nonce updates
-            if (isSimulation) return true;
 
             // Mark nonce as used in bitmap
             bitmap |= 1 << bitmapNonce;
@@ -460,14 +498,13 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
             if (bitmap == _FULL_BITMAP) {
                 // Update highestFullNonSeqBitmap if necessary
                 if (bitmapIndex == nonceTracker.highestFullNonSeqBitmap + 1) {
-                    nonceTracker = _incrementHighestFullNonSeqBitmap(nonceTracker, account);
+                    nonceTracker = _incrementHighestFullNonSeqBitmap(nonceTracker, account, isUser);
                 }
             }
 
             nonceBitmaps[bitmapKey] = nonceBitmap;
         }
 
-        nonceTrackers[account] = nonceTracker;
         return true;
     }
 
@@ -477,11 +514,13 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
     /// specific account.
     /// @param account The address of the account for which the nonce tracking is being updated. This is used to
     /// generate a unique key for accessing the correct bitmap from a mapping.
+    /// @param isUser A boolean indicating if the account is a user (true) or a dApp (false).
     /// @return nonceTracker The updated `NonceTracker` structure with the `highestFullNonSeqBitmap` field modified to
     /// reflect the highest index of a bitmap that is not fully utilized.
     function _incrementHighestFullNonSeqBitmap(
         NonceTracker memory nonceTracker,
-        address account
+        address account,
+        bool isUser
     )
         internal
         view
@@ -493,7 +532,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
                 ++nonceTracker.highestFullNonSeqBitmap;
             }
             uint256 bitmapIndex = uint256(nonceTracker.highestFullNonSeqBitmap) + 1;
-            bytes32 bitmapKey = keccak256(abi.encode(account, bitmapIndex));
+            bytes32 bitmapKey = keccak256(abi.encode(account, isUser, bitmapIndex));
             bitmap = uint256(nonceBitmaps[bitmapKey].bitmap);
         } while (bitmap == _FULL_BITMAP);
 
@@ -553,27 +592,24 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
     function _verifyUser(
         DAppConfig memory dConfig,
         UserOperation calldata userOp,
+        bytes32 userOpHash,
         address msgSender,
         bool isSimulation
     )
         internal
         returns (ValidCallsResult)
     {
+        if (userOp.from == address(this) || userOp.from == ATLAS || userOp.from == userOp.control) {
+            return ValidCallsResult.UserFromInvalid;
+        }
+
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp userNonces
 
-        bool isFromContract = userOp.from.code.length > 0;
-
-        bool signatureValid = false;
-        if (isFromContract) {
-            if (userOp.from == address(this) || userOp.from == ATLAS || userOp.from == userOp.control) {
-                return ValidCallsResult.UserFromInvalid;
-            }
-            signatureValid = IAccount(userOp.from).validateUserOp(userOp, _getUserOpHash(userOp), 0) == 0;
-        } else {
-            // user is an EOA
-            signatureValid = _verifyUserSignature(userOp);
-        }
+        // if (userOp.callConfig.allowsTrustedOpHash()) {
+        userOpHash = _getUserOperationPayload(userOp);
+        // }
+        bool signatureValid = SignatureChecker.isValidSignatureNow(userOp.from, userOpHash, userOp.signature);
 
         bool userIsBundler = userOp.from == msgSender;
         bool hasNoSignature = userOp.signature.length == 0;
@@ -592,58 +628,115 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         // which builders or validators may be able to profit via censorship.
         // DApps are encouraged to rely on the deadline parameter
         // to prevent replay attacks.
-        if (!_handleNonces(userOp.from, userOp.nonce, dConfig.callConfig.needsSequentialUserNonces(), isSimulation)) {
+        if (!_handleUserNonces(userOp.from, userOp.nonce, dConfig.callConfig.needsSequentialUserNonces(), isSimulation))
+        {
             return ValidCallsResult.UserNonceInvalid;
         }
 
         return ValidCallsResult.Valid;
     }
 
-    /// @notice Generates the hash of a UserOperation struct.
-    /// @param userOp The UserOperation struct to hash.
-    /// @return userOpHash The hash of the UserOperation struct.
-    function _getUserOpHash(UserOperation calldata userOp) internal pure returns (bytes32 userOpHash) {
-        userOpHash = keccak256(
-            abi.encode(
-                USER_TYPEHASH,
-                userOp.from,
-                userOp.to,
-                userOp.value,
-                userOp.gas,
-                userOp.maxFeePerGas,
-                userOp.nonce,
-                userOp.deadline,
-                userOp.dapp,
-                userOp.control,
-                userOp.callConfig,
-                userOp.sessionKey,
-                userOp.data
-            )
-        );
-    }
-
-    /// @notice Verifies the signature of a UserOperation struct.
-    /// @param userOp The UserOperation struct to verify.
-    /// @return A boolean indicating if the signature is valid.
-    function _verifyUserSignature(UserOperation calldata userOp) internal view returns (bool) {
-        (address signer,) = _hashTypedDataV4(_getUserOpHash(userOp)).tryRecover(userOp.signature);
-        return signer == userOp.from;
-    }
-
-    /// @notice Generates the hash of a UserOperation struct.
-    /// @param userOp The UserOperation struct to hash.
-    /// @return payload The hash of the UserOperation struct.
+    /// @notice Generates the payload hash of a UserOperation struct used in signatures.
+    /// @param userOp The UserOperation struct to generate the payload for.
+    /// @return payload The hash of the UserOperation struct for use in signatures.
     function getUserOperationPayload(UserOperation calldata userOp) public view returns (bytes32 payload) {
-        payload = _hashTypedDataV4(_getUserOpHash(userOp));
+        payload = _getUserOperationPayload(userOp);
+    }
+
+    function _getUserOperationPayload(UserOperation calldata userOp) internal view returns (bytes32 payload) {
+        payload = _getUserOperationHash(userOp, false);
+    }
+
+    /// @notice Generates the hash of a UserOperation struct used for inter-operation references.
+    /// @param userOp The UserOperation struct to generate the hash for.
+    /// @return hash The hash of the UserOperation struct for in inter-operation references.
+    function getUserOperationHash(UserOperation calldata userOp) public view returns (bytes32 hash) {
+        hash = _getUserOperationHash(userOp);
+    }
+
+    function _getUserOperationHash(UserOperation calldata userOp) internal view returns (bytes32 hash) {
+        hash = _getUserOperationHash(userOp, userOp.callConfig.allowsTrustedOpHash());
+    }
+
+    function _getUserOperationHash(
+        UserOperation memory userOp,
+        bool trusted
+    )
+        internal
+        view
+        returns (bytes32 userOpHash)
+    {
+        if (trusted) {
+            userOpHash = _hashTypedDataV4(
+                keccak256(
+                    abi.encode(
+                        USER_TYPEHASH_TRUSTED,
+                        userOp.from,
+                        userOp.to,
+                        userOp.dapp,
+                        userOp.control,
+                        userOp.callConfig,
+                        userOp.sessionKey
+                    )
+                )
+            );
+        } else {
+            userOpHash = _hashTypedDataV4(
+                keccak256(
+                    abi.encode(
+                        USER_TYPEHASH_DEFAULT,
+                        userOp.from,
+                        userOp.to,
+                        userOp.value,
+                        userOp.gas,
+                        userOp.maxFeePerGas,
+                        userOp.nonce,
+                        userOp.deadline,
+                        userOp.dapp,
+                        userOp.control,
+                        userOp.callConfig,
+                        userOp.sessionKey,
+                        userOp.data
+                    )
+                )
+            );
+        }
+    }
+
+    /// @notice Returns the next nonce for the given user, in sequential or non-sequential mode.
+    /// @param user The address of the account for which to retrieve the next nonce.
+    /// @param sequential A boolean indicating if the nonce should be sequential (true) or non-sequential (false).
+    /// @return The next nonce for the given user.
+    function getUserNextNonce(address user, bool sequential) external view returns (uint256) {
+        NonceTracker memory nonceTracker = userNonceTrackers[user];
+        return _getNextNonce(nonceTracker, user, true, sequential);
+    }
+
+    /// @notice Returns the next nonce for the given dApp signatory, in sequential or non-sequential mode.
+    /// @param dApp The address of the dApp for which to retrieve the next nonce.
+    /// @param sequential A boolean indicating if the nonce should be sequential (true) or non-sequential (false).
+    /// @return The next nonce for the given user.
+    function getDAppNextNonce(address dApp, bool sequential) external view returns (uint256) {
+        NonceTracker memory nonceTracker = dAppNonceTrackers[dApp];
+        return _getNextNonce(nonceTracker, dApp, false, sequential);
     }
 
     /// @notice Returns the next nonce for the given account, in sequential or non-sequential mode.
+    /// @param nonceTracker The NonceTracker of the account for which to retrieve the next nonce.
     /// @param account The address of the account for which to retrieve the next nonce.
+    /// @param isUser A boolean indicating if the account is a user (true) or a dApp (false).
     /// @param sequential A boolean indicating if the nonce should be sequential (true) or non-sequential (false).
     /// @return The next nonce for the given account.
-    function getNextNonce(address account, bool sequential) external view returns (uint256) {
-        NonceTracker memory nonceTracker = nonceTrackers[account];
-
+    function _getNextNonce(
+        NonceTracker memory nonceTracker,
+        address account,
+        bool isUser,
+        bool sequential
+    )
+        internal
+        view
+        returns (uint256)
+    {
         if (sequential) {
             return nonceTracker.lastUsedSeqNonce + 1;
         }
@@ -655,7 +748,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
                 ++n;
             }
             // Non-sequential bitmaps start at index 1. I.e. accounts start with bitmap 0 = HighestFullNonSeqBitmap
-            bytes32 bitmapKey = keccak256(abi.encode(account, nonceTracker.highestFullNonSeqBitmap + n));
+            bytes32 bitmapKey = keccak256(abi.encode(account, isUser, nonceTracker.highestFullNonSeqBitmap + n));
             NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
             bitmap = uint256(nonceBitmap.bitmap);
         } while (bitmap == _FULL_BITMAP);
@@ -664,9 +757,33 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         return ((nonceTracker.highestFullNonSeqBitmap + n - 1) * 240) + remainder;
     }
 
-    /// @notice Manually updates the highestFullNonSeqBitmap of the caller to reflect the real full bitmap.
-    function manuallyUpdateNonSeqNonceTracker() external {
-        NonceTracker memory nonceTracker = nonceTrackers[msg.sender];
+    /// @notice Manually updates the highestFullNonSeqBitmap of the caller to reflect the real full bitmap. This
+    /// function is specific to user nonces.
+    function manuallyUpdateUserNonSeqNonceTracker() external {
+        NonceTracker memory nonceTracker = userNonceTrackers[msg.sender];
+        userNonceTrackers[msg.sender] = _manuallyUpdateNonSeqNonceTracker(nonceTracker, msg.sender, true);
+    }
+
+    /// @notice Manually updates the highestFullNonSeqBitmap of the caller to reflect the real full bitmap. This
+    /// function is specific to dApp nonces.
+    function manuallyUpdateDAppNonSeqNonceTracker() external {
+        NonceTracker memory nonceTracker = dAppNonceTrackers[msg.sender];
+        dAppNonceTrackers[msg.sender] = _manuallyUpdateNonSeqNonceTracker(nonceTracker, msg.sender, false);
+    }
+
+    /// @notice Manually updates the highestFullNonSeqBitmap of an account to reflect the real full bitmap.
+    /// @param nonceTracker The NonceTracker of the account for which the update should be made.
+    /// @param account The address of the account for which the update should be made.
+    /// @param isUser A boolean indicating if the account is a user (true) or a dApp (false).
+    function _manuallyUpdateNonSeqNonceTracker(
+        NonceTracker memory nonceTracker,
+        address account,
+        bool isUser
+    )
+        internal
+        view
+        returns (NonceTracker memory)
+    {
         NonceBitmap memory nonceBitmap;
 
         // Checks the next 10 bitmaps for a higher full bitmap
@@ -675,7 +792,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
             nonceIndexToCheck > nonceTracker.highestFullNonSeqBitmap;
             nonceIndexToCheck--
         ) {
-            bytes32 bitmapKey = keccak256(abi.encode(msg.sender, nonceIndexToCheck));
+            bytes32 bitmapKey = keccak256(abi.encode(account, isUser, nonceIndexToCheck));
             nonceBitmap = nonceBitmaps[bitmapKey];
 
             if (nonceBitmap.bitmap == _FULL_BITMAP) {
@@ -684,7 +801,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
             }
         }
 
-        nonceTrackers[msg.sender] = nonceTracker;
+        return nonceTracker;
     }
 
     /// @notice Checks if a nonce is used in a 256-bit bitmap.
@@ -732,44 +849,4 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
 
         return 0;
     }
-}
-
-// FROM ETH-INFINITISM REPO:
-// https://github.com/eth-infinitism/account-abstraction/blob/develop/contracts/interfaces/IAccount.sol
-
-interface IAccount {
-    /**
-     * Validate user's signature and nonce
-     * the entryPoint will make the call to the recipient only if this validation call returns successfully.
-     * signature failure should be reported by returning SIG_VALIDATION_FAILED (1).
-     * This allows making a "simulation call" without a valid signature
-     * Other failures (e.g. nonce mismatch, or invalid signature format) should still revert to signal failure.
-     *
-     * @dev Must validate caller is the entryPoint.
-     *      Must validate the signature and nonce
-     * @param userOp              - The operation that is about to be executed.
-     * @param userOpHash          - Hash of the user's request data. can be used as the basis for signature.
-     * @param missingAccountFunds - Missing funds on the account's deposit in the entrypoint.
-     *                              This is the minimum amount to transfer to the sender(entryPoint) to be
-     *                              able to make the call. The excess is left as a deposit in the entrypoint
-     *                              for future calls. Can be withdrawn anytime using "entryPoint.withdrawTo()".
-     *                              In case there is a paymaster in the request (or the current deposit is high
-     *                              enough), this value will be zero.
-     * @return validationData       - Packaged ValidationData structure. use `_packValidationData` and
-     *                              `_unpackValidationData` to encode and decode.
-     *                              <20-byte> sigAuthorizer - 0 for valid signature, 1 to mark signature failure,
-     *                                 otherwise, an address of an "authorizer" contract.
-     *                              <6-byte> validUntil - Last timestamp this operation is valid. 0 for "indefinite"
-     *                              <6-byte> validAfter - First timestamp this operation is valid
-     *                                                    If an account doesn't use time-range, it is enough to
-     *                                                    return SIG_VALIDATION_FAILED value (1) for signature failure.
-     *                              Note that the validation code cannot use block.timestamp (or block.number) directly.
-     */
-    function validateUserOp(
-        UserOperation calldata userOp,
-        bytes32 userOpHash,
-        uint256 missingAccountFunds
-    )
-        external
-        returns (uint256 validationData);
 }

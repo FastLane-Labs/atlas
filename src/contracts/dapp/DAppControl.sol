@@ -37,6 +37,10 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
             // Max one of preOps or userOp return data can be tracked, not both
             revert AtlasErrors.BothPreOpsAndUserReturnDataCannotBeTracked();
         }
+        if (_callConfig.invertBidValue && _callConfig.exPostBids) {
+            // If both invertBidValue and exPostBids are true, solver's retreived bid cannot be determined
+            revert AtlasErrors.InvertBidValueCannotBeExPostBids();
+        }
         CALL_CONFIG = CallBits.encodeCallConfig(_callConfig);
         CONTROL = address(this);
         ATLAS_VERIFICATION = IAtlas(_atlas).VERIFICATION();

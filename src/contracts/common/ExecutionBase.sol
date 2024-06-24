@@ -1,10 +1,11 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { IPermit69 } from "src/contracts/interfaces/IPermit69.sol";
 import { ISafetyLocks } from "src/contracts/interfaces/ISafetyLocks.sol";
 import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+
 import { ExecutionPhase } from "src/contracts/types/LockTypes.sol";
 import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "src/contracts/libraries/SafetyBits.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
@@ -250,7 +251,7 @@ contract ExecutionBase is Base {
         view
         returns (bool available)
     {
-        uint256 balance = ERC20(_token).balanceOf(_source);
+        uint256 balance = IERC20(_token).balanceOf(_source);
         if (balance < _amount) {
             return false;
         }
@@ -263,7 +264,7 @@ contract ExecutionBase is Base {
             if (phase_bitwise & SAFE_USER_TRANSFER == 0) {
                 return false;
             }
-            if (ERC20(_token).allowance(user, ATLAS) < _amount) {
+            if (IERC20(_token).allowance(user, ATLAS) < _amount) {
                 return false;
             }
             return true;
@@ -273,7 +274,7 @@ contract ExecutionBase is Base {
             if (phase_bitwise & SAFE_DAPP_TRANSFER == 0) {
                 return false;
             }
-            if (ERC20(_token).allowance(dapp, ATLAS) < _amount) {
+            if (IERC20(_token).allowance(dapp, ATLAS) < _amount) {
                 return false;
             }
             return true;

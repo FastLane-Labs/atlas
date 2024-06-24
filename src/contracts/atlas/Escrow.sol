@@ -34,7 +34,9 @@ abstract contract Escrow is AtlETH {
         address _surchargeRecipient
     )
         AtlETH(_escrowDuration, _verification, _simulator, _surchargeRecipient)
-    { }
+    {
+        if (_escrowDuration == 0) revert InvalidEscrowDuration();
+    }
 
     /// @notice Executes the preOps logic defined in the Execution Environment.
     /// @param ctx Metacall context data from the Context struct.
@@ -129,7 +131,7 @@ abstract contract Escrow is AtlETH {
         uint256 gasWaterMark = gasleft();
         uint256 result;
         if (!prevalidated) {
-            result = IAtlasVerification(VERIFICATION).verifySolverOp(
+            result = VERIFICATION.verifySolverOp(
                 solverOp, ctx.userOpHash, userOp.maxFeePerGas, ctx.bundler
             );
             result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, result);
@@ -425,8 +427,7 @@ abstract contract Escrow is AtlETH {
 
         uint256 gasWaterMark = gasleft();
 
-        uint256 result =
-            IAtlasVerification(VERIFICATION).verifySolverOp(solverOp, ctx.userOpHash, userOp.maxFeePerGas, ctx.bundler);
+        uint256 result = VERIFICATION.verifySolverOp(solverOp, ctx.userOpHash, userOp.maxFeePerGas, ctx.bundler);
 
         result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, result);
 

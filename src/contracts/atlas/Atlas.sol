@@ -1,10 +1,9 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { LibSort } from "solady/utils/LibSort.sol";
 
-import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
 import { Escrow } from "./Escrow.sol";
@@ -58,18 +57,20 @@ contract Atlas is Escrow, Factory {
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
         // NOTE: Currently reverting instead of graceful return to help w/ testing. TODO - still reverting?
-        (bytes32 userOpHash, ValidCallsResult validCallsResult) = IAtlasVerification(VERIFICATION).validateCalls(
-            dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, isSimulation
-        );
+        ValidCallsResult validCallsResult =
+            VERIFICATION.validateCalls(dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, isSimulation);
         if (validCallsResult != ValidCallsResult.Valid) {
-            if (isSimulation) revert VerificationSimFail(uint256(validCallsResult));
+            if (isSimulation) revert VerificationSimFail(validCallsResult);
             revert ValidCalls(validCallsResult);
         }
 
         // Initialize the lock
         _setAccountingLock(dConfig, executionEnvironment, gasMarker, userOp.value);
 
-        try this.execute(dConfig, userOp, solverOps, executionEnvironment, msg.sender, userOpHash) returns (
+        // userOpHash has already been calculated and verified in validateCalls at this point, so rather
+        // than re-calculate it, we can simply take it from the dAppOp here. It's worth noting that this will
+        // be either a TRUSTED or DEFAULT hash, depending on the allowsTrustedOpHash setting.
+        try this.execute(dConfig, userOp, solverOps, executionEnvironment, msg.sender, dAppOp.userOpHash) returns (
             address winningSolver
         ) {
             auctionWon = winningSolver != address(0);

@@ -11,6 +11,7 @@ import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 
 import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
 import "src/contracts/types/DAppApprovalTypes.sol";
 
@@ -36,7 +37,7 @@ contract DAppOperationBuilder is Test {
 
     function withNonce(address atlasVerification, address account) public returns (DAppOperationBuilder) {
         // Assumes dappNoncesSequential = false. Use withNonce(address, address, bool) to specify sequential or not.
-        dappOperation.nonce = IAtlasVerification(atlasVerification).getNextNonce(account, false);
+        dappOperation.nonce = IAtlasVerification(atlasVerification).getDAppNextNonce(account, false);
         return this;
     }
 
@@ -48,7 +49,7 @@ contract DAppOperationBuilder is Test {
         public
         returns (DAppOperationBuilder)
     {
-        dappOperation.nonce = IAtlasVerification(atlasVerification).getNextNonce(account, sequential);
+        dappOperation.nonce = IAtlasVerification(atlasVerification).getDAppNextNonce(account, sequential);
         return this;
     }
 
@@ -73,17 +74,8 @@ contract DAppOperationBuilder is Test {
     }
 
     function withUserOpHash(UserOperation memory userOperation) public returns (DAppOperationBuilder) {
-        dappOperation.userOpHash = userOperation.getUserOperationHash();
-        return this;
-    }
-
-    function withAltUserOpHash(bytes32 altUserOpHash) public returns (DAppOperationBuilder) {
-        dappOperation.userOpHash = altUserOpHash;
-        return this;
-    }
-
-    function withAltUserOpHash(UserOperation memory userOperation) public returns (DAppOperationBuilder) {
-        dappOperation.userOpHash = userOperation.getAltOperationHash();
+        address verification = IAtlas(userOperation.to).VERIFICATION();
+        dappOperation.userOpHash = IAtlasVerification(verification).getUserOperationHash(userOperation);
         return this;
     }
 
@@ -116,7 +108,7 @@ contract DAppOperationBuilder is Test {
         return this;
     }
 
-    function build() public returns (DAppOperation memory) {
+    function build() public view returns (DAppOperation memory) {
         return dappOperation;
     }
 
