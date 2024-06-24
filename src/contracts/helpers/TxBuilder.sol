@@ -35,16 +35,17 @@ contract TxBuilder {
 
     function governanceNextNonce(address signatory) public view returns (uint256) {
         // Assume userNoncesSequential = false if control is not set
-        if (control == address(0)) return IAtlasVerification(verification).getNextNonce(signatory, false);
-        return IAtlasVerification(verification).getNextNonce(
+        if (control == address(0)) return IAtlasVerification(verification).getDAppNextNonce(signatory, false);
+        return IAtlasVerification(verification).getDAppNextNonce(
             signatory, IDAppControl(control).requireSequentialDAppNonces()
         );
     }
 
     function userNextNonce(address user) public view returns (uint256) {
         // Assume userNoncesSequential = false if control is not set
-        if (control == address(0)) return IAtlasVerification(verification).getNextNonce(user, false);
-        return IAtlasVerification(verification).getNextNonce(user, IDAppControl(control).requireSequentialUserNonces());
+        if (control == address(0)) return IAtlasVerification(verification).getUserNextNonce(user, false);
+        return
+            IAtlasVerification(verification).getUserNextNonce(user, IDAppControl(control).requireSequentialUserNonces());
     }
 
     function getControlCodeHash(address dAppControl) external view returns (bytes32) {
@@ -98,8 +99,7 @@ contract TxBuilder {
     {
         // generate userOpHash depending on CallConfig.trustedOpHash allowed or not
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
-        bytes32 userOpHash =
-            dConfig.callConfig.allowsTrustedOpHash() ? userOp.getAltOperationHash() : userOp.getUserOperationHash();
+        bytes32 userOpHash = IAtlasVerification(verification).getUserOperationHash(userOp);
 
         solverOp = SolverOperation({
             from: solverEOA,
@@ -130,8 +130,7 @@ contract TxBuilder {
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
 
         // generate userOpHash depending on CallConfig.trustedOpHash allowed or not
-        bytes32 userOpHash =
-            dConfig.callConfig.allowsTrustedOpHash() ? userOp.getAltOperationHash() : userOp.getUserOperationHash();
+        bytes32 userOpHash = IAtlasVerification(verification).getUserOperationHash(userOp);
         bytes32 callChainHash = CallVerification.getCallChainHash(dConfig, userOp, solverOps);
 
         dAppOp = DAppOperation({

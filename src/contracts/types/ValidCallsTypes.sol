@@ -26,5 +26,8 @@ enum ValidCallsResult {
     UserFromInvalid,
     ControlMismatch,
     UserNonceInvalid,
-    InvalidCallChainHash
+    InvalidCallChainHash,
+    DAppNotEnabled,
+    BothUserAndDAppNoncesCannotBeSequential,
+    InvertBidValueCannotBeExPostBids
 }
