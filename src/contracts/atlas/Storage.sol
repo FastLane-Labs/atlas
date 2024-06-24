@@ -6,13 +6,14 @@ import "src/contracts/types/LockTypes.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { AtlasConstants } from "src/contracts/types/AtlasConstants.sol";
+import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 
 /// @title Storage
 /// @author FastLane Labs
 /// @notice Storage manages all storage variables and constants for the Atlas smart contract.
 contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint256 public immutable ESCROW_DURATION;
-    address public immutable VERIFICATION;
+    AtlasVerification public immutable VERIFICATION;
     address public immutable SIMULATOR;
 
     // AtlETH ERC-20 public constants
@@ -23,6 +24,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     // Gas Accounting public constants
     uint256 public constant SURCHARGE_RATE = 1_000_000; // 1_000_000 / 10_000_000 = 10%
     uint256 public constant SURCHARGE_SCALE = 10_000_000; // 10_000_000 / 10_000_000 = 100%
+    uint256 public constant FIXED_GAS_OFFSET = 100_000;
 
     // AtlETH EIP-2612 constants
     uint256 internal immutable _INITIAL_CHAIN_ID;
@@ -59,7 +61,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         payable
     {
         ESCROW_DURATION = _escrowDuration;
-        VERIFICATION = _verification;
+        VERIFICATION = AtlasVerification(_verification);
         SIMULATOR = _simulator;
         _INITIAL_CHAIN_ID = block.chainid;
         _INITIAL_DOMAIN_SEPARATOR = _computeDomainSeparator();

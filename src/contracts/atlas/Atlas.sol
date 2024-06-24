@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { LibSort } from "solady/utils/LibSort.sol";
 
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
@@ -50,7 +50,7 @@ contract Atlas is Escrow, Factory {
         payable
         returns (bool auctionWon)
     {
-        uint256 gasMarker = gasleft(); // + 21_000 + (msg.data.length * _CALLDATA_LENGTH_PREMIUM);
+        uint256 gasMarker = gasleft() + 21_000 + (msg.data.length * _CALLDATA_LENGTH_PREMIUM);
         bool isSimulation = msg.sender == SIMULATOR;
 
         (address executionEnvironment, DAppConfig memory dConfig) = _getOrCreateExecutionEnvironment(userOp);
@@ -58,11 +58,10 @@ contract Atlas is Escrow, Factory {
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
         // NOTE: Currently reverting instead of graceful return to help w/ testing. TODO - still reverting?
-        (bytes32 userOpHash, ValidCallsResult validCallsResult) = IAtlasVerification(VERIFICATION).validateCalls(
-            dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, isSimulation
-        );
+        (bytes32 userOpHash, ValidCallsResult validCallsResult) =
+            VERIFICATION.validateCalls(dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, isSimulation);
         if (validCallsResult != ValidCallsResult.Valid) {
-            if (isSimulation) revert VerificationSimFail(uint256(validCallsResult));
+            if (isSimulation) revert VerificationSimFail(validCallsResult);
             revert ValidCalls(validCallsResult);
         }
 
@@ -70,22 +69,14 @@ contract Atlas is Escrow, Factory {
         _setAtlasLock(executionEnvironment, gasMarker, userOp.value);
 
         try this.execute(dConfig, userOp, solverOps, executionEnvironment, msg.sender, userOpHash) returns (
-            bool _auctionWon, uint256 winningSolverIndex
+            address winningSolver
         ) {
-            auctionWon = _auctionWon;
+            auctionWon = winningSolver != address(0);
             // Gas Refund to sender only if execution is successful
-            (uint256 ethPaidToBundler, uint256 netGasSurcharge) = _settle({
-                winningSolver: auctionWon ? solverOps[winningSolverIndex].from : msg.sender,
-                bundler: msg.sender
-            });
+            (uint256 ethPaidToBundler, uint256 netGasSurcharge) =
+                _settle({ winningSolver: auctionWon ? winningSolver : msg.sender, bundler: msg.sender });
 
-            emit MetacallResult(
-                msg.sender,
-                userOp.from,
-                auctionWon ? solverOps[winningSolverIndex].from : address(0),
-                ethPaidToBundler,
-                netGasSurcharge
-            );
+            emit MetacallResult(msg.sender, userOp.from, winningSolver, ethPaidToBundler, netGasSurcharge);
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
             _handleErrors(revertData, dConfig.callConfig);
@@ -105,8 +96,7 @@ contract Atlas is Escrow, Factory {
     /// @param executionEnvironment Address of the execution environment contract of the current metacall tx.
     /// @param bundler Address of the bundler of the current metacall tx.
     /// @param userOpHash Hash of the userOp struct of the current metacall tx.
-    /// @return auctionWon Boolean indicating whether the auction was won
-    /// @return uint256 The winningSolverIndex (stored in key.solverOutcome to prevent Stack Too Deep errors)
+    /// @return winningSolver Address of the winning solver (address(0) if no winner).
     function execute(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
@@ -117,10 +107,12 @@ contract Atlas is Escrow, Factory {
     )
         external
         payable
-        returns (bool auctionWon, uint256)
+        returns (address winningSolver)
     {
         // This is a self.call made externally so that it can be used with try/catch
         if (msg.sender != address(this)) revert InvalidAccess();
+
+        bool auctionWon;
 
         (bytes memory returnData, EscrowKey memory key) =
             _preOpsUserExecutionIteration(dConfig, userOp, solverOps, executionEnvironment, bundler, userOpHash);
@@ -131,8 +123,13 @@ contract Atlas is Escrow, Factory {
             (auctionWon, key) = _bidKnownIteration(dConfig, userOp, solverOps, returnData, key);
         }
 
-        // If no solver was successful, handle revert decision
-        if (!auctionWon) {
+        if (auctionWon) {
+            // when auctionWon, key.solverOutcome contains the index of the winning solver (to prevent Stack Too Deep
+            // errors)
+            winningSolver = solverOps[key.solverOutcome].from;
+        } else {
+            // when !auctionWon, key.solverOutcome contains the error code of the last solver
+            // If no solver was successful, handle revert decision
             if (key.isSimulation) revert SolverSimFail(uint256(key.solverOutcome));
             if (dConfig.callConfig.needsFulfillment()) {
                 revert UserNotFulfilled();
@@ -150,7 +147,6 @@ contract Atlas is Escrow, Factory {
                 revert PostOpsFail();
             }
         }
-        return (auctionWon, uint256(key.solverOutcome));
     }
 
     /// @notice Called above in `execute`, this function executes the preOps and userOp calls.
@@ -234,7 +230,8 @@ contract Atlas is Escrow, Factory {
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param returnData Return data from the preOps and userOp calls.
-    /// @param key EscrowKey struct containing the current state of the escrow lock.
+    /// @param key EscrowKey struct containing the current state of the escrow lock. key.solverOutcome is the index of
+    /// the winning solver. When no winner is found, key.solverOutcome is the error code of the last solver.
     /// @return auctionWon bool indicating whether a winning solver was found or not.
     /// @return EscrowKey struct containing the current state of the escrow lock.
     function _bidFindingIteration(
@@ -331,7 +328,8 @@ contract Atlas is Escrow, Factory {
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param returnData Return data from the preOps and userOp calls.
-    /// @param key EscrowKey struct containing the current state of the escrow lock.
+    /// @param key EscrowKey struct containing the current state of the escrow lock. key.solverOutcome is the index of
+    /// the winning solver. When no winner is found, key.solverOutcome is the error code of the last solver.
     /// @return auctionWon bool indicating whether a winning solver was found or not.
     /// @return EscrowKey struct containing the current state of the escrow lock.
     function _bidKnownIteration(

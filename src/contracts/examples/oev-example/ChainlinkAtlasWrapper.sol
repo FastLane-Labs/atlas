@@ -29,7 +29,7 @@ contract ChainlinkAtlasWrapper is Ownable, IChainlinkAtlasWrapper {
     error CannotReuseReport();
     error ZeroObservations();
     error ObservationsNotOrdered();
-    error AnswerMustBeAboveZero();
+    error ObservationsMustBePositive();
     error SignerVerificationFailed();
     error WithdrawETHFailed();
 
@@ -100,10 +100,10 @@ contract ChainlinkAtlasWrapper is Ownable, IChainlinkAtlasWrapper {
                 bool inOrder = r.observations[i] <= r.observations[i + 1];
                 if (!inOrder) revert ObservationsNotOrdered();
             }
+            if (r.observations[0] < 0) revert ObservationsMustBePositive();
 
             // Calculate median from observations, cannot be 0
             median = r.observations[observationCount / 2];
-            if (median <= 0) revert AnswerMustBeAboveZero();
         }
 
         bool signersVerified =

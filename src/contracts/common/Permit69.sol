@@ -1,7 +1,8 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { GasAccounting } from "src/contracts/atlas/GasAccounting.sol";
 
 import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "src/contracts/libraries/SafetyBits.sol";
@@ -23,8 +24,6 @@ import "src/contracts/types/EscrowTypes.sol";
 /// @notice Permit69 manages ERC20 approvals and transfers between Atlas and Execution Environment contracts during
 /// metacall transactions.
 abstract contract Permit69 is GasAccounting {
-    using SafeTransferLib for ERC20;
-
     constructor(
         uint256 _escrowDuration,
         address _verification,
@@ -73,7 +72,7 @@ abstract contract Permit69 is GasAccounting {
         _verifyLockState({ lockState: lockState, safeExecutionPhaseSet: SAFE_USER_TRANSFER });
 
         // Transfer token
-        ERC20(token).safeTransferFrom(user, destination, amount);
+        SafeTransferLib.safeTransferFrom(token, user, destination, amount);
     }
 
     /// @notice Transfers ERC20 tokens from the DAppControl contract to a destination address, only callable by the
@@ -103,7 +102,7 @@ abstract contract Permit69 is GasAccounting {
         _verifyLockState({ lockState: lockState, safeExecutionPhaseSet: SAFE_DAPP_TRANSFER });
 
         // Transfer token
-        ERC20(token).safeTransferFrom(control, destination, amount);
+        SafeTransferLib.safeTransferFrom(token, control, destination, amount);
     }
 
     /// @notice Verifies whether the lock state allows execution in the specified safe execution phase.
