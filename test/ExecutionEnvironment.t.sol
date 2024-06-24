@@ -15,7 +15,7 @@ import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 
 import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
-import { ERC20 } from "solmate/tokens/ERC20.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
@@ -510,12 +510,12 @@ contract ExecutionEnvironmentTest is BaseTest {
     function test_withdrawERC20() public {
         // Valid
         deal(chain.weth, address(executionEnvironment), 2e18);
-        assertEq(ERC20(chain.weth).balanceOf(address(executionEnvironment)), 2e18);
-        assertEq(ERC20(chain.weth).balanceOf(user), 0);
+        assertEq(IERC20(chain.weth).balanceOf(address(executionEnvironment)), 2e18);
+        assertEq(IERC20(chain.weth).balanceOf(user), 0);
         vm.prank(user);
         executionEnvironment.withdrawERC20(chain.weth, 2e18);
-        assertEq(ERC20(chain.weth).balanceOf(address(executionEnvironment)), 0);
-        assertEq(ERC20(chain.weth).balanceOf(user), 2e18);
+        assertEq(IERC20(chain.weth).balanceOf(address(executionEnvironment)), 0);
+        assertEq(IERC20(chain.weth).balanceOf(user), 2e18);
 
         // NotEnvironmentOwner
         vm.prank(invalid); // Invalid caller

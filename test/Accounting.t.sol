@@ -3,7 +3,7 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { ERC20 } from "solmate/tokens/ERC20.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
@@ -36,7 +36,7 @@ contract AccountingTest is BaseTest {
     UserOperation userOp;
     DAppOperation dAppOp;
 
-    ERC20 DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+    IERC20 DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     address DAI_ADDRESS = address(DAI);
 
     struct Sig {
@@ -237,14 +237,14 @@ contract HonestRFQSolver is SolverBase {
     function fulfillRFQ(SwapIntent calldata swapIntent, address executionEnvironment) public payable virtual {
         console.log("solver balance", address(this).balance);
         require(
-            ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells,
+            IERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells,
             "Did not receive enough tokenIn"
         );
         require(
-            ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys,
+            IERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys,
             "Not enough tokenOut to fulfill"
         );
-        ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
+        IERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
     }
 
     // This ensures a function can only be called through atlasSolverCall

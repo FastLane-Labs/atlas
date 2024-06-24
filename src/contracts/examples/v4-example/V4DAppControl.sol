@@ -2,7 +2,8 @@
 pragma solidity 0.8.22;
 
 // Base Imports
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Base Imports
 import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
@@ -132,7 +133,7 @@ contract V4DAppControl is DAppControl {
                 // Buying Pool's token1 with amountSpecified of User's token0
                 // ERC20(token0).approve(v4Singleton, amountSpecified);
                 SafeTransferLib.safeTransferFrom(
-                    ERC20(IPoolManager.Currency.unwrap(key.currency0)),
+                    IPoolManager.Currency.unwrap(key.currency0),
                     userOp.from,
                     v4Singleton, // <- TODO: confirm
                     uint256(params.amountSpecified)
