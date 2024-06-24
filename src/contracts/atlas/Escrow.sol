@@ -131,9 +131,7 @@ abstract contract Escrow is AtlETH {
         uint256 gasWaterMark = gasleft();
         uint256 result;
         if (!prevalidated) {
-            result = VERIFICATION.verifySolverOp(
-                solverOp, ctx.userOpHash, userOp.maxFeePerGas, ctx.bundler
-            );
+            result = VERIFICATION.verifySolverOp(solverOp, ctx.userOpHash, userOp.maxFeePerGas, ctx.bundler);
             result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, result);
         }
 

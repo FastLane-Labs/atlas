@@ -2,7 +2,8 @@
 pragma solidity ^0.8.16;
 
 // Base Imports
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Base Imports
 import { IEscrow } from "../../interfaces/IEscrow.sol";
@@ -35,8 +36,6 @@ struct SwapIntent {
  * @dev The invertBidValue flag is set to true
  */
 contract SwapIntentInvertBidDAppControl is DAppControl {
-    using SafeTransferLib for ERC20;
-
     bool public immutable _solverBidRetrievalRequired;
 
     constructor(
@@ -85,7 +84,7 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
     */
     function swap(SwapIntent calldata swapIntent) external payable returns (SwapIntent memory) {
         require(msg.sender == ATLAS, "SwapIntentDAppControl: InvalidSender");
-        require(_addressPointer() == CONTROL, "SwapIntentDAppControl: InvalidLockState");
+        // require(_addressPointer() == CONTROL, "SwapIntentDAppControl: InvalidLockState");
         require(address(this) != CONTROL, "SwapIntentDAppControl: MustBeDelegated");
 
         address user = _user();
@@ -131,7 +130,7 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
             // Optimistically transfer to the execution environment the amount that the solver is invert bidding
             _transferUserERC20(swapData.tokenUserSells, address(this), solverOp.bidAmount);
             // Approve the solver to retrieve the bid amount from ee
-            ERC20(swapData.tokenUserSells).safeApprove(solverTo, solverOp.bidAmount);
+            SafeTransferLib.safeApprove(swapData.tokenUserSells, solverTo, solverOp.bidAmount);
         } else {
             // Optimistically transfer to the solver contract the amount that the solver is invert bidding
             _transferUserERC20(swapData.tokenUserSells, solverTo, solverOp.bidAmount);
@@ -148,14 +147,14 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
     */
     function _postSolverCall(SolverOperation calldata, bytes calldata returnData) internal override {
         SwapIntent memory swapIntent = abi.decode(returnData, (SwapIntent));
-        uint256 buyTokenBalance = ERC20(swapIntent.tokenUserBuys).balanceOf(address(this));
+        uint256 buyTokenBalance = IERC20(swapIntent.tokenUserBuys).balanceOf(address(this));
 
         if (buyTokenBalance < swapIntent.amountUserBuys) {
             revert("SwapIntentInvertBid: Intent Unfulfilled - buyTokenBalance < amountUserBuys");
         }
 
         // Transfer the tokens the user is buying to the user
-        ERC20(swapIntent.tokenUserBuys).safeTransfer(_user(), swapIntent.amountUserBuys);
+        SafeTransferLib.safeTransfer(swapIntent.tokenUserBuys, _user(), swapIntent.amountUserBuys);
     }
 
     /*
@@ -170,7 +169,7 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
     */
     function _allocateValueCall(address bidToken, uint256, bytes calldata) internal override {
         if (bidToken != address(0)) {
-            ERC20(bidToken).safeTransfer(_user(), ERC20(bidToken).balanceOf(address(this)));
+            SafeTransferLib.safeTransfer(bidToken, _user(), IERC20(bidToken).balanceOf(address(this)));
         } else {
             SafeTransferLib.safeTransferETH(_user(), address(this).balance);
         }
