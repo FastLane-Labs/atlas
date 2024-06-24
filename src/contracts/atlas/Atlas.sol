@@ -298,6 +298,10 @@ contract Atlas is Escrow, Factory {
         if (errorSwitch == UserNotFulfilled.selector) {
             revert UserNotFulfilled();
         }
+        // If allowReuseUserOps = true, it reverts and bubbles up whatever the error
+        // was that it caught. This is to prevent storing the nonce as used so the userOp
+        // can be reused. Otherwise, the whole metacall doesn't revert but the inner
+        // execute() does so, no operation changes are persisted.
         if (callConfig.allowsReuseUserOps()) {
             assembly {
                 mstore(0, errorSwitch)
