@@ -7,14 +7,7 @@ import { Ownable } from "openzeppelin-contracts/contracts/access/Ownable.sol";
 contract Token is ERC20, Ownable {
     uint8 internal immutable _decimals;
 
-    constructor(
-        string memory _name,
-        string memory _symbol,
-        uint8 __decimals
-    )
-        ERC20(_name, _symbol)
-        Ownable()
-    {
+    constructor(string memory _name, string memory _symbol, uint8 __decimals) ERC20(_name, _symbol) Ownable() {
         _decimals = __decimals;
     }
 
