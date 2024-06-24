@@ -17,7 +17,7 @@ contract StorageTest is Test {
         );
 
         assertEq(s.ESCROW_DURATION(), 1);
-        assertEq(s.VERIFICATION(), address(1));
+        assertEq(address(s.VERIFICATION()), address(1));
         assertEq(s.SIMULATOR(), address(2));
         assertEq(s.getInitialChainId(), block.chainid);
         assertEq(s.getInitialDomainSeparator(), bytes32("SEPARATOR"));

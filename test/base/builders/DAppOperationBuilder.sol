@@ -11,6 +11,7 @@ import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 
 import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
 import "src/contracts/types/DAppApprovalTypes.sol";
 
@@ -73,17 +74,8 @@ contract DAppOperationBuilder is Test {
     }
 
     function withUserOpHash(UserOperation memory userOperation) public returns (DAppOperationBuilder) {
-        dappOperation.userOpHash = userOperation.getUserOperationHash();
-        return this;
-    }
-
-    function withAltUserOpHash(bytes32 altUserOpHash) public returns (DAppOperationBuilder) {
-        dappOperation.userOpHash = altUserOpHash;
-        return this;
-    }
-
-    function withAltUserOpHash(UserOperation memory userOperation) public returns (DAppOperationBuilder) {
-        dappOperation.userOpHash = userOperation.getAltOperationHash();
+        address verification = IAtlas(userOperation.to).VERIFICATION();
+        dappOperation.userOpHash = IAtlasVerification(verification).getUserOperationHash(userOperation);
         return this;
     }
 

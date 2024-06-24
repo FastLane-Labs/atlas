@@ -29,7 +29,7 @@ contract AtlasErrors {
     error PostSolverFailed();
     error InsufficientEscrow();
 
-    error VerificationSimFail(uint256 validCallsResult);
+    error VerificationSimFail(ValidCallsResult);
     error PreOpsSimFail();
     error UserOpSimFail();
     error SolverSimFail(uint256 solverOutcomeResult); // uint param is result returned in `verifySolverOp`
@@ -60,6 +60,7 @@ contract AtlasErrors {
 
     // Escrow
     error UncoveredResult();
+    error InvalidEscrowDuration();
 
     // AtlETH
     error InsufficientUnbondedBalance(uint256 balance, uint256 requested);
@@ -120,4 +121,5 @@ contract AtlasErrors {
     error WrongDepth();
     error InsufficientLocalFunds();
     error NotImplemented();
+    error InvertBidValueCannotBeExPostBids();
 }

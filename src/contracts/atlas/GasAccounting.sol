@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { SafetyLocks } from "src/contracts/atlas/SafetyLocks.sol";
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
@@ -126,52 +126,48 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param amount The amount of AtlETH to be taken.
     /// @param solverWon A boolean indicating whether the solver won the bid.
     /// @param bidFind Indicates if called in the context of `_getBidAmount` in Escrow.sol (true) or not (false).
-    /// @return isDeficit A boolean indicating whether there is a deficit after the assignment.
-    function _assign(address owner, uint256 amount, bool solverWon, bool bidFind) internal returns (bool isDeficit) {
-        if (amount == 0) {
-            accessData[owner].lastAccessedBlock = uint32(block.number); // still save on bidFind
-        } else {
-            if (amount > type(uint112).max) revert ValueTooLarge();
-            uint112 amt = uint112(amount);
+    /// @return deficit The amount of AtlETH that was not repaid, if any.
+    function _assign(address owner, uint256 amount, bool solverWon, bool bidFind) internal returns (uint256 deficit) {
+        if (amount > type(uint112).max) revert ValueTooLarge();
+        uint112 amt = uint112(amount);
 
-            EscrowAccountAccessData memory aData = accessData[owner];
+        EscrowAccountAccessData memory aData = accessData[owner];
 
-            if (aData.bonded < amt) {
-                // The bonded balance does not cover the amount owed. Check if there is enough unbonding balance to
-                // make up for the missing difference. If not, there is a deficit. Atlas does not consider drawing from
-                // the regular AtlETH balance (not bonded nor unbonding) to cover the remaining deficit because it is
-                // not meant to be used within an Atlas transaction, and must remain independent.
-                EscrowAccountBalance memory bData = _balanceOf[owner];
-                if (bData.unbonding + aData.bonded < amt) {
-                    // The unbonding balance is insufficient to cover the remaining amount owed. There is a deficit. Set
-                    // both bonded and unbonding balances to 0 and adjust the "amount" variable to reflect the amount
-                    // that was actually deducted.
-                    isDeficit = true;
-                    amount = uint256(bData.unbonding + aData.bonded); // contribute less to deposits ledger
-                    _balanceOf[owner].unbonding = 0;
-                    aData.bonded = 0;
-                } else {
-                    // The unbonding balance is sufficient to cover the remaining amount owed. Draw everything from the
-                    // bonded balance, and adjust the unbonding balance accordingly.
-                    _balanceOf[owner].unbonding = bData.unbonding + aData.bonded - amt;
-                    aData.bonded = 0;
-                }
+        if (aData.bonded < amt) {
+            // The bonded balance does not cover the amount owed. Check if there is enough unbonding balance to
+            // make up for the missing difference. If not, there is a deficit. Atlas does not consider drawing from
+            // the regular AtlETH balance (not bonded nor unbonding) to cover the remaining deficit because it is
+            // not meant to be used within an Atlas transaction, and must remain independent.
+            EscrowAccountBalance memory bData = _balanceOf[owner];
+            if (bData.unbonding + aData.bonded < amt) {
+                // The unbonding balance is insufficient to cover the remaining amount owed. There is a deficit. Set
+                // both bonded and unbonding balances to 0 and adjust the "amount" variable to reflect the amount
+                // that was actually deducted.
+                amount = uint256(bData.unbonding + aData.bonded); // contribute less to deposits ledger
+                deficit = uint256(amt) - amount;
+                _balanceOf[owner].unbonding = 0;
+                aData.bonded = 0;
             } else {
-                // The bonded balance is sufficient to cover the amount owed.
-                aData.bonded -= amt;
+                // The unbonding balance is sufficient to cover the remaining amount owed. Draw everything from the
+                // bonded balance, and adjust the unbonding balance accordingly.
+                _balanceOf[owner].unbonding = bData.unbonding + aData.bonded - amt;
+                aData.bonded = 0;
             }
-
-            if (!bidFind) {
-                aData.lastAccessedBlock = uint32(block.number);
-            }
-
-            _updateAnalytics(aData, amt, solverWon, bidFind);
-
-            accessData[owner] = aData;
-
-            bondedTotalSupply -= amount;
-            deposits += amount;
+        } else {
+            // The bonded balance is sufficient to cover the amount owed.
+            aData.bonded -= amt;
         }
+
+        if (!bidFind) {
+            aData.lastAccessedBlock = uint32(block.number);
+        }
+
+        _updateAnalytics(aData, amt, solverWon, bidFind);
+
+        accessData[owner] = aData;
+
+        bondedTotalSupply -= amount;
+        deposits += amount;
     }
 
     /// @notice Increases the owner's bonded balance by the specified amount.
@@ -191,6 +187,7 @@ abstract contract GasAccounting is SafetyLocks {
         _updateAnalytics(aData, 0, true, false);
 
         accessData[owner] = aData;
+        withdrawals += amount;
     }
 
     /// @notice Attempts to lock the solver's operation by borrowing AtlETH.
@@ -268,8 +265,9 @@ abstract contract GasAccounting is SafetyLocks {
         if (_deposits < _claims + _withdrawals) {
             // CASE: in deficit, subtract from bonded balance
             uint256 amountOwed = _claims + _withdrawals - _deposits;
-            if (_assign(winningSolver, amountOwed, true, false)) {
-                revert InsufficientTotalBalance((_claims + _withdrawals) - deposits);
+            uint256 deficit = _assign(winningSolver, amountOwed, true, false);
+            if (deficit > 0) {
+                revert InsufficientTotalBalance(deficit);
             }
         } else {
             // CASE: in surplus, add to bonded balance
@@ -278,7 +276,7 @@ abstract contract GasAccounting is SafetyLocks {
             _credit(winningSolver, amountCredited);
         }
 
-        netGasSurcharge = (_claims * SURCHARGE_RATE) / SURCHARGE_SCALE;
+        netGasSurcharge = (_claims * SURCHARGE_RATE) / (SURCHARGE_SCALE + SURCHARGE_RATE);
 
         _claims -= netGasSurcharge;
 
