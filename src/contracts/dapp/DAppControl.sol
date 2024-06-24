@@ -19,6 +19,11 @@ import { IDAppIntegration } from "src/contracts/interfaces/IDAppIntegration.sol"
 /// @notice Storage variables (except immutable) will be defaulted if accessed by delegatecalls.
 /// @notice If an extension DAppControl uses storage variables, those should not be accessed by delegatecalls.
 abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
+    // Reserved storage slots to avoid conflicts with ReentrancyGuard which is used in ExecutionEnvironment which delegatecalls this
+    // Attempts to use the same storage slots as ReentrancyGuard will result in storage collisions and a Dapp which does this should 
+    // be considered malicious.
+    uint256 private _reentrancyGuardReserved;
+
     using CallBits for uint32;
 
     uint8 private constant _CONTROL_DEPTH = 1 << 2;
