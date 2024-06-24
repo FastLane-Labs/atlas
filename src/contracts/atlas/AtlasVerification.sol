@@ -555,11 +555,10 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp userNonces
 
-        if (userOp.callConfig.allowsTrustedOpHash()) {
-            userOpHash = _getUserOperationPayload(userOp);
-        }
-        bool signatureValid =
-            SignatureChecker.isValidSignatureNow(userOp.from, userOpHash, userOp.signature);
+        // if (userOp.callConfig.allowsTrustedOpHash()) {
+        userOpHash = _getUserOperationPayload(userOp);
+        // }
+        bool signatureValid = SignatureChecker.isValidSignatureNow(userOp.from, userOpHash, userOp.signature);
 
         bool userIsBundler = userOp.from == msgSender;
         bool hasNoSignature = userOp.signature.length == 0;
@@ -602,7 +601,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
     function getUserOperationHash(UserOperation calldata userOp) public view returns (bytes32 hash) {
         hash = _getUserOperationHash(userOp);
     }
-    
+
     function _getUserOperationHash(UserOperation calldata userOp) internal view returns (bytes32 hash) {
         hash = _getUserOperationHash(userOp, userOp.callConfig.allowsTrustedOpHash());
     }
