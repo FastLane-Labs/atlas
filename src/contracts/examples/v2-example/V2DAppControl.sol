@@ -2,7 +2,7 @@
 pragma solidity 0.8.22;
 
 // Base Imports
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 // Atlas Base Imports
 import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
@@ -134,7 +134,7 @@ contract V2DAppControl is DAppControl {
 
         (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).getReserves();
 
-        SafeTransferLib.safeTransfer(ERC20(WETH), WETH_X_GOVERNANCE_POOL, bidAmount);
+        SafeTransferLib.safeTransfer(WETH, WETH_X_GOVERNANCE_POOL, bidAmount);
 
         uint256 amount0Out;
         uint256 amount1Out;

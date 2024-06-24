@@ -2,7 +2,8 @@
 pragma solidity 0.8.22;
 
 // Base Imports
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Base Imports
 import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
@@ -108,7 +109,7 @@ contract V2ExPost is DAppControl {
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
 
-        SafeTransferLib.safeTransfer(ERC20(WETH), _user(), ERC20(WETH).balanceOf(address(this)));
+        SafeTransferLib.safeTransfer(WETH, _user(), IERC20(WETH).balanceOf(address(this)));
 
         /*
         // ENABLE FOR FOUNDRY TESTING
