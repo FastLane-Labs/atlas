@@ -225,7 +225,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
 
     function testGetNextNonceAfter() public {
         defaultAtlasWithCallConfig(defaultCallConfig().build());
-        assertEq(atlasVerification.getUserNextNonceAfter(userEOA, 0), 1, "User next non-seq nonce after 0 should be 1");
+        assertEq(atlasVerification.getUserNextNonSeqNonceAfter(userEOA, 0), 1, "User next non-seq nonce after 0 should be 1");
 
         UserOperation memory userOp = validUserOperation().withNonce(1).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -234,10 +234,10 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
 
-        assertEq(atlasVerification.getUserNextNonceAfter(userEOA, 0), 2, "User next non-seq nonce after 0 should be 2");
-        assertEq(atlasVerification.getUserNextNonceAfter(userEOA, 1), 2, "User next non-seq nonce after 1 should be 2");
-        assertEq(atlasVerification.getUserNextNonceAfter(userEOA, 2), 3, "User next non-seq nonce after 2 should be 3");
-        assertEq(atlasVerification.getUserNextNonceAfter(userEOA, 3), 4, "User next non-seq nonce after 3 should be 4");
+        assertEq(atlasVerification.getUserNextNonSeqNonceAfter(userEOA, 0), 2, "User next non-seq nonce after 0 should be 2");
+        assertEq(atlasVerification.getUserNextNonSeqNonceAfter(userEOA, 1), 2, "User next non-seq nonce after 1 should be 2");
+        assertEq(atlasVerification.getUserNextNonSeqNonceAfter(userEOA, 2), 3, "User next non-seq nonce after 2 should be 3");
+        assertEq(atlasVerification.getUserNextNonSeqNonceAfter(userEOA, 3), 4, "User next non-seq nonce after 3 should be 4");
     }
 
     function testMultipleGetNextNonceAfter() public {
@@ -257,31 +257,31 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         ));
 
         uint256 refNonce = 252;
-        uint256 userNextNonce = atlasVerification.getUserNextNonceAfter(userEOA, refNonce);
+        uint256 userNextNonce = atlasVerification.getUserNextNonSeqNonceAfter(userEOA, refNonce);
 
         userOps[0] = validUserOperation().withNonce(userNextNonce).build();
         solverOps[0] = validSolverOperations(userOps[0]);
         dappOps[0] = validDAppOperation(userOps[0], solverOps[0]).withNonce(2).signAndBuild(address(atlasVerification), governancePK);
 
-        userNextNonce = atlasVerification.getUserNextNonceAfter(userEOA, userNextNonce);
+        userNextNonce = atlasVerification.getUserNextNonSeqNonceAfter(userEOA, userNextNonce);
 
         userOps[1] = validUserOperation().withNonce(userNextNonce).build();
         solverOps[1] = validSolverOperations(userOps[1]);
         dappOps[1] = validDAppOperation(userOps[1], solverOps[1]).withNonce(3).signAndBuild(address(atlasVerification), governancePK);
 
-        userNextNonce = atlasVerification.getUserNextNonceAfter(userEOA, userNextNonce);
+        userNextNonce = atlasVerification.getUserNextNonSeqNonceAfter(userEOA, userNextNonce);
 
         userOps[2] = validUserOperation().withNonce(userNextNonce).build();
         solverOps[2] = validSolverOperations(userOps[2]);
         dappOps[2] = validDAppOperation(userOps[2], solverOps[2]).withNonce(4).signAndBuild(address(atlasVerification), governancePK);
 
-        userNextNonce = atlasVerification.getUserNextNonceAfter(userEOA, userNextNonce);
+        userNextNonce = atlasVerification.getUserNextNonSeqNonceAfter(userEOA, userNextNonce);
 
         userOps[3] = validUserOperation().withNonce(userNextNonce).build();
         solverOps[3] = validSolverOperations(userOps[3]);
         dappOps[3] = validDAppOperation(userOps[3], solverOps[3]).withNonce(5).signAndBuild(address(atlasVerification), governancePK);
 
-        userNextNonce = atlasVerification.getUserNextNonceAfter(userEOA, userNextNonce);
+        userNextNonce = atlasVerification.getUserNextNonSeqNonceAfter(userEOA, userNextNonce);
 
         userOps[4] = validUserOperation().withNonce(userNextNonce).build();
         solverOps[4] = validSolverOperations(userOps[4]);
@@ -305,6 +305,6 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         )); // Nonce 255
 
         // Notice nonce 254 was skipped, the highest nonce used was 258 (in userOps[4])
-        assertEq(atlasVerification.getUserNextNonceAfter(userEOA, refNonce), 259, "User next non-seq nonce after 252 should be 259");
+        assertEq(atlasVerification.getUserNextNonSeqNonceAfter(userEOA, refNonce), 259, "User next non-seq nonce after 252 should be 259");
     }
 }
