@@ -280,7 +280,7 @@ contract ExPostTest is BaseTest {
     }
 
     // Shoutout to rholterhus for the test
-    function test_ExPostOrdering() public {
+    function test_ExPostOrdering_GasCheck() public {
         uint256 NUM_SOLVE_OPS = 3;
         UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
         userOp.control = address(v2ExPost);
@@ -323,16 +323,20 @@ contract ExPostTest is BaseTest {
         vm.stopPrank();
 
         // Simulate the UserOp
-        (bool simSuccess, Result simResult,) = simulator.simUserOperation(userOp);
-        assertTrue(simSuccess, "userOp fails in simulator");
+        {
+            (bool simSuccess, Result simResult,) = simulator.simUserOperation(userOp);
+            assertTrue(simSuccess, "userOp fails in simulator");
 
-        // Simulate the SolverOps
-        (simSuccess, simResult,) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
-        assertTrue(simSuccess, "solverOps fail in simulator");
+            // Simulate the SolverOps
+            (simSuccess, simResult,) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
+            assertTrue(simSuccess, "solverOps fail in simulator");
+        }
 
         vm.startPrank(userEOA);
+        uint256 gasLeftBefore = gasleft(); // reusing var because stack too deep
         (bool success,) =
             address(atlas).call(abi.encodeWithSelector(atlas.metacall.selector, userOp, solverOps, dAppOp));
+        console.log("Metacall Gas Cost:", gasLeftBefore - gasleft());
         if (success) console.log("success!");
         else console.log("failure");
         assertTrue(success);
