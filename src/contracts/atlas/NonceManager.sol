@@ -5,12 +5,12 @@ import { AtlasConstants } from "src/contracts/types/AtlasConstants.sol";
 
 contract NonceManager is AtlasConstants {
     // address => last used sequential nonce
-    mapping(address => uint256) public userSequencialNonceTrackers;
-    mapping(address => uint256) public dAppSequencialNonceTrackers;
+    mapping(address => uint256) public userSequentialNonceTrackers;
+    mapping(address => uint256) public dAppSequentialNonceTrackers;
 
     // address => word index => bitmap
-    mapping(address => mapping(uint248 => uint256)) public userNonSequencialNonceTrackers;
-    mapping(address => mapping(uint248 => uint256)) public dAppNonSequencialNonceTrackers;
+    mapping(address => mapping(uint248 => uint256)) public userNonSequentialNonceTrackers;
+    mapping(address => mapping(uint248 => uint256)) public dAppNonSequentialNonceTrackers;
 
     // NOTE: To prevent builder censorship, nonces can be processed in any order so long as they aren't duplicated and
     // as long as the dApp opts in to it.
@@ -42,19 +42,19 @@ contract NonceManager is AtlasConstants {
         if (nonce == 0) return false;
 
         if (sequential) {
-            uint256 lastUsedNonce = userSequencialNonceTrackers[user];
+            uint256 lastUsedNonce = userSequentialNonceTrackers[user];
             (validNonce, lastUsedNonce) = _handleSequentialNonces(lastUsedNonce, nonce);
             if (validNonce && !isSimulation) {
                 // Update storage only if valid and not in simulation
-                userSequencialNonceTrackers[user] = lastUsedNonce;
+                userSequentialNonceTrackers[user] = lastUsedNonce;
             }
         } else {
             (uint248 word, uint8 bitPos) = _bitmapPositions(nonce);
-            uint256 bitmap = userNonSequencialNonceTrackers[user][word];
+            uint256 bitmap = userNonSequentialNonceTrackers[user][word];
             (validNonce, bitmap) = _handleNonSequentialNonces(bitmap, bitPos);
             if (validNonce && !isSimulation) {
                 // Update storage only if valid and not in simulation
-                userNonSequencialNonceTrackers[user][word] = bitmap;
+                userNonSequentialNonceTrackers[user][word] = bitmap;
             }
         }
     }
@@ -79,19 +79,19 @@ contract NonceManager is AtlasConstants {
         if (nonce == 0) return false;
 
         if (sequential) {
-            uint256 lastUsedNonce = dAppSequencialNonceTrackers[dAppSignatory];
+            uint256 lastUsedNonce = dAppSequentialNonceTrackers[dAppSignatory];
             (validNonce, lastUsedNonce) = _handleSequentialNonces(lastUsedNonce, nonce);
             if (validNonce && !isSimulation) {
                 // Update storage only if valid and not in simulation
-                dAppSequencialNonceTrackers[dAppSignatory] = lastUsedNonce;
+                dAppSequentialNonceTrackers[dAppSignatory] = lastUsedNonce;
             }
         } else {
             (uint248 word, uint8 bitPos) = _bitmapPositions(nonce);
-            uint256 bitmap = dAppNonSequencialNonceTrackers[dAppSignatory][word];
+            uint256 bitmap = dAppNonSequentialNonceTrackers[dAppSignatory][word];
             (validNonce, bitmap) = _handleNonSequentialNonces(bitmap, bitPos);
             if (validNonce && !isSimulation) {
                 // Update storage only if valid and not in simulation
-                dAppNonSequencialNonceTrackers[dAppSignatory][word] = bitmap;
+                dAppNonSequentialNonceTrackers[dAppSignatory][word] = bitmap;
             }
         }
     }
@@ -135,7 +135,7 @@ contract NonceManager is AtlasConstants {
     /// @return nextNonce The next nonce for the given user.
     function getUserNextNonce(address user, bool sequential) external view returns (uint256 nextNonce) {
         if (sequential) {
-            nextNonce = userSequencialNonceTrackers[user] + 1;
+            nextNonce = userSequentialNonceTrackers[user] + 1;
         } else {
             // Set the starting position to 1 to skip the 0 nonce
             nextNonce = _getNextNonSequentialNonce(user, 0, 1, true);
@@ -157,7 +157,7 @@ contract NonceManager is AtlasConstants {
     /// @return nextNonce The next nonce for the given dApp.
     function getDAppNextNonce(address dApp, bool sequential) external view returns (uint256 nextNonce) {
         if (sequential) {
-            nextNonce = dAppSequencialNonceTrackers[dApp] + 1;
+            nextNonce = dAppSequentialNonceTrackers[dApp] + 1;
         } else {
             // Set the starting position to 1 to skip the 0 nonce
             nextNonce = _getNextNonSequentialNonce(dApp, 0, 1, false);
@@ -191,7 +191,7 @@ contract NonceManager is AtlasConstants {
     {
         while (true) {
             uint256 bitmap =
-                isUser ? userNonSequencialNonceTrackers[account][word] : dAppNonSequencialNonceTrackers[account][word];
+                isUser ? userNonSequentialNonceTrackers[account][word] : dAppNonSequentialNonceTrackers[account][word];
 
             if (bitmap == type(uint256).max) {
                 // Full bitmap, move to the next word
