@@ -49,12 +49,12 @@ contract NonceManager is AtlasConstants {
                 userSequentialNonceTrackers[user] = lastUsedNonce;
             }
         } else {
-            (uint248 word, uint8 bitPos) = _bitmapPositions(nonce);
-            uint256 bitmap = userNonSequentialNonceTrackers[user][word];
+            (uint248 wordIndex, uint8 bitPos) = _bitmapPositions(nonce);
+            uint256 bitmap = userNonSequentialNonceTrackers[user][wordIndex];
             (validNonce, bitmap) = _handleNonSequentialNonces(bitmap, bitPos);
             if (validNonce && !isSimulation) {
                 // Update storage only if valid and not in simulation
-                userNonSequentialNonceTrackers[user][word] = bitmap;
+                userNonSequentialNonceTrackers[user][wordIndex] = bitmap;
             }
         }
     }
@@ -86,12 +86,12 @@ contract NonceManager is AtlasConstants {
                 dAppSequentialNonceTrackers[dAppSignatory] = lastUsedNonce;
             }
         } else {
-            (uint248 word, uint8 bitPos) = _bitmapPositions(nonce);
-            uint256 bitmap = dAppNonSequentialNonceTrackers[dAppSignatory][word];
+            (uint248 wordIndex, uint8 bitPos) = _bitmapPositions(nonce);
+            uint256 bitmap = dAppNonSequentialNonceTrackers[dAppSignatory][wordIndex];
             (validNonce, bitmap) = _handleNonSequentialNonces(bitmap, bitPos);
             if (validNonce && !isSimulation) {
                 // Update storage only if valid and not in simulation
-                dAppNonSequentialNonceTrackers[dAppSignatory][word] = bitmap;
+                dAppNonSequentialNonceTrackers[dAppSignatory][wordIndex] = bitmap;
             }
         }
     }
@@ -104,7 +104,9 @@ contract NonceManager is AtlasConstants {
     function _handleSequentialNonces(uint256 lastUsedNonce, uint256 nonce) internal pure returns (bool, uint256) {
         // Nonces must increase by 1 if sequential
         if (nonce != lastUsedNonce + 1) return (false, lastUsedNonce);
-        return (true, ++lastUsedNonce);
+        unchecked {
+            return (true, ++lastUsedNonce);
+        }
     }
 
     /// @notice The _handleNonSequentialNonces internal function handles the verification of non-sequential nonces.
@@ -114,12 +116,12 @@ contract NonceManager is AtlasConstants {
     /// @return The updated bitmap.
     function _handleNonSequentialNonces(uint256 bitmap, uint8 bitPos) internal pure returns (bool, uint256) {
         uint256 bit = 1 << bitPos;
-        uint256 flipped = bitmap ^= bit;
+        uint256 flipped = bitmap ^ bit;
 
         // Nonce has already been used
         if (flipped & bit == 0) return (false, bitmap);
 
-        return (true, bitmap);
+        return (true, flipped);
     }
 
     // ---------------------------------------------------- //
@@ -146,9 +148,9 @@ contract NonceManager is AtlasConstants {
     /// @param user The address of the user for which to retrieve the next nonce.
     /// @param refNonce The nonce to start the search from.
     /// @return The next nonce for the given user.
-    function getUserNextNonceAfter(address user, uint256 refNonce) external view returns (uint256) {
-        (uint248 word, uint8 bitPos) = _nextNonceBitmapPositions(refNonce);
-        return _getNextNonSequentialNonce(user, word, bitPos, true);
+    function getUserNextNonSeqNonceAfter(address user, uint256 refNonce) external view returns (uint256) {
+        (uint248 wordIndex, uint8 bitPos) = _nextNonceBitmapPositions(refNonce);
+        return _getNextNonSequentialNonce(user, wordIndex, bitPos, true);
     }
 
     /// @notice Returns the next nonce for the given dApp signatory, in sequential or non-sequential mode.
@@ -168,20 +170,20 @@ contract NonceManager is AtlasConstants {
     /// @param dApp The address of the dApp signatory for which to retrieve the next nonce.
     /// @param refNonce The nonce to start the search from.
     /// @return The next nonce for the given dApp.
-    function getDAppNextNonceAfter(address dApp, uint256 refNonce) external view returns (uint256) {
-        (uint248 word, uint8 bitPos) = _nextNonceBitmapPositions(refNonce);
-        return _getNextNonSequentialNonce(dApp, word, bitPos, false);
+    function getDAppNextNonSeqNonceAfter(address dApp, uint256 refNonce) external view returns (uint256) {
+        (uint248 wordIndex, uint8 bitPos) = _nextNonceBitmapPositions(refNonce);
+        return _getNextNonSequentialNonce(dApp, wordIndex, bitPos, false);
     }
 
     /// @notice Returns the next nonce for the given account, in non-sequential mode.
     /// @param account The account to get the next nonce for.
-    /// @param word The word index to start the search from.
+    /// @param wordIndex The word index to start the search from.
     /// @param bitPos The bit position to start the search from.
     /// @param isUser A boolean indicating if the account is a user (true) or a dApp (false).
     /// @return nextNonce The next nonce for the given account.
     function _getNextNonSequentialNonce(
         address account,
-        uint248 word,
+        uint248 wordIndex,
         uint8 bitPos,
         bool isUser
     )
@@ -190,12 +192,13 @@ contract NonceManager is AtlasConstants {
         returns (uint256 nextNonce)
     {
         while (true) {
-            uint256 bitmap =
-                isUser ? userNonSequentialNonceTrackers[account][word] : dAppNonSequentialNonceTrackers[account][word];
+            uint256 bitmap = isUser
+                ? userNonSequentialNonceTrackers[account][wordIndex]
+                : dAppNonSequentialNonceTrackers[account][wordIndex];
 
             if (bitmap == type(uint256).max) {
                 // Full bitmap, move to the next word
-                ++word;
+                ++wordIndex;
                 bitPos = 0;
                 continue;
             }
@@ -212,7 +215,7 @@ contract NonceManager is AtlasConstants {
                 if (bitPos == type(uint8).max) {
                     // End of the bitmap, move to the next word
                     nextWord = true;
-                    ++word;
+                    ++wordIndex;
                     bitPos = 0;
                     break;
                 }
@@ -225,7 +228,7 @@ contract NonceManager is AtlasConstants {
                 continue;
             }
 
-            nextNonce = _nonceFromWordAndPos(word, bitPos);
+            nextNonce = _nonceFromWordAndPos(wordIndex, bitPos);
             break;
         }
     }
@@ -239,13 +242,13 @@ contract NonceManager is AtlasConstants {
 
     /// @notice Returns the index of the bitmap and the bit position within the bitmap for the next nonce.
     /// @param refNonce The nonce to get the next nonce positions from.
-    /// @return word The word position or index into the bitmap of the next nonce.
+    /// @return wordIndex The word position or index into the bitmap of the next nonce.
     /// @return bitPos The bit position of the next nonce.
-    function _nextNonceBitmapPositions(uint256 refNonce) internal pure returns (uint248 word, uint8 bitPos) {
-        (word, bitPos) = _bitmapPositions(refNonce);
+    function _nextNonceBitmapPositions(uint256 refNonce) internal pure returns (uint248 wordIndex, uint8 bitPos) {
+        (wordIndex, bitPos) = _bitmapPositions(refNonce);
         if (bitPos == type(uint8).max) {
             // End of the bitmap, move to the next word
-            ++word;
+            ++wordIndex;
             bitPos = 0;
         } else {
             // Otherwise, just move to the next bit
@@ -255,23 +258,23 @@ contract NonceManager is AtlasConstants {
 
     /// @notice Returns the index of the bitmap and the bit position within the bitmap. Used for non-sequenced nonces.
     /// @param nonce The nonce to get the associated word and bit positions.
-    /// @return word The word position or index into the bitmap.
+    /// @return wordIndex The word position or index into the bitmap.
     /// @return bitPos The bit position.
     /// @dev The first 248 bits of the nonce value is the index of the desired bitmap.
     /// @dev The last 8 bits of the nonce value is the position of the bit in the bitmap.
-    function _bitmapPositions(uint256 nonce) internal pure returns (uint248 word, uint8 bitPos) {
-        word = uint248(nonce >> 8);
+    function _bitmapPositions(uint256 nonce) internal pure returns (uint248 wordIndex, uint8 bitPos) {
+        wordIndex = uint248(nonce >> 8);
         bitPos = uint8(nonce);
     }
 
     /// @notice Constructs a nonce from a word and a position inside the word.
-    /// @param word The word position or index into the bitmap.
+    /// @param wordIndex The word position or index into the bitmap.
     /// @param bitPos The bit position.
     /// @return nonce The nonce constructed from the word and position.
     /// @dev The first 248 bits of the nonce value is the index of the desired bitmap.
     /// @dev The last 8 bits of the nonce value is the position of the bit in the bitmap.
-    function _nonceFromWordAndPos(uint248 word, uint8 bitPos) internal pure returns (uint256 nonce) {
-        nonce = uint256(word) << 8;
+    function _nonceFromWordAndPos(uint248 wordIndex, uint8 bitPos) internal pure returns (uint256 nonce) {
+        nonce = uint256(wordIndex) << 8;
         nonce |= bitPos;
     }
 }
