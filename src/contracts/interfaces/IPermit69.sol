@@ -17,9 +17,7 @@ interface IPermit69 {
         address destination,
         uint256 amount,
         address user,
-        address control,
-        uint32 callConfig,
-        uint8 phase
+        address control
     )
         external;
 
@@ -28,9 +26,7 @@ interface IPermit69 {
         address destination,
         uint256 amount,
         address user,
-        address control,
-        uint32 callConfig,
-        uint8 phase
+        address control
     )
         external;
 }
