@@ -34,7 +34,7 @@ contract MockGasAccounting is GasAccounting, Test {
     }
 
     function setPhase(ExecutionPhase _phase) external {
-        lock.phase = _phase;
+        lock.phase = uint8(_phase);
     }
 
     function assign(address owner, uint256 value, bool solverWon) external returns (uint256) {

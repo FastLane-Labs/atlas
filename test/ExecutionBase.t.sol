@@ -62,7 +62,7 @@ contract ExecutionBaseTest is BaseTest {
         assertEq(result, expected, testName);
     }
 
-    function forwardGetFirstSet(ExecutionPhase phase)
+    function forwardGetFirstSet(ExecutionPhase _phase)
         public
         pure
         returns (bytes memory firstSet, Context memory _ctx)
@@ -75,7 +75,7 @@ contract ExecutionBaseTest is BaseTest {
             paymentsSuccessful: true,
             callIndex: 0,
             callCount: 1,
-            phase: phase,
+            phase: uint8(_phase),
             solverOutcome: 2,
             bidFind: true,
             isSimulation: true,

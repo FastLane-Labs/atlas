@@ -44,7 +44,7 @@ contract SafetyBitsTest is Test {
             paymentsSuccessful: false,
             callIndex: callConfig.needsPreOpsCall() ? 0 : 1,
             callCount: solverOpCount + 3,
-            phase: ExecutionPhase.Uninitialized,
+            phase: uint8(ExecutionPhase.Uninitialized),
             solverOutcome: 0,
             bidFind: false,
             isSimulation: isSimulation,
@@ -58,7 +58,7 @@ contract SafetyBitsTest is Test {
         assertTrue(ctx.paymentsSuccessful == false);
         assertTrue(ctx.callIndex == 0);
         assertTrue(ctx.callCount == 4);
-        assertTrue(ctx.phase == ExecutionPhase.Uninitialized);
+        assertTrue(ctx.phase == uint8(ExecutionPhase.Uninitialized));
         assertTrue(ctx.solverOutcome == 0);
     }
 }

@@ -38,7 +38,7 @@ abstract contract GasAccounting is SafetyLocks {
         if (_lock.activeEnvironment != msg.sender) {
             revert InvalidExecutionEnvironment(_lock.activeEnvironment);
         }
-        if (_lock.phase > ExecutionPhase.SolverOperations) revert WrongPhase();
+        if (_lock.phase > uint8(ExecutionPhase.SolverOperations)) revert WrongPhase();
 
         if (_borrow(amount)) {
             SafeTransferLib.safeTransferETH(msg.sender, amount);
@@ -85,7 +85,7 @@ abstract contract GasAccounting is SafetyLocks {
         if (_lock.activeEnvironment != environment) {
             revert InvalidExecutionEnvironment(_lock.activeEnvironment);
         }
-        if (_lock.phase != ExecutionPhase.SolverOperations) {
+        if (_lock.phase != uint8(ExecutionPhase.SolverOperations)) {
             revert WrongPhase();
         }
 
