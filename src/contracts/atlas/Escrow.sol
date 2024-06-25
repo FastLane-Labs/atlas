@@ -216,7 +216,7 @@ abstract contract Escrow is AtlETH {
         SolverOperation calldata solverOp,
         uint256 bidAmount,
         uint256 gasLimit,
-        bytes calldata returnData
+        bytes memory returnData
     )
         internal
         withLockPhase(ExecutionPhase.SolverOperations)
@@ -224,6 +224,8 @@ abstract contract Escrow is AtlETH {
         // Set the solver lock - will perform accounting checks if value borrowed. If `_trySolverLock()` returns false,
         // we revert here and catch the error in `_solverOpWrapper()` above
         if (!_trySolverLock(solverOp)) revert InsufficientEscrow();
+
+        if (!lock.callConfig.needsUserReturnData()) returnData = new bytes(0);
 
         (bool success,) = solverOp.solver.call{ value: solverOp.value, gas: gasLimit }(
             abi.encodeCall(
