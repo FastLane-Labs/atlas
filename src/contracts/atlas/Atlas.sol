@@ -76,15 +76,10 @@ contract Atlas is Escrow, Factory {
             address winningSolver = ctx.solverSuccessful ? solverOps[uint256(ctx.solverIndex)].from : address(0);
 
             // Gas Refund to sender only if execution is successful
-            (uint256 ethPaidToBundler, uint256 netGasSurcharge) =
-                _settle({ 
-                    ctx: ctx, 
-                    winningSolver: winningSolver
-                });
+            (uint256 ethPaidToBundler, uint256 netGasSurcharge) = _settle({ ctx: ctx, winningSolver: winningSolver });
 
             emit MetacallResult(msg.sender, userOp.from, winningSolver, ethPaidToBundler, netGasSurcharge);
             auctionWon = ctx.solverSuccessful;
-
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
             _handleErrors(revertData, dConfig.callConfig);
@@ -136,15 +131,15 @@ contract Atlas is Escrow, Factory {
         returnData = _executeUserOperation(ctx, dConfig, userOp, returnData);
 
         // SolverOps Calls
-        uint256 winningBidAmount = dConfig.callConfig.exPostBids() ?
-            _bidFindingIteration(ctx, dConfig, userOp, solverOps, returnData) :
-            _bidKnownIteration(ctx, dConfig, userOp, solverOps, returnData);
+        uint256 winningBidAmount = dConfig.callConfig.exPostBids()
+            ? _bidFindingIteration(ctx, dConfig, userOp, solverOps, returnData)
+            : _bidKnownIteration(ctx, dConfig, userOp, solverOps, returnData);
 
         // AllocateValue Call
         if (ctx.solverSuccessful) {
             _allocateValue(ctx, dConfig, winningBidAmount, returnData);
         }
-        
+
         // PostOp Call
         if (dConfig.callConfig.needsPostOpsCall()) {
             _executePostOpsCall(ctx, ctx.solverSuccessful, returnData);
@@ -165,7 +160,8 @@ contract Atlas is Escrow, Factory {
         SolverOperation[] calldata solverOps,
         bytes memory returnData
     )
-        internal returns (uint256)
+        internal
+        returns (uint256)
     {
         // Return early if no solverOps (e.g. in simUserOperation)
         if (solverOps.length == 0) {
@@ -259,7 +255,8 @@ contract Atlas is Escrow, Factory {
         SolverOperation[] calldata solverOps,
         bytes memory returnData
     )
-        internal returns (uint256)
+        internal
+        returns (uint256)
     {
         uint256 bidAmount;
         uint8 k = uint8(solverOps.length);

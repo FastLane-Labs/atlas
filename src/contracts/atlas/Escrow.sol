@@ -87,8 +87,7 @@ abstract contract Escrow is AtlETH {
     {
         (bool success, bytes memory data) = ctx.executionEnvironment.call{ value: userOp.value }(
             abi.encodePacked(
-                abi.encodeCall(IExecutionEnvironment.userWrapper, userOp),
-                ctx.setAndPack(ExecutionPhase.UserOperation)
+                abi.encodeCall(IExecutionEnvironment.userWrapper, userOp), ctx.setAndPack(ExecutionPhase.UserOperation)
             )
         );
 

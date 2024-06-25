@@ -18,14 +18,7 @@ uint8 constant SAFE_DAPP_TRANSFER = uint8(
 );
 
 library SafetyBits {
-    function setAndPack(
-        Context memory self,
-        ExecutionPhase phase
-    )
-        internal
-        pure
-        returns (bytes memory packedKey)
-    {
+    function setAndPack(Context memory self, ExecutionPhase phase) internal pure returns (bytes memory packedKey) {
         packedKey = abi.encodePacked(
             self.bundler,
             self.solverSuccessful,
