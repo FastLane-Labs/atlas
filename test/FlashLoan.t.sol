@@ -202,37 +202,80 @@ contract FlashLoanTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-        uint256 solverStartingWETH = WETH.balanceOf(address(solver));
+        address _solver = address(solver);
+
+        uint256 solverStartingWETH = WETH.balanceOf(_solver);
+        uint256 solverStartingAtlETH = atlas.balanceOf(solverOneEOA);
+        uint256 solverStartingBonded = atlas.balanceOfBonded(solverOneEOA);
+
         uint256 atlasStartingETH = address(atlas).balance;
+
         uint256 userStartingETH = address(userEOA).balance;
+        uint256 userStartingAtlETH = atlas.balanceOf(userEOA);
+        uint256 userStartingBonded = atlas.balanceOfBonded(userEOA);
 
         assertEq(solverStartingWETH, 1e18, "solver incorrect starting WETH");
         assertEq(atlasStartingETH, 102e18, "atlas incorrect starting ETH"); // 2e initial + 1e solver + 100e user deposit
+
+
+        uint256 netSurcharge = atlas.cumulativeSurcharge();
 
         // Last call - should succeed
         vm.startPrank(userEOA);
         result = 0;
         vm.expectEmit(true, true, true, true);
-        emit AtlasEvents.SolverTxResult(address(solver), solverOneEOA, true, true, result);
+        emit AtlasEvents.SolverTxResult(_solver, solverOneEOA, true, true, result);
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
 
-        uint256 solverEndingWETH = WETH.balanceOf(address(solver));
-        uint256 atlasEndingETH = address(atlas).balance;
-        uint256 userEndingETH = address(userEOA).balance;
-
         // atlas 2e beginning bal + 1e from solver +100e eth from user = 103e atlas total
         // after metacall 1e user payout + 0.0001e bundler(user) gas refund = 101.9999e after metacall
-
-        console.log("solverWETH", solverStartingWETH, solverEndingWETH);
+        
+        /*
+        console.log("solverEndingWETH  :", WETH.balanceOf(address(solver)));
         console.log("solveratlETH", atlas.balanceOf(solverOneEOA));
-        console.log("atlasETH", atlasStartingETH, atlasEndingETH);
-        console.log("userETH", userStartingETH, userEndingETH);
+        console.log("solverStartingWETH:", solverStartingWETH);
 
-        assertEq(solverEndingWETH, 0, "solver WETH not used");
+        console.log("atlasETH", atlasStartingETH, address(atlas).balance);
+        console.log("userETH", userStartingETH, userEndingETH);
+        console.log("userStartingETH   :", userStartingETH);
+        console.log("userStartingAtlETH:", userStartingAtlETH);
+        console.log("userStartingBonded:", userStartingBonded);
+
+        console.log("userEndingETH     :", userEndingETH);
+        console.log("userEndingAtlETH  :", userEndingAtlETH);
+        console.log("userEndingBonded  :", userEndingBonded);
+        */
+
+
+        {
+        console.log("solverStartingTotal:  ", solverStartingWETH + solverStartingAtlETH + solverStartingBonded);
+        console.log("solverEndingTotal  :  ", WETH.balanceOf(_solver) + atlas.balanceOf(solverOneEOA) + atlas.balanceOfBonded(solverOneEOA));
+        }
+
+        uint256 userEndingETH = address(userEOA).balance;
+        uint256 userEndingAtlETH = atlas.balanceOf(userEOA);
+        uint256 userEndingBonded = atlas.balanceOfBonded(userEOA);
+
+        {
+        console.log("userStartingTotal  :", userStartingETH + userStartingAtlETH + userStartingBonded);
+        console.log("userEndingTotal    :", userEndingETH + userEndingAtlETH + userEndingBonded);
+
+        console.log("atlasStartingETH   :", atlasStartingETH);
+        console.log("atlasEndingETH     :", address(atlas).balance);
+        }
+
+        netSurcharge = atlas.cumulativeSurcharge() - netSurcharge;
+        console.log("NetCumulativeSrchrg:       ", netSurcharge);
+
+        assertEq(WETH.balanceOf(_solver), 0, "solver WETH not used");
         assertEq(atlas.balanceOf(solverOneEOA), 0, "solver atlETH not used");
-        assertTrue(atlasEndingETH < atlasStartingETH, "atlas incorrect ending ETH"); // atlas should lose a bit of eth used for gas refund
-        assertTrue((userEndingETH - userStartingETH) > 1 ether, "user incorrect ending ETH"); // user bal should increase by more than 1e (bid + gas refund)
+        assertTrue(address(atlas).balance >= atlasStartingETH, "atlas incorrect ending ETH"); // atlas should NEVER lose balance during a metacall
+        
+        console.log("userStartingETH   :", userStartingETH);
+        console.log("userEndingETH     :", userEndingETH);
+        assertTrue((userEndingETH - userStartingETH) == 1 ether, "user incorrect ending ETH"); // user bal should increase by exactly 1e (bid)
+        assertTrue((userEndingBonded - userStartingBonded) > 0, "user incorrect ending bonded AtlETH"); // user bonded bal should increase by gas refund
     }
 }
 

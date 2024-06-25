@@ -73,17 +73,11 @@ contract Atlas is Escrow, Factory {
         try this.execute(dConfig, userOp, solverOps, executionEnvironment, msg.sender, dAppOp.userOpHash) returns (
             Context memory ctx
         ) {
-            address winningSolver = ctx.solverSuccessful ? solverOps[uint256(ctx.solverIndex)].from : address(0);
-
             // Gas Refund to sender only if execution is successful
-            (uint256 ethPaidToBundler, uint256 netGasSurcharge) =
-                _settle({ 
-                    ctx: ctx, 
-                    winningSolver: winningSolver
-                });
+            (uint256 ethPaidToBundler, uint256 netGasSurcharge) = _settle(ctx, dConfig.solverGasLimit);
 
-            emit MetacallResult(msg.sender, userOp.from, winningSolver, ethPaidToBundler, netGasSurcharge);
             auctionWon = ctx.solverSuccessful;
+            emit MetacallResult(msg.sender, userOp.from, auctionWon, ctx.paymentsSuccessful, ethPaidToBundler, netGasSurcharge);
 
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
@@ -243,6 +237,7 @@ contract Atlas is Escrow, Factory {
         }
         if (ctx.isSimulation) revert SolverSimFail(uint256(ctx.solverOutcome));
         if (dConfig.callConfig.needsFulfillment()) revert UserNotFulfilled();
+        return 0;
     }
 
     /// @notice Called above in `execute` as an alternative to `_bidFindingIteration`, if solverOps have already been
@@ -275,6 +270,7 @@ contract Atlas is Escrow, Factory {
         }
         if (ctx.isSimulation) revert SolverSimFail(uint256(ctx.solverOutcome));
         if (dConfig.callConfig.needsFulfillment()) revert UserNotFulfilled();
+        return 0;
     }
 
     /// @notice Called at the end of `metacall` to bubble up specific error info in a revert.

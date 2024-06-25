@@ -153,7 +153,6 @@ abstract contract Escrow is AtlETH {
                 SolverTracker memory solverTracker;
 
                 // Execute the solver call
-                // _solverOpsWrapper returns a SolverOutcome enum value
                 (result, solverTracker) = _solverOpWrapper(ctx, solverOp, bidAmount, gasLimit, returnData);
 
                 if (result.executionSuccessful()) {
@@ -170,7 +169,7 @@ abstract contract Escrow is AtlETH {
 
         ctx.solverOutcome = uint24(result);
 
-        _releaseSolverLock(solverOp, gasWaterMark, result, false, !prevalidated);
+        _handleSolverAccounting(solverOp, gasWaterMark, result, false, !prevalidated);
 
         // emit event
         emit SolverTxResult(solverOp.solver, solverOp.from, result.executedWithError(), false, result);
@@ -214,11 +213,13 @@ abstract contract Escrow is AtlETH {
         bytes calldata returnData
     )
         internal
-        withLockPhase(ExecutionPhase.SolverOperations)
+        withLockPhase(ExecutionPhase.SolverOperation)
     {
-        // Set the solver lock - will perform accounting checks if value borrowed. If `_trySolverLock()` returns false,
-        // we revert here and catch the error in `_solverOpWrapper()` above
-        if (!_trySolverLock(solverOp)) revert InsufficientEscrow();
+        // Make sure there's enough value in Atlas for the Solver
+        if (!_borrow(solverOp.value)) revert InsufficientEscrow();
+
+        // Set the solver lock - if we revert here we'll catch the error in `_solverOpWrapper()` above
+        _solverLock = uint256(uint160(solverOp.from));
 
         (bool success,) = solverOp.solver.call{ value: solverOp.value, gas: gasLimit }(
             abi.encodeCall(

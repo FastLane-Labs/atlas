@@ -6,7 +6,8 @@ contract AtlasEvents {
     event MetacallResult(
         address indexed bundler,
         address indexed user,
-        address indexed winningSolver,
+        bool solverSuccessful,
+        bool disbursementSuccessful,
         uint256 ethPaidToBundler,
         uint256 netGasSurcharge
     );

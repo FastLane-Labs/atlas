@@ -49,11 +49,12 @@ abstract contract SafetyLocks is Storage {
 
         // Set the claimed amount
         uint256 rawClaims = (FIXED_GAS_OFFSET + gasMarker) * tx.gasprice;
-        claims = rawClaims * (SURCHARGE_SCALE + SURCHARGE_RATE) / SURCHARGE_SCALE;
+        claims = rawClaims * (SURCHARGE_SCALE + ATLAS_SURCHARGE_RATE + BUNDLER_SURCHARGE_RATE) / SURCHARGE_SCALE;
 
         // Set any withdraws or deposits
         withdrawals = userOpValue;
         deposits = msg.value;
+        writeoffs = 0;
     }
 
     modifier withLockPhase(ExecutionPhase _phase) {
@@ -106,6 +107,7 @@ abstract contract SafetyLocks is Storage {
         claims = type(uint256).max;
         withdrawals = type(uint256).max;
         deposits = type(uint256).max;
+        writeoffs = type(uint256).max;
     }
 
     /// @notice Returns the address of the currently active Execution Environment, if any.

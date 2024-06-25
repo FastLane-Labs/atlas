@@ -311,7 +311,11 @@ contract EscrowTest is AtlasBaseTest {
     }
 
     function test_executeSolverOperation_solverOpWrapper_BidNotPaid() public {
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
+            defaultCallConfig()
+                .withRequireFulfillment(true)
+                .build()
+        );
         solverOps[0] = validSolverOperation(userOp)
             .withBidAmount(defaultBidAmount * 2) // Solver's contract doesn't have that much
             .signAndBuild(address(atlasVerification), solverOnePK);
@@ -324,7 +328,8 @@ contract EscrowTest is AtlasBaseTest {
         uint256 bidAmount = dummySolver.noGasPayBack(); // Special bid value that will cause the solver to not call reconcile
         deal(address(dummySolver), bidAmount);
 
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
+            defaultCallConfig().withRequireFulfillment(true).build());
         solverOps[0] = validSolverOperation(userOp)
             .withBidAmount(bidAmount)
             .signAndBuild(address(atlasVerification), solverOnePK);
@@ -337,6 +342,7 @@ contract EscrowTest is AtlasBaseTest {
             defaultCallConfig()
                 .withTrackUserReturnData(true)
                 .withForwardReturnData(true)
+                .withRequireFulfillment(true)
                 .build()
         );
         solverOps[0] = validSolverOperation(userOp)
@@ -354,6 +360,7 @@ contract EscrowTest is AtlasBaseTest {
                 .withTrackUserReturnData(true)
                 .withRequirePreOps(false)
                 .withPreSolver(true)
+                .withRequireFulfillment(true)
                 .build()
         );
 
@@ -377,6 +384,7 @@ contract EscrowTest is AtlasBaseTest {
                 .withTrackUserReturnData(true)
                 .withRequirePreOps(false)
                 .withPostSolver(true)
+                .withRequireFulfillment(true)
                 .build()
         );
 
@@ -398,7 +406,8 @@ contract EscrowTest is AtlasBaseTest {
         uint256 bidAmount = dummySolver.partialGasPayBack(); // solver only pays half of shortfall
         deal(address(dummySolver), bidAmount);
 
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
+            defaultCallConfig().withRequireFulfillment(true).build());
         solverOps[0] = validSolverOperation(userOp)
             .withBidAmount(bidAmount)
             .signAndBuild(address(atlasVerification), solverOnePK);

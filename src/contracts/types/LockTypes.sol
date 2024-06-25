@@ -27,7 +27,7 @@ enum ExecutionPhase {
     PreOps,
     UserOperation,
     PreSolver,
-    SolverOperations,
+    SolverOperation,
     PostSolver,
     AllocateValue,
     PostOps

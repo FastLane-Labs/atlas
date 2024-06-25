@@ -22,9 +22,11 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint8 public constant decimals = 18;
 
     // Gas Accounting public constants
-    uint256 public constant SURCHARGE_RATE = 1_000_000; // 1_000_000 / 10_000_000 = 10%
+    uint256 public constant ATLAS_SURCHARGE_RATE = 1_000_000; // 1_000_000 / 10_000_000 = 10%
+    uint256 public constant BUNDLER_SURCHARGE_RATE = 1_000_000; // 1_000_000 / 10_000_000 = 10%
     uint256 public constant SURCHARGE_SCALE = 10_000_000; // 10_000_000 / 10_000_000 = 100%
     uint256 public constant FIXED_GAS_OFFSET = 100_000;
+    uint256 public constant BUNDLER_GAS_PENALTY_BUFFER = 1_000_000;
 
     // AtlETH EIP-2612 constants
     uint256 internal immutable _INITIAL_CHAIN_ID;
@@ -47,10 +49,12 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
 
     // Atlas SafetyLocks (transient storage)
     Lock public lock; // transient storage
+    uint256 internal _solverLock; // transient storage
+
     uint256 public claims; // transient storage
+    uint256 public writeoffs; // transient storage
     uint256 public withdrawals; // transient storage
     uint256 public deposits; // transient storage
-    uint256 internal _solverLock; // transient storage
 
     constructor(
         uint256 _escrowDuration,
