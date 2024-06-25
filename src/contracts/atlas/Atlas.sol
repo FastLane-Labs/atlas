@@ -84,7 +84,7 @@ contract Atlas is Escrow, Factory {
 
             emit MetacallResult(msg.sender, userOp.from, winningSolver, ethPaidToBundler, netGasSurcharge);
             auctionWon = ctx.solverSuccessful;
-            
+
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
             _handleErrors(revertData, dConfig.callConfig);
@@ -136,12 +136,15 @@ contract Atlas is Escrow, Factory {
         returnData = _executeUserOperation(ctx, dConfig, userOp, returnData);
 
         // SolverOps Calls
-        if (dConfig.callConfig.exPostBids()) {
-            _bidFindingIteration(ctx, dConfig, userOp, solverOps, returnData);
-        } else {
+        uint256 winningBidAmount = dConfig.callConfig.exPostBids() ?
+            _bidFindingIteration(ctx, dConfig, userOp, solverOps, returnData) :
             _bidKnownIteration(ctx, dConfig, userOp, solverOps, returnData);
-        }
 
+        // AllocateValue Call
+        if (ctx.solverSuccessful) {
+            _allocateValue(ctx, dConfig, winningBidAmount, returnData);
+        }
+        
         // PostOp Call
         if (dConfig.callConfig.needsPostOpsCall()) {
             _executePostOpsCall(ctx, ctx.solverSuccessful, returnData);
@@ -162,13 +165,13 @@ contract Atlas is Escrow, Factory {
         SolverOperation[] calldata solverOps,
         bytes memory returnData
     )
-        internal
+        internal returns (uint256)
     {
         // Return early if no solverOps (e.g. in simUserOperation)
         if (solverOps.length == 0) {
             if (ctx.isSimulation) revert SolverSimFail(0);
             if (dConfig.callConfig.needsFulfillment()) revert UserNotFulfilled();
-            return;
+            return 0;
         }
 
         ctx.bidFind = true;
@@ -233,8 +236,7 @@ contract Atlas is Escrow, Factory {
                 _executeSolverOperation(ctx, dConfig, userOp, solverOps[solverIndex], bidAmountFound, true, returnData);
 
             if (ctx.solverSuccessful) {
-                _allocateValue(ctx, dConfig, bidAmountFound, returnData);
-                return;
+                return bidAmountFound;
             }
 
             if (i == 0) break; // break to prevent underflow in next loop
@@ -257,7 +259,7 @@ contract Atlas is Escrow, Factory {
         SolverOperation[] calldata solverOps,
         bytes memory returnData
     )
-        internal
+        internal returns (uint256)
     {
         uint256 bidAmount;
         uint8 k = uint8(solverOps.length);
@@ -268,14 +270,8 @@ contract Atlas is Escrow, Factory {
             bidAmount = _executeSolverOperation(ctx, dConfig, userOp, solverOp, solverOp.bidAmount, false, returnData);
 
             if (ctx.solverSuccessful) {
-                _allocateValue(ctx, dConfig, bidAmount, returnData);
-                return;
+                return bidAmount;
             }
-
-            // Increment the call index once per solverOp
-            //unchecked {
-            //    ++ctx.solverIndex;
-            //}
         }
         if (ctx.isSimulation) revert SolverSimFail(uint256(ctx.solverOutcome));
         if (dConfig.callConfig.needsFulfillment()) revert UserNotFulfilled();
