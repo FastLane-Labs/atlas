@@ -2,7 +2,8 @@
 pragma solidity 0.8.22;
 
 /// @title SafeCall
-/// @author Optimism
+/// @author FastLane Labs
+/// @author Modified from Optimism's SafeCall lib
 /// (https://github.com/ethereum-optimism/optimism/blob/develop/packages/contracts-bedrock/src/libraries/SafeCall.sol)
 /// @notice Perform low level safe calls
 library SafeCall {
@@ -11,7 +12,7 @@ library SafeCall {
     /// @param _gas      Amount of gas to pass to the call
     /// @param _value    Amount of value to pass to the call
     /// @param _calldata Calldata to pass to the call
-    function call(address _target, uint256 _gas, uint256 _value, bytes memory _calldata) internal returns (bool) {
+    function safeCall(address _target, uint256 _gas, uint256 _value, bytes memory _calldata) internal returns (bool) {
         bool _success;
         assembly {
             _success :=

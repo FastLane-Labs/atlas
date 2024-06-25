@@ -558,7 +558,7 @@ abstract contract Escrow is AtlETH {
         if (!_trySolverLock(solverOp)) revert InsufficientEscrow();
 
         // Optimism's SafeCall lib allows us to limit how much returndata gets copied to memory, to prevent OOG attacks.
-        success = solverOp.solver.call(
+        success = solverOp.solver.safeCall(
             gasLimit,
             solverOp.value,
             abi.encodeCall(
