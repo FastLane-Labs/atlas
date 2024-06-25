@@ -19,6 +19,7 @@ contract AtlasErrors {
     error BidFindSuccessful(uint256 bidAmount);
     error UnexpectedNonRevert();
 
+    error InvalidSolver();
     error BidNotPaid();
     error BalanceNotReconciled();
     error SolverOpReverted();
@@ -113,6 +114,7 @@ contract AtlasErrors {
 
     // DAppControl
     error BothUserAndDAppNoncesCannotBeSequential();
+    error BothPreOpsAndUserReturnDataCannotBeTracked();
     error InvalidControl();
     error NoDelegatecall();
     error MustBeDelegatecalled();

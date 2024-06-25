@@ -110,7 +110,7 @@ contract OEVTest is BaseTest {
     //                  Full OEV Capture Test               //
     // ---------------------------------------------------- //
 
-    function testChainlinkOEV_StandardVersion() public {
+    function testChainlinkOEV_StandardVersion_GasCheck() public {
         UserOperation memory userOp;
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         DAppOperation memory dAppOp;
@@ -185,7 +185,7 @@ contract OEVTest is BaseTest {
         vm.prank(userEOA);
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
 
-        console.log("OEV Metacall Gas Cost:", gasLeftBefore - gasleft());
+        console.log("Metacall Gas Cost:", gasLeftBefore - gasleft());
 
         assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), targetOracleAnswer, "Wrapper did not update as expected");
         assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) != uint(AggregatorV2V3Interface(chainlinkETHUSD).latestAnswer()), "Wrapper and base feed should report different answers");

@@ -21,6 +21,7 @@ enum ValidCallsResult {
     InvalidControl,
     InvalidSolverGasLimit,
     InvalidDAppNonce,
+    InvalidCallConfig,
     CallConfigMismatch,
     DAppToInvalid,
     UserFromInvalid,

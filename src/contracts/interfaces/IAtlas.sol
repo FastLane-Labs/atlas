@@ -9,17 +9,6 @@ import "../types/LockTypes.sol";
 // TODO add all Atlas functions here
 
 interface IAtlas {
-    function solverCall(
-        uint256 bidAmount,
-        uint256 gasLimit,
-        EscrowKey calldata key,
-        SolverOperation calldata solverOp,
-        bytes calldata dAppReturnData
-    )
-        external
-        payable
-        returns (SolverTracker memory solverTracker);
-
     function metacall(
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,

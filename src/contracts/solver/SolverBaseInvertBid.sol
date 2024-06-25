@@ -45,9 +45,8 @@ contract SolverBaseInvertBid is ISolverContract {
         virtual
         safetyFirst(executionEnvironment, solverOpFrom)
         receiveBids(executionEnvironment, bidToken, bidAmount)
-        returns (bool success, bytes memory data)
     {
-        (success, data) = address(this).call{ value: msg.value }(solverOpData);
+        (bool success,) = address(this).call{ value: msg.value }(solverOpData);
 
         require(success, "CALL UNSUCCESSFUL");
     }

@@ -81,7 +81,7 @@ _availableFundsERC20() is used to check the approved balance of users and dapps 
 
 _transferDAppERC20() and _transferUserERC20() are functions that can be implemented by Atlas module developers in DappControl to access the user or dapp funds referenced in _availableFundsERC20().
 
-Module developers can access useful information about the atlas transaction by initializing an escrowKey struct in their DappControl and accessing these fields: addressPointer, solverSuccessful, paymentsSuccessful, callIndex, callCount, lockState, solverOutcome, bidFind, isSimulation.
+Module developers can access useful information about the atlas transaction by initializing an ctx struct in their DappControl and accessing these fields: bundler, solverSuccessful, paymentsSuccessful, callIndex, callCount, phase, solverOutcome, bidFind, isSimulation.
 
 The _contribute() function allows actors to sponsor the gas of the transaction by donating ETH to the Atlas Escrow balance. This contribution to the balance is available first to bundlers, with the surplus going to solvers.
 

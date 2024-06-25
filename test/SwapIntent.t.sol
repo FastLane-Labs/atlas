@@ -69,7 +69,7 @@ contract SwapIntentTest is BaseTest {
         // atlas.deposit{value: 1e18}();
     }
 
-    function testAtlasSwapIntentWithBasicRFQ() public {
+    function testAtlasSwapIntentWithBasicRFQ_GasCheck() public {
         // Swap 10 WETH for 20 DAI
         UserCondition userCondition = new UserCondition();
 
