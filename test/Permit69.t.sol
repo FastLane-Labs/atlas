@@ -3,8 +3,6 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { ERC20 } from "solmate/tokens/ERC20.sol";
-
 import { BaseTest } from "./base/BaseTest.t.sol";
 import "./base/TestUtils.sol";
 

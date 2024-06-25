@@ -3,7 +3,7 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { SafeTransferLib } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
 import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";

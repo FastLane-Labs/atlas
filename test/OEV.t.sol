@@ -3,7 +3,7 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { ERC20 } from "solmate/tokens/ERC20.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { Ownable } from "openzeppelin-contracts/contracts/access/Ownable.sol";
 
 import { BaseTest } from "test/base/BaseTest.t.sol";
@@ -42,7 +42,7 @@ contract OEVTest is BaseTest {
     uint256 liquidationReward = 10e18;
     uint256 solverWinningBid = 1e18;
 
-    ERC20 public DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+    IERC20 public DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
 
     struct Sig {
         uint8 v;
