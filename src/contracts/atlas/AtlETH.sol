@@ -6,14 +6,9 @@ import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.s
 import { Permit69 } from "src/contracts/common/Permit69.sol";
 import "src/contracts/types/EscrowTypes.sol";
 
-/// @notice Modified Solmate ERC20 with some Atlas-specific modifications.
 /// @author FastLane Labs
-/// @author Modified from Solmate (https://github.com/transmissions11/solmate/blob/main/src/tokens/ERC20.sol)
 /// @dev Do not manually set balances without updating totalSupply, as the sum of all user balances must not exceed it.
 abstract contract AtlETH is Permit69 {
-    bytes32 private constant PERMIT_TYPEHASH =
-        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
-
     constructor(
         uint256 _escrowDuration,
         address _verification,
@@ -77,108 +72,6 @@ abstract contract AtlETH is Permit69 {
     function withdraw(uint256 amount) external {
         _burn(msg.sender, amount);
         SafeTransferLib.safeTransferETH(msg.sender, amount);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                               ERC20 LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Approves the spender to spend a specified amount of tokens on behalf of the caller.
-    /// @param spender The address of the account allowed to spend the tokens.
-    /// @param amount The amount of tokens the spender is allowed to spend.
-    /// @return A boolean indicating whether the approval was successful.
-    function approve(address spender, uint256 amount) public returns (bool) {
-        allowance[msg.sender][spender] = amount;
-        emit Approval(msg.sender, spender, amount);
-        return true;
-    }
-
-    /// @notice Transfers tokens from the caller's account to the specified recipient.
-    /// @param to The address of the recipient to whom tokens are being transferred.
-    /// @param amount The amount of tokens to transfer.
-    /// @return A boolean indicating whether the transfer was successful.
-    function transfer(address to, uint256 amount) public returns (bool) {
-        _deduct(msg.sender, amount);
-        _balanceOf[to].balance += uint112(amount);
-
-        emit Transfer(msg.sender, to, amount);
-        return true;
-    }
-
-    /// @notice Transfers tokens from one account to another using an allowance mechanism.
-    /// @param from The address of the account from which tokens are being transferred.
-    /// @param to The address of the recipient to whom tokens are being transferred.
-    /// @param amount The amount of tokens to transfer.
-    /// @return A boolean indicating whether the transfer was successful.
-    function transferFrom(address from, address to, uint256 amount) public returns (bool) {
-        uint256 allowed = allowance[from][msg.sender]; // Saves gas for limited approvals.
-        if (allowed != type(uint256).max) allowance[from][msg.sender] = allowed - amount;
-        _deduct(from, amount);
-        _balanceOf[to].balance += uint112(amount);
-        emit Transfer(from, to, amount);
-        return true;
-    }
-
-    /// @notice Allows a token owner to approve spending a specific amount of tokens by a spender.
-    /// @dev This function is part of the EIP-2612 permit extension.
-    /// @param owner The address of the token owner granting the approval.
-    /// @param spender The address of the spender to whom approval is granted.
-    /// @param value The amount of tokens approved for spending.
-    /// @param deadline The deadline timestamp after which the permit is considered expired.
-    /// @param v The recovery identifier of the permit signature.
-    /// @param r The first half of the ECDSA signature of the permit.
-    /// @param s The second half of the ECDSA signature of the permit.
-    function permit(
-        address owner,
-        address spender,
-        uint256 value,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    )
-        public
-    {
-        if (deadline < block.timestamp) revert PermitDeadlineExpired();
-        // Unchecked because the only math done is incrementing
-        // the owner's nonce which cannot realistically overflow.
-        unchecked {
-            address recoveredAddress = ecrecover(
-                keccak256(
-                    abi.encodePacked(
-                        "\x19\x01",
-                        DOMAIN_SEPARATOR(),
-                        keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, value, nonces[owner]++, deadline))
-                    )
-                ),
-                v,
-                r,
-                s
-            );
-            if (recoveredAddress == address(0) || recoveredAddress != owner) revert InvalidSigner();
-            allowance[recoveredAddress][spender] = value;
-        }
-        emit Approval(owner, spender, value);
-    }
-
-    /// @notice Computes or reads the stored EIP-712 domain separator for permit signatures.
-    /// @return The domain separator bytes32 value.
-    function DOMAIN_SEPARATOR() public view returns (bytes32) {
-        return block.chainid == _INITIAL_CHAIN_ID ? _INITIAL_DOMAIN_SEPARATOR : _computeDomainSeparator();
-    }
-
-    /// @notice Computes the EIP-712 domain separator for permit signatures.
-    /// @return The domain separator bytes32 value.
-    function _computeDomainSeparator() internal view override returns (bytes32) {
-        return keccak256(
-            abi.encode(
-                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                keccak256(bytes(name)),
-                keccak256("1"),
-                block.chainid,
-                address(this)
-            )
-        );
     }
 
     /*//////////////////////////////////////////////////////////////
