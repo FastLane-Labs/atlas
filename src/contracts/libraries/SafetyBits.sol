@@ -32,6 +32,7 @@ library SafetyBits {
                 ++self.callIndex;
             }
         }
+        self.phase = uint8(phase);
         packedKey = abi.encodePacked(
             self.bundler,
             self.solverSuccessful,
