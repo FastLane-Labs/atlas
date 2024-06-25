@@ -184,18 +184,21 @@ contract GasAccountingTest is Test {
         vm.prank(executionEnvironment);
         vm.expectRevert(AtlasErrors.WrongPhase.selector);
         mockGasAccounting.borrow(borrowedAmount);
+        assertEq(executionEnvironment.balance, 0);
         vm.revertTo(startState);
 
         mockGasAccounting.setPhase(ExecutionPhase.AllocateValue);
         vm.prank(executionEnvironment);
         vm.expectRevert(AtlasErrors.WrongPhase.selector);
         mockGasAccounting.borrow(borrowedAmount);
+        assertEq(executionEnvironment.balance, 0);
         vm.revertTo(startState);
 
         mockGasAccounting.setPhase(ExecutionPhase.PostOps);
         vm.prank(executionEnvironment);
         vm.expectRevert(AtlasErrors.WrongPhase.selector);
         mockGasAccounting.borrow(borrowedAmount);
+        assertEq(executionEnvironment.balance, 0);
         vm.revertTo(startState);
     }
 
