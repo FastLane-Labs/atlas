@@ -71,7 +71,7 @@ abstract contract SafetyLocks is Storage {
     /// @param isSimulation Boolean indicating whether the call is a simulation or not.
     /// @return An Context struct initialized with the provided parameters.
     function _buildContext(
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         address executionEnvironment,
         bytes32 userOpHash,
         address bundler,

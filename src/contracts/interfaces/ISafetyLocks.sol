@@ -7,13 +7,6 @@ import "../types/DAppApprovalTypes.sol";
 import "../types/LockTypes.sol";
 
 interface ISafetyLocks {
-    function handleDAppOperation(
-        DAppConfig calldata dConfig,
-        bytes memory preOpsData,
-        bytes memory userReturnData
-    )
-        external;
-
     function activeEnvironment() external view returns (address);
 
     function isUnlocked() external view returns (bool);

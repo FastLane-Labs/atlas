@@ -45,7 +45,7 @@ abstract contract Escrow is AtlETH {
     /// @return preOpsData The data returned by the preOps call, if successful.
     function _executePreOpsCall(
         Context memory ctx,
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         UserOperation calldata userOp
     )
         internal
@@ -77,7 +77,7 @@ abstract contract Escrow is AtlETH {
     /// @return userData Data returned from executing the UserOperation, if the call was successful.
     function _executeUserOperation(
         Context memory ctx,
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         UserOperation calldata userOp,
         bytes memory returnData
     )
@@ -117,7 +117,7 @@ abstract contract Escrow is AtlETH {
     /// executed successfully; otherwise, returns 0.
     function _executeSolverOperation(
         Context memory ctx,
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         uint256 bidAmount,
@@ -195,7 +195,7 @@ abstract contract Escrow is AtlETH {
     /// is allocated.
     function _allocateValue(
         Context memory ctx,
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         uint256 bidAmount,
         uint256 solverIndex,
         bytes memory returnData
@@ -256,7 +256,7 @@ abstract contract Escrow is AtlETH {
     /// @return gasLimit The calculated gas limit for the SolverOperation, considering the operation's gas usage and
     /// the protocol's gas buffers.
     function _validateSolverOperation(
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         SolverOperation calldata solverOp,
         uint256 gasWaterMark
     )
@@ -332,7 +332,7 @@ abstract contract Escrow is AtlETH {
     /// executed successfully; otherwise, returns 0.
     function _getBidAmount(
         Context memory ctx,
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         bytes memory returnData

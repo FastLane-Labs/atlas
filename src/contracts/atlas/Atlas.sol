@@ -102,7 +102,7 @@ contract Atlas is Escrow, Factory {
     /// @param userOpHash Hash of the userOp struct of the current metacall tx.
     /// @return winningSolver Address of the winning solver (address(0) if no winner).
     function execute(
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         address executionEnvironment,
@@ -156,7 +156,7 @@ contract Atlas is Escrow, Factory {
     /// @param returnData Return data from the preOps and userOp calls.
     function _bidFindingIteration(
         Context memory ctx,
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         bytes memory returnData
@@ -250,7 +250,7 @@ contract Atlas is Escrow, Factory {
     /// @param returnData Return data from the preOps and userOp calls.
     function _bidKnownIteration(
         Context memory ctx,
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         bytes memory returnData
