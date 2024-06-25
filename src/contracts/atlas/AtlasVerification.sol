@@ -98,7 +98,7 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
                 return verifyUserResult;
             }
 
-            // Check number of solvers not greater than max, to prevent overflows in `callIndex`
+            // Check number of solvers not greater than max, to prevent overflows in `solverIndex`
             if (solverOpCount > _MAX_SOLVERS) {
                 return ValidCallsResult.TooManySolverOps;
             }

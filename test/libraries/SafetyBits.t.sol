@@ -42,8 +42,8 @@ contract SafetyBitsTest is Test {
             bundler: bundler,
             solverSuccessful: false,
             paymentsSuccessful: false,
-            callIndex: callConfig.needsPreOpsCall() ? 0 : 1,
-            callCount: solverOpCount + 3,
+            solverIndex: callConfig.needsPreOpsCall() ? 0 : 1,
+            solverCount: solverOpCount + 3,
             phase: ExecutionPhase.Uninitialized,
             solverOutcome: 0,
             bidFind: false,
@@ -56,8 +56,8 @@ contract SafetyBitsTest is Test {
         Context memory ctx = initializeContext(CallConfigIndex.RequirePreOps);
         assertTrue(ctx.solverSuccessful == false);
         assertTrue(ctx.paymentsSuccessful == false);
-        assertTrue(ctx.callIndex == 0);
-        assertTrue(ctx.callCount == 4);
+        assertTrue(ctx.solverIndex == 0);
+        assertTrue(ctx.solverCount == 4);
         assertTrue(ctx.phase == ExecutionPhase.Uninitialized);
         assertTrue(ctx.solverOutcome == 0);
     }

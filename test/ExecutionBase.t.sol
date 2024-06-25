@@ -51,7 +51,7 @@ contract ExecutionBaseTest is BaseTest {
     )
         internal
     {
-        data = abi.encodePacked(data, ctx.setAndPack(phase, false));
+        data = abi.encodePacked(data, ctx.setAndPack(phase));
 
         // Mimic the Mimic
         data = abi.encodePacked(data, user, dAppControl, callConfig);
@@ -73,8 +73,8 @@ contract ExecutionBaseTest is BaseTest {
             bundler: address(0),
             solverSuccessful: false,
             paymentsSuccessful: true,
-            callIndex: 0,
-            callCount: 1,
+            solverIndex: 0,
+            solverCount: 1,
             phase: phase,
             solverOutcome: 2,
             bidFind: true,
@@ -86,8 +86,8 @@ contract ExecutionBaseTest is BaseTest {
             _ctx.bundler,
             _ctx.solverSuccessful,
             _ctx.paymentsSuccessful,
-            _ctx.callIndex,
-            _ctx.callCount,
+            _ctx.solverIndex,
+            _ctx.solverCount,
             uint8(_ctx.phase),
             uint8(0),
             _ctx.solverOutcome,

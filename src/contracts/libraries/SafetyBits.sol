@@ -20,24 +20,18 @@ uint8 constant SAFE_DAPP_TRANSFER = uint8(
 library SafetyBits {
     function setAndPack(
         Context memory self,
-        ExecutionPhase phase,
-        bool increment
+        ExecutionPhase phase
     )
         internal
         pure
         returns (bytes memory packedKey)
     {
-        if (increment) {
-            unchecked {
-                ++self.callIndex;
-            }
-        }
         packedKey = abi.encodePacked(
             self.bundler,
             self.solverSuccessful,
             self.paymentsSuccessful,
-            self.callIndex,
-            self.callCount,
+            self.solverIndex,
+            self.solverCount,
             uint8(phase),
             uint8(0),
             self.solverOutcome,

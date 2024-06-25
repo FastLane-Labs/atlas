@@ -13,8 +13,8 @@ struct Context {
     address bundler;
     bool solverSuccessful;
     bool paymentsSuccessful;
-    uint8 callIndex;
-    uint8 callCount;
+    uint8 solverIndex;
+    uint8 solverCount;
     ExecutionPhase phase;
     uint24 solverOutcome;
     bool bidFind;

@@ -54,7 +54,31 @@ contract MockGasAccounting is GasAccounting, Test {
     }
 
     function settle(address winningSolver, address bundler) external returns (uint256, uint256) {
-        return _settle(winningSolver, bundler);
+        Context memory ctx = buildContext(bundler, true, true, 0, 1);
+        return _settle(ctx, winningSolver);
+    }
+
+    function buildContext(
+        address bundler,
+        bool solverSuccessful,
+        bool paymentsSuccessful,
+        uint256 winningSolverIndex,
+        uint256 solverCount
+    ) public returns (Context memory ctx) {
+        ctx = Context({
+            executionEnvironment: lock.activeEnvironment,
+            userOpHash: bytes32(0),
+            bundler: bundler,
+            solverSuccessful: solverSuccessful,
+            paymentsSuccessful: paymentsSuccessful,
+            solverIndex: uint8(winningSolverIndex),
+            solverCount: uint8(solverCount),
+            phase: ExecutionPhase.PostOps,
+            solverOutcome: 0,
+            bidFind: false,
+            isSimulation: false,
+            callDepth: 0
+        });
     }
 
     function increaseBondedBalance(address account, uint256 amount) external {
@@ -434,7 +458,6 @@ contract GasAccountingTest is Test {
         (bondedBefore,,,,) = mockGasAccounting.accessData(solverOp.from);
         mockGasAccounting.releaseSolverLock(solverOp, gasWaterMark, result);
         (bondedAfter,,,,) = mockGasAccounting.accessData(solverOp.from);
-        console.log("b");
         assertEq(bondedBefore, bondedAfter);
 
         // UncoveredResult
