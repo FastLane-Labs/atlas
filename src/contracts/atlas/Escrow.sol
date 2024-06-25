@@ -1,8 +1,6 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { ExcessivelySafeCall } from "ExcessivelySafeCall/ExcessivelySafeCall.sol";
-
 import { AtlETH } from "./AtlETH.sol";
 
 import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
@@ -11,6 +9,7 @@ import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
+import { SafeCall } from "src/contracts/libraries/SafeCall.sol";
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
@@ -28,7 +27,7 @@ abstract contract Escrow is AtlETH {
     using EscrowBits for uint256;
     using CallBits for uint32;
     using SafetyBits for Context;
-    using ExcessivelySafeCall for address;
+    using SafeCall for address;
 
     constructor(
         uint256 _escrowDuration,
@@ -558,11 +557,10 @@ abstract contract Escrow is AtlETH {
         // we revert here and catch the error in `_solverOpWrapper()` above
         if (!_trySolverLock(solverOp)) revert InsufficientEscrow();
 
-        // ExcessivelySafeCall allows us to limit how much returndata gets copied to memory, to prevent OOG attacks.
-        (success,) = solverOp.solver.excessivelySafeCall(
+        // Optimism's SafeCall lib allows us to limit how much returndata gets copied to memory, to prevent OOG attacks.
+        success = solverOp.solver.call(
             gasLimit,
             solverOp.value,
-            0,
             abi.encodeCall(
                 ISolverContract.atlasSolverCall,
                 (
