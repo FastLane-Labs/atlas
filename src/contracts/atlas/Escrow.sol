@@ -212,6 +212,13 @@ abstract contract Escrow is AtlETH {
             )
         );
 
+        if (!success && !dConfig.callConfig.allowAllocateValueFailure()) {
+            if (ctx.isSimulation) revert AllocateValueSimFail();
+            revert AllocateValueFail();
+        }
+
+        // paymentsSuccessful is part of the data forwarded to the postOps hook, dApps can easily check the value by
+        // calling _paymentsSuccessful()
         ctx.paymentsSuccessful = success;
         ctx.callIndex = ctx.callCount - 1;
         ctx.solverOutcome = uint24(solverIndex);

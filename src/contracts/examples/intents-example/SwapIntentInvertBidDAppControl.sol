@@ -65,7 +65,8 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
                 requireFulfillment: true,
                 trustedOpHash: true,
                 invertBidValue: true,
-                exPostBids: false
+                exPostBids: false,
+                allowAllocateValueFailure: true
             })
         )
     {

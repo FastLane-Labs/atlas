@@ -72,7 +72,8 @@ contract V2DAppControl is DAppControl {
                 requireFulfillment: false,
                 trustedOpHash: false,
                 invertBidValue: false,
-                exPostBids: false
+                exPostBids: false,
+                allowAllocateValueFailure: false
             })
         )
     {
@@ -140,9 +141,9 @@ contract V2DAppControl is DAppControl {
         uint256 amount1Out;
 
         if (govIsTok0) {
-            SwapMath.getAmountOut(bidAmount, uint256(token1Balance), uint256(token0Balance));
+            amount0Out = SwapMath.getAmountOut(bidAmount, uint256(token1Balance), uint256(token0Balance));
         } else {
-            SwapMath.getAmountOut(bidAmount, uint256(token0Balance), uint256(token1Balance));
+            amount1Out = SwapMath.getAmountOut(bidAmount, uint256(token0Balance), uint256(token1Balance));
         }
 
         bytes memory nullBytes;
