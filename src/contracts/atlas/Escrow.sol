@@ -168,6 +168,7 @@ abstract contract Escrow is AtlETH {
             }
         }
 
+        // If we reach this point, the solver call did not execute successfully.
         ctx.solverOutcome = uint24(result);
 
         _handleSolverAccounting(solverOp, gasWaterMark, result, !prevalidated);

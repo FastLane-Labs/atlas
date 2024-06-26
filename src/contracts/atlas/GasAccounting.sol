@@ -290,7 +290,7 @@ abstract contract GasAccounting is SafetyLocks {
             _gasLeft * tx.gasprice * (SURCHARGE_SCALE + ATLAS_SURCHARGE_RATE + BUNDLER_SURCHARGE_RATE) / SURCHARGE_SCALE;
         _claims -= _gasRemainder;
 
-        // By reducing the _claims, Solvers end up paying less in total.
+        // By reducing the _claims, solvers end up paying less in total.
         if (ctx.solverCount > 0) {
             uint256 _bundlerGasOveragePenalty;
 
@@ -326,15 +326,14 @@ abstract contract GasAccounting is SafetyLocks {
         internal
         returns (uint256 claimsPaidToBundler, uint256 netAtlasGasSurcharge)
     {
-        // NOTE: If there is no winningSolver but the dApp config allows unfulfilled 'successes,' the bundler
-        // is treated as the Solver.
+        // NOTE: If there is no winning solver but the dApp config allows unfulfilled 'successes', the bundler
+        // is treated as the solver.
 
         // If a solver won, their address is still in the _solverLock
         address _winningSolver = address(uint160(_solverLock));
 
         // Load what we can from storage so that it shows up in the gasleft() calc
         uint256 _surcharge = cumulativeSurcharge;
-
         uint256 _withdrawals = withdrawals;
         uint256 _deposits = deposits;
         (uint256 _claims, uint256 _writeoffs) = _getAdjustedClaimsAndWriteoffs(ctx, solverGasLimit);
@@ -342,7 +341,7 @@ abstract contract GasAccounting is SafetyLocks {
         netAtlasGasSurcharge =
             (_claims * ATLAS_SURCHARGE_RATE) / (SURCHARGE_SCALE + ATLAS_SURCHARGE_RATE + BUNDLER_SURCHARGE_RATE);
 
-        // Update the stored cumulative Surcharge
+        // Update the stored cumulative surcharge
         cumulativeSurcharge = _surcharge + netAtlasGasSurcharge;
 
         // Handle the settlement accounting logs
@@ -353,7 +352,7 @@ abstract contract GasAccounting is SafetyLocks {
             if (_deposits < _withdrawals + netAtlasGasSurcharge) {
                 // NOTE: We assume the bundler is fully on the hook for the gas, so we ignore claims and writeoffs
                 // and focus exclusively on deposits and withdrawals.
-                // The "+ netAtlasGasSurcharge" forces Bundler to pay the surcharge
+                // The "+ netAtlasGasSurcharge" forces the bundler to pay the surcharge
                 revert InsufficientTotalBalance(_withdrawals + netAtlasGasSurcharge - _deposits);
             }
             claimsPaidToBundler = _deposits - _withdrawals;
@@ -378,19 +377,19 @@ abstract contract GasAccounting is SafetyLocks {
             uint256 deficit = _assign(_winningSolver, amountOwed, true);
             if (deficit > 0) {
                 // CASE: Solver's bonded balance isn't enough to cover the amount owed, and the
-                // winning solver is unrelated to the bundler. The Bundler is not the Solver.
+                // winning solver is unrelated to the bundler. The bundler is not the solver.
                 if (deficit > _claims - _writeoffs - netAtlasGasSurcharge) {
-                    // CASE: The deficit is too large to writeoff by having the Bundler absorb the cost
+                    // CASE: The deficit is too large to writeoff by having the bundler absorb the cost
                     revert InsufficientTotalBalance(deficit);
                 } else {
-                    // CASE: We can writeoff the deficit (Bundler has already paid the gas anyway)
+                    // CASE: We can writeoff the deficit (bundler has already paid the gas anyway)
                     // TODO: Ensure incentive compatibility
                     _writeoffs += deficit;
                 }
             }
             claimsPaidToBundler = _claims - _writeoffs - netAtlasGasSurcharge;
         } else {
-            // CASE: in surplus, add to bonded balance
+            // CASE: Solver is in surplus, add to bonded balance
             uint256 amountCredited = _deposits + _writeoffs - _claims - _withdrawals;
             _credit(_winningSolver, amountCredited);
             claimsPaidToBundler = _claims - _writeoffs - netAtlasGasSurcharge;
