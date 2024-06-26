@@ -216,6 +216,10 @@ contract ExecutionEnvironment is Base, ReentrancyGuard {
         // Make sure the numbers add up and that the bid was paid
         if (solverTracker.floor > solverTracker.ceiling) revert AtlasErrors.BidNotPaid();
 
+        // The solver net bid is the token difference before and after the solver call.
+        // WARNING: There could be scenarios where the above assumption need not hold. For example, the solver could
+        // trigger an airdrop to the execution environment, which would increase the balance of the execution
+        // environment without the solver paying any bids.
         uint256 netBid = solverTracker.ceiling - solverTracker.floor;
 
         // If bids aren't inverted, revert if net amount received is less than the bid
