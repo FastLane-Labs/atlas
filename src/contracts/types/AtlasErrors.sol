@@ -34,6 +34,7 @@ contract AtlasErrors {
     error PreOpsSimFail();
     error UserOpSimFail();
     error SolverSimFail(uint256 solverOutcomeResult); // uint param is result returned in `verifySolverOp`
+    error AllocateValueSimFail();
     error PostOpsSimFail();
     error ValidCalls(ValidCallsResult);
 
@@ -56,6 +57,7 @@ contract AtlasErrors {
     error PreOpsFail();
     error UserOpFail();
     // error SolverFail(); // Only sim version of err is used
+    error AllocateValueFail();
     error PostOpsFail();
     error InvalidAccess();
 

@@ -65,7 +65,8 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
                 requireFulfillment: true,
                 trustedOpHash: true,
                 invertBidValue: true,
-                exPostBids: false
+                exPostBids: false,
+                allowAllocateValueFailure: true
             })
         )
     {
@@ -84,7 +85,6 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
     */
     function swap(SwapIntent calldata swapIntent) external payable returns (SwapIntent memory) {
         require(msg.sender == ATLAS, "SwapIntentDAppControl: InvalidSender");
-        // require(_addressPointer() == CONTROL, "SwapIntentDAppControl: InvalidLockState");
         require(address(this) != CONTROL, "SwapIntentDAppControl: MustBeDelegated");
 
         address user = _user();

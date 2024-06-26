@@ -41,7 +41,7 @@ abstract contract GasAccounting is SafetyLocks {
         if (_lock.activeEnvironment != msg.sender) {
             revert InvalidExecutionEnvironment(_lock.activeEnvironment);
         }
-        if (_lock.phase > ExecutionPhase.SolverOperation) revert WrongPhase();
+        if (_lock.phase > uint8(ExecutionPhase.SolverOperations)) revert WrongPhase();
 
         (, bool calledBack, bool fulfilled) = _solverLockData();
         if (calledBack || fulfilled) revert WrongPhase();
@@ -93,7 +93,7 @@ abstract contract GasAccounting is SafetyLocks {
         if (_lock.activeEnvironment != environment) {
             revert InvalidExecutionEnvironment(_lock.activeEnvironment);
         }
-        if (_lock.phase != ExecutionPhase.SolverOperation) {
+        if (_lock.phase != uint8(ExecutionPhase.SolverOperation)) {
             revert WrongPhase();
         }
 

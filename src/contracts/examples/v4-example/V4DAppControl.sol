@@ -2,7 +2,8 @@
 pragma solidity 0.8.22;
 
 // Base Imports
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Base Imports
 import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
@@ -74,7 +75,8 @@ contract V4DAppControl is DAppControl {
                 requireFulfillment: true,
                 trustedOpHash: false,
                 invertBidValue: false,
-                exPostBids: false
+                exPostBids: false,
+                allowAllocateValueFailure: false
             })
         )
     {
@@ -132,7 +134,7 @@ contract V4DAppControl is DAppControl {
                 // Buying Pool's token1 with amountSpecified of User's token0
                 // ERC20(token0).approve(v4Singleton, amountSpecified);
                 SafeTransferLib.safeTransferFrom(
-                    ERC20(IPoolManager.Currency.unwrap(key.currency0)),
+                    IPoolManager.Currency.unwrap(key.currency0),
                     userOp.from,
                     v4Singleton, // <- TODO: confirm
                     uint256(params.amountSpecified)
@@ -209,7 +211,7 @@ contract V4DAppControl is DAppControl {
         // and that DAppControl supplied a valid signature
         require(address(this) == hook, "ERR-H00 InvalidCallee");
         require(hook == _control(), "ERR-H01 InvalidCaller");
-        require(ctx.phase == ExecutionPhase.PreOps, "ERR-H02 InvalidLockStage");
+        require(ctx.phase == uint8(ExecutionPhase.PreOps), "ERR-H02 InvalidLockStage");
         require(hashLock == bytes32(0), "ERR-H03 AlreadyActive");
 
         // Set the storage lock to block reentry / concurrent trading
@@ -227,7 +229,7 @@ contract V4DAppControl is DAppControl {
         // and that DAppControl supplied a valid signature
         require(address(this) == hook, "ERR-H20 InvalidCallee");
         require(hook == _control(), "ERR-H21 InvalidCaller");
-        require(ctx.phase == ExecutionPhase.PostOps, "ERR-H22 InvalidLockStage");
+        require(ctx.phase == uint8(ExecutionPhase.PostOps), "ERR-H22 InvalidLockStage");
         require(hashLock == keccak256(abi.encode(key, msg.sender)), "ERR-H23 InvalidKey");
 
         // Release the storage lock

@@ -35,7 +35,7 @@ contract MockGasAccounting is GasAccounting, Test {
     }
 
     function setPhase(ExecutionPhase _phase) external {
-        lock.phase = _phase;
+        lock.phase = uint8(_phase);
     }
 
     function setSolverLock(address _solverFrom) external {
@@ -75,7 +75,7 @@ contract MockGasAccounting is GasAccounting, Test {
             paymentsSuccessful: paymentsSuccessful,
             solverIndex: uint8(winningSolverIndex),
             solverCount: uint8(solverCount),
-            phase: ExecutionPhase.PostOps,
+            phase: uint8(ExecutionPhase.PostOps),
             solverOutcome: 0,
             bidFind: false,
             isSimulation: false,
@@ -214,18 +214,21 @@ contract GasAccountingTest is Test {
         vm.prank(executionEnvironment);
         vm.expectRevert(AtlasErrors.WrongPhase.selector);
         mockGasAccounting.borrow(borrowedAmount);
+        assertEq(executionEnvironment.balance, 0);
         vm.revertTo(startState);
 
         mockGasAccounting.setPhase(ExecutionPhase.AllocateValue);
         vm.prank(executionEnvironment);
         vm.expectRevert(AtlasErrors.WrongPhase.selector);
         mockGasAccounting.borrow(borrowedAmount);
+        assertEq(executionEnvironment.balance, 0);
         vm.revertTo(startState);
 
         mockGasAccounting.setPhase(ExecutionPhase.PostOps);
         vm.prank(executionEnvironment);
         vm.expectRevert(AtlasErrors.WrongPhase.selector);
         mockGasAccounting.borrow(borrowedAmount);
+        assertEq(executionEnvironment.balance, 0);
         vm.revertTo(startState);
     }
 

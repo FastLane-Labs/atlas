@@ -3,8 +3,6 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { ERC20 } from "solmate/tokens/ERC20.sol";
-
 import { BaseTest } from "./base/BaseTest.t.sol";
 import "./base/TestUtils.sol";
 
@@ -73,7 +71,7 @@ contract Permit69Test is BaseTest {
             paymentsSuccessful: false,
             solverIndex: 0,
             solverCount: 0,
-            phase: ExecutionPhase.PreOps,
+            phase: uint8(ExecutionPhase.PreOps),
             solverOutcome: 0,
             bidFind: false,
             isSimulation: false,
@@ -343,19 +341,19 @@ contract MockAtlasForPermit69Tests is Atlas {
     }
 
     function setLock(
-        address activeEnvironment,
+        address _activeEnvironment,
         uint32 callConfig
     ) public {
         lock = Lock({
-            activeEnvironment: activeEnvironment,
-            phase: ExecutionPhase.Uninitialized,
+            activeEnvironment: _activeEnvironment,
+            phase: uint8(ExecutionPhase.Uninitialized),
             callConfig: callConfig
         });
     }
 
-    function setPhase(ExecutionPhase phase) public {
-        lock.phase = phase;
-        _ctx.phase = phase;
+    function setPhase(ExecutionPhase _phase) public {
+        lock.phase = uint8(_phase);
+        _ctx.phase = uint8(_phase);
     }
 
     function getOrCreateExecutionEnvironment(

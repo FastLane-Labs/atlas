@@ -2,7 +2,8 @@
 pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
@@ -17,7 +18,7 @@ import "src/contracts/types/LockTypes.sol";
 contract SwapIntentTest is BaseTest {
     Sig public sig;
 
-    ERC20 DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+    IERC20 DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     address DAI_ADDRESS = address(DAI);
 
     struct Sig {
@@ -268,14 +269,14 @@ contract SimpleRFQSolverInvertBid is SolverBaseInvertBid {
 
     function fulfillRFQ(SwapIntent calldata swapIntent, address executionEnvironment, uint256 solverBidAmount) public {
         require(
-            ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= solverBidAmount,
+            IERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= solverBidAmount,
             "Did not receive enough tokenUserSells (=solverBidAmount) to fulfill swapIntent"
         );
         require(
-            ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys,
+            IERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys,
             "Not enough tokenUserBuys to fulfill"
         );
-        ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
+        IERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
     }
 
     // This ensures a function can only be called through atlasSolverCall

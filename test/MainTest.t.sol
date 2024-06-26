@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import { IDAppIntegration } from "src/contracts/interfaces/IDAppIntegration.sol";
 import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
@@ -106,8 +107,8 @@ contract MainTest is BaseTest {
         console.log("executionEnvironment", executionEnvironment);
 
         // User must approve Atlas
-        ERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
-        ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
+        IERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
+        IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
 
         vm.stopPrank();
 
@@ -365,7 +366,7 @@ contract MainTest is BaseTest {
         assertFalse(exists, "ExecutionEnvironment already exists");
 
         vm.startPrank(userEOA);
-        ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
+        IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
         atlas.metacall(userOp, solverOps, dAppOp);
         vm.stopPrank();
 
@@ -391,7 +392,7 @@ contract MainTest is BaseTest {
         assertFalse(simResult, "metasimUserOperationcall tested true");
 
         // Success case
-        ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
+        IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
 
         (simResult,,) = simulator.simUserOperation(userOp);
         assertTrue(simResult, "metasimUserOperationcall tested false");
@@ -429,7 +430,7 @@ contract MainTest is BaseTest {
         dAppOp.signature = abi.encodePacked(r, s, v);
         vm.startPrank(userEOA);
         atlas.createExecutionEnvironment(userOp.control);
-        ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
+        IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
         (bool success, bytes memory data) = address(simulator).call(
             abi.encodeWithSelector(simulator.simSolverCalls.selector, userOp, solverOps, dAppOp)
         );
