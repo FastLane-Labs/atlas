@@ -9,7 +9,7 @@ import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
-import { SafeCall } from "src/contracts/libraries/SafeCall.sol";
+import { SafeCall } from "src/contracts/libraries/SafeCall/SafeCall.sol";
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
