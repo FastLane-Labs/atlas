@@ -156,9 +156,8 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param owner The address of the owner from whom AtlETH is taken.
     /// @param amount The amount of AtlETH to be taken.
     /// @param solverWon A boolean indicating whether the solver won the bid.
-    /// @param bidFind Indicates if called in the context of `_getBidAmount` in Escrow.sol (true) or not (false).
     /// @return deficit The amount of AtlETH that was not repaid, if any.
-    function _assign(address owner, uint256 amount, bool solverWon, bool bidFind) internal returns (uint256 deficit) {
+    function _assign(address owner, uint256 amount, bool solverWon) internal returns (uint256 deficit) {
         if (amount > type(uint112).max) revert ValueTooLarge();
         uint112 amt = uint112(amount);
 
@@ -192,20 +191,17 @@ abstract contract GasAccounting is SafetyLocks {
             aData.bonded -= amt;
         }
 
-        if (!bidFind) {
-            aData.lastAccessedBlock = uint32(block.number);
-
-            if (solverWon && deficit == 0) {
-                unchecked {
-                    ++aData.auctionWins;
-                }
-            } else {
-                unchecked {
-                    ++aData.auctionFails;
-                }
+        // Update aData vars before persisting changes in accessData
+        if (solverWon && deficit == 0) {
+            unchecked {
+                ++aData.auctionWins;
+            }
+        } else {
+            unchecked {
+                ++aData.auctionFails;
             }
         }
-
+        aData.lastAccessedBlock = uint32(block.number);
         aData.totalGasUsed += uint64(amount / _GAS_USED_DECIMALS_TO_DROP);
 
         accessData[owner] = aData;
@@ -267,7 +263,7 @@ abstract contract GasAccounting is SafetyLocks {
             writeoffs += gasUsed;
         } else {
             // CASE: Solver failed, so we calculate what they owe.
-            uint256 deficit = _assign(solverOp.from, gasUsed, false, false);
+            uint256 deficit = _assign(solverOp.from, gasUsed, false);
             if (deficit > 0) {
                 // Write off any deficit as a gas loss to the bundler so that other solvers aren't forced to pay it.
                 writeoffs += deficit;
@@ -366,7 +362,7 @@ abstract contract GasAccounting is SafetyLocks {
             if (_deposits < _withdrawals + netAtlasGasSurcharge) {
                 // CASE: in deficit, subtract from bonded balance
                 uint256 amountOwed = _withdrawals + netAtlasGasSurcharge - _deposits;
-                uint256 deficit = _assign(_winningSolver, amountOwed, true, false);
+                uint256 deficit = _assign(_winningSolver, amountOwed, true);
                 if (deficit > 0) {
                     revert InsufficientTotalBalance(deficit); // Revert if insufficient bonded balance.
                 }
@@ -379,7 +375,7 @@ abstract contract GasAccounting is SafetyLocks {
             // CASE: Not a special bundler, solver successful, balance in deficit.
             // NOTE _claims and _writeoffs already have the Gas Surcharges factored in
             uint256 amountOwed = _claims + _withdrawals - _writeoffs - _deposits;
-            uint256 deficit = _assign(_winningSolver, amountOwed, true, false);
+            uint256 deficit = _assign(_winningSolver, amountOwed, true);
             if (deficit > 0) {
                 // CASE: Solver's bonded balance isn't enough to cover the amount owed, and the
                 // winning solver is unrelated to the bundler. The Bundler is not the Solver.

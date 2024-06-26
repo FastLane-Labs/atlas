@@ -43,7 +43,7 @@ contract MockGasAccounting is GasAccounting, Test {
     }
 
     function assign(address owner, uint256 value, bool solverWon) external returns (uint256) {
-        return _assign(owner, value, solverWon, false);
+        return _assign(owner, value, solverWon);
     }
 
     function credit(address owner, uint256 value) external {
