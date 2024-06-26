@@ -219,7 +219,7 @@ contract ExecutionBase is Base {
     /// @param destination The address to which the tokens will be transferred.
     /// @param amount The amount of tokens to transfer.
     function _transferUserERC20(address token, address destination, uint256 amount) internal {
-        IPermit69(ATLAS).transferUserERC20(token, destination, amount, _user(), _control(), _config(), _phase());
+        IPermit69(ATLAS).transferUserERC20(token, destination, amount, _user(), _control());
     }
 
     /// @notice Transfers ERC20 tokens from the DApp of the current metacall tx, via Atlas, to a specified destination.
@@ -228,7 +228,7 @@ contract ExecutionBase is Base {
     /// @param destination The address to which the tokens will be transferred.
     /// @param amount The amount of tokens to transfer.
     function _transferDAppERC20(address token, address destination, uint256 amount) internal {
-        IPermit69(ATLAS).transferDAppERC20(token, destination, amount, _user(), _control(), _config(), _phase());
+        IPermit69(ATLAS).transferDAppERC20(token, destination, amount, _user(), _control());
     }
 
     /// @notice Returns a bool indicating whether a source address has approved the Atlas contract to transfer a certain
