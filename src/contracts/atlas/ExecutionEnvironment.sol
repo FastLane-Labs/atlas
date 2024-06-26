@@ -2,6 +2,7 @@
 pragma solidity 0.8.22;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { ReentrancyGuard } from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { Base } from "src/contracts/common/ExecutionBase.sol";
 
@@ -21,7 +22,7 @@ import "src/contracts/types/DAppApprovalTypes.sol";
 /// @author FastLane Labs
 /// @notice An Execution Environment contract is deployed for each unique combination of User address x DAppControl
 /// address that interacts with the Atlas protocol via a metacall transaction.
-contract ExecutionEnvironment is Base {
+contract ExecutionEnvironment is Base, ReentrancyGuard {
     using CallBits for uint32;
 
     uint8 private constant _ENVIRONMENT_DEPTH = 1 << 1;
@@ -30,6 +31,17 @@ contract ExecutionEnvironment is Base {
 
     modifier validUser(UserOperation calldata userOp) {
         if (userOp.to != ATLAS || userOp.dapp == ATLAS) revert AtlasErrors.InvalidTo();
+        _;
+    }
+
+    modifier validSolver(SolverOperation calldata solverOp) {
+        if (solverOp.solver == ATLAS || solverOp.solver == _control() || solverOp.solver == address(this)) {
+            revert AtlasErrors.InvalidSolver();
+        }
+        // Verify that the DAppControl contract matches the solver's expectations
+        if (solverOp.control != _control()) {
+            revert AtlasErrors.AlteredControl();
+        }
         _;
     }
 
@@ -44,8 +56,9 @@ contract ExecutionEnvironment is Base {
     /// @return preOpsData Data to be passed to the next call phase.
     function preOpsWrapper(UserOperation calldata userOp)
         external
+        nonReentrant
         validUser(userOp)
-        onlyAtlasEnvironment(ExecutionPhase.PreOps, _ENVIRONMENT_DEPTH)
+        onlyAtlasEnvironment
         returns (bytes memory)
     {
         bytes memory preOpsData = _forward(abi.encodeCall(IDAppControl.preOpsCall, userOp));
@@ -67,8 +80,9 @@ contract ExecutionEnvironment is Base {
     function userWrapper(UserOperation calldata userOp)
         external
         payable
+        nonReentrant
         validUser(userOp)
-        onlyAtlasEnvironment(ExecutionPhase.UserOperation, _ENVIRONMENT_DEPTH)
+        onlyAtlasEnvironment
         returns (bytes memory returnData)
     {
         uint32 config = _config();
@@ -95,13 +109,7 @@ contract ExecutionEnvironment is Base {
     /// corresponding `postOpsCall` function.
     /// @param solved Boolean indicating whether a winning SolverOperation was executed successfully.
     /// @param returnData Data returned from the previous call phase.
-    function postOpsWrapper(
-        bool solved,
-        bytes calldata returnData
-    )
-        external
-        onlyAtlasEnvironment(ExecutionPhase.PostOps, _ENVIRONMENT_DEPTH)
-    {
+    function postOpsWrapper(bool solved, bytes calldata returnData) external nonReentrant onlyAtlasEnvironment {
         bytes memory data = _forward(abi.encodeCall(IDAppControl.postOpsCall, (solved, returnData)));
 
         bool success;
@@ -125,14 +133,11 @@ contract ExecutionEnvironment is Base {
     )
         external
         payable
-        onlyAtlasEnvironment(ExecutionPhase.PreSolver, _ENVIRONMENT_DEPTH)
+        nonReentrant
+        onlyAtlasEnvironment
+        validSolver(solverOp)
         returns (SolverTracker memory solverTracker)
     {
-        // Verify that the DAppControl contract matches the solver's expectations
-        if (solverOp.control != _control()) {
-            revert AtlasErrors.AlteredControl();
-        }
-
         solverTracker.bidAmount = bidAmount;
         solverTracker.etherIsBidToken = solverOp.bidToken == address(0);
 
@@ -149,8 +154,8 @@ contract ExecutionEnvironment is Base {
         // Handle any solver preOps, if necessary
         if (_config().needsPreSolver()) {
             bool success;
-            bytes memory data = _forward(abi.encodeCall(IDAppControl.preSolverCall, (solverOp, returnData)));
 
+            bytes memory data = _forward(abi.encodeCall(IDAppControl.preSolverCall, (solverOp, returnData)));
             (success,) = _control().delegatecall(data);
 
             if (!success) revert AtlasErrors.PreSolverFailed();
@@ -179,7 +184,8 @@ contract ExecutionEnvironment is Base {
     )
         external
         payable
-        onlyAtlasEnvironment(ExecutionPhase.PostSolver, _ENVIRONMENT_DEPTH)
+        nonReentrant
+        onlyAtlasEnvironment
         returns (SolverTracker memory)
     {
         // bidValue is inverted; Lower bids are better; solver must withdraw <= bidAmount
@@ -190,10 +196,10 @@ contract ExecutionEnvironment is Base {
                 : IERC20(solverOp.bidToken).balanceOf(address(this));
         }
 
-        bool success;
         if (_config().needsSolverPostCall()) {
-            bytes memory data = _forward(abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData)));
+            bool success;
 
+            bytes memory data = _forward(abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData)));
             (success,) = _control().delegatecall(data);
 
             if (!success) revert AtlasErrors.PostSolverFailed();
@@ -236,7 +242,8 @@ contract ExecutionEnvironment is Base {
         bytes memory allocateData
     )
         external
-        onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _ENVIRONMENT_DEPTH)
+        nonReentrant
+        onlyAtlasEnvironment
     {
         allocateData = _forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, bidAmount, allocateData)));
 
@@ -258,7 +265,7 @@ contract ExecutionEnvironment is Base {
     /// @dev This function is only callable by the environment owner and only when Atlas is in an unlocked state.
     /// @param token The address of the ERC20 token to withdraw.
     /// @param amount The amount of the ERC20 token to withdraw.
-    function withdrawERC20(address token, uint256 amount) external {
+    function withdrawERC20(address token, uint256 amount) external nonReentrant {
         if (msg.sender != _user()) revert AtlasErrors.NotEnvironmentOwner();
         if (!ISafetyLocks(ATLAS).isUnlocked()) revert AtlasErrors.AtlasLockActive();
 
@@ -273,7 +280,7 @@ contract ExecutionEnvironment is Base {
     /// Environment.
     /// @dev This function is only callable by the environment owner and only when Atlas is in an unlocked state.
     /// @param amount The amount of Ether to withdraw.
-    function withdrawEther(uint256 amount) external {
+    function withdrawEther(uint256 amount) external nonReentrant {
         if (msg.sender != _user()) revert AtlasErrors.NotEnvironmentOwner();
         if (!ISafetyLocks(ATLAS).isUnlocked()) revert AtlasErrors.AtlasLockActive();
 

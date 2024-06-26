@@ -1,27 +1,25 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-struct EscrowKey {
-    address executionEnvironment; // not packed
-    bytes32 userOpHash; // not packed
-    address bundler; // not packed
-    address addressPointer;
-    bool solverSuccessful;
-    bool paymentsSuccessful;
-    uint8 callIndex;
-    uint8 callCount;
-    uint16 lockState; // bitwise
-    uint24 solverOutcome;
-    bool bidFind;
-    bool isSimulation;
-    uint8 callDepth;
+struct Lock {
+    address activeEnvironment;
+    uint32 callConfig;
+    uint8 phase;
 }
 
-enum BaseLock {
-    Unlocked,
-    Pending,
-    Active,
-    Locked
+struct Context {
+    bytes32 userOpHash; // not packed
+    address executionEnvironment; // not packed
+    uint24 solverOutcome;
+    uint8 callIndex;
+    uint8 callCount;
+    uint8 callDepth;
+    uint8 phase;
+    bool solverSuccessful;
+    bool paymentsSuccessful;
+    bool bidFind;
+    bool isSimulation;
+    address bundler;
 }
 
 enum ExecutionPhase {
@@ -31,7 +29,6 @@ enum ExecutionPhase {
     PreSolver,
     SolverOperations,
     PostSolver,
-    HandlingPayments,
-    PostOps,
-    Releasing
+    AllocateValue,
+    PostOps
 }

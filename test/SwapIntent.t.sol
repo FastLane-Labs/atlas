@@ -3,7 +3,7 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { ERC20 } from "solmate/tokens/ERC20.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
@@ -36,7 +36,7 @@ contract SwapIntentTest is BaseTest {
     TxBuilder public txBuilder;
     Sig public sig;
 
-    ERC20 DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+    IERC20 DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     address DAI_ADDRESS = address(DAI);
 
     struct Sig {
@@ -69,7 +69,7 @@ contract SwapIntentTest is BaseTest {
         // atlas.deposit{value: 1e18}();
     }
 
-    function testAtlasSwapIntentWithBasicRFQ() public {
+    function testAtlasSwapIntentWithBasicRFQ_GasCheck() public {
         // Swap 10 WETH for 20 DAI
         UserCondition userCondition = new UserCondition();
 
@@ -342,14 +342,14 @@ contract SimpleRFQSolver is SolverBase {
 
     function fulfillRFQ(SwapIntent calldata swapIntent, address executionEnvironment) public {
         require(
-            ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells,
+            IERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells,
             "Did not receive enough tokenIn"
         );
         require(
-            ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys,
+            IERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys,
             "Not enough tokenOut to fulfill"
         );
-        ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
+        IERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
     }
 
     // This ensures a function can only be called through atlasSolverCall
@@ -371,7 +371,7 @@ contract UniswapIntentSolver is SolverBase {
     function fulfillWithSwap(SwapIntent calldata swapIntent, address executionEnvironment) public onlySelf {
         // Checks recieved expected tokens from Atlas on behalf of user to swap
         require(
-            ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells,
+            IERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells,
             "Did not receive enough tokenIn"
         );
 
@@ -380,7 +380,7 @@ contract UniswapIntentSolver is SolverBase {
         path[1] = swapIntent.tokenUserBuys;
 
         // Attempt to sell all tokens for as many as possible of tokenUserBuys
-        ERC20(swapIntent.tokenUserSells).approve(address(router), swapIntent.amountUserSells);
+        IERC20(swapIntent.tokenUserSells).approve(address(router), swapIntent.amountUserSells);
         router.swapExactTokensForTokens({
             amountIn: swapIntent.amountUserSells,
             amountOutMin: swapIntent.amountUserBuys, // will revert here if not enough to fulfill intent
@@ -390,7 +390,7 @@ contract UniswapIntentSolver is SolverBase {
         });
 
         // Send min tokens back to user to fulfill intent, rest are profit for solver
-        ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
+        IERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
     }
 
     // This ensures a function can only be called through atlasSolverCall

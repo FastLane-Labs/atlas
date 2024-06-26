@@ -53,6 +53,11 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         // Verify that the calldata injection came from the dApp frontend
         // and that the signatures are valid.
 
+        if (dConfig.callConfig.needsPreOpsReturnData() && dConfig.callConfig.needsUserReturnData()) {
+            // Max one of preOps or userOp return data can be tracked, not both
+            return ValidCallsResult.InvalidCallConfig;
+        }
+
         bytes32 userOpHash = _getUserOperationHash(userOp);
         // CASE: Solvers trust app to update content of UserOp after submission of solverOp
         if (dConfig.callConfig.allowsTrustedOpHash()) {
@@ -601,13 +606,16 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp userNonces
 
-        // if (userOp.callConfig.allowsTrustedOpHash()) {
-        userOpHash = _getUserOperationPayload(userOp);
-        // }
-        bool signatureValid = SignatureChecker.isValidSignatureNow(userOp.from, userOpHash, userOp.signature);
-
         bool userIsBundler = userOp.from == msgSender;
         bool hasNoSignature = userOp.signature.length == 0;
+        bool signatureValid;
+
+        if (!userIsBundler) {
+            if (userOp.callConfig.allowsTrustedOpHash()) {
+                userOpHash = _getUserOperationHash(userOp, false);
+            }
+            signatureValid = SignatureChecker.isValidSignatureNow(userOp.from, userOpHash, userOp.signature);
+        }
 
         if (!(signatureValid || userIsBundler || (isSimulation && hasNoSignature))) {
             return ValidCallsResult.UserSignatureInvalid;
@@ -635,10 +643,6 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
     /// @param userOp The UserOperation struct to generate the payload for.
     /// @return payload The hash of the UserOperation struct for use in signatures.
     function getUserOperationPayload(UserOperation calldata userOp) public view returns (bytes32 payload) {
-        payload = _getUserOperationPayload(userOp);
-    }
-
-    function _getUserOperationPayload(UserOperation calldata userOp) internal view returns (bytes32 payload) {
         payload = _getUserOperationHash(userOp, false);
     }
 

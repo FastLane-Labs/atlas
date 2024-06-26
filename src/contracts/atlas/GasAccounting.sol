@@ -25,14 +25,21 @@ abstract contract GasAccounting is SafetyLocks {
 
     /// @notice Contributes ETH to the contract, increasing the deposits if a non-zero value is sent.
     function contribute() external payable {
-        if (lock != msg.sender) revert InvalidExecutionEnvironment(lock);
+        address currentEnvironment = lock.activeEnvironment;
+        if (currentEnvironment != msg.sender) revert InvalidExecutionEnvironment(currentEnvironment);
         _contribute();
     }
 
     /// @notice Borrows ETH from the contract, transferring the specified amount to the caller if available.
+    /// @dev Borrowing is only available until the end of the SolverOperations phase, for solver protection.
     /// @param amount The amount of ETH to borrow.
     function borrow(uint256 amount) external payable {
-        if (lock != msg.sender) revert InvalidExecutionEnvironment(lock);
+        Lock memory _lock = lock;
+        if (_lock.activeEnvironment != msg.sender) {
+            revert InvalidExecutionEnvironment(_lock.activeEnvironment);
+        }
+        if (_lock.phase > uint8(ExecutionPhase.SolverOperations)) revert WrongPhase();
+
         if (_borrow(amount)) {
             SafeTransferLib.safeTransferETH(msg.sender, amount);
         } else {
@@ -73,7 +80,14 @@ abstract contract GasAccounting is SafetyLocks {
 
         if (maxApprovedGasSpend > bondedBalance) maxApprovedGasSpend = bondedBalance;
 
-        if (lock != environment) revert InvalidExecutionEnvironment(lock);
+        Lock memory _lock = lock;
+
+        if (_lock.activeEnvironment != environment) {
+            revert InvalidExecutionEnvironment(_lock.activeEnvironment);
+        }
+        if (_lock.phase != uint8(ExecutionPhase.SolverOperations)) {
+            revert WrongPhase();
+        }
 
         (address currentSolver, bool calledBack, bool fulfilled) = _solverLockData();
 
@@ -109,6 +123,9 @@ abstract contract GasAccounting is SafetyLocks {
     }
 
     /// @notice Borrows ETH from the contract, transferring the specified amount to the caller if available.
+    /// @dev Borrowing should never be allowed after the SolverOperations phase, for solver safety. This is enforced in
+    /// the external `borrow` function, and the only other time this internal `_borrow` function is called is in
+    /// `_trySolverLock` which happens at the beginning of the SolverOperations phase.
     /// @param amount The amount of ETH to borrow.
     /// @return valid A boolean indicating whether the borrowing operation was successful.
     function _borrow(uint256 amount) internal returns (bool valid) {
