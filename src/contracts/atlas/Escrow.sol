@@ -547,7 +547,7 @@ abstract contract Escrow is AtlETH {
         //              Solver Call              //
         // ------------------------------------- //
 
-        lock.phase = uint8(ExecutionPhase.SolverOperations);
+        lock.phase = uint8(ExecutionPhase.SolverOperation);
 
         // Make sure there's enough value in Atlas for the Solver
         if (!_borrow(solverOp.value)) revert InsufficientEscrow();
