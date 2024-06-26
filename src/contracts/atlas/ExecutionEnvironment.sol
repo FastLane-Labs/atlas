@@ -22,6 +22,8 @@ import "src/contracts/types/DAppApprovalTypes.sol";
 /// @author FastLane Labs
 /// @notice An Execution Environment contract is deployed for each unique combination of User address x DAppControl
 /// address that interacts with the Atlas protocol via a metacall transaction.
+/// @notice IMPORTANT: The contract is not meant to be used as a smart contract wallet with any other protocols other
+/// than Atlas
 contract ExecutionEnvironment is Base, ReentrancyGuard {
     using CallBits for uint32;
 
