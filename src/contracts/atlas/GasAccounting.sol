@@ -37,12 +37,15 @@ abstract contract GasAccounting is SafetyLocks {
     function borrow(uint256 amount) external payable {
         if (amount == 0) return;
 
+        // borrow() can only be called by the Execution Environment (by delegatecalling a DAppControl hook), and only
+        // during or before the SolverOperation phase.
         Lock memory _lock = lock;
         if (_lock.activeEnvironment != msg.sender) {
             revert InvalidExecutionEnvironment(_lock.activeEnvironment);
         }
         if (_lock.phase > uint8(ExecutionPhase.SolverOperation)) revert WrongPhase();
 
+        // borrow() will revert if called after solver calls reconcile()
         (, bool calledBack, bool fulfilled) = _solverLockData();
         if (calledBack || fulfilled) revert WrongPhase();
 
@@ -79,9 +82,10 @@ abstract contract GasAccounting is SafetyLocks {
         returns (uint256 owed)
     {
         // NOTE: maxApprovedGasSpend is the amount of the solver's atlETH that the solver is allowing
-        // to be used to cover what they owe. assuming they're successful, a value up to this amount
-        // will be subtracted from the solver's bonded AtlETH during _settle()
-        // NOTE: After reconcile is called successfully by the Solver, neither the claims nor
+        // to be used to cover what they owe. Assuming they're successful, a value up to this amount
+        // will be subtracted from the solver's bonded AtlETH during _settle().
+
+        // NOTE: After reconcile is called successfully by the solver, neither the claims nor
         // withdrawals values can be increased.
 
         uint256 bondedBalance = uint256(accessData[solverFrom].bonded);
@@ -111,8 +115,8 @@ abstract contract GasAccounting is SafetyLocks {
         // CASE: Callback verified but insufficient balance
         if (_deductions > _additions + maxApprovedGasSpend) {
             if (!calledBack) {
-                // Setting the solverLock here does not make the Solver liable for the submitted maxApprovedGasSpend,
-                // but it does treat any msg.value as a deposit and allows for either the Solver to call back with a
+                // Setting the solverLock here does not make the solver liable for the submitted maxApprovedGasSpend,
+                // but it does treat any msg.value as a deposit and allows for either the solver to call back with a
                 // higher maxApprovedGasSpend or to have their deficit covered by a contribute during the postSolverOp
                 // hook.
                 _solverLock = uint256(uint160(currentSolver)) | _SOLVER_CALLED_BACK_MASK;
