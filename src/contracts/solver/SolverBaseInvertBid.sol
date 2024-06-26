@@ -1,7 +1,8 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import { ISafetyLocks } from "src/contracts/interfaces/ISafetyLocks.sol";
 import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
@@ -44,9 +45,8 @@ contract SolverBaseInvertBid is ISolverContract {
         virtual
         safetyFirst(executionEnvironment, solverOpFrom)
         receiveBids(executionEnvironment, bidToken, bidAmount)
-        returns (bool success, bytes memory data)
     {
-        (success, data) = address(this).call{ value: msg.value }(solverOpData);
+        (bool success,) = address(this).call{ value: msg.value }(solverOpData);
 
         require(success, "CALL UNSUCCESSFUL");
     }
@@ -75,7 +75,7 @@ contract SolverBaseInvertBid is ISolverContract {
         // Environment
         if (_bidRetreivalRequired) {
             require(bidToken != address(0), "Solver cannot retrieve ETH from EE");
-            SafeTransferLib.safeTransferFrom(ERC20(bidToken), executionEnvironment, address(this), bidAmount);
+            SafeTransferLib.safeTransferFrom(bidToken, executionEnvironment, address(this), bidAmount);
         }
         _;
     }

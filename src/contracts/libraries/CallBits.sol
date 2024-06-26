@@ -73,6 +73,9 @@ library CallBits {
         if (callConfig.exPostBids) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.ExPostBids);
         }
+        if (callConfig.allowAllocateValueFailure) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.AllowAllocateValueFailure);
+        }
     }
 
     function decodeCallConfig(uint32 encodedCallConfig) internal pure returns (CallConfig memory callConfig) {
@@ -96,7 +99,8 @@ library CallBits {
             requireFulfillment: needsFulfillment(encodedCallConfig),
             trustedOpHash: allowsTrustedOpHash(encodedCallConfig),
             invertBidValue: invertsBidValue(encodedCallConfig),
-            exPostBids: exPostBids(encodedCallConfig)
+            exPostBids: exPostBids(encodedCallConfig),
+            allowAllocateValueFailure: allowAllocateValueFailure(encodedCallConfig)
         });
     }
 
@@ -178,5 +182,9 @@ library CallBits {
 
     function exPostBids(uint32 callConfig) internal pure returns (bool) {
         return callConfig & (1 << uint32(CallConfigIndex.ExPostBids)) != 0;
+    }
+
+    function allowAllocateValueFailure(uint32 callConfig) internal pure returns (bool) {
+        return callConfig & (1 << uint32(CallConfigIndex.AllowAllocateValueFailure)) != 0;
     }
 }

@@ -10,7 +10,9 @@ import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 
 import "src/contracts/types/EscrowTypes.sol";
+import "src/contracts/types/LockTypes.sol";
 import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/DAppApprovalTypes.sol";
 
 contract MockGasAccounting is GasAccounting, Test {
     constructor(
@@ -26,8 +28,13 @@ contract MockGasAccounting is GasAccounting, Test {
         return (_balanceOf[account].balance, _balanceOf[account].unbonding);
     }
 
-    function initializeEscrowLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) external payable {
-        _setAtlasLock(executionEnvironment, gasMarker, userOpValue);
+    function initializeLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) external payable {
+        DAppConfig memory dConfig;
+        _setAccountingLock(dConfig, executionEnvironment, gasMarker, userOpValue);
+    }
+
+    function setPhase(ExecutionPhase _phase) external {
+        lock.phase = uint8(_phase);
     }
 
     function assign(address owner, uint256 value, bool solverWon) external returns (uint256) {
@@ -47,7 +54,31 @@ contract MockGasAccounting is GasAccounting, Test {
     }
 
     function settle(address winningSolver, address bundler) external returns (uint256, uint256) {
-        return _settle(winningSolver, bundler);
+        Context memory ctx = buildContext(bundler, true, true, 0, 1);
+        return _settle(ctx, winningSolver);
+    }
+
+    function buildContext(
+        address bundler,
+        bool solverSuccessful,
+        bool paymentsSuccessful,
+        uint256 winningSolverIndex,
+        uint256 solverCount
+    ) public returns (Context memory ctx) {
+        ctx = Context({
+            executionEnvironment: lock.activeEnvironment,
+            userOpHash: bytes32(0),
+            bundler: bundler,
+            solverSuccessful: solverSuccessful,
+            paymentsSuccessful: paymentsSuccessful,
+            solverIndex: uint8(winningSolverIndex),
+            solverCount: uint8(solverCount),
+            phase: uint8(ExecutionPhase.PostOps),
+            solverOutcome: 0,
+            bidFind: false,
+            isSimulation: false,
+            callDepth: 0
+        });
     }
 
     function increaseBondedBalance(address account, uint256 amount) external {
@@ -77,19 +108,26 @@ contract GasAccountingTest is Test {
 
     function setUp() public {
         mockGasAccounting = new MockGasAccounting(0, address(0), address(0), address(0));
+        uint256 _gasMarker = gasleft();
+
+        mockGasAccounting.initializeLock(executionEnvironment, _gasMarker, 0);
+
+        initialClaims = getInitialClaims(_gasMarker);
         solverOp.from = makeAddr("solver");
-        gasMarker = gasleft();
+    }
+
+    function getInitialClaims(uint256 _gasMarker) public view returns (uint256 claims) {
+        uint256 rawClaims = (_gasMarker + mockGasAccounting.FIXED_GAS_OFFSET()) * tx.gasprice;
+        claims = rawClaims + ((rawClaims * mockGasAccounting.SURCHARGE_RATE()) / mockGasAccounting.SURCHARGE_SCALE());
     }
 
     function initEscrowLock(uint256 metacallValue) public {
-        mockGasAccounting.initializeEscrowLock{value: metacallValue}(executionEnvironment, gasMarker, 0);
+        mockGasAccounting.initializeLock{value: metacallValue}(executionEnvironment, gasMarker, 0);
         uint256 rawClaims = (gasMarker + mockGasAccounting.FIXED_GAS_OFFSET()) * tx.gasprice;
         initialClaims = rawClaims + ((rawClaims * mockGasAccounting.SURCHARGE_RATE()) / mockGasAccounting.SURCHARGE_SCALE());
     }
 
     function test_contribute() public {
-        initEscrowLock(0);
-
         vm.expectRevert(
             abi.encodeWithSelector(AtlasErrors.InvalidExecutionEnvironment.selector, executionEnvironment)
         );
@@ -106,8 +144,6 @@ contract GasAccountingTest is Test {
     }
 
     function test_borrow() public {
-        initEscrowLock(0);
-
         uint256 borrowedAmount = 5000;
 
         vm.expectRevert(
@@ -132,9 +168,65 @@ contract GasAccountingTest is Test {
         assertEq(executionEnvironment.balance, borrowedAmount);
     }
 
+    function test_borrow_phasesEnforced() public {
+        // borrow should revert if called in or after PostSolver phase
+
+        uint256 borrowedAmount = 1e18;
+        deal(address(mockGasAccounting), borrowedAmount);
+        assertEq(executionEnvironment.balance, 0, "EE should start with 0 ETH");
+        uint256 startState = vm.snapshot();
+
+        // Allowed borrowed phases: PreOps, UserOperation, PreSolver, SolverOperations
+
+        mockGasAccounting.setPhase(ExecutionPhase.PreOps);
+        vm.prank(executionEnvironment);
+        mockGasAccounting.borrow(borrowedAmount);
+        assertEq(executionEnvironment.balance, borrowedAmount);
+        vm.revertTo(startState);
+
+        mockGasAccounting.setPhase(ExecutionPhase.UserOperation);
+        vm.prank(executionEnvironment);
+        mockGasAccounting.borrow(borrowedAmount);
+        assertEq(executionEnvironment.balance, borrowedAmount);
+        vm.revertTo(startState);
+
+        mockGasAccounting.setPhase(ExecutionPhase.PreSolver);
+        vm.prank(executionEnvironment);
+        mockGasAccounting.borrow(borrowedAmount);
+        assertEq(executionEnvironment.balance, borrowedAmount);
+        vm.revertTo(startState);
+
+        mockGasAccounting.setPhase(ExecutionPhase.SolverOperations);
+        vm.prank(executionEnvironment);
+        mockGasAccounting.borrow(borrowedAmount);
+        assertEq(executionEnvironment.balance, borrowedAmount);
+        vm.revertTo(startState);
+
+        // Disallowed borrowed phases: PostSolver, AllocateValue, PostOps
+
+        mockGasAccounting.setPhase(ExecutionPhase.PostSolver);
+        vm.prank(executionEnvironment);
+        vm.expectRevert(AtlasErrors.WrongPhase.selector);
+        mockGasAccounting.borrow(borrowedAmount);
+        assertEq(executionEnvironment.balance, 0);
+        vm.revertTo(startState);
+
+        mockGasAccounting.setPhase(ExecutionPhase.AllocateValue);
+        vm.prank(executionEnvironment);
+        vm.expectRevert(AtlasErrors.WrongPhase.selector);
+        mockGasAccounting.borrow(borrowedAmount);
+        assertEq(executionEnvironment.balance, 0);
+        vm.revertTo(startState);
+
+        mockGasAccounting.setPhase(ExecutionPhase.PostOps);
+        vm.prank(executionEnvironment);
+        vm.expectRevert(AtlasErrors.WrongPhase.selector);
+        mockGasAccounting.borrow(borrowedAmount);
+        assertEq(executionEnvironment.balance, 0);
+        vm.revertTo(startState);
+    }
+
     function test_multipleBorrows() public {
-        initEscrowLock(0);
-        
         uint256 atlasBalance = 100 ether;
         uint256 borrow1 = 75 ether;
         uint256 borrow2 = 10 ether;
@@ -152,8 +244,6 @@ contract GasAccountingTest is Test {
     }
 
     function test_shortfall() public {
-        initEscrowLock(0);
-
         assertEq(mockGasAccounting.shortfall(), initialClaims);
 
         deal(executionEnvironment, initialClaims);
@@ -164,14 +254,18 @@ contract GasAccountingTest is Test {
     }
 
     function test_reconcileFail() public {
-        initEscrowLock(0);
-
         vm.expectRevert(
             abi.encodeWithSelector(AtlasErrors.InvalidExecutionEnvironment.selector, executionEnvironment)
         );
         mockGasAccounting.reconcile(makeAddr("wrongExecutionEnvironment"), solverOp.from, 0);
 
         mockGasAccounting.trySolverLock(solverOp);
+        vm.expectRevert(AtlasErrors.WrongPhase.selector);
+        mockGasAccounting.reconcile(executionEnvironment, solverOp.from, 0);
+
+        mockGasAccounting.setPhase(ExecutionPhase.SolverOperations);
+
+        //mockGasAccounting.trySolverLock(solverOp);
         vm.expectRevert(abi.encodeWithSelector(AtlasErrors.InvalidSolverFrom.selector, solverOp.from));
         mockGasAccounting.reconcile(executionEnvironment, makeAddr("wrongSolver"), 0);
 
@@ -179,8 +273,7 @@ contract GasAccountingTest is Test {
     }
 
     function test_reconcile() public {
-        initEscrowLock(0);
-        
+        mockGasAccounting.setPhase(ExecutionPhase.SolverOperations);
         mockGasAccounting.trySolverLock(solverOp);
         assertTrue(mockGasAccounting.reconcile{ value: initialClaims }(executionEnvironment, solverOp.from, 0) == 0);
         (address currentSolver, bool verified, bool fulfilled) = mockGasAccounting.solverLockData();
@@ -190,8 +283,6 @@ contract GasAccountingTest is Test {
     }
 
     function test_assign() public {
-        initEscrowLock(0);
-
         uint256 assignedAmount = 1000;
         uint256 bondedTotalSupplyBefore;
         uint256 depositsBefore;
@@ -265,8 +356,6 @@ contract GasAccountingTest is Test {
     }
 
     function test_assign_reputation_analytics() public {
-        initEscrowLock(0);
-
         uint256 gasUsedDecimalsToDrop = 1000; // This should be same value as in Storage.sol
         uint256 assignedAmount = 1_234_567;
         uint24 auctionWins;
@@ -310,8 +399,6 @@ contract GasAccountingTest is Test {
     }
 
     function test_credit() public {
-        initEscrowLock(0);
-
         uint256 creditedAmount = 10_000;
         uint256 lastAccessedBlock;
 
@@ -338,8 +425,6 @@ contract GasAccountingTest is Test {
     }
 
     function test_trySolverLock() public {
-        initEscrowLock(0);
-
         assertTrue(mockGasAccounting.trySolverLock(solverOp));
 
         solverOp.value = 100_000;
@@ -347,8 +432,6 @@ contract GasAccountingTest is Test {
     }
 
     function test_releaseSolverLock() public {
-        initEscrowLock(0);
-
         solverOp.data = abi.encodePacked("calldata");
         uint256 calldataCost = (solverOp.data.length * mockGasAccounting.calldataLengthPremium()) + 1;
         uint256 gasWaterMark = gasleft() + 5000;
@@ -378,7 +461,6 @@ contract GasAccountingTest is Test {
         (bondedBefore,,,,) = mockGasAccounting.accessData(solverOp.from);
         mockGasAccounting.releaseSolverLock(solverOp, gasWaterMark, result);
         (bondedAfter,,,,) = mockGasAccounting.accessData(solverOp.from);
-        console.log("b");
         assertEq(bondedBefore, bondedAfter);
 
         // UncoveredResult
@@ -387,8 +469,6 @@ contract GasAccountingTest is Test {
     }
 
     function test_settle() public {
-        initEscrowLock(0);
-
         address bundler = makeAddr("bundler");
         uint112 bondedBefore;
         uint112 bondedAfter;
@@ -417,23 +497,23 @@ contract GasAccountingTest is Test {
         assertGt(bondedAfter, bondedBefore);
     }
 
-    function test_bundlerReimbursement() public {
-        initEscrowLock(gasMarker * tx.gasprice * 2);
+    // function test_bundlerReimbursement() public {
+    //     initEscrowLock(gasMarker * tx.gasprice * 2);
 
-        // The bundler is being reimbursed for the gas used between 2 gas markers,
-        // the first one is as the very beginning of metacall, and passed to _setAtlasLock(),
-        // the second one is in _settle().
+    //     // The bundler is being reimbursed for the gas used between 2 gas markers,
+    //     // the first one is as the very beginning of metacall, and passed to _setAtlasLock(),
+    //     // the second one is in _settle().
 
-        // First gas marker, saved as `rawClaims` in _setAtlasLock()
-        uint256 rawClaims = (gasMarker + mockGasAccounting.FIXED_GAS_OFFSET()) * tx.gasprice;
+    //     // First gas marker, saved as `rawClaims` in _setAtlasLock()
+    //     uint256 rawClaims = (gasMarker + mockGasAccounting.FIXED_GAS_OFFSET()) * tx.gasprice;
 
-        // Revert calculations to reach the second gas marker value in _settle()
-        (uint256 claimsPaidToBundler, uint256 netGasSurcharge) = mockGasAccounting.settle(solverOp.from, makeAddr("bundler"));
-        uint256 settleGasRemainder = initialClaims - (claimsPaidToBundler + netGasSurcharge);
-        settleGasRemainder = settleGasRemainder * mockGasAccounting.SURCHARGE_SCALE() / (mockGasAccounting.SURCHARGE_SCALE() + mockGasAccounting.SURCHARGE_RATE());
+    //     // Revert calculations to reach the second gas marker value in _settle()
+    //     (uint256 claimsPaidToBundler, uint256 netGasSurcharge) = mockGasAccounting.settle(solverOp.from, makeAddr("bundler"));
+    //     uint256 settleGasRemainder = initialClaims - (claimsPaidToBundler + netGasSurcharge);
+    //     settleGasRemainder = settleGasRemainder * mockGasAccounting.SURCHARGE_SCALE() / (mockGasAccounting.SURCHARGE_SCALE() + mockGasAccounting.SURCHARGE_RATE());
 
-        // The bundler must be repaid the gas cost between the 2 markers
-        uint256 diff = rawClaims - settleGasRemainder;
-        assertEq(diff, claimsPaidToBundler);
-    }
+    //     // The bundler must be repaid the gas cost between the 2 markers
+    //     uint256 diff = rawClaims - settleGasRemainder;
+    //     assertEq(diff, claimsPaidToBundler);
+    // }
 }

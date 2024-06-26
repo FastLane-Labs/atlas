@@ -7,6 +7,8 @@ import "src/contracts/types/DAppApprovalTypes.sol";
 import "src/contracts/types/UserCallTypes.sol";
 import "src/contracts/types/SolverCallTypes.sol";
 
+import "forge-std/Test.sol";
+
 library CallConfigBuilder {
     function allFalseCallConfig() internal pure returns (CallConfig memory) { }
 }
@@ -46,14 +48,13 @@ contract DummyDAppControl is DAppControl {
         return true;
     }
 
-    function _preSolverCall(SolverOperation calldata, bytes calldata returnData) internal pure virtual override {
+    function _preSolverCall(SolverOperation calldata, bytes calldata returnData) internal view virtual override {
         if (returnData.length == 0) {
             return;
         }
 
-        (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
+        (bool shouldRevert) = abi.decode(returnData, (bool));
         require(!shouldRevert, "_preSolverCall revert requested");
-        if (!returnValue) revert("_preSolverCall returned false");
     }
 
     function _postSolverCall(SolverOperation calldata, bytes calldata returnData) internal pure virtual override {
@@ -61,9 +62,8 @@ contract DummyDAppControl is DAppControl {
             return;
         }
 
-        (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
+        (bool shouldRevert) = abi.decode(returnData, (bool));
         require(!shouldRevert, "_postSolverCall revert requested");
-        if (!returnValue) revert("_postSolverCall returned false");
     }
 
     function _allocateValueCall(

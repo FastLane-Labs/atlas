@@ -2,7 +2,8 @@
 pragma solidity 0.8.22;
 
 // Base Imports
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Imports
 import { DAppControl } from "../../dapp/DAppControl.sol";
@@ -36,8 +37,6 @@ struct SwapData {
 }
 
 contract SwapIntentDAppControl is DAppControl {
-    using SafeTransferLib for ERC20;
-
     uint256 public constant USER_CONDITION_GAS_LIMIT = 20_000;
     uint256 public constant MAX_USER_CONDITIONS = 5;
 
@@ -65,7 +64,8 @@ contract SwapIntentDAppControl is DAppControl {
                 requireFulfillment: true,
                 trustedOpHash: true,
                 invertBidValue: false,
-                exPostBids: false
+                exPostBids: false,
+                allowAllocateValueFailure: false
             })
         )
     { }
@@ -84,7 +84,6 @@ contract SwapIntentDAppControl is DAppControl {
     */
     function swap(SwapIntent calldata swapIntent) external payable returns (SwapData memory) {
         require(msg.sender == ATLAS, "SwapIntentDAppControl: InvalidSender");
-        require(_addressPointer() == CONTROL, "SwapIntentDAppControl: InvalidLockState");
         require(address(this) != CONTROL, "SwapIntentDAppControl: MustBeDelegated");
         require(swapIntent.tokenUserSells != swapIntent.auctionBaseCurrency, "SwapIntentDAppControl: SellIsSurplus");
 
@@ -154,7 +153,7 @@ contract SwapIntentDAppControl is DAppControl {
     */
     function _postSolverCall(SolverOperation calldata, bytes calldata returnData) internal override {
         SwapData memory swapData = abi.decode(returnData, (SwapData));
-        uint256 buyTokenBalance = ERC20(swapData.tokenUserBuys).balanceOf(address(this));
+        uint256 buyTokenBalance = IERC20(swapData.tokenUserBuys).balanceOf(address(this));
 
         if (buyTokenBalance < swapData.amountUserBuys) {
             revert();
@@ -163,9 +162,9 @@ contract SwapIntentDAppControl is DAppControl {
         // Transfer exactly the amount the user is buying, the bid amount will be transferred
         // in _allocateValueCall, even if those are the same tokens
         if (swapData.tokenUserBuys != swapData.auctionBaseCurrency) {
-            ERC20(swapData.tokenUserBuys).safeTransfer(_user(), buyTokenBalance);
+            SafeTransferLib.safeTransfer(swapData.tokenUserBuys, _user(), buyTokenBalance);
         } else {
-            ERC20(swapData.tokenUserBuys).safeTransfer(_user(), swapData.amountUserBuys);
+            SafeTransferLib.safeTransfer(swapData.tokenUserBuys, _user(), swapData.amountUserBuys);
         }
 
         return; // success
@@ -182,7 +181,7 @@ contract SwapIntentDAppControl is DAppControl {
     */
     function _allocateValueCall(address bidToken, uint256, bytes calldata) internal override {
         if (bidToken != address(0)) {
-            ERC20(bidToken).safeTransfer(_user(), ERC20(bidToken).balanceOf(address(this)));
+            SafeTransferLib.safeTransfer(bidToken, _user(), IERC20(bidToken).balanceOf(address(this)));
         } else {
             SafeTransferLib.safeTransferETH(_user(), address(this).balance);
         }
