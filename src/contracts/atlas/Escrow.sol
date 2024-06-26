@@ -56,7 +56,7 @@ abstract contract Escrow is AtlETH {
     {
         (bool success, bytes memory data) = ctx.executionEnvironment.call(
             abi.encodePacked(
-                abi.encodeCall(IExecutionEnvironment.preOpsWrapper, userOp), ctx.setAndPack(ExecutionPhase.PreOps, true)
+                abi.encodeCall(IExecutionEnvironment.preOpsWrapper, userOp), ctx.setAndPack(ExecutionPhase.PreOps)
             )
         );
 
@@ -89,8 +89,7 @@ abstract contract Escrow is AtlETH {
     {
         (bool success, bytes memory data) = ctx.executionEnvironment.call{ value: userOp.value }(
             abi.encodePacked(
-                abi.encodeCall(IExecutionEnvironment.userWrapper, userOp),
-                ctx.setAndPack(ExecutionPhase.UserOperation, true)
+                abi.encodeCall(IExecutionEnvironment.userWrapper, userOp), ctx.setAndPack(ExecutionPhase.UserOperation)
             )
         );
 
@@ -135,11 +134,6 @@ abstract contract Escrow is AtlETH {
         if (!prevalidated) {
             result = VERIFICATION.verifySolverOp(solverOp, ctx.userOpHash, userOp.maxFeePerGas, ctx.bundler);
             result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, result);
-        }
-
-        // Increment the call index once per solverOp
-        unchecked {
-            ++ctx.callIndex;
         }
 
         // Verify the transaction.
@@ -199,7 +193,6 @@ abstract contract Escrow is AtlETH {
         Context memory ctx,
         DAppConfig memory dConfig,
         uint256 bidAmount,
-        uint256 solverIndex,
         bytes memory returnData
     )
         internal
@@ -208,7 +201,7 @@ abstract contract Escrow is AtlETH {
         (bool success,) = ctx.executionEnvironment.call(
             abi.encodePacked(
                 abi.encodeCall(IExecutionEnvironment.allocateValue, (dConfig.bidToken, bidAmount, returnData)),
-                ctx.setAndPack(ExecutionPhase.AllocateValue, true)
+                ctx.setAndPack(ExecutionPhase.AllocateValue)
             )
         );
 
@@ -220,9 +213,6 @@ abstract contract Escrow is AtlETH {
         // paymentsSuccessful is part of the data forwarded to the postOps hook, dApps can easily check the value by
         // calling _paymentsSuccessful()
         ctx.paymentsSuccessful = success;
-        ctx.callIndex = ctx.callCount - 1;
-        ctx.solverOutcome = uint24(solverIndex);
-        // NOTE: we reuse ctx.solverOutcome to store the index of the winning solverOp, to avoid stack too deep.
     }
 
     /// @notice Executes post-operation logic after SolverOperation, depending on the outcome of the auction.
@@ -242,7 +232,7 @@ abstract contract Escrow is AtlETH {
         (bool success,) = ctx.executionEnvironment.call(
             abi.encodePacked(
                 abi.encodeCall(IExecutionEnvironment.postOpsWrapper, (solved, returnData)),
-                ctx.setAndPack(ExecutionPhase.PostOps, false)
+                ctx.setAndPack(ExecutionPhase.PostOps)
             )
         );
 
@@ -540,7 +530,7 @@ abstract contract Escrow is AtlETH {
         (success, data) = ctx.executionEnvironment.call(
             abi.encodePacked(
                 abi.encodeCall(IExecutionEnvironment.solverPreTryCatch, (bidAmount, solverOp, returnData)),
-                ctx.setAndPack(ExecutionPhase.PreSolver, false)
+                ctx.setAndPack(ExecutionPhase.PreSolver)
             )
         );
 
@@ -593,7 +583,7 @@ abstract contract Escrow is AtlETH {
         (success, data) = ctx.executionEnvironment.call(
             abi.encodePacked(
                 abi.encodeCall(IExecutionEnvironment.solverPostTryCatch, (solverOp, returnData, solverTracker)),
-                ctx.setAndPack(ExecutionPhase.PostSolver, false)
+                ctx.setAndPack(ExecutionPhase.PostSolver)
             )
         );
 

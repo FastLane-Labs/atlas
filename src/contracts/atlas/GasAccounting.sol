@@ -255,11 +255,11 @@ abstract contract GasAccounting is SafetyLocks {
     /// solver and the bundler based on the outcome.
     /// @dev This function adjusts the claims, withdrawals, deposits, and surcharges based on the gas used by the
     /// transaction.
+    /// @param ctx Context struct containing relavent context information for the Atlas auction.
     /// @param winningSolver The address of the winning solver.
-    /// @param bundler The address of the bundler, who is refunded for the gas used during the transaction execution.
     function _settle(
-        address winningSolver,
-        address bundler
+        Context memory ctx,
+        address winningSolver
     )
         internal
         returns (uint256 claimsPaidToBundler, uint256 netGasSurcharge)
@@ -299,7 +299,7 @@ abstract contract GasAccounting is SafetyLocks {
 
         cumulativeSurcharge = _surcharge + netGasSurcharge;
 
-        SafeTransferLib.safeTransferETH(bundler, _claims);
+        SafeTransferLib.safeTransferETH(ctx.bundler, _claims);
 
         return (_claims, netGasSurcharge);
     }

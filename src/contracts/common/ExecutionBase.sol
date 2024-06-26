@@ -46,8 +46,8 @@ contract Base {
             _bundler(),
             _solverSuccessful(),
             _paymentsSuccessful(),
-            _callIndex(),
-            _callCount(),
+            _solverIndex(),
+            _solverCount(),
             _phase(),
             uint8(0),
             _solverOutcome(),
@@ -135,21 +135,21 @@ contract Base {
     /// @notice Extracts and returns the call count of the current metacall tx, from calldata.
     /// @dev Call count is calculated as number of solverOps + 3. This represents 1 call for preOps, userOp, and postOps
     /// each, then 1 call for each of the solverOps.
-    /// @return callCount The call count of the current metacall tx.
-    function _callCount() internal pure returns (uint8 callCount) {
+    /// @return solverCount The call count of the current metacall tx.
+    function _solverCount() internal pure returns (uint8 solverCount) {
         assembly {
-            callCount := shr(248, calldataload(sub(calldatasize(), 53)))
+            solverCount := shr(248, calldataload(sub(calldatasize(), 53)))
         }
     }
 
     /// @notice Extracts and returns the call index of the current metacall tx, from calldata.
-    /// @dev Call index is the index of the current call within the total calls (see `_callCount()`) of a metacall tx.
+    /// @dev Call index is the index of the current call within the total calls (see `_solverCount()`) of a metacall tx.
     /// I.e. preOpsCall has an index of 0, userOp has an index of 1, the first solverOp has an index of 2, subsequent
-    /// solverOps have indices of 3, 4, 5, etc, and postOpsCall has an index of `callCount - 1`.
-    /// @return callIndex The call index of the current metacall tx.
-    function _callIndex() internal pure returns (uint8 callIndex) {
+    /// solverOps have indices of 3, 4, 5, etc, and postOpsCall has an index of `solverCount - 1`.
+    /// @return solverIndex The call index of the current metacall tx.
+    function _solverIndex() internal pure returns (uint8 solverIndex) {
         assembly {
-            callIndex := shr(248, calldataload(sub(calldatasize(), 54)))
+            solverIndex := shr(248, calldataload(sub(calldatasize(), 54)))
         }
     }
 

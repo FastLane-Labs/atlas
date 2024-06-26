@@ -71,14 +71,15 @@ contract Atlas is Escrow, Factory {
         // than re-calculate it, we can simply take it from the dAppOp here. It's worth noting that this will
         // be either a TRUSTED or DEFAULT hash, depending on the allowsTrustedOpHash setting.
         try this.execute(dConfig, userOp, solverOps, executionEnvironment, msg.sender, dAppOp.userOpHash) returns (
-            address winningSolver
+            Context memory ctx
         ) {
-            auctionWon = winningSolver != address(0);
+            address winningSolver = ctx.solverSuccessful ? solverOps[uint256(ctx.solverIndex)].from : address(0);
+
             // Gas Refund to sender only if execution is successful
-            (uint256 ethPaidToBundler, uint256 netGasSurcharge) =
-                _settle({ winningSolver: auctionWon ? winningSolver : msg.sender, bundler: msg.sender });
+            (uint256 ethPaidToBundler, uint256 netGasSurcharge) = _settle({ ctx: ctx, winningSolver: winningSolver });
 
             emit MetacallResult(msg.sender, userOp.from, winningSolver, ethPaidToBundler, netGasSurcharge);
+            auctionWon = ctx.solverSuccessful;
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
             _handleErrors(revertData, dConfig.callConfig);
@@ -100,7 +101,7 @@ contract Atlas is Escrow, Factory {
     /// @param executionEnvironment Address of the execution environment contract of the current metacall tx.
     /// @param bundler Address of the bundler of the current metacall tx.
     /// @param userOpHash Hash of the userOp struct of the current metacall tx.
-    /// @return winningSolver Address of the winning solver (address(0) if no winner).
+    /// @return ctx Context struct containing relavent context information for the Atlas auction.
     function execute(
         DAppConfig memory dConfig,
         UserOperation calldata userOp,
@@ -111,13 +112,13 @@ contract Atlas is Escrow, Factory {
     )
         external
         payable
-        returns (address winningSolver)
+        returns (Context memory ctx)
     {
         // This is a self.call made externally so that it can be used with try/catch
         if (msg.sender != address(this)) revert InvalidAccess();
 
         // Build the context object
-        Context memory ctx = _buildContext(
+        ctx = _buildContext(
             dConfig, executionEnvironment, userOpHash, bundler, uint8(solverOps.length), bundler == SIMULATOR
         );
 
@@ -132,19 +133,19 @@ contract Atlas is Escrow, Factory {
         returnData = _executeUserOperation(ctx, dConfig, userOp, returnData);
 
         // SolverOps Calls
-        if (dConfig.callConfig.exPostBids()) {
-            _bidFindingIteration(ctx, dConfig, userOp, solverOps, returnData);
-        } else {
-            _bidKnownIteration(ctx, dConfig, userOp, solverOps, returnData);
+        uint256 winningBidAmount = dConfig.callConfig.exPostBids()
+            ? _bidFindingIteration(ctx, dConfig, userOp, solverOps, returnData)
+            : _bidKnownIteration(ctx, dConfig, userOp, solverOps, returnData);
+
+        // AllocateValue Call
+        if (ctx.solverSuccessful) {
+            _allocateValue(ctx, dConfig, winningBidAmount, returnData);
         }
 
         // PostOp Call
         if (dConfig.callConfig.needsPostOpsCall()) {
             _executePostOpsCall(ctx, ctx.solverSuccessful, returnData);
         }
-
-        // NOTE: In _allocateValue, we reused ctx.solverOutcome to store the index of the winning solverOp.
-        winningSolver = ctx.solverSuccessful ? solverOps[uint256(ctx.solverOutcome)].from : address(0);
     }
 
     /// @notice Called above in `execute` if the DAppConfig requires ex post bids. Sorts solverOps by bid amount and
@@ -162,12 +163,13 @@ contract Atlas is Escrow, Factory {
         bytes memory returnData
     )
         internal
+        returns (uint256)
     {
         // Return early if no solverOps (e.g. in simUserOperation)
         if (solverOps.length == 0) {
             if (ctx.isSimulation) revert SolverSimFail(0);
             if (dConfig.callConfig.needsFulfillment()) revert UserNotFulfilled();
-            return;
+            return 0;
         }
 
         ctx.bidFind = true;
@@ -224,15 +226,15 @@ contract Atlas is Escrow, Factory {
             if (bidAmountFound == 0) break;
 
             // Isolate the original solverOps index from the packed uint256 value
-            uint256 solverIndex = bidsAndIndices[i] & _FIRST_16_BITS_TRUE_MASK;
+            uint256 solverIndex = uint8(bidsAndIndices[i] & _FIRST_16_BITS_TRUE_MASK);
+            ctx.solverIndex = uint8(solverIndex); // Yay, compiler <3
 
             // Execute the solver operation. If solver won, allocate value and return. Otherwise continue looping.
             bidAmountFound =
                 _executeSolverOperation(ctx, dConfig, userOp, solverOps[solverIndex], bidAmountFound, true, returnData);
 
             if (ctx.solverSuccessful) {
-                _allocateValue(ctx, dConfig, bidAmountFound, solverIndex, returnData);
-                return;
+                return bidAmountFound;
             }
 
             if (i == 0) break; // break to prevent underflow in next loop
@@ -256,18 +258,18 @@ contract Atlas is Escrow, Factory {
         bytes memory returnData
     )
         internal
+        returns (uint256)
     {
         uint256 bidAmount;
-        uint256 k = solverOps.length;
+        uint8 k = uint8(solverOps.length);
 
-        for (uint256 solverIndex; solverIndex < k; ++solverIndex) {
-            SolverOperation calldata solverOp = solverOps[solverIndex];
+        for (; ctx.solverIndex < k; ctx.solverIndex++) {
+            SolverOperation calldata solverOp = solverOps[ctx.solverIndex];
 
             bidAmount = _executeSolverOperation(ctx, dConfig, userOp, solverOp, solverOp.bidAmount, false, returnData);
 
             if (ctx.solverSuccessful) {
-                _allocateValue(ctx, dConfig, bidAmount, solverIndex, returnData);
-                return;
+                return bidAmount;
             }
         }
         if (ctx.isSimulation) revert SolverSimFail(uint256(ctx.solverOutcome));

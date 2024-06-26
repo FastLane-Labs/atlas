@@ -11,8 +11,8 @@ struct Context {
     bytes32 userOpHash; // not packed
     address executionEnvironment; // not packed
     uint24 solverOutcome;
-    uint8 callIndex;
-    uint8 callCount;
+    uint8 solverIndex;
+    uint8 solverCount;
     uint8 callDepth;
     uint8 phase;
     bool solverSuccessful;

@@ -104,7 +104,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         userOp.from = user;
         userOp.to = address(atlas);
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
-        preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps, true));
+        preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps));
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(preOpsData);
         assertTrue(status);
@@ -113,7 +113,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         userOp.from = invalid; // Invalid from
         userOp.to = address(atlas);
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
-        preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps, true));
+        preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps));
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.InvalidUser.selector);
         (status,) = address(executionEnvironment).call(preOpsData);
@@ -122,7 +122,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         userOp.from = user;
         userOp.to = invalid; // Invalid to
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
-        preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps, true));
+        preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps));
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.InvalidTo.selector);
         (status,) = address(executionEnvironment).call(preOpsData);
@@ -138,14 +138,14 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // Valid
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
-        preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps, true));
+        preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps));
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(preOpsData);
         assertTrue(status);
 
         // InvalidSender
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
-        preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps, true));
+        preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps));
         vm.prank(address(0)); // Invalid sender
         vm.expectRevert(AtlasErrors.OnlyAtlas.selector);
         (status,) = address(executionEnvironment).call(preOpsData);
@@ -162,7 +162,7 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // Valid
         userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
-        userData = abi.encodePacked(userData, ctx.setAndPack(ExecutionPhase.UserOperation, true));
+        userData = abi.encodePacked(userData, ctx.setAndPack(ExecutionPhase.UserOperation));
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(userData);
         assertTrue(status);
@@ -172,7 +172,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         vm.etch(address(dAppControl), address(atlas).code);
 
         userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
-        userData = abi.encodePacked(userData, ctx.setAndPack(ExecutionPhase.UserOperation, true));
+        userData = abi.encodePacked(userData, ctx.setAndPack(ExecutionPhase.UserOperation));
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.InvalidCodeHash.selector);
         (status,) = address(executionEnvironment).call(userData);
@@ -192,7 +192,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         uint256 expectedReturnValue = 123;
         userOp.data = abi.encodeWithSelector(dAppControl.mockOperation.selector, false, expectedReturnValue);
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
-        preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps, true));
+        preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps));
         vm.prank(address(atlas));
         (status, data) = address(executionEnvironment).call(preOpsData);
         assertTrue(status);
@@ -201,7 +201,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         // DelegateRevert
         userOp.data = abi.encodeWithSelector(dAppControl.mockOperation.selector, true, uint256(0));
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
-        preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps, true));
+        preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps));
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PreOpsDelegatecallFail.selector);
         (status,) = address(executionEnvironment).call(preOpsData);
@@ -221,7 +221,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         // ValueExceedsBalance
         userOp.value = 1; // Positive value but EE has no balance
         userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
-        userData = abi.encodePacked(userData, ctx.setAndPack(ExecutionPhase.UserOperation, true));
+        userData = abi.encodePacked(userData, ctx.setAndPack(ExecutionPhase.UserOperation));
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.UserOpValueExceedsBalance.selector);
         (status,) = address(executionEnvironment).call(userData);
@@ -231,7 +231,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         expectedReturnValue = 987;
         userOp.data = abi.encodeWithSelector(dAppControl.mockOperation.selector, false, expectedReturnValue);
         userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
-        userData = abi.encodePacked(userData, ctx.setAndPack(ExecutionPhase.UserOperation, true));
+        userData = abi.encodePacked(userData, ctx.setAndPack(ExecutionPhase.UserOperation));
         vm.prank(address(atlas));
         (status, data) = address(executionEnvironment).call(userData);
         assertTrue(status);
@@ -240,7 +240,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         // CallRevert (needsDelegateUser=false)
         userOp.data = abi.encodeWithSelector(dAppControl.mockOperation.selector, true, 0);
         userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
-        userData = abi.encodePacked(userData, ctx.setAndPack(ExecutionPhase.UserOperation, true));
+        userData = abi.encodePacked(userData, ctx.setAndPack(ExecutionPhase.UserOperation));
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.UserWrapperCallFail.selector);
         (status,) = address(executionEnvironment).call(userData);
@@ -254,7 +254,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         expectedReturnValue = 277;
         userOp.data = abi.encodeWithSelector(dAppControl.mockOperation.selector, false, expectedReturnValue);
         userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
-        userData = abi.encodePacked(userData, ctx.setAndPack(ExecutionPhase.UserOperation, true));
+        userData = abi.encodePacked(userData, ctx.setAndPack(ExecutionPhase.UserOperation));
         vm.prank(address(atlas));
         (status, data) = address(executionEnvironment).call(userData);
         assertTrue(status);
@@ -263,7 +263,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         // DelegateRevert (needsDelegateUser=true)
         userOp.data = abi.encodeWithSelector(dAppControl.mockOperation.selector, true, 0);
         userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
-        userData = abi.encodePacked(userData, ctx.setAndPack(ExecutionPhase.UserOperation, true));
+        userData = abi.encodePacked(userData, ctx.setAndPack(ExecutionPhase.UserOperation));
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.UserWrapperDelegatecallFail.selector);
         (status,) = address(executionEnvironment).call(userData);
@@ -274,11 +274,11 @@ contract ExecutionEnvironmentTest is BaseTest {
         bool status;
 
         // Valid
-        ctx.callCount = 4;
-        ctx.callIndex = ctx.callCount - 1;
+        ctx.solverCount = 4;
+        ctx.solverIndex = ctx.solverCount - 1;
         postOpsData =
             abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, false, abi.encode(false, true));
-        postOpsData = abi.encodePacked(postOpsData, ctx.setAndPack(ExecutionPhase.PostOps, false));
+        postOpsData = abi.encodePacked(postOpsData, ctx.setAndPack(ExecutionPhase.PostOps));
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(postOpsData);
         assertTrue(status);
@@ -286,7 +286,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         // DelegateRevert
         postOpsData =
             abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, false, abi.encode(true, false));
-        postOpsData = abi.encodePacked(postOpsData, ctx.setAndPack(ExecutionPhase.PostOps, false));
+        postOpsData = abi.encodePacked(postOpsData, ctx.setAndPack(ExecutionPhase.PostOps));
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PostOpsDelegatecallFail.selector);
         (status,) = address(executionEnvironment).call(postOpsData);
@@ -294,7 +294,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         // DelegateUnsuccessful
         postOpsData =
             abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, false, abi.encode(false, false));
-        postOpsData = abi.encodePacked(postOpsData, ctx.setAndPack(ExecutionPhase.PostOps, false));
+        postOpsData = abi.encodePacked(postOpsData, ctx.setAndPack(ExecutionPhase.PostOps));
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PostOpsDelegatecallReturnedFalse.selector);
         (status,) = address(executionEnvironment).call(postOpsData);
@@ -459,7 +459,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         allocateData = abi.encodeWithSelector(
             executionEnvironment.allocateValue.selector, address(0), uint256(0), abi.encode(false)
         );
-        allocateData = abi.encodePacked(allocateData, ctx.setAndPack(ExecutionPhase.AllocateValue, true));
+        allocateData = abi.encodePacked(allocateData, ctx.setAndPack(ExecutionPhase.AllocateValue));
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(allocateData);
         assertTrue(status);
@@ -468,7 +468,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         allocateData = abi.encodeWithSelector(
             executionEnvironment.allocateValue.selector, address(0), uint256(0), abi.encode(true)
         );
-        allocateData = abi.encodePacked(allocateData, ctx.setAndPack(ExecutionPhase.AllocateValue, true));
+        allocateData = abi.encodePacked(allocateData, ctx.setAndPack(ExecutionPhase.AllocateValue));
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.AllocateValueDelegatecallFail.selector);
         (status,) = address(executionEnvironment).call(allocateData);
