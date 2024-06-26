@@ -73,7 +73,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
 
         // TODO remove these when transient storage behaviour is implemented
         // Gas Accounting - transient storage (delete this from constructor post dencun)
-        lock = Lock({ activeEnvironment: _UNLOCKED, phase: ExecutionPhase.Uninitialized, callConfig: uint32(0) });
+        lock = Lock({ activeEnvironment: _UNLOCKED, phase: uint8(ExecutionPhase.Uninitialized), callConfig: uint32(0) });
 
         _solverLock = _UNLOCKED_UINT;
         claims = type(uint256).max;

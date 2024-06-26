@@ -43,7 +43,7 @@ abstract contract SafetyLocks is Storage {
         // Initialize the Lock
         lock = Lock({
             activeEnvironment: executionEnvironment,
-            phase: dConfig.callConfig.needsPreOpsCall() ? ExecutionPhase.PreOps : ExecutionPhase.UserOperation,
+            phase: dConfig.callConfig.needsPreOpsCall() ? uint8(ExecutionPhase.PreOps) : uint8(ExecutionPhase.UserOperation),
             callConfig: dConfig.callConfig
         });
 
@@ -57,7 +57,7 @@ abstract contract SafetyLocks is Storage {
     }
 
     modifier withLockPhase(ExecutionPhase _phase) {
-        lock.phase = _phase;
+        lock.phase = uint8(_phase);
         _;
     }
 
@@ -71,7 +71,7 @@ abstract contract SafetyLocks is Storage {
     /// @param isSimulation Boolean indicating whether the call is a simulation or not.
     /// @return An Context struct initialized with the provided parameters.
     function _buildContext(
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         address executionEnvironment,
         bytes32 userOpHash,
         address bundler,
@@ -90,7 +90,7 @@ abstract contract SafetyLocks is Storage {
             paymentsSuccessful: false,
             solverIndex: 0,
             solverCount: solverOpCount,
-            phase: dConfig.callConfig.needsPreOpsCall() ? ExecutionPhase.PreOps : ExecutionPhase.UserOperation,
+            phase: dConfig.callConfig.needsPreOpsCall() ? uint8(ExecutionPhase.PreOps) : uint8(ExecutionPhase.UserOperation),
             solverOutcome: 0,
             bidFind: false,
             isSimulation: isSimulation,
@@ -101,7 +101,7 @@ abstract contract SafetyLocks is Storage {
     /// @notice Releases the Atlas lock, and resets the associated transient storage variables. Called at the end of
     /// `metacall`.
     function _releaseAccountingLock() internal {
-        lock = Lock({ activeEnvironment: _UNLOCKED, phase: ExecutionPhase.Uninitialized, callConfig: uint32(0) });
+        lock = Lock({ activeEnvironment: _UNLOCKED, phase: uint8(ExecutionPhase.Uninitialized), callConfig: uint32(0) });
         _solverLock = _UNLOCKED_UINT;
         claims = type(uint256).max;
         withdrawals = type(uint256).max;
@@ -114,7 +114,7 @@ abstract contract SafetyLocks is Storage {
     }
 
     function phase() external view returns (ExecutionPhase) {
-        return lock.phase;
+        return ExecutionPhase(lock.phase);
     }
 
     /// @notice Returns the current lock state of Atlas.

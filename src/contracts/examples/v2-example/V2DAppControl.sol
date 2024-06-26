@@ -2,7 +2,7 @@
 pragma solidity 0.8.22;
 
 // Base Imports
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 // Atlas Base Imports
 import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
@@ -72,7 +72,8 @@ contract V2DAppControl is DAppControl {
                 requireFulfillment: false,
                 trustedOpHash: false,
                 invertBidValue: false,
-                exPostBids: false
+                exPostBids: false,
+                allowAllocateValueFailure: false
             })
         )
     {
@@ -134,15 +135,15 @@ contract V2DAppControl is DAppControl {
 
         (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).getReserves();
 
-        SafeTransferLib.safeTransfer(ERC20(WETH), WETH_X_GOVERNANCE_POOL, bidAmount);
+        SafeTransferLib.safeTransfer(WETH, WETH_X_GOVERNANCE_POOL, bidAmount);
 
         uint256 amount0Out;
         uint256 amount1Out;
 
         if (govIsTok0) {
-            SwapMath.getAmountOut(bidAmount, uint256(token1Balance), uint256(token0Balance));
+            amount0Out = SwapMath.getAmountOut(bidAmount, uint256(token1Balance), uint256(token0Balance));
         } else {
-            SwapMath.getAmountOut(bidAmount, uint256(token0Balance), uint256(token1Balance));
+            amount1Out = SwapMath.getAmountOut(bidAmount, uint256(token0Balance), uint256(token1Balance));
         }
 
         bytes memory nullBytes;

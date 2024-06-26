@@ -85,6 +85,8 @@ contract Atlas is Escrow, Factory {
             _handleErrors(revertData, dConfig.callConfig);
 
             // Refund the msg.value to sender if it errored
+            // WARNING: If msg.sender is a disposable address such as a session key, make sure to remove ETH from it
+            // before disposal
             if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
         }
 
@@ -101,7 +103,7 @@ contract Atlas is Escrow, Factory {
     /// @param userOpHash Hash of the userOp struct of the current metacall tx.
     /// @return ctx Context struct containing relavent context information for the Atlas auction.
     function execute(
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         address executionEnvironment,
@@ -155,7 +157,7 @@ contract Atlas is Escrow, Factory {
     /// @param returnData Return data from the preOps and userOp calls.
     function _bidFindingIteration(
         Context memory ctx,
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         bytes memory returnData
@@ -250,7 +252,7 @@ contract Atlas is Escrow, Factory {
     /// @param returnData Return data from the preOps and userOp calls.
     function _bidKnownIteration(
         Context memory ctx,
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         bytes memory returnData
@@ -293,6 +295,8 @@ contract Atlas is Escrow, Factory {
                     solverOutcomeResult := mload(add(dataLocation, sub(mload(revertData), 32)))
                 }
                 revert SolverSimFail(solverOutcomeResult);
+            } else if (errorSwitch == AllocateValueSimFail.selector) {
+                revert AllocateValueSimFail();
             } else if (errorSwitch == PostOpsSimFail.selector) {
                 revert PostOpsSimFail();
             }

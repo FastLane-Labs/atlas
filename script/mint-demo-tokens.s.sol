@@ -6,7 +6,7 @@ import "forge-std/Test.sol";
 
 import { DeployBaseScript } from "script/base/deploy-base.s.sol";
 import { Token } from "src/contracts/helpers/DemoToken.sol";
-import { WETH } from "solmate/tokens/WETH.sol";
+import { WETH } from "solady/tokens/WETH.sol";
 
 contract MintDemoTokensScript is DeployBaseScript {
     // TODO update these to latest token addresses:

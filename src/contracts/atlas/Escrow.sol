@@ -9,6 +9,7 @@ import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
+import { SafeCall } from "src/contracts/libraries/SafeCall/SafeCall.sol";
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
@@ -26,6 +27,7 @@ abstract contract Escrow is AtlETH {
     using EscrowBits for uint256;
     using CallBits for uint32;
     using SafetyBits for Context;
+    using SafeCall for address;
 
     constructor(
         uint256 _escrowDuration,
@@ -45,7 +47,7 @@ abstract contract Escrow is AtlETH {
     /// @return preOpsData The data returned by the preOps call, if successful.
     function _executePreOpsCall(
         Context memory ctx,
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         UserOperation calldata userOp
     )
         internal
@@ -77,7 +79,7 @@ abstract contract Escrow is AtlETH {
     /// @return userData Data returned from executing the UserOperation, if the call was successful.
     function _executeUserOperation(
         Context memory ctx,
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         UserOperation calldata userOp,
         bytes memory returnData
     )
@@ -116,7 +118,7 @@ abstract contract Escrow is AtlETH {
     /// executed successfully; otherwise, returns 0.
     function _executeSolverOperation(
         Context memory ctx,
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         uint256 bidAmount,
@@ -177,86 +179,6 @@ abstract contract Escrow is AtlETH {
         return 0;
     }
 
-    function _preSolverOpInner(
-        Context calldata ctx,
-        SolverOperation calldata solverOp,
-        uint256 bidAmount,
-        bytes calldata returnData
-    )
-        internal
-        withLockPhase(ExecutionPhase.PreSolver)
-        returns (SolverTracker memory solverTracker)
-    {
-        (bool success, bytes memory data) = ctx.executionEnvironment.call(
-            abi.encodePacked(
-                abi.encodeCall(IExecutionEnvironment.solverPreTryCatch, (bidAmount, solverOp, returnData)),
-                ctx.setAndPack(ExecutionPhase.PreSolver)
-            )
-        );
-
-        // If ExecutionEnvironment.solverPreTryCatch() failed, bubble up the error
-        if (!success) {
-            assembly {
-                revert(add(data, 32), mload(data))
-            }
-        }
-
-        // Update solverTracker with returned data
-        return abi.decode(data, (SolverTracker));
-    }
-
-    function _solverOpInner(
-        Context calldata ctx,
-        SolverOperation calldata solverOp,
-        uint256 bidAmount,
-        uint256 gasLimit,
-        bytes calldata returnData
-    )
-        internal
-        withLockPhase(ExecutionPhase.SolverOperations)
-    {
-        // Set the solver lock - will perform accounting checks if value borrowed. If `_trySolverLock()` returns false,
-        // we revert here and catch the error in `_solverOpWrapper()` above
-        if (!_trySolverLock(solverOp)) revert InsufficientEscrow();
-
-        (bool success,) = solverOp.solver.call{ value: solverOp.value, gas: gasLimit }(
-            abi.encodeCall(
-                ISolverContract.atlasSolverCall,
-                (solverOp.from, ctx.executionEnvironment, solverOp.bidToken, bidAmount, solverOp.data, returnData)
-            )
-        );
-
-        if (!success) revert SolverOpReverted();
-    }
-
-    function _postSolverOpInner(
-        Context calldata ctx,
-        SolverOperation calldata solverOp,
-        bytes calldata returnData,
-        SolverTracker memory solverTracker
-    )
-        internal
-        withLockPhase(ExecutionPhase.PostSolver)
-        returns (SolverTracker memory)
-    {
-        (bool success, bytes memory data) = ctx.executionEnvironment.call(
-            abi.encodePacked(
-                abi.encodeCall(IExecutionEnvironment.solverPostTryCatch, (solverOp, returnData, solverTracker)),
-                ctx.setAndPack(ExecutionPhase.PostSolver)
-            )
-        );
-
-        // If ExecutionEnvironment.solverPostTryCatch() failed, bubble up the error
-        if (!success) {
-            assembly {
-                revert(add(data, 32), mload(data))
-            }
-        }
-
-        // Update solverTracker with returned data
-        return abi.decode(data, (SolverTracker));
-    }
-
     /// @notice Allocates the winning bid amount after a successful SolverOperation execution.
     /// @dev This function handles the allocation of the bid amount to the appropriate recipients as defined in the
     /// DApp's configuration. It calls the allocateValue function in the Execution Environment, which is responsible for
@@ -269,7 +191,7 @@ abstract contract Escrow is AtlETH {
     /// is allocated.
     function _allocateValue(
         Context memory ctx,
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         uint256 bidAmount,
         bytes memory returnData
     )
@@ -283,6 +205,13 @@ abstract contract Escrow is AtlETH {
             )
         );
 
+        if (!success && !dConfig.callConfig.allowAllocateValueFailure()) {
+            if (ctx.isSimulation) revert AllocateValueSimFail();
+            revert AllocateValueFail();
+        }
+
+        // paymentsSuccessful is part of the data forwarded to the postOps hook, dApps can easily check the value by
+        // calling _paymentsSuccessful()
         ctx.paymentsSuccessful = success;
     }
 
@@ -326,7 +255,7 @@ abstract contract Escrow is AtlETH {
     /// @return gasLimit The calculated gas limit for the SolverOperation, considering the operation's gas usage and
     /// the protocol's gas buffers.
     function _validateSolverOperation(
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         SolverOperation calldata solverOp,
         uint256 gasWaterMark
     )
@@ -402,7 +331,7 @@ abstract contract Escrow is AtlETH {
     /// executed successfully; otherwise, returns 0.
     function _getBidAmount(
         Context memory ctx,
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         UserOperation calldata userOp,
         SolverOperation calldata solverOp,
         bytes memory returnData
@@ -533,7 +462,7 @@ abstract contract Escrow is AtlETH {
         );
 
         if (success) {
-            // If solverCall() was successful, intentionally leave result unset as 0 indicates success
+            // If solverCall() was successful, intentionally leave uint256 result unset as 0 indicates success.
             solverTracker = abi.decode(data, (SolverTracker));
         } else {
             // If solverCall() failed, catch the error and encode the failure case in the result uint accordingly.
@@ -563,6 +492,9 @@ abstract contract Escrow is AtlETH {
                 result = 1 << uint256(SolverOutcome.EVMError);
             }
         }
+
+        // Update ctx.phase to reflect the changes made in the Context struct copy passed to solverCall()
+        ctx.phase = uint8(ExecutionPhase.PostSolver);
     }
 
     /// @notice Executes the SolverOperation logic, including preSolver and postSolver hooks via the Execution
@@ -574,7 +506,7 @@ abstract contract Escrow is AtlETH {
     /// @param returnData Data returned from previous call phases.
     /// @return solverTracker Additional data for handling the solver's bid in different scenarios.
     function solverCall(
-        Context calldata ctx,
+        Context memory ctx,
         SolverOperation calldata solverOp,
         uint256 bidAmount,
         uint256 gasLimit,
@@ -586,30 +518,93 @@ abstract contract Escrow is AtlETH {
     {
         if (msg.sender != address(this)) revert InvalidEntry();
 
+        bytes memory data;
         bool success;
-        bool calledback;
 
         // ------------------------------------- //
         //             Pre-Solver Call           //
         // ------------------------------------- //
 
-        solverTracker = _preSolverOpInner(ctx, solverOp, bidAmount, returnData);
+        lock.phase = uint8(ExecutionPhase.PreSolver);
+
+        (success, data) = ctx.executionEnvironment.call(
+            abi.encodePacked(
+                abi.encodeCall(IExecutionEnvironment.solverPreTryCatch, (bidAmount, solverOp, returnData)),
+                ctx.setAndPack(ExecutionPhase.PreSolver, false)
+            )
+        );
+
+        // If ExecutionEnvironment.solverPreTryCatch() failed, bubble up the error
+        if (!success) {
+            assembly {
+                revert(add(data, 32), mload(data))
+            }
+        }
+
+        // Update solverTracker with returned data
+        solverTracker = abi.decode(data, (SolverTracker));
 
         // ------------------------------------- //
         //              Solver Call              //
         // ------------------------------------- //
 
-        _solverOpInner(ctx, solverOp, bidAmount, gasLimit, returnData);
+        lock.phase = uint8(ExecutionPhase.SolverOperations);
+
+        // Set the solver lock - will perform accounting checks if value borrowed. If `_trySolverLock()` returns false,
+        // we revert here and catch the error in `_solverOpWrapper()` above
+        if (!_trySolverLock(solverOp)) revert InsufficientEscrow();
+
+        // Optimism's SafeCall lib allows us to limit how much returndata gets copied to memory, to prevent OOG attacks.
+        success = solverOp.solver.safeCall(
+            gasLimit,
+            solverOp.value,
+            abi.encodeCall(
+                ISolverContract.atlasSolverCall,
+                (
+                    solverOp.from,
+                    ctx.executionEnvironment,
+                    solverOp.bidToken,
+                    bidAmount,
+                    solverOp.data,
+                    // Only pass the returnData to solver if it came from userOp call and not from preOps call.
+                    lock.callConfig.needsUserReturnData() ? returnData : new bytes(0)
+                )
+            )
+        );
+
+        if (!success) revert SolverOpReverted();
 
         // ------------------------------------- //
         //            Post-Solver Call           //
         // ------------------------------------- //
 
-        solverTracker = _postSolverOpInner(ctx, solverOp, returnData, solverTracker);
+        lock.phase = uint8(ExecutionPhase.PostSolver);
+
+        (success, data) = ctx.executionEnvironment.call(
+            abi.encodePacked(
+                abi.encodeCall(IExecutionEnvironment.solverPostTryCatch, (solverOp, returnData, solverTracker)),
+                ctx.setAndPack(ExecutionPhase.PostSolver, false)
+            )
+        );
+
+        // If ExecutionEnvironment.solverPostTryCatch() failed, bubble up the error
+        if (!success) {
+            assembly {
+                revert(add(data, 32), mload(data))
+            }
+        }
+
+        // Update solverTracker with returned data
+        solverTracker = abi.decode(data, (SolverTracker));
+
+        // ------------------------------------- //
+        //              Final Checks             //
+        // ------------------------------------- //
 
         // Verify that the solver repaid their borrowed solverOp.value by calling `reconcile()`. If solver did not fully
         // repay via `reconcile()`, the postSolverCall may still have covered the outstanding debt via `contribute()` so
         // we do a final repayment check here.
+        bool calledback;
         (, calledback, success) = _solverLockData();
         if (!calledback) revert CallbackNotCalled();
         if (!success && deposits < claims + withdrawals) revert BalanceNotReconciled();

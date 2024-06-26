@@ -3,23 +3,23 @@ pragma solidity 0.8.22;
 
 struct Lock {
     address activeEnvironment;
-    ExecutionPhase phase;
     uint32 callConfig;
+    uint8 phase;
 }
 
 struct Context {
-    address executionEnvironment; // not packed
     bytes32 userOpHash; // not packed
-    address bundler;
-    bool solverSuccessful;
-    bool paymentsSuccessful;
+    address executionEnvironment; // not packed
+    uint24 solverOutcome;
     uint8 solverIndex;
     uint8 solverCount;
-    ExecutionPhase phase;
-    uint24 solverOutcome;
+    uint8 callDepth;
+    uint8 phase;
+    bool solverSuccessful;
+    bool paymentsSuccessful;
     bool bidFind;
     bool isSimulation;
-    uint8 callDepth;
+    address bundler;
 }
 
 enum ExecutionPhase {

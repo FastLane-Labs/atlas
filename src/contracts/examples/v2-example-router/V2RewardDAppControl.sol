@@ -2,7 +2,8 @@
 pragma solidity 0.8.22;
 
 // Base Imports
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Imports
 import { DAppControl } from "../../dapp/DAppControl.sol";
@@ -60,7 +61,8 @@ contract V2RewardDAppControl is DAppControl {
                 requireFulfillment: false,
                 trustedOpHash: true,
                 invertBidValue: false,
-                exPostBids: true
+                exPostBids: true,
+                allowAllocateValueFailure: false
             })
         )
     {
@@ -149,7 +151,7 @@ contract V2RewardDAppControl is DAppControl {
             _transferUserERC20(tokenSold, address(this), amountSold);
 
             // Approve UniswapV2Router02 to spend the tokens from ExecutionEnvironment
-            SafeTransferLib.safeApprove(ERC20(tokenSold), uniswapV2Router02, amountSold);
+            SafeTransferLib.safeApprove(tokenSold, uniswapV2Router02, amountSold);
         }
 
         // Return tokenSold for the _postOpsCall hook to be able to refund dust
@@ -176,7 +178,7 @@ contract V2RewardDAppControl is DAppControl {
         if (bidToken == address(0)) {
             SafeTransferLib.safeTransferETH(user, bidAmount);
         } else {
-            SafeTransferLib.safeTransfer(ERC20(REWARD_TOKEN), user, bidAmount);
+            SafeTransferLib.safeTransfer(REWARD_TOKEN, user, bidAmount);
         }
 
         emit TokensRewarded(user, REWARD_TOKEN, bidAmount);
@@ -202,9 +204,9 @@ contract V2RewardDAppControl is DAppControl {
                 SafeTransferLib.safeTransferETH(_user(), balance);
             }
         } else {
-            balance = ERC20(tokenSold).balanceOf(address(this));
+            balance = IERC20(tokenSold).balanceOf(address(this));
             if (balance > 0) {
-                SafeTransferLib.safeTransfer(ERC20(tokenSold), _user(), balance);
+                SafeTransferLib.safeTransfer(tokenSold, _user(), balance);
             }
         }
 

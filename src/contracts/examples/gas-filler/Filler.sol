@@ -2,7 +2,7 @@
 pragma solidity 0.8.22;
 
 // Base Imports
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 // Atlas Base Imports
 import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
@@ -29,8 +29,6 @@ interface IERC20 {
 }
 
 contract Filler is DAppControl {
-    using SafeTransferLib for ERC20;
-
     uint256 public constant CONTROL_GAS_USAGE = 250_000;
 
     struct AccessTuple {
@@ -92,7 +90,8 @@ contract Filler is DAppControl {
                 requireFulfillment: true,
                 trustedOpHash: false,
                 invertBidValue: true,
-                exPostBids: false
+                exPostBids: false,
+                allowAllocateValueFailure: false
             })
         )
     { }

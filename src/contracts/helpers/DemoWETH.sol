@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.22;
 
-import { WETH } from "solmate/tokens/WETH.sol";
+import { WETH } from "solady/tokens/WETH.sol";
 import { Ownable } from "openzeppelin-contracts/contracts/access/Ownable.sol";
 
 contract DemoWETH is WETH, Ownable {
