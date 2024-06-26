@@ -966,7 +966,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     //   and otherwise valid user, solver and dapp operations
     //     where the dapp operation nonce is zero
     // when validCalls is called from the userEOA
-    // then it should return valid
+    // then it should return InvalidDAppNonce
     // because zero is not a valid nonce when dappNoncesSequential is enabled
     //
     function test_validCalls_NonceIsZero_InvalidDAppNonce() public {
@@ -1011,7 +1011,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     //     where the dapp operation nonce is zero
     // when validCalls is called from the userEOA
     //   and isSimulation = true
-    // then it should return Valid
+    // then it should return InvalidDAppNonce
     // because zero is not a valid nonce for simulations when the dapp operation `from` field is set
     //
     function test_validCalls_NonceIsZero_Simulated_InvalidDAppNonce() public {
