@@ -9,6 +9,7 @@ import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
+import { SafeCall } from "src/contracts/libraries/SafeCall/SafeCall.sol";
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
@@ -26,6 +27,7 @@ abstract contract Escrow is AtlETH {
     using EscrowBits for uint256;
     using CallBits for uint32;
     using SafetyBits for Context;
+    using SafeCall for address;
 
     constructor(
         uint256 _escrowDuration,
@@ -464,9 +466,7 @@ abstract contract Escrow is AtlETH {
 
         if (success) {
             // If solverCall() was successful, intentionally leave uint256 result unset as 0 indicates success.
-            // solverCall above is an external call, so we need to update the Context memory object via the ctx pointer,
-            // to the updated struct returned explicitly from the external solverCall above.
-            (ctx, solverTracker) = abi.decode(data, (Context, SolverTracker));
+            solverTracker = abi.decode(data, (SolverTracker));
         } else {
             // If solverCall() failed, catch the error and encode the failure case in the result uint accordingly.
             bytes4 errorSwitch = bytes4(data);
@@ -495,6 +495,9 @@ abstract contract Escrow is AtlETH {
                 result = 1 << uint256(SolverOutcome.EVMError);
             }
         }
+
+        // Update ctx.phase to reflect the changes made in the Context struct copy passed to solverCall()
+        ctx.phase = uint8(ExecutionPhase.PostSolver);
     }
 
     /// @notice Executes the SolverOperation logic, including preSolver and postSolver hooks via the Execution
@@ -514,7 +517,7 @@ abstract contract Escrow is AtlETH {
     )
         external
         payable
-        returns (Context memory, SolverTracker memory solverTracker)
+        returns (SolverTracker memory solverTracker)
     {
         if (msg.sender != address(this)) revert InvalidEntry();
 
@@ -554,21 +557,23 @@ abstract contract Escrow is AtlETH {
         // we revert here and catch the error in `_solverOpWrapper()` above
         if (!_trySolverLock(solverOp)) revert InsufficientEscrow();
 
-        if (lock.callConfig.needsUserReturnData()) {
-            (success,) = solverOp.solver.call{ value: solverOp.value, gas: gasLimit }(
-                abi.encodeCall(
-                    ISolverContract.atlasSolverCall,
-                    (solverOp.from, ctx.executionEnvironment, solverOp.bidToken, bidAmount, solverOp.data, returnData)
+        // Optimism's SafeCall lib allows us to limit how much returndata gets copied to memory, to prevent OOG attacks.
+        success = solverOp.solver.safeCall(
+            gasLimit,
+            solverOp.value,
+            abi.encodeCall(
+                ISolverContract.atlasSolverCall,
+                (
+                    solverOp.from,
+                    ctx.executionEnvironment,
+                    solverOp.bidToken,
+                    bidAmount,
+                    solverOp.data,
+                    // Only pass the returnData to solver if it came from userOp call and not from preOps call.
+                    lock.callConfig.needsUserReturnData() ? returnData : new bytes(0)
                 )
-            );
-        } else {
-            (success,) = solverOp.solver.call{ value: solverOp.value, gas: gasLimit }(
-                abi.encodeCall(
-                    ISolverContract.atlasSolverCall,
-                    (solverOp.from, ctx.executionEnvironment, solverOp.bidToken, bidAmount, solverOp.data, new bytes(0))
-                )
-            );
-        }
+            )
+        );
 
         if (!success) revert SolverOpReverted();
 
@@ -609,7 +614,6 @@ abstract contract Escrow is AtlETH {
 
         // Check if this is an on-chain, ex post bid search
         if (ctx.bidFind) revert BidFindSuccessful(solverTracker.bidAmount);
-        return (ctx, solverTracker);
     }
 
     receive() external payable { }
