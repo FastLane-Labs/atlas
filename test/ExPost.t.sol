@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import { IDAppIntegration } from "src/contracts/interfaces/IDAppIntegration.sol";
 import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
@@ -119,8 +120,8 @@ contract ExPostTest is BaseTest {
         console.log("executionEnvironment", executionEnvironment);
 
         // User must approve Atlas
-        ERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
-        ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
+        IERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
+        IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
 
         vm.stopPrank();
 
@@ -280,7 +281,7 @@ contract ExPostTest is BaseTest {
     }
 
     // Shoutout to rholterhus for the test
-    function test_ExPostOrdering() public {
+    function test_ExPostOrdering_GasCheck() public {
         uint256 NUM_SOLVE_OPS = 3;
         UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
         userOp.control = address(v2ExPost);
@@ -318,21 +319,25 @@ contract ExPostTest is BaseTest {
         vm.startPrank(userEOA);
         address executionEnvironment = atlas.createExecutionEnvironment(userOp.control);
         // User must approve Atlas
-        ERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
-        ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
+        IERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
+        IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
         vm.stopPrank();
 
         // Simulate the UserOp
-        (bool simSuccess, Result simResult,) = simulator.simUserOperation(userOp);
-        assertTrue(simSuccess, "userOp fails in simulator");
+        {
+            (bool simSuccess, Result simResult,) = simulator.simUserOperation(userOp);
+            assertTrue(simSuccess, "userOp fails in simulator");
 
-        // Simulate the SolverOps
-        (simSuccess, simResult,) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
-        assertTrue(simSuccess, "solverOps fail in simulator");
+            // Simulate the SolverOps
+            (simSuccess, simResult,) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
+            assertTrue(simSuccess, "solverOps fail in simulator");
+        }
 
         vm.startPrank(userEOA);
+        uint256 gasLeftBefore = gasleft(); // reusing var because stack too deep
         (bool success,) =
             address(atlas).call(abi.encodeWithSelector(atlas.metacall.selector, userOp, solverOps, dAppOp));
+        console.log("Metacall Gas Cost:", gasLeftBefore - gasleft());
         if (success) console.log("success!");
         else console.log("failure");
         assertTrue(success);

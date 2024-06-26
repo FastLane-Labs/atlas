@@ -46,7 +46,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     address public pendingSurchargeRecipient; // For 2-step transfer process
 
     // Atlas SafetyLocks (transient storage)
-    address public lock; // transient storage
+    Lock public lock; // transient storage
     uint256 public claims; // transient storage
     uint256 public withdrawals; // transient storage
     uint256 public deposits; // transient storage
@@ -73,7 +73,8 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
 
         // TODO remove these when transient storage behaviour is implemented
         // Gas Accounting - transient storage (delete this from constructor post dencun)
-        lock = _UNLOCKED;
+        lock = Lock({ activeEnvironment: _UNLOCKED, phase: uint8(ExecutionPhase.Uninitialized), callConfig: uint32(0) });
+
         _solverLock = _UNLOCKED_UINT;
         claims = type(uint256).max;
         withdrawals = type(uint256).max;

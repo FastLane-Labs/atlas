@@ -9,6 +9,8 @@ import "src/contracts/types/DAppApprovalTypes.sol";
 import "src/contracts/types/UserCallTypes.sol";
 import "src/contracts/types/SolverCallTypes.sol";
 
+import "forge-std/Test.sol";
+
 library CallConfigBuilder {
     function allFalseCallConfig() internal pure returns (CallConfig memory) { }
 }
@@ -58,21 +60,13 @@ contract GasSponsorDAppControl is DAppControl {
         if (!returnValue) revert("_preSolverCall returned false");
     }
 
-    function _postSolverCall(SolverOperation calldata, bytes calldata returnData) internal virtual override {
-        if (returnData.length == 0) {
-            return;
-        }
-
+    function _postSolverCall(SolverOperation calldata, bytes calldata) internal virtual override {
         uint256 _solverShortfall = IAtlas(ATLAS).shortfall();
 
         GasSponsorDAppControl(CONTROL).sponsorETHViaExecutionEnvironment(_solverShortfall);
 
         require(address(this).balance >= _solverShortfall, "Not enough ETH in DAppControl to pay solver shortfall");
         IAtlas(ATLAS).contribute{ value: _solverShortfall }();
-
-        (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
-        require(!shouldRevert, "_postSolverCall revert requested");
-        return; // success if it gets here
     }
 
     function _allocateValueCall(

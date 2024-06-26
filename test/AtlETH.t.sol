@@ -173,93 +173,6 @@ contract AtlETHTest is BaseTest {
         assertEq(atlas.bondedTotalSupply(), 0, "total bonded atlETH supply should be 0");
     }
 
-    // ERC20 Function Tests
-
-    function test_atleth_approve() public {
-        // solverOne deposited 1 ETH into Atlas in BaseTest.setUp
-        assertEq(atlas.balanceOf(solverOneEOA), 1e18, "solverOne's atlETH balance should be 1 ETH");
-        assertEq(atlas.allowance(solverOneEOA, userEOA), 0, "solverOne's allowance for user should be 0");
-
-        vm.prank(solverOneEOA);
-        vm.expectEmit(true, true, false, true);
-        emit AtlasEvents.Approval(solverOneEOA, userEOA, 1e18);
-        atlas.approve(userEOA, 1e18);
-
-        assertEq(atlas.allowance(solverOneEOA, userEOA), 1e18, "solverOne's allowance for user should be 1 ETH");
-    }
-
-    function test_atleth_transfer() public {
-        assertEq(atlas.balanceOf(solverOneEOA), 1e18, "solverOne's atlETH balance should be 1 ETH");
-        assertEq(atlas.balanceOf(userEOA), 0, "user's atlETH balance should be 0");
-
-        vm.prank(solverOneEOA);
-        vm.expectEmit(true, true, false, true);
-        emit AtlasEvents.Transfer(solverOneEOA, userEOA, 1e18);
-        atlas.transfer(userEOA, 1e18);
-
-        assertEq(atlas.balanceOf(solverOneEOA), 0, "solverOne's atlETH balance should be 0");
-        assertEq(atlas.balanceOf(userEOA), 1e18, "user's atlETH balance should be 1 ETH");
-    }
-
-    function test_atleth_transferFrom() public {
-        assertEq(atlas.balanceOf(solverOneEOA), 1e18, "solverOne's atlETH balance should be 1 ETH");
-        assertEq(atlas.balanceOf(solverTwoEOA), 1e18, "solverTwo's atlETH balance should be 1 ETH");
-        assertEq(atlas.balanceOf(userEOA), 0, "user's atlETH balance should be 0");
-
-        vm.prank(solverOneEOA);
-        atlas.approve(userEOA, 1e18); // approve only 1 ETH
-
-        vm.prank(userEOA);
-        atlas.transferFrom(solverOneEOA, userEOA, 1e18);
-
-        assertEq(atlas.balanceOf(solverOneEOA), 0, "solverOne's atlETH balance should be 0");
-        assertEq(atlas.balanceOf(solverTwoEOA), 1e18, "solverTwo's atlETH balance should be 1 ETH");
-        assertEq(atlas.balanceOf(userEOA), 1e18, "user's atlETH balance should be 1 ETH");
-
-
-        vm.prank(solverTwoEOA);
-        atlas.approve(userEOA, type(uint256).max); // approve max
-        
-        vm.prank(userEOA);
-        vm.expectEmit(true, true, false, true);
-        emit AtlasEvents.Transfer(solverTwoEOA, userEOA, 1e18);
-        atlas.transferFrom(solverTwoEOA, userEOA, 1e18);
-
-        assertEq(atlas.balanceOf(solverTwoEOA), 0, "solverTwo's atlETH balance should be 0");
-        assertEq(atlas.balanceOf(userEOA), 2e18, "user's atlETH balance should be 2 ETH");
-    }
-
-    function test_atleth_permit() public {
-        assertEq(atlas.balanceOf(solverOneEOA), 1e18, "solverOne's atlETH balance should be 1 ETH");
-        assertEq(atlas.allowance(solverOneEOA, userEOA), 0, "solverOne's allowance for user should be 0");
-
-        bytes32 domainSeparator = atlas.DOMAIN_SEPARATOR();
-        bytes32 digest = keccak256(
-            abi.encodePacked(
-                "\x19\x01",
-                domainSeparator,
-                keccak256(
-                    abi.encode(
-                        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"),
-                        solverOneEOA,
-                        userEOA,
-                        1e18,
-                        atlas.nonces(solverOneEOA),
-                        type(uint256).max
-                    )
-                )
-            )
-        );
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(solverOnePK, digest);
-
-        vm.prank(userEOA);
-        vm.expectEmit(true, true, false, true);
-        emit AtlasEvents.Approval(solverOneEOA, userEOA, 1e18);
-        atlas.permit(solverOneEOA, userEOA, 1e18, type(uint256).max, v, r, s);
-
-        assertEq(atlas.allowance(solverOneEOA, userEOA), 1e18, "solverOne's allowance for user should be 1 ETH");
-    }
-
     // View Function Tests
     
     function test_atleth_balanceOf() public {
@@ -315,23 +228,5 @@ contract AtlETHTest is BaseTest {
         vm.stopPrank();
 
         assertEq(atlas.unbondingCompleteBlock(solverOneEOA), block.number + atlas.ESCROW_DURATION(), "solverOne's unbonding complete block should be the current block + 64");
-    }
-
-    function test_atleth_domainSeparator() public {
-        bytes32 expectedDomainSeparator = keccak256(
-            abi.encode(
-                    keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
-                    keccak256("Atlas ETH"),
-                    keccak256("1"),
-                    block.chainid,
-                    address(atlas)
-                )
-        );
-        assertEq(atlas.DOMAIN_SEPARATOR(), expectedDomainSeparator, "domainSeparator should be expected value");
-
-        // Change chainId to check _computeDomainSeparator() is run
-        vm.chainId(321);
-
-        assertTrue(atlas.DOMAIN_SEPARATOR() != expectedDomainSeparator, "domainSeparator should change with chainId");
     }
 }

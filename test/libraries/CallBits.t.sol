@@ -34,7 +34,8 @@ contract CallBitsTest is Test {
             requireFulfillment: false,
             trustedOpHash: true,
             invertBidValue: false,
-            exPostBids: true
+            exPostBids: true,
+            allowAllocateValueFailure: false
         });
 
         callConfig2 = CallConfig({
@@ -57,11 +58,12 @@ contract CallBitsTest is Test {
             requireFulfillment: !callConfig1.requireFulfillment,
             trustedOpHash: !callConfig1.trustedOpHash,
             invertBidValue: !callConfig1.invertBidValue,
-            exPostBids: !callConfig1.exPostBids
+            exPostBids: !callConfig1.exPostBids,
+            allowAllocateValueFailure: !callConfig1.allowAllocateValueFailure
         });
     }
 
-    function testEncodeCallConfig() public {
+    function testEncodeCallConfig() public view {
         string memory expectedBitMapString = "00000000000010101010101010101010";
         assertEq(
             TestUtils.uint32ToBinaryString(CallBits.encodeCallConfig(callConfig1)),
@@ -69,7 +71,7 @@ contract CallBitsTest is Test {
             "callConfig1 incorrect"
         );
 
-        expectedBitMapString = "00000000000001010101010101010101";
+        expectedBitMapString = "00000000000101010101010101010101";
         assertEq(
             TestUtils.uint32ToBinaryString(CallBits.encodeCallConfig(callConfig2)),
             expectedBitMapString,
@@ -77,7 +79,7 @@ contract CallBitsTest is Test {
         );
     }
 
-    function testDecodeCallConfig() public {
+    function testDecodeCallConfig() public view {
         uint32 encodedCallConfig = CallBits.encodeCallConfig(callConfig1);
         CallConfig memory decodedCallConfig = encodedCallConfig.decodeCallConfig();
         assertEq(decodedCallConfig.userNoncesSequential, false, "userNoncesSequential 1 incorrect");
@@ -100,6 +102,7 @@ contract CallBitsTest is Test {
         assertEq(decodedCallConfig.trustedOpHash, true, "trustedOpHash 1 incorrect");
         assertEq(decodedCallConfig.invertBidValue, false, "invertBidValue 1 incorrect");
         assertEq(decodedCallConfig.exPostBids, true, "exPostBids 1 incorrect");
+        assertEq(decodedCallConfig.allowAllocateValueFailure, false, "allowAllocateValueFailure 1 incorrect");
 
         encodedCallConfig = CallBits.encodeCallConfig(callConfig2);
         decodedCallConfig = encodedCallConfig.decodeCallConfig();
@@ -123,9 +126,10 @@ contract CallBitsTest is Test {
         assertEq(decodedCallConfig.trustedOpHash, false, "trustedOpHash 2 incorrect");
         assertEq(decodedCallConfig.invertBidValue, true, "invertBidValue 2 incorrect");
         assertEq(decodedCallConfig.exPostBids, false, "exPostBids 2 incorrect");
+        assertEq(decodedCallConfig.allowAllocateValueFailure, true, "allowAllocateValueFailure 2 incorrect");
     }
 
-    function testConfigParameters() public {
+    function testConfigParameters() public view {
         uint32 encodedCallConfig = CallBits.encodeCallConfig(callConfig1);
         assertEq(encodedCallConfig.needsSequentialUserNonces(), false, "needsSequentialUserNonces 1 incorrect");
         assertEq(encodedCallConfig.needsSequentialDAppNonces(), true, "needsSequentialDAppNonces 1 incorrect");
@@ -147,6 +151,7 @@ contract CallBitsTest is Test {
         assertEq(encodedCallConfig.allowsTrustedOpHash(), true, "allowsTrustedOpHash 1 incorrect");
         assertEq(encodedCallConfig.invertsBidValue(), false, "invertsBidValue 1 incorrect");
         assertEq(encodedCallConfig.exPostBids(), true, "exPostBids 1 incorrect");
+        assertEq(encodedCallConfig.allowAllocateValueFailure(), false, "allowAllocateValueFailure 1 incorrect");
         
 
         encodedCallConfig = CallBits.encodeCallConfig(callConfig2);
@@ -170,5 +175,6 @@ contract CallBitsTest is Test {
         assertEq(encodedCallConfig.allowsTrustedOpHash(), false, "allowsTrustedOpHash 2 incorrect");
         assertEq(encodedCallConfig.invertsBidValue(), true, "invertsBidValue 2 incorrect");
         assertEq(encodedCallConfig.exPostBids(), false, "exPostBids 2 incorrect");
+        assertEq(encodedCallConfig.allowAllocateValueFailure(), true, "allowAllocateValueFailure 2 incorrect");
     }
 }

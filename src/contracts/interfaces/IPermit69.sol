@@ -19,7 +19,7 @@ interface IPermit69 {
         address user,
         address control,
         uint32 callConfig,
-        uint16 lockState
+        uint8 phase
     )
         external;
 
@@ -30,7 +30,7 @@ interface IPermit69 {
         address user,
         address control,
         uint32 callConfig,
-        uint16 lockState
+        uint8 phase
     )
         external;
 }
