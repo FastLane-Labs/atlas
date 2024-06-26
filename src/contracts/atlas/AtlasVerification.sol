@@ -603,6 +603,10 @@ contract AtlasVerification is EIP712, DAppIntegration, AtlasConstants {
             return ValidCallsResult.UserFromInvalid;
         }
 
+        if (userOp.to != ATLAS) {
+            return ValidCallsResult.UserToInvalid;
+        }
+
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp userNonces
 

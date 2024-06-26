@@ -25,6 +25,7 @@ enum ValidCallsResult {
     CallConfigMismatch,
     DAppToInvalid,
     UserFromInvalid,
+    UserToInvalid,
     ControlMismatch,
     UserNonceInvalid,
     InvalidCallChainHash,
