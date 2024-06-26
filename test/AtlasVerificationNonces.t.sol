@@ -24,10 +24,9 @@ contract MockNonceManager is NonceManager {
     function handleDAppNonces(
         address dAppSignatory,
         uint256 nonce,
-        bool sequential,
         bool isSimulation
     ) external returns (bool) {
-        return _handleDAppNonces(dAppSignatory, nonce, sequential, isSimulation);
+        return _handleDAppNonces(dAppSignatory, nonce, isSimulation);
     }
 
     function handleSequentialNonces(uint256 lastUsedNonce, uint256 nonce) external pure returns (bool, uint256) {
@@ -50,13 +49,12 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
     function testGetNextNonceReturnsOneForNewAccount_Sequential() public {
         defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
         assertEq(atlasVerification.getUserNextNonce(userEOA, true), 1, "User seq next nonce should be 1");
-        assertEq(atlasVerification.getDAppNextNonce(governanceEOA, true), 1, "Gov seq next nonce should be 1");
+        assertEq(atlasVerification.getDAppNextNonce(governanceEOA), 1, "Gov seq next nonce should be 1");
     }
 
     function testGetNextNonceReturnsOneForNewAccount_NonSeq() public {
         defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(false).build());
         assertEq(atlasVerification.getUserNextNonce(userEOA, false), 1, "User non-seq next nonce should be 1");
-        assertEq(atlasVerification.getDAppNextNonce(governanceEOA, false), 1, "Gov non-seq next nonce should be 1");
     }
 
     function testUsingSeqNoncesDoNotChangeNextNonSeqNonce() public {
@@ -89,12 +87,12 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         assertEq(atlasVerification.getUserNextNonce(userEOA, false), 2, "User next non-seq nonce should now be 2");
     }
 
-    function testSameNonceCannotBeUsedTwice_UserSequential_DAppNonSeq() public {
+    function testSameNonceCannotBeUsedTwice_UserSequential() public {
         defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).withDappNoncesSequential(false).build());
 
         UserOperation memory userOp = validUserOperation().withNonce(1).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
-        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(1).signAndBuild(address(atlasVerification), governancePK);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).signAndBuild(address(atlasVerification), governancePK);
         doValidateCalls(AtlasVerificationBase.ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ));
@@ -102,18 +100,10 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         // Fails with UserNonceInvalid due to re-used user nonce
         userOp = validUserOperation().withNonce(1).build();
         solverOps = validSolverOperations(userOp);
-        dappOp = validDAppOperation(userOp, solverOps).withNonce(5).signAndBuild(address(atlasVerification), governancePK);
+        dappOp = validDAppOperation(userOp, solverOps).signAndBuild(address(atlasVerification), governancePK);
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.UserNonceInvalid);
-
-        // Fails with InvalidDAppNonce due to re-used dapp nonce
-        userOp = validUserOperation().withNonce(2).build();
-        solverOps = validSolverOperations(userOp);
-        dappOp = validDAppOperation(userOp, solverOps).withNonce(1).signAndBuild(address(atlasVerification), governancePK);
-        callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.InvalidDAppNonce);
     }
 
     function testSameNonceValidForSeqAndNonSeqDApps() public {
@@ -245,7 +235,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
 
         // Testing nonces 2 - 8
         for (uint256 i = 2; i < 9; i++) {
-            assertEq(atlasVerification.getDAppNextNonce(governanceEOA, true), i, "Next nonce not incrementing as expected");
+            assertEq(atlasVerification.getDAppNextNonce(governanceEOA), i, "Next nonce not incrementing as expected");
             
             userOp = validUserOperation().withNonce(i).build();
             solverOps = validSolverOperations(userOp);
@@ -255,7 +245,7 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
             ), ValidCallsResult.Valid);
         }
 
-        assertEq(atlasVerification.getDAppNextNonce(governanceEOA, true), 9, "Next nonce should be 9 after 8 seq nonces used");
+        assertEq(atlasVerification.getDAppNextNonce(governanceEOA), 9, "Next nonce should be 9 after 8 seq nonces used");
     }
 
     function testGetNextNonceAfter() public {
@@ -496,52 +486,52 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
         assertEq(mockNonceManager.dAppSequentialNonceTrackers(governanceEOA), 0, "DApp sequential nonce tracker should be 0");
 
         // Nonce 0 is not permitted
-        assertFalse(mockNonceManager.handleDAppNonces(governanceEOA, 0, true, false), "Nonce 0 is not permitted");
+        assertFalse(mockNonceManager.handleDAppNonces(governanceEOA, 0, false), "Nonce 0 is not permitted");
 
         // Last used nonce should still be 0
         assertEq(mockNonceManager.dAppSequentialNonceTrackers(governanceEOA), 0, "DApp sequential nonce tracker should still be 0");
 
         // Nonce 1 is valid
-        assertTrue(mockNonceManager.handleDAppNonces(governanceEOA, 1, true, false), "Nonce 1 should be valid");
+        assertTrue(mockNonceManager.handleDAppNonces(governanceEOA, 1, false), "Nonce 1 should be valid");
 
         // Last used nonce should have been updated to 1
         assertEq(mockNonceManager.dAppSequentialNonceTrackers(governanceEOA), 1, "DApp sequential nonce tracker should be 1");
 
         // Nonce 2 is valid (in simulation mode)
-        assertTrue(mockNonceManager.handleDAppNonces(governanceEOA, 2, true, true), "Nonce 2 should be valid in simulation mode");
+        assertTrue(mockNonceManager.handleDAppNonces(governanceEOA, 2, true), "Nonce 2 should be valid in simulation mode");
 
         // Last used nonce should not have been updated (because simulation mode), it should still be 1
         assertEq(mockNonceManager.dAppSequentialNonceTrackers(governanceEOA), 1, "DApp sequential nonce tracker should still be 1");
 
         // Nonce 3 is invalid
-        assertFalse(mockNonceManager.handleDAppNonces(governanceEOA, 3, true, false), "Nonce 3 should be invalid");
+        assertFalse(mockNonceManager.handleDAppNonces(governanceEOA, 3, false), "Nonce 3 should be invalid");
 
         // Nonce 2 is valid
-        assertTrue(mockNonceManager.handleDAppNonces(governanceEOA, 2, true, false), "Nonce 2 should be valid");
+        assertTrue(mockNonceManager.handleDAppNonces(governanceEOA, 2, false), "Nonce 2 should be valid");
 
         // Last used nonce should have been updated to 2
         assertEq(mockNonceManager.dAppSequentialNonceTrackers(governanceEOA), 2, "DApp sequential nonce tracker should be 2");
 
         // Nonce 2 is now invalid
-        assertFalse(mockNonceManager.handleDAppNonces(governanceEOA, 2, true, false), "Nonce 2 should be invalid");
+        assertFalse(mockNonceManager.handleDAppNonces(governanceEOA, 2, false), "Nonce 2 should be invalid");
 
         // Last used nonce should still be 2
         assertEq(mockNonceManager.dAppSequentialNonceTrackers(governanceEOA), 2, "DApp sequential nonce tracker should still be 2");
 
         // Getting next nonce
-        uint256 nextNonce = mockNonceManager.getDAppNextNonce(governanceEOA, true);
+        uint256 nextNonce = mockNonceManager.getDAppNextNonce(governanceEOA);
 
         // Next nonce should be 3
         assertEq(nextNonce, 3, "Next nonce should be 3");
 
         // Consume the nonce
-        assertTrue(mockNonceManager.handleDAppNonces(governanceEOA, nextNonce, true, false), "Next nonce should be valid");
+        assertTrue(mockNonceManager.handleDAppNonces(governanceEOA, nextNonce, false), "Next nonce should be valid");
 
         // Last used nonce should have been updated to 3
         assertEq(mockNonceManager.dAppSequentialNonceTrackers(governanceEOA), 3, "DApp sequential nonce tracker should be 3");
 
         // Next nonce should be 4
-        nextNonce = mockNonceManager.getDAppNextNonce(governanceEOA, true);
+        nextNonce = mockNonceManager.getDAppNextNonce(governanceEOA);
         assertEq(nextNonce, 4, "Next nonce should be 4");
     }
 
@@ -599,65 +589,6 @@ contract AtlasVerificationNoncesTest is AtlasVerificationBase {
 
         // Getting the next nonce after 68
         nextNonce = mockNonceManager.getUserNextNonSeqNonceAfter(userEOA, 68);
-
-        // Next nonce should be 70
-        assertEq(nextNonce, 70, "Next nonce should be 70");
-    }
-
-    function testHandleDAppNonSequentialNonces() public {
-        // The 0 index bitmap should be 0 (no nonce used yet)
-        assertEq(mockNonceManager.dAppNonSequentialNonceTrackers(governanceEOA, 0), 0, "DApp non-sequential nonce tracker should be 0");
-
-        // Nonce 0 is not permitted
-        assertFalse(mockNonceManager.handleDAppNonces(governanceEOA, 0, false, false), "Nonce 0 is not permitted");
-
-        // The 0 index bitmap should still be 0
-        assertEq(mockNonceManager.dAppNonSequentialNonceTrackers(governanceEOA, 0), 0, "DApp non-sequential nonce tracker should still be 0");
-
-        // Nonce 1 is valid
-        assertTrue(mockNonceManager.handleDAppNonces(governanceEOA, 1, false, false), "Nonce 1 should be valid");
-
-        // The 0 index bitmap should have been updated to 1 << 1 = 2
-        assertEq(mockNonceManager.dAppNonSequentialNonceTrackers(governanceEOA, 0), 2, "DApp non-sequential nonce tracker should be 2");
-
-        // Nonce 2 is valid (in simulation mode)
-        assertTrue(mockNonceManager.handleDAppNonces(governanceEOA, 2, false, true), "Nonce 2 should be valid in simulation mode");
-
-        // The 0 index bitmap should not have been updated (because simulation mode), it should still be 1
-        assertEq(mockNonceManager.dAppNonSequentialNonceTrackers(governanceEOA, 0), 2, "DApp non-sequential nonce tracker should still be 2");
-
-        // Nonce 69 is valid
-        assertTrue(mockNonceManager.handleDAppNonces(governanceEOA, 69, false, false), "Nonce 69 should be valid");
-
-        // The 0 index bitmap should have been updated to 2 + (1 << 69) = 590295810358705651714
-        assertEq(mockNonceManager.dAppNonSequentialNonceTrackers(governanceEOA, 0), 590295810358705651714, "DApp non-sequential nonce tracker should be 590295810358705651714");
-
-        // Nonce 69 is now invalid
-        assertFalse(mockNonceManager.handleDAppNonces(governanceEOA, 69, false, false), "Nonce 69 should be invalid");
-
-        // The 0 index bitmap should still be 590295810358705651714
-        assertEq(mockNonceManager.dAppNonSequentialNonceTrackers(governanceEOA, 0), 590295810358705651714, "DApp non-sequential nonce tracker should still be 590295810358705651714");
-
-        // Getting next nonce
-        uint256 nextNonce = mockNonceManager.getDAppNextNonce(governanceEOA, false);
-
-        // Next nonce should be 2
-        assertEq(nextNonce, 2, "Next nonce should be 2");
-
-        // Consume the nonce
-        assertTrue(mockNonceManager.handleDAppNonces(governanceEOA, nextNonce, false, false), "Next nonce should be valid");
-
-        // The 0 index bitmap should have been updated to 590295810358705651714 + (1 << 2) = 590295810358705651718
-        assertEq(mockNonceManager.dAppNonSequentialNonceTrackers(governanceEOA, 0), 590295810358705651718, "DApp non-sequential nonce tracker should be 590295810358705651718");
-
-        // Try to consume the same nonce again
-        assertFalse(mockNonceManager.handleDAppNonces(governanceEOA, nextNonce, false, false), "Next nonce should be invalid");
-
-        // The 0 index bitmap should still be 590295810358705651718
-        assertEq(mockNonceManager.dAppNonSequentialNonceTrackers(governanceEOA, 0), 590295810358705651718, "DApp non-sequential nonce tracker should still be 590295810358705651718");
-
-        // Getting the next nonce after 68
-        nextNonce = mockNonceManager.getDAppNextNonSeqNonceAfter(governanceEOA, 68);
 
         // Next nonce should be 70
         assertEq(nextNonce, 70, "Next nonce should be 70");

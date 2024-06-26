@@ -10,10 +10,9 @@ contract NonceManager is AtlasConstants {
 
     // address => word index => bitmap
     mapping(address => mapping(uint248 => uint256)) public userNonSequentialNonceTrackers;
-    mapping(address => mapping(uint248 => uint256)) public dAppNonSequentialNonceTrackers;
 
-    // NOTE: To prevent builder censorship, nonces can be processed in any order so long as they aren't duplicated and
-    // as long as the dApp opts in to it.
+    // NOTE: Non-sequential nonces are only enabled for users. If dApps nonces are not set to be sequential, their
+    // validation is not enforced.
 
     // ---------------------------------------------------- //
     //                                                      //
@@ -59,17 +58,16 @@ contract NonceManager is AtlasConstants {
         }
     }
 
-    /// @notice The _handleDAppNonces internal function handles the verification of dApp signatory nonces for both
-    /// sequential and non-sequential nonce systems.
+    /// @notice The _handleDAppNonces internal function handles the verification of dApp signatory nonces for sequential
+    /// nonce systems.
     /// @param dAppSignatory The address of the dApp to verify the nonce for.
     /// @param nonce The nonce to verify.
-    /// @param sequential A boolean indicating if the nonce mode is sequential (true) or not (false)
     /// @param isSimulation A boolean indicating if the execution is a simulation.
     /// @return validNonce A boolean indicating if the nonce is valid.
+    /// @dev DApps nonces are only handled in sequential mode.
     function _handleDAppNonces(
         address dAppSignatory,
         uint256 nonce,
-        bool sequential,
         bool isSimulation
     )
         internal
@@ -78,21 +76,11 @@ contract NonceManager is AtlasConstants {
         // 0 Nonces are not allowed. Nonces start at 1 for both sequential and non-sequential.
         if (nonce == 0) return false;
 
-        if (sequential) {
-            uint256 lastUsedNonce = dAppSequentialNonceTrackers[dAppSignatory];
-            (validNonce, lastUsedNonce) = _handleSequentialNonces(lastUsedNonce, nonce);
-            if (validNonce && !isSimulation) {
-                // Update storage only if valid and not in simulation
-                dAppSequentialNonceTrackers[dAppSignatory] = lastUsedNonce;
-            }
-        } else {
-            (uint248 wordIndex, uint8 bitPos) = _bitmapPositions(nonce);
-            uint256 bitmap = dAppNonSequentialNonceTrackers[dAppSignatory][wordIndex];
-            (validNonce, bitmap) = _handleNonSequentialNonces(bitmap, bitPos);
-            if (validNonce && !isSimulation) {
-                // Update storage only if valid and not in simulation
-                dAppNonSequentialNonceTrackers[dAppSignatory][wordIndex] = bitmap;
-            }
+        uint256 lastUsedNonce = dAppSequentialNonceTrackers[dAppSignatory];
+        (validNonce, lastUsedNonce) = _handleSequentialNonces(lastUsedNonce, nonce);
+        if (validNonce && !isSimulation) {
+            // Update storage only if valid and not in simulation
+            dAppSequentialNonceTrackers[dAppSignatory] = lastUsedNonce;
         }
     }
 
@@ -140,7 +128,7 @@ contract NonceManager is AtlasConstants {
             nextNonce = userSequentialNonceTrackers[user] + 1;
         } else {
             // Set the starting position to 1 to skip the 0 nonce
-            nextNonce = _getNextNonSequentialNonce(user, 0, 1, true);
+            nextNonce = _getNextNonSequentialNonce(user, 0, 1);
         }
     }
 
@@ -150,51 +138,34 @@ contract NonceManager is AtlasConstants {
     /// @return The next nonce for the given user.
     function getUserNextNonSeqNonceAfter(address user, uint256 refNonce) external view returns (uint256) {
         (uint248 wordIndex, uint8 bitPos) = _nextNonceBitmapPositions(refNonce);
-        return _getNextNonSequentialNonce(user, wordIndex, bitPos, true);
+        return _getNextNonSequentialNonce(user, wordIndex, bitPos);
     }
 
-    /// @notice Returns the next nonce for the given dApp signatory, in sequential or non-sequential mode.
+    /// @notice Returns the next nonce for the given dApp signatory, in sequential mode.
     /// @param dApp The address of the dApp signatory for which to retrieve the next nonce.
-    /// @param sequential A boolean indicating if the nonce should be sequential (true) or non-sequential (false).
     /// @return nextNonce The next nonce for the given dApp.
-    function getDAppNextNonce(address dApp, bool sequential) external view returns (uint256 nextNonce) {
-        if (sequential) {
-            nextNonce = dAppSequentialNonceTrackers[dApp] + 1;
-        } else {
-            // Set the starting position to 1 to skip the 0 nonce
-            nextNonce = _getNextNonSequentialNonce(dApp, 0, 1, false);
-        }
-    }
-
-    /// @notice Returns the next valid nonce after `refNonce` for the given dApp signatory, in non-sequential mode.
-    /// @param dApp The address of the dApp signatory for which to retrieve the next nonce.
-    /// @param refNonce The nonce to start the search from.
-    /// @return The next nonce for the given dApp.
-    function getDAppNextNonSeqNonceAfter(address dApp, uint256 refNonce) external view returns (uint256) {
-        (uint248 wordIndex, uint8 bitPos) = _nextNonceBitmapPositions(refNonce);
-        return _getNextNonSequentialNonce(dApp, wordIndex, bitPos, false);
+    /// @dev DApps nonces are only handled in sequential mode.
+    function getDAppNextNonce(address dApp) external view returns (uint256 nextNonce) {
+        nextNonce = dAppSequentialNonceTrackers[dApp] + 1;
     }
 
     /// @notice Returns the next nonce for the given account, in non-sequential mode.
-    /// @param account The account to get the next nonce for.
+    /// @param user The user to get the next nonce for.
     /// @param wordIndex The word index to start the search from.
     /// @param bitPos The bit position to start the search from.
-    /// @param isUser A boolean indicating if the account is a user (true) or a dApp (false).
     /// @return nextNonce The next nonce for the given account.
+    /// @dev Non-sequential nonces are only enabled for users.
     function _getNextNonSequentialNonce(
-        address account,
+        address user,
         uint248 wordIndex,
-        uint8 bitPos,
-        bool isUser
+        uint8 bitPos
     )
         internal
         view
         returns (uint256 nextNonce)
     {
         while (true) {
-            uint256 bitmap = isUser
-                ? userNonSequentialNonceTrackers[account][wordIndex]
-                : dAppNonSequentialNonceTrackers[account][wordIndex];
+            uint256 bitmap = userNonSequentialNonceTrackers[user][wordIndex];
 
             if (bitmap == type(uint256).max) {
                 // Full bitmap, move to the next word
