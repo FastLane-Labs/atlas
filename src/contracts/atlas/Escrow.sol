@@ -170,7 +170,7 @@ abstract contract Escrow is AtlETH {
 
         ctx.solverOutcome = uint24(result);
 
-        _handleSolverAccounting(solverOp, gasWaterMark, result, false, !prevalidated);
+        _handleSolverAccounting(solverOp, gasWaterMark, result, !prevalidated);
 
         // emit event
         emit SolverTxResult(solverOp.solver, solverOp.from, result.executedWithError(), false, result);

@@ -51,7 +51,7 @@ contract MockGasAccounting is GasAccounting, Test {
     }
 
     function releaseSolverLock(SolverOperation calldata solverOp, uint256 gasWaterMark, uint256 result) external {
-        _handleSolverAccounting(solverOp, gasWaterMark, result, false, true);
+        _handleSolverAccounting(solverOp, gasWaterMark, result, true);
     }
 
     function settle(address winningSolver, address bundler) external returns (uint256, uint256) {

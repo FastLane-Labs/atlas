@@ -242,13 +242,11 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param solverOp The current SolverOperation for which to account
     /// @param gasWaterMark The `gasleft()` watermark taken at the start of executing the SolverOperation.
     /// @param result The result bitmap of the SolverOperation execution.
-    /// @param bidFind Indicates if called in the context of `_getBidAmount` in Escrow.sol (true) or not (false).
     /// @param includeCalldata Whether to include calldata cost in the gas calculation.
     function _handleSolverAccounting(
         SolverOperation calldata solverOp,
         uint256 gasWaterMark,
         uint256 result,
-        bool bidFind,
         bool includeCalldata
     )
         internal
@@ -263,13 +261,13 @@ abstract contract GasAccounting is SafetyLocks {
 
         // Calculate what the solver owes
         // NOTE: This will cause an error if you are simulating with a gasPrice of 0
-        if (!bidFind && !result.updateEscrow()) {
+        if (!result.updateEscrow()) {
             // CASE: Solver is not responsible for the failure of their operation, so we blame the bundler
             // and reduce the total amount refunded to the bundler
             writeoffs += gasUsed;
         } else {
             // CASE: Solver failed, so we calculate what they owe.
-            uint256 deficit = _assign(solverOp.from, gasUsed, false, bidFind);
+            uint256 deficit = _assign(solverOp.from, gasUsed, false, false);
             if (deficit > 0) {
                 // Write off any deficit as a gas loss to the bundler so that other solvers aren't forced to pay it.
                 writeoffs += deficit;
