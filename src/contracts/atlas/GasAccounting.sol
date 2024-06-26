@@ -253,7 +253,7 @@ abstract contract GasAccounting is SafetyLocks {
             gasUsed += _getCalldataCost(solverOp.data.length);
         }
 
-        gasUsed = (gasUsed * ((SURCHARGE_SCALE + ATLAS_SURCHARGE_RATE + BUNDLER_SURCHARGE_RATE) / SURCHARGE_SCALE));
+        gasUsed = gasUsed * (SURCHARGE_SCALE + ATLAS_SURCHARGE_RATE + BUNDLER_SURCHARGE_RATE) / SURCHARGE_SCALE;
 
         // Calculate what the solver owes
         // NOTE: This will cause an error if you are simulating with a gasPrice of 0
