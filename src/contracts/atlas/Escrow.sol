@@ -140,7 +140,8 @@ abstract contract Escrow is AtlETH {
         if (result.canExecute()) {
             uint256 gasLimit;
             // Verify gasLimit again
-            (result, gasLimit) = _validateSolverOperation(dConfig, solverOp, gasWaterMark);
+            (result, gasLimit) = _validateSolverOpGas(dConfig, solverOp, gasWaterMark);
+            result |= _validateSolverOpDeadline(solverOp, dConfig);
 
             if (dConfig.callConfig.allowsTrustedOpHash()) {
                 if (!prevalidated && !_handleAltOpHash(userOp, solverOp)) {
@@ -242,10 +243,10 @@ abstract contract Escrow is AtlETH {
         }
     }
 
-    /// @notice Validates a SolverOperation's gas requirements and deadline against the current block and escrow state.
+    /// @notice Validates a SolverOperation's gas requirements against the escrow state.
     /// @dev Performs a series of checks to ensure that a SolverOperation can be executed within the defined parameters
-    /// and limits. This includes verifying that the operation is within the gas limit, that the current block is before
-    /// the operation's deadline, and that the solver has sufficient balance in escrow to cover the gas costs.
+    /// and limits. This includes verifying that the operation is within the gas limit and that the solver has
+    /// sufficient balance in escrow to cover the gas costs.
     /// @param dConfig DApp configuration data, including solver gas limits and operation parameters.
     /// @param solverOp The SolverOperation being validated.
     /// @param gasWaterMark The initial gas measurement before validation begins, used to ensure enough gas remains for
@@ -254,7 +255,7 @@ abstract contract Escrow is AtlETH {
     /// encountered.
     /// @return gasLimit The calculated gas limit for the SolverOperation, considering the operation's gas usage and
     /// the protocol's gas buffers.
-    function _validateSolverOperation(
+    function _validateSolverOpGas(
         DAppConfig memory dConfig,
         SolverOperation calldata solverOp,
         uint256 gasWaterMark
@@ -294,15 +295,7 @@ abstract contract Escrow is AtlETH {
         // subtract out the gas buffer since the solver's metaTx won't use it
         gasLimit -= _FASTLANE_GAS_BUFFER;
 
-        EscrowAccountAccessData memory aData = accessData[solverOp.from];
-
-        uint256 solverBalance = aData.bonded;
-        uint256 lastAccessedBlock = aData.lastAccessedBlock;
-
-        // NOTE: Turn this into time stamp check for FCFS L2s?
-        if (lastAccessedBlock == block.number) {
-            result = 1 << uint256(SolverOutcome.PerBlockLimit);
-        }
+        uint256 solverBalance = accessData[solverOp.from].bonded;
 
         // see if solver's escrow can afford tx gascost
         if (gasCost > solverBalance) {
@@ -311,6 +304,37 @@ abstract contract Escrow is AtlETH {
         }
 
         return (result, gasLimit);
+    }
+
+    /// @notice Validates a SolverOperation's deadline against the current block.
+    /// @param solverOp The SolverOperation being validated.
+    /// @param dConfig DApp configuration data, including solver gas limits and operation parameters.
+    /// @return result Updated result flags after performing the validation checks, including any new errors
+    function _validateSolverOpDeadline(
+        SolverOperation calldata solverOp,
+        DAppConfig memory dConfig
+    )
+        internal
+        view
+        returns (uint256 result)
+    {
+        if (solverOp.deadline != 0 && block.number > solverOp.deadline) {
+            result |= (
+                1
+                    << uint256(
+                        dConfig.callConfig.allowsTrustedOpHash()
+                            ? uint256(SolverOutcome.DeadlinePassedAlt)
+                            : uint256(SolverOutcome.DeadlinePassed)
+                    )
+            );
+            return result;
+        }
+
+        uint256 lastAccessedBlock = accessData[solverOp.from].lastAccessedBlock;
+
+        if (lastAccessedBlock == block.number) {
+            result |= 1 << uint256(SolverOutcome.PerBlockLimit);
+        }
     }
 
     /// @notice Determines the bid amount for a SolverOperation based on verification and validation results.
@@ -352,7 +376,7 @@ abstract contract Escrow is AtlETH {
         if (!result.canExecute()) return 0;
 
         uint256 gasLimit;
-        (result, gasLimit) = _validateSolverOperation(dConfig, solverOp, gasWaterMark);
+        (, gasLimit) = _validateSolverOpGas(dConfig, solverOp, gasWaterMark);
 
         if (dConfig.callConfig.allowsTrustedOpHash()) {
             if (!_handleAltOpHash(userOp, solverOp)) {
