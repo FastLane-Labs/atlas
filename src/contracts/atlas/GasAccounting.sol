@@ -292,8 +292,6 @@ abstract contract GasAccounting is SafetyLocks {
 
         // By reducing the _claims, solvers end up paying less in total.
         if (ctx.solverCount > 0) {
-            uint256 _bundlerGasOveragePenalty;
-
             // Calculate the unadjusted bundler gas surcharge
             uint256 _grossBundlerGasSurcharge =
                 (_claims * BUNDLER_SURCHARGE_RATE) / (SURCHARGE_SCALE + ATLAS_SURCHARGE_RATE + BUNDLER_SURCHARGE_RATE);
