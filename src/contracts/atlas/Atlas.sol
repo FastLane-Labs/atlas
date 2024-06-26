@@ -40,6 +40,7 @@ contract Atlas is Escrow, Factory {
     /// @param userOp The UserOperation struct containing the user's transaction data.
     /// @param solverOps The SolverOperation array containing the solvers' transaction data.
     /// @param dAppOp The DAppOperation struct containing the DApp's transaction data.
+    /// @return auctionWon A boolean indicating whether there was a successful, winning solver.
     function metacall(
         UserOperation calldata userOp, // set by user
         SolverOperation[] calldata solverOps, // supplied by ops relay
@@ -155,6 +156,7 @@ contract Atlas is Escrow, Factory {
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param returnData Return data from the preOps and userOp calls.
+    /// @return The winning bid amount.
     function _bidFindingIteration(
         Context memory ctx,
         DAppConfig memory dConfig,
@@ -251,6 +253,7 @@ contract Atlas is Escrow, Factory {
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param returnData Return data from the preOps and userOp calls.
+    /// @return The winning bid amount.
     function _bidKnownIteration(
         Context memory ctx,
         DAppConfig memory dConfig,
@@ -323,6 +326,8 @@ contract Atlas is Escrow, Factory {
     /// @param user User address
     /// @param control DAppControl contract address
     /// @param callConfig CallConfig of the current metacall tx.
+    /// @return A bool indicating whether the execution environment address is the same address that the factory would
+    /// deploy an Execution Environment to, given the user, control, and callConfig params.
     function _verifyUserControlExecutionEnv(
         address environment,
         address user,
