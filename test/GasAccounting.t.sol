@@ -73,7 +73,7 @@ contract MockGasAccounting is GasAccounting, Test {
             paymentsSuccessful: paymentsSuccessful,
             solverIndex: uint8(winningSolverIndex),
             solverCount: uint8(solverCount),
-            phase: ExecutionPhase.PostOps,
+            phase: uint8(ExecutionPhase.PostOps),
             solverOutcome: 0,
             bidFind: false,
             isSimulation: false,

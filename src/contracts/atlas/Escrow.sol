@@ -530,7 +530,7 @@ abstract contract Escrow is AtlETH {
         (success, data) = ctx.executionEnvironment.call(
             abi.encodePacked(
                 abi.encodeCall(IExecutionEnvironment.solverPreTryCatch, (bidAmount, solverOp, returnData)),
-                ctx.setAndPack(ExecutionPhase.PreSolver, false)
+                ctx.setAndPack(ExecutionPhase.PreSolver)
             )
         );
 
@@ -583,7 +583,7 @@ abstract contract Escrow is AtlETH {
         (success, data) = ctx.executionEnvironment.call(
             abi.encodePacked(
                 abi.encodeCall(IExecutionEnvironment.solverPostTryCatch, (solverOp, returnData, solverTracker)),
-                ctx.setAndPack(ExecutionPhase.PostSolver, false)
+                ctx.setAndPack(ExecutionPhase.PostSolver)
             )
         );
 
