@@ -75,9 +75,9 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         uint256 solverOpCount = solverOps.length;
 
         {
-            // bypassSignatoryApproval still verifies signature match, but does not check
-            // if dApp owner approved the signor.
-            (ValidCallsResult verifyAuctioneerResult, bool bypassSignatoryApproval) =
+            // allowUnapprovedDAppSignatories still verifies signature match, but does not check
+            // if dApp owner approved the signer.
+            (ValidCallsResult verifyAuctioneerResult, bool allowUnapprovedDAppSignatories) =
                 _verifyAuctioneer(dConfig, userOp, solverOps, dAppOp, msgSender);
 
             if (verifyAuctioneerResult != ValidCallsResult.Valid && !isSimulation) {
@@ -86,7 +86,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
 
             // Check dapp signature
             ValidCallsResult verifyDappResult =
-                _verifyDApp(dConfig, dAppOp, msgSender, bypassSignatoryApproval, isSimulation);
+                _verifyDApp(dConfig, dAppOp, msgSender, allowUnapprovedDAppSignatories, isSimulation);
             if (verifyDappResult != ValidCallsResult.Valid) {
                 return verifyDappResult;
             }
@@ -226,7 +226,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     /// @param dAppOp The DAppOperation struct of the metacall.
     /// @param msgSender The bundler (msg.sender) of the metacall transaction in the Atlas contract.
     /// @return validCallsResult The result of the ValidCalls check, in enum ValidCallsResult form.
-    /// @return bypassSignatoryApproval A boolean indicating if the signatory approval check should be bypassed.
+    /// @return allowUnapprovedDAppSignatories A boolean indicating if the signatory approval check should be bypassed.
     function _verifyAuctioneer(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
@@ -236,7 +236,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     )
         internal
         pure
-        returns (ValidCallsResult validCallsResult, bool bypassSignatoryApproval)
+        returns (ValidCallsResult validCallsResult, bool allowUnapprovedDAppSignatories)
     {
         if (
             dConfig.callConfig.verifyCallChainHash()
@@ -317,14 +317,14 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     /// @param dConfig The DAppConfig containing configuration details.
     /// @param dAppOp The DAppOperation struct of the metacall.
     /// @param msgSender The forwarded msg.sender of the original metacall transaction in the Atlas contract.
-    /// @param bypassSignatoryApproval Boolean indicating whether to bypass signatory approval.
+    /// @param allowUnapprovedDAppSignatories Boolean indicating whether to bypass signatory approval.
     /// @param isSimulation Boolean indicating whether the execution is a simulation.
     /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
     function _verifyDApp(
         DAppConfig memory dConfig,
         DAppOperation calldata dAppOp,
         address msgSender,
-        bool bypassSignatoryApproval,
+        bool allowUnapprovedDAppSignatories,
         bool isSimulation
     )
         internal
@@ -357,7 +357,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
 
         // If `_verifyAuctioneer()` allows bypassing signatory approval, the checks below are skipped and we can return
         // Valid here, considering the checks above have all passed.
-        if (bypassSignatoryApproval) return ValidCallsResult.Valid;
+        if (allowUnapprovedDAppSignatories) return ValidCallsResult.Valid;
 
         // Check actual bundler matches the dApp's intended `dAppOp.bundler`
         // If bundler and auctioneer are the same address, this check is skipped
