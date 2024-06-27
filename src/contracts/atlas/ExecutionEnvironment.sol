@@ -9,7 +9,7 @@ import { Base } from "src/contracts/common/ExecutionBase.sol";
 import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
 import { ISafetyLocks } from "src/contracts/interfaces/ISafetyLocks.sol";
 import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
-import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
@@ -252,7 +252,7 @@ contract ExecutionEnvironment is Base, ReentrancyGuard {
 
         uint256 balance = address(this).balance;
         if (balance > 0) {
-            IEscrow(ATLAS).contribute{ value: balance }();
+            IAtlas(ATLAS).contribute{ value: balance }();
         }
     }
 

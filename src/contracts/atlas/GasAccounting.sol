@@ -64,23 +64,13 @@ abstract contract GasAccounting is SafetyLocks {
         return (deficit > _deposits) ? (deficit - _deposits) : 0;
     }
 
-    /// @notice Reconciles the escrow balances and gas surcharge between the Execution Environment and the solver. This
-    /// function adjusts the solver's bonded balance based on the actual gas spent and any additional payments or
-    /// deductions.
-    /// @param environment The Execution Environment contract address involved in the reconciliation.
-    /// @param solverFrom The address of the solver from which the reconciliation is initiated.
-    /// @param maxApprovedGasSpend The maximum amount of gas spend approved by the solver for covering transaction
-    /// costs.
+    /// @notice Allows a solver to settle any outstanding ETH owed, either to repay gas used by their solverOp or to
+    /// repay any ETH borrowed from Atlas. This debt can be paid either by sending ETH when calling this function
+    /// (msg.value) or by approving Atlas to use a certain amount of the solver's bonded AtlETH.
+    /// @param maxApprovedGasSpend The maximum amount of the solver's bonded AtlETH that Atlas can deduct to cover the
+    /// solver's debt.
     /// @return owed The amount owed, if any, by the solver after reconciliation.
-    function reconcile(
-        address environment,
-        address solverFrom,
-        uint256 maxApprovedGasSpend
-    )
-        external
-        payable
-        returns (uint256 owed)
-    {
+    function reconcile(uint256 maxApprovedGasSpend) external payable returns (uint256 owed) {
         // NOTE: maxApprovedGasSpend is the amount of the solver's atlETH that the solver is allowing
         // to be used to cover what they owe. Assuming they're successful, a value up to this amount
         // will be subtracted from the solver's bonded AtlETH during _settle().
@@ -88,28 +78,22 @@ abstract contract GasAccounting is SafetyLocks {
         // NOTE: After reconcile is called successfully by the solver, neither the claims nor
         // withdrawals values can be increased.
 
-        uint256 bondedBalance = uint256(accessData[solverFrom].bonded);
-
-        if (maxApprovedGasSpend > bondedBalance) maxApprovedGasSpend = bondedBalance;
-
-        Lock memory _lock = lock;
-
-        if (_lock.activeEnvironment != environment) {
-            revert InvalidExecutionEnvironment(_lock.activeEnvironment);
-        }
-        if (_lock.phase != uint8(ExecutionPhase.SolverOperation)) {
-            revert WrongPhase();
-        }
+        // NOTE: While anyone can call this function, it can only be called in the SolverOperation phase. Because Atlas
+        // calls directly to the solver contract in this phase, the solver should be careful to not call malicious
+        // contracts which may call reconcile() on their behalf, with an excessive maxApprovedGasSpend.
+        if (lock.phase != uint8(ExecutionPhase.SolverOperation)) revert WrongPhase();
 
         (address currentSolver, bool calledBack, bool fulfilled) = _solverLockData();
+        uint256 bondedBalance = uint256(accessData[currentSolver].bonded);
 
-        if (solverFrom != currentSolver) revert InvalidSolverFrom(currentSolver);
+        // Solver can only approve up to their bonded balance, not more
+        if (maxApprovedGasSpend > bondedBalance) maxApprovedGasSpend = bondedBalance;
 
         uint256 _deductions = claims + withdrawals - writeoffs;
         uint256 _additions = deposits + msg.value;
 
         // Add msg.value to solver's deposits
-        // NOTE: This is inside the solver try/catch and will be undone if solver fails
+        // NOTE: This is inside the solver try/catch  and will be undone if solver fails
         if (msg.value > 0) deposits = _additions;
 
         // CASE: Callback verified but insufficient balance

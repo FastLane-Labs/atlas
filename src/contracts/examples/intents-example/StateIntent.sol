@@ -4,7 +4,7 @@ pragma solidity 0.8.22;
 // Atlas Base Imports
 import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
 import { IExecutionEnvironment } from "../../interfaces/IExecutionEnvironment.sol";
-import { IEscrow } from "../../interfaces/IEscrow.sol";
+import { IAtlas } from "../../interfaces/IAtlas.sol";
 
 import { SafetyBits } from "../../libraries/SafetyBits.sol";
 

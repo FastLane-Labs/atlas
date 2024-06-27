@@ -4,7 +4,7 @@ pragma solidity 0.8.22;
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { IPermit69 } from "src/contracts/interfaces/IPermit69.sol";
 import { ISafetyLocks } from "src/contracts/interfaces/ISafetyLocks.sol";
-import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
 import { ExecutionPhase } from "src/contracts/types/LockTypes.sol";
 import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "src/contracts/libraries/SafetyBits.sol";
@@ -203,14 +203,14 @@ contract ExecutionBase is Base {
     function _contribute(uint256 amt) internal {
         if (amt > address(this).balance) revert AtlasErrors.InsufficientLocalFunds();
 
-        IEscrow(ATLAS).contribute{ value: amt }();
+        IAtlas(ATLAS).contribute{ value: amt }();
     }
 
     /// @notice Borrows funds from the transient Atlas balance that will be repaid by the Solver or this Execution
     /// Environment via `_contribute()`
     /// @param amt The amount of funds to borrow.
     function _borrow(uint256 amt) internal {
-        IEscrow(ATLAS).borrow(amt);
+        IAtlas(ATLAS).borrow(amt);
     }
 
     /// @notice Transfers ERC20 tokens from the user of the current metacall tx, via Atlas, to a specified destination.

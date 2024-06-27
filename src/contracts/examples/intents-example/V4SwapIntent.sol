@@ -6,7 +6,7 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Base Imports
-import { IEscrow } from "../../interfaces/IEscrow.sol";
+import { IAtlas } from "../../interfaces/IAtlas.sol";
 
 import { CallConfig } from "../../types/DAppApprovalTypes.sol";
 import "../../types/UserCallTypes.sol";

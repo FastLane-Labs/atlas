@@ -9,7 +9,7 @@ import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.s
 import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 
 import { IFactory } from "src/contracts/interfaces/IFactory.sol";
-import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
 import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 
@@ -659,7 +659,7 @@ contract MockSolverContract {
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
         require(success, "atlasSolverCall call reverted");
         if (shouldReconcile) {
-            IEscrow(address(_atlas)).reconcile(executionEnvironment, solverOpFrom, type(uint256).max);
+            IAtlas(_atlas).reconcile(type(uint256).max);
         }
     }
 
