@@ -60,7 +60,7 @@ contract TxBuilder {
         address from,
         address to,
         uint256 maxFeePerGas,
-        uint256 value, // TODO check this is actually intended to be the value param. Was unnamed before.
+        uint256 value,
         uint256 deadline,
         bytes memory data
     )

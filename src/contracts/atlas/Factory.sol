@@ -167,7 +167,6 @@ abstract contract Factory {
         // NOTE: Changing compiler settings or solidity versions can break this.
         creationCode = type(Mimic).creationCode;
 
-        // TODO: unpack the SHL and reorient
         assembly {
             mstore(
                 add(creationCode, 85),

@@ -249,7 +249,7 @@ contract SwapIntentTest is BaseTest {
 
         // Builds the metaTx and to parts of userOp, signature still to be set
         userOp = txBuilder.buildUserOperation({
-            from: userEOA, // NOTE: Would from ever not be user?
+            from: userEOA,
             to: address(swapIntentControl),
             maxFeePerGas: tx.gasprice + 1, // TODO update
             value: 0,

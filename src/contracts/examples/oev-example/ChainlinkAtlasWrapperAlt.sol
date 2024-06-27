@@ -4,8 +4,6 @@ pragma solidity 0.8.22;
 import { Ownable } from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import { SafeERC20, IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import "forge-std/Test.sol"; //TODO remove
-
 // A wrapper contract for a specific Chainlink price feed, used by Atlas to capture Oracle Extractable Value (OEV).
 // Each MEV-generating protocol needs their own wrapper for each Chainlink price feed they use.
 contract ChainlinkAtlasWrapper is Ownable {
@@ -57,9 +55,6 @@ contract ChainlinkAtlasWrapper is Ownable {
         gasUsed = gasleft();
         IOffchainAggregator(aggregator).oracleObservationCount{ gas: 10_000 }(transmitter);
         gasUsed -= gasleft();
-
-        console.log("gasUsed:", gasUsed);
-        console.log("_GAS_THRESHOLD", _GAS_THRESHOLD);
 
         require(gasUsed > _GAS_THRESHOLD, "invalid gas threshold");
     }

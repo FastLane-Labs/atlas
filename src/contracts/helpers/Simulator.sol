@@ -12,8 +12,6 @@ import "../types/DAppApprovalTypes.sol";
 import "../types/ValidCallsTypes.sol";
 import "../types/EscrowTypes.sol";
 
-import "forge-std/Test.sol"; // TODO remove
-
 enum Result {
     Unknown,
     VerificationSimFail,
@@ -113,14 +111,10 @@ contract Simulator is AtlasErrors {
                 }
                 result = Result.VerificationSimFail;
                 additionalErrorCode = validCallsResult;
-                console.log("Result.VerificationSimFail");
-                console.log("ValidCallsResult:", validCallsResult);
             } else if (errorSwitch == PreOpsSimFail.selector) {
                 result = Result.PreOpsSimFail;
-                console.log("Result.PreOpsSimFail");
             } else if (errorSwitch == UserOpSimFail.selector) {
                 result = Result.UserOpSimFail;
-                console.log("Result.UserOpSimFail");
             } else if (errorSwitch == SolverSimFail.selector) {
                 // Expects revertData in form [bytes4, uint256]
                 uint256 solverOutcomeResult;
@@ -130,20 +124,14 @@ contract Simulator is AtlasErrors {
                 }
                 result = Result.SolverSimFail;
                 additionalErrorCode = solverOutcomeResult;
-                console.log("Result.SolverSimFail");
-                console.log("solverOutcomeResult:", solverOutcomeResult);
             } else if (errorSwitch == AllocateValueSimFail.selector) {
                 result = Result.AllocateValueSimFail;
-                console.log("Result.AllocateValueSimFail");
             } else if (errorSwitch == PostOpsSimFail.selector) {
                 result = Result.PostOpsSimFail;
-                console.log("Result.PostOpsSimFail");
             } else if (errorSwitch == SimulationPassed.selector) {
                 result = Result.SimulationPassed;
-                console.log("Result.SimulationPassed");
             } else {
                 result = Result.Unknown;
-                console.log("Result.Unknown");
             }
 
             return (result, additionalErrorCode);
