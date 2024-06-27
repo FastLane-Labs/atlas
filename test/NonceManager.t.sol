@@ -38,7 +38,7 @@ contract MockNonceManager is NonceManager {
     }
 }
 
-contract AtlasVerificationNoncesTest is AtlasVerificationBase {
+contract NonceManagerTest is AtlasVerificationBase {
 
     MockNonceManager public mockNonceManager;
 
