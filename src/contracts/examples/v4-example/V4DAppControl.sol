@@ -88,17 +88,21 @@ contract V4DAppControl is DAppControl {
     //                   ATLAS CALLS                       //
     /////////////////////////////////////////////////////////
 
+    function _checkUserOperation(UserOperation calldata userOp) internal view {
+        require(bytes4(userOp.data) == SWAP, "ERR-H10 InvalidFunction");
+        require(userOp.dapp == v4Singleton, "ERR-H11 InvalidTo"); // this is wrong
+    }
+
     /////////////// DELEGATED CALLS //////////////////
     function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory preOpsData) {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Atlas Escrow
 
+        // check if dapps using this DAppControl can handle the userOp
+        _checkUserOperation(userOp);
+
         require(!_currentKey.initialized, "ERR-H09 AlreadyInitialized");
-
-        require(bytes4(userOp.data) == SWAP, "ERR-H10 InvalidFunction");
-
-        require(userOp.dapp == v4Singleton, "ERR-H11 InvalidTo"); // this is wrong
 
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that DAppControl supplied a valid signature
