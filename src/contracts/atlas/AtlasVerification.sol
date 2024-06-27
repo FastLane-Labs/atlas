@@ -345,18 +345,12 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         // Some checks skipped if call is `simUserOperation()`, because the dAppOp struct is not available.
         bool skipDAppOpChecks = isSimulation && dAppOp.from == address(0);
 
-        // If the dapp indicated that they only accept sequential nonces
-        // (IE for FCFS execution), check and make sure the order is correct
-        // NOTE: allowing only sequential nonces could create a scenario in
-        // which builders or validators may be able to profit via censorship.
-        // DApps are encouraged to rely on the deadline parameter.
-        if (!skipDAppOpChecks) {
+        // If the dApp enabled sequential nonces (IE for FCFS execution), check and make sure the order is correct
+        // NOTE: enabling sequential nonces could create a scenario in which builders or validators may be able to
+        // profit via censorship. DApps are encouraged to rely on the deadline parameter.
+        if (!skipDAppOpChecks && dConfig.callConfig.needsSequentialDAppNonces()) {
             // When not in a simulation, nonces are stored even if the metacall fails, to prevent replay attacks.
-            if (
-                !_handleDAppNonces(
-                    dAppOp.from, dAppOp.nonce, dConfig.callConfig.needsSequentialDAppNonces(), isSimulation
-                )
-            ) {
+            if (!_handleDAppNonces(dAppOp.from, dAppOp.nonce, isSimulation)) {
                 return ValidCallsResult.InvalidDAppNonce;
             }
         }
