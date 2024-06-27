@@ -74,6 +74,11 @@ contract Sorter {
             return false;
         }
 
+        // solverOp.to must be the atlas address
+        if (solverOp.to != address(ATLAS)) {
+            return false;
+        }
+
         // Solvers can only do one tx per block - this prevents double counting bonded balances
         uint256 solverLastActiveBlock = IAtlETH(address(ATLAS)).accountLastActiveBlock(solverOp.from);
         if (solverLastActiveBlock >= block.number) {
@@ -87,6 +92,11 @@ contract Sorter {
 
         // Make sure that the solver's maxFeePerGas matches or exceeds the user's
         if (solverOp.maxFeePerGas < userOp.maxFeePerGas) {
+            return false;
+        }
+
+        // solverOp.solver must not be the atlas or verification address
+        if (solverOp.solver == address(ATLAS) || solverOp.solver == address(VERIFICATION)) {
             return false;
         }
 
