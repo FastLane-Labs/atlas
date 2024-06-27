@@ -46,8 +46,8 @@ abstract contract GasAccounting is SafetyLocks {
         if (_lock.phase > uint8(ExecutionPhase.SolverOperation)) revert WrongPhase();
 
         // borrow() will revert if called after solver calls reconcile()
-        (, bool calledBack, bool fulfilled) = _solverLockData();
-        if (calledBack || fulfilled) revert WrongPhase();
+        (, bool calledBack,) = _solverLockData();
+        if (calledBack) revert WrongPhase();
 
         if (_borrow(amount)) {
             SafeTransferLib.safeTransferETH(msg.sender, amount);
