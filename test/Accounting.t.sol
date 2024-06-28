@@ -195,7 +195,6 @@ contract AccountingTest is BaseTest {
 
         // Check user token balances before
         uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);
-        uint256 userDaiBalanceBefore = DAI.balanceOf(userEOA);
 
         vm.prank(userEOA); // Burn all users WETH except 10 so logs are more readable
         WETH.transfer(address(1), userWethBalanceBefore - swapIntent.amountUserSells);

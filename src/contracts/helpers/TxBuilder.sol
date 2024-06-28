@@ -94,7 +94,6 @@ contract TxBuilder {
         returns (SolverOperation memory solverOp)
     {
         // generate userOpHash depending on CallConfig.trustedOpHash allowed or not
-        DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
         bytes32 userOpHash = IAtlasVerification(verification).getUserOperationHash(userOp);
 
         solverOp = SolverOperation({

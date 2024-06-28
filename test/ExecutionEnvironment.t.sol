@@ -544,19 +544,19 @@ contract ExecutionEnvironmentTest is BaseTest {
         executionEnvironment.withdrawEther(2e18);
     }
 
-    function test_getUser() public {
+    function test_getUser() public view {
         assertEq(executionEnvironment.getUser(), user);
     }
 
-    function test_getControl() public {
+    function test_getControl() public view {
         assertEq(executionEnvironment.getControl(), address(dAppControl));
     }
 
-    function test_getConfig() public {
+    function test_getConfig() public view {
         assertEq(executionEnvironment.getConfig(), CallBits.encodeCallConfig(callConfig));
     }
 
-    function test_getEscrow() public {
+    function test_getEscrow() public view {
         assertEq(executionEnvironment.getEscrow(), address(atlas));
     }
 }
@@ -603,7 +603,7 @@ contract MockDAppControl is DAppControl {
     }
 
     function _postSolverCall(
-        SolverOperation calldata solverOp,
+        SolverOperation calldata,
         bytes calldata returnData
     )
         internal

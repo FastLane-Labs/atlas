@@ -67,7 +67,7 @@ contract V2ExPost is DAppControl {
         )
     { }
 
-    function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory returnData) {
+    function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory) {
         require(bytes4(userOp.data) == IUniswapV2Pair.swap.selector, "ERR-H10 InvalidFunction");
         require(
             IUniswapV2Factory(IUniswapV2Pair(userOp.dapp).factory()).getPair(
@@ -100,11 +100,13 @@ contract V2ExPost is DAppControl {
             userOp.dapp,
             amount0In > amount1In ? amount0In : amount1In
         );
+
+        return new bytes(0);
     }
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(address, uint256 bidAmount, bytes calldata) internal override {
+    function _allocateValueCall(address, uint256, bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
