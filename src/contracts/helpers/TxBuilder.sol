@@ -35,10 +35,8 @@ contract TxBuilder {
 
     function governanceNextNonce(address signatory) public view returns (uint256) {
         // Assume userNoncesSequential = false if control is not set
-        if (control == address(0)) return IAtlasVerification(verification).getDAppNextNonce(signatory, false);
-        return IAtlasVerification(verification).getDAppNextNonce(
-            signatory, IDAppControl(control).requireSequentialDAppNonces()
-        );
+        if (control == address(0) || !IDAppControl(control).requireSequentialDAppNonces()) return 0;
+        return IAtlasVerification(verification).getDAppNextNonce(signatory);
     }
 
     function userNextNonce(address user) public view returns (uint256) {
