@@ -27,17 +27,9 @@ abstract contract SafetyLocks is Storage {
 
     /// @notice Sets the Atlas lock to the specified execution environment, and tracks gas used, ETH borrowed by the
     /// UserOperation, and ETH deposited.
+    /// @param dConfig The DAppConfig of the current DAppControl contract.
     /// @param executionEnvironment The address of the execution environment to set the lock to.
-    /// @param gasMarker Initial `gasleft()` measured at the start of `metacall`.
-    /// @param userOpValue Amount of ETH required by the UserOperation.
-    function _setAccountingLock(
-        DAppConfig memory dConfig,
-        address executionEnvironment,
-        uint256 gasMarker,
-        uint256 userOpValue
-    )
-        internal
-    {
+    function _setEnvironmentLock(DAppConfig memory dConfig, address executionEnvironment) internal {
         if (lock.activeEnvironment != _UNLOCKED) revert AlreadyInitialized();
 
         // Initialize the Lock
@@ -46,15 +38,6 @@ abstract contract SafetyLocks is Storage {
             phase: dConfig.callConfig.needsPreOpsCall() ? uint8(ExecutionPhase.PreOps) : uint8(ExecutionPhase.UserOperation),
             callConfig: dConfig.callConfig
         });
-
-        // Set the claimed amount
-        uint256 rawClaims = (FIXED_GAS_OFFSET + gasMarker) * tx.gasprice;
-        claims = rawClaims * (SURCHARGE_SCALE + ATLAS_SURCHARGE_RATE + BUNDLER_SURCHARGE_RATE) / SURCHARGE_SCALE;
-
-        // Set any withdraws or deposits
-        withdrawals = userOpValue;
-        deposits = msg.value;
-        writeoffs = 0;
     }
 
     modifier withLockPhase(ExecutionPhase _phase) {

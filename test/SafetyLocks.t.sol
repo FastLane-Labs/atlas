@@ -22,7 +22,8 @@ contract MockSafetyLocks is SafetyLocks {
         payable
     {
         DAppConfig memory dConfig;
-        _setAccountingLock(dConfig, executionEnvironment, gasMarker, userOpValue);
+        _setEnvironmentLock(dConfig, executionEnvironment);
+        // _initializeAccountingValues(gasMarker);
     }
 
     function buildEscrowLock(
@@ -73,7 +74,7 @@ contract SafetyLocksTest is Test {
         safetyLocks = new MockSafetyLocks();
     }
 
-    function test_setAccountingLock() public {
+    function test_setEnvironmentLock() public {
         uint256 gasMarker = 222;
         uint256 userOpValue = 333;
         uint256 msgValue = 444;
