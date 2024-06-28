@@ -251,7 +251,7 @@ contract SwapIntentTest is BaseTest {
         userOp = txBuilder.buildUserOperation({
             from: userEOA,
             to: address(swapIntentControl),
-            maxFeePerGas: tx.gasprice + 1, // TODO update
+            maxFeePerGas: tx.gasprice + 1,
             value: 0,
             deadline: block.number + 2,
             data: userOpData
