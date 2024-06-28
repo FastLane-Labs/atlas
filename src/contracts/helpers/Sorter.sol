@@ -8,11 +8,12 @@ import { CallVerification } from "../libraries/CallVerification.sol";
 import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
 import { IAtlas } from "../interfaces/IAtlas.sol";
 
+import "src/contracts/types/AtlasConstants.sol";
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
-contract Sorter {
+contract Sorter is AtlasConstants {
     using CallBits for uint32;
     using CallVerification for UserOperation;
 
@@ -59,6 +60,10 @@ contract Sorter {
         return solverOp.bidToken == bidToken;
     }
 
+    /// @dev Verifies that the solver is eligible
+    /// @dev Does not check solver signature as it might be trusted (solverOp.from == bundler)
+    /// @dev Checks other than signature are same as those done in `verifySolverOp()` in AtlasVerification and
+    /// `_validateSolverOpGas()` and `_validateSolverOpDeadline()` in Atlas
     function _verifySolverEligibility(
         DAppConfig memory dConfig,
         UserOperation calldata userOp,
@@ -70,7 +75,19 @@ contract Sorter {
     {
         // Make sure the solver has enough funds bonded
         uint256 solverBalance = IAtlETH(address(ATLAS)).balanceOfBonded(solverOp.from);
-        if (solverBalance < solverOp.maxFeePerGas * solverOp.gas) {
+        uint256 gasLimit = _SOLVER_GAS_LIMIT_SCALE
+            * (solverOp.gas < dConfig.solverGasLimit ? solverOp.gas : dConfig.solverGasLimit)
+            / (_SOLVER_GAS_LIMIT_SCALE + _SOLVER_GAS_LIMIT_BUFFER_PERCENTAGE) + _FASTLANE_GAS_BUFFER;
+
+        uint256 calldataCost =
+            (solverOp.data.length + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM * solverOp.maxFeePerGas;
+        uint256 gasCost = (solverOp.maxFeePerGas * gasLimit) + calldataCost;
+        if (solverBalance < gasCost) {
+            return false;
+        }
+
+        // solverOp.to must be the atlas address
+        if (solverOp.to != address(ATLAS)) {
             return false;
         }
 
@@ -87,6 +104,16 @@ contract Sorter {
 
         // Make sure that the solver's maxFeePerGas matches or exceeds the user's
         if (solverOp.maxFeePerGas < userOp.maxFeePerGas) {
+            return false;
+        }
+
+        // solverOp.solver must not be the atlas or verification address
+        if (solverOp.solver == address(ATLAS) || solverOp.solver == address(VERIFICATION)) {
+            return false;
+        }
+
+        // solverOp.deadline must be in the future
+        if (solverOp.deadline != 0 && block.number > solverOp.deadline) {
             return false;
         }
 
