@@ -83,4 +83,5 @@ interface IAtlas {
     function VERIFICATION() external view returns (address);
     function lock() external returns (address);
     function solverLockData() external view returns (address currentSolver, bool calledBack, bool fulfilled);
+    function solver() external view returns (address);
 }

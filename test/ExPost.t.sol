@@ -4,7 +4,6 @@ pragma solidity 0.8.22;
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-import { IDAppIntegration } from "src/contracts/interfaces/IDAppIntegration.sol";
 import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 
 import { Atlas } from "src/contracts/atlas/Atlas.sol";

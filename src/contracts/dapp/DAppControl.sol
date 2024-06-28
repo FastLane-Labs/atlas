@@ -11,7 +11,7 @@ import "src/contracts/types/DAppApprovalTypes.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
-import { IDAppIntegration } from "src/contracts/interfaces/IDAppIntegration.sol";
+import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
 
 /// @title DAppControl
 /// @author FastLane Labs
@@ -215,7 +215,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         governance = newGovernance;
         delete pendingGovernance;
 
-        IDAppIntegration(ATLAS_VERIFICATION).changeDAppGovernance(prevGovernance, newGovernance);
+        IAtlasVerification(ATLAS_VERIFICATION).changeDAppGovernance(prevGovernance, newGovernance);
 
         emit AtlasEvents.GovernanceTransferred(prevGovernance, newGovernance);
     }

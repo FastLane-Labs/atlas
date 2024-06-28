@@ -3,8 +3,6 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { IDAppIntegration } from "src/contracts/interfaces/IDAppIntegration.sol";
-
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
