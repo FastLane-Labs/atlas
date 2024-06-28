@@ -6,7 +6,7 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Base Imports
-import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
+import { IAtlas } from "../../interfaces/IAtlas.sol";
 import { SafetyBits } from "../../libraries/SafetyBits.sol";
 
 import { CallConfig } from "../../types/DAppApprovalTypes.sol";
@@ -205,13 +205,11 @@ contract V4DAppControl is DAppControl {
         // address(this) = hook
         // msg.sender = ExecutionEnvironment
 
-        Context memory ctx = ISafetyLocks(ATLAS).getLockState();
-
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that DAppControl supplied a valid signature
         require(address(this) == hook, "ERR-H00 InvalidCallee");
         require(hook == _control(), "ERR-H01 InvalidCaller");
-        require(ctx.phase == uint8(ExecutionPhase.PreOps), "ERR-H02 InvalidLockStage");
+        require(IAtlas(ATLAS).phase() == ExecutionPhase.PreOps, "ERR-H02 InvalidLockStage");
         require(hashLock == bytes32(0), "ERR-H03 AlreadyActive");
 
         // Set the storage lock to block reentry / concurrent trading
@@ -223,13 +221,11 @@ contract V4DAppControl is DAppControl {
         // address(this) = hook
         // msg.sender = ExecutionEnvironment
 
-        Context memory ctx = ISafetyLocks(ATLAS).getLockState();
-
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that DAppControl supplied a valid signature
         require(address(this) == hook, "ERR-H20 InvalidCallee");
         require(hook == _control(), "ERR-H21 InvalidCaller");
-        require(ctx.phase == uint8(ExecutionPhase.PostOps), "ERR-H22 InvalidLockStage");
+        require(IAtlas(ATLAS).phase() == ExecutionPhase.PostOps, "ERR-H22 InvalidLockStage");
         require(hashLock == keccak256(abi.encode(key, msg.sender)), "ERR-H23 InvalidKey");
 
         // Release the storage lock

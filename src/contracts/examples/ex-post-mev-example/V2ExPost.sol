@@ -6,7 +6,6 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Base Imports
-import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
 import { IExecutionEnvironment } from "../../interfaces/IExecutionEnvironment.sol";
 
 import { SafetyBits } from "../../libraries/SafetyBits.sol";

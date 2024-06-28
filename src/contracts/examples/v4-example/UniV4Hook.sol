@@ -8,7 +8,7 @@ import { IHooks } from "./IHooks.sol";
 // Atlas Imports
 import { V4DAppControl } from "./V4DAppControl.sol";
 
-import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
+import { IAtlas } from "../../interfaces/IAtlas.sol";
 import { SafetyBits } from "../../libraries/SafetyBits.sol";
 
 import "../../types/SolverCallTypes.sol";
@@ -73,15 +73,15 @@ contract UniV4Hook is V4DAppControl {
         require(address(this) == hook, "ERR-H00 InvalidCallee");
         require(msg.sender == v4Singleton, "ERR-H01 InvalidCaller"); // TODO: Confirm this
 
-        Context memory ctx = ISafetyLocks(ATLAS).getLockState();
+        ExecutionPhase currentPhase = IAtlas(ATLAS).phase();
 
-        if (ctx.phase == uint8(ExecutionPhase.UserOperation)) {
+        if (currentPhase == ExecutionPhase.UserOperation) {
             // Case: User call
             // Sender = ExecutionEnvironment
 
             // Verify that the pool is valid for the user to trade in.
             require(keccak256(abi.encode(key, sender)) == hashLock, "ERR-H02 InvalidSwapper");
-        } else if (ctx.phase == uint8(ExecutionPhase.SolverOperations)) {
+        } else if (currentPhase == ExecutionPhase.SolverOperations) {
             // Case: Solver call
             // Sender = Solver contract
             // NOTE: This phase verifies that the user's transaction has already

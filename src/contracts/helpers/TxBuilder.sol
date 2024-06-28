@@ -4,7 +4,6 @@ pragma solidity 0.8.22;
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 import { IDAppIntegration } from "../interfaces/IDAppIntegration.sol";
 import { IAtlas } from "../interfaces/IAtlas.sol";
-import { IAtlETH } from "../interfaces/IAtlETH.sol";
 import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
 
 import "../types/SolverCallTypes.sol";

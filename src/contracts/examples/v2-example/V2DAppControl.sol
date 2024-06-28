@@ -5,7 +5,6 @@ pragma solidity 0.8.22;
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 // Atlas Base Imports
-import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
 import { IExecutionEnvironment } from "../../interfaces/IExecutionEnvironment.sol";
 
 import { SafetyBits } from "../../libraries/SafetyBits.sol";

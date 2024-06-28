@@ -24,8 +24,6 @@ import {
 
 import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
-import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
-
 // TODO Check if this is tested in more contract-specific tests, then delete this if true.
 contract AccountingTest is BaseTest {
     SwapIntentDAppControl public swapIntentControl;

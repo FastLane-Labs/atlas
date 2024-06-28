@@ -4,8 +4,7 @@ pragma solidity 0.8.22;
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-import { ISafetyLocks } from "src/contracts/interfaces/ISafetyLocks.sol";
-import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
 
 import "src/contracts/types/SolverCallTypes.sol";
@@ -58,7 +57,7 @@ contract SolverBaseInvertBid is ISolverContract {
 
         _;
 
-        uint256 shortfall = IEscrow(_atlas).shortfall();
+        uint256 shortfall = IAtlas(_atlas).shortfall();
 
         if (shortfall < msg.value) shortfall = 0;
         else shortfall -= msg.value;
@@ -67,7 +66,7 @@ contract SolverBaseInvertBid is ISolverContract {
             IWETH9(WETH_ADDRESS).withdraw(msg.value - address(this).balance);
         }
 
-        IEscrow(_atlas).reconcile{ value: msg.value }(executionEnvironment, solverOpFrom, shortfall);
+        IAtlas(_atlas).reconcile{ value: msg.value }(executionEnvironment, solverOpFrom, shortfall);
     }
 
     modifier receiveBids(address executionEnvironment, address bidToken, uint256 bidAmount) {

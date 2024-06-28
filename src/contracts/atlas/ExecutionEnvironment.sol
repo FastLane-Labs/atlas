@@ -6,10 +6,9 @@ import { ReentrancyGuard } from "openzeppelin-contracts/contracts/security/Reent
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { Base } from "src/contracts/common/ExecutionBase.sol";
 
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
-import { ISafetyLocks } from "src/contracts/interfaces/ISafetyLocks.sol";
 import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
-import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
 
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
@@ -252,7 +251,7 @@ contract ExecutionEnvironment is Base, ReentrancyGuard {
 
         uint256 balance = address(this).balance;
         if (balance > 0) {
-            IEscrow(ATLAS).contribute{ value: balance }();
+            IAtlas(ATLAS).contribute{ value: balance }();
         }
     }
 
@@ -267,7 +266,7 @@ contract ExecutionEnvironment is Base, ReentrancyGuard {
     /// @param amount The amount of the ERC20 token to withdraw.
     function withdrawERC20(address token, uint256 amount) external nonReentrant {
         if (msg.sender != _user()) revert AtlasErrors.NotEnvironmentOwner();
-        if (!ISafetyLocks(ATLAS).isUnlocked()) revert AtlasErrors.AtlasLockActive();
+        if (!IAtlas(ATLAS).isUnlocked()) revert AtlasErrors.AtlasLockActive();
 
         if (IERC20(token).balanceOf(address(this)) >= amount) {
             SafeTransferLib.safeTransfer(token, msg.sender, amount);
@@ -282,7 +281,7 @@ contract ExecutionEnvironment is Base, ReentrancyGuard {
     /// @param amount The amount of Ether to withdraw.
     function withdrawEther(uint256 amount) external nonReentrant {
         if (msg.sender != _user()) revert AtlasErrors.NotEnvironmentOwner();
-        if (!ISafetyLocks(ATLAS).isUnlocked()) revert AtlasErrors.AtlasLockActive();
+        if (!IAtlas(ATLAS).isUnlocked()) revert AtlasErrors.AtlasLockActive();
 
         if (address(this).balance >= amount) {
             SafeTransferLib.safeTransferETH(msg.sender, amount);

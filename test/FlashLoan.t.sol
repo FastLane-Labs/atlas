@@ -17,7 +17,7 @@ import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
 import { DAppOperation } from "src/contracts/types/DAppApprovalTypes.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
-import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 import { UserOperationBuilder } from "./base/builders/UserOperationBuilder.sol";
 import { SolverOperationBuilder } from "./base/builders/SolverOperationBuilder.sol";
 import { DAppOperationBuilder } from "./base/builders/DAppOperationBuilder.sol";
@@ -320,12 +320,12 @@ contract SimpleSolver {
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
 
         if (bytes4(solverOpData[:4]) == SimpleSolver.payback.selector) {
-            uint256 shortfall = IEscrow(atlas).shortfall();
+            uint256 shortfall = IAtlas(atlas).shortfall();
 
             if (shortfall < msg.value) shortfall = 0;
             else shortfall -= msg.value;
 
-            IEscrow(atlas).reconcile{ value: msg.value }(executionEnvironment, solverOpFrom, shortfall);
+            IAtlas(atlas).reconcile{ value: msg.value }(executionEnvironment, solverOpFrom, shortfall);
         }
     }
 

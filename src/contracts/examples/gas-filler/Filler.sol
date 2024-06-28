@@ -5,7 +5,7 @@ pragma solidity 0.8.22;
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 // Atlas Base Imports
-import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
+import { IAtlas } from "../../interfaces/IAtlas.sol";
 import { IExecutionEnvironment } from "../../interfaces/IExecutionEnvironment.sol";
 
 import { SafetyBits } from "../../libraries/SafetyBits.sol";
@@ -151,7 +151,7 @@ contract Filler is DAppControl {
     ///////////////////// DAPP STUFF ///////////////////////
 
     function postOpBalancing(uint256 prepaidAmount) external {
-        require(msg.sender == ISafetyLocks(ATLAS).activeEnvironment(), "ERR - INVALID SENDER");
+        require(msg.sender == IAtlas(ATLAS).activeEnvironment(), "ERR - INVALID SENDER");
         require(address(this) == _control(), "ERR - INVALID CONTROL");
         require(_depth() == 2, "ERR - INVALID DEPTH");
 
@@ -168,7 +168,7 @@ contract Filler is DAppControl {
         }
 
         // CASE: Nested call from Atlas EE
-        if (msg.sender == ISafetyLocks(ATLAS).activeEnvironment()) {
+        if (msg.sender == IAtlas(ATLAS).activeEnvironment()) {
             require(address(this) == _control(), "ERR - INVALID CONTROL");
             return _outerApprove(data);
         }

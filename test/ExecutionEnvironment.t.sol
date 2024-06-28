@@ -8,8 +8,7 @@ import { MockSafetyLocks } from "./SafetyLocks.t.sol";
 import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
 import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 
-import { IFactory } from "src/contracts/interfaces/IFactory.sol";
-import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
 import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 
@@ -92,7 +91,7 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         vm.prank(user);
         executionEnvironment =
-            ExecutionEnvironment(payable(IFactory(address(atlas)).createExecutionEnvironment(address(dAppControl))));
+            ExecutionEnvironment(payable(IAtlas(address(atlas)).createExecutionEnvironment(address(dAppControl))));
     }
 
     function test_modifier_validUser() public {
@@ -659,7 +658,7 @@ contract MockSolverContract {
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
         require(success, "atlasSolverCall call reverted");
         if (shouldReconcile) {
-            IEscrow(address(_atlas)).reconcile(executionEnvironment, solverOpFrom, type(uint256).max);
+            IAtlas(address(_atlas)).reconcile(executionEnvironment, solverOpFrom, type(uint256).max);
         }
     }
 
