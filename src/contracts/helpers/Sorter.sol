@@ -100,6 +100,11 @@ contract Sorter {
             return false;
         }
 
+        // solverOp.deadline must be in the future
+        if (solverOp.deadline != 0 && block.number > solverOp.deadline) {
+            return false;
+        }
+
         return true;
     }
 
