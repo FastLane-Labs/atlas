@@ -54,14 +54,14 @@ contract Atlas is Escrow, Factory {
 
         (address executionEnvironment, DAppConfig memory dConfig) = _getOrCreateExecutionEnvironment(userOp);
 
-        // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
-        // replay attacks.
-        // NOTE: Currently reverting instead of graceful return to help w/ testing. TODO - still reverting?
         ValidCallsResult validCallsResult =
             VERIFICATION.validateCalls(dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, isSimulation);
         if (validCallsResult != ValidCallsResult.Valid) {
             if (isSimulation) revert VerificationSimFail(validCallsResult);
-            revert ValidCalls(validCallsResult);
+
+            // Gracefully return if invalid and not in simulation mode. This allows nonces to be stored and prevents
+            // replay attacks.
+            return false;
         }
 
         // Initialize the lock
