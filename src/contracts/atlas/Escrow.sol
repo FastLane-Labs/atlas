@@ -320,7 +320,7 @@ abstract contract Escrow is AtlETH {
 
         uint256 lastAccessedBlock = accessData[solverOp.from].lastAccessedBlock;
 
-        if (lastAccessedBlock == block.number) {
+        if (lastAccessedBlock >= block.number) {
             result |= 1 << uint256(SolverOutcome.PerBlockLimit);
         }
     }
