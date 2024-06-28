@@ -8,11 +8,12 @@ import { CallVerification } from "../libraries/CallVerification.sol";
 import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
 import { IAtlas } from "../interfaces/IAtlas.sol";
 
+import "src/contracts/types/AtlasConstants.sol";
 import "../types/SolverCallTypes.sol";
 import "../types/UserCallTypes.sol";
 import "../types/DAppApprovalTypes.sol";
 
-contract Sorter {
+contract Sorter is AtlasConstants {
     using CallBits for uint32;
     using CallVerification for UserOperation;
 
@@ -70,7 +71,14 @@ contract Sorter {
     {
         // Make sure the solver has enough funds bonded
         uint256 solverBalance = IAtlETH(address(ATLAS)).balanceOfBonded(solverOp.from);
-        if (solverBalance < solverOp.maxFeePerGas * solverOp.gas) {
+        uint256 gasLimit = _SOLVER_GAS_LIMIT_SCALE
+            * (solverOp.gas < dConfig.solverGasLimit ? solverOp.gas : dConfig.solverGasLimit)
+            / (_SOLVER_GAS_LIMIT_SCALE + _SOLVER_GAS_LIMIT_BUFFER_PERCENTAGE) + _FASTLANE_GAS_BUFFER;
+
+        uint256 calldataCost =
+            (solverOp.data.length + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM * solverOp.maxFeePerGas;
+        uint256 gasCost = (solverOp.maxFeePerGas * gasLimit) + calldataCost;
+        if (solverBalance < gasCost) {
             return false;
         }
 
