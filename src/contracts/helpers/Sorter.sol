@@ -62,7 +62,8 @@ contract Sorter is AtlasConstants {
 
     /// @dev Verifies that the solver is eligible
     /// @dev Does not check solver signature as it might be trusted (solverOp.from == bundler)
-    /// @dev Checks other than signature are same as those done in `verifySolverOp()` in AtlasVerification and `_validateSolverOpGas()` and `_validateSolverOpDeadline()` in Atlas
+    /// @dev Checks other than signature are same as those done in `verifySolverOp()` in AtlasVerification and
+    /// `_validateSolverOpGas()` and `_validateSolverOpDeadline()` in Atlas
     function _verifySolverEligibility(
         DAppConfig memory dConfig,
         UserOperation calldata userOp,
