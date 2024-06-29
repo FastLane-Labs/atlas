@@ -16,7 +16,13 @@ import "src/contracts/types/UserCallTypes.sol";
 import "./base/TestUtils.sol";
 
 contract MockFactory is Factory, Test {
-    constructor(address _executionTemplate) Factory(_executionTemplate) { }
+    constructor(
+        uint256 _escrowDuration,
+        address _verification,
+        address _simulator,
+        address _surchargeRecipient,
+        address _executionTemplate
+    ) Factory(_escrowDuration, _verification, _simulator, _surchargeRecipient, _executionTemplate) { }
 
     function getOrCreateExecutionEnvironment(UserOperation calldata userOp)
         external
@@ -74,7 +80,13 @@ contract FactoryTest is Test {
         assertEq(address(atlas), expectedAtlasAddr, "Atlas address mismatch");
         atlasVerification = new AtlasVerification(address(atlas));
         assertEq(address(atlasVerification), expectedAtlasVerificationAddr, "AtlasVerification address mismatch");
-        mockFactory = new MockFactory({ _executionTemplate: address(execEnvTemplate) });
+        mockFactory = new MockFactory({
+            _escrowDuration: 64,
+            _verification: expectedAtlasVerificationAddr,
+            _simulator: address(0),
+            _executionTemplate: address(execEnvTemplate),
+            _surchargeRecipient: deployer
+        });
         assertEq(address(mockFactory), expectedFactoryAddr, "Factory address mismatch");
         dAppControl = new DummyDAppControl(expectedAtlasAddr, deployer, CallConfigBuilder.allFalseCallConfig());
         vm.stopPrank();

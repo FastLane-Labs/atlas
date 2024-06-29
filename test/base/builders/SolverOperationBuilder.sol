@@ -64,7 +64,7 @@ contract SolverOperationBuilder is Test {
     }
 
     function withUserOpHash(UserOperation memory userOperation) public returns (SolverOperationBuilder) {
-        address verification = IAtlas(userOperation.to).VERIFICATION();
+        address verification = address(IAtlas(userOperation.to).VERIFICATION());
         solverOperation.userOpHash = IAtlasVerification(verification).getUserOperationHash(userOperation);
         return this;
     }

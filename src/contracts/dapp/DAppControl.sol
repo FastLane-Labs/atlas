@@ -52,7 +52,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         }
         CALL_CONFIG = CallBits.encodeCallConfig(_callConfig);
         CONTROL = address(this);
-        ATLAS_VERIFICATION = IAtlas(_atlas).VERIFICATION();
+        ATLAS_VERIFICATION = address(IAtlas(_atlas).VERIFICATION());
 
         governance = _governance;
     }

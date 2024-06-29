@@ -4,9 +4,8 @@ pragma solidity 0.8.22;
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { LibSort } from "solady/utils/LibSort.sol";
 
-import { IDAppControl } from "../interfaces/IDAppControl.sol";
+import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 
-import { Escrow } from "./Escrow.sol";
 import { Factory } from "./Factory.sol";
 
 import "src/contracts/types/SolverCallTypes.sol";
@@ -21,7 +20,7 @@ import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 /// @title Atlas V1
 /// @author FastLane Labs
 /// @notice The Execution Abstraction protocol.
-contract Atlas is Escrow, Factory {
+contract Atlas is Factory {
     using CallBits for uint32;
     using SafetyBits for Context;
 
@@ -32,8 +31,7 @@ contract Atlas is Escrow, Factory {
         address _surchargeRecipient,
         address _executionTemplate
     )
-        Escrow(_escrowDuration, _verification, _simulator, _surchargeRecipient)
-        Factory(_executionTemplate)
+        Factory(_escrowDuration, _verification, _simulator, _surchargeRecipient, _executionTemplate)
     { }
 
     /// @notice metacall is the entrypoint function for the Atlas transactions.

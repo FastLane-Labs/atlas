@@ -11,6 +11,7 @@ import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 
 import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
+import "src/contracts/types/UserCallTypes.sol";
 import "src/contracts/types/SolverCallTypes.sol";
 import "src/contracts/types/DAppApprovalTypes.sol";
 
@@ -21,23 +22,37 @@ contract MockGasAccounting is GasAccounting, Test {
         address _simulator,
         address _surchargeRecipient
     )
-        GasAccounting(_escrowDuration, _verification, _simulator, _surchargeRecipient)
-    { }
+        GasAccounting(
+            _escrowDuration,
+            _verification,
+            _simulator,
+            _surchargeRecipient
+        )
+    {}
 
-    function balanceOf(address account) external view returns (uint112, uint112) {
-        return (_balanceOf[account].balance, _balanceOf[account].unbonding);
-    }
-
-    function initializeLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) external payable {
+    function initializeLock(
+        address executionEnvironment,
+        uint256 gasMarker,
+        uint256 userOpValue
+    ) external payable {
         DAppConfig memory dConfig;
-        _setAccountingLock(dConfig, executionEnvironment, gasMarker, userOpValue);
+        _setAccountingLock(
+            dConfig,
+            executionEnvironment,
+            gasMarker,
+            userOpValue
+        );
     }
 
     function setPhase(ExecutionPhase _phase) external {
         lock.phase = uint8(_phase);
     }
 
-    function assign(address owner, uint256 value, bool solverWon) external returns (uint256) {
+    function assign(
+        address owner,
+        uint256 value,
+        bool solverWon
+    ) external returns (uint256) {
         return _assign(owner, value, solverWon, false);
     }
 
@@ -45,15 +60,24 @@ contract MockGasAccounting is GasAccounting, Test {
         _credit(owner, value);
     }
 
-    function trySolverLock(SolverOperation calldata solverOp) external returns (bool) {
+    function trySolverLock(
+        SolverOperation calldata solverOp
+    ) external returns (bool) {
         return _trySolverLock(solverOp);
     }
 
-    function releaseSolverLock(SolverOperation calldata solverOp, uint256 gasWaterMark, uint256 result) external {
+    function releaseSolverLock(
+        SolverOperation calldata solverOp,
+        uint256 gasWaterMark,
+        uint256 result
+    ) external {
         _releaseSolverLock(solverOp, gasWaterMark, result, false, true);
     }
 
-    function settle(address winningSolver, address bundler) external returns (uint256, uint256) {
+    function settle(
+        address winningSolver,
+        address bundler
+    ) external returns (uint256, uint256) {
         Context memory ctx = buildContext(bundler, true, true, 0, 1);
         return _settle(ctx, winningSolver);
     }
@@ -87,7 +111,10 @@ contract MockGasAccounting is GasAccounting, Test {
         bondedTotalSupply += amount;
     }
 
-    function increaseUnbondingBalance(address account, uint256 amount) external {
+    function increaseUnbondingBalance(
+        address account,
+        uint256 amount
+    ) external {
         deal(address(this), amount);
         _balanceOf[account].unbonding += uint112(amount);
         bondedTotalSupply += amount;
@@ -96,6 +123,84 @@ contract MockGasAccounting is GasAccounting, Test {
     function calldataLengthPremium() external pure returns (uint256) {
         return _CALLDATA_LENGTH_PREMIUM;
     }
+
+    // Unimplemented function below
+
+    function metacall(
+        UserOperation calldata userOp,
+        SolverOperation[] calldata solverOps,
+        DAppOperation calldata dAppOp
+    ) external payable override returns (bool auctionWon) {}
+
+    function createExecutionEnvironment(
+        address control
+    ) external override returns (address executionEnvironment) {}
+
+    function getExecutionEnvironment(
+        address user,
+        address dAppControl
+    )
+        external
+        view
+        override
+        returns (address executionEnvironment, uint32 callConfig, bool exists)
+    {}
+
+    function balanceOfBonded(
+        address account
+    ) external view override returns (uint256) {}
+
+    function balanceOfUnbonding(
+        address account
+    ) external view override returns (uint256) {}
+
+    function accountLastActiveBlock(
+        address account
+    ) external view override returns (uint256) {}
+
+    function unbondingCompleteBlock(
+        address account
+    ) external view override returns (uint256) {}
+
+    function deposit() external payable override {}
+
+    function withdraw(uint256 amount) external override {}
+
+    function bond(uint256 amount) external override {}
+
+    function depositAndBond(uint256 amountToBond) external payable override {}
+
+    function unbond(uint256 amount) external override {}
+
+    function redeem(uint256 amount) external override {}
+
+    function withdrawSurcharge() external override {}
+
+    function transferSurchargeRecipient(
+        address newRecipient
+    ) external override {}
+
+    function becomeSurchargeRecipient() external override {}
+
+    function transferUserERC20(
+        address token,
+        address destination,
+        uint256 amount,
+        address user,
+        address control
+    ) external override {}
+
+    function transferDAppERC20(
+        address token,
+        address destination,
+        uint256 amount,
+        address user,
+        address control
+    ) external override {}
+
+    function balanceOf(
+        address account
+    ) external view override returns (uint256) {}
 }
 
 contract GasAccountingTest is Test {

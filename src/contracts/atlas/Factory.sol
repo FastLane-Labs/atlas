@@ -1,6 +1,8 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
+import { Escrow } from "src/contracts/atlas/Escrow.sol";
+
 import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 import { Mimic } from "./Mimic.sol";
 import { DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
@@ -13,7 +15,7 @@ import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 /// @notice Provides functionality for creating and managing execution environments for DApps within the Atlas Protocol.
 /// @dev This contract uses deterministic deployment to generate and manage Execution Environment instances based on
 /// predefined templates.
-abstract contract Factory {
+abstract contract Factory is Escrow {
     address public immutable EXECUTION_ENV_TEMPLATE;
     bytes32 internal immutable _FACTORY_BASE_SALT;
 
@@ -22,7 +24,15 @@ abstract contract Factory {
     /// @dev The Execution Environment Template must be separately deployed using the same calculated salt.
     /// @param _executionTemplate Address of the pre-deployed execution template contract for creating Execution
     /// Environment instances.
-    constructor(address _executionTemplate) {
+    constructor(
+        uint256 _escrowDuration,
+        address _verification,
+        address _simulator,
+        address _surchargeRecipient,
+        address _executionTemplate
+    )
+        Escrow(_escrowDuration, _verification, _simulator, _surchargeRecipient)
+    {
         EXECUTION_ENV_TEMPLATE = _executionTemplate;
         _FACTORY_BASE_SALT = keccak256(abi.encodePacked(block.chainid, address(this)));
     }

@@ -1,10 +1,12 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import "../types/SolverCallTypes.sol";
-import "../types/UserCallTypes.sol";
-import "../types/DAppApprovalTypes.sol";
-import "../types/LockTypes.sol";
+import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/UserCallTypes.sol";
+import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/LockTypes.sol";
+
+import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
 
 interface IAtlas {
     // Atlas.sol
@@ -80,8 +82,8 @@ interface IAtlas {
     function isUnlocked() external view returns (bool);
 
     // Storage.sol
-    function VERIFICATION() external view returns (address);
-    function lock() external returns (address);
+    function VERIFICATION() external view returns (IAtlasVerification);
+    function lock() external returns (Lock memory);
     function solverLockData() external view returns (address currentSolver, bool calledBack, bool fulfilled);
     function solver() external view returns (address);
 }
