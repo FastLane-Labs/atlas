@@ -51,6 +51,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint256 internal _solverLock; // transient storage
 
     uint256 public claims; // transient storage
+    uint256 public fees; // transient storage
     uint256 public writeoffs; // transient storage
     uint256 public withdrawals; // transient storage
     uint256 public deposits; // transient storage
@@ -80,6 +81,8 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
 
         _solverLock = _UNLOCKED_UINT;
         claims = type(uint256).max;
+        fees = type(uint256).max;
+        writeoffs = type(uint256).max;
         withdrawals = type(uint256).max;
         deposits = type(uint256).max;
 

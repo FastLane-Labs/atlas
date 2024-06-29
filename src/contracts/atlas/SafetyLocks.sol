@@ -88,6 +88,7 @@ abstract contract SafetyLocks is Storage {
         lock = Lock({ activeEnvironment: _UNLOCKED, phase: uint8(ExecutionPhase.Uninitialized), callConfig: uint32(0) });
         _solverLock = _UNLOCKED_UINT;
         claims = type(uint256).max;
+        fees = type(uint256).max;
         withdrawals = type(uint256).max;
         deposits = type(uint256).max;
         writeoffs = type(uint256).max;

@@ -64,6 +64,14 @@ contract MockSafetyLocks is SafetyLocks {
     function setDeposits(uint256 _deposits) external {
         deposits = _deposits;
     }
+
+    function setFees(uint256 _fees) external {
+        fees = _fees;
+    }
+
+    function setWriteoffs(uint256 _writeoffs) external {
+        writeoffs = _writeoffs;
+    }
 }
 
 contract SafetyLocksTest is Test {

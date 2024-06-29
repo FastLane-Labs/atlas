@@ -31,9 +31,10 @@ abstract contract GasAccounting is SafetyLocks {
 
         // Set any withdraws or deposits
         claims = rawClaims.withBundlerSurcharge();
-        withdrawals = rawClaims.getAtlasSurcharge(); // Atlas surcharge is based on the raw claims value.
+        fees = rawClaims.getAtlasSurcharge(); // Atlas surcharge is based on the raw claims value.
         deposits = msg.value;
         writeoffs = 0;
+        withdrawals = 0;
     }
 
     /// @notice Contributes ETH to the contract, increasing the deposits if a non-zero value is sent.
@@ -71,7 +72,7 @@ abstract contract GasAccounting is SafetyLocks {
     /// @notice Calculates the current shortfall between deficit (claims + withdrawals) and deposits.
     /// @return The current shortfall amount, if any.
     function shortfall() external view returns (uint256) {
-        uint256 deficit = claims + withdrawals - writeoffs;
+        uint256 deficit = claims + withdrawals + fees - writeoffs;
         uint256 _deposits = deposits;
         return (deficit > _deposits) ? (deficit - _deposits) : 0;
     }
@@ -101,7 +102,7 @@ abstract contract GasAccounting is SafetyLocks {
         // Solver can only approve up to their bonded balance, not more
         if (maxApprovedGasSpend > bondedBalance) maxApprovedGasSpend = bondedBalance;
 
-        uint256 _deductions = claims + withdrawals - writeoffs;
+        uint256 _deductions = claims + withdrawals + fees - writeoffs;
         uint256 _additions = deposits + msg.value;
 
         // Add msg.value to solver's deposits
@@ -259,13 +260,13 @@ abstract contract GasAccounting is SafetyLocks {
             writeoffs += gasUsed.withAtlasAndBundlerSurcharges();
         } else {
             // CASE: Solver failed, so we calculate what they owe.
-            uint256 deficit = _assign(solverOp.from, gasUsed.withAtlasAndBundlerSurcharges(), false);
+            _assign(solverOp.from, gasUsed.withAtlasAndBundlerSurcharges(), false);
         }
     }
 
     /// @param ctx Context struct containing relavent context information for the Atlas auction.
     /// @param solverGasLimit The maximum gas limit for a solver, as set in the DAppConfig
-    function _adjustAccountingValues(
+    function _adjustAccountingForFees(
         Context memory ctx,
         uint256 solverGasLimit
     )
@@ -292,17 +293,11 @@ abstract contract GasAccounting is SafetyLocks {
             // BUNDLER_SURCHARGE_RATE) / SURCHARGE_SCALE;
 
         // Calculate the preadjusted netAtlasGasSurcharge
-        netAtlasGasSurcharge = _claims.extractBundlerSurcharge().getNetAtlasSurchargeFromBundlerSurcharge();
-
-        uint256 _netAtlasGasSurchargeDelta = _gasRemainder.getAtlasSurcharge();
-
-        _withdrawals -= _netAtlasGasSurchargeDelta;
-        netAtlasGasSurcharge -= _netAtlasGasSurchargeDelta;
+        netAtlasGasSurcharge = fees - _gasRemainder.getAtlasSurcharge();
 
         _claims -= _gasRemainder.withBundlerSurcharge();
-
-        // Update the cumulative surcharge
-        cumulativeSurcharge = _surcharge + netAtlasGasSurcharge;
+        _withdrawals += netAtlasGasSurcharge;
+        cumulativeSurcharge = _surcharge + netAtlasGasSurcharge; // Update the cumulative surcharge
 
         // Calculate whether or not the bundler used an excessive amount of gas and, if so, reduce their
         // gas rebate. By reducing the _claims, solvers end up paying less in total.
@@ -352,7 +347,7 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 _deposits;
 
         (_withdrawals, _deposits, _claims, _writeoffs, netAtlasGasSurcharge) =
-            _adjustAccountingValues(ctx, solverGasLimit);
+            _adjustAccountingForFees(ctx, solverGasLimit);
 
         uint256 _amountSolverPays;
         uint256 _amountSolverReceives;
@@ -369,6 +364,7 @@ abstract contract GasAccounting is SafetyLocks {
         if (ctx.solverSuccessful && _winningSolver != ctx.bundler) {
             _amountSolverPays += (_claims - _writeoffs);
             claimsPaidToBundler = (_claims - _writeoffs);
+
         } else {
             claimsPaidToBundler = 0;
         }
