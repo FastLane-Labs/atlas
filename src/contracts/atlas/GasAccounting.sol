@@ -31,7 +31,7 @@ abstract contract GasAccounting is SafetyLocks {
 
         // Set any withdraws or deposits
         claims = rawClaims.withBundlerSurcharge();
-        withdrawals = rawClaims.getAtlasSurcharge(); // Atlas surcharge is based on the raw claims value.
+        withdrawals = getAtlasSurcharge(rawClaims); // Atlas surcharge is based on the raw claims value.
         deposits = msg.value;
         writeoffs = 0;
     }
@@ -292,9 +292,9 @@ abstract contract GasAccounting is SafetyLocks {
             // BUNDLER_SURCHARGE_RATE) / SURCHARGE_SCALE;
 
         // Calculate the preadjusted netAtlasGasSurcharge
-        netAtlasGasSurcharge = _claims.extractBundlerSurcharge().getNetAtlasSurchargeFromBundlerSurcharge();
+        netAtlasGasSurcharge = extractBundlerSurcharge(_claims).getNetAtlasSurchargeFromBundlerSurcharge();
 
-        uint256 _netAtlasGasSurchargeDelta = _gasRemainder.getAtlasSurcharge();
+        uint256 _netAtlasGasSurchargeDelta = getAtlasSurcharge(_gasRemainder);
 
         _withdrawals -= _netAtlasGasSurchargeDelta;
         netAtlasGasSurcharge -= _netAtlasGasSurchargeDelta;
