@@ -59,9 +59,11 @@ contract Atlas is Escrow, Factory {
         if (validCallsResult != ValidCallsResult.Valid) {
             if (isSimulation) revert VerificationSimFail(validCallsResult);
 
-            // Gracefully return if invalid and not in simulation mode. This allows nonces to be stored and prevents
-            // replay attacks.
-            return false;
+            // Gracefully return for results that need nonces to be stored and prevent replay attacks
+            if (uint8(validCallsResult) > uint8(ValidCallsResult.GRACEFUL_RETURN_THRESHOLD)) return false;
+
+            // Revert for all other results
+            revert ValidCalls(validCallsResult);
         }
 
         // Initialize the lock
