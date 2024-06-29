@@ -86,7 +86,7 @@ contract V2DAppControl is DAppControl {
         }
     }
 
-    function _checkUserOperation(UserOperation calldata userOp) internal view {
+    function _checkUserOperation(UserOperation memory userOp) internal view {
         require(bytes4(userOp.data) == SWAP, "ERR-H10 InvalidFunction");
 
         require(

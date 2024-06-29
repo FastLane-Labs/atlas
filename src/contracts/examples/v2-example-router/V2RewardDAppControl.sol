@@ -130,7 +130,7 @@ contract V2RewardDAppControl is DAppControl {
     //                     Atlas hooks                      //
     // ---------------------------------------------------- //
 
-    function _checkUserOperation(UserOperation calldata userOp) internal view {
+    function _checkUserOperation(UserOperation memory userOp) internal view {
         // User is only allowed to call UniswapV2Router02
         require(userOp.dapp == uniswapV2Router02, "V2RewardDAppControl: InvalidDestination");
     }

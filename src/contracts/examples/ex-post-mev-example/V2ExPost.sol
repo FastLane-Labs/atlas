@@ -68,7 +68,7 @@ contract V2ExPost is DAppControl {
         )
     { }
 
-    function _checkUserOperation(UserOperation calldata userOp) internal view {
+    function _checkUserOperation(UserOperation memory userOp) internal view {
         require(bytes4(userOp.data) == IUniswapV2Pair.swap.selector, "ERR-H10 InvalidFunction");
         require(
             IUniswapV2Factory(IUniswapV2Pair(userOp.dapp).factory()).getPair(
