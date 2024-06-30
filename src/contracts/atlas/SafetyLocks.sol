@@ -25,8 +25,7 @@ abstract contract SafetyLocks is Storage {
         Storage(_escrowDuration, _verification, _simulator, _surchargeRecipient)
     { }
 
-    /// @notice Sets the Atlas lock to the specified execution environment, and tracks gas used, ETH borrowed by the
-    /// UserOperation, and ETH deposited.
+    /// @notice Sets the Atlas lock to the specified execution environment.
     /// @param dConfig The DAppConfig of the current DAppControl contract.
     /// @param executionEnvironment The address of the execution environment to set the lock to.
     function _setEnvironmentLock(DAppConfig memory dConfig, address executionEnvironment) internal {
