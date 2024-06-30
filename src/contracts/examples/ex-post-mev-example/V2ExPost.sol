@@ -67,7 +67,7 @@ contract V2ExPost is DAppControl {
         )
     { }
 
-    function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory) {
+    function _checkUserOperation(UserOperation memory userOp) internal view {
         require(bytes4(userOp.data) == IUniswapV2Pair.swap.selector, "ERR-H10 InvalidFunction");
         require(
             IUniswapV2Factory(IUniswapV2Pair(userOp.dapp).factory()).getPair(
@@ -75,6 +75,11 @@ contract V2ExPost is DAppControl {
             ) == userOp.dapp,
             "ERR-H11 Invalid pair"
         );
+    }
+
+    function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory returnData) {
+        // check if dapps using this DApontrol can handle the userOp
+        _checkUserOperation(userOp);
 
         (
             uint256 amount0Out,
