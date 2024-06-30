@@ -384,7 +384,7 @@ abstract contract GasAccounting is SafetyLocks {
             _credit(_winningSolver, _amountSolverReceives - _amountSolverPays);
         }
 
-        SafeTransferLib.safeTransferETH(ctx.bundler, claimsPaidToBundler);
+        if(claimsPaidToBundler != 0) SafeTransferLib.safeTransferETH(ctx.bundler, claimsPaidToBundler);
 
         return (claimsPaidToBundler, netAtlasGasSurcharge);
     }
