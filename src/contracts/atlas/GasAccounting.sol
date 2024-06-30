@@ -371,6 +371,7 @@ abstract contract GasAccounting is SafetyLocks {
             claimsPaidToBundler = (_claims - _writeoffs);
         } else {
             claimsPaidToBundler = 0;
+            _winningSolver = ctx.bundler;
         }
 
         if (_amountSolverPays > _amountSolverReceives) {
