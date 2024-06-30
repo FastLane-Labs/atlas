@@ -4,7 +4,7 @@ pragma solidity 0.8.22;
 import "forge-std/Test.sol";
 
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
-import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
+import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
 import { DAppIntegration } from "src/contracts/atlas/DAppIntegration.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 

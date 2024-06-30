@@ -3,19 +3,19 @@ pragma solidity 0.8.22;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
-import { Permit69 } from "src/contracts/common/Permit69.sol";
+import { Permit69 } from "src/contracts/atlas/Permit69.sol";
 import "src/contracts/types/EscrowTypes.sol";
 
 /// @author FastLane Labs
 /// @dev Do not manually set balances without updating totalSupply, as the sum of all user balances must not exceed it.
 abstract contract AtlETH is Permit69 {
     constructor(
-        uint256 _escrowDuration,
-        address _verification,
-        address _simulator,
-        address _surchargeRecipient
+        uint256 escrowDuration,
+        address verification,
+        address simulator,
+        address surchargeRecipient
     )
-        Permit69(_escrowDuration, _verification, _simulator, _surchargeRecipient)
+        Permit69(escrowDuration, verification, simulator, surchargeRecipient)
     { }
 
     /*//////////////////////////////////////////////////////////////
@@ -26,37 +26,37 @@ abstract contract AtlETH is Permit69 {
     /// @param account The address for which to query the unbonded AtlETH balance.
     /// @return The unbonded AtlETH balance of the specified account.
     function balanceOf(address account) external view returns (uint256) {
-        return uint256(_balanceOf[account].balance);
+        return uint256(s_balanceOf[account].balance);
     }
 
     /// @notice Returns the bonded AtlETH balance of the specified account.
     /// @param account The address for which to query the bonded AtlETH balance.
     /// @return The bonded AtlETH balance of the specified account.
     function balanceOfBonded(address account) external view returns (uint256) {
-        return uint256(accessData[account].bonded);
+        return uint256(S_accessData[account].bonded);
     }
 
     /// @notice Returns the unbonding AtlETH balance of the specified account.
     /// @param account The address for which to query the unbonding AtlETH balance.
     /// @return The unbonding AtlETH balance of the specified account.
     function balanceOfUnbonding(address account) external view returns (uint256) {
-        return uint256(_balanceOf[account].unbonding);
+        return uint256(s_balanceOf[account].unbonding);
     }
 
     /// @notice Returns the last active block of the specified account in the escrow contract.
     /// @param account The address for which to query the last active block.
     /// @return The last active block of the specified account in the escrow contract.
     function accountLastActiveBlock(address account) external view returns (uint256) {
-        return uint256(accessData[account].lastAccessedBlock);
+        return uint256(S_accessData[account].lastAccessedBlock);
     }
 
     /// @notice Returns the block number at which the unbonding process of the specified account will be completed.
     /// @param account The address for which to query the completion block of unbonding.
     /// @return The block number at which the unbonding process of the specified account will be completed.
     function unbondingCompleteBlock(address account) external view returns (uint256) {
-        uint256 lastAccessedBlock = uint256(accessData[account].lastAccessedBlock);
-        if (lastAccessedBlock == 0) return 0;
-        return lastAccessedBlock + ESCROW_DURATION;
+        uint256 _lastAccessedBlock = uint256(S_accessData[account].lastAccessedBlock);
+        if (_lastAccessedBlock == 0) return 0;
+        return _lastAccessedBlock + ESCROW_DURATION;
     }
 
     /// @notice Deposits ETH to receive atlETH tokens in return.
@@ -82,8 +82,8 @@ abstract contract AtlETH is Permit69 {
     /// @param to The address to which the newly minted atlETH tokens will be assigned.
     /// @param amount The amount of atlETH tokens to mint and assign to the specified account.
     function _mint(address to, uint256 amount) internal {
-        totalSupply += amount;
-        _balanceOf[to].balance += SafeCast.toUint112(amount);
+        S_totalSupply += amount;
+        s_balanceOf[to].balance += SafeCast.toUint112(amount);
         emit Transfer(address(0), to, amount);
     }
 
@@ -92,7 +92,7 @@ abstract contract AtlETH is Permit69 {
     /// @param amount The amount of atlETH tokens to burn from the specified account.
     function _burn(address from, uint256 amount) internal {
         _deduct(from, amount);
-        totalSupply -= amount;
+        S_totalSupply -= amount;
         emit Transfer(from, address(0), amount);
     }
 
@@ -105,25 +105,25 @@ abstract contract AtlETH is Permit69 {
     /// @param account The address from which to deduct atlETH tokens.
     /// @param amount The amount of atlETH tokens to deduct from the specified account.
     function _deduct(address account, uint256 amount) internal {
-        uint112 amt = SafeCast.toUint112(amount);
+        uint112 _amt = SafeCast.toUint112(amount);
 
-        EscrowAccountBalance storage aData = _balanceOf[account];
+        EscrowAccountBalance storage s_aData = s_balanceOf[account];
 
-        uint112 balance = aData.balance;
+        uint112 _balance = s_aData.balance;
 
-        if (amt <= balance) {
-            _balanceOf[account].balance = balance - amt;
-        } else if (block.number > accessData[account].lastAccessedBlock + ESCROW_DURATION) {
-            uint112 _shortfall = amt - balance;
-            aData.balance = 0;
-            aData.unbonding -= _shortfall; // underflow here to revert if insufficient balance
+        if (_amt <= _balance) {
+            s_aData.balance = _balance - _amt;
+        } else if (block.number > S_accessData[account].lastAccessedBlock + ESCROW_DURATION) {
+            uint112 _shortfall = _amt - _balance;
+            s_aData.balance = 0;
+            s_aData.unbonding -= _shortfall; // underflow here to revert if insufficient balance
 
-            uint256 shortfall256 = uint256(_shortfall);
-            totalSupply += shortfall256; // add the released supply back to atleth.
-            bondedTotalSupply -= shortfall256; // subtract the unbonded, freed amount
+            uint256 _shortfall256 = uint256(_shortfall);
+            S_totalSupply += _shortfall256; // add the released supply back to atleth.
+            S_bondedTotalSupply -= _shortfall256; // subtract the unbonded, freed amount
         } else {
             // Reverts because amount > account's balance
-            revert InsufficientBalanceForDeduction(uint256(balance), amount);
+            revert InsufficientBalanceForDeduction(uint256(_balance), amount);
         }
     }
 
@@ -172,13 +172,13 @@ abstract contract AtlETH is Permit69 {
     /// @param owner The address of the account to put a hold on AtlETH tokens for.
     /// @param amount The amount of AtlETH tokens to put a hold on.
     function _bond(address owner, uint256 amount) internal {
-        uint112 amt = SafeCast.toUint112(amount);
+        uint112 _amt = SafeCast.toUint112(amount);
 
-        _balanceOf[owner].balance -= amt;
-        totalSupply -= amount;
+        s_balanceOf[owner].balance -= _amt;
+        S_totalSupply -= amount;
 
-        accessData[owner].bonded += amt;
-        bondedTotalSupply += amount;
+        S_accessData[owner].bonded += _amt;
+        S_bondedTotalSupply += amount;
 
         emit Bond(owner, amount);
     }
@@ -190,18 +190,18 @@ abstract contract AtlETH is Permit69 {
     /// @param owner The address of the account to start the unbonding wait time for.
     /// @param amount The amount of AtlETH tokens to start the unbonding wait time for.
     function _unbond(address owner, uint256 amount) internal {
-        uint112 amt = SafeCast.toUint112(amount);
+        uint112 _amt = SafeCast.toUint112(amount);
 
         // totalSupply and totalBondedSupply are unaffected; continue to count the
         // unbonding amount as bonded total supply since it is still inaccessible
         // for atomic xfer.
 
-        EscrowAccountAccessData storage aData = accessData[owner];
+        EscrowAccountAccessData storage s_aData = S_accessData[owner];
 
-        aData.bonded -= amt;
-        aData.lastAccessedBlock = uint32(block.number);
+        s_aData.bonded -= _amt;
+        s_aData.lastAccessedBlock = uint32(block.number);
 
-        _balanceOf[owner].unbonding += amt;
+        s_balanceOf[owner].unbonding += _amt;
 
         emit Unbond(owner, amount, block.number + ESCROW_DURATION + 1);
     }
@@ -214,19 +214,19 @@ abstract contract AtlETH is Permit69 {
     /// @param owner The address of the account redeeming AtlETH tokens for withdrawal.
     /// @param amount The amount of AtlETH tokens to redeem for withdrawal.
     function _redeem(address owner, uint256 amount) internal {
-        if (block.number <= uint256(accessData[owner].lastAccessedBlock) + ESCROW_DURATION) {
+        if (block.number <= uint256(S_accessData[owner].lastAccessedBlock) + ESCROW_DURATION) {
             revert EscrowLockActive();
         }
 
-        uint112 amt = SafeCast.toUint112(amount);
+        uint112 _amt = SafeCast.toUint112(amount);
 
-        EscrowAccountBalance storage bData = _balanceOf[owner];
+        EscrowAccountBalance storage s_bData = s_balanceOf[owner];
 
-        bData.unbonding -= amt;
-        bondedTotalSupply -= amount;
+        s_bData.unbonding -= _amt;
+        S_bondedTotalSupply -= amount;
 
-        bData.balance += amt;
-        totalSupply += amount;
+        s_bData.balance += _amt;
+        S_totalSupply += amount;
 
         emit Redeem(owner, amount);
     }
@@ -237,14 +237,14 @@ abstract contract AtlETH is Permit69 {
     /// @dev This function can only be called by the current surcharge recipient.
     /// It transfers the accumulated surcharge amount to the surcharge recipient's address.
     function withdrawSurcharge() external {
-        if (msg.sender != surchargeRecipient) {
+        if (msg.sender != S_surchargeRecipient) {
             revert InvalidAccess();
         }
 
-        uint256 paymentAmount = cumulativeSurcharge;
-        cumulativeSurcharge = 0; // Clear before transfer to prevent reentrancy
-        SafeTransferLib.safeTransferETH(msg.sender, paymentAmount);
-        emit SurchargeWithdrawn(msg.sender, paymentAmount);
+        uint256 _paymentAmount = S_cumulativeSurcharge;
+        S_cumulativeSurcharge = 0; // Clear before transfer to prevent reentrancy
+        SafeTransferLib.safeTransferETH(msg.sender, _paymentAmount);
+        emit SurchargeWithdrawn(msg.sender, _paymentAmount);
     }
 
     /// @notice Starts the transfer of the surcharge recipient designation to a new address.
@@ -254,12 +254,13 @@ abstract contract AtlETH is Permit69 {
     /// If the caller is not the current surcharge recipient, it reverts with an `InvalidAccess` error.
     /// @param newRecipient The address of the new surcharge recipient.
     function transferSurchargeRecipient(address newRecipient) external {
-        if (msg.sender != surchargeRecipient) {
+        address _surchargeRecipient = S_surchargeRecipient;
+        if (msg.sender != _surchargeRecipient) {
             revert InvalidAccess();
         }
 
-        pendingSurchargeRecipient = newRecipient;
-        emit SurchargeRecipientTransferStarted(surchargeRecipient, newRecipient);
+        S_pendingSurchargeRecipient = newRecipient;
+        emit SurchargeRecipientTransferStarted(_surchargeRecipient, newRecipient);
     }
 
     /// @notice Finalizes the transfer of the surcharge recipient designation to a new address.
@@ -268,12 +269,12 @@ abstract contract AtlETH is Permit69 {
     /// stored in `pendingSurchargeRecipient`.
     /// If the caller is not the pending surcharge recipient, it reverts with an `InvalidAccess` error.
     function becomeSurchargeRecipient() external {
-        if (msg.sender != pendingSurchargeRecipient) {
+        if (msg.sender != S_pendingSurchargeRecipient) {
             revert InvalidAccess();
         }
 
-        surchargeRecipient = msg.sender;
-        pendingSurchargeRecipient = address(0);
+        S_surchargeRecipient = msg.sender;
+        S_pendingSurchargeRecipient = address(0);
         emit SurchargeRecipientTransferred(msg.sender);
     }
 }

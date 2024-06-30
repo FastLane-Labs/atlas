@@ -25,12 +25,12 @@ import "src/contracts/types/EscrowTypes.sol";
 /// metacall transactions.
 abstract contract Permit69 is GasAccounting {
     constructor(
-        uint256 _escrowDuration,
-        address _verification,
-        address _simulator,
-        address _surchargeRecipient
+        uint256 escrowDuration,
+        address verification,
+        address simulator,
+        address surchargeRecipient
     )
-        GasAccounting(_escrowDuration, _verification, _simulator, _surchargeRecipient)
+        GasAccounting(escrowDuration, verification, simulator, surchargeRecipient)
     { }
 
     /// @notice Verifies that the caller is an authorized Execution Environment contract.
@@ -134,7 +134,7 @@ abstract contract Permit69 is GasAccounting {
     )
         internal
     {
-        Lock memory _lock = lock;
+        Lock memory _lock = T_lock;
 
         // Verify that the ExecutionEnvironment's context is correct.
         if (_lock.activeEnvironment != msg.sender) {

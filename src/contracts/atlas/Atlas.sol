@@ -50,41 +50,41 @@ contract Atlas is Escrow, Factory {
         payable
         returns (bool auctionWon)
     {
-        uint256 gasMarker = gasleft() + 21_000 + (msg.data.length * _CALLDATA_LENGTH_PREMIUM);
-        bool isSimulation = msg.sender == SIMULATOR;
+        uint256 _gasMarker = gasleft() + 21_000 + (msg.data.length * _CALLDATA_LENGTH_PREMIUM);
+        bool _isSimulation = msg.sender == SIMULATOR;
 
-        (address executionEnvironment, DAppConfig memory dConfig) = _getOrCreateExecutionEnvironment(userOp);
+        (address _executionEnvironment, DAppConfig memory _dConfig) = _getOrCreateExecutionEnvironment(userOp);
 
         // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
         // replay attacks.
         // NOTE: Currently reverting instead of graceful return to help w/ testing. TODO - still reverting?
-        ValidCallsResult validCallsResult =
-            VERIFICATION.validateCalls(dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, isSimulation);
-        if (validCallsResult != ValidCallsResult.Valid) {
-            if (isSimulation) revert VerificationSimFail(validCallsResult);
-            revert ValidCalls(validCallsResult);
+        ValidCallsResult _validCallsResult =
+            VERIFICATION.validateCalls(_dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, _isSimulation);
+        if (_validCallsResult != ValidCallsResult.Valid) {
+            if (_isSimulation) revert VerificationSimFail(_validCallsResult);
+            revert ValidCalls(_validCallsResult);
         }
 
         // Initialize the environment lock and accounting values
-        _setEnvironmentLock(dConfig, executionEnvironment);
-        _initializeAccountingValues(gasMarker);
+        _setEnvironmentLock(_dConfig, _executionEnvironment);
+        _initializeAccountingValues(_gasMarker);
 
         // userOpHash has already been calculated and verified in validateCalls at this point, so rather
         // than re-calculate it, we can simply take it from the dAppOp here. It's worth noting that this will
         // be either a TRUSTED or DEFAULT hash, depending on the allowsTrustedOpHash setting.
-        try this.execute(dConfig, userOp, solverOps, executionEnvironment, msg.sender, dAppOp.userOpHash) returns (
+        try this.execute(_dConfig, userOp, solverOps, _executionEnvironment, msg.sender, dAppOp.userOpHash) returns (
             Context memory ctx
         ) {
             // Gas Refund to sender only if execution is successful
-            (uint256 ethPaidToBundler, uint256 netGasSurcharge) = _settle(ctx, dConfig.solverGasLimit);
+            (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) = _settle(ctx, _dConfig.solverGasLimit);
 
             auctionWon = ctx.solverSuccessful;
             emit MetacallResult(
-                msg.sender, userOp.from, auctionWon, ctx.paymentsSuccessful, ethPaidToBundler, netGasSurcharge
+                msg.sender, userOp.from, auctionWon, ctx.paymentsSuccessful, _ethPaidToBundler, _netGasSurcharge
             );
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
-            _handleErrors(revertData, dConfig.callConfig);
+            _handleErrors(revertData, _dConfig.callConfig);
 
             // Refund the msg.value to sender if it errored
             // WARNING: If msg.sender is a disposable address such as a session key, make sure to remove ETH from it
@@ -124,29 +124,29 @@ contract Atlas is Escrow, Factory {
             dConfig, executionEnvironment, userOpHash, bundler, uint8(solverOps.length), bundler == SIMULATOR
         );
 
-        bytes memory returnData;
+        bytes memory _returnData;
 
         // PreOps Call
         if (dConfig.callConfig.needsPreOpsCall()) {
-            returnData = _executePreOpsCall(ctx, dConfig, userOp);
+            _returnData = _executePreOpsCall(ctx, dConfig, userOp);
         }
 
         // UserOp Call
-        returnData = _executeUserOperation(ctx, dConfig, userOp, returnData);
+        _returnData = _executeUserOperation(ctx, dConfig, userOp, _returnData);
 
         // SolverOps Calls
-        uint256 winningBidAmount = dConfig.callConfig.exPostBids()
-            ? _bidFindingIteration(ctx, dConfig, userOp, solverOps, returnData)
-            : _bidKnownIteration(ctx, dConfig, userOp, solverOps, returnData);
+        uint256 _winningBidAmount = dConfig.callConfig.exPostBids()
+            ? _bidFindingIteration(ctx, dConfig, userOp, solverOps, _returnData)
+            : _bidKnownIteration(ctx, dConfig, userOp, solverOps, _returnData);
 
         // AllocateValue Call
         if (ctx.solverSuccessful) {
-            _allocateValue(ctx, dConfig, winningBidAmount, returnData);
+            _allocateValue(ctx, dConfig, _winningBidAmount, _returnData);
         }
 
         // PostOp Call
         if (dConfig.callConfig.needsPostOpsCall()) {
-            _executePostOpsCall(ctx, ctx.solverSuccessful, returnData);
+            _executePostOpsCall(ctx, ctx.solverSuccessful, _returnData);
         }
     }
 
@@ -177,10 +177,10 @@ contract Atlas is Escrow, Factory {
 
         ctx.bidFind = true;
 
-        uint256[] memory bidsAndIndices = new uint256[](solverOps.length);
-        uint256 zeroBidCount;
-        uint256 bidAmountFound;
-        uint256 bidsAndIndicesLastIndex = bidsAndIndices.length - 1; // computed once for efficiency
+        uint256[] memory _bidsAndIndices = new uint256[](solverOps.length);
+        uint256 _zeroBidCount;
+        uint256 _bidAmountFound;
+        uint256 _bidsAndIndicesLastIndex = _bidsAndIndices.length - 1; // computed once for efficiency
 
         // First, get all bid amounts. Bids of zero are ignored by only storing non-zero bids in the array, from right
         // to left. If there are any zero bids they will end up on the left as uint(0) values - in their sorted
@@ -198,46 +198,46 @@ contract Atlas is Escrow, Factory {
         // |<------------------ 240 bits ---------------->|<------- 16 bits ------->|
 
         for (uint256 i; i < solverOps.length; ++i) {
-            bidAmountFound = _getBidAmount(ctx, dConfig, userOp, solverOps[i], returnData);
+            _bidAmountFound = _getBidAmount(ctx, dConfig, userOp, solverOps[i], returnData);
 
-            if (bidAmountFound == 0 || bidAmountFound > type(uint240).max) {
-                // Zero bids are ignored: increment zeroBidCount offset
+            if (_bidAmountFound == 0 || _bidAmountFound > type(uint240).max) {
+                // Zero bids are ignored: increment _zeroBidCount offset
                 // Bids that would cause an overflow are also ignored
                 unchecked {
-                    ++zeroBidCount;
+                    ++_zeroBidCount;
                 }
             } else {
                 // Non-zero bids are packed with their original solverOps index.
                 // The array is filled with non-zero bids from the right. This causes all zero bids to be on the left -
                 // in their sorted position, so fewer operations are needed in the sorting step below.
-                bidsAndIndices[bidsAndIndicesLastIndex - (i - zeroBidCount)] =
-                    uint256(bidAmountFound << _BITS_FOR_INDEX | uint16(i));
+                _bidsAndIndices[_bidsAndIndicesLastIndex - (i - _zeroBidCount)] =
+                    uint256(_bidAmountFound << _BITS_FOR_INDEX | uint16(i));
             }
         }
 
         // Then, sorts the uint256 array in-place, in ascending order.
-        LibSort.insertionSort(bidsAndIndices);
+        LibSort.insertionSort(_bidsAndIndices);
 
         ctx.bidFind = false;
 
         // Finally, iterate through sorted bidsAndIndices array in descending order of bidAmount.
-        for (uint256 i = bidsAndIndicesLastIndex; i >= 0; --i) {
+        for (uint256 i = _bidsAndIndicesLastIndex; i >= 0; --i) {
             // Isolate the bidAmount from the packed uint256 value
-            bidAmountFound = (bidsAndIndices[i] >> _BITS_FOR_INDEX) & _FIRST_240_BITS_TRUE_MASK;
+            _bidAmountFound = (_bidsAndIndices[i] >> _BITS_FOR_INDEX) & _FIRST_240_BITS_TRUE_MASK;
 
             // If we reach the zero bids on the left of array, break as all valid bids already checked.
-            if (bidAmountFound == 0) break;
+            if (_bidAmountFound == 0) break;
 
             // Isolate the original solverOps index from the packed uint256 value
-            uint256 solverIndex = uint8(bidsAndIndices[i] & _FIRST_16_BITS_TRUE_MASK);
-            ctx.solverIndex = uint8(solverIndex); // Yay, compiler <3
+            uint256 _solverIndex = uint8(_bidsAndIndices[i] & _FIRST_16_BITS_TRUE_MASK);
+            ctx.solverIndex = uint8(_solverIndex); // Yay, compiler <3
 
             // Execute the solver operation. If solver won, allocate value and return. Otherwise continue looping.
-            bidAmountFound =
-                _executeSolverOperation(ctx, dConfig, userOp, solverOps[solverIndex], bidAmountFound, true, returnData);
+            _bidAmountFound =
+                _executeSolverOperation(ctx, dConfig, userOp, solverOps[_solverIndex], _bidAmountFound, true, returnData);
 
             if (ctx.solverSuccessful) {
-                return bidAmountFound;
+                return _bidAmountFound;
             }
 
             if (i == 0) break; // break to prevent underflow in next loop
@@ -265,16 +265,15 @@ contract Atlas is Escrow, Factory {
         internal
         returns (uint256)
     {
-        uint256 bidAmount;
-        uint8 k = uint8(solverOps.length);
+        uint256 _bidAmount;
 
-        for (; ctx.solverIndex < k; ctx.solverIndex++) {
+        for (uint8 i = uint8(solverOps.length); ctx.solverIndex < i; ctx.solverIndex++) {
             SolverOperation calldata solverOp = solverOps[ctx.solverIndex];
 
-            bidAmount = _executeSolverOperation(ctx, dConfig, userOp, solverOp, solverOp.bidAmount, false, returnData);
+            _bidAmount = _executeSolverOperation(ctx, dConfig, userOp, solverOp, solverOp.bidAmount, false, returnData);
 
             if (ctx.solverSuccessful) {
-                return bidAmount;
+                return _bidAmount;
             }
         }
         if (ctx.isSimulation) revert SolverSimFail(uint256(ctx.solverOutcome));
@@ -286,28 +285,28 @@ contract Atlas is Escrow, Factory {
     /// @param revertData Revert data from a failure during the execution of the metacall.
     /// @param callConfig The CallConfig of the current metacall tx.
     function _handleErrors(bytes memory revertData, uint32 callConfig) internal view {
-        bytes4 errorSwitch = bytes4(revertData);
+        bytes4 _errorSwitch = bytes4(revertData);
         if (msg.sender == SIMULATOR) {
             // Simulation
-            if (errorSwitch == PreOpsSimFail.selector) {
+            if (_errorSwitch == PreOpsSimFail.selector) {
                 revert PreOpsSimFail();
-            } else if (errorSwitch == UserOpSimFail.selector) {
+            } else if (_errorSwitch == UserOpSimFail.selector) {
                 revert UserOpSimFail();
-            } else if (errorSwitch == SolverSimFail.selector) {
+            } else if (_errorSwitch == SolverSimFail.selector) {
                 // Expects revertData in form [bytes4, uint256]
-                uint256 solverOutcomeResult;
+                uint256 _solverOutcomeResult;
                 assembly {
                     let dataLocation := add(revertData, 0x20)
-                    solverOutcomeResult := mload(add(dataLocation, sub(mload(revertData), 32)))
+                    _solverOutcomeResult := mload(add(dataLocation, sub(mload(revertData), 32)))
                 }
-                revert SolverSimFail(solverOutcomeResult);
-            } else if (errorSwitch == AllocateValueSimFail.selector) {
+                revert SolverSimFail(_solverOutcomeResult);
+            } else if (_errorSwitch == AllocateValueSimFail.selector) {
                 revert AllocateValueSimFail();
-            } else if (errorSwitch == PostOpsSimFail.selector) {
+            } else if (_errorSwitch == PostOpsSimFail.selector) {
                 revert PostOpsSimFail();
             }
         }
-        if (errorSwitch == UserNotFulfilled.selector) {
+        if (_errorSwitch == UserNotFulfilled.selector) {
             revert UserNotFulfilled();
         }
         // If allowReuseUserOps = true, it reverts and bubbles up whatever the error
@@ -316,7 +315,7 @@ contract Atlas is Escrow, Factory {
         // execute() does so, no operation changes are persisted.
         if (callConfig.allowsReuseUserOps()) {
             assembly {
-                mstore(0, errorSwitch)
+                mstore(0, _errorSwitch)
                 revert(0, 4)
             }
         }

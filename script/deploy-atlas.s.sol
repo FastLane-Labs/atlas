@@ -11,7 +11,7 @@ import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 import { Simulator } from "src/contracts/helpers/Simulator.sol";
 import { Sorter } from "src/contracts/helpers/Sorter.sol";
-import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
+import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
 
 contract DeployAtlasScript is DeployBaseScript {
     function run() external {

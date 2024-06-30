@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { MockSafetyLocks } from "./SafetyLocks.t.sol";
 
-import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
+import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
 import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 
 import { IFactory } from "src/contracts/interfaces/IFactory.sol";
