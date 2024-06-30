@@ -625,7 +625,7 @@ abstract contract Escrow is AtlETH {
         bool calledback;
         (, calledback, success) = _solverLockData();
         if (!calledback) revert CallbackNotCalled();
-        if (!success && deposits < claims + withdrawals) revert BalanceNotReconciled();
+        if (!success && deposits < claims + withdrawals + fees - writeoffs) revert BalanceNotReconciled();
 
         // Check if this is an on-chain, ex post bid search
         if (ctx.bidFind) revert BidFindSuccessful(solverTracker.bidAmount);
