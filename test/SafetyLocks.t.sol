@@ -94,13 +94,12 @@ contract SafetyLocksTest is Test {
 
         safetyLocks.initializeLock{ value: msgValue }(executionEnvironment, gasMarker, userOpValue);
 
-        uint256 rawClaims = (gasMarker + safetyLocks.FIXED_GAS_OFFSET()) * tx.gasprice;
-        uint256 expectedClaims = rawClaims * (safetyLocks.SURCHARGE_SCALE() + safetyLocks.ATLAS_SURCHARGE_RATE() + safetyLocks.BUNDLER_SURCHARGE_RATE()) / safetyLocks.SURCHARGE_SCALE();
 
-        assertEq(safetyLocks.activeEnvironment(), executionEnvironment);
-        assertEq(safetyLocks.claims(), expectedClaims);
-        assertEq(safetyLocks.withdrawals(), userOpValue);
-        assertEq(safetyLocks.deposits(), msgValue);
+        (address activeEnv, uint32 callConfig, uint8 phase) = safetyLocks.lock();
+
+        assertEq(activeEnv, executionEnvironment);
+        assertEq(phase, uint8(ExecutionPhase.UserOperation));
+        assertEq(callConfig, uint32(0));
     }
 
     function test_buildContext() public {
