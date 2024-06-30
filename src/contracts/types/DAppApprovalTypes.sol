@@ -35,6 +35,8 @@ struct CallConfig {
     // the callChainHash.
     bool dappNoncesSequential;
     // requirePreOps: The preOps hook is executed before the userOp is executed. If false, the preOps hook is skipped.
+    // the dapp control should check the validity of the user operation (whether its dapps can support userOp.dapp and
+    // userOp.data) in the preOps hook.
     bool requirePreOps;
     // trackPreOpsReturnData: The return data from the preOps hook is passed to the next call phase. If false preOps
     // return data is discarded. If both trackPreOpsReturnData and trackUserReturnData are true, they are concatenated.
