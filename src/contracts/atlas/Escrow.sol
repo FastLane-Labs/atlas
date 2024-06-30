@@ -151,6 +151,7 @@ abstract contract Escrow is AtlETH {
             if (dConfig.callConfig.allowsTrustedOpHash()) {
                 if (!prevalidated && !_handleAltOpHash(userOp, solverOp)) {
                     ctx.solverOutcome = uint24(result);
+                    // TODO _handleSolverAccounting here
                     return 0;
                 }
             }

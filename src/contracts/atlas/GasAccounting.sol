@@ -71,8 +71,10 @@ abstract contract GasAccounting is SafetyLocks {
         }
     }
 
-    /// @notice Calculates the current shortfall between deficit (claims + withdrawals) and deposits.
-    /// @return The current shortfall amount, if any.
+    /// @notice Calculates the current shortfall currently owed by the winning solver.
+    /// @dev The shortfall is calculated `(claims + withdrawals + fees - writeoffs) - deposits`. If this value is less
+    /// than zero, shortfall returns 0 as there is no shortfall because the solver is in surplus.
+    /// @return The current shortfall amount, or 0 if there is no shortfall.
     function shortfall() external view returns (uint256) {
         uint256 deficit = claims + withdrawals + fees - writeoffs;
         uint256 _deposits = deposits;
@@ -233,10 +235,10 @@ abstract contract GasAccounting is SafetyLocks {
         withdrawals += amount;
     }
 
-    /// @notice Releases the solver lock and adjusts the solver's escrow balance based on the gas used and other
-    /// factors.
-    /// @dev Calculates the gas used for the SolverOperation and adjusts the solver's escrow balance accordingly.
-    /// @param solverOp The current SolverOperation for which to account
+    /// @notice Accounts for the gas cost of a failed SolverOperation, either by increasing writeoffs (if the bundler is
+    /// blamed for the failure) or by assigning the gas cost to the solver's bonded AtlETH balance (if the solver is
+    /// blamed for the failure).
+    /// @param solverOp The current SolverOperation for which to account.
     /// @param gasWaterMark The `gasleft()` watermark taken at the start of executing the SolverOperation.
     /// @param result The result bitmap of the SolverOperation execution.
     /// @param includeCalldata Whether to include calldata cost in the gas calculation.
@@ -322,11 +324,13 @@ abstract contract GasAccounting is SafetyLocks {
         }
     }
 
-    /// @notice Settles the transaction after execution, determining the final distribution of funds between the winning
-    /// solver and the bundler based on the outcome.
-    /// @dev This function adjusts the claims, withdrawals, deposits, and surcharges based on the gas used by the
-    /// transaction.
+    /// @notice Settle makes the final adjustments to accounting variables based on gas used in the metacall. AtlETH is
+    /// either taken (via _assign) or given (via _credit) to the winning solver, the bundler is sent the appropriate
+    /// refund for gas spent, and Atlas' gas surcharge is updated.
     /// @param ctx Context struct containing relavent context information for the Atlas auction.
+    /// @param solverGasLimit The dApp's maximum gas limit for a solver, as set in the DAppConfig.
+    /// @return claimsPaidToBundler The amount of ETH paid to the bundler in this function.
+    /// @return netAtlasGasSurcharge The net gas surcharge of the metacall, taken by Atlas.
     function _settle(
         Context memory ctx,
         uint256 solverGasLimit
