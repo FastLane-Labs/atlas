@@ -9,6 +9,7 @@ library EscrowBits {
         1 << uint256(SolverOutcome.InvalidSignature) // <- detected by verification
             | 1 << uint256(SolverOutcome.InvalidUserHash) // <- detected by verification
             | 1 << uint256(SolverOutcome.DeadlinePassedAlt) // <- detected by escrow
+            | 1 << uint256(SolverOutcome.GasPriceBelowUsersAlt) // <- detected by verification
             | 1 << uint256(SolverOutcome.InvalidTo) // <- detected by verification
             | 1 << uint256(SolverOutcome.UserOutOfGas) // <- detected by escrow
             | 1 << uint256(SolverOutcome.AlteredControl)

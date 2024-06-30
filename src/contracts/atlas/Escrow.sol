@@ -138,7 +138,9 @@ abstract contract Escrow is AtlETH {
         uint256 gasWaterMark = gasleft();
         uint256 result;
         if (!prevalidated) {
-            result = VERIFICATION.verifySolverOp(solverOp, ctx.userOpHash, userOp.maxFeePerGas, ctx.bundler);
+            result = VERIFICATION.verifySolverOp(
+                solverOp, ctx.userOpHash, userOp.maxFeePerGas, ctx.bundler, dConfig.callConfig.allowsTrustedOpHash()
+            );
             result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, result);
         }
 
@@ -283,7 +285,7 @@ abstract contract Escrow is AtlETH {
         if (solverOp.deadline != 0 && block.number > solverOp.deadline) {
             return (
                 1
-                    << uint256(
+                    << (
                         dConfig.callConfig.allowsTrustedOpHash()
                             ? uint256(SolverOutcome.DeadlinePassedAlt)
                             : uint256(SolverOutcome.DeadlinePassed)
@@ -356,7 +358,9 @@ abstract contract Escrow is AtlETH {
 
         uint256 gasWaterMark = gasleft();
 
-        uint256 result = VERIFICATION.verifySolverOp(solverOp, ctx.userOpHash, userOp.maxFeePerGas, ctx.bundler);
+        uint256 result = VERIFICATION.verifySolverOp(
+            solverOp, ctx.userOpHash, userOp.maxFeePerGas, ctx.bundler, dConfig.callConfig.allowsTrustedOpHash()
+        );
 
         result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, result);
 
