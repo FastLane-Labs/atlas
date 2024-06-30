@@ -26,6 +26,8 @@ abstract contract GasAccounting is SafetyLocks {
         SafetyLocks(_escrowDuration, _verification, _simulator, _surchargeRecipient)
     { }
 
+    /// @notice Sets the initial accounting values for the metacall transaction.
+    /// @param gasMarker The gas marker used to calculate the initial accounting values.
     function _initializeAccountingValues(uint256 gasMarker) internal {
         uint256 rawClaims = (FIXED_GAS_OFFSET + gasMarker) * tx.gasprice;
 
