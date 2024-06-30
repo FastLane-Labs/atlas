@@ -291,8 +291,7 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 _gasLeft = gasleft(); // Hold this constant for the calculations
 
         // Estimate the unspent, remaining gas that the Solver will not be liable for.
-        uint256 _gasRemainder = _gasLeft * tx.gasprice; // * (SURCHARGE_SCALE + ATLAS_SURCHARGE_RATE +
-            // BUNDLER_SURCHARGE_RATE) / SURCHARGE_SCALE;
+        uint256 _gasRemainder = _gasLeft * tx.gasprice;
 
         // Calculate the preadjusted netAtlasGasSurcharge
         netAtlasGasSurcharge = fees - _gasRemainder.getAtlasSurcharge();
