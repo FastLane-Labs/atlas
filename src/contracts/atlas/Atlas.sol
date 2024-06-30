@@ -37,6 +37,8 @@ contract Atlas is Escrow, Factory {
     { }
 
     /// @notice metacall is the entrypoint function for the Atlas transactions.
+    /// @dev Any ETH sent as msg.value with a metacall should be considered a potential subsidy for the winning solver's
+    /// gas repayment.
     /// @param userOp The UserOperation struct containing the user's transaction data.
     /// @param solverOps The SolverOperation array containing the solvers' transaction data.
     /// @param dAppOp The DAppOperation struct containing the DApp's transaction data.
