@@ -52,12 +52,19 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         // Verify that the calldata injection came from the dApp frontend
         // and that the signatures are valid.
 
+        bytes32 userOpHash = _getUserOperationHash(userOp);
+
+        // Check user signature
+        ValidCallsResult verifyUserResult = _verifyUser(dConfig, userOp, userOpHash, msgSender, isSimulation);
+        if (verifyUserResult != ValidCallsResult.Valid) {
+            return verifyUserResult;
+        }
+
         if (dConfig.callConfig.needsPreOpsReturnData() && dConfig.callConfig.needsUserReturnData()) {
             // Max one of preOps or userOp return data can be tracked, not both
             return ValidCallsResult.InvalidCallConfig;
         }
 
-        bytes32 userOpHash = _getUserOperationHash(userOp);
         // CASE: Solvers trust app to update content of UserOp after submission of solverOp
         if (dConfig.callConfig.allowsTrustedOpHash()) {
             // SessionKey must match explicitly - cannot be skipped
@@ -89,12 +96,6 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
                 _verifyDApp(dConfig, dAppOp, msgSender, allowUnapprovedDAppSignatories, isSimulation);
             if (verifyDappResult != ValidCallsResult.Valid) {
                 return verifyDappResult;
-            }
-
-            // Check user signature
-            ValidCallsResult verifyUserResult = _verifyUser(dConfig, userOp, userOpHash, msgSender, isSimulation);
-            if (verifyUserResult != ValidCallsResult.Valid) {
-                return verifyUserResult;
             }
 
             // Check number of solvers not greater than max, to prevent overflows in `solverIndex`
