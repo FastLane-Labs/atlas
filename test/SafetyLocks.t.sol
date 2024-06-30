@@ -22,7 +22,8 @@ contract MockSafetyLocks is SafetyLocks {
         payable
     {
         DAppConfig memory dConfig;
-        _setAccountingLock(dConfig, executionEnvironment, gasMarker, userOpValue);
+        _setEnvironmentLock(dConfig, executionEnvironment);
+        // _initializeAccountingValues(gasMarker);
     }
 
     function buildEscrowLock(
@@ -63,6 +64,14 @@ contract MockSafetyLocks is SafetyLocks {
     function setDeposits(uint256 _deposits) external {
         deposits = _deposits;
     }
+
+    function setFees(uint256 _fees) external {
+        fees = _fees;
+    }
+
+    function setWriteoffs(uint256 _writeoffs) external {
+        writeoffs = _writeoffs;
+    }
 }
 
 contract SafetyLocksTest is Test {
@@ -73,7 +82,7 @@ contract SafetyLocksTest is Test {
         safetyLocks = new MockSafetyLocks();
     }
 
-    function test_setAccountingLock() public {
+    function test_setEnvironmentLock() public {
         uint256 gasMarker = 222;
         uint256 userOpValue = 333;
         uint256 msgValue = 444;
@@ -85,13 +94,12 @@ contract SafetyLocksTest is Test {
 
         safetyLocks.initializeLock{ value: msgValue }(executionEnvironment, gasMarker, userOpValue);
 
-        uint256 rawClaims = (gasMarker + safetyLocks.FIXED_GAS_OFFSET()) * tx.gasprice;
-        uint256 expectedClaims = rawClaims * (safetyLocks.SURCHARGE_SCALE() + safetyLocks.ATLAS_SURCHARGE_RATE() + safetyLocks.BUNDLER_SURCHARGE_RATE()) / safetyLocks.SURCHARGE_SCALE();
 
-        assertEq(safetyLocks.activeEnvironment(), executionEnvironment);
-        assertEq(safetyLocks.claims(), expectedClaims);
-        assertEq(safetyLocks.withdrawals(), userOpValue);
-        assertEq(safetyLocks.deposits(), msgValue);
+        (address activeEnv, uint32 callConfig, uint8 phase) = safetyLocks.lock();
+
+        assertEq(activeEnv, executionEnvironment);
+        assertEq(phase, uint8(ExecutionPhase.UserOperation));
+        assertEq(callConfig, uint32(0));
     }
 
     function test_buildContext() public {

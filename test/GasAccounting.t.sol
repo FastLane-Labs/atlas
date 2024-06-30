@@ -31,7 +31,8 @@ contract MockGasAccounting is GasAccounting, Test {
 
     function initializeLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) external payable {
         DAppConfig memory dConfig;
-        _setAccountingLock(dConfig, executionEnvironment, gasMarker, userOpValue);
+        _setEnvironmentLock(dConfig, executionEnvironment);
+        _initializeAccountingValues(gasMarker);
     }
 
     function setPhase(ExecutionPhase _phase) external {
