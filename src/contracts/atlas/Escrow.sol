@@ -151,7 +151,12 @@ abstract contract Escrow is AtlETH {
             if (dConfig.callConfig.allowsTrustedOpHash()) {
                 if (!prevalidated && !_handleAltOpHash(userOp, solverOp)) {
                     ctx.solverOutcome = uint24(result);
-                    // TODO _handleSolverAccounting here
+
+                    // Account for failed SolverOperation gas costs
+                    _handleSolverAccounting(solverOp, gasWaterMark, result, !prevalidated);
+
+                    emit SolverTxResult(solverOp.solver, solverOp.from, false, false, result);
+
                     return 0;
                 }
             }
@@ -178,9 +183,9 @@ abstract contract Escrow is AtlETH {
         // If we reach this point, the solver call did not execute successfully.
         ctx.solverOutcome = uint24(result);
 
+        // Account for failed SolverOperation gas costs
         _handleSolverAccounting(solverOp, gasWaterMark, result, !prevalidated);
 
-        // emit event
         emit SolverTxResult(solverOp.solver, solverOp.from, result.executedWithError(), false, result);
 
         return 0;
