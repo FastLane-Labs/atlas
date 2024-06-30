@@ -386,13 +386,7 @@ abstract contract Escrow is AtlETH {
             // Get the uint256 from the memory array
             assembly {
                 let dataLocation := add(data, 0x20)
-                bidAmount :=
-                    mload(
-                        add(
-                            dataLocation,
-                            sub(mload(data), 32) // TODO: make sure a full uint256 is safe from overflow
-                        )
-                    )
+                bidAmount := mload(add(dataLocation, sub(mload(data), 32)))
             }
             return bidAmount;
         }
@@ -427,9 +421,11 @@ abstract contract Escrow is AtlETH {
         return true;
     }
 
-    // NOTE: This logic should be inside `verifySolverOp()` in AtlasVerification, but we hit Stack Too Deep errors when
-    // trying to do this check there, as an additional param (dConfig.bidToken) is needed. This logic should be moved to
-    // that function when a larger refactor is done to get around Stack Too Deep.
+    /// @notice Checks if the solver's bid token matches the dApp's bid token.
+    /// @param solverBidToken The solver's bid token address.
+    /// @param dConfigBidToken The dApp's bid token address.
+    /// @param result The current result bitmap, which will be updated with the outcome of the bid token check.
+    /// @return The updated result bitmap, with the SolverOutcome.InvalidBidToken flag set if the bid token check fails.
     function _checkSolverBidToken(
         address solverBidToken,
         address dConfigBidToken,
