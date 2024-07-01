@@ -60,7 +60,7 @@ contract Atlas is Escrow, Factory {
             if (isSimulation) revert VerificationSimFail(validCallsResult);
 
             // Gracefully return for results that need nonces to be stored and prevent replay attacks
-            if (uint8(validCallsResult) > uint8(ValidCallsResult.GRACEFUL_RETURN_THRESHOLD)) return false;
+            if (uint8(validCallsResult) >= _GRACEFUL_RETURN_THRESHOLD) return false;
 
             // Revert for all other results
             revert ValidCalls(validCallsResult);
