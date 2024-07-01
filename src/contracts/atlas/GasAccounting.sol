@@ -361,7 +361,7 @@ abstract contract GasAccounting is SafetyLocks {
         if (_deposits < _withdrawals) {
             _amountSolverPays = _withdrawals - _deposits;
         } else {
-            _amountSolverReceives += (_deposits - _withdrawals);
+            _amountSolverReceives = _deposits - _withdrawals;
         }
 
         // Only force solver to pay gas claims if they aren't also the bundler
