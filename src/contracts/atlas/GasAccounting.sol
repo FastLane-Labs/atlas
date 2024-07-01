@@ -359,7 +359,7 @@ abstract contract GasAccounting is SafetyLocks {
 
         // Calculate the balances that should be debited or credited to the solver and the bundler
         if (_deposits < _withdrawals) {
-            _amountSolverPays += (_withdrawals - _deposits);
+            _amountSolverPays = _withdrawals - _deposits;
         } else {
             _amountSolverReceives += (_deposits - _withdrawals);
         }
