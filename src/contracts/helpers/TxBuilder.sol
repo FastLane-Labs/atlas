@@ -2,9 +2,7 @@
 pragma solidity 0.8.22;
 
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
-import { IDAppIntegration } from "../interfaces/IDAppIntegration.sol";
 import { IAtlas } from "../interfaces/IAtlas.sol";
-import { IAtlETH } from "../interfaces/IAtlETH.sol";
 import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
 
 import "../types/SolverCallTypes.sol";
@@ -58,7 +56,7 @@ contract TxBuilder {
         address from,
         address to,
         uint256 maxFeePerGas,
-        uint256 value, // TODO check this is actually intended to be the value param. Was unnamed before.
+        uint256 value,
         uint256 deadline,
         bytes memory data
     )
@@ -96,7 +94,6 @@ contract TxBuilder {
         returns (SolverOperation memory solverOp)
     {
         // generate userOpHash depending on CallConfig.trustedOpHash allowed or not
-        DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
         bytes32 userOpHash = IAtlasVerification(verification).getUserOperationHash(userOp);
 
         solverOp = SolverOperation({

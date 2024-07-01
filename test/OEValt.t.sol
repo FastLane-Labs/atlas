@@ -167,7 +167,7 @@ contract OEVTest is BaseTest {
         assertEq(address(chainlinkAtlasWrapper).balance, 0, "Wrapper should not have any ETH");
 
         // To show the signer verification checks cause metacall to pass/fail:
-        uint256 snapshot = vm.snapshot();
+        // uint256 snapshot = vm.snapshot();
 
         // Should Succeed
         vm.prank(transmitter);
@@ -256,7 +256,7 @@ contract OEVTest is BaseTest {
     }
 
     function testChainlinkAtlasWrapperOwnableFunctionsEvents_AltVersion() public {
-        address mockEE = makeAddr("Mock EE");
+        // address mockEE = makeAddr("Mock EE");
 
         // Wrapper emits event on deployment to show ownership transfer
         vm.expectEmit(true, false, false, true);
@@ -300,9 +300,10 @@ contract OEVTest is BaseTest {
 
         vm.startPrank(transmitter);
         payable(address(chainlinkAtlasWrapper)).transfer(1e18);
-        address(chainlinkAtlasWrapper).call{value: 1e18}("");
+        (bool success, ) = address(chainlinkAtlasWrapper).call{value: 1e18}("");
         vm.stopPrank();
 
+        assertTrue(success, "Transfer should succeed");
         assertEq(address(chainlinkAtlasWrapper).balance, 2e18, "Wrapper should have 2 ETH");
     }
 
@@ -497,18 +498,18 @@ contract OEVTest is BaseTest {
 
     // View Functions
 
-    function test_ChainlinkDAppControl_getBidFormat_AltVersion() public {
+    function test_ChainlinkDAppControl_getBidFormat_AltVersion() public view {
         UserOperation memory userOp;
         assertEq(chainlinkDAppControl.getBidFormat(userOp), address(0), "Bid format should be addr 0 for ETH");
     }
 
-    function test_ChainlinkDAppControl_getBidValue_AltVersion() public {
+    function test_ChainlinkDAppControl_getBidValue_AltVersion() public view {
         SolverOperation memory solverOp;
         solverOp.bidAmount = 123;
         assertEq(chainlinkDAppControl.getBidValue(solverOp), 123, "Bid value should return solverOp.bidAmount");
     }
 
-    function test_ChainlinkDAppControl_getSignersForBaseFeed_AltVersion() public {
+    function test_ChainlinkDAppControl_getSignersForBaseFeed_AltVersion() public view {
         address[] memory signersFromDAppControl = chainlinkDAppControl.getSignersForBaseFeed(chainlinkETHUSD);
         address[] memory signers = getETHUSDSigners();
         assertEq(signersFromDAppControl.length, signers.length, "Signers length should be same as expected");
@@ -517,7 +518,7 @@ contract OEVTest is BaseTest {
         }
     }
 
-    function test_ChainlinkDAppControl_getOracleDataForBaseFeed_AltVersion() public {
+    function test_ChainlinkDAppControl_getOracleDataForBaseFeed_AltVersion() public view {
         address[] memory signers = getETHUSDSigners();
         for (uint i = 0; i < signers.length; i++) {
             Oracle memory oracle = chainlinkDAppControl.getOracleDataForBaseFeed(chainlinkETHUSD, signers[i]);
@@ -532,7 +533,7 @@ contract OEVTest is BaseTest {
     // ---------------------------------------------------- //
 
     // Returns calldata taken from a real Chainlink ETH/USD transmit tx
-    function getTransmitPayload() public returns (
+    function getTransmitPayload() public pure returns (
         bytes memory report,
         bytes32[] memory rs,
         bytes32[] memory ss,
@@ -575,7 +576,7 @@ contract OEVTest is BaseTest {
         return (report, rs, ss, rawVs);
     }
 
-    function getETHUSDSigners() public view returns (address[] memory) {
+    function getETHUSDSigners() public pure returns (address[] memory) {
         address[] memory signers = new address[](31);
         signers[0] = 0xCdEf689d3098A796F840A26f383CE19F4f023B5B;
         signers[1] = 0xb7bEA3A5d410F7c4eC2aa446ae4236F6Eed6b16A;
@@ -626,7 +627,8 @@ contract LiquidationOEVSolver is SolverBase {
 
     function withdrawETH() public {
         if(msg.sender != _owner) revert NotSolverOwner();
-        payable(msg.sender).call{value: address(this).balance}("");
+        (bool success, ) = payable(msg.sender).call{value: address(this).balance}("");
+        require(success, "Withdraw failed");
     }
 
     // This ensures a function can only be called through atlasSolverCall
@@ -654,7 +656,8 @@ contract MockLiquidatable {
         require(canLiquidate(), "Cannot liquidate");
         require(address(this).balance > 0, "No liquidation reward available");
         // If liquidated successfully, sends all the ETH in this contract to caller
-        payable(msg.sender).call{value: address(this).balance}("");
+        (bool success, ) = payable(msg.sender).call{value: address(this).balance}("");
+        require(success, "Liquidation failed");
     }
 
     // Can only liquidate if the oracle price is exactly the liquidation price
@@ -664,7 +667,7 @@ contract MockLiquidatable {
 }
 
 contract MockBadChainlinkFeed {
-    function latestAnswer() external returns(int256) {
+    function latestAnswer() external pure returns(int256) {
         return 0;
     }
 }

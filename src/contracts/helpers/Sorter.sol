@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { IAtlETH } from "../interfaces/IAtlETH.sol";
+import { IAtlas } from "../interfaces/IAtlas.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { CallVerification } from "../libraries/CallVerification.sol";
@@ -74,7 +74,7 @@ contract Sorter is AtlasConstants {
         returns (bool)
     {
         // Make sure the solver has enough funds bonded
-        uint256 solverBalance = IAtlETH(address(ATLAS)).balanceOfBonded(solverOp.from);
+        uint256 solverBalance = IAtlas(address(ATLAS)).balanceOfBonded(solverOp.from);
         uint256 gasLimit = _SOLVER_GAS_LIMIT_SCALE
             * (solverOp.gas < dConfig.solverGasLimit ? solverOp.gas : dConfig.solverGasLimit)
             / (_SOLVER_GAS_LIMIT_SCALE + _SOLVER_GAS_LIMIT_BUFFER_PERCENTAGE) + _FASTLANE_GAS_BUFFER;
@@ -92,7 +92,7 @@ contract Sorter is AtlasConstants {
         }
 
         // Solvers can only do one tx per block - this prevents double counting bonded balances
-        uint256 solverLastActiveBlock = IAtlETH(address(ATLAS)).accountLastActiveBlock(solverOp.from);
+        uint256 solverLastActiveBlock = IAtlas(address(ATLAS)).accountLastActiveBlock(solverOp.from);
         if (solverLastActiveBlock >= block.number) {
             return false;
         }

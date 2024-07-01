@@ -17,7 +17,7 @@ import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
 import { DAppOperation } from "src/contracts/types/DAppApprovalTypes.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
-import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 import { UserOperationBuilder } from "./base/builders/UserOperationBuilder.sol";
 import { SolverOperationBuilder } from "./base/builders/SolverOperationBuilder.sol";
 import { DAppOperationBuilder } from "./base/builders/DAppOperationBuilder.sol";
@@ -275,7 +275,7 @@ contract DummyDAppControlBuilder is DAppControl {
         weth = _weth;
     }
 
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
+    function _allocateValueCall(address bidToken, uint256, bytes calldata) internal override {
         if (bidToken != address(0)) {
             revert("not supported");
         }
@@ -283,7 +283,7 @@ contract DummyDAppControlBuilder is DAppControl {
         SafeTransferLib.safeTransferETH(_user(), address(this).balance);
     }
 
-    function getBidFormat(UserOperation calldata) public view override returns (address bidToken) {
+    function getBidFormat(UserOperation calldata) public pure override returns (address bidToken) {
         bidToken = address(0);
     }
 
@@ -307,10 +307,10 @@ contract SimpleSolver {
     function atlasSolverCall(
         address solverOpFrom,
         address executionEnvironment,
-        address bidToken,
-        uint256 bidAmount,
+        address,
+        uint256,
         bytes calldata solverOpData,
-        bytes calldata extraReturnData
+        bytes calldata
     )
         external
         payable
@@ -320,23 +320,23 @@ contract SimpleSolver {
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
 
         if (bytes4(solverOpData[:4]) == SimpleSolver.payback.selector) {
-            uint256 shortfall = IEscrow(atlas).shortfall();
+            uint256 shortfall = IAtlas(atlas).shortfall();
 
             if (shortfall < msg.value) shortfall = 0;
             else shortfall -= msg.value;
 
-            IEscrow(atlas).reconcile{ value: msg.value }(executionEnvironment, solverOpFrom, shortfall);
+            IAtlas(atlas).reconcile{ value: msg.value }(executionEnvironment, solverOpFrom, shortfall);
         }
     }
 
     function noPayback() external payable {
-        address(0).call{ value: msg.value }(""); // do something with the eth and dont pay it back
+        payable(address(0)).transfer(msg.value); // do something with the eth and dont pay it back
     }
 
     function onlyPayBid(uint256 bidAmount) external payable {
         IWETH(weth).withdraw(bidAmount);
         payable(environment).transfer(bidAmount); // pay back to atlas
-        address(0).call{ value: msg.value }(""); // do something with the remaining eth
+        payable(address(0)).transfer(msg.value); // do something with the remaining eth
     }
 
     function payback(uint256 bidAmount) external payable {

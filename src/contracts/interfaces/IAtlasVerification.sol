@@ -8,6 +8,7 @@ import "../types/EscrowTypes.sol";
 import "../types/ValidCallsTypes.sol";
 
 interface IAtlasVerification {
+    // AtlasVerification.sol
     function validateCalls(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
@@ -19,7 +20,6 @@ interface IAtlasVerification {
     )
         external
         returns (ValidCallsResult);
-
     function verifySolverOp(
         SolverOperation calldata solverOp,
         bytes32 userOpHash,
@@ -29,15 +29,24 @@ interface IAtlasVerification {
         external
         view
         returns (uint256 result);
-
+    function getUserOperationHash(UserOperation calldata userOp) external view returns (bytes32 hash);
     function getUserOperationPayload(UserOperation calldata userOp) external view returns (bytes32 payload);
-    function getUserOperationHash(UserOperation calldata userOp) external view returns (bytes32 payload);
     function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload);
     function getDAppOperationPayload(DAppOperation calldata dAppOp) external view returns (bytes32 payload);
+    function getDomainSeparator() external view returns (bytes32 domainSeparator);
+
+    // NonceManager.sol
     function getUserNextNonce(address user, bool sequential) external view returns (uint256 nextNonce);
+    function getUserNextNonSeqNonceAfter(address user, uint256 refNonce) external view returns (uint256);
     function getDAppNextNonce(address dApp) external view returns (uint256 nextNonce);
+
+    // DAppIntegration.sol
     function initializeGovernance(address control) external;
     function addSignatory(address control, address signatory) external;
     function removeSignatory(address control, address signatory) external;
-    function disableDApp(address dAppControl) external;
+    function changeDAppGovernance(address oldGovernance, address newGovernance) external;
+    function disableDApp(address control) external;
+    function getGovFromControl(address dAppControl) external view returns (address);
+    function isDAppSignatory(address dAppControl, address signatory) external view returns (bool);
+    function getDAppSignatories(address dAppControl) external view returns (address[] memory);
 }

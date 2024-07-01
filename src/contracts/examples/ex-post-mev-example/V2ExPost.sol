@@ -6,7 +6,6 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Base Imports
-import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
 import { IExecutionEnvironment } from "../../interfaces/IExecutionEnvironment.sol";
 
 import { SafetyBits } from "../../libraries/SafetyBits.sol";
@@ -106,11 +105,13 @@ contract V2ExPost is DAppControl {
             userOp.dapp,
             amount0In > amount1In ? amount0In : amount1In
         );
+
+        return new bytes(0);
     }
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(address, uint256 bidAmount, bytes calldata) internal override {
+    function _allocateValueCall(address, uint256, bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow

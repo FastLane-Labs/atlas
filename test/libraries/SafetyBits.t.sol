@@ -15,7 +15,7 @@ contract SafetyBitsTest is Test {
     using SafetyBits for Context;
     using CallBits for uint32;
 
-    function initializeContext(CallConfigIndex index) public view returns (Context memory ctx) {
+    function initializeContext(CallConfigIndex index) public pure returns (Context memory ctx) {
         uint32 callConfig = uint32(1 << uint256(index));
         ctx = _buildContext(callConfig, address(0), bytes32(0), address(0), 1, false);
     }
@@ -33,7 +33,7 @@ contract SafetyBitsTest is Test {
         bool isSimulation
     )
         internal
-        view
+        pure
         returns (Context memory)
     {   
         return Context({
@@ -52,7 +52,7 @@ contract SafetyBitsTest is Test {
         });
     }
 
-    function testInitializeEscrowLock() public {
+    function testInitializeEscrowLock() public pure {
         Context memory ctx = initializeContext(CallConfigIndex.RequirePreOps);
         assertTrue(ctx.solverSuccessful == false);
         assertTrue(ctx.paymentsSuccessful == false);

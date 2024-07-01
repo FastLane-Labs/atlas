@@ -159,6 +159,7 @@ contract Atlas is Escrow, Factory {
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param returnData Return data from the preOps and userOp calls.
+    /// @return The winning bid amount.
     function _bidFindingIteration(
         Context memory ctx,
         DAppConfig memory dConfig,
@@ -245,6 +246,7 @@ contract Atlas is Escrow, Factory {
         }
         if (ctx.isSimulation) revert SolverSimFail(uint256(ctx.solverOutcome));
         if (dConfig.callConfig.needsFulfillment()) revert UserNotFulfilled();
+        return 0;
     }
 
     /// @notice Called above in `execute` as an alternative to `_bidFindingIteration`, if solverOps have already been
@@ -254,6 +256,7 @@ contract Atlas is Escrow, Factory {
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param returnData Return data from the preOps and userOp calls.
+    /// @return The winning bid amount.
     function _bidKnownIteration(
         Context memory ctx,
         DAppConfig memory dConfig,
@@ -278,6 +281,7 @@ contract Atlas is Escrow, Factory {
         }
         if (ctx.isSimulation) revert SolverSimFail(uint256(ctx.solverOutcome));
         if (dConfig.callConfig.needsFulfillment()) revert UserNotFulfilled();
+        return 0;
     }
 
     /// @notice Called at the end of `metacall` to bubble up specific error info in a revert.

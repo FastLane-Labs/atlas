@@ -9,7 +9,7 @@ import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "src/contracts/libraries/
 import "src/contracts/types/LockTypes.sol";
 import "src/contracts/types/EscrowTypes.sol";
 
-// NOTE: IPermit69 only works inside of the Atlas environment - specifically
+// NOTE: Permit69 only works inside of the Atlas environment - specifically
 // inside of the custom ExecutionEnvironments that each user deploys when
 // interacting with Atlas in a manner controlled by the DeFi dApp.
 

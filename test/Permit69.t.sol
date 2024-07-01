@@ -272,7 +272,7 @@ contract Permit69Test is BaseTest {
         // preOpsPhaseSafe = 0000 0000 0010 0000
         uint8 preOpsPhaseSafe = uint8(ExecutionPhase.PreOps);
         // userOpPhaseSafe = 0000 0000 0100 0000
-        uint8 userOpPhaseSafe = uint8(ExecutionPhase.UserOperation);
+        // uint8 userOpPhaseSafe = uint8(ExecutionPhase.UserOperation);
 
         uint8 preSolverOpsPhaseSafe = uint8(ExecutionPhase.PreSolver);
         uint8 postSolverOpsPhaseSafe = uint8(ExecutionPhase.PostSolver);

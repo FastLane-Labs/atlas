@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
-import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
@@ -562,14 +562,14 @@ contract DummySolver {
             return;
         } else if (bidAmount == partialGasPayBack) {
             // Only pay half of shortfall owed - expect postSolverCall hook in DAppControl to pay the rest
-            uint256 _shortfall = IEscrow(_atlas).shortfall();
-            IEscrow(_atlas).reconcile(executionEnvironment, solverOpFrom, _shortfall / 2);
+            uint256 _shortfall = IAtlas(_atlas).shortfall();
+            IAtlas(_atlas).reconcile(executionEnvironment, solverOpFrom, _shortfall / 2);
             return;
         }
         
         // Default: Pay gas
-        uint256 shortfall = IEscrow(_atlas).shortfall();
-        IEscrow(_atlas).reconcile(executionEnvironment, solverOpFrom, shortfall);
+        uint256 shortfall = IAtlas(_atlas).shortfall();
+        IAtlas(_atlas).reconcile(executionEnvironment, solverOpFrom, shortfall);
         return;
     }
 }
@@ -598,8 +598,8 @@ contract DummySolverContributor {
         }
 
         // Pay borrowed ETH + gas used
-        uint256 shortfall = IEscrow(_atlas).shortfall();
-        IEscrow(_atlas).reconcile{value: shortfall}(executionEnvironment, solverOpFrom, shortfall);
+        uint256 shortfall = IAtlas(_atlas).shortfall();
+        IAtlas(_atlas).reconcile{value: shortfall}(executionEnvironment, solverOpFrom, shortfall);
 
         return;
     }

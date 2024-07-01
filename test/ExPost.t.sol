@@ -4,7 +4,6 @@ pragma solidity 0.8.22;
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-import { IDAppIntegration } from "src/contracts/interfaces/IDAppIntegration.sol";
 import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
@@ -317,7 +316,6 @@ contract ExPostTest is BaseTest {
         (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(r, s, v);
         vm.startPrank(userEOA);
-        address executionEnvironment = atlas.createExecutionEnvironment(userOp.control);
         // User must approve Atlas
         IERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
         IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);

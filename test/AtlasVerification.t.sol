@@ -34,8 +34,8 @@ contract DummySmartWallet {
     bool public isValidResult = true;
 
     function isValidSignature(
-        bytes32 hash,
-        bytes memory signature
+        bytes32,
+        bytes memory
     ) public view returns (bytes4) {
         console.log("DummySmartWallet.isValidSignature called, isValidResult: ", isValidResult);
         if (isValidResult) {
@@ -150,7 +150,7 @@ contract AtlasVerificationBase is AtlasBaseTest {
         vm.stopPrank();
     }
 
-    function assertValidCallsResult(ValidCallsResult actual, ValidCallsResult expected) public {
+    function assertValidCallsResult(ValidCallsResult actual, ValidCallsResult expected) public view {
         console.log("validCallsResult actual: ", uint(actual));
         console.log("validCallsResult expected: ", uint(expected));
         assertTrue(actual == expected, "validCallsResult different to expected");
@@ -1733,7 +1733,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         ), ValidCallsResult.NoSolverOp);
     }
 
-    function testGetDomainSeparatorInAtlasVerification() public {
+    function testGetDomainSeparatorInAtlasVerification() public view {
         bytes32 hashedName = keccak256(bytes("AtlasVerification"));
         bytes32 hashedVersion = keccak256(bytes("1.0"));
         bytes32 typeHash = keccak256(
