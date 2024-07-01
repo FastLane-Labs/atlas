@@ -2,7 +2,7 @@
 pragma solidity 0.8.22;
 
 bytes32 constant DAPP_TYPEHASH = keccak256(
-    "DAppApproval(address from,address to,uint256 nonce,uint256 deadline,address control,address bundler,bytes32 userOpHash,bytes32 callChainHash)"
+    "DAppOperation(address from,address to,uint256 nonce,uint256 deadline,address control,address bundler,bytes32 userOpHash,bytes32 callChainHash)"
 );
 
 struct DAppOperation {

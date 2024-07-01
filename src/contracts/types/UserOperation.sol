@@ -1,10 +1,16 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
+// Default UserOperation typehash
 bytes32 constant USER_TYPEHASH_DEFAULT = keccak256(
     "UserOperation(address from,address to,uint256 value,uint256 gas,uint256 maxFeePerGas,uint256 nonce,uint256 deadline,address dapp,address control,uint32 callConfig,address sessionKey,bytes data)"
 );
 
+// Trusted UserOperation typehash
+// NOTE: This is explicitly for the 'trustedOpHash' configuration option meant so that solvers can submit
+// SolverOperations
+// prior to seeing the UserOperation or its hash. In this scenario, the Solvers should trust the signer of the
+// UserOperation.
 bytes32 constant USER_TYPEHASH_TRUSTED = keccak256(
     "UserOperation(address from,address to,address dapp,address control,uint32 callConfig,address sessionKey)"
 );
