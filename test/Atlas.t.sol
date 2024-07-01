@@ -35,11 +35,11 @@ contract AtlasTest is BaseTest {
         // ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
 
         // atlas = new MockAtlas({
-        //     _escrowDuration: 64,
-        //     _verification: expectedAtlasVerificationAddr,
-        //     _simulator: address(simulator),
-        //     _executionTemplate: address(execEnvTemplate),
-        //     _surchargeRecipient: payee
+        //     escrowDuration: 64,
+        //     verification: expectedAtlasVerificationAddr,
+        //     simulator: address(simulator),
+        //     executionTemplate: address(execEnvTemplate),
+        //     surchargeRecipient: payee
         // });
         // atlasVerification = new AtlasVerification(address(atlas));
         // simulator.setAtlas(address(atlas));

@@ -34,11 +34,11 @@ contract DeployAtlasScript is DeployBaseScript {
 
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
         atlas = new Atlas({
-            _escrowDuration: 64,
-            _verification: expectedAtlasVerificationAddr,
-            _simulator: expectedSimulatorAddr,
-            _executionTemplate: address(execEnvTemplate),
-            _surchargeRecipient: deployer
+            escrowDuration: 64,
+            verification: expectedAtlasVerificationAddr,
+            simulator: expectedSimulatorAddr,
+            executionTemplate: address(execEnvTemplate),
+            surchargeRecipient: deployer
         });
         atlasVerification = new AtlasVerification(address(atlas));
 

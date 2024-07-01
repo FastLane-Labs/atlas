@@ -34,11 +34,11 @@ contract DAppIntegrationTest is Test {
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
 
         atlas = new Atlas({
-            _escrowDuration: 64,
-            _verification: expectedAtlasVerificationAddr,
-            _simulator: address(0),
-            _executionTemplate: address(execEnvTemplate),
-            _surchargeRecipient: atlasDeployer
+            escrowDuration: 64,
+            verification: expectedAtlasVerificationAddr,
+            simulator: address(0),
+            executionTemplate: address(execEnvTemplate),
+            surchargeRecipient: atlasDeployer
         });
         dAppIntegration = new MockDAppIntegration(expectedAtlasAddr);
         vm.stopPrank();

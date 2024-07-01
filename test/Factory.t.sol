@@ -65,11 +65,11 @@ contract FactoryTest is Test {
         
         vm.startPrank(deployer);
         atlas = new Atlas({
-            _escrowDuration: 64,
-            _verification: expectedAtlasVerificationAddr,
-            _simulator: address(0),
-            _executionTemplate: address(execEnvTemplate),
-            _surchargeRecipient: deployer
+            escrowDuration: 64,
+            verification: expectedAtlasVerificationAddr,
+            simulator: address(0),
+            executionTemplate: address(execEnvTemplate),
+            surchargeRecipient: deployer
         });
         assertEq(address(atlas), expectedAtlasAddr, "Atlas address mismatch");
         atlasVerification = new AtlasVerification(address(atlas));
