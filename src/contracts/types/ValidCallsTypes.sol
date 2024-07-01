@@ -6,33 +6,37 @@ pragma solidity 0.8.22;
 /// @dev A single ValidCallsResult is returned by `validateCalls` in AtlasVerification
 enum ValidCallsResult {
     Valid,
+    // Results below this line will cause metacall to revert
+    UserFromInvalid,
+    UserSignatureInvalid,
+    DAppSignatureInvalid,
+    UserNonceInvalid,
+    InvalidDAppNonce,
+    UnknownAuctioneerNotAllowed,
+    InvalidAuctioneer,
+    InvalidBundler,
+    // Results above this line will cause metacall to revert
+    InvertBidValueCannotBeExPostBids, // Threshold value (included in the revert range), any new reverting values should
+        // be included above this line
+    // Results below this line will cause metacall to gracefully return
     GasPriceHigherThanMax,
     TxValueLowerThanCallValue,
-    DAppSignatureInvalid,
-    UserSignatureInvalid,
     TooManySolverOps,
     UserDeadlineReached,
     DAppDeadlineReached,
     ExecutionEnvEmpty,
     NoSolverOp,
-    UnknownAuctioneerNotAllowed,
     InvalidSequence,
-    InvalidAuctioneer,
-    InvalidBundler,
     OpHashMismatch,
     DeadlineMismatch,
     InvalidControl,
     InvalidSolverGasLimit,
-    InvalidDAppNonce,
     InvalidCallConfig,
     CallConfigMismatch,
     DAppToInvalid,
-    UserFromInvalid,
     UserToInvalid,
     ControlMismatch,
-    UserNonceInvalid,
     InvalidCallChainHash,
     DAppNotEnabled,
-    BothUserAndDAppNoncesCannotBeSequential,
-    InvertBidValueCannotBeExPostBids
+    BothUserAndDAppNoncesCannotBeSequential
 }

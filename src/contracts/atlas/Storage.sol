@@ -3,6 +3,7 @@ pragma solidity 0.8.22;
 
 import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
+import "src/contracts/types/ValidCallsTypes.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { AtlasConstants } from "src/contracts/types/AtlasConstants.sol";
@@ -33,6 +34,8 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     // AtlETH ERC-20 storage
     uint256 public totalSupply;
     uint256 public bondedTotalSupply;
+
+    uint8 internal constant _GRACEFUL_RETURN_THRESHOLD = uint8(ValidCallsResult.InvertBidValueCannotBeExPostBids) + 1;
 
     mapping(address => uint256) public nonces;
     mapping(address => EscrowAccountBalance) internal _balanceOf;
