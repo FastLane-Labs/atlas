@@ -378,11 +378,11 @@ abstract contract GasAccounting is SafetyLocks {
         if (_amountSolverPays > _amountSolverReceives) {
             if (!ctx.solverSuccessful) {
                 revert InsufficientTotalBalance(_amountSolverPays - _amountSolverReceives);
-            } else {
-                uint256 deficit = _assign(_winningSolver, _amountSolverPays - _amountSolverReceives, true);
-                if (deficit > claimsPaidToBundler) revert InsufficientTotalBalance(deficit - claimsPaidToBundler);
-                claimsPaidToBundler -= deficit;
             }
+
+            uint256 deficit = _assign(_winningSolver, _amountSolverPays - _amountSolverReceives, true);
+            if (deficit > claimsPaidToBundler) revert InsufficientTotalBalance(deficit - claimsPaidToBundler);
+            claimsPaidToBundler -= deficit;
         } else {
             _credit(_winningSolver, _amountSolverReceives - _amountSolverPays);
         }
