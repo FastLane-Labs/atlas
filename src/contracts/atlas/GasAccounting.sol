@@ -362,9 +362,9 @@ abstract contract GasAccounting is SafetyLocks {
         // Only force solver to pay gas claims if they aren't also the bundler
         // NOTE: If the auction isn't won, _winningSolver will be address(0).
         if (ctx.solverSuccessful && _winningSolver != ctx.bundler) {
-            uint256 adjustedClaims = _claims - _writeoffs;
-            _amountSolverPays += adjustedClaims;
-            claimsPaidToBundler = adjustedClaims;
+            uint256 _adjustedClaims = _claims - _writeoffs;
+            _amountSolverPays += _adjustedClaims;
+            claimsPaidToBundler = _adjustedClaims;
         } else {
             claimsPaidToBundler = 0;
             _winningSolver = ctx.bundler;
@@ -375,9 +375,9 @@ abstract contract GasAccounting is SafetyLocks {
                 revert InsufficientTotalBalance(_amountSolverPays - _amountSolverReceives);
             }
 
-            uint256 deficit = _assign(_winningSolver, _amountSolverPays - _amountSolverReceives, true);
-            if (deficit > claimsPaidToBundler) revert InsufficientTotalBalance(deficit - claimsPaidToBundler);
-            claimsPaidToBundler -= deficit;
+            uint256 _deficit = _assign(_winningSolver, _amountSolverPays - _amountSolverReceives, true);
+            if (_deficit > claimsPaidToBundler) revert InsufficientTotalBalance(_deficit - claimsPaidToBundler);
+            claimsPaidToBundler -= _deficit;
         } else {
             _credit(_winningSolver, _amountSolverReceives - _amountSolverPays);
         }
