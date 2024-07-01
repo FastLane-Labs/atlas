@@ -69,7 +69,7 @@ contract FactoryTest is Test {
             verification: expectedAtlasVerificationAddr,
             simulator: address(0),
             executionTemplate: address(execEnvTemplate),
-            surchargeRecipient: deployer
+            initialSurchargeRecipient: deployer
         });
         assertEq(address(atlas), expectedAtlasAddr, "Atlas address mismatch");
         atlasVerification = new AtlasVerification(address(atlas));

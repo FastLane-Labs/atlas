@@ -13,9 +13,9 @@ abstract contract AtlETH is Permit69 {
         uint256 escrowDuration,
         address verification,
         address simulator,
-        address surchargeRecipient
+        address initialSurchargeRecipient
     )
-        Permit69(escrowDuration, verification, simulator, surchargeRecipient)
+        Permit69(escrowDuration, verification, simulator, initialSurchargeRecipient)
     { }
 
     /*//////////////////////////////////////////////////////////////

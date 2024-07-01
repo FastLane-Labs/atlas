@@ -38,7 +38,7 @@ contract DeployAtlasScript is DeployBaseScript {
             verification: expectedAtlasVerificationAddr,
             simulator: expectedSimulatorAddr,
             executionTemplate: address(execEnvTemplate),
-            surchargeRecipient: deployer
+            initialSurchargeRecipient: deployer
         });
         atlasVerification = new AtlasVerification(address(atlas));
 

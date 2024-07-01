@@ -30,10 +30,10 @@ contract Atlas is Escrow, Factory {
         uint256 escrowDuration,
         address verification,
         address simulator,
-        address surchargeRecipient,
+        address initialSurchargeRecipient,
         address executionTemplate
     )
-        Escrow(escrowDuration, verification, simulator, surchargeRecipient)
+        Escrow(escrowDuration, verification, simulator, initialSurchargeRecipient)
         Factory(executionTemplate)
     { }
 

@@ -20,9 +20,9 @@ abstract contract SafetyLocks is Storage {
         uint256 escrowDuration,
         address verification,
         address simulator,
-        address surchargeRecipient
+        address initialSurchargeRecipient
     )
-        Storage(escrowDuration, verification, simulator, surchargeRecipient)
+        Storage(escrowDuration, verification, simulator, initialSurchargeRecipient)
     { }
 
     /// @notice Sets the Atlas lock to the specified execution environment.

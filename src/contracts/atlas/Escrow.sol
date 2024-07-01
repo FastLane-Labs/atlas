@@ -33,9 +33,9 @@ abstract contract Escrow is AtlETH {
         uint256 escrowDuration,
         address verification,
         address simulator,
-        address surchargeRecipient
+        address initialSurchargeRecipient
     )
-        AtlETH(escrowDuration, verification, simulator, surchargeRecipient)
+        AtlETH(escrowDuration, verification, simulator, initialSurchargeRecipient)
     {
         if (escrowDuration == 0) revert InvalidEscrowDuration();
     }

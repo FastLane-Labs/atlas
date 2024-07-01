@@ -51,7 +51,14 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint256 internal T_withdrawals; // transient storage
     uint256 internal T_deposits; // transient storage
 
-    constructor(uint256 escrowDuration, address verification, address simulator, address surchargeRecipient) payable {
+    constructor(
+        uint256 escrowDuration,
+        address verification,
+        address simulator,
+        address initialSurchargeRecipient
+    )
+        payable
+    {
         ESCROW_DURATION = escrowDuration;
         VERIFICATION = AtlasVerification(verification);
         SIMULATOR = simulator;
@@ -59,7 +66,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         // Gas Accounting
         // Initialized with msg.value to seed flash loan liquidity
         S_cumulativeSurcharge = msg.value;
-        S_surchargeRecipient = surchargeRecipient;
+        S_surchargeRecipient = initialSurchargeRecipient;
 
         // TODO remove these when transient storage behaviour is implemented
         // Gas Accounting - transient storage (delete this from constructor post dencun)
@@ -73,7 +80,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         T_withdrawals = type(uint256).max;
         T_deposits = type(uint256).max;
 
-        emit SurchargeRecipientTransferred(surchargeRecipient);
+        emit SurchargeRecipientTransferred(initialSurchargeRecipient);
     }
 
     /// @notice Returns information about the current state of the solver lock.

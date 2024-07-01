@@ -88,7 +88,7 @@ contract BaseTest is Test, TestConstants {
             verification: expectedAtlasVerificationAddr,
             simulator: address(simulator),
             executionTemplate: address(execEnvTemplate),
-            surchargeRecipient: payee
+            initialSurchargeRecipient: payee
         });
         atlasVerification = new AtlasVerification(address(atlas));
         simulator.setAtlas(address(atlas));

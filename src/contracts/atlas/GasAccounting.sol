@@ -21,9 +21,9 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 escrowDuration,
         address verification,
         address simulator,
-        address surchargeRecipient
+        address initialSurchargeRecipient
     )
-        SafetyLocks(escrowDuration, verification, simulator, surchargeRecipient)
+        SafetyLocks(escrowDuration, verification, simulator, initialSurchargeRecipient)
     { }
 
     /// @notice Sets the initial accounting values for the metacall transaction.
