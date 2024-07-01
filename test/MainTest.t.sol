@@ -8,7 +8,7 @@ import { IDAppIntegration } from "src/contracts/interfaces/IDAppIntegration.sol"
 import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
-import { Mimic } from "src/contracts/atlas/Mimic.sol";
+import { Mimic } from "src/contracts/common/Mimic.sol";
 
 import { V2DAppControl } from "src/contracts/examples/v2-example/V2DAppControl.sol";
 

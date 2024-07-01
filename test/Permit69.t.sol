@@ -7,7 +7,7 @@ import { BaseTest } from "./base/BaseTest.t.sol";
 import "./base/TestUtils.sol";
 
 import { Permit69 } from "src/contracts/atlas/Permit69.sol";
-import { Mimic } from "src/contracts/atlas/Mimic.sol";
+import { Mimic } from "src/contracts/common/Mimic.sol";
 
 import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "src/contracts/atlas/Permit69.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
