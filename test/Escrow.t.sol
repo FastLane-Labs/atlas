@@ -21,9 +21,10 @@ import { SolverOperationBuilder } from "./base/builders/SolverOperationBuilder.s
 import { DAppOperationBuilder } from "./base/builders/DAppOperationBuilder.sol";
 import { GasSponsorDAppControl } from "./base/GasSponsorDAppControl.sol";
 
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/SolverCallTypes.sol";
-import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/DAppOperation.sol";
+import "src/contracts/types/ConfigTypes.sol";
 import "src/contracts/types/EscrowTypes.sol";
 
 contract EscrowTest is AtlasBaseTest {

@@ -5,11 +5,12 @@ import { IAtlas } from "../interfaces/IAtlas.sol";
 
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
-import "../types/SolverCallTypes.sol";
-import "../types/UserCallTypes.sol";
+import "../types/SolverOperation.sol";
+import "../types/UserOperation.sol";
 import "../types/LockTypes.sol";
-import "../types/DAppApprovalTypes.sol";
-import "../types/ValidCallsTypes.sol";
+import "../types/DAppOperation.sol";
+import "../types/ConfigTypes.sol";
+import "../types/ValidCalls.sol";
 import "../types/EscrowTypes.sol";
 
 import "forge-std/Test.sol"; // TODO remove

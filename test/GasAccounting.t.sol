@@ -11,8 +11,8 @@ import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 
 import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
-import "src/contracts/types/SolverCallTypes.sol";
-import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/ConfigTypes.sol";
 
 contract MockGasAccounting is GasAccounting, Test {
     uint256 public constant MOCK_SOLVER_GAS_LIMIT = 500_000;

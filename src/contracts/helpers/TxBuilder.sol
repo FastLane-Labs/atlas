@@ -7,9 +7,10 @@ import { IAtlas } from "../interfaces/IAtlas.sol";
 import { IAtlETH } from "../interfaces/IAtlETH.sol";
 import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
 
-import "../types/SolverCallTypes.sol";
-import "../types/UserCallTypes.sol";
-import "../types/DAppApprovalTypes.sol";
+import "../types/SolverOperation.sol";
+import "../types/UserOperation.sol";
+import "../types/ConfigTypes.sol";
+import "../types/DAppOperation.sol";
 
 import { CallVerification } from "../libraries/CallVerification.sol";
 import { CallBits } from "../libraries/CallBits.sol";

@@ -19,6 +19,7 @@ import { Atlas } from "src/contracts/atlas/Atlas.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 
 import "src/contracts/types/LockTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
 
 contract Permit69Test is BaseTest {
 

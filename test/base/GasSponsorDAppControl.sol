@@ -5,9 +5,9 @@ import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 
-import "src/contracts/types/DAppApprovalTypes.sol";
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/SolverOperation.sol";
 
 import "forge-std/Test.sol";
 

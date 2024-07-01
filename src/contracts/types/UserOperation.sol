@@ -20,7 +20,7 @@ struct UserOperation {
     address dapp; // Nested "to" for user's call (used in `to` field of the user call)
     address control; // Address of the DAppControl contract
     uint32 callConfig; // Call configuration expected by user, refer to
-        // `src/contracts/types/DAppApprovalTypes.sol:CallConfig`
+        // `src/contracts/types/ConfigTypes.sol:CallConfig`
     address sessionKey; // Address of the temporary session key which is used to sign the DappOperation
     bytes data; // User operation calldata (used in `data` field of the user call)
     bytes signature; // User operation signature signed by UserOperation.from

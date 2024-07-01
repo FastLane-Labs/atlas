@@ -11,11 +11,12 @@ import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { AtlasConstants } from "src/contracts/types/AtlasConstants.sol";
-import "src/contracts/types/SolverCallTypes.sol";
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
 import "src/contracts/types/EscrowTypes.sol";
-import "src/contracts/types/ValidCallsTypes.sol";
+import "src/contracts/types/ValidCalls.sol";
 
 /// @title AtlasVerification
 /// @author FastLane Labs

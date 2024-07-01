@@ -3,8 +3,8 @@ pragma solidity 0.8.22;
 
 import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 import { Mimic } from "src/contracts/common/Mimic.sol";
-import { DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
-import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
+import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
+import { UserOperation } from "src/contracts/types/UserOperation.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 

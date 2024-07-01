@@ -7,7 +7,7 @@ import { SafetyLocks } from "src/contracts/atlas/SafetyLocks.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
-import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/ConfigTypes.sol";
 import "src/contracts/types/LockTypes.sol";
 
 contract MockSafetyLocks is SafetyLocks {

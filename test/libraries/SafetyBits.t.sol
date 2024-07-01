@@ -9,7 +9,7 @@ import "../base/TestUtils.sol";
 
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 
-import { CallConfigIndex } from "src/contracts/types/DAppApprovalTypes.sol";
+import { CallConfigIndex } from "src/contracts/types/ConfigTypes.sol";
 
 contract SafetyBitsTest is Test {
     using SafetyBits for Context;

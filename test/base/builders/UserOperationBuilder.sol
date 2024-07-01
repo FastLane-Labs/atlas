@@ -3,8 +3,8 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
-import { CallConfig } from "src/contracts/types/DAppApprovalTypes.sol";
+import { UserOperation } from "src/contracts/types/UserOperation.sol";
+import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";

@@ -14,11 +14,12 @@ import { V2DAppControl } from "src/contracts/examples/v2-example/V2DAppControl.s
 
 import { Solver } from "src/contracts/solver/src/TestSolver.sol";
 
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/SolverOperation.sol";
 import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
-import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { V2Helper } from "./V2Helper.sol";

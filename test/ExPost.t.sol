@@ -15,11 +15,12 @@ import { V2ExPost } from "src/contracts/examples/ex-post-mev-example/V2ExPost.so
 
 import { SolverExPost } from "src/contracts/solver/src/TestSolverExPost.sol";
 
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/SolverOperation.sol";
 import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
-import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
+import "src/contracts/types/ConfigTypes.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { V2Helper } from "./V2Helper.sol";

@@ -11,7 +11,7 @@ import { DummyDAppControl, CallConfigBuilder } from "./base/DummyDAppControl.sol
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
-import "src/contracts/types/UserCallTypes.sol";
+import "src/contracts/types/UserOperation.sol";
 
 import "./base/TestUtils.sol";
 

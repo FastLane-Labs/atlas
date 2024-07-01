@@ -2,7 +2,7 @@
 pragma solidity 0.8.22;
 
 import { DummyDAppControl } from "../base/DummyDAppControl.sol";
-import { CallConfig } from "src/contracts/types/DAppApprovalTypes.sol";
+import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 
 import "forge-std/Test.sol";

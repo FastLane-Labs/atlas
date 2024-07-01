@@ -12,9 +12,10 @@ import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
 import { Sorter } from "src/contracts/helpers/Sorter.sol";
 import { Simulator } from "src/contracts/helpers/Simulator.sol";
-import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
-import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
-import { DAppOperation, DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
+import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
+import { UserOperation } from "src/contracts/types/UserOperation.sol";
+import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
 import "src/contracts/types/LockTypes.sol";
 
 import { LibSort } from "solady/utils/LibSort.sol";

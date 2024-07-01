@@ -7,9 +7,9 @@ import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol"
 
 // Atlas Imports
 import { DAppControl } from "../../dapp/DAppControl.sol";
-import { CallConfig } from "../../types/DAppApprovalTypes.sol";
-import "../../types/UserCallTypes.sol";
-import "../../types/SolverCallTypes.sol";
+import { CallConfig } from "../../types/ConfigTypes.sol";
+import "../../types/UserOperation.sol";
+import "../../types/SolverOperation.sol";
 
 // Uniswap Imports
 import { IUniswapV2Router01, IUniswapV2Router02 } from "./interfaces/IUniswapV2Router.sol";

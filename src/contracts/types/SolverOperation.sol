@@ -24,12 +24,3 @@ struct SolverOperation {
     bytes data; // Solver op calldata (used in `data` field of the solver call)
     bytes signature; // Solver operation signature signed by SolverOperation.from
 }
-
-// Additional struct to avoid Stack Too Deep while tracking variables related to the solver call.
-struct SolverTracker {
-    uint256 bidAmount;
-    uint256 floor;
-    uint256 ceiling;
-    bool etherIsBidToken;
-    bool invertsBidValue;
-}

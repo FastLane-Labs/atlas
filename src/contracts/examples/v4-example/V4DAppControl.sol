@@ -9,10 +9,10 @@ import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol"
 import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
 import { SafetyBits } from "../../libraries/SafetyBits.sol";
 
-import { CallConfig } from "../../types/DAppApprovalTypes.sol";
-import "../../types/SolverCallTypes.sol";
-import "../../types/UserCallTypes.sol";
-import "../../types/DAppApprovalTypes.sol";
+import { CallConfig } from "../../types/ConfigTypes.sol";
+import "../../types/SolverOperation.sol";
+import "../../types/UserOperation.sol";
+import "../../types/ConfigTypes.sol";
 import "../../types/LockTypes.sol";
 
 // Atlas DApp-Control Imports

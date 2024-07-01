@@ -14,9 +14,10 @@ import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { ExecutionPhase } from "src/contracts/types/LockTypes.sol";
-import "src/contracts/types/SolverCallTypes.sol";
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/EscrowTypes.sol";
 
 /// @title ExecutionEnvironment
 /// @author FastLane Labs
