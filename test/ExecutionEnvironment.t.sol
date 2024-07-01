@@ -645,7 +645,7 @@ contract MockSolverContract {
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
         require(success, "atlasSolverCall call reverted");
         if (shouldReconcile) {
-            IAtlas(address(_atlas)).reconcile(executionEnvironment, solverOpFrom, type(uint256).max);
+            IAtlas(_atlas).reconcile(type(uint256).max);
         }
     }
 

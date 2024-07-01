@@ -287,7 +287,7 @@ contract EscrowTest is AtlasBaseTest {
         atlas.unbond(1); // This will set the solver's lastAccessedBlock to the current block
 
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
-        executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.PerBlockLimit), true);
+        executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.PerBlockLimit), false);
     }
 
     function test_executeSolverOperation_validateSolverOperation_insufficientEscrow() public {
@@ -316,7 +316,7 @@ contract EscrowTest is AtlasBaseTest {
             .withValue(solverOpValue) // Set a call value that is too high
             .withBidAmount(defaultBidAmount)
             .signAndBuild(address(atlasVerification), solverOnePK);
-        executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.CallValueTooHigh), true);
+        executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.CallValueTooHigh), false);
     }
 
     function test_executeSolverOperation_validateSolverOperation_userOutOfGas() public {
@@ -327,7 +327,11 @@ contract EscrowTest is AtlasBaseTest {
     }
 
     function test_executeSolverOperation_solverOpWrapper_BidNotPaid() public {
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
+            defaultCallConfig()
+                .withRequireFulfillment(true)
+                .build()
+        );
         solverOps[0] = validSolverOperation(userOp)
             .withBidAmount(defaultBidAmount * 2) // Solver's contract doesn't have that much
             .signAndBuild(address(atlasVerification), solverOnePK);
@@ -340,7 +344,8 @@ contract EscrowTest is AtlasBaseTest {
         uint256 bidAmount = dummySolver.noGasPayBack(); // Special bid value that will cause the solver to not call reconcile
         deal(address(dummySolver), bidAmount);
 
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
+            defaultCallConfig().withRequireFulfillment(true).build());
         solverOps[0] = validSolverOperation(userOp)
             .withBidAmount(bidAmount)
             .signAndBuild(address(atlasVerification), solverOnePK);
@@ -353,6 +358,7 @@ contract EscrowTest is AtlasBaseTest {
             defaultCallConfig()
                 .withTrackUserReturnData(true)
                 .withForwardReturnData(true)
+                .withRequireFulfillment(true)
                 .build()
         );
         solverOps[0] = validSolverOperation(userOp)
@@ -370,6 +376,7 @@ contract EscrowTest is AtlasBaseTest {
                 .withTrackUserReturnData(true)
                 .withRequirePreOps(false)
                 .withPreSolver(true)
+                .withRequireFulfillment(true)
                 .build()
         );
 
@@ -393,6 +400,7 @@ contract EscrowTest is AtlasBaseTest {
                 .withTrackUserReturnData(true)
                 .withRequirePreOps(false)
                 .withPostSolver(true)
+                .withRequireFulfillment(true)
                 .build()
         );
 
@@ -414,7 +422,8 @@ contract EscrowTest is AtlasBaseTest {
         uint256 bidAmount = dummySolver.partialGasPayBack(); // solver only pays half of shortfall
         deal(address(dummySolver), bidAmount);
 
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
+            defaultCallConfig().withRequireFulfillment(true).build());
         solverOps[0] = validSolverOperation(userOp)
             .withBidAmount(bidAmount)
             .signAndBuild(address(atlasVerification), solverOnePK);
@@ -563,13 +572,13 @@ contract DummySolver {
         } else if (bidAmount == partialGasPayBack) {
             // Only pay half of shortfall owed - expect postSolverCall hook in DAppControl to pay the rest
             uint256 _shortfall = IAtlas(_atlas).shortfall();
-            IAtlas(_atlas).reconcile(executionEnvironment, solverOpFrom, _shortfall / 2);
+            IAtlas(_atlas).reconcile(_shortfall / 2);
             return;
         }
         
         // Default: Pay gas
         uint256 shortfall = IAtlas(_atlas).shortfall();
-        IAtlas(_atlas).reconcile(executionEnvironment, solverOpFrom, shortfall);
+        IAtlas(_atlas).reconcile(shortfall);
         return;
     }
 }
@@ -599,7 +608,7 @@ contract DummySolverContributor {
 
         // Pay borrowed ETH + gas used
         uint256 shortfall = IAtlas(_atlas).shortfall();
-        IAtlas(_atlas).reconcile{value: shortfall}(executionEnvironment, solverOpFrom, shortfall);
+        IAtlas(_atlas).reconcile{value: shortfall}(0);
 
         return;
     }

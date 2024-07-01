@@ -1,10 +1,10 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import "../types/SolverCallTypes.sol";
-import "../types/UserCallTypes.sol";
-import "../types/DAppApprovalTypes.sol";
-import "../types/LockTypes.sol";
+import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/UserCallTypes.sol";
+import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/LockTypes.sol";
 
 interface IAtlas {
     // Atlas.sol
@@ -65,14 +65,7 @@ interface IAtlas {
     function contribute() external payable;
     function borrow(uint256 amount) external payable;
     function shortfall() external view returns (uint256);
-    function reconcile(
-        address environment,
-        address solverFrom,
-        uint256 maxApprovedGasSpend
-    )
-        external
-        payable
-        returns (uint256 owed);
+    function reconcile(uint256 maxApprovedGasSpend) external payable returns (uint256 owed);
 
     // SafetyLocks.sol
     function activeEnvironment() external view returns (address);

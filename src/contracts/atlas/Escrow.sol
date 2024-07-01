@@ -87,11 +87,17 @@ abstract contract Escrow is AtlETH {
         withLockPhase(ExecutionPhase.UserOperation)
         returns (bytes memory)
     {
-        (bool success, bytes memory data) = ctx.executionEnvironment.call{ value: userOp.value }(
-            abi.encodePacked(
-                abi.encodeCall(IExecutionEnvironment.userWrapper, userOp), ctx.setAndPack(ExecutionPhase.UserOperation)
-            )
-        );
+        bool success;
+        bytes memory data;
+
+        if (_borrow(userOp.value)) {
+            (success, data) = ctx.executionEnvironment.call{ value: userOp.value }(
+                abi.encodePacked(
+                    abi.encodeCall(IExecutionEnvironment.userWrapper, userOp),
+                    ctx.setAndPack(ExecutionPhase.UserOperation)
+                )
+            );
+        }
 
         if (success) {
             // Handle formatting of returnData
@@ -132,7 +138,9 @@ abstract contract Escrow is AtlETH {
         uint256 gasWaterMark = gasleft();
         uint256 result;
         if (!prevalidated) {
-            result = VERIFICATION.verifySolverOp(solverOp, ctx.userOpHash, userOp.maxFeePerGas, ctx.bundler);
+            result = VERIFICATION.verifySolverOp(
+                solverOp, ctx.userOpHash, userOp.maxFeePerGas, ctx.bundler, dConfig.callConfig.allowsTrustedOpHash()
+            );
             result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, result);
         }
 
@@ -146,6 +154,12 @@ abstract contract Escrow is AtlETH {
             if (dConfig.callConfig.allowsTrustedOpHash()) {
                 if (!prevalidated && !_handleAltOpHash(userOp, solverOp)) {
                     ctx.solverOutcome = uint24(result);
+
+                    // Account for failed SolverOperation gas costs
+                    _handleSolverAccounting(solverOp, gasWaterMark, result, !prevalidated);
+
+                    emit SolverTxResult(solverOp.solver, solverOp.from, false, false, result);
+
                     return 0;
                 }
             }
@@ -155,7 +169,6 @@ abstract contract Escrow is AtlETH {
                 SolverTracker memory solverTracker;
 
                 // Execute the solver call
-                // _solverOpsWrapper returns a SolverOutcome enum value
                 (result, solverTracker) = _solverOpWrapper(ctx, solverOp, bidAmount, gasLimit, returnData);
 
                 if (result.executionSuccessful()) {
@@ -170,11 +183,12 @@ abstract contract Escrow is AtlETH {
             }
         }
 
+        // If we reach this point, the solver call did not execute successfully.
         ctx.solverOutcome = uint24(result);
 
-        _releaseSolverLock(solverOp, gasWaterMark, result, false, !prevalidated);
+        // Account for failed SolverOperation gas costs
+        _handleSolverAccounting(solverOp, gasWaterMark, result, !prevalidated);
 
-        // emit event
         emit SolverTxResult(solverOp.solver, solverOp.from, result.executedWithError(), false, result);
 
         return 0;
@@ -269,6 +283,18 @@ abstract contract Escrow is AtlETH {
             return (1 << uint256(SolverOutcome.UserOutOfGas), gasLimit); // gasLimit = 0
         }
 
+        if (solverOp.deadline != 0 && block.number > solverOp.deadline) {
+            return (
+                1
+                    << (
+                        dConfig.callConfig.allowsTrustedOpHash()
+                            ? uint256(SolverOutcome.DeadlinePassedAlt)
+                            : uint256(SolverOutcome.DeadlinePassed)
+                    ),
+                gasLimit // gasLimit = 0
+            );
+        }
+
         gasLimit = _SOLVER_GAS_LIMIT_SCALE
             * (solverOp.gas < dConfig.solverGasLimit ? solverOp.gas : dConfig.solverGasLimit)
             / (_SOLVER_GAS_LIMIT_SCALE + _SOLVER_GAS_LIMIT_BUFFER_PERCENTAGE) + _FASTLANE_GAS_BUFFER;
@@ -356,7 +382,9 @@ abstract contract Escrow is AtlETH {
 
         uint256 gasWaterMark = gasleft();
 
-        uint256 result = VERIFICATION.verifySolverOp(solverOp, ctx.userOpHash, userOp.maxFeePerGas, ctx.bundler);
+        uint256 result = VERIFICATION.verifySolverOp(
+            solverOp, ctx.userOpHash, userOp.maxFeePerGas, ctx.bundler, dConfig.callConfig.allowsTrustedOpHash()
+        );
 
         result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, result);
 
@@ -556,11 +584,13 @@ abstract contract Escrow is AtlETH {
         //              Solver Call              //
         // ------------------------------------- //
 
-        lock.phase = uint8(ExecutionPhase.SolverOperations);
+        lock.phase = uint8(ExecutionPhase.SolverOperation);
 
-        // Set the solver lock - will perform accounting checks if value borrowed. If `_trySolverLock()` returns false,
-        // we revert here and catch the error in `_solverOpWrapper()` above
-        if (!_trySolverLock(solverOp)) revert InsufficientEscrow();
+        // Make sure there's enough value in Atlas for the Solver
+        if (!_borrow(solverOp.value)) revert InsufficientEscrow();
+
+        // Set the solver lock - if we revert here we'll catch the error in `_solverOpWrapper()` above
+        _solverLock = uint256(uint160(solverOp.from));
 
         // Optimism's SafeCall lib allows us to limit how much returndata gets copied to memory, to prevent OOG attacks.
         success = solverOp.solver.safeCall(
@@ -615,7 +645,7 @@ abstract contract Escrow is AtlETH {
         bool calledback;
         (, calledback, success) = _solverLockData();
         if (!calledback) revert CallbackNotCalled();
-        if (!success && deposits < claims + withdrawals) revert BalanceNotReconciled();
+        if (!success && deposits < claims + withdrawals + fees - writeoffs) revert BalanceNotReconciled();
 
         // Check if this is an on-chain, ex post bid search
         if (ctx.bidFind) revert BidFindSuccessful(solverTracker.bidAmount);

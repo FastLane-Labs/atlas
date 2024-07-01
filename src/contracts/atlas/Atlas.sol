@@ -37,9 +37,12 @@ contract Atlas is Escrow, Factory {
     { }
 
     /// @notice metacall is the entrypoint function for the Atlas transactions.
+    /// @dev Any ETH sent as msg.value with a metacall should be considered a potential subsidy for the winning solver's
+    /// gas repayment.
     /// @param userOp The UserOperation struct containing the user's transaction data.
     /// @param solverOps The SolverOperation array containing the solvers' transaction data.
     /// @param dAppOp The DAppOperation struct containing the DApp's transaction data.
+    /// @return auctionWon A boolean indicating whether there was a successful, winning solver.
     function metacall(
         UserOperation calldata userOp, // set by user
         SolverOperation[] calldata solverOps, // supplied by ops relay
@@ -68,8 +71,9 @@ contract Atlas is Escrow, Factory {
             revert ValidCalls(validCallsResult);
         }
 
-        // Initialize the lock
-        _setAccountingLock(dConfig, executionEnvironment, gasMarker, userOp.value);
+        // Initialize the environment lock and accounting values
+        _setEnvironmentLock(dConfig, executionEnvironment);
+        _initializeAccountingValues(gasMarker);
 
         // userOpHash has already been calculated and verified in validateCalls at this point, so rather
         // than re-calculate it, we can simply take it from the dAppOp here. It's worth noting that this will
@@ -77,13 +81,13 @@ contract Atlas is Escrow, Factory {
         try this.execute(dConfig, userOp, solverOps, executionEnvironment, msg.sender, dAppOp.userOpHash) returns (
             Context memory ctx
         ) {
-            address winningSolver = ctx.solverSuccessful ? solverOps[uint256(ctx.solverIndex)].from : address(0);
-
             // Gas Refund to sender only if execution is successful
-            (uint256 ethPaidToBundler, uint256 netGasSurcharge) = _settle({ ctx: ctx, winningSolver: winningSolver });
+            (uint256 ethPaidToBundler, uint256 netGasSurcharge) = _settle(ctx, dConfig.solverGasLimit);
 
-            emit MetacallResult(msg.sender, userOp.from, winningSolver, ethPaidToBundler, netGasSurcharge);
             auctionWon = ctx.solverSuccessful;
+            emit MetacallResult(
+                msg.sender, userOp.from, auctionWon, ctx.paymentsSuccessful, ethPaidToBundler, netGasSurcharge
+            );
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
             _handleErrors(revertData, dConfig.callConfig);
@@ -329,6 +333,8 @@ contract Atlas is Escrow, Factory {
     /// @param user User address
     /// @param control DAppControl contract address
     /// @param callConfig CallConfig of the current metacall tx.
+    /// @return A bool indicating whether the execution environment address is the same address that the factory would
+    /// deploy an Execution Environment to, given the user, control, and callConfig params.
     function _verifyUserControlExecutionEnv(
         address environment,
         address user,

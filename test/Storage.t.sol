@@ -19,8 +19,6 @@ contract StorageTest is Test {
         assertEq(s.ESCROW_DURATION(), 1);
         assertEq(address(s.VERIFICATION()), address(1));
         assertEq(s.SIMULATOR(), address(2));
-        assertEq(s.getInitialChainId(), block.chainid);
-        assertEq(s.getInitialDomainSeparator(), bytes32("SEPARATOR"));
     }
 
     function testStorageSlotsDontChange() public {
@@ -58,16 +56,4 @@ contract MockStorageTests is Storage {
     )
         Storage(_escrowDuration, _verification, _simulator, _surchargeRecipient)
     { }
-
-    function getInitialChainId() public view returns (uint256) {
-        return _INITIAL_CHAIN_ID;
-    }
-
-    function getInitialDomainSeparator() public view returns (bytes32) {
-        return _INITIAL_DOMAIN_SEPARATOR;
-    }
-
-    function _computeDomainSeparator() internal view virtual override returns (bytes32) {
-        return bytes32("SEPARATOR");
-    }
 }

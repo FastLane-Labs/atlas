@@ -171,7 +171,8 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         SolverOperation calldata solverOp,
         bytes32 userOpHash,
         uint256 userMaxFeePerGas,
-        address bundler
+        address bundler,
+        bool allowsTrustedOpHash
     )
         external
         view
@@ -192,7 +193,14 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             if (tx.gasprice > solverOp.maxFeePerGas) result |= (1 << uint256(SolverOutcome.GasPriceOverCap));
 
             if (solverOp.maxFeePerGas < userMaxFeePerGas) {
-                result |= (1 << uint256(SolverOutcome.GasPriceBelowUsers));
+                result |= (
+                    1
+                        << (
+                            allowsTrustedOpHash
+                                ? uint256(SolverOutcome.GasPriceBelowUsersAlt)
+                                : uint256(SolverOutcome.GasPriceBelowUsers)
+                        )
+                );
             }
 
             if (solverOp.solver == ATLAS || solverOp.solver == address(this)) {

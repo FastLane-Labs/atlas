@@ -201,7 +201,8 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
             solverOps[0],
             atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
-            bundler
+            bundler,
+            false
         );
         assertEq(result, 1 << uint256(SolverOutcome.InvalidSignature), "Expected InvalidSignature 1");
 
@@ -211,7 +212,8 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
             solverOps[0],
             atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
-            bundler
+            bundler,
+            false
         );
         assertEq(result, 1 << uint256(SolverOutcome.InvalidSignature), "Expected InvalidSignature 2");
     }
@@ -227,7 +229,8 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
             solverOps[0],
             atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
-            bundler
+            bundler,
+            false
         );
         assertEq(result, 1 << uint256(SolverOutcome.InvalidUserHash), "Expected InvalidUserHash");
     }
@@ -243,7 +246,8 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
             solverOps[0],
             atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
-            bundler
+            bundler,
+            false
         );
         assertEq(result, 1 << uint256(SolverOutcome.InvalidTo), "Expected InvalidTo");
     }
@@ -259,7 +263,8 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
             solverOps[0],
             atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
-            bundler
+            bundler,
+            false
         );
         assertEq(result, 1 << uint256(SolverOutcome.GasPriceOverCap), "Expected GasPriceOverCap");
         vm.txGasPrice(tx.gasprice); // Reset gas price to expected level
@@ -275,7 +280,8 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
             solverOps[0],
             atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas + 1,
-            bundler
+            bundler,
+            false
         );
         assertEq(result, 1 << uint256(SolverOutcome.GasPriceBelowUsers), "Expected GasPriceBelowUsers");
     }
@@ -291,7 +297,8 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
             solverOps[0],
             atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
-            bundler
+            bundler,
+            false
         );
         assertEq(result, 1 << uint256(SolverOutcome.InvalidSolver), "Expected InvalidSolver");
     }
@@ -308,7 +315,8 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
             solverOps[0],
             atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
-            bundler
+            bundler,
+            false
         );
         assertEq(result, 0, "Expected No Errors 1"); // 0 = No SolverOutcome errors
 
@@ -319,7 +327,8 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
             solverOps[0],
             atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
-            bundler
+            bundler,
+            false
         );
         assertEq(result, 0, "Expected No Errors 2"); // 0 = No SolverOutcome errors
     }

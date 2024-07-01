@@ -37,7 +37,7 @@ contract SolverBaseInvertBid is ISolverContract {
         address bidToken,
         uint256 bidAmount,
         bytes calldata solverOpData,
-        bytes calldata
+        bytes calldata /* extraReturnData */
     )
         external
         payable
@@ -66,7 +66,7 @@ contract SolverBaseInvertBid is ISolverContract {
             IWETH9(WETH_ADDRESS).withdraw(msg.value - address(this).balance);
         }
 
-        IAtlas(_atlas).reconcile{ value: msg.value }(executionEnvironment, solverOpFrom, shortfall);
+        IAtlas(_atlas).reconcile{ value: msg.value }(shortfall);
     }
 
     modifier receiveBids(address executionEnvironment, address bidToken, uint256 bidAmount) {

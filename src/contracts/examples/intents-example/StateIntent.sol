@@ -2,14 +2,14 @@
 pragma solidity 0.8.22;
 
 // Atlas Base Imports
-import { IExecutionEnvironment } from "../../interfaces/IExecutionEnvironment.sol";
+import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 
-import { SafetyBits } from "../../libraries/SafetyBits.sol";
+import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 
-import "../../types/LockTypes.sol";
+import "src/contracts/types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
-import { DAppControl } from "../../dapp/DAppControl.sol";
+import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 
 import "forge-std/Test.sol";
 

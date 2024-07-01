@@ -24,7 +24,8 @@ interface IAtlasVerification {
         SolverOperation calldata solverOp,
         bytes32 userOpHash,
         uint256 userMaxFeePerGas,
-        address bundler
+        address bundler,
+        bool allowsTrustedOpHash
     )
         external
         view

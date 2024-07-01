@@ -1,6 +1,8 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
+import "src/contracts/types/ValidCallsTypes.sol";
+
 // NOTE: Internal constants that are defined but not used in the logic of a smart contract, will NOT be included in the
 // bytecode of the smart contract when compiled. However, public constants will be included in every inheriting contract
 // as they are part of the ABI. As such, only internal constants are defined in this shared contract.
@@ -27,13 +29,18 @@ contract AtlasConstants {
     // Gas Accounting constants
     uint256 internal constant _CALLDATA_LENGTH_PREMIUM = 32; // 16 (default) * 2
     uint256 internal constant _SOLVER_OP_BASE_CALLDATA = 608; // SolverOperation calldata length excluding solverOp.data
-    uint256 internal constant _SOLVER_LOCK_GAS_BUFFER = 5000; // Base gas charged to solver in `_releaseSolverLock()`
+    uint256 internal constant _SOLVER_BASE_GAS_USED = 5000; // Base gas charged to solver in `_handleSolverAccounting()`
+    uint256 internal constant _BUNDLER_GAS_PENALTY_BUFFER = 500_000;
 
     // First 160 bits of _solverLock are the address of the current solver.
     // The 161st bit represents whether the solver has called back via `reconcile`.
     // The 162nd bit represents whether the solver's outstanding debt has been repaid via `reconcile`.
     uint256 internal constant _SOLVER_CALLED_BACK_MASK = 1 << 161;
     uint256 internal constant _SOLVER_FULFILLED_MASK = 1 << 162;
+
+    // ValidCalls error threshold before which the metacall reverts, and after which it returns gracefully to store
+    // nonces as used.
+    uint8 internal constant _GRACEFUL_RETURN_THRESHOLD = uint8(ValidCallsResult.InvertBidValueCannotBeExPostBids) + 1;
 
     // ------------------------------------------------------- //
     //               ATLAS VERIFICATION CONSTANTS              //

@@ -25,6 +25,7 @@ enum SolverOutcome {
     InvalidSignature,
     InvalidUserHash,
     DeadlinePassedAlt,
+    GasPriceBelowUsersAlt,
     InvalidTo,
     UserOutOfGas,
     AlteredControl,

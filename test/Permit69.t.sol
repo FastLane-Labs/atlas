@@ -192,7 +192,7 @@ contract Permit69Test is BaseTest {
         );
 
         // SolverOperations
-        phase = ExecutionPhase.SolverOperations;
+        phase = ExecutionPhase.SolverOperation;
         mockAtlas.setPhase(phase);
         vm.expectRevert(AtlasErrors.InvalidLockState.selector);
         mockAtlas.transferDAppERC20(

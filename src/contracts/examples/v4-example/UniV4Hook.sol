@@ -8,13 +8,13 @@ import { IHooks } from "./IHooks.sol";
 // Atlas Imports
 import { V4DAppControl } from "./V4DAppControl.sol";
 
-import { IAtlas } from "../../interfaces/IAtlas.sol";
-import { SafetyBits } from "../../libraries/SafetyBits.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
+import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 
-import "../../types/SolverCallTypes.sol";
-import "../../types/UserCallTypes.sol";
-import "../../types/DAppApprovalTypes.sol";
-import "../../types/LockTypes.sol";
+import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/UserCallTypes.sol";
+import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/LockTypes.sol";
 
 // NOTE: Uniswap V4 is unique in that it would not require a frontend integration.
 // Instead, hooks can be used to enforce that the proceeds of the MEV auctions are
@@ -81,7 +81,7 @@ contract UniV4Hook is V4DAppControl {
 
             // Verify that the pool is valid for the user to trade in.
             require(keccak256(abi.encode(key, sender)) == hashLock, "ERR-H02 InvalidSwapper");
-        } else if (currentPhase == ExecutionPhase.SolverOperations) {
+        } else if (currentPhase == ExecutionPhase.SolverOperation) {
             // Case: Solver call
             // Sender = Solver contract
             // NOTE: This phase verifies that the user's transaction has already
