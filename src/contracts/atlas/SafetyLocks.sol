@@ -84,7 +84,8 @@ abstract contract SafetyLocks is Storage {
     /// @notice Releases the Atlas lock, and resets the associated transient storage variables. Called at the end of
     /// `metacall`.
     function _releaseAccountingLock() internal {
-        T_lock = Lock({ activeEnvironment: _UNLOCKED, phase: uint8(ExecutionPhase.Uninitialized), callConfig: uint32(0) });
+        T_lock =
+            Lock({ activeEnvironment: _UNLOCKED, phase: uint8(ExecutionPhase.Uninitialized), callConfig: uint32(0) });
         T_solverLock = _UNLOCKED_UINT;
         T_claims = type(uint256).max;
         T_fees = type(uint256).max;

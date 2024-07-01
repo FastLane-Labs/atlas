@@ -251,8 +251,8 @@ contract ExecutionBase is Base {
         view
         returns (bool available)
     {
-        uint256 _balance = IERC20(_token).balanceOf(_source);
-        if (_balance < _amount) {
+        uint256 _balance = IERC20(token).balanceOf(source);
+        if (_balance < amount) {
             return false;
         }
 
@@ -260,21 +260,21 @@ contract ExecutionBase is Base {
         address _user = _user();
         address _dapp = _control();
 
-        if (_source == _user) {
+        if (source == _user) {
             if (_phase_bitwise & SAFE_USER_TRANSFER == 0) {
                 return false;
             }
-            if (IERC20(_token).allowance(_user, ATLAS) < _amount) {
+            if (IERC20(token).allowance(_user, ATLAS) < amount) {
                 return false;
             }
             return true;
         }
 
-        if (_source == _dapp) {
+        if (source == _dapp) {
             if (_phase_bitwise & SAFE_DAPP_TRANSFER == 0) {
                 return false;
             }
-            if (IERC20(_token).allowance(_dapp, ATLAS) < _amount) {
+            if (IERC20(token).allowance(_dapp, ATLAS) < amount) {
                 return false;
             }
             return true;

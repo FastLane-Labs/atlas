@@ -18,5 +18,5 @@ interface IDAppIntegration {
 
     function isDAppSignatory(address dAppControl, address signatory) external view returns (bool);
 
-    function getDAppSignatories(address dAppControl) external view returns (address[] memory);
+    function dAppSignatories(address dAppControl) external view returns (address[] memory);
 }

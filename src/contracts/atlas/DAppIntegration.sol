@@ -26,11 +26,11 @@ contract DAppIntegration {
     address public immutable ATLAS;
 
     // from => nonceTracker
-    mapping(address => NonceTracker) public S_userNonceTrackers;
-    mapping(address => NonceTracker) public S_dAppNonceTrackers;
+    mapping(address => NonceTracker) internal S_userNonceTrackers;
+    mapping(address => NonceTracker) internal S_dAppNonceTrackers;
 
     // keccak256(from, isUser, bitmapNonceIndex) => nonceBitmap
-    mapping(bytes32 => NonceBitmap) public S_nonceBitmaps;
+    mapping(bytes32 => NonceBitmap) internal S_nonceBitmaps;
 
     // NOTE: To prevent builder censorship, dApp nonces can be
     // processed in any order so long as they aren't duplicated and
@@ -38,11 +38,11 @@ contract DAppIntegration {
 
     // map for tracking which EOAs are approved for a given dApp
     // keccak256(governance, signor)  => enabled
-    mapping(bytes32 => bool) public S_signatories;
+    mapping(bytes32 => bool) internal S_signatories;
 
     // map that lists all signatories for a given dApp
     // DAppControl => signatories
-    mapping(address => address[]) public S_dAppSignatories;
+    mapping(address => address[]) internal S_dAppSignatories;
 
     constructor(address atlas) {
         ATLAS = atlas;
@@ -195,10 +195,46 @@ contract DAppIntegration {
         return _isDAppSignatory(control, signatory);
     }
 
+    // ---------------------------------------------------- //
+    //                      Storage Getters                 //
+    // ---------------------------------------------------- //
+    function userNonceTrackers(address account)
+        external
+        view
+        returns (uint128 lastUsedSeqNonce, uint128 highestFullNonSeqBitmap)
+    {
+        NonceTracker memory _nTracker = S_userNonceTrackers[account];
+
+        lastUsedSeqNonce = _nTracker.lastUsedSeqNonce;
+        highestFullNonSeqBitmap = _nTracker.highestFullNonSeqBitmap;
+    }
+
+    function dAppNonceTrackers(address account)
+        external
+        view
+        returns (uint128 lastUsedSeqNonce, uint128 highestFullNonSeqBitmap)
+    {
+        NonceTracker memory _nTracker = S_dAppNonceTrackers[account];
+
+        lastUsedSeqNonce = _nTracker.lastUsedSeqNonce;
+        highestFullNonSeqBitmap = _nTracker.highestFullNonSeqBitmap;
+    }
+
+    function nonceBitmaps(bytes32 key) external view returns (uint8 highestUsedNonce, uint240 bitmap) {
+        NonceBitmap memory _nonceBitmap = S_nonceBitmaps[key];
+
+        highestUsedNonce = _nonceBitmap.highestUsedNonce;
+        bitmap = _nonceBitmap.bitmap;
+    }
+
+    function signatories(bytes32 key) external view returns (bool) {
+        return S_signatories[key];
+    }
+
     /// @notice Returns an array of signatories for a specified DAppControl contract.
     /// @param control The address of the DAppControl contract.
-    /// @return An array of signatories for the specified DAppControl contract.
-    function getDAppSignatories(address control) external view returns (address[] memory) {
+    /// @return address[] An array of signatories for the specified DAppControl contract.
+    function dAppSignatories(address control) external view returns (address[] memory) {
         return S_dAppSignatories[control];
     }
 }

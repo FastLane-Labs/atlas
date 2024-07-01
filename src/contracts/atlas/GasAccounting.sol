@@ -275,13 +275,7 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 solverGasLimit
     )
         internal
-        returns (
-            uint256 withdrawals,
-            uint256 deposits,
-            uint256 claims,
-            uint256 writeoffs,
-            uint256 netAtlasGasSurcharge
-        )
+        returns (uint256 withdrawals, uint256 deposits, uint256 claims, uint256 writeoffs, uint256 netAtlasGasSurcharge)
     {
         uint256 _surcharge = S_cumulativeSurcharge;
         uint256 _fees = T_fees;
@@ -290,7 +284,6 @@ abstract contract GasAccounting is SafetyLocks {
         writeoffs = T_writeoffs;
         withdrawals = T_withdrawals;
         deposits = T_deposits;
-        
 
         uint256 _gasLeft = gasleft(); // Hold this constant for the calculations
 

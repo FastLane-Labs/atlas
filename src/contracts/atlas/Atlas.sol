@@ -233,8 +233,9 @@ contract Atlas is Escrow, Factory {
             ctx.solverIndex = uint8(_solverIndex); // Yay, compiler <3
 
             // Execute the solver operation. If solver won, allocate value and return. Otherwise continue looping.
-            _bidAmountFound =
-                _executeSolverOperation(ctx, dConfig, userOp, solverOps[_solverIndex], _bidAmountFound, true, returnData);
+            _bidAmountFound = _executeSolverOperation(
+                ctx, dConfig, userOp, solverOps[_solverIndex], _bidAmountFound, true, returnData
+            );
 
             if (ctx.solverSuccessful) {
                 return _bidAmountFound;

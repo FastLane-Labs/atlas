@@ -344,7 +344,7 @@ contract MockAtlasForPermit69Tests is Atlas {
         address _activeEnvironment,
         uint32 callConfig
     ) public {
-        lock = Lock({
+        T_lock = Lock({
             activeEnvironment: _activeEnvironment,
             phase: uint8(ExecutionPhase.Uninitialized),
             callConfig: callConfig
@@ -352,7 +352,7 @@ contract MockAtlasForPermit69Tests is Atlas {
     }
 
     function setPhase(ExecutionPhase _phase) public {
-        lock.phase = uint8(_phase);
+        T_lock.phase = uint8(_phase);
         _ctx.phase = uint8(_phase);
     }
 

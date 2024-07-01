@@ -55,14 +55,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint256 internal T_withdrawals; // transient storage
     uint256 internal T_deposits; // transient storage
 
-    constructor(
-        uint256 escrowDuration,
-        address verification,
-        address simulator,
-        address surchargeRecipient
-    )
-        payable
-    {
+    constructor(uint256 escrowDuration, address verification, address simulator, address surchargeRecipient) payable {
         ESCROW_DURATION = escrowDuration;
         VERIFICATION = AtlasVerification(verification);
         SIMULATOR = simulator;
@@ -76,7 +69,8 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
 
         // TODO remove these when transient storage behaviour is implemented
         // Gas Accounting - transient storage (delete this from constructor post dencun)
-        T_lock = Lock({ activeEnvironment: _UNLOCKED, phase: uint8(ExecutionPhase.Uninitialized), callConfig: uint32(0) });
+        T_lock =
+            Lock({ activeEnvironment: _UNLOCKED, phase: uint8(ExecutionPhase.Uninitialized), callConfig: uint32(0) });
 
         T_solverLock = _UNLOCKED_UINT;
         T_claims = type(uint256).max;
@@ -88,6 +82,38 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         emit SurchargeRecipientTransferred(surchargeRecipient);
     }
 
+    /// @notice Returns information about the current state of the solver lock.
+    /// @return currentSolver Address of the current solver.
+    /// @return calledBack Boolean indicating whether the solver has called back via `reconcile`.
+    /// @return fulfilled Boolean indicating whether the solver's outstanding debt has been repaid via `reconcile`.
+    function solverLockData() external view returns (address currentSolver, bool calledBack, bool fulfilled) {
+        return _solverLockData();
+    }
+
+    /// @notice Returns the address of the current solver.
+    /// @return Address of the current solver.
+    function solver() public view returns (address) {
+        return address(uint160(T_solverLock));
+    }
+
+    /// @notice Returns information about the current state of the solver lock.
+    /// @return currentSolver Address of the current solver.
+    /// @return calledBack Boolean indicating whether the solver has called back via `reconcile`.
+    /// @return fulfilled Boolean indicating whether the solver's outstanding debt has been repaid via `reconcile`.
+    function _solverLockData() internal view returns (address currentSolver, bool calledBack, bool fulfilled) {
+        uint256 _solverLock = T_solverLock;
+        currentSolver = address(uint160(_solverLock));
+        calledBack = _solverLock & _SOLVER_CALLED_BACK_MASK != 0;
+        fulfilled = _solverLock & _SOLVER_FULFILLED_MASK != 0;
+    }
+
+    /// @notice Returns the EIP-712 domain separator for permit signatures, implemented in AtlETH.
+    /// @return bytes32 Domain separator hash.
+    function _computeDomainSeparator() internal view virtual returns (bytes32) { }
+
+    // ---------------------------------------------------- //
+    //                      Storage Getters                 //
+    // ---------------------------------------------------- //
     function totalSupply() external view returns (uint256) {
         return S_totalSupply;
     }
@@ -100,16 +126,30 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         return S_nonces[account];
     }
 
-    function accessData(uint256 account) external view returns (EscrowAccountAccessData memory) {
-        return S_accessData[account];
+    function accessData(address account)
+        external
+        view
+        returns (uint112 bonded, uint32 lastAccessedBlock, uint24 auctionWins, uint24 auctionFails, uint64 totalGasUsed)
+    {
+        EscrowAccountAccessData memory _aData = S_accessData[account];
+
+        bonded = _aData.bonded;
+        lastAccessedBlock = _aData.lastAccessedBlock;
+        auctionWins = _aData.auctionWins;
+        auctionFails = _aData.auctionFails;
+        totalGasUsed = _aData.totalGasUsed;
     }
 
     function solverOpHashes(bytes32 opHash) external view returns (bool) {
         return S_solverOpHashes[opHash];
     }
 
-    function lock() external view returns (Lock memory) {
-        return T_lock;
+    function lock() external view returns (address activeEnvironment, uint32 callConfig, uint8 phase) {
+        Lock memory _lock = T_lock;
+
+        activeEnvironment = _lock.activeEnvironment;
+        callConfig = _lock.callConfig;
+        phase = _lock.phase;
     }
 
     function solverLock() external view returns (uint256) {
@@ -147,33 +187,4 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     function pendingSurchargeRecipient() external view returns (address) {
         return S_pendingSurchargeRecipient;
     }
-
-    /// @notice Returns information about the current state of the solver lock.
-    /// @return currentSolver Address of the current solver.
-    /// @return calledBack Boolean indicating whether the solver has called back via `reconcile`.
-    /// @return fulfilled Boolean indicating whether the solver's outstanding debt has been repaid via `reconcile`.
-    function solverLockData() external view returns (address currentSolver, bool calledBack, bool fulfilled) {
-        return _solverLockData();
-    }
-
-    /// @notice Returns the address of the current solver.
-    /// @return Address of the current solver.
-    function solver() public view returns (address) {
-        return address(uint160(T_solverLock));
-    }
-
-    /// @notice Returns information about the current state of the solver lock.
-    /// @return currentSolver Address of the current solver.
-    /// @return calledBack Boolean indicating whether the solver has called back via `reconcile`.
-    /// @return fulfilled Boolean indicating whether the solver's outstanding debt has been repaid via `reconcile`.
-    function _solverLockData() internal view returns (address currentSolver, bool calledBack, bool fulfilled) {
-        uint256 _solverLock = T_solverLock;
-        currentSolver = address(uint160(_solverLock));
-        calledBack = _solverLock & _SOLVER_CALLED_BACK_MASK != 0;
-        fulfilled = _solverLock & _SOLVER_FULFILLED_MASK != 0;
-    }
-
-    /// @notice Returns the EIP-712 domain separator for permit signatures, implemented in AtlETH.
-    /// @return bytes32 Domain separator hash.
-    function _computeDomainSeparator() internal view virtual returns (bytes32) { }
 }
