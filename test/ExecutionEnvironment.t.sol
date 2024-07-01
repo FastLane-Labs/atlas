@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { MockSafetyLocks } from "./SafetyLocks.t.sol";
 
-import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
+import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
 import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
@@ -18,10 +18,11 @@ import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol"
 
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
-import "src/contracts/types/DAppApprovalTypes.sol";
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/SolverOperation.sol";
 import "src/contracts/types/LockTypes.sol";
+import "src/contracts/types/EscrowTypes.sol";
 
 import "src/contracts/libraries/CallBits.sol";
 

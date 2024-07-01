@@ -7,7 +7,7 @@ import { SafetyLocks } from "src/contracts/atlas/SafetyLocks.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
-import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/ConfigTypes.sol";
 import "src/contracts/types/LockTypes.sol";
 
 contract MockSafetyLocks is SafetyLocks {
@@ -46,7 +46,7 @@ contract MockSafetyLocks is SafetyLocks {
     }
 
     function setLock(address _activeEnvironment) external {
-        lock = Lock({
+        T_lock = Lock({
             activeEnvironment: _activeEnvironment,
             phase: uint8(ExecutionPhase.Uninitialized),
             callConfig: uint32(0)
@@ -54,23 +54,23 @@ contract MockSafetyLocks is SafetyLocks {
     }
 
     function setClaims(uint256 _claims) external {
-        claims = _claims;
+        T_claims = _claims;
     }
 
     function setWithdrawals(uint256 _withdrawals) external {
-        withdrawals = _withdrawals;
+        T_withdrawals = _withdrawals;
     }
 
     function setDeposits(uint256 _deposits) external {
-        deposits = _deposits;
+        T_deposits = _deposits;
     }
 
     function setFees(uint256 _fees) external {
-        fees = _fees;
+        T_fees = _fees;
     }
 
     function setWriteoffs(uint256 _writeoffs) external {
-        writeoffs = _writeoffs;
+        T_writeoffs = _writeoffs;
     }
 }
 

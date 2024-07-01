@@ -1,9 +1,9 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import "../types/UserCallTypes.sol";
-import "../types/SolverCallTypes.sol";
-import "../types/DAppApprovalTypes.sol";
+import "../types/UserOperation.sol";
+import "../types/SolverOperation.sol";
+import "../types/ConfigTypes.sol";
 
 interface IDAppControl {
     function preOpsCall(UserOperation calldata userOp) external payable returns (bytes memory);

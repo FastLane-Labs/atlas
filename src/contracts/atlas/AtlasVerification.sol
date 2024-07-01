@@ -10,11 +10,13 @@ import { NonceManager } from "src/contracts/atlas/NonceManager.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
-import "src/contracts/types/SolverCallTypes.sol";
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/DAppApprovalTypes.sol";
+import { AtlasConstants } from "src/contracts/types/AtlasConstants.sol";
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
 import "src/contracts/types/EscrowTypes.sol";
-import "src/contracts/types/ValidCallsTypes.sol";
+import "src/contracts/types/ValidCalls.sol";
 
 /// @title AtlasVerification
 /// @author FastLane Labs
@@ -25,7 +27,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     using CallBits for uint32;
     using CallVerification for UserOperation;
 
-    constructor(address _atlas) EIP712("AtlasVerification", "1.0") DAppIntegration(_atlas) { }
+    constructor(address atlas) EIP712("AtlasVerification", "1.0") DAppIntegration(atlas) { }
 
     /// @notice The validateCalls function verifies the validity of the metacall calldata components.
     /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
@@ -52,11 +54,11 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         // Verify that the calldata injection came from the dApp frontend
         // and that the signatures are valid.
 
-        bytes32 userOpHash = _getUserOperationHash(userOp);
+        bytes32 _userOpHash = _getUserOperationHash(userOp);
 
         {
             // Check user signature
-            ValidCallsResult verifyUserResult = _verifyUser(dConfig, userOp, userOpHash, msgSender, isSimulation);
+            ValidCallsResult verifyUserResult = _verifyUser(dConfig, userOp, _userOpHash, msgSender, isSimulation);
             if (verifyUserResult != ValidCallsResult.Valid) {
                 return verifyUserResult;
             }
@@ -97,11 +99,11 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             }
         }
 
-        uint256 solverOpCount = solverOps.length;
+        uint256 _solverOpCount = solverOps.length;
 
         {
             // Check number of solvers not greater than max, to prevent overflows in `solverIndex`
-            if (solverOpCount > _MAX_SOLVERS) {
+            if (_solverOpCount > _MAX_SOLVERS) {
                 return ValidCallsResult.TooManySolverOps;
             }
 
@@ -132,9 +134,9 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         }
 
         // Check if the call configuration is valid
-        ValidCallsResult verifyCallConfigResult = _verifyCallConfig(dConfig.callConfig);
-        if (verifyCallConfigResult != ValidCallsResult.Valid) {
-            return verifyCallConfigResult;
+        ValidCallsResult _verifyCallConfigResult = _verifyCallConfig(dConfig.callConfig);
+        if (_verifyCallConfigResult != ValidCallsResult.Valid) {
+            return _verifyCallConfigResult;
         }
 
         // Some checks are only needed when call is not a simulation
@@ -144,7 +146,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         }
 
         // Verify a solver was successfully verified.
-        if (solverOpCount == 0) {
+        if (_solverOpCount == 0) {
             if (!dConfig.callConfig.allowsZeroSolvers()) {
                 return ValidCallsResult.NoSolverOp;
             }
@@ -154,7 +156,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             }
         }
 
-        if (userOpHash != dAppOp.userOpHash) {
+        if (_userOpHash != dAppOp.userOpHash) {
             return ValidCallsResult.OpHashMismatch;
         }
 
@@ -217,12 +219,12 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     /// @param callConfig The call configuration to verify.
     /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
     function _verifyCallConfig(uint32 callConfig) internal pure returns (ValidCallsResult) {
-        CallConfig memory decodedCallConfig = CallBits.decodeCallConfig(callConfig);
-        if (decodedCallConfig.userNoncesSequential && decodedCallConfig.dappNoncesSequential) {
+        CallConfig memory _decodedCallConfig = CallBits.decodeCallConfig(callConfig);
+        if (_decodedCallConfig.userNoncesSequential && _decodedCallConfig.dappNoncesSequential) {
             // Max one of user or dapp nonces can be sequential, not both
             return ValidCallsResult.BothUserAndDAppNoncesCannotBeSequential;
         }
-        if (decodedCallConfig.invertBidValue && decodedCallConfig.exPostBids) {
+        if (_decodedCallConfig.invertBidValue && _decodedCallConfig.exPostBids) {
             // If both invertBidValue and exPostBids are true, solver's retreived bid cannot be determined
             return ValidCallsResult.InvertBidValueCannotBeExPostBids;
         }
@@ -291,8 +293,8 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     /// @param solverOp The SolverOperation struct to verify.
     /// @return A boolean indicating if the signature is valid.
     function _verifySolverSignature(SolverOperation calldata solverOp) internal view returns (bool) {
-        (address signer,) = _hashTypedDataV4(_getSolverOpHash(solverOp)).tryRecover(solverOp.signature);
-        return signer == solverOp.from;
+        (address _signer,) = _hashTypedDataV4(_getSolverOpHash(solverOp)).tryRecover(solverOp.signature);
+        return _signer == solverOp.from;
     }
 
     /// @notice The _getSolverOpHash internal function returns the hash of a SolverOperation struct.
@@ -343,9 +345,9 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     {
         if (dAppOp.to != ATLAS) return ValidCallsResult.DAppToInvalid;
 
-        bool bypassSignature = msgSender == dAppOp.from || (isSimulation && dAppOp.signature.length == 0);
+        bool _bypassSignature = msgSender == dAppOp.from || (isSimulation && dAppOp.signature.length == 0);
 
-        if (!bypassSignature && !_verifyDAppSignature(dAppOp)) {
+        if (!_bypassSignature && !_verifyDAppSignature(dAppOp)) {
             return ValidCallsResult.DAppSignatureInvalid;
         }
 
@@ -354,12 +356,12 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         }
 
         // Some checks skipped if call is `simUserOperation()`, because the dAppOp struct is not available.
-        bool skipDAppOpChecks = isSimulation && dAppOp.from == address(0);
+        bool _skipDAppOpChecks = isSimulation && dAppOp.from == address(0);
 
         // If the dApp enabled sequential nonces (IE for FCFS execution), check and make sure the order is correct
         // NOTE: enabling sequential nonces could create a scenario in which builders or validators may be able to
         // profit via censorship. DApps are encouraged to rely on the deadline parameter.
-        if (!skipDAppOpChecks && dConfig.callConfig.needsSequentialDAppNonces()) {
+        if (!_skipDAppOpChecks && dConfig.callConfig.needsSequentialDAppNonces()) {
             // When not in a simulation, nonces are stored even if the metacall fails, to prevent replay attacks.
             if (!_handleDAppNonces(dAppOp.from, dAppOp.nonce, isSimulation)) {
                 return ValidCallsResult.InvalidDAppNonce;
@@ -373,13 +375,13 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         // Check actual bundler matches the dApp's intended `dAppOp.bundler`
         // If bundler and auctioneer are the same address, this check is skipped
         if (dAppOp.bundler != address(0) && msgSender != dAppOp.bundler) {
-            if (!skipDAppOpChecks && !_isDAppSignatory(dAppOp.control, msgSender)) {
+            if (!_skipDAppOpChecks && !_isDAppSignatory(dAppOp.control, msgSender)) {
                 return ValidCallsResult.InvalidBundler;
             }
         }
 
         // Make sure the signer is currently enabled by dapp owner
-        if (!skipDAppOpChecks && !_isDAppSignatory(dAppOp.control, dAppOp.from)) {
+        if (!_skipDAppOpChecks && !_isDAppSignatory(dAppOp.control, dAppOp.from)) {
             return ValidCallsResult.DAppNotEnabled;
         }
 
@@ -409,8 +411,8 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     /// @param dAppOp The DAppOperation struct to verify.
     /// @return A boolean indicating if the signature is valid.
     function _verifyDAppSignature(DAppOperation calldata dAppOp) internal view returns (bool) {
-        (address signer,) = _hashTypedDataV4(_getDAppOpHash(dAppOp)).tryRecover(dAppOp.signature);
-        return signer == dAppOp.from;
+        (address _signer,) = _hashTypedDataV4(_getDAppOpHash(dAppOp)).tryRecover(dAppOp.signature);
+        return _signer == dAppOp.from;
     }
 
     /// @notice Generates the hash of a DAppOperation struct.
@@ -457,18 +459,18 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp userNonces
 
-        bool userIsBundler = userOp.from == msgSender;
-        bool hasNoSignature = userOp.signature.length == 0;
-        bool signatureValid;
+        bool _userIsBundler = userOp.from == msgSender;
+        bool _hasNoSignature = userOp.signature.length == 0;
+        bool _signatureValid;
 
-        if (!userIsBundler) {
+        if (!_userIsBundler) {
             if (userOp.callConfig.allowsTrustedOpHash()) {
                 userOpHash = _getUserOperationHash(userOp, false);
             }
-            signatureValid = SignatureChecker.isValidSignatureNow(userOp.from, userOpHash, userOp.signature);
+            _signatureValid = SignatureChecker.isValidSignatureNow(userOp.from, userOpHash, userOp.signature);
         }
 
-        if (!(signatureValid || userIsBundler || (isSimulation && hasNoSignature))) {
+        if (!(_signatureValid || _userIsBundler || (isSimulation && _hasNoSignature))) {
             return ValidCallsResult.UserSignatureInvalid;
         }
 
@@ -499,13 +501,14 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
 
     /// @notice Generates the hash of a UserOperation struct used for inter-operation references.
     /// @param userOp The UserOperation struct to generate the hash for.
-    /// @return hash The hash of the UserOperation struct for in inter-operation references.
-    function getUserOperationHash(UserOperation calldata userOp) public view returns (bytes32 hash) {
-        hash = _getUserOperationHash(userOp);
+    /// @return userOpHash The hash of the UserOperation struct for in inter-operation references.
+    function getUserOperationHash(UserOperation calldata userOp) public view returns (bytes32 userOpHash) {
+        userOpHash = _getUserOperationHash(userOp);
     }
 
-    function _getUserOperationHash(UserOperation calldata userOp) internal view returns (bytes32 hash) {
-        hash = _getUserOperationHash(userOp, userOp.callConfig.allowsTrustedOpHash());
+    // TODO: Do we need this??? Why not just call the next function?
+    function _getUserOperationHash(UserOperation calldata userOp) internal view returns (bytes32 userOpHash) {
+        userOpHash = _getUserOperationHash(userOp, userOp.callConfig.allowsTrustedOpHash());
     }
 
     function _getUserOperationHash(

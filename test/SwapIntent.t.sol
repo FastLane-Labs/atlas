@@ -8,9 +8,10 @@ import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol"
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 
-import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
-import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
-import { DAppOperation, DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
+import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
+import { UserOperation } from "src/contracts/types/UserOperation.sol";
+import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
 
 import {
     SwapIntentDAppControl,

@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
-import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
+import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
 
 import { Sorter } from "src/contracts/helpers/Sorter.sol";
 import { Simulator } from "src/contracts/helpers/Simulator.sol";
@@ -84,11 +84,11 @@ contract BaseTest is Test, TestConstants {
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
 
         atlas = new Atlas({
-            _escrowDuration: 64,
-            _verification: expectedAtlasVerificationAddr,
-            _simulator: address(simulator),
-            _executionTemplate: address(execEnvTemplate),
-            _surchargeRecipient: payee
+            escrowDuration: 64,
+            verification: expectedAtlasVerificationAddr,
+            simulator: address(simulator),
+            executionTemplate: address(execEnvTemplate),
+            initialSurchargeRecipient: payee
         });
         atlasVerification = new AtlasVerification(address(atlas));
         simulator.setAtlas(address(atlas));

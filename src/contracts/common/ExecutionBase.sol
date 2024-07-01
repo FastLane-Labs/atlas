@@ -12,8 +12,8 @@ contract Base {
     address public immutable ATLAS;
     address public immutable SOURCE;
 
-    constructor(address _atlas) {
-        ATLAS = _atlas;
+    constructor(address atlas) {
+        ATLAS = atlas;
         SOURCE = address(this);
     }
 
@@ -233,46 +233,46 @@ contract ExecutionBase is Base {
     /// amount of a certain token, and whether Atlas is in the correct phase to transfer the token. Note: this is just
     /// for convenience - transfers via `_transferDAppERC20()` and `_transferUserERC20()` will independently ensure all
     /// necessary checks are made.
-    /// @param _token The address of the ERC20 token contract.
-    /// @param _source The address of the source of the tokens.
-    /// @param _amount The amount of tokens to transfer.
+    /// @param token The address of the ERC20 token contract.
+    /// @param source The address of the source of the tokens.
+    /// @param amount The amount of tokens to transfer.
     /// @param phase The phase of the current metacall tx.
     /// @return available A bool indicating whether a transfer from the source, via Atlas, of the specified amount of
     /// the specified token, will succeed.
     function _availableFundsERC20(
-        address _token,
-        address _source,
-        uint256 _amount,
+        address token,
+        address source,
+        uint256 amount,
         ExecutionPhase phase
     )
         internal
         view
         returns (bool available)
     {
-        uint256 balance = IERC20(_token).balanceOf(_source);
-        if (balance < _amount) {
+        uint256 _balance = IERC20(token).balanceOf(source);
+        if (_balance < amount) {
             return false;
         }
 
-        uint8 phase_bitwise = uint8(1 << uint8(phase));
-        address user = _user();
-        address dapp = _control();
+        uint8 _phase_bitwise = uint8(1 << uint8(phase));
+        address _user = _user();
+        address _dapp = _control();
 
-        if (_source == user) {
-            if (phase_bitwise & SAFE_USER_TRANSFER == 0) {
+        if (source == _user) {
+            if (_phase_bitwise & SAFE_USER_TRANSFER == 0) {
                 return false;
             }
-            if (IERC20(_token).allowance(user, ATLAS) < _amount) {
+            if (IERC20(token).allowance(_user, ATLAS) < amount) {
                 return false;
             }
             return true;
         }
 
-        if (_source == dapp) {
-            if (phase_bitwise & SAFE_DAPP_TRANSFER == 0) {
+        if (source == _dapp) {
+            if (_phase_bitwise & SAFE_DAPP_TRANSFER == 0) {
                 return false;
             }
-            if (IERC20(_token).allowance(dapp, ATLAS) < _amount) {
+            if (IERC20(token).allowance(_dapp, ATLAS) < amount) {
                 return false;
             }
             return true;

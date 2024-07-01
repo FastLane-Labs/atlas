@@ -1,11 +1,12 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import "../types/UserCallTypes.sol";
-import "../types/DAppApprovalTypes.sol";
-import "../types/SolverCallTypes.sol";
+import "../types/UserOperation.sol";
+import "../types/ConfigTypes.sol";
+import "../types/DAppOperation.sol";
+import "../types/SolverOperation.sol";
 import "../types/EscrowTypes.sol";
-import "../types/ValidCallsTypes.sol";
+import "../types/ValidCalls.sol";
 
 interface IAtlasVerification {
     // AtlasVerification.sol
@@ -40,6 +41,15 @@ interface IAtlasVerification {
     function getUserNextNonce(address user, bool sequential) external view returns (uint256 nextNonce);
     function getUserNextNonSeqNonceAfter(address user, uint256 refNonce) external view returns (uint256);
     function getDAppNextNonce(address dApp) external view returns (uint256 nextNonce);
+    function userSequentialNonceTrackers(address account) external view returns (uint256 lastUsedSeqNonce);
+    function dAppSequentialNonceTrackers(address account) external view returns (uint256 lastUsedSeqNonce);
+    function userNonSequentialNonceTrackers(
+        address account,
+        uint248 wordIndex
+    )
+        external
+        view
+        returns (uint256 bitmap);
 
     // DAppIntegration.sol
     function initializeGovernance(address control) external;
@@ -49,5 +59,6 @@ interface IAtlasVerification {
     function disableDApp(address control) external;
     function getGovFromControl(address dAppControl) external view returns (address);
     function isDAppSignatory(address dAppControl, address signatory) external view returns (bool);
-    function getDAppSignatories(address dAppControl) external view returns (address[] memory);
+    function signatories(bytes32 key) external view returns (bool);
+    function dAppSignatories(address dAppControl) external view returns (address[] memory);
 }

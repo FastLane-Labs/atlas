@@ -10,9 +10,10 @@ import { BaseTest } from "test/base/BaseTest.t.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 import { UserOperationBuilder } from "test/base/builders/UserOperationBuilder.sol";
 
-import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
-import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
-import { DAppOperation, DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
+import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
+import { UserOperation } from "src/contracts/types/UserOperation.sol";
+import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
 
 import { ChainlinkDAppControl, Oracle, Role } from "src/contracts/examples/oev-example/ChainlinkDAppControlAlt.sol";
 import {ChainlinkAtlasWrapper, IChainlinkFeed } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapperAlt.sol";

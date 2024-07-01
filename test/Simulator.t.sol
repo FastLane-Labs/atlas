@@ -4,12 +4,13 @@ pragma solidity 0.8.22;
 import "forge-std/Test.sol";
 
 import { Result } from "src/contracts/helpers/Simulator.sol";
-import { DAppConfig, DAppOperation, CallConfig } from "src/contracts/types/DAppApprovalTypes.sol";
-import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
-import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
+import { DAppConfig, CallConfig } from "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
+import { UserOperation } from "src/contracts/types/UserOperation.sol";
+import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
-import { ValidCallsResult } from "src/contracts/types/ValidCallsTypes.sol";
+import { ValidCallsResult } from "src/contracts/types/ValidCalls.sol";
 import { SolverOutcome } from "src/contracts/types/EscrowTypes.sol";
 import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 

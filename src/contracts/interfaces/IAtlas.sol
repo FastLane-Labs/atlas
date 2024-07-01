@@ -1,9 +1,9 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import "src/contracts/types/SolverCallTypes.sol";
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/DAppOperation.sol";
 import "src/contracts/types/LockTypes.sol";
 
 interface IAtlas {
@@ -74,7 +74,23 @@ interface IAtlas {
 
     // Storage.sol
     function VERIFICATION() external view returns (address);
-    function lock() external returns (address);
     function solverLockData() external view returns (address currentSolver, bool calledBack, bool fulfilled);
     function solver() external view returns (address);
+    function totalSupply() external view returns (uint256);
+    function bondedTotalSupply() external view returns (uint256);
+    function accessData(address account)
+        external
+        view
+        returns (uint112 bonded, uint32 lastAccessedBlock, uint24 auctionWins, uint24 auctionFails, uint64 totalGasUsed);
+    function solverOpHashes(bytes32 opHash) external view returns (bool);
+    function lock() external view returns (address activeEnvironment, uint32 callConfig, uint8 phase);
+    function solverLock() external view returns (uint256);
+    function claims() external view returns (uint256);
+    function fees() external view returns (uint256);
+    function writeoffs() external view returns (uint256);
+    function withdrawals() external view returns (uint256);
+    function deposits() external view returns (uint256);
+    function cumulativeSurcharge() external view returns (uint256);
+    function surchargeRecipient() external view returns (address);
+    function pendingSurchargeRecipient() external view returns (address);
 }

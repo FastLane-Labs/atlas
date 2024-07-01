@@ -5,10 +5,13 @@ pragma solidity ^0.8.16;
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-import { CallConfig } from "src/contracts/types/DAppApprovalTypes.sol";
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/SolverCallTypes.sol";
-import "src/contracts/types/LockTypes.sol";
+// Atlas Base Imports
+import { IAtlas } from "../../interfaces/IAtlas.sol";
+
+import { CallConfig } from "../../types/ConfigTypes.sol";
+import "../../types/UserOperation.sol";
+import "../../types/SolverOperation.sol";
+import "../../types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
 import { DAppControl } from "src/contracts/dapp/DAppControl.sol";

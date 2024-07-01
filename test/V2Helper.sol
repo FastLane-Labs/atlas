@@ -7,12 +7,12 @@ import { IUniswapV2Pair } from "src/contracts/examples/v2-example/interfaces/IUn
 
 import { BlindBackrun } from "src/contracts/solver/src/BlindBackrun/BlindBackrun.sol";
 
-import "src/contracts/types/SolverCallTypes.sol";
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/ConfigTypes.sol";
 import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
-import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/ConfigTypes.sol";
 
 import { TestConstants } from "./base/TestConstants.sol";
 

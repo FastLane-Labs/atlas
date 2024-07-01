@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import "src/contracts/types/ValidCallsTypes.sol";
+import "src/contracts/types/ValidCalls.sol";
 
 // NOTE: Internal constants that are defined but not used in the logic of a smart contract, will NOT be included in the
 // bytecode of the smart contract when compiled. However, public constants will be included in every inheriting contract

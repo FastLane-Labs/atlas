@@ -5,9 +5,9 @@ import { DAppControlTemplate } from "./ControlTemplate.sol";
 import { ExecutionBase } from "src/contracts/common/ExecutionBase.sol";
 import { ExecutionPhase } from "src/contracts/types/LockTypes.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
-import "src/contracts/types/SolverCallTypes.sol";
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/ConfigTypes.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
@@ -37,24 +37,24 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     address public governance;
     address public pendingGovernance;
 
-    constructor(address _atlas, address _governance, CallConfig memory _callConfig) ExecutionBase(_atlas) {
-        if (_callConfig.userNoncesSequential && _callConfig.dappNoncesSequential) {
+    constructor(address atlas, address initialGovernance, CallConfig memory callConfig) ExecutionBase(atlas) {
+        if (callConfig.userNoncesSequential && callConfig.dappNoncesSequential) {
             // Max one of user or dapp nonces can be sequential, not both
             revert AtlasErrors.BothUserAndDAppNoncesCannotBeSequential();
         }
-        if (_callConfig.trackPreOpsReturnData && _callConfig.trackUserReturnData) {
+        if (callConfig.trackPreOpsReturnData && callConfig.trackUserReturnData) {
             // Max one of preOps or userOp return data can be tracked, not both
             revert AtlasErrors.BothPreOpsAndUserReturnDataCannotBeTracked();
         }
-        if (_callConfig.invertBidValue && _callConfig.exPostBids) {
+        if (callConfig.invertBidValue && callConfig.exPostBids) {
             // If both invertBidValue and exPostBids are true, solver's retreived bid cannot be determined
             revert AtlasErrors.InvertBidValueCannotBeExPostBids();
         }
-        CALL_CONFIG = CallBits.encodeCallConfig(_callConfig);
+        CALL_CONFIG = CallBits.encodeCallConfig(callConfig);
         CONTROL = address(this);
-        ATLAS_VERIFICATION = IAtlas(_atlas).VERIFICATION();
+        ATLAS_VERIFICATION = IAtlas(atlas).VERIFICATION();
 
-        governance = _governance;
+        governance = initialGovernance;
     }
 
     // Safety and support functions and modifiers that make the relationship between dApp

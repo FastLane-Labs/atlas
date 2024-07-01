@@ -4,10 +4,11 @@ pragma solidity 0.8.22;
 import "forge-std/Test.sol";
 
 import { AtlasVerification, USER_TYPEHASH_DEFAULT, USER_TYPEHASH_TRUSTED } from "src/contracts/atlas/AtlasVerification.sol";
-import { DAppConfig, DAppOperation, CallConfig } from "src/contracts/types/DAppApprovalTypes.sol";
-import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
-import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
-import { ValidCallsResult } from "src/contracts/types/ValidCallsTypes.sol";
+import { DAppConfig, CallConfig } from "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
+import { UserOperation } from "src/contracts/types/UserOperation.sol";
+import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
+import { ValidCallsResult } from "src/contracts/types/ValidCalls.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { DummyDAppControl } from "./base/DummyDAppControl.sol";
 import { AtlasBaseTest } from "./base/AtlasBaseTest.t.sol";

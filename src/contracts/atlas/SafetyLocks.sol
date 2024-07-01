@@ -3,9 +3,9 @@ pragma solidity 0.8.22;
 
 import { Storage } from "./Storage.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
-import "src/contracts/types/SolverCallTypes.sol";
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/ConfigTypes.sol";
 import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
 
@@ -17,30 +17,30 @@ abstract contract SafetyLocks is Storage {
     using CallBits for uint32;
 
     constructor(
-        uint256 _escrowDuration,
-        address _verification,
-        address _simulator,
-        address _surchargeRecipient
+        uint256 escrowDuration,
+        address verification,
+        address simulator,
+        address initialSurchargeRecipient
     )
-        Storage(_escrowDuration, _verification, _simulator, _surchargeRecipient)
+        Storage(escrowDuration, verification, simulator, initialSurchargeRecipient)
     { }
 
     /// @notice Sets the Atlas lock to the specified execution environment.
     /// @param dConfig The DAppConfig of the current DAppControl contract.
     /// @param executionEnvironment The address of the execution environment to set the lock to.
     function _setEnvironmentLock(DAppConfig memory dConfig, address executionEnvironment) internal {
-        if (lock.activeEnvironment != _UNLOCKED) revert AlreadyInitialized();
+        if (T_lock.activeEnvironment != _UNLOCKED) revert AlreadyInitialized();
 
         // Initialize the Lock
-        lock = Lock({
+        T_lock = Lock({
             activeEnvironment: executionEnvironment,
             phase: dConfig.callConfig.needsPreOpsCall() ? uint8(ExecutionPhase.PreOps) : uint8(ExecutionPhase.UserOperation),
             callConfig: dConfig.callConfig
         });
     }
 
-    modifier withLockPhase(ExecutionPhase _phase) {
-        lock.phase = uint8(_phase);
+    modifier withLockPhase(ExecutionPhase executionPhase) {
+        T_lock.phase = uint8(executionPhase);
         _;
     }
 
@@ -84,27 +84,28 @@ abstract contract SafetyLocks is Storage {
     /// @notice Releases the Atlas lock, and resets the associated transient storage variables. Called at the end of
     /// `metacall`.
     function _releaseAccountingLock() internal {
-        lock = Lock({ activeEnvironment: _UNLOCKED, phase: uint8(ExecutionPhase.Uninitialized), callConfig: uint32(0) });
-        _solverLock = _UNLOCKED_UINT;
-        claims = type(uint256).max;
-        fees = type(uint256).max;
-        withdrawals = type(uint256).max;
-        deposits = type(uint256).max;
-        writeoffs = type(uint256).max;
+        T_lock =
+            Lock({ activeEnvironment: _UNLOCKED, phase: uint8(ExecutionPhase.Uninitialized), callConfig: uint32(0) });
+        T_solverLock = _UNLOCKED_UINT;
+        T_claims = type(uint256).max;
+        T_fees = type(uint256).max;
+        T_withdrawals = type(uint256).max;
+        T_deposits = type(uint256).max;
+        T_writeoffs = type(uint256).max;
     }
 
     /// @notice Returns the address of the currently active Execution Environment, if any.
     function activeEnvironment() external view returns (address) {
-        return lock.activeEnvironment;
+        return T_lock.activeEnvironment;
     }
 
     function phase() external view returns (ExecutionPhase) {
-        return ExecutionPhase(lock.phase);
+        return ExecutionPhase(T_lock.phase);
     }
 
     /// @notice Returns the current lock state of Atlas.
     /// @return Boolean indicating whether Atlas is in a locked state or not.
     function isUnlocked() external view returns (bool) {
-        return lock.activeEnvironment == _UNLOCKED;
+        return T_lock.activeEnvironment == _UNLOCKED;
     }
 }

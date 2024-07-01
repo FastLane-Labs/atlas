@@ -2,7 +2,7 @@
 pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
-import { Mimic } from "src/contracts/atlas/Mimic.sol";
+import { Mimic } from "src/contracts/common/Mimic.sol";
 
 contract MimicTest is Test {
     function testMimicDelegatecall() public {

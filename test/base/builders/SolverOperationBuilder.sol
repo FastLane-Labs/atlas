@@ -3,8 +3,8 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
-import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
+import { UserOperation } from "src/contracts/types/UserOperation.sol";
+import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
 
 import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 

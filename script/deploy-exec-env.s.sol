@@ -6,7 +6,7 @@ import "forge-std/Test.sol";
 
 import { DeployBaseScript } from "script/base/deploy-base.s.sol";
 
-import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
+import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
 
 contract DeployExecEnvScript is DeployBaseScript {
     ExecutionEnvironment public execEnv;

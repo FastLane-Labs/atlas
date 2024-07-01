@@ -11,8 +11,8 @@ import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 
 import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
-import "src/contracts/types/SolverCallTypes.sol";
-import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/ConfigTypes.sol";
 
 contract MockGasAccounting is GasAccounting, Test {
     uint256 public constant MOCK_SOLVER_GAS_LIMIT = 500_000;
@@ -26,7 +26,7 @@ contract MockGasAccounting is GasAccounting, Test {
     { }
 
     function balanceOf(address account) external view returns (uint112, uint112) {
-        return (_balanceOf[account].balance, _balanceOf[account].unbonding);
+        return (s_balanceOf[account].balance, s_balanceOf[account].unbonding);
     }
 
     function initializeLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) external payable {
@@ -36,11 +36,11 @@ contract MockGasAccounting is GasAccounting, Test {
     }
 
     function setPhase(ExecutionPhase _phase) external {
-        lock.phase = uint8(_phase);
+        T_lock.phase = uint8(_phase);
     }
 
     function setSolverLock(address _solverFrom) external {
-        _solverLock = uint256(uint160(_solverFrom));
+        T_solverLock = uint256(uint160(_solverFrom));
     }
 
     function assign(address owner, uint256 value, bool solverWon) external returns (uint256) {
@@ -69,7 +69,7 @@ contract MockGasAccounting is GasAccounting, Test {
         uint256 solverCount
     ) public view returns (Context memory ctx) {
         ctx = Context({
-            executionEnvironment: lock.activeEnvironment,
+            executionEnvironment: T_lock.activeEnvironment,
             userOpHash: bytes32(0),
             bundler: bundler,
             solverSuccessful: solverSuccessful,
@@ -86,14 +86,14 @@ contract MockGasAccounting is GasAccounting, Test {
 
     function increaseBondedBalance(address account, uint256 amount) external {
         deal(address(this), amount);
-        accessData[account].bonded += uint112(amount);
-        bondedTotalSupply += amount;
+        S_accessData[account].bonded += uint112(amount);
+        S_bondedTotalSupply += amount;
     }
 
     function increaseUnbondingBalance(address account, uint256 amount) external {
         deal(address(this), amount);
-        _balanceOf[account].unbonding += uint112(amount);
-        bondedTotalSupply += amount;
+        s_balanceOf[account].unbonding += uint112(amount);
+        S_bondedTotalSupply += amount;
     }
 
     function calldataLengthPremium() external pure returns (uint256) {

@@ -6,19 +6,20 @@ import "forge-std/Test.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
 import "./base/TestUtils.sol";
 
-import { Permit69 } from "src/contracts/common/Permit69.sol";
-import { Mimic } from "src/contracts/atlas/Mimic.sol";
+import { Permit69 } from "src/contracts/atlas/Permit69.sol";
+import { Mimic } from "src/contracts/common/Mimic.sol";
 
-import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "src/contracts/common/Permit69.sol";
+import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "src/contracts/atlas/Permit69.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
-import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
+import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
 
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 
 import "src/contracts/types/LockTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
 
 contract Permit69Test is BaseTest {
 
@@ -344,7 +345,7 @@ contract MockAtlasForPermit69Tests is Atlas {
         address _activeEnvironment,
         uint32 callConfig
     ) public {
-        lock = Lock({
+        T_lock = Lock({
             activeEnvironment: _activeEnvironment,
             phase: uint8(ExecutionPhase.Uninitialized),
             callConfig: callConfig
@@ -352,7 +353,7 @@ contract MockAtlasForPermit69Tests is Atlas {
     }
 
     function setPhase(ExecutionPhase _phase) public {
-        lock.phase = uint8(_phase);
+        T_lock.phase = uint8(_phase);
         _ctx.phase = uint8(_phase);
     }
 

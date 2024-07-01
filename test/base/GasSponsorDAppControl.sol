@@ -5,9 +5,9 @@ import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 
-import "src/contracts/types/DAppApprovalTypes.sol";
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/SolverOperation.sol";
 
 import "forge-std/Test.sol";
 
@@ -104,7 +104,8 @@ contract GasSponsorDAppControl is DAppControl {
 
     function sponsorETHViaExecutionEnvironment(uint256 amount) public {
         // Check caller is active execution environment and this contract is active dapp on atlas
-        require(IAtlas(ATLAS).lock() == msg.sender, "Caller isn't active EE");
+        (address activeEnvironment,,) = IAtlas(ATLAS).lock();
+        require(activeEnvironment == msg.sender, "Caller isn't active EE");
         require(
             IExecutionEnvironment(msg.sender).getControl() == CONTROL, "Calling EE's control is not this DAppControl"
         );

@@ -9,12 +9,13 @@ import { UserOperationBuilder } from "test/base/builders/UserOperationBuilder.so
 
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
-import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
+import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
 import { Sorter } from "src/contracts/helpers/Sorter.sol";
 import { Simulator } from "src/contracts/helpers/Simulator.sol";
-import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
-import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
-import { DAppOperation, DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
+import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
+import { UserOperation } from "src/contracts/types/UserOperation.sol";
+import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
 import "src/contracts/types/LockTypes.sol";
 
 import { LibSort } from "solady/utils/LibSort.sol";
@@ -35,11 +36,11 @@ contract AtlasTest is BaseTest {
         // ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
 
         // atlas = new MockAtlas({
-        //     _escrowDuration: 64,
-        //     _verification: expectedAtlasVerificationAddr,
-        //     _simulator: address(simulator),
-        //     _executionTemplate: address(execEnvTemplate),
-        //     _surchargeRecipient: payee
+        //     escrowDuration: 64,
+        //     verification: expectedAtlasVerificationAddr,
+        //     simulator: address(simulator),
+        //     executionTemplate: address(execEnvTemplate),
+        //     surchargeRecipient: payee
         // });
         // atlasVerification = new AtlasVerification(address(atlas));
         // simulator.setAtlas(address(atlas));

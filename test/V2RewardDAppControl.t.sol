@@ -10,9 +10,10 @@ import { BaseTest } from "test/base/BaseTest.t.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 import { UserOperationBuilder } from "test/base/builders/UserOperationBuilder.sol";
 
-import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
-import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
-import { DAppOperation, DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
+import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
+import { UserOperation } from "src/contracts/types/UserOperation.sol";
+import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
 
 import { V2RewardDAppControl } from "src/contracts/examples/v2-example-router/V2RewardDAppControl.sol";
 import { IUniswapV2Router01, IUniswapV2Router02 } from "src/contracts/examples/v2-example-router/interfaces/IUniswapV2Router.sol";

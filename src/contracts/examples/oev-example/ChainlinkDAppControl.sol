@@ -2,9 +2,9 @@
 pragma solidity 0.8.22;
 
 import { ECDSA } from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
-import { CallConfig } from "src/contracts/types/DAppApprovalTypes.sol";
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/SolverCallTypes.sol";
+import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/SolverOperation.sol";
 import "src/contracts/types/LockTypes.sol";
 import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 import { ChainlinkAtlasWrapper } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapper.sol";

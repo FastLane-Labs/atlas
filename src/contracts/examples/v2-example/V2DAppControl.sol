@@ -9,9 +9,9 @@ import { IExecutionEnvironment } from "../../interfaces/IExecutionEnvironment.so
 
 import { SafetyBits } from "../../libraries/SafetyBits.sol";
 
-import { CallConfig } from "../../types/DAppApprovalTypes.sol";
-import "../../types/UserCallTypes.sol";
-import "../../types/SolverCallTypes.sol";
+import { CallConfig } from "../../types/ConfigTypes.sol";
+import "../../types/UserOperation.sol";
+import "../../types/SolverOperation.sol";
 import "../../types/LockTypes.sol";
 
 // Atlas DApp-Control Imports

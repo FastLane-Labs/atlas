@@ -3,9 +3,9 @@ pragma solidity 0.8.22;
 
 import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 
-import "src/contracts/types/DAppApprovalTypes.sol";
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/SolverOperation.sol";
 
 import "forge-std/Test.sol";
 

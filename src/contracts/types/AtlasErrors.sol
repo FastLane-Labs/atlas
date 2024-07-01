@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import "../types/ValidCallsTypes.sol";
+import "../types/ValidCalls.sol";
 
 contract AtlasErrors {
     // Simulator

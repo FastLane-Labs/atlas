@@ -6,12 +6,12 @@ import "forge-std/Test.sol";
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import { Factory } from "src/contracts/atlas/Factory.sol";
-import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
+import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
 import { DummyDAppControl, CallConfigBuilder } from "./base/DummyDAppControl.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
-import "src/contracts/types/UserCallTypes.sol";
+import "src/contracts/types/UserOperation.sol";
 
 import "./base/TestUtils.sol";
 
@@ -65,11 +65,11 @@ contract FactoryTest is Test {
         
         vm.startPrank(deployer);
         atlas = new Atlas({
-            _escrowDuration: 64,
-            _verification: expectedAtlasVerificationAddr,
-            _simulator: address(0),
-            _executionTemplate: address(execEnvTemplate),
-            _surchargeRecipient: deployer
+            escrowDuration: 64,
+            verification: expectedAtlasVerificationAddr,
+            simulator: address(0),
+            executionTemplate: address(execEnvTemplate),
+            initialSurchargeRecipient: deployer
         });
         assertEq(address(atlas), expectedAtlasAddr, "Atlas address mismatch");
         atlasVerification = new AtlasVerification(address(atlas));

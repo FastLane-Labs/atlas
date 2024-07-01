@@ -4,10 +4,11 @@ pragma solidity 0.8.22;
 import "forge-std/Test.sol";
 
 import { NonceManager } from "src/contracts/atlas/NonceManager.sol";
-import { DAppConfig, DAppOperation, CallConfig } from "src/contracts/types/DAppApprovalTypes.sol";
-import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
-import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
-import { ValidCallsResult } from "src/contracts/types/ValidCallsTypes.sol";
+import { DAppConfig, CallConfig } from "src/contracts/types/ConfigTypes.sol";
+import { UserOperation } from "src/contracts/types/UserOperation.sol";
+import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
+import { DAppOperation } from "src/contracts/types/DAppOperation.sol";
+import { ValidCallsResult } from "src/contracts/types/ValidCalls.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import { AtlasVerificationBase } from "./AtlasVerification.t.sol";
 

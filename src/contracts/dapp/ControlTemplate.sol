@@ -1,9 +1,9 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import "../types/SolverCallTypes.sol";
-import "../types/UserCallTypes.sol";
-import "../types/DAppApprovalTypes.sol";
+import "../types/SolverOperation.sol";
+import "../types/UserOperation.sol";
+import "../types/ConfigTypes.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import "forge-std/Test.sol";

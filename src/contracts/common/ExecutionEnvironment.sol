@@ -13,9 +13,10 @@ import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { ExecutionPhase } from "src/contracts/types/LockTypes.sol";
-import "src/contracts/types/SolverCallTypes.sol";
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/EscrowTypes.sol";
 
 /// @title ExecutionEnvironment
 /// @author FastLane Labs
@@ -28,7 +29,7 @@ contract ExecutionEnvironment is Base, ReentrancyGuard {
 
     uint8 private constant _ENVIRONMENT_DEPTH = 1 << 1;
 
-    constructor(address _atlas) Base(_atlas) { }
+    constructor(address atlas) Base(atlas) { }
 
     modifier validUser(UserOperation calldata userOp) {
         if (userOp.to != ATLAS || userOp.dapp == ATLAS) revert AtlasErrors.InvalidTo();
@@ -62,15 +63,15 @@ contract ExecutionEnvironment is Base, ReentrancyGuard {
         onlyAtlasEnvironment
         returns (bytes memory)
     {
-        bytes memory preOpsData = _forward(abi.encodeCall(IDAppControl.preOpsCall, userOp));
+        bytes memory _preOpsData = _forward(abi.encodeCall(IDAppControl.preOpsCall, userOp));
 
-        bool success;
-        (success, preOpsData) = _control().delegatecall(preOpsData);
+        bool _success;
+        (_success, _preOpsData) = _control().delegatecall(_preOpsData);
 
-        if (!success) revert AtlasErrors.PreOpsDelegatecallFail();
+        if (!_success) revert AtlasErrors.PreOpsDelegatecallFail();
 
-        preOpsData = abi.decode(preOpsData, (bytes));
-        return preOpsData;
+        _preOpsData = abi.decode(_preOpsData, (bytes));
+        return _preOpsData;
     }
 
     /// @notice The userWrapper function is called by Atlas to execute the UserOperation.
@@ -86,22 +87,20 @@ contract ExecutionEnvironment is Base, ReentrancyGuard {
         onlyAtlasEnvironment
         returns (bytes memory returnData)
     {
-        uint32 config = _config();
-
         if (userOp.value > msg.value) revert AtlasErrors.UserOpValueExceedsBalance();
 
         // Do not attach extra calldata via `_forward()` if contract called is not dAppControl, as the additional
         // calldata may cause unexpected behaviour in third-party protocols
-        bytes memory callData = (userOp.dapp != userOp.control) ? userOp.data : _forward(userOp.data);
-        bool success;
+        bytes memory _data = (userOp.dapp != userOp.control) ? userOp.data : _forward(userOp.data);
+        bool _success;
 
-        if (config.needsDelegateUser()) {
-            (success, returnData) = userOp.dapp.delegatecall(callData);
-            if (!success) revert AtlasErrors.UserWrapperDelegatecallFail();
+        if (_config().needsDelegateUser()) {
+            (_success, returnData) = userOp.dapp.delegatecall(_data);
+            if (!_success) revert AtlasErrors.UserWrapperDelegatecallFail();
         } else {
             // regular user call - executed at regular destination and not performed locally
-            (success, returnData) = userOp.dapp.call{ value: userOp.value }(callData);
-            if (!success) revert AtlasErrors.UserWrapperCallFail();
+            (_success, returnData) = userOp.dapp.call{ value: userOp.value }(_data);
+            if (!_success) revert AtlasErrors.UserWrapperCallFail();
         }
     }
 
@@ -111,13 +110,13 @@ contract ExecutionEnvironment is Base, ReentrancyGuard {
     /// @param solved Boolean indicating whether a winning SolverOperation was executed successfully.
     /// @param returnData Data returned from the previous call phase.
     function postOpsWrapper(bool solved, bytes calldata returnData) external nonReentrant onlyAtlasEnvironment {
-        bytes memory data = _forward(abi.encodeCall(IDAppControl.postOpsCall, (solved, returnData)));
+        bytes memory _data = _forward(abi.encodeCall(IDAppControl.postOpsCall, (solved, returnData)));
 
-        bool success;
-        (success, data) = _control().delegatecall(data);
+        bool _success;
+        (_success, _data) = _control().delegatecall(_data);
 
-        if (!success) revert AtlasErrors.PostOpsDelegatecallFail();
-        if (!abi.decode(data, (bool))) revert AtlasErrors.PostOpsDelegatecallReturnedFalse();
+        if (!_success) revert AtlasErrors.PostOpsDelegatecallFail();
+        if (!abi.decode(_data, (bool))) revert AtlasErrors.PostOpsDelegatecallReturnedFalse();
     }
 
     /// @notice The solverPreTryCatch function is called by Atlas to execute the preSolverCall part of each
@@ -154,12 +153,12 @@ contract ExecutionEnvironment is Base, ReentrancyGuard {
 
         // Handle any solver preOps, if necessary
         if (_config().needsPreSolver()) {
-            bool success;
+            bool _success;
 
-            bytes memory data = _forward(abi.encodeCall(IDAppControl.preSolverCall, (solverOp, returnData)));
-            (success,) = _control().delegatecall(data);
+            bytes memory _data = _forward(abi.encodeCall(IDAppControl.preSolverCall, (solverOp, returnData)));
+            (_success,) = _control().delegatecall(_data);
 
-            if (!success) revert AtlasErrors.PreSolverFailed();
+            if (!_success) revert AtlasErrors.PreSolverFailed();
         }
 
         // bidValue is not inverted; Higher bids are better; solver must deposit >= bidAmount
@@ -198,12 +197,12 @@ contract ExecutionEnvironment is Base, ReentrancyGuard {
         }
 
         if (_config().needsSolverPostCall()) {
-            bool success;
+            bool _success;
 
-            bytes memory data = _forward(abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData)));
-            (success,) = _control().delegatecall(data);
+            bytes memory _data = _forward(abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData)));
+            (_success,) = _control().delegatecall(_data);
 
-            if (!success) revert AtlasErrors.PostSolverFailed();
+            if (!_success) revert AtlasErrors.PostSolverFailed();
         }
 
         // bidValue is not inverted; Higher bids are better; solver must deposit >= bidAmount
@@ -221,16 +220,16 @@ contract ExecutionEnvironment is Base, ReentrancyGuard {
         // WARNING: There could be scenarios where the above assumption need not hold. For example, the solver could
         // trigger an airdrop to the execution environment, which would increase the balance of the execution
         // environment without the solver paying any bids.
-        uint256 netBid = solverTracker.ceiling - solverTracker.floor;
+        uint256 _netBid = solverTracker.ceiling - solverTracker.floor;
 
         // If bids aren't inverted, revert if net amount received is less than the bid
-        if (!solverTracker.invertsBidValue && netBid < solverTracker.bidAmount) revert AtlasErrors.BidNotPaid();
+        if (!solverTracker.invertsBidValue && _netBid < solverTracker.bidAmount) revert AtlasErrors.BidNotPaid();
 
         // If bids are inverted, revert if the net amount sent is more than the bid
-        if (solverTracker.invertsBidValue && netBid > solverTracker.bidAmount) revert AtlasErrors.BidNotPaid();
+        if (solverTracker.invertsBidValue && _netBid > solverTracker.bidAmount) revert AtlasErrors.BidNotPaid();
 
         // Update the bidAmount to the bid received
-        solverTracker.bidAmount = netBid;
+        solverTracker.bidAmount = _netBid;
 
         return solverTracker;
     }
@@ -252,12 +251,12 @@ contract ExecutionEnvironment is Base, ReentrancyGuard {
     {
         allocateData = _forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, bidAmount, allocateData)));
 
-        (bool success,) = _control().delegatecall(allocateData);
-        if (!success) revert AtlasErrors.AllocateValueDelegatecallFail();
+        (bool _success,) = _control().delegatecall(allocateData);
+        if (!_success) revert AtlasErrors.AllocateValueDelegatecallFail();
 
-        uint256 balance = address(this).balance;
-        if (balance > 0) {
-            IAtlas(ATLAS).contribute{ value: balance }();
+        uint256 _balance = address(this).balance;
+        if (_balance > 0) {
+            IAtlas(ATLAS).contribute{ value: _balance }();
         }
     }
 
@@ -316,7 +315,7 @@ contract ExecutionEnvironment is Base, ReentrancyGuard {
     }
 
     /// @notice The getEscrow function returns the address of the Atlas/Escrow contract.
-    /// @return The address of the Atlas/Escrow contract.
+    /// @return address The address of the Atlas/Escrow contract.
     function getEscrow() external view returns (address) {
         return ATLAS;
     }

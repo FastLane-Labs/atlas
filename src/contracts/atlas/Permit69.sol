@@ -25,12 +25,12 @@ import "src/contracts/types/EscrowTypes.sol";
 /// metacall transactions.
 abstract contract Permit69 is GasAccounting {
     constructor(
-        uint256 _escrowDuration,
-        address _verification,
-        address _simulator,
-        address _surchargeRecipient
+        uint256 escrowDuration,
+        address verification,
+        address simulator,
+        address initialSurchargeRecipient
     )
-        GasAccounting(_escrowDuration, _verification, _simulator, _surchargeRecipient)
+        GasAccounting(escrowDuration, verification, simulator, initialSurchargeRecipient)
     { }
 
     /// @notice Verifies that the caller is an authorized Execution Environment contract.
@@ -104,7 +104,7 @@ abstract contract Permit69 is GasAccounting {
     /// @param control The address of the current DAppControl contract.
     /// @param safeExecutionPhaseSet The set of safe execution phases.
     function _validateTransfer(address user, address control, uint8 safeExecutionPhaseSet) internal {
-        Lock memory _lock = lock;
+        Lock memory _lock = T_lock;
 
         // Verify that the ExecutionEnvironment's context is correct.
         if (_lock.activeEnvironment != msg.sender) {

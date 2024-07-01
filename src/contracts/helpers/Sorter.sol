@@ -6,12 +6,11 @@ import { IDAppControl } from "../interfaces/IDAppControl.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { CallVerification } from "../libraries/CallVerification.sol";
 import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
-import { IAtlas } from "../interfaces/IAtlas.sol";
+import { AtlasConstants } from "../types/AtlasConstants.sol";
 
-import "src/contracts/types/AtlasConstants.sol";
-import "../types/SolverCallTypes.sol";
-import "../types/UserCallTypes.sol";
-import "../types/DAppApprovalTypes.sol";
+import "../types/SolverOperation.sol";
+import "../types/UserOperation.sol";
+import "../types/ConfigTypes.sol";
 
 contract Sorter is AtlasConstants {
     using CallBits for uint32;

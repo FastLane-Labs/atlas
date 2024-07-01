@@ -3,7 +3,7 @@ pragma solidity 0.8.22;
 
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
-import "../types/DAppApprovalTypes.sol";
+import "../types/ConfigTypes.sol";
 
 library CallBits {
     uint32 internal constant _ONE = uint32(1);
