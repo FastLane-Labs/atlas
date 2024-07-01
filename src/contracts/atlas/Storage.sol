@@ -31,7 +31,6 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint256 public totalSupply;
     uint256 public bondedTotalSupply;
 
-    mapping(address => uint256) public nonces;
     mapping(address => EscrowAccountBalance) internal _balanceOf;
     mapping(address => EscrowAccountAccessData) public accessData;
     mapping(bytes32 => bool) internal _solverOpHashes; // NOTE: Only used for when allowTrustedOpHash is enabled
