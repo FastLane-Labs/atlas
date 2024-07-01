@@ -14,8 +14,8 @@ contract Base {
     address public immutable ATLAS;
     address public immutable SOURCE;
 
-    constructor(address _atlas) {
-        ATLAS = _atlas;
+    constructor(address atlas) {
+        ATLAS = atlas;
         SOURCE = address(this);
     }
 

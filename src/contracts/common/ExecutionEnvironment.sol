@@ -27,7 +27,7 @@ contract ExecutionEnvironment is Base, ReentrancyGuard {
 
     uint8 private constant _ENVIRONMENT_DEPTH = 1 << 1;
 
-    constructor(address _atlas) Base(_atlas) { }
+    constructor(address atlas) Base(atlas) { }
 
     modifier validUser(UserOperation calldata userOp) {
         if (userOp.to != ATLAS || userOp.dapp == ATLAS) revert AtlasErrors.InvalidTo();

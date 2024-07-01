@@ -26,14 +26,14 @@ contract Atlas is Escrow, Factory {
     using SafetyBits for Context;
 
     constructor(
-        uint256 _escrowDuration,
-        address _verification,
-        address _simulator,
-        address _surchargeRecipient,
-        address _executionTemplate
+        uint256 escrowDuration,
+        address verification,
+        address simulator,
+        address surchargeRecipient,
+        address executionTemplate
     )
-        Escrow(_escrowDuration, _verification, _simulator, _surchargeRecipient)
-        Factory(_executionTemplate)
+        Escrow(escrowDuration, verification, simulator, surchargeRecipient)
+        Factory(executionTemplate)
     { }
 
     /// @notice metacall is the entrypoint function for the Atlas transactions.
