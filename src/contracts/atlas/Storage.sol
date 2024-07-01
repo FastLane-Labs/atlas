@@ -3,6 +3,7 @@ pragma solidity 0.8.22;
 
 import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
+
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { AtlasConstants } from "src/contracts/types/AtlasConstants.sol";
@@ -16,7 +17,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     AtlasVerification public immutable VERIFICATION;
     address public immutable SIMULATOR;
 
-    // AtlETH ERC-20 public constants
+    // AtlETH public constants
     string public constant name = "Atlas ETH";
     string public constant symbol = "atlETH";
     uint8 public constant decimals = 18;
@@ -27,17 +28,12 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint256 public constant SURCHARGE_SCALE = 10_000_000; // 10_000_000 / 10_000_000 = 100%
     uint256 public constant FIXED_GAS_OFFSET = 100_000;
 
-    // AtlETH EIP-2612 constants
-    uint256 internal immutable _INITIAL_CHAIN_ID;
-    bytes32 internal immutable _INITIAL_DOMAIN_SEPARATOR;
-
     // AtlETH storage
-    uint256 internal S_totalSupply;
-    uint256 internal S_bondedTotalSupply;
+    uint256 public S_totalSupply;
+    uint256 public S_bondedTotalSupply;
 
-    mapping(address => uint256) internal S_nonces;
     mapping(address => EscrowAccountBalance) internal s_balanceOf; // public balanceOf will return a uint256
-    mapping(address => EscrowAccountAccessData) internal S_accessData;
+    mapping(address => EscrowAccountAccessData) public S_accessData;
     mapping(bytes32 => bool) internal S_solverOpHashes; // NOTE: Only used for when allowTrustedOpHash is enabled
 
     // atlETH GasAccounting storage
@@ -59,8 +55,6 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         ESCROW_DURATION = escrowDuration;
         VERIFICATION = AtlasVerification(verification);
         SIMULATOR = simulator;
-        _INITIAL_CHAIN_ID = block.chainid;
-        _INITIAL_DOMAIN_SEPARATOR = _computeDomainSeparator();
 
         // Gas Accounting
         // Initialized with msg.value to seed flash loan liquidity
@@ -120,10 +114,6 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
 
     function bondedTotalSupply() external view returns (uint256) {
         return S_bondedTotalSupply;
-    }
-
-    function nonces(address account) external view returns (uint256) {
-        return S_nonces[account];
     }
 
     function accessData(address account)

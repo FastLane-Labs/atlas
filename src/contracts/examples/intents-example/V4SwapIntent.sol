@@ -14,7 +14,7 @@ import "../../types/SolverOperation.sol";
 import "../../types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
-import { DAppControl } from "../../dapp/DAppControl.sol";
+import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 
 import "forge-std/Test.sol";
 

@@ -13,28 +13,7 @@ import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 contract DAppIntegration {
     using CallBits for uint32;
 
-    struct NonceBitmap {
-        uint8 highestUsedNonce;
-        uint240 bitmap;
-    }
-
-    struct NonceTracker {
-        uint128 lastUsedSeqNonce; // Sequential nonces tracked using only this value
-        uint128 highestFullNonSeqBitmap; // Non-sequential nonces tracked using bitmaps
-    }
-
     address public immutable ATLAS;
-
-    // from => nonceTracker
-    mapping(address => NonceTracker) internal S_userNonceTrackers;
-    mapping(address => NonceTracker) internal S_dAppNonceTrackers;
-
-    // keccak256(from, isUser, bitmapNonceIndex) => nonceBitmap
-    mapping(bytes32 => NonceBitmap) internal S_nonceBitmaps;
-
-    // NOTE: To prevent builder censorship, dApp nonces can be
-    // processed in any order so long as they aren't duplicated and
-    // as long as the dApp opts in to it
 
     // map for tracking which EOAs are approved for a given dApp
     // keccak256(governance, signor)  => enabled
@@ -198,34 +177,6 @@ contract DAppIntegration {
     // ---------------------------------------------------- //
     //                      Storage Getters                 //
     // ---------------------------------------------------- //
-    function userNonceTrackers(address account)
-        external
-        view
-        returns (uint128 lastUsedSeqNonce, uint128 highestFullNonSeqBitmap)
-    {
-        NonceTracker memory _nTracker = S_userNonceTrackers[account];
-
-        lastUsedSeqNonce = _nTracker.lastUsedSeqNonce;
-        highestFullNonSeqBitmap = _nTracker.highestFullNonSeqBitmap;
-    }
-
-    function dAppNonceTrackers(address account)
-        external
-        view
-        returns (uint128 lastUsedSeqNonce, uint128 highestFullNonSeqBitmap)
-    {
-        NonceTracker memory _nTracker = S_dAppNonceTrackers[account];
-
-        lastUsedSeqNonce = _nTracker.lastUsedSeqNonce;
-        highestFullNonSeqBitmap = _nTracker.highestFullNonSeqBitmap;
-    }
-
-    function nonceBitmaps(bytes32 key) external view returns (uint8 highestUsedNonce, uint240 bitmap) {
-        NonceBitmap memory _nonceBitmap = S_nonceBitmaps[key];
-
-        highestUsedNonce = _nonceBitmap.highestUsedNonce;
-        bitmap = _nonceBitmap.bitmap;
-    }
 
     function signatories(bytes32 key) external view returns (bool) {
         return S_signatories[key];

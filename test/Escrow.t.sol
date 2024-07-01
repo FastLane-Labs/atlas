@@ -288,7 +288,7 @@ contract EscrowTest is AtlasBaseTest {
         atlas.unbond(1); // This will set the solver's lastAccessedBlock to the current block
 
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
-        executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.PerBlockLimit), true);
+        executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.PerBlockLimit), false);
     }
 
     function test_executeSolverOperation_validateSolverOperation_insufficientEscrow() public {
@@ -317,7 +317,7 @@ contract EscrowTest is AtlasBaseTest {
             .withValue(solverOpValue) // Set a call value that is too high
             .withBidAmount(defaultBidAmount)
             .signAndBuild(address(atlasVerification), solverOnePK);
-        executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.CallValueTooHigh), true);
+        executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.CallValueTooHigh), false);
     }
 
     function test_executeSolverOperation_validateSolverOperation_userOutOfGas() public {

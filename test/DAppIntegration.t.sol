@@ -55,7 +55,7 @@ contract DAppIntegrationTest is Test {
         );
     }
 
-    function test_initializeGovernance_notInitialized() public {
+    function test_initializeGovernance_notInitialized() public view {
         bytes32 signatoryKey = keccak256(abi.encodePacked(address(dAppControl), governance));
         assertFalse(
             dAppIntegration.signatories(signatoryKey), "signatories[signatoryKey] should be false when not initialized"

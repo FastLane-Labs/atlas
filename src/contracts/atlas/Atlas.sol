@@ -38,6 +38,8 @@ contract Atlas is Escrow, Factory {
     { }
 
     /// @notice metacall is the entrypoint function for the Atlas transactions.
+    /// @dev Any ETH sent as msg.value with a metacall should be considered a potential subsidy for the winning solver's
+    /// gas repayment.
     /// @param userOp The UserOperation struct containing the user's transaction data.
     /// @param solverOps The SolverOperation array containing the solvers' transaction data.
     /// @param dAppOp The DAppOperation struct containing the DApp's transaction data.
@@ -56,13 +58,17 @@ contract Atlas is Escrow, Factory {
 
         (address _executionEnvironment, DAppConfig memory _dConfig) = _getOrCreateExecutionEnvironment(userOp);
 
-        // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
-        // replay attacks.
-        // NOTE: Currently reverting instead of graceful return to help w/ testing. TODO - still reverting?
         ValidCallsResult _validCallsResult =
             VERIFICATION.validateCalls(_dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, _isSimulation);
         if (_validCallsResult != ValidCallsResult.Valid) {
             if (_isSimulation) revert VerificationSimFail(_validCallsResult);
+
+            // Gracefully return for results that need nonces to be stored and prevent replay attacks
+            if (uint8(_validCallsResult) >= _GRACEFUL_RETURN_THRESHOLD && !_dConfig.callConfig.allowsReuseUserOps()) {
+                return false;
+            }
+
+            // Revert for all other results
             revert ValidCalls(_validCallsResult);
         }
 

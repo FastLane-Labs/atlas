@@ -36,20 +36,8 @@ contract DAppOperationBuilder is Test {
     }
 
     function withNonce(address atlasVerification, address account) public returns (DAppOperationBuilder) {
-        // Assumes dappNoncesSequential = false. Use withNonce(address, address, bool) to specify sequential or not.
-        dappOperation.nonce = IAtlasVerification(atlasVerification).getDAppNextNonce(account, false);
-        return this;
-    }
-
-    function withNonce(
-        address atlasVerification,
-        address account,
-        bool sequential
-    )
-        public
-        returns (DAppOperationBuilder)
-    {
-        dappOperation.nonce = IAtlasVerification(atlasVerification).getDAppNextNonce(account, sequential);
+        // Assumes dappNoncesSequential = true.
+        dappOperation.nonce = IAtlasVerification(atlasVerification).getDAppNextNonce(account);
         return this;
     }
 

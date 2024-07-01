@@ -152,7 +152,7 @@ contract FactoryTest is Test {
         assertEq(predictedEE, actualEE, "Predicted and actual EE addrs should match 2");
     }
 
-    function test_factoryBaseAndComputedSalts() public {
+    function test_factoryBaseAndComputedSalts() public view {
         bytes32 baseSalt = keccak256(abi.encodePacked(block.chainid, address(mockFactory)));
         assertEq(baseSalt, mockFactory.baseSalt(), "Factory base salt not set correctly");
 

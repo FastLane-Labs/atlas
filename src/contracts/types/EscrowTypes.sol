@@ -24,11 +24,17 @@ struct SolverTracker {
     bool invertsBidValue;
 }
 
+/// @title SolverOutcome
+/// @notice Enum for SolverOutcome
+/// @dev Multiple SolverOutcomes can be used to represent the outcome of a solver call
+/// @dev Typical usage looks like solverOutcome = (1 << SolverOutcome.InvalidSignature) | (1 <<
+/// SolverOutcome.InvalidUserHash) to indicate SolverOutcome.InvalidSignature and SolverOutcome.InvalidUserHash
 enum SolverOutcome {
     // no refund (relay error or hostile user)
     InvalidSignature,
     InvalidUserHash,
     DeadlinePassedAlt,
+    GasPriceBelowUsersAlt,
     InvalidTo,
     UserOutOfGas,
     AlteredControl,

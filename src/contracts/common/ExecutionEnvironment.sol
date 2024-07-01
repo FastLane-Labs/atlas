@@ -6,10 +6,9 @@ import { ReentrancyGuard } from "openzeppelin-contracts/contracts/security/Reent
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { Base } from "src/contracts/common/ExecutionBase.sol";
 
-import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
-import { ISafetyLocks } from "src/contracts/interfaces/ISafetyLocks.sol";
-import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
+import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
+import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
@@ -23,6 +22,8 @@ import "src/contracts/types/EscrowTypes.sol";
 /// @author FastLane Labs
 /// @notice An Execution Environment contract is deployed for each unique combination of User address x DAppControl
 /// address that interacts with the Atlas protocol via a metacall transaction.
+/// @notice IMPORTANT: The contract is not meant to be used as a smart contract wallet with any other protocols other
+/// than Atlas
 contract ExecutionEnvironment is Base, ReentrancyGuard {
     using CallBits for uint32;
 
@@ -215,6 +216,10 @@ contract ExecutionEnvironment is Base, ReentrancyGuard {
         // Make sure the numbers add up and that the bid was paid
         if (solverTracker.floor > solverTracker.ceiling) revert AtlasErrors.BidNotPaid();
 
+        // The solver net bid is the token difference before and after the solver call.
+        // WARNING: There could be scenarios where the above assumption need not hold. For example, the solver could
+        // trigger an airdrop to the execution environment, which would increase the balance of the execution
+        // environment without the solver paying any bids.
         uint256 _netBid = solverTracker.ceiling - solverTracker.floor;
 
         // If bids aren't inverted, revert if net amount received is less than the bid
@@ -266,7 +271,7 @@ contract ExecutionEnvironment is Base, ReentrancyGuard {
     /// @param amount The amount of the ERC20 token to withdraw.
     function withdrawERC20(address token, uint256 amount) external nonReentrant {
         if (msg.sender != _user()) revert AtlasErrors.NotEnvironmentOwner();
-        if (!ISafetyLocks(ATLAS).isUnlocked()) revert AtlasErrors.AtlasLockActive();
+        if (!IAtlas(ATLAS).isUnlocked()) revert AtlasErrors.AtlasLockActive();
 
         if (IERC20(token).balanceOf(address(this)) >= amount) {
             SafeTransferLib.safeTransfer(token, msg.sender, amount);
@@ -281,7 +286,7 @@ contract ExecutionEnvironment is Base, ReentrancyGuard {
     /// @param amount The amount of Ether to withdraw.
     function withdrawEther(uint256 amount) external nonReentrant {
         if (msg.sender != _user()) revert AtlasErrors.NotEnvironmentOwner();
-        if (!ISafetyLocks(ATLAS).isUnlocked()) revert AtlasErrors.AtlasLockActive();
+        if (!IAtlas(ATLAS).isUnlocked()) revert AtlasErrors.AtlasLockActive();
 
         if (address(this).balance >= amount) {
             SafeTransferLib.safeTransferETH(msg.sender, amount);

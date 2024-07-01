@@ -354,31 +354,35 @@ abstract contract GasAccounting is SafetyLocks {
 
         // Calculate the balances that should be debited or credited to the solver and the bundler
         if (_deposits < _withdrawals) {
-            _amountSolverPays += (_withdrawals - _deposits);
+            _amountSolverPays = _withdrawals - _deposits;
         } else {
-            _amountSolverReceives += (_deposits - _withdrawals);
+            _amountSolverReceives = _deposits - _withdrawals;
         }
 
         // Only force solver to pay gas claims if they aren't also the bundler
         // NOTE: If the auction isn't won, _winningSolver will be address(0).
         if (ctx.solverSuccessful && _winningSolver != ctx.bundler) {
-            _amountSolverPays += (_claims - _writeoffs);
-            claimsPaidToBundler = (_claims - _writeoffs);
+            uint256 adjustedClaims = _claims - _writeoffs;
+            _amountSolverPays += adjustedClaims;
+            claimsPaidToBundler = adjustedClaims;
         } else {
             claimsPaidToBundler = 0;
+            _winningSolver = ctx.bundler;
         }
 
         if (_amountSolverPays > _amountSolverReceives) {
             if (!ctx.solverSuccessful) {
                 revert InsufficientTotalBalance(_amountSolverPays - _amountSolverReceives);
-            } else {
-                claimsPaidToBundler -= _assign(_winningSolver, _amountSolverPays - _amountSolverReceives, true);
             }
+
+            uint256 deficit = _assign(_winningSolver, _amountSolverPays - _amountSolverReceives, true);
+            if (deficit > claimsPaidToBundler) revert InsufficientTotalBalance(deficit - claimsPaidToBundler);
+            claimsPaidToBundler -= deficit;
         } else {
             _credit(_winningSolver, _amountSolverReceives - _amountSolverPays);
         }
 
-        SafeTransferLib.safeTransferETH(ctx.bundler, claimsPaidToBundler);
+        if (claimsPaidToBundler != 0) SafeTransferLib.safeTransferETH(ctx.bundler, claimsPaidToBundler);
 
         return (claimsPaidToBundler, netAtlasGasSurcharge);
     }

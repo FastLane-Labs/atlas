@@ -83,7 +83,7 @@ contract SorterTest is AtlasBaseTest {
             .sign(address(atlasVerification), solverPK);
     }
 
-    function validateSortedOps(SolverOperation[] memory sortedOps, uint256 validOps) internal {
+    function validateSortedOps(SolverOperation[] memory sortedOps, uint256 validOps) internal pure {
         if (sortedOps.length > 1) {
             for (uint256 i; i < sortedOps.length - 1; i++) {
                 assertTrue(sortedOps[i].bidAmount >= sortedOps[i + 1].bidAmount, "Not sorted");

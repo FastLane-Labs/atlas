@@ -9,7 +9,7 @@ import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "src/contracts/libraries/
 import "src/contracts/types/LockTypes.sol";
 import "src/contracts/types/EscrowTypes.sol";
 
-// NOTE: IPermit69 only works inside of the Atlas environment - specifically
+// NOTE: Permit69 only works inside of the Atlas environment - specifically
 // inside of the custom ExecutionEnvironments that each user deploys when
 // interacting with Atlas in a manner controlled by the DeFi dApp.
 
@@ -60,27 +60,17 @@ abstract contract Permit69 is GasAccounting {
     /// @param amount The amount of tokens to transfer.
     /// @param user The address of the user invoking the function.
     /// @param control The address of the current DAppControl contract.
-    /// @param callConfig The CallConfig of the current DAppControl contract.
-    /// @param currentPhase The lock state indicating the safe execution phase for the token transfer.
     function transferUserERC20(
         address token,
         address destination,
         uint256 amount,
         address user,
-        address control,
-        uint32 callConfig,
-        uint8 currentPhase
+        address control
     )
         external
     {
         // Validate that the transfer is legitimate
-        _validateTransfer({
-            user: user,
-            control: control,
-            callConfig: callConfig,
-            currentPhase: currentPhase,
-            safeExecutionPhaseSet: SAFE_USER_TRANSFER
-        });
+        _validateTransfer({ user: user, control: control, safeExecutionPhaseSet: SAFE_USER_TRANSFER });
 
         // Transfer token
         SafeTransferLib.safeTransferFrom(token, user, destination, amount);
@@ -93,27 +83,17 @@ abstract contract Permit69 is GasAccounting {
     /// @param amount The amount of tokens to transfer.
     /// @param user The address of the user invoking the function.
     /// @param control The address of the current DAppControl contract.
-    /// @param callConfig The CallConfig of the current DAppControl contract.
-    /// @param currentPhase The lock state indicating the safe execution phase for the token transfer.
     function transferDAppERC20(
         address token,
         address destination,
         uint256 amount,
         address user,
-        address control,
-        uint32 callConfig,
-        uint8 currentPhase
+        address control
     )
         external
     {
         // Validate that the transfer is legitimate
-        _validateTransfer({
-            user: user,
-            control: control,
-            callConfig: callConfig,
-            currentPhase: currentPhase,
-            safeExecutionPhaseSet: SAFE_DAPP_TRANSFER
-        });
+        _validateTransfer({ user: user, control: control, safeExecutionPhaseSet: SAFE_DAPP_TRANSFER });
 
         // Transfer token
         SafeTransferLib.safeTransferFrom(token, control, destination, amount);
@@ -122,39 +102,22 @@ abstract contract Permit69 is GasAccounting {
     /// @notice Verifies whether the lock state allows execution in the specified safe execution phase.
     /// @param user The address of the user invoking the function.
     /// @param control The address of the current DAppControl contract.
-    /// @param callConfig The CallConfig of the DAppControl contract of the current transaction.
-    /// @param currentPhase The lock state to be checked.
     /// @param safeExecutionPhaseSet The set of safe execution phases.
-    function _validateTransfer(
-        address user,
-        address control,
-        uint32 callConfig,
-        uint8 currentPhase,
-        uint8 safeExecutionPhaseSet
-    )
-        internal
-    {
+    function _validateTransfer(address user, address control, uint8 safeExecutionPhaseSet) internal {
         Lock memory _lock = T_lock;
 
         // Verify that the ExecutionEnvironment's context is correct.
         if (_lock.activeEnvironment != msg.sender) {
             revert InvalidEnvironment();
         }
-        if (uint8(_lock.phase) != currentPhase) {
-            revert WrongPhase();
-        }
-
-        if (_lock.callConfig != callConfig) {
-            revert EnvironmentMismatch();
-        }
 
         // Verify that the given user and control are the owners of this ExecutionEnvironment
-        if (!_verifyUserControlExecutionEnv(msg.sender, user, control, callConfig)) {
+        if (!_verifyUserControlExecutionEnv(msg.sender, user, control, _lock.callConfig)) {
             revert EnvironmentMismatch();
         }
 
         // Verify that the current phase allows for transfers
-        if (1 << currentPhase & safeExecutionPhaseSet == 0) {
+        if (1 << uint8(_lock.phase) & safeExecutionPhaseSet == 0) {
             revert InvalidLockState();
         }
     }

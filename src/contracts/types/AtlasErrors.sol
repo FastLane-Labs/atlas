@@ -48,7 +48,6 @@ contract AtlasErrors {
     error UserWrapperCallFail();
     error PostOpsDelegatecallFail();
     error PostOpsDelegatecallReturnedFalse();
-    error SolverMetaTryCatchIncorrectValue();
     error AllocateValueDelegatecallFail();
     error NotEnvironmentOwner();
     error ExecutionEnvironmentBalanceTooLow();

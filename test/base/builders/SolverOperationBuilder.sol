@@ -11,7 +11,7 @@ import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
 import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
-import { IAtlETH } from "src/contracts/interfaces/IAtlETH.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
 contract SolverOperationBuilder is Test {
     using CallVerification for UserOperation;
@@ -121,13 +121,13 @@ contract SolverOperationBuilder is Test {
         returns (SolverOperationBuilder)
     {
         vm.prank(from);
-        IAtlETH(atlas).depositAndBond{ value: amount }(amount);
+        IAtlas(atlas).depositAndBond{ value: amount }(amount);
         return this;
     }
 
     function depositAndBondAtlEth(address atlas, uint256 amount) public returns (SolverOperationBuilder) {
         vm.prank(solverOperation.from);
-        IAtlETH(atlas).depositAndBond{ value: amount }(amount);
+        IAtlas(atlas).depositAndBond{ value: amount }(amount);
         return this;
     }
 
