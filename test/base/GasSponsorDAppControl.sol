@@ -104,7 +104,8 @@ contract GasSponsorDAppControl is DAppControl {
 
     function sponsorETHViaExecutionEnvironment(uint256 amount) public {
         // Check caller is active execution environment and this contract is active dapp on atlas
-        require(IAtlas(ATLAS).lock() == msg.sender, "Caller isn't active EE");
+        (address activeEnvironment,,) = IAtlas(ATLAS).lock();
+        require(activeEnvironment == msg.sender, "Caller isn't active EE");
         require(
             IExecutionEnvironment(msg.sender).getControl() == CONTROL, "Calling EE's control is not this DAppControl"
         );
