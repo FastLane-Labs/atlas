@@ -1,9 +1,9 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import "../types/SolverCallTypes.sol";
-import "../types/UserCallTypes.sol";
-import "../types/DAppApprovalTypes.sol";
+import "../types/SolverOperation.sol";
+import "../types/UserOperation.sol";
+import "../types/ConfigTypes.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import "forge-std/Test.sol";
@@ -78,7 +78,7 @@ abstract contract DAppControlTemplate {
     //      and is designed to give the solver everything they need to fulfill
     //      the user's 'intent.'
 
-    function _preSolverCall(SolverOperation calldata, bytes calldata) internal virtual returns (bool) {
+    function _preSolverCall(SolverOperation calldata, bytes calldata) internal virtual {
         revert AtlasErrors.NotImplemented();
     }
 
@@ -100,7 +100,7 @@ abstract contract DAppControlTemplate {
     //      and is designed to make sure that the solver is fulfilling
     //      the user's 'intent.'
 
-    function _postSolverCall(SolverOperation calldata, bytes calldata) internal virtual returns (bool) {
+    function _postSolverCall(SolverOperation calldata, bytes calldata) internal virtual {
         revert AtlasErrors.NotImplemented();
     }
 

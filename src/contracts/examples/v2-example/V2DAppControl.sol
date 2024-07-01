@@ -2,17 +2,16 @@
 pragma solidity 0.8.22;
 
 // Base Imports
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 // Atlas Base Imports
-import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
 import { IExecutionEnvironment } from "../../interfaces/IExecutionEnvironment.sol";
 
 import { SafetyBits } from "../../libraries/SafetyBits.sol";
 
-import { CallConfig } from "../../types/DAppApprovalTypes.sol";
-import "../../types/UserCallTypes.sol";
-import "../../types/SolverCallTypes.sol";
+import { CallConfig } from "../../types/ConfigTypes.sol";
+import "../../types/UserOperation.sol";
+import "../../types/SolverOperation.sol";
 import "../../types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
@@ -20,6 +19,7 @@ import { DAppControl } from "../../dapp/DAppControl.sol";
 
 // Uni V2 Imports
 import { IUniswapV2Pair } from "./interfaces/IUniswapV2Pair.sol";
+import { IUniswapV2Factory } from "./interfaces/IUniswapV2Factory.sol";
 
 // Misc
 import { SwapMath } from "./SwapMath.sol";
@@ -52,8 +52,8 @@ contract V2DAppControl is DAppControl {
             _atlas,
             msg.sender,
             CallConfig({
-                userNoncesSequenced: false,
-                dappNoncesSequenced: false,
+                userNoncesSequential: false,
+                dappNoncesSequential: false,
                 requirePreOps: true,
                 trackPreOpsReturnData: false,
                 trackUserReturnData: false,
@@ -71,7 +71,8 @@ contract V2DAppControl is DAppControl {
                 requireFulfillment: false,
                 trustedOpHash: false,
                 invertBidValue: false,
-                exPostBids: false
+                exPostBids: false,
+                allowAllocateValueFailure: false
             })
         )
     {
@@ -80,11 +81,24 @@ contract V2DAppControl is DAppControl {
             require(IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token1() == WETH, "INVALID TOKEN PAIR");
         } else {
             require(IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token0() == WETH, "INVALID TOKEN PAIR");
+            require(IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).token1() == GOVERNANCE_TOKEN, "INVALID TOKEN PAIR");
         }
     }
 
-    function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory) {
+    function _checkUserOperation(UserOperation memory userOp) internal view {
         require(bytes4(userOp.data) == SWAP, "ERR-H10 InvalidFunction");
+
+        require(
+            IUniswapV2Factory(IUniswapV2Pair(userOp.dapp).factory()).getPair(
+                IUniswapV2Pair(userOp.dapp).token0(), IUniswapV2Pair(userOp.dapp).token1()
+            ) == userOp.dapp,
+            "ERR-H11 Invalid pair"
+        );
+    }
+
+    function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory) {
+        // check if dapps using this DAppControl can handle the userOp
+        _checkUserOperation(userOp);
 
         (
             uint256 amount0Out,
@@ -92,6 +106,9 @@ contract V2DAppControl is DAppControl {
             , // address recipient // Unused
                 // bytes memory swapData // Unused
         ) = abi.decode(userOp.data[4:], (uint256, uint256, address, bytes));
+
+        require(amount0Out == 0 || amount1Out == 0, "ERR-H12 InvalidAmountOuts");
+        require(amount0Out > 0 || amount1Out > 0, "ERR-H13 InvalidAmountOuts");
 
         (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(userOp.dapp).getReserves();
 
@@ -123,17 +140,15 @@ contract V2DAppControl is DAppControl {
 
         (uint112 token0Balance, uint112 token1Balance,) = IUniswapV2Pair(WETH_X_GOVERNANCE_POOL).getReserves();
 
-        ERC20(WETH).transfer(WETH_X_GOVERNANCE_POOL, bidAmount);
+        SafeTransferLib.safeTransfer(WETH, WETH_X_GOVERNANCE_POOL, bidAmount);
 
         uint256 amount0Out;
         uint256 amount1Out;
 
         if (govIsTok0) {
-            amount0Out = ((997_000 * bidAmount) * uint256(token0Balance))
-                / ((uint256(token1Balance) * 1_000_000) + (997_000 * bidAmount));
+            amount0Out = SwapMath.getAmountOut(bidAmount, uint256(token1Balance), uint256(token0Balance));
         } else {
-            amount1Out = ((997_000 * bidAmount) * uint256(token1Balance))
-                / (((uint256(token0Balance) * 1_000_000) + (997_000 * bidAmount)));
+            amount1Out = SwapMath.getAmountOut(bidAmount, uint256(token0Balance), uint256(token1Balance));
         }
 
         bytes memory nullBytes;
@@ -145,7 +160,7 @@ contract V2DAppControl is DAppControl {
         // ENABLE FOR FOUNDRY TESTING
         console.log("----====++++====----");
         console.log("DApp Control");
-        console.log("Governance Tokens Burned:", govIsTok0 ? amount0Out : amount1Out);
+        console.log("Governance Tokens Sent to user:", govIsTok0 ? amount0Out : amount1Out);
         console.log("----====++++====----");
         */
     }

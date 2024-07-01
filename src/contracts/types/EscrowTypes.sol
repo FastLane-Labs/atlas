@@ -15,11 +15,26 @@ struct EscrowAccountAccessData {
     uint64 totalGasUsed;
 }
 
+// Additional struct to avoid Stack Too Deep while tracking variables related to the solver call.
+struct SolverTracker {
+    uint256 bidAmount;
+    uint256 floor;
+    uint256 ceiling;
+    bool etherIsBidToken;
+    bool invertsBidValue;
+}
+
+/// @title SolverOutcome
+/// @notice Enum for SolverOutcome
+/// @dev Multiple SolverOutcomes can be used to represent the outcome of a solver call
+/// @dev Typical usage looks like solverOutcome = (1 << SolverOutcome.InvalidSignature) | (1 <<
+/// SolverOutcome.InvalidUserHash) to indicate SolverOutcome.InvalidSignature and SolverOutcome.InvalidUserHash
 enum SolverOutcome {
     // no refund (relay error or hostile user)
     InvalidSignature,
     InvalidUserHash,
     DeadlinePassedAlt,
+    GasPriceBelowUsersAlt,
     InvalidTo,
     UserOutOfGas,
     AlteredControl,
@@ -27,6 +42,7 @@ enum SolverOutcome {
     DeadlinePassed,
     GasPriceOverCap,
     InvalidSolver,
+    InvalidBidToken,
     PerBlockLimit, // solvers can only send one tx per block
     // if they sent two we wouldn't be able to flag builder censorship
     InsufficientEscrow,
@@ -36,8 +52,8 @@ enum SolverOutcome {
     PreSolverFailed,
     SolverOpReverted,
     PostSolverFailed,
-    IntentUnfulfilled,
     BidNotPaid,
     BalanceNotReconciled,
+    CallbackNotCalled,
     EVMError
 }

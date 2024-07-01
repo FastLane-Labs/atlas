@@ -1,34 +1,33 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
-import { DAppIntegration } from "./DAppIntegration.sol";
+import { EIP712 } from "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
+import { ECDSA } from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
+import { SignatureChecker } from "openzeppelin-contracts/contracts/utils/cryptography/SignatureChecker.sol";
+import { DAppIntegration } from "src/contracts/atlas/DAppIntegration.sol";
+import { NonceManager } from "src/contracts/atlas/NonceManager.sol";
 
-import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
-import "src/contracts/types/SolverCallTypes.sol";
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/DAppApprovalTypes.sol";
+import { AtlasConstants } from "src/contracts/types/AtlasConstants.sol";
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
 import "src/contracts/types/EscrowTypes.sol";
-import "src/contracts/types/ValidCallsTypes.sol";
+import "src/contracts/types/ValidCalls.sol";
 
 /// @title AtlasVerification
 /// @author FastLane Labs
 /// @notice AtlasVerification handles the verification of DAppConfigs, UserOperations, SolverOperations, and
 /// DAppOperations within a metacall to ensure that calldata sourced from various parties is safe and valid.
-contract AtlasVerification is EIP712, DAppIntegration {
+contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     using ECDSA for bytes32;
     using CallBits for uint32;
     using CallVerification for UserOperation;
 
-    uint256 internal constant FULL_BITMAP = uint256(0x0000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF);
-    uint256 internal constant FIRST_16_BITS_FULL = uint256(0xFFFF);
-    uint256 internal constant FIRST_4_BITS_FULL = uint256(0xF);
-    uint8 internal constant MAX_SOLVERS = type(uint8).max - 2;
-
-    constructor(address _atlas) EIP712("AtlasVerification", "1.0") DAppIntegration(_atlas) { }
+    constructor(address atlas) EIP712("AtlasVerification", "1.0") DAppIntegration(atlas) { }
 
     /// @notice The validateCalls function verifies the validity of the metacall calldata components.
     /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
@@ -38,7 +37,6 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @param msgValue The ETH value sent with the metacall transaction.
     /// @param msgSender The forwarded msg.sender of the original metacall transaction in the Atlas contract.
     /// @param isSimulation A boolean indicating if the call is a simulation.
-    /// @return userOpHash The hash of the UserOperation struct.
     /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
     function validateCalls(
         DAppConfig calldata dConfig,
@@ -50,131 +48,119 @@ contract AtlasVerification is EIP712, DAppIntegration {
         bool isSimulation
     )
         external
-        returns (bytes32 userOpHash, ValidCallsResult)
+        returns (ValidCallsResult)
     {
         if (msg.sender != ATLAS) revert AtlasErrors.InvalidCaller();
-        return _validCalls(dConfig, userOp, solverOps, dAppOp, msgValue, msgSender, isSimulation);
-    }
-
-    /// @notice The internal _validCalls function verifies the validity of the metacall calldata components, and is
-    /// called by validateCalls.
-    /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
-    /// @param userOp The UserOperation struct of the metacall.
-    /// @param solverOps An array of SolverOperation structs.
-    /// @param dAppOp The DAppOperation struct of the metacall.
-    /// @param msgValue The ETH value sent with the metacall transaction.
-    /// @param msgSender The forwarded msg.sender of the original metacall transaction in the Atlas contract.
-    /// @param isSimulation A boolean indicating if the call is a simulation.
-    /// @return userOpHash The hash of the UserOperation struct.
-    /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
-    function _validCalls(
-        DAppConfig calldata dConfig,
-        UserOperation calldata userOp,
-        SolverOperation[] calldata solverOps,
-        DAppOperation calldata dAppOp,
-        uint256 msgValue,
-        address msgSender,
-        bool isSimulation
-    )
-        internal
-        returns (bytes32 userOpHash, ValidCallsResult)
-    {
         // Verify that the calldata injection came from the dApp frontend
         // and that the signatures are valid.
 
+        bytes32 _userOpHash = _getUserOperationHash(userOp);
+
+        {
+            // Check user signature
+            ValidCallsResult verifyUserResult = _verifyUser(dConfig, userOp, _userOpHash, msgSender, isSimulation);
+            if (verifyUserResult != ValidCallsResult.Valid) {
+                return verifyUserResult;
+            }
+
+            // allowUnapprovedDAppSignatories still verifies signature match, but does not check
+            // if dApp owner approved the signer.
+            (ValidCallsResult verifyAuctioneerResult, bool allowUnapprovedDAppSignatories) =
+                _verifyAuctioneer(dConfig, userOp, solverOps, dAppOp, msgSender);
+
+            if (verifyAuctioneerResult != ValidCallsResult.Valid && !isSimulation) {
+                return verifyAuctioneerResult;
+            }
+
+            // Check dapp signature
+            ValidCallsResult verifyDappResult =
+                _verifyDApp(dConfig, dAppOp, msgSender, allowUnapprovedDAppSignatories, isSimulation);
+            if (verifyDappResult != ValidCallsResult.Valid) {
+                return verifyDappResult;
+            }
+        }
+
+        if (dConfig.callConfig.needsPreOpsReturnData() && dConfig.callConfig.needsUserReturnData()) {
+            // Max one of preOps or userOp return data can be tracked, not both
+            return ValidCallsResult.InvalidCallConfig;
+        }
+
         // CASE: Solvers trust app to update content of UserOp after submission of solverOp
         if (dConfig.callConfig.allowsTrustedOpHash()) {
-            userOpHash = userOp.getAltOperationHash();
-
             // SessionKey must match explicitly - cannot be skipped
             if (userOp.sessionKey != dAppOp.from && !isSimulation) {
-                return (userOpHash, ValidCallsResult.InvalidAuctioneer);
+                return ValidCallsResult.InvalidAuctioneer;
             }
 
             // msgSender (the bundler) must be userOp.from, userOp.sessionKey / dappOp.from, or dappOp.bundler
             if (!(msgSender == dAppOp.from || msgSender == dAppOp.bundler || msgSender == userOp.from) && !isSimulation)
             {
-                return (userOpHash, ValidCallsResult.InvalidBundler);
+                return ValidCallsResult.InvalidBundler;
             }
-        } else {
-            userOpHash = userOp.getUserOperationHash();
         }
 
-        uint256 solverOpCount = solverOps.length;
+        uint256 _solverOpCount = solverOps.length;
 
         {
-            // bypassSignatoryApproval still verifies signature match, but does not check
-            // if dApp approved the signor.
-            (bool validAuctioneer, bool bypassSignatoryApproval) = _verifyAuctioneer(dConfig, userOp, solverOps, dAppOp);
-
-            if (!validAuctioneer && !isSimulation) {
-                return (userOpHash, ValidCallsResult.InvalidAuctioneer);
-            }
-
-            // Check dapp signature
-            (bool validDAppOp, ValidCallsResult result) =
-                _verifyDApp(dConfig, dAppOp, msgSender, bypassSignatoryApproval, isSimulation);
-            if (!validDAppOp) {
-                return (userOpHash, result);
-            }
-
-            // Check user signature
-            if (!_verifyUser(dConfig, userOp, msgSender, isSimulation)) {
-                return (userOpHash, ValidCallsResult.UserSignatureInvalid);
-            }
-
-            // Check solvers not over the max (253)
-            if (solverOpCount > MAX_SOLVERS) {
-                return (userOpHash, ValidCallsResult.TooManySolverOps);
+            // Check number of solvers not greater than max, to prevent overflows in `solverIndex`
+            if (_solverOpCount > _MAX_SOLVERS) {
+                return ValidCallsResult.TooManySolverOps;
             }
 
             // Check if past user's deadline
-            if (block.number > userOp.deadline) {
-                if (userOp.deadline != 0 && !isSimulation) {
-                    return (userOpHash, ValidCallsResult.UserDeadlineReached);
-                }
+            if (userOp.deadline != 0 && block.number > userOp.deadline) {
+                return ValidCallsResult.UserDeadlineReached;
             }
 
             // Check if past dapp's deadline
-            if (block.number > dAppOp.deadline) {
-                if (dAppOp.deadline != 0 && !isSimulation) {
-                    return (userOpHash, ValidCallsResult.DAppDeadlineReached);
-                }
+            if (dAppOp.deadline != 0 && block.number > dAppOp.deadline) {
+                return ValidCallsResult.DAppDeadlineReached;
             }
 
             // Check gas price is within user's limit
             if (tx.gasprice > userOp.maxFeePerGas) {
-                return (userOpHash, ValidCallsResult.GasPriceHigherThanMax);
+                return ValidCallsResult.GasPriceHigherThanMax;
             }
 
             // Check that the value of the tx is greater than or equal to the value specified
             if (msgValue < userOp.value) {
-                return (userOpHash, ValidCallsResult.TxValueLowerThanCallValue);
+                return ValidCallsResult.TxValueLowerThanCallValue;
             }
+
+            // Check the call config read at the start of the metacall is same as user expected (as set in userOp)
+            if (dConfig.callConfig != userOp.callConfig) {
+                return ValidCallsResult.CallConfigMismatch;
+            }
+        }
+
+        // Check if the call configuration is valid
+        ValidCallsResult _verifyCallConfigResult = _verifyCallConfig(dConfig.callConfig);
+        if (_verifyCallConfigResult != ValidCallsResult.Valid) {
+            return _verifyCallConfigResult;
         }
 
         // Some checks are only needed when call is not a simulation
         if (isSimulation) {
             // Add all solver ops if simulation
-            return (userOpHash, ValidCallsResult.Valid);
+            return ValidCallsResult.Valid;
         }
 
         // Verify a solver was successfully verified.
-        if (solverOpCount == 0) {
+        if (_solverOpCount == 0) {
             if (!dConfig.callConfig.allowsZeroSolvers()) {
-                return (userOpHash, ValidCallsResult.NoSolverOp);
+                return ValidCallsResult.NoSolverOp;
             }
 
             if (dConfig.callConfig.needsFulfillment()) {
-                return (userOpHash, ValidCallsResult.NoSolverOp);
+                return ValidCallsResult.NoSolverOp;
             }
         }
 
-        if (userOpHash != dAppOp.userOpHash) {
-            return (userOpHash, ValidCallsResult.OpHashMismatch);
+        if (_userOpHash != dAppOp.userOpHash) {
+            return ValidCallsResult.OpHashMismatch;
         }
 
-        return (userOpHash, ValidCallsResult.Valid);
+        return ValidCallsResult.Valid;
     }
 
     /// @notice The verifySolverOp function verifies the validity of a SolverOperation.
@@ -187,7 +173,8 @@ contract AtlasVerification is EIP712, DAppIntegration {
         SolverOperation calldata solverOp,
         bytes32 userOpHash,
         uint256 userMaxFeePerGas,
-        address bundler
+        address bundler,
+        bool allowsTrustedOpHash
     )
         external
         view
@@ -208,7 +195,14 @@ contract AtlasVerification is EIP712, DAppIntegration {
             if (tx.gasprice > solverOp.maxFeePerGas) result |= (1 << uint256(SolverOutcome.GasPriceOverCap));
 
             if (solverOp.maxFeePerGas < userMaxFeePerGas) {
-                result |= (1 << uint256(SolverOutcome.GasPriceBelowUsers));
+                result |= (
+                    1
+                        << (
+                            allowsTrustedOpHash
+                                ? uint256(SolverOutcome.GasPriceBelowUsersAlt)
+                                : uint256(SolverOutcome.GasPriceBelowUsers)
+                        )
+                );
             }
 
             if (solverOp.solver == ATLAS || solverOp.solver == address(this)) {
@@ -221,60 +215,95 @@ contract AtlasVerification is EIP712, DAppIntegration {
         }
     }
 
+    /// @notice The _verifyCallConfig internal function verifies the validity of the call configuration.
+    /// @param callConfig The call configuration to verify.
+    /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
+    function _verifyCallConfig(uint32 callConfig) internal pure returns (ValidCallsResult) {
+        CallConfig memory _decodedCallConfig = CallBits.decodeCallConfig(callConfig);
+        if (_decodedCallConfig.userNoncesSequential && _decodedCallConfig.dappNoncesSequential) {
+            // Max one of user or dapp nonces can be sequential, not both
+            return ValidCallsResult.BothUserAndDAppNoncesCannotBeSequential;
+        }
+        if (_decodedCallConfig.invertBidValue && _decodedCallConfig.exPostBids) {
+            // If both invertBidValue and exPostBids are true, solver's retreived bid cannot be determined
+            return ValidCallsResult.InvertBidValueCannotBeExPostBids;
+        }
+        return ValidCallsResult.Valid;
+    }
+
     /// @notice The _verifyAuctioneer internal function is called by _validCalls to verify that the auctioneer of the
     /// metacall is valid according to the rules set in the DAppConfig.
     /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
     /// @param userOp The UserOperation struct of the metacall.
     /// @param solverOps An array of SolverOperation structs.
     /// @param dAppOp The DAppOperation struct of the metacall.
-    /// @return valid A boolean indicating if the auctioneer is valid.
-    /// @return bypassSignatoryApproval A boolean indicating if the signatory approval check should be bypassed.
+    /// @param msgSender The bundler (msg.sender) of the metacall transaction in the Atlas contract.
+    /// @return validCallsResult The result of the ValidCalls check, in enum ValidCallsResult form.
+    /// @return allowUnapprovedDAppSignatories A boolean indicating if the signatory approval check should be bypassed.
     function _verifyAuctioneer(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
-        DAppOperation calldata dAppOp
+        DAppOperation calldata dAppOp,
+        address msgSender
     )
         internal
         pure
-        returns (bool valid, bool bypassSignatoryApproval)
+        returns (ValidCallsResult validCallsResult, bool allowUnapprovedDAppSignatories)
     {
         if (
             dConfig.callConfig.verifyCallChainHash()
                 && dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps)
-        ) return (false, false);
+        ) return (ValidCallsResult.InvalidCallChainHash, false);
 
-        if (dConfig.callConfig.allowsUserAuctioneer() && dAppOp.from == userOp.sessionKey) return (true, true);
+        if (dConfig.callConfig.allowsUserAuctioneer() && dAppOp.from == userOp.sessionKey) {
+            return (ValidCallsResult.Valid, true);
+        }
 
-        if (dConfig.callConfig.allowsSolverAuctioneer() && dAppOp.from == solverOps[0].from) return (true, true);
+        if (dConfig.callConfig.allowsSolverAuctioneer() && solverOps.length > 0) {
+            // If the solver is the auctioneer, there must be exactly 1 solver
+            if (dAppOp.from == solverOps[0].from) {
+                if (solverOps.length != 1) {
+                    // If not exactly one solver and first solver is auctioneer
+                    // => invalid
+                    return (ValidCallsResult.TooManySolverOps, false);
+                } else if (msgSender == solverOps[0].from) {
+                    // If exactly one solver AND that solver is auctioneer,
+                    // AND the solver is also the bundler,
+                    // => valid AND bypass sig approval
+                    return (ValidCallsResult.Valid, true);
+                }
+            }
+            // If first solver is not the auctioneer,
+            // => valid BUT do not bypass sig approval
+        }
 
-        if (dConfig.callConfig.allowsUnknownAuctioneer()) return (true, true);
+        if (dConfig.callConfig.allowsUnknownAuctioneer()) return (ValidCallsResult.Valid, true);
 
-        return (true, false);
+        return (ValidCallsResult.Valid, false);
     }
 
-    /// @notice The getSolverPayload function returns the hash of a SolverOperation struct.
+    /// @notice The getSolverPayload function returns the hash of a SolverOperation struct for use in signatures.
     /// @param solverOp The SolverOperation struct to hash.
     function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload) {
-        payload = _hashTypedDataV4(_getSolverHash(solverOp));
+        payload = _hashTypedDataV4(_getSolverOpHash(solverOp));
     }
 
     /// @notice The internal _verifySolverSignature function verifies the signature of a SolverOperation.
     /// @param solverOp The SolverOperation struct to verify.
     /// @return A boolean indicating if the signature is valid.
     function _verifySolverSignature(SolverOperation calldata solverOp) internal view returns (bool) {
-        if (solverOp.signature.length == 0) return false;
-        address signer = _hashTypedDataV4(_getSolverHash(solverOp)).recover(solverOp.signature);
-        return signer == solverOp.from;
+        (address _signer,) = _hashTypedDataV4(_getSolverOpHash(solverOp)).tryRecover(solverOp.signature);
+        return _signer == solverOp.from;
     }
 
-    /// @notice The _getSolverHash internal function returns the hash of a SolverOperation struct.
+    /// @notice The _getSolverOpHash internal function returns the hash of a SolverOperation struct.
     /// @param solverOp The SolverOperation struct to hash.
-    /// @return solverHash The hash of the SolverOperation struct.
-    function _getSolverHash(SolverOperation calldata solverOp) internal pure returns (bytes32 solverHash) {
+    /// @return solverOpHash The hash of the SolverOperation struct.
+    function _getSolverOpHash(SolverOperation calldata solverOp) internal pure returns (bytes32 solverOpHash) {
         return keccak256(
             abi.encode(
-                SOLVER_TYPE_HASH,
+                SOLVER_TYPEHASH,
                 solverOp.from,
                 solverOp.to,
                 solverOp.value,
@@ -286,7 +315,7 @@ contract AtlasVerification is EIP712, DAppIntegration {
                 solverOp.userOpHash,
                 solverOp.bidToken,
                 solverOp.bidAmount,
-                keccak256(solverOp.data)
+                solverOp.data
             )
         );
     }
@@ -301,198 +330,79 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @param dConfig The DAppConfig containing configuration details.
     /// @param dAppOp The DAppOperation struct of the metacall.
     /// @param msgSender The forwarded msg.sender of the original metacall transaction in the Atlas contract.
-    /// @param bypassSignatoryApproval Boolean indicating whether to bypass signatory approval.
+    /// @param allowUnapprovedDAppSignatories Boolean indicating whether to bypass signatory approval.
     /// @param isSimulation Boolean indicating whether the execution is a simulation.
-    /// @return A boolean indicating if the DAppOperation is valid.
     /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
     function _verifyDApp(
         DAppConfig memory dConfig,
         DAppOperation calldata dAppOp,
         address msgSender,
-        bool bypassSignatoryApproval,
+        bool allowUnapprovedDAppSignatories,
         bool isSimulation
     )
         internal
-        returns (bool, ValidCallsResult)
+        returns (ValidCallsResult)
     {
-        // Verify the signature before storing any data to avoid
-        // spoof transactions clogging up dapp nonces
+        if (dAppOp.to != ATLAS) return ValidCallsResult.DAppToInvalid;
 
-        bool bypassSignature = msgSender == dAppOp.from || (isSimulation && dAppOp.signature.length == 0);
+        bool _bypassSignature = msgSender == dAppOp.from || (isSimulation && dAppOp.signature.length == 0);
 
-        if (!bypassSignature && !_verifyDAppSignature(dAppOp)) {
-            return (false, ValidCallsResult.DAppSignatureInvalid);
+        if (!_bypassSignature && !_verifyDAppSignature(dAppOp)) {
+            return ValidCallsResult.DAppSignatureInvalid;
         }
 
-        if (bypassSignatoryApproval) return (true, ValidCallsResult.Valid); // If bypass, return true after signature
-            // verification
+        if (dAppOp.control != dConfig.to) {
+            return ValidCallsResult.InvalidControl;
+        }
 
-        // NOTE: to avoid replay attacks arising from key management errors,
-        // the state changes below must be *saved* even if they render the
-        // transaction invalid.
-        // TODO: consider dapp-owned gas escrow.  Enshrined account
-        // abstraction may render that redundant at a large scale, but
-        // allocating different parts of the tx to different parties
-        // will allow for optimized trustlessness. This could lead to
-        // users not having to trust the front end at all - a huge
-        // improvement over the current experience.
+        // Some checks skipped if call is `simUserOperation()`, because the dAppOp struct is not available.
+        bool _skipDAppOpChecks = isSimulation && dAppOp.from == address(0);
 
-        // Check bundler matches dAppOp bundler
+        // If the dApp enabled sequential nonces (IE for FCFS execution), check and make sure the order is correct
+        // NOTE: enabling sequential nonces could create a scenario in which builders or validators may be able to
+        // profit via censorship. DApps are encouraged to rely on the deadline parameter.
+        if (!_skipDAppOpChecks && dConfig.callConfig.needsSequentialDAppNonces()) {
+            // When not in a simulation, nonces are stored even if the metacall fails, to prevent replay attacks.
+            if (!_handleDAppNonces(dAppOp.from, dAppOp.nonce, isSimulation)) {
+                return ValidCallsResult.InvalidDAppNonce;
+            }
+        }
+
+        // If `_verifyAuctioneer()` allows bypassing signatory approval, the checks below are skipped and we can return
+        // Valid here, considering the checks above have all passed.
+        if (allowUnapprovedDAppSignatories) return ValidCallsResult.Valid;
+
+        // Check actual bundler matches the dApp's intended `dAppOp.bundler`
+        // If bundler and auctioneer are the same address, this check is skipped
         if (dAppOp.bundler != address(0) && msgSender != dAppOp.bundler) {
-            if (!signatories[keccak256(abi.encodePacked(dAppOp.control, msgSender))]) {
-                bool bypassSignatoryCheck = isSimulation && dAppOp.from == address(0);
-                if (!isSimulation) {
-                    return (false, ValidCallsResult.InvalidBundler);
-                }
+            if (!_skipDAppOpChecks && !_isDAppSignatory(dAppOp.control, msgSender)) {
+                return ValidCallsResult.InvalidBundler;
             }
         }
 
         // Make sure the signer is currently enabled by dapp owner
-        if (!signatories[keccak256(abi.encodePacked(dAppOp.control, dAppOp.from))]) {
-            bool bypassSignatoryCheck = isSimulation && dAppOp.from == address(0);
-            if (!bypassSignatoryCheck) {
-                return (false, ValidCallsResult.DAppSignatureInvalid);
-            }
+        if (!_skipDAppOpChecks && !_isDAppSignatory(dAppOp.control, dAppOp.from)) {
+            return ValidCallsResult.DAppNotEnabled;
         }
 
-        if (dAppOp.control != dConfig.to) {
-            return (false, ValidCallsResult.InvalidControl);
-        }
-
-        // If dAppOp.from is left blank and sim = true,
-        // implies a simUserOp call, so dapp nonce check is skipped.
-        if (dAppOp.from == address(0) && isSimulation) {
-            return (true, ValidCallsResult.Valid);
-        }
-
-        // If the dapp indicated that they only accept sequenced nonces
-        // (IE for FCFS execution), check and make sure the order is correct
-        // NOTE: allowing only sequenced nonces could create a scenario in
-        // which builders or validators may be able to profit via censorship.
-        // DApps are encouraged to rely on the deadline parameter.
-        if (!_handleNonces(dAppOp.from, dAppOp.nonce, !dConfig.callConfig.needsSequencedDAppNonces(), isSimulation)) {
-            return (false, ValidCallsResult.InvalidDAppNonce);
-        }
-
-        return (true, ValidCallsResult.Valid);
-    }
-
-    /// @notice The _handleNonces internal function handles the verification of nonces for both sequenced and async
-    /// nonce systems.
-    /// @param account The address of the account to verify the nonce for.
-    /// @param nonce The nonce to verify.
-    /// @param async A boolean indicating if the nonce is async (true) or sequential (false).
-    /// @param isSimulation A boolean indicating if the execution is a simulation.
-    /// @return A boolean indicating if the nonce is valid.
-    function _handleNonces(address account, uint256 nonce, bool async, bool isSimulation) internal returns (bool) {
-        if (nonce > type(uint128).max - 1) {
-            return false;
-        }
-
-        // 0 Nonces are not allowed. Nonces start at 1 for both sequenced and async.
-        if (nonce == 0) return false;
-
-        NonceTracker memory nonceTracker = nonceTrackers[account];
-
-        if (!async) {
-            // SEQUENTIAL NONCES
-
-            // Nonces must increase by 1 if sequential
-            if (nonce != nonceTracker.lastUsedSeqNonce + 1) return false;
-
-            // Return true here if simulation to avoid storing nonce updates
-            if (isSimulation) return true;
-
-            ++nonceTracker.lastUsedSeqNonce;
-        } else {
-            // ASYNC NONCES
-
-            uint256 bitmapIndex = ((nonce - 1) / 240) + 1; // +1 because highestFullBitmap initializes at 0
-            uint256 bitmapNonce = ((nonce - 1) % 240); // 1 -> 0, 240 -> 239. Needed for shifts in bitmap.
-
-            bytes32 bitmapKey = keccak256(abi.encode(account, bitmapIndex));
-            NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
-            uint256 bitmap = uint256(nonceBitmap.bitmap);
-
-            // Check if nonce has already been used
-            if (_nonceUsedInBitmap(bitmap, bitmapNonce)) {
-                return false;
-            }
-
-            // Return true here if simulation to avoid storing nonce updates
-            if (isSimulation) return true;
-
-            // Mark nonce as used in bitmap
-            bitmap |= 1 << bitmapNonce;
-            nonceBitmap.bitmap = uint240(bitmap);
-
-            // Update highestUsedNonce if necessary.
-            // Add 1 back to bitmapNonce: 1 -> 1, 240 -> 240. As opposed to the shift form used above.
-            if (bitmapNonce + 1 > uint256(nonceBitmap.highestUsedNonce)) {
-                nonceBitmap.highestUsedNonce = uint8(bitmapNonce + 1);
-            }
-
-            // Mark bitmap as full if necessary
-            if (bitmap == FULL_BITMAP) {
-                // Update highestFullAsyncBitmap if necessary
-                if (bitmapIndex == nonceTracker.highestFullAsyncBitmap + 1) {
-                    nonceTracker = _incrementHighestFullAsyncBitmap(nonceTracker, account);
-                }
-            }
-
-            nonceBitmaps[bitmapKey] = nonceBitmap;
-        }
-
-        nonceTrackers[account] = nonceTracker;
-        return true;
-    }
-
-    /// @notice Increments the `highestFullAsyncBitmap` of a given `nonceTracker` for the specified `account` until a
-    /// non-fully utilized bitmap is found.
-    /// @param nonceTracker The `NonceTracker` memory structure representing the current state of nonce tracking for a
-    /// specific account.
-    /// @param account The address of the account for which the nonce tracking is being updated. This is used to
-    /// generate a unique key for accessing the correct bitmap from a mapping.
-    /// @return nonceTracker The updated `NonceTracker` structure with the `highestFullAsyncBitmap` field modified to
-    /// reflect the highest index of a bitmap that is not fully utilized.
-    function _incrementHighestFullAsyncBitmap(
-        NonceTracker memory nonceTracker,
-        address account
-    )
-        internal
-        view
-        returns (NonceTracker memory)
-    {
-        uint256 bitmap;
-        do {
-            unchecked {
-                ++nonceTracker.highestFullAsyncBitmap;
-            }
-            uint256 bitmapIndex = uint256(nonceTracker.highestFullAsyncBitmap) + 1;
-            bytes32 bitmapKey = keccak256(abi.encode(account, bitmapIndex));
-            bitmap = uint256(nonceBitmaps[bitmapKey].bitmap);
-        } while (bitmap == FULL_BITMAP);
-
-        return nonceTracker;
+        return ValidCallsResult.Valid;
     }
 
     /// @notice Generates the hash of a DAppOperation struct.
-    /// @param approval The DAppOperation struct to hash.
-    /// @return proofHash The hash of the DAppOperation struct.
-    function _getProofHash(DAppOperation memory approval) internal pure returns (bytes32 proofHash) {
-        proofHash = keccak256(
+    /// @param dAppOp The DAppOperation struct to hash.
+    /// @return dappOpHash The hash of the DAppOperation struct.
+    function _getDAppOpHash(DAppOperation calldata dAppOp) internal pure returns (bytes32 dappOpHash) {
+        dappOpHash = keccak256(
             abi.encode(
-                DAPP_TYPE_HASH,
-                approval.from,
-                approval.to,
-                approval.value,
-                approval.gas,
-                approval.nonce,
-                approval.deadline,
-                approval.control,
-                approval.bundler,
-                approval.userOpHash,
-                approval.callChainHash
+                DAPP_TYPEHASH,
+                dAppOp.from,
+                dAppOp.to,
+                dAppOp.nonce,
+                dAppOp.deadline,
+                dAppOp.control,
+                dAppOp.bundler,
+                dAppOp.userOpHash,
+                dAppOp.callChainHash
             )
         );
     }
@@ -501,17 +411,15 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @param dAppOp The DAppOperation struct to verify.
     /// @return A boolean indicating if the signature is valid.
     function _verifyDAppSignature(DAppOperation calldata dAppOp) internal view returns (bool) {
-        if (dAppOp.signature.length == 0) return false;
-        address signer = _hashTypedDataV4(_getProofHash(dAppOp)).recover(dAppOp.signature);
-
-        return signer == dAppOp.from;
+        (address _signer,) = _hashTypedDataV4(_getDAppOpHash(dAppOp)).tryRecover(dAppOp.signature);
+        return _signer == dAppOp.from;
     }
 
     /// @notice Generates the hash of a DAppOperation struct.
     /// @param dAppOp The DAppOperation struct to hash.
     /// @return payload The hash of the DAppOperation struct.
-    function getDAppOperationPayload(DAppOperation memory dAppOp) public view returns (bytes32 payload) {
-        payload = _hashTypedDataV4(_getProofHash(dAppOp));
+    function getDAppOperationPayload(DAppOperation calldata dAppOp) public view returns (bytes32 payload) {
+        payload = _hashTypedDataV4(_getDAppOpHash(dAppOp));
     }
 
     /// @notice Returns the domain separator for the EIP712 signature scheme.
@@ -529,224 +437,122 @@ contract AtlasVerification is EIP712, DAppIntegration {
     /// @param userOp The UserOperation struct to verify.
     /// @param msgSender The forwarded msg.sender of the original metacall transaction in the Atlas contract.
     /// @param isSimulation A boolean indicating if the call is a simulation.
-    /// @return A boolean indicating if the UserOperation is valid.
+    /// @return The result of the UserOperation verification, in enum ValidCallsResult form.
     function _verifyUser(
         DAppConfig memory dConfig,
         UserOperation calldata userOp,
+        bytes32 userOpHash,
         address msgSender,
         bool isSimulation
     )
         internal
-        returns (bool)
+        returns (ValidCallsResult)
     {
+        if (userOp.from == address(this) || userOp.from == ATLAS || userOp.from == userOp.control) {
+            return ValidCallsResult.UserFromInvalid;
+        }
+
+        if (userOp.to != ATLAS) {
+            return ValidCallsResult.UserToInvalid;
+        }
+
         // Verify the signature before storing any data to avoid
         // spoof transactions clogging up dapp userNonces
 
-        if (userOp.from.code.length > 0) {
-            // TODO: not sure if 30k gas limit is accurate
-            if (userOp.from == address(this) || userOp.from == ATLAS || userOp.from == userOp.control) {
-                return false;
+        bool _userIsBundler = userOp.from == msgSender;
+        bool _hasNoSignature = userOp.signature.length == 0;
+        bool _signatureValid;
+
+        if (!_userIsBundler) {
+            if (userOp.callConfig.allowsTrustedOpHash()) {
+                userOpHash = _getUserOperationHash(userOp, false);
             }
-            bool validSmartWallet =
-                IAccount(userOp.from).validateUserOp{ gas: 30_000 }(userOp, _getProofHash(userOp), 0) == 0;
-            return (isSimulation || validSmartWallet);
+            _signatureValid = SignatureChecker.isValidSignatureNow(userOp.from, userOpHash, userOp.signature);
         }
 
-        bool bypassSignature = msgSender == userOp.from || (isSimulation && userOp.signature.length == 0);
-
-        if (!bypassSignature && !_verifyUserSignature(userOp)) {
-            return false;
+        if (!(_signatureValid || _userIsBundler || (isSimulation && _hasNoSignature))) {
+            return ValidCallsResult.UserSignatureInvalid;
         }
 
         if (userOp.control != dConfig.to) {
-            return false;
+            return ValidCallsResult.ControlMismatch;
         }
 
-        // If the dapp indicated that they only accept sequenced userNonces
+        // If the dapp indicated that they only accept sequential userNonces
         // (IE for FCFS execution), check and make sure the order is correct
-        // NOTE: allowing only sequenced userNonces could create a scenario in
+        // NOTE: allowing only sequential userNonces could create a scenario in
         // which builders or validators may be able to profit via censorship.
         // DApps are encouraged to rely on the deadline parameter
         // to prevent replay attacks.
-        if (!_handleNonces(userOp.from, userOp.nonce, !dConfig.callConfig.needsSequencedUserNonces(), isSimulation)) {
-            return false;
+        if (!_handleUserNonces(userOp.from, userOp.nonce, dConfig.callConfig.needsSequentialUserNonces(), isSimulation))
+        {
+            return ValidCallsResult.UserNonceInvalid;
         }
 
-        return true;
+        return ValidCallsResult.Valid;
     }
 
-    /// @notice Generates the hash of a UserOperation struct.
-    /// @param userOp The UserOperation struct to hash.
-    /// @return proofHash The hash of the UserOperation struct.
-    function _getProofHash(UserOperation memory userOp) internal pure returns (bytes32 proofHash) {
-        proofHash = keccak256(
-            abi.encode(
-                USER_TYPE_HASH,
-                userOp.from,
-                userOp.to,
-                userOp.value,
-                userOp.gas,
-                userOp.maxFeePerGas,
-                userOp.nonce,
-                userOp.deadline,
-                userOp.dapp,
-                userOp.control,
-                userOp.sessionKey,
-                keccak256(userOp.data)
-            )
-        );
+    /// @notice Generates the payload hash of a UserOperation struct used in signatures.
+    /// @param userOp The UserOperation struct to generate the payload for.
+    /// @return payload The hash of the UserOperation struct for use in signatures.
+    function getUserOperationPayload(UserOperation calldata userOp) public view returns (bytes32 payload) {
+        payload = _getUserOperationHash(userOp, false);
     }
 
-    /// @notice Verifies the signature of a UserOperation struct.
-    /// @param userOp The UserOperation struct to verify.
-    /// @return A boolean indicating if the signature is valid.
-    function _verifyUserSignature(UserOperation calldata userOp) internal view returns (bool) {
-        if (userOp.signature.length == 0) return false;
-        address signer = _hashTypedDataV4(_getProofHash(userOp)).recover(userOp.signature);
-
-        return signer == userOp.from;
+    /// @notice Generates the hash of a UserOperation struct used for inter-operation references.
+    /// @param userOp The UserOperation struct to generate the hash for.
+    /// @return userOpHash The hash of the UserOperation struct for in inter-operation references.
+    function getUserOperationHash(UserOperation calldata userOp) public view returns (bytes32 userOpHash) {
+        userOpHash = _getUserOperationHash(userOp);
     }
 
-    /// @notice Generates the hash of a UserOperation struct.
-    /// @param userOp The UserOperation struct to hash.
-    /// @return payload The hash of the UserOperation struct.
-    function getUserOperationPayload(UserOperation memory userOp) public view returns (bytes32 payload) {
-        payload = _hashTypedDataV4(_getProofHash(userOp));
+    // TODO: Do we need this??? Why not just call the next function?
+    function _getUserOperationHash(UserOperation calldata userOp) internal view returns (bytes32 userOpHash) {
+        userOpHash = _getUserOperationHash(userOp, userOp.callConfig.allowsTrustedOpHash());
     }
 
-    /// @notice Returns the next nonce for the given account, in sequential or async mode.
-    /// @param account The address of the account for which to retrieve the next nonce.
-    /// @param sequenced A boolean indicating if the nonce should be sequential (true) or async (false).
-    /// @return The next nonce for the given account.
-    function getNextNonce(address account, bool sequenced) external view returns (uint256) {
-        NonceTracker memory nonceTracker = nonceTrackers[account];
-
-        if (sequenced) {
-            return nonceTracker.lastUsedSeqNonce + 1;
-        } else {
-            uint256 n;
-            uint256 bitmap256;
-            do {
-                unchecked {
-                    ++n;
-                }
-                // Async bitmaps start at index 1. I.e. accounts start with bitmap 0 = HighestFullAsyncBitmap
-                bytes32 bitmapKey = keccak256(abi.encode(account, nonceTracker.highestFullAsyncBitmap + n));
-                NonceBitmap memory nonceBitmap = nonceBitmaps[bitmapKey];
-                bitmap256 = uint256(nonceBitmap.bitmap);
-            } while (bitmap256 == FULL_BITMAP);
-
-            uint256 remainder = _getFirstUnusedNonceInBitmap(bitmap256);
-            return ((nonceTracker.highestFullAsyncBitmap + n - 1) * 240) + remainder;
-        }
-    }
-
-    /// @notice Manually updates the highestFullAsyncBitmap of an account to reflect the real full bitmap.
-    /// @dev Only the owner of the account whose nonce tracker is being updated can call this function.
-    /// @param account The address of the account for which to update the highestFullAsyncBitmap.
-    function manuallyUpdateNonceTracker(address account) external {
-        if (msg.sender != account) revert AtlasErrors.OnlyAccount();
-
-        NonceTracker memory nonceTracker = nonceTrackers[account];
-        NonceBitmap memory nonceBitmap;
-
-        // Checks the next 10 bitmaps for a higher full bitmap
-        uint128 nonceIndexToCheck = nonceTracker.highestFullAsyncBitmap + 10;
-        for (; nonceIndexToCheck > nonceTracker.highestFullAsyncBitmap; nonceIndexToCheck--) {
-            bytes32 bitmapKey = keccak256(abi.encode(account, nonceIndexToCheck));
-            nonceBitmap = nonceBitmaps[bitmapKey];
-
-            if (nonceBitmap.bitmap == FULL_BITMAP) {
-                nonceTracker.highestFullAsyncBitmap = nonceIndexToCheck;
-                break;
-            }
-        }
-
-        nonceTrackers[account] = nonceTracker;
-    }
-
-    /// @notice Checks if a nonce is used in a 256-bit bitmap.
-    /// @dev Only accurate for nonces 1 - 240 within a 256-bit bitmap.
-    /// @param bitmap The 256-bit bitmap to check.
-    /// @param nonce The nonce to check.
-    /// @return A boolean indicating if the nonce is used in the bitmap.
-    function _nonceUsedInBitmap(uint256 bitmap, uint256 nonce) internal pure returns (bool) {
-        return (bitmap & (1 << nonce)) != 0;
-    }
-
-    /// @notice Returns the first unused nonce in a 256-bit bitmap.
-    /// @dev Finds the first unused nonce within a given 240-bit bitmap, checking 16 bits and then 4 bits at a time for
-    /// efficiency.
-    /// @param bitmap A uint256 where the first 240 bits are used to represent the used/unused status of nonces.
-    /// @return The 1-indexed position of the first unused nonce within the bitmap, or 0 if all nonces represented by
-    /// the bitmap are used.
-    function _getFirstUnusedNonceInBitmap(uint256 bitmap) internal pure returns (uint256) {
-        // Check the 240-bit bitmap, 16 bits at a time, if a 16 bit chunk is not full.
-        // Then check the located 16-bit chunk, 4 bits at a time, for an unused 4-bit chunk.
-        // Then loop normally from the start of the 4-bit chunk to find the first unused bit.
-
-        for (uint256 i = 0; i < 240; i += 16) {
-            // Isolate the next 16 bits to check
-            uint256 chunk16 = (bitmap >> i) & FIRST_16_BITS_FULL;
-            // Find non-full 16-bit chunk
-            if (chunk16 != FIRST_16_BITS_FULL) {
-                for (uint256 j = 0; j < 16; j += 4) {
-                    // Isolate the next 4 bits within the 16-bit chunk to check
-                    uint256 chunk4 = (chunk16 >> j) & FIRST_4_BITS_FULL;
-                    // Find non-full 4-bit chunk
-                    if (chunk4 != FIRST_4_BITS_FULL) {
-                        for (uint256 k = 0; k < 4; k++) {
-                            // Find first unused bit
-                            if ((chunk4 >> k) & 0x1 == 0) {
-                                // Returns 1-indexed nonce
-                                return i + j + k + 1;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        return 0;
-    }
-}
-
-// FROM ETH-INFINITISM REPO:
-// https://github.com/eth-infinitism/account-abstraction/blob/develop/contracts/interfaces/IAccount.sol
-
-interface IAccount {
-    /**
-     * Validate user's signature and nonce
-     * the entryPoint will make the call to the recipient only if this validation call returns successfully.
-     * signature failure should be reported by returning SIG_VALIDATION_FAILED (1).
-     * This allows making a "simulation call" without a valid signature
-     * Other failures (e.g. nonce mismatch, or invalid signature format) should still revert to signal failure.
-     *
-     * @dev Must validate caller is the entryPoint.
-     *      Must validate the signature and nonce
-     * @param userOp              - The operation that is about to be executed.
-     * @param userOpHash          - Hash of the user's request data. can be used as the basis for signature.
-     * @param missingAccountFunds - Missing funds on the account's deposit in the entrypoint.
-     *                              This is the minimum amount to transfer to the sender(entryPoint) to be
-     *                              able to make the call. The excess is left as a deposit in the entrypoint
-     *                              for future calls. Can be withdrawn anytime using "entryPoint.withdrawTo()".
-     *                              In case there is a paymaster in the request (or the current deposit is high
-     *                              enough), this value will be zero.
-     * @return validationData       - Packaged ValidationData structure. use `_packValidationData` and
-     *                              `_unpackValidationData` to encode and decode.
-     *                              <20-byte> sigAuthorizer - 0 for valid signature, 1 to mark signature failure,
-     *                                 otherwise, an address of an "authorizer" contract.
-     *                              <6-byte> validUntil - Last timestamp this operation is valid. 0 for "indefinite"
-     *                              <6-byte> validAfter - First timestamp this operation is valid
-     *                                                    If an account doesn't use time-range, it is enough to
-     *                                                    return SIG_VALIDATION_FAILED value (1) for signature failure.
-     *                              Note that the validation code cannot use block.timestamp (or block.number) directly.
-     */
-    function validateUserOp(
-        UserOperation calldata userOp,
-        bytes32 userOpHash,
-        uint256 missingAccountFunds
+    function _getUserOperationHash(
+        UserOperation memory userOp,
+        bool trusted
     )
-        external
-        returns (uint256 validationData);
+        internal
+        view
+        returns (bytes32 userOpHash)
+    {
+        if (trusted) {
+            userOpHash = _hashTypedDataV4(
+                keccak256(
+                    abi.encode(
+                        USER_TYPEHASH_TRUSTED,
+                        userOp.from,
+                        userOp.to,
+                        userOp.dapp,
+                        userOp.control,
+                        userOp.callConfig,
+                        userOp.sessionKey
+                    )
+                )
+            );
+        } else {
+            userOpHash = _hashTypedDataV4(
+                keccak256(
+                    abi.encode(
+                        USER_TYPEHASH_DEFAULT,
+                        userOp.from,
+                        userOp.to,
+                        userOp.value,
+                        userOp.gas,
+                        userOp.maxFeePerGas,
+                        userOp.nonce,
+                        userOp.deadline,
+                        userOp.dapp,
+                        userOp.control,
+                        userOp.callConfig,
+                        userOp.sessionKey,
+                        userOp.data
+                    )
+                )
+            );
+        }
+    }
 }

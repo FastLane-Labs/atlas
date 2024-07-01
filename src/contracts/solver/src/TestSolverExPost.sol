@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import { SolverBase } from "../SolverBase.sol";
 
@@ -29,36 +30,36 @@ contract SolverExPost is SolverBase, BlindBackrun {
     }
 
     function atlasSolverCall(
-        address sender,
+        address solverOpFrom,
+        address executionEnvironment,
         address bidToken,
         uint256 bidAmount,
         bytes calldata solverOpData,
-        bytes calldata extraReturnData
+        bytes calldata
     )
         external
         payable
         override(SolverBase)
-        safetyFirst(sender)
-        findAndPayBids(bidToken, bidAmount)
-        returns (bool success, bytes memory data)
+        safetyFirst(executionEnvironment, solverOpFrom)
+        findAndPayBids(executionEnvironment, bidToken, bidAmount)
     {
-        (success, data) = address(this).call{ value: msg.value }(solverOpData);
+        (bool success,) = address(this).call{ value: msg.value }(solverOpData);
 
         require(success, "CALL UNSUCCESSFUL");
     }
 
-    modifier findAndPayBids(address bidToken, uint256 bidAmount) {
+    modifier findAndPayBids(address executionEnvironment, address bidToken, uint256 bidAmount) {
         // Track starting balances
 
         // Starting Balance
         uint256 balance =
-            bidToken == address(0) ? address(this).balance - msg.value : ERC20(bidToken).balanceOf(address(this));
+            bidToken == address(0) ? address(this).balance - msg.value : IERC20(bidToken).balanceOf(address(this));
 
         _;
 
         // Calculate profit
         balance = (
-            bidToken == address(0) ? address(this).balance - msg.value : ERC20(bidToken).balanceOf(address(this))
+            bidToken == address(0) ? address(this).balance - msg.value : IERC20(bidToken).balanceOf(address(this))
         ) - balance;
 
         // Handle bid payment
@@ -76,7 +77,7 @@ contract SolverExPost is SolverBase, BlindBackrun {
                 IWETH9(WETH_ADDRESS).withdraw(ethOwed - address(this).balance);
             }
 
-            SafeTransferLib.safeTransferETH(msg.sender, ethOwed);
+            SafeTransferLib.safeTransferETH(executionEnvironment, ethOwed);
         } else {
             // ERC20 balance
 
@@ -85,9 +86,9 @@ contract SolverExPost is SolverBase, BlindBackrun {
             }
 
             if (bidAmount == 0) {
-                SafeTransferLib.safeTransfer(ERC20(bidToken), msg.sender, (balance * _bidPayPercent / 100));
+                SafeTransferLib.safeTransfer(bidToken, executionEnvironment, (balance * _bidPayPercent / 100));
             } else {
-                SafeTransferLib.safeTransfer(ERC20(bidToken), msg.sender, bidAmount);
+                SafeTransferLib.safeTransfer(bidToken, executionEnvironment, bidAmount);
             }
         }
     }

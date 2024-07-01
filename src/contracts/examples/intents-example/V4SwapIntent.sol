@@ -2,18 +2,19 @@
 pragma solidity ^0.8.16;
 
 // Base Imports
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Base Imports
-import { IEscrow } from "../../interfaces/IEscrow.sol";
+import { IAtlas } from "../../interfaces/IAtlas.sol";
 
-import { CallConfig } from "../../types/DAppApprovalTypes.sol";
-import "../../types/UserCallTypes.sol";
-import "../../types/SolverCallTypes.sol";
+import { CallConfig } from "../../types/ConfigTypes.sol";
+import "../../types/UserOperation.sol";
+import "../../types/SolverOperation.sol";
 import "../../types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
-import { DAppControl } from "../../dapp/DAppControl.sol";
+import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 
 import "forge-std/Test.sol";
 
@@ -26,9 +27,7 @@ struct SwapData {
     address recipient;
 }
 
-contract V4SwapIntentController is DAppControl {
-    using SafeTransferLib for ERC20;
-
+contract V4SwapIntentControl is DAppControl {
     address immutable V4_POOL; // TODO: set for test v4 pool
 
     uint256 startingBalance; // Balance tracked for the v4 pool
@@ -41,8 +40,8 @@ contract V4SwapIntentController is DAppControl {
             _atlas,
             msg.sender,
             CallConfig({
-                userNoncesSequenced: false,
-                dappNoncesSequenced: false,
+                userNoncesSequential: false,
+                dappNoncesSequential: false,
                 requirePreOps: false,
                 trackPreOpsReturnData: false,
                 trackUserReturnData: true,
@@ -60,7 +59,8 @@ contract V4SwapIntentController is DAppControl {
                 requireFulfillment: true,
                 trustedOpHash: false,
                 invertBidValue: false,
-                exPostBids: false
+                exPostBids: false,
+                allowAllocateValueFailure: false
             })
         )
     {
@@ -72,21 +72,20 @@ contract V4SwapIntentController is DAppControl {
     //////////////////////////////////
 
     modifier verifyCall(address tokenIn, address tokenOut, uint256 amount) {
-        require(msg.sender == atlas, "ERR-PI002 InvalidSender");
-        require(_addressPointer() == CONTROL, "ERR-PI003 InvalidLockState");
+        require(msg.sender == ATLAS, "ERR-PI002 InvalidSender");
         require(address(this) != CONTROL, "ERR-PI004 MustBeDelegated");
 
         address user = _user();
 
         // TODO: Could maintain a balance of "1" of each token to allow the user to save gas over multiple uses
-        uint256 tokenInBalance = ERC20(tokenIn).balanceOf(address(this));
+        uint256 tokenInBalance = IERC20(tokenIn).balanceOf(address(this));
         if (tokenInBalance > 0) {
-            ERC20(tokenIn).safeTransfer(user, tokenInBalance);
+            SafeTransferLib.safeTransfer(tokenIn, user, tokenInBalance);
         }
 
-        uint256 tokenOutBalance = ERC20(tokenOut).balanceOf(address(this));
+        uint256 tokenOutBalance = IERC20(tokenOut).balanceOf(address(this));
         if (tokenOutBalance > 0) {
-            ERC20(tokenOut).safeTransfer(user, tokenOutBalance);
+            SafeTransferLib.safeTransfer(tokenOut, user, tokenOutBalance);
         }
 
         require(_availableFundsERC20(tokenIn, user, amount, ExecutionPhase.PreSolver), "ERR-PI059 SellFundsUnavailable");
@@ -153,17 +152,10 @@ contract V4SwapIntentController is DAppControl {
     //   ATLAS OVERRIDE FUNCTIONS   //
     //////////////////////////////////
 
-    function _preSolverCall(
-        SolverOperation calldata solverOp,
-        bytes calldata returnData
-    )
-        internal
-        override
-        returns (bool)
-    {
+    function _preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
         address solverTo = solverOp.solver;
-        if (solverTo == address(this) || solverTo == _control() || solverTo == atlas) {
-            return false;
+        if (solverTo == address(this) || solverTo == _control() || solverTo == ATLAS) {
+            revert();
         }
 
         SwapData memory swapData = abi.decode(returnData, (SwapData));
@@ -171,11 +163,11 @@ contract V4SwapIntentController is DAppControl {
         // Record balance and transfer to the solver
         if (swapData.requestedAmount > 0) {
             // exact input
-            startingBalance = ERC20(swapData.tokenIn).balanceOf(V4_POOL);
+            startingBalance = IERC20(swapData.tokenIn).balanceOf(V4_POOL);
             _transferUserERC20(swapData.tokenIn, solverTo, uint256(swapData.requestedAmount));
         } else {
             // exact output
-            startingBalance = ERC20(swapData.tokenOut).balanceOf(V4_POOL);
+            startingBalance = IERC20(swapData.tokenOut).balanceOf(V4_POOL);
             _transferUserERC20(swapData.tokenIn, solverTo, swapData.limitAmount - solverOp.bidAmount);
             // For exact output swaps, the solver solvers compete and bid on how much tokens they can
             // return to the user in excess of their specified limit input. We only transfer what they
@@ -184,21 +176,13 @@ contract V4SwapIntentController is DAppControl {
 
         // TODO: Permit69 is currently enabled during solver phase, but there is low conviction that this
         // does not enable an attack vector. Consider enabling to save gas on a transfer?
-        return true;
     }
 
     // Checking intent was fulfilled, and user has received their tokens, happens here
-    function _postSolverCall(
-        SolverOperation calldata solverOp,
-        bytes calldata returnData
-    )
-        internal
-        override
-        returns (bool)
-    {
+    function _postSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
         SwapData memory swapData = abi.decode(returnData, (SwapData));
 
-        uint256 buyTokenBalance = ERC20(swapData.tokenOut).balanceOf(address(this));
+        uint256 buyTokenBalance = IERC20(swapData.tokenOut).balanceOf(address(this));
         uint256 amountUserBuys =
             swapData.requestedAmount > 0 ? swapData.limitAmount : uint256(-swapData.requestedAmount);
 
@@ -208,20 +192,20 @@ contract V4SwapIntentController is DAppControl {
         // c) PoolManager's balances increased by the provided input amount
         if (swapData.requestedAmount > 0) {
             if (buyTokenBalance < swapData.limitAmount) {
-                return false; // insufficient amount out
+                revert(); // insufficient amount out
             }
             if (buyTokenBalance < solverOp.bidAmount) {
-                return false; // does not meet solver bid
+                revert(); // does not meet solver bid
             }
-            uint256 endingBalance = ERC20(swapData.tokenIn).balanceOf(V4_POOL);
+            uint256 endingBalance = IERC20(swapData.tokenIn).balanceOf(V4_POOL);
             if ((endingBalance - startingBalance) < uint256(swapData.requestedAmount)) {
-                return false; // pool manager balances did not increase by the provided input amount
+                revert(); // pool manager balances did not increase by the provided input amount
             }
         } else {
             // Exact output swap - check the output amount was transferred out by pool
-            uint256 endingBalance = ERC20(swapData.tokenOut).balanceOf(V4_POOL);
+            uint256 endingBalance = IERC20(swapData.tokenOut).balanceOf(V4_POOL);
             if ((startingBalance - endingBalance) < amountUserBuys) {
-                return false; // pool manager balances did not decrease by the provided output amount
+                revert(); // pool manager balances did not decrease by the provided output amount
             }
         }
         // no need to check for exact output, since the max is whatever the user transferred
@@ -232,14 +216,14 @@ contract V4SwapIntentController is DAppControl {
             address auctionBaseCurrency = swapData.requestedAmount > 0 ? swapData.tokenOut : swapData.tokenIn;
 
             if (swapData.tokenOut != auctionBaseCurrency) {
-                ERC20(swapData.tokenOut).safeTransfer(swapData.recipient, buyTokenBalance);
+                SafeTransferLib.safeTransfer(swapData.tokenOut, swapData.recipient, buyTokenBalance);
             } else {
-                ERC20(swapData.tokenOut).safeTransfer(swapData.recipient, amountUserBuys);
+                SafeTransferLib.safeTransfer(swapData.tokenOut, swapData.recipient, amountUserBuys);
             }
-            return true;
-        } else {
-            return false;
+            return; // only success case of this hook
         }
+
+        revert();
     }
 
     // This occurs after a Solver has successfully paid their bid, which is
@@ -249,7 +233,7 @@ contract V4SwapIntentController is DAppControl {
         // address(this) = ExecutionEnvironment
         // msg.sender = Atlas
         if (bidToken != address(0)) {
-            ERC20(bidToken).safeTransfer(_user(), bidAmount);
+            SafeTransferLib.safeTransfer(bidToken, _user(), bidAmount);
         } else {
             SafeTransferLib.safeTransferETH(_user(), address(this).balance);
         }

@@ -2,16 +2,17 @@
 pragma solidity 0.8.22;
 
 // Base Imports
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Base Imports
-import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
+import { IAtlas } from "../../interfaces/IAtlas.sol";
 import { SafetyBits } from "../../libraries/SafetyBits.sol";
 
-import { CallConfig } from "../../types/DAppApprovalTypes.sol";
-import "../../types/SolverCallTypes.sol";
-import "../../types/UserCallTypes.sol";
-import "../../types/DAppApprovalTypes.sol";
+import { CallConfig } from "../../types/ConfigTypes.sol";
+import "../../types/SolverOperation.sol";
+import "../../types/UserOperation.sol";
+import "../../types/ConfigTypes.sol";
 import "../../types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
@@ -55,8 +56,8 @@ contract V4DAppControl is DAppControl {
             _atlas,
             msg.sender,
             CallConfig({
-                userNoncesSequenced: false,
-                dappNoncesSequenced: false,
+                userNoncesSequential: false,
+                dappNoncesSequential: false,
                 requirePreOps: true,
                 trackPreOpsReturnData: true,
                 trackUserReturnData: false,
@@ -74,7 +75,8 @@ contract V4DAppControl is DAppControl {
                 requireFulfillment: true,
                 trustedOpHash: false,
                 invertBidValue: false,
-                exPostBids: false
+                exPostBids: false,
+                allowAllocateValueFailure: false
             })
         )
     {
@@ -86,21 +88,25 @@ contract V4DAppControl is DAppControl {
     //                   ATLAS CALLS                       //
     /////////////////////////////////////////////////////////
 
+    function _checkUserOperation(UserOperation memory userOp) internal view {
+        require(bytes4(userOp.data) == SWAP, "ERR-H10 InvalidFunction");
+        require(userOp.dapp == v4Singleton, "ERR-H11 InvalidTo"); // this is wrong
+    }
+
     /////////////// DELEGATED CALLS //////////////////
     function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory preOpsData) {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Atlas Escrow
 
+        // check if dapps using this DAppControl can handle the userOp
+        _checkUserOperation(userOp);
+
         require(!_currentKey.initialized, "ERR-H09 AlreadyInitialized");
-
-        require(bytes4(userOp.data) == SWAP, "ERR-H10 InvalidFunction");
-
-        require(userOp.dapp == v4Singleton, "ERR-H11 InvalidTo"); // this is wrong
 
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that DAppControl supplied a valid signature
-        require(msg.sender == atlas, "ERR-H00 InvalidCaller");
+        require(msg.sender == ATLAS, "ERR-H00 InvalidCaller");
 
         (IPoolManager.PoolKey memory key, IPoolManager.SwapParams memory params) =
             abi.decode(userOp.data[4:], (IPoolManager.PoolKey, IPoolManager.SwapParams));
@@ -132,7 +138,7 @@ contract V4DAppControl is DAppControl {
                 // Buying Pool's token1 with amountSpecified of User's token0
                 // ERC20(token0).approve(v4Singleton, amountSpecified);
                 SafeTransferLib.safeTransferFrom(
-                    ERC20(IPoolManager.Currency.unwrap(key.currency0)),
+                    IPoolManager.Currency.unwrap(key.currency0),
                     userOp.from,
                     v4Singleton, // <- TODO: confirm
                     uint256(params.amountSpecified)
@@ -203,13 +209,11 @@ contract V4DAppControl is DAppControl {
         // address(this) = hook
         // msg.sender = ExecutionEnvironment
 
-        EscrowKey memory escrowKey = ISafetyLocks(atlas).getLockState();
-
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that DAppControl supplied a valid signature
         require(address(this) == hook, "ERR-H00 InvalidCallee");
-        require(hook == escrowKey.addressPointer, "ERR-H01 InvalidCaller");
-        require(escrowKey.lockState == SafetyBits._LOCKED_X_PRE_OPS_X_UNSET, "ERR-H02 InvalidLockStage");
+        require(hook == _control(), "ERR-H01 InvalidCaller");
+        require(IAtlas(ATLAS).phase() == ExecutionPhase.PreOps, "ERR-H02 InvalidLockStage");
         require(hashLock == bytes32(0), "ERR-H03 AlreadyActive");
 
         // Set the storage lock to block reentry / concurrent trading
@@ -221,13 +225,11 @@ contract V4DAppControl is DAppControl {
         // address(this) = hook
         // msg.sender = ExecutionEnvironment
 
-        EscrowKey memory escrowKey = ISafetyLocks(atlas).getLockState();
-
         // Verify that the swapper went through the FastLane Atlas MEV Auction
         // and that DAppControl supplied a valid signature
         require(address(this) == hook, "ERR-H20 InvalidCallee");
-        require(hook == escrowKey.addressPointer, "ERR-H21 InvalidCaller");
-        require(escrowKey.lockState == SafetyBits._LOCKED_X_VERIFICATION_X_UNSET, "ERR-H22 InvalidLockStage");
+        require(hook == _control(), "ERR-H21 InvalidCaller");
+        require(IAtlas(ATLAS).phase() == ExecutionPhase.PostOps, "ERR-H22 InvalidLockStage");
         require(hashLock == keccak256(abi.encode(key, msg.sender)), "ERR-H23 InvalidKey");
 
         // Release the storage lock

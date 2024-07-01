@@ -1,20 +1,14 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { IDAppControl } from "../interfaces/IDAppControl.sol";
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/ConfigTypes.sol";
 
-import "../types/SolverCallTypes.sol";
-import "../types/UserCallTypes.sol";
-import "../types/DAppApprovalTypes.sol";
+import { CallBits } from "src/contracts/libraries/CallBits.sol";
 
 library CallVerification {
-    function getUserOperationHash(UserOperation memory userOp) internal pure returns (bytes32 userOpHash) {
-        userOpHash = keccak256(abi.encode(userOp));
-    }
-
-    function getAltOperationHash(UserOperation memory userOp) internal pure returns (bytes32 altOpHash) {
-        altOpHash = keccak256(abi.encodePacked(userOp.from, userOp.to, userOp.dapp, userOp.control, userOp.sessionKey));
-    }
+    using CallBits for uint32;
 
     function getCallChainHash(
         DAppConfig memory dConfig,
@@ -25,42 +19,15 @@ library CallVerification {
         pure
         returns (bytes32 callSequenceHash)
     {
-        uint256 i;
-        if (dConfig.callConfig & 1 << uint32(CallConfigIndex.RequirePreOps) != 0) {
+        bytes memory callSequence;
+
+        if (dConfig.callConfig.needsPreOpsCall()) {
             // Start with preOps call if preOps is needed
-            callSequenceHash = keccak256(
-                abi.encodePacked(
-                    callSequenceHash, // initial hash = null
-                    dConfig.to,
-                    abi.encodeWithSelector(IDAppControl.preOpsCall.selector, userOp),
-                    i++
-                )
-            );
+            callSequence = abi.encodePacked(dConfig.to);
         }
 
-        // then user call
-        callSequenceHash = keccak256(
-            abi.encodePacked(
-                callSequenceHash, // always reference previous hash
-                abi.encode(userOp),
-                i++
-            )
-        );
-
-        // then solver calls
-        uint256 count = solverOps.length;
-        uint256 n;
-        for (; n < count;) {
-            callSequenceHash = keccak256(
-                abi.encodePacked(
-                    callSequenceHash, // reference previous hash
-                    abi.encode(solverOps[n]), // solver op
-                    i++
-                )
-            );
-            unchecked {
-                ++n;
-            }
-        }
+        // Then user and solver call
+        callSequence = abi.encodePacked(callSequence, abi.encode(userOp), abi.encode(solverOps));
+        callSequenceHash = keccak256(callSequence);
     }
 }

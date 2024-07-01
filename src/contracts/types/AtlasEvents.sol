@@ -6,7 +6,8 @@ contract AtlasEvents {
     event MetacallResult(
         address indexed bundler,
         address indexed user,
-        address indexed winningSolver,
+        bool solverSuccessful,
+        bool disbursementSuccessful,
         uint256 ethPaidToBundler,
         uint256 netGasSurcharge
     );
@@ -37,13 +38,13 @@ contract AtlasEvents {
 
     // DAppIntegration events
     event NewDAppSignatory(
-        address indexed controller, address indexed governance, address indexed signatory, uint32 callConfig
+        address indexed control, address indexed governance, address indexed signatory, uint32 callConfig
     );
     event RemovedDAppSignatory(
-        address indexed controller, address indexed governance, address indexed signatory, uint32 callConfig
+        address indexed control, address indexed governance, address indexed signatory, uint32 callConfig
     );
     event DAppGovernanceChanged(
-        address indexed controller, address indexed oldGovernance, address indexed newGovernance, uint32 callConfig
+        address indexed control, address indexed oldGovernance, address indexed newGovernance, uint32 callConfig
     );
-    event DAppDisabled(address indexed controller, address indexed governance, uint32 callConfig);
+    event DAppDisabled(address indexed control, address indexed governance, uint32 callConfig);
 }

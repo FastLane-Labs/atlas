@@ -2,13 +2,14 @@
 pragma solidity 0.8.22;
 
 // Base Imports
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Imports
 import { DAppControl } from "../../dapp/DAppControl.sol";
-import { CallConfig } from "../../types/DAppApprovalTypes.sol";
-import "../../types/UserCallTypes.sol";
-import "../../types/SolverCallTypes.sol";
+import { CallConfig } from "../../types/ConfigTypes.sol";
+import "../../types/UserOperation.sol";
+import "../../types/SolverOperation.sol";
 
 // Uniswap Imports
 import { IUniswapV2Router01, IUniswapV2Router02 } from "./interfaces/IUniswapV2Router.sol";
@@ -41,8 +42,8 @@ contract V2RewardDAppControl is DAppControl {
             _atlas,
             msg.sender,
             CallConfig({
-                userNoncesSequenced: false,
-                dappNoncesSequenced: false,
+                userNoncesSequential: false,
+                dappNoncesSequential: false,
                 requirePreOps: true,
                 trackPreOpsReturnData: true,
                 trackUserReturnData: false,
@@ -60,7 +61,8 @@ contract V2RewardDAppControl is DAppControl {
                 requireFulfillment: false,
                 trustedOpHash: true,
                 invertBidValue: false,
-                exPostBids: true
+                exPostBids: true,
+                allowAllocateValueFailure: false
             })
         )
     {
@@ -128,6 +130,11 @@ contract V2RewardDAppControl is DAppControl {
     //                     Atlas hooks                      //
     // ---------------------------------------------------- //
 
+    function _checkUserOperation(UserOperation memory userOp) internal view {
+        // User is only allowed to call UniswapV2Router02
+        require(userOp.dapp == uniswapV2Router02, "V2RewardDAppControl: InvalidDestination");
+    }
+
     /*
     * @notice This function is called before the user's call to UniswapV2Router02
     * @dev This function is delegatecalled: msg.sender = Atlas, address(this) = ExecutionEnvironment
@@ -138,8 +145,8 @@ contract V2RewardDAppControl is DAppControl {
         _postOpsCall hook to refund leftover dust, if any
     */
     function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory) {
-        // User is only allowed to call UniswapV2Router02
-        require(userOp.dapp == uniswapV2Router02, "V2RewardDAppControl: InvalidDestination");
+        // check if dapps using this DAppControl can handle the userOp
+        _checkUserOperation(userOp);
 
         // The current hook is delegatecalled, so we need to call the userOp.control to access the mappings
         (address tokenSold, uint256 amountSold) = V2RewardDAppControl(userOp.control).getTokenSold(userOp.data);
@@ -149,7 +156,7 @@ contract V2RewardDAppControl is DAppControl {
             _transferUserERC20(tokenSold, address(this), amountSold);
 
             // Approve UniswapV2Router02 to spend the tokens from ExecutionEnvironment
-            SafeTransferLib.safeApprove(ERC20(tokenSold), uniswapV2Router02, amountSold);
+            SafeTransferLib.safeApprove(tokenSold, uniswapV2Router02, amountSold);
         }
 
         // Return tokenSold for the _postOpsCall hook to be able to refund dust
@@ -176,7 +183,7 @@ contract V2RewardDAppControl is DAppControl {
         if (bidToken == address(0)) {
             SafeTransferLib.safeTransferETH(user, bidAmount);
         } else {
-            SafeTransferLib.safeTransfer(ERC20(REWARD_TOKEN), user, bidAmount);
+            SafeTransferLib.safeTransfer(REWARD_TOKEN, user, bidAmount);
         }
 
         emit TokensRewarded(user, REWARD_TOKEN, bidAmount);
@@ -202,9 +209,9 @@ contract V2RewardDAppControl is DAppControl {
                 SafeTransferLib.safeTransferETH(_user(), balance);
             }
         } else {
-            balance = ERC20(tokenSold).balanceOf(address(this));
+            balance = IERC20(tokenSold).balanceOf(address(this));
             if (balance > 0) {
-                SafeTransferLib.safeTransfer(ERC20(tokenSold), _user(), balance);
+                SafeTransferLib.safeTransfer(tokenSold, _user(), balance);
             }
         }
 

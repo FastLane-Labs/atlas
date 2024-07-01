@@ -2,7 +2,7 @@
 pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
-import { Mimic } from "src/contracts/atlas/Mimic.sol";
+import { Mimic } from "src/contracts/common/Mimic.sol";
 
 contract MimicTest is Test {
     function testMimicDelegatecall() public {
@@ -16,8 +16,7 @@ contract MimicTest is Test {
             passedData,
             address(0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB),
             address(0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC),
-            uint32(0x22222222),
-            bytes32(uint256(0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee))
+            uint32(0x22222222)
         ));
         (bool success, bytes memory data) = address(mimic).call(passedData);
         assertEq(success, true);

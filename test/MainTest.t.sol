@@ -1,23 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-import { IDAppIntegration } from "src/contracts/interfaces/IDAppIntegration.sol";
 import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
-import { Mimic } from "src/contracts/atlas/Mimic.sol";
+import { Mimic } from "src/contracts/common/Mimic.sol";
 
 import { V2DAppControl } from "src/contracts/examples/v2-example/V2DAppControl.sol";
 
 import { Solver } from "src/contracts/solver/src/TestSolver.sol";
 
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/SolverOperation.sol";
 import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
-import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { V2Helper } from "./V2Helper.sol";
@@ -102,12 +103,12 @@ contract MainTest is BaseTest {
 
         console.log("userEOA", userEOA);
         console.log("atlas", address(atlas));
-        console.log("control", address(control));
+        console.log("v2DAppControl", address(v2DAppControl));
         console.log("executionEnvironment", executionEnvironment);
 
         // User must approve Atlas
-        ERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
-        ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
+        IERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
+        IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
 
         vm.stopPrank();
 
@@ -321,16 +322,16 @@ contract MainTest is BaseTest {
         */
 
         vm.startPrank(userEOA);
-        atlas.createExecutionEnvironment(address(control));
-        address newEnvironment = atlas.createExecutionEnvironment(address(control));
+        atlas.createExecutionEnvironment(address(v2DAppControl));
+        address newEnvironment = atlas.createExecutionEnvironment(address(v2DAppControl));
         vm.stopPrank();
 
         assertTrue(IExecutionEnvironment(newEnvironment).getUser() == userEOA, "Mimic Error - User Mismatch");
         assertTrue(
-            IExecutionEnvironment(newEnvironment).getControl() == address(control), "Mimic Error - Control Mismatch"
+            IExecutionEnvironment(newEnvironment).getControl() == address(v2DAppControl), "Mimic Error - Control Mismatch"
         );
         assertTrue(
-            IExecutionEnvironment(newEnvironment).getConfig() == control.CALL_CONFIG(),
+            IExecutionEnvironment(newEnvironment).getConfig() == v2DAppControl.CALL_CONFIG(),
             "Mimic Error - CallConfig Mismatch"
         );
         assertTrue(
@@ -361,16 +362,16 @@ contract MainTest is BaseTest {
         dAppOp.signature = abi.encodePacked(r, s, v);
 
         // Execution environment should not exist yet
-        (,, bool exists) = atlas.getExecutionEnvironment(userEOA, address(control));
+        (,, bool exists) = atlas.getExecutionEnvironment(userEOA, address(v2DAppControl));
         assertFalse(exists, "ExecutionEnvironment already exists");
 
         vm.startPrank(userEOA);
-        ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
+        IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
         atlas.metacall(userOp, solverOps, dAppOp);
         vm.stopPrank();
 
         // Execution environment should exist now
-        (,, exists) = atlas.getExecutionEnvironment(userEOA, address(control));
+        (,, exists) = atlas.getExecutionEnvironment(userEOA, address(v2DAppControl));
         assertTrue(exists, "ExecutionEnvironment wasn't created");
     }
 
@@ -391,7 +392,7 @@ contract MainTest is BaseTest {
         assertFalse(simResult, "metasimUserOperationcall tested true");
 
         // Success case
-        ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
+        IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
 
         (simResult,,) = simulator.simUserOperation(userOp);
         assertTrue(simResult, "metasimUserOperationcall tested false");
@@ -429,7 +430,7 @@ contract MainTest is BaseTest {
         dAppOp.signature = abi.encodePacked(r, s, v);
         vm.startPrank(userEOA);
         atlas.createExecutionEnvironment(userOp.control);
-        ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
+        IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
         (bool success, bytes memory data) = address(simulator).call(
             abi.encodeWithSelector(simulator.simSolverCalls.selector, userOp, solverOps, dAppOp)
         );

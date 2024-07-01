@@ -1,20 +1,23 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { IAtlETH } from "../interfaces/IAtlETH.sol";
+import { IAtlas } from "../interfaces/IAtlas.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { CallVerification } from "../libraries/CallVerification.sol";
+import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
+import { AtlasConstants } from "../types/AtlasConstants.sol";
 
-import "../types/SolverCallTypes.sol";
-import "../types/UserCallTypes.sol";
-import "../types/DAppApprovalTypes.sol";
+import "../types/SolverOperation.sol";
+import "../types/UserOperation.sol";
+import "../types/ConfigTypes.sol";
 
-contract Sorter {
+contract Sorter is AtlasConstants {
     using CallBits for uint32;
     using CallVerification for UserOperation;
 
-    address public immutable atlas;
+    IAtlas public immutable ATLAS;
+    IAtlasVerification public immutable VERIFICATION;
 
     struct SortingData {
         uint256 amount;
@@ -22,7 +25,8 @@ contract Sorter {
     }
 
     constructor(address _atlas) {
-        atlas = _atlas;
+        ATLAS = IAtlas(_atlas);
+        VERIFICATION = IAtlasVerification(ATLAS.VERIFICATION());
     }
 
     function sortBids(
@@ -41,16 +45,11 @@ contract Sorter {
 
         uint256[] memory sorted = _sort(sortingData, count, invalid);
 
-        SolverOperation[] memory solverOpsSorted = new SolverOperation[](count - invalid);
-
         count -= invalid;
-        uint256 i = 0;
+        SolverOperation[] memory solverOpsSorted = new SolverOperation[](count);
 
-        for (; i < count;) {
+        for (uint256 i; i < count; ++i) {
             solverOpsSorted[i] = solverOps[sorted[i]];
-            unchecked {
-                ++i;
-            }
         }
 
         return solverOpsSorted;
@@ -60,6 +59,10 @@ contract Sorter {
         return solverOp.bidToken == bidToken;
     }
 
+    /// @dev Verifies that the solver is eligible
+    /// @dev Does not check solver signature as it might be trusted (solverOp.from == bundler)
+    /// @dev Checks other than signature are same as those done in `verifySolverOp()` in AtlasVerification and
+    /// `_validateSolverOpGas()` and `_validateSolverOpDeadline()` in Atlas
     function _verifySolverEligibility(
         DAppConfig memory dConfig,
         UserOperation calldata userOp,
@@ -69,27 +72,26 @@ contract Sorter {
         view
         returns (bool)
     {
-        // Verify that the solver submitted the correct userOpHash
-        bytes32 userOpHash;
+        // Make sure the solver has enough funds bonded
+        uint256 solverBalance = IAtlas(address(ATLAS)).balanceOfBonded(solverOp.from);
+        uint256 gasLimit = _SOLVER_GAS_LIMIT_SCALE
+            * (solverOp.gas < dConfig.solverGasLimit ? solverOp.gas : dConfig.solverGasLimit)
+            / (_SOLVER_GAS_LIMIT_SCALE + _SOLVER_GAS_LIMIT_BUFFER_PERCENTAGE) + _FASTLANE_GAS_BUFFER;
 
-        if (dConfig.callConfig.allowsTrustedOpHash()) {
-            userOpHash = userOp.getAltOperationHash();
-        } else {
-            userOpHash = userOp.getUserOperationHash();
-        }
-
-        if (solverOp.userOpHash != userOpHash) {
+        uint256 calldataCost =
+            (solverOp.data.length + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM * solverOp.maxFeePerGas;
+        uint256 gasCost = (solverOp.maxFeePerGas * gasLimit) + calldataCost;
+        if (solverBalance < gasCost) {
             return false;
         }
 
-        // Make sure the solver has enough funds bonded
-        uint256 solverBalance = IAtlETH(atlas).balanceOfBonded(solverOp.from);
-        if (solverBalance < solverOp.maxFeePerGas * solverOp.gas) {
+        // solverOp.to must be the atlas address
+        if (solverOp.to != address(ATLAS)) {
             return false;
         }
 
         // Solvers can only do one tx per block - this prevents double counting bonded balances
-        uint256 solverLastActiveBlock = IAtlETH(atlas).accountLastActiveBlock(solverOp.from);
+        uint256 solverLastActiveBlock = IAtlas(address(ATLAS)).accountLastActiveBlock(solverOp.from);
         if (solverLastActiveBlock >= block.number) {
             return false;
         }
@@ -101,6 +103,16 @@ contract Sorter {
 
         // Make sure that the solver's maxFeePerGas matches or exceeds the user's
         if (solverOp.maxFeePerGas < userOp.maxFeePerGas) {
+            return false;
+        }
+
+        // solverOp.solver must not be the atlas or verification address
+        if (solverOp.solver == address(ATLAS) || solverOp.solver == address(VERIFICATION)) {
+            return false;
+        }
+
+        // solverOp.deadline must be in the future
+        if (solverOp.deadline != 0 && block.number > solverOp.deadline) {
             return false;
         }
 
@@ -121,10 +133,14 @@ contract Sorter {
 
         SortingData[] memory sortingData = new SortingData[](count);
 
-        uint256 i;
+        bytes32 userOpHash = VERIFICATION.getUserOperationHash(userOp);
+
         uint256 invalid;
-        for (; i < count;) {
-            if (_verifyBidFormat(bidToken, solverOps[i]) && _verifySolverEligibility(dConfig, userOp, solverOps[i])) {
+        for (uint256 i; i < count; ++i) {
+            if (
+                solverOps[i].userOpHash == userOpHash && _verifyBidFormat(bidToken, solverOps[i])
+                    && _verifySolverEligibility(dConfig, userOp, solverOps[i])
+            ) {
                 sortingData[i] =
                     SortingData({ amount: IDAppControl(dConfig.to).getBidValue(solverOps[i]), valid: true });
             } else {
@@ -132,9 +148,6 @@ contract Sorter {
                 unchecked {
                     ++invalid;
                 }
-            }
-            unchecked {
-                ++i;
             }
         }
 
@@ -155,30 +168,27 @@ contract Sorter {
             return sorted;
         }
 
-        uint256 topBidAmount;
-        uint256 topBidIndex;
-        uint256 i;
-        uint256 j;
+        int256 topBidAmount;
+        int256 topBidIndex;
 
-        for (; i < sorted.length;) {
-            topBidAmount = 0;
-            topBidIndex = 0;
+        for (uint256 i; i < sorted.length; ++i) {
+            topBidAmount = -1;
+            topBidIndex = -1;
 
-            for (j = 0; j < count;) {
-                if (sortingData[j].valid && sortingData[j].amount >= topBidAmount) {
-                    topBidAmount = sortingData[j].amount;
-                    topBidIndex = j;
-                }
-                unchecked {
-                    ++j;
+            for (uint256 j; j < count; ++j) {
+                if (sortingData[j].valid && int256(sortingData[j].amount) > topBidAmount) {
+                    topBidAmount = int256(sortingData[j].amount);
+                    topBidIndex = int256(j);
                 }
             }
 
-            sortingData[topBidIndex].valid = false;
-            sorted[i] = topBidIndex;
-            unchecked {
-                ++i;
+            if (topBidIndex == -1) {
+                // all indices in sorting data are invalid
+                break;
             }
+
+            sortingData[uint256(topBidIndex)].valid = false;
+            sorted[i] = uint256(topBidIndex);
         }
 
         return sorted;

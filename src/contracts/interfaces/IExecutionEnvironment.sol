@@ -1,9 +1,10 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import "../types/SolverCallTypes.sol";
-import "../types/UserCallTypes.sol";
-import "../types/DAppApprovalTypes.sol";
+import "../types/SolverOperation.sol";
+import "../types/UserOperation.sol";
+import "../types/ConfigTypes.sol";
+import "../types/EscrowTypes.sol";
 
 interface IExecutionEnvironment {
     function preOpsWrapper(UserOperation calldata userOp) external returns (bytes memory preOpsData);
@@ -12,14 +13,21 @@ interface IExecutionEnvironment {
 
     function postOpsWrapper(bool solved, bytes calldata returnData) external;
 
-    function solverMetaTryCatch(
+    function solverPreTryCatch(
         uint256 bidAmount,
-        uint256 gasLimit,
         SolverOperation calldata solverOp,
-        bytes calldata dAppReturnData
+        bytes calldata returnData
     )
         external
-        payable;
+        returns (SolverTracker memory solverTracker);
+
+    function solverPostTryCatch(
+        SolverOperation calldata solverOp,
+        bytes calldata returnData,
+        SolverTracker memory solverTracker
+    )
+        external
+        returns (SolverTracker memory);
 
     function allocateValue(address bidToken, uint256 bidAmount, bytes memory returnData) external;
 

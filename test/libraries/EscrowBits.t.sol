@@ -10,9 +10,9 @@ import "../base/TestUtils.sol";
 contract EscrowBitsTest is Test {
     using EscrowBits for uint256;
 
-    function testConstants() public {
+    function testConstants() public pure {
         string memory expectedBitMapString =
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000111111";
+            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001111111";
         assertEq(
             TestUtils.uint256ToBinaryString(EscrowBits._NO_REFUND),
             expectedBitMapString,
@@ -20,7 +20,7 @@ contract EscrowBitsTest is Test {
         );
 
         expectedBitMapString =
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000011111111000000";
+            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001111111110000000";
         assertEq(
             TestUtils.uint256ToBinaryString(EscrowBits._PARTIAL_REFUND),
             expectedBitMapString,
@@ -28,19 +28,19 @@ contract EscrowBitsTest is Test {
         );
 
         expectedBitMapString =
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000011111100000000000000";
+            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001111110000000000000000";
         assertEq(
             TestUtils.uint256ToBinaryString(EscrowBits._FULL_REFUND), expectedBitMapString, "_FULL_REFUND incorrect"
         );
     }
 
-    function testLogEscrowConstants() public {
+    function testLogEscrowConstants() public view {
         console.log("EscrowBits._NO_REFUND", EscrowBits._NO_REFUND);
         console.log("EscrowBits._NO_REFUND", EscrowBits._PARTIAL_REFUND);
         console.log("EscrowBits._NO_REFUND", EscrowBits._FULL_REFUND);
     }
 
-    function testCanExecute() public {
+    function testCanExecute() public pure {
         uint256 valid = 0;
         assertEq(valid.canExecute(), true);
 
@@ -50,7 +50,7 @@ contract EscrowBitsTest is Test {
         assertEq(invalid.canExecute(), false);
     }
 
-    function testExecutionSuccessful() public {
+    function testExecutionSuccessful() public pure {
         uint256 valid = 0;
         assertEq(valid.executionSuccessful(), true);
 
@@ -72,8 +72,6 @@ contract EscrowBitsTest is Test {
         assertEq(invalid.executionSuccessful(), false);
         invalid = 1 << uint256(SolverOutcome.BidNotPaid);
         assertEq(invalid.executionSuccessful(), false);
-        invalid = 1 << uint256(SolverOutcome.IntentUnfulfilled);
-        assertEq(invalid.executionSuccessful(), false);
         invalid = 1 << uint256(SolverOutcome.PreSolverFailed);
         assertEq(invalid.executionSuccessful(), false);
         invalid = 1 << uint256(SolverOutcome.CallValueTooHigh);
@@ -82,18 +80,18 @@ contract EscrowBitsTest is Test {
         assertEq(invalid.executionSuccessful(), false);
     }
 
-    function testExecutedWithError() public {
+    function testExecutedWithError() public pure {
         uint256 valid = 1 << uint256(SolverOutcome.SolverOpReverted);
         assertEq(valid.executedWithError(), true);
         valid = 1 << uint256(SolverOutcome.BidNotPaid);
         assertEq(valid.executedWithError(), true);
         valid = 1 << uint256(SolverOutcome.CallValueTooHigh);
         assertEq(valid.executedWithError(), false);
-        valid = 1 << uint256(SolverOutcome.IntentUnfulfilled);
-        assertEq(valid.executedWithError(), true);
         valid = 1 << uint256(SolverOutcome.PreSolverFailed);
         assertEq(valid.executedWithError(), false);
         valid = 1 << uint256(SolverOutcome.BalanceNotReconciled);
+        assertEq(valid.executedWithError(), true);
+        valid = 1 << uint256(SolverOutcome.CallbackNotCalled);
         assertEq(valid.executedWithError(), true);
         valid = 1 << uint256(SolverOutcome.EVMError);
         assertEq(valid.executedWithError(), true);
@@ -116,7 +114,7 @@ contract EscrowBitsTest is Test {
         assertEq(invalid.executedWithError(), false);
     }
 
-    function testUpdateEscrow() public {
+    function testUpdateEscrow() public pure {
         uint256 valid = 0;
         assertEq(valid.updateEscrow(), true);
         valid = 1 << uint256(SolverOutcome.UserOutOfGas);
@@ -128,8 +126,6 @@ contract EscrowBitsTest is Test {
         valid = 1 << uint256(SolverOutcome.SolverOpReverted);
         assertEq(valid.updateEscrow(), true);
         valid = 1 << uint256(SolverOutcome.BidNotPaid);
-        assertEq(valid.updateEscrow(), true);
-        valid = 1 << uint256(SolverOutcome.IntentUnfulfilled);
         assertEq(valid.updateEscrow(), true);
         valid = 1 << uint256(SolverOutcome.PreSolverFailed);
         assertEq(valid.updateEscrow(), true);

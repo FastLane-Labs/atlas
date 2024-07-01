@@ -4,7 +4,7 @@ pragma solidity 0.8.22;
 import "forge-std/Test.sol";
 
 import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
-import "src/contracts/types/UserCallTypes.sol";
+import "src/contracts/types/UserOperation.sol";
 import "../base/TestUtils.sol";
 
 contract CallVerificationTest is Test {
@@ -21,6 +21,7 @@ contract CallVerificationTest is Test {
             value: 90,
             dapp: address(0x2),
             control: address(0x3),
+            callConfig: 321,
             sessionKey: address(0),
             data: "data",
             signature: "signature"
@@ -45,15 +46,7 @@ contract CallVerificationTest is Test {
         });
     }
 
-    function testGetUserCallHash() public {
-        this._testGetUserCallHash(buildUserOperation());
-    }
-
-    function _testGetUserCallHash(UserOperation calldata userOp) external {
-        assertEq(userOp.getUserOperationHash(), keccak256(abi.encode(userOp)));
-    }
-
-    function testGetCallChainHash() public {
+    function testGetCallChainHash() public view {
         DAppConfig memory dConfig = DAppConfig({ to: address(0x1), callConfig: 1, bidToken: address(0), solverGasLimit: 1_000_000 });
         UserOperation memory userOp = buildUserOperation();
         SolverOperation[] memory solverOps = new SolverOperation[](2);
@@ -67,7 +60,7 @@ contract CallVerificationTest is Test {
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps
     )
-        external
+        external pure
     {
         bytes32 callChainHash = CallVerification.getCallChainHash(dConfig, userOp, solverOps);
         assertEq(

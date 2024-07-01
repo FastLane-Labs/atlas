@@ -3,9 +3,11 @@ pragma solidity 0.8.22;
 
 import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 
-import "src/contracts/types/DAppApprovalTypes.sol";
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/SolverOperation.sol";
+
+import "forge-std/Test.sol";
 
 library CallConfigBuilder {
     function allFalseCallConfig() internal pure returns (CallConfig memory) { }
@@ -46,42 +48,22 @@ contract DummyDAppControl is DAppControl {
         return true;
     }
 
-    function _preSolverCall(
-        SolverOperation calldata,
-        bytes calldata returnData
-    )
-        internal
-        pure
-        virtual
-        override
-        returns (bool)
-    {
+    function _preSolverCall(SolverOperation calldata, bytes calldata returnData) internal view virtual override {
         if (returnData.length == 0) {
-            return true;
+            return;
         }
 
-        (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
+        (bool shouldRevert) = abi.decode(returnData, (bool));
         require(!shouldRevert, "_preSolverCall revert requested");
-        return returnValue;
     }
 
-    function _postSolverCall(
-        SolverOperation calldata,
-        bytes calldata returnData
-    )
-        internal
-        pure
-        virtual
-        override
-        returns (bool)
-    {
+    function _postSolverCall(SolverOperation calldata, bytes calldata returnData) internal pure virtual override {
         if (returnData.length == 0) {
-            return true;
+            return;
         }
 
-        (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
+        (bool shouldRevert) = abi.decode(returnData, (bool));
         require(!shouldRevert, "_postSolverCall revert requested");
-        return returnValue;
     }
 
     function _allocateValueCall(

@@ -1,14 +1,15 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { GasAccounting } from "src/contracts/atlas/GasAccounting.sol";
 
 import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "src/contracts/libraries/SafetyBits.sol";
 import "src/contracts/types/LockTypes.sol";
 import "src/contracts/types/EscrowTypes.sol";
 
-// NOTE: IPermit69 only works inside of the Atlas environment - specifically
+// NOTE: Permit69 only works inside of the Atlas environment - specifically
 // inside of the custom ExecutionEnvironments that each user deploys when
 // interacting with Atlas in a manner controlled by the DeFi dApp.
 
@@ -23,15 +24,13 @@ import "src/contracts/types/EscrowTypes.sol";
 /// @notice Permit69 manages ERC20 approvals and transfers between Atlas and Execution Environment contracts during
 /// metacall transactions.
 abstract contract Permit69 is GasAccounting {
-    using SafeTransferLib for ERC20;
-
     constructor(
-        uint256 _escrowDuration,
-        address _verification,
-        address _simulator,
-        address _surchargeRecipient
+        uint256 escrowDuration,
+        address verification,
+        address simulator,
+        address initialSurchargeRecipient
     )
-        GasAccounting(_escrowDuration, _verification, _simulator, _surchargeRecipient)
+        GasAccounting(escrowDuration, verification, simulator, initialSurchargeRecipient)
     { }
 
     /// @notice Verifies that the caller is an authorized Execution Environment contract.
@@ -39,10 +38,20 @@ abstract contract Permit69 is GasAccounting {
     /// controlled by the current DAppControl contract. It helps prevent unauthorized access and ensures that
     /// token transfers are performed within the context of Atlas's controlled environment. The implementation of this
     /// function can be found in Atlas.sol
+    /// @param environment ExecutionEnvironment address
     /// @param user The address of the user invoking the function.
-    /// @param controller The address of the current DAppControl contract.
+    /// @param control The address of the current DAppControl contract.
     /// @param callConfig The CallConfig of the DAppControl contract of the current transaction.
-    function _verifyCallerIsExecutionEnv(address user, address controller, uint32 callConfig) internal virtual { }
+    function _verifyUserControlExecutionEnv(
+        address environment,
+        address user,
+        address control,
+        uint32 callConfig
+    )
+        internal
+        virtual
+        returns (bool)
+    { }
 
     /// @notice Transfers ERC20 tokens from a user to a destination address, only callable by the expected Execution
     /// Environment.
@@ -50,30 +59,21 @@ abstract contract Permit69 is GasAccounting {
     /// @param destination The address to which the tokens will be transferred.
     /// @param amount The amount of tokens to transfer.
     /// @param user The address of the user invoking the function.
-    /// @param controller The address of the current DAppControl contract.
-    /// @param callConfig The CallConfig of the current DAppControl contract.
-    /// @param lockState The lock state indicating the safe execution phase for the token transfer.
+    /// @param control The address of the current DAppControl contract.
     function transferUserERC20(
         address token,
         address destination,
         uint256 amount,
         address user,
-        address controller,
-        uint32 callConfig,
-        uint16 lockState
+        address control
     )
         external
     {
-        // Verify that the caller is legitimate
-        // NOTE: Use the *current* DAppControl's codehash to help mitigate social engineering bamboozles if, for
-        // example, a DAO is having internal issues.
-        _verifyCallerIsExecutionEnv(user, controller, callConfig);
-
-        // Verify the lock state
-        _verifyLockState({ lockState: lockState, safeExecutionPhaseSet: SAFE_USER_TRANSFER });
+        // Validate that the transfer is legitimate
+        _validateTransfer({ user: user, control: control, safeExecutionPhaseSet: SAFE_USER_TRANSFER });
 
         // Transfer token
-        ERC20(token).safeTransferFrom(user, destination, amount);
+        SafeTransferLib.safeTransferFrom(token, user, destination, amount);
     }
 
     /// @notice Transfers ERC20 tokens from the DAppControl contract to a destination address, only callable by the
@@ -82,35 +82,42 @@ abstract contract Permit69 is GasAccounting {
     /// @param destination The address to which the tokens will be transferred.
     /// @param amount The amount of tokens to transfer.
     /// @param user The address of the user invoking the function.
-    /// @param controller The address of the current DAppControl contract.
-    /// @param callConfig The CallConfig of the current DAppControl contract.
-    /// @param lockState The lock state indicating the safe execution phase for the token transfer.
+    /// @param control The address of the current DAppControl contract.
     function transferDAppERC20(
         address token,
         address destination,
         uint256 amount,
         address user,
-        address controller,
-        uint32 callConfig,
-        uint16 lockState
+        address control
     )
         external
     {
-        // Verify that the caller is legitimate
-        _verifyCallerIsExecutionEnv(user, controller, callConfig);
-
-        // Verify the lock state
-        _verifyLockState({ lockState: lockState, safeExecutionPhaseSet: SAFE_DAPP_TRANSFER });
+        // Validate that the transfer is legitimate
+        _validateTransfer({ user: user, control: control, safeExecutionPhaseSet: SAFE_DAPP_TRANSFER });
 
         // Transfer token
-        ERC20(token).safeTransferFrom(controller, destination, amount);
+        SafeTransferLib.safeTransferFrom(token, control, destination, amount);
     }
 
     /// @notice Verifies whether the lock state allows execution in the specified safe execution phase.
-    /// @param lockState The lock state to be checked.
+    /// @param user The address of the user invoking the function.
+    /// @param control The address of the current DAppControl contract.
     /// @param safeExecutionPhaseSet The set of safe execution phases.
-    function _verifyLockState(uint16 lockState, uint16 safeExecutionPhaseSet) internal pure {
-        if (lockState & safeExecutionPhaseSet == 0) {
+    function _validateTransfer(address user, address control, uint8 safeExecutionPhaseSet) internal {
+        Lock memory _lock = T_lock;
+
+        // Verify that the ExecutionEnvironment's context is correct.
+        if (_lock.activeEnvironment != msg.sender) {
+            revert InvalidEnvironment();
+        }
+
+        // Verify that the given user and control are the owners of this ExecutionEnvironment
+        if (!_verifyUserControlExecutionEnv(msg.sender, user, control, _lock.callConfig)) {
+            revert EnvironmentMismatch();
+        }
+
+        // Verify that the current phase allows for transfers
+        if (1 << uint8(_lock.phase) & safeExecutionPhaseSet == 0) {
             revert InvalidLockState();
         }
     }

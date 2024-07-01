@@ -5,24 +5,24 @@ import "forge-std/Test.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { MockSafetyLocks } from "./SafetyLocks.t.sol";
 
-import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
+import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
 import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 
-import { IFactory } from "src/contracts/interfaces/IFactory.sol";
-import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
 import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 
 import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
-import { ERC20 } from "solmate/tokens/ERC20.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
-import "src/contracts/types/DAppApprovalTypes.sol";
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/SolverOperation.sol";
 import "src/contracts/types/LockTypes.sol";
+import "src/contracts/types/EscrowTypes.sol";
 
 import "src/contracts/libraries/CallBits.sol";
 
@@ -31,12 +31,12 @@ import "src/contracts/libraries/CallBits.sol";
 /// Non covered parts are explicitly mentioned in the comments, with the reason it couldn't be covered.
 contract ExecutionEnvironmentTest is BaseTest {
     using stdStorage for StdStorage;
-    using SafetyBits for EscrowKey;
+    using SafetyBits for Context;
 
     ExecutionEnvironment public executionEnvironment;
     MockDAppControl public dAppControl;
 
-    EscrowKey public escrowKey;
+    Context public ctx;
 
     address public governance = makeAddr("governance");
     address public user = makeAddr("user");
@@ -92,7 +92,7 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         vm.prank(user);
         executionEnvironment =
-            ExecutionEnvironment(payable(IFactory(address(atlas)).createExecutionEnvironment(address(dAppControl))));
+            ExecutionEnvironment(payable(IAtlas(address(atlas)).createExecutionEnvironment(address(dAppControl))));
     }
 
     function test_modifier_validUser() public {
@@ -103,9 +103,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         // Valid
         userOp.from = user;
         userOp.to = address(atlas);
-        escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
-        preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
+        preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps));
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(preOpsData);
         assertTrue(status);
@@ -113,24 +112,20 @@ contract ExecutionEnvironmentTest is BaseTest {
         // InvalidUser
         userOp.from = invalid; // Invalid from
         userOp.to = address(atlas);
-        escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
-        preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
+        preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps));
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-CE02 InvalidUser"));
+        vm.expectRevert(AtlasErrors.InvalidUser.selector);
         (status,) = address(executionEnvironment).call(preOpsData);
-        assertTrue(status, "expectRevert ERR-CE02 InvalidUser: call did not revert");
 
         // InvalidTo
         userOp.from = user;
         userOp.to = invalid; // Invalid to
-        escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
-        preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
+        preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps));
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EV007 InvalidTo"));
+        vm.expectRevert(AtlasErrors.InvalidTo.selector);
         (status,) = address(executionEnvironment).call(preOpsData);
-        assertTrue(status, "expectRevert ERR-EV007 InvalidTo: call did not revert");
     }
 
     function test_modifier_onlyAtlasEnvironment() public {
@@ -142,34 +137,19 @@ contract ExecutionEnvironmentTest is BaseTest {
         userOp.to = address(atlas);
 
         // Valid
-        escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
-        preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
+        preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps));
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(preOpsData);
         assertTrue(status);
 
         // InvalidSender
-        escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
-        preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
+        preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps));
         vm.prank(address(0)); // Invalid sender
         vm.expectRevert(AtlasErrors.OnlyAtlas.selector);
         (status,) = address(executionEnvironment).call(preOpsData);
         assertTrue(status, "expectRevert OnlyAtlas: call did not revert");
-
-        // WrongPhase
-        escrowKey = escrowKey.holdUserLock(address(dAppControl)); // Invalid lock state
-        preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
-        preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
-        vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.WrongPhase.selector);
-        (status,) = address(executionEnvironment).call(preOpsData);
-        assertTrue(status, "expectRevert WrongPhase: call did not revert");
-
-        // NotDelegated and WrongDepth
-        // Can't be reached with this setup.
-        // Tests for Base contract (where this modifier is defined) should cover those reverts.
     }
 
     function test_modifier_validControlHash() public {
@@ -181,9 +161,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         userOp.to = address(atlas);
 
         // Valid
-        escrowKey = escrowKey.holdUserLock(address(dAppControl));
         userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
-        userData = abi.encodePacked(userData, escrowKey.pack());
+        userData = abi.encodePacked(userData, ctx.setAndPack(ExecutionPhase.UserOperation));
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(userData);
         assertTrue(status);
@@ -192,44 +171,11 @@ contract ExecutionEnvironmentTest is BaseTest {
         // Alter the code hash of the control contract
         vm.etch(address(dAppControl), address(atlas).code);
 
-        escrowKey = escrowKey.holdUserLock(address(dAppControl));
         userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
-        userData = abi.encodePacked(userData, escrowKey.pack());
+        userData = abi.encodePacked(userData, ctx.setAndPack(ExecutionPhase.UserOperation));
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EV008 InvalidCodeHash"));
+        vm.expectRevert(AtlasErrors.InvalidCodeHash.selector);
         (status,) = address(executionEnvironment).call(userData);
-        assertTrue(status, "expectRevert ERR-EV008 InvalidCodeHash: call did not revert");
-    }
-
-    function test_modifier_contributeSurplus() public {
-        UserOperation memory userOp;
-        bytes memory userData;
-        bool status;
-
-        userOp.from = user;
-        userOp.to = address(atlas);
-
-        // The following 2 lines change Atlas' storage values in order to make the test succeed.
-        // lock and deposits values are normally initialized in the _initializeEscrowLock function,
-        // but we can't call it in the current setup.
-        // Any changes in the Storage contract could make this test fail, feel free to skip it until
-        // the contract's layout is finalized.
-
-        // Set lock address to the execution environment
-        vm.store(address(atlas), bytes32(lockSlot), bytes32(uint256(uint160(address(executionEnvironment)))));
-        // Set deposits to 0
-        vm.store(address(atlas), bytes32(depositsSlot), bytes32(uint256(0)));
-
-        uint256 depositsBefore = atlas.deposits();
-        uint256 surplusAmount = 50_000;
-
-        escrowKey = escrowKey.holdUserLock(address(dAppControl));
-        userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
-        userData = abi.encodePacked(userData, escrowKey.pack());
-        vm.prank(address(atlas));
-        (status,) = address(executionEnvironment).call{ value: surplusAmount }(userData);
-        assertTrue(status);
-        assertEq(atlas.deposits(), depositsBefore + surplusAmount);
     }
 
     function test_preOpsWrapper() public {
@@ -245,9 +191,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         // Valid
         uint256 expectedReturnValue = 123;
         userOp.data = abi.encodeWithSelector(dAppControl.mockOperation.selector, false, expectedReturnValue);
-        escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
-        preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
+        preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps));
         vm.prank(address(atlas));
         (status, data) = address(executionEnvironment).call(preOpsData);
         assertTrue(status);
@@ -255,13 +200,11 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // DelegateRevert
         userOp.data = abi.encodeWithSelector(dAppControl.mockOperation.selector, true, uint256(0));
-        escrowKey = escrowKey.holdPreOpsLock(address(dAppControl));
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
-        preOpsData = abi.encodePacked(preOpsData, escrowKey.pack());
+        preOpsData = abi.encodePacked(preOpsData, ctx.setAndPack(ExecutionPhase.PreOps));
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC02 DelegateRevert"));
+        vm.expectRevert(AtlasErrors.PreOpsDelegatecallFail.selector);
         (status,) = address(executionEnvironment).call(preOpsData);
-        assertTrue(status, "expectRevert ERR-EC02 DelegateRevert: call did not revert");
     }
 
     function test_userWrapper() public {
@@ -277,21 +220,18 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // ValueExceedsBalance
         userOp.value = 1; // Positive value but EE has no balance
-        escrowKey = escrowKey.holdUserLock(address(dAppControl));
         userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
-        userData = abi.encodePacked(userData, escrowKey.pack());
+        userData = abi.encodePacked(userData, ctx.setAndPack(ExecutionPhase.UserOperation));
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-CE01 ValueExceedsBalance"));
+        vm.expectRevert(AtlasErrors.UserOpValueExceedsBalance.selector);
         (status,) = address(executionEnvironment).call(userData);
-        assertTrue(status, "expectRevert ERR-CE01 ValueExceedsBalance: call did not revert");
         userOp.value = 0;
 
         // Valid (needsDelegateUser=false)
         expectedReturnValue = 987;
         userOp.data = abi.encodeWithSelector(dAppControl.mockOperation.selector, false, expectedReturnValue);
-        escrowKey = escrowKey.holdUserLock(address(dAppControl));
         userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
-        userData = abi.encodePacked(userData, escrowKey.pack());
+        userData = abi.encodePacked(userData, ctx.setAndPack(ExecutionPhase.UserOperation));
         vm.prank(address(atlas));
         (status, data) = address(executionEnvironment).call(userData);
         assertTrue(status);
@@ -299,13 +239,11 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // CallRevert (needsDelegateUser=false)
         userOp.data = abi.encodeWithSelector(dAppControl.mockOperation.selector, true, 0);
-        escrowKey = escrowKey.holdUserLock(address(dAppControl));
         userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
-        userData = abi.encodePacked(userData, escrowKey.pack());
+        userData = abi.encodePacked(userData, ctx.setAndPack(ExecutionPhase.UserOperation));
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC04a CallRevert"));
+        vm.expectRevert(AtlasErrors.UserWrapperCallFail.selector);
         (status,) = address(executionEnvironment).call(userData);
-        assertTrue(status, "expectRevert ERR-EC04a CallRevert: call did not revert");
 
         // Change of config
         callConfig.delegateUser = true;
@@ -315,9 +253,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         // Valid (needsDelegateUser=true)
         expectedReturnValue = 277;
         userOp.data = abi.encodeWithSelector(dAppControl.mockOperation.selector, false, expectedReturnValue);
-        escrowKey = escrowKey.holdUserLock(address(dAppControl));
         userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
-        userData = abi.encodePacked(userData, escrowKey.pack());
+        userData = abi.encodePacked(userData, ctx.setAndPack(ExecutionPhase.UserOperation));
         vm.prank(address(atlas));
         (status, data) = address(executionEnvironment).call(userData);
         assertTrue(status);
@@ -325,13 +262,11 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // DelegateRevert (needsDelegateUser=true)
         userOp.data = abi.encodeWithSelector(dAppControl.mockOperation.selector, true, 0);
-        escrowKey = escrowKey.holdUserLock(address(dAppControl));
         userData = abi.encodeWithSelector(executionEnvironment.userWrapper.selector, userOp);
-        userData = abi.encodePacked(userData, escrowKey.pack());
+        userData = abi.encodePacked(userData, ctx.setAndPack(ExecutionPhase.UserOperation));
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC02 DelegateRevert"));
+        vm.expectRevert(AtlasErrors.UserWrapperDelegatecallFail.selector);
         (status,) = address(executionEnvironment).call(userData);
-        assertTrue(status, "expectRevert ERR-EC02 DelegateRevert: call did not revert");
     }
 
     function test_postOpsWrapper() public {
@@ -339,40 +274,35 @@ contract ExecutionEnvironmentTest is BaseTest {
         bool status;
 
         // Valid
-        escrowKey.addressPointer = address(dAppControl);
-        escrowKey.callCount = 4;
-        escrowKey = escrowKey.holdPostOpsLock();
+        ctx.solverCount = 4;
+        ctx.solverIndex = ctx.solverCount - 1;
         postOpsData =
             abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, false, abi.encode(false, true));
-        postOpsData = abi.encodePacked(postOpsData, escrowKey.pack());
+        postOpsData = abi.encodePacked(postOpsData, ctx.setAndPack(ExecutionPhase.PostOps));
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(postOpsData);
         assertTrue(status);
 
         // DelegateRevert
-        escrowKey = escrowKey.holdPostOpsLock();
         postOpsData =
             abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, false, abi.encode(true, false));
-        postOpsData = abi.encodePacked(postOpsData, escrowKey.pack());
+        postOpsData = abi.encodePacked(postOpsData, ctx.setAndPack(ExecutionPhase.PostOps));
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC02 DelegateRevert"));
+        vm.expectRevert(AtlasErrors.PostOpsDelegatecallFail.selector);
         (status,) = address(executionEnvironment).call(postOpsData);
-        assertTrue(status, "expectRevert ERR-EC02 DelegateRevert: call did not revert");
 
         // DelegateUnsuccessful
-        escrowKey = escrowKey.holdPostOpsLock();
         postOpsData =
             abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, false, abi.encode(false, false));
-        postOpsData = abi.encodePacked(postOpsData, escrowKey.pack());
+        postOpsData = abi.encodePacked(postOpsData, ctx.setAndPack(ExecutionPhase.PostOps));
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC03a DelegateUnsuccessful"));
+        vm.expectRevert(AtlasErrors.PostOpsDelegatecallReturnedFalse.selector);
         (status,) = address(executionEnvironment).call(postOpsData);
-        assertTrue(status, "expectRevert ERR-EC03a DelegateUnsuccessful: call did not revert");
     }
 
-    function test_solverMetaTryCatch() public {
-        bytes memory solverMetaData;
-        bool status;
+    function test_solverPreTryCatch() public {
+        bytes memory preTryCatchMetaData;
+        bool revertsAsExpected;
 
         vm.prank(solver);
         MockSolverContract solverContract = new MockSolverContract(chain.weth, address(atlas));
@@ -382,84 +312,37 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverOp.control = address(dAppControl);
         solverOp.solver = address(solverContract);
 
-        uint256 solverGasLimit = 1_000_000;
-
-        // IncorrectValue
-        _setLocks();
-        solverOp.value = 1; // Positive value but EE has no balance
-        escrowKey = escrowKey.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0)
+        // Valid
+        preTryCatchMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverPreTryCatch.selector, solverOp.bidAmount, solverOp, new bytes(0)
         );
-        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        preTryCatchMetaData = abi.encodePacked(preTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-CE05 IncorrectValue"));
-        (status,) = address(executionEnvironment).call(solverMetaData);
-        assertTrue(status, "expectRevert ERR-CE05 IncorrectValue: call did not revert");
-        solverOp.value = 0;
-        _unsetLocks();
+        (bool status,) = address(executionEnvironment).call(preTryCatchMetaData);
+        assertTrue(status, "solverPreTryCatch failed");
+
+        // InvalidSolver
+        solverOp.solver = address(executionEnvironment); // Invalid solver
+        preTryCatchMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverPreTryCatch.selector, solverOp.bidAmount, solverOp, new bytes(0)
+        );
+        preTryCatchMetaData = abi.encodePacked(preTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
+        vm.prank(address(atlas));
+        vm.expectRevert(AtlasErrors.InvalidSolver.selector);
+        (revertsAsExpected,) = address(executionEnvironment).call(preTryCatchMetaData);
+        assertTrue(revertsAsExpected, "expectRevert InvalidSolver: call did not revert");
 
         // AlteredControl
-        _setLocks();
+        solverOp.solver = address(solverContract);
         solverOp.control = invalid; // Invalid control
-        escrowKey = escrowKey.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0)
+        preTryCatchMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverPreTryCatch.selector, solverOp.bidAmount, solverOp, new bytes(0)
         );
-        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        preTryCatchMetaData = abi.encodePacked(preTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.AlteredControl.selector);
-        (status,) = address(executionEnvironment).call(solverMetaData);
-        assertTrue(status, "expectRevert AlteredControl: call did not revert");
-        solverOp.control = address(dAppControl);
-        _unsetLocks();
-
-        // SolverOperationReverted
-        _setLocks();
-        solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, true);
-        escrowKey = escrowKey.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0)
-        );
-        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
-        vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.SolverOperationReverted.selector);
-        (status,) = address(executionEnvironment).call(solverMetaData);
-        assertTrue(status, "expectRevert SolverOperationReverted: call did not revert");
-        _unsetLocks();
-
-        // SolverBidUnpaid
-        _setLocks();
-        solverOp.bidAmount = 1; // Bid won't be paid
-        solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
-        escrowKey = escrowKey.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0)
-        );
-        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
-        vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.SolverBidUnpaid.selector);
-        (status,) = address(executionEnvironment).call(solverMetaData);
-        assertTrue(status, "expectRevert SolverBidUnpaid: call did not revert");
-        solverOp.bidAmount = 0;
-        _unsetLocks();
-
-        // BalanceNotReconciled
-        // Solver's contract does not call reconcile
-        _setLocks();
-        solverContract.setReconcile(false);
-        solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
-        escrowKey = escrowKey.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0)
-        );
-        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
-        vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.BalanceNotReconciled.selector);
-        (status,) = address(executionEnvironment).call(solverMetaData);
-        assertTrue(status, "expectRevert BalanceNotReconciled: call did not revert");
-        solverContract.setReconcile(true);
-        _unsetLocks();
+        (revertsAsExpected,) = address(executionEnvironment).call(preTryCatchMetaData);
+        assertTrue(revertsAsExpected, "expectRevert AlteredControl: call did not revert");
 
         // Change of config
         callConfig.preSolver = true;
@@ -467,130 +350,140 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverOp.control = address(dAppControl);
 
         // PreSolverFailed
-        _setLocks();
-        escrowKey = escrowKey.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector,
-            solverOp.bidAmount,
-            solverGasLimit,
-            solverOp,
-            abi.encode(true, false)
+        bytes memory returnData = abi.encode(true, true);
+        preTryCatchMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverPreTryCatch.selector, solverOp.bidAmount, solverOp, returnData
         );
-        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        preTryCatchMetaData = abi.encodePacked(preTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PreSolverFailed.selector);
-        (status,) = address(executionEnvironment).call(solverMetaData);
-        assertTrue(status, "expectRevert PreSolverFailed: call did not revert");
-        _unsetLocks();
+        (revertsAsExpected,) = address(executionEnvironment).call(preTryCatchMetaData);
+        assertTrue(revertsAsExpected, "expectRevert PreSolverFailed: call did not revert");
+    }
 
-        // PreSolverFailed 2
-        _setLocks();
-        escrowKey = escrowKey.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector,
-            solverOp.bidAmount,
-            solverGasLimit,
-            solverOp,
-            abi.encode(false, false)
+    function test_solverPostTryCatch() public {
+        bytes memory postTryCatchMetaData;
+        bool revertsAsExpected;
+
+        vm.prank(solver);
+        MockSolverContract solverContract = new MockSolverContract(chain.weth, address(atlas));
+
+        SolverTracker memory solverTracker;
+        solverTracker.etherIsBidToken = true;
+
+        SolverOperation memory solverOp;
+        solverOp.from = solver;
+        solverOp.control = address(dAppControl);
+        solverOp.solver = address(solverContract);
+
+        // Valid
+        postTryCatchMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverPostTryCatch.selector, solverOp, new bytes(0), solverTracker
         );
-        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        postTryCatchMetaData = abi.encodePacked(postTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PostSolver));
         vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.PreSolverFailed.selector);
-        (status,) = address(executionEnvironment).call(solverMetaData);
-        assertTrue(status, "expectRevert PreSolverFailed 2: call did not revert");
-        _unsetLocks();
+        (bool status,) = address(executionEnvironment).call(postTryCatchMetaData);
+        assertTrue(status, "solverPostTryCatch failed");
+
+        // BidNotPaid (floor > ceiling)
+        solverTracker.floor = 1;
+        postTryCatchMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverPostTryCatch.selector, solverOp, new bytes(0), solverTracker
+        );
+        postTryCatchMetaData = abi.encodePacked(postTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
+        vm.prank(address(atlas));
+        vm.expectRevert(AtlasErrors.BidNotPaid.selector);
+        (revertsAsExpected,) = address(executionEnvironment).call(postTryCatchMetaData);
+        assertTrue(revertsAsExpected, "expectRevert BidNotPaid: call did not revert");
+
+        // BidNotPaid (!invertsBidValue && netBid < bidAmount)
+        solverTracker.floor = 0;
+        solverTracker.bidAmount = 1;
+        postTryCatchMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverPostTryCatch.selector, solverOp, new bytes(0), solverTracker
+        );
+        postTryCatchMetaData = abi.encodePacked(postTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
+        vm.prank(address(atlas));
+        vm.expectRevert(AtlasErrors.BidNotPaid.selector);
+        (revertsAsExpected,) = address(executionEnvironment).call(postTryCatchMetaData);
+        assertTrue(revertsAsExpected, "expectRevert BidNotPaid: call did not revert");
+
+        // BidNotPaid (invertsBidValue && netBid > bidAmount)
+        solverTracker.invertsBidValue = true;
+        solverTracker.bidAmount = 0;
+        solverTracker.ceiling = 1;
+        postTryCatchMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverPostTryCatch.selector, solverOp, new bytes(0), solverTracker
+        );
+        postTryCatchMetaData = abi.encodePacked(postTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
+        vm.prank(address(atlas));
+        vm.expectRevert(AtlasErrors.BidNotPaid.selector);
+        (revertsAsExpected,) = address(executionEnvironment).call(postTryCatchMetaData);
+        assertTrue(revertsAsExpected, "expectRevert BidNotPaid: call did not revert");
 
         // Change of config
-        callConfig.preSolver = false;
         callConfig.postSolver = true;
         setupDAppControl(callConfig);
         solverOp.control = address(dAppControl);
 
         // PostSolverFailed
-        _setLocks();
-        solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
-        escrowKey = escrowKey.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector,
-            solverOp.bidAmount,
-            solverGasLimit,
-            solverOp,
-            abi.encode(true, false)
+        bytes memory returnData = abi.encode(true, true);
+        postTryCatchMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverPostTryCatch.selector, solverOp, returnData, solverTracker
         );
-        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
+        postTryCatchMetaData = abi.encodePacked(postTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PostSolverFailed.selector);
-        (status,) = address(executionEnvironment).call(solverMetaData);
-        assertTrue(status, "expectRevert PostSolverFailed: call did not revert");
-        _unsetLocks();
-
-        // IntentUnfulfilled
-        _setLocks();
-        solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
-        escrowKey = escrowKey.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector,
-            solverOp.bidAmount,
-            solverGasLimit,
-            solverOp,
-            abi.encode(false, false)
-        );
-        solverMetaData = abi.encodePacked(solverMetaData, escrowKey.pack());
-        vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.IntentUnfulfilled.selector);
-        (status,) = address(executionEnvironment).call(solverMetaData);
-        assertTrue(status, "expectRevert IntentUnfulfilled: call did not revert");
-        _unsetLocks();
+        (revertsAsExpected,) = address(executionEnvironment).call(postTryCatchMetaData);
+        assertTrue(revertsAsExpected, "expectRevert PostSolverFailed: call did not revert");
     }
-
+    
     function test_allocateValue() public {
         bytes memory allocateData;
         bool status;
 
         // Valid
-        escrowKey = escrowKey.holdAllocateValueLock(address(dAppControl));
         allocateData = abi.encodeWithSelector(
             executionEnvironment.allocateValue.selector, address(0), uint256(0), abi.encode(false)
         );
-        allocateData = abi.encodePacked(allocateData, escrowKey.pack());
+        allocateData = abi.encodePacked(allocateData, ctx.setAndPack(ExecutionPhase.AllocateValue));
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(allocateData);
         assertTrue(status);
 
         // DelegateRevert
-        escrowKey = escrowKey.holdAllocateValueLock(address(dAppControl));
         allocateData = abi.encodeWithSelector(
             executionEnvironment.allocateValue.selector, address(0), uint256(0), abi.encode(true)
         );
-        allocateData = abi.encodePacked(allocateData, escrowKey.pack());
+        allocateData = abi.encodePacked(allocateData, ctx.setAndPack(ExecutionPhase.AllocateValue));
         vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC02 DelegateRevert"));
+        vm.expectRevert(AtlasErrors.AllocateValueDelegatecallFail.selector);
         (status,) = address(executionEnvironment).call(allocateData);
-        assertTrue(status, "expectRevert ERR-EC02 DelegateRevert: call did not revert");
     }
+
 
     function test_withdrawERC20() public {
         // Valid
         deal(chain.weth, address(executionEnvironment), 2e18);
-        assertEq(ERC20(chain.weth).balanceOf(address(executionEnvironment)), 2e18);
-        assertEq(ERC20(chain.weth).balanceOf(user), 0);
+        assertEq(IERC20(chain.weth).balanceOf(address(executionEnvironment)), 2e18);
+        assertEq(IERC20(chain.weth).balanceOf(user), 0);
         vm.prank(user);
         executionEnvironment.withdrawERC20(chain.weth, 2e18);
-        assertEq(ERC20(chain.weth).balanceOf(address(executionEnvironment)), 0);
-        assertEq(ERC20(chain.weth).balanceOf(user), 2e18);
+        assertEq(IERC20(chain.weth).balanceOf(address(executionEnvironment)), 0);
+        assertEq(IERC20(chain.weth).balanceOf(user), 2e18);
 
         // NotEnvironmentOwner
         vm.prank(invalid); // Invalid caller
-        vm.expectRevert(bytes("ERR-EC01 NotEnvironmentOwner"));
+        vm.expectRevert(AtlasErrors.NotEnvironmentOwner.selector);
         executionEnvironment.withdrawERC20(chain.weth, 2e18);
 
         // BalanceTooLow
         vm.prank(user);
-        vm.expectRevert(bytes("ERR-EC02 BalanceTooLow"));
+        vm.expectRevert(AtlasErrors.ExecutionEnvironmentBalanceTooLow.selector);
         executionEnvironment.withdrawERC20(chain.weth, 2e18);
 
         // The following line changes an Atlas storage value in order to make the test succeed.
-        // lock value is normally initialized in the _initializeEscrowLock function,
+        // lock value is normally initialized in the _initializeContext function,
         // but we can't call it in the current setup.
         // Any changes in the Storage contract could make this test fail, feel free to comment it until
         // the contract's layout is finalized.
@@ -600,7 +493,7 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // EscrowLocked
         vm.prank(user);
-        vm.expectRevert(bytes("ERR-EC15 EscrowLocked"));
+        vm.expectRevert(AtlasErrors.AtlasLockActive.selector);
         executionEnvironment.withdrawERC20(chain.weth, 2e18);
     }
 
@@ -616,16 +509,16 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // NotEnvironmentOwner
         vm.prank(address(0)); // Invalid caller
-        vm.expectRevert(bytes("ERR-EC01 NotEnvironmentOwner"));
+        vm.expectRevert(AtlasErrors.NotEnvironmentOwner.selector);
         executionEnvironment.withdrawEther(2e18);
 
         // BalanceTooLow
         vm.prank(user);
-        vm.expectRevert(bytes("ERR-EC03 BalanceTooLow"));
+        vm.expectRevert(AtlasErrors.ExecutionEnvironmentBalanceTooLow.selector);
         executionEnvironment.withdrawEther(2e18);
 
         // The following line changes an Atlas storage value in order to make the test succeed.
-        // lock value is normally initialized in the _initializeEscrowLock function,
+        // lock value is normally initialized in the _initializeContext function,
         // but we can't call it in the current setup.
         // Any changes in the Storage contract could make this test fail, feel free to comment it until
         // the contract's layout is finalized.
@@ -635,103 +528,23 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         // EscrowLocked
         vm.prank(user);
-        vm.expectRevert(bytes("ERR-EC15 EscrowLocked"));
+        vm.expectRevert(AtlasErrors.AtlasLockActive.selector);
         executionEnvironment.withdrawEther(2e18);
     }
 
-    function test_factoryWithdrawERC20() public {
-        // Valid
-        deal(chain.weth, address(executionEnvironment), 2e18);
-        assertEq(ERC20(chain.weth).balanceOf(address(executionEnvironment)), 2e18);
-        assertEq(ERC20(chain.weth).balanceOf(user), 0);
-        vm.prank(address(atlas));
-        executionEnvironment.factoryWithdrawERC20(user, chain.weth, 2e18);
-        assertEq(ERC20(chain.weth).balanceOf(address(executionEnvironment)), 0);
-        assertEq(ERC20(chain.weth).balanceOf(user), 2e18);
-
-        // NotFactory
-        vm.prank(invalid); // Invalid caller
-        vm.expectRevert(bytes("ERR-EC10 NotFactory"));
-        executionEnvironment.factoryWithdrawERC20(user, chain.weth, 2e18);
-
-        // NotEnvironmentOwner
-        vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC11 NotEnvironmentOwner"));
-        executionEnvironment.factoryWithdrawERC20(invalid, chain.weth, 2e18); // Invalid user
-
-        // BalanceTooLow
-        vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC02 BalanceTooLow"));
-        executionEnvironment.factoryWithdrawERC20(user, chain.weth, 2e18);
-
-        // The following line changes an Atlas storage value in order to make the test succeed.
-        // lock value is normally initialized in the _initializeEscrowLock function,
-        // but we can't call it in the current setup.
-        // Any changes in the Storage contract could make this test fail, feel free to comment it until
-        // the contract's layout is finalized.
-
-        // Set lock address to the execution environment
-        vm.store(address(atlas), bytes32(lockSlot), bytes32(uint256(uint160(address(executionEnvironment)))));
-
-        // EscrowLocked
-        vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC15 EscrowLocked"));
-        executionEnvironment.factoryWithdrawERC20(user, chain.weth, 2e18);
-    }
-
-    function test_factoryWithdrawEther() public {
-        // Valid
-        deal(address(executionEnvironment), 2e18);
-        assertEq(address(executionEnvironment).balance, 2e18);
-        assertEq(user.balance, 0);
-        vm.prank(address(atlas));
-        executionEnvironment.factoryWithdrawEther(user, 2e18);
-        assertEq(address(executionEnvironment).balance, 0);
-        assertEq(user.balance, 2e18);
-
-        // NotFactory
-        vm.prank(invalid); // Invalid caller
-        vm.expectRevert(bytes("ERR-EC10 NotFactory"));
-        executionEnvironment.factoryWithdrawEther(user, 2e18);
-
-        // NotEnvironmentOwner
-        vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC11 NotEnvironmentOwner"));
-        executionEnvironment.factoryWithdrawEther(invalid, 2e18); // Invalid user
-
-        // BalanceTooLow
-        vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC03 BalanceTooLow"));
-        executionEnvironment.factoryWithdrawEther(user, 2e18);
-
-        // The following line changes an Atlas storage value in order to make the test succeed.
-        // lock value is normally initialized in the _initializeEscrowLock function,
-        // but we can't call it in the current setup.
-        // Any changes in the Storage contract could make this test fail, feel free to comment it until
-        // the contract's layout is finalized.
-
-        // Set lock address to the execution environment
-        vm.store(address(atlas), bytes32(lockSlot), bytes32(uint256(uint160(address(executionEnvironment)))));
-
-        // EscrowLocked
-        vm.prank(address(atlas));
-        vm.expectRevert(bytes("ERR-EC15 EscrowLocked"));
-        executionEnvironment.factoryWithdrawEther(user, 2e18);
-    }
-
-    function test_getUser() public {
+    function test_getUser() public view {
         assertEq(executionEnvironment.getUser(), user);
     }
 
-    function test_getControl() public {
+    function test_getControl() public view {
         assertEq(executionEnvironment.getControl(), address(dAppControl));
     }
 
-    function test_getConfig() public {
+    function test_getConfig() public view {
         assertEq(executionEnvironment.getConfig(), CallBits.encodeCallConfig(callConfig));
     }
 
-    function test_getEscrow() public {
+    function test_getEscrow() public view {
         assertEq(executionEnvironment.getEscrow(), address(atlas));
     }
 }
@@ -771,25 +584,23 @@ contract MockDAppControl is DAppControl {
         internal
         pure
         override
-        returns (bool)
     {
         (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
         require(!shouldRevert, "_preSolverCall revert requested");
-        return returnValue;
+        if (!returnValue) revert("_preSolverCall returned false");
     }
 
     function _postSolverCall(
-        SolverOperation calldata solverOp,
+        SolverOperation calldata,
         bytes calldata returnData
     )
         internal
         pure
         override
-        returns (bool)
     {
         (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
         require(!shouldRevert, "_postSolverCall revert requested");
-        return returnValue;
+        if (!returnValue) revert("_postSolverCall returned false");
     }
 
     function _allocateValueCall(address, uint256, bytes calldata data) internal virtual override {
@@ -821,7 +632,8 @@ contract MockSolverContract {
     }
 
     function atlasSolverCall(
-        address sender,
+        address solverOpFrom,
+        address executionEnvironment,
         address,
         uint256,
         bytes calldata solverOpData,
@@ -834,7 +646,7 @@ contract MockSolverContract {
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
         require(success, "atlasSolverCall call reverted");
         if (shouldReconcile) {
-            IEscrow(address(_atlas)).reconcile(msg.sender, sender, type(uint256).max);
+            IAtlas(_atlas).reconcile(type(uint256).max);
         }
     }
 

@@ -45,9 +45,9 @@ contract SurchargeTest is BaseTest {
         atlas.withdrawSurcharge();
 
         // Set surcharge for withdrawal
-        uint256 surchargeSlot = stdstore.target(address(atlas)).sig("surcharge()").find();
-        vm.store(address(atlas), bytes32(surchargeSlot), bytes32(uint256(1 ether)));
-        assertEq(atlas.surcharge(), 1 ether, "surcharge should be set to 1 ether");
+        uint256 cumulativeSurchargeSlot = stdstore.target(address(atlas)).sig("cumulativeSurcharge()").find();
+        vm.store(address(atlas), bytes32(cumulativeSurchargeSlot), bytes32(uint256(1 ether)));
+        assertEq(atlas.cumulativeSurcharge(), 1 ether, "surcharge should be set to 1 ether");
         deal(address(atlas), 1 ether);
 
         // Test actual withdrawal

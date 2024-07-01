@@ -3,16 +3,17 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { ERC20 } from "solmate/tokens/ERC20.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { Ownable } from "openzeppelin-contracts/contracts/access/Ownable.sol";
 
 import { BaseTest } from "test/base/BaseTest.t.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 import { UserOperationBuilder } from "test/base/builders/UserOperationBuilder.sol";
 
-import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
-import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
-import { DAppOperation, DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
+import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
+import { UserOperation } from "src/contracts/types/UserOperation.sol";
+import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
 
 import { ChainlinkDAppControl, Oracle, Role } from "src/contracts/examples/oev-example/ChainlinkDAppControlAlt.sol";
 import {ChainlinkAtlasWrapper, IChainlinkFeed } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapperAlt.sol";
@@ -42,7 +43,7 @@ contract OEVTest is BaseTest {
     uint256 liquidationReward = 10e18;
     uint256 solverWinningBid = 1e18;
 
-    ERC20 public DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+    IERC20 public DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
 
     struct Sig {
         uint8 v;
@@ -60,8 +61,9 @@ contract OEVTest is BaseTest {
     function setUp() public virtual override {
         BaseTest.setUp();
         vm.rollFork(forkBlock);
+        vm.deal(solverOneEOA, 100e18);
 
-        // Creating new gov address (ERR-V49 OwnerActive if already registered with controller)
+        // Creating new gov address (SignatoryActive error if already registered with control)
         uint256 chainlinkGovPK = 11_112;
         uint256 aaveGovPK = 11_113;
         chainlinkGovEOA = vm.addr(chainlinkGovPK);
@@ -96,8 +98,8 @@ contract OEVTest is BaseTest {
         vm.stopPrank();
 
         txBuilder = new TxBuilder({
-            controller: address(chainlinkDAppControl),
-            atlasAddress: address(atlas),
+            _control: address(chainlinkDAppControl),
+            _atlas: address(atlas),
             _verification: address(atlasVerification)
         });
 
@@ -113,7 +115,7 @@ contract OEVTest is BaseTest {
     //                  Full OEV Capture Test               //
     // ---------------------------------------------------- //
 
-    function testChainlinkOEV() public {
+    function testChainlinkOEV_AltVersion() public {
         UserOperation memory userOp;
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         DAppOperation memory dAppOp;
@@ -166,7 +168,7 @@ contract OEVTest is BaseTest {
         assertEq(address(chainlinkAtlasWrapper).balance, 0, "Wrapper should not have any ETH");
 
         // To show the signer verification checks cause metacall to pass/fail:
-        uint256 snapshot = vm.snapshot();
+        // uint256 snapshot = vm.snapshot();
 
         // Should Succeed
         vm.prank(transmitter);
@@ -181,7 +183,7 @@ contract OEVTest is BaseTest {
     //               ChainlinkAtlasWrapper Tests            //
     // ---------------------------------------------------- //
 
-    function testChainlinkAtlasWrapperViewFunctions() public {
+    function testChainlinkAtlasWrapperViewFunctions_AltVersion() public {
         // Check wrapper and base start as expected
         assertEq(chainlinkAtlasWrapper.atlasLatestAnswer(), 0, "Wrapper stored latestAnswer should be 0");
         assertTrue(IChainlinkFeed(chainlinkETHUSD).latestAnswer() != 0, "Base latestAnswer should not be 0");
@@ -222,7 +224,7 @@ contract OEVTest is BaseTest {
         assertEq(answeredInRoundAtlas, answeredInRoundBase, "answeredInRound should still be same as base");
     }
 
-    function testChainlinkAtlasWrapperWithdrawFunctions() public {
+    function testChainlinkAtlasWrapperWithdrawFunctions_AltVersion() public {
         uint256 startETH = 10e18;
         uint256 startDai = 5e18;
         deal(address(chainlinkAtlasWrapper), startETH); // Give wrapper 10 ETH
@@ -254,8 +256,8 @@ contract OEVTest is BaseTest {
         assertEq(DAI.balanceOf(aaveGovEOA), startDai, "Aave Gov should have 5 DAI");
     }
 
-    function testChainlinkAtlasWrapperOwnableFunctionsEvents() public {
-        address mockEE = makeAddr("Mock EE");
+    function testChainlinkAtlasWrapperOwnableFunctionsEvents_AltVersion() public {
+        // address mockEE = makeAddr("Mock EE");
 
         // Wrapper emits event on deployment to show ownership transfer
         vm.expectEmit(true, false, false, true);
@@ -274,7 +276,7 @@ contract OEVTest is BaseTest {
         // assertEq(chainlinkAtlasWrapper.transmitters(mockEE), true, "EE should be trusted now");
     }
 
-    function testChainlinkAtlasWrapperTransmit() public {
+    function testChainlinkAtlasWrapperTransmit_AltVersion() public {
         TransmitData memory transmitData;
         (transmitData.report, transmitData.rs, transmitData.ss, transmitData.rawVs) = getTransmitPayload();
 
@@ -292,16 +294,17 @@ contract OEVTest is BaseTest {
         assertEq(uint(chainlinkAtlasWrapper.atlasLatestAnswer()), targetOracleAnswer, "Wrapper stored latestAnswer should be updated");
     }
 
-    function testChainlinkAtlasWrapperCanReceiveETH() public {
+    function testChainlinkAtlasWrapperCanReceiveETH_AltVersion() public {
         deal(transmitter, 2e18);
 
         assertEq(address(chainlinkAtlasWrapper).balance, 0, "Wrapper should have 0 ETH");
 
         vm.startPrank(transmitter);
         payable(address(chainlinkAtlasWrapper)).transfer(1e18);
-        address(chainlinkAtlasWrapper).call{value: 1e18}("");
+        (bool success, ) = address(chainlinkAtlasWrapper).call{value: 1e18}("");
         vm.stopPrank();
 
+        assertTrue(success, "Transfer should succeed");
         assertEq(address(chainlinkAtlasWrapper).balance, 2e18, "Wrapper should have 2 ETH");
     }
 
@@ -309,7 +312,7 @@ contract OEVTest is BaseTest {
     //               ChainlinkDAppControl Tests             //
     // ---------------------------------------------------- //
 
-    function test_ChainlinkDAppControl_setSignersForBaseFeed() public {
+    function test_ChainlinkDAppControl_setSignersForBaseFeed_AltVersion() public {
         address[] memory signers = getETHUSDSigners();
         address[] memory signersFromDAppControl;
 
@@ -380,7 +383,7 @@ contract OEVTest is BaseTest {
         assertEq(oracle.index, 1, "Oracle index should be 1");
     }
 
-    function test_ChainlinkDAppControl_addSignerForBaseFeed() public {
+    function test_ChainlinkDAppControl_addSignerForBaseFeed_AltVersion() public {
         vm.expectRevert(ChainlinkDAppControl.OnlyGovernance.selector);
         chainlinkDAppControl.addSignerForBaseFeed(chainlinkETHUSD, chainlinkGovEOA);
 
@@ -429,7 +432,7 @@ contract OEVTest is BaseTest {
         assertEq(oracle.index, 1, "Oracle index should be 1");
     }
 
-    function test_ChainlinkDAppControl_removeSignerOfBaseFeed() public {
+    function test_ChainlinkDAppControl_removeSignerOfBaseFeed_AltVersion() public {
         address[] memory realSigners = getETHUSDSigners();
         address signerToRemove = realSigners[10];
         address[] memory signersFromDappControl = chainlinkDAppControl.getSignersForBaseFeed(chainlinkETHUSD);
@@ -459,7 +462,7 @@ contract OEVTest is BaseTest {
         assertEq(uint(oracle.role), uint(Role.Unset));
     }
 
-    function test_ChainlinkDAppControl_verifyTransmitSigners() public {
+    function test_ChainlinkDAppControl_verifyTransmitSigners_AltVersion() public {
         // 3rd signer in the ETHUSD transmit example tx used
         address signerToRemove = 0xCc1b49B86F79C7E50E294D3e3734fe94DB9A42F0;
         (
@@ -476,7 +479,7 @@ contract OEVTest is BaseTest {
         assertEq(chainlinkDAppControl.verifyTransmitSigners(chainlinkETHUSD, report, rs, ss, rawVs), false);
     }
 
-    function test_ChainlinkDAppControl_createNewChainlinkAtlasWrapper() public {
+    function test_ChainlinkDAppControl_createNewChainlinkAtlasWrapper_AltVersion() public {
         MockBadChainlinkFeed mockBadFeed = new MockBadChainlinkFeed();
 
         // Should revert is base feed returns price of 0
@@ -496,18 +499,18 @@ contract OEVTest is BaseTest {
 
     // View Functions
 
-    function test_ChainlinkDAppControl_getBidFormat() public {
+    function test_ChainlinkDAppControl_getBidFormat_AltVersion() public view {
         UserOperation memory userOp;
         assertEq(chainlinkDAppControl.getBidFormat(userOp), address(0), "Bid format should be addr 0 for ETH");
     }
 
-    function test_ChainlinkDAppControl_getBidValue() public {
+    function test_ChainlinkDAppControl_getBidValue_AltVersion() public view {
         SolverOperation memory solverOp;
         solverOp.bidAmount = 123;
         assertEq(chainlinkDAppControl.getBidValue(solverOp), 123, "Bid value should return solverOp.bidAmount");
     }
 
-    function test_ChainlinkDAppControl_getSignersForBaseFeed() public {
+    function test_ChainlinkDAppControl_getSignersForBaseFeed_AltVersion() public view {
         address[] memory signersFromDAppControl = chainlinkDAppControl.getSignersForBaseFeed(chainlinkETHUSD);
         address[] memory signers = getETHUSDSigners();
         assertEq(signersFromDAppControl.length, signers.length, "Signers length should be same as expected");
@@ -516,7 +519,7 @@ contract OEVTest is BaseTest {
         }
     }
 
-    function test_ChainlinkDAppControl_getOracleDataForBaseFeed() public {
+    function test_ChainlinkDAppControl_getOracleDataForBaseFeed_AltVersion() public view {
         address[] memory signers = getETHUSDSigners();
         for (uint i = 0; i < signers.length; i++) {
             Oracle memory oracle = chainlinkDAppControl.getOracleDataForBaseFeed(chainlinkETHUSD, signers[i]);
@@ -531,7 +534,7 @@ contract OEVTest is BaseTest {
     // ---------------------------------------------------- //
 
     // Returns calldata taken from a real Chainlink ETH/USD transmit tx
-    function getTransmitPayload() public returns (
+    function getTransmitPayload() public pure returns (
         bytes memory report,
         bytes32[] memory rs,
         bytes32[] memory ss,
@@ -574,7 +577,7 @@ contract OEVTest is BaseTest {
         return (report, rs, ss, rawVs);
     }
 
-    function getETHUSDSigners() public view returns (address[] memory) {
+    function getETHUSDSigners() public pure returns (address[] memory) {
         address[] memory signers = new address[](31);
         signers[0] = 0xCdEf689d3098A796F840A26f383CE19F4f023B5B;
         signers[1] = 0xb7bEA3A5d410F7c4eC2aa446ae4236F6Eed6b16A;
@@ -625,13 +628,14 @@ contract LiquidationOEVSolver is SolverBase {
 
     function withdrawETH() public {
         if(msg.sender != _owner) revert NotSolverOwner();
-        payable(msg.sender).call{value: address(this).balance}("");
+        (bool success, ) = payable(msg.sender).call{value: address(this).balance}("");
+        require(success, "Withdraw failed");
     }
 
-    // This ensures a function can only be called through metaFlashCall
+    // This ensures a function can only be called through atlasSolverCall
     // which includes security checks to work safely with Atlas
     modifier onlySelf() {
-        require(msg.sender == address(this), "Not called via metaFlashCall");
+        require(msg.sender == address(this), "Not called via atlasSolverCall");
         _;
     }
 
@@ -653,7 +657,8 @@ contract MockLiquidatable {
         require(canLiquidate(), "Cannot liquidate");
         require(address(this).balance > 0, "No liquidation reward available");
         // If liquidated successfully, sends all the ETH in this contract to caller
-        payable(msg.sender).call{value: address(this).balance}("");
+        (bool success, ) = payable(msg.sender).call{value: address(this).balance}("");
+        require(success, "Liquidation failed");
     }
 
     // Can only liquidate if the oracle price is exactly the liquidation price
@@ -663,7 +668,7 @@ contract MockLiquidatable {
 }
 
 contract MockBadChainlinkFeed {
-    function latestAnswer() external returns(int256) {
+    function latestAnswer() external pure returns(int256) {
         return 0;
     }
 }

@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import "../types/ValidCallsTypes.sol";
+import "../types/ValidCalls.sol";
 
 contract AtlasErrors {
     // Simulator
@@ -19,32 +19,50 @@ contract AtlasErrors {
     error BidFindSuccessful(uint256 bidAmount);
     error UnexpectedNonRevert();
 
-    error SolverBidUnpaid();
+    error InvalidSolver();
+    error BidNotPaid();
     error BalanceNotReconciled();
-    error SolverOperationReverted();
+    error SolverOpReverted();
     error AlteredControl();
     error InvalidEntry();
     error CallbackNotCalled();
-    error IntentUnfulfilled();
     error PreSolverFailed();
     error PostSolverFailed();
+    error InsufficientEscrow();
 
-    error VerificationSimFail(uint256 validCallsResult);
+    error VerificationSimFail(ValidCallsResult);
     error PreOpsSimFail();
     error UserOpSimFail();
     error SolverSimFail(uint256 solverOutcomeResult); // uint param is result returned in `verifySolverOp`
+    error AllocateValueSimFail();
     error PostOpsSimFail();
     error ValidCalls(ValidCallsResult);
+
+    // Execution Environment
+    error InvalidUser();
+    error InvalidTo();
+    error InvalidCodeHash();
+    error PreOpsDelegatecallFail();
+    error UserOpValueExceedsBalance();
+    error UserWrapperDelegatecallFail();
+    error UserWrapperCallFail();
+    error PostOpsDelegatecallFail();
+    error PostOpsDelegatecallReturnedFalse();
+    error AllocateValueDelegatecallFail();
+    error NotEnvironmentOwner();
+    error ExecutionEnvironmentBalanceTooLow();
 
     // Atlas
     error PreOpsFail();
     error UserOpFail();
     // error SolverFail(); // Only sim version of err is used
+    error AllocateValueFail();
     error PostOpsFail();
     error InvalidAccess();
 
     // Escrow
     error UncoveredResult();
+    error InvalidEscrowDuration();
 
     // AtlETH
     error InsufficientUnbondedBalance(uint256 balance, uint256 requested);
@@ -61,12 +79,12 @@ contract AtlasErrors {
 
     // DAppIntegration
     error OnlyGovernance();
-    error OwnerActive();
     error SignatoryActive();
     error InvalidCaller();
     error InvalidDAppControl();
     error DAppNotEnabled();
     error AtlasLockActive();
+    error InvalidSignatory();
 
     // Permit69
     error InvalidEnvironment();
@@ -94,10 +112,10 @@ contract AtlasErrors {
 
     // AtlasVerification
     error NoUnusedNonceInBitmap();
-    error OnlyAccount();
 
     // DAppControl
-    error BothUserAndDAppNoncesCannotBeSequenced();
+    error BothUserAndDAppNoncesCannotBeSequential();
+    error BothPreOpsAndUserReturnDataCannotBeTracked();
     error InvalidControl();
     error NoDelegatecall();
     error MustBeDelegatecalled();
@@ -106,4 +124,5 @@ contract AtlasErrors {
     error WrongDepth();
     error InsufficientLocalFunds();
     error NotImplemented();
+    error InvertBidValueCannotBeExPostBids();
 }

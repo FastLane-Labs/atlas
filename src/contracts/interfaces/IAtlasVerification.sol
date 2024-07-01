@@ -1,13 +1,15 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import "../types/UserCallTypes.sol";
-import "../types/DAppApprovalTypes.sol";
-import "../types/SolverCallTypes.sol";
+import "../types/UserOperation.sol";
+import "../types/ConfigTypes.sol";
+import "../types/DAppOperation.sol";
+import "../types/SolverOperation.sol";
 import "../types/EscrowTypes.sol";
-import "../types/ValidCallsTypes.sol";
+import "../types/ValidCalls.sol";
 
 interface IAtlasVerification {
+    // AtlasVerification.sol
     function validateCalls(
         DAppConfig calldata dConfig,
         UserOperation calldata userOp,
@@ -18,25 +20,45 @@ interface IAtlasVerification {
         bool isSimulation
     )
         external
-        returns (bytes32 userOpHash, ValidCallsResult);
-
+        returns (ValidCallsResult);
     function verifySolverOp(
         SolverOperation calldata solverOp,
         bytes32 userOpHash,
         uint256 userMaxFeePerGas,
-        address bundler
+        address bundler,
+        bool allowsTrustedOpHash
     )
         external
         view
         returns (uint256 result);
-
-    function getUserOperationPayload(UserOperation memory userOp) external view returns (bytes32 payload);
+    function getUserOperationHash(UserOperation calldata userOp) external view returns (bytes32 hash);
+    function getUserOperationPayload(UserOperation calldata userOp) external view returns (bytes32 payload);
     function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload);
-    function getDAppOperationPayload(DAppOperation memory dAppOp) external view returns (bytes32 payload);
-    function getNextNonce(address account, bool sequenced) external view returns (uint256 nextNonce);
+    function getDAppOperationPayload(DAppOperation calldata dAppOp) external view returns (bytes32 payload);
+    function getDomainSeparator() external view returns (bytes32 domainSeparator);
 
-    function initializeGovernance(address controller) external;
-    function addSignatory(address controller, address signatory) external;
-    function removeSignatory(address controller, address signatory) external;
-    function disableDApp(address dAppControl) external;
+    // NonceManager.sol
+    function getUserNextNonce(address user, bool sequential) external view returns (uint256 nextNonce);
+    function getUserNextNonSeqNonceAfter(address user, uint256 refNonce) external view returns (uint256);
+    function getDAppNextNonce(address dApp) external view returns (uint256 nextNonce);
+    function userSequentialNonceTrackers(address account) external view returns (uint256 lastUsedSeqNonce);
+    function dAppSequentialNonceTrackers(address account) external view returns (uint256 lastUsedSeqNonce);
+    function userNonSequentialNonceTrackers(
+        address account,
+        uint248 wordIndex
+    )
+        external
+        view
+        returns (uint256 bitmap);
+
+    // DAppIntegration.sol
+    function initializeGovernance(address control) external;
+    function addSignatory(address control, address signatory) external;
+    function removeSignatory(address control, address signatory) external;
+    function changeDAppGovernance(address oldGovernance, address newGovernance) external;
+    function disableDApp(address control) external;
+    function getGovFromControl(address dAppControl) external view returns (address);
+    function isDAppSignatory(address dAppControl, address signatory) external view returns (bool);
+    function signatories(bytes32 key) external view returns (bool);
+    function dAppSignatories(address dAppControl) external view returns (address[] memory);
 }

@@ -3,19 +3,21 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { ERC20 } from "solmate/tokens/ERC20.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { Ownable } from "openzeppelin-contracts/contracts/access/Ownable.sol";
 
 import { BaseTest } from "test/base/BaseTest.t.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 import { UserOperationBuilder } from "test/base/builders/UserOperationBuilder.sol";
 
-import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
-import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
-import { DAppOperation, DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
+import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
+import { UserOperation } from "src/contracts/types/UserOperation.sol";
+import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
 
 import { ChainlinkDAppControl, Oracle, Role } from "src/contracts/examples/oev-example/ChainlinkDAppControl.sol";
-import {ChainlinkAtlasWrapper, IChainlinkFeed } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapper.sol";
+import { ChainlinkAtlasWrapper } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapper.sol";
+import { AggregatorV2V3Interface } from "src/contracts/examples/oev-example/IChainlinkAtlasWrapper.sol";
 import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
 
@@ -41,7 +43,7 @@ contract OEVTest is BaseTest {
     uint256 liquidationReward = 10e18;
     uint256 solverWinningBid = 1e18;
 
-    ERC20 public DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+    IERC20 public DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
 
     struct Sig {
         uint8 v;
@@ -59,8 +61,9 @@ contract OEVTest is BaseTest {
     function setUp() public virtual override {
         BaseTest.setUp();
         vm.rollFork(forkBlock);
+        vm.deal(solverOneEOA, 100e18);
 
-        // Creating new gov address (ERR-V49 OwnerActive if already registered with controller)
+        // Creating new gov address (SignatoryActive error if already registered with control)
         uint256 chainlinkGovPK = 11_112;
         uint256 aaveGovPK = 11_113;
         chainlinkGovEOA = vm.addr(chainlinkGovPK);
@@ -91,8 +94,8 @@ contract OEVTest is BaseTest {
         deal(address(mockLiquidatable), liquidationReward); // Add 10 ETH as liquidation reward
 
         txBuilder = new TxBuilder({
-            controller: address(chainlinkDAppControl),
-            atlasAddress: address(atlas),
+            _control: address(chainlinkDAppControl),
+            _atlas: address(atlas),
             _verification: address(atlasVerification)
         });
 
@@ -108,7 +111,7 @@ contract OEVTest is BaseTest {
     //                  Full OEV Capture Test               //
     // ---------------------------------------------------- //
 
-    function testChainlinkOEV() public {
+    function testChainlinkOEV_StandardVersion_GasCheck() public {
         UserOperation memory userOp;
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         DAppOperation memory dAppOp;
@@ -118,6 +121,8 @@ contract OEVTest is BaseTest {
         atlas.deposit{ value: 1e18 }();
         atlas.bond(1e18);
         vm.stopPrank();
+
+        assertTrue(chainlinkDAppControl.isChainlinkWrapper(address(chainlinkAtlasWrapper)), "Wrapper should be registered on DAppControl - otherwise will revert in allocateValue");
 
         // Basic userOp created but excludes oracle price update data
         userOp = txBuilder.buildUserOperation({
@@ -155,7 +160,7 @@ contract OEVTest is BaseTest {
 
         assertEq(mockLiquidatable.canLiquidate(), false);
         assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) !=  targetOracleAnswer, "Wrapper answer should not be target yet");
-        assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), uint(IChainlinkFeed(chainlinkETHUSD).latestAnswer()), "Wrapper and base feed should report same answer");
+        assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), uint(AggregatorV2V3Interface(chainlinkETHUSD).latestAnswer()), "Wrapper and base feed should report same answer");
         assertEq(address(chainlinkAtlasWrapper).balance, 0, "Wrapper should not have any ETH");
 
         // To show the signer verification checks cause metacall to pass/fail:
@@ -170,17 +175,21 @@ contract OEVTest is BaseTest {
         vm.prank(userEOA);
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
 
-        assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), uint(IChainlinkFeed(chainlinkETHUSD).latestAnswer()), "Metacall unexpectedly succeeded");
+        assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), uint(AggregatorV2V3Interface(chainlinkETHUSD).latestAnswer()), "Metacall unexpectedly succeeded");
 
         // Go back to before removing the signer
         vm.revertTo(snapshot);
+
+        uint256 gasLeftBefore = gasleft();
 
         // Should Succeed
         vm.prank(userEOA);
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
 
+        console.log("Metacall Gas Cost:", gasLeftBefore - gasleft());
+
         assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), targetOracleAnswer, "Wrapper did not update as expected");
-        assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) != uint(IChainlinkFeed(chainlinkETHUSD).latestAnswer()), "Wrapper and base feed should report different answers");
+        assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) != uint(AggregatorV2V3Interface(chainlinkETHUSD).latestAnswer()), "Wrapper and base feed should report different answers");
         assertEq(address(chainlinkAtlasWrapper).balance, solverWinningBid, "Wrapper should hold winning bid as OEV");
     }
 
@@ -191,16 +200,16 @@ contract OEVTest is BaseTest {
     function testChainlinkAtlasWrapperViewFunctions() public {
         // Check wrapper and base start as expected
         assertEq(chainlinkAtlasWrapper.atlasLatestAnswer(), 0, "Wrapper stored latestAnswer should be 0");
-        assertTrue(IChainlinkFeed(chainlinkETHUSD).latestAnswer() != 0, "Base latestAnswer should not be 0");
+        assertTrue(AggregatorV2V3Interface(chainlinkETHUSD).latestAnswer() != 0, "Base latestAnswer should not be 0");
         assertEq(chainlinkAtlasWrapper.atlasLatestTimestamp(), 0, "Wrapper stored latestTimestamp should be 0");
-        assertTrue(IChainlinkFeed(chainlinkETHUSD).latestTimestamp() != 0, "Base latestTimestamp should not be 0");
+        assertTrue(AggregatorV2V3Interface(chainlinkETHUSD).latestTimestamp() != 0, "Base latestTimestamp should not be 0");
 
         (uint80 roundIdAtlas, int256 answerAtlas, uint256 startedAtAtlas, uint256 updatedAtAtlas, uint80 answeredInRoundAtlas) = chainlinkAtlasWrapper.latestRoundData();
-        (uint80 roundIdBase, int256 answerBase, uint256 startedAtBase, uint256 updatedAtBase, uint80 answeredInRoundBase) = IChainlinkFeed(chainlinkETHUSD).latestRoundData();
+        (uint80 roundIdBase, int256 answerBase, uint256 startedAtBase, uint256 updatedAtBase, uint80 answeredInRoundBase) = AggregatorV2V3Interface(chainlinkETHUSD).latestRoundData();
 
         // Before Atlas price update, all view functions should fall back to base oracle
-        assertEq(chainlinkAtlasWrapper.latestAnswer(), IChainlinkFeed(chainlinkETHUSD).latestAnswer(), "latestAnswer should be same as base");
-        assertEq(chainlinkAtlasWrapper.latestTimestamp(), IChainlinkFeed(chainlinkETHUSD).latestTimestamp(), "latestTimestamp should be same as base");
+        assertEq(chainlinkAtlasWrapper.latestAnswer(), AggregatorV2V3Interface(chainlinkETHUSD).latestAnswer(), "latestAnswer should be same as base");
+        assertEq(chainlinkAtlasWrapper.latestTimestamp(), AggregatorV2V3Interface(chainlinkETHUSD).latestTimestamp(), "latestTimestamp should be same as base");
         assertEq(roundIdAtlas, roundIdBase, "roundId should be same as base");
         assertEq(answerAtlas, answerBase, "answer should be same as base");
         assertEq(startedAtAtlas, startedAtBase, "startedAt should be same as base");
@@ -215,12 +224,12 @@ contract OEVTest is BaseTest {
 
         // After Atlas price update, latestAnswer and latestTimestamp should be different to base oracle
         assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), targetOracleAnswer, "latestAnswer should be updated");
-        assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) != uint(IChainlinkFeed(chainlinkETHUSD).latestAnswer()), "latestAnswer should be different to base");
+        assertTrue(uint(chainlinkAtlasWrapper.latestAnswer()) != uint(AggregatorV2V3Interface(chainlinkETHUSD).latestAnswer()), "latestAnswer should be different to base");
         assertEq(chainlinkAtlasWrapper.latestTimestamp(), block.timestamp, "latestTimestamp should be updated");
-        assertTrue(chainlinkAtlasWrapper.latestTimestamp() > IChainlinkFeed(chainlinkETHUSD).latestTimestamp(), "latestTimestamp should be later than base");
+        assertTrue(chainlinkAtlasWrapper.latestTimestamp() > AggregatorV2V3Interface(chainlinkETHUSD).latestTimestamp(), "latestTimestamp should be later than base");
 
         (roundIdAtlas, answerAtlas, startedAtAtlas, updatedAtAtlas, answeredInRoundAtlas) = chainlinkAtlasWrapper.latestRoundData();
-        (roundIdBase, answerBase, startedAtBase, updatedAtBase, answeredInRoundBase) = IChainlinkFeed(chainlinkETHUSD).latestRoundData();
+        (roundIdBase, answerBase, startedAtBase, updatedAtBase, answeredInRoundBase) = AggregatorV2V3Interface(chainlinkETHUSD).latestRoundData();
 
         assertEq(roundIdAtlas, roundIdBase, "roundId should still be same as base");
         assertTrue(answerAtlas == int(targetOracleAnswer) && answerAtlas != answerBase, "answer should be updated");
@@ -293,10 +302,25 @@ contract OEVTest is BaseTest {
 
         assertEq(chainlinkAtlasWrapper.atlasLatestAnswer(), 0, "Wrapper stored latestAnswer should still be 0");
 
+        // Check transmit reverts if rs and ss arrays are not the same length
+        vm.prank(executionEnvironment);
+        vm.expectRevert(ChainlinkAtlasWrapper.ArrayLengthMismatch.selector);
+        chainlinkAtlasWrapper.transmit(transmitData.report, new bytes32[](0), transmitData.ss, transmitData.rawVs);
+
+        // Check that transmit reverts if quorum is not met (uses rs array length for sig count)
+        vm.prank(executionEnvironment);
+        vm.expectRevert(ChainlinkAtlasWrapper.SignerVerificationFailed.selector);
+        chainlinkAtlasWrapper.transmit(transmitData.report, new bytes32[](0), new bytes32[](0), transmitData.rawVs);
+
         vm.prank(executionEnvironment);
         chainlinkAtlasWrapper.transmit(transmitData.report, transmitData.rs, transmitData.ss, transmitData.rawVs);
 
         assertEq(uint(chainlinkAtlasWrapper.atlasLatestAnswer()), targetOracleAnswer, "Wrapper stored latestAnswer should be updated");
+
+        // Check that transmit reverts if called again with same data
+        vm.prank(executionEnvironment);
+        vm.expectRevert(ChainlinkAtlasWrapper.CannotReuseReport.selector);
+        chainlinkAtlasWrapper.transmit(transmitData.report, transmitData.rs, transmitData.ss, transmitData.rawVs);
     }
 
     function testChainlinkAtlasWrapperCanReceiveETH() public {
@@ -306,9 +330,10 @@ contract OEVTest is BaseTest {
 
         vm.startPrank(userEOA);
         payable(address(chainlinkAtlasWrapper)).transfer(1e18);
-        address(chainlinkAtlasWrapper).call{value: 1e18}("");
+        (bool success, ) = address(chainlinkAtlasWrapper).call{value: 1e18}("");
         vm.stopPrank();
 
+        assertTrue(success, "Transfer should succeed");
         assertEq(address(chainlinkAtlasWrapper).balance, 2e18, "Wrapper should have 2 ETH");
     }
 
@@ -466,6 +491,23 @@ contract OEVTest is BaseTest {
         assertEq(uint(oracle.role), uint(Role.Unset));
     }
 
+    function test_ChainlinkDAppControl_setObservationsQuorum() public {
+        uint256 expectedDefaultQuorum = 1;
+        uint256 newQuorum = 3;
+
+        assertEq(chainlinkDAppControl.observationsQuorum(), expectedDefaultQuorum, "Default starting observations quorum not as expected");
+
+        vm.expectRevert(ChainlinkDAppControl.OnlyGovernance.selector);
+        chainlinkDAppControl.setObservationsQuorum(newQuorum);
+
+        vm.prank(chainlinkGovEOA);
+        vm.expectEmit(true, false, false, true);
+        emit ChainlinkDAppControl.ObservationsQuorumSet(expectedDefaultQuorum, newQuorum);
+        chainlinkDAppControl.setObservationsQuorum(newQuorum);
+
+        assertEq(chainlinkDAppControl.observationsQuorum(), newQuorum, "Observations quorum not updated as expected");
+    }
+
     function test_ChainlinkDAppControl_verifyTransmitSigners() public {
         // 3rd signer in the ETHUSD transmit example tx used
         address signerToRemove = 0xCc1b49B86F79C7E50E294D3e3734fe94DB9A42F0;
@@ -476,6 +518,11 @@ contract OEVTest is BaseTest {
 
         // All signers should be verified
         assertEq(chainlinkDAppControl.verifyTransmitSigners(chainlinkETHUSD, report, rs, ss, rawVs), true);
+
+        // If quorum is not met, should return false
+        uint256 quorum = chainlinkDAppControl.observationsQuorum();
+        require(quorum > 0, "TEST: Quorum cant be 0 for this check");
+        assertEq(chainlinkDAppControl.verifyTransmitSigners(chainlinkETHUSD, report, new bytes32[](0), ss, rawVs), false);
 
         // If a verified signer is removed from DAppControl, should return false
         vm.prank(chainlinkGovEOA);
@@ -503,18 +550,18 @@ contract OEVTest is BaseTest {
 
     // View Functions
 
-    function test_ChainlinkDAppControl_getBidFormat() public {
+    function test_ChainlinkDAppControl_getBidFormat() public view {
         UserOperation memory userOp;
         assertEq(chainlinkDAppControl.getBidFormat(userOp), address(0), "Bid format should be addr 0 for ETH");
     }
 
-    function test_ChainlinkDAppControl_getBidValue() public {
+    function test_ChainlinkDAppControl_getBidValue() public view {
         SolverOperation memory solverOp;
         solverOp.bidAmount = 123;
         assertEq(chainlinkDAppControl.getBidValue(solverOp), 123, "Bid value should return solverOp.bidAmount");
     }
 
-    function test_ChainlinkDAppControl_getSignersForBaseFeed() public {
+    function test_ChainlinkDAppControl_getSignersForBaseFeed() public view {
         address[] memory signersFromDAppControl = chainlinkDAppControl.getSignersForBaseFeed(chainlinkETHUSD);
         address[] memory signers = getETHUSDSigners();
         assertEq(signersFromDAppControl.length, signers.length, "Signers length should be same as expected");
@@ -523,7 +570,7 @@ contract OEVTest is BaseTest {
         }
     }
 
-    function test_ChainlinkDAppControl_getOracleDataForBaseFeed() public {
+    function test_ChainlinkDAppControl_getOracleDataForBaseFeed() public view {
         address[] memory signers = getETHUSDSigners();
         for (uint i = 0; i < signers.length; i++) {
             Oracle memory oracle = chainlinkDAppControl.getOracleDataForBaseFeed(chainlinkETHUSD, signers[i]);
@@ -532,20 +579,19 @@ contract OEVTest is BaseTest {
         }
     }
 
-    function test_logUserOpTransmitData_Sepolia() public {
+    function test_logUserOpTransmitData_Sepolia() public view {
         console.log("Sepolia Chainlink Transmit Data in userOp.data form:");
         console.log("Sets ETH/USD Price to $2979.36");
         console.log("\n");
         console.logBytes(getTransmitPayload_Sepolia());
     }
 
-
     // ---------------------------------------------------- //
     //                     OEV Test Utils                   //
     // ---------------------------------------------------- //
 
     // Returns calldata taken from a real Chainlink ETH/USD transmit tx
-    function getTransmitPayload() public returns (
+    function getTransmitPayload() public pure returns (
         bytes memory report,
         bytes32[] memory rs,
         bytes32[] memory ss,
@@ -588,7 +634,7 @@ contract OEVTest is BaseTest {
         return (report, rs, ss, rawVs);
     }
 
-    function getTransmitPayload_Sepolia() public returns (
+    function getTransmitPayload_Sepolia() public pure returns (
         bytes memory userOpData
     ) {
         // From this ETHUSD transmit tx on sepolia:
@@ -611,7 +657,7 @@ contract OEVTest is BaseTest {
         userOpData = abi.encodeCall(ChainlinkAtlasWrapper.transmit, (report, rs, ss, rawVs));
     }
 
-    function getETHUSDSigners() public view returns (address[] memory) {
+    function getETHUSDSigners() public pure returns (address[] memory) {
         address[] memory signers = new address[](31);
         signers[0] = 0xCdEf689d3098A796F840A26f383CE19F4f023B5B;
         signers[1] = 0xb7bEA3A5d410F7c4eC2aa446ae4236F6Eed6b16A;
@@ -662,13 +708,14 @@ contract LiquidationOEVSolver is SolverBase {
 
     function withdrawETH() public {
         if(msg.sender != _owner) revert NotSolverOwner();
-        payable(msg.sender).call{value: address(this).balance}("");
+        (bool success, ) = payable(msg.sender).call{value: address(this).balance}("");
+        require(success, "Withdraw failed");
     }
 
-    // This ensures a function can only be called through metaFlashCall
+    // This ensures a function can only be called through atlasSolverCall
     // which includes security checks to work safely with Atlas
     modifier onlySelf() {
-        require(msg.sender == address(this), "Not called via metaFlashCall");
+        require(msg.sender == address(this), "Not called via atlasSolverCall");
         _;
     }
 
@@ -690,17 +737,18 @@ contract MockLiquidatable {
         require(canLiquidate(), "Cannot liquidate");
         require(address(this).balance > 0, "No liquidation reward available");
         // If liquidated successfully, sends all the ETH in this contract to caller
-        payable(msg.sender).call{value: address(this).balance}("");
+        (bool success, ) = payable(msg.sender).call{value: address(this).balance}("");
+        require(success, "Liquidation failed");
     }
 
     // Can only liquidate if the oracle price is exactly the liquidation price
     function canLiquidate() public view returns (bool) {
-        return uint256(IChainlinkFeed(oracle).latestAnswer()) == liquidationPrice;
+        return uint256(AggregatorV2V3Interface(oracle).latestAnswer()) == liquidationPrice;
     }
 }
 
 contract MockBadChainlinkFeed {
-    function latestAnswer() external returns(int256) {
+    function latestAnswer() external pure returns(int256) {
         return 0;
     }
 }

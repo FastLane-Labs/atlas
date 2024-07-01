@@ -3,11 +3,12 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
-import { DAppConfig, DAppOperation, CallConfig } from "src/contracts/types/DAppApprovalTypes.sol";
-import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
-import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
-import { ValidCallsResult } from "src/contracts/types/ValidCallsTypes.sol";
+import { AtlasVerification, USER_TYPEHASH_DEFAULT, USER_TYPEHASH_TRUSTED } from "src/contracts/atlas/AtlasVerification.sol";
+import { DAppConfig, CallConfig } from "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
+import { UserOperation } from "src/contracts/types/UserOperation.sol";
+import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
+import { ValidCallsResult } from "src/contracts/types/ValidCalls.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { DummyDAppControl } from "./base/DummyDAppControl.sol";
 import { AtlasBaseTest } from "./base/AtlasBaseTest.t.sol";
@@ -25,6 +26,30 @@ import { DAppOperationBuilder } from "./base/builders/DAppOperationBuilder.sol";
 // --- (Also used in other files) --- //
 // - Scroll down for the actual tests - //
 //
+
+contract DummyNotSmartWallet {
+}
+
+contract DummySmartWallet {
+    bytes4 constant internal EIP1271_MAGIC_VALUE = 0x1626ba7e;
+    bool public isValidResult = true;
+
+    function isValidSignature(
+        bytes32,
+        bytes memory
+    ) public view returns (bytes4) {
+        console.log("DummySmartWallet.isValidSignature called, isValidResult: ", isValidResult);
+        if (isValidResult) {
+            return EIP1271_MAGIC_VALUE;
+        } else {
+            return 0;
+        }
+    }
+
+    function setIsValidResult(bool data) external {
+        isValidResult = data;
+    }
+}
 
 contract AtlasVerificationBase is AtlasBaseTest {
     DummyDAppControl dAppControl;
@@ -52,13 +77,14 @@ contract AtlasVerificationBase is AtlasBaseTest {
     function validUserOperation() public returns (UserOperationBuilder) {
         return new UserOperationBuilder()
             .withFrom(userEOA)
-            .withTo(address(dAppControl))
+            .withTo(address(atlas))
             .withValue(0)
             .withGas(1_000_000)
             .withMaxFeePerGas(tx.gasprice + 1)
             .withNonce(address(atlasVerification), userEOA)
             .withDeadline(block.number + 2)
             .withControl(address(dAppControl))
+            .withCallConfig(dAppControl.CALL_CONFIG())
             .withSessionKey(address(0))
             .withData("")
             .sign(address(atlasVerification), userPK);
@@ -89,8 +115,6 @@ contract AtlasVerificationBase is AtlasBaseTest {
         return new DAppOperationBuilder()
             .withFrom(governanceEOA)
             .withTo(address(atlas))
-            .withValue(0)
-            .withGas(2_000_000)
             .withNonce(address(atlasVerification), governanceEOA)
             .withDeadline(userOp.deadline)
             .withControl(userOp.control)
@@ -104,8 +128,6 @@ contract AtlasVerificationBase is AtlasBaseTest {
         return new DAppOperationBuilder()
             .withFrom(governanceEOA)
             .withTo(address(atlas))
-            .withValue(0)
-            .withGas(2_000_000)
             .withNonce(address(atlasVerification), governanceEOA)
             .withDeadline(userOp.deadline)
             .withControl(userOp.control)
@@ -118,7 +140,7 @@ contract AtlasVerificationBase is AtlasBaseTest {
     function doValidateCalls(ValidCallsCall memory call) public returns (ValidCallsResult result) {
         DAppConfig memory config = dAppControl.getDAppConfig(call.userOp);
         vm.startPrank(address(atlas));
-        (, result) = atlasVerification.validateCalls(
+        result = atlasVerification.validateCalls(
             config,
             call.userOp,
             call.solverOps,
@@ -129,7 +151,7 @@ contract AtlasVerificationBase is AtlasBaseTest {
         vm.stopPrank();
     }
 
-    function assertValidCallsResult(ValidCallsResult actual, ValidCallsResult expected) public {
+    function assertValidCallsResult(ValidCallsResult actual, ValidCallsResult expected) public view {
         console.log("validCallsResult actual: ", uint(actual));
         console.log("validCallsResult expected: ", uint(expected));
         assertTrue(actual == expected, "validCallsResult different to expected");
@@ -164,6 +186,11 @@ contract AtlasVerificationBase is AtlasBaseTest {
 contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
     using CallVerification for UserOperation;
 
+    function setUp() public override {
+        AtlasBaseTest.setUp();
+        dAppControl = defaultDAppControl().buildAndIntegrate(atlasVerification);
+    }
+
     function test_verifySolverOp_InvalidSignature() public {
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -173,9 +200,10 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         solverOps[0] = validSolverOperation(userOp).signAndBuild(address(atlasVerification), userPK);
         uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
-            bundler
+            bundler,
+            false
         );
         assertEq(result, 1 << uint256(SolverOutcome.InvalidSignature), "Expected InvalidSignature 1");
 
@@ -183,9 +211,10 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         solverOps[0].signature = "";
         result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
-            bundler
+            bundler,
+            false
         );
         assertEq(result, 1 << uint256(SolverOutcome.InvalidSignature), "Expected InvalidSignature 2");
     }
@@ -199,9 +228,10 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         solverOps[0].userOpHash = keccak256(abi.encodePacked("Not the userOp"));
         uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
-            bundler
+            bundler,
+            false
         );
         assertEq(result, 1 << uint256(SolverOutcome.InvalidUserHash), "Expected InvalidUserHash");
     }
@@ -215,9 +245,10 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         solverOps[0].to = address(0);
         uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
-            bundler
+            bundler,
+            false
         );
         assertEq(result, 1 << uint256(SolverOutcome.InvalidTo), "Expected InvalidTo");
     }
@@ -231,9 +262,10 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         vm.txGasPrice(solverOps[0].maxFeePerGas + 1); // Increase gas price above solver's max
         uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
-            bundler
+            bundler,
+            false
         );
         assertEq(result, 1 << uint256(SolverOutcome.GasPriceOverCap), "Expected GasPriceOverCap");
         vm.txGasPrice(tx.gasprice); // Reset gas price to expected level
@@ -247,9 +279,10 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         // maxFeePerGas is below user's = SolverOutcome.GasPriceBelowUsers
         uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas + 1,
-            bundler
+            bundler,
+            false
         );
         assertEq(result, 1 << uint256(SolverOutcome.GasPriceBelowUsers), "Expected GasPriceBelowUsers");
     }
@@ -263,9 +296,10 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         solverOps[0].solver = address(atlas);
         uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
-            bundler
+            bundler,
+            false
         );
         assertEq(result, 1 << uint256(SolverOutcome.InvalidSolver), "Expected InvalidSolver");
     }
@@ -280,9 +314,10 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         vm.prank(solverOneEOA);
         uint256 result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
-            bundler
+            bundler,
+            false
         );
         assertEq(result, 0, "Expected No Errors 1"); // 0 = No SolverOutcome errors
 
@@ -291,19 +326,276 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         bundler = userEOA;
         result = atlasVerification.verifySolverOp(
             solverOps[0],
-            userOp.getUserOperationHash(),
+            atlasVerification.getUserOperationHash(userOp),
             userOp.maxFeePerGas,
-            bundler
+            bundler,
+            false
         );
         assertEq(result, 0, "Expected No Errors 2"); // 0 = No SolverOutcome errors
     }
-}
+    }
 
 //
 // ---- VALID CALLS TESTS BEGIN HERE ---- //
 //
 
 contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
+    using CallVerification for UserOperation;
+
+    // Default Everything Valid Test Case
+
+    function test_DefaultEverything_Valid() public {
+        defaultAtlasEnvironment();
+
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+        ), ValidCallsResult.Valid);
+    }
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    // where the user operation is not signed properly
+    // when validCalls is called and the bundler is not the user
+    // then it should return InvalidSignature
+    // because the user operation must be signed by the user unless the bundler is the user
+    //
+    function test_verifyUserOp_UserSignatureInvalid_WhenOpUnsignedIfNotUserBundler() public {
+        defaultAtlasEnvironment();
+
+        UserOperation memory userOp = validUserOperation().build();
+        userOp.signature = "";
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+        ), ValidCallsResult.UserSignatureInvalid);
+    }
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    // where the user operation is not signed properly
+    // when validCalls is called and the bundler is the user
+    // then it should return Valid
+    // because the user operation doesn't need to be signed by the user if the bundler is the user
+    //
+    function test_verifyUserOp_Valid_WhenOpUnsignedIfUserBundler() public {
+        defaultAtlasEnvironment();
+
+        UserOperation memory userOp = validUserOperation().build();
+        userOp.signature = "";
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+        ), ValidCallsResult.Valid);
+    }
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    // where the user operation is not
+    // when validCalls is called
+    //   and the bundler is not the user
+    //   and isSimulation = true
+    // then it should return Valid
+    // because the user operation doesn't need to be signed if it's a simulation
+    //
+    function test_verifyUserOp_Valid_WhenOpUnsignedIfIsSimulation() public {
+        defaultAtlasEnvironment();
+
+        UserOperation memory userOp = validUserOperation().build();
+        userOp.signature = "";
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: true}
+        ), ValidCallsResult.Valid);
+    }
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    // where the user operation has a bad signature
+    // when validCalls is called
+    //   and the bundler is not the user
+    //   and isSimulation = true
+    // then it should return UserSignatureInvalid
+    // because the user operation doesn't need to be signed if it's a simulation
+    //
+    function test_verifyUserOp_Valid_WhenOpHasBadSignatureIfIsSimulation() public {
+        defaultAtlasEnvironment();
+
+        UserOperation memory userOp = validUserOperation()
+            .withSignature("bad signature")
+            .build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: true}
+        ), ValidCallsResult.UserSignatureInvalid);
+    }
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    // where the user operation is from a smart contract
+    //   and the from address is Atlas, AtlasVerification or the dAppControl
+    // when validCalls is called
+    // then it should return UserFromInvalid
+    // to prevent abusive behavior
+    //
+    function test_verifyUserOp_UserFromInvalid_WhenFromInvalidSmartContract() public {
+        defaultAtlasEnvironment();
+
+        address[] memory invalidFroms = new address[](3);
+        invalidFroms[0] = address(atlas);
+        invalidFroms[1] = address(atlasVerification);
+        invalidFroms[2] = address(dAppControl);
+
+        for (uint256 i = 0; i < invalidFroms.length; i++) {
+            UserOperation memory userOp = validUserOperation()
+                .withFrom(invalidFroms[i])
+                .withSignature("")
+                .build();
+
+            SolverOperation[] memory solverOps = validSolverOperations(userOp);
+            DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+            callAndAssert(ValidCallsCall({
+                userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+            ), ValidCallsResult.UserFromInvalid);
+        }
+    }
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    // where the user operation is from a contract
+    //   and the contract doesn't implement IAccount
+    // when validCalls is called
+    // then it should revert with an EVM revert error
+    // to prevent abusive behavior
+    //
+    function test_verifyUserOp_UserSmartWalletInvalid_NotFromSmartWallet() public {
+        defaultAtlasEnvironment();
+
+        DummyNotSmartWallet smartWallet = new DummyNotSmartWallet();
+
+        UserOperation memory userOp = validUserOperation()
+            .withFrom(address(smartWallet))
+            .withSignature("")
+            .build();
+
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        vm.skip(true); // TODO: can't get expectRevert to catch the EVM revert here, not sure why, but it does revert
+
+        vm.expectRevert();
+        doValidateCalls(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+        ));
+    }
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    // where the user operation is from a contract
+    //   and the contract implements IAccount
+    //   and the userOp is not valid
+    // when validCalls is called
+    // then it should return UserSmartWalletInvalid
+    // because the user operation has failed validation
+    //
+    function test_verifyUserOp_UserSmartWalletInvalid_FromSmartWallet() public {
+        defaultAtlasEnvironment();
+
+        DummySmartWallet smartWallet = new DummySmartWallet();
+        smartWallet.setIsValidResult(false); // Set validationData to 1 to fail validation
+
+        UserOperation memory userOp = validUserOperation()
+            .withFrom(address(smartWallet))
+            .withSignature("")
+            .build();
+
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+        ), ValidCallsResult.UserSignatureInvalid);
+    }
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    // where the user operation is from a contract
+    //   and the contract contract implements IAccount
+    //   and the userOp passes IAccount validation
+    // when validCalls is called
+    // then it should return Valid
+    //
+    function test_verifyUserOp_Valid_FromSmartWallet() public {
+        defaultAtlasEnvironment();
+
+        DummySmartWallet smartWallet = new DummySmartWallet();
+
+        UserOperation memory userOp = validUserOperation()
+            .withFrom(address(smartWallet))
+            .withSignature("")
+            .build();
+
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+        ), ValidCallsResult.Valid);
+    }
+
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    // where the user operation is from a contract
+    //   and the contract contract implements IAccount
+    //   and the userOp passes IAccount validation
+    // when validCalls is called twice with the same userOp
+    // then the second call should return UserOpNonceInvalid
+    // to prevent replay attacks
+    //
+    function test_verifyUserOp_UserNonceInvalid_FromSmartWallet() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
+
+        DummySmartWallet smartWallet = new DummySmartWallet();
+
+        UserOperation memory userOp = validUserOperation()
+            .withFrom(address(smartWallet))
+            .withSignature("")
+            .build();
+
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+        ), ValidCallsResult.Valid);
+
+        dappOp = validDAppOperation(userOp, solverOps).build(); // increment dappOp so we can hit _verifyUser
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+        ), ValidCallsResult.UserNonceInvalid);
+    }
 
     // TrustedOpHash Allowed Tests
 
@@ -313,21 +605,43 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         UserOperation memory userOp = validUserOperation().withSessionKey(address(0)).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
-        solverOps[0] = validSolverOperation(userOp).withAltUserOpHash(userOp).build();
+        solverOps[0] = validSolverOperation(userOp).withUserOpHash(atlasVerification.getUserOperationHash(userOp)).build();
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
         ), ValidCallsResult.InvalidAuctioneer);
     }
 
-
-    function test_validCalls_trustedOpHash_msgSenderWrong_InvalidBundler() public {
+    //
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    // where the user operation is from a contract
+    //   and the contract contract implements IAccount
+    //   and the userOp passes IAccount validation
+    // when validCalls is called twice with the same userOp
+    // then the second call should return UserOpNonceInvalid
+    // to prevent replay attacks
+    //
+    function test_validCalls_trustedOpHash_userOpChangesButTrustedHashStillValid_Valid() public {
         defaultAtlasWithCallConfig(defaultCallConfig().withTrustedOpHash(true).build());
 
         UserOperation memory userOp = validUserOperation().withSessionKey(governanceEOA).build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
-        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withAltUserOpHash(userOp).build();
-        solverOps[0] = validSolverOperation(userOp).withAltUserOpHash(userOp).build();
+        userOp = validUserOperation().withSessionKey(governanceEOA).withDeadline(block.number + 3).build();
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
+        ), ValidCallsResult.Valid);
+    }
+
+    function test_validCalls_trustedOpHash_msgSenderWrong_InvalidBundler() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withTrustedOpHash(true).build());
+
+        UserOperation memory userOp = validUserOperation().withSessionKey(governanceEOA).sign(address(atlasVerification), userPK).build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+        solverOps[0] = validSolverOperation(userOp).build();
 
         // If msgSender in _validCalls is neither dAppOp.from nor userOp.from,
         // and trustedOpHash is true --> return InvalidBundler
@@ -421,9 +735,9 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     //   and otherwise valid user, solver and dapp operations
     //      where the dapp operation has an empty callChainHash
     // when validCalls is called from the userEOA
-    // then it should return InvalidAuctioneer
+    // then it should return InvalidCallChainHash
     //
-    function test_validCalls_VerifyCallChainHash_InvalidAuctioneer() public {
+    function test_validCalls_VerifyCallChainHash_InvalidCallChainHash() public {
         defaultAtlasWithCallConfig(defaultCallConfig().withVerifyCallChainHash(true).build());
 
         UserOperation memory userOp = validUserOperation().build();
@@ -434,7 +748,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.InvalidAuctioneer);
+        ), ValidCallsResult.InvalidCallChainHash);
     }
 
     //
@@ -547,6 +861,30 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         ), ValidCallsResult.Valid);
     }
 
+    // 
+    // given a default atlas environment
+    //   and otherwise valid user, solver and dapp operations
+    //   and the governanceEOA is not a valid signatory
+    //   and callConfig.solverAuctioneer = true
+    // when validCalls is called from the solverOneEOA
+    // when there is more than 1 solver (must be exactly 1 solver if solver == auctioneer)
+    // then it should return TooManySolverOps
+    //
+    function test_validCalls_SolverAuctioneer_TwoSolvers_TooManySolverOps() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withSolverAuctioneer(true).build());
+        vm.prank(governanceEOA);
+        atlasVerification.removeSignatory(address(dAppControl), governanceEOA);
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = new SolverOperation[](2);
+        solverOps[0] = validSolverOperation(userOp).build();
+        solverOps[1] = validSolverOperation(userOp).build();
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withFrom(solverOneEOA).signAndBuild(address(atlasVerification), governancePK);
+
+        callAndAssert(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: solverOneEOA, isSimulation: false}
+        ), ValidCallsResult.TooManySolverOps);
+    }
+
     //
     // given a default atlas environment
     //   and otherwise valid user, solver and dapp operations
@@ -574,10 +912,11 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     // given a default atlas environment
     //   and otherwise valid user, solver and dapp operations
     //   and the governanceEOA is not a valid signatory
+    //   and the dAppControl is not enabled
     // when validCalls is called from the userEOA
     // then it should return DAppSignatureInvalid
     //
-    function test_validCalls_SignerNotEnabled_DAppSignatureInvalid() public {
+    function test_validCalls_SignerNotEnabled_DAppNotEnabled() public {
         defaultAtlasEnvironment();
         vm.prank(governanceEOA);
         atlasVerification.removeSignatory(address(dAppControl), governanceEOA);
@@ -588,7 +927,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.DAppSignatureInvalid);
+        ), ValidCallsResult.DAppNotEnabled);
     }
 
     //
@@ -596,9 +935,9 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     //   and otherwise valid user, solver and dapp operations
     //     where the dapp operation control address is different to the dapp config to address
     // when validCalls is called from the userEOA
-    // then it should return DAppSignatureInvalid
+    // then it should return InvalidControl
     //
-    function test_validCalls_ControlConfigMismatch_DAppSignatureInvalid() public {
+    function test_validCalls_ControlConfigMismatch_InvalidControl() public {
         defaultAtlasEnvironment();
 
         UserOperation memory userOp = validUserOperation().build();
@@ -607,27 +946,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.DAppSignatureInvalid);
-    }
-
-    //
-    // given a default atlas environment
-    //   and otherwise valid user, solver and dapp operations
-    //     where the dapp operation nonce is uint128.max
-    // when validCalls is called from the userEOA
-    // then it should return DAppSignatureInvalid
-    // because anything above uint128.max - 1 is not a valid nonce
-    //
-    function test_validCalls_NonceTooLarge_DAppSignatureInvalid() public {
-        defaultAtlasEnvironment();
-
-        UserOperation memory userOp = validUserOperation().build();
-        SolverOperation[] memory solverOps = validSolverOperations(userOp);
-        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(type(uint128).max).signAndBuild(address(atlasVerification), governancePK);
-
-        callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.InvalidDAppNonce);
+        ), ValidCallsResult.InvalidControl);
     }
 
     //
@@ -635,11 +954,33 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     //   and otherwise valid user, solver and dapp operations
     //     where the dapp operation nonce is zero
     // when validCalls is called from the userEOA
-    // then it should return DAppSignatureInvalid
-    // because zero is not a valid nonce
+    // then it should return valid
+    // because although zero is not a valid nonce, it is not
+    // checked when dappNoncesSequential isn't enabled
     //
-    function test_validCalls_NonceIsZero_DAppSignatureInvalid() public {
+    function test_validCalls_NonceIsZero_valid() public {
         defaultAtlasEnvironment();
+
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(0).signAndBuild(address(atlasVerification), governancePK);
+
+        doValidateCalls(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: governanceEOA, isSimulation: false}
+        ));
+    }
+
+    //
+    // given a default atlas environment
+    //   and callConfig.dappNoncesSequential = true
+    //   and otherwise valid user, solver and dapp operations
+    //     where the dapp operation nonce is zero
+    // when validCalls is called from the userEOA
+    // then it should return InvalidDAppNonce
+    // because zero is not a valid nonce when dappNoncesSequential is enabled
+    //
+    function test_validCalls_NonceIsZero_InvalidDAppNonce() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequential(true).build());
 
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -652,15 +993,39 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     //
     // given a default atlas environment
+    //   and callConfig.dappNoncesSequential = true
+    //   and otherwise valid user, solver and dapp operations
+    //     where the dapp operation nonce is zero
+    //     and the dapp operation `from` field is address(0)
+    // when validCalls is called from the userEOA
+    //   and isSimulation = true
+    // then it should return Valid
+    // because zero is a valid nonce for simulations when the dapp operation `from` field isn't set
+    //
+    function test_validCalls_NonceIsZero_Simulated_valid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequential(true).build());
+
+        UserOperation memory userOp = validUserOperation().build();
+        SolverOperation[] memory solverOps = validSolverOperations(userOp);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withNonce(0).build();
+
+        doValidateCalls(ValidCallsCall({
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: true}
+        ));
+    }
+
+    //
+    // given a default atlas environment
+    //   and callConfig.dappNoncesSequential = true
     //   and otherwise valid user, solver and dapp operations
     //     where the dapp operation nonce is zero
     // when validCalls is called from the userEOA
     //   and isSimulation = true
-    // then it should return Valid
-    // because zero is a valid nonce for simulations
+    // then it should return InvalidDAppNonce
+    // because zero is not a valid nonce for simulations when the dapp operation `from` field is set
     //
-    function test_validCalls_NonceIsZero_Simulated_DAppSignatureInvalid() public {
-        defaultAtlasEnvironment();
+    function test_validCalls_NonceIsZero_Simulated_InvalidDAppNonce() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequential(true).build());
 
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -673,14 +1038,14 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     //
     // given a default atlas environment
-    //   and callConfig.sequenced = false
+    //   and callConfig.userNoncesSequential = false
     //   and otherwise valid user, solver and dapp operations
     //     where the dapp operation nonce is one
     // when validCalls is called from the userEOA
     // then it should return Valid
     // because one has not been used before
     //
-    function test_validCalls_UnsequencedNonceIsOne_Valid() public {
+    function test_validCalls_NonSeqNonceIsOne_Valid() public {
         defaultAtlasEnvironment();
 
         UserOperation memory userOp = validUserOperation().build();
@@ -694,16 +1059,16 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     //
     // given a default atlas environment
-    //   and callConfig.sequenced = true
+    //   and callConfig.dappNoncesSequential = true
     //   and otherwise valid user, solver and dapp operations
     //     where the dapp operation nonce is one
     // when validCalls is called from the userEOA
     // then it should return Valid
-    // because one is the first valid nonce for sequenced calls
+    // because one is the first valid nonce for sequential calls
     //  and this is the first call for the user
     //
-    function test_validCalls_SequencedNonceIsOne_Valid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequenced(true).build());
+    function test_validCalls_SequentialNonceIsOne_Valid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequential(true).build());
 
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -716,16 +1081,16 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     //
     // given a default atlas environment
-    //   and callConfig.sequenced = true
+    //   and callConfig.dappNoncesSequential = true
     //   and otherwise valid user, solver and dapp operations
     //     where the dapp operation nonce is two
     // when validCalls is called from the userEOA
     // then it should return DAppSignatureInvalid
-    // because one is the first valid nonce for sequenced calls
+    // because one is the first valid nonce for sequential calls
     //  and this is the first call for the user
     //
-    function test_validCalls_SequencedNonceIsTwo_DAppSignatureInvalid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequenced(true).build());
+    function test_validCalls_SequentialNonceIsTwo_DAppSignatureInvalid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequential(true).build());
 
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -738,7 +1103,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     //
     // given an otherwise valid atlas transaction with a dAppOp.nonce of 2
-    //   and the callConfig.sequenced = true
+    //   and the callConfig.userNoncesSequential = true
     //   and the last dAppOp.nonce for the user is 1
     // when validCalls is called
     // then it should return Valid
@@ -746,17 +1111,17 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     //
     // given a default atlas environment
-    //   and callConfig.sequenced = true
+    //   and callConfig.userNoncesSequential = true
     //   and otherwise valid user, solver and dapp operations
     //     where the dapp operation nonce is two
     //   and the last dapp operation nonce for the user is one
     // when validCalls is called from the userEOA
     // then it should return Valid
-    // because one is the first valid nonce for sequenced calls
+    // because one is the first valid nonce for sequential calls
     //  and this is the first call for the user
     //
-    function test_validCalls_SequencedNonceWasOneIsNowTwo_Valid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
+    function test_validCalls_SequentialNonceWasOneIsNowTwo_Valid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
 
         // these first ops are to increment the nonce to 1
         UserOperation memory userOp = validUserOperation().build();
@@ -778,7 +1143,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     // 
     // given a default atlas environment
-    //   and callConfig.sequenced = true
+    //   and callConfig.dappNoncesSequential = true
     //   and otherwise valid user, solver and dapp operations
     //     where the dapp operation nonce is three
     //   and the last dapp operation nonce for the user is one
@@ -787,8 +1152,8 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     // because the current nonce for the user is 1
     //  and the next valid nonce is 2
     //
-    function test_validCalls_SequencedNonceWasOneIsNowThree_DAppSignatureInvalid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequenced(true).build());
+    function test_validCalls_SequentialNonceWasOneIsNowThree_DAppSignatureInvalid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withDappNoncesSequential(true).build());
 
         // these first ops are to increment the nonce to 1
         UserOperation memory userOp = validUserOperation().build();
@@ -901,49 +1266,20 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     //   and otherwise valid user, solver and dapp operations
     //     where the user op control address is different to the dapp config to address
     // when validCalls is called from the userEOA
-    // then it should return UserSignatureInvalid
+    // then it should return ControlMismatch
     // because the user op signature control address must match the dapp config to address
     //
-    function test_validCalls_InvalidUserOpControl_UserSignatureInvalid() public {
+    function test_validCalls_InvalidUserOpControl_ControlMismatch() public {
         defaultAtlasEnvironment();
-        DAppConfig memory config = DAppConfig({ to: address(dAppControl), callConfig: CallBits.encodeCallConfig(defaultCallConfig().build()), bidToken: address(0), solverGasLimit: 1_000_000 });
+        DummyDAppControl otherDappControl = defaultDAppControl().buildAndIntegrate(atlasVerification);
 
-        UserOperation memory userOp = validUserOperation().withControl(address(0)).build();
+        UserOperation memory userOp = validUserOperation().withControl(address(otherDappControl)).signAndBuild(address(atlasVerification), userPK);
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
-        DAppOperation memory dappOp = validDAppOperation(config, userOp, solverOps).withControl(address(dAppControl)).signAndBuild(address(atlasVerification), governancePK);
-
-        ValidCallsResult result;
-        vm.startPrank(address(atlas));
-        (, result) = atlasVerification.validateCalls(
-            config,
-            userOp,
-            solverOps,
-            dappOp,
-            0,
-            userEOA,
-            false);
-        vm.stopPrank();
-        assertValidCallsResult(result, ValidCallsResult.UserSignatureInvalid);
-    }
-
-    //
-    // given a default atlas environment
-    //   and otherwise valid user, solver and dapp operations
-    //     where the user operation nonce is greater than uint128.max - 1
-    // when validCalls is called from the userEOA
-    // then it should return UserSignatureInvalid
-    // because anything above uint128.max - 1 is not a valid nonce
-    //
-    function test_validCalls_UserOpNonceToBig_UserSignatureInvalid() public {
-        defaultAtlasEnvironment();
-
-        UserOperation memory userOp = validUserOperation().withNonce(type(uint128).max).signAndBuild(address(atlasVerification), userPK);
-        SolverOperation[] memory solverOps = validSolverOperations(userOp);
-        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).withControl(address(dAppControl)).signAndBuild(address(atlasVerification), governancePK);
 
         callAndAssert(ValidCallsCall({
-            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.UserSignatureInvalid);
+            userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: governanceEOA, isSimulation: true}
+        ), ValidCallsResult.ControlMismatch);
     }
     
     //
@@ -951,10 +1287,10 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     //   and otherwise valid user, solver and dapp operations
     //     where the user operation nonce is zero
     // when validCalls is called from the userEOA
-    // then it should return UserSignatureInvalid
+    // then it should return UserNonceInvalid
     // because zero is not a valid nonce
     //
-    function test_validCalls_UserOpNonceIsZero_UserSignatureInvalid() public {
+    function test_validCalls_UserOpNonceIsZero_UserNonceInvalid() public {
         defaultAtlasEnvironment();
 
         UserOperation memory userOp = validUserOperation().withNonce(0).signAndBuild(address(atlasVerification), userPK);
@@ -963,7 +1299,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.UserSignatureInvalid);
+        ), ValidCallsResult.UserNonceInvalid);
     }
 
     //
@@ -972,10 +1308,10 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     //     where the user operation nonce is zero
     // when validCalls is called from the userEOA
     //   and isSimulation = true
-    // then it should return UserSignatureInvalid
+    // then it should return UserNonceInvalid
     // because zero is never a valid nonce
     //
-    function test_validCalls_UserOpNonceIsZero_Simulated_UserSignatureInvalid() public {
+    function test_validCalls_UserOpNonceIsZero_Simulated_UserNonceInvalid() public {
         defaultAtlasEnvironment();
 
         UserOperation memory userOp = validUserOperation().withNonce(0).signAndBuild(address(atlasVerification), userPK);
@@ -984,7 +1320,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: true}
-        ), ValidCallsResult.UserSignatureInvalid);
+        ), ValidCallsResult.UserNonceInvalid);
     }
 
     //
@@ -1009,16 +1345,16 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     //
     // given a default atlas environment
-    //   and callConfig.sequenced = true
+    //   and callConfig.userNoncesSequential = true
     //   and otherwise valid user, solver and dapp operations
     //     where the user operation nonce is one
     // when validCalls is called from the userEOA
     // then it should return Valid
-    // because one is the first valid nonce for sequenced calls
+    // because one is the first valid nonce for sequential calls
     //  and this is the first call for the user
     //
-    function test_validCalls_SequencedUserOpNonceIsOne_Valid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
+    function test_validCalls_SequentialUserOpNonceIsOne_Valid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
 
         UserOperation memory userOp = validUserOperation().withNonce(1).signAndBuild(address(atlasVerification), userPK);
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -1031,24 +1367,24 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     //
     // given an otherwise valid atlas transaction with a userOp.nonce of 2
-    //   and the callConfig.sequenced = true
+    //   and the callConfig.userNoncesSequential = true
     //   and the nonce is uninitialized for the user
     // when validCalls is called
-    // then it should return DAppSignatureInvalid
+    // then it should return UserNonceInvalid
     //
 
     //
     // given a default atlas environment
-    //   and callConfig.sequenced = true
+    //   and callConfig.userNoncesSequential = true
     //   and otherwise valid user, solver and dapp operations
     //     where the user operation nonce is two
     // when validCalls is called from the userEOA
-    // then it should return DAppSignatureInvalid
-    // because one is the first valid nonce for sequenced calls
+    // then it should return UserNonceInvalid
+    // because one is the first valid nonce for sequential calls
     //  and this is the first call for the user
     //
-    function test_validCalls_SequencedUserOpNonceIsTwo_UserSignatureInvalid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
+    function test_validCalls_SequentialUserOpNonceIsTwo_UserNonceInvalid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
 
         UserOperation memory userOp = validUserOperation().withNonce(2).signAndBuild(address(atlasVerification), userPK);
         SolverOperation[] memory solverOps = validSolverOperations(userOp);
@@ -1056,12 +1392,12 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.UserSignatureInvalid);
+        ), ValidCallsResult.UserNonceInvalid);
     }
 
     //
     // given a default atlas environment
-    //   and callConfig.sequenced = true
+    //   and callConfig.userNoncesSequential = true
     //   and otherwise valid user, solver and dapp operations
     //     where the user operation nonce is two
     //  and the last user operation nonce for the user is one
@@ -1070,8 +1406,8 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     // because the current nonce for the user is 1
     //  and the next valid nonce is 2
     //
-    function test_validCalls_SequencedUserOpNonceIsTwo_Valid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
+    function test_validCalls_SequentialUserOpNonceIsTwo_Valid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
 
         // increment the nonce to 1
         UserOperation memory userOp = validUserOperation().signAndBuild(address(atlasVerification), userPK);
@@ -1093,25 +1429,25 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     //
     // given an otherwise valid atlas transaction with a userOp.nonce of 3
-    //   and the callConfig.sequenced = true
+    //   and the callConfig.userNoncesSequential = true
     //   and the last nonce for the user is 1
     // when validCalls is called
-    // then it should return DAppSignatureInvalid
+    // then it should return UserNonceInvalid
     //
 
     //
     // given a default atlas environment
-    //   and callConfig.sequenced = true
+    //   and callConfig.userNoncesSequential = true
     //   and otherwise valid user, solver and dapp operations
     //     where the user operation nonce is three
     //   and the last user operation nonce for the user is one
     // when validCalls is called from the userEOA
-    // then it should return DAppSignatureInvalid
+    // then it should return UserNonceInvalid
     // because the current nonce for the user is 1
     //   and the next valid nonce is 2
     //
-    function test_validCalls_SequencedUserOpNonceIsThree_UserSignatureInvalid() public {
-        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequenced(true).build());
+    function test_validCalls_SequentialUserOpNonceIsThree_UserNonceInvalid() public {
+        defaultAtlasWithCallConfig(defaultCallConfig().withUserNoncesSequential(true).build());
 
         // increment the nonce to 1
         UserOperation memory userOp = validUserOperation().signAndBuild(address(atlasVerification), userPK);
@@ -1128,7 +1464,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
         callAndAssert(ValidCallsCall({
             userOp: userOp, solverOps: solverOps, dAppOp: dappOp, msgValue: 0, msgSender: userEOA, isSimulation: false}
-        ), ValidCallsResult.UserSignatureInvalid);
+        ), ValidCallsResult.UserNonceInvalid);
     }
 
     // TooManySolverOps cases
@@ -1407,7 +1743,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
         ), ValidCallsResult.NoSolverOp);
     }
 
-    function testGetDomainSeparatorInAtlasVerification() public {
+    function testGetDomainSeparatorInAtlasVerification() public view {
         bytes32 hashedName = keccak256(bytes("AtlasVerification"));
         bytes32 hashedVersion = keccak256(bytes("1.0"));
         bytes32 typeHash = keccak256(

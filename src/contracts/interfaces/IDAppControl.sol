@@ -1,28 +1,16 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import "../types/UserCallTypes.sol";
-import "../types/SolverCallTypes.sol";
-import "../types/DAppApprovalTypes.sol";
+import "../types/UserOperation.sol";
+import "../types/SolverOperation.sol";
+import "../types/ConfigTypes.sol";
 
 interface IDAppControl {
     function preOpsCall(UserOperation calldata userOp) external payable returns (bytes memory);
 
-    function preSolverCall(
-        SolverOperation calldata solverOp,
-        bytes calldata returnData
-    )
-        external
-        payable
-        returns (bool);
+    function preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) external payable;
 
-    function postSolverCall(
-        SolverOperation calldata solverOp,
-        bytes calldata returnData
-    )
-        external
-        payable
-        returns (bool);
+    function postSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) external payable;
 
     function postOpsCall(bool solved, bytes calldata data) external payable returns (bytes memory);
 
@@ -38,9 +26,9 @@ interface IDAppControl {
 
     function getDAppSignatory() external view returns (address governanceAddress);
 
-    function requireSequencedUserNonces() external view returns (bool isSequenced);
+    function requireSequentialUserNonces() external view returns (bool isSequential);
 
-    function requireSequencedDAppNonces() external view returns (bool isSequenced);
+    function requireSequentialDAppNonces() external view returns (bool isSequential);
 
     function preOpsDelegated() external view returns (bool delegated);
 

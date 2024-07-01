@@ -1,19 +1,20 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { LibSort } from "solady/utils/LibSort.sol";
 
-import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
+import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
 import { Escrow } from "./Escrow.sol";
 import { Factory } from "./Factory.sol";
 
-import "src/contracts/types/SolverCallTypes.sol";
-import "src/contracts/types/UserCallTypes.sol";
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/UserOperation.sol";
 import "src/contracts/types/LockTypes.sol";
-import "src/contracts/types/DAppApprovalTypes.sol";
-import "src/contracts/types/ValidCallsTypes.sol";
+import "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
+import "src/contracts/types/ValidCalls.sol";
 
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
@@ -23,23 +24,26 @@ import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 /// @notice The Execution Abstraction protocol.
 contract Atlas is Escrow, Factory {
     using CallBits for uint32;
-    using SafetyBits for EscrowKey;
+    using SafetyBits for Context;
 
     constructor(
-        uint256 _escrowDuration,
-        address _verification,
-        address _simulator,
-        address _surchargeRecipient,
-        address _executionTemplate
+        uint256 escrowDuration,
+        address verification,
+        address simulator,
+        address initialSurchargeRecipient,
+        address executionTemplate
     )
-        Escrow(_escrowDuration, _verification, _simulator, _surchargeRecipient)
-        Factory(_executionTemplate)
+        Escrow(escrowDuration, verification, simulator, initialSurchargeRecipient)
+        Factory(executionTemplate)
     { }
 
     /// @notice metacall is the entrypoint function for the Atlas transactions.
+    /// @dev Any ETH sent as msg.value with a metacall should be considered a potential subsidy for the winning solver's
+    /// gas repayment.
     /// @param userOp The UserOperation struct containing the user's transaction data.
     /// @param solverOps The SolverOperation array containing the solvers' transaction data.
     /// @param dAppOp The DAppOperation struct containing the DApp's transaction data.
+    /// @return auctionWon A boolean indicating whether there was a successful, winning solver.
     function metacall(
         UserOperation calldata userOp, // set by user
         SolverOperation[] calldata solverOps, // supplied by ops relay
@@ -49,51 +53,54 @@ contract Atlas is Escrow, Factory {
         payable
         returns (bool auctionWon)
     {
-        uint256 gasMarker = gasleft(); // + 21_000 + (msg.data.length * _CALLDATA_LENGTH_PREMIUM);
-        bool isSimulation = msg.sender == SIMULATOR;
+        uint256 _gasMarker = gasleft() + 21_000 + (msg.data.length * _CALLDATA_LENGTH_PREMIUM);
+        bool _isSimulation = msg.sender == SIMULATOR;
 
-        (address executionEnvironment, DAppConfig memory dConfig) = _getOrCreateExecutionEnvironment(userOp);
+        (address _executionEnvironment, DAppConfig memory _dConfig) = _getOrCreateExecutionEnvironment(userOp);
 
-        // Gracefully return if not valid. This allows signature data to be stored, which helps prevent
-        // replay attacks.
-        // NOTE: Currently reverting instead of graceful return to help w/ testing. TODO - still reverting?
-        (bytes32 userOpHash, ValidCallsResult validCallsResult) = IAtlasVerification(VERIFICATION).validateCalls(
-            dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, isSimulation
-        );
-        if (validCallsResult != ValidCallsResult.Valid) {
-            if (isSimulation) revert VerificationSimFail(uint256(validCallsResult));
-            else revert ValidCalls(validCallsResult);
+        ValidCallsResult _validCallsResult =
+            VERIFICATION.validateCalls(_dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, _isSimulation);
+        if (_validCallsResult != ValidCallsResult.Valid) {
+            if (_isSimulation) revert VerificationSimFail(_validCallsResult);
+
+            // Gracefully return for results that need nonces to be stored and prevent replay attacks
+            if (uint8(_validCallsResult) >= _GRACEFUL_RETURN_THRESHOLD && !_dConfig.callConfig.allowsReuseUserOps()) {
+                return false;
+            }
+
+            // Revert for all other results
+            revert ValidCalls(_validCallsResult);
         }
 
-        // Initialize the lock
-        _setAtlasLock(executionEnvironment, gasMarker, userOp.value);
+        // Initialize the environment lock and accounting values
+        _setEnvironmentLock(_dConfig, _executionEnvironment);
+        _initializeAccountingValues(_gasMarker);
 
-        try this.execute{ value: msg.value }(dConfig, userOp, solverOps, executionEnvironment, msg.sender, userOpHash)
-        returns (bool _auctionWon, uint256 winningSolverIndex) {
-            auctionWon = _auctionWon;
+        // userOpHash has already been calculated and verified in validateCalls at this point, so rather
+        // than re-calculate it, we can simply take it from the dAppOp here. It's worth noting that this will
+        // be either a TRUSTED or DEFAULT hash, depending on the allowsTrustedOpHash setting.
+        try this.execute(_dConfig, userOp, solverOps, _executionEnvironment, msg.sender, dAppOp.userOpHash) returns (
+            Context memory ctx
+        ) {
             // Gas Refund to sender only if execution is successful
-            (uint256 ethPaidToBundler, uint256 netGasSurcharge) = _settle({
-                winningSolver: auctionWon ? solverOps[winningSolverIndex].from : msg.sender,
-                bundler: msg.sender
-            });
+            (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) = _settle(ctx, _dConfig.solverGasLimit);
 
+            auctionWon = ctx.solverSuccessful;
             emit MetacallResult(
-                msg.sender,
-                userOp.from,
-                auctionWon ? solverOps[winningSolverIndex].from : address(0),
-                ethPaidToBundler,
-                netGasSurcharge
+                msg.sender, userOp.from, auctionWon, ctx.paymentsSuccessful, _ethPaidToBundler, _netGasSurcharge
             );
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
-            _handleErrors(revertData, dConfig.callConfig);
+            _handleErrors(revertData, _dConfig.callConfig);
 
             // Refund the msg.value to sender if it errored
+            // WARNING: If msg.sender is a disposable address such as a session key, make sure to remove ETH from it
+            // before disposal
             if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
         }
 
         // Release the lock
-        _releaseAtlasLock();
+        _releaseAccountingLock();
     }
 
     /// @notice execute is called above, in a try-catch block in metacall.
@@ -103,10 +110,9 @@ contract Atlas is Escrow, Factory {
     /// @param executionEnvironment Address of the execution environment contract of the current metacall tx.
     /// @param bundler Address of the bundler of the current metacall tx.
     /// @param userOpHash Hash of the userOp struct of the current metacall tx.
-    /// @return auctionWon Boolean indicating whether the auction was won
-    /// @return uint256 The solver outcome bitmap
+    /// @return ctx Context struct containing relavent context information for the Atlas auction.
     function execute(
-        DAppConfig calldata dConfig,
+        DAppConfig memory dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         address executionEnvironment,
@@ -115,145 +121,73 @@ contract Atlas is Escrow, Factory {
     )
         external
         payable
-        returns (bool auctionWon, uint256)
+        returns (Context memory ctx)
     {
         // This is a self.call made externally so that it can be used with try/catch
         if (msg.sender != address(this)) revert InvalidAccess();
 
-        (bytes memory returnData, EscrowKey memory key) =
-            _preOpsUserExecutionIteration(dConfig, userOp, solverOps, executionEnvironment, bundler, userOpHash);
-
-        if (dConfig.callConfig.exPostBids()) {
-            (auctionWon, key) = _bidFindingIteration(dConfig, userOp, solverOps, returnData, key);
-        } else {
-            (auctionWon, key) = _bidKnownIteration(dConfig, userOp, solverOps, returnData, key);
-        }
-
-        // If no solver was successful, handle revert decision
-        if (!auctionWon) {
-            if (key.isSimulation) revert SolverSimFail(uint256(key.solverOutcome));
-            if (dConfig.callConfig.needsFulfillment()) {
-                revert UserNotFulfilled(); // revert("ERR-E003 SolverFulfillmentFailure");
-            }
-        }
-
-        if (dConfig.callConfig.needsPostOpsCall()) {
-            // NOTE: key.addressPointer currently points at address(0) if all solvers fail.
-            // TODO: point key.addressPointer at bundler if all fail.
-            key = key.holdPostOpsLock(); // preserves addressPointer of winning solver
-
-            bool callSuccessful = _executePostOpsCall(auctionWon, returnData, key);
-            if (!callSuccessful) {
-                if (key.isSimulation) revert PostOpsSimFail();
-                else revert PostOpsFail();
-            }
-        }
-        return (auctionWon, uint256(key.solverOutcome));
-    }
-
-    /// @notice Called above in `execute`, this function executes the preOps and userOp calls.
-    /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
-    /// @param userOp UserOperation struct of the current metacall tx.
-    /// @param solverOps SolverOperation array of the current metacall tx.
-    /// @param executionEnvironment Address of the execution environment contract of the current metacall tx.
-    /// @param bundler Address of the bundler of the current metacall tx.
-    /// @param userOpHash Hash of the userOp struct of the current metacall tx.
-    /// @return bytes returnData returned from the preOps and/or userOp calls.
-    /// @return EscrowKey struct containing the current state of the escrow lock.
-    function _preOpsUserExecutionIteration(
-        DAppConfig calldata dConfig,
-        UserOperation calldata userOp,
-        SolverOperation[] calldata solverOps,
-        address executionEnvironment,
-        address bundler,
-        bytes32 userOpHash
-    )
-        internal
-        returns (bytes memory, EscrowKey memory)
-    {
-        bool callSuccessful;
-        bool usePreOpsReturnData;
-        bytes memory returnData;
-
-        // Build the memory lock
-        EscrowKey memory key = _buildEscrowLock(
+        // Build the context object
+        ctx = _buildContext(
             dConfig, executionEnvironment, userOpHash, bundler, uint8(solverOps.length), bundler == SIMULATOR
         );
 
+        bytes memory _returnData;
+
+        // PreOps Call
         if (dConfig.callConfig.needsPreOpsCall()) {
-            // CASE: Need PreOps Call
-            key = key.holdPreOpsLock(dConfig.to);
-
-            if (CallBits.needsPreOpsReturnData(dConfig.callConfig)) {
-                // CASE: Need PreOps return data
-                usePreOpsReturnData = true;
-                (callSuccessful, returnData) = _executePreOpsCall(userOp, executionEnvironment, key.pack());
-            } else {
-                // CASE: Ignore PreOps return data
-                (callSuccessful,) = _executePreOpsCall(userOp, executionEnvironment, key.pack());
-            }
-
-            if (!callSuccessful) {
-                if (key.isSimulation) revert PreOpsSimFail();
-                else revert PreOpsFail();
-            }
+            _returnData = _executePreOpsCall(ctx, dConfig, userOp);
         }
 
-        key = key.holdUserLock(userOp.dapp);
+        // UserOp Call
+        _returnData = _executeUserOperation(ctx, dConfig, userOp, _returnData);
 
-        if (CallBits.needsUserReturnData(dConfig.callConfig)) {
-            // CASE: Need User return data
+        // SolverOps Calls
+        uint256 _winningBidAmount = dConfig.callConfig.exPostBids()
+            ? _bidFindingIteration(ctx, dConfig, userOp, solverOps, _returnData)
+            : _bidKnownIteration(ctx, dConfig, userOp, solverOps, _returnData);
 
-            if (usePreOpsReturnData) {
-                // CASE: Need PreOps return Data, Need User return data
-                bytes memory userReturnData;
-                (callSuccessful, userReturnData) = _executeUserOperation(userOp, executionEnvironment, key.pack());
-                returnData = bytes.concat(returnData, userReturnData);
-            } else {
-                // CASE: Ignore PreOps return data, Need User return data
-                (callSuccessful, returnData) = _executeUserOperation(userOp, executionEnvironment, key.pack());
-            }
-        } else {
-            // CASE: Ignore User return data
-            (callSuccessful,) = _executeUserOperation(userOp, executionEnvironment, key.pack());
+        // AllocateValue Call
+        if (ctx.solverSuccessful) {
+            _allocateValue(ctx, dConfig, _winningBidAmount, _returnData);
         }
 
-        if (!callSuccessful) {
-            if (key.isSimulation) revert UserOpSimFail();
-            else revert UserOpFail();
+        // PostOp Call
+        if (dConfig.callConfig.needsPostOpsCall()) {
+            _executePostOpsCall(ctx, ctx.solverSuccessful, _returnData);
         }
-
-        return (returnData, key);
     }
 
     /// @notice Called above in `execute` if the DAppConfig requires ex post bids. Sorts solverOps by bid amount and
     /// executes them in descending order until a successful winner is found.
+    /// @param ctx Context struct containing the current state of the escrow lock.
     /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param returnData Return data from the preOps and userOp calls.
-    /// @param key EscrowKey struct containing the current state of the escrow lock.
-    /// @return auctionWon bool indicating whether a winning solver was found or not.
-    /// @return EscrowKey struct containing the current state of the escrow lock.
+    /// @return The winning bid amount.
     function _bidFindingIteration(
-        DAppConfig calldata dConfig,
+        Context memory ctx,
+        DAppConfig memory dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
-        bytes memory returnData,
-        EscrowKey memory key
+        bytes memory returnData
     )
         internal
-        returns (bool auctionWon, EscrowKey memory)
+        returns (uint256)
     {
         // Return early if no solverOps (e.g. in simUserOperation)
-        if (solverOps.length == 0) return (false, key);
+        if (solverOps.length == 0) {
+            if (ctx.isSimulation) revert SolverSimFail(0);
+            if (dConfig.callConfig.needsFulfillment()) revert UserNotFulfilled();
+            return 0;
+        }
 
-        key.bidFind = true;
+        ctx.bidFind = true;
 
-        uint256[] memory bidsAndIndices = new uint256[](solverOps.length);
-        uint256 zeroBidCount;
-        uint256 bidAmountFound;
-        uint256 bidsAndIndicesLastIndex = bidsAndIndices.length - 1; // computed once for efficiency
+        uint256[] memory _bidsAndIndices = new uint256[](solverOps.length);
+        uint256 _zeroBidCount;
+        uint256 _bidAmountFound;
+        uint256 _bidsAndIndicesLastIndex = _bidsAndIndices.length - 1; // computed once for efficiency
 
         // First, get all bid amounts. Bids of zero are ignored by only storing non-zero bids in the array, from right
         // to left. If there are any zero bids they will end up on the left as uint(0) values - in their sorted
@@ -271,142 +205,148 @@ contract Atlas is Escrow, Factory {
         // |<------------------ 240 bits ---------------->|<------- 16 bits ------->|
 
         for (uint256 i; i < solverOps.length; ++i) {
-            bidAmountFound = _getBidAmount(dConfig, userOp, solverOps[i], returnData, key);
+            _bidAmountFound = _getBidAmount(ctx, dConfig, userOp, solverOps[i], returnData);
 
-            if (bidAmountFound == 0 || bidAmountFound > type(uint240).max) {
-                // Zero bids are ignored: increment zeroBidCount offset
+            if (_bidAmountFound == 0 || _bidAmountFound > type(uint240).max) {
+                // Zero bids are ignored: increment _zeroBidCount offset
                 // Bids that would cause an overflow are also ignored
                 unchecked {
-                    ++zeroBidCount;
+                    ++_zeroBidCount;
                 }
             } else {
                 // Non-zero bids are packed with their original solverOps index.
                 // The array is filled with non-zero bids from the right. This causes all zero bids to be on the left -
                 // in their sorted position, so fewer operations are needed in the sorting step below.
-                bidsAndIndices[bidsAndIndicesLastIndex - (i - zeroBidCount)] =
-                    uint256(bidAmountFound << BITS_FOR_INDEX | uint16(i));
+                _bidsAndIndices[_bidsAndIndicesLastIndex - (i - _zeroBidCount)] =
+                    uint256(_bidAmountFound << _BITS_FOR_INDEX | uint16(i));
             }
         }
 
         // Then, sorts the uint256 array in-place, in ascending order.
-        LibSort.insertionSort(bidsAndIndices);
+        LibSort.insertionSort(_bidsAndIndices);
 
-        key.bidFind = false;
+        ctx.bidFind = false;
 
         // Finally, iterate through sorted bidsAndIndices array in descending order of bidAmount.
-        for (uint256 i = bidsAndIndicesLastIndex; i >= 0; --i) {
+        for (uint256 i = _bidsAndIndicesLastIndex; i >= 0; --i) {
             // Isolate the bidAmount from the packed uint256 value
-            bidAmountFound = (bidsAndIndices[i] >> BITS_FOR_INDEX) & FIRST_240_BITS_MASK;
+            _bidAmountFound = (_bidsAndIndices[i] >> _BITS_FOR_INDEX) & _FIRST_240_BITS_TRUE_MASK;
 
             // If we reach the zero bids on the left of array, break as all valid bids already checked.
-            if (bidAmountFound == 0) break;
+            if (_bidAmountFound == 0) break;
 
             // Isolate the original solverOps index from the packed uint256 value
-            uint256 solverOpsIndex = bidsAndIndices[i] & FIRST_16_BITS_MASK;
+            uint256 _solverIndex = uint8(_bidsAndIndices[i] & _FIRST_16_BITS_TRUE_MASK);
+            ctx.solverIndex = uint8(_solverIndex); // Yay, compiler <3
 
-            (auctionWon, key) = _executeSolverOperation(
-                dConfig, userOp, solverOps[solverOpsIndex], returnData, bidAmountFound, true, key
+            // Execute the solver operation. If solver won, allocate value and return. Otherwise continue looping.
+            _bidAmountFound = _executeSolverOperation(
+                ctx, dConfig, userOp, solverOps[_solverIndex], _bidAmountFound, true, returnData
             );
 
-            if (auctionWon) {
-                key = _allocateValue(dConfig, solverOps[solverOpsIndex], bidAmountFound, returnData, key);
-                key.solverOutcome = uint24(solverOpsIndex);
-                return (auctionWon, key);
+            if (ctx.solverSuccessful) {
+                return _bidAmountFound;
             }
 
             if (i == 0) break; // break to prevent underflow in next loop
         }
-
-        return (auctionWon, key);
+        if (ctx.isSimulation) revert SolverSimFail(uint256(ctx.solverOutcome));
+        if (dConfig.callConfig.needsFulfillment()) revert UserNotFulfilled();
+        return 0;
     }
 
     /// @notice Called above in `execute` as an alternative to `_bidFindingIteration`, if solverOps have already been
     /// reliably sorted. Executes solverOps in order until a successful winner is found.
+    /// @param ctx Context struct containing the current state of the escrow lock.
     /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param returnData Return data from the preOps and userOp calls.
-    /// @param key EscrowKey struct containing the current state of the escrow lock.
-    /// @return auctionWon bool indicating whether a winning solver was found or not.
-    /// @return EscrowKey struct containing the current state of the escrow lock.
+    /// @return The winning bid amount.
     function _bidKnownIteration(
-        DAppConfig calldata dConfig,
+        Context memory ctx,
+        DAppConfig memory dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
-        bytes memory returnData,
-        EscrowKey memory key
+        bytes memory returnData
     )
         internal
-        returns (bool auctionWon, EscrowKey memory)
+        returns (uint256)
     {
-        uint256 k = solverOps.length;
-        uint256 i;
+        uint256 _bidAmount;
 
-        for (; i < k;) {
-            // valid solverOps are packed from left of array - break at first invalid solverOp
+        for (uint8 i = uint8(solverOps.length); ctx.solverIndex < i; ctx.solverIndex++) {
+            SolverOperation calldata solverOp = solverOps[ctx.solverIndex];
 
-            SolverOperation calldata solverOp = solverOps[i];
+            _bidAmount = _executeSolverOperation(ctx, dConfig, userOp, solverOp, solverOp.bidAmount, false, returnData);
 
-            (auctionWon, key) =
-                _executeSolverOperation(dConfig, userOp, solverOp, returnData, solverOp.bidAmount, false, key);
-
-            if (auctionWon) {
-                key = _allocateValue(dConfig, solverOp, solverOp.bidAmount, returnData, key);
-
-                key.solverOutcome = uint24(i);
-
-                return (auctionWon, key);
-            }
-
-            unchecked {
-                ++i;
+            if (ctx.solverSuccessful) {
+                return _bidAmount;
             }
         }
-
-        return (auctionWon, key);
+        if (ctx.isSimulation) revert SolverSimFail(uint256(ctx.solverOutcome));
+        if (dConfig.callConfig.needsFulfillment()) revert UserNotFulfilled();
+        return 0;
     }
 
     /// @notice Called at the end of `metacall` to bubble up specific error info in a revert.
     /// @param revertData Revert data from a failure during the execution of the metacall.
     /// @param callConfig The CallConfig of the current metacall tx.
     function _handleErrors(bytes memory revertData, uint32 callConfig) internal view {
-        bytes4 errorSwitch = bytes4(revertData);
+        bytes4 _errorSwitch = bytes4(revertData);
         if (msg.sender == SIMULATOR) {
             // Simulation
-            if (errorSwitch == PreOpsSimFail.selector) {
+            if (_errorSwitch == PreOpsSimFail.selector) {
                 revert PreOpsSimFail();
-            } else if (errorSwitch == UserOpSimFail.selector) {
+            } else if (_errorSwitch == UserOpSimFail.selector) {
                 revert UserOpSimFail();
-            } else if (errorSwitch == SolverSimFail.selector) {
+            } else if (_errorSwitch == SolverSimFail.selector) {
                 // Expects revertData in form [bytes4, uint256]
-                uint256 solverOutcomeResult;
+                uint256 _solverOutcomeResult;
                 assembly {
                     let dataLocation := add(revertData, 0x20)
-                    solverOutcomeResult := mload(add(dataLocation, sub(mload(revertData), 32)))
+                    _solverOutcomeResult := mload(add(dataLocation, sub(mload(revertData), 32)))
                 }
-                revert SolverSimFail(solverOutcomeResult);
-            } else if (errorSwitch == PostOpsSimFail.selector) {
+                revert SolverSimFail(_solverOutcomeResult);
+            } else if (_errorSwitch == AllocateValueSimFail.selector) {
+                revert AllocateValueSimFail();
+            } else if (_errorSwitch == PostOpsSimFail.selector) {
                 revert PostOpsSimFail();
             }
         }
-        if (errorSwitch == UserNotFulfilled.selector) {
+        if (_errorSwitch == UserNotFulfilled.selector) {
             revert UserNotFulfilled();
         }
+        // If allowReuseUserOps = true, it reverts and bubbles up whatever the error
+        // was that it caught. This is to prevent storing the nonce as used so the userOp
+        // can be reused. Otherwise, the whole metacall doesn't revert but the inner
+        // execute() does so, no operation changes are persisted.
         if (callConfig.allowsReuseUserOps()) {
             assembly {
-                mstore(0, errorSwitch)
+                mstore(0, _errorSwitch)
                 revert(0, 4)
             }
         }
     }
 
-    /// @notice Reverts if the caller is not the execution environment address expected from the set of inputs.
+    /// @notice Returns whether or not the execution environment address matches what's expected from the set of inputs.
+    /// @param environment ExecutionEnvironment address
     /// @param user User address
-    /// @param controller DAppControl contract address
+    /// @param control DAppControl contract address
     /// @param callConfig CallConfig of the current metacall tx.
-    function _verifyCallerIsExecutionEnv(address user, address controller, uint32 callConfig) internal view override {
-        if (msg.sender != _getExecutionEnvironmentCustom(user, controller.codehash, controller, callConfig)) {
-            revert EnvironmentMismatch();
-        }
+    /// @return A bool indicating whether the execution environment address is the same address that the factory would
+    /// deploy an Execution Environment to, given the user, control, and callConfig params.
+    function _verifyUserControlExecutionEnv(
+        address environment,
+        address user,
+        address control,
+        uint32 callConfig
+    )
+        internal
+        view
+        override
+        returns (bool)
+    {
+        return environment == _getExecutionEnvironmentCustom(user, control, callConfig);
     }
 }

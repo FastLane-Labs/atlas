@@ -1,9 +1,6 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-// Base Imports
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
-
 // V4 Imports
 import { IPoolManager } from "./IPoolManager.sol";
 import { IHooks } from "./IHooks.sol";
@@ -11,12 +8,12 @@ import { IHooks } from "./IHooks.sol";
 // Atlas Imports
 import { V4DAppControl } from "./V4DAppControl.sol";
 
-import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
-import { SafetyBits } from "../../libraries/SafetyBits.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
+import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 
-import "../../types/SolverCallTypes.sol";
-import "../../types/UserCallTypes.sol";
-import "../../types/DAppApprovalTypes.sol";
+import "../../types/SolverOperation.sol";
+import "../../types/UserOperation.sol";
+import "../../types/ConfigTypes.sol";
 import "../../types/LockTypes.sol";
 
 // NOTE: Uniswap V4 is unique in that it would not require a frontend integration.
@@ -76,25 +73,24 @@ contract UniV4Hook is V4DAppControl {
         require(address(this) == hook, "ERR-H00 InvalidCallee");
         require(msg.sender == v4Singleton, "ERR-H01 InvalidCaller"); // TODO: Confirm this
 
-        EscrowKey memory escrowKey = ISafetyLocks(atlas).getLockState();
+        ExecutionPhase currentPhase = IAtlas(ATLAS).phase();
 
-        if (escrowKey.lockState == SafetyBits._LOCKED_X_USER_X_UNSET) {
+        if (currentPhase == ExecutionPhase.UserOperation) {
             // Case: User call
             // Sender = ExecutionEnvironment
 
             // Verify that the pool is valid for the user to trade in.
             require(keccak256(abi.encode(key, sender)) == hashLock, "ERR-H02 InvalidSwapper");
-        } else if (escrowKey.lockState == SafetyBits._LOCKED_X_SOLVERS_X_REQUESTED) {
+        } else if (currentPhase == ExecutionPhase.SolverOperation) {
             // Case: Solver call
             // Sender = Solver contract
-            // NOTE: This lockState verifies that the user's transaction has already
+            // NOTE: This phase verifies that the user's transaction has already
             // been executed.
             // NOTE: Solvers must have triggered the safetyCallback on the ExecutionEnvironment
-            // *before* swapping.  The safetyCallback sets the ExecutionEnvironment as the
-            // escrowKey.addressPointer.
+            // *before* swapping.  The safetyCallback sets the ExecutionEnvironment as
 
             // Verify that the pool is valid for a solver to trade in.
-            require(hashLock == keccak256(abi.encode(key, escrowKey.addressPointer)), "ERR-H04 InvalidPoolKey");
+            require(hashLock == keccak256(abi.encode(key, _control())), "ERR-H04 InvalidPoolKey");
         } else {
             // Case: Other call
             // Determine if the sequenced order was processed earlier in the block

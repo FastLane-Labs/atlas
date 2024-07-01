@@ -3,11 +3,9 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { IDAppIntegration } from "src/contracts/interfaces/IDAppIntegration.sol";
-
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
-import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
+import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
 
 import { Sorter } from "src/contracts/helpers/Sorter.sol";
 import { Simulator } from "src/contracts/helpers/Simulator.sol";
@@ -55,7 +53,7 @@ contract BaseTest is Test, TestConstants {
     SolverExPost public solverOneXP;
     SolverExPost public solverTwoXP;
 
-    V2DAppControl public control;
+    V2DAppControl public v2DAppControl;
 
     V2Helper public helper;
 
@@ -86,11 +84,11 @@ contract BaseTest is Test, TestConstants {
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
 
         atlas = new Atlas({
-            _escrowDuration: 64,
-            _verification: expectedAtlasVerificationAddr,
-            _simulator: address(simulator),
-            _executionTemplate: address(execEnvTemplate),
-            _surchargeRecipient: payee
+            escrowDuration: 64,
+            verification: expectedAtlasVerificationAddr,
+            simulator: address(simulator),
+            executionTemplate: address(execEnvTemplate),
+            initialSurchargeRecipient: payee
         });
         atlasVerification = new AtlasVerification(address(atlas));
         simulator.setAtlas(address(atlas));
@@ -99,8 +97,8 @@ contract BaseTest is Test, TestConstants {
         vm.stopPrank();
         vm.startPrank(governanceEOA);
 
-        control = new V2DAppControl(address(atlas));
-        atlasVerification.initializeGovernance(address(control));
+        v2DAppControl = new V2DAppControl(address(atlas));
+        atlasVerification.initializeGovernance(address(v2DAppControl));
 
         vm.stopPrank();
 
@@ -108,8 +106,9 @@ contract BaseTest is Test, TestConstants {
 
         vm.startPrank(solverOneEOA);
 
-        solverOne = new Solver(WETH_ADDRESS, address(atlas), solverOneEOA);
-        solverOneXP = new SolverExPost(WETH_ADDRESS, address(atlas), solverOneEOA, 60);
+        // Salt to avoid clashes caused by vm.rollFork() in other tests
+        solverOne = new Solver{ salt: keccak256("1") }(WETH_ADDRESS, address(atlas), solverOneEOA);
+        solverOneXP = new SolverExPost{ salt: keccak256("2") }(WETH_ADDRESS, address(atlas), solverOneEOA, 60);
         atlas.deposit{ value: 1e18 }();
 
         vm.stopPrank();
@@ -136,7 +135,7 @@ contract BaseTest is Test, TestConstants {
         deal(TOKEN_ZERO, address(solverTwoXP), 10e24);
         deal(TOKEN_ONE, address(solverTwoXP), 10e24);
 
-        helper = new V2Helper(address(control), address(atlas), address(atlasVerification));
+        helper = new V2Helper(address(v2DAppControl), address(atlas), address(atlasVerification));
         u = new Utilities();
 
         deal(TOKEN_ZERO, address(atlas), 1);
@@ -144,6 +143,6 @@ contract BaseTest is Test, TestConstants {
 
         vm.label(userEOA, "USER");
         vm.label(address(atlas), "ATLAS");
-        vm.label(address(control), "DAPP CONTROL");
+        vm.label(address(v2DAppControl), "V2 DAPP CONTROL");
     }
 }

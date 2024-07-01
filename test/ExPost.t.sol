@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.22;
 
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-import { IDAppIntegration } from "src/contracts/interfaces/IDAppIntegration.sol";
 import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
@@ -14,11 +14,12 @@ import { V2ExPost } from "src/contracts/examples/ex-post-mev-example/V2ExPost.so
 
 import { SolverExPost } from "src/contracts/solver/src/TestSolverExPost.sol";
 
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/SolverOperation.sol";
 import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
-import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
+import "src/contracts/types/ConfigTypes.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { V2Helper } from "./V2Helper.sol";
@@ -56,6 +57,7 @@ contract ExPostTest is BaseTest {
 
         UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
         userOp.control = address(v2ExPost);
+        userOp.callConfig = v2ExPost.CALL_CONFIG();
 
         // user does not sign their own operation when bundling
         // (v, r, s) = vm.sign(userPK, atlasVerification.getUserOperationPayload(userOp));
@@ -114,12 +116,12 @@ contract ExPostTest is BaseTest {
 
         console.log("userEOA", userEOA);
         console.log("atlas", address(atlas));
-        console.log("control", address(v2ExPost));
+        console.log("v2 ExPost Control", address(v2ExPost));
         console.log("executionEnvironment", executionEnvironment);
 
         // User must approve Atlas
-        ERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
-        ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
+        IERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
+        IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
 
         vm.stopPrank();
 
@@ -134,7 +136,7 @@ contract ExPostTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
         (simSuccess, simResult,) = simulator.simSolverCall(userOp, solverOps[0], dAppOp);
-        assertTrue(simSuccess, "solverOps[0] should succeed in simulator");
+        assertEq(simSuccess, false, "solverOps[0] should fail in sim due to swap path");
 
         // Simulate the second SolverOp
         tempSolverOps[0] = solverOps[1];
@@ -142,7 +144,7 @@ contract ExPostTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
         (simSuccess, simResult,) = simulator.simSolverCall(userOp, solverOps[1], dAppOp);
-        assertEq(simSuccess, false, "solverOps[1] should fail in sim due to swap path");
+        assertEq(simSuccess, true, "solverOps[1] should succeed in simulator");
 
         // Simulate all SolverOps together
         dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
@@ -279,10 +281,11 @@ contract ExPostTest is BaseTest {
     }
 
     // Shoutout to rholterhus for the test
-    function test_ExPostOrdering() public {
+    function test_ExPostOrdering_GasCheck() public {
         uint256 NUM_SOLVE_OPS = 3;
         UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
         userOp.control = address(v2ExPost);
+        userOp.callConfig = v2ExPost.CALL_CONFIG();
         SolverOperation[] memory solverOps = new SolverOperation[](NUM_SOLVE_OPS);
         bytes memory solverOpData;
         address[] memory solverEOAs = new address[](NUM_SOLVE_OPS);
@@ -314,23 +317,26 @@ contract ExPostTest is BaseTest {
         (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(r, s, v);
         vm.startPrank(userEOA);
-        address executionEnvironment = atlas.createExecutionEnvironment(userOp.control);
         // User must approve Atlas
-        ERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
-        ERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
+        IERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
+        IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
         vm.stopPrank();
 
         // Simulate the UserOp
-        (bool simSuccess, Result simResult,) = simulator.simUserOperation(userOp);
-        assertTrue(simSuccess, "userOp fails in simulator");
+        {
+            (bool simSuccess, Result simResult,) = simulator.simUserOperation(userOp);
+            assertTrue(simSuccess, "userOp fails in simulator");
 
-        // Simulate the SolverOps
-        (simSuccess, simResult,) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
-        assertTrue(simSuccess, "solverOps fail in simulator");
+            // Simulate the SolverOps
+            (simSuccess, simResult,) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
+            assertTrue(simSuccess, "solverOps fail in simulator");
+        }
 
         vm.startPrank(userEOA);
+        uint256 gasLeftBefore = gasleft(); // reusing var because stack too deep
         (bool success,) =
             address(atlas).call(abi.encodeWithSelector(atlas.metacall.selector, userOp, solverOps, dAppOp));
+        console.log("Metacall Gas Cost:", gasLeftBefore - gasleft());
         if (success) console.log("success!");
         else console.log("failure");
         assertTrue(success);

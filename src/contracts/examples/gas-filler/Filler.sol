@@ -2,23 +2,21 @@
 pragma solidity 0.8.22;
 
 // Base Imports
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 // Atlas Base Imports
-import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
+import { IAtlas } from "../../interfaces/IAtlas.sol";
 import { IExecutionEnvironment } from "../../interfaces/IExecutionEnvironment.sol";
 
 import { SafetyBits } from "../../libraries/SafetyBits.sol";
 
-import { CallConfig } from "../../types/DAppApprovalTypes.sol";
-import "../../types/UserCallTypes.sol";
-import "../../types/SolverCallTypes.sol";
+import { CallConfig } from "../../types/ConfigTypes.sol";
+import "../../types/UserOperation.sol";
+import "../../types/SolverOperation.sol";
 import "../../types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
 import { DAppControl } from "../../dapp/DAppControl.sol";
-
-// import "forge-std/Test.sol";
 
 interface IERC20 {
     function allowance(address owner, address spender) external view returns (uint256);
@@ -29,8 +27,6 @@ interface IERC20 {
 }
 
 contract Filler is DAppControl {
-    using SafeTransferLib for ERC20;
-
     uint256 public constant CONTROL_GAS_USAGE = 250_000;
 
     struct AccessTuple {
@@ -73,8 +69,8 @@ contract Filler is DAppControl {
             _atlas,
             msg.sender,
             CallConfig({
-                userNoncesSequenced: false,
-                dappNoncesSequenced: false,
+                userNoncesSequential: false,
+                dappNoncesSequential: false,
                 requirePreOps: false,
                 trackPreOpsReturnData: false,
                 trackUserReturnData: true,
@@ -92,7 +88,8 @@ contract Filler is DAppControl {
                 requireFulfillment: true,
                 trustedOpHash: false,
                 invertBidValue: true,
-                exPostBids: false
+                exPostBids: false,
+                allowAllocateValueFailure: false
             })
         )
     { }
@@ -106,47 +103,33 @@ contract Filler is DAppControl {
         SafeTransferLib.safeTransferETH(_user(), bidAmount);
     }
 
-    function _preSolverCall(
-        SolverOperation calldata solverOp,
-        bytes calldata returnData
-    )
-        internal
-        override
-        returns (bool)
-    {
+    function _preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
         address solverTo = solverOp.solver;
-        if (solverTo == address(this) || solverTo == _control() || solverTo == atlas) {
-            return false;
+        if (solverTo == address(this) || solverTo == _control() || solverTo == ATLAS) {
+            revert();
         }
 
         (address approvalToken, uint256 maxTokenAmount,) = abi.decode(returnData, (address, uint256, uint256));
 
-        if (solverOp.bidAmount > maxTokenAmount) return false;
-        if (solverOp.bidToken != approvalToken) return false;
+        if (solverOp.bidAmount > maxTokenAmount) revert();
+        if (solverOp.bidToken != approvalToken) revert();
 
         _transferDAppERC20(approvalToken, solverOp.solver, solverOp.bidAmount);
 
-        return true;
+        return; // success
     }
 
-    function _postSolverCall(
-        SolverOperation calldata solverOp,
-        bytes calldata returnData
-    )
-        internal
-        override
-        returns (bool)
-    {
+    function _postSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
         (, uint256 maxTokenAmount, uint256 gasNeeded) = abi.decode(returnData, (address, uint256, uint256));
 
         require(address(this).balance >= gasNeeded, "ERR - EXISTING GAS BALANCE");
 
-        bytes memory data = abi.encodeWithSelector(this.postOpBalancing.selector, maxTokenAmount - solverOp.bidAmount);
+        bytes memory data = abi.encodeCall(this.postOpBalancing, maxTokenAmount - solverOp.bidAmount);
 
-        (bool success,) = _control().call(forward(data));
+        (bool success,) = _control().call(_forward(data));
         require(success, "HITTING THIS = JOB OFFER");
 
-        return true;
+        return; // success
     }
 
     ///////////////// GETTERS & HELPERS // //////////////////
@@ -168,7 +151,7 @@ contract Filler is DAppControl {
     ///////////////////// DAPP STUFF ///////////////////////
 
     function postOpBalancing(uint256 prepaidAmount) external {
-        require(msg.sender == ISafetyLocks(atlas).activeEnvironment(), "ERR - INVALID SENDER");
+        require(msg.sender == IAtlas(ATLAS).activeEnvironment(), "ERR - INVALID SENDER");
         require(address(this) == _control(), "ERR - INVALID CONTROL");
         require(_depth() == 2, "ERR - INVALID DEPTH");
 
@@ -179,21 +162,21 @@ contract Filler is DAppControl {
     // (BUT IT HELPS WITH MENTALLY GROKKING THE FLOW)
     function approve(bytes calldata data) external returns (bytes memory) {
         // CASE: Base call
-        if (msg.sender == atlas) {
+        if (msg.sender == ATLAS) {
             require(address(this) != _control(), "ERR - NOT DELEGATED");
             return _innerApprove(data);
+        }
 
-            // CASE: Nested call from Atlas EE
-        } else if (msg.sender == ISafetyLocks(atlas).activeEnvironment()) {
+        // CASE: Nested call from Atlas EE
+        if (msg.sender == IAtlas(ATLAS).activeEnvironment()) {
             require(address(this) == _control(), "ERR - INVALID CONTROL");
             return _outerApprove(data);
-
-            // CASE: Non-Atlas external call
-        } else {
-            require(address(this) == _control(), "ERR - INVALID CONTROL");
-            _externalApprove(data);
-            return new bytes(0);
         }
+
+        // CASE: Non-Atlas external call
+        require(address(this) == _control(), "ERR - INVALID CONTROL");
+        _externalApprove(data);
+        return new bytes(0);
     }
 
     function _innerApprove(bytes calldata data) internal returns (bytes memory) {
@@ -205,9 +188,9 @@ contract Filler is DAppControl {
         require(address(this).balance == 0, "ERR - EXISTING GAS BALANCE");
 
         // TODO: use assembly (current impl is a lazy way to grab the approval tx data)
-        bytes memory mData = abi.encodeWithSelector(this.approve.selector, bytes.concat(approvalTx.data, data));
+        bytes memory mData = abi.encodeCall(this.approve, bytes.concat(approvalTx.data, data));
 
-        (bool success, bytes memory returnData) = _control().call(forward(mData));
+        (bool success, bytes memory returnData) = _control().call(_forward(mData));
         // NOTE: approvalTx.data includes func selector
 
         require(success, "ERR - REJECTED");
@@ -228,7 +211,7 @@ contract Filler is DAppControl {
 
         require(spender == address(this), "ERR - INVALID SPENDER");
         require(IERC20(approvalToken).allowance(user, address(this)) == 0, "ERR - EXISTING APPROVAL");
-        require(IERC20(approvalToken).allowance(address(this), atlas) >= amount, "ERR - TOKEN UNAPPROVED");
+        require(IERC20(approvalToken).allowance(address(this), ATLAS) >= amount, "ERR - TOKEN UNAPPROVED");
         require(amount <= IERC20(approvalToken).balanceOf(address(this)), "ERR - POOL BALANCE TOO LOW");
         require(amount <= IERC20(approvalToken).balanceOf(user), "ERR - USER BALANCE TOO LOW");
         require(userLock == address(0), "ERR - USER ALREADY LOCKED");

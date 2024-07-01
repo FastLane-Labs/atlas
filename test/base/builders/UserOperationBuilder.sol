@@ -3,11 +3,15 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
+import { UserOperation } from "src/contracts/types/UserOperation.sol";
+import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
+import { CallBits } from "src/contracts/libraries/CallBits.sol";
 
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
 
 contract UserOperationBuilder is Test {
+    using CallBits for uint32;
+
     UserOperation userOperation;
 
     function withFrom(address from) public returns (UserOperationBuilder) {
@@ -41,31 +45,31 @@ contract UserOperationBuilder is Test {
     }
 
     function withNonce(address atlasVerification) public returns (UserOperationBuilder) {
-        // Assumes sequenced = false. Use withNonce(address, bool) to specify sequenced.
-        userOperation.nonce = IAtlasVerification(atlasVerification).getNextNonce(userOperation.from, false);
+        // Assumes sequential = false. Use withNonce(address, bool) to specify sequential.
+        userOperation.nonce = IAtlasVerification(atlasVerification).getUserNextNonce(userOperation.from, false);
         return this;
     }
 
-    function withNonce(address atlasVerification, bool sequenced) public returns (UserOperationBuilder) {
-        userOperation.nonce = IAtlasVerification(atlasVerification).getNextNonce(userOperation.from, sequenced);
+    function withNonce(address atlasVerification, bool sequential) public returns (UserOperationBuilder) {
+        userOperation.nonce = IAtlasVerification(atlasVerification).getUserNextNonce(userOperation.from, sequential);
         return this;
     }
 
     function withNonce(address atlasVerification, address account) public returns (UserOperationBuilder) {
-        // Assumes sequenced = false. Use withNonce(address, address, bool) to specify sequenced.
-        userOperation.nonce = IAtlasVerification(atlasVerification).getNextNonce(account, false);
+        // Assumes sequential = false. Use withNonce(address, address, bool) to specify sequential.
+        userOperation.nonce = IAtlasVerification(atlasVerification).getUserNextNonce(account, false);
         return this;
     }
 
     function withNonce(
         address atlasVerification,
         address account,
-        bool sequenced
+        bool sequential
     )
         public
         returns (UserOperationBuilder)
     {
-        userOperation.nonce = IAtlasVerification(atlasVerification).getNextNonce(account, sequenced);
+        userOperation.nonce = IAtlasVerification(atlasVerification).getUserNextNonce(account, sequential);
         return this;
     }
 
@@ -81,6 +85,16 @@ contract UserOperationBuilder is Test {
 
     function withControl(address control) public returns (UserOperationBuilder) {
         userOperation.control = control;
+        return this;
+    }
+
+    function withCallConfig(CallConfig memory callConfig) public returns (UserOperationBuilder) {
+        userOperation.callConfig = CallBits.encodeCallConfig(callConfig);
+        return this;
+    }
+
+    function withCallConfig(uint32 callConfig) public returns (UserOperationBuilder) {
+        userOperation.callConfig = callConfig;
         return this;
     }
 
@@ -106,7 +120,7 @@ contract UserOperationBuilder is Test {
         return this;
     }
 
-    function build() public returns (UserOperation memory) {
+    function build() public view returns (UserOperation memory) {
         return userOperation;
     }
 

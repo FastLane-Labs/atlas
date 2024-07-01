@@ -5,18 +5,13 @@ import { IAtlas } from "../interfaces/IAtlas.sol";
 
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
-import "../types/SolverCallTypes.sol";
-import "../types/UserCallTypes.sol";
+import "../types/SolverOperation.sol";
+import "../types/UserOperation.sol";
 import "../types/LockTypes.sol";
-import "../types/DAppApprovalTypes.sol";
-import "../types/ValidCallsTypes.sol";
+import "../types/DAppOperation.sol";
+import "../types/ConfigTypes.sol";
+import "../types/ValidCalls.sol";
 import "../types/EscrowTypes.sol";
-
-import { CallVerification } from "../libraries/CallVerification.sol";
-import { CallBits } from "../libraries/CallBits.sol";
-import { SafetyBits } from "../libraries/SafetyBits.sol";
-
-import "forge-std/Test.sol";
 
 enum Result {
     Unknown,
@@ -24,14 +19,12 @@ enum Result {
     PreOpsSimFail,
     UserOpSimFail,
     SolverSimFail,
+    AllocateValueSimFail,
     PostOpsSimFail,
     SimulationPassed
 }
 
 contract Simulator is AtlasErrors {
-    using CallVerification for UserOperation;
-    using CallBits for uint32;
-
     address public immutable deployer;
     address public atlas;
 
@@ -51,6 +44,7 @@ contract Simulator is AtlasErrors {
     {
         SolverOperation[] memory solverOps = new SolverOperation[](0);
         DAppOperation memory dAppOp;
+        dAppOp.to = atlas;
         dAppOp.control = userOp.control;
 
         (Result result, uint256 validCallsResult) = _errorCatcher(userOp, solverOps, dAppOp);
@@ -118,14 +112,10 @@ contract Simulator is AtlasErrors {
                 }
                 result = Result.VerificationSimFail;
                 additionalErrorCode = validCallsResult;
-                console.log("Result.VerificationSimFail");
-                console.log("ValidCallsResult:", validCallsResult);
             } else if (errorSwitch == PreOpsSimFail.selector) {
                 result = Result.PreOpsSimFail;
-                console.log("Result.PreOpsSimFail");
             } else if (errorSwitch == UserOpSimFail.selector) {
                 result = Result.UserOpSimFail;
-                console.log("Result.UserOpSimFail");
             } else if (errorSwitch == SolverSimFail.selector) {
                 // Expects revertData in form [bytes4, uint256]
                 uint256 solverOutcomeResult;
@@ -135,17 +125,14 @@ contract Simulator is AtlasErrors {
                 }
                 result = Result.SolverSimFail;
                 additionalErrorCode = solverOutcomeResult;
-                console.log("Result.SolverSimFail");
-                console.log("solverOutcomeResult:", solverOutcomeResult);
+            } else if (errorSwitch == AllocateValueSimFail.selector) {
+                result = Result.AllocateValueSimFail;
             } else if (errorSwitch == PostOpsSimFail.selector) {
                 result = Result.PostOpsSimFail;
-                console.log("Result.PostOpsSimFail");
             } else if (errorSwitch == SimulationPassed.selector) {
                 result = Result.SimulationPassed;
-                console.log("Result.SimulationPassed");
             } else {
                 result = Result.Unknown;
-                console.log("Result.Unknown");
             }
 
             return (result, additionalErrorCode);

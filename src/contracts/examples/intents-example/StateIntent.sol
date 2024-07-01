@@ -1,20 +1,15 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-// Base Imports
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
-
 // Atlas Base Imports
-import { ISafetyLocks } from "../../interfaces/ISafetyLocks.sol";
-import { IExecutionEnvironment } from "../../interfaces/IExecutionEnvironment.sol";
-import { IEscrow } from "../../interfaces/IEscrow.sol";
+import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 
-import { SafetyBits } from "../../libraries/SafetyBits.sol";
+import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 
-import "../../types/LockTypes.sol";
+import "src/contracts/types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
-import { DAppControl } from "../../dapp/DAppControl.sol";
+import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 
 import "forge-std/Test.sol";
 

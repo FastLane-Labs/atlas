@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 
 import { BaseTest } from "./BaseTest.t.sol";
 import { IUniswapV2Router02 } from "./interfaces/IUniswapV2Router.sol";
-import { ERC20 } from "solmate/tokens/ERC20.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 contract ArbitrageTest is BaseTest {
     // Uniswap
@@ -33,14 +33,14 @@ contract ArbitrageTest is BaseTest {
         assertTrue(revenue - optimalAmountIn > 0, "No arbitrage opportunity");
 
         deal(chain.weth, swapper, optimalAmountIn);
-        uint256 balanceBefore = ERC20(chain.weth).balanceOf(swapper);
+        uint256 balanceBefore = IERC20(chain.weth).balanceOf(swapper);
 
         address[] memory path = new address[](2);
         path[0] = chain.weth;
         path[1] = chain.dai;
 
         vm.startPrank(swapper);
-        ERC20(chain.weth).approve(v2Router, optimalAmountIn);
+        IERC20(chain.weth).approve(v2Router, optimalAmountIn);
         uint256 daiOut =
             IUniswapV2Router02(v2Router).swapExactTokensForTokens(optimalAmountIn, 0, path, swapper, block.timestamp)[1];
         vm.stopPrank();
@@ -49,11 +49,11 @@ contract ArbitrageTest is BaseTest {
         path[1] = chain.weth;
 
         vm.startPrank(swapper);
-        ERC20(chain.dai).approve(s2Router, daiOut);
+        IERC20(chain.dai).approve(s2Router, daiOut);
         IUniswapV2Router02(s2Router).swapExactTokensForTokens(daiOut, 0, path, swapper, block.timestamp);
         vm.stopPrank();
 
-        uint256 balanceAfter = ERC20(chain.weth).balanceOf(swapper);
+        uint256 balanceAfter = IERC20(chain.weth).balanceOf(swapper);
 
         assertTrue(balanceAfter > balanceBefore, "Arbitrage failed");
         console.log("WETH revenue: ", balanceAfter - balanceBefore);
@@ -79,7 +79,7 @@ contract ArbitrageTest is BaseTest {
         path[1] = tokenA;
 
         vm.startPrank(swapper);
-        ERC20(tokenB).approve(routerA, amountB);
+        IERC20(tokenB).approve(routerA, amountB);
         IUniswapV2Router02(routerA).swapExactTokensForTokens(amountB, 0, path, swapper, block.timestamp);
         vm.stopPrank();
 
@@ -87,7 +87,7 @@ contract ArbitrageTest is BaseTest {
         path[1] = tokenB;
 
         vm.startPrank(swapper);
-        ERC20(tokenA).approve(routerB, amountA);
+        IERC20(tokenA).approve(routerB, amountA);
         IUniswapV2Router02(routerB).swapExactTokensForTokens(amountA, 0, path, swapper, block.timestamp);
         vm.stopPrank();
     }
@@ -139,9 +139,8 @@ contract ArbitrageTest is BaseTest {
         } else if (revenue1 > revenue2) {
             if (c == m) return (revenue1, mid1);
             return ternarySearch(tokenIn, tokenOut, routerIn, routerOut, left, mid2, c + 1, m);
-        } else {
-            if (c == m) return (revenue2, mid2);
-            return ternarySearch(tokenIn, tokenOut, routerIn, routerOut, mid1, right, c + 1, m);
         }
+        if (c == m) return (revenue2, mid2);
+        return ternarySearch(tokenIn, tokenOut, routerIn, routerOut, mid1, right, c + 1, m);
     }
 }

@@ -1,16 +1,13 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { CallConfig } from "src/contracts/types/DAppApprovalTypes.sol";
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/SolverCallTypes.sol";
+import { ECDSA } from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
+import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/SolverOperation.sol";
 import "src/contracts/types/LockTypes.sol";
-
-// Atlas DApp-Control Imports
 import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 import { ChainlinkAtlasWrapper } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapper.sol";
-
-import "forge-std/Test.sol";
 
 // Role enum as per Chainlink's OffchainAggregatorBilling.sol contract
 enum Role {
@@ -37,7 +34,10 @@ struct VerificationVars {
 contract ChainlinkDAppControl is DAppControl {
     uint256 public constant MAX_NUM_ORACLES = 31;
 
+    uint256 public observationsQuorum = 1;
+
     mapping(address baseChainlinkFeed => VerificationVars) internal verificationVars;
+    mapping(address chainlinkWrapper => bool isWrapper) public isChainlinkWrapper;
 
     error InvalidBaseFeed();
     error FailedToAllocateOEV();
@@ -45,19 +45,21 @@ contract ChainlinkDAppControl is DAppControl {
     error SignerNotFound();
     error TooManySigners();
     error DuplicateSigner(address signer);
+    error InvalidChainlinkAtlasWrapper();
 
     event NewChainlinkWrapperCreated(address indexed wrapper, address indexed baseFeed, address indexed owner);
     event SignersSetForBaseFeed(address indexed baseFeed, address[] signers);
     event SignerAddedForBaseFeed(address indexed baseFeed, address indexed signer);
     event SignerRemovedForBaseFeed(address indexed baseFeed, address indexed signer);
+    event ObservationsQuorumSet(uint256 oldQuorum, uint256 newQuorum);
 
     constructor(address _atlas)
         DAppControl(
             _atlas,
             msg.sender,
             CallConfig({
-                userNoncesSequenced: false,
-                dappNoncesSequenced: false,
+                userNoncesSequential: false,
+                dappNoncesSequential: false,
                 requirePreOps: false,
                 trackPreOpsReturnData: false,
                 trackUserReturnData: true,
@@ -75,7 +77,8 @@ contract ChainlinkDAppControl is DAppControl {
                 requireFulfillment: false, // Update oracle even if all solvers fail
                 trustedOpHash: true,
                 invertBidValue: false,
-                exPostBids: false
+                exPostBids: false,
+                allowAllocateValueFailure: false
             })
         )
     { }
@@ -84,8 +87,11 @@ contract ChainlinkDAppControl is DAppControl {
     //                  Atlas Hook Overrides                //
     // ---------------------------------------------------- //
 
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) internal virtual override {
+    function _allocateValueCall(address, uint256 bidAmount, bytes calldata data) internal virtual override {
         address chainlinkWrapper = abi.decode(data, (address));
+        if (!ChainlinkDAppControl(_control()).isChainlinkWrapper(chainlinkWrapper)) {
+            revert InvalidChainlinkAtlasWrapper();
+        }
         (bool success,) = chainlinkWrapper.call{ value: bidAmount }("");
         if (!success) revert FailedToAllocateOEV();
     }
@@ -96,7 +102,7 @@ contract ChainlinkDAppControl is DAppControl {
     //                    View Functions                    //
     // ---------------------------------------------------- //
 
-    function getBidFormat(UserOperation calldata userOp) public pure override returns (address bidToken) {
+    function getBidFormat(UserOperation calldata) public pure override returns (address bidToken) {
         return address(0); // ETH is bid token
     }
 
@@ -127,7 +133,8 @@ contract ChainlinkDAppControl is DAppControl {
     // OEV-generating protocol.
     function createNewChainlinkAtlasWrapper(address baseChainlinkFeed) external returns (address) {
         if (IChainlinkFeed(baseChainlinkFeed).latestAnswer() == 0) revert InvalidBaseFeed();
-        address newWrapper = address(new ChainlinkAtlasWrapper(atlas, baseChainlinkFeed, msg.sender));
+        address newWrapper = address(new ChainlinkAtlasWrapper(ATLAS, baseChainlinkFeed, msg.sender));
+        isChainlinkWrapper[newWrapper] = true;
         emit NewChainlinkWrapperCreated(newWrapper, baseChainlinkFeed, msg.sender);
         return newWrapper;
     }
@@ -146,11 +153,18 @@ contract ChainlinkDAppControl is DAppControl {
     {
         bool[] memory signed = new bool[](MAX_NUM_ORACLES);
         bytes32 reportHash = keccak256(report);
+        uint256 observations = rs.length;
+
+        VerificationVars storage verificationVar = verificationVars[baseChainlinkFeed];
         Oracle memory currentOracle;
 
-        for (uint256 i = 0; i < rs.length; ++i) {
-            address signer = ecrecover(reportHash, uint8(rawVs[i]) + 27, rs[i], ss[i]);
-            currentOracle = verificationVars[baseChainlinkFeed].oracles[signer];
+        // Check number of observations is enough to reach quorum, but not more than max allowed otherwise will cause
+        // array out-of-bounds error
+        if (observations < observationsQuorum || observations > MAX_NUM_ORACLES) return false;
+
+        for (uint256 i; i < observations; ++i) {
+            (address signer,) = ECDSA.tryRecover(reportHash, uint8(rawVs[i]) + 27, rs[i], ss[i]);
+            currentOracle = verificationVar.oracles[signer];
 
             // Signer must be pre-approved and only 1 observation per signer
             if (currentOracle.role != Role.Signer || signed[currentOracle.index]) {
@@ -165,15 +179,21 @@ contract ChainlinkDAppControl is DAppControl {
     //                    OnlyGov Functions                 //
     // ---------------------------------------------------- //
 
+    function setObservationsQuorum(uint256 newQuorum) external onlyGov {
+        uint256 oldQuorum = observationsQuorum;
+        observationsQuorum = newQuorum;
+        emit ObservationsQuorumSet(oldQuorum, newQuorum);
+    }
+
     // Clears any existing signers and adds a new set of signers for a specific Chainlink feed.
     function setSignersForBaseFeed(address baseChainlinkFeed, address[] calldata signers) external onlyGov {
         if (signers.length > MAX_NUM_ORACLES) revert TooManySigners();
 
         _removeAllSignersOfBaseFeed(baseChainlinkFeed); // Removes any existing signers first
         VerificationVars storage vars = verificationVars[baseChainlinkFeed];
-        Oracle memory currentOracle;
 
-        for (uint256 i = 0; i < signers.length; ++i) {
+        uint256 signersLength = signers.length;
+        for (uint256 i; i < signersLength; ++i) {
             if (vars.oracles[signers[i]].role != Role.Unset) revert DuplicateSigner(signers[i]);
             vars.oracles[signers[i]] = Oracle({ index: uint8(i), role: Role.Signer });
         }
@@ -203,8 +223,9 @@ contract ChainlinkDAppControl is DAppControl {
         if (oracle.role != Role.Signer) revert SignerNotFound();
 
         if (oracle.index < signers.length - 1) {
-            signers[oracle.index] = signers[signers.length - 1];
-            verificationVars[baseChainlinkFeed].oracles[signers[oracle.index]].index = oracle.index;
+            address lastSigner = signers[signers.length - 1];
+            signers[oracle.index] = lastSigner;
+            verificationVars[baseChainlinkFeed].oracles[lastSigner].index = oracle.index;
         }
         signers.pop();
         delete verificationVars[baseChainlinkFeed].oracles[signer];
@@ -215,8 +236,9 @@ contract ChainlinkDAppControl is DAppControl {
     function _removeAllSignersOfBaseFeed(address baseChainlinkFeed) internal {
         VerificationVars storage vars = verificationVars[baseChainlinkFeed];
         address[] storage signers = vars.signers;
-        if (signers.length == 0) return;
-        for (uint256 i = 0; i < signers.length; ++i) {
+        uint256 signersLength = signers.length;
+        if (signersLength == 0) return;
+        for (uint256 i; i < signersLength; ++i) {
             delete vars.oracles[signers[i]];
         }
         delete vars.signers;

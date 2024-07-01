@@ -3,14 +3,15 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { ERC20 } from "solmate/tokens/ERC20.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 
-import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
-import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
-import { DAppOperation, DAppConfig } from "src/contracts/types/DAppApprovalTypes.sol";
+import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
+import { UserOperation } from "src/contracts/types/UserOperation.sol";
+import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
 
 import {
     SwapIntentDAppControl,
@@ -32,11 +33,11 @@ interface IUniV2Router02 {
 }
 
 contract SwapIntentTest is BaseTest {
-    SwapIntentDAppControl public swapIntentController;
+    SwapIntentDAppControl public swapIntentControl;
     TxBuilder public txBuilder;
     Sig public sig;
 
-    ERC20 DAI = ERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
+    IERC20 DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     address DAI_ADDRESS = address(DAI);
 
     struct Sig {
@@ -48,19 +49,19 @@ contract SwapIntentTest is BaseTest {
     function setUp() public virtual override {
         BaseTest.setUp();
 
-        // Creating new gov address (ERR-V49 OwnerActive if already registered with controller)
+        // Creating new gov address (SignatoryActive error if already registered with control)
         governancePK = 11_112;
         governanceEOA = vm.addr(governancePK);
 
-        // Deploy new SwapIntent Controller from new gov and initialize in Atlas
+        // Deploy new SwapIntent Control from new gov and initialize in Atlas
         vm.startPrank(governanceEOA);
-        swapIntentController = new SwapIntentDAppControl(address(atlas));
-        atlasVerification.initializeGovernance(address(swapIntentController));
+        swapIntentControl = new SwapIntentDAppControl(address(atlas));
+        atlasVerification.initializeGovernance(address(swapIntentControl));
         vm.stopPrank();
 
         txBuilder = new TxBuilder({
-            controller: address(swapIntentController),
-            atlasAddress: address(atlas),
+            _control: address(swapIntentControl),
+            _atlas: address(atlas),
             _verification: address(atlasVerification)
         });
 
@@ -69,7 +70,7 @@ contract SwapIntentTest is BaseTest {
         // atlas.deposit{value: 1e18}();
     }
 
-    function testAtlasSwapIntentWithBasicRFQ() public {
+    function testAtlasSwapIntentWithBasicRFQ_GasCheck() public {
         // Swap 10 WETH for 20 DAI
         UserCondition userCondition = new UserCondition();
 
@@ -124,7 +125,7 @@ contract SwapIntentTest is BaseTest {
         // Builds the metaTx and to parts of userOp, signature still to be set
         userOp = txBuilder.buildUserOperation({
             from: userEOA,
-            to: address(swapIntentController),
+            to: address(swapIntentControl),
             maxFeePerGas: tx.gasprice + 1,
             value: 0,
             deadline: block.number + 2,
@@ -188,7 +189,11 @@ contract SwapIntentTest is BaseTest {
         (simResult,,) = simulator.simUserOperation(userOp);
         assertTrue(simResult, "metasimUserOperationcall tested false c");
 
+        uint256 gasLeftBefore = gasleft();
+
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
+
+        console.log("Metacall Gas Cost:", gasLeftBefore - gasleft());
         vm.stopPrank();
 
         console.log("\nAFTER METACALL");
@@ -245,9 +250,9 @@ contract SwapIntentTest is BaseTest {
 
         // Builds the metaTx and to parts of userOp, signature still to be set
         userOp = txBuilder.buildUserOperation({
-            from: userEOA, // NOTE: Would from ever not be user?
-            to: address(swapIntentController),
-            maxFeePerGas: tx.gasprice + 1, // TODO update
+            from: userEOA,
+            to: address(swapIntentControl),
+            maxFeePerGas: tx.gasprice + 1,
             value: 0,
             deadline: block.number + 2,
             data: userOpData
@@ -338,20 +343,20 @@ contract SimpleRFQSolver is SolverBase {
 
     function fulfillRFQ(SwapIntent calldata swapIntent, address executionEnvironment) public {
         require(
-            ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells,
+            IERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells,
             "Did not receive enough tokenIn"
         );
         require(
-            ERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys,
+            IERC20(swapIntent.tokenUserBuys).balanceOf(address(this)) >= swapIntent.amountUserBuys,
             "Not enough tokenOut to fulfill"
         );
-        ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
+        IERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
     }
 
-    // This ensures a function can only be called through metaFlashCall
+    // This ensures a function can only be called through atlasSolverCall
     // which includes security checks to work safely with Atlas
     modifier onlySelf() {
-        require(msg.sender == address(this), "Not called via metaFlashCall");
+        require(msg.sender == address(this), "Not called via atlasSolverCall");
         _;
     }
 
@@ -367,7 +372,7 @@ contract UniswapIntentSolver is SolverBase {
     function fulfillWithSwap(SwapIntent calldata swapIntent, address executionEnvironment) public onlySelf {
         // Checks recieved expected tokens from Atlas on behalf of user to swap
         require(
-            ERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells,
+            IERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells,
             "Did not receive enough tokenIn"
         );
 
@@ -376,7 +381,7 @@ contract UniswapIntentSolver is SolverBase {
         path[1] = swapIntent.tokenUserBuys;
 
         // Attempt to sell all tokens for as many as possible of tokenUserBuys
-        ERC20(swapIntent.tokenUserSells).approve(address(router), swapIntent.amountUserSells);
+        IERC20(swapIntent.tokenUserSells).approve(address(router), swapIntent.amountUserSells);
         router.swapExactTokensForTokens({
             amountIn: swapIntent.amountUserSells,
             amountOutMin: swapIntent.amountUserBuys, // will revert here if not enough to fulfill intent
@@ -386,7 +391,7 @@ contract UniswapIntentSolver is SolverBase {
         });
 
         // Send min tokens back to user to fulfill intent, rest are profit for solver
-        ERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
+        IERC20(swapIntent.tokenUserBuys).transfer(executionEnvironment, swapIntent.amountUserBuys);
     }
 
     // This ensures a function can only be called through atlasSolverCall

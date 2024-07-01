@@ -3,21 +3,21 @@ pragma solidity 0.8.22;
 
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
-import "../types/DAppApprovalTypes.sol";
+import "../types/ConfigTypes.sol";
 
 library CallBits {
     uint32 internal constant _ONE = uint32(1);
 
-    function buildCallConfig(address controller) internal view returns (uint32 callConfig) {
-        callConfig = IDAppControl(controller).CALL_CONFIG();
+    function buildCallConfig(address control) internal view returns (uint32 callConfig) {
+        callConfig = IDAppControl(control).CALL_CONFIG();
     }
 
     function encodeCallConfig(CallConfig memory callConfig) internal pure returns (uint32 encodedCallConfig) {
-        if (callConfig.userNoncesSequenced) {
-            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.UserNoncesSequenced);
+        if (callConfig.userNoncesSequential) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.UserNoncesSequential);
         }
-        if (callConfig.dappNoncesSequenced) {
-            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.DAppNoncesSequenced);
+        if (callConfig.dappNoncesSequential) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.DAppNoncesSequential);
         }
         if (callConfig.requirePreOps) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.RequirePreOps);
@@ -73,12 +73,15 @@ library CallBits {
         if (callConfig.exPostBids) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.ExPostBids);
         }
+        if (callConfig.allowAllocateValueFailure) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.AllowAllocateValueFailure);
+        }
     }
 
     function decodeCallConfig(uint32 encodedCallConfig) internal pure returns (CallConfig memory callConfig) {
         callConfig = CallConfig({
-            userNoncesSequenced: needsSequencedUserNonces(encodedCallConfig),
-            dappNoncesSequenced: needsSequencedDAppNonces(encodedCallConfig),
+            userNoncesSequential: needsSequentialUserNonces(encodedCallConfig),
+            dappNoncesSequential: needsSequentialDAppNonces(encodedCallConfig),
             requirePreOps: needsPreOpsCall(encodedCallConfig),
             trackPreOpsReturnData: needsPreOpsReturnData(encodedCallConfig),
             trackUserReturnData: needsUserReturnData(encodedCallConfig),
@@ -96,87 +99,92 @@ library CallBits {
             requireFulfillment: needsFulfillment(encodedCallConfig),
             trustedOpHash: allowsTrustedOpHash(encodedCallConfig),
             invertBidValue: invertsBidValue(encodedCallConfig),
-            exPostBids: exPostBids(encodedCallConfig)
+            exPostBids: exPostBids(encodedCallConfig),
+            allowAllocateValueFailure: allowAllocateValueFailure(encodedCallConfig)
         });
     }
 
-    function needsSequencedUserNonces(uint32 callConfig) internal pure returns (bool sequenced) {
-        sequenced = (callConfig & 1 << uint32(CallConfigIndex.UserNoncesSequenced) != 0);
+    function needsSequentialUserNonces(uint32 callConfig) internal pure returns (bool sequential) {
+        sequential = callConfig & (1 << uint32(CallConfigIndex.UserNoncesSequential)) != 0;
     }
 
-    function needsSequencedDAppNonces(uint32 callConfig) internal pure returns (bool sequenced) {
-        sequenced = (callConfig & 1 << uint32(CallConfigIndex.DAppNoncesSequenced) != 0);
+    function needsSequentialDAppNonces(uint32 callConfig) internal pure returns (bool sequential) {
+        sequential = callConfig & (1 << uint32(CallConfigIndex.DAppNoncesSequential)) != 0;
     }
 
     function needsPreOpsCall(uint32 callConfig) internal pure returns (bool needsPreOps) {
-        needsPreOps = (callConfig & 1 << uint32(CallConfigIndex.RequirePreOps) != 0);
+        needsPreOps = callConfig & (1 << uint32(CallConfigIndex.RequirePreOps)) != 0;
     }
 
     function needsPreOpsReturnData(uint32 callConfig) internal pure returns (bool needsReturnData) {
-        needsReturnData = (callConfig & 1 << uint32(CallConfigIndex.TrackPreOpsReturnData) != 0);
+        needsReturnData = callConfig & (1 << uint32(CallConfigIndex.TrackPreOpsReturnData)) != 0;
     }
 
     function needsUserReturnData(uint32 callConfig) internal pure returns (bool needsReturnData) {
-        needsReturnData = (callConfig & 1 << uint32(CallConfigIndex.TrackUserReturnData) != 0);
+        needsReturnData = callConfig & (1 << uint32(CallConfigIndex.TrackUserReturnData)) != 0;
     }
 
     function needsDelegateUser(uint32 callConfig) internal pure returns (bool delegateUser) {
-        delegateUser = (callConfig & 1 << uint32(CallConfigIndex.DelegateUser) != 0);
+        delegateUser = callConfig & (1 << uint32(CallConfigIndex.DelegateUser)) != 0;
     }
 
     function needsPreSolver(uint32 callConfig) internal pure returns (bool preSolver) {
-        preSolver = (callConfig & 1 << uint32(CallConfigIndex.PreSolver) != 0);
+        preSolver = callConfig & (1 << uint32(CallConfigIndex.PreSolver)) != 0;
     }
 
     function needsSolverPostCall(uint32 callConfig) internal pure returns (bool postSolver) {
-        postSolver = (callConfig & 1 << uint32(CallConfigIndex.PostSolver) != 0);
+        postSolver = callConfig & (1 << uint32(CallConfigIndex.PostSolver)) != 0;
     }
 
     function needsPostOpsCall(uint32 callConfig) internal pure returns (bool needsPostOps) {
-        needsPostOps = (callConfig & 1 << uint32(CallConfigIndex.RequirePostOpsCall) != 0);
+        needsPostOps = callConfig & (1 << uint32(CallConfigIndex.RequirePostOpsCall)) != 0;
     }
 
     function allowsZeroSolvers(uint32 callConfig) internal pure returns (bool zeroSolvers) {
-        zeroSolvers = (callConfig & 1 << uint32(CallConfigIndex.ZeroSolvers) != 0);
+        zeroSolvers = callConfig & (1 << uint32(CallConfigIndex.ZeroSolvers)) != 0;
     }
 
     function allowsReuseUserOps(uint32 callConfig) internal pure returns (bool reuseUserOp) {
-        reuseUserOp = (callConfig & 1 << uint32(CallConfigIndex.ReuseUserOp) != 0);
+        reuseUserOp = callConfig & (1 << uint32(CallConfigIndex.ReuseUserOp)) != 0;
     }
 
     function allowsUserAuctioneer(uint32 callConfig) internal pure returns (bool userAuctioneer) {
-        userAuctioneer = (callConfig & 1 << uint32(CallConfigIndex.UserAuctioneer) != 0);
+        userAuctioneer = callConfig & (1 << uint32(CallConfigIndex.UserAuctioneer)) != 0;
     }
 
     function allowsSolverAuctioneer(uint32 callConfig) internal pure returns (bool userAuctioneer) {
-        userAuctioneer = (callConfig & 1 << uint32(CallConfigIndex.SolverAuctioneer) != 0);
+        userAuctioneer = callConfig & (1 << uint32(CallConfigIndex.SolverAuctioneer)) != 0;
     }
 
     function allowsUnknownAuctioneer(uint32 callConfig) internal pure returns (bool unknownAuctioneer) {
-        unknownAuctioneer = (callConfig & 1 << uint32(CallConfigIndex.UnknownAuctioneer) != 0);
+        unknownAuctioneer = callConfig & (1 << uint32(CallConfigIndex.UnknownAuctioneer)) != 0;
     }
 
     function verifyCallChainHash(uint32 callConfig) internal pure returns (bool verify) {
-        verify = (callConfig & 1 << uint32(CallConfigIndex.VerifyCallChainHash) != 0);
+        verify = callConfig & (1 << uint32(CallConfigIndex.VerifyCallChainHash)) != 0;
     }
 
     function forwardReturnData(uint32 callConfig) internal pure returns (bool) {
-        return (callConfig & 1 << uint32(CallConfigIndex.ForwardReturnData) != 0);
+        return callConfig & (1 << uint32(CallConfigIndex.ForwardReturnData)) != 0;
     }
 
     function needsFulfillment(uint32 callConfig) internal pure returns (bool) {
-        return (callConfig & 1 << uint32(CallConfigIndex.RequireFulfillment) != 0);
+        return callConfig & (1 << uint32(CallConfigIndex.RequireFulfillment)) != 0;
     }
 
     function allowsTrustedOpHash(uint32 callConfig) internal pure returns (bool) {
-        return (callConfig & 1 << uint32(CallConfigIndex.TrustedOpHash) != 0);
+        return callConfig & (1 << uint32(CallConfigIndex.TrustedOpHash)) != 0;
     }
 
     function invertsBidValue(uint32 callConfig) internal pure returns (bool) {
-        return (callConfig & 1 << uint32(CallConfigIndex.InvertBidValue) != 0);
+        return callConfig & (1 << uint32(CallConfigIndex.InvertBidValue)) != 0;
     }
 
     function exPostBids(uint32 callConfig) internal pure returns (bool) {
-        return (callConfig & 1 << uint32(CallConfigIndex.ExPostBids) != 0);
+        return callConfig & (1 << uint32(CallConfigIndex.ExPostBids)) != 0;
+    }
+
+    function allowAllocateValueFailure(uint32 callConfig) internal pure returns (bool) {
+        return callConfig & (1 << uint32(CallConfigIndex.AllowAllocateValueFailure)) != 0;
     }
 }

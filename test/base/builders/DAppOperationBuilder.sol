@@ -3,16 +3,17 @@ pragma solidity 0.8.22;
 
 import "forge-std/Test.sol";
 
-import { UserOperation } from "src/contracts/types/UserCallTypes.sol";
-import { SolverOperation } from "src/contracts/types/SolverCallTypes.sol";
-import { DAppOperation } from "src/contracts/types/DAppApprovalTypes.sol";
+import { UserOperation } from "src/contracts/types/UserOperation.sol";
+import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/DAppOperation.sol";
 
 import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 
 import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
-import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/ConfigTypes.sol";
 
 contract DAppOperationBuilder is Test {
     using CallVerification for UserOperation;
@@ -29,36 +30,14 @@ contract DAppOperationBuilder is Test {
         return this;
     }
 
-    function withValue(uint256 value) public returns (DAppOperationBuilder) {
-        dappOperation.value = value;
-        return this;
-    }
-
-    function withGas(uint256 gas) public returns (DAppOperationBuilder) {
-        dappOperation.gas = gas;
-        return this;
-    }
-
     function withNonce(uint256 nonce) public returns (DAppOperationBuilder) {
         dappOperation.nonce = nonce;
         return this;
     }
 
     function withNonce(address atlasVerification, address account) public returns (DAppOperationBuilder) {
-        // Assumes sequenced = false. Use withNonce(address, address, bool) to specify sequenced.
-        dappOperation.nonce = IAtlasVerification(atlasVerification).getNextNonce(account, false);
-        return this;
-    }
-
-    function withNonce(
-        address atlasVerification,
-        address account,
-        bool sequenced
-    )
-        public
-        returns (DAppOperationBuilder)
-    {
-        dappOperation.nonce = IAtlasVerification(atlasVerification).getNextNonce(account, sequenced);
+        // Assumes dappNoncesSequential = true.
+        dappOperation.nonce = IAtlasVerification(atlasVerification).getDAppNextNonce(account);
         return this;
     }
 
@@ -83,17 +62,8 @@ contract DAppOperationBuilder is Test {
     }
 
     function withUserOpHash(UserOperation memory userOperation) public returns (DAppOperationBuilder) {
-        dappOperation.userOpHash = userOperation.getUserOperationHash();
-        return this;
-    }
-
-    function withAltUserOpHash(bytes32 altUserOpHash) public returns (DAppOperationBuilder) {
-        dappOperation.userOpHash = altUserOpHash;
-        return this;
-    }
-
-    function withAltUserOpHash(UserOperation memory userOperation) public returns (DAppOperationBuilder) {
-        dappOperation.userOpHash = userOperation.getAltOperationHash();
+        address verification = IAtlas(userOperation.to).VERIFICATION();
+        dappOperation.userOpHash = IAtlasVerification(verification).getUserOperationHash(userOperation);
         return this;
     }
 
@@ -126,7 +96,7 @@ contract DAppOperationBuilder is Test {
         return this;
     }
 
-    function build() public returns (DAppOperation memory) {
+    function build() public view returns (DAppOperation memory) {
         return dappOperation;
     }
 

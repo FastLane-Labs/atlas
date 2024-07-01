@@ -9,8 +9,8 @@ import { CallConfigBuilder } from "./helpers/CallConfigBuilder.sol";
 import { UserOperationBuilder } from "./base/builders/UserOperationBuilder.sol";
 import { SolverOperationBuilder } from "./base/builders/SolverOperationBuilder.sol";
 
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/SolverCallTypes.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/SolverOperation.sol";
 
 contract SorterTest is AtlasBaseTest {
     DummyDAppControl dAppControl;
@@ -83,7 +83,7 @@ contract SorterTest is AtlasBaseTest {
             .sign(address(atlasVerification), solverPK);
     }
 
-    function validateSortedOps(SolverOperation[] memory sortedOps, uint256 validOps) internal {
+    function validateSortedOps(SolverOperation[] memory sortedOps, uint256 validOps) internal pure {
         if (sortedOps.length > 1) {
             for (uint256 i; i < sortedOps.length - 1; i++) {
                 assertTrue(sortedOps[i].bidAmount >= sortedOps[i + 1].bidAmount, "Not sorted");

@@ -2,14 +2,13 @@
 pragma solidity 0.8.22;
 
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
-import { IDAppIntegration } from "../interfaces/IDAppIntegration.sol";
 import { IAtlas } from "../interfaces/IAtlas.sol";
-import { IAtlETH } from "../interfaces/IAtlETH.sol";
 import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
 
-import "../types/SolverCallTypes.sol";
-import "../types/UserCallTypes.sol";
-import "../types/DAppApprovalTypes.sol";
+import "../types/SolverOperation.sol";
+import "../types/UserOperation.sol";
+import "../types/ConfigTypes.sol";
+import "../types/DAppOperation.sol";
 
 import { CallVerification } from "../libraries/CallVerification.sol";
 import { CallBits } from "../libraries/CallBits.sol";
@@ -26,24 +25,24 @@ contract TxBuilder {
 
     uint256 public immutable gas;
 
-    constructor(address controller, address atlasAddress, address _verification) {
-        control = controller;
-        atlas = atlasAddress;
+    constructor(address _control, address _atlas, address _verification) {
+        control = _control;
+        atlas = _atlas;
         verification = _verification;
         gas = 1_000_000;
     }
 
     function governanceNextNonce(address signatory) public view returns (uint256) {
-        // Assume sequenced = false if control is not set
-        if (control == address(0)) return IAtlasVerification(verification).getNextNonce(signatory, false);
-        return
-            IAtlasVerification(verification).getNextNonce(signatory, IDAppControl(control).requireSequencedDAppNonces());
+        // Assume userNoncesSequential = false if control is not set
+        if (control == address(0) || !IDAppControl(control).requireSequentialDAppNonces()) return 0;
+        return IAtlasVerification(verification).getDAppNextNonce(signatory);
     }
 
     function userNextNonce(address user) public view returns (uint256) {
-        // Assume sequenced = false if control is not set
-        if (control == address(0)) return IAtlasVerification(verification).getNextNonce(user, false);
-        return IAtlasVerification(verification).getNextNonce(user, IDAppControl(control).requireSequencedUserNonces());
+        // Assume userNoncesSequential = false if control is not set
+        if (control == address(0)) return IAtlasVerification(verification).getUserNextNonce(user, false);
+        return
+            IAtlasVerification(verification).getUserNextNonce(user, IDAppControl(control).requireSequentialUserNonces());
     }
 
     function getControlCodeHash(address dAppControl) external view returns (bytes32) {
@@ -58,7 +57,7 @@ contract TxBuilder {
         address from,
         address to,
         uint256 maxFeePerGas,
-        uint256 value, // TODO check this is actually intended to be the value param. Was unnamed before.
+        uint256 value,
         uint256 deadline,
         bytes memory data
     )
@@ -76,6 +75,7 @@ contract TxBuilder {
             deadline: deadline,
             dapp: to,
             control: control,
+            callConfig: IDAppControl(control).CALL_CONFIG(),
             sessionKey: address(0),
             data: data,
             signature: new bytes(0)
@@ -95,9 +95,7 @@ contract TxBuilder {
         returns (SolverOperation memory solverOp)
     {
         // generate userOpHash depending on CallConfig.trustedOpHash allowed or not
-        DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
-        bytes32 userOpHash =
-            dConfig.callConfig.allowsTrustedOpHash() ? userOp.getAltOperationHash() : userOp.getUserOperationHash();
+        bytes32 userOpHash = IAtlasVerification(verification).getUserOperationHash(userOp);
 
         solverOp = SolverOperation({
             from: solverEOA,
@@ -128,15 +126,12 @@ contract TxBuilder {
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
 
         // generate userOpHash depending on CallConfig.trustedOpHash allowed or not
-        bytes32 userOpHash =
-            dConfig.callConfig.allowsTrustedOpHash() ? userOp.getAltOperationHash() : userOp.getUserOperationHash();
+        bytes32 userOpHash = IAtlasVerification(verification).getUserOperationHash(userOp);
         bytes32 callChainHash = CallVerification.getCallChainHash(dConfig, userOp, solverOps);
 
         dAppOp = DAppOperation({
             from: governanceEOA,
             to: atlas,
-            value: 0,
-            gas: 2_000_000,
             nonce: governanceNextNonce(governanceEOA),
             deadline: userOp.deadline,
             control: userOp.control,

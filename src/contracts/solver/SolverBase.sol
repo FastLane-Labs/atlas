@@ -1,21 +1,27 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.22;
 
-import { SafeTransferLib, ERC20 } from "solmate/utils/SafeTransferLib.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-import { ISafetyLocks } from "../interfaces/ISafetyLocks.sol";
-import { IEscrow } from "src/contracts/interfaces/IEscrow.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
+import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
 
-import "../types/SolverCallTypes.sol";
-
-import "forge-std/Test.sol";
+import "src/contracts/types/SolverOperation.sol";
 
 interface IWETH9 {
     function deposit() external payable;
     function withdraw(uint256 wad) external payable;
 }
 
-contract SolverBase is Test {
+/**
+ * @title SolverBase
+ * @notice A base contract for Solvers
+ * @dev Does safety checks, escrow reconciliation and pays bids.
+ * @dev Works with DappControls which have set the `invertBidValue` flag to false.
+ * @dev Use `SolverBaseInvertBid` for DappControls which have set the `invertBidValue` flag to true.
+ */
+contract SolverBase is ISolverContract {
     address public immutable WETH_ADDRESS;
     address internal immutable _owner;
     address internal immutable _atlas;
@@ -27,66 +33,65 @@ contract SolverBase is Test {
     }
 
     function atlasSolverCall(
-        address sender,
+        address solverOpFrom,
+        address executionEnvironment,
         address bidToken,
         uint256 bidAmount,
         bytes calldata solverOpData,
-        bytes calldata extraReturnData
+        bytes calldata
     )
         external
         payable
         virtual
-        safetyFirst(sender)
-        payBids(bidToken, bidAmount)
-        returns (bool success, bytes memory data)
+        safetyFirst(executionEnvironment, solverOpFrom)
+        payBids(executionEnvironment, bidToken, bidAmount)
     {
-        (success, data) = address(this).call{ value: msg.value }(solverOpData);
+        (bool success,) = address(this).call{ value: msg.value }(solverOpData);
 
         require(success, "CALL UNSUCCESSFUL");
     }
 
-    modifier safetyFirst(address sender) {
+    modifier safetyFirst(address executionEnvironment, address solverOpFrom) {
         // Safety checks
-        require(sender == _owner, "INVALID CALLER");
-        // uint256 msgValueOwed = msg.value;
+        require(msg.sender == _atlas, "INVALID ENTRY");
+        require(solverOpFrom == _owner, "INVALID CALLER");
 
         _;
 
-        uint256 shortfall = IEscrow(_atlas).shortfall();
+        uint256 shortfall = IAtlas(_atlas).shortfall();
 
         if (shortfall < msg.value) shortfall = 0;
         else shortfall -= msg.value;
 
-        IEscrow(_atlas).reconcile{ value: msg.value }(msg.sender, sender, shortfall);
+        if (msg.value > address(this).balance) {
+            IWETH9(WETH_ADDRESS).withdraw(msg.value - address(this).balance);
+        }
+
+        IAtlas(_atlas).reconcile{ value: msg.value }(shortfall);
     }
 
-    modifier payBids(address bidToken, uint256 bidAmount) {
-        // Track starting balances
-
-        uint256 bidBalance =
-            bidToken == address(0) ? address(this).balance - msg.value : ERC20(bidToken).balanceOf(address(this));
-
+    modifier payBids(address executionEnvironment, address bidToken, uint256 bidAmount) {
         _;
 
-        // Handle bid payment
+        // After the solverCall logic has executed, pay the solver's bid to the Execution Environment of the current
+        // metacall tx.
+
         if (bidToken == address(0)) {
-            // Ether balance
+            // Pay bid in ETH
 
-            uint256 ethOwed = bidAmount + msg.value;
-
-            if (ethOwed > address(this).balance) {
-                IWETH9(WETH_ADDRESS).withdraw(ethOwed - address(this).balance);
+            if (bidAmount > address(this).balance) {
+                IWETH9(WETH_ADDRESS).withdraw(bidAmount - address(this).balance);
             }
 
-            SafeTransferLib.safeTransferETH(msg.sender, bidAmount);
+            SafeTransferLib.safeTransferETH(executionEnvironment, bidAmount);
         } else {
-            // ERC20 balance
+            // Pay bid in ERC20 (bidToken)
 
             if (msg.value > address(this).balance) {
                 IWETH9(WETH_ADDRESS).withdraw(msg.value - address(this).balance);
             }
 
-            SafeTransferLib.safeTransfer(ERC20(bidToken), msg.sender, bidAmount);
+            SafeTransferLib.safeTransfer(bidToken, executionEnvironment, bidAmount);
         }
     }
 }

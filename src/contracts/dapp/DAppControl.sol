@@ -3,21 +3,31 @@ pragma solidity 0.8.22;
 
 import { DAppControlTemplate } from "./ControlTemplate.sol";
 import { ExecutionBase } from "src/contracts/common/ExecutionBase.sol";
-import { EXECUTION_PHASE_OFFSET } from "src/contracts/libraries/SafetyBits.sol";
 import { ExecutionPhase } from "src/contracts/types/LockTypes.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
-import "src/contracts/types/SolverCallTypes.sol";
-import "src/contracts/types/UserCallTypes.sol";
-import "src/contracts/types/DAppApprovalTypes.sol";
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/ConfigTypes.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
-import { IDAppIntegration } from "src/contracts/interfaces/IDAppIntegration.sol";
+import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
 
 /// @title DAppControl
 /// @author FastLane Labs
 /// @notice DAppControl is the base contract which should be inherited by any Atlas dApps.
+/// @notice Storage variables (except immutable) will be defaulted if accessed by delegatecalls.
+/// @notice If an extension DAppControl uses storage variables, those should not be accessed by delegatecalls.
 abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
+    // Reserved storage slots to avoid conflicts with ReentrancyGuard which is used in ExecutionEnvironment which
+    // delegatecalls this
+    // Attempts to use the same storage slots as ReentrancyGuard will result in storage collisions and a Dapp which does
+    // this should
+    // be considered malicious.
+    uint256 private _reentrancyGuardReserved;
+
+    using CallBits for uint32;
+
     uint8 private constant _CONTROL_DEPTH = 1 << 2;
 
     uint32 public immutable CALL_CONFIG;
@@ -27,16 +37,24 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     address public governance;
     address public pendingGovernance;
 
-    constructor(address _atlas, address _governance, CallConfig memory _callConfig) ExecutionBase(_atlas) {
-        if (_callConfig.userNoncesSequenced && _callConfig.dappNoncesSequenced) {
-            // Max one of user or dapp nonces can be sequenced, not both
-            revert AtlasErrors.BothUserAndDAppNoncesCannotBeSequenced();
+    constructor(address atlas, address initialGovernance, CallConfig memory callConfig) ExecutionBase(atlas) {
+        if (callConfig.userNoncesSequential && callConfig.dappNoncesSequential) {
+            // Max one of user or dapp nonces can be sequential, not both
+            revert AtlasErrors.BothUserAndDAppNoncesCannotBeSequential();
         }
-        CALL_CONFIG = CallBits.encodeCallConfig(_callConfig);
+        if (callConfig.trackPreOpsReturnData && callConfig.trackUserReturnData) {
+            // Max one of preOps or userOp return data can be tracked, not both
+            revert AtlasErrors.BothPreOpsAndUserReturnDataCannotBeTracked();
+        }
+        if (callConfig.invertBidValue && callConfig.exPostBids) {
+            // If both invertBidValue and exPostBids are true, solver's retreived bid cannot be determined
+            revert AtlasErrors.InvertBidValueCannotBeExPostBids();
+        }
+        CALL_CONFIG = CallBits.encodeCallConfig(callConfig);
         CONTROL = address(this);
-        ATLAS_VERIFICATION = IAtlas(_atlas).VERIFICATION();
+        ATLAS_VERIFICATION = IAtlas(atlas).VERIFICATION();
 
-        governance = _governance;
+        governance = initialGovernance;
     }
 
     // Safety and support functions and modifiers that make the relationship between dApp
@@ -60,16 +78,16 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         external
         payable
         validControl
-        onlyAtlasEnvironment(ExecutionPhase.PreOps, _CONTROL_DEPTH)
+        onlyAtlasEnvironment
         returns (bytes memory)
     {
         return _preOpsCall(userOp);
     }
 
     /// @notice The preSolverCall hook which may be called before the SolverOperation is executed.
+    /// @dev Should revert if any DApp-specific checks fail to indicate non-fulfillment.
     /// @param solverOp The SolverOperation to be executed after this hook has been called.
     /// @param returnData Data returned from the previous call phase.
-    /// @return Boolean indicating whether the preSolverCall was successful.
     function preSolverCall(
         SolverOperation calldata solverOp,
         bytes calldata returnData
@@ -77,16 +95,15 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         external
         payable
         validControl
-        onlyAtlasEnvironment(ExecutionPhase.PreSolver, _CONTROL_DEPTH)
-        returns (bool)
+        onlyAtlasEnvironment
     {
-        return _preSolverCall(solverOp, returnData);
+        _preSolverCall(solverOp, returnData);
     }
 
     /// @notice The postSolverCall hook which may be called after the SolverOperation has been executed.
+    /// @dev Should revert if any DApp-specific checks fail to indicate non-fulfillment.
     /// @param solverOp The SolverOperation struct that was executed just before this hook was called.
     /// @param returnData Data returned from the previous call phase.
-    /// @return Boolean indicating whether the postSolverCall was successful.
     function postSolverCall(
         SolverOperation calldata solverOp,
         bytes calldata returnData
@@ -94,10 +111,9 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         external
         payable
         validControl
-        onlyAtlasEnvironment(ExecutionPhase.PostSolver, _CONTROL_DEPTH)
-        returns (bool)
+        onlyAtlasEnvironment
     {
-        return _postSolverCall(solverOp, returnData);
+        _postSolverCall(solverOp, returnData);
     }
 
     /// @notice The allocateValueCall hook which is called after a successful SolverOperation.
@@ -111,7 +127,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     )
         external
         validControl
-        onlyAtlasEnvironment(ExecutionPhase.HandlingPayments, _CONTROL_DEPTH)
+        onlyAtlasEnvironment
     {
         _allocateValueCall(bidToken, bidAmount, data);
     }
@@ -127,22 +143,22 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         external
         payable
         validControl
-        onlyAtlasEnvironment(ExecutionPhase.PostOps, _CONTROL_DEPTH)
+        onlyAtlasEnvironment
         returns (bool)
     {
         return _postOpsCall(solved, data);
     }
 
     function userDelegated() external view returns (bool delegated) {
-        delegated = CallBits.needsDelegateUser(CALL_CONFIG);
+        delegated = CALL_CONFIG.needsDelegateUser();
     }
 
-    function requireSequencedUserNonces() external view returns (bool isSequenced) {
-        isSequenced = CallBits.needsSequencedUserNonces(CALL_CONFIG);
+    function requireSequentialUserNonces() external view returns (bool isSequential) {
+        isSequential = CALL_CONFIG.needsSequentialUserNonces();
     }
 
-    function requireSequencedDAppNonces() external view returns (bool isSequenced) {
-        isSequenced = CallBits.needsSequencedDAppNonces(CALL_CONFIG);
+    function requireSequentialDAppNonces() external view returns (bool isSequential) {
+        isSequential = CALL_CONFIG.needsSequentialDAppNonces();
     }
 
     /// @notice Returns the DAppConfig struct of this DAppControl contract.
@@ -169,18 +185,18 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     }
 
     function _getCallConfig() internal view returns (CallConfig memory) {
-        return CallBits.decodeCallConfig(CALL_CONFIG);
+        return CALL_CONFIG.decodeCallConfig();
     }
 
     /// @notice Returns the current governance address of this DAppControl contract.
     /// @return The address of the current governance account of this DAppControl contract.
-    function getDAppSignatory() external view returns (address) {
+    function getDAppSignatory() external view mustBeCalled returns (address) {
         return governance;
     }
 
     /// @notice Starts the transfer of governance to a new address. Only callable by the current governance address.
     /// @param newGovernance The address of the new governance.
-    function transferGovernance(address newGovernance) external {
+    function transferGovernance(address newGovernance) external mustBeCalled {
         if (msg.sender != governance) {
             revert AtlasErrors.OnlyGovernance();
         }
@@ -189,7 +205,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     }
 
     /// @notice Accepts the transfer of governance to a new address. Only callable by the new governance address.
-    function acceptGovernance() external {
+    function acceptGovernance() external mustBeCalled {
         address newGovernance = pendingGovernance;
         if (msg.sender != newGovernance) {
             revert AtlasErrors.Unauthorized();
@@ -199,7 +215,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         governance = newGovernance;
         delete pendingGovernance;
 
-        IDAppIntegration(ATLAS_VERIFICATION).changeDAppGovernance(prevGovernance, newGovernance);
+        IAtlasVerification(ATLAS_VERIFICATION).changeDAppGovernance(prevGovernance, newGovernance);
 
         emit AtlasEvents.GovernanceTransferred(prevGovernance, newGovernance);
     }

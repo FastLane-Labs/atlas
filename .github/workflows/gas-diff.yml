@@ -3,8 +3,8 @@ name: Gas Diff
 on:
   push:
     branches:
-      - main
-  pull_request:
+      - main-disabled
+  # pull_request:
     # Optionally configure to run only for changes in specific files. For example:
     # paths:
     # - src/**

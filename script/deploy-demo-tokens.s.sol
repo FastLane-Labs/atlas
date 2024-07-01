@@ -12,7 +12,7 @@ import { V2RewardDAppControl } from "src/contracts/examples/v2-example-router/V2
 import { IUniswapV2Router02 } from "src/contracts/examples/v2-example-router/interfaces/IUniswapV2Router.sol";
 
 import { Token } from "src/contracts/helpers/DemoToken.sol";
-import { WETH } from "solmate/tokens/WETH.sol";
+import { WETH } from "solady/tokens/WETH.sol";
 
 // Deploy 3 stablecoin tokens (DAI, USDA, USDB) - all 18 decimals
 // Use WETH recognized by Uniswap V2 Router on the target chain
@@ -134,7 +134,7 @@ interface IUniswapV2Factory {
     function createPair(address tokenA, address tokenB) external returns (address pair);
 }
 
-// Foundry not compiling if WETH imported directly from solmate/tokens/WETH.sol for some reason.
+// Foundry not compiling if WETH imported directly from solady/tokens/WETH.sol for some reason.
 contract WETH9 is WETH {
     constructor() WETH() { }
 }

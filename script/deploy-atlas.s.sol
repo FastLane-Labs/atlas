@@ -11,7 +11,7 @@ import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
 import { Simulator } from "src/contracts/helpers/Simulator.sol";
 import { Sorter } from "src/contracts/helpers/Sorter.sol";
-import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
+import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
 
 contract DeployAtlasScript is DeployBaseScript {
     function run() external {
@@ -34,11 +34,11 @@ contract DeployAtlasScript is DeployBaseScript {
 
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
         atlas = new Atlas({
-            _escrowDuration: 64,
-            _verification: expectedAtlasVerificationAddr,
-            _simulator: expectedSimulatorAddr,
-            _executionTemplate: address(execEnvTemplate),
-            _surchargeRecipient: deployer
+            escrowDuration: 64,
+            verification: expectedAtlasVerificationAddr,
+            simulator: expectedSimulatorAddr,
+            executionTemplate: address(execEnvTemplate),
+            initialSurchargeRecipient: deployer
         });
         atlasVerification = new AtlasVerification(address(atlas));
 
@@ -52,7 +52,7 @@ contract DeployAtlasScript is DeployBaseScript {
         if (address(atlas) != simulator.atlas() || address(atlas) != atlasVerification.ATLAS()) {
             console.log("ERROR: Atlas address not set correctly in Simulator, AtlasVerification");
         }
-        if (address(atlasVerification) != atlas.VERIFICATION()) {
+        if (atlasVerification != atlas.VERIFICATION()) {
             console.log("ERROR: AtlasVerification address not set correctly in Atlas");
         }
         if (address(simulator) != atlas.SIMULATOR()) {
