@@ -10,7 +10,7 @@ import "../base/TestUtils.sol";
 contract EscrowBitsTest is Test {
     using EscrowBits for uint256;
 
-    function testConstants() public {
+    function testConstants() public pure {
         string memory expectedBitMapString =
             "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001111111";
         assertEq(
@@ -34,13 +34,13 @@ contract EscrowBitsTest is Test {
         );
     }
 
-    function testLogEscrowConstants() public {
+    function testLogEscrowConstants() public view {
         console.log("EscrowBits._NO_REFUND", EscrowBits._NO_REFUND);
         console.log("EscrowBits._NO_REFUND", EscrowBits._PARTIAL_REFUND);
         console.log("EscrowBits._NO_REFUND", EscrowBits._FULL_REFUND);
     }
 
-    function testCanExecute() public {
+    function testCanExecute() public pure {
         uint256 valid = 0;
         assertEq(valid.canExecute(), true);
 
@@ -50,7 +50,7 @@ contract EscrowBitsTest is Test {
         assertEq(invalid.canExecute(), false);
     }
 
-    function testExecutionSuccessful() public {
+    function testExecutionSuccessful() public pure {
         uint256 valid = 0;
         assertEq(valid.executionSuccessful(), true);
 
@@ -80,7 +80,7 @@ contract EscrowBitsTest is Test {
         assertEq(invalid.executionSuccessful(), false);
     }
 
-    function testExecutedWithError() public {
+    function testExecutedWithError() public pure {
         uint256 valid = 1 << uint256(SolverOutcome.SolverOpReverted);
         assertEq(valid.executedWithError(), true);
         valid = 1 << uint256(SolverOutcome.BidNotPaid);
@@ -114,7 +114,7 @@ contract EscrowBitsTest is Test {
         assertEq(invalid.executedWithError(), false);
     }
 
-    function testUpdateEscrow() public {
+    function testUpdateEscrow() public pure {
         uint256 valid = 0;
         assertEq(valid.updateEscrow(), true);
         valid = 1 << uint256(SolverOutcome.UserOutOfGas);

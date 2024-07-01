@@ -47,7 +47,7 @@ contract AtlasTest is BaseTest {
         // vm.stopPrank();
     }
 
-    function test_bidFindingIteration_sortingOrder() public {
+    function test_bidFindingIteration_sortingOrder() public pure {
         // Test order of bidsAndIndices after insertionSort
 
         // 3 items. [200, 0, 100] --> [0, 100, 200] 
@@ -78,7 +78,7 @@ contract AtlasTest is BaseTest {
         assertEq(bidsAndIndices[1], 100);
     }
 
-    function test_bidFindingIteration_packBidAndIndex() public {
+    function test_bidFindingIteration_packBidAndIndex() public pure {
         uint256 bid = 12345;
         uint256 index = 2;
 

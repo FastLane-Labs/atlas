@@ -35,8 +35,6 @@ contract StorageTest is Test {
         // uint256 noncesSlot = stdstore.target(address(s)).sig("nonces(address)").with_key(address(this)).find();
         // uint256 lockSlot = stdstore.target(address(s)).sig("lock()").find();
 
-        // TODO: figure out how to check the allowance and ledger slots, haven't been able to make these work yet
-
         // if you're getting an error from one of these assertions, it means that the storage slot has changed
         // and you either need to update the slot number or revert the change
 

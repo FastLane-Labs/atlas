@@ -96,7 +96,7 @@ contract Permit69Test is BaseTest {
         vm.prank(solverOneEOA);
         vm.expectRevert(AtlasErrors.InvalidEnvironment.selector);
         mockAtlas.transferUserERC20(
-            WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl, mockCallConfig, uint8(phase)
+            WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl
         );
     }
 
@@ -111,7 +111,7 @@ contract Permit69Test is BaseTest {
         // Uninitialized
         vm.expectRevert(AtlasErrors.InvalidLockState.selector);
         mockAtlas.transferUserERC20(
-            WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl, mockCallConfig, uint8(phase)
+            WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl
         );
 
         // AllocateValue
@@ -120,7 +120,7 @@ contract Permit69Test is BaseTest {
         mockAtlas.setPhase(phase);
         vm.expectRevert(AtlasErrors.InvalidLockState.selector);
         mockAtlas.transferUserERC20(
-            WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl, mockCallConfig, uint8(phase)
+            WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl
         );
 
         // Releasing
@@ -129,7 +129,7 @@ contract Permit69Test is BaseTest {
         mockAtlas.setPhase(phase);
         vm.expectRevert(AtlasErrors.InvalidLockState.selector);
         mockAtlas.transferUserERC20(
-            WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl, mockCallConfig, uint8(phase)
+            WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl
         );
 
         vm.stopPrank();
@@ -150,7 +150,7 @@ contract Permit69Test is BaseTest {
 
         vm.prank(mockExecutionEnvAddress);
         mockAtlas.transferUserERC20(
-            WETH_ADDRESS, solverOneEOA, wethTransferred, mockUser, mockDAppControl, mockCallConfig, uint8(phase)
+            WETH_ADDRESS, solverOneEOA, wethTransferred, mockUser, mockDAppControl
         );
 
         assertEq(WETH.balanceOf(mockUser), userWethBefore - wethTransferred, "User did not lose WETH");
@@ -166,7 +166,7 @@ contract Permit69Test is BaseTest {
         vm.prank(solverOneEOA);
         vm.expectRevert(AtlasErrors.InvalidEnvironment.selector);
         mockAtlas.transferDAppERC20(
-            WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl, mockCallConfig, uint8(phase)
+            WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl
         );
     }
 
@@ -180,7 +180,7 @@ contract Permit69Test is BaseTest {
         mockAtlas.setPhase(phase);
         vm.expectRevert(AtlasErrors.InvalidLockState.selector);
         mockAtlas.transferDAppERC20(
-            WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl, mockCallConfig, uint8(phase)
+            WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl
         );
 
         // UserOperation
@@ -188,7 +188,7 @@ contract Permit69Test is BaseTest {
         mockAtlas.setPhase(phase);
         vm.expectRevert(AtlasErrors.InvalidLockState.selector);
         mockAtlas.transferDAppERC20(
-            WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl, mockCallConfig, uint8(phase)
+            WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl
         );
 
         // SolverOperations
@@ -196,7 +196,7 @@ contract Permit69Test is BaseTest {
         mockAtlas.setPhase(phase);
         vm.expectRevert(AtlasErrors.InvalidLockState.selector);
         mockAtlas.transferDAppERC20(
-            WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl, mockCallConfig, uint8(phase)
+            WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl
         );
 
         // Releasing
@@ -204,7 +204,7 @@ contract Permit69Test is BaseTest {
         mockAtlas.setPhase(phase);
         vm.expectRevert(AtlasErrors.InvalidLockState.selector);
         mockAtlas.transferDAppERC20(
-            WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl, mockCallConfig, uint8(phase)
+            WETH_ADDRESS, solverOneEOA, 10e18, mockUser, mockDAppControl
         );
 
         vm.stopPrank();
@@ -224,7 +224,7 @@ contract Permit69Test is BaseTest {
 
         vm.prank(mockExecutionEnvAddress);
         mockAtlas.transferDAppERC20(
-            WETH_ADDRESS, solverOneEOA, wethTransferred, mockUser, mockDAppControl, mockCallConfig, uint8(phase)
+            WETH_ADDRESS, solverOneEOA, wethTransferred, mockUser, mockDAppControl
         );
 
         assertEq(WETH.balanceOf(mockDAppControl), dAppWethBefore - wethTransferred, "DApp did not lose WETH");
@@ -272,7 +272,7 @@ contract Permit69Test is BaseTest {
         // preOpsPhaseSafe = 0000 0000 0010 0000
         uint8 preOpsPhaseSafe = uint8(ExecutionPhase.PreOps);
         // userOpPhaseSafe = 0000 0000 0100 0000
-        uint8 userOpPhaseSafe = uint8(ExecutionPhase.UserOperation);
+        // uint8 userOpPhaseSafe = uint8(ExecutionPhase.UserOperation);
 
         uint8 preSolverOpsPhaseSafe = uint8(ExecutionPhase.PreSolver);
         uint8 postSolverOpsPhaseSafe = uint8(ExecutionPhase.PostSolver);

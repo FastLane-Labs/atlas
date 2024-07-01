@@ -2,8 +2,6 @@
 pragma solidity 0.8.22;
 
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import { IPermit69 } from "src/contracts/interfaces/IPermit69.sol";
-import { ISafetyLocks } from "src/contracts/interfaces/ISafetyLocks.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
 import { ExecutionPhase } from "src/contracts/types/LockTypes.sol";
@@ -187,7 +185,7 @@ contract Base {
     /// @notice Returns the address of the currently active Execution Environment, if any.
     /// @return activeEnvironment The address of the currently active Execution Environment.
     function _activeEnvironment() internal view returns (address activeEnvironment) {
-        activeEnvironment = ISafetyLocks(ATLAS).activeEnvironment();
+        activeEnvironment = IAtlas(ATLAS).activeEnvironment();
     }
 }
 
@@ -219,7 +217,7 @@ contract ExecutionBase is Base {
     /// @param destination The address to which the tokens will be transferred.
     /// @param amount The amount of tokens to transfer.
     function _transferUserERC20(address token, address destination, uint256 amount) internal {
-        IPermit69(ATLAS).transferUserERC20(token, destination, amount, _user(), _control(), _config(), _phase());
+        IAtlas(ATLAS).transferUserERC20(token, destination, amount, _user(), _control());
     }
 
     /// @notice Transfers ERC20 tokens from the DApp of the current metacall tx, via Atlas, to a specified destination.
@@ -228,7 +226,7 @@ contract ExecutionBase is Base {
     /// @param destination The address to which the tokens will be transferred.
     /// @param amount The amount of tokens to transfer.
     function _transferDAppERC20(address token, address destination, uint256 amount) internal {
-        IPermit69(ATLAS).transferDAppERC20(token, destination, amount, _user(), _control(), _config(), _phase());
+        IAtlas(ATLAS).transferDAppERC20(token, destination, amount, _user(), _control());
     }
 
     /// @notice Returns a bool indicating whether a source address has approved the Atlas contract to transfer a certain

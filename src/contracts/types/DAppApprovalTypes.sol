@@ -8,7 +8,8 @@ bytes32 constant DAPP_TYPEHASH = keccak256(
 struct DAppOperation {
     address from; // EOA of signer of the DAppOperation
     address to; // Atlas address
-    uint256 nonce; // Atlas nonce of the DAppOperation available in the AtlasVerification contract
+    uint256 nonce; // Signer unique nonce for this operation (not checked when the dAppControl's
+        // callConfig.dappNoncesSequential isn't enabled)
     uint256 deadline; // block.number deadline for the DAppOperation
     address control; // DAppControl address
     address bundler; // Signer of the atlas tx (msg.sender)
@@ -26,12 +27,16 @@ struct DAppConfig {
 
 struct CallConfig {
     // userNoncesSequential: The userOp nonce must be the next sequential nonce for that user’s address in Atlas’
-    // nonce system
+    // nonce system. If false, the userOp nonces are allowed to be non-sequential (unordered), as long as they are
+    // unique.
     bool userNoncesSequential;
-    // dappNoncesSequential: The dappOp nonce must be the next sequential nonce for that dapp signer’s address in
-    // Atlas’ nonce system
+    // dappNoncesSequential: The dappOp nonce must be the next sequential nonce for that dApp signer’s address in
+    // Atlas’ nonce system. If false, the dappOp nonce is not checked, as the dAppOp is tied to its userOp's nonce via
+    // the callChainHash.
     bool dappNoncesSequential;
     // requirePreOps: The preOps hook is executed before the userOp is executed. If false, the preOps hook is skipped.
+    // the dapp control should check the validity of the user operation (whether its dapps can support userOp.dapp and
+    // userOp.data) in the preOps hook.
     bool requirePreOps;
     // trackPreOpsReturnData: The return data from the preOps hook is passed to the next call phase. If false preOps
     // return data is discarded. If both trackPreOpsReturnData and trackUserReturnData are true, they are concatenated.

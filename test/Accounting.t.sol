@@ -24,9 +24,6 @@ import {
 
 import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
-import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
-
-// TODO Check if this is tested in more contract-specific tests, then delete this if true.
 contract AccountingTest is BaseTest {
     SwapIntentDAppControl public swapIntentControl;
     TxBuilder public txBuilder;
@@ -197,7 +194,6 @@ contract AccountingTest is BaseTest {
 
         // Check user token balances before
         uint256 userWethBalanceBefore = WETH.balanceOf(userEOA);
-        uint256 userDaiBalanceBefore = DAI.balanceOf(userEOA);
 
         vm.prank(userEOA); // Burn all users WETH except 10 so logs are more readable
         WETH.transfer(address(1), userWethBalanceBefore - swapIntent.amountUserSells);

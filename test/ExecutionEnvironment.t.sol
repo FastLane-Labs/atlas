@@ -8,7 +8,6 @@ import { MockSafetyLocks } from "./SafetyLocks.t.sol";
 import { ExecutionEnvironment } from "src/contracts/atlas/ExecutionEnvironment.sol";
 import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 
-import { IFactory } from "src/contracts/interfaces/IFactory.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
 import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
@@ -92,7 +91,7 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         vm.prank(user);
         executionEnvironment =
-            ExecutionEnvironment(payable(IFactory(address(atlas)).createExecutionEnvironment(address(dAppControl))));
+            ExecutionEnvironment(payable(IAtlas(address(atlas)).createExecutionEnvironment(address(dAppControl))));
     }
 
     function test_modifier_validUser() public {
@@ -300,11 +299,9 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(postOpsData);
     }
 
-    /*
-    // TODO refactor this into 2 tests: test_solverPreTryCatch and test_solverPostTryCatch
-    function test_solverMetaTryCatch() public {
-        bytes memory solverMetaData;
-        bool status;
+    function test_solverPreTryCatch() public {
+        bytes memory preTryCatchMetaData;
+        bool revertsAsExpected;
 
         vm.prank(solver);
         MockSolverContract solverContract = new MockSolverContract(chain.weth, address(atlas));
@@ -314,79 +311,37 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverOp.control = address(dAppControl);
         solverOp.solver = address(solverContract);
 
-        uint256 solverGasLimit = 1_000_000;
-
-        // IncorrectValue
-        _setLocks();
-        solverOp.value = 1; // Positive value but EE has no balance
-        ctx = ctx.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0)
+        // Valid
+        preTryCatchMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverPreTryCatch.selector, solverOp.bidAmount, solverOp, new bytes(0)
         );
-        solverMetaData = abi.encodePacked(solverMetaData, ctx.pack());
+        preTryCatchMetaData = abi.encodePacked(preTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
         vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.SolverMetaTryCatchIncorrectValue.selector);
-        (status,) = address(executionEnvironment).call(solverMetaData);
-        solverOp.value = 0;
-        _unsetLocks();
+        (bool status,) = address(executionEnvironment).call(preTryCatchMetaData);
+        assertTrue(status, "solverPreTryCatch failed");
+
+        // InvalidSolver
+        solverOp.solver = address(executionEnvironment); // Invalid solver
+        preTryCatchMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverPreTryCatch.selector, solverOp.bidAmount, solverOp, new bytes(0)
+        );
+        preTryCatchMetaData = abi.encodePacked(preTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
+        vm.prank(address(atlas));
+        vm.expectRevert(AtlasErrors.InvalidSolver.selector);
+        (revertsAsExpected,) = address(executionEnvironment).call(preTryCatchMetaData);
+        assertTrue(revertsAsExpected, "expectRevert InvalidSolver: call did not revert");
 
         // AlteredControl
-        _setLocks();
+        solverOp.solver = address(solverContract);
         solverOp.control = invalid; // Invalid control
-        ctx = ctx.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0)
+        preTryCatchMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverPreTryCatch.selector, solverOp.bidAmount, solverOp, new bytes(0)
         );
-        solverMetaData = abi.encodePacked(solverMetaData, ctx.pack());
+        preTryCatchMetaData = abi.encodePacked(preTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.AlteredControl.selector);
-        (status,) = address(executionEnvironment).call(solverMetaData);
-        solverOp.control = address(dAppControl);
-        _unsetLocks();
-
-        // SolverOpReverted
-        _setLocks();
-        solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, true);
-        ctx = ctx.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0)
-        );
-        solverMetaData = abi.encodePacked(solverMetaData, ctx.pack());
-        vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.SolverOpReverted.selector);
-        (status,) = address(executionEnvironment).call(solverMetaData);
-        _unsetLocks();
-
-        // BidNotPaid
-        _setLocks();
-        solverOp.bidAmount = 1; // Bid won't be paid
-        solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
-        ctx = ctx.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0)
-        );
-        solverMetaData = abi.encodePacked(solverMetaData, ctx.pack());
-        vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.BidNotPaid.selector);
-        (status,) = address(executionEnvironment).call(solverMetaData);
-        solverOp.bidAmount = 0;
-        _unsetLocks();
-
-        // BalanceNotReconciled
-        // Solver's contract does not call reconcile
-        _setLocks();
-        solverContract.setReconcile(false);
-        solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
-        ctx = ctx.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector, solverOp.bidAmount, solverGasLimit, solverOp, new bytes(0)
-        );
-        solverMetaData = abi.encodePacked(solverMetaData, ctx.pack());
-        vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.BalanceNotReconciled.selector);
-        (status,) = address(executionEnvironment).call(solverMetaData);
-        solverContract.setReconcile(true);
-        _unsetLocks();
+        (revertsAsExpected,) = address(executionEnvironment).call(preTryCatchMetaData);
+        assertTrue(revertsAsExpected, "expectRevert AlteredControl: call did not revert");
 
         // Change of config
         callConfig.preSolver = true;
@@ -394,62 +349,93 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverOp.control = address(dAppControl);
 
         // PreSolverFailed
-        _setLocks();
-        ctx = ctx.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector,
-            solverOp.bidAmount,
-            solverGasLimit,
-            solverOp,
-            abi.encode(true, false)
+        bytes memory returnData = abi.encode(true, true);
+        preTryCatchMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverPreTryCatch.selector, solverOp.bidAmount, solverOp, returnData
         );
-        solverMetaData = abi.encodePacked(solverMetaData, ctx.pack());
+        preTryCatchMetaData = abi.encodePacked(preTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PreSolverFailed.selector);
-        (status,) = address(executionEnvironment).call(solverMetaData);
-        _unsetLocks();
+        (revertsAsExpected,) = address(executionEnvironment).call(preTryCatchMetaData);
+        assertTrue(revertsAsExpected, "expectRevert PreSolverFailed: call did not revert");
+    }
 
-        // PreSolverFailed 2
-        _setLocks();
-        ctx = ctx.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector,
-            solverOp.bidAmount,
-            solverGasLimit,
-            solverOp,
-            abi.encode(false, false)
+    function test_solverPostTryCatch() public {
+        bytes memory postTryCatchMetaData;
+        bool revertsAsExpected;
+
+        vm.prank(solver);
+        MockSolverContract solverContract = new MockSolverContract(chain.weth, address(atlas));
+
+        SolverTracker memory solverTracker;
+        solverTracker.etherIsBidToken = true;
+
+        SolverOperation memory solverOp;
+        solverOp.from = solver;
+        solverOp.control = address(dAppControl);
+        solverOp.solver = address(solverContract);
+
+        // Valid
+        postTryCatchMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverPostTryCatch.selector, solverOp, new bytes(0), solverTracker
         );
-        solverMetaData = abi.encodePacked(solverMetaData, ctx.pack());
+        postTryCatchMetaData = abi.encodePacked(postTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PostSolver));
         vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.PreSolverFailed.selector);
-        (status,) = address(executionEnvironment).call(solverMetaData);
-        _unsetLocks();
+        (bool status,) = address(executionEnvironment).call(postTryCatchMetaData);
+        assertTrue(status, "solverPostTryCatch failed");
+
+        // BidNotPaid (floor > ceiling)
+        solverTracker.floor = 1;
+        postTryCatchMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverPostTryCatch.selector, solverOp, new bytes(0), solverTracker
+        );
+        postTryCatchMetaData = abi.encodePacked(postTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
+        vm.prank(address(atlas));
+        vm.expectRevert(AtlasErrors.BidNotPaid.selector);
+        (revertsAsExpected,) = address(executionEnvironment).call(postTryCatchMetaData);
+        assertTrue(revertsAsExpected, "expectRevert BidNotPaid: call did not revert");
+
+        // BidNotPaid (!invertsBidValue && netBid < bidAmount)
+        solverTracker.floor = 0;
+        solverTracker.bidAmount = 1;
+        postTryCatchMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverPostTryCatch.selector, solverOp, new bytes(0), solverTracker
+        );
+        postTryCatchMetaData = abi.encodePacked(postTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
+        vm.prank(address(atlas));
+        vm.expectRevert(AtlasErrors.BidNotPaid.selector);
+        (revertsAsExpected,) = address(executionEnvironment).call(postTryCatchMetaData);
+        assertTrue(revertsAsExpected, "expectRevert BidNotPaid: call did not revert");
+
+        // BidNotPaid (invertsBidValue && netBid > bidAmount)
+        solverTracker.invertsBidValue = true;
+        solverTracker.bidAmount = 0;
+        solverTracker.ceiling = 1;
+        postTryCatchMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverPostTryCatch.selector, solverOp, new bytes(0), solverTracker
+        );
+        postTryCatchMetaData = abi.encodePacked(postTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
+        vm.prank(address(atlas));
+        vm.expectRevert(AtlasErrors.BidNotPaid.selector);
+        (revertsAsExpected,) = address(executionEnvironment).call(postTryCatchMetaData);
+        assertTrue(revertsAsExpected, "expectRevert BidNotPaid: call did not revert");
 
         // Change of config
-        callConfig.preSolver = false;
         callConfig.postSolver = true;
         setupDAppControl(callConfig);
         solverOp.control = address(dAppControl);
 
         // PostSolverFailed
-        _setLocks();
-        solverOp.data = abi.encodeWithSelector(solverContract.solverMockOperation.selector, false);
-        ctx = ctx.holdSolverLock(solverOp.solver);
-        solverMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverMetaTryCatch.selector,
-            solverOp.bidAmount,
-            solverGasLimit,
-            solverOp,
-            abi.encode(true, false)
+        bytes memory returnData = abi.encode(true, true);
+        postTryCatchMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverPostTryCatch.selector, solverOp, returnData, solverTracker
         );
-        solverMetaData = abi.encodePacked(solverMetaData, ctx.pack());
+        postTryCatchMetaData = abi.encodePacked(postTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PostSolverFailed.selector);
-        (status,) = address(executionEnvironment).call(solverMetaData);
-        _unsetLocks();
+        (revertsAsExpected,) = address(executionEnvironment).call(postTryCatchMetaData);
+        assertTrue(revertsAsExpected, "expectRevert PostSolverFailed: call did not revert");
     }
-    */
-
     
     function test_allocateValue() public {
         bytes memory allocateData;
@@ -545,19 +531,19 @@ contract ExecutionEnvironmentTest is BaseTest {
         executionEnvironment.withdrawEther(2e18);
     }
 
-    function test_getUser() public {
+    function test_getUser() public view {
         assertEq(executionEnvironment.getUser(), user);
     }
 
-    function test_getControl() public {
+    function test_getControl() public view {
         assertEq(executionEnvironment.getControl(), address(dAppControl));
     }
 
-    function test_getConfig() public {
+    function test_getConfig() public view {
         assertEq(executionEnvironment.getConfig(), CallBits.encodeCallConfig(callConfig));
     }
 
-    function test_getEscrow() public {
+    function test_getEscrow() public view {
         assertEq(executionEnvironment.getEscrow(), address(atlas));
     }
 }
@@ -604,7 +590,7 @@ contract MockDAppControl is DAppControl {
     }
 
     function _postSolverCall(
-        SolverOperation calldata solverOp,
+        SolverOperation calldata,
         bytes calldata returnData
     )
         internal

@@ -67,7 +67,7 @@ contract MockGasAccounting is GasAccounting, Test {
         bool paymentsSuccessful,
         uint256 winningSolverIndex,
         uint256 solverCount
-    ) public returns (Context memory ctx) {
+    ) public view returns (Context memory ctx) {
         ctx = Context({
             executionEnvironment: lock.activeEnvironment,
             userOpHash: bytes32(0),

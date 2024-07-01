@@ -6,29 +6,75 @@ import "src/contracts/types/UserCallTypes.sol";
 import "src/contracts/types/DAppApprovalTypes.sol";
 import "src/contracts/types/LockTypes.sol";
 
-// TODO add all Atlas functions here
-
 interface IAtlas {
+    // Atlas.sol
     function metacall(
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
-        DAppOperation calldata verification
+        DAppOperation calldata dAppOp
     )
         external
         payable
         returns (bool auctionWon);
 
-    function VERIFICATION() external view returns (address);
+    // Factory.sol
+    function createExecutionEnvironment(address control) external returns (address executionEnvironment);
+    function getExecutionEnvironment(
+        address user,
+        address dAppControl
+    )
+        external
+        view
+        returns (address executionEnvironment, uint32 callConfig, bool exists);
 
+    // AtlETH.sol
+    function balanceOf(address account) external view returns (uint256);
+    function balanceOfBonded(address account) external view returns (uint256);
+    function balanceOfUnbonding(address account) external view returns (uint256);
+    function accountLastActiveBlock(address account) external view returns (uint256);
+    function unbondingCompleteBlock(address account) external view returns (uint256);
+    function deposit() external payable;
+    function withdraw(uint256 amount) external;
+    function bond(uint256 amount) external;
+    function depositAndBond(uint256 amountToBond) external payable;
+    function unbond(uint256 amount) external;
+    function redeem(uint256 amount) external;
+    function withdrawSurcharge() external;
+    function transferSurchargeRecipient(address newRecipient) external;
+    function becomeSurchargeRecipient() external;
+
+    // Permit69.sol
+    function transferUserERC20(
+        address token,
+        address destination,
+        uint256 amount,
+        address user,
+        address control
+    )
+        external;
+    function transferDAppERC20(
+        address token,
+        address destination,
+        uint256 amount,
+        address user,
+        address control
+    )
+        external;
+
+    // GasAccounting.sol
+    function contribute() external payable;
+    function borrow(uint256 amount) external payable;
+    function shortfall() external view returns (uint256);
+    function reconcile(uint256 maxApprovedGasSpend) external payable returns (uint256 owed);
+
+    // SafetyLocks.sol
+    function activeEnvironment() external view returns (address);
+    function phase() external view returns (ExecutionPhase);
     function isUnlocked() external view returns (bool);
 
+    // Storage.sol
+    function VERIFICATION() external view returns (address);
     function lock() external returns (address);
-
-    function shortfall() external view returns (uint256);
-
-    function contribute() external payable;
-
-    function borrow(uint256 amount) external payable;
-
-    function reconcile(uint256 maxApprovedGasSpend) external payable returns (uint256 owed);
+    function solverLockData() external view returns (address currentSolver, bool calledBack, bool fulfilled);
+    function solver() external view returns (address);
 }
