@@ -6,11 +6,11 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Imports
-import { DAppControl } from "../../dapp/DAppControl.sol";
-import { CallConfig } from "../../types/ConfigTypes.sol";
-import "../../types/UserOperation.sol";
-import "../../types/SolverOperation.sol";
-import "../../types/LockTypes.sol";
+import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
+import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/LockTypes.sol";
 
 struct Condition {
     address antecedent;

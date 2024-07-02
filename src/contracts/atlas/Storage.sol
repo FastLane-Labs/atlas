@@ -7,15 +7,15 @@ import "src/contracts/types/LockTypes.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { AtlasConstants } from "src/contracts/types/AtlasConstants.sol";
-import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
+import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
 
 /// @title Storage
 /// @author FastLane Labs
 /// @notice Storage manages all storage variables and constants for the Atlas smart contract.
 contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
-    uint256 public immutable ESCROW_DURATION;
-    AtlasVerification public immutable VERIFICATION;
+    IAtlasVerification public immutable VERIFICATION;
     address public immutable SIMULATOR;
+    uint256 public immutable ESCROW_DURATION;
 
     // AtlETH public constants
     string public constant name = "Atlas ETH";
@@ -59,9 +59,9 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     )
         payable
     {
-        ESCROW_DURATION = escrowDuration;
-        VERIFICATION = AtlasVerification(verification);
+        VERIFICATION = IAtlasVerification(verification);
         SIMULATOR = simulator;
+        ESCROW_DURATION = escrowDuration;
 
         // Gas Accounting
         // Initialized with msg.value to seed flash loan liquidity
