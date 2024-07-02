@@ -52,7 +52,7 @@ contract DeployAtlasScript is DeployBaseScript {
         if (address(atlas) != simulator.atlas() || address(atlas) != atlasVerification.ATLAS()) {
             console.log("ERROR: Atlas address not set correctly in Simulator, AtlasVerification");
         }
-        if (atlasVerification != atlas.VERIFICATION()) {
+        if (address(atlasVerification) != address(atlas.VERIFICATION())) {
             console.log("ERROR: AtlasVerification address not set correctly in Atlas");
         }
         if (address(simulator) != atlas.SIMULATOR()) {
