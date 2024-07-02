@@ -202,7 +202,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
 
     // Sets the Lock phase without changing the activeEnvironment or callConfig.
     function _setLockPhase(uint8 phase) internal {
-        _tstore(_T_LOCK_SLOT, (_tload(_T_LOCK_SLOT) & (_LOCK_PHASE_MASK | bytes32(uint256(phase)))));
+        _tstore(_T_LOCK_SLOT, (_tload(_T_LOCK_SLOT) & _LOCK_PHASE_MASK) | bytes32(uint256(phase)));
     }
 
     function _setSolverLock(uint256 solverLock) internal {
