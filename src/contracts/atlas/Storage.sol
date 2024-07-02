@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
@@ -183,5 +183,23 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
 
     function pendingSurchargeRecipient() external view returns (address) {
         return S_pendingSurchargeRecipient;
+    }
+
+    // ------------------------------------------------------ //
+    //                TRANSIENT STORAGE HELPERS               //
+    // ------------------------------------------------------ //
+
+    function _tstore(bytes32 slot, bytes32 value) internal {
+        assembly {
+            tstore(slot, value)
+        }
+    }
+
+    function _tload(bytes32 slot) internal view returns (bytes32) {
+        bytes32 value;
+        assembly {
+            value := tload(slot)
+        }
+        return value;
     }
 }
