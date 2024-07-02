@@ -561,7 +561,7 @@ abstract contract Escrow is AtlETH {
         //             Pre-Solver Call           //
         // ------------------------------------- //
 
-        T_lock.phase = uint8(ExecutionPhase.PreSolver);
+        _setLockPhase(uint8(ExecutionPhase.PreSolver));
 
         (_success, _data) = ctx.executionEnvironment.call(
             abi.encodePacked(
@@ -584,7 +584,7 @@ abstract contract Escrow is AtlETH {
         //              Solver Call              //
         // ------------------------------------- //
 
-        T_lock.phase = uint8(ExecutionPhase.SolverOperation);
+        _setLockPhase(uint8(ExecutionPhase.SolverOperation));
 
         // Make sure there's enough value in Atlas for the Solver
         if (!_borrow(solverOp.value)) revert InsufficientEscrow();
@@ -616,7 +616,7 @@ abstract contract Escrow is AtlETH {
         //            Post-Solver Call           //
         // ------------------------------------- //
 
-        T_lock.phase = uint8(ExecutionPhase.PostSolver);
+        _setLockPhase(uint8(ExecutionPhase.PostSolver));
 
         (_success, _data) = ctx.executionEnvironment.call(
             abi.encodePacked(

@@ -41,10 +41,6 @@ contract MockSafetyLocks is SafetyLocks {
         return _buildContext(dConfig, executionEnvironment, userOpHash, bundler, solverOpCount, isSimulation);
     }
 
-    function releaseEscrowLock() external {
-        _releaseAccountingLock();
-    }
-
     function setLock(address _activeEnvironment) external {
         T_lock = Lock({
             activeEnvironment: _activeEnvironment,
@@ -108,19 +104,6 @@ contract SafetyLocksTest is Test {
         safetyLocks.initializeLock(executionEnvironment, 0, 0);
         Context memory ctx = safetyLocks.buildEscrowLock(dConfig, executionEnvironment, bytes32(0), address(0), 0, false);
         assertEq(executionEnvironment, ctx.executionEnvironment);
-    }
-
-    function test_releaseAccountingLock() public {
-        safetyLocks.initializeLock(executionEnvironment, 0, 0);
-        safetyLocks.releaseEscrowLock();
-
-        (address currentSolver, bool verified, bool fulfilled) = safetyLocks.solverLockData();
-
-        assertEq(currentSolver, address(1));
-        assertEq(safetyLocks.activeEnvironment(), address(1));
-        assertEq(safetyLocks.claims(), type(uint256).max);
-        assertEq(safetyLocks.withdrawals(), type(uint256).max);
-        assertEq(safetyLocks.deposits(), type(uint256).max);
     }
 
     function test_activeEnvironment() public {

@@ -77,18 +77,6 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         S_cumulativeSurcharge = msg.value;
         S_surchargeRecipient = initialSurchargeRecipient;
 
-        // TODO remove these when transient storage behaviour is implemented
-        // Gas Accounting - transient storage (delete this from constructor post dencun)
-        T_lock =
-            Lock({ activeEnvironment: _UNLOCKED, phase: uint8(ExecutionPhase.Uninitialized), callConfig: uint32(0) });
-
-        T_solverLock = _UNLOCKED_UINT;
-        T_claims = type(uint256).max;
-        T_fees = type(uint256).max;
-        T_writeoffs = type(uint256).max;
-        T_withdrawals = type(uint256).max;
-        T_deposits = type(uint256).max;
-
         emit SurchargeRecipientTransferred(initialSurchargeRecipient);
     }
 
@@ -138,33 +126,33 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     }
 
     // ---------------------------------------------------- //
-    //                   Transient Getters                  //
+    //              Transient External Getters              //
     // ---------------------------------------------------- //
 
-    function lock() external view returns (address activeEnvironment, uint32 callConfig, uint8 phase) {
-        bytes32 lockData = _tload(_T_LOCK_SLOT);
-        activeEnvironment = address(uint160(uint256(lockData >> 40)));
-        callConfig = uint32(uint256(lockData >> 8));
-        phase = uint8(uint256(lockData));
+    function lock() public view returns (address activeEnvironment, uint32 callConfig, uint8 phase) {
+        bytes32 _lockData = _tload(_T_LOCK_SLOT);
+        activeEnvironment = address(uint160(uint256(_lockData >> 40)));
+        callConfig = uint32(uint256(_lockData >> 8));
+        phase = uint8(uint256(_lockData));
     }
 
-    function claims() external view returns (uint256) {
+    function claims() public view returns (uint256) {
         return uint256(_tload(_T_CLAIMS_SLOT));
     }
 
-    function fees() external view returns (uint256) {
+    function fees() public view returns (uint256) {
         return uint256(_tload(_T_FEES_SLOT));
     }
 
-    function writeoffs() external view returns (uint256) {
+    function writeoffs() public view returns (uint256) {
         return uint256(_tload(_T_WRITEOFFS_SLOT));
     }
 
-    function withdrawals() external view returns (uint256) {
+    function withdrawals() public view returns (uint256) {
         return uint256(_tload(_T_WITHDRAWALS_SLOT));
     }
 
-    function deposits() external view returns (uint256) {
+    function deposits() public view returns (uint256) {
         return uint256(_tload(_T_DEPOSITS_SLOT));
     }
 
@@ -176,6 +164,10 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         return _solverLockData();
     }
 
+    // ---------------------------------------------------- //
+    //              Transient Internal Getters              //
+    // ---------------------------------------------------- //
+
     /// @notice Returns information about the current state of the solver lock.
     /// @return currentSolver Address of the current solver.
     /// @return calledBack Boolean indicating whether the solver has called back via `reconcile`.
@@ -185,6 +177,10 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         currentSolver = address(uint160(_solverLock));
         calledBack = _solverLock & _SOLVER_CALLED_BACK_MASK != 0;
         fulfilled = _solverLock & _SOLVER_FULFILLED_MASK != 0;
+    }
+
+    function _isUnlocked() internal view returns (bool) {
+        return _tload(_T_LOCK_SLOT) == bytes32(0);
     }
 
     // ---------------------------------------------------- //
@@ -200,6 +196,11 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
             bytes32(uint256(uint160(lock.activeEnvironment))) << 40 | bytes32(uint256(lock.callConfig)) << 8
                 | bytes32(uint256(lock.phase))
         );
+    }
+
+    // Sets the Lock phase without changing the activeEnvironment or callConfig.
+    function _setLockPhase(uint8 phase) internal {
+        _tstore(_T_LOCK_SLOT, (_tload(_T_LOCK_SLOT) & (_LOCK_PHASE_MASK | bytes32(uint256(phase)))));
     }
 
     function _setSolverLock(uint256 solverLock) internal {
@@ -236,8 +237,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         }
     }
 
-    function _tload(bytes32 slot) internal view returns (bytes32) {
-        bytes32 value;
+    function _tload(bytes32 slot) internal view returns (bytes32 value) {
         assembly {
             value := tload(slot)
         }

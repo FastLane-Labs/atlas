@@ -32,11 +32,12 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 _rawClaims = (FIXED_GAS_OFFSET + gasMarker) * tx.gasprice;
 
         // Set any withdraws or deposits
-        T_claims = _rawClaims.withBundlerSurcharge();
-        T_fees = _rawClaims.getAtlasSurcharge(); // Atlas surcharge is based on the raw claims value.
-        T_deposits = msg.value;
-        T_writeoffs = 0;
-        T_withdrawals = 0;
+        _setClaims(_rawClaims.withBundlerSurcharge());
+
+        // Atlas surcharge is based on the raw claims value.
+        _setFees(_rawClaims.getAtlasSurcharge());
+        _setDeposits(msg.value);
+        // writeoffs and withdrawawls transient storage variables are already 0
     }
 
     /// @notice Contributes ETH to the contract, increasing the deposits if a non-zero value is sent.
