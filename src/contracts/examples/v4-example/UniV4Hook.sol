@@ -11,10 +11,10 @@ import { V4DAppControl } from "./V4DAppControl.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 
-import "../../types/SolverOperation.sol";
-import "../../types/UserOperation.sol";
-import "../../types/ConfigTypes.sol";
-import "../../types/LockTypes.sol";
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/LockTypes.sol";
 
 // NOTE: Uniswap V4 is unique in that it would not require a frontend integration.
 // Instead, hooks can be used to enforce that the proceeds of the MEV auctions are
