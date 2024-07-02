@@ -277,7 +277,6 @@ contract GasAccountingTest is Test {
         (address currentSolver, bool verified, bool fulfilled) = mockGasAccounting.solverLockData();
         assertTrue(verified && fulfilled);
         assertEq(currentSolver, solverOp.from);
-        assertEq(mockGasAccounting.solver(), solverOp.from);
     }
 
     function test_assign() public {

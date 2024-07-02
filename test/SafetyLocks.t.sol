@@ -111,11 +111,13 @@ contract SafetyLocksTest is Test {
     }
 
     function test_releaseAccountingLock() public {
-
         safetyLocks.initializeLock(executionEnvironment, 0, 0);
         safetyLocks.releaseEscrowLock();
+
+        (address currentSolver, bool verified, bool fulfilled) = safetyLocks.solverLockData();
+
+        assertEq(currentSolver, address(1));
         assertEq(safetyLocks.activeEnvironment(), address(1));
-        assertEq(safetyLocks.solver(), address(1));
         assertEq(safetyLocks.claims(), type(uint256).max);
         assertEq(safetyLocks.withdrawals(), type(uint256).max);
         assertEq(safetyLocks.deposits(), type(uint256).max);

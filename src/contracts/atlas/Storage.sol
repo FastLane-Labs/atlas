@@ -51,6 +51,15 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint256 internal T_withdrawals; // transient storage
     uint256 internal T_deposits; // transient storage
 
+    // TODO refactor to constants once PR is ready
+    bytes32 private constant _T_LOCK_SLOT = keccak256("LOCK");
+    bytes32 private constant _T_SOLVER_LOCK_SLOT = keccak256("SOLVER_LOCK");
+    bytes32 private constant _T_CLAIMS_SLOT = keccak256("CLAIMS");
+    bytes32 private constant _T_FEES_SLOT = keccak256("FEES");
+    bytes32 private constant _T_WRITEOFFS_SLOT = keccak256("WRITEOFFS");
+    bytes32 private constant _T_WITHDRAWALS_SLOT = keccak256("WITHDRAWALS");
+    bytes32 private constant _T_DEPOSITS_SLOT = keccak256("DEPOSITS");
+
     constructor(
         uint256 escrowDuration,
         address verification,
@@ -83,37 +92,12 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         emit SurchargeRecipientTransferred(initialSurchargeRecipient);
     }
 
-    /// @notice Returns information about the current state of the solver lock.
-    /// @return currentSolver Address of the current solver.
-    /// @return calledBack Boolean indicating whether the solver has called back via `reconcile`.
-    /// @return fulfilled Boolean indicating whether the solver's outstanding debt has been repaid via `reconcile`.
-    function solverLockData() external view returns (address currentSolver, bool calledBack, bool fulfilled) {
-        return _solverLockData();
-    }
-
-    /// @notice Returns the address of the current solver.
-    /// @return Address of the current solver.
-    function solver() public view returns (address) {
-        return address(uint160(T_solverLock));
-    }
-
-    /// @notice Returns information about the current state of the solver lock.
-    /// @return currentSolver Address of the current solver.
-    /// @return calledBack Boolean indicating whether the solver has called back via `reconcile`.
-    /// @return fulfilled Boolean indicating whether the solver's outstanding debt has been repaid via `reconcile`.
-    function _solverLockData() internal view returns (address currentSolver, bool calledBack, bool fulfilled) {
-        uint256 _solverLock = T_solverLock;
-        currentSolver = address(uint160(_solverLock));
-        calledBack = _solverLock & _SOLVER_CALLED_BACK_MASK != 0;
-        fulfilled = _solverLock & _SOLVER_FULFILLED_MASK != 0;
-    }
-
     /// @notice Returns the EIP-712 domain separator for permit signatures, implemented in AtlETH.
     /// @return bytes32 Domain separator hash.
     function _computeDomainSeparator() internal view virtual returns (bytes32) { }
 
     // ---------------------------------------------------- //
-    //                      Storage Getters                 //
+    //                     Storage Getters                  //
     // ---------------------------------------------------- //
     function totalSupply() external view returns (uint256) {
         return S_totalSupply;
@@ -141,38 +125,6 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         return S_solverOpHashes[opHash];
     }
 
-    function lock() external view returns (address activeEnvironment, uint32 callConfig, uint8 phase) {
-        Lock memory _lock = T_lock;
-
-        activeEnvironment = _lock.activeEnvironment;
-        callConfig = _lock.callConfig;
-        phase = _lock.phase;
-    }
-
-    function solverLock() external view returns (uint256) {
-        return T_solverLock;
-    }
-
-    function claims() external view returns (uint256) {
-        return T_claims;
-    }
-
-    function fees() external view returns (uint256) {
-        return T_fees;
-    }
-
-    function writeoffs() external view returns (uint256) {
-        return T_writeoffs;
-    }
-
-    function withdrawals() external view returns (uint256) {
-        return T_withdrawals;
-    }
-
-    function deposits() external view returns (uint256) {
-        return T_deposits;
-    }
-
     function cumulativeSurcharge() external view returns (uint256) {
         return S_cumulativeSurcharge;
     }
@@ -185,8 +137,97 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         return S_pendingSurchargeRecipient;
     }
 
+    // ---------------------------------------------------- //
+    //                   Transient Getters                  //
+    // ---------------------------------------------------- //
+
+    function lock() external view returns (address activeEnvironment, uint32 callConfig, uint8 phase) {
+        bytes32 lockData = _tload(_T_LOCK_SLOT);
+        activeEnvironment = address(uint160(uint256(lockData >> 40)));
+        callConfig = uint32(uint256(lockData >> 8));
+        phase = uint8(uint256(lockData));
+    }
+
+    function claims() external view returns (uint256) {
+        return uint256(_tload(_T_CLAIMS_SLOT));
+    }
+
+    function fees() external view returns (uint256) {
+        return uint256(_tload(_T_FEES_SLOT));
+    }
+
+    function writeoffs() external view returns (uint256) {
+        return uint256(_tload(_T_WRITEOFFS_SLOT));
+    }
+
+    function withdrawals() external view returns (uint256) {
+        return uint256(_tload(_T_WITHDRAWALS_SLOT));
+    }
+
+    function deposits() external view returns (uint256) {
+        return uint256(_tload(_T_DEPOSITS_SLOT));
+    }
+
+    /// @notice Returns information about the current state of the solver lock.
+    /// @return currentSolver Address of the current solver.
+    /// @return calledBack Boolean indicating whether the solver has called back via `reconcile`.
+    /// @return fulfilled Boolean indicating whether the solver's outstanding debt has been repaid via `reconcile`.
+    function solverLockData() external view returns (address currentSolver, bool calledBack, bool fulfilled) {
+        return _solverLockData();
+    }
+
+    /// @notice Returns information about the current state of the solver lock.
+    /// @return currentSolver Address of the current solver.
+    /// @return calledBack Boolean indicating whether the solver has called back via `reconcile`.
+    /// @return fulfilled Boolean indicating whether the solver's outstanding debt has been repaid via `reconcile`.
+    function _solverLockData() internal view returns (address currentSolver, bool calledBack, bool fulfilled) {
+        uint256 _solverLock = uint256(_tload(_T_SOLVER_LOCK_SLOT));
+        currentSolver = address(uint160(_solverLock));
+        calledBack = _solverLock & _SOLVER_CALLED_BACK_MASK != 0;
+        fulfilled = _solverLock & _SOLVER_FULFILLED_MASK != 0;
+    }
+
+    // ---------------------------------------------------- //
+    //                   Transient Setters                  //
+    // ---------------------------------------------------- //
+
+    function _setLock(Lock memory lock) internal {
+        // Pack the lock slot from the right:
+        // [   56 bits   ][     160 bits      ][  32 bits   ][ 8 bits ]
+        // [ unused bits ][ activeEnvironment ][ callConfig ][ phase  ]
+        _tstore(
+            _T_LOCK_SLOT,
+            bytes32(uint256(uint160(lock.activeEnvironment))) << 40 | bytes32(uint256(lock.callConfig)) << 8
+                | bytes32(uint256(lock.phase))
+        );
+    }
+
+    function _setSolverLock(uint256 solverLock) internal {
+        _tstore(_T_SOLVER_LOCK_SLOT, bytes32(solverLock));
+    }
+
+    function _setClaims(uint256 claims) internal {
+        _tstore(_T_CLAIMS_SLOT, bytes32(claims));
+    }
+
+    function _setFees(uint256 fees) internal {
+        _tstore(_T_FEES_SLOT, bytes32(fees));
+    }
+
+    function _setWriteoffs(uint256 writeoffs) internal {
+        _tstore(_T_WRITEOFFS_SLOT, bytes32(writeoffs));
+    }
+
+    function _setWithdrawals(uint256 withdrawals) internal {
+        _tstore(_T_WITHDRAWALS_SLOT, bytes32(withdrawals));
+    }
+
+    function _setDeposits(uint256 deposits) internal {
+        _tstore(_T_DEPOSITS_SLOT, bytes32(deposits));
+    }
+
     // ------------------------------------------------------ //
-    //                TRANSIENT STORAGE HELPERS               //
+    //                Transient Storage Helpers               //
     // ------------------------------------------------------ //
 
     function _tstore(bytes32 slot, bytes32 value) internal {
