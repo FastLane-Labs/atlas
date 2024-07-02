@@ -270,20 +270,33 @@ abstract contract GasAccounting is SafetyLocks {
 
     /// @param ctx Context struct containing relavent context information for the Atlas auction.
     /// @param solverGasLimit The maximum gas limit for a solver, as set in the DAppConfig
+    /// @return adjustedWithdrawals Withdrawals of the current metacall, adjusted by adding the Atlas gas surcharge.
+    /// @return adjustedDeposits Deposits of the current metacall, no adjustments applied.
+    /// @return adjustedClaims Claims of the current metacall, adjusted by subtracting the unused gas scaled to include
+    /// bundler surcharge.
+    /// @return adjustedWriteoffs Writeoffs of the current metacall, adjusted by adding the bundler gas overage penalty
+    /// if applicable.
+    /// @return netAtlasGasSurcharge The net gas surcharge of the metacall, taken by Atlas.
     function _adjustAccountingForFees(
         Context memory ctx,
         uint256 solverGasLimit
     )
         internal
-        returns (uint256 withdrawals, uint256 deposits, uint256 claims, uint256 writeoffs, uint256 netAtlasGasSurcharge)
+        returns (
+            uint256 adjustedWithdrawals,
+            uint256 adjustedDeposits,
+            uint256 adjustedClaims,
+            uint256 adjustedWriteoffs,
+            uint256 netAtlasGasSurcharge
+        )
     {
         uint256 _surcharge = S_cumulativeSurcharge;
         uint256 _fees = T_fees;
 
-        claims = T_claims;
-        writeoffs = T_writeoffs;
-        withdrawals = T_withdrawals;
-        deposits = T_deposits;
+        adjustedWithdrawals = T_withdrawals;
+        adjustedDeposits = T_deposits;
+        adjustedClaims = T_claims;
+        adjustedWriteoffs = T_writeoffs;
 
         uint256 _gasLeft = gasleft(); // Hold this constant for the calculations
 
@@ -293,28 +306,28 @@ abstract contract GasAccounting is SafetyLocks {
         // Calculate the preadjusted netAtlasGasSurcharge
         netAtlasGasSurcharge = _fees - _gasRemainder.getAtlasSurcharge();
 
-        claims -= _gasRemainder.withBundlerSurcharge();
-        withdrawals += netAtlasGasSurcharge;
+        adjustedClaims -= _gasRemainder.withBundlerSurcharge();
+        adjustedWithdrawals += netAtlasGasSurcharge;
         S_cumulativeSurcharge = _surcharge + netAtlasGasSurcharge; // Update the cumulative surcharge
 
         // Calculate whether or not the bundler used an excessive amount of gas and, if so, reduce their
         // gas rebate. By reducing the claims, solvers end up paying less in total.
         if (ctx.solverCount > 0) {
             // Calculate the unadjusted bundler gas surcharge
-            uint256 _grossBundlerGasSurcharge = claims.withoutBundlerSurcharge();
+            uint256 _grossBundlerGasSurcharge = adjustedClaims.withoutBundlerSurcharge();
 
             // Calculate an estimate for how much gas should be remaining
             // NOTE: There is a free buffer of one SolverOperation because solverIndex starts at 0.
             uint256 _upperGasRemainingEstimate =
                 (solverGasLimit * (ctx.solverCount - ctx.solverIndex)) + _BUNDLER_GAS_PENALTY_BUFFER;
 
-            // Increase the _writeoffs value if the bundler set too high of a gas parameter and forced solvers to
+            // Increase the writeoffs value if the bundler set too high of a gas parameter and forced solvers to
             // maintain higher escrow balances.
             if (_gasLeft > _upperGasRemainingEstimate) {
                 // Penalize the bundler's gas
                 uint256 _bundlerGasOveragePenalty =
                     _grossBundlerGasSurcharge - (_grossBundlerGasSurcharge * _upperGasRemainingEstimate / _gasLeft);
-                writeoffs += _bundlerGasOveragePenalty;
+                adjustedWriteoffs += _bundlerGasOveragePenalty;
             }
         }
     }
