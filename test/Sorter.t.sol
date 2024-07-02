@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import { AtlasBaseTest } from "./base/AtlasBaseTest.t.sol";
 

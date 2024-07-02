@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import { Storage } from "./Storage.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
@@ -29,18 +29,22 @@ abstract contract SafetyLocks is Storage {
     /// @param dConfig The DAppConfig of the current DAppControl contract.
     /// @param executionEnvironment The address of the execution environment to set the lock to.
     function _setEnvironmentLock(DAppConfig memory dConfig, address executionEnvironment) internal {
-        if (T_lock.activeEnvironment != _UNLOCKED) revert AlreadyInitialized();
+        if (!_isUnlocked()) revert AlreadyInitialized();
 
         // Initialize the Lock
-        T_lock = Lock({
-            activeEnvironment: executionEnvironment,
-            phase: dConfig.callConfig.needsPreOpsCall() ? uint8(ExecutionPhase.PreOps) : uint8(ExecutionPhase.UserOperation),
-            callConfig: dConfig.callConfig
-        });
+        _setLock(
+            Lock({
+                activeEnvironment: executionEnvironment,
+                callConfig: dConfig.callConfig,
+                phase: dConfig.callConfig.needsPreOpsCall()
+                    ? uint8(ExecutionPhase.PreOps)
+                    : uint8(ExecutionPhase.UserOperation)
+            })
+        );
     }
 
     modifier withLockPhase(ExecutionPhase executionPhase) {
-        T_lock.phase = uint8(executionPhase);
+        _setLockPhase(uint8(executionPhase));
         _;
     }
 
@@ -79,33 +83,5 @@ abstract contract SafetyLocks is Storage {
             isSimulation: isSimulation,
             callDepth: 0
         });
-    }
-
-    /// @notice Releases the Atlas lock, and resets the associated transient storage variables. Called at the end of
-    /// `metacall`.
-    function _releaseAccountingLock() internal {
-        T_lock =
-            Lock({ activeEnvironment: _UNLOCKED, phase: uint8(ExecutionPhase.Uninitialized), callConfig: uint32(0) });
-        T_solverLock = _UNLOCKED_UINT;
-        T_claims = type(uint256).max;
-        T_fees = type(uint256).max;
-        T_withdrawals = type(uint256).max;
-        T_deposits = type(uint256).max;
-        T_writeoffs = type(uint256).max;
-    }
-
-    /// @notice Returns the address of the currently active Execution Environment, if any.
-    function activeEnvironment() external view returns (address) {
-        return T_lock.activeEnvironment;
-    }
-
-    function phase() external view returns (ExecutionPhase) {
-        return ExecutionPhase(T_lock.phase);
-    }
-
-    /// @notice Returns the current lock state of Atlas.
-    /// @return Boolean indicating whether Atlas is in a locked state or not.
-    function isUnlocked() external view returns (bool) {
-        return T_lock.activeEnvironment == _UNLOCKED;
     }
 }

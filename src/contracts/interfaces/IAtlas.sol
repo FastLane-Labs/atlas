@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import "src/contracts/types/SolverOperation.sol";
 import "src/contracts/types/UserOperation.sol";
@@ -75,7 +75,6 @@ interface IAtlas {
     // Storage.sol
     function VERIFICATION() external view returns (address);
     function solverLockData() external view returns (address currentSolver, bool calledBack, bool fulfilled);
-    function solver() external view returns (address);
     function totalSupply() external view returns (uint256);
     function bondedTotalSupply() external view returns (uint256);
     function accessData(address account)

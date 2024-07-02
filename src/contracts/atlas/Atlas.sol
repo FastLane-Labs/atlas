@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { LibSort } from "solady/utils/LibSort.sol";
@@ -99,8 +99,8 @@ contract Atlas is Escrow, Factory {
             if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
         }
 
-        // Release the lock
-        _releaseAccountingLock();
+        // The Accounting Lock is implicitly released here as the transient storage variables are zeroed out at the end
+        // of the transaction.
     }
 
     /// @notice execute is called above, in a try-catch block in metacall.
