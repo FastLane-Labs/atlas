@@ -42,8 +42,8 @@ abstract contract GasAccounting is SafetyLocks {
 
     /// @notice Contributes ETH to the contract, increasing the deposits if a non-zero value is sent.
     function contribute() external payable {
-        address _currentEnvironment = T_lock.activeEnvironment;
-        if (_currentEnvironment != msg.sender) revert InvalidExecutionEnvironment(_currentEnvironment);
+        (address _activeEnvironment,,) = lock();
+        if (_activeEnvironment != msg.sender) revert InvalidExecutionEnvironment(_activeEnvironment);
         _contribute();
     }
 
@@ -55,11 +55,9 @@ abstract contract GasAccounting is SafetyLocks {
 
         // borrow() can only be called by the Execution Environment (by delegatecalling a DAppControl hook), and only
         // during or before the SolverOperation phase.
-        Lock memory _lock = T_lock;
-        if (_lock.activeEnvironment != msg.sender) {
-            revert InvalidExecutionEnvironment(_lock.activeEnvironment);
-        }
-        if (_lock.phase > uint8(ExecutionPhase.SolverOperation)) revert WrongPhase();
+        (address _activeEnvironment,, uint8 _phase) = lock();
+        if (_activeEnvironment != msg.sender) revert InvalidExecutionEnvironment(_activeEnvironment);
+        if (_phase > uint8(ExecutionPhase.SolverOperation)) revert WrongPhase();
 
         // borrow() will revert if called after solver calls reconcile()
         (, bool _calledBack,) = _solverLockData();
@@ -77,8 +75,8 @@ abstract contract GasAccounting is SafetyLocks {
     /// than zero, shortfall returns 0 as there is no shortfall because the solver is in surplus.
     /// @return uint256 The current shortfall amount, or 0 if there is no shortfall.
     function shortfall() external view returns (uint256) {
-        uint256 _deficit = T_claims + T_withdrawals + T_fees - T_writeoffs;
-        uint256 _deposits = T_deposits;
+        uint256 _deficit = claims() + withdrawals() + fees() - writeoffs();
+        uint256 _deposits = deposits();
         return (_deficit > _deposits) ? (_deficit - _deposits) : 0;
     }
 
@@ -99,7 +97,8 @@ abstract contract GasAccounting is SafetyLocks {
         // NOTE: While anyone can call this function, it can only be called in the SolverOperation phase. Because Atlas
         // calls directly to the solver contract in this phase, the solver should be careful to not call malicious
         // contracts which may call reconcile() on their behalf, with an excessive maxApprovedGasSpend.
-        if (T_lock.phase != uint8(ExecutionPhase.SolverOperation)) revert WrongPhase();
+        (,, uint8 _phase) = lock();
+        if (_phase != uint8(ExecutionPhase.SolverOperation)) revert WrongPhase();
 
         (address _currentSolver, bool _calledBack, bool _fulfilled) = _solverLockData();
         uint256 _bondedBalance = uint256(S_accessData[_currentSolver].bonded);
@@ -107,13 +106,13 @@ abstract contract GasAccounting is SafetyLocks {
         // Solver can only approve up to their bonded balance, not more
         if (maxApprovedGasSpend > _bondedBalance) maxApprovedGasSpend = _bondedBalance;
 
-        uint256 _deductions = T_claims + T_withdrawals + T_fees - T_writeoffs;
-        uint256 _additions = T_deposits + msg.value;
+        uint256 _deductions = claims() + withdrawals() + fees() - writeoffs();
+        uint256 _additions = deposits() + msg.value;
 
         // Add msg.value to solver's deposits
         // NOTE: Surplus deposits are credited back to the Solver during settlement.
         // NOTE: This function is called inside the solver try/catch and will be undone if solver fails.
-        if (msg.value > 0) T_deposits = _additions;
+        if (msg.value > 0) _setDeposits(_additions);
 
         // CASE: Callback verified but insufficient balance
         if (_deductions > _additions + maxApprovedGasSpend) {
@@ -122,21 +121,21 @@ abstract contract GasAccounting is SafetyLocks {
                 // but it does treat any msg.value as a deposit and allows for either the solver to call back with a
                 // higher maxApprovedGasSpend or to have their deficit covered by a contribute during the postSolverOp
                 // hook.
-                T_solverLock = uint256(uint160(_currentSolver)) | _SOLVER_CALLED_BACK_MASK;
+                _setSolverLock(uint256(uint160(_currentSolver)) | _SOLVER_CALLED_BACK_MASK);
             }
             return _deductions - _additions;
         }
 
         // CASE: Callback verified and solver duty fulfilled
         if (!_fulfilled) {
-            T_solverLock = uint256(uint160(_currentSolver)) | _SOLVER_CALLED_BACK_MASK | _SOLVER_FULFILLED_MASK;
+            _setSolverLock(uint256(uint160(_currentSolver)) | _SOLVER_CALLED_BACK_MASK | _SOLVER_FULFILLED_MASK);
         }
         return 0;
     }
 
     /// @notice Internal function to handle ETH contribution, increasing deposits if a non-zero value is sent.
     function _contribute() internal {
-        if (msg.value != 0) T_deposits += msg.value;
+        if (msg.value != 0) _setDeposits(deposits() + msg.value);
     }
 
     /// @notice Borrows ETH from the contract, transferring the specified amount to the caller if available.
@@ -149,7 +148,7 @@ abstract contract GasAccounting is SafetyLocks {
         if (amount == 0) return true;
         if (address(this).balance < amount) return false;
 
-        T_withdrawals += amount;
+        _setWithdrawals(withdrawals() + amount);
 
         return true;
     }
@@ -182,7 +181,7 @@ abstract contract GasAccounting is SafetyLocks {
                 s_balanceOf[owner].unbonding = 0;
                 _aData.bonded = 0;
 
-                T_writeoffs += deficit;
+                _setWriteoffs(writeoffs() + deficit);
                 amount -= deficit; // Set amount equal to total to accurately track the changing bondedTotalSupply
             } else {
                 // The unbonding balance is sufficient to cover the remaining amount owed. Draw everything from the
@@ -211,7 +210,7 @@ abstract contract GasAccounting is SafetyLocks {
         S_accessData[owner] = _aData;
 
         S_bondedTotalSupply -= amount;
-        T_deposits += amount;
+        _setDeposits(deposits() + amount);
     }
 
     /// @notice Increases the owner's bonded balance by the specified amount.
@@ -233,7 +232,7 @@ abstract contract GasAccounting is SafetyLocks {
         }
 
         S_accessData[owner] = _aData;
-        T_withdrawals += amount;
+        _setWithdrawals(withdrawals() + amount);
     }
 
     /// @notice Accounts for the gas cost of a failed SolverOperation, either by increasing writeoffs (if the bundler is
@@ -262,7 +261,7 @@ abstract contract GasAccounting is SafetyLocks {
         if (!result.updateEscrow()) {
             // CASE: Solver is not responsible for the failure of their operation, so we blame the bundler
             // and reduce the total amount refunded to the bundler
-            T_writeoffs += _gasUsed.withAtlasAndBundlerSurcharges();
+            _setWriteoffs(writeoffs() + _gasUsed.withAtlasAndBundlerSurcharges());
         } else {
             // CASE: Solver failed, so we calculate what they owe.
             _assign(solverOp.from, _gasUsed.withAtlasAndBundlerSurcharges(), false);
@@ -292,12 +291,12 @@ abstract contract GasAccounting is SafetyLocks {
         )
     {
         uint256 _surcharge = S_cumulativeSurcharge;
-        uint256 _fees = T_fees;
+        uint256 _fees = fees();
 
-        adjustedWithdrawals = T_withdrawals;
-        adjustedDeposits = T_deposits;
-        adjustedClaims = T_claims;
-        adjustedWriteoffs = T_writeoffs;
+        adjustedWithdrawals = withdrawals();
+        adjustedDeposits = deposits();
+        adjustedClaims = claims();
+        adjustedWriteoffs = writeoffs();
 
         uint256 _gasLeft = gasleft(); // Hold this constant for the calculations
 
@@ -351,7 +350,7 @@ abstract contract GasAccounting is SafetyLocks {
         // is treated as the solver.
 
         // If a solver won, their address is still in the _solverLock
-        address _winningSolver = address(uint160(T_solverLock));
+        (address _winningSolver,,) = _solverLockData();
 
         // Load what we can from storage so that it shows up in the gasleft() calc
 

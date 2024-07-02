@@ -42,31 +42,31 @@ contract MockSafetyLocks is SafetyLocks {
     }
 
     function setLock(address _activeEnvironment) external {
-        T_lock = Lock({
+        _setLock(Lock({
             activeEnvironment: _activeEnvironment,
             phase: uint8(ExecutionPhase.Uninitialized),
             callConfig: uint32(0)
-        });
+        }));
     }
 
     function setClaims(uint256 _claims) external {
-        T_claims = _claims;
+        _setClaims(_claims);
     }
 
     function setWithdrawals(uint256 _withdrawals) external {
-        T_withdrawals = _withdrawals;
+        _setWithdrawals(_withdrawals);
     }
 
     function setDeposits(uint256 _deposits) external {
-        T_deposits = _deposits;
+        _setDeposits(_deposits);
     }
 
     function setFees(uint256 _fees) external {
-        T_fees = _fees;
+        _setFees(_fees);
     }
 
     function setWriteoffs(uint256 _writeoffs) external {
-        T_writeoffs = _writeoffs;
+        _setWriteoffs(_writeoffs);
     }
 }
 

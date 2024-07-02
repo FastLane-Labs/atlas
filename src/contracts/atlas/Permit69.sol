@@ -104,20 +104,20 @@ abstract contract Permit69 is GasAccounting {
     /// @param control The address of the current DAppControl contract.
     /// @param safeExecutionPhaseSet The set of safe execution phases.
     function _validateTransfer(address user, address control, uint8 safeExecutionPhaseSet) internal {
-        Lock memory _lock = T_lock;
+        (address _activeEnvironment, uint32 _callConfig, uint8 _phase) = lock();
 
         // Verify that the ExecutionEnvironment's context is correct.
-        if (_lock.activeEnvironment != msg.sender) {
+        if (_activeEnvironment != msg.sender) {
             revert InvalidEnvironment();
         }
 
         // Verify that the given user and control are the owners of this ExecutionEnvironment
-        if (!_verifyUserControlExecutionEnv(msg.sender, user, control, _lock.callConfig)) {
+        if (!_verifyUserControlExecutionEnv(msg.sender, user, control, _callConfig)) {
             revert EnvironmentMismatch();
         }
 
         // Verify that the current phase allows for transfers
-        if (1 << uint8(_lock.phase) & safeExecutionPhaseSet == 0) {
+        if (1 << _phase & safeExecutionPhaseSet == 0) {
             revert InvalidLockState();
         }
     }

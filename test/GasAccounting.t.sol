@@ -36,11 +36,11 @@ contract MockGasAccounting is GasAccounting, Test {
     }
 
     function setPhase(ExecutionPhase _phase) external {
-        T_lock.phase = uint8(_phase);
+        _setLockPhase(uint8(_phase));
     }
 
     function setSolverLock(address _solverFrom) external {
-        T_solverLock = uint256(uint160(_solverFrom));
+        _setSolverLock(uint256(uint160(_solverFrom)));
     }
 
     function assign(address owner, uint256 value, bool solverWon) external returns (uint256) {
@@ -68,8 +68,9 @@ contract MockGasAccounting is GasAccounting, Test {
         uint256 winningSolverIndex,
         uint256 solverCount
     ) public view returns (Context memory ctx) {
+        (address _activeEnvironment,,) = lock();
         ctx = Context({
-            executionEnvironment: T_lock.activeEnvironment,
+            executionEnvironment: _activeEnvironment,
             userOpHash: bytes32(0),
             bundler: bundler,
             solverSuccessful: solverSuccessful,

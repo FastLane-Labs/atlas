@@ -84,19 +84,4 @@ abstract contract SafetyLocks is Storage {
             callDepth: 0
         });
     }
-
-    /// @notice Returns the address of the currently active Execution Environment, if any.
-    function activeEnvironment() external view returns (address) {
-        return T_lock.activeEnvironment;
-    }
-
-    function phase() external view returns (ExecutionPhase) {
-        return ExecutionPhase(T_lock.phase);
-    }
-
-    /// @notice Returns the current lock state of Atlas.
-    /// @return Boolean indicating whether Atlas is in a locked state or not.
-    function isUnlocked() external view returns (bool) {
-        return _isUnlocked();
-    }
 }

@@ -28,6 +28,15 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint256 public constant SURCHARGE_SCALE = 10_000_000; // 10_000_000 / 10_000_000 = 100%
     uint256 public constant FIXED_GAS_OFFSET = 100_000;
 
+    // Transient storage slots
+    bytes32 private constant _T_LOCK_SLOT = keccak256("LOCK");
+    bytes32 private constant _T_SOLVER_LOCK_SLOT = keccak256("SOLVER_LOCK");
+    bytes32 private constant _T_CLAIMS_SLOT = keccak256("CLAIMS");
+    bytes32 private constant _T_FEES_SLOT = keccak256("FEES");
+    bytes32 private constant _T_WRITEOFFS_SLOT = keccak256("WRITEOFFS");
+    bytes32 private constant _T_WITHDRAWALS_SLOT = keccak256("WITHDRAWALS");
+    bytes32 private constant _T_DEPOSITS_SLOT = keccak256("DEPOSITS");
+
     // AtlETH storage
     uint256 public S_totalSupply;
     uint256 public S_bondedTotalSupply;
@@ -40,25 +49,6 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint256 internal S_cumulativeSurcharge; // Cumulative gas surcharges collected
     address internal S_surchargeRecipient; // Fastlane surcharge recipient
     address internal S_pendingSurchargeRecipient; // For 2-step transfer process
-
-    // Atlas SafetyLocks (transient storage)
-    Lock internal T_lock; // transient storage
-    uint256 internal T_solverLock; // transient storage
-
-    uint256 internal T_claims; // transient storage
-    uint256 internal T_fees; // transient storage
-    uint256 internal T_writeoffs; // transient storage
-    uint256 internal T_withdrawals; // transient storage
-    uint256 internal T_deposits; // transient storage
-
-    // TODO refactor to constants once PR is ready
-    bytes32 private constant _T_LOCK_SLOT = keccak256("LOCK");
-    bytes32 private constant _T_SOLVER_LOCK_SLOT = keccak256("SOLVER_LOCK");
-    bytes32 private constant _T_CLAIMS_SLOT = keccak256("CLAIMS");
-    bytes32 private constant _T_FEES_SLOT = keccak256("FEES");
-    bytes32 private constant _T_WRITEOFFS_SLOT = keccak256("WRITEOFFS");
-    bytes32 private constant _T_WITHDRAWALS_SLOT = keccak256("WITHDRAWALS");
-    bytes32 private constant _T_DEPOSITS_SLOT = keccak256("DEPOSITS");
 
     constructor(
         uint256 escrowDuration,
@@ -79,10 +69,6 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
 
         emit SurchargeRecipientTransferred(initialSurchargeRecipient);
     }
-
-    /// @notice Returns the EIP-712 domain separator for permit signatures, implemented in AtlETH.
-    /// @return bytes32 Domain separator hash.
-    function _computeDomainSeparator() internal view virtual returns (bytes32) { }
 
     // ---------------------------------------------------- //
     //                     Storage Getters                  //
@@ -134,6 +120,22 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         activeEnvironment = address(uint160(uint256(_lockData >> 40)));
         callConfig = uint32(uint256(_lockData >> 8));
         phase = uint8(uint256(_lockData));
+    }
+
+    function activeEnvironment() external view returns (address) {
+        // right shift 40 bits to remove the callConfig and phase, only activeEnvironment remains
+        return address(uint160(uint256(_tload(_T_LOCK_SLOT) >> 40)));
+    }
+
+    function phase() external view returns (ExecutionPhase) {
+        // right-most 8 bits of Lock are the phase
+        return ExecutionPhase(uint8(uint256(_tload(_T_LOCK_SLOT))));
+    }
+
+    /// @notice Returns the current lock state of Atlas.
+    /// @return Boolean indicating whether Atlas is in a locked state or not.
+    function isUnlocked() external view returns (bool) {
+        return _isUnlocked();
     }
 
     function claims() public view returns (uint256) {

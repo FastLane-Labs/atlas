@@ -590,7 +590,9 @@ abstract contract Escrow is AtlETH {
         if (!_borrow(solverOp.value)) revert InsufficientEscrow();
 
         // Set the solver lock - if we revert here we'll catch the error in `_solverOpWrapper()` above
-        T_solverLock = uint256(uint160(solverOp.from));
+        _setSolverLock(uint256(uint160(solverOp.from)));
+
+        (, uint32 _callConfig,) = lock();
 
         // Optimism's SafeCall lib allows us to limit how much returndata gets copied to memory, to prevent OOG attacks.
         _success = solverOp.solver.safeCall(
@@ -605,7 +607,7 @@ abstract contract Escrow is AtlETH {
                     bidAmount,
                     solverOp.data,
                     // Only pass the returnData to solver if it came from userOp call and not from preOps call.
-                    T_lock.callConfig.needsUserReturnData() ? returnData : new bytes(0)
+                    _callConfig.needsUserReturnData() ? returnData : new bytes(0)
                 )
             )
         );
@@ -645,7 +647,7 @@ abstract contract Escrow is AtlETH {
         bool _calledback;
         (, _calledback, _success) = _solverLockData();
         if (!_calledback) revert CallbackNotCalled();
-        if (!_success && T_deposits < T_claims + T_withdrawals + T_fees - T_writeoffs) revert BalanceNotReconciled();
+        if (!_success && deposits() < claims() + withdrawals() + fees() - writeoffs()) revert BalanceNotReconciled();
 
         // Check if this is an on-chain, ex post bid search
         if (ctx.bidFind) revert BidFindSuccessful(solverTracker.bidAmount);
