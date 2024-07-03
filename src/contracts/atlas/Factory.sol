@@ -168,6 +168,7 @@ abstract contract Factory {
         creationCode = type(Mimic).creationCode;
 
         assembly {
+            // Insert the ExecutionEnvironment "Lib" address, into the AAAA placeholder in the creation code.
             mstore(
                 add(creationCode, 79),
                 or(
@@ -176,6 +177,7 @@ abstract contract Factory {
                 )
             )
 
+            // Insert the user address into the BBBB placeholder in the creation code.
             mstore(
                 add(creationCode, 111),
                 or(
@@ -184,15 +186,19 @@ abstract contract Factory {
                 )
             )
 
+            // Insert the control address into the CCCC placeholder in the creation code.
             mstore(
                 add(creationCode, 132),
                 or(
-                    and(
-                        mload(add(creationCode, 132)),
-                        not(shl(56, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00FFFFFFFF))
-                    ),
-                    add(shl(96, control), add(shl(88, 0x63), shl(56, callConfig)))
+                    and(mload(add(creationCode, 132)), not(shl(96, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF))),
+                    shl(96, control)
                 )
+            )
+
+            // Insert the callConfig into the 2222 placeholder in the creation code.
+            mstore(
+                add(creationCode, 153),
+                or(and(mload(add(creationCode, 153)), not(shl(224, 0xFFFFFFFF))), shl(224, callConfig))
             )
         }
     }
