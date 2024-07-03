@@ -115,21 +115,8 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     //              Transient External Getters              //
     // ---------------------------------------------------- //
 
-    function lock() public view returns (address activeEnvironment, uint32 callConfig, uint8 phase) {
-        bytes32 _lockData = _tload(_T_LOCK_SLOT);
-        activeEnvironment = address(uint160(uint256(_lockData >> 40)));
-        callConfig = uint32(uint256(_lockData >> 8));
-        phase = uint8(uint256(_lockData));
-    }
-
-    function activeEnvironment() external view returns (address) {
-        // right shift 40 bits to remove the callConfig and phase, only activeEnvironment remains
-        return address(uint160(uint256(_tload(_T_LOCK_SLOT) >> 40)));
-    }
-
-    function phase() external view returns (ExecutionPhase) {
-        // right-most 8 bits of Lock are the phase
-        return ExecutionPhase(uint8(uint256(_tload(_T_LOCK_SLOT))));
+    function lock() external view returns (address activeEnvironment, uint32 callConfig, uint8 phase) {
+        return _lock();
     }
 
     /// @notice Returns the current lock state of Atlas.
@@ -169,6 +156,28 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     // ---------------------------------------------------- //
     //              Transient Internal Getters              //
     // ---------------------------------------------------- //
+
+    function _lock() internal view returns (address activeEnvironment, uint32 callConfig, uint8 phase) {
+        bytes32 _lockData = _tload(_T_LOCK_SLOT);
+        activeEnvironment = address(uint160(uint256(_lockData >> 40)));
+        callConfig = uint32(uint256(_lockData >> 8));
+        phase = uint8(uint256(_lockData));
+    }
+
+    function _activeEnvironment() internal view returns (address) {
+        // right shift 40 bits to remove the callConfig and phase, only activeEnvironment remains
+        return address(uint160(uint256(_tload(_T_LOCK_SLOT) >> 40)));
+    }
+
+    function _activeCallConfig() internal view returns (uint32) {
+        // right shift 8 bits to remove the phase, cast to uint32 to remove the activeEnvironment
+        return uint32(uint256(_tload(_T_LOCK_SLOT) >> 8));
+    }
+
+    function _phase() internal view returns (uint8) {
+        // right-most 8 bits of Lock are the phase
+        return uint8(uint256(_tload(_T_LOCK_SLOT)));
+    }
 
     /// @notice Returns information about the current state of the solver lock.
     /// @return currentSolver Address of the current solver.

@@ -592,8 +592,6 @@ abstract contract Escrow is AtlETH {
         // Set the solver lock - if we revert here we'll catch the error in `_solverOpWrapper()` above
         _setSolverLock(uint256(uint160(solverOp.from)));
 
-        (, uint32 _callConfig,) = lock();
-
         // Optimism's SafeCall lib allows us to limit how much returndata gets copied to memory, to prevent OOG attacks.
         _success = solverOp.solver.safeCall(
             gasLimit,
@@ -607,7 +605,7 @@ abstract contract Escrow is AtlETH {
                     bidAmount,
                     solverOp.data,
                     // Only pass the returnData to solver if it came from userOp call and not from preOps call.
-                    _callConfig.needsUserReturnData() ? returnData : new bytes(0)
+                    _activeCallConfig().needsUserReturnData() ? returnData : new bytes(0)
                 )
             )
         );

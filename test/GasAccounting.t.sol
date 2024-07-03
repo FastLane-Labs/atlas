@@ -68,9 +68,8 @@ contract MockGasAccounting is GasAccounting, Test {
         uint256 winningSolverIndex,
         uint256 solverCount
     ) public view returns (Context memory ctx) {
-        (address _activeEnvironment,,) = lock();
         ctx = Context({
-            executionEnvironment: _activeEnvironment,
+            executionEnvironment: _activeEnvironment(),
             userOpHash: bytes32(0),
             bundler: bundler,
             solverSuccessful: solverSuccessful,

@@ -42,8 +42,8 @@ abstract contract GasAccounting is SafetyLocks {
 
     /// @notice Contributes ETH to the contract, increasing the deposits if a non-zero value is sent.
     function contribute() external payable {
-        (address _activeEnvironment,,) = lock();
-        if (_activeEnvironment != msg.sender) revert InvalidExecutionEnvironment(_activeEnvironment);
+        address _activeEnv = _activeEnvironment();
+        if (_activeEnv != msg.sender) revert InvalidExecutionEnvironment(_activeEnv);
         _contribute();
     }
 
@@ -55,9 +55,9 @@ abstract contract GasAccounting is SafetyLocks {
 
         // borrow() can only be called by the Execution Environment (by delegatecalling a DAppControl hook), and only
         // during or before the SolverOperation phase.
-        (address _activeEnvironment,, uint8 _phase) = lock();
-        if (_activeEnvironment != msg.sender) revert InvalidExecutionEnvironment(_activeEnvironment);
-        if (_phase > uint8(ExecutionPhase.SolverOperation)) revert WrongPhase();
+        (address _activeEnv,, uint8 _currentPhase) = _lock();
+        if (_activeEnv != msg.sender) revert InvalidExecutionEnvironment(_activeEnv);
+        if (_currentPhase > uint8(ExecutionPhase.SolverOperation)) revert WrongPhase();
 
         // borrow() will revert if called after solver calls reconcile()
         (, bool _calledBack,) = _solverLockData();
@@ -97,8 +97,7 @@ abstract contract GasAccounting is SafetyLocks {
         // NOTE: While anyone can call this function, it can only be called in the SolverOperation phase. Because Atlas
         // calls directly to the solver contract in this phase, the solver should be careful to not call malicious
         // contracts which may call reconcile() on their behalf, with an excessive maxApprovedGasSpend.
-        (,, uint8 _phase) = lock();
-        if (_phase != uint8(ExecutionPhase.SolverOperation)) revert WrongPhase();
+        if (_phase() != uint8(ExecutionPhase.SolverOperation)) revert WrongPhase();
 
         (address _currentSolver, bool _calledBack, bool _fulfilled) = _solverLockData();
         uint256 _bondedBalance = uint256(S_accessData[_currentSolver].bonded);

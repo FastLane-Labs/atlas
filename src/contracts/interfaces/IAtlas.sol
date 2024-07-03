@@ -68,8 +68,6 @@ interface IAtlas {
     function reconcile(uint256 maxApprovedGasSpend) external payable returns (uint256 owed);
 
     // SafetyLocks.sol
-    function activeEnvironment() external view returns (address);
-    function phase() external view returns (ExecutionPhase);
     function isUnlocked() external view returns (bool);
 
     // Storage.sol

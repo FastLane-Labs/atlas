@@ -105,9 +105,4 @@ contract SafetyLocksTest is Test {
         Context memory ctx = safetyLocks.buildEscrowLock(dConfig, executionEnvironment, bytes32(0), address(0), 0, false);
         assertEq(executionEnvironment, ctx.executionEnvironment);
     }
-
-    function test_activeEnvironment() public {
-        safetyLocks.initializeLock(executionEnvironment, 0, 0);
-        assertEq(safetyLocks.activeEnvironment(), executionEnvironment);
-    }
 }

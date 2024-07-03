@@ -172,7 +172,7 @@ contract ChainlinkAtlasWrapper is Ownable {
         }
 
         // Verify that this environment is the currently active one according to Atlas
-        // require(msg.sender == IAtlasFactory(ATLAS).activeEnvironment(), "inactive EE");
+        // require(msg.sender == _activeEnvironment(), "inactive EE");
 
         // Get the valid transmitters
         // NOTE: Be careful if considering storing these in a map - that would make it tricky to deauthorize for this

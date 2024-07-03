@@ -185,7 +185,7 @@ contract Base {
     /// @notice Returns the address of the currently active Execution Environment, if any.
     /// @return activeEnvironment The address of the currently active Execution Environment.
     function _activeEnvironment() internal view returns (address activeEnvironment) {
-        activeEnvironment = IAtlas(ATLAS).activeEnvironment();
+        (activeEnvironment,,) = IAtlas(ATLAS).lock();
     }
 }
 

@@ -151,7 +151,7 @@ contract Filler is DAppControl {
     ///////////////////// DAPP STUFF ///////////////////////
 
     function postOpBalancing(uint256 prepaidAmount) external {
-        require(msg.sender == IAtlas(ATLAS).activeEnvironment(), "ERR - INVALID SENDER");
+        require(msg.sender == _activeEnvironment(), "ERR - INVALID SENDER");
         require(address(this) == _control(), "ERR - INVALID CONTROL");
         require(_depth() == 2, "ERR - INVALID DEPTH");
 
@@ -168,7 +168,7 @@ contract Filler is DAppControl {
         }
 
         // CASE: Nested call from Atlas EE
-        if (msg.sender == IAtlas(ATLAS).activeEnvironment()) {
+        if (msg.sender == _activeEnvironment()) {
             require(address(this) == _control(), "ERR - INVALID CONTROL");
             return _outerApprove(data);
         }
