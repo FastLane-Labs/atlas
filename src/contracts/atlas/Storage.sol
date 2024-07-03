@@ -189,44 +189,44 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     //                   Transient Setters                  //
     // ---------------------------------------------------- //
 
-    function _setLock(Lock memory lock) internal {
+    function _setLock(Lock memory newLock) internal {
         // Pack the lock slot from the right:
         // [   56 bits   ][     160 bits      ][  32 bits   ][ 8 bits ]
         // [ unused bits ][ activeEnvironment ][ callConfig ][ phase  ]
         _tstore(
             _T_LOCK_SLOT,
-            bytes32(uint256(uint160(lock.activeEnvironment))) << 40 | bytes32(uint256(lock.callConfig)) << 8
-                | bytes32(uint256(lock.phase))
+            bytes32(uint256(uint160(newLock.activeEnvironment))) << 40 | bytes32(uint256(newLock.callConfig)) << 8
+                | bytes32(uint256(newLock.phase))
         );
     }
 
     // Sets the Lock phase without changing the activeEnvironment or callConfig.
-    function _setLockPhase(uint8 phase) internal {
-        _tstore(_T_LOCK_SLOT, (_tload(_T_LOCK_SLOT) & _LOCK_PHASE_MASK) | bytes32(uint256(phase)));
+    function _setLockPhase(uint8 newPhase) internal {
+        _tstore(_T_LOCK_SLOT, (_tload(_T_LOCK_SLOT) & _LOCK_PHASE_MASK) | bytes32(uint256(newPhase)));
     }
 
-    function _setSolverLock(uint256 solverLock) internal {
-        _tstore(_T_SOLVER_LOCK_SLOT, bytes32(solverLock));
+    function _setSolverLock(uint256 newSolverLock) internal {
+        _tstore(_T_SOLVER_LOCK_SLOT, bytes32(newSolverLock));
     }
 
-    function _setClaims(uint256 claims) internal {
-        _tstore(_T_CLAIMS_SLOT, bytes32(claims));
+    function _setClaims(uint256 newClaims) internal {
+        _tstore(_T_CLAIMS_SLOT, bytes32(newClaims));
     }
 
-    function _setFees(uint256 fees) internal {
-        _tstore(_T_FEES_SLOT, bytes32(fees));
+    function _setFees(uint256 newFees) internal {
+        _tstore(_T_FEES_SLOT, bytes32(newFees));
     }
 
-    function _setWriteoffs(uint256 writeoffs) internal {
-        _tstore(_T_WRITEOFFS_SLOT, bytes32(writeoffs));
+    function _setWriteoffs(uint256 newWriteoffs) internal {
+        _tstore(_T_WRITEOFFS_SLOT, bytes32(newWriteoffs));
     }
 
-    function _setWithdrawals(uint256 withdrawals) internal {
-        _tstore(_T_WITHDRAWALS_SLOT, bytes32(withdrawals));
+    function _setWithdrawals(uint256 newWithdrawals) internal {
+        _tstore(_T_WITHDRAWALS_SLOT, bytes32(newWithdrawals));
     }
 
-    function _setDeposits(uint256 deposits) internal {
-        _tstore(_T_DEPOSITS_SLOT, bytes32(deposits));
+    function _setDeposits(uint256 newDeposits) internal {
+        _tstore(_T_DEPOSITS_SLOT, bytes32(newDeposits));
     }
 
     // ------------------------------------------------------ //
