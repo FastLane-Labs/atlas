@@ -53,7 +53,7 @@ contract Atlas is Escrow, Factory {
         payable
         returns (bool auctionWon)
     {
-        uint256 _gasMarker = gasleft() + 21_000 + (msg.data.length * _CALLDATA_LENGTH_PREMIUM);
+        uint256 _gasMarker = gasleft() + _BASE_TRANSACTION_GAS_USED + (msg.data.length * _CALLDATA_LENGTH_PREMIUM);
         bool _isSimulation = msg.sender == SIMULATOR;
 
         (address _executionEnvironment, DAppConfig memory _dConfig) = _getOrCreateExecutionEnvironment(userOp);
