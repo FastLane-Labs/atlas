@@ -232,7 +232,7 @@ contract Atlas is Escrow, Factory {
         // Finally, iterate through sorted bidsAndIndices array in descending order of bidAmount.
         for (uint256 i = _bidsAndIndicesLastIndex; i >= 0; --i) {
             // Isolate the bidAmount from the packed uint256 value
-            _bidAmountFound = (_bidsAndIndices[i] >> _BITS_FOR_INDEX) & _FIRST_240_BITS_TRUE_MASK;
+            _bidAmountFound = _bidsAndIndices[i] >> _BITS_FOR_INDEX;
 
             // If we reach the zero bids on the left of array, break as all valid bids already checked.
             if (_bidAmountFound == 0) break;
