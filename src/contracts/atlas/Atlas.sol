@@ -175,8 +175,10 @@ contract Atlas is Escrow, Factory {
         internal
         returns (uint256)
     {
+        uint256 solverOpsLength = solverOps.length; // computed once for efficiency
+
         // Return early if no solverOps (e.g. in simUserOperation)
-        if (solverOps.length == 0) {
+        if (solverOpsLength == 0) {
             if (ctx.isSimulation) revert SolverSimFail(0);
             if (dConfig.callConfig.needsFulfillment()) revert UserNotFulfilled();
             return 0;
@@ -184,7 +186,7 @@ contract Atlas is Escrow, Factory {
 
         ctx.bidFind = true;
 
-        uint256[] memory _bidsAndIndices = new uint256[](solverOps.length);
+        uint256[] memory _bidsAndIndices = new uint256[](solverOpsLength);
         uint256 _zeroBidCount;
         uint256 _bidAmountFound;
         uint256 _bidsAndIndicesLastIndex = _bidsAndIndices.length - 1; // computed once for efficiency
@@ -204,7 +206,7 @@ contract Atlas is Escrow, Factory {
         // |                                              |                         |
         // |<------------------ 240 bits ---------------->|<------- 16 bits ------->|
 
-        for (uint256 i; i < solverOps.length; ++i) {
+        for (uint256 i; i < solverOpsLength; ++i) {
             _bidAmountFound = _getBidAmount(ctx, dConfig, userOp, solverOps[i], returnData);
 
             if (_bidAmountFound == 0 || _bidAmountFound > type(uint240).max) {
