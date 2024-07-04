@@ -31,6 +31,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     // Transient storage slots
     bytes32 private constant _T_LOCK_SLOT = keccak256("LOCK");
     bytes32 private constant _T_SOLVER_LOCK_SLOT = keccak256("SOLVER_LOCK");
+    bytes32 private constant _T_SOLVER_TO_SLOT = keccak256("SOLVER_TO");
     bytes32 private constant _T_CLAIMS_SLOT = keccak256("CLAIMS");
     bytes32 private constant _T_FEES_SLOT = keccak256("FEES");
     bytes32 private constant _T_WRITEOFFS_SLOT = keccak256("WRITEOFFS");
@@ -190,6 +191,10 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         fulfilled = _solverLock & _SOLVER_FULFILLED_MASK != 0;
     }
 
+    function _solverTo() internal view returns (address) {
+        return address(uint160(uint256(_tload(_T_SOLVER_TO_SLOT))));
+    }
+
     function _isUnlocked() internal view returns (bool) {
         return _tload(_T_LOCK_SLOT) == bytes32(0);
     }
@@ -216,6 +221,10 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
 
     function _setSolverLock(uint256 newSolverLock) internal {
         _tstore(_T_SOLVER_LOCK_SLOT, bytes32(newSolverLock));
+    }
+
+    function _setSolverTo(address newSolverTo) internal {
+        _tstore(_T_SOLVER_TO_SLOT, bytes32(uint256(uint160(newSolverTo))));
     }
 
     function _setClaims(uint256 newClaims) internal {

@@ -98,6 +98,7 @@ abstract contract GasAccounting is SafetyLocks {
         // calls directly to the solver contract in this phase, the solver should be careful to not call malicious
         // contracts which may call reconcile() on their behalf, with an excessive maxApprovedGasSpend.
         if (_phase() != uint8(ExecutionPhase.SolverOperation)) revert WrongPhase();
+        if (msg.sender != _solverTo()) revert InvalidAccess();
 
         (address _currentSolver, bool _calledBack, bool _fulfilled) = _solverLockData();
         uint256 _bondedBalance = uint256(S_accessData[_currentSolver].bonded);
