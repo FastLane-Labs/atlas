@@ -228,7 +228,7 @@ contract Atlas is Escrow, Factory {
         ctx.bidFind = false;
 
         // Finally, iterate through sorted bidsAndIndices array in descending order of bidAmount.
-        for (uint256 i = _bidsAndIndicesLastIndex;; --i) {
+        for (uint256 i = _bidsAndIndicesLastIndex;; /* breaks when 0 */ --i) {
             // Isolate the bidAmount from the packed uint256 value
             _bidAmountFound = (_bidsAndIndices[i] >> _BITS_FOR_INDEX) & _FIRST_240_BITS_TRUE_MASK;
 
