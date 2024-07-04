@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";

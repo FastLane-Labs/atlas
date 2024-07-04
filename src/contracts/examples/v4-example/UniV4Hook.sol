@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 // V4 Imports
 import { IPoolManager } from "./IPoolManager.sol";
@@ -73,7 +73,7 @@ contract UniV4Hook is V4DAppControl {
         require(address(this) == hook, "ERR-H00 InvalidCallee");
         require(msg.sender == v4Singleton, "ERR-H01 InvalidCaller"); // TODO: Confirm this
 
-        ExecutionPhase currentPhase = IAtlas(ATLAS).phase();
+        ExecutionPhase currentPhase = ExecutionPhase(_phase());
 
         if (currentPhase == ExecutionPhase.UserOperation) {
             // Case: User call

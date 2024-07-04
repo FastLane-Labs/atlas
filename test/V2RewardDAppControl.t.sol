@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import "forge-std/Test.sol";
 
@@ -54,7 +54,7 @@ contract V2RewardDAppControlTest is BaseTest {
 
     // Swap 1 WETH for 1830 DAI
     function test_V2RewardDApp_swapWETHForDAI() public {
-        // FIXME: fix before merging spearbit-audit-fixes branch
+        // FIXME: fix before merging spearbit-reaudit branch
         vm.skip(true);
         // This whole test will get redone in the gas accounting update
         

@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
@@ -28,6 +28,15 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint256 public constant SURCHARGE_SCALE = 10_000_000; // 10_000_000 / 10_000_000 = 100%
     uint256 public constant FIXED_GAS_OFFSET = 100_000;
 
+    // Transient storage slots
+    bytes32 private constant _T_LOCK_SLOT = keccak256("LOCK");
+    bytes32 private constant _T_SOLVER_LOCK_SLOT = keccak256("SOLVER_LOCK");
+    bytes32 private constant _T_CLAIMS_SLOT = keccak256("CLAIMS");
+    bytes32 private constant _T_FEES_SLOT = keccak256("FEES");
+    bytes32 private constant _T_WRITEOFFS_SLOT = keccak256("WRITEOFFS");
+    bytes32 private constant _T_WITHDRAWALS_SLOT = keccak256("WITHDRAWALS");
+    bytes32 private constant _T_DEPOSITS_SLOT = keccak256("DEPOSITS");
+
     // AtlETH storage
     uint256 public S_totalSupply;
     uint256 public S_bondedTotalSupply;
@@ -40,16 +49,6 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint256 internal S_cumulativeSurcharge; // Cumulative gas surcharges collected
     address internal S_surchargeRecipient; // Fastlane surcharge recipient
     address internal S_pendingSurchargeRecipient; // For 2-step transfer process
-
-    // Atlas SafetyLocks (transient storage)
-    Lock internal T_lock; // transient storage
-    uint256 internal T_solverLock; // transient storage
-
-    uint256 internal T_claims; // transient storage
-    uint256 internal T_fees; // transient storage
-    uint256 internal T_writeoffs; // transient storage
-    uint256 internal T_withdrawals; // transient storage
-    uint256 internal T_deposits; // transient storage
 
     constructor(
         uint256 escrowDuration,
@@ -68,52 +67,11 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         S_cumulativeSurcharge = msg.value;
         S_surchargeRecipient = initialSurchargeRecipient;
 
-        // TODO remove these when transient storage behaviour is implemented
-        // Gas Accounting - transient storage (delete this from constructor post dencun)
-        T_lock =
-            Lock({ activeEnvironment: _UNLOCKED, phase: uint8(ExecutionPhase.Uninitialized), callConfig: uint32(0) });
-
-        T_solverLock = _UNLOCKED_UINT;
-        T_claims = type(uint256).max;
-        T_fees = type(uint256).max;
-        T_writeoffs = type(uint256).max;
-        T_withdrawals = type(uint256).max;
-        T_deposits = type(uint256).max;
-
         emit SurchargeRecipientTransferred(initialSurchargeRecipient);
     }
 
-    /// @notice Returns information about the current state of the solver lock.
-    /// @return currentSolver Address of the current solver.
-    /// @return calledBack Boolean indicating whether the solver has called back via `reconcile`.
-    /// @return fulfilled Boolean indicating whether the solver's outstanding debt has been repaid via `reconcile`.
-    function solverLockData() external view returns (address currentSolver, bool calledBack, bool fulfilled) {
-        return _solverLockData();
-    }
-
-    /// @notice Returns the address of the current solver.
-    /// @return Address of the current solver.
-    function solver() public view returns (address) {
-        return address(uint160(T_solverLock));
-    }
-
-    /// @notice Returns information about the current state of the solver lock.
-    /// @return currentSolver Address of the current solver.
-    /// @return calledBack Boolean indicating whether the solver has called back via `reconcile`.
-    /// @return fulfilled Boolean indicating whether the solver's outstanding debt has been repaid via `reconcile`.
-    function _solverLockData() internal view returns (address currentSolver, bool calledBack, bool fulfilled) {
-        uint256 _solverLock = T_solverLock;
-        currentSolver = address(uint160(_solverLock));
-        calledBack = _solverLock & _SOLVER_CALLED_BACK_MASK != 0;
-        fulfilled = _solverLock & _SOLVER_FULFILLED_MASK != 0;
-    }
-
-    /// @notice Returns the EIP-712 domain separator for permit signatures, implemented in AtlETH.
-    /// @return bytes32 Domain separator hash.
-    function _computeDomainSeparator() internal view virtual returns (bytes32) { }
-
     // ---------------------------------------------------- //
-    //                      Storage Getters                 //
+    //                     Storage Getters                  //
     // ---------------------------------------------------- //
     function totalSupply() external view returns (uint256) {
         return S_totalSupply;
@@ -141,38 +99,6 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         return S_solverOpHashes[opHash];
     }
 
-    function lock() external view returns (address activeEnvironment, uint32 callConfig, uint8 phase) {
-        Lock memory _lock = T_lock;
-
-        activeEnvironment = _lock.activeEnvironment;
-        callConfig = _lock.callConfig;
-        phase = _lock.phase;
-    }
-
-    function solverLock() external view returns (uint256) {
-        return T_solverLock;
-    }
-
-    function claims() external view returns (uint256) {
-        return T_claims;
-    }
-
-    function fees() external view returns (uint256) {
-        return T_fees;
-    }
-
-    function writeoffs() external view returns (uint256) {
-        return T_writeoffs;
-    }
-
-    function withdrawals() external view returns (uint256) {
-        return T_withdrawals;
-    }
-
-    function deposits() external view returns (uint256) {
-        return T_deposits;
-    }
-
     function cumulativeSurcharge() external view returns (uint256) {
         return S_cumulativeSurcharge;
     }
@@ -183,5 +109,149 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
 
     function pendingSurchargeRecipient() external view returns (address) {
         return S_pendingSurchargeRecipient;
+    }
+
+    // ---------------------------------------------------- //
+    //              Transient External Getters              //
+    // ---------------------------------------------------- //
+
+    function lock() external view returns (address activeEnvironment, uint32 callConfig, uint8 phase) {
+        return _lock();
+    }
+
+    /// @notice Returns the current lock state of Atlas.
+    /// @return Boolean indicating whether Atlas is in a locked state or not.
+    function isUnlocked() external view returns (bool) {
+        return _isUnlocked();
+    }
+
+    function claims() public view returns (uint256) {
+        return uint256(_tload(_T_CLAIMS_SLOT));
+    }
+
+    function fees() public view returns (uint256) {
+        return uint256(_tload(_T_FEES_SLOT));
+    }
+
+    function writeoffs() public view returns (uint256) {
+        return uint256(_tload(_T_WRITEOFFS_SLOT));
+    }
+
+    function withdrawals() public view returns (uint256) {
+        return uint256(_tload(_T_WITHDRAWALS_SLOT));
+    }
+
+    function deposits() public view returns (uint256) {
+        return uint256(_tload(_T_DEPOSITS_SLOT));
+    }
+
+    /// @notice Returns information about the current state of the solver lock.
+    /// @return currentSolver Address of the current solver.
+    /// @return calledBack Boolean indicating whether the solver has called back via `reconcile`.
+    /// @return fulfilled Boolean indicating whether the solver's outstanding debt has been repaid via `reconcile`.
+    function solverLockData() external view returns (address currentSolver, bool calledBack, bool fulfilled) {
+        return _solverLockData();
+    }
+
+    // ---------------------------------------------------- //
+    //              Transient Internal Getters              //
+    // ---------------------------------------------------- //
+
+    function _lock() internal view returns (address activeEnvironment, uint32 callConfig, uint8 phase) {
+        bytes32 _lockData = _tload(_T_LOCK_SLOT);
+        activeEnvironment = address(uint160(uint256(_lockData >> 40)));
+        callConfig = uint32(uint256(_lockData >> 8));
+        phase = uint8(uint256(_lockData));
+    }
+
+    function _activeEnvironment() internal view returns (address) {
+        // right shift 40 bits to remove the callConfig and phase, only activeEnvironment remains
+        return address(uint160(uint256(_tload(_T_LOCK_SLOT) >> 40)));
+    }
+
+    function _activeCallConfig() internal view returns (uint32) {
+        // right shift 8 bits to remove the phase, cast to uint32 to remove the activeEnvironment
+        return uint32(uint256(_tload(_T_LOCK_SLOT) >> 8));
+    }
+
+    function _phase() internal view returns (uint8) {
+        // right-most 8 bits of Lock are the phase
+        return uint8(uint256(_tload(_T_LOCK_SLOT)));
+    }
+
+    /// @notice Returns information about the current state of the solver lock.
+    /// @return currentSolver Address of the current solver.
+    /// @return calledBack Boolean indicating whether the solver has called back via `reconcile`.
+    /// @return fulfilled Boolean indicating whether the solver's outstanding debt has been repaid via `reconcile`.
+    function _solverLockData() internal view returns (address currentSolver, bool calledBack, bool fulfilled) {
+        uint256 _solverLock = uint256(_tload(_T_SOLVER_LOCK_SLOT));
+        currentSolver = address(uint160(_solverLock));
+        calledBack = _solverLock & _SOLVER_CALLED_BACK_MASK != 0;
+        fulfilled = _solverLock & _SOLVER_FULFILLED_MASK != 0;
+    }
+
+    function _isUnlocked() internal view returns (bool) {
+        return _tload(_T_LOCK_SLOT) == bytes32(0);
+    }
+
+    // ---------------------------------------------------- //
+    //                   Transient Setters                  //
+    // ---------------------------------------------------- //
+
+    function _setLock(Lock memory newLock) internal {
+        // Pack the lock slot from the right:
+        // [   56 bits   ][     160 bits      ][  32 bits   ][ 8 bits ]
+        // [ unused bits ][ activeEnvironment ][ callConfig ][ phase  ]
+        _tstore(
+            _T_LOCK_SLOT,
+            bytes32(uint256(uint160(newLock.activeEnvironment))) << 40 | bytes32(uint256(newLock.callConfig)) << 8
+                | bytes32(uint256(newLock.phase))
+        );
+    }
+
+    // Sets the Lock phase without changing the activeEnvironment or callConfig.
+    function _setLockPhase(uint8 newPhase) internal {
+        _tstore(_T_LOCK_SLOT, (_tload(_T_LOCK_SLOT) & _LOCK_PHASE_MASK) | bytes32(uint256(newPhase)));
+    }
+
+    function _setSolverLock(uint256 newSolverLock) internal {
+        _tstore(_T_SOLVER_LOCK_SLOT, bytes32(newSolverLock));
+    }
+
+    function _setClaims(uint256 newClaims) internal {
+        _tstore(_T_CLAIMS_SLOT, bytes32(newClaims));
+    }
+
+    function _setFees(uint256 newFees) internal {
+        _tstore(_T_FEES_SLOT, bytes32(newFees));
+    }
+
+    function _setWriteoffs(uint256 newWriteoffs) internal {
+        _tstore(_T_WRITEOFFS_SLOT, bytes32(newWriteoffs));
+    }
+
+    function _setWithdrawals(uint256 newWithdrawals) internal {
+        _tstore(_T_WITHDRAWALS_SLOT, bytes32(newWithdrawals));
+    }
+
+    function _setDeposits(uint256 newDeposits) internal {
+        _tstore(_T_DEPOSITS_SLOT, bytes32(newDeposits));
+    }
+
+    // ------------------------------------------------------ //
+    //                Transient Storage Helpers               //
+    // ------------------------------------------------------ //
+
+    function _tstore(bytes32 slot, bytes32 value) internal {
+        assembly {
+            tstore(slot, value)
+        }
+    }
+
+    function _tload(bytes32 slot) internal view returns (bytes32 value) {
+        assembly {
+            value := tload(slot)
+        }
+        return value;
     }
 }

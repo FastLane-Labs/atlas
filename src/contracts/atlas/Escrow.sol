@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import { AtlETH } from "./AtlETH.sol";
 
@@ -561,7 +561,7 @@ abstract contract Escrow is AtlETH {
         //             Pre-Solver Call           //
         // ------------------------------------- //
 
-        T_lock.phase = uint8(ExecutionPhase.PreSolver);
+        _setLockPhase(uint8(ExecutionPhase.PreSolver));
 
         (_success, _data) = ctx.executionEnvironment.call(
             abi.encodePacked(
@@ -584,13 +584,13 @@ abstract contract Escrow is AtlETH {
         //              Solver Call              //
         // ------------------------------------- //
 
-        T_lock.phase = uint8(ExecutionPhase.SolverOperation);
+        _setLockPhase(uint8(ExecutionPhase.SolverOperation));
 
         // Make sure there's enough value in Atlas for the Solver
         if (!_borrow(solverOp.value)) revert InsufficientEscrow();
 
         // Set the solver lock - if we revert here we'll catch the error in `_solverOpWrapper()` above
-        T_solverLock = uint256(uint160(solverOp.from));
+        _setSolverLock(uint256(uint160(solverOp.from)));
 
         // Optimism's SafeCall lib allows us to limit how much returndata gets copied to memory, to prevent OOG attacks.
         _success = solverOp.solver.safeCall(
@@ -605,7 +605,7 @@ abstract contract Escrow is AtlETH {
                     bidAmount,
                     solverOp.data,
                     // Only pass the returnData to solver if it came from userOp call and not from preOps call.
-                    T_lock.callConfig.needsUserReturnData() ? returnData : new bytes(0)
+                    _activeCallConfig().needsUserReturnData() ? returnData : new bytes(0)
                 )
             )
         );
@@ -616,7 +616,7 @@ abstract contract Escrow is AtlETH {
         //            Post-Solver Call           //
         // ------------------------------------- //
 
-        T_lock.phase = uint8(ExecutionPhase.PostSolver);
+        _setLockPhase(uint8(ExecutionPhase.PostSolver));
 
         (_success, _data) = ctx.executionEnvironment.call(
             abi.encodePacked(
@@ -645,7 +645,7 @@ abstract contract Escrow is AtlETH {
         bool _calledback;
         (, _calledback, _success) = _solverLockData();
         if (!_calledback) revert CallbackNotCalled();
-        if (!_success && T_deposits < T_claims + T_withdrawals + T_fees - T_writeoffs) revert BalanceNotReconciled();
+        if (!_success && deposits() < claims() + withdrawals() + fees() - writeoffs()) revert BalanceNotReconciled();
 
         // Check if this is an on-chain, ex post bid search
         if (ctx.bidFind) revert BidFindSuccessful(solverTracker.bidAmount);

@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import { Ownable } from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import { SafeERC20, IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -172,7 +172,7 @@ contract ChainlinkAtlasWrapper is Ownable {
         }
 
         // Verify that this environment is the currently active one according to Atlas
-        // require(msg.sender == IAtlasFactory(ATLAS).activeEnvironment(), "inactive EE");
+        // require(msg.sender == _activeEnvironment(), "inactive EE");
 
         // Get the valid transmitters
         // NOTE: Be careful if considering storing these in a map - that would make it tricky to deauthorize for this

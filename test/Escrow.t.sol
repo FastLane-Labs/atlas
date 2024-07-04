@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import "forge-std/Test.sol";
 
@@ -423,6 +423,8 @@ contract EscrowTest is AtlasBaseTest {
         uint256 bidAmount = dummySolver.partialGasPayBack(); // solver only pays half of shortfall
         deal(address(dummySolver), bidAmount);
 
+        vm.txGasPrice(2);
+
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
             defaultCallConfig().withRequireFulfillment(true).build());
         solverOps[0] = validSolverOperation(userOp)
@@ -573,6 +575,10 @@ contract DummySolver {
         } else if (bidAmount == partialGasPayBack) {
             // Only pay half of shortfall owed - expect postSolverCall hook in DAppControl to pay the rest
             uint256 _shortfall = IAtlas(_atlas).shortfall();
+
+            console.log("Solver shortfall", _shortfall);
+            console.log("gas price", tx.gasprice);
+
             IAtlas(_atlas).reconcile(_shortfall / 2);
             return;
         }
