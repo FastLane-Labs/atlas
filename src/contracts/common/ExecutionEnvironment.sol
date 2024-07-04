@@ -27,8 +27,6 @@ import "src/contracts/types/EscrowTypes.sol";
 contract ExecutionEnvironment is Base, ReentrancyGuard {
     using CallBits for uint32;
 
-    uint8 private constant _ENVIRONMENT_DEPTH = 1 << 1;
-
     constructor(address atlas) Base(atlas) { }
 
     modifier validUser(UserOperation calldata userOp) {
