@@ -3,6 +3,9 @@ pragma solidity 0.8.25;
 
 import "src/contracts/atlas/Atlas.sol";
 
+/// @title TestAtlas
+/// @author FastLane Labs
+/// @notice A test version of the Atlas contract that just exposes internal transient storage helpers.
 contract TestAtlas is Atlas {
     constructor(
         uint256 escrowDuration,
@@ -16,7 +19,7 @@ contract TestAtlas is Atlas {
 
     // Public functions to expose internal transient helpers for testing
 
-    function clearTransientVariables() public {
+    function clearTransientStorage() public {
         _setLock(Lock(address(0), 0, 0));
         _setSolverLock(0);
         _setSolverTo(address(0));
