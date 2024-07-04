@@ -12,10 +12,8 @@ import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
-import { ExecutionPhase } from "src/contracts/types/LockTypes.sol";
 import "src/contracts/types/SolverOperation.sol";
 import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/ConfigTypes.sol";
 import "src/contracts/types/EscrowTypes.sol";
 
 /// @title ExecutionEnvironment
