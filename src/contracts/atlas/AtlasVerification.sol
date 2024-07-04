@@ -315,7 +315,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
                 solverOp.userOpHash,
                 solverOp.bidToken,
                 solverOp.bidAmount,
-                solverOp.data
+                keccak256(solverOp.data)
             )
         );
     }
@@ -549,7 +549,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
                         userOp.control,
                         userOp.callConfig,
                         userOp.sessionKey,
-                        userOp.data
+                        keccak256(userOp.data)
                     )
                 )
             );
