@@ -34,8 +34,8 @@ contract TestAtlas is Atlas {
         _setLock(newLock);
     }
 
-    function setLockPhase(uint8 newPhase) public {
-        _setLockPhase(newPhase);
+    function setLockPhase(ExecutionPhase newPhase) public {
+        _setLockPhase(uint8(newPhase));
     }
 
     function setSolverLock(uint256 newSolverLock) public {

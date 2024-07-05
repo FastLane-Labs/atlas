@@ -69,6 +69,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         bytes memory preOpsData;
         bool status;
 
+        atlas.setLockPhase(ExecutionPhase.PreOps);
+
         // Valid
         userOp.from = user;
         userOp.to = address(atlas);
@@ -104,6 +106,8 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         userOp.from = user;
         userOp.to = address(atlas);
+
+        atlas.setLockPhase(ExecutionPhase.PreOps);
 
         // Valid
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
@@ -156,6 +160,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         userOp.from = user;
         userOp.to = address(atlas);
         userOp.dapp = address(dAppControl);
+
+        atlas.setLockPhase(ExecutionPhase.PreOps);
 
         // Valid
         uint256 expectedReturnValue = 123;
@@ -241,6 +247,8 @@ contract ExecutionEnvironmentTest is BaseTest {
     function test_postOpsWrapper_SkipCoverage() public {
         bytes memory postOpsData;
         bool status;
+
+        atlas.setLockPhase(ExecutionPhase.PostOps);
 
         // Valid
         ctx.solverCount = 4;
@@ -410,6 +418,8 @@ contract ExecutionEnvironmentTest is BaseTest {
     function test_allocateValue_SkipCoverage() public {
         bytes memory allocateData;
         bool status;
+
+        atlas.setLockPhase(ExecutionPhase.AllocateValue);
 
         // Valid
         allocateData = abi.encodeWithSelector(
