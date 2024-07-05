@@ -106,7 +106,7 @@ contract Sorter is AtlasConstants {
             return false;
         }
 
-        // solverOp.solver must not be the atlas or verification address
+        // Ensure the solver control address matches the configured dApp control address
         if (solverOp.solver == address(ATLAS) || solverOp.solver == address(VERIFICATION)) {
             return false;
         }
