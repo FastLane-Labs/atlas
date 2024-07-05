@@ -409,4 +409,12 @@ abstract contract GasAccounting is SafetyLocks {
         // _SOLVER_OP_BASE_CALLDATA = SolverOperation calldata length excluding solverOp.data
         calldataCost = (calldataLength + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM * tx.gasprice;
     }
+
+    /// @notice Checks if the current balance is reconciled.
+    /// @dev Compares the deposits with the sum of claims, withdrawals, fees, and write-offs to ensure the balance is
+    /// correct.
+    /// @return True if the balance is reconciled, false otherwise.
+    function _isBalanceReconciled() internal view returns (bool) {
+        return deposits() >= claims() + withdrawals() + fees() - writeoffs();
+    }
 }
