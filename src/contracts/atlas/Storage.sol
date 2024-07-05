@@ -3,6 +3,7 @@ pragma solidity 0.8.25;
 
 import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
+import "src/contracts/libraries/AccountingMath.sol";
 
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
@@ -23,10 +24,10 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint8 public constant decimals = 18;
 
     // Gas Accounting public constants
-    uint256 public constant ATLAS_SURCHARGE_RATE = 1_000_000; // 1_000_000 / 10_000_000 = 10%
-    uint256 public constant BUNDLER_SURCHARGE_RATE = 1_000_000; // 1_000_000 / 10_000_000 = 10%
-    uint256 public constant SURCHARGE_SCALE = 10_000_000; // 10_000_000 / 10_000_000 = 100%
-    uint256 public constant FIXED_GAS_OFFSET = 100_000;
+    uint256 public constant ATLAS_SURCHARGE_RATE = AccountingMath._ATLAS_SURCHARGE_RATE;
+    uint256 public constant BUNDLER_SURCHARGE_RATE = AccountingMath._BUNDLER_SURCHARGE_RATE;
+    uint256 public constant SURCHARGE_SCALE = AccountingMath._SURCHARGE_SCALE;
+    uint256 public constant FIXED_GAS_OFFSET = AccountingMath._FIXED_GAS_OFFSET;
 
     // Transient storage slots
     bytes32 private constant _T_LOCK_SLOT = keccak256("LOCK");
