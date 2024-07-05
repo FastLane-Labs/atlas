@@ -12,6 +12,7 @@ import { SafeCall } from "src/contracts/libraries/SafeCall/SafeCall.sol";
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
+import { AccountingMath } from "src/contracts/libraries/AccountingMath.sol";
 import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
 import "src/contracts/types/SolverOperation.sol";
 import "src/contracts/types/UserOperation.sol";
@@ -295,9 +296,7 @@ abstract contract Escrow is AtlETH {
             );
         }
 
-        gasLimit = _SOLVER_GAS_LIMIT_SCALE
-            * (solverOp.gas < dConfig.solverGasLimit ? solverOp.gas : dConfig.solverGasLimit)
-            / (_SOLVER_GAS_LIMIT_SCALE + _SOLVER_GAS_LIMIT_BUFFER_PERCENTAGE) + _FASTLANE_GAS_BUFFER;
+        gasLimit = AccountingMath.solverGasLimitScaledDown(solverOp.gas, dConfig.solverGasLimit) + _FASTLANE_GAS_BUFFER;
 
         uint256 _gasCost = (tx.gasprice * gasLimit) + _getCalldataCost(solverOp.data.length);
 

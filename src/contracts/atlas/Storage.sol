@@ -26,7 +26,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     // Gas Accounting public constants
     uint256 public constant ATLAS_SURCHARGE_RATE = AccountingMath._ATLAS_SURCHARGE_RATE;
     uint256 public constant BUNDLER_SURCHARGE_RATE = AccountingMath._BUNDLER_SURCHARGE_RATE;
-    uint256 public constant SURCHARGE_SCALE = AccountingMath._SURCHARGE_SCALE;
+    uint256 public constant SCALE = AccountingMath._SCALE;
     uint256 public constant FIXED_GAS_OFFSET = AccountingMath._FIXED_GAS_OFFSET;
 
     // Transient storage slots
