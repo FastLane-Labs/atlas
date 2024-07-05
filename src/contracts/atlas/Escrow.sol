@@ -639,14 +639,17 @@ abstract contract Escrow is AtlETH {
         //              Final Checks             //
         // ------------------------------------- //
 
-        // Verify that the solver repaid their borrowed solverOp.value by calling `reconcile()`. If solver did not fully
-        // repay via `reconcile()`, the postSolverCall may still have covered the outstanding debt via `contribute()` so
-        // we do a final repayment check here.
+        // Verify that the solver repaid their borrowed solverOp.value by calling `reconcile()`. If `reconcile()` did
+        // not fully repay the borrowed amount, the `postSolverCall` might have covered the outstanding debt via
+        // `contribute()`. This final check ensures that the solver has fulfilled their repayment obligations before
+        // proceeding.
         (, bool _calledback, bool _fulfilled) = _solverLockData();
         if (!_calledback) revert CallbackNotCalled();
         if (!_fulfilled && !_isBalanceReconciled()) revert BalanceNotReconciled();
 
-        // Check if this is an on-chain, ex post bid search
+        // Check if this is an on-chain, ex post bid search by verifying the `ctx.bidFind` flag.
+        // If the flag is set, revert with `BidFindSuccessful` and include the solver's bid amount in `solverTracker`.
+        // This indicates that the bid search process has completed successfully.
         if (ctx.bidFind) revert BidFindSuccessful(solverTracker.bidAmount);
     }
 
