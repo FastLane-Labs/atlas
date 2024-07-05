@@ -557,6 +557,10 @@ abstract contract Escrow is AtlETH {
         bytes memory _data;
         bool _success;
 
+        // Set the solver lock and solver address at the beginning to ensure reliability
+        _setSolverLock(uint256(uint160(solverOp.from)));
+        _setSolverTo(solverOp.solver);
+
         // ------------------------------------- //
         //             Pre-Solver Call           //
         // ------------------------------------- //
@@ -588,10 +592,6 @@ abstract contract Escrow is AtlETH {
 
         // Make sure there's enough value in Atlas for the Solver
         if (!_borrow(solverOp.value)) revert InsufficientEscrow();
-
-        // Set the solver lock - if we revert here we'll catch the error in `_solverOpWrapper()` above
-        _setSolverLock(uint256(uint160(solverOp.from)));
-        _setSolverTo(solverOp.solver);
 
         // Optimism's SafeCall lib allows us to limit how much returndata gets copied to memory, to prevent OOG attacks.
         _success = solverOp.solver.safeCall(
