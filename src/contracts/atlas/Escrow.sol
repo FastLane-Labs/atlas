@@ -90,14 +90,15 @@ abstract contract Escrow is AtlETH {
         bool _success;
         bytes memory _data;
 
-        if (_borrow(userOp.value)) {
-            (_success, _data) = ctx.executionEnvironment.call{ value: userOp.value }(
-                abi.encodePacked(
-                    abi.encodeCall(IExecutionEnvironment.userWrapper, userOp),
-                    ctx.setAndPack(ExecutionPhase.UserOperation)
-                )
-            );
+        if (!_borrow(userOp.value)) {
+            revert InsufficientEscrow();
         }
+
+        (_success, _data) = ctx.executionEnvironment.call{ value: userOp.value }(
+            abi.encodePacked(
+                abi.encodeCall(IExecutionEnvironment.userWrapper, userOp), ctx.setAndPack(ExecutionPhase.UserOperation)
+            )
+        );
 
         if (_success) {
             // Handle formatting of returnData
