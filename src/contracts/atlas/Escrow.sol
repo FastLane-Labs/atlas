@@ -2,7 +2,6 @@
 pragma solidity 0.8.25;
 
 import { AtlETH } from "./AtlETH.sol";
-
 import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
@@ -645,7 +644,7 @@ abstract contract Escrow is AtlETH {
         // we do a final repayment check here.
         (, bool _calledback, bool _fulfilled) = _solverLockData();
         if (!_calledback) revert CallbackNotCalled();
-        if (!_fulfilled && deposits() < claims() + withdrawals() + fees() - writeoffs()) revert BalanceNotReconciled();
+        if (!_fulfilled && !_isBalanceReconciled()) revert BalanceNotReconciled();
 
         // Check if this is an on-chain, ex post bid search
         if (ctx.bidFind) revert BidFindSuccessful(solverTracker.bidAmount);
