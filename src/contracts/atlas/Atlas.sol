@@ -213,11 +213,9 @@ contract Atlas is Escrow, Factory {
                 // Non-zero bids are packed with their original solverOps index.
                 // The array is filled with non-zero bids from the right.
                 _bidsAndIndices[_bidsAndIndicesLastIndex] = uint256(_bidAmountFound << _BITS_FOR_INDEX | uint16(i));
-            }
-
-            // decrease for each iteration
-            unchecked {
-                --_bidsAndIndicesLastIndex;
+                unchecked {
+                    --_bidsAndIndicesLastIndex;
+                }
             }
         }
 
