@@ -350,6 +350,7 @@ contract Atlas is Escrow, Factory {
         override
         returns (bool)
     {
-        return environment == _getExecutionEnvironmentCustom(user, control, callConfig);
+        (address expectedEnvironment,) = _computeExecutionEnvironmentAddress(user, control, callConfig);
+        return environment == expectedEnvironment;
     }
 }

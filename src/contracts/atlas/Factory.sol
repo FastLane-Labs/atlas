@@ -32,8 +32,7 @@ abstract contract Factory {
     /// @return executionEnvironment The address of the newly created Execution Environment instance.
     function createExecutionEnvironment(address control) external returns (address executionEnvironment) {
         uint32 _callConfig = IDAppControl(control).CALL_CONFIG();
-        executionEnvironment =
-            _getOrCreateExecutionEnvironment({ user: msg.sender, control: control, callConfig: _callConfig });
+        executionEnvironment = _createExecutionEnvironment(msg.sender, control, _callConfig);
     }
 
     /// @notice Retrieves the address and configuration of an existing execution environment for a given user and DApp
@@ -53,8 +52,7 @@ abstract contract Factory {
         returns (address executionEnvironment, uint32 callConfig, bool exists)
     {
         callConfig = IDAppControl(control).CALL_CONFIG();
-        executionEnvironment = _getExecutionEnvironmentCustom(user, control, callConfig);
-        exists = executionEnvironment.code.length != 0;
+        (executionEnvironment, exists) = _computeExecutionEnvironmentAddress(user, control, callConfig);
     }
 
     /// @notice Gets an existing execution environment or creates a new one if it does not exist for the specified user
@@ -67,68 +65,38 @@ abstract contract Factory {
         returns (address executionEnvironment, DAppConfig memory dConfig)
     {
         dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
-        executionEnvironment = _getOrCreateExecutionEnvironment({
+        bool exists;
+        (executionEnvironment, exists) = _computeExecutionEnvironmentAddress({
             user: userOp.from,
             control: userOp.control,
             callConfig: dConfig.callConfig
         });
-    }
 
-    /// @notice Deploys a new execution environment or retrieves the address of an existing one based on the DApp
-    /// control, user, and configuration.
-    /// @dev Uses the `create2` opcode for deterministic deployment, allowing the calculation of the execution
-    /// environment's address before deployment. The deployment uses a combination of the DAppControl address, user
-    /// address, call configuration, and a unique salt to ensure the uniqueness and predictability of the environment's
-    /// address.
-    /// @param user The address of the user for whom the execution environment is being set.
-    /// @param control The address of the DAppControl contract providing the operational context.
-    /// @param callConfig CallConfig settings of the DApp control contract.
-    /// @return executionEnvironment The address of the newly created or already existing execution environment.
-    function _getOrCreateExecutionEnvironment(
-        address user,
-        address control,
-        uint32 callConfig
-    )
-        internal
-        returns (address executionEnvironment)
-    {
-        bytes memory _creationCode = _getMimicCreationCode({ user: user, control: control, callConfig: callConfig });
-        bytes32 _salt = _computeSalt(user, control, callConfig);
-
-        executionEnvironment = address(
-            uint160(
-                uint256(
-                    keccak256(
-                        abi.encodePacked(bytes1(0xff), address(this), _salt, keccak256(abi.encodePacked(_creationCode)))
-                    )
-                )
-            )
-        );
-
-        if (executionEnvironment.code.length == 0) {
-            assembly {
-                executionEnvironment := create2(0, add(_creationCode, 32), mload(_creationCode), _salt)
-            }
-            emit AtlasEvents.ExecutionEnvironmentCreated(user, executionEnvironment);
+        if (!exists) {
+            executionEnvironment = _createExecutionEnvironment({
+                user: userOp.from,
+                control: userOp.control,
+                callConfig: dConfig.callConfig
+            });
         }
     }
 
-    /// @notice Generates the address of a user's execution environment affected by deprecated callConfig changes in the
-    /// DAppControl.
+    /// @notice Computes the address of an execution environment based on the DApp control, user, and configuration.
     /// @dev Calculates the deterministic address of the execution environment based on the user, control,
     /// callConfig, and controlCodeHash, ensuring consistency across changes in callConfig.
-    /// @param user The address of the user for whom the execution environment's address is being generated.
-    /// @param control The address of the DAppControl contract associated with the execution environment.
-    /// @param callConfig The configuration flags defining the behavior of the execution environment.
-    /// @return executionEnvironment The address of the user's execution environment.
-    function _getExecutionEnvironmentCustom(
+    /// @param user The address of the user for whom the execution environment is being set.
+    /// @param control The address of the DAppControl contract providing the operational context.
+    /// @param callConfig CallConfig settings of the DApp control contract.
+    /// @return executionEnvironment The address of the execution environment.
+    /// @return exists A boolean indicating whether the execution environment already exists (true) or not (false).
+    function _computeExecutionEnvironmentAddress(
         address user,
         address control,
         uint32 callConfig
     )
         internal
         view
-        returns (address executionEnvironment)
+        returns (address executionEnvironment, bool exists)
     {
         bytes memory _creationCode = _getMimicCreationCode({ user: user, control: control, callConfig: callConfig });
         bytes32 _salt = _computeSalt(user, control, callConfig);
@@ -142,6 +110,37 @@ abstract contract Factory {
                 )
             )
         );
+
+        exists = executionEnvironment.code.length != 0;
+    }
+
+    /// @notice Deploys a new execution environment based on the DApp control, user, and configuration.
+    /// control, user, and configuration.
+    /// @dev Uses the `create2` opcode for deterministic deployment, allowing the calculation of the execution
+    /// @param user The address of the user for whom the execution environment is being set.
+    /// @param control The address of the DAppControl contract providing the operational context.
+    /// @param callConfig CallConfig settings of the DApp control contract.
+    /// @return executionEnvironment The address of the newly created execution environment.
+    function _createExecutionEnvironment(
+        address user,
+        address control,
+        uint32 callConfig
+    )
+        internal
+        returns (address executionEnvironment)
+    {
+        bool exists;
+        (executionEnvironment, exists) = _computeExecutionEnvironmentAddress(user, control, callConfig);
+        bytes memory _creationCode = _getMimicCreationCode({ user: user, control: control, callConfig: callConfig });
+        bytes32 _salt = _computeSalt(user, control, callConfig);
+
+        // use create2 on non existing execution environment
+        if (!exists) {
+            assembly {
+                executionEnvironment := create2(0, add(_creationCode, 32), mload(_creationCode), _salt)
+            }
+            emit AtlasEvents.ExecutionEnvironmentCreated(user, executionEnvironment);
+        }
     }
 
     function _computeSalt(address user, address control, uint32 callConfig) internal view returns (bytes32) {

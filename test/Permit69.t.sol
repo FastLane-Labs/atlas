@@ -376,7 +376,7 @@ contract MockAtlasForPermit69Tests is Atlas {
         public
         returns (address executionEnvironment) 
     {
-        return _getOrCreateExecutionEnvironment(user, control, callConfig);
+        return _createExecutionEnvironment(user, control, callConfig);
     }
 
     function verifyUserControlExecutionEnv(address sender, address user, address control, uint32 callConfig) internal view  returns (bool)
