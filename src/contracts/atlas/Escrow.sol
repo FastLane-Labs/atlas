@@ -392,7 +392,8 @@ abstract contract Escrow is AtlETH {
         if (!_result.canExecute()) return 0;
 
         uint256 _gasLimit;
-        (, _gasLimit) = _validateSolverOpGas(dConfig, solverOp, _gasWaterMark);
+        (_result, _gasLimit) = _validateSolverOpGas(dConfig, solverOp, _gasWaterMark);
+        _result |= _validateSolverOpDeadline(solverOp, dConfig);
 
         if (dConfig.callConfig.allowsTrustedOpHash()) {
             if (!_handleAltOpHash(userOp, solverOp)) {
