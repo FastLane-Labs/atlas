@@ -51,7 +51,7 @@ contract ExPostTest is BaseTest {
         v2ExPost = new V2ExPost(address(atlas));
     }
 
-    function test_ExPostMEV() public {
+    function test_ExPostMEV_SkipCoverage() public {
 
         Sig memory sig;
 
@@ -281,7 +281,7 @@ contract ExPostTest is BaseTest {
     }
 
     // Shoutout to rholterhus for the test
-    function test_ExPostOrdering_GasCheck() public {
+    function test_ExPostOrdering_GasCheck_SkipCoverage() public {
         uint256 NUM_SOLVE_OPS = 3;
         UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
         userOp.control = address(v2ExPost);
