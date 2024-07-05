@@ -96,7 +96,7 @@ contract Sorter is AtlasConstants {
             return false;
         }
 
-        // Make sure that the solver has the correct codehash for dApp control contract
+        // Ensure the solver control address matches the configured dApp control address
         if (dConfig.to != solverOp.control) {
             return false;
         }

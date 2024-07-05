@@ -89,14 +89,15 @@ abstract contract Escrow is AtlETH {
         bool _success;
         bytes memory _data;
 
-        if (_borrow(userOp.value)) {
-            (_success, _data) = ctx.executionEnvironment.call{ value: userOp.value }(
-                abi.encodePacked(
-                    abi.encodeCall(IExecutionEnvironment.userWrapper, userOp),
-                    ctx.setAndPack(ExecutionPhase.UserOperation)
-                )
-            );
+        if (!_borrow(userOp.value)) {
+            revert InsufficientEscrow();
         }
+
+        (_success, _data) = ctx.executionEnvironment.call{ value: userOp.value }(
+            abi.encodePacked(
+                abi.encodeCall(IExecutionEnvironment.userWrapper, userOp), ctx.setAndPack(ExecutionPhase.UserOperation)
+            )
+        );
 
         if (_success) {
             // Handle formatting of returnData
@@ -355,15 +356,14 @@ abstract contract Escrow is AtlETH {
     /// the Atlas protocol's rules and the current Context lock state. It checks for valid execution based on the
     /// SolverOperation's specifics, like gas usage and deadlines. The function aims to protect against malicious
     /// bundlers by ensuring solvers are not unfairly charged for on-chain bid finding gas usage. If the operation
-    /// passes verification and validation, and if it's eligible for bid amount determination, the function attempts to
-    /// execute and determine the bid amount.
-    /// @param ctx Context struct containing the current state of the escrow lock.
-    /// @param dConfig DApp configuration data, including parameters relevant to solver bid validation.
+    /// passes verification and validation, and if it's eligible for bid amount determination, the function
+    /// attempts to execute and determine the bid amount.
+    /// @param ctx The Context struct containing the current state of the escrow lock.
+    /// @param dConfig The DApp configuration data, including parameters relevant to solver bid validation.
     /// @param userOp The UserOperation associated with this SolverOperation, providing context for the bid amount
     /// determination.
     /// @param solverOp The SolverOperation being assessed, containing the solver's bid amount.
-    /// @param returnData Data returned from execution of the UserOp call, passed to the execution environment's
-    /// solverMetaTryCatch function for execution.
+    /// @param returnData Data returned from the execution of the UserOp call.
     /// @return bidAmount The determined bid amount for the SolverOperation if all validations pass and the operation is
     /// executed successfully; otherwise, returns 0.
     function _getBidAmount(
@@ -556,6 +556,10 @@ abstract contract Escrow is AtlETH {
         bytes memory _data;
         bool _success;
 
+        // Set the solver lock and solver address at the beginning to ensure reliability
+        _setSolverLock(uint256(uint160(solverOp.from)));
+        _setSolverTo(solverOp.solver);
+
         // ------------------------------------- //
         //             Pre-Solver Call           //
         // ------------------------------------- //
@@ -587,10 +591,6 @@ abstract contract Escrow is AtlETH {
 
         // Make sure there's enough value in Atlas for the Solver
         if (!_borrow(solverOp.value)) revert InsufficientEscrow();
-
-        // Set the solver lock - if we revert here we'll catch the error in `_solverOpWrapper()` above
-        _setSolverLock(uint256(uint160(solverOp.from)));
-        _setSolverTo(solverOp.solver);
 
         // Optimism's SafeCall lib allows us to limit how much returndata gets copied to memory, to prevent OOG attacks.
         _success = solverOp.solver.safeCall(
@@ -642,10 +642,10 @@ abstract contract Escrow is AtlETH {
         // Verify that the solver repaid their borrowed solverOp.value by calling `reconcile()`. If solver did not fully
         // repay via `reconcile()`, the postSolverCall may still have covered the outstanding debt via `contribute()` so
         // we do a final repayment check here.
-        bool _calledback;
-        (, _calledback, _success) = _solverLockData();
+        (, bool _calledback, bool _fulfilled) = _solverLockData();
         if (!_calledback) revert CallbackNotCalled();
-        if (!_success && !_isBalanceReconciled()) revert BalanceNotReconciled();
+        if (!_fulfilled && !_isBalanceReconciled()) revert BalanceNotReconciled();
+
         // Check if this is an on-chain, ex post bid search
         if (ctx.bidFind) revert BidFindSuccessful(solverTracker.bidAmount);
     }

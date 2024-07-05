@@ -64,10 +64,12 @@ contract ExecutionEnvironmentTest is BaseTest {
             ExecutionEnvironment(payable(IAtlas(address(atlas)).createExecutionEnvironment(address(dAppControl))));
     }
 
-    function test_modifier_validUser() public {
+    function test_modifier_validUser_SkipCoverage() public {
         UserOperation memory userOp;
         bytes memory preOpsData;
         bool status;
+
+        atlas.setLockPhase(ExecutionPhase.PreOps);
 
         // Valid
         userOp.from = user;
@@ -97,13 +99,15 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(preOpsData);
     }
 
-    function test_modifier_onlyAtlasEnvironment() public {
+    function test_modifier_onlyAtlasEnvironment_SkipCoverage() public {
         UserOperation memory userOp;
         bytes memory preOpsData;
         bool status;
 
         userOp.from = user;
         userOp.to = address(atlas);
+
+        atlas.setLockPhase(ExecutionPhase.PreOps);
 
         // Valid
         preOpsData = abi.encodeWithSelector(executionEnvironment.preOpsWrapper.selector, userOp);
@@ -121,7 +125,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertTrue(status, "expectRevert OnlyAtlas: call did not revert");
     }
 
-    function test_modifier_validControlHash() public {
+    function test_modifier_validControlHash_SkipCoverage() public {
         UserOperation memory userOp;
         bytes memory userData;
         bool status;
@@ -147,7 +151,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(userData);
     }
 
-    function test_preOpsWrapper() public {
+    function test_preOpsWrapper_SkipCoverage() public {
         UserOperation memory userOp;
         bytes memory preOpsData;
         bool status;
@@ -156,6 +160,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         userOp.from = user;
         userOp.to = address(atlas);
         userOp.dapp = address(dAppControl);
+
+        atlas.setLockPhase(ExecutionPhase.PreOps);
 
         // Valid
         uint256 expectedReturnValue = 123;
@@ -176,7 +182,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(preOpsData);
     }
 
-    function test_userWrapper() public {
+    function test_userWrapper_SkipCoverage() public {
         UserOperation memory userOp;
         bytes memory userData;
         bool status;
@@ -238,9 +244,11 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(userData);
     }
 
-    function test_postOpsWrapper() public {
+    function test_postOpsWrapper_SkipCoverage() public {
         bytes memory postOpsData;
         bool status;
+
+        atlas.setLockPhase(ExecutionPhase.PostOps);
 
         // Valid
         ctx.solverCount = 4;
@@ -269,7 +277,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(postOpsData);
     }
 
-    function test_solverPreTryCatch() public {
+    function test_solverPreTryCatch_SkipCoverage() public {
         bytes memory preTryCatchMetaData;
         bool revertsAsExpected;
 
@@ -330,7 +338,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertTrue(revertsAsExpected, "expectRevert PreSolverFailed: call did not revert");
     }
 
-    function test_solverPostTryCatch() public {
+    function test_solverPostTryCatch_SkipCoverage() public {
         bytes memory postTryCatchMetaData;
         bool revertsAsExpected;
 
@@ -407,9 +415,11 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertTrue(revertsAsExpected, "expectRevert PostSolverFailed: call did not revert");
     }
     
-    function test_allocateValue() public {
+    function test_allocateValue_SkipCoverage() public {
         bytes memory allocateData;
         bool status;
+
+        atlas.setLockPhase(ExecutionPhase.AllocateValue);
 
         // Valid
         allocateData = abi.encodeWithSelector(
@@ -431,7 +441,7 @@ contract ExecutionEnvironmentTest is BaseTest {
     }
 
 
-    function test_withdrawERC20() public {
+    function test_withdrawERC20_SkipCoverage() public {
         // FIXME: fix before merging spearbit-reaudit branch
         vm.skip(true);
 
@@ -471,7 +481,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         executionEnvironment.withdrawERC20(chain.weth, 2e18);
     }
 
-    function test_withdrawEther() public {
+    function test_withdrawEther_SkipCoverage() public {
         // FIXME: fix before merging spearbit-reaudit branch
         vm.skip(true);
 
@@ -510,19 +520,19 @@ contract ExecutionEnvironmentTest is BaseTest {
         executionEnvironment.withdrawEther(2e18);
     }
 
-    function test_getUser() public view {
+    function test_getUser_SkipCoverage() public view {
         assertEq(executionEnvironment.getUser(), user);
     }
 
-    function test_getControl() public view {
+    function test_getControl_SkipCoverage() public view {
         assertEq(executionEnvironment.getControl(), address(dAppControl));
     }
 
-    function test_getConfig() public view {
+    function test_getConfig_SkipCoverage() public view {
         assertEq(executionEnvironment.getConfig(), CallBits.encodeCallConfig(callConfig));
     }
 
-    function test_getEscrow() public view {
+    function test_getEscrow_SkipCoverage() public view {
         assertEq(executionEnvironment.getEscrow(), address(atlas));
     }
 }

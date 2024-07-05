@@ -115,7 +115,7 @@ contract OEVTest is BaseTest {
     //                  Full OEV Capture Test               //
     // ---------------------------------------------------- //
 
-    function testChainlinkOEV_AltVersion() public {
+    function testChainlinkOEV_AltVersion_SkipCoverage() public {
         UserOperation memory userOp;
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         DAppOperation memory dAppOp;
@@ -183,7 +183,7 @@ contract OEVTest is BaseTest {
     //               ChainlinkAtlasWrapper Tests            //
     // ---------------------------------------------------- //
 
-    function testChainlinkAtlasWrapperViewFunctions_AltVersion() public {
+    function testChainlinkAtlasWrapperViewFunctions_AltVersion_SkipCoverage() public {
         // Check wrapper and base start as expected
         assertEq(chainlinkAtlasWrapper.atlasLatestAnswer(), 0, "Wrapper stored latestAnswer should be 0");
         assertTrue(IChainlinkFeed(chainlinkETHUSD).latestAnswer() != 0, "Base latestAnswer should not be 0");
@@ -276,7 +276,7 @@ contract OEVTest is BaseTest {
         // assertEq(chainlinkAtlasWrapper.transmitters(mockEE), true, "EE should be trusted now");
     }
 
-    function testChainlinkAtlasWrapperTransmit_AltVersion() public {
+    function testChainlinkAtlasWrapperTransmit_AltVersion_SkipCoverage() public {
         TransmitData memory transmitData;
         (transmitData.report, transmitData.rs, transmitData.ss, transmitData.rawVs) = getTransmitPayload();
 
