@@ -527,9 +527,6 @@ abstract contract Escrow is AtlETH {
                 result = 1 << uint256(SolverOutcome.EVMError);
             }
         }
-
-        // Update ctx.phase to reflect the changes made in the Context struct copy passed to solverCall()
-        ctx.phase = uint8(ExecutionPhase.PostSolver);
     }
 
     /// @notice Executes the SolverOperation logic, including preSolver and postSolver hooks via the Execution
