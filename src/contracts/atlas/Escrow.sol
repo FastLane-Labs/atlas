@@ -59,15 +59,15 @@ abstract contract Escrow is AtlETH {
             )
         );
 
-        if (_success) {
-            if (dConfig.callConfig.needsPreOpsReturnData()) {
-                return abi.decode(_data, (bytes));
-            } else {
-                return new bytes(0);
-            }
-        } else {
+        if (!_success) {
             if (ctx.isSimulation) revert PreOpsSimFail();
             revert PreOpsFail();
+        }
+
+        if (dConfig.callConfig.needsPreOpsReturnData()) {
+            return abi.decode(_data, (bytes));
+        } else {
+            return new bytes(0);
         }
     }
 
