@@ -193,7 +193,7 @@ contract Base {
 // ExecutionEnvironment and DAppControl. ExecutionBase then adds utility functions which make it easier for custom
 // DAppControls to interact with Atlas.
 contract ExecutionBase is Base {
-    constructor(address _atlas) Base(_atlas) { }
+    constructor(address atlas) Base(atlas) { }
 
     /// @notice Deposits local funds from this Execution Environment, to the transient Atlas balance. These funds go
     /// towards the bundler, with any surplus going to the Solver.
