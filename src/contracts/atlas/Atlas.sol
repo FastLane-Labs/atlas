@@ -187,9 +187,8 @@ contract Atlas is Escrow, Factory {
         ctx.bidFind = true;
 
         uint256[] memory _bidsAndIndices = new uint256[](solverOpsLength);
-        uint256 _zeroBidCount;
         uint256 _bidAmountFound;
-        uint256 _bidsAndIndicesLastIndex = _bidsAndIndices.length - 1; // computed once for efficiency
+        uint256 _bidsAndIndicesLastIndex = solverOpsLength - 1; // Start from the last index
 
         // First, get all bid amounts. Bids of zero are ignored by only storing non-zero bids in the array, from right
         // to left. If there are any zero bids they will end up on the left as uint(0) values - in their sorted
@@ -209,20 +208,19 @@ contract Atlas is Escrow, Factory {
         for (uint256 i; i < solverOpsLength; ++i) {
             _bidAmountFound = _getBidAmount(ctx, dConfig, userOp, solverOps[i], returnData);
 
-            if (_bidAmountFound == 0 || _bidAmountFound > type(uint240).max) {
-                // Zero bids are ignored: increment _zeroBidCount offset
-                // Bids that would cause an overflow are also ignored
-                unchecked {
-                    ++_zeroBidCount;
-                }
-            } else {
+            // skip zero and overflow bid's
+            if (_bidAmountFound != 0 && _bidAmountFound <= type(uint240).max) {
                 // Non-zero bids are packed with their original solverOps index.
-                // The array is filled with non-zero bids from the right. This causes all zero bids to be on the left -
-                // in their sorted position, so fewer operations are needed in the sorting step below.
-                _bidsAndIndices[_bidsAndIndicesLastIndex - (i - _zeroBidCount)] =
-                    uint256(_bidAmountFound << _BITS_FOR_INDEX | uint16(i));
+                // The array is filled with non-zero bids from the right.
+                _bidsAndIndices[_bidsAndIndicesLastIndex] = uint256(_bidAmountFound << _BITS_FOR_INDEX | uint16(i));
+                unchecked {
+                    --_bidsAndIndicesLastIndex;
+                }
             }
         }
+
+        // Reinitialize _bidsAndIndicesLastIndex to iterate through the sorted array in descending order
+        _bidsAndIndicesLastIndex = solverOpsLength - 1;
 
         // Then, sorts the uint256 array in-place, in ascending order.
         LibSort.insertionSort(_bidsAndIndices);

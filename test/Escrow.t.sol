@@ -134,7 +134,7 @@ contract EscrowTest is AtlasBaseTest {
     // Ensure the preOps hook is successfully called. To ensure the hooks' returned data is as expected, we forward it
     // to the solver call; the data field of the solverOperation contains the expected value, the check is made in the
     // solver's atlasSolverCall function, as defined in the DummySolver contract.
-    function test_executePreOpsCall_success() public {
+    function test_executePreOpsCall_success_SkipCoverage() public {
         defaultAtlasWithCallConfig(
             defaultCallConfig()
                 .withRequirePreOps(true) // Execute the preOps hook
@@ -160,7 +160,7 @@ contract EscrowTest is AtlasBaseTest {
     // Ensure the user operation executes successfully. To ensure the operation's returned data is as expected, we
     // forward it to the solver call; the data field of the solverOperation contains the expected value, the check is
     // made in the solver's atlasSolverCall function, as defined in the DummySolver contract.
-    function test_executeUserOperation_success() public {
+    function test_executeUserOperation_success_SkipCoverage() public {
         defaultAtlasWithCallConfig(
             defaultCallConfig()
                 .withTrackUserReturnData(true) // Track the user operation's return data
@@ -182,7 +182,7 @@ contract EscrowTest is AtlasBaseTest {
     }
 
     // Ensure metacall reverts with the proper error when the allocateValue hook reverts.
-    function test_executeAllocateValueCall_failure() public {
+    function test_executeAllocateValueCall_failure_SkipCoverage() public {
         defaultAtlasWithCallConfig(
             defaultCallConfig()
                 .withTrackUserReturnData(true) // Track the user operation's return data
@@ -196,7 +196,7 @@ contract EscrowTest is AtlasBaseTest {
 
     // Ensure the postOps hook is successfully called. No return data is expected from the postOps hook, so we do not
     // forward any data to the solver call.
-    function test_executePostOpsCall_success() public {
+    function test_executePostOpsCall_success_SkipCoverage() public {
         defaultAtlasWithCallConfig(
             defaultCallConfig()
                 .withRequirePostOps(true) // Execute the postOps hook
@@ -206,7 +206,7 @@ contract EscrowTest is AtlasBaseTest {
     }
 
     // Ensure metacall reverts with the proper error when the postOps hook reverts.
-    function test_executePostOpsCall_failure() public {
+    function test_executePostOpsCall_failure_SkipCoverage() public {
         defaultAtlasWithCallConfig(
             defaultCallConfig()
                 .withTrackUserReturnData(true) // Track the user operation's return data
@@ -222,7 +222,7 @@ contract EscrowTest is AtlasBaseTest {
     // Ensure the allocateValue hook is successfully called. No return data is expected from the allocateValue hook, so
     // we check by emitting an event in the hook. The emitter must be the executionEnvironment since allocateValue is
     // delegatecalled.
-    function test_allocateValue_success() public {
+    function test_allocateValue_success_SkipCoverage() public {
         defaultAtlasWithCallConfig(
             defaultCallConfig()
                 .withTrackUserReturnData(true) // Track the user operation's return data
@@ -283,7 +283,7 @@ contract EscrowTest is AtlasBaseTest {
         executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.InvalidTo), true);
     }
 
-    function test_executeSolverOperation_validateSolverOperation_perBlockLimit() public {
+    function test_executeSolverOperation_validateSolverOperation_perBlockLimit_SkipCoverage() public {
         vm.prank(solverOneEOA);
         atlas.unbond(1); // This will set the solver's lastAccessedBlock to the current block
 
@@ -291,7 +291,7 @@ contract EscrowTest is AtlasBaseTest {
         executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.PerBlockLimit), false);
     }
 
-    function test_executeSolverOperation_validateSolverOperation_insufficientEscrow() public {
+    function test_executeSolverOperation_validateSolverOperation_insufficientEscrow_SkipCoverage() public {
         // Solver only has 1 ETH escrowed
         vm.txGasPrice(10e18); // Set a gas price that will cause the solver to run out of escrow
         uint256 solverGasLimit = 1_000_000;
@@ -307,7 +307,7 @@ contract EscrowTest is AtlasBaseTest {
         executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.InsufficientEscrow), true);
     }
 
-    function test_executeSolverOperation_validateSolverOperation_callValueTooHigh() public {
+    function test_executeSolverOperation_validateSolverOperation_callValueTooHigh_SkipCoverage() public {
         // Will revert with CallValueTooHigh if more ETH than held in Atlas requested
         uint256 solverOpValue = 100 ether;
         assertTrue(solverOpValue > address(atlas).balance, "solverOpValue must be greater than Atlas balance to trigger CallValueTooHigh");
@@ -320,14 +320,14 @@ contract EscrowTest is AtlasBaseTest {
         executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.CallValueTooHigh), false);
     }
 
-    function test_executeSolverOperation_validateSolverOperation_userOutOfGas() public {
+    function test_executeSolverOperation_validateSolverOperation_userOutOfGas_SkipCoverage() public {
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
         this.executeSolverOperationCase{gas: _VALIDATION_GAS_LIMIT + _SOLVER_GAS_LIMIT + 1_000_000}(
             userOp, solverOps, false, false, 1 << uint256(SolverOutcome.UserOutOfGas), true
         );
     }
 
-    function test_executeSolverOperation_solverOpWrapper_BidNotPaid() public {
+    function test_executeSolverOperation_solverOpWrapper_BidNotPaid_SkipCoverage() public {
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
             defaultCallConfig()
                 .withRequireFulfillment(true)
@@ -340,7 +340,7 @@ contract EscrowTest is AtlasBaseTest {
         executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
-    function test_executeSolverOperation_solverOpWrapper_CallbackNotCalled() public {
+    function test_executeSolverOperation_solverOpWrapper_CallbackNotCalled_SkipCoverage() public {
         // Fails because solver doesn't call reconcile() at all
         uint256 bidAmount = dummySolver.noGasPayBack(); // Special bid value that will cause the solver to not call reconcile
         deal(address(dummySolver), bidAmount);
@@ -354,7 +354,7 @@ contract EscrowTest is AtlasBaseTest {
         executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
-    function test_executeSolverOperation_solverOpWrapper_SolverOpReverted() public {
+    function test_executeSolverOperation_solverOpWrapper_SolverOpReverted_SkipCoverage() public {
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
             defaultCallConfig()
                 .withTrackUserReturnData(true)
@@ -370,7 +370,7 @@ contract EscrowTest is AtlasBaseTest {
         executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
-    function test_executeSolverOperation_solverOpWrapper_preSolverFailed() public {
+    function test_executeSolverOperation_solverOpWrapper_preSolverFailed_SkipCoverage() public {
         defaultAtlasWithCallConfig(
             defaultCallConfig()
                 .withTrackPreOpsReturnData(false)
@@ -394,7 +394,7 @@ contract EscrowTest is AtlasBaseTest {
         executeSolverOperationCase(userOp, solverOps, false, false, result, true);
     }
 
-    function test_executeSolverOperation_solverOpWrapper_postSolverFailed() public {
+    function test_executeSolverOperation_solverOpWrapper_postSolverFailed_SkipCoverage() public {
         defaultAtlasWithCallConfig(
             defaultCallConfig()
                 .withTrackPreOpsReturnData(false)
@@ -418,7 +418,7 @@ contract EscrowTest is AtlasBaseTest {
         executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
-    function test_executeSolverOperation_solverOpWrapper_BalanceNotReconciled_ifPartialRepayment() public {
+    function test_executeSolverOperation_solverOpWrapper_BalanceNotReconciled_ifPartialRepayment_SkipCoverage() public {
         // Fails because solver calls reconcile but doesn't fully repay the shortfall
         uint256 bidAmount = dummySolver.partialGasPayBack(); // solver only pays half of shortfall
         deal(address(dummySolver), bidAmount);
@@ -434,7 +434,7 @@ contract EscrowTest is AtlasBaseTest {
         executeSolverOperationCase(userOp, solverOps, true, false, expectedResult, true);
     }
 
-    function test_executeSolverOperation_solverOpWrapper_Success_ifPartialRepaymentAndDappCoversTheRest() public {
+    function test_executeSolverOperation_solverOpWrapper_Success_ifPartialRepaymentAndDappCoversTheRest_SkipCoverage() public {
         uint256 bidAmount = dummySolver.partialGasPayBack(); // solver only pays half of shortfall
         deal(address(dummySolver), bidAmount);
 
