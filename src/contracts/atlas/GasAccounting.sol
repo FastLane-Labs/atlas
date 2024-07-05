@@ -395,6 +395,9 @@ abstract contract GasAccounting is SafetyLocks {
             _credit(_winningSolver, _amountSolverReceives - _amountSolverPays);
         }
 
+        // Set lock to FullyLocked to prevent any reentrancy possibility
+        _setLockPhase(uint8(ExecutionPhase.FullyLocked));
+
         if (claimsPaidToBundler != 0) SafeTransferLib.safeTransferETH(ctx.bundler, claimsPaidToBundler);
 
         return (claimsPaidToBundler, netAtlasGasSurcharge);
