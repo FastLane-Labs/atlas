@@ -70,7 +70,7 @@ contract SwapIntentTest is BaseTest {
         // atlas.deposit{value: 1e18}();
     }
 
-    function testAtlasSwapIntentWithBasicRFQ_GasCheck() public {
+    function testAtlasSwapIntentWithBasicRFQ_GasCheck_SkipCoverage() public {
         // Swap 10 WETH for 20 DAI
         UserCondition userCondition = new UserCondition();
 
@@ -209,7 +209,7 @@ contract SwapIntentTest is BaseTest {
         assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + swapIntent.amountUserBuys, "Did not receive enough DAI");
     }
 
-    function testAtlasSwapIntentWithUniswapSolver() public {
+    function testAtlasSwapIntentWithUniswapSolver_SkipCoverage() public {
         // Swap 10 WETH for 20 DAI
         Condition[] memory conditions;
 

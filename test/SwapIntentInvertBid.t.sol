@@ -36,7 +36,7 @@ contract SwapIntentTest is BaseTest {
         governanceEOA = vm.addr(governancePK);
     }
 
-    function testAtlasSwapIntentInvertBid_solverBidRetreivalNotRequired() public {
+    function testAtlasSwapIntentInvertBid_solverBidRetreivalNotRequired_SkipCoverage() public {
         vm.startPrank(governanceEOA);
         SwapIntentInvertBidDAppControl controlContract = new SwapIntentInvertBidDAppControl(address(atlas), false);
         address control = address(controlContract);
@@ -71,7 +71,7 @@ contract SwapIntentTest is BaseTest {
         assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + swapIntent.amountUserBuys, "Did not receive enough DAI");
     }
 
-    function testAtlasSwapIntentInvertBid_solverBidRetreivalNotRequired_multipleSolvers() public {
+    function testAtlasSwapIntentInvertBid_solverBidRetreivalNotRequired_multipleSolvers_SkipCoverage() public {
         vm.startPrank(governanceEOA);
         SwapIntentInvertBidDAppControl controlContract = new SwapIntentInvertBidDAppControl(address(atlas), false);
         address control = address(controlContract);
@@ -111,7 +111,7 @@ contract SwapIntentTest is BaseTest {
         assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + swapIntent.amountUserBuys, "Did not receive enough DAI");
     }
 
-    function testAtlasSwapIntentInvertBid_solverBidRetreivalRequired() public {
+    function testAtlasSwapIntentInvertBid_solverBidRetreivalRequired_SkipCoverage() public {
         vm.startPrank(governanceEOA);
         SwapIntentInvertBidDAppControl controlContract = new SwapIntentInvertBidDAppControl(address(atlas), true);
         address control = address(controlContract);

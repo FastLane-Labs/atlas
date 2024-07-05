@@ -111,7 +111,7 @@ contract OEVTest is BaseTest {
     //                  Full OEV Capture Test               //
     // ---------------------------------------------------- //
 
-    function testChainlinkOEV_StandardVersion_GasCheck() public {
+    function testChainlinkOEV_StandardVersion_GasCheck_SkipCoverage() public {
         UserOperation memory userOp;
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         DAppOperation memory dAppOp;

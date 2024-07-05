@@ -289,7 +289,7 @@ contract MainTest is BaseTest {
         */
     }
 
-    function testMimic() public {
+    function testMimic_SkipCoverage() public {
         // uncomment to debug if this test is broken
         /*
         address aaaaa = atlas.executionTemplate();
@@ -375,7 +375,7 @@ contract MainTest is BaseTest {
         assertTrue(exists, "ExecutionEnvironment wasn't created");
     }
 
-    function testTestUserOperation() public {
+    function testTestUserOperation_SkipCoverage() public {
         uint8 v;
         bytes32 r;
         bytes32 s;
@@ -400,7 +400,7 @@ contract MainTest is BaseTest {
         vm.stopPrank();
     }
 
-    function testSolverCalls() public {
+    function testSolverCalls_SkipCoverage() public {
         uint8 v;
         bytes32 r;
         bytes32 s;
