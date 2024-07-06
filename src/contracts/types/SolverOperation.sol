@@ -9,7 +9,7 @@ bytes32 constant SOLVER_TYPEHASH = keccak256(
 // is stored in the `_SOLVER_OP_BASE_CALLDATA` constant in Storage.sol and must be kept up-to-date with any changes to
 // this struct.
 struct SolverOperation {
-    address from; // Solver EOA address
+    address from; // Solver address
     address to; // Atlas address
     uint256 value; // Amount of ETH required for the solver operation (used in `value` field of the solver call)
     uint256 gas; // Gas limit for the solver operation

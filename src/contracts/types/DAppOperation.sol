@@ -6,7 +6,7 @@ bytes32 constant DAPP_TYPEHASH = keccak256(
 );
 
 struct DAppOperation {
-    address from; // EOA of signer of the DAppOperation
+    address from; // signer of the DAppOperation
     address to; // Atlas address
     uint256 nonce; // Atlas nonce of the DAppOperation available in the AtlasVerification contract
     uint256 deadline; // block.number deadline for the DAppOperation

@@ -15,7 +15,7 @@ contract DAppIntegration {
 
     address public immutable ATLAS;
 
-    // map for tracking which EOAs are approved for a given dApp
+    // map for tracking which accounts are approved for a given dApp
     // keccak256(governance, signor)  => enabled
     mapping(bytes32 => bool) internal S_signatories;
 

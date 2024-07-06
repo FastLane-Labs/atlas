@@ -16,7 +16,7 @@ bytes32 constant USER_TYPEHASH_TRUSTED = keccak256(
 );
 
 struct UserOperation {
-    address from; // User EOA address
+    address from; // User address
     address to; // Atlas address
     uint256 value; // Amount of ETH required for the user operation (used in `value` field of the user call)
     uint256 gas; // Gas limit for the user operation
