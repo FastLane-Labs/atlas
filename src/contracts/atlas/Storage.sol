@@ -19,6 +19,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint256 public immutable ESCROW_DURATION;
 
     // AtlETH public constants
+    // These constants double as interface functions for the ERC20 standard, hence the lowercase naming convention.
     string public constant name = "Atlas ETH";
     string public constant symbol = "atlETH";
     uint8 public constant decimals = 18;
