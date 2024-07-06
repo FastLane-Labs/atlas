@@ -86,13 +86,15 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param maxApprovedGasSpend The maximum amount of the solver's bonded AtlETH that Atlas can deduct to cover the
     /// solver's debt.
     /// @return owed The amount owed, if any, by the solver after reconciliation.
+    /// @dev The solver can call this function multiple times until the owed amount is zero.
+    /// @dev Note: `reconcile()` must be called by the solver to avoid a `CallbackNotCalled` error in `solverCall()`.
     function reconcile(uint256 maxApprovedGasSpend) external payable returns (uint256 owed) {
         // NOTE: maxApprovedGasSpend is the amount of the solver's atlETH that the solver is allowing
         // to be used to cover what they owe. Assuming they're successful, a value up to this amount
         // will be subtracted from the solver's bonded AtlETH during _settle().
 
-        // NOTE: After reconcile is called successfully by the solver, neither the claims nor
-        // withdrawals values can be increased.
+        // NOTE: After reconcile is called for the first time by the solver, neither the claims nor withdrawals values
+        // can be increased.
 
         // NOTE: While anyone can call this function, it can only be called in the SolverOperation phase. Because Atlas
         // calls directly to the solver contract in this phase, the solver should be careful to not call malicious
@@ -268,7 +270,7 @@ abstract contract GasAccounting is SafetyLocks {
         }
     }
 
-    /// @param ctx Context struct containing relavent context information for the Atlas auction.
+    /// @param ctx Context struct containing relevant context information for the Atlas auction.
     /// @param solverGasLimit The maximum gas limit for a solver, as set in the DAppConfig
     /// @return adjustedWithdrawals Withdrawals of the current metacall, adjusted by adding the Atlas gas surcharge.
     /// @return adjustedDeposits Deposits of the current metacall, no adjustments applied.
@@ -277,6 +279,9 @@ abstract contract GasAccounting is SafetyLocks {
     /// @return adjustedWriteoffs Writeoffs of the current metacall, adjusted by adding the bundler gas overage penalty
     /// if applicable.
     /// @return netAtlasGasSurcharge The net gas surcharge of the metacall, taken by Atlas.
+    /// @dev This function is called internally to adjust the accounting for fees based on the gas usage.
+    /// Note: The behavior of this function depends on whether `_bidFindingIteration()` or `_bidKnownIteration()` is
+    /// used, as they both use a different order of execution.
     function _adjustAccountingForFees(
         Context memory ctx,
         uint256 solverGasLimit
@@ -335,7 +340,7 @@ abstract contract GasAccounting is SafetyLocks {
     /// @notice Settle makes the final adjustments to accounting variables based on gas used in the metacall. AtlETH is
     /// either taken (via _assign) or given (via _credit) to the winning solver, the bundler is sent the appropriate
     /// refund for gas spent, and Atlas' gas surcharge is updated.
-    /// @param ctx Context struct containing relavent context information for the Atlas auction.
+    /// @param ctx Context struct containing relevant context information for the Atlas auction.
     /// @param solverGasLimit The dApp's maximum gas limit for a solver, as set in the DAppConfig.
     /// @return claimsPaidToBundler The amount of ETH paid to the bundler in this function.
     /// @return netAtlasGasSurcharge The net gas surcharge of the metacall, taken by Atlas.
