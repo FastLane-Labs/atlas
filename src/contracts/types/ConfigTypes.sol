@@ -64,9 +64,8 @@ struct CallConfig {
     bool forwardReturnData;
     // requireFulfillment: If true, a winning solver must be found, otherwise the metacall will fail.
     bool requireFulfillment;
-    // trustedOpHash: If true, the userOpHash is calculated using `getAltOperationHash` instead of the more secure
-    // `getUserOperationHash`. This implies solvers trust changes made to the userOp after signing their associated
-    // solverOps.
+    // trustedOpHash: If true, the userOpHash is calculated using `getUserOperationHash`, implying solvers trust changes
+    // made to the userOp after signing their associated solverOps.
     bool trustedOpHash;
     // invertBidValue: If true, the solver with the lowest successful bid wins.
     bool invertBidValue;
