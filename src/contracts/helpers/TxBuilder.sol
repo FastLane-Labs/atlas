@@ -85,7 +85,7 @@ contract TxBuilder {
     function buildSolverOperation(
         UserOperation memory userOp,
         bytes memory solverOpData,
-        address solverEOA,
+        address solver,
         address solverContract,
         uint256 bidAmount,
         uint256 value
@@ -98,7 +98,7 @@ contract TxBuilder {
         bytes32 userOpHash = IAtlasVerification(verification).getUserOperationHash(userOp);
 
         solverOp = SolverOperation({
-            from: solverEOA,
+            from: solver,
             to: atlas,
             value: value,
             gas: gas,
@@ -115,7 +115,7 @@ contract TxBuilder {
     }
 
     function buildDAppOperation(
-        address governanceEOA,
+        address governance,
         UserOperation memory userOp,
         SolverOperation[] memory solverOps
     )
@@ -130,9 +130,9 @@ contract TxBuilder {
         bytes32 callChainHash = CallVerification.getCallChainHash(dConfig, userOp, solverOps);
 
         dAppOp = DAppOperation({
-            from: governanceEOA,
+            from: governance,
             to: atlas,
-            nonce: governanceNextNonce(governanceEOA),
+            nonce: governanceNextNonce(governance),
             deadline: userOp.deadline,
             control: userOp.control,
             bundler: address(0),

@@ -141,7 +141,7 @@ contract OEVTest is BaseTest {
         solverOps[0] = txBuilder.buildSolverOperation({
             userOp: userOp,
             solverOpData: solverOpData,
-            solverEOA: solverOneEOA,
+            solver: solverOneEOA,
             solverContract: address(liquidationSolver),
             bidAmount: solverWinningBid,
             value: 0

@@ -174,7 +174,7 @@ contract AccountingTest is BaseTest {
         solverOps[0] = txBuilder.buildSolverOperation({
             userOp: userOp,
             solverOpData: solverOpData,
-            solverEOA: solverOneEOA,
+            solver: solverOneEOA,
             solverContract: rfqSolver,
             bidAmount: solverMsgValue,
             value: 0

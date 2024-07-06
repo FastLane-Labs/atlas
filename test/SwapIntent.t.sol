@@ -146,7 +146,7 @@ contract SwapIntentTest is BaseTest {
         solverOps[0] = txBuilder.buildSolverOperation({
             userOp: userOp,
             solverOpData: solverOpData,
-            solverEOA: solverOneEOA,
+            solver: solverOneEOA,
             solverContract: address(rfqSolver),
             bidAmount: 1e18,
             value: 0
@@ -272,7 +272,7 @@ contract SwapIntentTest is BaseTest {
         solverOps[0] = txBuilder.buildSolverOperation({
             userOp: userOp,
             solverOpData: solverOpData,
-            solverEOA: solverOneEOA,
+            solver: solverOneEOA,
             solverContract: address(uniswapSolver),
             bidAmount: 1e18,
             value: 0
