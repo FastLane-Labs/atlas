@@ -166,19 +166,21 @@ abstract contract GasAccounting is SafetyLocks {
         uint112 _amt = uint112(amount);
 
         EscrowAccountAccessData memory _aData = S_accessData[owner];
-        EscrowAccountBalance memory _bData = s_balanceOf[owner];
 
-        uint256 _total = uint256(_bData.unbonding) + uint256(_aData.bonded); // Combine the balances
         if (_amt > _aData.bonded) {
             // The bonded balance does not cover the amount owed. Check if there is enough unbonding balance to
             // make up for the missing difference. If not, there is a deficit. Atlas does not consider drawing from
             // the regular AtlETH balance (not bonded nor unbonding) to cover the remaining deficit because it is
             // not meant to be used within an Atlas transaction, and must remain independent.
-            if (_amt > _total) {
+
+            EscrowAccountBalance memory _bData = s_balanceOf[owner];
+            uint256 _bondedAndUnbonding = uint256(_bData.unbonding) + uint256(_aData.bonded);
+
+            if (_amt > _bondedAndUnbonding) {
                 // The unbonding balance is insufficient to cover the remaining amount owed. There is a deficit. Set
                 // both bonded and unbonding balances to 0 and adjust the "amount" variable to reflect the amount
                 // that was actually deducted.
-                deficit = amount - _total;
+                deficit = amount - _bondedAndUnbonding;
                 s_balanceOf[owner].unbonding = 0;
                 _aData.bonded = 0;
 
@@ -187,7 +189,7 @@ abstract contract GasAccounting is SafetyLocks {
             } else {
                 // The unbonding balance is sufficient to cover the remaining amount owed. Draw everything from the
                 // bonded balance, and adjust the unbonding balance accordingly.
-                s_balanceOf[owner].unbonding = uint112(_total - _amt);
+                s_balanceOf[owner].unbonding = uint112(_bondedAndUnbonding - _amt);
                 _aData.bonded = 0;
             }
         } else {
