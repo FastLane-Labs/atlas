@@ -216,7 +216,7 @@ contract SwapIntentTest is BaseTest {
         SolverOperation memory solverOp = txBuilder.buildSolverOperation({
             userOp: userOp,
             solverOpData: solverOpData,
-            solverEOA: solverOneEOA,
+            solver: solverOneEOA,
             solverContract: solverAddress,
             bidAmount: solverBidAmount,
             value: 0
