@@ -96,9 +96,7 @@ contract DAppIntegration {
         address _dAppGov = IDAppControl(control).getDAppSignatory();
         if (msg.sender != _dAppGov) revert AtlasErrors.OnlyGovernance();
 
-        bytes32 _signatoryKey = keccak256(abi.encodePacked(control, _dAppGov));
-        if (!S_signatories[_signatoryKey]) revert AtlasErrors.DAppNotEnabled();
-
+        // Remove the signatory
         _removeSignatory(control, _dAppGov);
 
         uint32 callConfig = IDAppControl(control).CALL_CONFIG();
@@ -134,16 +132,25 @@ contract DAppIntegration {
     /// @param signatory The address of the signatory to be removed.
     function _removeSignatory(address control, address signatory) internal {
         bytes32 _signatoryKey = keccak256(abi.encodePacked(control, signatory));
-        if (!S_signatories[_signatoryKey]) revert AtlasErrors.InvalidSignatory();
+
+        // Check if the signatory exists
+        if (!S_signatories[_signatoryKey]) revert AtlasErrors.DAppNotEnabled();
+
+        // Remove the signatory from the mapping
         delete S_signatories[_signatoryKey];
+
+        // Iterate through the list of signatories and remove the specified signatory
         for (uint256 i; i < S_dAppSignatories[control].length; i++) {
             if (S_dAppSignatories[control][i] == signatory) {
+                // Replace the signatory with the last element and pop the last element
                 S_dAppSignatories[control][i] = S_dAppSignatories[control][S_dAppSignatories[control].length - 1];
                 S_dAppSignatories[control].pop();
                 return;
             }
         }
-        revert();
+
+        // Revert if the signatory was not found in the list
+        revert AtlasErrors.InvalidSignatory();
     }
 
     /// @notice Checks if the Atlas protocol is in an unlocked state. Will revert if not.
