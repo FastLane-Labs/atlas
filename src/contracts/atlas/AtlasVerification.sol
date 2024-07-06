@@ -465,6 +465,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
 
         if (!_userIsBundler) {
             if (userOp.callConfig.allowsTrustedOpHash()) {
+                // Use full untrusted hash for signature verification to ensure all operation parameters are included.
                 userOpHash = _getUserOperationHash(userOp, false);
             }
             _signatureValid = SignatureChecker.isValidSignatureNow(userOp.from, userOpHash, userOp.signature);
