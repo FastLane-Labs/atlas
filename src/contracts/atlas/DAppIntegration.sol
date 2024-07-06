@@ -160,8 +160,7 @@ contract DAppIntegration {
     /// @return The governance address of the specified DAppControl contract.
     function getGovFromControl(address control) external view returns (address) {
         address _dAppGov = IDAppControl(control).getDAppSignatory();
-        bytes32 _signatoryKey = keccak256(abi.encodePacked(control, _dAppGov));
-        if (!S_signatories[_signatoryKey]) revert AtlasErrors.DAppNotEnabled();
+        if (!_isDAppSignatory(control, _dAppGov)) revert AtlasErrors.DAppNotEnabled();
         return _dAppGov;
     }
 
