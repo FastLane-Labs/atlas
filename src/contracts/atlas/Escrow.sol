@@ -112,6 +112,30 @@ abstract contract Escrow is AtlETH {
         }
     }
 
+    /// @notice Checks if the trusted operation hash matches and sets the appropriate error bit if it doesn't.
+    /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
+    /// @param prevalidated Boolean flag indicating whether the SolverOperation has been prevalidated to skip certain
+    /// checks.
+    /// @param userOp UserOperation struct containing the user's transaction data relevant to this SolverOperation.
+    /// @param solverOp SolverOperation struct containing the solver's bid and execution data.
+    /// @param result The current result bitmask that tracks the status of various checks and validations.
+    /// @return The updated result bitmask with the AltOpHashMismatch bit set if the operation hash does not match.
+    function _checkTrustedOpHash(
+        DAppConfig memory dConfig,
+        bool prevalidated,
+        UserOperation calldata userOp,
+        SolverOperation calldata solverOp,
+        uint256 result
+    )
+        internal
+        returns (uint256)
+    {
+        if (dConfig.callConfig.allowsTrustedOpHash() && !prevalidated && !_handleAltOpHash(userOp, solverOp)) {
+            result |= 1 << uint256(SolverOutcome.AltOpHashMismatch);
+        }
+        return result;
+    }
+
     /// @notice Attempts to execute a SolverOperation and determine if it wins the auction.
     /// @param ctx Context struct containing the current state of the escrow lock.
     /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
@@ -151,18 +175,8 @@ abstract contract Escrow is AtlETH {
             (_result, _gasLimit) = _validateSolverOpGas(dConfig, solverOp, _gasWaterMark);
             _result |= _validateSolverOpDeadline(solverOp, dConfig);
 
-            if (dConfig.callConfig.allowsTrustedOpHash()) {
-                if (!prevalidated && !_handleAltOpHash(userOp, solverOp)) {
-                    ctx.solverOutcome = uint24(_result);
-
-                    // Account for failed SolverOperation gas costs
-                    _handleSolverAccounting(solverOp, _gasWaterMark, _result, !prevalidated);
-
-                    emit SolverTxResult(solverOp.solver, solverOp.from, false, false, _result);
-
-                    return 0;
-                }
-            }
+            // Check for trusted operation hash
+            _result = _checkTrustedOpHash(dConfig, prevalidated, userOp, solverOp, _result);
 
             // If there are no errors, attempt to execute
             if (_result.canExecute()) {
@@ -172,8 +186,7 @@ abstract contract Escrow is AtlETH {
                 (_result, _solverTracker) = _solverOpWrapper(ctx, solverOp, bidAmount, _gasLimit, returnData);
 
                 if (_result.executionSuccessful()) {
-                    // first successful solver call that paid what it bid
-
+                    // First successful solver call that paid what it bid
                     emit SolverTxResult(solverOp.solver, solverOp.from, true, true, _result);
 
                     ctx.solverSuccessful = true;

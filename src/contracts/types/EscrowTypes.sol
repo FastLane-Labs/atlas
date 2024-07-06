@@ -38,6 +38,7 @@ enum SolverOutcome {
     InvalidTo,
     UserOutOfGas,
     AlteredControl,
+    AltOpHashMismatch,
     // Partial Refund but no execution
     DeadlinePassed,
     GasPriceOverCap,
