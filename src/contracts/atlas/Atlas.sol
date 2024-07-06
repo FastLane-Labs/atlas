@@ -110,7 +110,7 @@ contract Atlas is Escrow, Factory {
     /// @param executionEnvironment Address of the execution environment contract of the current metacall tx.
     /// @param bundler Address of the bundler of the current metacall tx.
     /// @param userOpHash Hash of the userOp struct of the current metacall tx.
-    /// @return ctx Context struct containing relavent context information for the Atlas auction.
+    /// @return ctx Context struct containing relevent context information for the Atlas auction.
     function execute(
         DAppConfig memory dConfig,
         UserOperation calldata userOp,
