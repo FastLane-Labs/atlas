@@ -122,16 +122,16 @@ contract GasAccountingTest is Test {
     function getInitialClaims(uint256 _gasMarker) public view returns (uint256 claims) {
         uint256 rawClaims = (_gasMarker + mockGasAccounting.FIXED_GAS_OFFSET()) * tx.gasprice;
         claims = rawClaims * (
-            mockGasAccounting.SURCHARGE_SCALE() + mockGasAccounting.ATLAS_SURCHARGE_RATE() + mockGasAccounting.BUNDLER_SURCHARGE_RATE()
-        ) / mockGasAccounting.SURCHARGE_SCALE();
+            mockGasAccounting.SCALE() + mockGasAccounting.ATLAS_SURCHARGE_RATE() + mockGasAccounting.BUNDLER_SURCHARGE_RATE()
+        ) / mockGasAccounting.SCALE();
     }
 
     function initEscrowLock(uint256 metacallValue) public {
         mockGasAccounting.initializeLock{value: metacallValue}(executionEnvironment, gasMarker, 0);
         uint256 rawClaims = (gasMarker + mockGasAccounting.FIXED_GAS_OFFSET()) * tx.gasprice;
         initialClaims = rawClaims * (
-            mockGasAccounting.SURCHARGE_SCALE() + mockGasAccounting.ATLAS_SURCHARGE_RATE() + mockGasAccounting.BUNDLER_SURCHARGE_RATE()
-        ) / mockGasAccounting.SURCHARGE_SCALE();
+            mockGasAccounting.SCALE() + mockGasAccounting.ATLAS_SURCHARGE_RATE() + mockGasAccounting.BUNDLER_SURCHARGE_RATE()
+        ) / mockGasAccounting.SCALE();
     }
 
     function test_contribute() public {
@@ -462,7 +462,7 @@ contract GasAccountingTest is Test {
         // FULL_REFUND
         result = EscrowBits._FULL_REFUND;
         maxGasUsed = gasWaterMark + calldataCost;
-        maxGasUsed = maxGasUsed * (mockGasAccounting.SURCHARGE_SCALE() + mockGasAccounting.ATLAS_SURCHARGE_RATE() + mockGasAccounting.BUNDLER_SURCHARGE_RATE()) / mockGasAccounting.SURCHARGE_SCALE()
+        maxGasUsed = maxGasUsed * (mockGasAccounting.SCALE() + mockGasAccounting.ATLAS_SURCHARGE_RATE() + mockGasAccounting.BUNDLER_SURCHARGE_RATE()) / mockGasAccounting.SCALE()
             * tx.gasprice;
         mockGasAccounting.increaseBondedBalance(solverOp.from, maxGasUsed);
         (bondedBefore,,,,) = mockGasAccounting.accessData(solverOp.from);
@@ -470,7 +470,7 @@ contract GasAccountingTest is Test {
         (bondedAfter,,,,) = mockGasAccounting.accessData(solverOp.from);
         assertGt(
             bondedBefore - bondedAfter,
-            calldataCost * (mockGasAccounting.SURCHARGE_SCALE() + mockGasAccounting.ATLAS_SURCHARGE_RATE() + mockGasAccounting.BUNDLER_SURCHARGE_RATE()) / mockGasAccounting.ATLAS_SURCHARGE_RATE()
+            calldataCost * (mockGasAccounting.SCALE() + mockGasAccounting.ATLAS_SURCHARGE_RATE() + mockGasAccounting.BUNDLER_SURCHARGE_RATE()) / mockGasAccounting.ATLAS_SURCHARGE_RATE()
                 * tx.gasprice
         ); // Must be greater than calldataCost
         assertLt(bondedBefore - bondedAfter, maxGasUsed); // Must be less than maxGasUsed
@@ -535,7 +535,7 @@ contract GasAccountingTest is Test {
     //     // Revert calculations to reach the second gas marker value in _settle()
     //     (uint256 claimsPaidToBundler, uint256 netGasSurcharge) = mockGasAccounting.settle(solverOp.from, makeAddr("bundler"));
     //     uint256 settleGasRemainder = initialClaims - (claimsPaidToBundler + netGasSurcharge);
-    //     settleGasRemainder = settleGasRemainder * mockGasAccounting.SURCHARGE_SCALE() / (mockGasAccounting.SURCHARGE_SCALE() + mockGasAccounting.ATLAS_SURCHARGE_RATE());
+    //     settleGasRemainder = settleGasRemainder * mockGasAccounting.SCALE() / (mockGasAccounting.SCALE() + mockGasAccounting.ATLAS_SURCHARGE_RATE());
 
     //     // The bundler must be repaid the gas cost between the 2 markers
     //     uint256 diff = rawClaims - settleGasRemainder;

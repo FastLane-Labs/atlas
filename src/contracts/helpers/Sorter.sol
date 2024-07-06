@@ -4,6 +4,7 @@ pragma solidity 0.8.25;
 import { IAtlas } from "../interfaces/IAtlas.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
+import { AccountingMath } from "src/contracts/libraries/AccountingMath.sol";
 import { CallVerification } from "../libraries/CallVerification.sol";
 import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
 import { AtlasConstants } from "../types/AtlasConstants.sol";
@@ -74,9 +75,9 @@ contract Sorter is AtlasConstants {
     {
         // Make sure the solver has enough funds bonded
         uint256 solverBalance = IAtlas(address(ATLAS)).balanceOfBonded(solverOp.from);
-        uint256 gasLimit = _SOLVER_GAS_LIMIT_SCALE
-            * (solverOp.gas < dConfig.solverGasLimit ? solverOp.gas : dConfig.solverGasLimit)
-            / (_SOLVER_GAS_LIMIT_SCALE + _SOLVER_GAS_LIMIT_BUFFER_PERCENTAGE) + _FASTLANE_GAS_BUFFER;
+
+        uint256 gasLimit =
+            AccountingMath.solverGasLimitScaledDown(solverOp.gas, dConfig.solverGasLimit) + _FASTLANE_GAS_BUFFER;
 
         uint256 calldataCost =
             (solverOp.data.length + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM * solverOp.maxFeePerGas;

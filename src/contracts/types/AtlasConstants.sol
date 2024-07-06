@@ -22,8 +22,6 @@ contract AtlasConstants {
 
     // Escrow constants
     uint256 internal constant _VALIDATION_GAS_LIMIT = 500_000;
-    uint256 internal constant _SOLVER_GAS_LIMIT_BUFFER_PERCENTAGE = 5; // out of 100 = 5%
-    uint256 internal constant _SOLVER_GAS_LIMIT_SCALE = 100; // out of 100 = 100%
     uint256 internal constant _FASTLANE_GAS_BUFFER = 125_000; // integer amount
 
     // Gas Accounting constants
