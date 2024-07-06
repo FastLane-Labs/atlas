@@ -440,7 +440,7 @@ abstract contract Escrow is AtlETH {
         if (userOp.control != solverOp.control) {
             return false;
         }
-        if (userOp.deadline != 0 && solverOp.deadline != 0 && solverOp.deadline != userOp.deadline) {
+        if (!(userOp.deadline == 0 || solverOp.deadline == 0 || solverOp.deadline == userOp.deadline)) {
             return false;
         }
         bytes32 _hashId = keccak256(abi.encodePacked(solverOp.userOpHash, solverOp.from, solverOp.deadline));
