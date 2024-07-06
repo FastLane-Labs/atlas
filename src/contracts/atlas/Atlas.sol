@@ -92,6 +92,8 @@ contract Atlas is Escrow, Factory {
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
             _handleErrors(revertData, _dConfig.callConfig);
+            // Set lock to FullyLocked to prevent any reentrancy possibility
+            _setLockPhase(uint8(ExecutionPhase.FullyLocked));
 
             // Refund the msg.value to sender if it errored
             // WARNING: If msg.sender is a disposable address such as a session key, make sure to remove ETH from it
