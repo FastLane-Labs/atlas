@@ -80,9 +80,10 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             }
         }
 
-        if (dConfig.callConfig.needsPreOpsReturnData() && dConfig.callConfig.needsUserReturnData()) {
-            // Max one of preOps or userOp return data can be tracked, not both
-            return ValidCallsResult.InvalidCallConfig;
+        // Check if the call configuration is valid
+        ValidCallsResult _verifyCallConfigResult = _verifyCallConfig(dConfig.callConfig);
+        if (_verifyCallConfigResult != ValidCallsResult.Valid) {
+            return _verifyCallConfigResult;
         }
 
         // CASE: Solvers trust app to update content of UserOp after submission of solverOp
@@ -131,12 +132,6 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             if (dConfig.callConfig != userOp.callConfig) {
                 return ValidCallsResult.CallConfigMismatch;
             }
-        }
-
-        // Check if the call configuration is valid
-        ValidCallsResult _verifyCallConfigResult = _verifyCallConfig(dConfig.callConfig);
-        if (_verifyCallConfigResult != ValidCallsResult.Valid) {
-            return _verifyCallConfigResult;
         }
 
         // Some checks are only needed when call is not a simulation
@@ -219,13 +214,18 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     /// @param callConfig The call configuration to verify.
     /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
     function _verifyCallConfig(uint32 callConfig) internal pure returns (ValidCallsResult) {
+        if (CallBits.needsPreOpsReturnData(callConfig) && CallBits.needsUserReturnData(callConfig)) {
+            // Max one of preOps or userOp return data can be tracked, not both
+            return ValidCallsResult.InvalidCallConfig;
+        }
+
         CallConfig memory _decodedCallConfig = CallBits.decodeCallConfig(callConfig);
         if (_decodedCallConfig.userNoncesSequential && _decodedCallConfig.dappNoncesSequential) {
             // Max one of user or dapp nonces can be sequential, not both
             return ValidCallsResult.BothUserAndDAppNoncesCannotBeSequential;
         }
         if (_decodedCallConfig.invertBidValue && _decodedCallConfig.exPostBids) {
-            // If both invertBidValue and exPostBids are true, solver's retreived bid cannot be determined
+            // If both invertBidValue and exPostBids are true, solver's retrieved bid cannot be determined
             return ValidCallsResult.InvertBidValueCannotBeExPostBids;
         }
         return ValidCallsResult.Valid;
