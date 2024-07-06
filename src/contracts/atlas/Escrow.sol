@@ -59,22 +59,23 @@ abstract contract Escrow is AtlETH {
             )
         );
 
-        if (!_success) {
-            if (ctx.isSimulation) revert PreOpsSimFail();
-            revert PreOpsFail();
+        if (_success) {
+            if (dConfig.callConfig.needsPreOpsReturnData()) {
+                return abi.decode(_data, (bytes));
+            } else {
+                return new bytes(0);
+            }
         }
 
-        if (dConfig.callConfig.needsPreOpsReturnData()) {
-            return abi.decode(_data, (bytes));
-        } else {
-            return new bytes(0);
-        }
+        if (ctx.isSimulation) revert PreOpsSimFail();
+        revert PreOpsFail();
     }
 
     /// @notice Executes the user operation logic defined in the Execution Environment.
     /// @param ctx Metacall context data from the Context struct.
     /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
     /// @param userOp UserOperation struct containing the user's transaction data.
+    /// @param returnData Data returned from previous call phases.
     /// @return userData Data returned from executing the UserOperation, if the call was successful.
     function _executeUserOperation(
         Context memory ctx,
@@ -106,10 +107,10 @@ abstract contract Escrow is AtlETH {
             } else {
                 return returnData;
             }
-        } else {
-            if (ctx.isSimulation) revert UserOpSimFail();
-            revert UserOpFail();
         }
+        // revert for failed
+        if (ctx.isSimulation) revert UserOpSimFail();
+        revert UserOpFail();
     }
 
     /// @notice Attempts to execute a SolverOperation and determine if it wins the auction.
