@@ -340,7 +340,7 @@ abstract contract GasAccounting is SafetyLocks {
     /// @notice Settle makes the final adjustments to accounting variables based on gas used in the metacall. AtlETH is
     /// either taken (via _assign) or given (via _credit) to the winning solver, the bundler is sent the appropriate
     /// refund for gas spent, and Atlas' gas surcharge is updated.
-    /// @param ctx Context struct containing relavent context information for the Atlas auction.
+    /// @param ctx Context struct containing relevant context information for the Atlas auction.
     /// @param solverGasLimit The dApp's maximum gas limit for a solver, as set in the DAppConfig.
     /// @return claimsPaidToBundler The amount of ETH paid to the bundler in this function.
     /// @return netAtlasGasSurcharge The net gas surcharge of the metacall, taken by Atlas.
