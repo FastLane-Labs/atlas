@@ -134,7 +134,7 @@ contract DAppIntegration {
         bytes32 _signatoryKey = keccak256(abi.encodePacked(control, signatory));
 
         // Check if the signatory exists
-        if (!S_signatories[_signatoryKey]) revert AtlasErrors.DAppNotEnabled();
+        if (!S_signatories[_signatoryKey]) revert AtlasErrors.InvalidSignatory();
 
         // Remove the signatory from the mapping
         delete S_signatories[_signatoryKey];
