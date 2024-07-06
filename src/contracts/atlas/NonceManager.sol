@@ -167,6 +167,11 @@ contract NonceManager is AtlasConstants {
         while (true) {
             uint256 _bitmap = S_userNonSequentialNonceTrackers[user][wordIndex];
 
+            // Compensate for missing nonce 0
+            if (wordIndex == 0) {
+                _bitmap |= 1;
+            }
+
             if (_bitmap == type(uint256).max) {
                 // Full bitmap, move to the next word
                 ++wordIndex;
