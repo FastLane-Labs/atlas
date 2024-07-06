@@ -150,7 +150,7 @@ abstract contract Escrow is AtlETH {
         if (_result.canExecute()) {
             uint256 _gasLimit;
             // Verify gasLimit again
-            (_result, _gasLimit) = _validateSolverOpGas(dConfig, solverOp, _gasWaterMark);
+            (_result, _gasLimit) = _validateSolverOpGas(dConfig, solverOp, _gasWaterMark, _result);
             _result |= _validateSolverOpDeadline(solverOp, dConfig);
 
             if (dConfig.callConfig.allowsTrustedOpHash()) {
@@ -267,6 +267,7 @@ abstract contract Escrow is AtlETH {
     /// @param solverOp The SolverOperation being validated.
     /// @param gasWaterMark The initial gas measurement before validation begins, used to ensure enough gas remains for
     /// validation logic.
+    /// @param result The current result bitmap, which will be updated with the outcome of the gas validation checks.
     /// @return result Updated result flags after performing the validation checks, including any new errors
     /// encountered.
     /// @return gasLimit The calculated gas limit for the SolverOperation, considering the operation's gas usage and
@@ -274,27 +275,28 @@ abstract contract Escrow is AtlETH {
     function _validateSolverOpGas(
         DAppConfig memory dConfig,
         SolverOperation calldata solverOp,
-        uint256 gasWaterMark
+        uint256 gasWaterMark,
+        uint256 result
     )
         internal
         view
-        returns (uint256 result, uint256 gasLimit)
+        returns (uint256, uint256 gasLimit)
     {
         if (gasWaterMark < _VALIDATION_GAS_LIMIT + dConfig.solverGasLimit) {
             // Make sure to leave enough gas for dApp validation calls
-            return (1 << uint256(SolverOutcome.UserOutOfGas), gasLimit); // gasLimit = 0
+            result |= 1 << uint256(SolverOutcome.UserOutOfGas);
+            return (result, gasLimit); // gasLimit = 0
         }
 
         if (solverOp.deadline != 0 && block.number > solverOp.deadline) {
-            return (
-                1
-                    << (
-                        dConfig.callConfig.allowsTrustedOpHash()
-                            ? uint256(SolverOutcome.DeadlinePassedAlt)
-                            : uint256(SolverOutcome.DeadlinePassed)
-                    ),
-                gasLimit // gasLimit = 0
-            );
+            result |= 1
+                << (
+                    dConfig.callConfig.allowsTrustedOpHash()
+                        ? uint256(SolverOutcome.DeadlinePassedAlt)
+                        : uint256(SolverOutcome.DeadlinePassed)
+                );
+
+            return (result, gasLimit); // gasLimit = 0
         }
 
         gasLimit = AccountingMath.solverGasLimitScaledDown(solverOp.gas, dConfig.solverGasLimit) + _FASTLANE_GAS_BUFFER;
@@ -303,7 +305,8 @@ abstract contract Escrow is AtlETH {
 
         // Verify that we can lend the solver their tx value
         if (solverOp.value > address(this).balance) {
-            return (1 << uint256(SolverOutcome.CallValueTooHigh), gasLimit);
+            result |= 1 << uint256(SolverOutcome.CallValueTooHigh);
+            return (result, gasLimit);
         }
 
         // subtract out the gas buffer since the solver's metaTx won't use it
@@ -380,18 +383,18 @@ abstract contract Escrow is AtlETH {
         // solvers should not be on the hook for any 'on chain bid finding' gas usage.
 
         uint256 _gasWaterMark = gasleft();
+        uint256 _gasLimit;
 
         uint256 _result = VERIFICATION.verifySolverOp(
             solverOp, ctx.userOpHash, userOp.maxFeePerGas, ctx.bundler, dConfig.callConfig.allowsTrustedOpHash()
         );
 
         _result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, _result);
+        (_result, _gasLimit) = _validateSolverOpGas(dConfig, solverOp, _gasWaterMark, _result);
+        _result |= _validateSolverOpDeadline(solverOp, dConfig);
 
         // Verify the transaction.
         if (!_result.canExecute()) return 0;
-
-        uint256 _gasLimit;
-        (, _gasLimit) = _validateSolverOpGas(dConfig, solverOp, _gasWaterMark);
 
         if (dConfig.callConfig.allowsTrustedOpHash()) {
             if (!_handleAltOpHash(userOp, solverOp)) {
