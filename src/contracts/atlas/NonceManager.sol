@@ -92,9 +92,7 @@ contract NonceManager is AtlasConstants {
     function _handleSequentialNonces(uint256 lastUsedNonce, uint256 nonce) internal pure returns (bool, uint256) {
         // Nonces must increase by 1 if sequential
         if (nonce != lastUsedNonce + 1) return (false, lastUsedNonce);
-        unchecked {
-            return (true, ++lastUsedNonce);
-        }
+        return (true, nonce);
     }
 
     /// @notice The _handleNonSequentialNonces internal function handles the verification of non-sequential nonces.
