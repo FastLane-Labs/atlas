@@ -214,17 +214,16 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     /// @param callConfig The call configuration to verify.
     /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
     function _verifyCallConfig(uint32 callConfig) internal pure returns (ValidCallsResult) {
-        if (CallBits.needsPreOpsReturnData(callConfig) && CallBits.needsUserReturnData(callConfig)) {
+        if (callConfig.needsPreOpsReturnData() && callConfig.needsUserReturnData()) {
             // Max one of preOps or userOp return data can be tracked, not both
             return ValidCallsResult.InvalidCallConfig;
         }
 
-        CallConfig memory _decodedCallConfig = CallBits.decodeCallConfig(callConfig);
-        if (_decodedCallConfig.userNoncesSequential && _decodedCallConfig.dappNoncesSequential) {
+        if (callConfig.needsSequentialUserNonces() && callConfig.needsSequentialDAppNonces()) {
             // Max one of user or dapp nonces can be sequential, not both
             return ValidCallsResult.BothUserAndDAppNoncesCannotBeSequential;
         }
-        if (_decodedCallConfig.invertBidValue && _decodedCallConfig.exPostBids) {
+        if (callConfig.invertsBidValue() && callConfig.exPostBids()) {
             // If both invertBidValue and exPostBids are true, solver's retrieved bid cannot be determined
             return ValidCallsResult.InvertBidValueCannotBeExPostBids;
         }
