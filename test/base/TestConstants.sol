@@ -8,6 +8,12 @@ import { IUniswapV2Pair } from "src/contracts/examples/v2-example/interfaces/IUn
 contract TestConstants {
     uint256 public constant BLOCK_START = 17_441_786;
 
+    uint256 public constant DEFAULT_ESCROW_DURATION = 64;
+    uint256 public constant DEFAULT_ATLAS_SURCHARGE_RATE = 1_000_000; // out of 10_000_000 = 10%
+    uint256 public constant DEFAULT_BUNDLER_SURCHARGE_RATE = 1_000_000; // out of 10_000_000 = 10%
+    uint256 public constant DEFAULT_SCALE = 10_000_000; // out of 10_000_000 = 100%
+    uint256 public constant DEFAULT_FIXED_GAS_OFFSET = 100_000;
+
     // Structs
     struct ChainVars {
         string rpcUrlKey;
