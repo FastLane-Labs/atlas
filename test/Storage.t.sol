@@ -4,6 +4,8 @@ pragma solidity 0.8.25;
 import "forge-std/Test.sol";
 
 import { Storage } from "src/contracts/atlas/Storage.sol";
+import "src/contracts/types/LockTypes.sol";
+
 import { BaseTest } from "test/base/BaseTest.t.sol";
 
 contract StorageTest is BaseTest {
@@ -117,14 +119,181 @@ contract StorageTest is BaseTest {
 
     // Transient Storage Getters and Setters
 
+    function test_storage_transient_lock() public {
+        (address activeEnv, uint32 callConfig, uint8 phase) = atlas.lock();
 
+        assertEq(activeEnv, address(0), "activeEnv should start at 0");
+        assertEq(callConfig, 0, "callConfig should start at 0");
+        assertEq(phase, 0, "phase should start at 0");
 
+        atlas.setLock(Lock(address(1), 2, 3));
+        (activeEnv, callConfig, phase) = atlas.lock();
 
+        assertEq(activeEnv, address(1), "activeEnv should be 1");
+        assertEq(callConfig, 2, "callConfig should be 2");
+        assertEq(phase, 3, "phase should be 3");
 
+        atlas.clearTransientStorage();
+        (activeEnv, callConfig, phase) = atlas.lock();
+
+        assertEq(activeEnv, address(0), "activeEnv should be 0 again");
+        assertEq(callConfig, 0, "callConfig should be 0 again");
+        assertEq(phase, 0, "phase should be 0 again");
+    }
+
+    function test_storage_transient_isUnlocked() public {
+        assertEq(atlas.isUnlocked(), true, "isUnlocked should start as true");
+
+        atlas.setLock(Lock(address(1), 0, 0));
+        assertEq(atlas.isUnlocked(), false, "isUnlocked should be false");
+
+        atlas.clearTransientStorage();
+        assertEq(atlas.isUnlocked(), true, "isUnlocked should be true");
+    }
+
+    function test_storage_transient_solverLockData() public {
+        // MockStorage just used here to access AtlasConstants
+        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0));
+        (address currentSolver, bool calledBack, bool fulfilled) = atlas.solverLockData();
+
+        assertEq(currentSolver, address(0), "currentSolver should start at 0");
+        assertEq(calledBack, false, "calledBack should start as false");
+        assertEq(fulfilled, false, "fulfilled should start as false");
+
+        uint256 testSolverLock = mockStorage.SOLVER_CALLED_BACK_MASK();
+        atlas.setSolverLock(testSolverLock);
+        (currentSolver, calledBack, fulfilled) = atlas.solverLockData();
+
+        assertEq(currentSolver, address(0), "currentSolver should still be 0");
+        assertEq(calledBack, true, "calledBack should be true");
+        assertEq(fulfilled, false, "fulfilled should still be false");
+
+        testSolverLock = mockStorage.SOLVER_CALLED_BACK_MASK() | mockStorage.SOLVER_FULFILLED_MASK();
+        atlas.setSolverLock(testSolverLock);
+        (currentSolver, calledBack, fulfilled) = atlas.solverLockData();
+
+        assertEq(currentSolver, address(0), "currentSolver should still be 0");
+        assertEq(calledBack, true, "calledBack should still be true");
+        assertEq(fulfilled, true, "fulfilled should be true");
+
+        testSolverLock = mockStorage.SOLVER_CALLED_BACK_MASK() | mockStorage.SOLVER_FULFILLED_MASK() | uint256(uint160(userEOA));
+        atlas.setSolverLock(testSolverLock);
+        (currentSolver, calledBack, fulfilled) = atlas.solverLockData();
+
+        assertEq(currentSolver, userEOA, "currentSolver should be userEOA");
+        assertEq(calledBack, true, "calledBack should still be true");
+        assertEq(fulfilled, true, "fulfilled should still be true");
+
+        atlas.clearTransientStorage();
+        (currentSolver, calledBack, fulfilled) = atlas.solverLockData();
+
+        assertEq(currentSolver, address(0), "currentSolver should be 0 again");
+        assertEq(calledBack, false, "calledBack should be false again");
+        assertEq(fulfilled, false, "fulfilled should be false again");
+    }
+
+    function test_storage_transient_claims() public {
+        assertEq(atlas.claims(), 0, "claims should start at 0");
+
+        atlas.setClaims(100);
+        assertEq(atlas.claims(), 100, "claims should be 100");
+
+        atlas.clearTransientStorage();
+        assertEq(atlas.claims(), 0, "claims should be 0 again");
+    }
+
+    function test_storage_transient_fees() public {
+        assertEq(atlas.fees(), 0, "fees should start at 0");
+
+        atlas.setFees(100);
+        assertEq(atlas.fees(), 100, "fees should be 100");
+
+        atlas.clearTransientStorage();
+        assertEq(atlas.fees(), 0, "fees should be 0 again");
+    }
+
+    function test_storage_transient_writeoffs() public {
+        assertEq(atlas.writeoffs(), 0, "writeoffs should start at 0");
+
+        atlas.setWriteoffs(100);
+        assertEq(atlas.writeoffs(), 100, "writeoffs should be 100");
+
+        atlas.clearTransientStorage();
+        assertEq(atlas.writeoffs(), 0, "writeoffs should be 0 again");
+    }
+
+    function test_storage_transient_withdrawals() public {
+        assertEq(atlas.withdrawals(), 0, "withdrawals should start at 0");
+
+        atlas.setWithdrawals(100);
+        assertEq(atlas.withdrawals(), 100, "withdrawals should be 100");
+
+        atlas.clearTransientStorage();
+        assertEq(atlas.withdrawals(), 0, "withdrawals should be 0 again");
+    }
+
+    function test_storage_transient_deposits() public {
+        assertEq(atlas.deposits(), 0, "deposits should start at 0");
+
+        atlas.setDeposits(100);
+        assertEq(atlas.deposits(), 100, "deposits should be 100");
+
+        atlas.clearTransientStorage();
+        assertEq(atlas.deposits(), 0, "deposits should be 0 again");
+    }
+
+    function test_storage_transient_solverTo() public {
+        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0));
+        assertEq(mockStorage.solverTo(), address(0), "solverTo should start at 0");
+
+        mockStorage.setSolverTo(userEOA);
+        assertEq(mockStorage.solverTo(), userEOA, "solverTo should be userEOA");
+
+        mockStorage.clearTransientStorage();
+        assertEq(mockStorage.solverTo(), address(0), "solverTo should be 0 again");
+    }
+
+    function test_storage_transient_activeEnvironment() public {
+        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0));
+        assertEq(mockStorage.activeEnvironment(), address(0), "activeEnvironment should start at 0");
+
+        mockStorage.setLock(Lock(address(1), 0, 0));
+        assertEq(mockStorage.activeEnvironment(), address(1), "activeEnvironment should be 1");
+
+        mockStorage.clearTransientStorage();
+        assertEq(mockStorage.activeEnvironment(), address(0), "activeEnvironment should be 0 again");
+    }
+
+    function test_storage_transient_activeCallConfig() public {
+        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0));
+        assertEq(mockStorage.activeCallConfig(), 0, "activeCallConfig should start at 0");
+
+        mockStorage.setLock(Lock(address(0), 1, 0));
+        assertEq(mockStorage.activeCallConfig(), 1, "activeCallConfig should be 1");
+
+        mockStorage.clearTransientStorage();
+        assertEq(mockStorage.activeCallConfig(), 0, "activeCallConfig should be 0 again");
+    }
+
+    function test_storage_transient_phase() public {
+        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0));
+        assertEq(mockStorage.phase(), 0, "phase should start at 0");
+
+        mockStorage.setLock(Lock(address(0), 0, 1));
+        assertEq(mockStorage.phase(), 1, "phase should be 1");
+
+        mockStorage.clearTransientStorage();
+        assertEq(mockStorage.phase(), 0, "phase should be 0 again");
+    }
 }
 
 // To test solverOpHashes() and cumulativeSurcharge() view function
 contract MockStorage is Storage {
+
+    // For solverLockData test
+    uint256 public constant SOLVER_CALLED_BACK_MASK = _SOLVER_CALLED_BACK_MASK;
+    uint256 public constant SOLVER_FULFILLED_MASK = _SOLVER_FULFILLED_MASK;
+
     constructor(
         uint256 escrowDuration,
         address verification,
@@ -140,5 +309,44 @@ contract MockStorage is Storage {
 
     function setCumulativeSurcharge(uint256 surcharge) public {
         S_cumulativeSurcharge = surcharge;
+    }
+
+    // For internal view functions without external versions
+
+    function solverTo() public view returns (address) {
+        return _solverTo();
+    }
+
+    function setSolverTo(address newSolverTo) public {
+        _setSolverTo(newSolverTo);
+    }
+
+    function activeEnvironment() public view returns (address) {
+        return _activeEnvironment();
+    }
+
+    function activeCallConfig() public view returns (uint32) {
+        return _activeCallConfig();
+    }
+
+    function phase() public view returns (uint8) {
+        return _phase();
+    }
+
+    // Setter for the above 3 view functions
+    function setLock(Lock memory newLock) public {
+        _setLock(newLock);
+    }
+
+    // To clear all transient storage vars
+    function clearTransientStorage() public {
+        _setLock(Lock(address(0), 0, 0));
+        _setSolverLock(0);
+        _setSolverTo(address(0));
+        _setClaims(0);
+        _setFees(0);
+        _setWriteoffs(0);
+        _setWithdrawals(0);
+        _setDeposits(0);
     }
 }
