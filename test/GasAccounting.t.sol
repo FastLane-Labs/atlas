@@ -1,26 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import "forge-std/Test.sol";
-
 import { GasAccounting } from "src/contracts/atlas/GasAccounting.sol";
-
-import "src/contracts/libraries/AccountingMath.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
-import { AtlasConstants } from "src/contracts/types/AtlasConstants.sol";
-
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
-import { IL2GasCalculator } from "src/contracts/interfaces/IL2GasCalculator.sol";
-
+import "src/contracts/libraries/AccountingMath.sol";
 import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
 import "src/contracts/types/SolverOperation.sol";
 import "src/contracts/types/ConfigTypes.sol";
 
+import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
+
 import { TestAtlas } from "test/base/TestAtlas.sol";
 import { BaseTest } from "test/base/BaseTest.t.sol";
-import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
 
 contract MockGasAccounting is TestAtlas, BaseTest {
     uint256 public constant MOCK_SOLVER_GAS_LIMIT = 500_000;
