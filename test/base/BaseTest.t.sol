@@ -85,7 +85,7 @@ contract BaseTest is Test, TestConstants {
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
 
         atlas = new TestAtlas({
-            escrowDuration: 64,
+            escrowDuration: DEFAULT_ESCROW_DURATION,
             verification: expectedAtlasVerificationAddr,
             simulator: address(simulator),
             executionTemplate: address(execEnvTemplate),
