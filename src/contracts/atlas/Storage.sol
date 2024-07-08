@@ -41,11 +41,11 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     bytes32 private constant _T_DEPOSITS_SLOT = keccak256("DEPOSITS");
 
     // AtlETH storage
-    uint256 public S_totalSupply;
-    uint256 public S_bondedTotalSupply;
+    uint256 internal S_totalSupply;
+    uint256 internal S_bondedTotalSupply;
 
     mapping(address => EscrowAccountBalance) internal s_balanceOf; // public balanceOf will return a uint256
-    mapping(address => EscrowAccountAccessData) public S_accessData;
+    mapping(address => EscrowAccountAccessData) internal S_accessData;
     mapping(bytes32 => bool) internal S_solverOpHashes; // NOTE: Only used for when allowTrustedOpHash is enabled
 
     // atlETH GasAccounting storage
