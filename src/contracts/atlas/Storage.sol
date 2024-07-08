@@ -31,14 +31,14 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint256 public constant FIXED_GAS_OFFSET = AccountingMath._FIXED_GAS_OFFSET;
 
     // Transient storage slots
-    bytes32 private constant _T_LOCK_SLOT = keccak256("LOCK");
-    bytes32 private constant _T_SOLVER_LOCK_SLOT = keccak256("SOLVER_LOCK");
-    bytes32 private constant _T_SOLVER_TO_SLOT = keccak256("SOLVER_TO");
-    bytes32 private constant _T_CLAIMS_SLOT = keccak256("CLAIMS");
-    bytes32 private constant _T_FEES_SLOT = keccak256("FEES");
-    bytes32 private constant _T_WRITEOFFS_SLOT = keccak256("WRITEOFFS");
-    bytes32 private constant _T_WITHDRAWALS_SLOT = keccak256("WITHDRAWALS");
-    bytes32 private constant _T_DEPOSITS_SLOT = keccak256("DEPOSITS");
+    bytes32 private constant _T_LOCK_SLOT = keccak256("ATLAS_LOCK");
+    bytes32 private constant _T_SOLVER_LOCK_SLOT = keccak256("ATLAS_SOLVER_LOCK");
+    bytes32 private constant _T_SOLVER_TO_SLOT = keccak256("ATLAS_SOLVER_TO");
+    bytes32 private constant _T_CLAIMS_SLOT = keccak256("ATLAS_CLAIMS");
+    bytes32 private constant _T_FEES_SLOT = keccak256("ATLAS_FEES");
+    bytes32 private constant _T_WRITEOFFS_SLOT = keccak256("ATLAS_WRITEOFFS");
+    bytes32 private constant _T_WITHDRAWALS_SLOT = keccak256("ATLAS_WITHDRAWALS");
+    bytes32 private constant _T_DEPOSITS_SLOT = keccak256("ATLAS_DEPOSITS");
 
     // AtlETH storage
     uint256 internal S_totalSupply;
@@ -205,14 +205,14 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     //                   Transient Setters                  //
     // ---------------------------------------------------- //
 
-    function _setLock(Lock memory newLock) internal {
+    function _setLock(address activeEnvironment, uint32 callConfig, uint8 phase) internal {
         // Pack the lock slot from the right:
         // [   56 bits   ][     160 bits      ][  32 bits   ][ 8 bits ]
         // [ unused bits ][ activeEnvironment ][ callConfig ][ phase  ]
         _tstore(
             _T_LOCK_SLOT,
-            bytes32(uint256(uint160(newLock.activeEnvironment))) << 40 | bytes32(uint256(newLock.callConfig)) << 8
-                | bytes32(uint256(newLock.phase))
+            bytes32(uint256(uint160(activeEnvironment))) << 40 | bytes32(uint256(callConfig)) << 8
+                | bytes32(uint256(phase))
         );
     }
 

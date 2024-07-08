@@ -42,11 +42,11 @@ contract MockSafetyLocks is SafetyLocks {
     }
 
     function setLock(address _activeEnvironment) external {
-        _setLock(Lock({
+        _setLock({
             activeEnvironment: _activeEnvironment,
             phase: uint8(ExecutionPhase.Uninitialized),
             callConfig: uint32(0)
-        }));
+        });
     }
 
     function setClaims(uint256 _claims) external {

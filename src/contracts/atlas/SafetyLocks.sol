@@ -32,15 +32,11 @@ abstract contract SafetyLocks is Storage {
         if (!_isUnlocked()) revert AlreadyInitialized();
 
         // Initialize the Lock
-        _setLock(
-            Lock({
-                activeEnvironment: executionEnvironment,
-                callConfig: dConfig.callConfig,
-                phase: dConfig.callConfig.needsPreOpsCall()
-                    ? uint8(ExecutionPhase.PreOps)
-                    : uint8(ExecutionPhase.UserOperation)
-            })
-        );
+        _setLock({
+            activeEnvironment: executionEnvironment,
+            callConfig: dConfig.callConfig,
+            phase: dConfig.callConfig.needsPreOpsCall() ? uint8(ExecutionPhase.PreOps) : uint8(ExecutionPhase.UserOperation)
+        });
     }
 
     modifier withLockPhase(ExecutionPhase executionPhase) {

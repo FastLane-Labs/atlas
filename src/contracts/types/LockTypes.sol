@@ -1,12 +1,6 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.25;
 
-struct Lock {
-    address activeEnvironment;
-    uint32 callConfig;
-    uint8 phase;
-}
-
 struct Context {
     bytes32 userOpHash; // not packed
     address executionEnvironment; // not packed
