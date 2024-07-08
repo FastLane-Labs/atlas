@@ -264,7 +264,7 @@ contract Atlas is Escrow, Factory {
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param returnData Return data from the preOps and userOp calls.
-    /// @return The winning bid amount.
+    /// @return The winning bid amount or 0 when no solverOps.
     function _bidKnownIteration(
         Context memory ctx,
         DAppConfig memory dConfig,
