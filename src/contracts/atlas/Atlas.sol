@@ -101,8 +101,8 @@ contract Atlas is Escrow, Factory {
             if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
         }
 
-        // The environment lock is explicitly released here to allow multiple metacalls in a single transaction
-        _setLock(address(0), 0, 0);
+        // The environment lock is explicitly released here to allow multiple metacalls in a single transaction.
+        _releaseLock();
     }
 
     /// @notice execute is called above, in a try-catch block in metacall.

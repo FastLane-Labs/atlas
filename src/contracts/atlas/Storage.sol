@@ -198,7 +198,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     }
 
     function _isUnlocked() internal view returns (bool) {
-        return _tload(_T_LOCK_SLOT) == bytes32(0);
+        return _tload(_T_LOCK_SLOT) == bytes32(_UNLOCKED);
     }
 
     // ---------------------------------------------------- //
@@ -214,6 +214,10 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
             bytes32(uint256(uint160(activeEnvironment))) << 40 | bytes32(uint256(callConfig)) << 8
                 | bytes32(uint256(phase))
         );
+    }
+
+    function _releaseLock() internal {
+        _tstore(_T_LOCK_SLOT, bytes32(_UNLOCKED));
     }
 
     // Sets the Lock phase without changing the activeEnvironment or callConfig.

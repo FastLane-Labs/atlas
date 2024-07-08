@@ -37,7 +37,16 @@ abstract contract GasAccounting is SafetyLocks {
         // Atlas surcharge is based on the raw claims value.
         _setFees(_rawClaims.getAtlasSurcharge());
         _setDeposits(msg.value);
-        // writeoffs and withdrawawls transient storage variables are already 0
+
+        // Explicitly set writeoffs and withdrawals to 0 in case multiple metacalls in single tx.
+        _setWriteoffs(0);
+        _setWithdrawals(0);
+
+        // Explicitly clear solverLock and solverTo in case multiple metacalls in single tx.
+        _setSolverLock(0);
+        _setSolverTo(address(0));
+
+        // The Lock slot is cleared at the end of the metacall, so no need to zero again here.
     }
 
     /// @notice Contributes ETH to the contract, increasing the deposits if a non-zero value is sent.
