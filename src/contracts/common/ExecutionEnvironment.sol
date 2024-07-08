@@ -106,10 +106,9 @@ contract ExecutionEnvironment is Base {
         bytes memory _data = _forward(abi.encodeCall(IDAppControl.postOpsCall, (solved, returnData)));
 
         bool _success;
-        (_success, _data) = _control().delegatecall(_data);
+        (_success,) = _control().delegatecall(_data);
 
         if (!_success) revert AtlasErrors.PostOpsDelegatecallFail();
-        if (!abi.decode(_data, (bool))) revert AtlasErrors.PostOpsDelegatecallReturnedFalse();
     }
 
     /// @notice The solverPreTryCatch function is called by Atlas to execute the preSolverCall part of each
