@@ -16,8 +16,13 @@ import "src/contracts/types/LockTypes.sol";
 import "src/contracts/types/SolverOperation.sol";
 import "src/contracts/types/ConfigTypes.sol";
 
-contract MockGasAccounting is GasAccounting, Test {
+import { TestAtlas } from "test/base/TestAtlas.sol";
+import { BaseTest } from "test/base/BaseTest.t.sol";
+import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
+
+contract MockGasAccounting is TestAtlas, BaseTest {
     uint256 public constant MOCK_SOLVER_GAS_LIMIT = 500_000;
+
     constructor(
         uint256 _escrowDuration,
         address _verification,
@@ -28,7 +33,7 @@ contract MockGasAccounting is GasAccounting, Test {
         GasAccounting(_escrowDuration, _verification, _simulator, _surchargeRecipient, _l2GasCalculator)
     { }
 
-    function balanceOf(address account) external view returns (uint112, uint112) {
+    function _balanceOf(address account) external view returns (uint112, uint112) {
         return (s_balanceOf[account].balance, s_balanceOf[account].unbonding);
     }
 
@@ -70,7 +75,11 @@ contract MockGasAccounting is GasAccounting, Test {
         bool paymentsSuccessful,
         uint256 winningSolverIndex,
         uint256 solverCount
-    ) public view returns (Context memory ctx) {
+    )
+        public
+        view
+        returns (Context memory ctx)
+    {
         ctx = Context({
             executionEnvironment: _activeEnvironment(),
             userOpHash: bytes32(0),
@@ -140,46 +149,58 @@ contract MockGasCalculator is IL2GasCalculator, Test {
     }
 }
 
-contract GasAccountingTest is AtlasConstants, Test {
+contract GasAccountingTest is AtlasConstants, BaseTes {
     MockGasAccounting public mockGasAccounting;
-    address executionEnvironment = makeAddr("executionEnvironment");
-
     uint256 gasMarker;
     uint256 initialClaims;
     SolverOperation solverOp;
+    address executionEnvironment = makeAddr("executionEnvironment");
 
-    function setUp() public {
-        mockGasAccounting = new MockGasAccounting(0, address(0), address(0), address(0), address(0));
-        uint256 _gasMarker = gasleft();
+    function setUp() public override {
+        // Run the base setup
+        super.setUp();
 
-        mockGasAccounting.initializeLock(executionEnvironment, _gasMarker, 0);
+        mockGasAccounting = new MockGasAccounting(
+            DEFAULT_ESCROW_DURATION,
+            address(atlasVerification),
+            address(simulator),
+            payee,
+            address(new ExecutionEnvironment(address(atlas)))
+        );
 
-        initialClaims = getInitialClaims(_gasMarker);
+        gasMarker = gasleft();
+        mockGasAccounting.initializeLock{ value: 0 }(executionEnvironment, gasMarker, 0);
+        initialClaims = getInitialClaims(gasMarker);
         solverOp.from = makeAddr("solver");
+
+        // Initialize TestAtlas storage slots
+        initializeTestAtlasSlots();
+    }
+
+    function initializeTestAtlasSlots() internal {
+        mockGasAccounting.clearTransientStorage();
+        mockGasAccounting.setLock(Lock(address(0), 0, 0));
+        mockGasAccounting.setSolverLock(0);
+        mockGasAccounting.setSolverTo(address(0));
+        mockGasAccounting.setClaims(0);
+        mockGasAccounting.setFees(0);
+        mockGasAccounting.setWriteoffs(0);
+        mockGasAccounting.setWithdrawals(0);
+        mockGasAccounting.setDeposits(0);
     }
 
     function getInitialClaims(uint256 _gasMarker) public view returns (uint256 claims) {
         uint256 rawClaims = (_gasMarker + mockGasAccounting.FIXED_GAS_OFFSET()) * tx.gasprice;
-        claims = rawClaims * (
-            mockGasAccounting.SCALE() + mockGasAccounting.ATLAS_SURCHARGE_RATE() + mockGasAccounting.BUNDLER_SURCHARGE_RATE()
-        ) / mockGasAccounting.SCALE();
-    }
-
-    function initEscrowLock(uint256 metacallValue) public {
-        mockGasAccounting.initializeLock{value: metacallValue}(executionEnvironment, gasMarker, 0);
-        uint256 rawClaims = (gasMarker + mockGasAccounting.FIXED_GAS_OFFSET()) * tx.gasprice;
-        initialClaims = rawClaims * (
-            mockGasAccounting.SCALE() + mockGasAccounting.ATLAS_SURCHARGE_RATE() + mockGasAccounting.BUNDLER_SURCHARGE_RATE()
-        ) / mockGasAccounting.SCALE();
+        claims = rawClaims
+            * (
+                mockGasAccounting.SCALE() + mockGasAccounting.ATLAS_SURCHARGE_RATE()
+                    + mockGasAccounting.BUNDLER_SURCHARGE_RATE()
+            ) / mockGasAccounting.SCALE();
     }
 
     function test_contribute() public {
-        // FIXME: fix before merging spearbit-reaudit branch
         vm.skip(true);
-
-        vm.expectRevert(
-            abi.encodeWithSelector(AtlasErrors.InvalidExecutionEnvironment.selector, executionEnvironment)
-        );
+        vm.expectRevert(abi.encodeWithSelector(AtlasErrors.InvalidExecutionEnvironment.selector, executionEnvironment));
         mockGasAccounting.contribute();
 
         uint256 contributeValue = 1000;
@@ -193,20 +214,14 @@ contract GasAccountingTest is AtlasConstants, Test {
     }
 
     function test_borrow() public {
-        // FIXME: fix before merging spearbit-reaudit branch
         vm.skip(true);
-
         uint256 borrowedAmount = 5000;
 
-        vm.expectRevert(
-            abi.encodeWithSelector(AtlasErrors.InvalidExecutionEnvironment.selector, executionEnvironment)
-        );
+        vm.expectRevert(abi.encodeWithSelector(AtlasErrors.InvalidExecutionEnvironment.selector, executionEnvironment));
         mockGasAccounting.borrow(borrowedAmount);
 
         vm.prank(executionEnvironment);
-        vm.expectRevert(
-            abi.encodeWithSelector(AtlasErrors.InsufficientAtlETHBalance.selector, 0, borrowedAmount)
-        );
+        vm.expectRevert(abi.encodeWithSelector(AtlasErrors.InsufficientAtlETHBalance.selector, 0, borrowedAmount));
         mockGasAccounting.borrow(borrowedAmount);
 
         deal(
@@ -221,10 +236,7 @@ contract GasAccountingTest is AtlasConstants, Test {
     }
 
     function test_borrow_phasesEnforced() public {
-        // FIXME: fix before merging spearbit-reaudit branch
         vm.skip(true);
-        // borrow should revert if called in or after PostSolver phase
-
         uint256 borrowedAmount = 1e18;
         deal(address(mockGasAccounting), borrowedAmount);
         assertEq(executionEnvironment.balance, 0, "EE should start with 0 ETH");
@@ -281,9 +293,7 @@ contract GasAccountingTest is AtlasConstants, Test {
     }
 
     function test_multipleBorrows() public {
-        // FIXME: fix before merging spearbit-reaudit branch
         vm.skip(true);
-
         uint256 atlasBalance = 100 ether;
         uint256 borrow1 = 75 ether;
         uint256 borrow2 = 10 ether;
@@ -301,9 +311,7 @@ contract GasAccountingTest is AtlasConstants, Test {
     }
 
     function test_shortfall() public {
-        // FIXME: fix before merging spearbit-reaudit branch
         vm.skip(true);
-
         assertEq(mockGasAccounting.shortfall(), initialClaims);
 
         deal(executionEnvironment, initialClaims);
@@ -314,9 +322,7 @@ contract GasAccountingTest is AtlasConstants, Test {
     }
 
     function test_reconcileFail() public {
-        // FIXME: fix before merging spearbit-reaudit branch
         vm.skip(true);
-
         vm.expectRevert(AtlasErrors.WrongPhase.selector);
         mockGasAccounting.reconcile(0);
 
@@ -327,9 +333,7 @@ contract GasAccountingTest is AtlasConstants, Test {
     }
 
     function test_reconcile() public {
-        // FIXME: fix before merging spearbit-reaudit branch
         vm.skip(true);
-
         mockGasAccounting.setPhase(ExecutionPhase.SolverOperation);
         mockGasAccounting.setSolverLock(solverOp.from);
         assertTrue(mockGasAccounting.reconcile{ value: initialClaims }(0) == 0);
@@ -338,16 +342,28 @@ contract GasAccountingTest is AtlasConstants, Test {
         assertEq(currentSolver, solverOp.from);
     }
 
-    function test_assign() public {
-        // FIXME: fix before merging spearbit-reaudit branch
-        vm.skip(true);
+    function test_assign_zeroAmount() public {
+        uint256 snapshotId = vm.snapshot();
+
+        uint256 assignedAmount = 0;
+        uint256 bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
+        uint256 depositsBefore = mockGasAccounting.deposits();
+
+        mockGasAccounting.increaseBondedBalance(solverOp.from, assignedAmount * 3);
+        assertEq(mockGasAccounting.assign(solverOp.from, assignedAmount, true), 0);
+        (, uint32 lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
+        assertEq(lastAccessedBlock, uint32(block.number));
+        assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore);
+        assertEq(mockGasAccounting.deposits(), depositsBefore);
+
+        vm.revertTo(snapshotId);
+    }
+
+    function test_assign_sufficientBondedBalance() public {
+        uint256 snapshotId = vm.snapshot();
 
         uint256 assignedAmount = 1000;
-        uint256 bondedTotalSupplyBefore;
-        uint256 depositsBefore;
-        uint112 bonded;
-        uint112 unbonding;
-        uint32 lastAccessedBlock;
+        uint256 initialBondedAmount = assignedAmount * 3;
 
         bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
         depositsBefore = mockGasAccounting.getDeposits();
@@ -414,23 +430,25 @@ contract GasAccountingTest is AtlasConstants, Test {
         assertEq(unbonding, unbondingBefore);
     }
 
-    function test_assign_reputation_analytics() public {
-        uint256 gasUsedDecimalsToDrop = 1000; // This should be same value as in Storage.sol
+    function test_assign_reputationAnalytics() public {
+        uint256 snapshotId = vm.snapshot();
+
+        uint256 gasUsedDecimalsToDrop = 1000;
         uint256 assignedAmount = 1_234_567;
         uint24 auctionWins;
         uint24 auctionFails;
         uint64 totalGasUsed;
 
         mockGasAccounting.increaseBondedBalance(solverOp.from, 100e18);
-        (,,auctionWins,auctionFails,totalGasUsed) = mockGasAccounting.accessData(solverOp.from);
+        (,, auctionWins, auctionFails, totalGasUsed) = mockGasAccounting.accessData(solverOp.from);
         assertEq(auctionWins, 0, "auctionWins should start at 0");
         assertEq(auctionFails, 0, "auctionFails should start at 0");
         assertEq(totalGasUsed, 0, "totalGasUsed should start at 0");
 
         mockGasAccounting.assign(solverOp.from, assignedAmount, true);
         uint256 expectedGasUsed = assignedAmount / gasUsedDecimalsToDrop;
-            
-        (,,auctionWins,auctionFails,totalGasUsed) = mockGasAccounting.accessData(solverOp.from);
+
+        (,, auctionWins, auctionFails, totalGasUsed) = mockGasAccounting.accessData(solverOp.from);
         assertEq(auctionWins, 1, "auctionWins should be incremented by 1");
         assertEq(auctionFails, 0, "auctionFails should remain at 0");
         assertEq(totalGasUsed, expectedGasUsed, "totalGasUsed not as expected");
@@ -438,7 +456,7 @@ contract GasAccountingTest is AtlasConstants, Test {
         mockGasAccounting.assign(solverOp.from, assignedAmount, false);
         expectedGasUsed += assignedAmount / gasUsedDecimalsToDrop;
 
-        (,,auctionWins,auctionFails,totalGasUsed) = mockGasAccounting.accessData(solverOp.from);
+        (,, auctionWins, auctionFails, totalGasUsed) = mockGasAccounting.accessData(solverOp.from);
         assertEq(auctionWins, 1, "auctionWins should remain at 1");
         assertEq(auctionFails, 1, "auctionFails should be incremented by 1");
         assertEq(totalGasUsed, expectedGasUsed, "totalGasUsed not as expected");
@@ -450,17 +468,39 @@ contract GasAccountingTest is AtlasConstants, Test {
         // NOTE: This truncation only happens at values > 1.844e22 which is unrealistic for gas spent
         uint256 largeAmountOfGas = (uint256(type(uint64).max) + 2) * gasUsedDecimalsToDrop;
 
-        mockGasAccounting.increaseBondedBalance(address(12345), 1000000e18);
-        mockGasAccounting.assign(address(12345), largeAmountOfGas, false);
+        mockGasAccounting.increaseBondedBalance(address(12_345), 1_000_000e18);
+        mockGasAccounting.assign(address(12_345), largeAmountOfGas, false);
 
-        (,,,,totalGasUsed) = mockGasAccounting.accessData(address(12345));
+        (,,,, totalGasUsed) = mockGasAccounting.accessData(address(12_345));
         assertEq(totalGasUsed, 1, "totalGasUsed should be 1");
+
+        vm.revertTo(snapshotId);
+    }
+
+    function test_assign_overflow_reverts() public {
+        uint256 snapshotId = vm.snapshot();
+
+        uint256 bondedAmount = uint256(type(uint112).max) + 1e18;
+        uint256 assignedAmount = uint256(type(uint112).max) + 1;
+
+        mockGasAccounting.increaseBondedBalance(solverOp.from, bondedAmount);
+        uint256 bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
+        uint256 depositsBefore = mockGasAccounting.deposits();
+        (uint112 unbondingBefore,) = mockGasAccounting._balanceOf(solverOp.from);
+        vm.expectRevert(AtlasErrors.ValueTooLarge.selector);
+        mockGasAccounting.assign(solverOp.from, assignedAmount, true);
+
+        // Check assign reverted with overflow, and accounting values did not change
+        assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore);
+        assertEq(mockGasAccounting.deposits(), depositsBefore);
+        (uint112 unbonding,) = mockGasAccounting._balanceOf(solverOp.from);
+        assertEq(unbonding, unbondingBefore);
+
+        vm.revertTo(snapshotId);
     }
 
     function test_credit() public {
-        // FIXME: fix before merging spearbit-reaudit branch
-        vm.skip(true);
-
+        uint256 snapshotId = vm.snapshot();
         uint256 creditedAmount = 10_000;
         uint256 lastAccessedBlock;
 
@@ -484,12 +524,11 @@ contract GasAccountingTest is AtlasConstants, Test {
         uint256 overflowAmount = uint256(type(uint112).max) + 1;
         vm.expectRevert(AtlasErrors.ValueTooLarge.selector);
         mockGasAccounting.credit(solverOp.from, overflowAmount);
+        vm.revertTo(snapshotId);
     }
 
     function test_handleSolverAccounting() public {
-        // FIXME: fix before merging spearbit-reaudit branch
         vm.skip(true);
-
         solverOp.data = abi.encodePacked("calldata");
         uint256 calldataCost = (solverOp.data.length * mockGasAccounting.calldataLengthPremium()) + 1;
         uint256 gasWaterMark = gasleft() + 5000;
@@ -501,16 +540,22 @@ contract GasAccountingTest is AtlasConstants, Test {
         // FULL_REFUND
         result = EscrowBits._FULL_REFUND;
         maxGasUsed = gasWaterMark + calldataCost;
-        maxGasUsed = maxGasUsed * (mockGasAccounting.SCALE() + mockGasAccounting.ATLAS_SURCHARGE_RATE() + mockGasAccounting.BUNDLER_SURCHARGE_RATE()) / mockGasAccounting.SCALE()
-            * tx.gasprice;
+        maxGasUsed = maxGasUsed
+            * (
+                mockGasAccounting.SCALE() + mockGasAccounting.ATLAS_SURCHARGE_RATE()
+                    + mockGasAccounting.BUNDLER_SURCHARGE_RATE()
+            ) / mockGasAccounting.SCALE() * tx.gasprice;
         mockGasAccounting.increaseBondedBalance(solverOp.from, maxGasUsed);
         (bondedBefore,,,,) = mockGasAccounting.accessData(solverOp.from);
         mockGasAccounting.releaseSolverLock(solverOp, gasWaterMark, result);
         (bondedAfter,,,,) = mockGasAccounting.accessData(solverOp.from);
         assertGt(
             bondedBefore - bondedAfter,
-            calldataCost * (mockGasAccounting.SCALE() + mockGasAccounting.ATLAS_SURCHARGE_RATE() + mockGasAccounting.BUNDLER_SURCHARGE_RATE()) / mockGasAccounting.ATLAS_SURCHARGE_RATE()
-                * tx.gasprice
+            calldataCost
+                * (
+                    mockGasAccounting.SCALE() + mockGasAccounting.ATLAS_SURCHARGE_RATE()
+                        + mockGasAccounting.BUNDLER_SURCHARGE_RATE()
+                ) / mockGasAccounting.ATLAS_SURCHARGE_RATE() * tx.gasprice
         ); // Must be greater than calldataCost
         assertLt(bondedBefore - bondedAfter, maxGasUsed); // Must be less than maxGasUsed
 
