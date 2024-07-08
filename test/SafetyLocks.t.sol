@@ -27,7 +27,6 @@ contract MockSafetyLocks is SafetyLocks {
     }
 
     function buildEscrowLock(
-        DAppConfig calldata dConfig,
         address executionEnvironment,
         bytes32 userOpHash,
         address bundler,
@@ -38,7 +37,7 @@ contract MockSafetyLocks is SafetyLocks {
         pure
         returns (Context memory ctx)
     {
-        return _buildContext(dConfig, executionEnvironment, userOpHash, bundler, solverOpCount, isSimulation);
+        return _buildContext(executionEnvironment, userOpHash, bundler, solverOpCount, isSimulation);
     }
 
     function setLock(address _activeEnvironment) external {
@@ -102,10 +101,8 @@ contract SafetyLocksTest is Test {
     }
 
     function test_buildContext() public {
-        DAppConfig memory dConfig = DAppConfig({ to: address(10), callConfig: 0, bidToken: address(0), solverGasLimit: 1_000_000});
-
         safetyLocks.initializeLock(executionEnvironment, 0, 0);
-        Context memory ctx = safetyLocks.buildEscrowLock(dConfig, executionEnvironment, bytes32(0), address(0), 0, false);
+        Context memory ctx = safetyLocks.buildEscrowLock(executionEnvironment, bytes32(0), address(0), 0, false);
         assertEq(executionEnvironment, ctx.executionEnvironment);
     }
 }
