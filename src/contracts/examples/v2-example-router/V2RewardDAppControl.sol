@@ -196,9 +196,8 @@ contract V2RewardDAppControl is DAppControl {
         function and the amount sold is less than the amountInMax)
     * @param data The address of the ERC20 token the user is selling (or address(0) for ETH), that was returned by the
         _preOpsCall hook
-    * @return Boolean indicating whether the postOpsCall was successful
     */
-    function _postOpsCall(bool, bytes calldata data) internal override returns (bool) {
+    function _postOpsCall(bool, bytes calldata data) internal override {
         address tokenSold = abi.decode(data, (address));
         uint256 balance;
 
@@ -214,8 +213,6 @@ contract V2RewardDAppControl is DAppControl {
                 SafeTransferLib.safeTransfer(tokenSold, _user(), balance);
             }
         }
-
-        return true;
     }
 
     // ---------------------------------------------------- //

@@ -140,7 +140,6 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     /// @notice The postOpsCall hook which may be called as the last phase of a `metacall` transaction.
     /// @param solved Boolean indicating whether a winning SolverOperation was executed successfully.
     /// @param data Data returned from the previous call phase.
-    /// @return Boolean indicating whether the postOpsCall was successful.
     function postOpsCall(
         bool solved,
         bytes calldata data
@@ -150,9 +149,8 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         validControl
         onlyAtlasEnvironment
         onlyPhase(ExecutionPhase.PostOps)
-        returns (bool)
     {
-        return _postOpsCall(solved, data);
+        _postOpsCall(solved, data);
     }
 
     function userDelegated() external view returns (bool delegated) {

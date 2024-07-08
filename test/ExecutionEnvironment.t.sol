@@ -559,10 +559,9 @@ contract MockDAppControl is DAppControl {
         return new bytes(0);
     }
 
-    function _postOpsCall(bool, bytes calldata data) internal pure override returns (bool) {
-        (bool shouldRevert, bool returnValue) = abi.decode(data, (bool, bool));
+    function _postOpsCall(bool, bytes calldata data) internal pure override {
+        (bool shouldRevert, ) = abi.decode(data, (bool, bool));
         require(!shouldRevert, "_postSolverCall revert requested");
-        return returnValue;
     }
 
     function _preSolverCall(
