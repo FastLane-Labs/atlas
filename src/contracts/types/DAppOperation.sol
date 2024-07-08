@@ -1,12 +1,12 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 bytes32 constant DAPP_TYPEHASH = keccak256(
     "DAppOperation(address from,address to,uint256 nonce,uint256 deadline,address control,address bundler,bytes32 userOpHash,bytes32 callChainHash)"
 );
 
 struct DAppOperation {
-    address from; // EOA of signer of the DAppOperation
+    address from; // signer of the DAppOperation
     address to; // Atlas address
     uint256 nonce; // Atlas nonce of the DAppOperation available in the AtlasVerification contract
     uint256 deadline; // block.number deadline for the DAppOperation

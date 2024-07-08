@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 struct DAppConfig {
     address to; // Address of the DAppControl contract
@@ -64,9 +64,9 @@ struct CallConfig {
     bool forwardReturnData;
     // requireFulfillment: If true, a winning solver must be found, otherwise the metacall will fail.
     bool requireFulfillment;
-    // trustedOpHash: If true, the userOpHash is calculated using `getAltOperationHash` instead of the more secure
-    // `getUserOperationHash`. This implies solvers trust changes made to the userOp after signing their associated
-    // solverOps.
+    // trustedOpHash: If true, the userOpHash excludes some userOp inputs such as `value`, `gas`, `maxFeePerGas`,
+    // `nonce`, `deadline`, and `data`, implying solvers trust changes made to these parts of the userOp after signing
+    // their associated solverOps.
     bool trustedOpHash;
     // invertBidValue: If true, the solver with the lowest successful bid wins.
     bool invertBidValue;

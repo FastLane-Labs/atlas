@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import "forge-std/Test.sol";
 
@@ -70,7 +70,7 @@ contract SwapIntentTest is BaseTest {
         // atlas.deposit{value: 1e18}();
     }
 
-    function testAtlasSwapIntentWithBasicRFQ_GasCheck() public {
+    function testAtlasSwapIntentWithBasicRFQ_GasCheck_SkipCoverage() public {
         // Swap 10 WETH for 20 DAI
         UserCondition userCondition = new UserCondition();
 
@@ -146,7 +146,7 @@ contract SwapIntentTest is BaseTest {
         solverOps[0] = txBuilder.buildSolverOperation({
             userOp: userOp,
             solverOpData: solverOpData,
-            solverEOA: solverOneEOA,
+            solver: solverOneEOA,
             solverContract: address(rfqSolver),
             bidAmount: 1e18,
             value: 0
@@ -209,7 +209,7 @@ contract SwapIntentTest is BaseTest {
         assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + swapIntent.amountUserBuys, "Did not receive enough DAI");
     }
 
-    function testAtlasSwapIntentWithUniswapSolver() public {
+    function testAtlasSwapIntentWithUniswapSolver_SkipCoverage() public {
         // Swap 10 WETH for 20 DAI
         Condition[] memory conditions;
 
@@ -272,7 +272,7 @@ contract SwapIntentTest is BaseTest {
         solverOps[0] = txBuilder.buildSolverOperation({
             userOp: userOp,
             solverOpData: solverOpData,
-            solverEOA: solverOneEOA,
+            solver: solverOneEOA,
             solverContract: address(uniswapSolver),
             bidAmount: 1e18,
             value: 0

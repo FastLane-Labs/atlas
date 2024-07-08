@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import "forge-std/Test.sol";
 
-import { Atlas } from "src/contracts/atlas/Atlas.sol";
+// import { Atlas } from "src/contracts/atlas/Atlas.sol";
+import { TestAtlas } from "./TestAtlas.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
 
@@ -41,7 +42,7 @@ contract BaseTest is Test, TestConstants {
     uint256 public userPK = 44_444;
     address public userEOA = vm.addr(userPK);
 
-    Atlas public atlas;
+    TestAtlas public atlas;
     AtlasVerification public atlasVerification;
 
     Simulator public simulator;
@@ -83,8 +84,8 @@ contract BaseTest is Test, TestConstants {
         bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedAtlasAddr, "AtlasFactory 1.0"));
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
 
-        atlas = new Atlas({
-            escrowDuration: 64,
+        atlas = new TestAtlas({
+            escrowDuration: DEFAULT_ESCROW_DURATION,
             verification: expectedAtlasVerificationAddr,
             simulator: address(simulator),
             executionTemplate: address(execEnvTemplate),

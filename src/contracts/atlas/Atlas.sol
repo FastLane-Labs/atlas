@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { LibSort } from "solady/utils/LibSort.sol";
@@ -53,7 +53,7 @@ contract Atlas is Escrow, Factory {
         payable
         returns (bool auctionWon)
     {
-        uint256 _gasMarker = gasleft() + 21_000 + (msg.data.length * _CALLDATA_LENGTH_PREMIUM);
+        uint256 _gasMarker = gasleft() + _BASE_TRANSACTION_GAS_USED + (msg.data.length * _CALLDATA_LENGTH_PREMIUM);
         bool _isSimulation = msg.sender == SIMULATOR;
 
         (address _executionEnvironment, DAppConfig memory _dConfig) = _getOrCreateExecutionEnvironment(userOp);
@@ -92,6 +92,8 @@ contract Atlas is Escrow, Factory {
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
             _handleErrors(revertData, _dConfig.callConfig);
+            // Set lock to FullyLocked to prevent any reentrancy possibility
+            _setLockPhase(uint8(ExecutionPhase.FullyLocked));
 
             // Refund the msg.value to sender if it errored
             // WARNING: If msg.sender is a disposable address such as a session key, make sure to remove ETH from it
@@ -99,8 +101,8 @@ contract Atlas is Escrow, Factory {
             if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
         }
 
-        // Release the lock
-        _releaseAccountingLock();
+        // The environment lock and accounting values set above are implicitly released here as the transient storage
+        // variables are zeroed out at the end of the transaction.
     }
 
     /// @notice execute is called above, in a try-catch block in metacall.
@@ -110,7 +112,7 @@ contract Atlas is Escrow, Factory {
     /// @param executionEnvironment Address of the execution environment contract of the current metacall tx.
     /// @param bundler Address of the bundler of the current metacall tx.
     /// @param userOpHash Hash of the userOp struct of the current metacall tx.
-    /// @return ctx Context struct containing relavent context information for the Atlas auction.
+    /// @return ctx Context struct containing relevant context information for the Atlas auction.
     function execute(
         DAppConfig memory dConfig,
         UserOperation calldata userOp,
@@ -164,7 +166,7 @@ contract Atlas is Escrow, Factory {
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param returnData Return data from the preOps and userOp calls.
-    /// @return The winning bid amount.
+    /// @return The winning bid amount or 0 when no solverOps.
     function _bidFindingIteration(
         Context memory ctx,
         DAppConfig memory dConfig,
@@ -175,8 +177,10 @@ contract Atlas is Escrow, Factory {
         internal
         returns (uint256)
     {
+        uint256 solverOpsLength = solverOps.length; // computed once for efficiency
+
         // Return early if no solverOps (e.g. in simUserOperation)
-        if (solverOps.length == 0) {
+        if (solverOpsLength == 0) {
             if (ctx.isSimulation) revert SolverSimFail(0);
             if (dConfig.callConfig.needsFulfillment()) revert UserNotFulfilled();
             return 0;
@@ -184,10 +188,9 @@ contract Atlas is Escrow, Factory {
 
         ctx.bidFind = true;
 
-        uint256[] memory _bidsAndIndices = new uint256[](solverOps.length);
-        uint256 _zeroBidCount;
+        uint256[] memory _bidsAndIndices = new uint256[](solverOpsLength);
         uint256 _bidAmountFound;
-        uint256 _bidsAndIndicesLastIndex = _bidsAndIndices.length - 1; // computed once for efficiency
+        uint256 _bidsAndIndicesLastIndex = solverOpsLength - 1; // Start from the last index
 
         // First, get all bid amounts. Bids of zero are ignored by only storing non-zero bids in the array, from right
         // to left. If there are any zero bids they will end up on the left as uint(0) values - in their sorted
@@ -204,23 +207,22 @@ contract Atlas is Escrow, Factory {
         // |                                              |                         |
         // |<------------------ 240 bits ---------------->|<------- 16 bits ------->|
 
-        for (uint256 i; i < solverOps.length; ++i) {
+        for (uint256 i; i < solverOpsLength; ++i) {
             _bidAmountFound = _getBidAmount(ctx, dConfig, userOp, solverOps[i], returnData);
 
-            if (_bidAmountFound == 0 || _bidAmountFound > type(uint240).max) {
-                // Zero bids are ignored: increment _zeroBidCount offset
-                // Bids that would cause an overflow are also ignored
-                unchecked {
-                    ++_zeroBidCount;
-                }
-            } else {
+            // skip zero and overflow bid's
+            if (_bidAmountFound != 0 && _bidAmountFound <= type(uint240).max) {
                 // Non-zero bids are packed with their original solverOps index.
-                // The array is filled with non-zero bids from the right. This causes all zero bids to be on the left -
-                // in their sorted position, so fewer operations are needed in the sorting step below.
-                _bidsAndIndices[_bidsAndIndicesLastIndex - (i - _zeroBidCount)] =
-                    uint256(_bidAmountFound << _BITS_FOR_INDEX | uint16(i));
+                // The array is filled with non-zero bids from the right.
+                _bidsAndIndices[_bidsAndIndicesLastIndex] = uint256(_bidAmountFound << _BITS_FOR_INDEX | uint16(i));
+                unchecked {
+                    --_bidsAndIndicesLastIndex;
+                }
             }
         }
+
+        // Reinitialize _bidsAndIndicesLastIndex to iterate through the sorted array in descending order
+        _bidsAndIndicesLastIndex = solverOpsLength - 1;
 
         // Then, sorts the uint256 array in-place, in ascending order.
         LibSort.insertionSort(_bidsAndIndices);
@@ -228,9 +230,9 @@ contract Atlas is Escrow, Factory {
         ctx.bidFind = false;
 
         // Finally, iterate through sorted bidsAndIndices array in descending order of bidAmount.
-        for (uint256 i = _bidsAndIndicesLastIndex; i >= 0; --i) {
+        for (uint256 i = _bidsAndIndicesLastIndex;; /* breaks when 0 */ --i) {
             // Isolate the bidAmount from the packed uint256 value
-            _bidAmountFound = (_bidsAndIndices[i] >> _BITS_FOR_INDEX) & _FIRST_240_BITS_TRUE_MASK;
+            _bidAmountFound = _bidsAndIndices[i] >> _BITS_FOR_INDEX;
 
             // If we reach the zero bids on the left of array, break as all valid bids already checked.
             if (_bidAmountFound == 0) break;
@@ -275,7 +277,8 @@ contract Atlas is Escrow, Factory {
     {
         uint256 _bidAmount;
 
-        for (uint8 i = uint8(solverOps.length); ctx.solverIndex < i; ctx.solverIndex++) {
+        uint8 i = uint8(solverOps.length);
+        for (; ctx.solverIndex < i; ctx.solverIndex++) {
             SolverOperation calldata solverOp = solverOps[ctx.solverIndex];
 
             _bidAmount = _executeSolverOperation(ctx, dConfig, userOp, solverOp, solverOp.bidAmount, false, returnData);

@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 bytes32 constant SOLVER_TYPEHASH = keccak256(
     "SolverOperation(address from,address to,uint256 value,uint256 gas,uint256 maxFeePerGas,uint256 deadline,address solver,address control,bytes32 userOpHash,address bidToken,uint256 bidAmount,bytes data)"
@@ -9,7 +9,7 @@ bytes32 constant SOLVER_TYPEHASH = keccak256(
 // is stored in the `_SOLVER_OP_BASE_CALLDATA` constant in Storage.sol and must be kept up-to-date with any changes to
 // this struct.
 struct SolverOperation {
-    address from; // Solver EOA address
+    address from; // Solver address
     address to; // Atlas address
     uint256 value; // Amount of ETH required for the solver operation (used in `value` field of the solver call)
     uint256 gas; // Gas limit for the solver operation

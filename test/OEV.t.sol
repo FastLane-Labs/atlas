@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import "forge-std/Test.sol";
 
@@ -111,7 +111,7 @@ contract OEVTest is BaseTest {
     //                  Full OEV Capture Test               //
     // ---------------------------------------------------- //
 
-    function testChainlinkOEV_StandardVersion_GasCheck() public {
+    function testChainlinkOEV_StandardVersion_GasCheck_SkipCoverage() public {
         UserOperation memory userOp;
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         DAppOperation memory dAppOp;
@@ -141,7 +141,7 @@ contract OEVTest is BaseTest {
         solverOps[0] = txBuilder.buildSolverOperation({
             userOp: userOp,
             solverOpData: solverOpData,
-            solverEOA: solverOneEOA,
+            solver: solverOneEOA,
             solverContract: address(liquidationSolver),
             bidAmount: solverWinningBid,
             value: 0

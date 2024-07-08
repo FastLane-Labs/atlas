@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import "forge-std/Test.sol";
 
@@ -52,7 +52,7 @@ contract FlashLoanTest is BaseTest {
         vm.stopPrank();
     }
 
-    function testFlashLoan() public {
+    function testFlashLoan_SkipCoverage() public {
         vm.startPrank(solverOneEOA);
         SimpleSolver solver = new SimpleSolver(WETH_ADDRESS, address(atlas));
         deal(WETH_ADDRESS, address(solver), 1e18); // 1 WETH to solver to pay bid

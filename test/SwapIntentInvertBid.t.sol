@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import "forge-std/Test.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
@@ -36,7 +36,7 @@ contract SwapIntentTest is BaseTest {
         governanceEOA = vm.addr(governancePK);
     }
 
-    function testAtlasSwapIntentInvertBid_solverBidRetreivalNotRequired() public {
+    function testAtlasSwapIntentInvertBid_solverBidRetreivalNotRequired_SkipCoverage() public {
         vm.startPrank(governanceEOA);
         SwapIntentInvertBidDAppControl controlContract = new SwapIntentInvertBidDAppControl(address(atlas), false);
         address control = address(controlContract);
@@ -71,7 +71,7 @@ contract SwapIntentTest is BaseTest {
         assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + swapIntent.amountUserBuys, "Did not receive enough DAI");
     }
 
-    function testAtlasSwapIntentInvertBid_solverBidRetreivalNotRequired_multipleSolvers() public {
+    function testAtlasSwapIntentInvertBid_solverBidRetreivalNotRequired_multipleSolvers_SkipCoverage() public {
         vm.startPrank(governanceEOA);
         SwapIntentInvertBidDAppControl controlContract = new SwapIntentInvertBidDAppControl(address(atlas), false);
         address control = address(controlContract);
@@ -111,7 +111,7 @@ contract SwapIntentTest is BaseTest {
         assertEq(DAI.balanceOf(userEOA), userDaiBalanceBefore + swapIntent.amountUserBuys, "Did not receive enough DAI");
     }
 
-    function testAtlasSwapIntentInvertBid_solverBidRetreivalRequired() public {
+    function testAtlasSwapIntentInvertBid_solverBidRetreivalRequired_SkipCoverage() public {
         vm.startPrank(governanceEOA);
         SwapIntentInvertBidDAppControl controlContract = new SwapIntentInvertBidDAppControl(address(atlas), true);
         address control = address(controlContract);
@@ -216,7 +216,7 @@ contract SwapIntentTest is BaseTest {
         SolverOperation memory solverOp = txBuilder.buildSolverOperation({
             userOp: userOp,
             solverOpData: solverOpData,
-            solverEOA: solverOneEOA,
+            solver: solverOneEOA,
             solverContract: solverAddress,
             bidAmount: solverBidAmount,
             value: 0

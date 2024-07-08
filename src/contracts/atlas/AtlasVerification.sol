@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import { EIP712 } from "openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
 import { ECDSA } from "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
@@ -80,9 +80,10 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             }
         }
 
-        if (dConfig.callConfig.needsPreOpsReturnData() && dConfig.callConfig.needsUserReturnData()) {
-            // Max one of preOps or userOp return data can be tracked, not both
-            return ValidCallsResult.InvalidCallConfig;
+        // Check if the call configuration is valid
+        ValidCallsResult _verifyCallConfigResult = _verifyCallConfig(dConfig.callConfig);
+        if (_verifyCallConfigResult != ValidCallsResult.Valid) {
+            return _verifyCallConfigResult;
         }
 
         // CASE: Solvers trust app to update content of UserOp after submission of solverOp
@@ -131,12 +132,6 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             if (dConfig.callConfig != userOp.callConfig) {
                 return ValidCallsResult.CallConfigMismatch;
             }
-        }
-
-        // Check if the call configuration is valid
-        ValidCallsResult _verifyCallConfigResult = _verifyCallConfig(dConfig.callConfig);
-        if (_verifyCallConfigResult != ValidCallsResult.Valid) {
-            return _verifyCallConfigResult;
         }
 
         // Some checks are only needed when call is not a simulation
@@ -219,13 +214,17 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     /// @param callConfig The call configuration to verify.
     /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
     function _verifyCallConfig(uint32 callConfig) internal pure returns (ValidCallsResult) {
-        CallConfig memory _decodedCallConfig = CallBits.decodeCallConfig(callConfig);
-        if (_decodedCallConfig.userNoncesSequential && _decodedCallConfig.dappNoncesSequential) {
+        if (callConfig.needsPreOpsReturnData() && callConfig.needsUserReturnData()) {
+            // Max one of preOps or userOp return data can be tracked, not both
+            return ValidCallsResult.InvalidCallConfig;
+        }
+
+        if (callConfig.needsSequentialUserNonces() && callConfig.needsSequentialDAppNonces()) {
             // Max one of user or dapp nonces can be sequential, not both
             return ValidCallsResult.BothUserAndDAppNoncesCannotBeSequential;
         }
-        if (_decodedCallConfig.invertBidValue && _decodedCallConfig.exPostBids) {
-            // If both invertBidValue and exPostBids are true, solver's retreived bid cannot be determined
+        if (callConfig.invertsBidValue() && callConfig.exPostBids()) {
+            // If both invertBidValue and exPostBids are true, solver's retrieved bid cannot be determined
             return ValidCallsResult.InvertBidValueCannotBeExPostBids;
         }
         return ValidCallsResult.Valid;
@@ -315,7 +314,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
                 solverOp.userOpHash,
                 solverOp.bidToken,
                 solverOp.bidAmount,
-                solverOp.data
+                keccak256(solverOp.data)
             )
         );
     }
@@ -465,6 +464,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
 
         if (!_userIsBundler) {
             if (userOp.callConfig.allowsTrustedOpHash()) {
+                // Use full untrusted hash for signature verification to ensure all operation parameters are included.
                 userOpHash = _getUserOperationHash(userOp, false);
             }
             _signatureValid = SignatureChecker.isValidSignatureNow(userOp.from, userOpHash, userOp.signature);
@@ -549,7 +549,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
                         userOp.control,
                         userOp.callConfig,
                         userOp.sessionKey,
-                        userOp.data
+                        keccak256(userOp.data)
                     )
                 )
             );

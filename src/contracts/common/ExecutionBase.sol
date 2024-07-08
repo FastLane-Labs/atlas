@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
@@ -185,7 +185,7 @@ contract Base {
     /// @notice Returns the address of the currently active Execution Environment, if any.
     /// @return activeEnvironment The address of the currently active Execution Environment.
     function _activeEnvironment() internal view returns (address activeEnvironment) {
-        activeEnvironment = IAtlas(ATLAS).activeEnvironment();
+        (activeEnvironment,,) = IAtlas(ATLAS).lock();
     }
 }
 
@@ -193,7 +193,7 @@ contract Base {
 // ExecutionEnvironment and DAppControl. ExecutionBase then adds utility functions which make it easier for custom
 // DAppControls to interact with Atlas.
 contract ExecutionBase is Base {
-    constructor(address _atlas) Base(_atlas) { }
+    constructor(address atlas) Base(atlas) { }
 
     /// @notice Deposits local funds from this Execution Environment, to the transient Atlas balance. These funds go
     /// towards the bundler, with any surplus going to the Solver.

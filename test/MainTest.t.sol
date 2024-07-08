@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
@@ -289,7 +289,7 @@ contract MainTest is BaseTest {
         */
     }
 
-    function testMimic() public {
+    function testMimic_SkipCoverage() public {
         // uncomment to debug if this test is broken
         /*
         address aaaaa = atlas.executionTemplate();
@@ -375,7 +375,7 @@ contract MainTest is BaseTest {
         assertTrue(exists, "ExecutionEnvironment wasn't created");
     }
 
-    function testTestUserOperation() public {
+    function testTestUserOperation_SkipCoverage() public {
         uint8 v;
         bytes32 r;
         bytes32 s;
@@ -400,7 +400,7 @@ contract MainTest is BaseTest {
         vm.stopPrank();
     }
 
-    function testSolverCalls() public {
+    function testSolverCalls_SkipCoverage() public {
         uint8 v;
         bytes32 r;
         bytes32 s;

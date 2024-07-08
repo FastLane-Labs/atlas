@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import "forge-std/Test.sol";
 
@@ -63,7 +63,7 @@ contract AccountingTest is BaseTest {
         });
     }
 
-    function testSolverBorrowRepaySuccessfully() public {
+    function testSolverBorrowRepaySuccessfully_SkipCoverage() public {
         // Solver deploys the RFQ solver contract (defined at bottom of this file)
         vm.startPrank(solverOneEOA);
         HonestRFQSolver honestSolver = new HonestRFQSolver(WETH_ADDRESS, address(atlas));
@@ -88,7 +88,7 @@ contract AccountingTest is BaseTest {
         // console.log("UserEOA", userEOA);
     }
 
-    function testSolverBorrowWithoutRepayingReverts() public {
+    function testSolverBorrowWithoutRepayingReverts_SkipCoverage() public {
         // Solver deploys the RFQ solver contract (defined at bottom of this file)
         vm.startPrank(solverOneEOA);
         // TODO make evil solver
@@ -174,7 +174,7 @@ contract AccountingTest is BaseTest {
         solverOps[0] = txBuilder.buildSolverOperation({
             userOp: userOp,
             solverOpData: solverOpData,
-            solverEOA: solverOneEOA,
+            solver: solverOneEOA,
             solverContract: rfqSolver,
             bidAmount: solverMsgValue,
             value: 0

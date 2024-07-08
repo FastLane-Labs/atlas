@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 // V4 Imports
 import { IPoolManager } from "./IPoolManager.sol";
@@ -11,10 +11,10 @@ import { V4DAppControl } from "./V4DAppControl.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 
-import "../../types/SolverOperation.sol";
-import "../../types/UserOperation.sol";
-import "../../types/ConfigTypes.sol";
-import "../../types/LockTypes.sol";
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/LockTypes.sol";
 
 // NOTE: Uniswap V4 is unique in that it would not require a frontend integration.
 // Instead, hooks can be used to enforce that the proceeds of the MEV auctions are
@@ -73,7 +73,7 @@ contract UniV4Hook is V4DAppControl {
         require(address(this) == hook, "ERR-H00 InvalidCallee");
         require(msg.sender == v4Singleton, "ERR-H01 InvalidCaller"); // TODO: Confirm this
 
-        ExecutionPhase currentPhase = IAtlas(ATLAS).phase();
+        ExecutionPhase currentPhase = ExecutionPhase(_phase());
 
         if (currentPhase == ExecutionPhase.UserOperation) {
             // Case: User call

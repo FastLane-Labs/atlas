@@ -1,22 +1,22 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 // Base Imports
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 // Atlas Base Imports
-import { IAtlas } from "../../interfaces/IAtlas.sol";
-import { IExecutionEnvironment } from "../../interfaces/IExecutionEnvironment.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
+import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 
-import { SafetyBits } from "../../libraries/SafetyBits.sol";
+import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 
-import { CallConfig } from "../../types/ConfigTypes.sol";
-import "../../types/UserOperation.sol";
-import "../../types/SolverOperation.sol";
-import "../../types/LockTypes.sol";
+import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/LockTypes.sol";
 
 // Atlas DApp-Control Imports
-import { DAppControl } from "../../dapp/DAppControl.sol";
+import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 
 interface IERC20 {
     function allowance(address owner, address spender) external view returns (uint256);
@@ -151,7 +151,7 @@ contract Filler is DAppControl {
     ///////////////////// DAPP STUFF ///////////////////////
 
     function postOpBalancing(uint256 prepaidAmount) external {
-        require(msg.sender == IAtlas(ATLAS).activeEnvironment(), "ERR - INVALID SENDER");
+        require(msg.sender == _activeEnvironment(), "ERR - INVALID SENDER");
         require(address(this) == _control(), "ERR - INVALID CONTROL");
         require(_depth() == 2, "ERR - INVALID DEPTH");
 
@@ -168,7 +168,7 @@ contract Filler is DAppControl {
         }
 
         // CASE: Nested call from Atlas EE
-        if (msg.sender == IAtlas(ATLAS).activeEnvironment()) {
+        if (msg.sender == _activeEnvironment()) {
             require(address(this) == _control(), "ERR - INVALID CONTROL");
             return _outerApprove(data);
         }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.22;
+pragma solidity 0.8.25;
 
 import "forge-std/Test.sol";
 
@@ -43,7 +43,7 @@ contract SimulatorTest is BaseTest {
         dAppControl = defaultDAppControl().buildAndIntegrate(atlasVerification);
     }
 
-    function test_simUserOperation_success_valid() public {
+    function test_simUserOperation_success_valid_SkipCoverage() public {
         UserOperation memory userOp = validUserOperation().build();
 
         (bool success, Result result, uint256 validCallsResult) = simulator.simUserOperation(userOp);
@@ -62,7 +62,7 @@ contract SimulatorTest is BaseTest {
         assertEq(validCallsResult, uint256(ValidCallsResult.GasPriceHigherThanMax));
     }
 
-    function test_simSolverCall_success_validSolverOutcome() public {
+    function test_simSolverCall_success_validSolverOutcome_SkipCoverage() public {
         vm.startPrank(solverOneEOA);
         DummySolver solver = new DummySolver(WETH_ADDRESS, address(atlas));
         atlas.bond(1e18);
@@ -83,7 +83,7 @@ contract SimulatorTest is BaseTest {
         assertEq(solverOutcomeResult, 0);
     }
 
-    function test_simSolverCall_fail_bubblesUpSolverOutcomeResult() public {
+    function test_simSolverCall_fail_bubblesUpSolverOutcomeResult_SkipCoverage() public {
         vm.startPrank(solverOneEOA);
         DummySolver solver = new DummySolver(WETH_ADDRESS, address(atlas));
         // atlas.bond(1e18); - DO NOT BOND - Triggers InsufficientEscrow error
@@ -104,7 +104,7 @@ contract SimulatorTest is BaseTest {
         assertEq(solverOutcomeResult, 1 << uint256(SolverOutcome.InsufficientEscrow));
     }
 
-    function test_simSolverCalls_success_validSolverOutcome() public {
+    function test_simSolverCalls_success_validSolverOutcome_SkipCoverage() public {
         vm.startPrank(solverOneEOA);
         DummySolver solver = new DummySolver(WETH_ADDRESS, address(atlas));
         atlas.bond(1e18);
@@ -137,7 +137,7 @@ contract SimulatorTest is BaseTest {
         assertEq(solverOutcomeResult, uint256(type(SolverOutcome).max) + 1);
     }
 
-    function test_simSolverCalls_fail_bubblesUpSolverOutcomeResult() public {
+    function test_simSolverCalls_fail_bubblesUpSolverOutcomeResult_SkipCoverage() public {
         vm.startPrank(solverOneEOA);
         DummySolver solver = new DummySolver(WETH_ADDRESS, address(atlas));
         // atlas.bond(1e18); - DO NOT BOND - Triggers InsufficientEscrow error
