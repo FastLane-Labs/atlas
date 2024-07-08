@@ -4,6 +4,8 @@ pragma solidity 0.8.25;
 import "forge-std/Test.sol";
 
 import { GasAccounting } from "src/contracts/atlas/GasAccounting.sol";
+
+import "src/contracts/libraries/AccountingMath.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { AtlasConstants } from "src/contracts/types/AtlasConstants.sol";
@@ -59,8 +61,15 @@ contract MockGasAccounting is TestAtlas, BaseTest {
         _credit(owner, value, value);
     }
 
-    function releaseSolverLock(SolverOperation calldata solverOp, uint256 gasWaterMark, uint256 result) external {
-        _handleSolverAccounting(solverOp, gasWaterMark, result, true);
+    function handleSolverAccounting(
+        SolverOperation calldata solverOp,
+        uint256 gasWaterMark,
+        uint256 result,
+        bool includeCalldata
+    )
+        external
+    {
+        _handleSolverAccounting(solverOp, gasWaterMark, result, includeCalldata);
     }
 
     function settle(address winningSolver, address bundler) external returns (uint256, uint256) {
@@ -172,7 +181,7 @@ contract GasAccountingTest is AtlasConstants, BaseTes {
         mockGasAccounting.initializeLock{ value: 0 }(executionEnvironment, gasMarker, 0);
         initialClaims = getInitialClaims(gasMarker);
         solverOp.from = makeAddr("solver");
-
+        solverOp.data = abi.encodePacked("calldata");
         // Initialize TestAtlas storage slots
         initializeTestAtlasSlots();
     }
@@ -527,48 +536,91 @@ contract GasAccountingTest is AtlasConstants, BaseTes {
         vm.revertTo(snapshotId);
     }
 
-    function test_handleSolverAccounting() public {
-        vm.skip(true);
+    function test_handleSolverAccounting_solverNotResponsible() public {
+        uint256 snapshotId = vm.snapshot();
+
+        // Setup
+        solverOp.data = "";
+        uint256 gasWaterMark = gasleft() + 5000;
+        uint256 initialWriteoffs = mockGasAccounting.writeoffs();
+
+        // Simulate solver not responsible for failure
+        uint256 result = EscrowBits._NO_REFUND;
+
+        // Recalculate expected writeoffs
+        uint256 _gasUsed = 7_094_964_000_000_000; // gas used
+
+        mockGasAccounting.handleSolverAccounting(solverOp, gasWaterMark, result, false);
+
+        uint256 expectedWriteoffs = initialWriteoffs + AccountingMath.withAtlasAndBundlerSurcharges(_gasUsed);
+
+        // Verify writeoffs have increased
+        assertEq(mockGasAccounting.writeoffs(), expectedWriteoffs, "Writeoffs mismatch");
+
+        vm.revertTo(snapshotId);
+    }
+
+    function test_handleSolverAccounting_solverResponsible() public {
+        uint256 snapshotId = vm.snapshot();
+
+        // Setup
+        solverOp.data = ""; // no calldata
+        uint256 gasWaterMark = gasleft() + 5000;
+        uint256 initialBondedBalance = 1000 ether;
+        uint256 unbondingAmount = 500 ether;
+
+        // Set up initial balances
+        mockGasAccounting.increaseBondedBalance(solverOp.from, initialBondedBalance);
+        mockGasAccounting.increaseUnbondingBalance(solverOp.from, unbondingAmount); // Set unbonding balance
+
+        // Simulate solver responsible for failure
+        uint256 result = EscrowBits._FULL_REFUND;
+
+        // Perform the operation
+        (uint112 unbondingBefore,) = mockGasAccounting._balanceOf(solverOp.from);
+
+        mockGasAccounting.handleSolverAccounting(solverOp, gasWaterMark, result, false);
+
+        // Verify bonded balance has decreased
+        (uint112 unbonding,) = mockGasAccounting._balanceOf(solverOp.from);
+        assertEq(unbonding, unbondingBefore);
+
+        vm.revertTo(snapshotId);
+    }
+
+    function test_handleSolverAccounting_includingCalldata() public {
+        uint256 snapshotId = vm.snapshot();
+
+        // Setup
         solverOp.data = abi.encodePacked("calldata");
         uint256 calldataCost = (solverOp.data.length * mockGasAccounting.calldataLengthPremium()) + 1;
         uint256 gasWaterMark = gasleft() + 5000;
-        uint256 maxGasUsed;
-        uint112 bondedBefore;
-        uint112 bondedAfter;
-        uint256 result;
+        uint256 initialBondedBalance = 1000 ether;
+        uint256 unbondingAmount = 500 ether;
+        uint256 initialWriteoffs = mockGasAccounting.writeoffs();
 
-        // FULL_REFUND
-        result = EscrowBits._FULL_REFUND;
-        maxGasUsed = gasWaterMark + calldataCost;
-        maxGasUsed = maxGasUsed
-            * (
-                mockGasAccounting.SCALE() + mockGasAccounting.ATLAS_SURCHARGE_RATE()
-                    + mockGasAccounting.BUNDLER_SURCHARGE_RATE()
-            ) / mockGasAccounting.SCALE() * tx.gasprice;
-        mockGasAccounting.increaseBondedBalance(solverOp.from, maxGasUsed);
-        (bondedBefore,,,,) = mockGasAccounting.accessData(solverOp.from);
-        mockGasAccounting.releaseSolverLock(solverOp, gasWaterMark, result);
-        (bondedAfter,,,,) = mockGasAccounting.accessData(solverOp.from);
-        assertGt(
-            bondedBefore - bondedAfter,
-            calldataCost
-                * (
-                    mockGasAccounting.SCALE() + mockGasAccounting.ATLAS_SURCHARGE_RATE()
-                        + mockGasAccounting.BUNDLER_SURCHARGE_RATE()
-                ) / mockGasAccounting.ATLAS_SURCHARGE_RATE() * tx.gasprice
-        ); // Must be greater than calldataCost
-        assertLt(bondedBefore - bondedAfter, maxGasUsed); // Must be less than maxGasUsed
+        // Set up initial balances
+        mockGasAccounting.increaseBondedBalance(solverOp.from, initialBondedBalance);
+        mockGasAccounting.increaseUnbondingBalance(solverOp.from, unbondingAmount); // Set unbonding balance
 
-        // NO_REFUND
-        result = 1 << uint256(SolverOutcome.InvalidTo);
-        (bondedBefore,,,,) = mockGasAccounting.accessData(solverOp.from);
-        mockGasAccounting.releaseSolverLock(solverOp, gasWaterMark, result);
-        (bondedAfter,,,,) = mockGasAccounting.accessData(solverOp.from);
-        assertEq(bondedBefore, bondedAfter);
+        // Perform the operation
+        (uint112 unbondingBefore,) = mockGasAccounting._balanceOf(solverOp.from);
 
-        // UncoveredResult
-        result = 0;
-        mockGasAccounting.releaseSolverLock(solverOp, gasWaterMark, result);
+        // Simulate solver responsible for failure including calldata
+        uint256 result = EscrowBits._FULL_REFUND;
+
+        mockGasAccounting.handleSolverAccounting(solverOp, gasWaterMark, result, true);
+
+        (uint112 bondedAfter,,,,) = mockGasAccounting.accessData(solverOp.from);
+        uint256 gasUsed = 7_200_705_000_000_000 + calldataCost;
+
+        uint256 expectedWriteoffs = initialWriteoffs + AccountingMath.withAtlasAndBundlerSurcharges(gasUsed);
+
+        // Verify bonded balance has decreased
+        (uint112 unbonding,) = mockGasAccounting._balanceOf(solverOp.from);
+        assertEq(unbonding, unbondingBefore);
+
+        vm.revertTo(snapshotId);
     }
 
     function test_settle() public {
