@@ -16,7 +16,7 @@ interface IWETH9 {
 
 /**
  * @title SolverBaseInvertBid
- * @notice A base contract for Solvers that work with DappControls which have set the `invertBidValue` flag to true.
+ * @notice A base contract for Solvers that work with DAppControls which have set the `invertBidValue` flag to true.
  */
 contract SolverBaseInvertBid is ISolverContract {
     address public immutable WETH_ADDRESS;

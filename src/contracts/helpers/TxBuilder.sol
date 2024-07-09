@@ -45,8 +45,8 @@ contract TxBuilder {
             IAtlasVerification(verification).getUserNextNonce(user, IDAppControl(control).requireSequentialUserNonces());
     }
 
-    function getControlCodeHash(address dAppControl) external view returns (bytes32) {
-        return dAppControl.codehash;
+    function getControlCodeHash(address _control) external view returns (bytes32) {
+        return _control.codehash;
     }
 
     function getBlockchainID() external view returns (uint256 chainId) {
