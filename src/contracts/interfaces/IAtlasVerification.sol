@@ -57,8 +57,8 @@ interface IAtlasVerification {
     function removeSignatory(address control, address signatory) external;
     function changeDAppGovernance(address oldGovernance, address newGovernance) external;
     function disableDApp(address control) external;
-    function getGovFromControl(address dAppControl) external view returns (address);
-    function isDAppSignatory(address dAppControl, address signatory) external view returns (bool);
+    function getGovFromControl(address control) external view returns (address);
+    function isDAppSignatory(address control, address signatory) external view returns (bool);
     function signatories(bytes32 key) external view returns (bool);
-    function dAppSignatories(address dAppControl) external view returns (address[] memory);
+    function dAppSignatories(address control) external view returns (address[] memory);
 }
