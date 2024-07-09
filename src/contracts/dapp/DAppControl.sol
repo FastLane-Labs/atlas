@@ -21,8 +21,6 @@ import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.
 abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     using CallBits for uint32;
 
-    uint8 private constant _CONTROL_DEPTH = 1 << 2;
-
     uint32 public immutable CALL_CONFIG;
     address public immutable CONTROL;
     address public immutable ATLAS_VERIFICATION;
