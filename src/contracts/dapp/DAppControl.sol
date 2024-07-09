@@ -138,6 +138,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     }
 
     /// @notice The postOpsCall hook which may be called as the last phase of a `metacall` transaction.
+    /// @dev Should revert if any DApp-specific checks fail.
     /// @param solved Boolean indicating whether a winning SolverOperation was executed successfully.
     /// @param data Data returned from the previous call phase.
     function postOpsCall(
