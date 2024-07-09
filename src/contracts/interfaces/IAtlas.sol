@@ -21,7 +21,7 @@ interface IAtlas {
     function createExecutionEnvironment(address control) external returns (address executionEnvironment);
     function getExecutionEnvironment(
         address user,
-        address dAppControl
+        address control
     )
         external
         view

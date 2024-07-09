@@ -18,8 +18,8 @@ interface IWETH9 {
  * @title SolverBase
  * @notice A base contract for Solvers
  * @dev Does safety checks, escrow reconciliation and pays bids.
- * @dev Works with DappControls which have set the `invertBidValue` flag to false.
- * @dev Use `SolverBaseInvertBid` for DappControls which have set the `invertBidValue` flag to true.
+ * @dev Works with DAppControls which have set the `invertBidValue` flag to false.
+ * @dev Use `SolverBaseInvertBid` for DAppControls which have set the `invertBidValue` flag to true.
  */
 contract SolverBase is ISolverContract {
     address public immutable WETH_ADDRESS;
