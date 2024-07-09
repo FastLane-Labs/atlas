@@ -22,13 +22,13 @@ contract SolverBaseInvertBid is ISolverContract {
     address public immutable WETH_ADDRESS;
     address internal immutable _owner;
     address internal immutable _atlas;
-    bool internal immutable _bidRetreivalRequired;
+    bool internal immutable _bidRetrievalRequired;
 
-    constructor(address weth, address atlas, address owner, bool bidRetreivalRequired) {
+    constructor(address weth, address atlas, address owner, bool bidRetrievalRequired) {
         WETH_ADDRESS = weth;
         _owner = owner;
         _atlas = atlas;
-        _bidRetreivalRequired = bidRetreivalRequired;
+        _bidRetrievalRequired = bidRetrievalRequired;
     }
 
     function atlasSolverCall(
@@ -72,7 +72,7 @@ contract SolverBaseInvertBid is ISolverContract {
     modifier receiveBids(address executionEnvironment, address bidToken, uint256 bidAmount) {
         // Before the solverCall logic executes, the solver's bid must be received by the solver from the Execution
         // Environment
-        if (_bidRetreivalRequired) {
+        if (_bidRetrievalRequired) {
             require(bidToken != address(0), "Solver cannot retrieve ETH from EE");
             SafeTransferLib.safeTransferFrom(bidToken, executionEnvironment, address(this), bidAmount);
         }
