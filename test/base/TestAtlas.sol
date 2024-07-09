@@ -20,7 +20,7 @@ contract TestAtlas is Atlas {
     // Public functions to expose internal transient helpers for testing
 
     function clearTransientStorage() public {
-        _setLock(Lock(address(0), 0, 0));
+        _setLock(address(0), 0, 0);
         _setSolverLock(0);
         _setSolverTo(address(0));
         _setClaims(0);
@@ -30,8 +30,8 @@ contract TestAtlas is Atlas {
         _setDeposits(0);
     }
 
-    function setLock(Lock memory newLock) public {
-        _setLock(newLock);
+    function setLock(address activeEnvironment, uint32 callConfig, uint8 phase) public {
+        _setLock(activeEnvironment, callConfig, phase);
     }
 
     function setLockPhase(ExecutionPhase newPhase) public {

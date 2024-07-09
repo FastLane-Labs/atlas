@@ -101,8 +101,8 @@ contract Atlas is Escrow, Factory {
             if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
         }
 
-        // The environment lock and accounting values set above are implicitly released here as the transient storage
-        // variables are zeroed out at the end of the transaction.
+        // The environment lock is explicitly released here to allow multiple metacalls in a single transaction.
+        _releaseLock();
     }
 
     /// @notice execute is called above, in a try-catch block in metacall.
@@ -129,9 +129,7 @@ contract Atlas is Escrow, Factory {
         if (msg.sender != address(this)) revert InvalidAccess();
 
         // Build the context object
-        ctx = _buildContext(
-            dConfig, executionEnvironment, userOpHash, bundler, uint8(solverOps.length), bundler == SIMULATOR
-        );
+        ctx = _buildContext(executionEnvironment, userOpHash, bundler, uint8(solverOps.length), bundler == SIMULATOR);
 
         bytes memory _returnData;
 

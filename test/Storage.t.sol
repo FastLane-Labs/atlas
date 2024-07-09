@@ -126,7 +126,7 @@ contract StorageTest is BaseTest {
         assertEq(callConfig, 0, "callConfig should start at 0");
         assertEq(phase, 0, "phase should start at 0");
 
-        atlas.setLock(Lock(address(1), 2, 3));
+        atlas.setLock(address(1), 2, 3);
         (activeEnv, callConfig, phase) = atlas.lock();
 
         assertEq(activeEnv, address(1), "activeEnv should be 1");
@@ -144,7 +144,7 @@ contract StorageTest is BaseTest {
     function test_storage_transient_isUnlocked() public {
         assertEq(atlas.isUnlocked(), true, "isUnlocked should start as true");
 
-        atlas.setLock(Lock(address(1), 0, 0));
+        atlas.setLock(address(1), 0, 0);
         assertEq(atlas.isUnlocked(), false, "isUnlocked should be false");
 
         atlas.clearTransientStorage();
@@ -257,7 +257,7 @@ contract StorageTest is BaseTest {
         MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0));
         assertEq(mockStorage.activeEnvironment(), address(0), "activeEnvironment should start at 0");
 
-        mockStorage.setLock(Lock(address(1), 0, 0));
+        mockStorage.setLock(address(1), 0, 0);
         assertEq(mockStorage.activeEnvironment(), address(1), "activeEnvironment should be 1");
 
         mockStorage.clearTransientStorage();
@@ -268,7 +268,7 @@ contract StorageTest is BaseTest {
         MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0));
         assertEq(mockStorage.activeCallConfig(), 0, "activeCallConfig should start at 0");
 
-        mockStorage.setLock(Lock(address(0), 1, 0));
+        mockStorage.setLock(address(0), 1, 0);
         assertEq(mockStorage.activeCallConfig(), 1, "activeCallConfig should be 1");
 
         mockStorage.clearTransientStorage();
@@ -279,7 +279,7 @@ contract StorageTest is BaseTest {
         MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0));
         assertEq(mockStorage.phase(), 0, "phase should start at 0");
 
-        mockStorage.setLock(Lock(address(0), 0, 1));
+        mockStorage.setLock(address(0), 0, 1);
         assertEq(mockStorage.phase(), 1, "phase should be 1");
 
         mockStorage.clearTransientStorage();
@@ -334,13 +334,13 @@ contract MockStorage is Storage {
     }
 
     // Setter for the above 3 view functions
-    function setLock(Lock memory newLock) public {
-        _setLock(newLock);
+    function setLock(address activeEnv, uint32 callConfig, uint8 newPhase) public {
+        _setLock(activeEnv, callConfig, newPhase);
     }
 
     // To clear all transient storage vars
     function clearTransientStorage() public {
-        _setLock(Lock(address(0), 0, 0));
+        _setLock(address(0), 0, 0);
         _setSolverLock(0);
         _setSolverTo(address(0));
         _setClaims(0);
