@@ -2,6 +2,7 @@
 pragma solidity 0.8.25;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 import { SafetyLocks } from "src/contracts/atlas/SafetyLocks.sol";
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { AccountingMath } from "src/contracts/libraries/AccountingMath.sol";
@@ -162,8 +163,7 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param solverWon A boolean indicating whether the solver won the bid.
     /// @return deficit The amount of AtlETH that was not repaid, if any.
     function _assign(address owner, uint256 amount, bool solverWon) internal returns (uint256 deficit) {
-        if (amount > type(uint112).max) revert ValueTooLarge();
-        uint112 _amt = uint112(amount);
+        uint112 _amt = SafeCast.toUint112(amount);
 
         EscrowAccountAccessData memory _aData = S_accessData[owner];
 
@@ -189,7 +189,7 @@ abstract contract GasAccounting is SafetyLocks {
             } else {
                 // The unbonding balance is sufficient to cover the remaining amount owed. Draw everything from the
                 // bonded balance, and adjust the unbonding balance accordingly.
-                s_balanceOf[owner].unbonding = uint112(_total - _amt);
+                s_balanceOf[owner].unbonding = SafeCast.toUint112(_total - _amt);
                 _aData.bonded = 0;
             }
         } else {
@@ -220,8 +220,7 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param owner The address of the owner whose bonded balance will be increased.
     /// @param amount The amount by which to increase the owner's bonded balance.
     function _credit(address owner, uint256 amount) internal {
-        if (amount > type(uint112).max) revert ValueTooLarge();
-        uint112 _amt = uint112(amount);
+        uint112 _amt = SafeCast.toUint112(amount);
 
         EscrowAccountAccessData memory _aData = S_accessData[owner];
 
