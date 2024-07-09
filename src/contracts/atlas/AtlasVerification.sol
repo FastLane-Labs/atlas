@@ -54,7 +54,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         // Verify that the calldata injection came from the dApp frontend
         // and that the signatures are valid.
 
-        bytes32 _userOpHash = _getUserOperationHash(userOp);
+        bytes32 _userOpHash = _getUserOperationHash(userOp, userOp.callConfig.allowsTrustedOpHash());
 
         {
             // Check user signature
@@ -503,11 +503,6 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     /// @param userOp The UserOperation struct to generate the hash for.
     /// @return userOpHash The hash of the UserOperation struct for in inter-operation references.
     function getUserOperationHash(UserOperation calldata userOp) public view returns (bytes32 userOpHash) {
-        userOpHash = _getUserOperationHash(userOp);
-    }
-
-    // TODO: Do we need this??? Why not just call the next function?
-    function _getUserOperationHash(UserOperation calldata userOp) internal view returns (bytes32 userOpHash) {
         userOpHash = _getUserOperationHash(userOp, userOp.callConfig.allowsTrustedOpHash());
     }
 
