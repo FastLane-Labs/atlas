@@ -99,6 +99,9 @@ contract Atlas is Escrow, Factory {
             // WARNING: If msg.sender is a disposable address such as a session key, make sure to remove ETH from it
             // before disposal
             if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
+
+            // Emit event indicating the metacall failed in `execute()`
+            emit MetacallResult(msg.sender, userOp.from, false, false, 0, 0);
         }
 
         // The environment lock is explicitly released here to allow multiple metacalls in a single transaction.
