@@ -86,11 +86,6 @@ contract SolverBase is ISolverContract {
             SafeTransferLib.safeTransferETH(executionEnvironment, bidAmount);
         } else {
             // Pay bid in ERC20 (bidToken)
-
-            if (msg.value > address(this).balance) {
-                IWETH9(WETH_ADDRESS).withdraw(msg.value - address(this).balance);
-            }
-
             SafeTransferLib.safeTransfer(bidToken, executionEnvironment, bidAmount);
         }
     }
