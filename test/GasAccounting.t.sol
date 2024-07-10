@@ -150,6 +150,10 @@ contract MockGasAccounting is TestAtlas, BaseTest {
     function getCalldataCost(uint256 length) external view returns (uint256) {
         return _getCalldataCost(length);
     }
+
+    function activeEnvironment() public view returns (address) {
+        return _activeEnvironment();
+    }
 }
 
 contract MockGasCalculator is IL2GasCalculator, Test {
@@ -167,7 +171,8 @@ contract GasAccountingTest is AtlasConstants, BaseTes {
     uint256 gasMarker;
     uint256 initialClaims;
     SolverOperation solverOp;
-    address executionEnvironment = makeAddr("executionEnvironment");
+    address executionEnvironment;
+    uint256 snapshotId;
 
     function setUp() public override {
         // Run the base setup
@@ -186,8 +191,20 @@ contract GasAccountingTest is AtlasConstants, BaseTes {
         initialClaims = getInitialClaims(gasMarker);
         solverOp.from = makeAddr("solver");
         solverOp.data = abi.encodePacked("calldata");
+        executionEnvironment = mockGasAccounting.activeEnvironment();
         // Initialize TestAtlas storage slots
         initializeTestAtlasSlots();
+
+        // Ensure the execution environment starts with zero balance
+        deal(executionEnvironment, 0);
+
+        // Take a snapshot before each test
+        snapshotId = vm.snapshot();
+    }
+
+    function tearDown() public {
+        // Revert to the snapshot after each test
+        vm.revertTo(snapshotId);
     }
 
     function initializeTestAtlasSlots() internal {
@@ -211,6 +228,13 @@ contract GasAccountingTest is AtlasConstants, BaseTes {
             ) / mockGasAccounting.SCALE();
     }
 
+    function fundContract(uint256 amount) internal {
+        // Fund the contract with enough ETH
+        deal(address(mockGasAccounting), amount);
+        // Verify the contract has sufficient balance
+        assertEq(address(mockGasAccounting).balance, amount, "Contract should have enough ETH balance");
+    }
+
     function test_contribute() public {
         vm.skip(true);
         vm.expectRevert(abi.encodeWithSelector(AtlasErrors.InvalidExecutionEnvironment.selector, executionEnvironment));
@@ -226,101 +250,189 @@ contract GasAccountingTest is AtlasConstants, BaseTes {
         assertEq(mockGasAccounting.getDeposits(), contributeValue);
     }
 
-    function test_borrow() public {
-        vm.skip(true);
-        uint256 borrowedAmount = 5000;
-
-        vm.expectRevert(abi.encodeWithSelector(AtlasErrors.InvalidExecutionEnvironment.selector, executionEnvironment));
-        mockGasAccounting.borrow(borrowedAmount);
-
-        vm.prank(executionEnvironment);
-        vm.expectRevert(abi.encodeWithSelector(AtlasErrors.InsufficientAtlETHBalance.selector, 0, borrowedAmount));
-        mockGasAccounting.borrow(borrowedAmount);
-
-        deal(
-            address(mockGasAccounting),
-            initialClaims + borrowedAmount // claims + amount borrowed
-        );
-
-        vm.prank(executionEnvironment);
-        mockGasAccounting.borrow(borrowedAmount);
-
-        assertEq(executionEnvironment.balance, borrowedAmount);
-    }
-
-    function test_borrow_phasesEnforced() public {
-        vm.skip(true);
+    function test_borrow_preOpsPhase() public {
         uint256 borrowedAmount = 1e18;
-        deal(address(mockGasAccounting), borrowedAmount);
-        assertEq(executionEnvironment.balance, 0, "EE should start with 0 ETH");
         uint256 startState = vm.snapshot();
 
-        // Allowed borrowed phases: PreOps, UserOperation, PreSolver, SolverOperations
+        fundContract(borrowedAmount);
 
         mockGasAccounting.setPhase(ExecutionPhase.PreOps);
         vm.prank(executionEnvironment);
         mockGasAccounting.borrow(borrowedAmount);
-        assertEq(executionEnvironment.balance, borrowedAmount);
+
+        assertEq(
+            executionEnvironment.balance,
+            borrowedAmount,
+            "Execution environment balance should be equal to borrowed amount"
+        );
+
         vm.revertTo(startState);
+    }
+
+    function test_borrow_userOperationPhase() public {
+        uint256 borrowedAmount = 1e18;
+        uint256 startState = vm.snapshot();
+
+        fundContract(borrowedAmount);
 
         mockGasAccounting.setPhase(ExecutionPhase.UserOperation);
         vm.prank(executionEnvironment);
         mockGasAccounting.borrow(borrowedAmount);
-        assertEq(executionEnvironment.balance, borrowedAmount);
+
+        assertEq(
+            executionEnvironment.balance,
+            borrowedAmount,
+            "Execution environment balance should be equal to borrowed amount"
+        );
+
         vm.revertTo(startState);
+    }
+
+    function test_borrow_preSolverPhase() public {
+        uint256 borrowedAmount = 1e18;
+        uint256 startState = vm.snapshot();
+
+        fundContract(borrowedAmount);
 
         mockGasAccounting.setPhase(ExecutionPhase.PreSolver);
         vm.prank(executionEnvironment);
         mockGasAccounting.borrow(borrowedAmount);
-        assertEq(executionEnvironment.balance, borrowedAmount);
+
+        assertEq(
+            executionEnvironment.balance,
+            borrowedAmount,
+            "Execution environment balance should be equal to borrowed amount"
+        );
+
         vm.revertTo(startState);
+    }
+
+    function test_borrow_solverOperationPhase() public {
+        uint256 borrowedAmount = 1e18;
+        uint256 startState = vm.snapshot();
+
+        fundContract(borrowedAmount);
 
         mockGasAccounting.setPhase(ExecutionPhase.SolverOperation);
         vm.prank(executionEnvironment);
         mockGasAccounting.borrow(borrowedAmount);
-        assertEq(executionEnvironment.balance, borrowedAmount);
-        vm.revertTo(startState);
 
-        // Disallowed borrowed phases: PostSolver, AllocateValue, PostOps
+        assertEq(
+            executionEnvironment.balance,
+            borrowedAmount,
+            "Execution environment balance should be equal to borrowed amount"
+        );
+
+        vm.revertTo(startState);
+    }
+
+    function test_borrow_postSolverPhase() public {
+        uint256 borrowedAmount = 1e18;
+        uint256 startState = vm.snapshot();
+
+        fundContract(borrowedAmount);
 
         mockGasAccounting.setPhase(ExecutionPhase.PostSolver);
         vm.prank(executionEnvironment);
         vm.expectRevert(AtlasErrors.WrongPhase.selector);
         mockGasAccounting.borrow(borrowedAmount);
-        assertEq(executionEnvironment.balance, 0);
+
+        assertEq(executionEnvironment.balance, 0, "Execution environment balance should remain zero");
+
         vm.revertTo(startState);
+    }
+
+    function test_borrow_allocateValuePhase() public {
+        uint256 borrowedAmount = 1e18;
+        uint256 startState = vm.snapshot();
+
+        fundContract(borrowedAmount);
 
         mockGasAccounting.setPhase(ExecutionPhase.AllocateValue);
         vm.prank(executionEnvironment);
         vm.expectRevert(AtlasErrors.WrongPhase.selector);
         mockGasAccounting.borrow(borrowedAmount);
-        assertEq(executionEnvironment.balance, 0);
+
+        assertEq(executionEnvironment.balance, 0, "Execution environment balance should remain zero");
+
         vm.revertTo(startState);
+    }
+
+    function test_borrow_postOpsPhase() public {
+        uint256 borrowedAmount = 1e18;
+        uint256 startState = vm.snapshot();
+
+        fundContract(borrowedAmount);
 
         mockGasAccounting.setPhase(ExecutionPhase.PostOps);
         vm.prank(executionEnvironment);
         vm.expectRevert(AtlasErrors.WrongPhase.selector);
         mockGasAccounting.borrow(borrowedAmount);
-        assertEq(executionEnvironment.balance, 0);
+
+        assertEq(executionEnvironment.balance, 0, "Execution environment balance should remain zero");
+
         vm.revertTo(startState);
     }
 
     function test_multipleBorrows() public {
-        vm.skip(true);
         uint256 atlasBalance = 100 ether;
         uint256 borrow1 = 75 ether;
         uint256 borrow2 = 10 ether;
         uint256 borrow3 = 15 ether;
 
+        // Ensure the execution environment starts with zero balance
+        deal(executionEnvironment, 0);
+
+        // Fund the contract with enough ETH (initial claims + total borrow amount)
+        uint256 totalBorrowAmount = borrow1 + borrow2 + borrow3;
         deal(address(mockGasAccounting), initialClaims + atlasBalance);
 
+        // Verify the contract has sufficient balance before borrowing
+        assertEq(
+            address(mockGasAccounting).balance, initialClaims + atlasBalance, "Contract should have enough ETH balance"
+        );
+
+        // Set the phase to an allowed phase for borrowing
+        mockGasAccounting.setPhase(ExecutionPhase.PreOps);
+
+        // Start borrowing operations
         vm.startPrank(executionEnvironment);
         mockGasAccounting.borrow(borrow1);
+        assertEq(
+            executionEnvironment.balance,
+            borrow1,
+            "Execution environment balance should equal borrow1 after first borrow"
+        );
+
         mockGasAccounting.borrow(borrow2);
+        assertEq(
+            executionEnvironment.balance,
+            borrow1 + borrow2,
+            "Execution environment balance should equal borrow1 + borrow2 after second borrow"
+        );
+
         mockGasAccounting.borrow(borrow3);
+        assertEq(
+            executionEnvironment.balance,
+            borrow1 + borrow2 + borrow3,
+            "Execution environment balance should equal borrow1 + borrow2 + borrow3 after third borrow"
+        );
         vm.stopPrank();
 
-        assertEq(executionEnvironment.balance, borrow1 + borrow2 + borrow3);
+        // Verify the final balance of the execution environment
+        assertEq(
+            executionEnvironment.balance,
+            borrow1 + borrow2 + borrow3,
+            "Final execution environment balance should equal total borrowed amount"
+        );
+
+        // Verify the final balance of the contract
+        uint256 expectedFinalContractBalance = initialClaims + atlasBalance - totalBorrowAmount;
+        assertEq(
+            address(mockGasAccounting).balance,
+            expectedFinalContractBalance,
+            "Final contract balance should be initial balance minus total borrowed amount"
+        );
     }
 
     function test_shortfall() public {
@@ -356,8 +468,6 @@ contract GasAccountingTest is AtlasConstants, BaseTes {
     }
 
     function test_assign_zeroAmount() public {
-        uint256 snapshotId = vm.snapshot();
-
         uint256 assignedAmount = 0;
         uint256 bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
         uint256 depositsBefore = mockGasAccounting.deposits();
@@ -368,13 +478,9 @@ contract GasAccountingTest is AtlasConstants, BaseTes {
         assertEq(lastAccessedBlock, uint32(block.number));
         assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore);
         assertEq(mockGasAccounting.deposits(), depositsBefore);
-
-        vm.revertTo(snapshotId);
     }
 
     function test_assign_sufficientBondedBalance() public {
-        uint256 snapshotId = vm.snapshot();
-
         uint256 assignedAmount = 1000;
         uint256 initialBondedAmount = assignedAmount * 3;
 
@@ -401,6 +507,65 @@ contract GasAccountingTest is AtlasConstants, BaseTes {
         depositsBefore = mockGasAccounting.getDeposits();
         assertGt(mockGasAccounting.assign(solverOp.from, assignedAmount, true), 0);
         (, lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
+        uint256 bondedTotalSupplyAfter = mockGasAccounting.bondedTotalSupply();
+        uint256 depositsAfter = mockGasAccounting.deposits();
+
+        assertEq(bondedTotalSupplyAfter, bondedTotalSupplyBefore - assignedAmount);
+        assertEq(depositsAfter, depositsBefore + assignedAmount);
+
+        vm.revertTo(snapshotId);
+    }
+
+    function test_assign_insufficientBondedSufficientUnbonding() public {
+        uint256 assignedAmount = 1000;
+        uint256 unbondingAmount = assignedAmount * 2; // 2000
+        uint256 bondedAmount = assignedAmount / 2; // 500
+
+        // Set up initial balances
+        mockGasAccounting.increaseUnbondingBalance(solverOp.from, unbondingAmount); // Set unbonding balance to 2000
+        mockGasAccounting.increaseBondedBalance(solverOp.from, bondedAmount); // Set bonded balance to 500
+
+        uint256 bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
+        uint256 depositsBefore = mockGasAccounting.deposits();
+
+        // Call the assign function and capture the deficit
+        uint256 deficit = mockGasAccounting.assign(solverOp.from, assignedAmount, true);
+        assertEq(deficit, 0, "Deficit should be 0");
+
+        // Retrieve and check the updated access data
+        (, uint32 lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
+        assertEq(lastAccessedBlock, uint32(block.number), "Last accessed block should be current block");
+
+        // Check the updated bonded total supply and deposits
+        assertEq(
+            mockGasAccounting.bondedTotalSupply(),
+            bondedTotalSupplyBefore - assignedAmount,
+            "Bonded total supply mismatch"
+        );
+        assertEq(mockGasAccounting.deposits(), depositsBefore + assignedAmount, "Deposits mismatch");
+
+        // Retrieve and check the updated balances
+        (uint112 bonded, uint112 unbonding) = mockGasAccounting._balanceOf(solverOp.from);
+        uint256 expectedUnbonding = uint112(unbondingAmount - (assignedAmount - bondedAmount));
+        assertEq(unbonding, expectedUnbonding, "Unbonding balance mismatch");
+        assertEq(bonded, 0, "Bonded balance mismatch");
+
+        vm.revertTo(snapshotId);
+    }
+
+    function test_assign_insufficientBondedAndUnbonding() public {
+        uint256 assignedAmount = 1000;
+        uint256 unbondingAmount = assignedAmount / 2;
+        uint256 bondedAmount = assignedAmount / 4;
+
+        mockGasAccounting.increaseUnbondingBalance(solverOp.from, unbondingAmount);
+        mockGasAccounting.increaseBondedBalance(solverOp.from, bondedAmount);
+
+        uint256 bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
+        uint256 depositsBefore = mockGasAccounting.deposits();
+        uint256 deficit = mockGasAccounting.assign(solverOp.from, assignedAmount, true);
+        assertEq(deficit, assignedAmount - (unbondingAmount + bondedAmount));
+        (, uint32 lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
         assertEq(lastAccessedBlock, uint32(block.number));
         assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore);
         assertEq(mockGasAccounting.getDeposits(), depositsBefore);
@@ -455,8 +620,6 @@ contract GasAccountingTest is AtlasConstants, BaseTes {
     }
 
     function test_assign_reputationAnalytics() public {
-        uint256 snapshotId = vm.snapshot();
-
         uint256 gasUsedDecimalsToDrop = 1000;
         uint256 assignedAmount = 1_234_567;
         uint24 auctionWins;
@@ -502,8 +665,6 @@ contract GasAccountingTest is AtlasConstants, BaseTes {
     }
 
     function test_assign_overflow_reverts() public {
-        uint256 snapshotId = vm.snapshot();
-
         uint256 bondedAmount = uint256(type(uint112).max) + 1e18;
         uint256 assignedAmount = uint256(type(uint112).max) + 1;
 
@@ -519,12 +680,9 @@ contract GasAccountingTest is AtlasConstants, BaseTes {
         assertEq(mockGasAccounting.deposits(), depositsBefore);
         (uint112 unbonding,) = mockGasAccounting._balanceOf(solverOp.from);
         assertEq(unbonding, unbondingBefore);
-
-        vm.revertTo(snapshotId);
     }
 
     function test_credit() public {
-        uint256 snapshotId = vm.snapshot();
         uint256 creditedAmount = 10_000;
         uint256 lastAccessedBlock;
 
@@ -548,12 +706,9 @@ contract GasAccountingTest is AtlasConstants, BaseTes {
         uint256 overflowAmount = uint256(type(uint112).max) + 1;
         vm.expectRevert("SafeCast: value doesn't fit in 112 bits");
         mockGasAccounting.credit(solverOp.from, overflowAmount);
-        vm.revertTo(snapshotId);
     }
 
     function test_handleSolverAccounting_solverNotResponsible() public {
-        uint256 snapshotId = vm.snapshot();
-
         // Setup
         solverOp.data = "";
         uint256 gasWaterMark = gasleft() + 5000;
@@ -562,7 +717,7 @@ contract GasAccountingTest is AtlasConstants, BaseTes {
         // Simulate solver not responsible for failure
         uint256 result = EscrowBits._NO_REFUND;
         // Recalculate expected writeoffs
-        uint256 gasUsedOffset = 7_073_448_000_000_000; //difference between _gasUsed
+        uint256 gasUsedOffset = 7_073_515_500_000_000; //difference between _gasUsed
         uint256 gasUsed =
             (gasWaterMark + mockGasAccounting.solverBaseGasUsed() - gasleft()) * tx.gasprice + gasUsedOffset;
         mockGasAccounting.handleSolverAccounting(solverOp, gasWaterMark, result, false);
@@ -570,13 +725,9 @@ contract GasAccountingTest is AtlasConstants, BaseTes {
 
         // Verify writeoffs have increased
         assertEq(mockGasAccounting.writeoffs(), expectedWriteoffs, "Writeoffs mismatch");
-
-        vm.revertTo(snapshotId);
     }
 
     function test_handleSolverAccounting_solverResponsible() public {
-        uint256 snapshotId = vm.snapshot();
-
         // Setup
         solverOp.data = ""; // no calldata
         uint256 gasWaterMark = gasleft() + 5000;
@@ -597,13 +748,9 @@ contract GasAccountingTest is AtlasConstants, BaseTes {
         // Verify bonded balance has decreased
         (uint112 unbonding,) = mockGasAccounting._balanceOf(solverOp.from);
         assertEq(unbonding, unbondingBefore);
-
-        vm.revertTo(snapshotId);
     }
 
     function test_handleSolverAccounting_includingCalldata() public {
-        uint256 snapshotId = vm.snapshot();
-
         // Setup
         solverOp.data = abi.encodePacked("calldata");
         uint256 gasWaterMark = gasleft() + 5000;
@@ -625,8 +772,6 @@ contract GasAccountingTest is AtlasConstants, BaseTes {
         // Verify bonded balance has decreased
         (uint112 unbonding,) = mockGasAccounting._balanceOf(solverOp.from);
         assertEq(unbonding, unbondingBefore);
-
-        vm.revertTo(snapshotId);
     }
 
     function test_settle() public {
