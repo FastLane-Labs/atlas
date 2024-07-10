@@ -75,7 +75,6 @@ contract AtlasErrors {
     error InsufficientAvailableBalance(uint256 balance, uint256 requested);
     error InsufficientSurchargeBalance(uint256 balance, uint256 requested);
     error InsufficientBalanceForDeduction(uint256 balance, uint256 requested);
-    error ValueTooLarge();
     error BidTooHigh(uint256 indexInSolverOps, uint256 bidAmount);
 
     // DAppIntegration
