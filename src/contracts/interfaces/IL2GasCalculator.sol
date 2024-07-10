@@ -2,5 +2,6 @@
 pragma solidity 0.8.25;
 
 interface IL2GasCalculator {
-    function calculateL2GasCost(uint256 gas) external view returns (uint256 gasCostETH);
+    /// @notice Calculate the cost of calldata in ETH on a L2 with a different fee structure than mainnet
+    function getCalldataCost(uint256 length) external view returns (uint256 calldataCostETH);
 }

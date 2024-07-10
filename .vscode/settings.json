@@ -1,7 +1,7 @@
 {
   "solidity.packageDefaultDependenciesContractsDirectory": "src",
   "solidity.packageDefaultDependenciesDirectory": "lib",
-  "solidity.compileUsingRemoteVersion": "v0.8.22+commit.4fc1097e",
+  "solidity.compileUsingRemoteVersion": "v0.8.25+commit.b61c2a91",
   "solidity.formatter": "forge",
   "search.exclude": { "lib": true },
   "files.associations": {

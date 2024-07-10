@@ -7,6 +7,7 @@ import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { AccountingMath } from "src/contracts/libraries/AccountingMath.sol";
 import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
 import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
+import { IL2GasCalculator } from "src/contracts/interfaces/IL2GasCalculator.sol";
 import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
 
@@ -21,9 +22,10 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 escrowDuration,
         address verification,
         address simulator,
-        address initialSurchargeRecipient
+        address initialSurchargeRecipient,
+        address l2GasCalculator
     )
-        SafetyLocks(escrowDuration, verification, simulator, initialSurchargeRecipient)
+        SafetyLocks(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
     { }
 
     /// @notice Sets the initial accounting values for the metacall transaction.
@@ -413,10 +415,14 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param calldataLength The length of the `data` field in the SolverOperation.
     /// @return calldataCost The gas cost of the calldata used to execute the SolverOperation.
     function _getCalldataCost(uint256 calldataLength) internal view returns (uint256 calldataCost) {
-        // NOTE: Alter this for L2s.
-
-        // _SOLVER_OP_BASE_CALLDATA = SolverOperation calldata length excluding solverOp.data
-        calldataCost = (calldataLength + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM * tx.gasprice;
+        if (S_l2GasCalculator == address(0)) {
+            // Default to using mainnet gas calculations
+            // _SOLVER_OP_BASE_CALLDATA = SolverOperation calldata length excluding solverOp.data
+            calldataCost = (calldataLength + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM * tx.gasprice;
+        } else {
+            calldataCost =
+                IL2GasCalculator(S_l2GasCalculator).getCalldataCost(calldataLength + _SOLVER_OP_BASE_CALLDATA);
+        }
     }
 
     /// @notice Checks if the current balance is reconciled.

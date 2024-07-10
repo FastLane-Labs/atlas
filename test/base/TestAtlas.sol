@@ -12,9 +12,10 @@ contract TestAtlas is Atlas {
         address verification,
         address simulator,
         address initialSurchargeRecipient,
+        address l2GasCalculator,
         address executionTemplate
     )
-        Atlas(escrowDuration, verification, simulator, initialSurchargeRecipient, executionTemplate)
+        Atlas(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator, executionTemplate)
     { }
 
     // Public functions to expose internal transient helpers for testing

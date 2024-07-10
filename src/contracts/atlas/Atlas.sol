@@ -31,9 +31,10 @@ contract Atlas is Escrow, Factory {
         address verification,
         address simulator,
         address initialSurchargeRecipient,
+        address l2GasCalculator,
         address executionTemplate
     )
-        Escrow(escrowDuration, verification, simulator, initialSurchargeRecipient)
+        Escrow(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
         Factory(executionTemplate)
     { }
 

@@ -38,7 +38,8 @@ contract DAppIntegrationTest is Test {
             verification: expectedAtlasVerificationAddr,
             simulator: address(0),
             executionTemplate: address(execEnvTemplate),
-            initialSurchargeRecipient: atlasDeployer
+            initialSurchargeRecipient: atlasDeployer,
+            l2GasCalculator: address(0)
         });
         dAppIntegration = new MockDAppIntegration(expectedAtlasAddr);
         vm.stopPrank();

@@ -52,12 +52,14 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint256 internal S_cumulativeSurcharge; // Cumulative gas surcharges collected
     address internal S_surchargeRecipient; // Fastlane surcharge recipient
     address internal S_pendingSurchargeRecipient; // For 2-step transfer process
+    address internal S_l2GasCalculator; // Gas calculator for L2s
 
     constructor(
         uint256 escrowDuration,
         address verification,
         address simulator,
-        address initialSurchargeRecipient
+        address initialSurchargeRecipient,
+        address l2GasCalculator
     )
         payable
     {
@@ -69,6 +71,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         // Initialized with msg.value to seed flash loan liquidity
         S_cumulativeSurcharge = msg.value;
         S_surchargeRecipient = initialSurchargeRecipient;
+        S_l2GasCalculator = l2GasCalculator;
 
         emit SurchargeRecipientTransferred(initialSurchargeRecipient);
     }
