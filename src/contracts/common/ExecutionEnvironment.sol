@@ -241,7 +241,7 @@ contract ExecutionEnvironment is Base {
         allocateData = _forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, bidAmount, allocateData)));
 
         (bool _success,) = _control().delegatecall(allocateData);
-        if (!_success) revert AtlasErrors.AllocateValueDelegatecallFail();
+        if (!_success && !_config().allowAllocateValueFailure()) revert AtlasErrors.AllocateValueDelegatecallFail();
 
         uint256 _balance = address(this).balance;
         if (_balance > 0) {
