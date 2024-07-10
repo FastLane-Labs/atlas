@@ -905,7 +905,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         uint256 bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
         uint256 depositsBefore = mockGasAccounting.getDeposits();
         (uint112 unbondingBefore,) = mockGasAccounting._balanceOf(solverOp.from);
-        vm.expectRevert(AtlasErrors.ValueTooLarge.selector);
+        vm.expectRevert("SafeCast: value doesn't fit in 112 bits");
         mockGasAccounting.assign(solverOp.from, assignedAmount, true);
 
         // Check assign reverted with overflow, and accounting values did not change
