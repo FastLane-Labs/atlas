@@ -18,6 +18,8 @@ import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.
 import { TestAtlas } from "test/base/TestAtlas.sol";
 import { BaseTest } from "test/base/BaseTest.t.sol";
 
+import "forge-std/console.sol";
+
 contract MockGasAccounting is TestAtlas, BaseTest {
     uint256 public constant MOCK_SOLVER_GAS_LIMIT = 500_000;
 
