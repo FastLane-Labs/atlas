@@ -75,6 +75,18 @@ contract MockSafetyLocks is SafetyLocks {
     function setWriteoffs(uint256 _writeoffs) external {
         _setWriteoffs(_writeoffs);
     }
+
+     function setSolverLock(uint256 newSolverLock) external {
+        _setSolverLock(newSolverLock);
+    }
+
+    function setSolverTo(address newSolverTo) external {
+        _setSolverTo(newSolverTo);
+    }
+
+    function solverTo() external view returns (address) {
+        return _solverTo();
+    }
 }
 
 contract SafetyLocksTest is Test {
@@ -164,6 +176,31 @@ contract SafetyLocksTest is Test {
         assertEq(writeoffs, newWriteoffs);
     }
 
+    function test_setSolverLock() public {
+        uint256 newSolverLock = 98234723414317349817948719;
+
+        safetyLocks.setSolverLock(newSolverLock);
+
+        (address currentSolver, bool calledBack, bool fulfilled) = safetyLocks.solverLockData();
+        assertEq(currentSolver, address(uint160(newSolverLock)));
+    }
+
+    function test_setSolverTo() public {
+        address newSolverTo = address(0x123);
+
+        safetyLocks.setSolverTo(newSolverTo);
+
+        address solverTo = safetyLocks.solverTo();
+        assertEq(solverTo, newSolverTo);
+    }
+
+    function test_isUnlocked() public {
+        safetyLocks.setLock(address(2));
+        assertEq(safetyLocks.isUnlocked(), false);        
+        safetyLocks.releaseLock();
+        assertEq(safetyLocks.isUnlocked(), true);
+    }
+
     function test_combinedOperations() public {
         address ee = makeAddr("anotherExecutionEnvironment");
         uint256 gasMarker = 222;
@@ -171,9 +208,11 @@ contract SafetyLocksTest is Test {
         uint256 msgValue = 444;
 
         safetyLocks.setLock(address(2));
+        assertEq(safetyLocks.isUnlocked(), false);
         vm.expectRevert(AtlasErrors.AlreadyInitialized.selector);
         safetyLocks.initializeLock{ value: msgValue }(ee, gasMarker, userOpValue);
         safetyLocks.releaseLock();
+        assertEq(safetyLocks.isUnlocked(), true);
         safetyLocks.initializeLock{ value: msgValue }(ee, gasMarker, userOpValue);
         safetyLocks.setClaims(1000);
         safetyLocks.setWithdrawals(500);
@@ -181,6 +220,7 @@ contract SafetyLocksTest is Test {
         safetyLocks.setFees(888);
         safetyLocks.setWriteoffs(666);
         safetyLocks.setLockPhase(uint8(ExecutionPhase.SolverOperation));
+        safetyLocks.setSolverLock(0x456);
 
         (address activeEnv, uint32 callConfig, uint8 phase) = safetyLocks.lock();
         uint256 claims = safetyLocks.claims();
@@ -188,7 +228,9 @@ contract SafetyLocksTest is Test {
         uint256 deposits = safetyLocks.deposits();
         uint256 fees = safetyLocks.fees();
         uint256 writeoffs = safetyLocks.writeoffs();
+        (address solverTo,,) = safetyLocks.solverLockData();
 
+        assertEq(safetyLocks.isUnlocked(), false);
         assertEq(activeEnv, ee);
         assertEq(phase, uint8(ExecutionPhase.SolverOperation));
         assertEq(callConfig, uint32(0));
@@ -197,6 +239,6 @@ contract SafetyLocksTest is Test {
         assertEq(deposits, 2000);
         assertEq(fees, 888);
         assertEq(writeoffs, 666);
-
+        assertEq(solverTo, address(0x456));
     }
 }
