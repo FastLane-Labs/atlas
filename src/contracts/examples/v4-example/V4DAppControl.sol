@@ -185,12 +185,12 @@ contract V4DAppControl is DAppControl {
         sequenceLock[sequenceKey] = true;
     }
 
-    function _postOpsCall(bool solved, bytes calldata data) internal override returns (bool) {
+    function _postOpsCall(bool solved, bytes calldata data) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
 
-        if (!solved) return false;
+        if (!solved) revert();
 
         (bytes memory returnData) = abi.decode(data, (bytes));
 
@@ -199,8 +199,6 @@ contract V4DAppControl is DAppControl {
         V4DAppControl(hook).releaseLock(preOpsReturn.poolKey);
 
         delete _currentKey;
-
-        return true;
     }
 
     /////////////// EXTERNAL CALLS //////////////////
