@@ -238,9 +238,13 @@ contract Atlas is Escrow, Factory {
             // If we reach the zero bids on the left of array, break as all valid bids already checked.
             if (_bidAmountFound == 0) break;
 
+            // NOTE: We reuse the ctx.solverIndex variable to store the count of solver ops that have been executed.
+            // This count is useful in `_settle()` when we may penalize the bundler for overestimating gas limit of the
+            // metacall tx.
+            ctx.solverIndex = uint8(_bidsAndIndicesLastIndex - i);
+
             // Isolate the original solverOps index from the packed uint256 value
             uint256 _solverIndex = uint8(_bidsAndIndices[i] & _FIRST_16_BITS_TRUE_MASK);
-            ctx.solverIndex = uint8(_solverIndex); // Yay, compiler <3
 
             // Execute the solver operation. If solver won, allocate value and return. Otherwise continue looping.
             _bidAmountFound = _executeSolverOperation(
