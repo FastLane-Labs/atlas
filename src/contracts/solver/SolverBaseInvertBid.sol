@@ -24,6 +24,10 @@ contract SolverBaseInvertBid is ISolverContract {
     address internal immutable _atlas;
     bool internal immutable _bidRetrievalRequired;
 
+    error SolverCallUnsuccessful();
+    error InvalidEntry();
+    error InvalidCaller();
+
     constructor(address weth, address atlas, address owner, bool bidRetrievalRequired) {
         WETH_ADDRESS = weth;
         _owner = owner;
@@ -46,14 +50,13 @@ contract SolverBaseInvertBid is ISolverContract {
         receiveBids(executionEnvironment, bidToken, bidAmount)
     {
         (bool success,) = address(this).call{ value: msg.value }(solverOpData);
-
-        require(success, "CALL UNSUCCESSFUL");
+        if (!success) revert SolverCallUnsuccessful();
     }
 
     modifier safetyFirst(address executionEnvironment, address solverOpFrom) {
         // Safety checks
-        require(msg.sender == _atlas, "INVALID ENTRY");
-        require(solverOpFrom == _owner, "INVALID CALLER");
+        if (msg.sender != _atlas) revert InvalidEntry();
+        if (solverOpFrom != _owner) revert InvalidCaller();
 
         _;
 

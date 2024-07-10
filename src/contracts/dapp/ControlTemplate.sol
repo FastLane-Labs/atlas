@@ -6,8 +6,6 @@ import "../types/UserOperation.sol";
 import "../types/ConfigTypes.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
-import "forge-std/Test.sol";
-
 abstract contract DAppControlTemplate {
     uint32 internal constant DEFAULT_SOLVER_GAS_LIMIT = 1_000_000;
 
