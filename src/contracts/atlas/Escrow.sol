@@ -202,7 +202,7 @@ abstract contract Escrow is AtlETH {
         ctx.solverOutcome = uint24(_result);
 
         // Account for failed SolverOperation gas costs
-        _handleSolverAccounting(solverOp, _gasWaterMark, _result, !prevalidated);
+        _handleSolverAccounting(solverOp, _gasWaterMark, _result, !prevalidated, ctx.bidFind);
 
         emit SolverTxResult(solverOp.solver, solverOp.from, _result.executedWithError(), false, _result);
 

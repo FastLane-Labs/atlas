@@ -44,7 +44,7 @@ contract MockGasAccounting is GasAccounting, Test {
     }
 
     function assign(address owner, uint256 value, bool solverWon) external returns (uint256) {
-        return _assign(owner, value, solverWon, value);
+        return _assign(owner, value, value, solverWon, false);
     }
 
     function credit(address owner, uint256 value) external {
@@ -52,7 +52,7 @@ contract MockGasAccounting is GasAccounting, Test {
     }
 
     function releaseSolverLock(SolverOperation calldata solverOp, uint256 gasWaterMark, uint256 result) external {
-        _handleSolverAccounting(solverOp, gasWaterMark, result, true);
+        _handleSolverAccounting(solverOp, gasWaterMark, result, true, false);
     }
 
     function settle(address winningSolver, address bundler) external returns (uint256, uint256) {
