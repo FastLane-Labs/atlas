@@ -29,23 +29,9 @@ contract MockGasAccounting is TestAtlas, BaseTest {
         GasAccounting(_escrowDuration, _verification, _simulator, _surchargeRecipient, _l2GasCalculator)
     { }
 
-    function _balanceOf(address account) external view returns (uint112, uint112) {
-        return (s_balanceOf[account].balance, s_balanceOf[account].unbonding);
-    }
-
-    function initializeLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) external payable {
-        DAppConfig memory dConfig;
-        _setEnvironmentLock(dConfig, executionEnvironment);
-        _initializeAccountingValues(gasMarker);
-    }
-
-    function setPhase(ExecutionPhase _phase) external {
-        _setLockPhase(uint8(_phase));
-    }
-
-    function setSolverLock(address _solverFrom) external {
-        _setSolverLock(uint256(uint160(_solverFrom)));
-    }
+    /////////////////////////////////////////////////////////
+    //  Expose access to internal functions for testing    //
+    /////////////////////////////////////////////////////////
 
     function assign(address owner, uint256 value, bool solverWon) external returns (uint256) {
         return _assign(owner, value, value, solverWon);
@@ -72,6 +58,10 @@ contract MockGasAccounting is TestAtlas, BaseTest {
         return _settle(ctx, MOCK_SOLVER_GAS_LIMIT);
     }
 
+    /////////////////////////////////////////////////////////
+    //                 SETTERS & HELPERS                   //
+    /////////////////////////////////////////////////////////
+
     function buildContext(
         address bundler,
         bool solverSuccessful,
@@ -97,6 +87,24 @@ contract MockGasAccounting is TestAtlas, BaseTest {
             isSimulation: false,
             callDepth: 0
         });
+    }
+
+    function setPhase(ExecutionPhase _phase) external {
+        _setLockPhase(uint8(_phase));
+    }
+
+    function setSolverLock(address _solverFrom) external {
+        _setSolverLock(uint256(uint160(_solverFrom)));
+    }
+
+    function _balanceOf(address account) external view returns (uint112, uint112) {
+        return (s_balanceOf[account].balance, s_balanceOf[account].unbonding);
+    }
+
+    function initializeLock(address executionEnvironment, uint256 gasMarker, uint256 userOpValue) external payable {
+        DAppConfig memory dConfig;
+        _setEnvironmentLock(dConfig, executionEnvironment);
+        _initializeAccountingValues(gasMarker);
     }
 
     function increaseBondedBalance(address account, uint256 amount) external {
@@ -182,7 +190,7 @@ contract GasAccountingTest is AtlasConstants, BaseTes {
 
     function initializeTestAtlasSlots() internal {
         mockGasAccounting.clearTransientStorage();
-        mockGasAccounting.setLock(Lock(address(0), 0, 0));
+        mockGasAccounting.setLock(address(0), 0, 0);
         mockGasAccounting.setSolverLock(0);
         mockGasAccounting.setSolverTo(address(0));
         mockGasAccounting.setClaims(0);
@@ -490,7 +498,7 @@ contract GasAccountingTest is AtlasConstants, BaseTes {
         uint256 bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
         uint256 depositsBefore = mockGasAccounting.deposits();
         (uint112 unbondingBefore,) = mockGasAccounting._balanceOf(solverOp.from);
-        vm.expectRevert(AtlasErrors.ValueTooLarge.selector);
+        vm.expectRevert("SafeCast: value doesn't fit in 112 bits");
         mockGasAccounting.assign(solverOp.from, assignedAmount, true);
 
         // Check assign reverted with overflow, and accounting values did not change
@@ -525,7 +533,7 @@ contract GasAccountingTest is AtlasConstants, BaseTes {
 
         // Testing uint112 boundary values for casting from uint256 to uint112 in _credit()
         uint256 overflowAmount = uint256(type(uint112).max) + 1;
-        vm.expectRevert(AtlasErrors.ValueTooLarge.selector);
+        vm.expectRevert("SafeCast: value doesn't fit in 112 bits");
         mockGasAccounting.credit(solverOp.from, overflowAmount);
         vm.revertTo(snapshotId);
     }
