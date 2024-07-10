@@ -6,8 +6,10 @@ import "forge-std/Test.sol";
 import { GasAccounting } from "src/contracts/atlas/GasAccounting.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import { AtlasConstants } from "src/contracts/types/AtlasConstants.sol";
 
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
+import { IL2GasCalculator } from "src/contracts/interfaces/IL2GasCalculator.sol";
 
 import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
@@ -100,9 +102,19 @@ contract MockGasAccounting is GasAccounting, Test {
     function calldataLengthPremium() external pure returns (uint256) {
         return _CALLDATA_LENGTH_PREMIUM;
     }
+
+    function getCalldataCost(uint256 length) external view returns (uint256) {
+        return _getCalldataCost(length);
+    }
 }
 
-contract GasAccountingTest is Test {
+contract MockGasCalculator is IL2GasCalculator, Test {
+    function getCalldataCost(uint256 length) external view returns (uint256 calldataCostETH) {
+        calldataCostETH = length * 16;
+    }
+}
+
+contract GasAccountingTest is AtlasConstants, Test {
     MockGasAccounting public mockGasAccounting;
     address executionEnvironment = makeAddr("executionEnvironment");
 
@@ -521,6 +533,13 @@ contract GasAccountingTest is Test {
         mockGasAccounting.settle(solverOp.from, bundler);
         (bondedAfter,,,,) = mockGasAccounting.accessData(solverOp.from);
         assertGt(bondedAfter, bondedBefore);
+    }
+
+    function test_l2GasCalculatorCall() public {
+        IL2GasCalculator gasCalculator = new MockGasCalculator();
+        MockGasAccounting l2GasAccounting = new MockGasAccounting(0, address(0), address(0), address(0), address(gasCalculator));
+    
+        assertEq(l2GasAccounting.getCalldataCost(100), (100 + _SOLVER_OP_BASE_CALLDATA) * 16);
     }
 
     // function test_bundlerReimbursement() public {
