@@ -420,6 +420,11 @@ abstract contract GasAccounting is SafetyLocks {
         return (claimsPaidToBundler, netAtlasGasSurcharge);
     }
 
+    /// @notice Updates auctionWins, auctionFails, and totalGasUsed values of a solver's EscrowAccountAccessData.
+    /// @dev This function is only ever called in the context of bidFind = false so no risk of doublecounting changes.
+    /// @param aData The Solver's EscrowAccountAccessData struct to update.
+    /// @param auctionWon A boolean indicating whether the solver's solverOp won the auction.
+    /// @param gasUsed The amount of gas used by the solverOp.
     function _updateAnalytics(EscrowAccountAccessData memory aData, bool auctionWon, uint256 gasUsed) internal pure {
         if (auctionWon) {
             unchecked {
