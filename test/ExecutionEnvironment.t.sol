@@ -358,6 +358,7 @@ contract ExecutionEnvironmentTest is BaseTest {
     }
 
     function test_solverPostTryCatch_BidNotPaid_InvalidBalanceAdjustment() public {
+        // Take a snapshot of the current state
         uint256 snapshot = vm.snapshot();
 
         // Set up for floor > ceiling scenario
@@ -374,16 +375,20 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverOp.from = solver;
         solverOp.control = address(dAppControl);
         solverOp.solver = address(solverContract);
-        // BidNotPaid (floor > ceiling)
+
+        // Create the postTryCatchMetaData with the invalid floor > ceiling scenario
         postTryCatchMetaData = abi.encodeWithSelector(
             executionEnvironment.solverPostTryCatch.selector, solverOp, new bytes(0), solverTracker
         );
         postTryCatchMetaData = abi.encodePacked(postTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
+
+        // Expect the revert with the specific error
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.BidNotPaid_InvalidBalanceAdjustment.selector);
         (bool revertsAsExpected,) = address(executionEnvironment).call(postTryCatchMetaData);
-        assertTrue(revertsAsExpected, "expectRevert BidNotPaid: call did not revert");
+        assertTrue(revertsAsExpected, "expectRevert BidNotPaid_InvalidBalanceAdjustment: call did not revert");
 
+        // Revert to the original snapshot to clean up any state changes
         vm.revertTo(snapshot);
     }
 

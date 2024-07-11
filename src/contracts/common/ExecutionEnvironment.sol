@@ -176,8 +176,8 @@ contract ExecutionEnvironment is Base {
         onlyAtlasEnvironment
         returns (SolverTracker memory)
     {
-        // Record the initial balance before postSolverCall
-        uint256 initialBalance =
+        // Record the final balance after postSolverCall
+        uint256 finalBalance =
             solverTracker.etherIsBidToken ? address(this).balance : IERC20(solverOp.bidToken).balanceOf(address(this));
 
         // Ensure postSolverCall records balance correctly
@@ -187,10 +187,6 @@ contract ExecutionEnvironment is Base {
             (success,) = _control().delegatecall(data);
             if (!success) revert AtlasErrors.PostSolverFailed();
         }
-
-        // Record the final balance after postSolverCall
-        uint256 finalBalance =
-            solverTracker.etherIsBidToken ? address(this).balance : IERC20(solverOp.bidToken).balanceOf(address(this));
 
         // Update floor and ceiling based on whether bids are inverted or not using shorthand if statements
         solverTracker.invertsBidValue ? solverTracker.floor = finalBalance : solverTracker.ceiling = finalBalance;
