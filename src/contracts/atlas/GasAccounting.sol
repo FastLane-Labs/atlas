@@ -2,6 +2,7 @@
 pragma solidity 0.8.25;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 import { SafetyLocks } from "src/contracts/atlas/SafetyLocks.sol";
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { AccountingMath } from "src/contracts/libraries/AccountingMath.sol";
@@ -37,7 +38,16 @@ abstract contract GasAccounting is SafetyLocks {
         // Atlas surcharge is based on the raw claims value.
         _setFees(_rawClaims.getAtlasSurcharge());
         _setDeposits(msg.value);
-        // writeoffs and withdrawawls transient storage variables are already 0
+
+        // Explicitly set writeoffs and withdrawals to 0 in case multiple metacalls in single tx.
+        _setWriteoffs(0);
+        _setWithdrawals(0);
+
+        // Explicitly clear solverLock and solverTo in case multiple metacalls in single tx.
+        _setSolverLock(0);
+        _setSolverTo(address(0));
+
+        // The Lock slot is cleared at the end of the metacall, so no need to zero again here.
     }
 
     /// @notice Contributes ETH to the contract, increasing the deposits if a non-zero value is sent.
@@ -174,7 +184,7 @@ abstract contract GasAccounting is SafetyLocks {
         returns (uint256 deficit)
     {
         if (amount > type(uint112).max) revert ValueTooLarge();
-        uint112 _amt = uint112(amount);
+        uint112 _amt = SafeCast.toUint112(amount);
 
         EscrowAccountAccessData memory _aData = S_accessData[owner];
 
@@ -200,7 +210,7 @@ abstract contract GasAccounting is SafetyLocks {
             } else {
                 // The unbonding balance is sufficient to cover the remaining amount owed. Draw everything from the
                 // bonded balance, and adjust the unbonding balance accordingly.
-                s_balanceOf[owner].unbonding = uint112(_total - _amt);
+                s_balanceOf[owner].unbonding = SafeCast.toUint112(_total - _amt);
                 _aData.bonded = 0;
             }
         } else {
@@ -223,8 +233,7 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param owner The address of the owner whose bonded balance will be increased.
     /// @param amount The amount by which to increase the owner's bonded balance.
     function _credit(address owner, uint256 amount, uint256 gasUsed) internal {
-        if (amount > type(uint112).max) revert ValueTooLarge();
-        uint112 _amt = uint112(amount);
+        uint112 _amt = SafeCast.toUint112(amount);
 
         EscrowAccountAccessData memory _aData = S_accessData[owner];
 

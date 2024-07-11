@@ -5,11 +5,11 @@ import { AtlasConstants } from "src/contracts/types/AtlasConstants.sol";
 
 contract NonceManager is AtlasConstants {
     // address => last used sequential nonce
-    mapping(address => uint256) public S_userSequentialNonceTrackers;
-    mapping(address => uint256) public S_dAppSequentialNonceTrackers;
+    mapping(address => uint256) internal S_userSequentialNonceTrackers;
+    mapping(address => uint256) internal S_dAppSequentialNonceTrackers;
 
     // address => word index => bitmap
-    mapping(address => mapping(uint248 => uint256)) public S_userNonSequentialNonceTrackers;
+    mapping(address => mapping(uint248 => uint256)) internal S_userNonSequentialNonceTrackers;
 
     // NOTE: Non-sequential nonces are only enabled for users. If dApps nonces are not set to be sequential, their
     // validation is not enforced.

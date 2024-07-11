@@ -356,11 +356,11 @@ contract MockAtlasForPermit69Tests is Atlas {
         address _activeEnvironment,
         uint32 callConfig
     ) public {
-        _setLock(Lock({
+        _setLock({
             activeEnvironment: _activeEnvironment,
             callConfig: callConfig,
             phase: uint8(ExecutionPhase.Uninitialized)
-        }));
+        });
     }
 
     function setPhase(ExecutionPhase _phase) public {

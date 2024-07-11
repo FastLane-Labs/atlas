@@ -174,7 +174,7 @@ abstract contract Escrow is AtlETH {
         if (_result.canExecute()) {
             uint256 _gasLimit;
             // Verify gasLimit again
-            (_result, _gasLimit) = _validateSolverOpGas(dConfig, solverOp, _gasWaterMark, _result);
+            (_result, _gasLimit) = _validateSolverOpGasAndValue(dConfig, solverOp, _gasWaterMark, _result);
             _result |= _validateSolverOpDeadline(solverOp, dConfig);
 
             // Check for trusted operation hash
@@ -285,7 +285,7 @@ abstract contract Escrow is AtlETH {
     /// encountered.
     /// @return gasLimit The calculated gas limit for the SolverOperation, considering the operation's gas usage and
     /// the protocol's gas buffers.
-    function _validateSolverOpGas(
+    function _validateSolverOpGasAndValue(
         DAppConfig memory dConfig,
         SolverOperation calldata solverOp,
         uint256 gasWaterMark,
@@ -403,7 +403,7 @@ abstract contract Escrow is AtlETH {
         );
 
         _result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, _result);
-        (_result, _gasLimit) = _validateSolverOpGas(dConfig, solverOp, _gasWaterMark, _result);
+        (_result, _gasLimit) = _validateSolverOpGasAndValue(dConfig, solverOp, _gasWaterMark, _result);
         _result |= _validateSolverOpDeadline(solverOp, dConfig);
 
         // Verify the transaction.

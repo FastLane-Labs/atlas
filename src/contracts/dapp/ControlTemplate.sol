@@ -6,8 +6,6 @@ import "../types/UserOperation.sol";
 import "../types/ConfigTypes.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
-import "forge-std/Test.sol";
-
 abstract contract DAppControlTemplate {
     uint32 internal constant DEFAULT_SOLVER_GAS_LIMIT = 1_000_000;
 
@@ -120,7 +118,7 @@ abstract contract DAppControlTemplate {
     //      Function: Executing the function set by DAppControl
     //      Container: Inside of the FastLane ExecutionEnvironment
     //      Access: Storage access (read+write) to the ExecutionEnvironment contract
-    function _postOpsCall(bool, bytes calldata) internal virtual returns (bool) {
+    function _postOpsCall(bool, bytes calldata) internal virtual {
         revert AtlasErrors.NotImplemented();
     }
 

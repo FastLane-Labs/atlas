@@ -21,8 +21,6 @@ import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.
 abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     using CallBits for uint32;
 
-    uint8 private constant _CONTROL_DEPTH = 1 << 2;
-
     uint32 public immutable CALL_CONFIG;
     address public immutable CONTROL;
     address public immutable ATLAS_VERIFICATION;
@@ -138,9 +136,9 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     }
 
     /// @notice The postOpsCall hook which may be called as the last phase of a `metacall` transaction.
+    /// @dev Should revert if any DApp-specific checks fail.
     /// @param solved Boolean indicating whether a winning SolverOperation was executed successfully.
     /// @param data Data returned from the previous call phase.
-    /// @return Boolean indicating whether the postOpsCall was successful.
     function postOpsCall(
         bool solved,
         bytes calldata data
@@ -150,9 +148,8 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         validControl
         onlyAtlasEnvironment
         onlyPhase(ExecutionPhase.PostOps)
-        returns (bool)
     {
-        return _postOpsCall(solved, data);
+        _postOpsCall(solved, data);
     }
 
     function userDelegated() external view returns (bool delegated) {

@@ -106,10 +106,9 @@ contract ExecutionEnvironment is Base {
         bytes memory _data = _forward(abi.encodeCall(IDAppControl.postOpsCall, (solved, returnData)));
 
         bool _success;
-        (_success, _data) = _control().delegatecall(_data);
+        (_success,) = _control().delegatecall(_data);
 
         if (!_success) revert AtlasErrors.PostOpsDelegatecallFail();
-        if (!abi.decode(_data, (bool))) revert AtlasErrors.PostOpsDelegatecallReturnedFalse();
     }
 
     /// @notice The solverPreTryCatch function is called by Atlas to execute the preSolverCall part of each
@@ -138,9 +137,8 @@ contract ExecutionEnvironment is Base {
             solverTracker.invertsBidValue = true;
             // if invertsBidValue, record ceiling now
             // inventory to send to solver must have been transferred in by userOp or preOp call
-            solverTracker.ceiling = solverTracker.etherIsBidToken
-                ? address(this).balance
-                : IERC20(solverOp.bidToken).balanceOf(address(this));
+            solverTracker.ceiling =
+                solverTracker.etherIsBidToken ? address(this).balance : _tryBalanceOf(solverOp.bidToken, true);
         }
 
         // Handle any solver preOps, if necessary
@@ -156,9 +154,8 @@ contract ExecutionEnvironment is Base {
         // bidValue is not inverted; Higher bids are better; solver must deposit >= bidAmount
         if (!solverTracker.invertsBidValue) {
             // if not invertsBidValue, record floor now
-            solverTracker.floor = solverTracker.etherIsBidToken
-                ? address(this).balance
-                : IERC20(solverOp.bidToken).balanceOf(address(this));
+            solverTracker.floor =
+                solverTracker.etherIsBidToken ? address(this).balance : _tryBalanceOf(solverOp.bidToken, true);
         }
     }
 
@@ -182,9 +179,8 @@ contract ExecutionEnvironment is Base {
         // bidValue is inverted; Lower bids are better; solver must withdraw <= bidAmount
         if (solverTracker.invertsBidValue) {
             // if invertsBidValue, record floor now
-            solverTracker.floor = solverTracker.etherIsBidToken
-                ? address(this).balance
-                : IERC20(solverOp.bidToken).balanceOf(address(this));
+            solverTracker.floor =
+                solverTracker.etherIsBidToken ? address(this).balance : _tryBalanceOf(solverOp.bidToken, false);
         }
 
         if (_config().needsSolverPostCall()) {
@@ -199,9 +195,8 @@ contract ExecutionEnvironment is Base {
         // bidValue is not inverted; Higher bids are better; solver must deposit >= bidAmount
         if (!solverTracker.invertsBidValue) {
             // if not invertsBidValue, record ceiling now
-            solverTracker.ceiling = solverTracker.etherIsBidToken
-                ? address(this).balance
-                : IERC20(solverOp.bidToken).balanceOf(address(this));
+            solverTracker.ceiling =
+                solverTracker.etherIsBidToken ? address(this).balance : _tryBalanceOf(solverOp.bidToken, false);
         }
 
         // Make sure the numbers add up and that the bid was paid
@@ -242,7 +237,7 @@ contract ExecutionEnvironment is Base {
         allocateData = _forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, bidAmount, allocateData)));
 
         (bool _success,) = _control().delegatecall(allocateData);
-        if (!_success) revert AtlasErrors.AllocateValueDelegatecallFail();
+        if (!_success && !_config().allowAllocateValueFailure()) revert AtlasErrors.AllocateValueDelegatecallFail();
 
         uint256 _balance = address(this).balance;
         if (_balance > 0) {
@@ -308,6 +303,21 @@ contract ExecutionEnvironment is Base {
     /// @return address The address of the Atlas/Escrow contract.
     function getEscrow() external view returns (address) {
         return ATLAS;
+    }
+
+    /// @notice Calls balanceOf of an arbitrary ERC20 token, and reverts with either a PreSolverFailed or
+    /// PostSolverFailed, depending on the context in which this function is called, if any error occurs.
+    /// @dev This stops malicious errors from bubbling up to the Atlas contract, and triggering unexpected behavior.
+    function _tryBalanceOf(address token, bool inPreSolver) internal view returns (uint256) {
+        (bool success, bytes memory data) = token.staticcall(abi.encodeCall(IERC20.balanceOf, address(this)));
+
+        if (!success) {
+            if (inPreSolver) revert AtlasErrors.PreSolverFailed();
+            revert AtlasErrors.PostSolverFailed();
+        }
+
+        // If the balanceOf call did not revert, decode result to uint256 and return
+        return abi.decode(data, (uint256));
     }
 
     receive() external payable { }

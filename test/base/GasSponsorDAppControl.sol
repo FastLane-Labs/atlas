@@ -40,14 +40,11 @@ contract GasSponsorDAppControl is DAppControl {
         return data;
     }
 
-    function _postOpsCall(bool, bytes calldata data) internal pure virtual override returns (bool) {
-        if (data.length == 0) {
-            return true;
-        }
+    function _postOpsCall(bool, bytes calldata data) internal pure virtual override {
+        if (data.length == 0) return;
 
         (bool shouldRevert) = abi.decode(data, (bool));
         require(!shouldRevert, "_postOpsCall revert requested");
-        return true;
     }
 
     function _preSolverCall(SolverOperation calldata, bytes calldata returnData) internal pure virtual override {
