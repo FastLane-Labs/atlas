@@ -416,7 +416,7 @@ abstract contract Escrow is AtlETH {
         }
 
         (bool _success, bytes memory _data) = address(this).call{ gas: _gasLimit }(
-            abi.encodeCall(this.solverCall, (ctx, solverOp, solverOp.bidAmount, _gasLimit, returnData))
+            abi.encodeCall(this.solverCall, (ctx, solverOp, solverOp.bidAmount, returnData))
         );
 
         // The `solverCall()` above should always revert as key.bidFind is always true when it's called in the context
@@ -508,9 +508,8 @@ abstract contract Escrow is AtlETH {
         // Calls the solverCall function, just below this function, which will handle calling solverPreTryCatch and
         // solverPostTryCatch via the ExecutionEnvironment, and in between those two hooks, the actual solver call
         // directly from Atlas to the solver contract (not via the ExecutionEnvironment).
-        (bool _success, bytes memory _data) = address(this).call{ gas: gasLimit }(
-            abi.encodeCall(this.solverCall, (ctx, solverOp, bidAmount, gasLimit, returnData))
-        );
+        (bool _success, bytes memory _data) =
+            address(this).call{ gas: gasLimit }(abi.encodeCall(this.solverCall, (ctx, solverOp, bidAmount, returnData)));
 
         if (_success) {
             // If solverCall() was successful, intentionally leave uint256 result unset as 0 indicates success.
@@ -550,14 +549,12 @@ abstract contract Escrow is AtlETH {
     /// @param ctx The Context struct containing lock data and the Execution Environment address.
     /// @param solverOp The SolverOperation to be executed.
     /// @param bidAmount The bid amount associated with the SolverOperation.
-    /// @param gasLimit The gas limit for executing the SolverOperation.
     /// @param returnData Data returned from previous call phases.
     /// @return solverTracker Additional data for handling the solver's bid in different scenarios.
     function solverCall(
         Context memory ctx,
         SolverOperation calldata solverOp,
         uint256 bidAmount,
-        uint256 gasLimit,
         bytes calldata returnData
     )
         external
@@ -607,7 +604,7 @@ abstract contract Escrow is AtlETH {
 
         // Optimism's SafeCall lib allows us to limit how much returndata gets copied to memory, to prevent OOG attacks.
         _success = solverOp.solver.safeCall(
-            gasLimit,
+            gasleft(),
             solverOp.value,
             abi.encodeCall(
                 ISolverContract.atlasSolverCall,
