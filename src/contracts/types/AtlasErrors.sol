@@ -21,6 +21,7 @@ contract AtlasErrors {
 
     error InvalidSolver();
     error BidNotPaid();
+    error BidNotPaid_InvalidBalanceAdjustment();
     error BalanceNotReconciled();
     error SolverOpReverted();
     error AlteredControl();

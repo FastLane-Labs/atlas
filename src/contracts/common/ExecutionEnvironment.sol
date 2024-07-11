@@ -176,47 +176,41 @@ contract ExecutionEnvironment is Base {
         onlyAtlasEnvironment
         returns (SolverTracker memory)
     {
-        // bidValue is inverted; Lower bids are better; solver must withdraw <= bidAmount
-        if (solverTracker.invertsBidValue) {
-            // if invertsBidValue, record floor now
-            solverTracker.floor =
-                solverTracker.etherIsBidToken ? address(this).balance : _tryBalanceOf(solverOp.bidToken, false);
-        }
+        // Record the initial balance before postSolverCall
+        uint256 initialBalance =
+            solverTracker.etherIsBidToken ? address(this).balance : IERC20(solverOp.bidToken).balanceOf(address(this));
 
+        // Ensure postSolverCall records balance correctly
         if (_config().needsSolverPostCall()) {
-            bool _success;
-
-            bytes memory _data = _forward(abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData)));
-            (_success,) = _control().delegatecall(_data);
-
-            if (!_success) revert AtlasErrors.PostSolverFailed();
+            bool success;
+            bytes memory data = _forward(abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData)));
+            (success,) = _control().delegatecall(data);
+            if (!success) revert AtlasErrors.PostSolverFailed();
         }
 
-        // bidValue is not inverted; Higher bids are better; solver must deposit >= bidAmount
-        if (!solverTracker.invertsBidValue) {
-            // if not invertsBidValue, record ceiling now
-            solverTracker.ceiling =
-                solverTracker.etherIsBidToken ? address(this).balance : _tryBalanceOf(solverOp.bidToken, false);
+        // Record the final balance after postSolverCall
+        uint256 finalBalance =
+            solverTracker.etherIsBidToken ? address(this).balance : IERC20(solverOp.bidToken).balanceOf(address(this));
+
+        // Update floor and ceiling based on whether bids are inverted or not using shorthand if statements
+        solverTracker.invertsBidValue ? solverTracker.floor = finalBalance : solverTracker.ceiling = finalBalance;
+
+        // Calculate the net bid, revert if floor is greater than ceiling
+        if (solverTracker.ceiling < solverTracker.floor) {
+            revert AtlasErrors.BidNotPaid_InvalidBalanceAdjustment();
+        }
+        uint256 netBid = solverTracker.ceiling - solverTracker.floor;
+
+        // Check the bid conditions
+        if (
+            (!solverTracker.invertsBidValue && netBid < solverTracker.bidAmount)
+                || (solverTracker.invertsBidValue && netBid > solverTracker.bidAmount)
+        ) {
+            revert AtlasErrors.BidNotPaid();
         }
 
-        // Make sure the numbers add up and that the bid was paid
-        if (solverTracker.floor > solverTracker.ceiling) revert AtlasErrors.BidNotPaid();
-
-        // The solver net bid is the token difference before and after the solver call.
-        // WARNING: There could be scenarios where the above assumption need not hold. For example, the solver could
-        // trigger an airdrop to the execution environment, which would increase the balance of the execution
-        // environment without the solver paying any bids.
-        uint256 _netBid = solverTracker.ceiling - solverTracker.floor;
-
-        // If bids aren't inverted, revert if net amount received is less than the bid
-        if (!solverTracker.invertsBidValue && _netBid < solverTracker.bidAmount) revert AtlasErrors.BidNotPaid();
-
-        // If bids are inverted, revert if the net amount sent is more than the bid
-        if (solverTracker.invertsBidValue && _netBid > solverTracker.bidAmount) revert AtlasErrors.BidNotPaid();
-
-        // Update the bidAmount to the bid received
-        solverTracker.bidAmount = _netBid;
-
+        // Update the bidAmount to the net bid
+        solverTracker.bidAmount = netBid;
         return solverTracker;
     }
 
