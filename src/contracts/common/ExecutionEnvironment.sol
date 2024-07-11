@@ -176,9 +176,9 @@ contract ExecutionEnvironment is Base {
         onlyAtlasEnvironment
         returns (SolverTracker memory)
     {
-        // Record the final balance after postSolverCall
-        uint256 finalBalance =
-            solverTracker.etherIsBidToken ? address(this).balance : IERC20(solverOp.bidToken).balanceOf(address(this));
+        // Record the final bid balance before postSolverCall
+        uint256 finalBidBalance =
+            solverTracker.etherIsBidToken ? address(this).balance : _tryBalanceOf(solverOp.bidToken, false);
 
         // Ensure postSolverCall records balance correctly
         if (_config().needsSolverPostCall()) {
@@ -188,8 +188,14 @@ contract ExecutionEnvironment is Base {
             if (!success) revert AtlasErrors.PostSolverFailed();
         }
 
-        // Update floor and ceiling based on whether bids are inverted or not using shorthand if statements
-        solverTracker.invertsBidValue ? solverTracker.floor = finalBalance : solverTracker.ceiling = finalBalance;
+        // Update floor and ceiling based on whether bids are inverted or not
+        if (solverTracker.invertsBidValue) {
+            // For inverted bids (lower bids are better), set balance as floor
+            solverTracker.floor = finalBidBalance;
+        } else {
+            // For non-inverted bids (higher bids are better), set balance as ceiling
+            solverTracker.ceiling = finalBidBalance;
+        }
 
         // Calculate the net bid, revert if floor is greater than ceiling
         if (solverTracker.ceiling < solverTracker.floor) {
