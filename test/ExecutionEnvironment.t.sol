@@ -328,10 +328,130 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertTrue(revertsAsExpected, "expectRevert PreSolverFailed: call did not revert");
     }
 
-    function test_solverPostTryCatch_SkipCoverage() public {
-        bytes memory postTryCatchMetaData;
-        bool revertsAsExpected;
+    function test_solverPostTryCatch_Valid() public {
+        uint256 snapshot = vm.snapshot();
 
+        // Set up for a valid scenario
+        bytes memory postTryCatchMetaData;
+        vm.prank(solver);
+        MockSolverContract solverContract = new MockSolverContract(chain.weth, address(atlas));
+
+        SolverTracker memory solverTracker;
+        solverTracker.etherIsBidToken = true;
+        solverTracker.floor = 0;
+        solverTracker.ceiling = 1_000_000_000_000_000_000; // Ensure netBid calculation is correct
+
+        SolverOperation memory solverOp;
+        solverOp.from = solver;
+        solverOp.control = address(dAppControl);
+        solverOp.solver = address(solverContract);
+
+        postTryCatchMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverPostTryCatch.selector, solverOp, new bytes(0), solverTracker
+        );
+        postTryCatchMetaData = abi.encodePacked(postTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
+        vm.prank(address(atlas));
+        (bool status,) = address(executionEnvironment).call(postTryCatchMetaData);
+        assertTrue(status, "solverPostTryCatch failed");
+
+        vm.revertTo(snapshot);
+    }
+
+    function test_solverPostTryCatch_BidNotPaid_InvalidBalanceAdjustment() public {
+        uint256 snapshot = vm.snapshot();
+
+        // Set up for floor > ceiling scenario
+        bytes memory postTryCatchMetaData;
+        vm.prank(solver);
+        MockSolverContract solverContract = new MockSolverContract(chain.weth, address(atlas));
+
+        SolverTracker memory solverTracker;
+        solverTracker.etherIsBidToken = true;
+        solverTracker.floor = 1_000_000_000_000_000_001; // Set floor greater than ceiling to trigger the revert
+        solverTracker.ceiling = 1_000_000_000_000_000_000;
+
+        SolverOperation memory solverOp;
+        solverOp.from = solver;
+        solverOp.control = address(dAppControl);
+        solverOp.solver = address(solverContract);
+        // BidNotPaid (floor > ceiling)
+        postTryCatchMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverPostTryCatch.selector, solverOp, new bytes(0), solverTracker
+        );
+        postTryCatchMetaData = abi.encodePacked(postTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
+        vm.prank(address(atlas));
+        vm.expectRevert(AtlasErrors.BidNotPaid_InvalidBalanceAdjustment.selector);
+        (bool revertsAsExpected,) = address(executionEnvironment).call(postTryCatchMetaData);
+        assertTrue(revertsAsExpected, "expectRevert BidNotPaid: call did not revert");
+
+        vm.revertTo(snapshot);
+    }
+
+    function test_solverPostTryCatch_BidNotPaid_NetBidLessThanBidAmount() public {
+        uint256 snapshot = vm.snapshot();
+
+        bytes memory postTryCatchMetaData;
+        vm.prank(solver);
+        MockSolverContract solverContract = new MockSolverContract(chain.weth, address(atlas));
+
+        SolverTracker memory solverTracker;
+        solverTracker.etherIsBidToken = true;
+        solverTracker.floor = 0;
+        solverTracker.bidAmount = 1;
+
+        SolverOperation memory solverOp;
+        solverOp.from = solver;
+        solverOp.control = address(dAppControl);
+        solverOp.solver = address(solverContract);
+
+        // BidNotPaid (!invertsBidValue && netBid < bidAmount)
+        postTryCatchMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverPostTryCatch.selector, solverOp, new bytes(0), solverTracker
+        );
+        postTryCatchMetaData = abi.encodePacked(postTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
+        vm.prank(address(atlas));
+        vm.expectRevert(AtlasErrors.BidNotPaid.selector);
+        (bool revertsAsExpected,) = address(executionEnvironment).call(postTryCatchMetaData);
+        assertTrue(revertsAsExpected, "expectRevert BidNotPaid: call did not revert");
+
+        vm.revertTo(snapshot);
+    }
+
+    function test_solverPostTryCatch_BidNotPaid_NetBidGreaterThanBidAmountInverts() public {
+        uint256 snapshot = vm.snapshot();
+
+        bytes memory postTryCatchMetaData;
+        vm.prank(solver);
+        MockSolverContract solverContract = new MockSolverContract(chain.weth, address(atlas));
+
+        SolverTracker memory solverTracker;
+        solverTracker.etherIsBidToken = true;
+        solverTracker.invertsBidValue = true;
+        solverTracker.bidAmount = 0;
+        solverTracker.ceiling = 1;
+
+        SolverOperation memory solverOp;
+        solverOp.from = solver;
+        solverOp.control = address(dAppControl);
+        solverOp.solver = address(solverContract);
+
+        // BidNotPaid (invertsBidValue && netBid > bidAmount)
+        postTryCatchMetaData = abi.encodeWithSelector(
+            executionEnvironment.solverPostTryCatch.selector, solverOp, new bytes(0), solverTracker
+        );
+        postTryCatchMetaData = abi.encodePacked(postTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
+        vm.prank(address(atlas));
+        vm.expectRevert(AtlasErrors.BidNotPaid.selector);
+        (bool revertsAsExpected,) = address(executionEnvironment).call(postTryCatchMetaData);
+        assertTrue(revertsAsExpected, "expectRevert BidNotPaid: call did not revert");
+
+        vm.revertTo(snapshot);
+    }
+
+    function test_solverPostTryCatch_PostSolverFailed() public {
+        uint256 snapshot = vm.snapshot();
+
+        bytes memory postTryCatchMetaData;
         vm.prank(solver);
         MockSolverContract solverContract = new MockSolverContract(chain.weth, address(atlas));
 
@@ -342,51 +462,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         solverOp.from = solver;
         solverOp.control = address(dAppControl);
         solverOp.solver = address(solverContract);
-
-        // Valid
-        postTryCatchMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverPostTryCatch.selector, solverOp, new bytes(0), solverTracker
-        );
-        postTryCatchMetaData = abi.encodePacked(postTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PostSolver));
-        vm.prank(address(atlas));
-        (bool status,) = address(executionEnvironment).call(postTryCatchMetaData);
-        assertTrue(status, "solverPostTryCatch failed");
-
-        // BidNotPaid (floor > ceiling)
-        solverTracker.floor = 1;
-        postTryCatchMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverPostTryCatch.selector, solverOp, new bytes(0), solverTracker
-        );
-        postTryCatchMetaData = abi.encodePacked(postTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
-        vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.BidNotPaid.selector);
-        (revertsAsExpected,) = address(executionEnvironment).call(postTryCatchMetaData);
-        assertTrue(revertsAsExpected, "expectRevert BidNotPaid: call did not revert");
-
-        // BidNotPaid (!invertsBidValue && netBid < bidAmount)
-        solverTracker.floor = 0;
-        solverTracker.bidAmount = 1;
-        postTryCatchMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverPostTryCatch.selector, solverOp, new bytes(0), solverTracker
-        );
-        postTryCatchMetaData = abi.encodePacked(postTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
-        vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.BidNotPaid.selector);
-        (revertsAsExpected,) = address(executionEnvironment).call(postTryCatchMetaData);
-        assertTrue(revertsAsExpected, "expectRevert BidNotPaid: call did not revert");
-
-        // BidNotPaid (invertsBidValue && netBid > bidAmount)
-        solverTracker.invertsBidValue = true;
-        solverTracker.bidAmount = 0;
-        solverTracker.ceiling = 1;
-        postTryCatchMetaData = abi.encodeWithSelector(
-            executionEnvironment.solverPostTryCatch.selector, solverOp, new bytes(0), solverTracker
-        );
-        postTryCatchMetaData = abi.encodePacked(postTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
-        vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.BidNotPaid.selector);
-        (revertsAsExpected,) = address(executionEnvironment).call(postTryCatchMetaData);
-        assertTrue(revertsAsExpected, "expectRevert BidNotPaid: call did not revert");
 
         // Change of config
         callConfig.postSolver = true;
@@ -401,10 +476,12 @@ contract ExecutionEnvironmentTest is BaseTest {
         postTryCatchMetaData = abi.encodePacked(postTryCatchMetaData, ctx.setAndPack(ExecutionPhase.PreSolver));
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PostSolverFailed.selector);
-        (revertsAsExpected,) = address(executionEnvironment).call(postTryCatchMetaData);
+        (bool revertsAsExpected,) = address(executionEnvironment).call(postTryCatchMetaData);
         assertTrue(revertsAsExpected, "expectRevert PostSolverFailed: call did not revert");
+
+        vm.revertTo(snapshot);
     }
-    
+
     function test_allocateValue_SkipCoverage() public {
         bytes memory allocateData;
         bool status;
@@ -430,11 +507,9 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(allocateData);
     }
 
-
     function test_withdrawERC20_SkipCoverage() public {
         // FIXME: fix before merging spearbit-reaudit branch
         vm.skip(true);
-
 
         // Valid
         deal(chain.weth, address(executionEnvironment), 2e18);
@@ -550,33 +625,17 @@ contract MockDAppControl is DAppControl {
     }
 
     function _postOpsCall(bool, bytes calldata data) internal view override {
-        console.log("before decode");
         bool shouldRevert = abi.decode(data, (bool));
-        console.log("after decode");
         require(!shouldRevert, "_postSolverCall revert requested");
     }
 
-    function _preSolverCall(
-        SolverOperation calldata,
-        bytes calldata returnData
-    )
-        internal
-        pure
-        override
-    {
+    function _preSolverCall(SolverOperation calldata, bytes calldata returnData) internal pure override {
         (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
         require(!shouldRevert, "_preSolverCall revert requested");
         if (!returnValue) revert("_preSolverCall returned false");
     }
 
-    function _postSolverCall(
-        SolverOperation calldata,
-        bytes calldata returnData
-    )
-        internal
-        pure
-        override
-    {
+    function _postSolverCall(SolverOperation calldata, bytes calldata returnData) internal pure override {
         (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
         require(!shouldRevert, "_postSolverCall revert requested");
         if (!returnValue) revert("_postSolverCall returned false");
