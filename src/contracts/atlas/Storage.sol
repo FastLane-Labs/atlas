@@ -53,7 +53,6 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint256 internal S_cumulativeSurcharge; // Cumulative gas surcharges collected
     address internal S_surchargeRecipient; // Fastlane surcharge recipient
     address internal S_pendingSurchargeRecipient; // For 2-step transfer process
-    address internal S_l2GasCalculator; // Gas calculator for L2s
 
     constructor(
         uint256 escrowDuration,
