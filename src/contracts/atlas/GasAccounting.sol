@@ -169,9 +169,19 @@ abstract contract GasAccounting is SafetyLocks {
     /// increase transient solver deposits.
     /// @param owner The address of the owner from whom AtlETH is taken.
     /// @param amount The amount of AtlETH to be taken.
+    /// @param gasUsed The amount of gas used in the SolverOperation.
     /// @param solverWon A boolean indicating whether the solver won the bid.
     /// @return deficit The amount of AtlETH that was not repaid, if any.
-    function _assign(address owner, uint256 amount, bool solverWon) internal returns (uint256 deficit) {
+    function _assign(
+        address owner,
+        uint256 amount,
+        uint256 gasUsed,
+        bool solverWon
+    )
+        internal
+        returns (uint256 deficit)
+    {
+        if (amount > type(uint112).max) revert ValueTooLarge();
         uint112 _amt = SafeCast.toUint112(amount);
 
         EscrowAccountAccessData memory _aData = S_accessData[owner];
@@ -206,19 +216,11 @@ abstract contract GasAccounting is SafetyLocks {
             _aData.bonded -= _amt;
         }
 
-        // Update aData vars before persisting changes in accessData
-        if (solverWon && deficit == 0) {
-            unchecked {
-                ++_aData.auctionWins;
-            }
-        } else {
-            unchecked {
-                ++_aData.auctionFails;
-            }
-        }
+        // Update analytics (auctionWins, auctionFails, totalGasUsed) and lastAccessedBlock
+        _updateAnalytics(_aData, solverWon && deficit == 0, gasUsed);
         _aData.lastAccessedBlock = uint32(block.number);
-        _aData.totalGasUsed += uint64(amount / _GAS_USED_DECIMALS_TO_DROP);
 
+        // Persist changes in the _aData memory struct back to storage
         S_accessData[owner] = _aData;
 
         S_bondedTotalSupply -= amount;
@@ -228,7 +230,7 @@ abstract contract GasAccounting is SafetyLocks {
     /// @notice Increases the owner's bonded balance by the specified amount.
     /// @param owner The address of the owner whose bonded balance will be increased.
     /// @param amount The amount by which to increase the owner's bonded balance.
-    function _credit(address owner, uint256 amount) internal {
+    function _credit(address owner, uint256 amount, uint256 gasUsed) internal {
         uint112 _amt = SafeCast.toUint112(amount);
 
         EscrowAccountAccessData memory _aData = S_accessData[owner];
@@ -238,10 +240,10 @@ abstract contract GasAccounting is SafetyLocks {
 
         S_bondedTotalSupply += amount;
 
-        unchecked {
-            ++_aData.auctionWins;
-        }
+        // Update analytics (auctionWins, auctionFails, totalGasUsed)
+        _updateAnalytics(_aData, true, gasUsed);
 
+        // Persist changes in the _aData memory struct back to storage
         S_accessData[owner] = _aData;
         _setWithdrawals(withdrawals() + amount);
     }
@@ -275,7 +277,8 @@ abstract contract GasAccounting is SafetyLocks {
             _setWriteoffs(writeoffs() + _gasUsed.withAtlasAndBundlerSurcharges());
         } else {
             // CASE: Solver failed, so we calculate what they owe.
-            _assign(solverOp.from, _gasUsed.withAtlasAndBundlerSurcharges(), false);
+            uint256 _gasUsedWithSurcharges = _gasUsed.withAtlasAndBundlerSurcharges();
+            _assign(solverOp.from, _gasUsedWithSurcharges, _gasUsedWithSurcharges, false);
         }
     }
 
@@ -378,6 +381,7 @@ abstract contract GasAccounting is SafetyLocks {
 
         uint256 _amountSolverPays;
         uint256 _amountSolverReceives;
+        uint256 _adjustedClaims = _claims - _writeoffs;
 
         // Calculate the balances that should be debited or credited to the solver and the bundler
         if (_deposits < _withdrawals) {
@@ -389,7 +393,6 @@ abstract contract GasAccounting is SafetyLocks {
         // Only force solver to pay gas claims if they aren't also the bundler
         // NOTE: If the auction isn't won, _winningSolver will be address(0).
         if (ctx.solverSuccessful && _winningSolver != ctx.bundler) {
-            uint256 _adjustedClaims = _claims - _writeoffs;
             _amountSolverPays += _adjustedClaims;
             claimsPaidToBundler = _adjustedClaims;
         } else {
@@ -402,11 +405,11 @@ abstract contract GasAccounting is SafetyLocks {
                 revert InsufficientTotalBalance(_amountSolverPays - _amountSolverReceives);
             }
 
-            uint256 _deficit = _assign(_winningSolver, _amountSolverPays - _amountSolverReceives, true);
+            uint256 _deficit = _assign(_winningSolver, _amountSolverPays - _amountSolverReceives, _adjustedClaims, true);
             if (_deficit > claimsPaidToBundler) revert InsufficientTotalBalance(_deficit - claimsPaidToBundler);
             claimsPaidToBundler -= _deficit;
         } else {
-            _credit(_winningSolver, _amountSolverReceives - _amountSolverPays);
+            _credit(_winningSolver, _amountSolverReceives - _amountSolverPays, _adjustedClaims);
         }
 
         // Set lock to FullyLocked to prevent any reentrancy possibility
@@ -415,6 +418,25 @@ abstract contract GasAccounting is SafetyLocks {
         if (claimsPaidToBundler != 0) SafeTransferLib.safeTransferETH(ctx.bundler, claimsPaidToBundler);
 
         return (claimsPaidToBundler, netAtlasGasSurcharge);
+    }
+
+    /// @notice Updates auctionWins, auctionFails, and totalGasUsed values of a solver's EscrowAccountAccessData.
+    /// @dev This function is only ever called in the context of bidFind = false so no risk of doublecounting changes.
+    /// @param aData The Solver's EscrowAccountAccessData struct to update.
+    /// @param auctionWon A boolean indicating whether the solver's solverOp won the auction.
+    /// @param gasUsed The amount of gas used by the solverOp.
+    function _updateAnalytics(EscrowAccountAccessData memory aData, bool auctionWon, uint256 gasUsed) internal pure {
+        if (auctionWon) {
+            unchecked {
+                ++aData.auctionWins;
+            }
+        } else {
+            unchecked {
+                ++aData.auctionFails;
+            }
+        }
+
+        aData.totalGasUsed += uint64(gasUsed / _GAS_USED_DECIMALS_TO_DROP);
     }
 
     /// @notice Calculates the gas cost of the calldata used to execute a SolverOperation.
