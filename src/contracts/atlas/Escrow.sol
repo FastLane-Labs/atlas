@@ -301,17 +301,6 @@ abstract contract Escrow is AtlETH {
             return (result, gasLimit); // gasLimit = 0
         }
 
-        if (solverOp.deadline != 0 && block.number > solverOp.deadline) {
-            result |= 1
-                << (
-                    dConfig.callConfig.allowsTrustedOpHash()
-                        ? uint256(SolverOutcome.DeadlinePassedAlt)
-                        : uint256(SolverOutcome.DeadlinePassed)
-                );
-
-            return (result, gasLimit); // gasLimit = 0
-        }
-
         gasLimit = AccountingMath.solverGasLimitScaledDown(solverOp.gas, dConfig.solverGasLimit) + _FASTLANE_GAS_BUFFER;
 
         uint256 _gasCost = (tx.gasprice * gasLimit) + _getCalldataCost(solverOp.data.length);
