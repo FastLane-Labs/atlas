@@ -16,6 +16,7 @@ import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.
 contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     IAtlasVerification public immutable VERIFICATION;
     address public immutable SIMULATOR;
+    address public immutable L2_GAS_CALCULATOR;
     uint256 public immutable ESCROW_DURATION;
 
     // AtlETH public constants
@@ -65,13 +66,13 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     {
         VERIFICATION = IAtlasVerification(verification);
         SIMULATOR = simulator;
+        L2_GAS_CALCULATOR = l2GasCalculator;
         ESCROW_DURATION = escrowDuration;
 
         // Gas Accounting
         // Initialized with msg.value to seed flash loan liquidity
         S_cumulativeSurcharge = msg.value;
         S_surchargeRecipient = initialSurchargeRecipient;
-        S_l2GasCalculator = l2GasCalculator;
 
         emit SurchargeRecipientTransferred(initialSurchargeRecipient);
     }

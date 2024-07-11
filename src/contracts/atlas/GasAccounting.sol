@@ -415,13 +415,13 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param calldataLength The length of the `data` field in the SolverOperation.
     /// @return calldataCost The gas cost of the calldata used to execute the SolverOperation.
     function _getCalldataCost(uint256 calldataLength) internal view returns (uint256 calldataCost) {
-        if (S_l2GasCalculator == address(0)) {
+        if (L2_GAS_CALCULATOR == address(0)) {
             // Default to using mainnet gas calculations
             // _SOLVER_OP_BASE_CALLDATA = SolverOperation calldata length excluding solverOp.data
             calldataCost = (calldataLength + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM * tx.gasprice;
         } else {
             calldataCost =
-                IL2GasCalculator(S_l2GasCalculator).getCalldataCost(calldataLength + _SOLVER_OP_BASE_CALLDATA);
+                IL2GasCalculator(L2_GAS_CALCULATOR).getCalldataCost(calldataLength + _SOLVER_OP_BASE_CALLDATA);
         }
     }
 
