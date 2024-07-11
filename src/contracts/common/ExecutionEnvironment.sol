@@ -226,6 +226,9 @@ contract ExecutionEnvironment is Base {
     /// @param bidToken The address of the token used for the winning SolverOperation's bid.
     /// @param bidAmount The winning bid amount.
     /// @param allocateData Data returned from the previous call phase.
+    /// @return allocateValueSucceeded Boolean indicating whether the allocateValue delegatecall succeeded (true) or
+    /// reverted (false). This is useful when allowAllocateValueFailure is set to true, the failure is caught here, but
+    /// we still need to communicate to Atlas that the hook did not succeed.
     function allocateValue(
         address bidToken,
         uint256 bidAmount,
@@ -233,6 +236,7 @@ contract ExecutionEnvironment is Base {
     )
         external
         onlyAtlasEnvironment
+        returns (bool allocateValueSucceeded)
     {
         allocateData = _forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, bidAmount, allocateData)));
 
@@ -243,6 +247,8 @@ contract ExecutionEnvironment is Base {
         if (_balance > 0) {
             IAtlas(ATLAS).contribute{ value: _balance }();
         }
+
+        return _success;
     }
 
     ///////////////////////////////////////
