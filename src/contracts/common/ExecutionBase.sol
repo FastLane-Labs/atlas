@@ -47,7 +47,6 @@ contract Base {
             _solverIndex(),
             _solverCount(),
             _phase(),
-            uint8(0),
             _solverOutcome(),
             _bidFind(),
             _simulation(),
@@ -120,13 +119,11 @@ contract Base {
         }
     }
 
-    // EMPTY 8BIT PLACEHOLDER AT shr(248, calldataload(sub(calldatasize(), 51)))
-
     /// @notice Extracts and returns the lock state bitmap of the current metacall tx, from calldata.
     /// @return phase The lock state bitmap of the current metacall tx, in uint8 form.
     function _phase() internal pure returns (uint8 phase) {
         assembly {
-            phase := shr(248, calldataload(sub(calldatasize(), 52)))
+            phase := shr(248, calldataload(sub(calldatasize(), 51)))
         }
     }
 
@@ -134,7 +131,7 @@ contract Base {
     /// @return solverCount The number of solverOps in the current metacall tx.
     function _solverCount() internal pure returns (uint8 solverCount) {
         assembly {
-            solverCount := shr(248, calldataload(sub(calldatasize(), 53)))
+            solverCount := shr(248, calldataload(sub(calldatasize(), 52)))
         }
     }
 
@@ -143,7 +140,7 @@ contract Base {
     /// @return solverIndex The count of executed solverOps in the current metacall tx.
     function _solverIndex() internal pure returns (uint8 solverIndex) {
         assembly {
-            solverIndex := shr(248, calldataload(sub(calldatasize(), 54)))
+            solverIndex := shr(248, calldataload(sub(calldatasize(), 53)))
         }
     }
 
@@ -153,7 +150,7 @@ contract Base {
     /// step in the current metacall tx.
     function _paymentsSuccessful() internal pure returns (bool paymentsSuccessful) {
         assembly {
-            paymentsSuccessful := shr(248, calldataload(sub(calldatasize(), 55)))
+            paymentsSuccessful := shr(248, calldataload(sub(calldatasize(), 54)))
         }
     }
 
@@ -163,7 +160,7 @@ contract Base {
     /// current metacall tx.
     function _solverSuccessful() internal pure returns (bool solverSuccessful) {
         assembly {
-            solverSuccessful := shr(248, calldataload(sub(calldatasize(), 56)))
+            solverSuccessful := shr(248, calldataload(sub(calldatasize(), 55)))
         }
     }
 
@@ -174,7 +171,7 @@ contract Base {
     /// @return bundler The current value of the bundler of the current metacall tx.
     function _bundler() internal pure returns (address bundler) {
         assembly {
-            bundler := shr(96, calldataload(sub(calldatasize(), 76)))
+            bundler := shr(96, calldataload(sub(calldatasize(), 75)))
         }
     }
 
