@@ -228,13 +228,18 @@ abstract contract Escrow is AtlETH {
         internal
         withLockPhase(ExecutionPhase.AllocateValue)
     {
-        (bool _success,) = ctx.executionEnvironment.call(
+        (bool _success, bytes memory _returnData) = ctx.executionEnvironment.call(
             abi.encodePacked(
                 abi.encodeCall(IExecutionEnvironment.allocateValue, (dConfig.bidToken, bidAmount, returnData)),
                 ctx.setAndPack(ExecutionPhase.AllocateValue)
             )
         );
 
+        // If the call from Atlas to EE succeeded, decode the return data to check if the allocateValue delegatecall
+        // from EE to DAppControl succeeded.
+        if (_success) _success = abi.decode(_returnData, (bool));
+
+        // Revert if allocateValue failed at any point, unless the call config allows allocate value failure.
         if (!_success && !dConfig.callConfig.allowAllocateValueFailure()) {
             if (ctx.isSimulation) revert AllocateValueSimFail();
             revert AllocateValueFail();

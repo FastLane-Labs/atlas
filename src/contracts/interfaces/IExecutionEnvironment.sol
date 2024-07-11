@@ -29,7 +29,13 @@ interface IExecutionEnvironment {
         external
         returns (SolverTracker memory);
 
-    function allocateValue(address bidToken, uint256 bidAmount, bytes memory returnData) external;
+    function allocateValue(
+        address bidToken,
+        uint256 bidAmount,
+        bytes memory returnData
+    )
+        external
+        returns (bool allocateValueSucceeded);
 
     function getUser() external pure returns (address user);
     function getControl() external pure returns (address control);
