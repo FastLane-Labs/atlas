@@ -132,13 +132,18 @@ contract ExecutionEnvironment is Base {
         solverTracker.bidAmount = bidAmount;
         solverTracker.etherIsBidToken = solverOp.bidToken == address(0);
 
+        // Record the initial balance before checking bid inversion
+        uint256 initialBalance =
+            solverTracker.etherIsBidToken ? address(this).balance : _tryBalanceOf(solverOp.bidToken, true);
+
         // bidValue is inverted; Lower bids are better; solver must withdraw <= bidAmount
+        // Update ceiling or floor based on whether bids are inverted or not
         if (_config().invertsBidValue()) {
             solverTracker.invertsBidValue = true;
-            // if invertsBidValue, record ceiling now
-            // inventory to send to solver must have been transferred in by userOp or preOp call
-            solverTracker.ceiling =
-                solverTracker.etherIsBidToken ? address(this).balance : _tryBalanceOf(solverOp.bidToken, true);
+            solverTracker.ceiling = initialBalance;
+        } else {
+            // bidValue is not inverted; Higher bids are better; solver must deposit >= bidAmount
+            solverTracker.floor = initialBalance;
         }
 
         // Handle any solver preOps, if necessary
@@ -149,13 +154,6 @@ contract ExecutionEnvironment is Base {
             (_success,) = _control().delegatecall(_data);
 
             if (!_success) revert AtlasErrors.PreSolverFailed();
-        }
-
-        // bidValue is not inverted; Higher bids are better; solver must deposit >= bidAmount
-        if (!solverTracker.invertsBidValue) {
-            // if not invertsBidValue, record floor now
-            solverTracker.floor =
-                solverTracker.etherIsBidToken ? address(this).balance : _tryBalanceOf(solverOp.bidToken, true);
         }
     }
 
