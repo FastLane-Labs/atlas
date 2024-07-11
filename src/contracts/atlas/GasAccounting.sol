@@ -171,14 +171,12 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param amount The amount of AtlETH to be taken.
     /// @param gasUsed The amount of gas used in the SolverOperation.
     /// @param solverWon A boolean indicating whether the solver won the bid.
-    /// @param bidFind A boolean indicating whether the call is in the context of `_bidFindingIteration()`.
     /// @return deficit The amount of AtlETH that was not repaid, if any.
     function _assign(
         address owner,
         uint256 amount,
         uint256 gasUsed,
-        bool solverWon,
-        bool bidFind
+        bool solverWon
     )
         internal
         returns (uint256 deficit)
@@ -219,7 +217,7 @@ abstract contract GasAccounting is SafetyLocks {
         }
 
         // Update analytics (auctionWins, auctionFails, totalGasUsed) and lastAccessedBlock
-        if (!bidFind) _updateAnalytics(_aData, solverWon && deficit == 0, gasUsed);
+        _updateAnalytics(_aData, solverWon && deficit == 0, gasUsed);
         _aData.lastAccessedBlock = uint32(block.number);
 
         // Persist changes in the _aData memory struct back to storage
@@ -257,13 +255,11 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param gasWaterMark The `gasleft()` watermark taken at the start of executing the SolverOperation.
     /// @param result The result bitmap of the SolverOperation execution.
     /// @param includeCalldata Whether to include calldata cost in the gas calculation.
-    /// @param bidFind A boolean indicating whether the call is in the context of `_bidFindingIteration()`.
     function _handleSolverAccounting(
         SolverOperation calldata solverOp,
         uint256 gasWaterMark,
         uint256 result,
-        bool includeCalldata,
-        bool bidFind
+        bool includeCalldata
     )
         internal
     {
@@ -282,7 +278,7 @@ abstract contract GasAccounting is SafetyLocks {
         } else {
             // CASE: Solver failed, so we calculate what they owe.
             uint256 _gasUsedWithSurcharges = _gasUsed.withAtlasAndBundlerSurcharges();
-            _assign(solverOp.from, _gasUsedWithSurcharges, _gasUsedWithSurcharges, false, bidFind);
+            _assign(solverOp.from, _gasUsedWithSurcharges, _gasUsedWithSurcharges, false);
         }
     }
 
@@ -409,8 +405,7 @@ abstract contract GasAccounting is SafetyLocks {
                 revert InsufficientTotalBalance(_amountSolverPays - _amountSolverReceives);
             }
 
-            uint256 _deficit =
-                _assign(_winningSolver, _amountSolverPays - _amountSolverReceives, _adjustedClaims, true, false);
+            uint256 _deficit = _assign(_winningSolver, _amountSolverPays - _amountSolverReceives, _adjustedClaims, true);
             if (_deficit > claimsPaidToBundler) revert InsufficientTotalBalance(_deficit - claimsPaidToBundler);
             claimsPaidToBundler -= _deficit;
         } else {
