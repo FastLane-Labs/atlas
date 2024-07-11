@@ -31,6 +31,7 @@ interface IAtlasVerification {
         external
         view
         returns (uint256 result);
+    function verifyCallConfig(uint32 callConfig) external view returns (ValidCallsResult);
     function getUserOperationHash(UserOperation calldata userOp) external view returns (bytes32 hash);
     function getUserOperationPayload(UserOperation calldata userOp) external view returns (bytes32 payload);
     function getSolverPayload(SolverOperation calldata solverOp) external view returns (bytes32 payload);
