@@ -226,21 +226,22 @@ contract V4SwapIntentControl is DAppControl {
         revert();
     }
 
-    // This occurs after a Solver has successfully paid their bid, which is
-    // held in ExecutionEnvironment.
+    /*
+    * @notice This function is called after a solver has successfully paid their bid
+    * @dev This function is delegatecalled: msg.sender = Atlas, address(this) = ExecutionEnvironment
+    * @dev transfers the bid amount to the user supports native ETH and ERC20 tokens
+    * @param bidToken The address of the token used for the winning SolverOperation's bid
+    * @param bidAmount The winning bid amount
+    * @param _
+    */
     function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Atlas
-        if (bidAmount == 0) {
-            return;
-        }
-
-        address user = _user();
         if (bidToken == address(0)) {
-            SafeTransferLib.safeTransferETH(user, address(this).balance);
+            SafeTransferLib.safeTransferETH(_user(), bidAmount);
         } else {
-            SafeTransferLib.safeTransfer(bidToken, user, bidAmount);
+            SafeTransferLib.safeTransfer(bidToken, _user(), bidAmount);
         }
     }
 

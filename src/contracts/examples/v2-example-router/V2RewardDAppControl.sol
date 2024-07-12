@@ -170,13 +170,10 @@ contract V2RewardDAppControl is DAppControl {
         token, so we don't have any more steps to take here)
     * @param bidToken The address of the token used for the winning SolverOperation's bid
     * @param bidAmount The winning bid amount
+    * @param _
     */
     function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
         require(bidToken == REWARD_TOKEN, "V2RewardDAppControl: InvalidBidToken");
-
-        if (bidAmount == 0) {
-            return;
-        }
 
         address user = _user();
 

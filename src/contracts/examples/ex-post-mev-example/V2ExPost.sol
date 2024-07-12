@@ -109,23 +109,20 @@ contract V2ExPost is DAppControl {
         return new bytes(0);
     }
 
-    // This occurs after a Solver has successfully paid their bid, which is
-    // held in ExecutionEnvironment.
+    /*
+    * @notice This function is called after a solver has successfully paid their bid
+    * @dev This function is delegatecalled: msg.sender = Atlas, address(this) = ExecutionEnvironment
+    * @dev transfers the bid amount to the user supports only WETH
+    * @param bidToken The address of the token used for the winning SolverOperation's bid
+    * @param bidAmount The winning bid amount
+    * @param _
+    */
     function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
-
-        if (bidAmount == 0) {
-            return;
-        }
-
-        address user = _user();
-        if (bidToken == address(0)) {
-            SafeTransferLib.safeTransferETH(user, address(this).balance);
-        } else {
-            SafeTransferLib.safeTransfer(bidToken, user, bidAmount);
-        }
+        require(bidToken == WETH, "V2ExPost: InvalidBidToken");
+        SafeTransferLib.safeTransfer(bidToken, _user(), bidAmount);
 
         /*
         // ENABLE FOR FOUNDRY TESTING
