@@ -66,29 +66,50 @@ contract FlashLoanTest is BaseTest {
 
         // Input params for Atlas.metacall() - will be populated below
 
-        UserOperation memory userOp = new UserOperationBuilder().withFrom(userEOA).withTo(address(atlas)).withGas(
-            1_000_000
-        ).withMaxFeePerGas(tx.gasprice + 1).withNonce(address(atlasVerification)).withDapp(address(control)).withControl(
-            address(control)
-        ).withCallConfig(control.CALL_CONFIG()).withDeadline(block.number + 2).withData(new bytes(0)).build();
+        UserOperation memory userOp = new UserOperationBuilder()
+            .withFrom(userEOA)
+            .withTo(address(atlas))
+            .withGas(1_000_000)
+            .withMaxFeePerGas(tx.gasprice + 1)
+            .withNonce(address(atlasVerification))
+            .withDapp(address(control))
+            .withControl(address(control))
+            .withCallConfig(control.CALL_CONFIG())
+            .withDeadline(block.number + 2)
+            .withData(new bytes(0))
+            .build();
 
         SolverOperation[] memory solverOps = new SolverOperation[](1);
-        solverOps[0] = new SolverOperationBuilder().withFrom(solverOneEOA).withTo(address(atlas)).withGas(1_000_000)
-            .withMaxFeePerGas(userOp.maxFeePerGas).withDeadline(userOp.deadline).withSolver(address(solver)).withControl(
-            address(control)
-        ).withUserOpHash(userOp).withBidToken(userOp).withBidAmount(1e18).withData(
-            abi.encodeWithSelector(SimpleSolver.noPayback.selector)
-        ).withValue(10e18).sign(address(atlasVerification), solverOnePK).build();
+        solverOps[0] = new SolverOperationBuilder()
+            .withFrom(solverOneEOA)
+            .withTo(address(atlas))
+            .withGas(1_000_000)
+            .withMaxFeePerGas(userOp.maxFeePerGas)
+            .withDeadline(userOp.deadline)
+            .withSolver(address(solver))
+            .withControl(address(control))
+            .withUserOpHash(userOp)
+            .withBidToken(userOp)
+            .withBidAmount(1e18)
+            .withData(abi.encodeWithSelector(SimpleSolver.noPayback.selector))
+            .withValue(10e18)
+            .sign(address(atlasVerification), solverOnePK)
+            .build();
 
         // Solver signs the solverOp
         (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Frontend creates dAppOp calldata after seeing rest of data
-        DAppOperation memory dAppOp = new DAppOperationBuilder().withFrom(governanceEOA).withTo(address(atlas))
-            .withNonce(address(atlasVerification), governanceEOA).withDeadline(userOp.deadline).withControl(
-            address(control)
-        ).withUserOpHash(userOp).withCallChainHash(userOp, solverOps).sign(address(atlasVerification), governancePK)
+        DAppOperation memory dAppOp = new DAppOperationBuilder()
+            .withFrom(governanceEOA)
+            .withTo(address(atlas))
+            .withNonce(address(atlasVerification), governanceEOA)
+            .withDeadline(userOp.deadline)
+            .withControl(address(control))
+            .withUserOpHash(userOp)
+            .withCallChainHash(userOp, solverOps)
+            .sign(address(atlasVerification), governancePK)
             .build();
 
         // Frontend signs the dAppOp payload
@@ -105,22 +126,35 @@ contract FlashLoanTest is BaseTest {
         vm.stopPrank();
 
         // now try it again with a valid solverOp - but dont fully pay back
-        solverOps[0] = new SolverOperationBuilder().withFrom(solverOneEOA).withTo(address(atlas)).withGas(1_000_000)
-            .withMaxFeePerGas(userOp.maxFeePerGas).withDeadline(userOp.deadline).withSolver(address(solver)).withControl(
-            address(control)
-        ).withUserOpHash(userOp).withBidToken(userOp).withBidAmount(1e18).withData(
-            abi.encodeWithSelector(SimpleSolver.onlyPayBid.selector, 1e18)
-        ).withValue(address(atlas).balance + 1).sign(address(atlasVerification), solverOnePK).build();
+        solverOps[0] = new SolverOperationBuilder()
+            .withFrom(solverOneEOA)
+            .withTo(address(atlas))
+            .withGas(1_000_000)
+            .withMaxFeePerGas(userOp.maxFeePerGas)
+            .withDeadline(userOp.deadline)
+            .withSolver(address(solver))
+            .withControl(address(control))
+            .withUserOpHash(userOp)
+            .withBidToken(userOp)
+            .withBidAmount(1e18)
+            .withData(abi.encodeWithSelector(SimpleSolver.onlyPayBid.selector, 1e18))
+            .withValue(address(atlas).balance + 1)
+            .sign(address(atlasVerification), solverOnePK)
+            .build();
 
         (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-        dAppOp = new DAppOperationBuilder().withFrom(governanceEOA).withTo(address(atlas)).withNonce(
-            address(atlasVerification), governanceEOA
-        ).withDeadline(userOp.deadline).withControl(address(control)).withUserOpHash(userOp).withCallChainHash(
-            userOp, solverOps
-        ).sign(address(atlasVerification), governancePK).build();
-
+        dAppOp = new DAppOperationBuilder()
+            .withFrom(governanceEOA)
+            .withTo(address(atlas))
+            .withNonce(address(atlasVerification), governanceEOA)
+            .withDeadline(userOp.deadline)
+            .withControl(address(control))
+            .withUserOpHash(userOp)
+            .withCallChainHash(userOp, solverOps)
+            .sign(address(atlasVerification), governancePK)
+            .build();
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
@@ -135,21 +169,35 @@ contract FlashLoanTest is BaseTest {
         vm.stopPrank();
 
         // final try, should be successful with full payback
-        solverOps[0] = new SolverOperationBuilder().withFrom(solverOneEOA).withTo(address(atlas)).withGas(1_000_000)
-            .withMaxFeePerGas(userOp.maxFeePerGas).withDeadline(userOp.deadline).withSolver(address(solver)).withControl(
-            address(control)
-        ).withUserOpHash(userOp).withBidToken(userOp).withBidAmount(1e18).withData(
-            abi.encodeWithSelector(SimpleSolver.payback.selector, 1e18)
-        ).withValue(10e18).sign(address(atlasVerification), solverOnePK).build();
+        solverOps[0] = new SolverOperationBuilder()
+            .withFrom(solverOneEOA)
+            .withTo(address(atlas))
+            .withGas(1_000_000)
+            .withMaxFeePerGas(userOp.maxFeePerGas)
+            .withDeadline(userOp.deadline)
+            .withSolver(address(solver))
+            .withControl(address(control))
+            .withUserOpHash(userOp)
+            .withBidToken(userOp)
+            .withBidAmount(1e18)
+            .withData(abi.encodeWithSelector(SimpleSolver.payback.selector, 1e18))
+            .withValue(10e18)
+            .sign(address(atlasVerification), solverOnePK)
+            .build();
 
         (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOps[0]));
         solverOps[0].signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-        dAppOp = new DAppOperationBuilder().withFrom(governanceEOA).withTo(address(atlas)).withNonce(
-            address(atlasVerification), governanceEOA
-        ).withDeadline(userOp.deadline).withControl(address(control)).withUserOpHash(userOp).withCallChainHash(
-            userOp, solverOps
-        ).sign(address(atlasVerification), governancePK).build();
+        dAppOp = new DAppOperationBuilder()
+            .withFrom(governanceEOA)
+            .withTo(address(atlas))
+            .withNonce(address(atlasVerification), governanceEOA)
+            .withDeadline(userOp.deadline)
+            .withControl(address(control))
+            .withUserOpHash(userOp)
+            .withCallChainHash(userOp, solverOps)
+            .sign(address(atlasVerification), governancePK)
+            .build();
 
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
@@ -167,8 +215,7 @@ contract FlashLoanTest is BaseTest {
         assertEq(solverStartingTotal, 1e18, "solver incorrect starting WETH");
         solverStartingTotal += (atlas.balanceOf(solverOneEOA) + atlas.balanceOfBonded(solverOneEOA));
 
-        assertEq(atlasStartingETH, 102e18, "atlas incorrect starting ETH"); // 2e initial + 1e solver + 100e user
-            // deposit
+        assertEq(atlasStartingETH, 102e18, "atlas incorrect starting ETH"); // 2e initial + 1e solver + 100e user deposit
 
         uint256 netSurcharge = atlas.cumulativeSurcharge();
 
@@ -185,13 +232,8 @@ contract FlashLoanTest is BaseTest {
 
         {
             console.log("solverStartingTotal:  ", solverStartingTotal);
-            console.log(
-                "solverEndingTotal  :  ",
-                WETH.balanceOf(_solver) + atlas.balanceOf(solverOneEOA) + atlas.balanceOfBonded(solverOneEOA)
-            );
-            solverStartingTotal -=
-                (WETH.balanceOf(_solver) + atlas.balanceOf(solverOneEOA) + atlas.balanceOfBonded(solverOneEOA));
-
+            console.log("solverEndingTotal  :  ", WETH.balanceOf(_solver) + atlas.balanceOf(solverOneEOA) + atlas.balanceOfBonded(solverOneEOA));
+            solverStartingTotal -= (WETH.balanceOf(_solver) + atlas.balanceOf(solverOneEOA) + atlas.balanceOfBonded(solverOneEOA));
             console.log("solverDeltaTotal   :  ", solverStartingTotal);
         }
 
@@ -216,15 +258,12 @@ contract FlashLoanTest is BaseTest {
         console.log("atlasEnding  ETH   :", address(atlas).balance);
 
         // NOTE: solverStartingTotal is the solverTotal delta, not starting.
-        assertTrue(address(atlas).balance >= atlasStartingETH - solverStartingTotal, "atlas incorrect ending ETH"); // atlas
-            // should NEVER lose balance during a metacall
+        assertTrue(address(atlas).balance >= atlasStartingETH - solverStartingTotal, "atlas incorrect ending ETH"); // atlas should NEVER lose balance during a metacall
 
         console.log("userStartingETH    :", userStartingETH);
         console.log("userEndingETH      :", userEndingETH);
-        assertTrue((userEndingETH - userStartingETH) >= 1 ether, "user incorrect ending ETH"); // user bal should
-            // increase by 1e (bid) + gas refund
-        assertTrue((userEndingBonded - userStartingBonded) == 0, "user incorrect ending bonded AtlETH"); // user bonded
-            // bal should increase by gas refund
+        assertTrue((userEndingETH - userStartingETH) >= 1 ether, "user incorrect ending ETH"); // user bal should increase by 1e (bid) + gas refund
+        assertTrue((userEndingBonded - userStartingBonded) == 0, "user incorrect ending bonded AtlETH"); // user bonded bal should increase by gas refund
     }
 }
 
