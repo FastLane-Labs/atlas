@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import "src/contracts/types/EscrowTypes.sol";
-import "../base/TestUtils.sol";
+import "test/base/TestUtils.sol";
 
 contract EscrowBitsTest is Test {
     using EscrowBits for uint256;
@@ -163,65 +163,63 @@ contract EscrowBitsTest is Test {
         assertEq(invalid.executedWithError(), false);
     }
 
-    function testUpdateEscrow() public pure {
+    function testBundlersFault() public pure {
         // SUCCESS
-        uint256 valid = 0;
-        assertEq(valid.updateEscrow(), true);
+        uint256 invalid = 0;
+        assertEq(invalid.bundlersFault(), false);
 
-        // NO REFUND group        
-        uint256 invalid = 1 << uint256(SolverOutcome.InvalidSignature);
-        assertEq(invalid.updateEscrow(), false);
-        invalid = 1 << uint256(SolverOutcome.InvalidUserHash);
-        assertEq(invalid.updateEscrow(), false);
-        invalid = 1 << uint256(SolverOutcome.DeadlinePassedAlt);
-        assertEq(invalid.updateEscrow(), false);
-        invalid = 1 << uint256(SolverOutcome.GasPriceBelowUsersAlt);
-        assertEq(invalid.updateEscrow(), false);
-        invalid = 1 << uint256(SolverOutcome.InvalidTo);
-        assertEq(invalid.updateEscrow(), false);
-        invalid = 1 << uint256(SolverOutcome.UserOutOfGas);
-        assertEq(invalid.updateEscrow(), false);
-        invalid = 1 << uint256(SolverOutcome.AlteredControl);
-        assertEq(invalid.updateEscrow(), false);
-        invalid = 1 << uint256(SolverOutcome.AltOpHashMismatch);
-        assertEq(invalid.updateEscrow(), false);
-
-        // TODO consider changing updateEscrow() to bundlersFault()
+        // NO REFUND group - Should all be bundlers fault      
+        uint256 valid = 1 << uint256(SolverOutcome.InvalidSignature);
+        assertEq(valid.bundlersFault(), true);
+        valid = 1 << uint256(SolverOutcome.InvalidUserHash);
+        assertEq(valid.bundlersFault(), true);
+        valid = 1 << uint256(SolverOutcome.DeadlinePassedAlt);
+        assertEq(valid.bundlersFault(), true);
+        valid = 1 << uint256(SolverOutcome.GasPriceBelowUsersAlt);
+        assertEq(valid.bundlersFault(), true);
+        valid = 1 << uint256(SolverOutcome.InvalidTo);
+        assertEq(valid.bundlersFault(), true);
+        valid = 1 << uint256(SolverOutcome.UserOutOfGas);
+        assertEq(valid.bundlersFault(), true);
+        valid = 1 << uint256(SolverOutcome.AlteredControl);
+        assertEq(valid.bundlersFault(), true);
+        valid = 1 << uint256(SolverOutcome.AltOpHashMismatch);
+        assertEq(valid.bundlersFault(), true);
 
         // PARTIAL REFUND group
-        // uint256 valid = 0;
-        // valid = 1 << uint256(SolverOutcome.DeadlinePassed);
-        // assertEq(valid.updateEscrow(), true);
-        // valid = 1 << uint256(SolverOutcome.GasPriceOverCap);
-        // assertEq(valid.updateEscrow(), true);
-        // valid = 1 << uint256(SolverOutcome.InvalidSolver);
-        // assertEq(valid.updateEscrow(), true);
-        // valid = 1 << uint256(SolverOutcome.InvalidBidToken);
-        // assertEq(valid.updateEscrow(), true);
-        // valid = 1 << uint256(SolverOutcome.PerBlockLimit);
-        // assertEq(valid.updateEscrow(), true);
-        // valid = 1 << uint256(SolverOutcome.InsufficientEscrow);
-        // assertEq(valid.updateEscrow(), true);
-        // valid = 1 << uint256(SolverOutcome.GasPriceBelowUsers);
-        // assertEq(valid.updateEscrow(), true);
-        // valid = 1 << uint256(SolverOutcome.CallValueTooHigh);
-        // assertEq(valid.updateEscrow(), true);
-        // valid = 1 << uint256(SolverOutcome.PreSolverFailed);
-        // assertEq(valid.updateEscrow(), true);
+        invalid = 1 << uint256(SolverOutcome.DeadlinePassed);
+        assertEq(invalid.bundlersFault(), false);
+        invalid = 1 << uint256(SolverOutcome.GasPriceOverCap);
+        assertEq(invalid.bundlersFault(), false);
+        invalid = 1 << uint256(SolverOutcome.InvalidSolver);
+        assertEq(invalid.bundlersFault(), false);
+        invalid = 1 << uint256(SolverOutcome.InvalidBidToken);
+        assertEq(invalid.bundlersFault(), false);
+        invalid = 1 << uint256(SolverOutcome.PerBlockLimit);
+        assertEq(invalid.bundlersFault(), false);
+        invalid = 1 << uint256(SolverOutcome.InsufficientEscrow);
+        assertEq(invalid.bundlersFault(), false);
+        invalid = 1 << uint256(SolverOutcome.GasPriceBelowUsers);
+        assertEq(invalid.bundlersFault(), false);
+        invalid = 1 << uint256(SolverOutcome.CallValueTooHigh);
+        assertEq(invalid.bundlersFault(), false);
+        invalid = 1 << uint256(SolverOutcome.PreSolverFailed);
+        assertEq(invalid.bundlersFault(), false);
 
         // FULL REFUND group
-        // valid = 1 << uint256(SolverOutcome.SolverOpReverted);
-        // assertEq(valid.updateEscrow(), true);
-        // valid = 1 << uint256(SolverOutcome.PostSolverFailed);
-        // assertEq(valid.updateEscrow(), true);
-        // valid = 1 << uint256(SolverOutcome.BidNotPaid);
-        // assertEq(valid.updateEscrow(), true);
-        // valid = 1 << uint256(SolverOutcome.InvertedBidExceedsCeiling);
-        // assertEq(valid.updateEscrow(), true);
-        // valid = 1 << uint256(SolverOutcome.BalanceNotReconciled);
-        // assertEq(valid.updateEscrow(), true);
-        // valid = 1 << uint256(SolverOutcome.CallbackNotCalled);
-        // assertEq(valid.updateEscrow(), true);
-        // valid = 1 << uint256(SolverOutcome.EVMError);
+        invalid = 1 << uint256(SolverOutcome.SolverOpReverted);
+        assertEq(invalid.bundlersFault(), false);
+        invalid = 1 << uint256(SolverOutcome.PostSolverFailed);
+        assertEq(invalid.bundlersFault(), false);
+        invalid = 1 << uint256(SolverOutcome.BidNotPaid);
+        assertEq(invalid.bundlersFault(), false);
+        invalid = 1 << uint256(SolverOutcome.InvertedBidExceedsCeiling);
+        assertEq(invalid.bundlersFault(), false);
+        invalid = 1 << uint256(SolverOutcome.BalanceNotReconciled);
+        assertEq(invalid.bundlersFault(), false);
+        invalid = 1 << uint256(SolverOutcome.CallbackNotCalled);
+        assertEq(invalid.bundlersFault(), false);
+        invalid = 1 << uint256(SolverOutcome.EVMError);
+        assertEq(invalid.bundlersFault(), false);
     }
 }

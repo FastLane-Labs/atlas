@@ -271,7 +271,7 @@ abstract contract GasAccounting is SafetyLocks {
 
         // Calculate what the solver owes
         // NOTE: This will cause an error if you are simulating with a gasPrice of 0
-        if (!result.updateEscrow()) {
+        if (result.bundlersFault()) {
             // CASE: Solver is not responsible for the failure of their operation, so we blame the bundler
             // and reduce the total amount refunded to the bundler
             _setWriteoffs(writeoffs() + _gasUsed.withAtlasAndBundlerSurcharges());
