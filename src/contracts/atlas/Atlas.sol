@@ -285,7 +285,9 @@ contract Atlas is Escrow, Factory {
         uint8 i = uint8(solverOps.length);
         for (; ctx.solverIndex < i; ctx.solverIndex++) {
             SolverOperation calldata solverOp = solverOps[ctx.solverIndex];
-            _bidAmount = _executeSolverOperation(ctx, dConfig, userOp, solverOp, IDAppControl(dConfig.to).getBidValue(solverOp), false, returnData);
+            _bidAmount = _executeSolverOperation(
+                ctx, dConfig, userOp, solverOp, IDAppControl(dConfig.to).getBidValue(solverOp), false, returnData
+            );
 
             if (ctx.solverSuccessful) {
                 return _bidAmount;
