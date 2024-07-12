@@ -46,7 +46,7 @@ contract V4DAppControl is DAppControl {
     // key: keccak(token0, token1, block.number)
     mapping(bytes32 => bool) public sequenceLock;
 
-    PoolKey internal _currentKey; // TODO: Transient storage <-
+    bool initialized;
 
     constructor(
         address _atlas,
@@ -82,6 +82,7 @@ contract V4DAppControl is DAppControl {
     {
         hook = address(this);
         v4Singleton = _v4Singleton;
+        initialized = false;
     }
 
     /////////////////////////////////////////////////////////
@@ -102,7 +103,7 @@ contract V4DAppControl is DAppControl {
         // check if dapps using this DAppControl can handle the userOp
         _checkUserOperation(userOp);
 
-        require(!_currentKey.initialized, "ERR-H09 AlreadyInitialized");
+        require(!initialized, "ERR-H09 AlreadyInitialized");
 
         (IPoolManager.PoolKey memory key, IPoolManager.SwapParams memory params) =
             abi.decode(userOp.data[4:], (IPoolManager.PoolKey, IPoolManager.SwapParams));
@@ -110,11 +111,7 @@ contract V4DAppControl is DAppControl {
         // Perform more checks and activate the lock
         V4DAppControl(hook).setLock(key);
 
-        // Store the key so that we can access it at verification
-        _currentKey = PoolKey({
-            initialized: true, // TODO: consider using a lock array like v4 so we can handle multiple?
-            key: key
-        });
+        initialized = true;
 
         // Handle forwarding of token approvals, or token transfers.
         // NOTE: The user will have approved the ExecutionEnvironment in a prior call
@@ -161,7 +158,7 @@ contract V4DAppControl is DAppControl {
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
 
-        require(!_currentKey.initialized, "ERR-H09 AlreadyInitialized");
+        require(!initialized, "ERR-H09 AlreadyInitialized");
 
         IPoolManager.PoolKey memory key; // todo: finish
 
@@ -194,7 +191,7 @@ contract V4DAppControl is DAppControl {
 
         V4DAppControl(hook).releaseLock(preOpsReturn.poolKey);
 
-        delete _currentKey;
+        initialized = false;
     }
 
     /////////////// EXTERNAL CALLS //////////////////
