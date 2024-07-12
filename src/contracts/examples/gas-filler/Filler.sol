@@ -96,11 +96,18 @@ contract Filler is DAppControl {
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(address, uint256 bidAmount, bytes calldata) internal override {
+    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
         // NOTE: gas value xferred to user in postSolverCall
         // Pay the solver (since auction is reversed)
         // Address Pointer = winning solver.
-        SafeTransferLib.safeTransferETH(_user(), bidAmount);
+
+        // revert for ERC20 tokens
+        if (bidToken != address(0)) revert("not supported");
+
+        if (bidAmount == 0) return;
+
+        address user = _user();
+        SafeTransferLib.safeTransferETH(user, address(this).balance);
     }
 
     function _preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {

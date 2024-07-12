@@ -111,12 +111,21 @@ contract V2ExPost is DAppControl {
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(address, uint256, bytes calldata) internal override {
+    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
 
-        SafeTransferLib.safeTransfer(WETH, _user(), IERC20(WETH).balanceOf(address(this)));
+        if (bidAmount == 0) {
+            return;
+        }
+
+        address user = _user();
+        if (bidToken == address(0)) {
+            SafeTransferLib.safeTransferETH(user, address(this).balance);
+        } else {
+            SafeTransferLib.safeTransfer(bidToken, user, bidAmount);
+        }
 
         /*
         // ENABLE FOR FOUNDRY TESTING

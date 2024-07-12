@@ -232,10 +232,15 @@ contract V4SwapIntentControl is DAppControl {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Atlas
-        if (bidToken != address(0)) {
-            SafeTransferLib.safeTransfer(bidToken, _user(), bidAmount);
+        if (bidAmount == 0) {
+            return;
+        }
+
+        address user = _user();
+        if (bidToken == address(0)) {
+            SafeTransferLib.safeTransferETH(user, address(this).balance);
         } else {
-            SafeTransferLib.safeTransferETH(_user(), address(this).balance);
+            SafeTransferLib.safeTransfer(bidToken, user, bidAmount);
         }
     }
 
