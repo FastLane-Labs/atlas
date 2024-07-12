@@ -211,7 +211,7 @@ contract V4DAppControl is DAppControl {
         require(address(this) == hook, "ERR-H00 InvalidCallee");
         require(hook == _control(), "ERR-H01 InvalidCaller");
         require(_phase() == uint8(ExecutionPhase.PreOps), "ERR-H02 InvalidLockStage");
-        
+
         bytes32 hashLock;
         assembly {
             hashLock := tload(transient_slot_hashLock.slot)
