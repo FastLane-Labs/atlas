@@ -34,7 +34,7 @@ library EscrowBits {
         1 << uint256(SolverOutcome.SolverOpReverted) // <- detected by Escrow
             | 1 << uint256(SolverOutcome.PostSolverFailed) // <- detected by EE
             | 1 << uint256(SolverOutcome.BidNotPaid) // <- detected by EE
-            | 1 << uint256(SolverOutcome.BidAmountExceedsAvailableFunds) // <- detected by EE
+            | 1 << uint256(SolverOutcome.InvertedBidExceedsCeiling) // <- detected by EE
             | 1 << uint256(SolverOutcome.BalanceNotReconciled) // <- detected by Escrow
             | 1 << uint256(SolverOutcome.CallbackNotCalled) // <- detected by Escrow
             | 1 << uint256(SolverOutcome.EVMError)

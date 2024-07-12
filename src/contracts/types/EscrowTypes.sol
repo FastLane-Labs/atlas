@@ -54,7 +54,7 @@ enum SolverOutcome {
     SolverOpReverted,
     PostSolverFailed,
     BidNotPaid,
-    BidAmountExceedsAvailableFunds,
+    InvertedBidExceedsCeiling,
     BalanceNotReconciled,
     CallbackNotCalled,
     EVMError
