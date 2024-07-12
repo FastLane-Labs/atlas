@@ -117,10 +117,6 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
     */
     function _preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
         address solverTo = solverOp.solver;
-        if (solverTo == address(this) || solverTo == _control() || solverTo == ATLAS) {
-            revert("Invalid solver address - solverOp.solver cannot be execution environment, dapp control or atlas");
-        }
-
         SwapIntent memory swapData = abi.decode(returnData, (SwapIntent));
 
         // The solver must be bidding less than the intent's maxAmountUserSells
