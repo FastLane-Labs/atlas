@@ -252,7 +252,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     {
         if (
             dConfig.callConfig.verifyCallChainHash()
-                && dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps)
+                && dAppOp.callChainHash != CallVerification.getCallChainHash(userOp, solverOps)
         ) return (ValidCallsResult.InvalidCallChainHash, false);
 
         if (dConfig.callConfig.allowsUserAuctioneer() && dAppOp.from == userOp.sessionKey) {
