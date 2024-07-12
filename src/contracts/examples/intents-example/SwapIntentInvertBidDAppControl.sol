@@ -127,10 +127,8 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
         require(solverOp.bidAmount <= swapData.maxAmountUserSells, "SwapIntentInvertBid: BidTooHigh");
 
         if (_solverBidRetrievalRequired) {
-            // Optimistically transfer to the execution environment the amount that the solver is invert bidding
-            _transferUserERC20(swapData.tokenUserSells, address(this), solverOp.bidAmount);
-            // Approve the solver to retrieve the bid amount from ee
-            SafeTransferLib.safeApprove(swapData.tokenUserSells, solverTo, solverOp.bidAmount);
+            // Pull the tokens from the user and approve the solver to spend them
+            _getAndApproveUserERC20(swapData.tokenUserSells, solverOp.bidAmount, solverTo);
         } else {
             // Optimistically transfer to the solver contract the amount that the solver is invert bidding
             _transferUserERC20(swapData.tokenUserSells, solverTo, solverOp.bidAmount);

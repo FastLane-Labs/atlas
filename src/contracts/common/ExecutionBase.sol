@@ -1,6 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.25;
 
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
@@ -279,5 +280,20 @@ contract ExecutionBase is Base {
         }
 
         return false;
+    }
+
+    /// @notice Transfers ERC20 tokens from the user of the current metacall tx, via Atlas, to the current
+    /// ExecutionEnvironment, and approves the destination address to spend the tokens from the ExecutionEnvironment.
+    /// @param token The address of the ERC20 token contract.
+    /// @param amount The amount of tokens to transfer and approve.
+    /// @param destination The address approved to spend the tokens from the ExecutionEnvironment.
+    function _getAndApproveUserERC20(address token, uint256 amount, address destination) internal {
+        if (token == address(0) || amount == 0) return;
+
+        // Pull tokens from user to ExecutionEnvironment
+        _transferUserERC20(token, address(this), amount);
+
+        // Approve destination to spend the tokens from ExecutionEnvironment
+        SafeTransferLib.safeApprove(token, destination, amount);
     }
 }
