@@ -24,7 +24,7 @@ contract EscrowBitsTest is Test {
         );
 
         expectedBitMapString =
-            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000111011100000000000000000";
+            "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000111111100000000000000000";
         assertEq(
             TestUtils.uint256ToBinaryString(EscrowBits._FULL_REFUND), expectedBitMapString, "_FULL_REFUND incorrect"
         );
@@ -123,6 +123,8 @@ contract EscrowBitsTest is Test {
         assertEq(valid.updateEscrow(), true);
         valid = 1 << uint256(SolverOutcome.BidNotPaid);
         assertEq(valid.updateEscrow(), true);
+        valid = 1 << uint256(SolverOutcome.BidAmountExceedsAvailableFunds);
+        assertEq(valid.executedWithError(), true);
         valid = 1 << uint256(SolverOutcome.PreSolverFailed);
         assertEq(valid.updateEscrow(), true);
         valid = 1 << uint256(SolverOutcome.CallValueTooHigh);
