@@ -28,13 +28,11 @@ contract DAppIntegrationTest is Test {
 
     function setUp() public {
         vm.startPrank(atlasDeployer);
+        
+        // Compute expected addresses for Atlas
+        address expectedAtlasAddr = vm.computeCreateAddress(atlasDeployer, vm.getNonce(atlasDeployer) + 2);
 
-        // Deploy ExecutionEnvironment with a salt
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedAtlasAddr);
-
-        // Compute expected addresses for Atlas and AtlasVerification
-        address expectedAtlasAddr = vm.computeCreateAddress(atlasDeployer, vm.getNonce(atlasDeployer) + 1);
-        address expectedAtlasVerificationAddr = vm.computeCreateAddress(atlasDeployer, vm.getNonce(atlasDeployer) + 2);
 
         // Deploy the AtlasVerification contract
         atlasVerification = new AtlasVerification(expectedAtlasAddr);
@@ -47,6 +45,8 @@ contract DAppIntegrationTest is Test {
             executionTemplate: address(execEnvTemplate),
             initialSurchargeRecipient: atlasDeployer
         });
+
+        assertEq(address(atlas), expectedAtlasAddr, "Atlas address should be as expected");
 
         // Deploy the MockDAppIntegration contract
         dAppIntegration = new MockDAppIntegration(address(atlas));
