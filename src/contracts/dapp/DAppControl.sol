@@ -71,6 +71,9 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         onlyPhase(ExecutionPhase.PreOps)
         returns (bytes memory)
     {
+        // check if dapps using this DApontrol can handle the userOp
+        _checkUserOperation(userOp);
+
         return _preOpsCall(userOp);
     }
 

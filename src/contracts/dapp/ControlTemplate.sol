@@ -40,6 +40,30 @@ abstract contract DAppControlTemplate {
     }
 
     /////////////////////////////////////////////////////////
+    //         CHECK USER OPERATION                        //
+    /////////////////////////////////////////////////////////
+    //
+    // PreOps:
+    // Data should be decoded as:
+    //
+    //     bytes memory userOpData
+    //
+
+    // _checkUserOperation
+    // Details:
+    //  preOps/delegate =
+    //      Inputs: User's calldata
+    //      Function: Executing the function set by DAppControl
+    //      Container: Inside of the FastLane ExecutionEnvironment
+    //      Access: With storage access (read + write) only to the ExecutionEnvironment
+    //
+    // DApp exposure: Trustless
+    // User exposure: Trustless
+    function _checkUserOperation(UserOperation memory) internal virtual {
+        revert AtlasErrors.NotImplemented();
+    }
+
+    /////////////////////////////////////////////////////////
     //                MEV ALLOCATION                       //
     /////////////////////////////////////////////////////////
     //

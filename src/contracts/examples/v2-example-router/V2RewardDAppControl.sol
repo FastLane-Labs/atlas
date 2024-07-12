@@ -130,7 +130,7 @@ contract V2RewardDAppControl is DAppControl {
     //                     Atlas hooks                      //
     // ---------------------------------------------------- //
 
-    function _checkUserOperation(UserOperation memory userOp) internal view {
+    function _checkUserOperation(UserOperation memory userOp) internal view override {
         // User is only allowed to call UniswapV2Router02
         require(userOp.dapp == uniswapV2Router02, "V2RewardDAppControl: InvalidDestination");
     }
@@ -145,9 +145,6 @@ contract V2RewardDAppControl is DAppControl {
         _postOpsCall hook to refund leftover dust, if any
     */
     function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory) {
-        // check if dapps using this DAppControl can handle the userOp
-        _checkUserOperation(userOp);
-
         // The current hook is delegatecalled, so we need to call the userOp.control to access the mappings
         (address tokenSold, uint256 amountSold) = V2RewardDAppControl(userOp.control).getTokenSold(userOp.data);
 
