@@ -95,6 +95,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         external
         payable
         validControl
+        validSolver(solverOp)
         onlyAtlasEnvironment
         onlyPhase(ExecutionPhase.PreSolver)
     {
@@ -112,6 +113,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         external
         payable
         validControl
+        validSolver(solverOp)
         onlyAtlasEnvironment
         onlyPhase(ExecutionPhase.PostSolver)
     {

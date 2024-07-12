@@ -31,17 +31,6 @@ contract ExecutionEnvironment is Base {
         _;
     }
 
-    modifier validSolver(SolverOperation calldata solverOp) {
-        if (solverOp.solver == ATLAS || solverOp.solver == _control() || solverOp.solver == address(this)) {
-            revert AtlasErrors.InvalidSolver();
-        }
-        // Verify that the DAppControl contract matches the solver's expectations
-        if (solverOp.control != _control()) {
-            revert AtlasErrors.AlteredControl();
-        }
-        _;
-    }
-
     //////////////////////////////////
     ///    CORE CALL FUNCTIONS     ///
     //////////////////////////////////

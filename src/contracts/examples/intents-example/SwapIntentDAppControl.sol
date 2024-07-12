@@ -130,15 +130,10 @@ contract SwapIntentDAppControl is DAppControl {
     * @return true if the transfer was successful, false otherwise
     */
     function _preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
-        address solverTo = solverOp.solver;
-        if (solverTo == address(this) || solverTo == _control() || solverTo == ATLAS) {
-            revert();
-        }
-
         SwapData memory swapData = abi.decode(returnData, (SwapData));
 
         // Optimistically transfer to the solver contract the tokens that the user is selling
-        _transferUserERC20(swapData.tokenUserSells, solverTo, swapData.amountUserSells);
+        _transferUserERC20(swapData.tokenUserSells, solverOp.solver, swapData.amountUserSells);
 
         return; // success
     }

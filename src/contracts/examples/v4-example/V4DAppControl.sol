@@ -104,10 +104,6 @@ contract V4DAppControl is DAppControl {
 
         require(!_currentKey.initialized, "ERR-H09 AlreadyInitialized");
 
-        // Verify that the swapper went through the FastLane Atlas MEV Auction
-        // and that DAppControl supplied a valid signature
-        require(msg.sender == ATLAS, "ERR-H00 InvalidCaller");
-
         (IPoolManager.PoolKey memory key, IPoolManager.SwapParams memory params) =
             abi.decode(userOp.data[4:], (IPoolManager.PoolKey, IPoolManager.SwapParams));
 
