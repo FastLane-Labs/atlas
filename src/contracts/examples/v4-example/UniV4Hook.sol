@@ -75,6 +75,11 @@ contract UniV4Hook is V4DAppControl {
 
         ExecutionPhase currentPhase = ExecutionPhase(_phase());
 
+        bytes32 hashLock;
+        assembly {
+            hashLock := tload(transient_slot_hashLock.slot)
+        }
+
         if (currentPhase == ExecutionPhase.UserOperation) {
             // Case: User call
             // Sender = ExecutionEnvironment
