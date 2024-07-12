@@ -38,7 +38,7 @@ library CallBits {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.PostSolver);
         }
         if (callConfig.requirePostOps) {
-            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.RequirepostOpsDelegateCall);
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.RequirePostOpsDelegateCall);
         }
         if (callConfig.zeroSolvers) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.ZeroSolvers);
@@ -137,7 +137,7 @@ library CallBits {
     }
 
     function needsPostOpsDelegateCall(uint32 callConfig) internal pure returns (bool needsPostOps) {
-        needsPostOps = callConfig & (1 << uint32(CallConfigIndex.RequirepostOpsDelegateCall)) != 0;
+        needsPostOps = callConfig & (1 << uint32(CallConfigIndex.RequirePostOpsDelegateCall)) != 0;
     }
 
     function allowsZeroSolvers(uint32 callConfig) internal pure returns (bool zeroSolvers) {
