@@ -102,12 +102,9 @@ contract Filler is DAppControl {
         // Address Pointer = winning solver.
 
         // revert for ERC20 tokens
-        if (bidToken != address(0)) revert("not supported");
+        if (bidToken != address(0)) revert("ERC20 bids not supported");
 
-        if (bidAmount == 0) return;
-
-        address user = _user();
-        SafeTransferLib.safeTransferETH(user, address(this).balance);
+        SafeTransferLib.safeTransferETH(_user(), bidAmount);
     }
 
     function _preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
