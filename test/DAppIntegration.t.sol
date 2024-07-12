@@ -30,8 +30,7 @@ contract DAppIntegrationTest is Test {
         vm.startPrank(atlasDeployer);
 
         // Deploy ExecutionEnvironment with a salt
-        bytes32 salt = keccak256(abi.encodePacked(block.chainid, address(this), "AtlasFactory 1.0"));
-        ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(address(this));
+        ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedAtlasAddr);
 
         // Compute expected addresses for Atlas and AtlasVerification
         address expectedAtlasAddr = vm.computeCreateAddress(atlasDeployer, vm.getNonce(atlasDeployer) + 1);
