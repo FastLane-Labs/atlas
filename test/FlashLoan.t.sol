@@ -155,7 +155,6 @@ contract FlashLoanTest is BaseTest {
             .withCallChainHash(userOp, solverOps)
             .sign(address(atlasVerification), governancePK)
             .build();
-            
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
@@ -218,7 +217,6 @@ contract FlashLoanTest is BaseTest {
 
         assertEq(atlasStartingETH, 102e18, "atlas incorrect starting ETH"); // 2e initial + 1e solver + 100e user deposit
 
-
         uint256 netSurcharge = atlas.cumulativeSurcharge();
 
         // Last call - should succeed
@@ -231,14 +229,12 @@ contract FlashLoanTest is BaseTest {
 
         // atlas 2e beginning bal + 1e from solver +100e eth from user = 103e atlas total
         // after metacall 1e user payout + 0.0001e bundler(user) gas refund = 101.9999e after metacall
-        
 
         {
-        console.log("solverStartingTotal:  ", solverStartingTotal);
-        console.log("solverEndingTotal  :  ", WETH.balanceOf(_solver) + atlas.balanceOf(solverOneEOA) + atlas.balanceOfBonded(solverOneEOA));
-        solverStartingTotal -= (WETH.balanceOf(_solver) + atlas.balanceOf(solverOneEOA) + atlas.balanceOfBonded(solverOneEOA));
-        
-        console.log("solverDeltaTotal   :  ", solverStartingTotal);
+            console.log("solverStartingTotal:  ", solverStartingTotal);
+            console.log("solverEndingTotal  :  ", WETH.balanceOf(_solver) + atlas.balanceOf(solverOneEOA) + atlas.balanceOfBonded(solverOneEOA));
+            solverStartingTotal -= (WETH.balanceOf(_solver) + atlas.balanceOf(solverOneEOA) + atlas.balanceOfBonded(solverOneEOA));
+            console.log("solverDeltaTotal   :  ", solverStartingTotal);
         }
 
         uint256 userEndingETH = address(userEOA).balance;
@@ -246,11 +242,11 @@ contract FlashLoanTest is BaseTest {
         uint256 userEndingBonded = atlas.balanceOfBonded(userEOA);
 
         {
-        console.log("userStartingTotal  :", userStartingETH + userStartingAtlETH + userStartingBonded);
-        console.log("userEndingTotal    :", userEndingETH + userEndingAtlETH + userEndingBonded);
+            console.log("userStartingTotal  :", userStartingETH + userStartingAtlETH + userStartingBonded);
+            console.log("userEndingTotal    :", userEndingETH + userEndingAtlETH + userEndingBonded);
 
-        console.log("atlasStartingETH   :", atlasStartingETH);
-        console.log("atlasEndingETH     :", address(atlas).balance);
+            console.log("atlasStartingETH   :", atlasStartingETH);
+            console.log("atlasEndingETH     :", address(atlas).balance);
         }
 
         netSurcharge = atlas.cumulativeSurcharge() - netSurcharge;
@@ -263,7 +259,7 @@ contract FlashLoanTest is BaseTest {
 
         // NOTE: solverStartingTotal is the solverTotal delta, not starting.
         assertTrue(address(atlas).balance >= atlasStartingETH - solverStartingTotal, "atlas incorrect ending ETH"); // atlas should NEVER lose balance during a metacall
-        
+
         console.log("userStartingETH    :", userStartingETH);
         console.log("userEndingETH      :", userEndingETH);
         assertTrue((userEndingETH - userStartingETH) >= 1 ether, "user incorrect ending ETH"); // user bal should increase by 1e (bid) + gas refund
@@ -313,7 +309,7 @@ contract DummyDAppControlBuilder is DAppControl {
         if (bidToken != address(0)) {
             revert("not supported");
         }
-        
+
         SafeTransferLib.safeTransferETH(_user(), address(this).balance);
     }
 

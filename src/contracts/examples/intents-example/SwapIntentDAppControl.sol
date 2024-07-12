@@ -174,11 +174,11 @@ contract SwapIntentDAppControl is DAppControl {
     * @param _
     * @param _
     */
-    function _allocateValueCall(address bidToken, uint256, bytes calldata) internal override {
-        if (bidToken != address(0)) {
-            SafeTransferLib.safeTransfer(bidToken, _user(), IERC20(bidToken).balanceOf(address(this)));
+    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
+        if (bidToken == address(0)) {
+            SafeTransferLib.safeTransferETH(_user(), bidAmount);
         } else {
-            SafeTransferLib.safeTransferETH(_user(), address(this).balance);
+            SafeTransferLib.safeTransfer(bidToken, _user(), bidAmount);
         }
     }
 

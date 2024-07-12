@@ -158,14 +158,14 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
     * @dev It transfers all the available bid tokens on the contract (instead of only the bid amount,
     *      to avoid leaving any dust on the contract)
     * @param bidToken The address of the token used for the winning solver operation's bid
-    * @param _
+    * @param bidAmount The winning bid amount
     * @param _
     */
-    function _allocateValueCall(address bidToken, uint256, bytes calldata) internal override {
-        if (bidToken != address(0)) {
-            SafeTransferLib.safeTransfer(bidToken, _user(), IERC20(bidToken).balanceOf(address(this)));
+    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
+        if (bidToken == address(0)) {
+            SafeTransferLib.safeTransferETH(_user(), bidAmount);
         } else {
-            SafeTransferLib.safeTransferETH(_user(), address(this).balance);
+            SafeTransferLib.safeTransfer(bidToken, _user(), bidAmount);
         }
     }
 
