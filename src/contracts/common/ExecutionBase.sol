@@ -7,6 +7,7 @@ import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 import { ExecutionPhase } from "src/contracts/types/LockTypes.sol";
 import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "src/contracts/libraries/SafetyBits.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import "src/contracts/types/SolverOperation.sol";
 
 contract Base {
     address public immutable ATLAS;
@@ -23,6 +24,18 @@ contract Base {
 
     modifier onlyAtlasEnvironment() {
         _onlyAtlasEnvironment();
+        _;
+    }
+
+    modifier validSolver(SolverOperation calldata solverOp) {
+        address solverContract = solverOp.solver;
+        if (solverContract == ATLAS || solverContract == _control() || solverContract == address(this)) {
+            revert AtlasErrors.InvalidSolver();
+        }
+        // Verify that the dAppControl contract matches the solver's expectations
+        if (solverOp.control != _control()) {
+            revert AtlasErrors.AlteredControl();
+        }
         _;
     }
 

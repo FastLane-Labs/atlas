@@ -117,7 +117,6 @@ contract AtlasErrors {
     error BothUserAndDAppNoncesCannotBeSequential();
     error BothPreOpsAndUserReturnDataCannotBeTracked();
     error InvalidControl();
-    error InvalidSolverContract();
     error NoDelegatecall();
     error MustBeDelegatecalled();
     error OnlyAtlas();
