@@ -57,6 +57,14 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         _;
     }
 
+    modifier validSolverContract(SolverOperation memory solverOp) {
+        address solverContract = solverOp.solver;
+        if (solverContract == address(this) || solverContract == _control() || solverContract == ATLAS) {
+            revert AtlasErrors.InvalidSolverContract();
+        }
+        _;
+    }
+
     // Reverts if phase in Atlas is not the specified phase.
     // This is required to prevent reentrancy in hooks from other hooks in different phases.
     modifier onlyPhase(ExecutionPhase phase) {
@@ -95,6 +103,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         external
         payable
         validControl
+        validSolverContract(solverOp)
         onlyAtlasEnvironment
         onlyPhase(ExecutionPhase.PreSolver)
     {
@@ -112,6 +121,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         external
         payable
         validControl
+        validSolverContract(solverOp)
         onlyAtlasEnvironment
         onlyPhase(ExecutionPhase.PostSolver)
     {
