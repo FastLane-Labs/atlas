@@ -421,7 +421,7 @@ abstract contract Escrow is AtlETH {
         }
 
         (bool _success, bytes memory _data) = address(this).call{ gas: _gasLimit }(
-            abi.encodeCall(this.solverCall, (ctx, solverOp, solverOp.bidAmount, _gasLimit, returnData))
+            abi.encodeCall(this.solverCall, (ctx, solverOp, IDAppControl(dConfig.to).getBidValue(solverOp), _gasLimit, returnData))
         );
 
         // The `solverCall()` above should always revert as key.bidFind is always true when it's called in the context
