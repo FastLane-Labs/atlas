@@ -540,6 +540,8 @@ contract MockDAppControl is DAppControl {
                         ATLAS OVERRIDE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
+    function _checkUserOperation(UserOperation memory) internal pure override { }
+
     function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory) {
         if (userOp.data.length > 0) {
             (bool success, bytes memory data) = address(userOp.dapp).call(userOp.data);

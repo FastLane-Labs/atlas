@@ -28,6 +28,8 @@ contract DummyDAppControl is DAppControl {
     // Atlas overrides
     // ****************************************
 
+    function _checkUserOperation(UserOperation memory) internal pure virtual override { }
+
     function _preOpsCall(UserOperation calldata userOp) internal virtual override returns (bytes memory) {
         if (userOp.data.length == 0) {
             return new bytes(0);

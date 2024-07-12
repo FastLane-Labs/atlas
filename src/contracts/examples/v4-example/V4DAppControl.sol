@@ -88,7 +88,7 @@ contract V4DAppControl is DAppControl {
     //                   ATLAS CALLS                       //
     /////////////////////////////////////////////////////////
 
-    function _checkUserOperation(UserOperation memory userOp) internal view {
+    function _checkUserOperation(UserOperation memory userOp) internal view override {
         require(bytes4(userOp.data) == SWAP, "ERR-H10 InvalidFunction");
         require(userOp.dapp == v4Singleton, "ERR-H11 InvalidTo"); // this is wrong
     }
@@ -98,9 +98,6 @@ contract V4DAppControl is DAppControl {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Atlas Escrow
-
-        // check if dapps using this DAppControl can handle the userOp
-        _checkUserOperation(userOp);
 
         require(!_currentKey.initialized, "ERR-H09 AlreadyInitialized");
 

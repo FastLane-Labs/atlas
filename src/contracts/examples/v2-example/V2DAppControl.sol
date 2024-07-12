@@ -89,7 +89,7 @@ contract V2DAppControl is DAppControl {
         }
     }
 
-    function _checkUserOperation(UserOperation memory userOp) internal view {
+    function _checkUserOperation(UserOperation memory userOp) internal view override {
         require(bytes4(userOp.data) == SWAP, "ERR-H10 InvalidFunction");
 
         require(
@@ -101,9 +101,6 @@ contract V2DAppControl is DAppControl {
     }
 
     function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory) {
-        // check if dapps using this DAppControl can handle the userOp
-        _checkUserOperation(userOp);
-
         (
             uint256 amount0Out,
             uint256 amount1Out,
