@@ -222,4 +222,64 @@ contract EscrowBitsTest is Test {
         invalid = 1 << uint256(SolverOutcome.EVMError);
         assertEq(invalid.bundlersFault(), false);
     }
+
+    function testSolversFault() public pure {
+        // SUCCESS - no one to blame
+        uint256 invalid = 0;
+        assertEq(invalid.solversFault(), false);
+
+        // NO REFUND group - Bundler's fault
+        uint256 valid = 1 << uint256(SolverOutcome.InvalidSignature);
+        assertEq(valid.solversFault(), false);
+        valid = 1 << uint256(SolverOutcome.InvalidUserHash);
+        assertEq(valid.solversFault(), false);
+        valid = 1 << uint256(SolverOutcome.DeadlinePassedAlt);
+        assertEq(valid.solversFault(), false);
+        valid = 1 << uint256(SolverOutcome.GasPriceBelowUsersAlt);
+        assertEq(valid.solversFault(), false);
+        valid = 1 << uint256(SolverOutcome.InvalidTo);
+        assertEq(valid.solversFault(), false);
+        valid = 1 << uint256(SolverOutcome.UserOutOfGas);
+        assertEq(valid.solversFault(), false);
+        valid = 1 << uint256(SolverOutcome.AlteredControl);
+        assertEq(valid.solversFault(), false);
+        valid = 1 << uint256(SolverOutcome.AltOpHashMismatch);
+        assertEq(valid.solversFault(), false);
+
+        // PARTIAL REFUND group - Solver's fault
+        valid = 1 << uint256(SolverOutcome.DeadlinePassed);
+        assertEq(valid.solversFault(), true);
+        valid = 1 << uint256(SolverOutcome.GasPriceOverCap);
+        assertEq(valid.solversFault(), true);
+        valid = 1 << uint256(SolverOutcome.InvalidSolver);
+        assertEq(valid.solversFault(), true);
+        valid = 1 << uint256(SolverOutcome.InvalidBidToken);
+        assertEq(valid.solversFault(), true);
+        valid = 1 << uint256(SolverOutcome.PerBlockLimit);
+        assertEq(valid.solversFault(), true);
+        valid = 1 << uint256(SolverOutcome.InsufficientEscrow);
+        assertEq(valid.solversFault(), true);
+        valid = 1 << uint256(SolverOutcome.GasPriceBelowUsers);
+        assertEq(valid.solversFault(), true);
+        valid = 1 << uint256(SolverOutcome.CallValueTooHigh);
+        assertEq(valid.solversFault(), true);
+        valid = 1 << uint256(SolverOutcome.PreSolverFailed);
+        assertEq(valid.solversFault(), true);
+
+        // FULL REFUND group - Solver's fault
+        valid = 1 << uint256(SolverOutcome.SolverOpReverted);
+        assertEq(valid.solversFault(), true);
+        valid = 1 << uint256(SolverOutcome.PostSolverFailed);
+        assertEq(valid.solversFault(), true);
+        valid = 1 << uint256(SolverOutcome.BidNotPaid);
+        assertEq(valid.solversFault(), true);
+        valid = 1 << uint256(SolverOutcome.InvertedBidExceedsCeiling);
+        assertEq(valid.solversFault(), true);
+        valid = 1 << uint256(SolverOutcome.BalanceNotReconciled);
+        assertEq(valid.solversFault(), true);
+        valid = 1 << uint256(SolverOutcome.CallbackNotCalled);
+        assertEq(valid.solversFault(), true);
+        valid = 1 << uint256(SolverOutcome.EVMError);
+        assertEq(valid.solversFault(), true);
+    }
 }

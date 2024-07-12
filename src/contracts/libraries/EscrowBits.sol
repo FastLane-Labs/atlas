@@ -63,4 +63,10 @@ library EscrowBits {
         // returns true if bundler blamed and no solver refund required
         return (result & _NO_REFUND != 0);
     }
+
+    function solversFault(uint256 result) internal pure returns (bool) {
+        // Only update solver escrow if failure is not due to bundler's fault
+        // returns true if solver blamed and solver refund required
+        return (result & (_PARTIAL_REFUND | _FULL_REFUND) != 0);
+    }
 }

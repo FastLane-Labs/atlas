@@ -269,16 +269,16 @@ abstract contract GasAccounting is SafetyLocks {
             _gasUsed += _getCalldataCost(solverOp.data.length);
         }
 
-        // Calculate what the solver owes
+        // Calculate what the solver owes. First check if solver can be blamed for failure. If not, bundler is blamed.
         // NOTE: This will cause an error if you are simulating with a gasPrice of 0
-        if (result.bundlersFault()) {
-            // CASE: Solver is not responsible for the failure of their operation, so we blame the bundler
-            // and reduce the total amount refunded to the bundler
-            _setWriteoffs(writeoffs() + _gasUsed.withAtlasAndBundlerSurcharges());
-        } else {
+        if (result.solversFault()) {
             // CASE: Solver failed, so we calculate what they owe.
             uint256 _gasUsedWithSurcharges = _gasUsed.withAtlasAndBundlerSurcharges();
             _assign(solverOp.from, _gasUsedWithSurcharges, _gasUsedWithSurcharges, false);
+        } else {
+            // CASE: Solver is not responsible for the failure of their operation, so we blame the bundler
+            // and reduce the total amount refunded to the bundler
+            _setWriteoffs(writeoffs() + _gasUsed.withAtlasAndBundlerSurcharges());
         }
     }
 
