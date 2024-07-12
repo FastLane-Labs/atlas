@@ -128,6 +128,9 @@ contract ExecutionEnvironment is Base {
             // inventory to send to solver must have been transferred in by userOp or preOp call
             solverTracker.ceiling =
                 solverTracker.etherIsBidToken ? address(this).balance : _tryBalanceOf(solverOp.bidToken, true);
+
+            // Ensure the ceiling is not less than the bid amount
+            if (solverTracker.ceiling < bidAmount) revert AtlasErrors.InvertedBidExceedsCeiling();
         }
 
         // Handle any solver preOps, if necessary
