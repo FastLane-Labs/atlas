@@ -44,7 +44,4 @@ interface IExecutionEnvironment {
 
     function withdrawERC20(address token, uint256 amount) external;
     function withdrawEther(uint256 amount) external;
-
-    function factoryWithdrawERC20(address user, address token, uint256 amount) external;
-    function factoryWithdrawEther(address user, uint256 amount) external;
 }
