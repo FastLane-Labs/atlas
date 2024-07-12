@@ -76,7 +76,6 @@ library TestUtils {
     }
 
     function computeCallChainHash(
-        DAppConfig calldata dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps
     )
@@ -84,15 +83,7 @@ library TestUtils {
         pure
         returns (bytes32 callSequenceHash)
     {
-        bytes memory callSequence;
-
-        if (dConfig.callConfig.needsPreOpsCall()) {
-            // Start with preOps call if preOps is needed
-            callSequence = abi.encodePacked(dConfig.to);
-        }
-
-        // Then user and solver call
-        callSequence = abi.encodePacked(callSequence, abi.encode(userOp), abi.encode(solverOps));
+        bytes memory callSequence = abi.encodePacked(abi.encode(userOp), abi.encode(solverOps));
         callSequenceHash = keccak256(callSequence);
     }
 }

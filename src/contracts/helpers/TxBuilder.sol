@@ -123,11 +123,9 @@ contract TxBuilder {
         view
         returns (DAppOperation memory dAppOp)
     {
-        DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
-
         // generate userOpHash depending on CallConfig.trustedOpHash allowed or not
         bytes32 userOpHash = IAtlasVerification(verification).getUserOperationHash(userOp);
-        bytes32 callChainHash = CallVerification.getCallChainHash(dConfig, userOp, solverOps);
+        bytes32 callChainHash = CallVerification.getCallChainHash(userOp, solverOps);
 
         dAppOp = DAppOperation({
             from: governance,

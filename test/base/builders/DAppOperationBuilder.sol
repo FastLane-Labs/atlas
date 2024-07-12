@@ -79,8 +79,7 @@ contract DAppOperationBuilder is Test {
         public
         returns (DAppOperationBuilder)
     {
-        DAppConfig memory dConfig = IDAppControl(useroperation.control).getDAppConfig(useroperation);
-        dappOperation.callChainHash = CallVerification.getCallChainHash(dConfig, useroperation, solverOperations);
+        dappOperation.callChainHash = CallVerification.getCallChainHash(useroperation, solverOperations);
         return this;
     }
 

@@ -111,7 +111,7 @@ contract AtlasVerificationBase is AtlasBaseTest {
     }
 
     function validDAppOperation(DAppConfig memory config, UserOperation memory userOp, SolverOperation[] memory solverOps) public returns (DAppOperationBuilder) {
-        bytes32 callChainHash = CallVerification.getCallChainHash(config, userOp, solverOps);
+        bytes32 callChainHash = CallVerification.getCallChainHash(userOp, solverOps);
         return new DAppOperationBuilder()
             .withFrom(governanceEOA)
             .withTo(address(atlas))
