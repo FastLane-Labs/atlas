@@ -35,14 +35,14 @@ contract SafetyBitsTest is Test {
         internal
         pure
         returns (Context memory)
-    {   
+    {
         return Context({
             executionEnvironment: executionEnvironment,
             userOpHash: userOpHash,
             bundler: bundler,
             solverSuccessful: false,
             paymentsSuccessful: false,
-            solverIndex: callConfig.needsPreOpsCall() ? 0 : 1,
+            solverIndex: callConfig.needsPreOpsDelegateCall() ? 0 : 1,
             solverCount: solverOpCount + 3,
             phase: uint8(ExecutionPhase.Uninitialized),
             solverOutcome: 0,

@@ -212,10 +212,9 @@ Coverage as per coverage report:
 
 Coverage Bugs:
 
-- L86 `_allocateValueCall` hook is delegatecalled in the full Atlas test of the OEV module.
+- L86 `_allocateValueDelegateCall` hook is delegatecalled in the full Atlas test of the OEV module.
 - L131 the `return newWrapper;` line in `createNewChainlinkAtlasWrapper` is tested in `test_ChainlinkDAppControl_createNewChainlinkAtlasWrapper`
 
 Last updated: 2024-Mar-19
-
 
 <!-- TODO add more folders and contracts -->

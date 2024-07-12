@@ -142,8 +142,9 @@ contract Base {
 
     /// @notice Extracts and returns the call index of the current metacall tx, from calldata.
     /// @dev Call index is the index of the current call within the total calls (see `_solverCount()`) of a metacall tx.
-    /// I.e. preOpsCall has an index of 0, userOp has an index of 1, the first solverOp has an index of 2, subsequent
-    /// solverOps have indices of 3, 4, 5, etc, and postOpsCall has an index of `solverCount - 1`.
+    /// I.e. preOpsDelegateCall has an index of 0, userOp has an index of 1, the first solverOp has an index of 2,
+    /// subsequent
+    /// solverOps have indices of 3, 4, 5, etc, and postOpsDelegateCall has an index of `solverCount - 1`.
     /// @return solverIndex The call index of the current metacall tx.
     function _solverIndex() internal pure returns (uint8 solverIndex) {
         assembly {

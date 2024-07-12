@@ -115,7 +115,7 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
     * @param solverOp The SolverOperation that is about to execute
     * @return true if the transfer was successful, false otherwise
     */
-    function _preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
+    function _preSolverDelegateCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
         address solverTo = solverOp.solver;
         if (solverTo == address(this) || solverTo == _control() || solverTo == ATLAS) {
             revert("Invalid solver address - solverOp.solver cannot be execution environment, dapp control or atlas");
@@ -145,7 +145,7 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
     * @param returnData The return data from the user operation (swap data)
     * @return true if the transfer was successful, false otherwise
     */
-    function _postSolverCall(SolverOperation calldata, bytes calldata returnData) internal override {
+    function _postSolverDelegateCall(SolverOperation calldata, bytes calldata returnData) internal override {
         SwapIntent memory swapIntent = abi.decode(returnData, (SwapIntent));
         uint256 buyTokenBalance = IERC20(swapIntent.tokenUserBuys).balanceOf(address(this));
 
@@ -167,7 +167,7 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
     * @param _
     * @param _
     */
-    function _allocateValueCall(address bidToken, uint256, bytes calldata) internal override {
+    function _allocateValueDelegateCall(address bidToken, uint256, bytes calldata) internal override {
         if (bidToken != address(0)) {
             SafeTransferLib.safeTransfer(bidToken, _user(), IERC20(bidToken).balanceOf(address(this)));
         } else {

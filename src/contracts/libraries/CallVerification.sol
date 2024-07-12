@@ -21,7 +21,7 @@ library CallVerification {
     {
         bytes memory callSequence;
 
-        if (dConfig.callConfig.needsPreOpsCall()) {
+        if (dConfig.callConfig.needsPreOpsDelegateCall()) {
             // Start with preOps call if preOps is needed
             callSequence = abi.encodePacked(dConfig.to);
         }

@@ -45,7 +45,7 @@ abstract contract Escrow is AtlETH {
     /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @return preOpsData The data returned by the preOps call, if successful.
-    function _executePreOpsCall(
+    function _executePreOpsDelegateCall(
         Context memory ctx,
         DAppConfig memory dConfig,
         UserOperation calldata userOp
@@ -256,7 +256,7 @@ abstract contract Escrow is AtlETH {
     /// @param ctx Context struct containing the current state of the escrow lock.
     /// @param solved Boolean indicating whether a SolverOperation was successful and won the auction.
     /// @param returnData Data returned from execution of the UserOp call, which may be required for the postOps logic.
-    function _executePostOpsCall(
+    function _executepostOpsDelegateCall(
         Context memory ctx,
         bool solved,
         bytes memory returnData
@@ -658,7 +658,7 @@ abstract contract Escrow is AtlETH {
         // ------------------------------------- //
 
         // Verify that the solver repaid their borrowed solverOp.value by calling `reconcile()`. If `reconcile()` did
-        // not fully repay the borrowed amount, the `postSolverCall` might have covered the outstanding debt via
+        // not fully repay the borrowed amount, the `postSolverDelegateCall` might have covered the outstanding debt via
         // `contribute()`. This final check ensures that the solver has fulfilled their repayment obligations before
         // proceeding.
         (, bool _calledback, bool _fulfilled) = _solverLockData();

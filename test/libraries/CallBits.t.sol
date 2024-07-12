@@ -122,7 +122,7 @@ contract CallBitsTest is Test {
         assertEq(decodedCallConfig.unknownAuctioneer, false, "unknownAuctioneer 2 incorrect");
         assertEq(decodedCallConfig.verifyCallChainHash, true, "verifyCallChainHash 2 incorrect");
         assertEq(decodedCallConfig.forwardReturnData, false, "forwardPreOpsReturnData 2 incorrect");
-        assertEq(decodedCallConfig.requireFulfillment, true, "requireFulfillment 2 incorrect");   
+        assertEq(decodedCallConfig.requireFulfillment, true, "requireFulfillment 2 incorrect");
         assertEq(decodedCallConfig.trustedOpHash, false, "trustedOpHash 2 incorrect");
         assertEq(decodedCallConfig.invertBidValue, true, "invertBidValue 2 incorrect");
         assertEq(decodedCallConfig.exPostBids, false, "exPostBids 2 incorrect");
@@ -133,13 +133,13 @@ contract CallBitsTest is Test {
         uint32 encodedCallConfig = CallBits.encodeCallConfig(callConfig1);
         assertEq(encodedCallConfig.needsSequentialUserNonces(), false, "needsSequentialUserNonces 1 incorrect");
         assertEq(encodedCallConfig.needsSequentialDAppNonces(), true, "needsSequentialDAppNonces 1 incorrect");
-        assertEq(encodedCallConfig.needsPreOpsCall(), false, "needsPreOpsCall 1 incorrect");
+        assertEq(encodedCallConfig.needsPreOpsDelegateCall(), false, "needsPreOpsDelegateCall 1 incorrect");
         assertEq(encodedCallConfig.needsPreOpsReturnData(), true, "needsPreOpsReturnData 1 incorrect");
         assertEq(encodedCallConfig.needsUserReturnData(), false, "needsUserReturnData 1 incorrect");
         assertEq(encodedCallConfig.needsDelegateUser(), true, "needsDelegateUser 1 incorrect");
-        assertEq(encodedCallConfig.needsPreSolver(), false, "needsPreSolver 1 incorrect");
-        assertEq(encodedCallConfig.needsSolverPostCall(), true, "needsSolverPostCall 1 incorrect");
-        assertEq(encodedCallConfig.needsPostOpsCall(), false, "needsPostOpsCall 1 incorrect");
+        assertEq(encodedCallConfig.needsPreSolverDelegateCall(), false, "needsPreSolverDelegateCall 1 incorrect");
+        assertEq(encodedCallConfig.needsSolverPostDelegateCall(), true, "needsSolverPostDelegateCall 1 incorrect");
+        assertEq(encodedCallConfig.needsPostOpsDelegateCall(), false, "needsPostOpsDelegateCall 1 incorrect");
         assertEq(encodedCallConfig.allowsZeroSolvers(), true, "allowsZeroSolvers 1 incorrect");
         assertEq(encodedCallConfig.allowsReuseUserOps(), false, "allowsReuseUserOps 1 incorrect");
         assertEq(encodedCallConfig.allowsUserAuctioneer(), true, "allowsUserAuctioneer 1 incorrect");
@@ -152,18 +152,17 @@ contract CallBitsTest is Test {
         assertEq(encodedCallConfig.invertsBidValue(), false, "invertsBidValue 1 incorrect");
         assertEq(encodedCallConfig.exPostBids(), true, "exPostBids 1 incorrect");
         assertEq(encodedCallConfig.allowAllocateValueFailure(), false, "allowAllocateValueFailure 1 incorrect");
-        
 
         encodedCallConfig = CallBits.encodeCallConfig(callConfig2);
         assertEq(encodedCallConfig.needsSequentialUserNonces(), true, "needsSequentialUserNonces 2 incorrect");
         assertEq(encodedCallConfig.needsSequentialDAppNonces(), false, "needsSequentialDAppNonces 2 incorrect");
-        assertEq(encodedCallConfig.needsPreOpsCall(), true, "needsPreOpsCall 2 incorrect");
+        assertEq(encodedCallConfig.needsPreOpsDelegateCall(), true, "needsPreOpsDelegateCall 2 incorrect");
         assertEq(encodedCallConfig.needsPreOpsReturnData(), false, "needsPreOpsReturnData 2 incorrect");
         assertEq(encodedCallConfig.needsUserReturnData(), true, "needsUserReturnData 2 incorrect");
         assertEq(encodedCallConfig.needsDelegateUser(), false, "needsDelegateUser 2 incorrect");
-        assertEq(encodedCallConfig.needsPreSolver(), true, "needsPreSolver 2 incorrect");
-        assertEq(encodedCallConfig.needsSolverPostCall(), false, "needsSolverPostCall 2 incorrect");
-        assertEq(encodedCallConfig.needsPostOpsCall(), true, "needsPostOpsCall 2 incorrect");
+        assertEq(encodedCallConfig.needsPreSolverDelegateCall(), true, "needsPreSolverDelegateCall 2 incorrect");
+        assertEq(encodedCallConfig.needsSolverPostDelegateCall(), false, "needsSolverPostDelegateCall 2 incorrect");
+        assertEq(encodedCallConfig.needsPostOpsDelegateCall(), true, "needsPostOpsDelegateCall 2 incorrect");
         assertEq(encodedCallConfig.allowsZeroSolvers(), false, "allowsZeroSolvers 2 incorrect");
         assertEq(encodedCallConfig.allowsReuseUserOps(), true, "allowsReuseUserOps 2 incorrect");
         assertEq(encodedCallConfig.allowsUserAuctioneer(), false, "allowsUserAuctioneer 2 incorrect");

@@ -28,42 +28,58 @@ contract DummyDAppControl is DAppControl {
     // Atlas overrides
     // ****************************************
 
-    function _preOpsCall(UserOperation calldata userOp) internal virtual override returns (bytes memory) {
+    function _preOpsDelegateCall(UserOperation calldata userOp) internal virtual override returns (bytes memory) {
         if (userOp.data.length == 0) {
             return new bytes(0);
         }
 
         (bool success, bytes memory data) = address(userOp.dapp).call(userOp.data);
-        require(success, "_preOpsCall reverted");
+        require(success, "_preOpsDelegateCall reverted");
         return data;
     }
 
-    function _postOpsCall(bool, bytes calldata data) internal pure virtual override {
+    function _postOpsDelegateCall(bool, bytes calldata data) internal pure virtual override {
         if (data.length == 0) return;
 
         (bool shouldRevert) = abi.decode(data, (bool));
-        require(!shouldRevert, "_postOpsCall revert requested");
+        require(!shouldRevert, "_postOpsDelegateCall revert requested");
     }
 
-    function _preSolverCall(SolverOperation calldata, bytes calldata returnData) internal view virtual override {
+    function _preSolverDelegateCall(
+        SolverOperation calldata,
+        bytes calldata returnData
+    )
+        internal
+        view
+        virtual
+        override
+    {
         if (returnData.length == 0) {
             return;
         }
 
         (bool shouldRevert) = abi.decode(returnData, (bool));
-        require(!shouldRevert, "_preSolverCall revert requested");
+        require(!shouldRevert, "_preSolverDelegateCall revert requested");
     }
 
-    function _postSolverCall(SolverOperation calldata, bytes calldata returnData) internal pure virtual override {
+    function _postSolverDelegateCall(
+        SolverOperation calldata,
+        bytes calldata returnData
+    )
+        internal
+        pure
+        virtual
+        override
+    {
         if (returnData.length == 0) {
             return;
         }
 
         (bool shouldRevert) = abi.decode(returnData, (bool));
-        require(!shouldRevert, "_postSolverCall revert requested");
+        require(!shouldRevert, "_postSolverDelegateCall revert requested");
     }
 
-    function _allocateValueCall(
+    function _allocateValueDelegateCall(
         address bidToken,
         uint256 winningAmount,
         bytes calldata data
@@ -77,7 +93,7 @@ contract DummyDAppControl is DAppControl {
         }
 
         (bool shouldRevert) = abi.decode(data, (bool));
-        require(!shouldRevert, "_allocateValueCall revert requested");
+        require(!shouldRevert, "_allocateValueDelegateCall revert requested");
         emit MEVPaymentSuccess(bidToken, winningAmount);
     }
 

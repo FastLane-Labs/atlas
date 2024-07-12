@@ -75,14 +75,10 @@ contract SwapIntentTest is BaseTest {
         UserCondition userCondition = new UserCondition();
 
         Condition[] memory conditions = new Condition[](2);
-        conditions[0] = Condition({
-            antecedent: address(userCondition),
-            context: abi.encodeCall(UserCondition.isLessThanFive, 3)
-        });
-        conditions[1] = Condition({
-            antecedent: address(userCondition),
-            context: abi.encodeCall(UserCondition.isLessThanFive, 4)
-        });
+        conditions[0] =
+            Condition({ antecedent: address(userCondition), context: abi.encodeCall(UserCondition.isLessThanFive, 3) });
+        conditions[1] =
+            Condition({ antecedent: address(userCondition), context: abi.encodeCall(UserCondition.isLessThanFive, 4) });
 
         SwapIntent memory swapIntent = SwapIntent({
             tokenUserBuys: DAI_ADDRESS,
@@ -115,8 +111,8 @@ contract SwapIntentTest is BaseTest {
         vm.stopPrank();
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
-        // userOpData is used in delegatecall from exec env to control, calling preOpsCall
-        // first 4 bytes are "userSelector" param in preOpsCall in DAppControl - swap() selector
+        // userOpData is used in delegatecall from exec env to control, calling preOpsDelegateCall
+        // first 4 bytes are "userSelector" param in preOpsDelegateCall in DAppControl - swap() selector
         // rest of data is "userData" param
 
         // swap(SwapIntent calldata) selector = 0x98434997
@@ -139,8 +135,7 @@ contract SwapIntentTest is BaseTest {
         // userOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         // Build solver calldata (function selector on solver contract and its params)
-        bytes memory solverOpData =
-            abi.encodeCall(SimpleRFQSolver.fulfillRFQ, (swapIntent, executionEnvironment));
+        bytes memory solverOpData = abi.encodeCall(SimpleRFQSolver.fulfillRFQ, (swapIntent, executionEnvironment));
 
         // Builds the SolverOperation
         solverOps[0] = txBuilder.buildSolverOperation({
@@ -241,8 +236,8 @@ contract SwapIntentTest is BaseTest {
         vm.stopPrank();
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
-        // userOpData is used in delegatecall from exec env to control, calling preOpsCall
-        // first 4 bytes are "userSelector" param in preOpsCall in DAppControl - swap() selector
+        // userOpData is used in delegatecall from exec env to control, calling preOpsDelegateCall
+        // first 4 bytes are "userSelector" param in preOpsDelegateCall in DAppControl - swap() selector
         // rest of data is "userData" param
 
         // swap(SwapIntent calldata) selector = 0x98434997

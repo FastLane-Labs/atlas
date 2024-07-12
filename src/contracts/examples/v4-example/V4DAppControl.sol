@@ -94,7 +94,7 @@ contract V4DAppControl is DAppControl {
     }
 
     /////////////// DELEGATED CALLS //////////////////
-    function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory preOpsData) {
+    function _preOpsDelegateCall(UserOperation calldata userOp) internal override returns (bytes memory preOpsData) {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Atlas Escrow
@@ -160,7 +160,7 @@ contract V4DAppControl is DAppControl {
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
+    function _allocateValueDelegateCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
@@ -185,7 +185,7 @@ contract V4DAppControl is DAppControl {
         sequenceLock[sequenceKey] = true;
     }
 
-    function _postOpsCall(bool solved, bytes calldata data) internal override {
+    function _postOpsDelegateCall(bool solved, bytes calldata data) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow

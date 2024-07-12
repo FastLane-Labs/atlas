@@ -87,7 +87,7 @@ enum CallConfigIndex {
     DelegateUser,
     PreSolver,
     PostSolver,
-    RequirePostOpsCall,
+    RequirepostOpsDelegateCall,
     ZeroSolvers,
     ReuseUserOp,
     UserAuctioneer,

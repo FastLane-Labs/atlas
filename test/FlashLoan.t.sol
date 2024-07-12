@@ -309,7 +309,7 @@ contract DummyDAppControlBuilder is DAppControl {
         weth = _weth;
     }
 
-    function _allocateValueCall(address bidToken, uint256, bytes calldata) internal override {
+    function _allocateValueDelegateCall(address bidToken, uint256, bytes calldata) internal override {
         if (bidToken != address(0)) {
             revert("not supported");
         }

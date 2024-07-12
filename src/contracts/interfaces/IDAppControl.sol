@@ -6,15 +6,15 @@ import "../types/SolverOperation.sol";
 import "../types/ConfigTypes.sol";
 
 interface IDAppControl {
-    function preOpsCall(UserOperation calldata userOp) external payable returns (bytes memory);
+    function preOpsDelegateCall(UserOperation calldata userOp) external payable returns (bytes memory);
 
-    function preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) external payable;
+    function preSolverDelegateCall(SolverOperation calldata solverOp, bytes calldata returnData) external payable;
 
-    function postSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) external payable;
+    function postSolverDelegateCall(SolverOperation calldata solverOp, bytes calldata returnData) external payable;
 
-    function postOpsCall(bool solved, bytes calldata data) external payable;
+    function postOpsDelegateCall(bool solved, bytes calldata data) external payable;
 
-    function allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) external;
+    function allocateValueDelegateCall(address bidToken, uint256 bidAmount, bytes calldata data) external;
 
     function getDAppConfig(UserOperation calldata userOp) external view returns (DAppConfig memory dConfig);
 

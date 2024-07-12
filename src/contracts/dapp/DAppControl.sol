@@ -70,10 +70,10 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         _;
     }
 
-    /// @notice The preOpsCall hook which may be called before the UserOperation is executed.
+    /// @notice The preOpsDelegateCall hook which may be called before the UserOperation is executed.
     /// @param userOp The UserOperation struct.
     /// @return data Data to be passed to the next call phase.
-    function preOpsCall(UserOperation calldata userOp)
+    function preOpsDelegateCall(UserOperation calldata userOp)
         external
         payable
         validControl
@@ -81,14 +81,14 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         onlyPhase(ExecutionPhase.PreOps)
         returns (bytes memory)
     {
-        return _preOpsCall(userOp);
+        return _preOpsDelegateCall(userOp);
     }
 
-    /// @notice The preSolverCall hook which may be called before the SolverOperation is executed.
+    /// @notice The preSolverDelegateCall hook which may be called before the SolverOperation is executed.
     /// @dev Should revert if any DApp-specific checks fail to indicate non-fulfillment.
     /// @param solverOp The SolverOperation to be executed after this hook has been called.
     /// @param returnData Data returned from the previous call phase.
-    function preSolverCall(
+    function preSolverDelegateCall(
         SolverOperation calldata solverOp,
         bytes calldata returnData
     )
@@ -98,14 +98,14 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         onlyAtlasEnvironment
         onlyPhase(ExecutionPhase.PreSolver)
     {
-        _preSolverCall(solverOp, returnData);
+        _preSolverDelegateCall(solverOp, returnData);
     }
 
-    /// @notice The postSolverCall hook which may be called after the SolverOperation has been executed.
+    /// @notice The postSolverDelegateCall hook which may be called after the SolverOperation has been executed.
     /// @dev Should revert if any DApp-specific checks fail to indicate non-fulfillment.
     /// @param solverOp The SolverOperation struct that was executed just before this hook was called.
     /// @param returnData Data returned from the previous call phase.
-    function postSolverCall(
+    function postSolverDelegateCall(
         SolverOperation calldata solverOp,
         bytes calldata returnData
     )
@@ -115,14 +115,14 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         onlyAtlasEnvironment
         onlyPhase(ExecutionPhase.PostSolver)
     {
-        _postSolverCall(solverOp, returnData);
+        _postSolverDelegateCall(solverOp, returnData);
     }
 
-    /// @notice The allocateValueCall hook which is called after a successful SolverOperation.
+    /// @notice The allocateValueDelegateCall hook which is called after a successful SolverOperation.
     /// @param bidToken The address of the token used for the winning SolverOperation's bid.
     /// @param bidAmount The winning bid amount.
     /// @param data Data returned from the previous call phase.
-    function allocateValueCall(
+    function allocateValueDelegateCall(
         address bidToken,
         uint256 bidAmount,
         bytes calldata data
@@ -132,14 +132,14 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         onlyAtlasEnvironment
         onlyPhase(ExecutionPhase.AllocateValue)
     {
-        _allocateValueCall(bidToken, bidAmount, data);
+        _allocateValueDelegateCall(bidToken, bidAmount, data);
     }
 
-    /// @notice The postOpsCall hook which may be called as the last phase of a `metacall` transaction.
+    /// @notice The postOpsDelegateCall hook which may be called as the last phase of a `metacall` transaction.
     /// @dev Should revert if any DApp-specific checks fail.
     /// @param solved Boolean indicating whether a winning SolverOperation was executed successfully.
     /// @param data Data returned from the previous call phase.
-    function postOpsCall(
+    function postOpsDelegateCall(
         bool solved,
         bytes calldata data
     )
@@ -149,7 +149,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         onlyAtlasEnvironment
         onlyPhase(ExecutionPhase.PostOps)
     {
-        _postOpsCall(solved, data);
+        _postOpsDelegateCall(solved, data);
     }
 
     function userDelegated() external view returns (bool delegated) {

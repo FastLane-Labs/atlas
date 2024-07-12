@@ -38,7 +38,7 @@ library CallBits {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.PostSolver);
         }
         if (callConfig.requirePostOps) {
-            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.RequirePostOpsCall);
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.RequirepostOpsDelegateCall);
         }
         if (callConfig.zeroSolvers) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.ZeroSolvers);
@@ -82,13 +82,13 @@ library CallBits {
         callConfig = CallConfig({
             userNoncesSequential: needsSequentialUserNonces(encodedCallConfig),
             dappNoncesSequential: needsSequentialDAppNonces(encodedCallConfig),
-            requirePreOps: needsPreOpsCall(encodedCallConfig),
+            requirePreOps: needsPreOpsDelegateCall(encodedCallConfig),
             trackPreOpsReturnData: needsPreOpsReturnData(encodedCallConfig),
             trackUserReturnData: needsUserReturnData(encodedCallConfig),
             delegateUser: needsDelegateUser(encodedCallConfig),
-            preSolver: needsPreSolver(encodedCallConfig),
-            postSolver: needsSolverPostCall(encodedCallConfig),
-            requirePostOps: needsPostOpsCall(encodedCallConfig),
+            preSolver: needsPreSolverDelegateCall(encodedCallConfig),
+            postSolver: needsSolverPostDelegateCall(encodedCallConfig),
+            requirePostOps: needsPostOpsDelegateCall(encodedCallConfig),
             zeroSolvers: allowsZeroSolvers(encodedCallConfig),
             reuseUserOp: allowsReuseUserOps(encodedCallConfig),
             userAuctioneer: allowsUserAuctioneer(encodedCallConfig),
@@ -112,7 +112,7 @@ library CallBits {
         sequential = callConfig & (1 << uint32(CallConfigIndex.DAppNoncesSequential)) != 0;
     }
 
-    function needsPreOpsCall(uint32 callConfig) internal pure returns (bool needsPreOps) {
+    function needsPreOpsDelegateCall(uint32 callConfig) internal pure returns (bool needsPreOps) {
         needsPreOps = callConfig & (1 << uint32(CallConfigIndex.RequirePreOps)) != 0;
     }
 
@@ -128,16 +128,16 @@ library CallBits {
         delegateUser = callConfig & (1 << uint32(CallConfigIndex.DelegateUser)) != 0;
     }
 
-    function needsPreSolver(uint32 callConfig) internal pure returns (bool preSolver) {
+    function needsPreSolverDelegateCall(uint32 callConfig) internal pure returns (bool preSolver) {
         preSolver = callConfig & (1 << uint32(CallConfigIndex.PreSolver)) != 0;
     }
 
-    function needsSolverPostCall(uint32 callConfig) internal pure returns (bool postSolver) {
+    function needsSolverPostDelegateCall(uint32 callConfig) internal pure returns (bool postSolver) {
         postSolver = callConfig & (1 << uint32(CallConfigIndex.PostSolver)) != 0;
     }
 
-    function needsPostOpsCall(uint32 callConfig) internal pure returns (bool needsPostOps) {
-        needsPostOps = callConfig & (1 << uint32(CallConfigIndex.RequirePostOpsCall)) != 0;
+    function needsPostOpsDelegateCall(uint32 callConfig) internal pure returns (bool needsPostOps) {
+        needsPostOps = callConfig & (1 << uint32(CallConfigIndex.RequirepostOpsDelegateCall)) != 0;
     }
 
     function allowsZeroSolvers(uint32 callConfig) internal pure returns (bool zeroSolvers) {

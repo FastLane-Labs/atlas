@@ -137,8 +137,8 @@ contract Atlas is Escrow, Factory {
         bytes memory _returnData;
 
         // PreOps Call
-        if (dConfig.callConfig.needsPreOpsCall()) {
-            _returnData = _executePreOpsCall(ctx, dConfig, userOp);
+        if (dConfig.callConfig.needsPreOpsDelegateCall()) {
+            _returnData = _executePreOpsDelegateCall(ctx, dConfig, userOp);
         }
 
         // UserOp Call
@@ -155,8 +155,8 @@ contract Atlas is Escrow, Factory {
         }
 
         // PostOp Call
-        if (dConfig.callConfig.needsPostOpsCall()) {
-            _executePostOpsCall(ctx, ctx.solverSuccessful, _returnData);
+        if (dConfig.callConfig.needsPostOpsDelegateCall()) {
+            _executepostOpsDelegateCall(ctx, ctx.solverSuccessful, _returnData);
         }
     }
 

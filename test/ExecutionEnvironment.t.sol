@@ -404,7 +404,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         (revertsAsExpected,) = address(executionEnvironment).call(postTryCatchMetaData);
         assertTrue(revertsAsExpected, "expectRevert PostSolverFailed: call did not revert");
     }
-    
+
     function test_allocateValue_SkipCoverage() public {
         bytes memory allocateData;
         bool status;
@@ -430,11 +430,9 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(allocateData);
     }
 
-
     function test_withdrawERC20_SkipCoverage() public {
         // FIXME: fix before merging spearbit-reaudit branch
         vm.skip(true);
-
 
         // Valid
         deal(chain.weth, address(executionEnvironment), 2e18);
@@ -540,51 +538,37 @@ contract MockDAppControl is DAppControl {
                         ATLAS OVERRIDE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory) {
+    function _preOpsDelegateCall(UserOperation calldata userOp) internal override returns (bytes memory) {
         if (userOp.data.length > 0) {
             (bool success, bytes memory data) = address(userOp.dapp).call(userOp.data);
-            require(success, "_preOpsCall reverted");
+            require(success, "_preOpsDelegateCall reverted");
             return data;
         }
         return new bytes(0);
     }
 
-    function _postOpsCall(bool, bytes calldata data) internal view override {
+    function _postOpsDelegateCall(bool, bytes calldata data) internal view override {
         console.log("before decode");
         bool shouldRevert = abi.decode(data, (bool));
         console.log("after decode");
-        require(!shouldRevert, "_postSolverCall revert requested");
+        require(!shouldRevert, "_postSolverDelegateCall revert requested");
     }
 
-    function _preSolverCall(
-        SolverOperation calldata,
-        bytes calldata returnData
-    )
-        internal
-        pure
-        override
-    {
+    function _preSolverDelegateCall(SolverOperation calldata, bytes calldata returnData) internal pure override {
         (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
-        require(!shouldRevert, "_preSolverCall revert requested");
-        if (!returnValue) revert("_preSolverCall returned false");
+        require(!shouldRevert, "_preSolverDelegateCall revert requested");
+        if (!returnValue) revert("_preSolverDelegateCall returned false");
     }
 
-    function _postSolverCall(
-        SolverOperation calldata,
-        bytes calldata returnData
-    )
-        internal
-        pure
-        override
-    {
+    function _postSolverDelegateCall(SolverOperation calldata, bytes calldata returnData) internal pure override {
         (bool shouldRevert, bool returnValue) = abi.decode(returnData, (bool, bool));
-        require(!shouldRevert, "_postSolverCall revert requested");
-        if (!returnValue) revert("_postSolverCall returned false");
+        require(!shouldRevert, "_postSolverDelegateCall revert requested");
+        if (!returnValue) revert("_postSolverDelegateCall returned false");
     }
 
-    function _allocateValueCall(address, uint256, bytes calldata data) internal virtual override {
+    function _allocateValueDelegateCall(address, uint256, bytes calldata data) internal virtual override {
         (bool shouldRevert) = abi.decode(data, (bool));
-        require(!shouldRevert, "_allocateValueCall revert requested");
+        require(!shouldRevert, "_allocateValueDelegateCall revert requested");
     }
 
     function getBidFormat(UserOperation calldata) public view virtual override returns (address) { }

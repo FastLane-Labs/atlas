@@ -48,7 +48,7 @@ contract ExecutionEnvironment is Base {
 
     /// @notice The preOpsWrapper function may be called by Atlas before the UserOperation is executed.
     /// @dev This contract is called by the Atlas contract, and delegatecalls the DAppControl contract via the
-    /// corresponding `preOpsCall` function.
+    /// corresponding `preOpsDelegateCall` function.
     /// @param userOp The UserOperation struct.
     /// @return preOpsData Data to be passed to the next call phase.
     function preOpsWrapper(UserOperation calldata userOp)
@@ -57,7 +57,7 @@ contract ExecutionEnvironment is Base {
         onlyAtlasEnvironment
         returns (bytes memory)
     {
-        bytes memory _preOpsData = _forward(abi.encodeCall(IDAppControl.preOpsCall, userOp));
+        bytes memory _preOpsData = _forward(abi.encodeCall(IDAppControl.preOpsDelegateCall, userOp));
 
         bool _success;
         (_success, _preOpsData) = _control().delegatecall(_preOpsData);
@@ -99,11 +99,11 @@ contract ExecutionEnvironment is Base {
 
     /// @notice The postOpsWrapper function may be called by Atlas as the last phase of a `metacall` transaction.
     /// @dev This contract is called by the Atlas contract, and delegatecalls the DAppControl contract via the
-    /// corresponding `postOpsCall` function.
+    /// corresponding `postOpsDelegateCall` function.
     /// @param solved Boolean indicating whether a winning SolverOperation was executed successfully.
     /// @param returnData Data returned from the previous call phase.
     function postOpsWrapper(bool solved, bytes calldata returnData) external onlyAtlasEnvironment {
-        bytes memory _data = _forward(abi.encodeCall(IDAppControl.postOpsCall, (solved, returnData)));
+        bytes memory _data = _forward(abi.encodeCall(IDAppControl.postOpsDelegateCall, (solved, returnData)));
 
         bool _success;
         (_success,) = _control().delegatecall(_data);
@@ -111,7 +111,7 @@ contract ExecutionEnvironment is Base {
         if (!_success) revert AtlasErrors.PostOpsDelegatecallFail();
     }
 
-    /// @notice The solverPreTryCatch function is called by Atlas to execute the preSolverCall part of each
+    /// @notice The solverPreTryCatch function is called by Atlas to execute the preSolverDelegateCall part of each
     /// SolverOperation. A SolverTracker struct is also returned, containing bid info needed to handle the difference in
     /// logic between inverted and non-inverted bids.
     /// @param bidAmount The Solver's bid amount.
@@ -142,10 +142,10 @@ contract ExecutionEnvironment is Base {
         }
 
         // Handle any solver preOps, if necessary
-        if (_config().needsPreSolver()) {
+        if (_config().needsPreSolverDelegateCall()) {
             bool _success;
 
-            bytes memory _data = _forward(abi.encodeCall(IDAppControl.preSolverCall, (solverOp, returnData)));
+            bytes memory _data = _forward(abi.encodeCall(IDAppControl.preSolverDelegateCall, (solverOp, returnData)));
             (_success,) = _control().delegatecall(_data);
 
             if (!_success) revert AtlasErrors.PreSolverFailed();
@@ -159,7 +159,7 @@ contract ExecutionEnvironment is Base {
         }
     }
 
-    /// @notice The solverPostTryCatch function is called by Atlas to execute the postSolverCall part of each
+    /// @notice The solverPostTryCatch function is called by Atlas to execute the postSolverDelegateCall part of each
     /// SolverOperation. The different logic scenarios depending on the value of invertsBidValue are also handled, and
     /// the SolverTracker struct is updated accordingly.
     /// @param solverOp The SolverOperation struct.
@@ -183,10 +183,10 @@ contract ExecutionEnvironment is Base {
                 solverTracker.etherIsBidToken ? address(this).balance : _tryBalanceOf(solverOp.bidToken, false);
         }
 
-        if (_config().needsSolverPostCall()) {
+        if (_config().needsSolverPostDelegateCall()) {
             bool _success;
 
-            bytes memory _data = _forward(abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData)));
+            bytes memory _data = _forward(abi.encodeCall(IDAppControl.postSolverDelegateCall, (solverOp, returnData)));
             (_success,) = _control().delegatecall(_data);
 
             if (!_success) revert AtlasErrors.PostSolverFailed();
@@ -222,7 +222,7 @@ contract ExecutionEnvironment is Base {
 
     /// @notice The allocateValue function is called by Atlas after a successful SolverOperation.
     /// @dev This contract is called by the Atlas contract, and delegatecalls the DAppControl contract via the
-    /// corresponding `allocateValueCall` function.
+    /// corresponding `allocateValueDelegateCall` function.
     /// @param bidToken The address of the token used for the winning SolverOperation's bid.
     /// @param bidAmount The winning bid amount.
     /// @param allocateData Data returned from the previous call phase.
@@ -238,7 +238,8 @@ contract ExecutionEnvironment is Base {
         onlyAtlasEnvironment
         returns (bool allocateValueSucceeded)
     {
-        allocateData = _forward(abi.encodeCall(IDAppControl.allocateValueCall, (bidToken, bidAmount, allocateData)));
+        allocateData =
+            _forward(abi.encodeCall(IDAppControl.allocateValueDelegateCall, (bidToken, bidAmount, allocateData)));
 
         (bool _success,) = _control().delegatecall(allocateData);
         if (!_success && !_config().allowAllocateValueFailure()) revert AtlasErrors.AllocateValueDelegatecallFail();

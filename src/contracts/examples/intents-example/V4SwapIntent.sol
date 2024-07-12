@@ -152,7 +152,7 @@ contract V4SwapIntentControl is DAppControl {
     //   ATLAS OVERRIDE FUNCTIONS   //
     //////////////////////////////////
 
-    function _preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
+    function _preSolverDelegateCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
         address solverTo = solverOp.solver;
         if (solverTo == address(this) || solverTo == _control() || solverTo == ATLAS) {
             revert();
@@ -179,7 +179,7 @@ contract V4SwapIntentControl is DAppControl {
     }
 
     // Checking intent was fulfilled, and user has received their tokens, happens here
-    function _postSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
+    function _postSolverDelegateCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
         SwapData memory swapData = abi.decode(returnData, (SwapData));
 
         uint256 buyTokenBalance = IERC20(swapData.tokenOut).balanceOf(address(this));
@@ -228,7 +228,7 @@ contract V4SwapIntentControl is DAppControl {
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
+    function _allocateValueDelegateCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Atlas

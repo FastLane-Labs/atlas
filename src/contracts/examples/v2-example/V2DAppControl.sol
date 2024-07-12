@@ -96,7 +96,7 @@ contract V2DAppControl is DAppControl {
         );
     }
 
-    function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory) {
+    function _preOpsDelegateCall(UserOperation calldata userOp) internal override returns (bytes memory) {
         // check if dapps using this DAppControl can handle the userOp
         _checkUserOperation(userOp);
 
@@ -131,7 +131,7 @@ contract V2DAppControl is DAppControl {
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(address, uint256 bidAmount, bytes calldata) internal override {
+    function _allocateValueDelegateCall(address, uint256 bidAmount, bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow

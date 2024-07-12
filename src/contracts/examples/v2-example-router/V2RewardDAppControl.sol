@@ -118,7 +118,7 @@ contract V2RewardDAppControl is DAppControl {
                 // Exact amount sold
                 (amountSold,, path,,) = abi.decode(userData[4:], (uint256, uint256, address[], address, uint256));
             } else {
-                // Max amount sold, unused amount will be refunded in the _postOpsCall hook if any
+                // Max amount sold, unused amount will be refunded in the _postOpsDelegateCall hook if any
                 (, amountSold, path,,) = abi.decode(userData[4:], (uint256, uint256, address[], address, uint256));
             }
 
@@ -142,9 +142,9 @@ contract V2RewardDAppControl is DAppControl {
         ExecutionEnvironment and approves UniswapV2Router02 to spend the tokens from the ExecutionEnvironment
     * @param userOp The UserOperation struct
     * @return The address of the ERC20 token the user is selling (or address(0) for ETH), which is used in the
-        _postOpsCall hook to refund leftover dust, if any
+        _postOpsDelegateCall hook to refund leftover dust, if any
     */
-    function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory) {
+    function _preOpsDelegateCall(UserOperation calldata userOp) internal override returns (bytes memory) {
         // check if dapps using this DAppControl can handle the userOp
         _checkUserOperation(userOp);
 
@@ -159,7 +159,7 @@ contract V2RewardDAppControl is DAppControl {
             SafeTransferLib.safeApprove(tokenSold, uniswapV2Router02, amountSold);
         }
 
-        // Return tokenSold for the _postOpsCall hook to be able to refund dust
+        // Return tokenSold for the _postOpsDelegateCall hook to be able to refund dust
         return abi.encode(tokenSold);
     }
 
@@ -171,7 +171,7 @@ contract V2RewardDAppControl is DAppControl {
     * @param bidToken The address of the token used for the winning SolverOperation's bid
     * @param bidAmount The winning bid amount
     */
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
+    function _allocateValueDelegateCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
         require(bidToken == REWARD_TOKEN, "V2RewardDAppControl: InvalidBidToken");
 
         if (bidAmount == 0) {
@@ -195,9 +195,9 @@ contract V2RewardDAppControl is DAppControl {
     * @dev It refunds any leftover dust (ETH/ERC20) to the user (this can occur when the user is calling an exactOUT
         function and the amount sold is less than the amountInMax)
     * @param data The address of the ERC20 token the user is selling (or address(0) for ETH), that was returned by the
-        _preOpsCall hook
+        _preOpsDelegateCall hook
     */
-    function _postOpsCall(bool, bytes calldata data) internal override {
+    function _postOpsDelegateCall(bool, bytes calldata data) internal override {
         address tokenSold = abi.decode(data, (address));
         uint256 balance;
 

@@ -51,44 +51,26 @@ contract EscrowTest is AtlasBaseTest {
     }
 
     function defaultDAppControl() public returns (DummyDAppControlBuilder) {
-        return new DummyDAppControlBuilder()
-            .withEscrow(address(atlas))
-            .withGovernance(governanceEOA)
-            .withCallConfig(defaultCallConfig().build());
+        return new DummyDAppControlBuilder().withEscrow(address(atlas)).withGovernance(governanceEOA).withCallConfig(
+            defaultCallConfig().build()
+        );
     }
 
     function validUserOperation(address _control) public returns (UserOperationBuilder) {
-        return new UserOperationBuilder()
-            .withFrom(userEOA)
-            .withTo(address(atlas))
-            .withValue(0)
-            .withGas(1_000_000)
-            .withMaxFeePerGas(tx.gasprice + 1)
-            .withNonce(address(atlasVerification), userEOA)
-            .withDeadline(block.number + 2)
-            .withDapp(_control)
-            .withControl(_control)
-            .withCallConfig(IDAppControl(_control).CALL_CONFIG())
-            .withSessionKey(address(0))
-            .withData("")
-            .sign(address(atlasVerification), userPK);
+        return new UserOperationBuilder().withFrom(userEOA).withTo(address(atlas)).withValue(0).withGas(1_000_000)
+            .withMaxFeePerGas(tx.gasprice + 1).withNonce(address(atlasVerification), userEOA).withDeadline(block.number + 2)
+            .withDapp(_control).withControl(_control).withCallConfig(IDAppControl(_control).CALL_CONFIG()).withSessionKey(
+            address(0)
+        ).withData("").sign(address(atlasVerification), userPK);
     }
 
     function validSolverOperation(UserOperation memory userOp) public returns (SolverOperationBuilder) {
-        return new SolverOperationBuilder()
-            .withFrom(solverOneEOA)
-            .withTo(address(atlas))
-            .withValue(0)
-            .withGas(1_000_000)
-            .withMaxFeePerGas(userOp.maxFeePerGas)
-            .withDeadline(userOp.deadline)
-            .withSolver(address(dummySolver))
-            .withControl(userOp.control)
-            .withUserOpHash(userOp)
-            .withBidToken(userOp)
-            .withBidAmount(0)
-            .withData("")
-            .sign(address(atlasVerification), solverOnePK);
+        return new SolverOperationBuilder().withFrom(solverOneEOA).withTo(address(atlas)).withValue(0).withGas(
+            1_000_000
+        ).withMaxFeePerGas(userOp.maxFeePerGas).withDeadline(userOp.deadline).withSolver(address(dummySolver))
+            .withControl(userOp.control).withUserOpHash(userOp).withBidToken(userOp).withBidAmount(0).withData("").sign(
+            address(atlasVerification), solverOnePK
+        );
     }
 
     function validDAppOperation(
@@ -98,16 +80,10 @@ contract EscrowTest is AtlasBaseTest {
         public
         returns (DAppOperationBuilder)
     {
-        return new DAppOperationBuilder()
-            .withFrom(governanceEOA)
-            .withTo(address(atlas))
-            .withNonce(address(atlasVerification), governanceEOA)
-            .withDeadline(userOp.deadline)
-            .withControl(userOp.control)
-            .withBundler(address(0))
-            .withUserOpHash(userOp)
-            .withCallChainHash(userOp, solverOps)
-            .sign(address(atlasVerification), governancePK);
+        return new DAppOperationBuilder().withFrom(governanceEOA).withTo(address(atlas)).withNonce(
+            address(atlasVerification), governanceEOA
+        ).withDeadline(userOp.deadline).withControl(userOp.control).withBundler(address(0)).withUserOpHash(userOp)
+            .withCallChainHash(userOp, solverOps).sign(address(atlasVerification), governancePK);
     }
 
     function defaultAtlasWithCallConfig(CallConfig memory callConfig) public {
@@ -134,24 +110,23 @@ contract EscrowTest is AtlasBaseTest {
     // Ensure the preOps hook is successfully called. To ensure the hooks' returned data is as expected, we forward it
     // to the solver call; the data field of the solverOperation contains the expected value, the check is made in the
     // solver's atlasSolverCall function, as defined in the DummySolver contract.
-    function test_executePreOpsCall_success_SkipCoverage() public {
+    function test_executePreOpsDelegateCall_success_SkipCoverage() public {
         defaultAtlasWithCallConfig(
-            defaultCallConfig()
-                .withRequirePreOps(true) // Execute the preOps hook
-                .withTrackPreOpsReturnData(true) // Track the preOps hook's return data
-                .withForwardReturnData(true) // Forward the preOps hook's return data to the solver call
-                .withAllowAllocateValueFailure(true) // Allow the value allocation to fail
+            defaultCallConfig().withRequirePreOps(true).withTrackPreOpsReturnData(true).withForwardReturnData(true)
+                .withAllowAllocateValueFailure(true) // Execute the preOps hook
+                    // Track the preOps hook's return data
+                    // Forward the preOps hook's return data to the solver call
+                    // Allow the value allocation to fail
                 .build()
         );
         executeHookCase(false, block.timestamp * 2, noError);
     }
 
     // Ensure metacall reverts with the proper error when the preOps hook reverts.
-    function test_executePreOpsCall_failure() public {
+    function test_executePreOpsDelegateCall_failure() public {
         defaultAtlasWithCallConfig(
-            defaultCallConfig()
-                .withRequirePreOps(true) // Execute the preOps hook
-                .withReuseUserOp(true) // Allow metacall to revert
+            defaultCallConfig().withRequirePreOps(true).withReuseUserOp(true) // Execute the preOps hook
+                    // Allow metacall to revert
                 .build()
         );
         executeHookCase(true, 0, AtlasErrors.PreOpsFail.selector);
@@ -162,10 +137,11 @@ contract EscrowTest is AtlasBaseTest {
     // made in the solver's atlasSolverCall function, as defined in the DummySolver contract.
     function test_executeUserOperation_success_SkipCoverage() public {
         defaultAtlasWithCallConfig(
-            defaultCallConfig()
-                .withTrackUserReturnData(true) // Track the user operation's return data
-                .withForwardReturnData(true) // Forward the user operation's return data to the solver call
-                .withAllowAllocateValueFailure(true) // Allow the value allocation to fail
+            defaultCallConfig().withTrackUserReturnData(true).withForwardReturnData(true).withAllowAllocateValueFailure(
+                true
+            ) // Track the user operation's return data
+                    // Forward the user operation's return data to the solver call
+                    // Allow the value allocation to fail
                 .build()
         );
         executeHookCase(false, block.timestamp * 3, noError);
@@ -174,21 +150,20 @@ contract EscrowTest is AtlasBaseTest {
     // Ensure metacall reverts with the proper error when the user operation reverts.
     function test_executeUserOperation_failure() public {
         defaultAtlasWithCallConfig(
-            defaultCallConfig()
-                .withReuseUserOp(true) // Allow metacall to revert
+            defaultCallConfig().withReuseUserOp(true) // Allow metacall to revert
                 .build()
         );
         executeHookCase(true, 0, AtlasErrors.UserOpFail.selector);
     }
 
     // Ensure metacall reverts with the proper error when the allocateValue hook reverts.
-    function test_executeAllocateValueCall_failure_SkipCoverage() public {
+    function test_executeallocateValueDelegateCall_failure_SkipCoverage() public {
         defaultAtlasWithCallConfig(
-            defaultCallConfig()
-                .withTrackUserReturnData(true) // Track the user operation's return data
-                .withForwardReturnData(true) // Forward the user operation's return data to the solver call
-                .withReuseUserOp(true) // Allow metacall to revert
-                .withAllowAllocateValueFailure(false) // Do not allow the value allocation to fail
+            defaultCallConfig().withTrackUserReturnData(true).withForwardReturnData(true).withReuseUserOp(true)
+                .withAllowAllocateValueFailure(false) // Track the user operation's return data
+                    // Forward the user operation's return data to the solver call
+                    // Allow metacall to revert
+                    // Do not allow the value allocation to fail
                 .build()
         );
         executeHookCase(false, 1, AtlasErrors.AllocateValueFail.selector);
@@ -196,24 +171,23 @@ contract EscrowTest is AtlasBaseTest {
 
     // Ensure the postOps hook is successfully called. No return data is expected from the postOps hook, so we do not
     // forward any data to the solver call.
-    function test_executePostOpsCall_success_SkipCoverage() public {
+    function test_executepostOpsDelegateCall_success_SkipCoverage() public {
         defaultAtlasWithCallConfig(
-            defaultCallConfig()
-                .withRequirePostOps(true) // Execute the postOps hook
+            defaultCallConfig().withRequirePostOps(true) // Execute the postOps hook
                 .build()
         );
         executeHookCase(false, 0, noError);
     }
 
     // Ensure metacall reverts with the proper error when the postOps hook reverts.
-    function test_executePostOpsCall_failure_SkipCoverage() public {
+    function test_executepostOpsDelegateCall_failure_SkipCoverage() public {
         defaultAtlasWithCallConfig(
-            defaultCallConfig()
-                .withTrackUserReturnData(true) // Track the user operation's return data
-                .withForwardReturnData(true) // Forward the user operation's return data to the solver call
-                .withRequirePostOps(true) // Execute the postOps hook
-                .withReuseUserOp(true) // Allow metacall to revert
-                .withAllowAllocateValueFailure(true) // Allow the value allocation to fail
+            defaultCallConfig().withTrackUserReturnData(true).withForwardReturnData(true).withRequirePostOps(true)
+                .withReuseUserOp(true).withAllowAllocateValueFailure(true) // Track the user operation's return data
+                    // Forward the user operation's return data to the solver call
+                    // Execute the postOps hook
+                    // Allow metacall to revert
+                    // Allow the value allocation to fail
                 .build()
         );
         executeHookCase(false, 1, AtlasErrors.PostOpsFail.selector);
@@ -224,8 +198,7 @@ contract EscrowTest is AtlasBaseTest {
     // delegatecalled.
     function test_allocateValue_success_SkipCoverage() public {
         defaultAtlasWithCallConfig(
-            defaultCallConfig()
-                .withTrackUserReturnData(true) // Track the user operation's return data
+            defaultCallConfig().withTrackUserReturnData(true) // Track the user operation's return data
                 .build()
         );
 
@@ -240,21 +213,14 @@ contract EscrowTest is AtlasBaseTest {
     function executeHookCase(bool hookShouldRevert, uint256 expectedHookReturnValue, bytes4 expectedError) public {
         bool revertExpected = expectedError != noError;
 
-        UserOperation memory userOp = validUserOperation(address(dAppControl))
-            .withData(
-                abi.encodeWithSelector(
-                    dAppControl.userOperationCall.selector,
-                    hookShouldRevert,
-                    expectedHookReturnValue
-                )
-            )
-            .signAndBuild(address(atlasVerification), userPK);
+        UserOperation memory userOp = validUserOperation(address(dAppControl)).withData(
+            abi.encodeWithSelector(dAppControl.userOperationCall.selector, hookShouldRevert, expectedHookReturnValue)
+        ).signAndBuild(address(atlasVerification), userPK);
 
         SolverOperation[] memory solverOps = new SolverOperation[](1);
-        solverOps[0] = validSolverOperation(userOp)
-            .withBidAmount(defaultBidAmount)
-            .withData(abi.encode(expectedHookReturnValue))
-            .signAndBuild(address(atlasVerification), solverOnePK);
+        solverOps[0] = validSolverOperation(userOp).withBidAmount(defaultBidAmount).withData(
+            abi.encode(expectedHookReturnValue)
+        ).signAndBuild(address(atlasVerification), solverOnePK);
 
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
@@ -264,7 +230,7 @@ contract EscrowTest is AtlasBaseTest {
 
         vm.prank(userEOA);
         bool auctionWon = atlas.metacall(userOp, solverOps, dappOp);
-        
+
         if (!revertExpected) {
             assertTrue(auctionWon, "auction should have been won");
         }
@@ -275,11 +241,11 @@ contract EscrowTest is AtlasBaseTest {
         // be filtered out by the AtlasVerification contract, before reaching executeSolverOperation.
         vm.skip(true);
 
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
-        solverOps[0] = validSolverOperation(userOp)
-            .withTo(invalid)
-            .withBidAmount(defaultBidAmount)
-            .signAndBuild(address(atlasVerification), solverOnePK);
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) =
+            executeSolverOperationInit(defaultCallConfig().build());
+        solverOps[0] = validSolverOperation(userOp).withTo(invalid).withBidAmount(defaultBidAmount).signAndBuild(
+            address(atlasVerification), solverOnePK
+        );
         executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.InvalidTo), true);
     }
 
@@ -287,7 +253,8 @@ contract EscrowTest is AtlasBaseTest {
         vm.prank(solverOneEOA);
         atlas.unbond(1); // This will set the solver's lastAccessedBlock to the current block
 
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) =
+            executeSolverOperationInit(defaultCallConfig().build());
         executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.PerBlockLimit), false);
     }
 
@@ -296,45 +263,51 @@ contract EscrowTest is AtlasBaseTest {
         vm.txGasPrice(10e18); // Set a gas price that will cause the solver to run out of escrow
         uint256 solverGasLimit = 1_000_000;
         uint256 maxSolverGasCost = solverGasLimit * tx.gasprice;
-        assertTrue(maxSolverGasCost > atlas.balanceOfBonded(solverOneEOA), "maxSolverGasCost must be greater than solver bonded AtlETH to trigger InsufficientEscrow");
+        assertTrue(
+            maxSolverGasCost > atlas.balanceOfBonded(solverOneEOA),
+            "maxSolverGasCost must be greater than solver bonded AtlETH to trigger InsufficientEscrow"
+        );
 
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
-        solverOps[0] = validSolverOperation(userOp)
-            .withBidAmount(defaultBidAmount)
-            .withGas(solverGasLimit)
-            .signAndBuild(address(atlasVerification), solverOnePK);
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) =
+            executeSolverOperationInit(defaultCallConfig().build());
+        solverOps[0] = validSolverOperation(userOp).withBidAmount(defaultBidAmount).withGas(solverGasLimit).signAndBuild(
+            address(atlasVerification), solverOnePK
+        );
 
-        executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.InsufficientEscrow), true);
+        executeSolverOperationCase(
+            userOp, solverOps, false, false, 1 << uint256(SolverOutcome.InsufficientEscrow), true
+        );
     }
 
     function test_executeSolverOperation_validateSolverOperation_callValueTooHigh_SkipCoverage() public {
         // Will revert with CallValueTooHigh if more ETH than held in Atlas requested
         uint256 solverOpValue = 100 ether;
-        assertTrue(solverOpValue > address(atlas).balance, "solverOpValue must be greater than Atlas balance to trigger CallValueTooHigh");
+        assertTrue(
+            solverOpValue > address(atlas).balance,
+            "solverOpValue must be greater than Atlas balance to trigger CallValueTooHigh"
+        );
 
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
-        solverOps[0] = validSolverOperation(userOp)
-            .withValue(solverOpValue) // Set a call value that is too high
-            .withBidAmount(defaultBidAmount)
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) =
+            executeSolverOperationInit(defaultCallConfig().build());
+        solverOps[0] = validSolverOperation(userOp).withValue(solverOpValue).withBidAmount(defaultBidAmount) // Set a
+            // call value that is too high
             .signAndBuild(address(atlasVerification), solverOnePK);
         executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.CallValueTooHigh), false);
     }
 
     function test_executeSolverOperation_validateSolverOperation_userOutOfGas_SkipCoverage() public {
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
-        this.executeSolverOperationCase{gas: _VALIDATION_GAS_LIMIT + _SOLVER_GAS_LIMIT + 1_000_000}(
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) =
+            executeSolverOperationInit(defaultCallConfig().build());
+        this.executeSolverOperationCase{ gas: _VALIDATION_GAS_LIMIT + _SOLVER_GAS_LIMIT + 1_000_000 }(
             userOp, solverOps, false, false, 1 << uint256(SolverOutcome.UserOutOfGas), true
         );
     }
 
     function test_executeSolverOperation_solverOpWrapper_BidNotPaid_SkipCoverage() public {
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
-            defaultCallConfig()
-                .withRequireFulfillment(true)
-                .build()
-        );
-        solverOps[0] = validSolverOperation(userOp)
-            .withBidAmount(defaultBidAmount * 2) // Solver's contract doesn't have that much
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) =
+            executeSolverOperationInit(defaultCallConfig().withRequireFulfillment(true).build());
+        solverOps[0] = validSolverOperation(userOp).withBidAmount(defaultBidAmount * 2) // Solver's contract doesn't
+            // have that much
             .signAndBuild(address(atlasVerification), solverOnePK);
         uint256 result = (1 << uint256(SolverOutcome.BidNotPaid));
         executeSolverOperationCase(userOp, solverOps, true, false, result, true);
@@ -342,53 +315,44 @@ contract EscrowTest is AtlasBaseTest {
 
     function test_executeSolverOperation_solverOpWrapper_CallbackNotCalled_SkipCoverage() public {
         // Fails because solver doesn't call reconcile() at all
-        uint256 bidAmount = dummySolver.noGasPayBack(); // Special bid value that will cause the solver to not call reconcile
+        uint256 bidAmount = dummySolver.noGasPayBack(); // Special bid value that will cause the solver to not call
+            // reconcile
         deal(address(dummySolver), bidAmount);
 
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
-            defaultCallConfig().withRequireFulfillment(true).build());
-        solverOps[0] = validSolverOperation(userOp)
-            .withBidAmount(bidAmount)
-            .signAndBuild(address(atlasVerification), solverOnePK);
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) =
+            executeSolverOperationInit(defaultCallConfig().withRequireFulfillment(true).build());
+        solverOps[0] =
+            validSolverOperation(userOp).withBidAmount(bidAmount).signAndBuild(address(atlasVerification), solverOnePK);
         uint256 result = (1 << uint256(SolverOutcome.CallbackNotCalled));
         executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
     function test_executeSolverOperation_solverOpWrapper_SolverOpReverted_SkipCoverage() public {
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
-            defaultCallConfig()
-                .withTrackUserReturnData(true)
-                .withForwardReturnData(true)
-                .withRequireFulfillment(true)
+            defaultCallConfig().withTrackUserReturnData(true).withForwardReturnData(true).withRequireFulfillment(true)
                 .build()
         );
-        solverOps[0] = validSolverOperation(userOp)
-            .withData(abi.encode(1))
-            .withBidAmount(defaultBidAmount)
-            .signAndBuild(address(atlasVerification), solverOnePK);
+        solverOps[0] = validSolverOperation(userOp).withData(abi.encode(1)).withBidAmount(defaultBidAmount).signAndBuild(
+            address(atlasVerification), solverOnePK
+        );
         uint256 result = (1 << uint256(SolverOutcome.SolverOpReverted));
         executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
     function test_executeSolverOperation_solverOpWrapper_preSolverFailed_SkipCoverage() public {
         defaultAtlasWithCallConfig(
-            defaultCallConfig()
-                .withTrackPreOpsReturnData(false)
-                .withTrackUserReturnData(true)
-                .withRequirePreOps(false)
-                .withPreSolver(true)
-                .withRequireFulfillment(true)
-                .build()
+            defaultCallConfig().withTrackPreOpsReturnData(false).withTrackUserReturnData(true).withRequirePreOps(false)
+                .withPreSolver(true).withRequireFulfillment(true).build()
         );
 
-        UserOperation memory userOp = validUserOperation(address(dAppControl))
-            .withData(abi.encodeWithSelector(dAppControl.userOperationCall.selector, false, 1))
-            .signAndBuild(address(atlasVerification), userPK);
-        
+        UserOperation memory userOp = validUserOperation(address(dAppControl)).withData(
+            abi.encodeWithSelector(dAppControl.userOperationCall.selector, false, 1)
+        ).signAndBuild(address(atlasVerification), userPK);
+
         SolverOperation[] memory solverOps = new SolverOperation[](1);
-        solverOps[0] = validSolverOperation(userOp)
-            .withBidAmount(defaultBidAmount)
-            .signAndBuild(address(atlasVerification), solverOnePK);
+        solverOps[0] = validSolverOperation(userOp).withBidAmount(defaultBidAmount).signAndBuild(
+            address(atlasVerification), solverOnePK
+        );
 
         uint256 result = (1 << uint256(SolverOutcome.PreSolverFailed));
         executeSolverOperationCase(userOp, solverOps, false, false, result, true);
@@ -396,72 +360,66 @@ contract EscrowTest is AtlasBaseTest {
 
     function test_executeSolverOperation_solverOpWrapper_postSolverFailed_SkipCoverage() public {
         defaultAtlasWithCallConfig(
-            defaultCallConfig()
-                .withTrackPreOpsReturnData(false)
-                .withTrackUserReturnData(true)
-                .withRequirePreOps(false)
-                .withPostSolver(true)
-                .withRequireFulfillment(true)
-                .build()
+            defaultCallConfig().withTrackPreOpsReturnData(false).withTrackUserReturnData(true).withRequirePreOps(false)
+                .withPostSolver(true).withRequireFulfillment(true).build()
         );
 
-        UserOperation memory userOp = validUserOperation(address(dAppControl))
-            .withData(abi.encodeWithSelector(dAppControl.userOperationCall.selector, false, 1))
-            .signAndBuild(address(atlasVerification), userPK);
-        
+        UserOperation memory userOp = validUserOperation(address(dAppControl)).withData(
+            abi.encodeWithSelector(dAppControl.userOperationCall.selector, false, 1)
+        ).signAndBuild(address(atlasVerification), userPK);
+
         SolverOperation[] memory solverOps = new SolverOperation[](1);
-        solverOps[0] = validSolverOperation(userOp)
-            .withBidAmount(defaultBidAmount)
-            .signAndBuild(address(atlasVerification), solverOnePK);
-        
+        solverOps[0] = validSolverOperation(userOp).withBidAmount(defaultBidAmount).signAndBuild(
+            address(atlasVerification), solverOnePK
+        );
+
         uint256 result = (1 << uint256(SolverOutcome.PostSolverFailed));
         executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
-    function test_executeSolverOperation_solverOpWrapper_BalanceNotReconciled_ifPartialRepayment_SkipCoverage() public {
+    function test_executeSolverOperation_solverOpWrapper_BalanceNotReconciled_ifPartialRepayment_SkipCoverage()
+        public
+    {
         // Fails because solver calls reconcile but doesn't fully repay the shortfall
         uint256 bidAmount = dummySolver.partialGasPayBack(); // solver only pays half of shortfall
         deal(address(dummySolver), bidAmount);
 
         vm.txGasPrice(2);
 
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
-            defaultCallConfig().withRequireFulfillment(true).build());
-        solverOps[0] = validSolverOperation(userOp)
-            .withBidAmount(bidAmount)
-            .signAndBuild(address(atlasVerification), solverOnePK);
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) =
+            executeSolverOperationInit(defaultCallConfig().withRequireFulfillment(true).build());
+        solverOps[0] =
+            validSolverOperation(userOp).withBidAmount(bidAmount).signAndBuild(address(atlasVerification), solverOnePK);
         uint256 expectedResult = (1 << uint256(SolverOutcome.BalanceNotReconciled));
         executeSolverOperationCase(userOp, solverOps, true, false, expectedResult, true);
     }
 
-    function test_executeSolverOperation_solverOpWrapper_Success_ifPartialRepaymentAndDappCoversTheRest_SkipCoverage() public {
+    function test_executeSolverOperation_solverOpWrapper_Success_ifPartialRepaymentAndDappCoversTheRest_SkipCoverage()
+        public
+    {
         uint256 bidAmount = dummySolver.partialGasPayBack(); // solver only pays half of shortfall
         deal(address(dummySolver), bidAmount);
 
         GasSponsorDAppControl gasSponsorControl = new GasSponsorDAppControl(
             address(atlas),
             address(governanceEOA),
-            defaultCallConfig()
-                .withTrackPreOpsReturnData(false)
-                .withTrackUserReturnData(true)
-                .withRequirePreOps(false)
-                .withPostSolver(true)
-                .build());
-    
+            defaultCallConfig().withTrackPreOpsReturnData(false).withTrackUserReturnData(true).withRequirePreOps(false)
+                .withPostSolver(true).build()
+        );
+
         // Give dapp control enough funds to cover the shortfall
         deal(address(gasSponsorControl), 1 ether);
 
         vm.prank(governanceEOA);
         atlasVerification.initializeGovernance(address(gasSponsorControl));
 
-        UserOperation memory userOp = validUserOperation(address(gasSponsorControl))
-            .withData(abi.encodeCall(gasSponsorControl.userOperationCall, (false, 0)))
-            .signAndBuild(address(atlasVerification), userPK);
-        
+        UserOperation memory userOp = validUserOperation(address(gasSponsorControl)).withData(
+            abi.encodeCall(gasSponsorControl.userOperationCall, (false, 0))
+        ).signAndBuild(address(atlasVerification), userPK);
+
         SolverOperation[] memory solverOps = new SolverOperation[](1);
-        solverOps[0] = validSolverOperation(userOp)
-            .withBidAmount(bidAmount)
-            .signAndBuild(address(atlasVerification), solverOnePK);
+        solverOps[0] =
+            validSolverOperation(userOp).withBidAmount(bidAmount).signAndBuild(address(atlasVerification), solverOnePK);
 
         console.log("DApp control balance", address(gasSponsorControl).balance);
         console.log("Solver balance", address(dummySolver).balance);
@@ -478,16 +436,14 @@ contract EscrowTest is AtlasBaseTest {
 
         uint256 solverOpValue = address(atlas).balance;
         assertTrue(solverOpValue > 0, "solverOpValue must be greater than 0");
-        
 
         deal(address(solver), 10e18); // plenty of ETH to repay what solver owes
 
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
-        solverOps[0] = validSolverOperation(userOp)
-            .withSolver(address(solver))
-            .withValue(solverOpValue)
-            .withBidAmount(defaultBidAmount)
-            .signAndBuild(address(atlasVerification), solverOnePK);
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) =
+            executeSolverOperationInit(defaultCallConfig().build());
+        solverOps[0] = validSolverOperation(userOp).withSolver(address(solver)).withValue(solverOpValue).withBidAmount(
+            defaultBidAmount
+        ).signAndBuild(address(atlasVerification), solverOnePK);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         vm.prank(userEOA);
@@ -506,14 +462,14 @@ contract EscrowTest is AtlasBaseTest {
     {
         defaultAtlasWithCallConfig(callConfig);
 
-        userOp = validUserOperation(address(dAppControl))
-            .withData(abi.encodeWithSelector(dAppControl.userOperationCall.selector, false, 0))
-            .signAndBuild(address(atlasVerification), userPK);
-        
+        userOp = validUserOperation(address(dAppControl)).withData(
+            abi.encodeWithSelector(dAppControl.userOperationCall.selector, false, 0)
+        ).signAndBuild(address(atlasVerification), userPK);
+
         solverOps = new SolverOperation[](1);
-        solverOps[0] = validSolverOperation(userOp)
-            .withBidAmount(defaultBidAmount)
-            .signAndBuild(address(atlasVerification), solverOnePK);
+        solverOps[0] = validSolverOperation(userOp).withBidAmount(defaultBidAmount).signAndBuild(
+            address(atlasVerification), solverOnePK
+        );
     }
 
     function executeSolverOperationCase(
@@ -532,14 +488,15 @@ contract EscrowTest is AtlasBaseTest {
         emit SolverTxResult(solverOps[0].solver, solverOps[0].from, solverOpExecuted, solverOpSuccess, expectedResult);
 
         vm.prank(userEOA);
-        if (metacallShouldRevert) vm.expectRevert(); // Metacall should revert, the reason isn't important, we're only checking the event
+        if (metacallShouldRevert) vm.expectRevert(); // Metacall should revert, the reason isn't important, we're only
+            // checking the event
         atlas.metacall(userOp, solverOps, dappOp);
     }
 }
 
 contract DummySolver {
-    uint256 public noGasPayBack = 123456789;
-    uint256 public partialGasPayBack = 987654321;
+    uint256 public noGasPayBack = 123_456_789;
+    uint256 public partialGasPayBack = 987_654_321;
     address private _atlas;
 
     constructor(address atlas) {
@@ -568,12 +525,11 @@ contract DummySolver {
             SafeTransferLib.safeTransferETH(executionEnvironment, bidAmount);
         }
 
-        
         if (bidAmount == noGasPayBack) {
             // Don't pay gas
             return;
         } else if (bidAmount == partialGasPayBack) {
-            // Only pay half of shortfall owed - expect postSolverCall hook in DAppControl to pay the rest
+            // Only pay half of shortfall owed - expect postSolverDelegateCall hook in DAppControl to pay the rest
             uint256 _shortfall = IAtlas(_atlas).shortfall();
 
             console.log("Solver shortfall", _shortfall);
@@ -582,7 +538,7 @@ contract DummySolver {
             IAtlas(_atlas).reconcile(_shortfall / 2);
             return;
         }
-        
+
         // Default: Pay gas
         uint256 shortfall = IAtlas(_atlas).shortfall();
         IAtlas(_atlas).reconcile(shortfall);
@@ -615,7 +571,7 @@ contract DummySolverContributor {
 
         // Pay borrowed ETH + gas used
         uint256 shortfall = IAtlas(_atlas).shortfall();
-        IAtlas(_atlas).reconcile{value: shortfall}(0);
+        IAtlas(_atlas).reconcile{ value: shortfall }(0);
 
         return;
     }

@@ -25,7 +25,7 @@ abstract contract DAppControlTemplate {
     //     bytes calldata userOpData
     //
 
-    // _preOpsCall
+    // _preOpsDelegateCall
     // Details:
     //  preOps/delegate =
     //      Inputs: User's calldata
@@ -35,7 +35,7 @@ abstract contract DAppControlTemplate {
     //
     // DApp exposure: Trustless
     // User exposure: Trustless
-    function _preOpsCall(UserOperation calldata) internal virtual returns (bytes memory) {
+    function _preOpsDelegateCall(UserOperation calldata) internal virtual returns (bytes memory) {
         revert AtlasErrors.NotImplemented();
     }
 
@@ -43,7 +43,7 @@ abstract contract DAppControlTemplate {
     //                MEV ALLOCATION                       //
     /////////////////////////////////////////////////////////
     //
-    // _allocateValueCall
+    // _allocateValueDelegateCall
     // Details:
     //  allocate/delegate =
     //      Inputs: MEV Profits (ERC20 balances)
@@ -53,14 +53,14 @@ abstract contract DAppControlTemplate {
     //
     // DApp exposure: Trustless
     // User exposure: Trustless
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) internal virtual;
+    function _allocateValueDelegateCall(address bidToken, uint256 bidAmount, bytes calldata data) internal virtual;
 
     /////////////////////////////////////////////////////////
     //              INTENT FULFILLMENT                     //
     /////////////////////////////////////////////////////////
     //
 
-    // _preSolverCall
+    // _preSolverDelegateCall
     //
     // Details:
     //  Data should be decoded as:
@@ -76,11 +76,11 @@ abstract contract DAppControlTemplate {
     //      and is designed to give the solver everything they need to fulfill
     //      the user's 'intent.'
 
-    function _preSolverCall(SolverOperation calldata, bytes calldata) internal virtual {
+    function _preSolverDelegateCall(SolverOperation calldata, bytes calldata) internal virtual {
         revert AtlasErrors.NotImplemented();
     }
 
-    // _postSolverCall
+    // _postSolverDelegateCall
     //
     // Details:
     //
@@ -98,7 +98,7 @@ abstract contract DAppControlTemplate {
     //      and is designed to make sure that the solver is fulfilling
     //      the user's 'intent.'
 
-    function _postSolverCall(SolverOperation calldata, bytes calldata) internal virtual {
+    function _postSolverDelegateCall(SolverOperation calldata, bytes calldata) internal virtual {
         revert AtlasErrors.NotImplemented();
     }
 
@@ -111,14 +111,14 @@ abstract contract DAppControlTemplate {
     //    bytes memory returnData
     //
 
-    // _postOpsCall
+    // _postOpsDelegateCall
     // Details:
     //  verification/delegatecall =
     //      Inputs: User's return data + preOps call's returnData
     //      Function: Executing the function set by DAppControl
     //      Container: Inside of the FastLane ExecutionEnvironment
     //      Access: Storage access (read+write) to the ExecutionEnvironment contract
-    function _postOpsCall(bool, bytes calldata) internal virtual {
+    function _postOpsDelegateCall(bool, bytes calldata) internal virtual {
         revert AtlasErrors.NotImplemented();
     }
 

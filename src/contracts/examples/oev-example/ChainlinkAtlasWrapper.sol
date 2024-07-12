@@ -48,7 +48,7 @@ contract ChainlinkAtlasWrapper is Ownable, IChainlinkAtlasWrapper {
     // ---------------------------------------------------- //
 
     // Called by a trusted ExecutionEnvironment during an Atlas metacall
-    // Returns address of this contract - used in allocateValueCall for OEV allocation
+    // Returns address of this contract - used in allocateValueDelegateCall for OEV allocation
     function transmit(
         bytes calldata report,
         bytes32[] calldata rs,

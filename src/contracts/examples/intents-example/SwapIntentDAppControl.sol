@@ -129,7 +129,7 @@ contract SwapIntentDAppControl is DAppControl {
     * @param solverOp The SolverOperation that is about to execute
     * @return true if the transfer was successful, false otherwise
     */
-    function _preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
+    function _preSolverDelegateCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
         address solverTo = solverOp.solver;
         if (solverTo == address(this) || solverTo == _control() || solverTo == ATLAS) {
             revert();
@@ -151,7 +151,7 @@ contract SwapIntentDAppControl is DAppControl {
     * @param returnData The return data from the user operation (swap data)
     * @return true if the transfer was successful, false otherwise
     */
-    function _postSolverCall(SolverOperation calldata, bytes calldata returnData) internal override {
+    function _postSolverDelegateCall(SolverOperation calldata, bytes calldata returnData) internal override {
         SwapData memory swapData = abi.decode(returnData, (SwapData));
         uint256 buyTokenBalance = IERC20(swapData.tokenUserBuys).balanceOf(address(this));
 
@@ -160,7 +160,7 @@ contract SwapIntentDAppControl is DAppControl {
         }
 
         // Transfer exactly the amount the user is buying, the bid amount will be transferred
-        // in _allocateValueCall, even if those are the same tokens
+        // in _allocateValueDelegateCall, even if those are the same tokens
         if (swapData.tokenUserBuys != swapData.auctionBaseCurrency) {
             SafeTransferLib.safeTransfer(swapData.tokenUserBuys, _user(), buyTokenBalance);
         } else {
@@ -179,7 +179,7 @@ contract SwapIntentDAppControl is DAppControl {
     * @param _
     * @param _
     */
-    function _allocateValueCall(address bidToken, uint256, bytes calldata) internal override {
+    function _allocateValueDelegateCall(address bidToken, uint256, bytes calldata) internal override {
         if (bidToken != address(0)) {
             SafeTransferLib.safeTransfer(bidToken, _user(), IERC20(bidToken).balanceOf(address(this)));
         } else {

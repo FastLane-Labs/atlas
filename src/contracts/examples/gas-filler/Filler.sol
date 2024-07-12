@@ -96,14 +96,14 @@ contract Filler is DAppControl {
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(address, uint256 bidAmount, bytes calldata) internal override {
-        // NOTE: gas value xferred to user in postSolverCall
+    function _allocateValueDelegateCall(address, uint256 bidAmount, bytes calldata) internal override {
+        // NOTE: gas value xferred to user in postSolverDelegateCall
         // Pay the solver (since auction is reversed)
         // Address Pointer = winning solver.
         SafeTransferLib.safeTransferETH(_user(), bidAmount);
     }
 
-    function _preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
+    function _preSolverDelegateCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
         address solverTo = solverOp.solver;
         if (solverTo == address(this) || solverTo == _control() || solverTo == ATLAS) {
             revert();
@@ -119,7 +119,7 @@ contract Filler is DAppControl {
         return; // success
     }
 
-    function _postSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
+    function _postSolverDelegateCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
         (, uint256 maxTokenAmount, uint256 gasNeeded) = abi.decode(returnData, (address, uint256, uint256));
 
         require(address(this).balance >= gasNeeded, "ERR - EXISTING GAS BALANCE");
