@@ -376,7 +376,7 @@ contract EscrowTest is AtlasBaseTest {
                 .withTrackPreOpsReturnData(false)
                 .withTrackUserReturnData(true)
                 .withRequirePreOps(false)
-                .withPreSolver(true)
+                .withRequirePreSolver(true)
                 .withRequireFulfillment(true)
                 .build()
         );
@@ -400,7 +400,7 @@ contract EscrowTest is AtlasBaseTest {
                 .withTrackPreOpsReturnData(false)
                 .withTrackUserReturnData(true)
                 .withRequirePreOps(false)
-                .withPostSolver(true)
+                .withRequirePostSolver(true)
                 .withRequireFulfillment(true)
                 .build()
         );
@@ -445,7 +445,7 @@ contract EscrowTest is AtlasBaseTest {
                 .withTrackPreOpsReturnData(false)
                 .withTrackUserReturnData(true)
                 .withRequirePreOps(false)
-                .withPostSolver(true)
+                .withRequirePostSolver(true)
                 .build());
     
         // Give dapp control enough funds to cover the shortfall

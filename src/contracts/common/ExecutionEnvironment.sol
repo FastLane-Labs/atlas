@@ -134,7 +134,7 @@ contract ExecutionEnvironment is Base {
         }
 
         // Handle any solver preOps, if necessary
-        if (_config().needsPreSolver()) {
+        if (_config().needsPreSolverCall()) {
             bool _success;
 
             bytes memory _data = _forward(abi.encodeCall(IDAppControl.preSolverCall, (solverOp, returnData)));
@@ -175,7 +175,7 @@ contract ExecutionEnvironment is Base {
                 solverTracker.etherIsBidToken ? address(this).balance : _tryBalanceOf(solverOp.bidToken, false);
         }
 
-        if (_config().needsSolverPostCall()) {
+        if (_config().needsPostSolverCall()) {
             bool _success;
 
             bytes memory _data = _forward(abi.encodeCall(IDAppControl.postSolverCall, (solverOp, returnData)));
