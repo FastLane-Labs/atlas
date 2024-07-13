@@ -18,6 +18,7 @@ import "src/contracts/types/ValidCalls.sol";
 
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
+import { IL2GasCalculator } from "src/contracts/interfaces/IL2GasCalculator.sol";
 
 /// @title Atlas V1
 /// @author FastLane Labs
@@ -54,7 +55,9 @@ contract Atlas is Escrow, Factory {
         payable
         returns (bool auctionWon)
     {
-        uint256 _gasMarker = gasleft() + _BASE_TRANSACTION_GAS_USED + (msg.data.length * _CALLDATA_LENGTH_PREMIUM);
+        uint256 _gasMarker = L2_GAS_CALCULATOR == address(0)
+            ? gasleft() + _BASE_TRANSACTION_GAS_USED + (msg.data.length * _CALLDATA_LENGTH_PREMIUM)
+            : IL2GasCalculator(L2_GAS_CALCULATOR).initialGasUsed(msg.data.length);
         bool _isSimulation = msg.sender == SIMULATOR;
 
         (address _executionEnvironment, DAppConfig memory _dConfig) = _getOrCreateExecutionEnvironment(userOp);

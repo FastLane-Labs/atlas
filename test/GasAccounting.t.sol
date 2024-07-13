@@ -112,6 +112,10 @@ contract MockGasCalculator is IL2GasCalculator, Test {
     function getCalldataCost(uint256 length) external view returns (uint256 calldataCostETH) {
         calldataCostETH = length * 16;
     }
+
+    function initialGasUsed(uint256 calldataLength) external view returns (uint256 gasUsed) {
+        gasUsed = calldataLength * 16;
+    }
 }
 
 contract GasAccountingTest is AtlasConstants, Test {
