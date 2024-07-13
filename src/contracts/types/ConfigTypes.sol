@@ -34,8 +34,7 @@ struct CallConfig {
     // skipped.
     bool requirePreSolver;
     // requirePostSolver: The postSolver hook is executed after the solverOp is executed. If false, the postSolver hook
-    // is
-    // skipped.
+    // is skipped.
     bool requirePostSolver;
     // requirePostOps: The postOps hook is executed as the last step of the metacall. If false, the postOps hook is
     // skipped.
