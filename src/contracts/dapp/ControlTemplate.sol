@@ -99,6 +99,10 @@ abstract contract DAppControlTemplate {
     //      NOTE: This happens *inside* of the solver's try/catch wrapper
     //      and is designed to give the solver everything they need to fulfill
     //      the user's 'intent.'
+    //      NOTE: If using invertsBid mode, the inventory being invert-bidded on should be in the ExecutionEnvironment
+    //      before the PreSolver phase - it should be moved in during the PreOps or UserOperation phases.
+    //      NOTE: If using invertsBid mode, the dapp should either transfer the inventory to the solver in this
+    //      PreSolver phase, or set an allowance so the solver can pull the tokens during their SolverOperation.
 
     function _preSolverCall(SolverOperation calldata, bytes calldata) internal virtual {
         revert AtlasErrors.NotImplemented();
