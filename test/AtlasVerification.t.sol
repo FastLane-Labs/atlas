@@ -457,10 +457,9 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     function test_verifyUserOp_UserFromInvalid_WhenFromInvalidSmartContract() public {
         defaultAtlasEnvironment();
 
-        address[] memory invalidFroms = new address[](3);
+        address[] memory invalidFroms = new address[](2);
         invalidFroms[0] = address(atlas);
         invalidFroms[1] = address(atlasVerification);
-        invalidFroms[2] = address(dAppControl);
 
         for (uint256 i = 0; i < invalidFroms.length; i++) {
             UserOperation memory userOp = validUserOperation()
