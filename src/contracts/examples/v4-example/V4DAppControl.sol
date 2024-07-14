@@ -61,7 +61,7 @@ contract V4DAppControl is DAppControl {
                 delegateUser: false,
                 preSolver: false,
                 postSolver: false,
-                requirePostOps: false,
+                requirePostOps: true,
                 zeroSolvers: true,
                 reuseUserOp: false,
                 userAuctioneer: true,
