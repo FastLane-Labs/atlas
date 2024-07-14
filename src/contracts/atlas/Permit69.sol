@@ -28,9 +28,10 @@ abstract contract Permit69 is GasAccounting {
         uint256 escrowDuration,
         address verification,
         address simulator,
-        address initialSurchargeRecipient
+        address initialSurchargeRecipient,
+        address l2GasCalculator
     )
-        GasAccounting(escrowDuration, verification, simulator, initialSurchargeRecipient)
+        GasAccounting(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
     { }
 
     /// @notice Verifies that the caller is an authorized Execution Environment contract.

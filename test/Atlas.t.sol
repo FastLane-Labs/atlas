@@ -136,9 +136,10 @@ contract MockAtlas is Atlas {
         address _verification,
         address _simulator,
         address _surchargeRecipient,
+        address _l2GasCalculator,
         address _executionTemplate
     ) 
-        Atlas(_escrowDuration, _verification, _simulator, _surchargeRecipient, _executionTemplate) 
+        Atlas(_escrowDuration, _verification, _simulator, _surchargeRecipient, _l2GasCalculator, _executionTemplate) 
     { }
 
     function bidFindingIteration(

@@ -92,7 +92,7 @@ contract StorageTest is BaseTest {
     }
 
     function test_storage_view_solverOpHashes() public {
-        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0));
+        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0), address(0));
         bytes32 testHash = keccak256(abi.encodePacked("test"));
         assertEq(mockStorage.solverOpHashes(testHash), false, "solverOpHashes[testHash] not false");
         mockStorage.setSolverOpHash(testHash);
@@ -100,7 +100,7 @@ contract StorageTest is BaseTest {
     }
 
     function test_storage_view_cumulativeSurcharge() public {
-        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0));
+        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0), address(0));
         assertEq(mockStorage.cumulativeSurcharge(), 0, "cumulativeSurcharge not 0");
         mockStorage.setCumulativeSurcharge(100);
         assertEq(mockStorage.cumulativeSurcharge(), 100, "cumulativeSurcharge not 100");
@@ -153,7 +153,7 @@ contract StorageTest is BaseTest {
 
     function test_storage_transient_solverLockData() public {
         // MockStorage just used here to access AtlasConstants
-        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0));
+        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0), address(0));
         (address currentSolver, bool calledBack, bool fulfilled) = atlas.solverLockData();
 
         assertEq(currentSolver, address(0), "currentSolver should start at 0");
@@ -243,7 +243,7 @@ contract StorageTest is BaseTest {
     }
 
     function test_storage_transient_solverTo() public {
-        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0));
+        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0), address(0));
         assertEq(mockStorage.solverTo(), address(0), "solverTo should start at 0");
 
         mockStorage.setSolverTo(userEOA);
@@ -254,7 +254,7 @@ contract StorageTest is BaseTest {
     }
 
     function test_storage_transient_activeEnvironment() public {
-        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0));
+        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0), address(0));
         assertEq(mockStorage.activeEnvironment(), address(0), "activeEnvironment should start at 0");
 
         mockStorage.setLock(address(1), 0, 0);
@@ -265,7 +265,7 @@ contract StorageTest is BaseTest {
     }
 
     function test_storage_transient_activeCallConfig() public {
-        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0));
+        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0), address(0));
         assertEq(mockStorage.activeCallConfig(), 0, "activeCallConfig should start at 0");
 
         mockStorage.setLock(address(0), 1, 0);
@@ -276,7 +276,7 @@ contract StorageTest is BaseTest {
     }
 
     function test_storage_transient_phase() public {
-        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0));
+        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0), address(0));
         assertEq(mockStorage.phase(), 0, "phase should start at 0");
 
         mockStorage.setLock(address(0), 0, 1);
@@ -298,9 +298,10 @@ contract MockStorage is Storage {
         uint256 escrowDuration,
         address verification,
         address simulator,
-        address initialSurchargeRecipient
+        address initialSurchargeRecipient,
+        address l2GasCalculator
     )
-        Storage(escrowDuration, verification, simulator, initialSurchargeRecipient)
+        Storage(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
     { }
 
     function setSolverOpHash(bytes32 opHash) public {
