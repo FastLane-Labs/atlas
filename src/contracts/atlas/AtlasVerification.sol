@@ -454,7 +454,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         internal
         returns (ValidCallsResult)
     {
-        if (userOp.from == address(this) || userOp.from == ATLAS || userOp.from == userOp.control) {
+        if (userOp.from == address(this) || userOp.from == ATLAS) {
             return ValidCallsResult.UserFromInvalid;
         }
 
