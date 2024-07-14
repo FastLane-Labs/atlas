@@ -197,6 +197,7 @@ contract Atlas is Escrow, Factory {
         uint256[] memory _bidsAndIndices = new uint256[](solverOpsLength);
         uint256 _bidAmountFound;
         uint256 _bidsAndIndicesLastIndex = solverOpsLength - 1; // Start from the last index
+        uint256 _gasWaterMark = gasleft();
 
         // First, get all bid amounts. Bids of zero are ignored by only storing non-zero bids in the array, from right
         // to left. If there are any zero bids they will end up on the left as uint(0) values - in their sorted
@@ -234,6 +235,10 @@ contract Atlas is Escrow, Factory {
         LibSort.insertionSort(_bidsAndIndices);
 
         ctx.bidFind = false;
+
+        // Write off the gas cost involved in on-chain bid-finding execution of all solverOps, as these costs should be
+        // paid by the bundler.
+        _writeOffBidFindGasCost(_gasWaterMark - gasleft());
 
         // Finally, iterate through sorted bidsAndIndices array in descending order of bidAmount.
         for (uint256 i = _bidsAndIndicesLastIndex;; /* breaks when 0 */ --i) {

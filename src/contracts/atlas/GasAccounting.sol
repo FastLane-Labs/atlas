@@ -288,6 +288,10 @@ abstract contract GasAccounting is SafetyLocks {
         }
     }
 
+    function _writeOffBidFindGasCost(uint256 gasUsed) internal {
+        _setWriteoffs(writeoffs() + gasUsed.withAtlasAndBundlerSurcharges());
+    }
+
     /// @param ctx Context struct containing relevant context information for the Atlas auction.
     /// @param solverGasLimit The maximum gas limit for a solver, as set in the DAppConfig
     /// @return adjustedWithdrawals Withdrawals of the current metacall, adjusted by adding the Atlas gas surcharge.
