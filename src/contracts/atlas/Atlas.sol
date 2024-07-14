@@ -223,9 +223,6 @@ contract Atlas is Escrow, Factory {
             }
         }
 
-        // Write off the gas cost involved in on-chain bid-finding execution of all solverOps
-        _writeOffBidFindGasCost(_gasWaterMark - gasleft());
-
         // Reinitialize _bidsAndIndicesLastIndex to iterate through the sorted array in descending order
         _bidsAndIndicesLastIndex = solverOpsLength - 1;
 
@@ -233,6 +230,10 @@ contract Atlas is Escrow, Factory {
         LibSort.insertionSort(_bidsAndIndices);
 
         ctx.bidFind = false;
+
+        // Write off the gas cost involved in on-chain bid-finding execution of all solverOps, as these costs should be
+        // paid by the bundler.
+        _writeOffBidFindGasCost(_gasWaterMark - gasleft());
 
         // Finally, iterate through sorted bidsAndIndices array in descending order of bidAmount.
         for (uint256 i = _bidsAndIndicesLastIndex;; /* breaks when 0 */ --i) {
