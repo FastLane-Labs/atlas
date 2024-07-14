@@ -142,8 +142,7 @@ contract Sorter is AtlasConstants {
                 solverOps[i].userOpHash == userOpHash && _verifyBidFormat(bidToken, solverOps[i])
                     && _verifySolverEligibility(dConfig, userOp, solverOps[i])
             ) {
-                sortingData[i] =
-                    SortingData({ amount: IDAppControl(dConfig.to).getBidValue(solverOps[i]), valid: true });
+                sortingData[i] = SortingData({ amount: solverOps[i].bidAmount, valid: true });
             } else {
                 sortingData[i] = SortingData({ amount: 0, valid: false });
                 unchecked {
