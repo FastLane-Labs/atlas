@@ -15,6 +15,7 @@ import "src/contracts/types/LockTypes.sol";
 
 // Interface Import
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
+import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
 struct Approval {
@@ -38,10 +39,16 @@ contract GeneralizedBackrunUserBundler is DAppControl {
 
     address private _userLock = address(1); // TODO: Convert to transient storage
 
-    address public immutable VERIFICATION;
-
     uint256 private constant _FEE_BASE = 100;
 
+    //      USER                TOKEN       AMOUNT
+    mapping(address => mapping(address => uint256)) internal s_deposits;
+
+    //   SolverOpHash   SolverOperation
+    mapping(bytes32 => SolverOperation) public S_solverOpCache;
+
+    //      UserOpHash  SolverOpHash[]
+    mapping(bytes32 => bytes32[]) public S_solverOpHashes;
 
     constructor(address _atlas)
         DAppControl(
@@ -50,100 +57,166 @@ contract GeneralizedBackrunUserBundler is DAppControl {
             CallConfig({
                 userNoncesSequential: false,
                 dappNoncesSequential: false,
-                requirePreOps: true,
+                requirePreOps: false,
                 trackPreOpsReturnData: false,
                 trackUserReturnData: true,
                 delegateUser: true,
                 preSolver: false,
                 postSolver: false,
                 requirePostOps: false,
-                zeroSolvers: false,
-                reuseUserOp: false,
+                zeroSolvers: true,
+                reuseUserOp: true,
                 userAuctioneer: true,
                 solverAuctioneer: false,
                 unknownAuctioneer: false,
                 verifyCallChainHash: true,
                 forwardReturnData: false,
                 requireFulfillment: false,
-                trustedOpHash: false,
+                trustedOpHash: true,
                 invertBidValue: false,
                 exPostBids: false,
                 allowAllocateValueFailure: true
             })
         )
-    { 
-        VERIFICATION = IAtlas(_atlas).VERIFICATION();
-    }
+    { }
 
     // ---------------------------------------------------- //
     //                       Custom                         //
     // ---------------------------------------------------- //
 
-    // Control functions that aren't delegated
+    /////////////////////////////////////////////////////////
+    //              CONTROL FUNCTIONS                      //
+    //                 (not delegated)                     //
+    /////////////////////////////////////////////////////////
 
-    modifier withUserLock() {
+    modifier onlyAsControl() {
         if (address(this) != CONTROL) revert();
+        _;
+    }
+
+    modifier withUserLock(address user) {
         if (_userLock != address(1)) revert();
-        _userLock = msg.sender;
+        _userLock = user;
         _;
         _userLock = address(1);
     }
 
-    function getUser() external view returns (address) {
+    modifier onlyWhenUnlocked() {
+        if (_userLock != address(1)) revert();
+        _;
+    }
+
+    function getUser() external view onlyAsControl returns (address) {
         address _user = _userLock;
         if (_user == address(1)) revert();
-        if (address(this) != CONTROL) revert();
         return _user;
     }
 
-    // Entrypoint function for usage with permit / permit2
-    function forward(
-        // Permits
-        Approval[] calldata approvals, 
-        address[] calldata receivables,
-        Beneficiary[] calldata beneficiaries,
-        address innerTarget,
-        bytes calldata innerData,
-        SolverOperation[] calldata solverOps
+    function addSolverOp(SolverOperation calldata solverOp) external onlyAsControl {
+        /*
+        //   SolverOpHash   SolverOperation
+        mapping(bytes32 => SolverOperation) public S_solverOpCache;
+
+        //      UserOpHash  SolverOpHash[]
+        mapping(bytes32 => bytes32[]) public S_solverOpHashes;
+        */
+        if (msg.sender != solverOp.from) revert();
+
+        bytes32 _solverOpHash = keccak256(abi.encode(solverOp));
+
+        S_solverOpCache[_solverOpHash] = solverOp;
+        S_solverOpHashes[solverOp.userOpHash].push(_solverOpHash);
+
+    }
+
+    // Entrypoint function for usage with permit / permit2 / bridges / whatever
+    function bundledProxyCall(
+        UserOperation calldata userOp,
+        address transferHelper,
+        bytes calldata transferData,
+        bytes32[] calldata solverOpHashes
     )  
         external 
         payable 
-        withUserLock
+        withUserLock(userOp.from)
+        onlyAsControl
     {
-        // INCOMPLETE
+        // Decode the token information
+        (Approval[] memory _approvals,,,,) = abi.decode(userOp.data[4:], (Approval[], address[], Beneficiary[], address, bytes));
 
-        bytes memory _outerData = abi.encodeCall(this.proxyCall, (approvals, receivables, beneficiaries, innerTarget, innerData));
-
-        UserOperation memory userOp = UserOperation({
-            from: address(this), // User address (replaced with this entrypoint)
-            to: ATLAS, // Atlas address
-            value: msg.value, // Amount of ETH required for the user operation (used in `value` field of the user call)
-            gas: gasleft(), // Gas limit for the user operation
-            maxFeePerGas: tx.gasprice,// Max fee per gas for the user operation
-            nonce: uint256(keccak256(abi.encodePacked(block.number, msg.sender))), // Atlas nonce of the user operation available in the AtlasVerification contract
-            deadline: block.number, // block.number deadline for the user operation
-            dapp: address(this), // Nested "to" for user's call (used in `to` field of the user call)
-            control: address(this), // Address of the DAppControl contract
-            callConfig: CALL_CONFIG, // Call configuration expected by user, refer to `src/contracts/types/ConfigTypes.sol:CallConfig`
-            sessionKey: address(this), // Address of the temporary session key which is used to sign the DappOperation
-            data: _outerData, // User operation calldata (used in `data` field of the user call)
-            signature: new bytes(0) // User operation signature signed by UserOperation.from
-        });
+        // Process token transfers if necessary.  If transferHelper == address(0), skip. 
+        if (transferHelper != address(0)) {
         
-        bytes32 _userOpHash = IAtlasVerification(VERIFICATION).getUserOperationHash(userOp);
+            (bool _success, bytes memory _data) = transferHelper.call(transferData);
+            if (!_success) {
+                assembly {
+                    revert(add(_data, 32), mload(_data))
+                }
+            }
 
-        DAppOperation memory dAppOp =  DAppOperation({
+            // Get the execution environment address
+            (address _environment,,) = IAtlas(ATLAS).getExecutionEnvironment(userOp.from, CONTROL);
+
+            for (uint256 i; i < _approvals.length; i++) {
+                uint256 _balance = IERC20(_approvals[i].token).balanceOf(address(this));
+                if (_balance != 0) {
+                    IERC20(_approvals[i].token).transfer(_environment, _balance);
+                }
+            }
+        }
+
+        uint256 _bundlerRefundTracker = address(this).balance - msg.value;
+
+        bytes32 _userOpHash = IAtlasVerification(ATLAS_VERIFICATION).getUserOperationHash(userOp);
+
+        DAppOperation memory _dAppOp =  DAppOperation({
             from: address(this), // signer of the DAppOperation
             to: ATLAS,  // Atlas address
             nonce: 0, // Atlas nonce of the DAppOperation available in the AtlasVerification contract
-            deadline: block.number,  // block.number deadline for the DAppOperation
+            deadline: userOp.deadline,  // block.number deadline for the DAppOperation
             control: address(this), // DAppControl address
             bundler: address(this), // Signer of the atlas tx (msg.sender)
             userOpHash: _userOpHash,// keccak256 of userOp.to, userOp.data
             callChainHash: bytes32(0), // keccak256 of the solvers' txs
             signature: new bytes(0) // DAppOperation signed by DAppOperation.from
         });
+
+        // TODO: Add in the solverOp grabber
+        SolverOperation[] memory _solverOps = _getSolverOps(solverOpHashes);
+
+        (bool _success, bytes memory _data) = ATLAS.call{value: msg.value}(
+            abi.encodeCall(IAtlas.metacall, (userOp, _solverOps, _dAppOp))
+        );
+        if (!_success) {
+            assembly {
+                revert(add(_data, 32), mload(_data))
+            }
+        }
+        
+
+        if (address(this).balance > _bundlerRefundTracker) {
+            SafeTransferLib.safeTransferETH(msg.sender, address(this).balance - _bundlerRefundTracker);
+        }
+
+        // TODO: add bundler subsidy capabilities for apps. 
     }
+
+    function _getSolverOps(bytes32[] calldata solverOpHashes) internal view returns (SolverOperation[] memory solverOps) {
+        solverOps = new SolverOperation[](solverOpHashes.length);
+
+        uint256 _j;
+        for (uint256 i; i < solverOpHashes.length; i++) {
+            SolverOperation memory _solverOp = S_solverOpCache[solverOpHashes[i]];
+            if (_solverOp.from != address(0)) {
+                solverOps[_j++] = _solverOp;
+            }
+        }
+    }
+
+    /////////////////////////////////////////////////////////
+    //        EXECUTION ENVIRONMENT FUNCTIONS              //
+    //                 (not delegated)                     //
+    /////////////////////////////////////////////////////////
 
     // NOTE: this is delegatecalled
     function proxyCall(
@@ -159,21 +232,46 @@ contract GeneralizedBackrunUserBundler is DAppControl {
         returns (Beneficiary[] memory)
     {
         bool _isProxied;
-        address _recipient = _user();
 
-        // If this is being proxied, get the underlying user. 
-        if (_recipient == CONTROL) {
-            _recipient = IGeneralizedBackrunProxy(CONTROL).getUser();
+        // CASE: Bundled (Force all bundlers to go through bundler contract (this one))
+        if (_bundler() == CONTROL) {
+            if (IGeneralizedBackrunProxy(CONTROL).getUser() != _user()) revert();
             _isProxied = true;
+        
+        // CASE: Direct 
+        } else if (_bundler() != _user()) {
+            // revert if bundler isn't CONTROL or _user()
+            revert();
         }
+        
+        return _proxyCall(approvals, receivables, beneficiaries, innerTarget, innerData, _isProxied);
+    }
+
+
+    function _proxyCall(
+        Approval[] calldata approvals, 
+        address[] calldata receivables,
+        Beneficiary[] calldata beneficiaries,
+        address innerTarget,
+        bytes calldata innerData,
+        bool isProxied
+    )  
+        internal 
+        returns (Beneficiary[] memory)
+    {
+        
+        address _recipient = _user();
 
         // Handle approvals
         for (uint256 i; i < approvals.length; i++) {
             Approval calldata approval = approvals[i];
 
             // CASE: Proxied - user should have signed a permit or permit2
-            if (_isProxied) {
-                // TODO
+            if (isProxied) {
+                uint256 _currentBalance = IERC20(approval.token).balanceOf(address(this));
+                if (approval.amount > _currentBalance) {
+                    _transferUserERC20(approval.token, address(this), approval.amount - _currentBalance);
+                }
             } else {
                 // Transfer the User's token to the EE:
                 _transferUserERC20(approval.token, address(this), approval.amount);
@@ -220,10 +318,10 @@ contract GeneralizedBackrunUserBundler is DAppControl {
             }
         }
 
-        // Forward any value that accrued
+        // Forward any value that accrued to the bundler (either user or contract) - don't share w/ solvers
         uint256 _balance = address(this).balance;
         if (_balance > 0) {
-            SafeTransferLib.safeTransferETH(_recipient, _balance);
+            SafeTransferLib.safeTransferETH(_bundler(), _balance);
         }
         return beneficiaries;
     }
@@ -232,18 +330,8 @@ contract GeneralizedBackrunUserBundler is DAppControl {
     //                     Atlas hooks                      //
     // ---------------------------------------------------- //
 
-    /*
-    * @notice This function is called after a solver has successfully paid their bid
-    * @dev This function is delegatecalled: msg.sender = Atlas, address(this) = ExecutionEnvironment
-    * @dev It transfers all the available bid tokens on the contract (instead of only the bid amount,
-    *      to avoid leaving any dust on the contract)
-    * @param bidToken The address of the token used for the winning solver operation's bid
-    * @param _
-    * @param _
-    */
     function _allocateValueCall(address bidToken, uint256, bytes calldata returnData) internal override {
         
-
         // NOTE: The _user() receives any remaining balance after the other beneficiaries are paid.
         Beneficiary[] memory _beneficiaries = abi.decode(returnData, (Beneficiary[]));
 
