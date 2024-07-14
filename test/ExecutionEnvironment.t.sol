@@ -312,7 +312,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertTrue(revertsAsExpected, "expectRevert AlteredControl: call did not revert");
 
         // Change of config
-        callConfig.preSolver = true;
+        callConfig.requirePreSolver = true;
         setupDAppControl(callConfig);
         solverOp.control = address(dAppControl);
 
@@ -389,7 +389,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertTrue(revertsAsExpected, "expectRevert BidNotPaid: call did not revert");
 
         // Change of config
-        callConfig.postSolver = true;
+        callConfig.requirePostSolver = true;
         setupDAppControl(callConfig);
         solverOp.control = address(dAppControl);
 

@@ -12,8 +12,8 @@ contract CallConfigBuilder is Test {
     bool trackPreOpsReturnData;
     bool trackUserReturnData;
     bool delegateUser;
-    bool preSolver;
-    bool postSolver;
+    bool requirePreSolver;
+    bool requirePostSolver;
     bool requirePostOps;
     bool zeroSolvers;
     bool reuseUserOp;
@@ -58,13 +58,13 @@ contract CallConfigBuilder is Test {
         return this;
     }
 
-    function withPreSolver(bool _preSolver) public returns (CallConfigBuilder) {
-        preSolver = _preSolver;
+    function withRequirePreSolver(bool _requirePreSolver) public returns (CallConfigBuilder) {
+        requirePreSolver = _requirePreSolver;
         return this;
     }
 
-    function withPostSolver(bool _postSolver) public returns (CallConfigBuilder) {
-        postSolver = _postSolver;
+    function withRequirePostSolver(bool _requirePostSolver) public returns (CallConfigBuilder) {
+        requirePostSolver = _requirePostSolver;
         return this;
     }
 
@@ -141,8 +141,8 @@ contract CallConfigBuilder is Test {
             trackPreOpsReturnData,
             trackUserReturnData,
             delegateUser,
-            preSolver,
-            postSolver,
+            requirePreSolver,
+            requirePostSolver,
             requirePostOps,
             zeroSolvers,
             reuseUserOp,
