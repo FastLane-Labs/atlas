@@ -193,53 +193,53 @@ contract StorageTest is BaseTest {
     }
 
     function test_storage_transient_claims() public {
-        assertEq(atlas.claims(), 0, "claims should start at 0");
+        assertEq(atlas.getClaims(), 0, "claims should start at 0");
 
         atlas.setClaims(100);
-        assertEq(atlas.claims(), 100, "claims should be 100");
+        assertEq(atlas.getClaims(), 100, "claims should be 100");
 
         atlas.clearTransientStorage();
-        assertEq(atlas.claims(), 0, "claims should be 0 again");
+        assertEq(atlas.getClaims(), 0, "claims should be 0 again");
     }
 
     function test_storage_transient_fees() public {
-        assertEq(atlas.fees(), 0, "fees should start at 0");
+        assertEq(atlas.getFees(), 0, "fees should start at 0");
 
         atlas.setFees(100);
-        assertEq(atlas.fees(), 100, "fees should be 100");
+        assertEq(atlas.getFees(), 100, "fees should be 100");
 
         atlas.clearTransientStorage();
-        assertEq(atlas.fees(), 0, "fees should be 0 again");
+        assertEq(atlas.getFees(), 0, "fees should be 0 again");
     }
 
     function test_storage_transient_writeoffs() public {
-        assertEq(atlas.writeoffs(), 0, "writeoffs should start at 0");
+        assertEq(atlas.getWriteoffs(), 0, "writeoffs should start at 0");
 
         atlas.setWriteoffs(100);
-        assertEq(atlas.writeoffs(), 100, "writeoffs should be 100");
+        assertEq(atlas.getWriteoffs(), 100, "writeoffs should be 100");
 
         atlas.clearTransientStorage();
-        assertEq(atlas.writeoffs(), 0, "writeoffs should be 0 again");
+        assertEq(atlas.getWriteoffs(), 0, "writeoffs should be 0 again");
     }
 
     function test_storage_transient_withdrawals() public {
-        assertEq(atlas.withdrawals(), 0, "withdrawals should start at 0");
+        assertEq(atlas.getWithdrawals(), 0, "withdrawals should start at 0");
 
         atlas.setWithdrawals(100);
-        assertEq(atlas.withdrawals(), 100, "withdrawals should be 100");
+        assertEq(atlas.getWithdrawals(), 100, "withdrawals should be 100");
 
         atlas.clearTransientStorage();
-        assertEq(atlas.withdrawals(), 0, "withdrawals should be 0 again");
+        assertEq(atlas.getWithdrawals(), 0, "withdrawals should be 0 again");
     }
 
     function test_storage_transient_deposits() public {
-        assertEq(atlas.deposits(), 0, "deposits should start at 0");
+        assertEq(atlas.getDeposits(), 0, "deposits should start at 0");
 
         atlas.setDeposits(100);
-        assertEq(atlas.deposits(), 100, "deposits should be 100");
+        assertEq(atlas.getDeposits(), 100, "deposits should be 100");
 
         atlas.clearTransientStorage();
-        assertEq(atlas.deposits(), 0, "deposits should be 0 again");
+        assertEq(atlas.getDeposits(), 0, "deposits should be 0 again");
     }
 
     function test_storage_transient_solverTo() public {
@@ -349,5 +349,27 @@ contract MockStorage is Storage {
         _setWriteoffs(0);
         _setWithdrawals(0);
         _setDeposits(0);
+    }
+
+    // View functions
+
+    function getClaims() external view returns (uint256) {
+        return claims();
+    }
+
+    function getFees() external view returns (uint256) {
+        return fees();
+    }
+
+    function getWriteoffs() external view returns (uint256) {
+        return writeoffs();
+    }
+
+    function getWithdrawals() external view returns (uint256) {
+        return withdrawals();
+    }
+
+    function getDeposits() external view returns (uint256) {
+        return deposits();
     }
 }

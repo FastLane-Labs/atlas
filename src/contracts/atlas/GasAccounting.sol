@@ -87,9 +87,13 @@ abstract contract GasAccounting is SafetyLocks {
     /// than zero, shortfall returns 0 as there is no shortfall because the solver is in surplus.
     /// @return uint256 The current shortfall amount, or 0 if there is no shortfall.
     function shortfall() external view returns (uint256) {
-        uint256 _deficit = claims() + withdrawals() + fees() - writeoffs();
+        uint256 _currentDeficit = _deficit();
         uint256 _deposits = deposits();
-        return (_deficit > _deposits) ? (_deficit - _deposits) : 0;
+        return (_currentDeficit > _deposits) ? (_currentDeficit - _deposits) : 0;
+    }
+
+    function _deficit() internal view returns (uint256) {
+        return claims() + withdrawals() + fees() - writeoffs();
     }
 
     /// @notice Allows a solver to settle any outstanding ETH owed, either to repay gas used by their solverOp or to
@@ -120,7 +124,7 @@ abstract contract GasAccounting is SafetyLocks {
         // Solver can only approve up to their bonded balance, not more
         if (maxApprovedGasSpend > _bondedBalance) maxApprovedGasSpend = _bondedBalance;
 
-        uint256 _deductions = claims() + withdrawals() + fees() - writeoffs();
+        uint256 _deductions = _deficit();
         uint256 _additions = deposits() + msg.value;
 
         // Add msg.value to solver's deposits
@@ -407,9 +411,12 @@ abstract contract GasAccounting is SafetyLocks {
                 revert InsufficientTotalBalance(_amountSolverPays - _amountSolverReceives);
             }
 
-            uint256 _deficit = _assign(_winningSolver, _amountSolverPays - _amountSolverReceives, _adjustedClaims, true);
-            if (_deficit > claimsPaidToBundler) revert InsufficientTotalBalance(_deficit - claimsPaidToBundler);
-            claimsPaidToBundler -= _deficit;
+            uint256 _currentDeficit =
+                _assign(_winningSolver, _amountSolverPays - _amountSolverReceives, _adjustedClaims, true);
+            if (_currentDeficit > claimsPaidToBundler) {
+                revert InsufficientTotalBalance(_currentDeficit - claimsPaidToBundler);
+            }
+            claimsPaidToBundler -= _currentDeficit;
         } else {
             _credit(_winningSolver, _amountSolverReceives - _amountSolverPays, _adjustedClaims);
         }
@@ -460,6 +467,6 @@ abstract contract GasAccounting is SafetyLocks {
     /// correct.
     /// @return True if the balance is reconciled, false otherwise.
     function _isBalanceReconciled() internal view returns (bool) {
-        return deposits() >= claims() + withdrawals() + fees() - writeoffs();
+        return deposits() >= _deficit();
     }
 }
