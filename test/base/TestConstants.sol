@@ -12,7 +12,7 @@ contract TestConstants {
     uint256 public constant DEFAULT_ATLAS_SURCHARGE_RATE = 1_000_000; // out of 10_000_000 = 10%
     uint256 public constant DEFAULT_BUNDLER_SURCHARGE_RATE = 1_000_000; // out of 10_000_000 = 10%
     uint256 public constant DEFAULT_SCALE = 10_000_000; // out of 10_000_000 = 100%
-    uint256 public constant DEFAULT_FIXED_GAS_OFFSET = 100_000;
+    uint256 public constant DEFAULT_FIXED_GAS_OFFSET = 85_000;
 
     // Structs
     struct ChainVars {
