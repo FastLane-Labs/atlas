@@ -147,9 +147,7 @@ contract Filler is DAppControl {
     }
 
     function getBidValue(SolverOperation calldata solverOp) public pure override returns (uint256) {
-        // NOTE: This is just for sorting
-        // Invert the amounts - less = more.
-        return type(uint256).max - solverOp.bidAmount;
+        return solverOp.bidAmount;
     }
 
     ///////////////////// DAPP STUFF ///////////////////////
