@@ -18,6 +18,7 @@ import "src/contracts/types/ValidCalls.sol";
 
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
+import { IL2GasCalculator } from "src/contracts/interfaces/IL2GasCalculator.sol";
 
 /// @title Atlas V1
 /// @author FastLane Labs
@@ -31,9 +32,10 @@ contract Atlas is Escrow, Factory {
         address verification,
         address simulator,
         address initialSurchargeRecipient,
+        address l2GasCalculator,
         address executionTemplate
     )
-        Escrow(escrowDuration, verification, simulator, initialSurchargeRecipient)
+        Escrow(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
         Factory(executionTemplate)
     { }
 
@@ -53,7 +55,10 @@ contract Atlas is Escrow, Factory {
         payable
         returns (bool auctionWon)
     {
-        uint256 _gasMarker = gasleft() + _BASE_TRANSACTION_GAS_USED + (msg.data.length * _CALLDATA_LENGTH_PREMIUM);
+        uint256 _gasMarker = L2_GAS_CALCULATOR == address(0)
+            ? gasleft() + _BASE_TRANSACTION_GAS_USED + (msg.data.length * _CALLDATA_LENGTH_PREMIUM)
+            : gasleft() + IL2GasCalculator(L2_GAS_CALCULATOR).initialGasUsed(msg.data.length);
+
         bool _isSimulation = msg.sender == SIMULATOR;
 
         (address _executionEnvironment, DAppConfig memory _dConfig) = _getOrCreateExecutionEnvironment(userOp);
@@ -99,10 +104,13 @@ contract Atlas is Escrow, Factory {
             // WARNING: If msg.sender is a disposable address such as a session key, make sure to remove ETH from it
             // before disposal
             if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
+
+            // Emit event indicating the metacall failed in `execute()`
+            emit MetacallResult(msg.sender, userOp.from, false, false, 0, 0);
         }
 
-        // The environment lock and accounting values set above are implicitly released here as the transient storage
-        // variables are zeroed out at the end of the transaction.
+        // The environment lock is explicitly released here to allow multiple metacalls in a single transaction.
+        _releaseLock();
     }
 
     /// @notice execute is called above, in a try-catch block in metacall.
@@ -129,9 +137,7 @@ contract Atlas is Escrow, Factory {
         if (msg.sender != address(this)) revert InvalidAccess();
 
         // Build the context object
-        ctx = _buildContext(
-            dConfig, executionEnvironment, userOpHash, bundler, uint8(solverOps.length), bundler == SIMULATOR
-        );
+        ctx = _buildContext(executionEnvironment, userOpHash, bundler, uint8(solverOps.length), bundler == SIMULATOR);
 
         bytes memory _returnData;
 
@@ -191,6 +197,7 @@ contract Atlas is Escrow, Factory {
         uint256[] memory _bidsAndIndices = new uint256[](solverOpsLength);
         uint256 _bidAmountFound;
         uint256 _bidsAndIndicesLastIndex = solverOpsLength - 1; // Start from the last index
+        uint256 _gasWaterMark = gasleft();
 
         // First, get all bid amounts. Bids of zero are ignored by only storing non-zero bids in the array, from right
         // to left. If there are any zero bids they will end up on the left as uint(0) values - in their sorted
@@ -229,6 +236,10 @@ contract Atlas is Escrow, Factory {
 
         ctx.bidFind = false;
 
+        // Write off the gas cost involved in on-chain bid-finding execution of all solverOps, as these costs should be
+        // paid by the bundler.
+        _writeOffBidFindGasCost(_gasWaterMark - gasleft());
+
         // Finally, iterate through sorted bidsAndIndices array in descending order of bidAmount.
         for (uint256 i = _bidsAndIndicesLastIndex;; /* breaks when 0 */ --i) {
             // Isolate the bidAmount from the packed uint256 value
@@ -237,9 +248,13 @@ contract Atlas is Escrow, Factory {
             // If we reach the zero bids on the left of array, break as all valid bids already checked.
             if (_bidAmountFound == 0) break;
 
+            // NOTE: We reuse the ctx.solverIndex variable to store the count of solver ops that have been executed.
+            // This count is useful in `_settle()` when we may penalize the bundler for overestimating gas limit of the
+            // metacall tx.
+            ctx.solverIndex = uint8(_bidsAndIndicesLastIndex - i);
+
             // Isolate the original solverOps index from the packed uint256 value
             uint256 _solverIndex = uint8(_bidsAndIndices[i] & _FIRST_16_BITS_TRUE_MASK);
-            ctx.solverIndex = uint8(_solverIndex); // Yay, compiler <3
 
             // Execute the solver operation. If solver won, allocate value and return. Otherwise continue looping.
             _bidAmountFound = _executeSolverOperation(
@@ -264,7 +279,7 @@ contract Atlas is Escrow, Factory {
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
     /// @param returnData Return data from the preOps and userOp calls.
-    /// @return The winning bid amount.
+    /// @return The winning bid amount or 0 when no solverOps.
     function _bidKnownIteration(
         Context memory ctx,
         DAppConfig memory dConfig,

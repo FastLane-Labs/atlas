@@ -29,7 +29,13 @@ interface IExecutionEnvironment {
         external
         returns (SolverTracker memory);
 
-    function allocateValue(address bidToken, uint256 bidAmount, bytes memory returnData) external;
+    function allocateValue(
+        address bidToken,
+        uint256 bidAmount,
+        bytes memory returnData
+    )
+        external
+        returns (bool allocateValueSucceeded);
 
     function getUser() external pure returns (address user);
     function getControl() external pure returns (address control);
@@ -38,7 +44,4 @@ interface IExecutionEnvironment {
 
     function withdrawERC20(address token, uint256 amount) external;
     function withdrawEther(uint256 amount) external;
-
-    function factoryWithdrawERC20(address user, address token, uint256 amount) external;
-    function factoryWithdrawEther(address user, uint256 amount) external;
 }

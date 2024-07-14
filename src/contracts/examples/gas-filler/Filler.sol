@@ -75,8 +75,8 @@ contract Filler is DAppControl {
                 trackPreOpsReturnData: false,
                 trackUserReturnData: true,
                 delegateUser: true,
-                preSolver: true,
-                postSolver: true,
+                requirePreSolver: true,
+                requirePostSolver: true,
                 requirePostOps: false,
                 zeroSolvers: false,
                 reuseUserOp: false,
@@ -96,10 +96,14 @@ contract Filler is DAppControl {
 
     // This occurs after a Solver has successfully paid their bid, which is
     // held in ExecutionEnvironment.
-    function _allocateValueCall(address, uint256 bidAmount, bytes calldata) internal override {
+    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
         // NOTE: gas value xferred to user in postSolverCall
         // Pay the solver (since auction is reversed)
         // Address Pointer = winning solver.
+
+        // revert for ERC20 tokens
+        if (bidToken != address(0)) revert("ERC20 bids not supported");
+
         SafeTransferLib.safeTransferETH(_user(), bidAmount);
     }
 
@@ -143,9 +147,7 @@ contract Filler is DAppControl {
     }
 
     function getBidValue(SolverOperation calldata solverOp) public pure override returns (uint256) {
-        // NOTE: This is just for sorting
-        // Invert the amounts - less = more.
-        return type(uint256).max - solverOp.bidAmount;
+        return solverOp.bidAmount;
     }
 
     ///////////////////// DAPP STUFF ///////////////////////

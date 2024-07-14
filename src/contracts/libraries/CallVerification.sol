@@ -11,7 +11,6 @@ library CallVerification {
     using CallBits for uint32;
 
     function getCallChainHash(
-        DAppConfig memory dConfig,
         UserOperation memory userOp,
         SolverOperation[] memory solverOps
     )
@@ -19,15 +18,7 @@ library CallVerification {
         pure
         returns (bytes32 callSequenceHash)
     {
-        bytes memory callSequence;
-
-        if (dConfig.callConfig.needsPreOpsCall()) {
-            // Start with preOps call if preOps is needed
-            callSequence = abi.encodePacked(dConfig.to);
-        }
-
-        // Then user and solver call
-        callSequence = abi.encodePacked(callSequence, abi.encode(userOp), abi.encode(solverOps));
+        bytes memory callSequence = abi.encodePacked(abi.encode(userOp), abi.encode(solverOps));
         callSequenceHash = keccak256(callSequence);
     }
 }

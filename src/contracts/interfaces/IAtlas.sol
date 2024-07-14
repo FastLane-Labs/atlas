@@ -21,7 +21,7 @@ interface IAtlas {
     function createExecutionEnvironment(address control) external returns (address executionEnvironment);
     function getExecutionEnvironment(
         address user,
-        address dAppControl
+        address control
     )
         external
         view
@@ -82,11 +82,6 @@ interface IAtlas {
     function solverOpHashes(bytes32 opHash) external view returns (bool);
     function lock() external view returns (address activeEnvironment, uint32 callConfig, uint8 phase);
     function solverLock() external view returns (uint256);
-    function claims() external view returns (uint256);
-    function fees() external view returns (uint256);
-    function writeoffs() external view returns (uint256);
-    function withdrawals() external view returns (uint256);
-    function deposits() external view returns (uint256);
     function cumulativeSurcharge() external view returns (uint256);
     function surchargeRecipient() external view returns (address);
     function pendingSurchargeRecipient() external view returns (address);

@@ -52,20 +52,19 @@ contract CallVerificationTest is Test {
         SolverOperation[] memory solverOps = new SolverOperation[](2);
         solverOps[0] = builderSolverOperation();
         solverOps[1] = builderSolverOperation();
-        this._testGetCallChainHash(dConfig, userOp, solverOps);
+        this._testGetCallChainHash(userOp, solverOps);
     }
 
     function _testGetCallChainHash(
-        DAppConfig calldata dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps
     )
         external pure
     {
-        bytes32 callChainHash = CallVerification.getCallChainHash(dConfig, userOp, solverOps);
+        bytes32 callChainHash = CallVerification.getCallChainHash(userOp, solverOps);
         assertEq(
             callChainHash,
-            TestUtils.computeCallChainHash(dConfig, userOp, solverOps),
+            TestUtils.computeCallChainHash(userOp, solverOps),
             "callChainHash different to TestUtils reproduction"
         );
     }

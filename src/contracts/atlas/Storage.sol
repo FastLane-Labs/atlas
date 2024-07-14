@@ -16,6 +16,7 @@ import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.
 contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     IAtlasVerification public immutable VERIFICATION;
     address public immutable SIMULATOR;
+    address public immutable L2_GAS_CALCULATOR;
     uint256 public immutable ESCROW_DURATION;
 
     // AtlETH public constants
@@ -31,14 +32,14 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint256 public constant FIXED_GAS_OFFSET = AccountingMath._FIXED_GAS_OFFSET;
 
     // Transient storage slots
-    bytes32 private constant _T_LOCK_SLOT = keccak256("LOCK");
-    bytes32 private constant _T_SOLVER_LOCK_SLOT = keccak256("SOLVER_LOCK");
-    bytes32 private constant _T_SOLVER_TO_SLOT = keccak256("SOLVER_TO");
-    bytes32 private constant _T_CLAIMS_SLOT = keccak256("CLAIMS");
-    bytes32 private constant _T_FEES_SLOT = keccak256("FEES");
-    bytes32 private constant _T_WRITEOFFS_SLOT = keccak256("WRITEOFFS");
-    bytes32 private constant _T_WITHDRAWALS_SLOT = keccak256("WITHDRAWALS");
-    bytes32 private constant _T_DEPOSITS_SLOT = keccak256("DEPOSITS");
+    bytes32 private constant _T_LOCK_SLOT = keccak256("ATLAS_LOCK");
+    bytes32 private constant _T_SOLVER_LOCK_SLOT = keccak256("ATLAS_SOLVER_LOCK");
+    bytes32 private constant _T_SOLVER_TO_SLOT = keccak256("ATLAS_SOLVER_TO");
+    bytes32 private constant _T_CLAIMS_SLOT = keccak256("ATLAS_CLAIMS");
+    bytes32 private constant _T_FEES_SLOT = keccak256("ATLAS_FEES");
+    bytes32 private constant _T_WRITEOFFS_SLOT = keccak256("ATLAS_WRITEOFFS");
+    bytes32 private constant _T_WITHDRAWALS_SLOT = keccak256("ATLAS_WITHDRAWALS");
+    bytes32 private constant _T_DEPOSITS_SLOT = keccak256("ATLAS_DEPOSITS");
 
     // AtlETH storage
     uint256 internal S_totalSupply;
@@ -57,12 +58,14 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         uint256 escrowDuration,
         address verification,
         address simulator,
-        address initialSurchargeRecipient
+        address initialSurchargeRecipient,
+        address l2GasCalculator
     )
         payable
     {
         VERIFICATION = IAtlasVerification(verification);
         SIMULATOR = simulator;
+        L2_GAS_CALCULATOR = l2GasCalculator;
         ESCROW_DURATION = escrowDuration;
 
         // Gas Accounting
@@ -128,26 +131,6 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         return _isUnlocked();
     }
 
-    function claims() public view returns (uint256) {
-        return uint256(_tload(_T_CLAIMS_SLOT));
-    }
-
-    function fees() public view returns (uint256) {
-        return uint256(_tload(_T_FEES_SLOT));
-    }
-
-    function writeoffs() public view returns (uint256) {
-        return uint256(_tload(_T_WRITEOFFS_SLOT));
-    }
-
-    function withdrawals() public view returns (uint256) {
-        return uint256(_tload(_T_WITHDRAWALS_SLOT));
-    }
-
-    function deposits() public view returns (uint256) {
-        return uint256(_tload(_T_DEPOSITS_SLOT));
-    }
-
     /// @notice Returns information about the current state of the solver lock.
     /// @return currentSolver Address of the current solver.
     /// @return calledBack Boolean indicating whether the solver has called back via `reconcile`.
@@ -159,6 +142,26 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     // ---------------------------------------------------- //
     //              Transient Internal Getters              //
     // ---------------------------------------------------- //
+
+    function claims() internal view returns (uint256) {
+        return uint256(_tload(_T_CLAIMS_SLOT));
+    }
+
+    function fees() internal view returns (uint256) {
+        return uint256(_tload(_T_FEES_SLOT));
+    }
+
+    function writeoffs() internal view returns (uint256) {
+        return uint256(_tload(_T_WRITEOFFS_SLOT));
+    }
+
+    function withdrawals() internal view returns (uint256) {
+        return uint256(_tload(_T_WITHDRAWALS_SLOT));
+    }
+
+    function deposits() internal view returns (uint256) {
+        return uint256(_tload(_T_DEPOSITS_SLOT));
+    }
 
     function _lock() internal view returns (address activeEnvironment, uint32 callConfig, uint8 phase) {
         bytes32 _lockData = _tload(_T_LOCK_SLOT);
@@ -198,22 +201,26 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     }
 
     function _isUnlocked() internal view returns (bool) {
-        return _tload(_T_LOCK_SLOT) == bytes32(0);
+        return _tload(_T_LOCK_SLOT) == bytes32(_UNLOCKED);
     }
 
     // ---------------------------------------------------- //
     //                   Transient Setters                  //
     // ---------------------------------------------------- //
 
-    function _setLock(Lock memory newLock) internal {
+    function _setLock(address activeEnvironment, uint32 callConfig, uint8 phase) internal {
         // Pack the lock slot from the right:
         // [   56 bits   ][     160 bits      ][  32 bits   ][ 8 bits ]
         // [ unused bits ][ activeEnvironment ][ callConfig ][ phase  ]
         _tstore(
             _T_LOCK_SLOT,
-            bytes32(uint256(uint160(newLock.activeEnvironment))) << 40 | bytes32(uint256(newLock.callConfig)) << 8
-                | bytes32(uint256(newLock.phase))
+            bytes32(uint256(uint160(activeEnvironment))) << 40 | bytes32(uint256(callConfig)) << 8
+                | bytes32(uint256(phase))
         );
+    }
+
+    function _releaseLock() internal {
+        _tstore(_T_LOCK_SLOT, bytes32(_UNLOCKED));
     }
 
     // Sets the Lock phase without changing the activeEnvironment or callConfig.

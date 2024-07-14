@@ -28,6 +28,8 @@ contract DummyDAppControl is DAppControl {
     // Atlas overrides
     // ****************************************
 
+    function _checkUserOperation(UserOperation memory) internal pure virtual override { }
+
     function _preOpsCall(UserOperation calldata userOp) internal virtual override returns (bytes memory) {
         if (userOp.data.length == 0) {
             return new bytes(0);
@@ -38,14 +40,11 @@ contract DummyDAppControl is DAppControl {
         return data;
     }
 
-    function _postOpsCall(bool, bytes calldata data) internal pure virtual override returns (bool) {
-        if (data.length == 0) {
-            return true;
-        }
+    function _postOpsCall(bool, bytes calldata data) internal pure virtual override {
+        if (data.length == 0) return;
 
         (bool shouldRevert) = abi.decode(data, (bool));
         require(!shouldRevert, "_postOpsCall revert requested");
-        return true;
     }
 
     function _preSolverCall(SolverOperation calldata, bytes calldata returnData) internal view virtual override {

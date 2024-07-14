@@ -31,11 +31,11 @@ library CallBits {
         if (callConfig.delegateUser) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.DelegateUser);
         }
-        if (callConfig.preSolver) {
-            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.PreSolver);
+        if (callConfig.requirePreSolver) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.RequirePreSolver);
         }
-        if (callConfig.postSolver) {
-            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.PostSolver);
+        if (callConfig.requirePostSolver) {
+            encodedCallConfig ^= _ONE << uint32(CallConfigIndex.RequirePostSolver);
         }
         if (callConfig.requirePostOps) {
             encodedCallConfig ^= _ONE << uint32(CallConfigIndex.RequirePostOpsCall);
@@ -86,8 +86,8 @@ library CallBits {
             trackPreOpsReturnData: needsPreOpsReturnData(encodedCallConfig),
             trackUserReturnData: needsUserReturnData(encodedCallConfig),
             delegateUser: needsDelegateUser(encodedCallConfig),
-            preSolver: needsPreSolver(encodedCallConfig),
-            postSolver: needsSolverPostCall(encodedCallConfig),
+            requirePreSolver: needsPreSolverCall(encodedCallConfig),
+            requirePostSolver: needsPostSolverCall(encodedCallConfig),
             requirePostOps: needsPostOpsCall(encodedCallConfig),
             zeroSolvers: allowsZeroSolvers(encodedCallConfig),
             reuseUserOp: allowsReuseUserOps(encodedCallConfig),
@@ -128,12 +128,12 @@ library CallBits {
         delegateUser = callConfig & (1 << uint32(CallConfigIndex.DelegateUser)) != 0;
     }
 
-    function needsPreSolver(uint32 callConfig) internal pure returns (bool preSolver) {
-        preSolver = callConfig & (1 << uint32(CallConfigIndex.PreSolver)) != 0;
+    function needsPreSolverCall(uint32 callConfig) internal pure returns (bool needsPreSolver) {
+        needsPreSolver = callConfig & (1 << uint32(CallConfigIndex.RequirePreSolver)) != 0;
     }
 
-    function needsSolverPostCall(uint32 callConfig) internal pure returns (bool postSolver) {
-        postSolver = callConfig & (1 << uint32(CallConfigIndex.PostSolver)) != 0;
+    function needsPostSolverCall(uint32 callConfig) internal pure returns (bool needsPostSolver) {
+        needsPostSolver = callConfig & (1 << uint32(CallConfigIndex.RequirePostSolver)) != 0;
     }
 
     function needsPostOpsCall(uint32 callConfig) internal pure returns (bool needsPostOps) {

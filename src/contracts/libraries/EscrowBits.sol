@@ -34,6 +34,7 @@ library EscrowBits {
         1 << uint256(SolverOutcome.SolverOpReverted) // <- detected by Escrow
             | 1 << uint256(SolverOutcome.PostSolverFailed) // <- detected by EE
             | 1 << uint256(SolverOutcome.BidNotPaid) // <- detected by EE
+            | 1 << uint256(SolverOutcome.InvertedBidExceedsCeiling) // <- detected by EE
             | 1 << uint256(SolverOutcome.BalanceNotReconciled) // <- detected by Escrow
             | 1 << uint256(SolverOutcome.CallbackNotCalled) // <- detected by Escrow
             | 1 << uint256(SolverOutcome.EVMError)
@@ -57,9 +58,9 @@ library EscrowBits {
         return (result & _FULL_REFUND) != 0;
     }
 
-    function updateEscrow(uint256 result) internal pure returns (bool) {
-        // Only update solver escrow if they need to refund gas
-        // returns true if solver has to do the refund.
-        return (result & _NO_REFUND == 0);
+    function bundlersFault(uint256 result) internal pure returns (bool) {
+        // Only update solver escrow if failure is not due to bundler's fault
+        // returns true if bundler blamed and no solver refund required
+        return (result & _NO_REFUND != 0);
     }
 }

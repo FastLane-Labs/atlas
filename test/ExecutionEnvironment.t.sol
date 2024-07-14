@@ -253,27 +253,17 @@ contract ExecutionEnvironmentTest is BaseTest {
         // Valid
         ctx.solverCount = 4;
         ctx.solverIndex = ctx.solverCount - 1;
-        postOpsData =
-            abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, false, abi.encode(false, true));
+        postOpsData = abi.encodeCall(executionEnvironment.postOpsWrapper, (false, abi.encode(false)));
         postOpsData = abi.encodePacked(postOpsData, ctx.setAndPack(ExecutionPhase.PostOps));
         vm.prank(address(atlas));
         (status,) = address(executionEnvironment).call(postOpsData);
         assertTrue(status);
 
         // DelegateRevert
-        postOpsData =
-            abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, false, abi.encode(true, false));
+        postOpsData = abi.encodeCall(executionEnvironment.postOpsWrapper, (false, abi.encode(true)));
         postOpsData = abi.encodePacked(postOpsData, ctx.setAndPack(ExecutionPhase.PostOps));
         vm.prank(address(atlas));
         vm.expectRevert(AtlasErrors.PostOpsDelegatecallFail.selector);
-        (status,) = address(executionEnvironment).call(postOpsData);
-
-        // DelegateUnsuccessful
-        postOpsData =
-            abi.encodeWithSelector(executionEnvironment.postOpsWrapper.selector, false, abi.encode(false, false));
-        postOpsData = abi.encodePacked(postOpsData, ctx.setAndPack(ExecutionPhase.PostOps));
-        vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.PostOpsDelegatecallReturnedFalse.selector);
         (status,) = address(executionEnvironment).call(postOpsData);
     }
 
@@ -322,7 +312,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertTrue(revertsAsExpected, "expectRevert AlteredControl: call did not revert");
 
         // Change of config
-        callConfig.preSolver = true;
+        callConfig.requirePreSolver = true;
         setupDAppControl(callConfig);
         solverOp.control = address(dAppControl);
 
@@ -399,7 +389,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertTrue(revertsAsExpected, "expectRevert BidNotPaid: call did not revert");
 
         // Change of config
-        callConfig.postSolver = true;
+        callConfig.requirePostSolver = true;
         setupDAppControl(callConfig);
         solverOp.control = address(dAppControl);
 
@@ -550,6 +540,8 @@ contract MockDAppControl is DAppControl {
                         ATLAS OVERRIDE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
+    function _checkUserOperation(UserOperation memory) internal pure override { }
+
     function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory) {
         if (userOp.data.length > 0) {
             (bool success, bytes memory data) = address(userOp.dapp).call(userOp.data);
@@ -559,10 +551,11 @@ contract MockDAppControl is DAppControl {
         return new bytes(0);
     }
 
-    function _postOpsCall(bool, bytes calldata data) internal pure override returns (bool) {
-        (bool shouldRevert, bool returnValue) = abi.decode(data, (bool, bool));
+    function _postOpsCall(bool, bytes calldata data) internal view override {
+        console.log("before decode");
+        bool shouldRevert = abi.decode(data, (bool));
+        console.log("after decode");
         require(!shouldRevert, "_postSolverCall revert requested");
-        return returnValue;
     }
 
     function _preSolverCall(

@@ -18,13 +18,17 @@ interface IWETH9 {
  * @title SolverBase
  * @notice A base contract for Solvers
  * @dev Does safety checks, escrow reconciliation and pays bids.
- * @dev Works with DappControls which have set the `invertBidValue` flag to false.
- * @dev Use `SolverBaseInvertBid` for DappControls which have set the `invertBidValue` flag to true.
+ * @dev Works with DAppControls which have set the `invertBidValue` flag to false.
+ * @dev Use `SolverBaseInvertBid` for DAppControls which have set the `invertBidValue` flag to true.
  */
 contract SolverBase is ISolverContract {
     address public immutable WETH_ADDRESS;
     address internal immutable _owner;
     address internal immutable _atlas;
+
+    error SolverCallUnsuccessful();
+    error InvalidEntry();
+    error InvalidCaller();
 
     constructor(address weth, address atlas, address owner) {
         WETH_ADDRESS = weth;
@@ -47,14 +51,13 @@ contract SolverBase is ISolverContract {
         payBids(executionEnvironment, bidToken, bidAmount)
     {
         (bool success,) = address(this).call{ value: msg.value }(solverOpData);
-
-        require(success, "CALL UNSUCCESSFUL");
+        if (!success) revert SolverCallUnsuccessful();
     }
 
     modifier safetyFirst(address executionEnvironment, address solverOpFrom) {
         // Safety checks
-        require(msg.sender == _atlas, "INVALID ENTRY");
-        require(solverOpFrom == _owner, "INVALID CALLER");
+        if (msg.sender != _atlas) revert InvalidEntry();
+        if (solverOpFrom != _owner) revert InvalidCaller();
 
         _;
 
@@ -86,11 +89,6 @@ contract SolverBase is ISolverContract {
             SafeTransferLib.safeTransferETH(executionEnvironment, bidAmount);
         } else {
             // Pay bid in ERC20 (bidToken)
-
-            if (msg.value > address(this).balance) {
-                IWETH9(WETH_ADDRESS).withdraw(msg.value - address(this).balance);
-            }
-
             SafeTransferLib.safeTransfer(bidToken, executionEnvironment, bidAmount);
         }
     }

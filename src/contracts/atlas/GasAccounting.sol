@@ -2,11 +2,13 @@
 pragma solidity 0.8.25;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 import { SafetyLocks } from "src/contracts/atlas/SafetyLocks.sol";
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { AccountingMath } from "src/contracts/libraries/AccountingMath.sol";
 import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
 import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
+import { IL2GasCalculator } from "src/contracts/interfaces/IL2GasCalculator.sol";
 import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
 
@@ -21,9 +23,10 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 escrowDuration,
         address verification,
         address simulator,
-        address initialSurchargeRecipient
+        address initialSurchargeRecipient,
+        address l2GasCalculator
     )
-        SafetyLocks(escrowDuration, verification, simulator, initialSurchargeRecipient)
+        SafetyLocks(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
     { }
 
     /// @notice Sets the initial accounting values for the metacall transaction.
@@ -37,7 +40,16 @@ abstract contract GasAccounting is SafetyLocks {
         // Atlas surcharge is based on the raw claims value.
         _setFees(_rawClaims.getAtlasSurcharge());
         _setDeposits(msg.value);
-        // writeoffs and withdrawawls transient storage variables are already 0
+
+        // Explicitly set writeoffs and withdrawals to 0 in case multiple metacalls in single tx.
+        _setWriteoffs(0);
+        _setWithdrawals(0);
+
+        // Explicitly clear solverLock and solverTo in case multiple metacalls in single tx.
+        _setSolverLock(0);
+        _setSolverTo(address(0));
+
+        // The Lock slot is cleared at the end of the metacall, so no need to zero again here.
     }
 
     /// @notice Contributes ETH to the contract, increasing the deposits if a non-zero value is sent.
@@ -75,9 +87,13 @@ abstract contract GasAccounting is SafetyLocks {
     /// than zero, shortfall returns 0 as there is no shortfall because the solver is in surplus.
     /// @return uint256 The current shortfall amount, or 0 if there is no shortfall.
     function shortfall() external view returns (uint256) {
-        uint256 _deficit = claims() + withdrawals() + fees() - writeoffs();
+        uint256 _currentDeficit = _deficit();
         uint256 _deposits = deposits();
-        return (_deficit > _deposits) ? (_deficit - _deposits) : 0;
+        return (_currentDeficit > _deposits) ? (_currentDeficit - _deposits) : 0;
+    }
+
+    function _deficit() internal view returns (uint256) {
+        return claims() + withdrawals() + fees() - writeoffs();
     }
 
     /// @notice Allows a solver to settle any outstanding ETH owed, either to repay gas used by their solverOp or to
@@ -108,7 +124,7 @@ abstract contract GasAccounting is SafetyLocks {
         // Solver can only approve up to their bonded balance, not more
         if (maxApprovedGasSpend > _bondedBalance) maxApprovedGasSpend = _bondedBalance;
 
-        uint256 _deductions = claims() + withdrawals() + fees() - writeoffs();
+        uint256 _deductions = _deficit();
         uint256 _additions = deposits() + msg.value;
 
         // Add msg.value to solver's deposits
@@ -159,11 +175,20 @@ abstract contract GasAccounting is SafetyLocks {
     /// increase transient solver deposits.
     /// @param owner The address of the owner from whom AtlETH is taken.
     /// @param amount The amount of AtlETH to be taken.
+    /// @param gasUsed The amount of gas used in the SolverOperation.
     /// @param solverWon A boolean indicating whether the solver won the bid.
     /// @return deficit The amount of AtlETH that was not repaid, if any.
-    function _assign(address owner, uint256 amount, bool solverWon) internal returns (uint256 deficit) {
+    function _assign(
+        address owner,
+        uint256 amount,
+        uint256 gasUsed,
+        bool solverWon
+    )
+        internal
+        returns (uint256 deficit)
+    {
         if (amount > type(uint112).max) revert ValueTooLarge();
-        uint112 _amt = uint112(amount);
+        uint112 _amt = SafeCast.toUint112(amount);
 
         EscrowAccountAccessData memory _aData = S_accessData[owner];
 
@@ -189,7 +214,7 @@ abstract contract GasAccounting is SafetyLocks {
             } else {
                 // The unbonding balance is sufficient to cover the remaining amount owed. Draw everything from the
                 // bonded balance, and adjust the unbonding balance accordingly.
-                s_balanceOf[owner].unbonding = uint112(_total - _amt);
+                s_balanceOf[owner].unbonding = SafeCast.toUint112(_total - _amt);
                 _aData.bonded = 0;
             }
         } else {
@@ -197,19 +222,11 @@ abstract contract GasAccounting is SafetyLocks {
             _aData.bonded -= _amt;
         }
 
-        // Update aData vars before persisting changes in accessData
-        if (solverWon && deficit == 0) {
-            unchecked {
-                ++_aData.auctionWins;
-            }
-        } else {
-            unchecked {
-                ++_aData.auctionFails;
-            }
-        }
+        // Update analytics (auctionWins, auctionFails, totalGasUsed) and lastAccessedBlock
+        _updateAnalytics(_aData, solverWon && deficit == 0, gasUsed);
         _aData.lastAccessedBlock = uint32(block.number);
-        _aData.totalGasUsed += uint64(amount / _GAS_USED_DECIMALS_TO_DROP);
 
+        // Persist changes in the _aData memory struct back to storage
         S_accessData[owner] = _aData;
 
         S_bondedTotalSupply -= amount;
@@ -219,9 +236,8 @@ abstract contract GasAccounting is SafetyLocks {
     /// @notice Increases the owner's bonded balance by the specified amount.
     /// @param owner The address of the owner whose bonded balance will be increased.
     /// @param amount The amount by which to increase the owner's bonded balance.
-    function _credit(address owner, uint256 amount) internal {
-        if (amount > type(uint112).max) revert ValueTooLarge();
-        uint112 _amt = uint112(amount);
+    function _credit(address owner, uint256 amount, uint256 gasUsed) internal {
+        uint112 _amt = SafeCast.toUint112(amount);
 
         EscrowAccountAccessData memory _aData = S_accessData[owner];
 
@@ -230,10 +246,10 @@ abstract contract GasAccounting is SafetyLocks {
 
         S_bondedTotalSupply += amount;
 
-        unchecked {
-            ++_aData.auctionWins;
-        }
+        // Update analytics (auctionWins, auctionFails, totalGasUsed)
+        _updateAnalytics(_aData, true, gasUsed);
 
+        // Persist changes in the _aData memory struct back to storage
         S_accessData[owner] = _aData;
         _setWithdrawals(withdrawals() + amount);
     }
@@ -261,14 +277,19 @@ abstract contract GasAccounting is SafetyLocks {
 
         // Calculate what the solver owes
         // NOTE: This will cause an error if you are simulating with a gasPrice of 0
-        if (!result.updateEscrow()) {
+        if (result.bundlersFault()) {
             // CASE: Solver is not responsible for the failure of their operation, so we blame the bundler
             // and reduce the total amount refunded to the bundler
             _setWriteoffs(writeoffs() + _gasUsed.withAtlasAndBundlerSurcharges());
         } else {
             // CASE: Solver failed, so we calculate what they owe.
-            _assign(solverOp.from, _gasUsed.withAtlasAndBundlerSurcharges(), false);
+            uint256 _gasUsedWithSurcharges = _gasUsed.withAtlasAndBundlerSurcharges();
+            _assign(solverOp.from, _gasUsedWithSurcharges, _gasUsedWithSurcharges, false);
         }
+    }
+
+    function _writeOffBidFindGasCost(uint256 gasUsed) internal {
+        _setWriteoffs(writeoffs() + gasUsed.withAtlasAndBundlerSurcharges());
     }
 
     /// @param ctx Context struct containing relevant context information for the Atlas auction.
@@ -370,6 +391,7 @@ abstract contract GasAccounting is SafetyLocks {
 
         uint256 _amountSolverPays;
         uint256 _amountSolverReceives;
+        uint256 _adjustedClaims = _claims - _writeoffs;
 
         // Calculate the balances that should be debited or credited to the solver and the bundler
         if (_deposits < _withdrawals) {
@@ -381,7 +403,6 @@ abstract contract GasAccounting is SafetyLocks {
         // Only force solver to pay gas claims if they aren't also the bundler
         // NOTE: If the auction isn't won, _winningSolver will be address(0).
         if (ctx.solverSuccessful && _winningSolver != ctx.bundler) {
-            uint256 _adjustedClaims = _claims - _writeoffs;
             _amountSolverPays += _adjustedClaims;
             claimsPaidToBundler = _adjustedClaims;
         } else {
@@ -394,11 +415,14 @@ abstract contract GasAccounting is SafetyLocks {
                 revert InsufficientTotalBalance(_amountSolverPays - _amountSolverReceives);
             }
 
-            uint256 _deficit = _assign(_winningSolver, _amountSolverPays - _amountSolverReceives, true);
-            if (_deficit > claimsPaidToBundler) revert InsufficientTotalBalance(_deficit - claimsPaidToBundler);
-            claimsPaidToBundler -= _deficit;
+            uint256 _currentDeficit =
+                _assign(_winningSolver, _amountSolverPays - _amountSolverReceives, _adjustedClaims, true);
+            if (_currentDeficit > claimsPaidToBundler) {
+                revert InsufficientTotalBalance(_currentDeficit - claimsPaidToBundler);
+            }
+            claimsPaidToBundler -= _currentDeficit;
         } else {
-            _credit(_winningSolver, _amountSolverReceives - _amountSolverPays);
+            _credit(_winningSolver, _amountSolverReceives - _amountSolverPays, _adjustedClaims);
         }
 
         // Set lock to FullyLocked to prevent any reentrancy possibility
@@ -409,14 +433,37 @@ abstract contract GasAccounting is SafetyLocks {
         return (claimsPaidToBundler, netAtlasGasSurcharge);
     }
 
+    /// @notice Updates auctionWins, auctionFails, and totalGasUsed values of a solver's EscrowAccountAccessData.
+    /// @dev This function is only ever called in the context of bidFind = false so no risk of doublecounting changes.
+    /// @param aData The Solver's EscrowAccountAccessData struct to update.
+    /// @param auctionWon A boolean indicating whether the solver's solverOp won the auction.
+    /// @param gasUsed The amount of gas used by the solverOp.
+    function _updateAnalytics(EscrowAccountAccessData memory aData, bool auctionWon, uint256 gasUsed) internal pure {
+        if (auctionWon) {
+            unchecked {
+                ++aData.auctionWins;
+            }
+        } else {
+            unchecked {
+                ++aData.auctionFails;
+            }
+        }
+
+        aData.totalGasUsed += uint64(gasUsed / _GAS_USED_DECIMALS_TO_DROP);
+    }
+
     /// @notice Calculates the gas cost of the calldata used to execute a SolverOperation.
     /// @param calldataLength The length of the `data` field in the SolverOperation.
     /// @return calldataCost The gas cost of the calldata used to execute the SolverOperation.
     function _getCalldataCost(uint256 calldataLength) internal view returns (uint256 calldataCost) {
-        // NOTE: Alter this for L2s.
-
-        // _SOLVER_OP_BASE_CALLDATA = SolverOperation calldata length excluding solverOp.data
-        calldataCost = (calldataLength + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM * tx.gasprice;
+        if (L2_GAS_CALCULATOR == address(0)) {
+            // Default to using mainnet gas calculations
+            // _SOLVER_OP_BASE_CALLDATA = SolverOperation calldata length excluding solverOp.data
+            calldataCost = (calldataLength + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM * tx.gasprice;
+        } else {
+            calldataCost =
+                IL2GasCalculator(L2_GAS_CALCULATOR).getCalldataCost(calldataLength + _SOLVER_OP_BASE_CALLDATA);
+        }
     }
 
     /// @notice Checks if the current balance is reconciled.
@@ -424,6 +471,6 @@ abstract contract GasAccounting is SafetyLocks {
     /// correct.
     /// @return True if the balance is reconciled, false otherwise.
     function _isBalanceReconciled() internal view returns (bool) {
-        return deposits() >= claims() + withdrawals() + fees() - writeoffs();
+        return deposits() >= _deficit();
     }
 }

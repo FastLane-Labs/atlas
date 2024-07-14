@@ -7,6 +7,7 @@ import { Atlas } from "src/contracts/atlas/Atlas.sol";
 import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
 import { DAppIntegration } from "src/contracts/atlas/DAppIntegration.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 
 import { DummyDAppControl, CallConfigBuilder } from "./base/DummyDAppControl.sol";
 
@@ -18,6 +19,7 @@ contract DAppIntegrationTest is Test {
     Atlas public atlas;
     MockDAppIntegration public dAppIntegration;
     DummyDAppControl public dAppControl;
+    AtlasVerification atlasVerification;
 
     address atlasDeployer = makeAddr("atlas deployer");
     address governance = makeAddr("governance");
@@ -25,25 +27,34 @@ contract DAppIntegrationTest is Test {
     address invalid = makeAddr("invalid");
 
     function setUp() public {
-    
         vm.startPrank(atlasDeployer);
-        // Computes the addresses at which AtlasVerification will be deployed
-        address expectedAtlasAddr = vm.computeCreateAddress(atlasDeployer, vm.getNonce(atlasDeployer) + 1);
-        address expectedAtlasVerificationAddr = vm.computeCreateAddress(atlasDeployer, vm.getNonce(atlasDeployer) + 2);
-        bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedAtlasAddr, "AtlasFactory 1.0"));
-        ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
+        
+        // Compute expected addresses for Atlas
+        address expectedAtlasAddr = vm.computeCreateAddress(atlasDeployer, vm.getNonce(atlasDeployer) + 2);
 
+        ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedAtlasAddr);
+
+        // Deploy the AtlasVerification contract
+        atlasVerification = new AtlasVerification(expectedAtlasAddr);
+
+        // Deploy the Atlas contract with correct parameters
         atlas = new Atlas({
             escrowDuration: 64,
-            verification: expectedAtlasVerificationAddr,
+            verification: address(atlasVerification),
             simulator: address(0),
             executionTemplate: address(execEnvTemplate),
-            initialSurchargeRecipient: atlasDeployer
+            initialSurchargeRecipient: atlasDeployer,
+            l2GasCalculator: address(0)
         });
-        dAppIntegration = new MockDAppIntegration(expectedAtlasAddr);
+
+        assertEq(address(atlas), expectedAtlasAddr, "Atlas address should be as expected");
+
+        // Deploy the MockDAppIntegration contract
+        dAppIntegration = new MockDAppIntegration(address(atlas));
         vm.stopPrank();
 
-        dAppControl = new DummyDAppControl(expectedAtlasAddr, governance, CallConfigBuilder.allFalseCallConfig());
+        // Deploy the DummyDAppControl contract
+        dAppControl = new DummyDAppControl(address(atlas), governance, CallConfigBuilder.allFalseCallConfig());
     }
 
     function test_initializeGovernance_successfullyInitialized() public {
