@@ -74,7 +74,8 @@ contract AtlasBaseTest is Test, TestConstants {
             verification: expectedAtlasVerificationAddr,
             simulator: address(simulator),
             executionTemplate: address(execEnvTemplate),
-            initialSurchargeRecipient: payee
+            initialSurchargeRecipient: payee,
+            l2GasCalculator: address(0)
         });
         atlasVerification = new AtlasVerification(address(atlas));
 

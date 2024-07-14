@@ -8,6 +8,7 @@ import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { AccountingMath } from "src/contracts/libraries/AccountingMath.sol";
 import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
 import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
+import { IL2GasCalculator } from "src/contracts/interfaces/IL2GasCalculator.sol";
 import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
 
@@ -22,9 +23,10 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 escrowDuration,
         address verification,
         address simulator,
-        address initialSurchargeRecipient
+        address initialSurchargeRecipient,
+        address l2GasCalculator
     )
-        SafetyLocks(escrowDuration, verification, simulator, initialSurchargeRecipient)
+        SafetyLocks(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
     { }
 
     /// @notice Sets the initial accounting values for the metacall transaction.
@@ -85,9 +87,13 @@ abstract contract GasAccounting is SafetyLocks {
     /// than zero, shortfall returns 0 as there is no shortfall because the solver is in surplus.
     /// @return uint256 The current shortfall amount, or 0 if there is no shortfall.
     function shortfall() external view returns (uint256) {
-        uint256 _deficit = claims() + withdrawals() + fees() - writeoffs();
+        uint256 _currentDeficit = _deficit();
         uint256 _deposits = deposits();
-        return (_deficit > _deposits) ? (_deficit - _deposits) : 0;
+        return (_currentDeficit > _deposits) ? (_currentDeficit - _deposits) : 0;
+    }
+
+    function _deficit() internal view returns (uint256) {
+        return claims() + withdrawals() + fees() - writeoffs();
     }
 
     /// @notice Allows a solver to settle any outstanding ETH owed, either to repay gas used by their solverOp or to
@@ -118,7 +124,7 @@ abstract contract GasAccounting is SafetyLocks {
         // Solver can only approve up to their bonded balance, not more
         if (maxApprovedGasSpend > _bondedBalance) maxApprovedGasSpend = _bondedBalance;
 
-        uint256 _deductions = claims() + withdrawals() + fees() - writeoffs();
+        uint256 _deductions = _deficit();
         uint256 _additions = deposits() + msg.value;
 
         // Add msg.value to solver's deposits
@@ -405,9 +411,12 @@ abstract contract GasAccounting is SafetyLocks {
                 revert InsufficientTotalBalance(_amountSolverPays - _amountSolverReceives);
             }
 
-            uint256 _deficit = _assign(_winningSolver, _amountSolverPays - _amountSolverReceives, _adjustedClaims, true);
-            if (_deficit > claimsPaidToBundler) revert InsufficientTotalBalance(_deficit - claimsPaidToBundler);
-            claimsPaidToBundler -= _deficit;
+            uint256 _currentDeficit =
+                _assign(_winningSolver, _amountSolverPays - _amountSolverReceives, _adjustedClaims, true);
+            if (_currentDeficit > claimsPaidToBundler) {
+                revert InsufficientTotalBalance(_currentDeficit - claimsPaidToBundler);
+            }
+            claimsPaidToBundler -= _currentDeficit;
         } else {
             _credit(_winningSolver, _amountSolverReceives - _amountSolverPays, _adjustedClaims);
         }
@@ -443,10 +452,14 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param calldataLength The length of the `data` field in the SolverOperation.
     /// @return calldataCost The gas cost of the calldata used to execute the SolverOperation.
     function _getCalldataCost(uint256 calldataLength) internal view returns (uint256 calldataCost) {
-        // NOTE: Alter this for L2s.
-
-        // _SOLVER_OP_BASE_CALLDATA = SolverOperation calldata length excluding solverOp.data
-        calldataCost = (calldataLength + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM * tx.gasprice;
+        if (L2_GAS_CALCULATOR == address(0)) {
+            // Default to using mainnet gas calculations
+            // _SOLVER_OP_BASE_CALLDATA = SolverOperation calldata length excluding solverOp.data
+            calldataCost = (calldataLength + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM * tx.gasprice;
+        } else {
+            calldataCost =
+                IL2GasCalculator(L2_GAS_CALCULATOR).getCalldataCost(calldataLength + _SOLVER_OP_BASE_CALLDATA);
+        }
     }
 
     /// @notice Checks if the current balance is reconciled.
@@ -454,6 +467,6 @@ abstract contract GasAccounting is SafetyLocks {
     /// correct.
     /// @return True if the balance is reconciled, false otherwise.
     function _isBalanceReconciled() internal view returns (bool) {
-        return deposits() >= claims() + withdrawals() + fees() - writeoffs();
+        return deposits() >= _deficit();
     }
 }

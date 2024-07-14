@@ -12,9 +12,10 @@ contract TestAtlas is Atlas {
         address verification,
         address simulator,
         address initialSurchargeRecipient,
+        address l2GasCalculator,
         address executionTemplate
     )
-        Atlas(escrowDuration, verification, simulator, initialSurchargeRecipient, executionTemplate)
+        Atlas(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator, executionTemplate)
     { }
 
     // Public functions to expose internal transient helpers for testing
@@ -64,5 +65,27 @@ contract TestAtlas is Atlas {
 
     function setDeposits(uint256 newDeposits) public {
         _setDeposits(newDeposits);
+    }
+
+    // View functions
+
+    function getClaims() external view returns (uint256) {
+        return claims();
+    }
+
+    function getFees() external view returns (uint256) {
+        return fees();
+    }
+
+    function getWriteoffs() external view returns (uint256) {
+        return writeoffs();
+    }
+
+    function getWithdrawals() external view returns (uint256) {
+        return withdrawals();
+    }
+
+    function getDeposits() external view returns (uint256) {
+        return deposits();
     }
 }

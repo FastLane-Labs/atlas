@@ -43,7 +43,8 @@ contract DAppIntegrationTest is Test {
             verification: address(atlasVerification),
             simulator: address(0),
             executionTemplate: address(execEnvTemplate),
-            initialSurchargeRecipient: atlasDeployer
+            initialSurchargeRecipient: atlasDeployer,
+            l2GasCalculator: address(0)
         });
 
         assertEq(address(atlas), expectedAtlasAddr, "Atlas address should be as expected");

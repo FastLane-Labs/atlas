@@ -87,14 +87,8 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
         require(msg.sender == ATLAS, "SwapIntentDAppControl: InvalidSender");
         require(address(this) != CONTROL, "SwapIntentDAppControl: MustBeDelegated");
 
-        address user = _user();
-
-        require(
-            _availableFundsERC20(
-                swapIntent.tokenUserSells, user, swapIntent.maxAmountUserSells, ExecutionPhase.PreSolver
-            ),
-            "SwapIntentDAppControl: SellFundsUnavailable"
-        );
+        // Transfer to the Execution Environment the amount that the solver is invert bidding
+        _transferUserERC20(swapIntent.tokenUserSells, address(this), swapIntent.maxAmountUserSells);
 
         return SwapIntent({
             tokenUserBuys: swapIntent.tokenUserBuys,
@@ -123,11 +117,13 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
         require(solverOp.bidAmount <= swapData.maxAmountUserSells, "SwapIntentInvertBid: BidTooHigh");
 
         if (_solverBidRetrievalRequired) {
-            // Pull the tokens from the user and approve the solver to spend them
-            _getAndApproveUserERC20(swapData.tokenUserSells, solverOp.bidAmount, solverTo);
+            // Approve solver to take their bidAmount of the token the user is selling
+            // _getAndApproveUserERC20(swapData.tokenUserSells, solverOp.bidAmount, solverTo);
+            SafeTransferLib.safeApprove(swapData.tokenUserSells, solverTo, solverOp.bidAmount);
         } else {
             // Optimistically transfer to the solver contract the amount that the solver is invert bidding
-            _transferUserERC20(swapData.tokenUserSells, solverTo, solverOp.bidAmount);
+            // _transferUserERC20(swapData.tokenUserSells, solverTo, solverOp.bidAmount);
+            SafeTransferLib.safeTransfer(swapData.tokenUserSells, solverTo, solverOp.bidAmount);
         }
     }
 
@@ -161,11 +157,11 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
     * @param bidAmount The winning bid amount
     * @param _
     */
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
+    function _allocateValueCall(address bidToken, uint256, bytes calldata) internal override {
         if (bidToken == address(0)) {
-            SafeTransferLib.safeTransferETH(_user(), bidAmount);
+            SafeTransferLib.safeTransferETH(_user(), address(this).balance);
         } else {
-            SafeTransferLib.safeTransfer(bidToken, _user(), bidAmount);
+            SafeTransferLib.safeTransfer(bidToken, _user(), IERC20(bidToken).balanceOf(address(this)));
         }
     }
 

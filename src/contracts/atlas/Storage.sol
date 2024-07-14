@@ -16,6 +16,7 @@ import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.
 contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     IAtlasVerification public immutable VERIFICATION;
     address public immutable SIMULATOR;
+    address public immutable L2_GAS_CALCULATOR;
     uint256 public immutable ESCROW_DURATION;
 
     // AtlETH public constants
@@ -57,12 +58,14 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         uint256 escrowDuration,
         address verification,
         address simulator,
-        address initialSurchargeRecipient
+        address initialSurchargeRecipient,
+        address l2GasCalculator
     )
         payable
     {
         VERIFICATION = IAtlasVerification(verification);
         SIMULATOR = simulator;
+        L2_GAS_CALCULATOR = l2GasCalculator;
         ESCROW_DURATION = escrowDuration;
 
         // Gas Accounting
@@ -128,26 +131,6 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         return _isUnlocked();
     }
 
-    function claims() public view returns (uint256) {
-        return uint256(_tload(_T_CLAIMS_SLOT));
-    }
-
-    function fees() public view returns (uint256) {
-        return uint256(_tload(_T_FEES_SLOT));
-    }
-
-    function writeoffs() public view returns (uint256) {
-        return uint256(_tload(_T_WRITEOFFS_SLOT));
-    }
-
-    function withdrawals() public view returns (uint256) {
-        return uint256(_tload(_T_WITHDRAWALS_SLOT));
-    }
-
-    function deposits() public view returns (uint256) {
-        return uint256(_tload(_T_DEPOSITS_SLOT));
-    }
-
     /// @notice Returns information about the current state of the solver lock.
     /// @return currentSolver Address of the current solver.
     /// @return calledBack Boolean indicating whether the solver has called back via `reconcile`.
@@ -159,6 +142,26 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     // ---------------------------------------------------- //
     //              Transient Internal Getters              //
     // ---------------------------------------------------- //
+
+    function claims() internal view returns (uint256) {
+        return uint256(_tload(_T_CLAIMS_SLOT));
+    }
+
+    function fees() internal view returns (uint256) {
+        return uint256(_tload(_T_FEES_SLOT));
+    }
+
+    function writeoffs() internal view returns (uint256) {
+        return uint256(_tload(_T_WRITEOFFS_SLOT));
+    }
+
+    function withdrawals() internal view returns (uint256) {
+        return uint256(_tload(_T_WITHDRAWALS_SLOT));
+    }
+
+    function deposits() internal view returns (uint256) {
+        return uint256(_tload(_T_DEPOSITS_SLOT));
+    }
 
     function _lock() internal view returns (address activeEnvironment, uint32 callConfig, uint8 phase) {
         bytes32 _lockData = _tload(_T_LOCK_SLOT);

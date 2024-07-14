@@ -37,7 +37,6 @@ contract SwapIntentTest is BaseTest {
     }
 
     function testAtlasSwapIntentInvertBid_solverBidRetreivalNotRequired_SkipCoverage() public {
-        vm.skip(true);
         vm.startPrank(governanceEOA);
         SwapIntentInvertBidDAppControl controlContract = new SwapIntentInvertBidDAppControl(address(atlas), false);
         address control = address(controlContract);
@@ -73,7 +72,6 @@ contract SwapIntentTest is BaseTest {
     }
 
     function testAtlasSwapIntentInvertBid_solverBidRetreivalNotRequired_multipleSolvers_SkipCoverage() public {
-        vm.skip(true);
         vm.startPrank(governanceEOA);
         SwapIntentInvertBidDAppControl controlContract = new SwapIntentInvertBidDAppControl(address(atlas), false);
         address control = address(controlContract);
@@ -114,7 +112,6 @@ contract SwapIntentTest is BaseTest {
     }
 
     function testAtlasSwapIntentInvertBid_solverBidRetreivalRequired_SkipCoverage() public {
-        vm.skip(true);
         vm.startPrank(governanceEOA);
         SwapIntentInvertBidDAppControl controlContract = new SwapIntentInvertBidDAppControl(address(atlas), true);
         address control = address(controlContract);
