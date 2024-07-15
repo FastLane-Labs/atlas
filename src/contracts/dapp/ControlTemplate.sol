@@ -59,9 +59,7 @@ abstract contract DAppControlTemplate {
     //
     // DApp exposure: Trustless
     // User exposure: Trustless
-    function _checkUserOperation(UserOperation memory) internal virtual {
-        revert AtlasErrors.NotImplemented();
-    }
+    function _checkUserOperation(UserOperation memory) internal virtual { }
 
     /////////////////////////////////////////////////////////
     //                MEV ALLOCATION                       //
