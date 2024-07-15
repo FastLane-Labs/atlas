@@ -213,7 +213,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     /// @notice External function to call the internal _verifyCallConfig function
     /// @param callConfig The call configuration struct to verify.
     /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
-    function verifyCallConfig(uint32 callConfig) external returns (ValidCallsResult) {
+    function verifyCallConfig(uint32 callConfig) external pure returns (ValidCallsResult) {
         return _verifyCallConfig(callConfig);
     }
 
