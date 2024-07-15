@@ -59,7 +59,7 @@ contract MockGasAccounting is TestAtlas, BaseTest {
         _handleSolverAccounting(solverOp, gasWaterMark, result, includeCalldata);
     }
 
-    function settle(address winningSolver, address bundler) external returns (uint256, uint256) {
+    function settle(address bundler) external returns (uint256, uint256) {
         Context memory ctx = buildContext(bundler, true, true, 0, 1);
 
         return _settle(ctx, MOCK_SOLVER_GAS_LIMIT);
@@ -149,11 +149,11 @@ contract MockGasAccounting is TestAtlas, BaseTest {
 }
 
 contract MockGasCalculator is IL2GasCalculator, Test {
-    function getCalldataCost(uint256 length) external view returns (uint256 calldataCostETH) {
+    function getCalldataCost(uint256 length) external pure returns (uint256 calldataCostETH) {
         calldataCostETH = length * 16;
     }
 
-    function initialGasUsed(uint256 calldataLength) external view returns (uint256 gasUsed) {
+    function initialGasUsed(uint256 calldataLength) external pure returns (uint256 gasUsed) {
         gasUsed = calldataLength * 16;
     }
 }
@@ -240,6 +240,49 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(mockGasAccounting.getDeposits(), contributeValue);
     }
 
+    function test_multipleContributes() public {
+        // Set up the environment for multiple valid contribute calls
+        uint256 firstContributeValue = 1000;
+        uint256 secondContributeValue = 1500;
+        uint256 totalContributeValue = firstContributeValue + secondContributeValue;
+
+        deal(executionEnvironment, firstContributeValue + secondContributeValue);
+
+        mockGasAccounting.setLock(executionEnvironment, 0, uint8(ExecutionPhase.SolverOperation));
+
+        // Perform the first valid contribute call
+        vm.prank(executionEnvironment);
+        mockGasAccounting.contribute{ value: firstContributeValue }();
+
+        // Verify the balances after the first contribution
+        assertEq(address(mockGasAccounting).balance, firstContributeValue);
+        assertEq(mockGasAccounting.getDeposits(), firstContributeValue);
+
+        // Perform the second valid contribute call
+        vm.prank(executionEnvironment);
+        mockGasAccounting.contribute{ value: secondContributeValue }();
+
+        // Verify the balances after the second contribution
+        assertEq(address(mockGasAccounting).balance, totalContributeValue);
+        assertEq(mockGasAccounting.getDeposits(), totalContributeValue);
+    }
+
+    function test_contribute_withZeroValue() public {
+        // Set up the environment for the first valid contribute call
+        uint256 contributeValue = 0;
+        deal(executionEnvironment, contributeValue);
+
+        mockGasAccounting.setLock(executionEnvironment, 0, uint8(ExecutionPhase.SolverOperation));
+
+        // Perform the first valid contribute call
+        vm.prank(executionEnvironment);
+        mockGasAccounting.contribute{ value: contributeValue }();
+
+        // Verify the balances after the contribution is zero
+        assertEq(address(mockGasAccounting).balance, contributeValue);
+        assertEq(mockGasAccounting.getDeposits(), contributeValue);
+    }
+
     function test_borrow_preOpsPhase() public {
         uint256 borrowedAmount = 1e18;
 
@@ -252,6 +295,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(
             solverOneEOA.balance, borrowedAmount, "Execution environment balance should be equal to borrowed amount"
         );
+        assertEq(borrowedAmount, mockGasAccounting.getWithdrawals(), "Withdrawals should be equal to borrowed amount");
     }
 
     function test_borrow_userOperationPhase() public {
@@ -268,6 +312,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             borrowedAmount,
             "Execution environment balance should be equal to borrowed amount"
         );
+        assertEq(borrowedAmount, mockGasAccounting.getWithdrawals(), "Withdrawals should be equal to borrowed amount");
     }
 
     function test_borrow_preSolverPhase() public {
@@ -284,13 +329,13 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             borrowedAmount,
             "Execution environment balance should be equal to borrowed amount"
         );
+        assertEq(borrowedAmount, mockGasAccounting.getWithdrawals(), "Withdrawals should be equal to borrowed amount");
     }
 
     function test_borrow_solverOperationPhase() public {
         uint256 borrowedAmount = 1e18;
 
         fundContract(borrowedAmount);
-
         mockGasAccounting.setLock(executionEnvironment, 0, uint8(ExecutionPhase.SolverOperation));
         vm.prank(executionEnvironment);
         mockGasAccounting.borrow(borrowedAmount);
@@ -300,11 +345,12 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             borrowedAmount,
             "Execution environment balance should be equal to borrowed amount"
         );
+        assertEq(borrowedAmount, mockGasAccounting.getWithdrawals(), "Withdrawals should be equal to borrowed amount");
     }
 
     function test_borrow_postSolverPhase_reverts() public {
         uint256 borrowedAmount = 1e18;
-
+        uint256 withdrawalsBefore = mockGasAccounting.getWithdrawals();
         fundContract(borrowedAmount);
 
         mockGasAccounting.setLock(executionEnvironment, 0, uint8(ExecutionPhase.PostSolver));
@@ -313,11 +359,12 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         mockGasAccounting.borrow(borrowedAmount);
 
         assertEq(executionEnvironment.balance, 0, "Execution environment balance should remain zero");
+        assertEq(withdrawalsBefore, mockGasAccounting.getWithdrawals(), "Withdrawals should remain unchanged");
     }
 
     function test_borrow_allocateValuePhase_reverts() public {
         uint256 borrowedAmount = 1e18;
-
+        uint256 withdrawalsBefore = mockGasAccounting.getWithdrawals();
         fundContract(borrowedAmount);
 
         mockGasAccounting.setLock(executionEnvironment, 0, uint8(ExecutionPhase.AllocateValue));
@@ -326,11 +373,12 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         mockGasAccounting.borrow(borrowedAmount);
 
         assertEq(executionEnvironment.balance, 0, "Execution environment balance should remain zero");
+        assertEq(withdrawalsBefore, mockGasAccounting.getWithdrawals(), "Withdrawals should remain unchanged");
     }
 
     function test_borrow_postOpsPhase_reverts() public {
         uint256 borrowedAmount = 1e18;
-
+        uint256 withdrawalsBefore = mockGasAccounting.getWithdrawals();
         fundContract(borrowedAmount);
 
         mockGasAccounting.setLock(executionEnvironment, 0, uint8(ExecutionPhase.PostOps));
@@ -339,6 +387,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         mockGasAccounting.borrow(borrowedAmount);
 
         assertEq(executionEnvironment.balance, 0, "Execution environment balance should remain zero");
+        assertEq(withdrawalsBefore, mockGasAccounting.getWithdrawals(), "Withdrawals should remain unchanged");
     }
 
     function test_multipleBorrows() public {
@@ -401,13 +450,17 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             expectedFinalContractBalance,
             "Final contract balance should be initial balance minus total borrowed amount"
         );
+        assertEq(
+            totalBorrowAmount, mockGasAccounting.getWithdrawals(), "Withdrawals should equal total borrowed amount"
+        );
     }
 
-    function test_shortfall() public {
+    function test_shortfall_initialClaimsAndContribution() public {
         // Ensure the execution environment starts with zero balance
         deal(executionEnvironment, 0);
 
         // Set initial claims in the contract
+        initialClaims = 1000;
         mockGasAccounting.setClaims(initialClaims);
 
         // Verify initial shortfall
@@ -418,6 +471,104 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         deal(executionEnvironment, initialClaims);
         vm.prank(executionEnvironment);
         mockGasAccounting.contribute{ value: initialClaims }();
+
+        // Verify shortfall after contribution
+        assertEq(mockGasAccounting.shortfall(), 0, "Shortfall should be zero after contribution");
+    }
+
+    function test_shortfall_claimsAndWithdrawals() public {
+        // Ensure the execution environment starts with zero balance
+        deal(executionEnvironment, 0);
+
+        // Set initial claims and withdrawals in the contract
+        initialClaims = 1000;
+        uint256 withdrawals = 500;
+        mockGasAccounting.setClaims(initialClaims);
+        mockGasAccounting.setWithdrawals(withdrawals);
+
+        // Verify initial shortfall
+        uint256 expectedShortfall = initialClaims + withdrawals;
+        assertEq(
+            mockGasAccounting.shortfall(), expectedShortfall, "Initial shortfall should be claims plus withdrawals"
+        );
+
+        // Contribute to the contract
+        mockGasAccounting.setLock(executionEnvironment, 0, uint8(ExecutionPhase.PreOps));
+        deal(executionEnvironment, expectedShortfall);
+        vm.prank(executionEnvironment);
+        mockGasAccounting.contribute{ value: expectedShortfall }();
+
+        // Verify shortfall after contribution
+        assertEq(mockGasAccounting.shortfall(), 0, "Shortfall should be zero after contribution");
+    }
+
+    function test_shortfall_claimsAndFees() public {
+        // Ensure the execution environment starts with zero balance
+        deal(executionEnvironment, 0);
+
+        // Set initial claims and fees in the contract
+        initialClaims = 1000;
+        uint256 fees = 200;
+        mockGasAccounting.setClaims(initialClaims);
+        mockGasAccounting.setFees(fees);
+
+        // Verify initial shortfall
+        uint256 expectedShortfall = initialClaims + fees;
+        assertEq(mockGasAccounting.shortfall(), expectedShortfall, "Initial shortfall should be claims plus fees");
+
+        // Contribute to the contract
+        mockGasAccounting.setLock(executionEnvironment, 0, uint8(ExecutionPhase.PreOps));
+        deal(executionEnvironment, expectedShortfall);
+        vm.prank(executionEnvironment);
+        mockGasAccounting.contribute{ value: expectedShortfall }();
+
+        // Verify shortfall after contribution
+        assertEq(mockGasAccounting.shortfall(), 0, "Shortfall should be zero after contribution");
+    }
+
+    function test_shortfall_claimsAndWriteoffs() public {
+        // Ensure the execution environment starts with zero balance
+        deal(executionEnvironment, 0);
+
+        // Set initial claims and writeoffs in the contract
+        initialClaims = 1000;
+        uint256 writeoffs = 300;
+        mockGasAccounting.setClaims(initialClaims);
+        mockGasAccounting.setWriteoffs(writeoffs);
+
+        // Verify initial shortfall
+        uint256 expectedShortfall = initialClaims - writeoffs;
+        assertEq(mockGasAccounting.shortfall(), expectedShortfall, "Initial shortfall should be claims minus writeoffs");
+
+        // Contribute to the contract
+        mockGasAccounting.setLock(executionEnvironment, 0, uint8(ExecutionPhase.PreOps));
+        deal(executionEnvironment, expectedShortfall);
+        vm.prank(executionEnvironment);
+        mockGasAccounting.contribute{ value: expectedShortfall }();
+
+        // Verify shortfall after contribution
+        assertEq(mockGasAccounting.shortfall(), 0, "Shortfall should be zero after contribution");
+    }
+
+    function test_shortfall_claimsAndDeposits() public {
+        // Ensure the execution environment starts with zero balance
+        deal(executionEnvironment, 0);
+
+        // Set initial claims and deposits in the contract
+        initialClaims = 1000;
+        uint256 deposits = 500;
+        mockGasAccounting.setClaims(initialClaims);
+        mockGasAccounting.setDeposits(deposits);
+
+        // Verify initial shortfall
+        uint256 expectedShortfall = initialClaims - deposits;
+        assertEq(mockGasAccounting.shortfall(), expectedShortfall, "Initial shortfall should be claims minus deposits");
+
+        // Contribute to the contract
+        mockGasAccounting.setLock(executionEnvironment, 0, uint8(ExecutionPhase.PreOps));
+        deal(executionEnvironment, expectedShortfall);
+        vm.prank(executionEnvironment);
+        mockGasAccounting.contribute{ value: expectedShortfall }();
 
         // Verify shortfall after contribution
         assertEq(mockGasAccounting.shortfall(), 0, "Shortfall should be zero after contribution");
@@ -482,11 +633,39 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertTrue(result > 0, "Reconcile should return a value greater than zero");
     }
 
-    function test_reconcile() public {
+    function test_reconcileWithoutETH() public {
         // Ensure the execution environment starts with zero balance
         deal(executionEnvironment, 0);
 
-        // Fund the contract to allow reconciliation
+        // Fund the contract initially
+        initialClaims = 1000;
+        mockGasAccounting.setDeposits(initialClaims);
+
+        // Set phase to SolverOperation and set solver lock
+        mockGasAccounting.setPhase(ExecutionPhase.SolverOperation);
+        mockGasAccounting.setSolverLock(solverOneEOA);
+        mockGasAccounting.setSolverTo(solverOneEOA);
+
+        // Call reconcile without sending additional ETH
+        vm.prank(solverOneEOA);
+        assertTrue(mockGasAccounting.reconcile(0) == 0, "Reconcile should return zero");
+
+        // Verify solver lock data
+        (address currentSolver, bool verified, bool fulfilled) = mockGasAccounting.solverLockData();
+        assertTrue(fulfilled, "Solver should be fulfilled");
+        assertTrue(verified, "Solver should be verified");
+        assertEq(currentSolver, solverOneEOA, "Current solver should match execution environment");
+
+        // Verify that deposits did not increase
+        assertEq(mockGasAccounting.getDeposits(), initialClaims, "Deposits should remain unchanged");
+    }
+
+    function test_reconcileWithETH() public {
+        // Ensure the execution environment starts with zero balance
+        deal(executionEnvironment, 0);
+
+        // Fund the execution environment to allow reconciliation
+        initialClaims = 1000;
         deal(executionEnvironment, initialClaims);
 
         // Set phase to SolverOperation and set solver lock
@@ -494,14 +673,18 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         mockGasAccounting.setSolverLock(solverOneEOA);
         mockGasAccounting.setSolverTo(solverOneEOA);
 
-        // Call reconcile with the correct execution environment
+        // Call reconcile with the correct execution environment and ETH sent as msg.value
         vm.prank(solverOneEOA);
         assertTrue(mockGasAccounting.reconcile{ value: initialClaims }(0) == 0, "Reconcile should return zero");
 
         // Verify solver lock data
         (address currentSolver, bool verified, bool fulfilled) = mockGasAccounting.solverLockData();
-        assertTrue(verified && fulfilled, "Solver should be verified and fulfilled");
+        assertTrue(fulfilled, "Solver should be fulfilled");
+        assertTrue(verified, "Solver should be verified");
         assertEq(currentSolver, solverOneEOA, "Current solver should match execution environment");
+
+        // Verify that deposits increased by the reconciled amount
+        assertEq(mockGasAccounting.getDeposits(), initialClaims, "Deposits should match the amount sent as msg.value");
     }
 
     function test_assign_zeroAmount() public {
