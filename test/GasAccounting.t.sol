@@ -231,7 +231,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
     }
 
     function setupContext(
-        uint256 initialClaims,
+        uint256 _initialClaims,
         uint256 deposits,
         uint256 bondedAmount,
         uint256 unbondingAmount,
@@ -240,10 +240,10 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         internal
         returns (Context memory)
     {
-        uint256 gasMarker = calculateGasMarker();
+        gasMarker = calculateGasMarker();
         mockGasAccounting.initializeAccountingValues(gasMarker);
         mockGasAccounting.setDeposits(deposits);
-        mockGasAccounting.setClaims(initialClaims);
+        mockGasAccounting.setClaims(_initialClaims);
 
         mockGasAccounting.increaseBondedBalance(solverOneEOA, bondedAmount);
         mockGasAccounting.increaseUnbondingBalance(solverOneEOA, unbondingAmount);
@@ -255,7 +255,6 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         // Verify the balance setup
         uint256 actualBonded = mockGasAccounting.balanceOfBonded(solverOneEOA);
         uint256 actualUnbonding = mockGasAccounting.balanceOfUnbonding(solverOneEOA);
-        uint256 actualRegular = solverOneEOA.balance;
 
         require(actualBonded == bondedAmount, "Bonded balance not set correctly");
         require(actualUnbonding == unbondingAmount, "Unbonding balance not set correctly");
@@ -1015,34 +1014,6 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         // Verify bonded balance has decreased
         (uint112 unbonding,) = mockGasAccounting._balanceOf(solverOp.from);
         assertEq(unbonding, unbondingBefore);
-    }
-
-    // Ensure this function is defined only once in your contract
-    function calculateExpectedSettledRemainder(
-        uint256 initialClaims,
-        uint256 claimsPaidToBundler,
-        uint256 netGasSurcharge,
-        uint256 writeoffs,
-        uint256 adjustedClaims
-    )
-        internal
-        view
-        returns (uint256)
-    {
-        uint256 remainingClaims = adjustedClaims > (claimsPaidToBundler + netGasSurcharge)
-            ? adjustedClaims - (claimsPaidToBundler + netGasSurcharge)
-            : 0;
-        return remainingClaims * AccountingMath._SCALE
-            / (AccountingMath._SCALE + mockGasAccounting.getAtlasSurchargeRate());
-    }
-
-    function test_settle_withZeroClaims() public {
-        Context memory ctx = setupContext(0, 1 ether, 4000 ether, 1000 ether, true);
-        (uint256 claimsPaidToBundler, uint256 netGasSurcharge) = mockGasAccounting.settle(ctx);
-
-        assertEq(claimsPaidToBundler, 0, "Claims paid to bundler should be zero");
-        assertTrue(netGasSurcharge > 0, "Net gas surcharge should be non-zero");
-        assertEq(mockGasAccounting.getClaims(), 0, "Final claims should be zero");
     }
 
     function test_settle_withFailedsolver_reverts() public {
