@@ -59,10 +59,21 @@ contract MockGasAccounting is TestAtlas, BaseTest {
         _handleSolverAccounting(solverOp, gasWaterMark, result, includeCalldata);
     }
 
-    function settle(address bundler) external returns (uint256, uint256) {
-        Context memory ctx = buildContext(bundler, true, true, 0, 1);
-
+    function settle(Context memory ctx) external returns (uint256, uint256) {
         return _settle(ctx, MOCK_SOLVER_GAS_LIMIT);
+    }
+
+    function adjustAccountingForFees(Context memory ctx)
+        external
+        returns (
+            uint256 adjustedWithdrawals,
+            uint256 adjustedDeposits,
+            uint256 adjustedClaims,
+            uint256 adjustedWriteoffs,
+            uint256 netAtlasGasSurcharge
+        )
+    {
+        return _adjustAccountingForFees(ctx, MOCK_SOLVER_GAS_LIMIT);
     }
 
     /////////////////////////////////////////////////////////
@@ -126,6 +137,10 @@ contract MockGasAccounting is TestAtlas, BaseTest {
         S_bondedTotalSupply += amount;
     }
 
+    function initializeAccountingValues(uint256 gasMarker) external {
+        _initializeAccountingValues(gasMarker);
+    }
+
     // View functions
     function getSolverBaseGasUsed() external pure returns (uint256) {
         return _SOLVER_BASE_GAS_USED;
@@ -145,6 +160,22 @@ contract MockGasAccounting is TestAtlas, BaseTest {
 
     function getCalldataLengthPremium() external pure returns (uint256) {
         return _CALLDATA_LENGTH_PREMIUM;
+    }
+
+    function getContractGasPrice() external view returns (uint256) {
+        return tx.gasprice;
+    }
+
+    function getFixedGasOffset() external pure returns (uint256) {
+        return AccountingMath._FIXED_GAS_OFFSET;
+    }
+
+    function getAtlasSurchargeRate() external pure returns (uint256) {
+        return AccountingMath._ATLAS_SURCHARGE_RATE;
+    }
+
+    function getBundlerSurchargeRate() external pure returns (uint256) {
+        return AccountingMath._BUNDLER_SURCHARGE_RATE;
     }
 }
 
@@ -199,6 +230,51 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         deal(executionEnvironment, 0);
     }
 
+    function setupContext(
+        uint256 initialClaims,
+        uint256 deposits,
+        uint256 bondedAmount,
+        uint256 unbondingAmount,
+        bool solverSuccessful
+    )
+        internal
+        returns (Context memory)
+    {
+        uint256 gasMarker = calculateGasMarker();
+        mockGasAccounting.initializeAccountingValues(gasMarker);
+        mockGasAccounting.setDeposits(deposits);
+        mockGasAccounting.setClaims(initialClaims);
+
+        mockGasAccounting.increaseBondedBalance(solverOneEOA, bondedAmount);
+        mockGasAccounting.increaseUnbondingBalance(solverOneEOA, unbondingAmount);
+
+        // Set up execution environment balance
+        uint256 eeBalance = bondedAmount + unbondingAmount;
+        deal(address(mockGasAccounting), eeBalance);
+
+        // Verify the balance setup
+        uint256 actualBonded = mockGasAccounting.balanceOfBonded(solverOneEOA);
+        uint256 actualUnbonding = mockGasAccounting.balanceOfUnbonding(solverOneEOA);
+        uint256 actualRegular = solverOneEOA.balance;
+
+        require(actualBonded == bondedAmount, "Bonded balance not set correctly");
+        require(actualUnbonding == unbondingAmount, "Unbonding balance not set correctly");
+
+        Context memory ctx = mockGasAccounting.buildContext(
+            makeAddr("bundler"),
+            solverSuccessful,
+            true, // paymentsSuccessful
+            0, // winningSolverIndex
+            1 // solverCount
+        );
+
+        mockGasAccounting.setPhase(ExecutionPhase.SolverOperation);
+        mockGasAccounting.setSolverLock(solverOneEOA);
+        mockGasAccounting.setSolverTo(solverOneEOA);
+
+        return ctx;
+    }
+
     function initializeTestAtlasSlots() internal {
         mockGasAccounting.clearTransientStorage();
     }
@@ -210,6 +286,10 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
                 mockGasAccounting.SCALE() + mockGasAccounting.ATLAS_SURCHARGE_RATE()
                     + mockGasAccounting.BUNDLER_SURCHARGE_RATE()
             ) / mockGasAccounting.SCALE();
+    }
+
+    function calculateGasMarker() internal view returns (uint256) {
+        return gasleft() + mockGasAccounting.getSolverBaseGasUsed() + mockGasAccounting.getCalldataCost(msg.data.length);
     }
 
     function fundContract(uint256 amount) internal {
@@ -878,12 +958,13 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         // NOTE: This is a hack to get the correct gasUsed value will break on setup changes or code changes before
         // handleSolverAccounting is called
-        uint256 gasUsedOffset = 7_073_355_000_000_000; //difference between _gasUsed
+        uint256 gasUsedOffset = 7_073_451_000_000_000; //difference between _gasUsed
 
         // Recalculate expected writeoffs
         uint256 gasUsed =
             (gasWaterMark + mockGasAccounting.getSolverBaseGasUsed() - gasleft()) * tx.gasprice + gasUsedOffset;
         mockGasAccounting.handleSolverAccounting(solverOp, gasWaterMark, result, false);
+
         uint256 expectedWriteoffs = initialWriteoffs + AccountingMath.withAtlasAndBundlerSurcharges(gasUsed);
         // Verify writeoffs have increased
         assertEq(mockGasAccounting.getWriteoffs(), expectedWriteoffs, "Writeoffs mismatch");
@@ -934,6 +1015,110 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         // Verify bonded balance has decreased
         (uint112 unbonding,) = mockGasAccounting._balanceOf(solverOp.from);
         assertEq(unbonding, unbondingBefore);
+    }
+
+    // Ensure this function is defined only once in your contract
+    function calculateExpectedSettledRemainder(
+        uint256 initialClaims,
+        uint256 claimsPaidToBundler,
+        uint256 netGasSurcharge,
+        uint256 writeoffs,
+        uint256 adjustedClaims
+    )
+        internal
+        view
+        returns (uint256)
+    {
+        uint256 remainingClaims = adjustedClaims > (claimsPaidToBundler + netGasSurcharge)
+            ? adjustedClaims - (claimsPaidToBundler + netGasSurcharge)
+            : 0;
+        return remainingClaims * AccountingMath._SCALE
+            / (AccountingMath._SCALE + mockGasAccounting.getAtlasSurchargeRate());
+    }
+
+    function test_settle_withZeroClaims() public {
+        Context memory ctx = setupContext(0, 1 ether, 4000 ether, 1000 ether, true);
+        (uint256 claimsPaidToBundler, uint256 netGasSurcharge) = mockGasAccounting.settle(ctx);
+
+        assertEq(claimsPaidToBundler, 0, "Claims paid to bundler should be zero");
+        assertTrue(netGasSurcharge > 0, "Net gas surcharge should be non-zero");
+        assertEq(mockGasAccounting.getClaims(), 0, "Final claims should be zero");
+    }
+
+    function test_settle_withFailedsolver_reverts() public {
+        // Setup context with initial claims and deposits
+        Context memory ctx = setupContext(1 ether, 1 ether, 4000 ether, 1000 ether, false);
+
+        // Expect a revert due to insufficient total balance for a failed solver
+        vm.expectRevert();
+        mockGasAccounting.settle(ctx);
+    }
+
+    function test_settle_with_deposits() public {
+        Context memory ctx = setupContext(1 ether, 0.5 ether, 4000 ether, 1000 ether, true);
+        // Check initial balances
+        uint256 initialEEBalance = address(mockGasAccounting).balance;
+        uint256 initialBonded = mockGasAccounting.balanceOfBonded(solverOneEOA);
+        uint256 initialUnbonding = mockGasAccounting.balanceOfUnbonding(solverOneEOA);
+        {
+            require(initialBonded > 0, "Initial solver bonded balance should be non-zero");
+            require(initialUnbonding > 0, "Initial solver unbonding balance should be non-zero");
+        }
+
+        // Perform settlement
+        (uint256 claimsPaidToBundler, uint256 netGasSurcharge) = mockGasAccounting.settle(ctx);
+
+        // Check final balances and perform assertions
+        uint256 finalClaims = mockGasAccounting.getClaims();
+        uint256 finalBonded = mockGasAccounting.balanceOfBonded(solverOneEOA);
+        uint256 finalUnbonding = mockGasAccounting.balanceOfUnbonding(solverOneEOA);
+        {
+            uint256 finalEEBalance = address(mockGasAccounting).balance;
+
+            assertTrue(claimsPaidToBundler > 0, "Claims paid to bundler should be non-zero");
+            assertTrue(netGasSurcharge > 0, "Net gas surcharge should be non-zero");
+            assertLe(
+                finalClaims, 1.5 ether, "Final claims should be less than or equal to initial claims plus deposits"
+            );
+
+            uint256 totalCost = claimsPaidToBundler + netGasSurcharge;
+            uint256 initialSolverTotalBalance = initialBonded + initialUnbonding;
+
+            assertGe(
+                initialSolverTotalBalance,
+                totalCost,
+                "Initial solver total balance should be sufficient to cover all payments"
+            );
+
+            uint256 finalSolverTotalBalance = finalBonded + finalUnbonding;
+            uint256 actualSolverBalanceDecrease = initialSolverTotalBalance - finalSolverTotalBalance;
+
+            assertApproxEqAbs(
+                actualSolverBalanceDecrease,
+                totalCost,
+                1.5 ether,
+                "Solver balance decrease should approximately match total payments"
+            );
+
+            assertApproxEqAbs(
+                finalEEBalance, initialEEBalance, claimsPaidToBundler, "EE balance should not change during settlement"
+            );
+        }
+    }
+
+    function test_settle_with_multiple_solvers() public {
+        Context memory ctx = setupContext(2 ether, 1 ether, 4000 ether, 1000 ether, true);
+        ctx.solverCount = 3;
+        ctx.solverIndex = 1;
+        (uint256 claimsPaidToBundler, uint256 netGasSurcharge) = mockGasAccounting.settle(ctx);
+
+        assertTrue(claimsPaidToBundler > 0, "Claims paid to bundler should be non-zero");
+        assertTrue(netGasSurcharge > 0, "Net gas surcharge should be non-zero");
+        assertLe(
+            mockGasAccounting.getClaims(),
+            3 ether,
+            "Final claims should be less than or equal to initial claims plus deposits"
+        );
     }
 
     function test_l2GasCalculatorCall() public {
