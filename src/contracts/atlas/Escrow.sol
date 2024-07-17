@@ -33,9 +33,10 @@ abstract contract Escrow is AtlETH {
         uint256 escrowDuration,
         address verification,
         address simulator,
-        address initialSurchargeRecipient
+        address initialSurchargeRecipient,
+        address l2GasCalculator
     )
-        AtlETH(escrowDuration, verification, simulator, initialSurchargeRecipient)
+        AtlETH(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
     {
         if (escrowDuration == 0) revert InvalidEscrowDuration();
     }
@@ -174,7 +175,7 @@ abstract contract Escrow is AtlETH {
         if (_result.canExecute()) {
             uint256 _gasLimit;
             // Verify gasLimit again
-            (_result, _gasLimit) = _validateSolverOpGas(dConfig, solverOp, _gasWaterMark, _result);
+            (_result, _gasLimit) = _validateSolverOpGasAndValue(dConfig, solverOp, _gasWaterMark, _result);
             _result |= _validateSolverOpDeadline(solverOp, dConfig);
 
             // Check for trusted operation hash
@@ -228,13 +229,18 @@ abstract contract Escrow is AtlETH {
         internal
         withLockPhase(ExecutionPhase.AllocateValue)
     {
-        (bool _success,) = ctx.executionEnvironment.call(
+        (bool _success, bytes memory _returnData) = ctx.executionEnvironment.call(
             abi.encodePacked(
                 abi.encodeCall(IExecutionEnvironment.allocateValue, (dConfig.bidToken, bidAmount, returnData)),
                 ctx.setAndPack(ExecutionPhase.AllocateValue)
             )
         );
 
+        // If the call from Atlas to EE succeeded, decode the return data to check if the allocateValue delegatecall
+        // from EE to DAppControl succeeded.
+        if (_success) _success = abi.decode(_returnData, (bool));
+
+        // Revert if allocateValue failed at any point, unless the call config allows allocate value failure.
         if (!_success && !dConfig.callConfig.allowAllocateValueFailure()) {
             if (ctx.isSimulation) revert AllocateValueSimFail();
             revert AllocateValueFail();
@@ -285,7 +291,7 @@ abstract contract Escrow is AtlETH {
     /// encountered.
     /// @return gasLimit The calculated gas limit for the SolverOperation, considering the operation's gas usage and
     /// the protocol's gas buffers.
-    function _validateSolverOpGas(
+    function _validateSolverOpGasAndValue(
         DAppConfig memory dConfig,
         SolverOperation calldata solverOp,
         uint256 gasWaterMark,
@@ -298,17 +304,6 @@ abstract contract Escrow is AtlETH {
         if (gasWaterMark < _VALIDATION_GAS_LIMIT + dConfig.solverGasLimit) {
             // Make sure to leave enough gas for dApp validation calls
             result |= 1 << uint256(SolverOutcome.UserOutOfGas);
-            return (result, gasLimit); // gasLimit = 0
-        }
-
-        if (solverOp.deadline != 0 && block.number > solverOp.deadline) {
-            result |= 1
-                << (
-                    dConfig.callConfig.allowsTrustedOpHash()
-                        ? uint256(SolverOutcome.DeadlinePassedAlt)
-                        : uint256(SolverOutcome.DeadlinePassed)
-                );
-
             return (result, gasLimit); // gasLimit = 0
         }
 
@@ -403,7 +398,7 @@ abstract contract Escrow is AtlETH {
         );
 
         _result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, _result);
-        (_result, _gasLimit) = _validateSolverOpGas(dConfig, solverOp, _gasWaterMark, _result);
+        (_result, _gasLimit) = _validateSolverOpGasAndValue(dConfig, solverOp, _gasWaterMark, _result);
         _result |= _validateSolverOpDeadline(solverOp, dConfig);
 
         // Verify the transaction.
@@ -416,7 +411,7 @@ abstract contract Escrow is AtlETH {
         }
 
         (bool _success, bytes memory _data) = address(this).call{ gas: _gasLimit }(
-            abi.encodeCall(this.solverCall, (ctx, solverOp, solverOp.bidAmount, _gasLimit, returnData))
+            abi.encodeCall(this.solverCall, (ctx, solverOp, solverOp.bidAmount, returnData))
         );
 
         // The `solverCall()` above should always revert as key.bidFind is always true when it's called in the context
@@ -508,9 +503,8 @@ abstract contract Escrow is AtlETH {
         // Calls the solverCall function, just below this function, which will handle calling solverPreTryCatch and
         // solverPostTryCatch via the ExecutionEnvironment, and in between those two hooks, the actual solver call
         // directly from Atlas to the solver contract (not via the ExecutionEnvironment).
-        (bool _success, bytes memory _data) = address(this).call{ gas: gasLimit }(
-            abi.encodeCall(this.solverCall, (ctx, solverOp, bidAmount, gasLimit, returnData))
-        );
+        (bool _success, bytes memory _data) =
+            address(this).call{ gas: gasLimit }(abi.encodeCall(this.solverCall, (ctx, solverOp, bidAmount, returnData)));
 
         if (_success) {
             // If solverCall() was successful, intentionally leave uint256 result unset as 0 indicates success.
@@ -550,14 +544,12 @@ abstract contract Escrow is AtlETH {
     /// @param ctx The Context struct containing lock data and the Execution Environment address.
     /// @param solverOp The SolverOperation to be executed.
     /// @param bidAmount The bid amount associated with the SolverOperation.
-    /// @param gasLimit The gas limit for executing the SolverOperation.
     /// @param returnData Data returned from previous call phases.
     /// @return solverTracker Additional data for handling the solver's bid in different scenarios.
     function solverCall(
         Context memory ctx,
         SolverOperation calldata solverOp,
         uint256 bidAmount,
-        uint256 gasLimit,
         bytes calldata returnData
     )
         external
@@ -607,7 +599,7 @@ abstract contract Escrow is AtlETH {
 
         // Optimism's SafeCall lib allows us to limit how much returndata gets copied to memory, to prevent OOG attacks.
         _success = solverOp.solver.safeCall(
-            gasLimit,
+            gasleft(),
             solverOp.value,
             abi.encodeCall(
                 ISolverContract.atlasSolverCall,

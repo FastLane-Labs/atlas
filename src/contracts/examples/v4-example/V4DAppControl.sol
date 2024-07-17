@@ -37,16 +37,13 @@ contract V4DAppControl is DAppControl {
     address public immutable hook;
     address public immutable v4Singleton;
 
-    // Storage lock
-    // keccak256(poolKey, executionEnvironment)
-    bytes32 public hashLock; // TODO: Transient storage <-
-
     // Map to track when "Non Adversarial" flow is allowed.
     // NOTE: This hook is meant to be used for multiple pairs
     // key: keccak(token0, token1, block.number)
     mapping(bytes32 => bool) public sequenceLock;
 
-    PoolKey internal _currentKey; // TODO: Transient storage <-
+    uint256 transient_slot_initialized = uint256(keccak256("V4DAppControl.initialized"));
+    uint256 transient_slot_hashLock = uint256(keccak256("V4DAppControl.hashLock"));
 
     constructor(
         address _atlas,
@@ -62,9 +59,9 @@ contract V4DAppControl is DAppControl {
                 trackPreOpsReturnData: true,
                 trackUserReturnData: false,
                 delegateUser: false,
-                preSolver: false,
-                postSolver: false,
-                requirePostOps: false,
+                requirePreSolver: false,
+                requirePostSolver: false,
+                requirePostOps: true,
                 zeroSolvers: true,
                 reuseUserOp: false,
                 userAuctioneer: true,
@@ -88,7 +85,7 @@ contract V4DAppControl is DAppControl {
     //                   ATLAS CALLS                       //
     /////////////////////////////////////////////////////////
 
-    function _checkUserOperation(UserOperation memory userOp) internal view {
+    function _checkUserOperation(UserOperation memory userOp) internal view override {
         require(bytes4(userOp.data) == SWAP, "ERR-H10 InvalidFunction");
         require(userOp.dapp == v4Singleton, "ERR-H11 InvalidTo"); // this is wrong
     }
@@ -99,14 +96,12 @@ contract V4DAppControl is DAppControl {
         // address(this) = ExecutionEnvironment
         // msg.sender = Atlas Escrow
 
-        // check if dapps using this DAppControl can handle the userOp
-        _checkUserOperation(userOp);
+        bool initialized;
+        assembly {
+            initialized := tload(transient_slot_initialized.slot)
+        }
 
-        require(!_currentKey.initialized, "ERR-H09 AlreadyInitialized");
-
-        // Verify that the swapper went through the FastLane Atlas MEV Auction
-        // and that DAppControl supplied a valid signature
-        require(msg.sender == ATLAS, "ERR-H00 InvalidCaller");
+        require(!initialized, "ERR-H09 AlreadyInitialized");
 
         (IPoolManager.PoolKey memory key, IPoolManager.SwapParams memory params) =
             abi.decode(userOp.data[4:], (IPoolManager.PoolKey, IPoolManager.SwapParams));
@@ -114,11 +109,9 @@ contract V4DAppControl is DAppControl {
         // Perform more checks and activate the lock
         V4DAppControl(hook).setLock(key);
 
-        // Store the key so that we can access it at verification
-        _currentKey = PoolKey({
-            initialized: true, // TODO: consider using a lock array like v4 so we can handle multiple?
-            key: key
-        });
+        assembly {
+            tstore(transient_slot_initialized.slot, 1)
+        }
 
         // Handle forwarding of token approvals, or token transfers.
         // NOTE: The user will have approved the ExecutionEnvironment in a prior call
@@ -165,7 +158,11 @@ contract V4DAppControl is DAppControl {
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
 
-        require(!_currentKey.initialized, "ERR-H09 AlreadyInitialized");
+        bool initialized;
+        assembly {
+            initialized := tload(transient_slot_initialized.slot)
+        }
+        require(!initialized, "ERR-H09 AlreadyInitialized");
 
         IPoolManager.PoolKey memory key; // todo: finish
 
@@ -185,12 +182,12 @@ contract V4DAppControl is DAppControl {
         sequenceLock[sequenceKey] = true;
     }
 
-    function _postOpsCall(bool solved, bytes calldata data) internal override returns (bool) {
+    function _postOpsCall(bool solved, bytes calldata data) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
 
-        if (!solved) return false;
+        if (!solved) revert();
 
         (bytes memory returnData) = abi.decode(data, (bytes));
 
@@ -198,9 +195,9 @@ contract V4DAppControl is DAppControl {
 
         V4DAppControl(hook).releaseLock(preOpsReturn.poolKey);
 
-        delete _currentKey;
-
-        return true;
+        assembly {
+            tstore(transient_slot_initialized.slot, 0)
+        }
     }
 
     /////////////// EXTERNAL CALLS //////////////////
@@ -214,10 +211,18 @@ contract V4DAppControl is DAppControl {
         require(address(this) == hook, "ERR-H00 InvalidCallee");
         require(hook == _control(), "ERR-H01 InvalidCaller");
         require(_phase() == uint8(ExecutionPhase.PreOps), "ERR-H02 InvalidLockStage");
+
+        bytes32 hashLock;
+        assembly {
+            hashLock := tload(transient_slot_hashLock.slot)
+        }
         require(hashLock == bytes32(0), "ERR-H03 AlreadyActive");
 
         // Set the storage lock to block reentry / concurrent trading
         hashLock = keccak256(abi.encode(key, msg.sender));
+        assembly {
+            tstore(transient_slot_hashLock.slot, hashLock)
+        }
     }
 
     function releaseLock(IPoolManager.PoolKey memory key) external {
@@ -230,10 +235,18 @@ contract V4DAppControl is DAppControl {
         require(address(this) == hook, "ERR-H20 InvalidCallee");
         require(hook == _control(), "ERR-H21 InvalidCaller");
         require(_phase() == uint8(ExecutionPhase.PostOps), "ERR-H22 InvalidLockStage");
+
+        bytes32 hashLock;
+        assembly {
+            hashLock := tload(transient_slot_hashLock.slot)
+        }
         require(hashLock == keccak256(abi.encode(key, msg.sender)), "ERR-H23 InvalidKey");
 
         // Release the storage lock
-        delete hashLock;
+        assembly {
+            tstore(transient_slot_hashLock.slot, 0)
+        }
+        //delete hashLock;
     }
 
     ///////////////// GETTERS & HELPERS // //////////////////

@@ -38,7 +38,7 @@ contract ExecutionBaseTest is BaseTest {
 
         bytes memory expected = bytes.concat(randomData, firstSet, secondSet);
 
-        bytes memory data = abi.encodeWithSelector(MockExecutionEnvironment.forward.selector, randomData);
+        bytes memory data = abi.encodeCall(MockExecutionEnvironment.forward, randomData);
         executeForwardCase(phase, "forward", data, _ctx, expected);
     }
 
@@ -59,6 +59,12 @@ contract ExecutionBaseTest is BaseTest {
         (, bytes memory result) = address(mockExecutionEnvironment).call(data);
         result = abi.decode(result, (bytes));
 
+        console.log("Expected:");
+        console.logBytes(expected);
+
+        console.log("Result:");
+        console.logBytes(result);
+
         assertEq(result, expected, testName);
     }
 
@@ -68,17 +74,17 @@ contract ExecutionBaseTest is BaseTest {
         returns (bytes memory firstSet, Context memory _ctx)
     {
         _ctx = Context({
-            executionEnvironment: address(0),
-            userOpHash: bytes32(0),
-            bundler: address(0),
+            executionEnvironment: address(123),
+            userOpHash: bytes32(uint256(456)),
+            bundler: address(789),
             solverSuccessful: false,
             paymentsSuccessful: true,
-            solverIndex: 0,
-            solverCount: 1,
+            solverIndex: 7,
+            solverCount: 11,
             phase: uint8(_phase),
             solverOutcome: 2,
             bidFind: true,
-            isSimulation: true,
+            isSimulation: false,
             callDepth: 1
         });
 
@@ -88,8 +94,7 @@ contract ExecutionBaseTest is BaseTest {
             _ctx.paymentsSuccessful,
             _ctx.solverIndex,
             _ctx.solverCount,
-            uint8(_ctx.phase),
-            uint8(0),
+            _ctx.phase,
             _ctx.solverOutcome,
             _ctx.bidFind,
             _ctx.isSimulation,

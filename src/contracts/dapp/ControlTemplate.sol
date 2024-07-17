@@ -6,8 +6,6 @@ import "../types/UserOperation.sol";
 import "../types/ConfigTypes.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
-import "forge-std/Test.sol";
-
 abstract contract DAppControlTemplate {
     uint32 internal constant DEFAULT_SOLVER_GAS_LIMIT = 1_000_000;
 
@@ -40,6 +38,28 @@ abstract contract DAppControlTemplate {
     function _preOpsCall(UserOperation calldata) internal virtual returns (bytes memory) {
         revert AtlasErrors.NotImplemented();
     }
+
+    /////////////////////////////////////////////////////////
+    //         CHECK USER OPERATION                        //
+    /////////////////////////////////////////////////////////
+    //
+    // PreOps:
+    // Data should be decoded as:
+    //
+    //     bytes memory userOpData
+    //
+
+    // _checkUserOperation
+    // Details:
+    //  preOps/delegate =
+    //      Inputs: User's calldata
+    //      Function: Executing the function set by DAppControl
+    //      Container: Inside of the FastLane ExecutionEnvironment
+    //      Access: With storage access (read + write) only to the ExecutionEnvironment
+    //
+    // DApp exposure: Trustless
+    // User exposure: Trustless
+    function _checkUserOperation(UserOperation memory) internal virtual { }
 
     /////////////////////////////////////////////////////////
     //                MEV ALLOCATION                       //
@@ -77,6 +97,10 @@ abstract contract DAppControlTemplate {
     //      NOTE: This happens *inside* of the solver's try/catch wrapper
     //      and is designed to give the solver everything they need to fulfill
     //      the user's 'intent.'
+    //      NOTE: If using invertsBid mode, the inventory being invert-bidded on should be in the ExecutionEnvironment
+    //      before the PreSolver phase - it should be moved in during the PreOps or UserOperation phases.
+    //      NOTE: If using invertsBid mode, the dapp should either transfer the inventory to the solver in this
+    //      PreSolver phase, or set an allowance so the solver can pull the tokens during their SolverOperation.
 
     function _preSolverCall(SolverOperation calldata, bytes calldata) internal virtual {
         revert AtlasErrors.NotImplemented();
@@ -120,7 +144,7 @@ abstract contract DAppControlTemplate {
     //      Function: Executing the function set by DAppControl
     //      Container: Inside of the FastLane ExecutionEnvironment
     //      Access: Storage access (read+write) to the ExecutionEnvironment contract
-    function _postOpsCall(bool, bytes calldata) internal virtual returns (bool) {
+    function _postOpsCall(bool, bytes calldata) internal virtual {
         revert AtlasErrors.NotImplemented();
     }
 

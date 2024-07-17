@@ -52,8 +52,8 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
                 trackPreOpsReturnData: false,
                 trackUserReturnData: true,
                 delegateUser: true,
-                preSolver: true,
-                postSolver: true,
+                requirePreSolver: true,
+                requirePostSolver: true,
                 requirePostOps: false,
                 zeroSolvers: false,
                 reuseUserOp: true,
@@ -87,14 +87,8 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
         require(msg.sender == ATLAS, "SwapIntentDAppControl: InvalidSender");
         require(address(this) != CONTROL, "SwapIntentDAppControl: MustBeDelegated");
 
-        address user = _user();
-
-        require(
-            _availableFundsERC20(
-                swapIntent.tokenUserSells, user, swapIntent.maxAmountUserSells, ExecutionPhase.PreSolver
-            ),
-            "SwapIntentDAppControl: SellFundsUnavailable"
-        );
+        // Transfer to the Execution Environment the amount that the solver is invert bidding
+        _transferUserERC20(swapIntent.tokenUserSells, address(this), swapIntent.maxAmountUserSells);
 
         return SwapIntent({
             tokenUserBuys: swapIntent.tokenUserBuys,
@@ -117,23 +111,19 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
     */
     function _preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
         address solverTo = solverOp.solver;
-        if (solverTo == address(this) || solverTo == _control() || solverTo == ATLAS) {
-            revert("Invalid solver address - solverOp.solver cannot be execution environment, dapp control or atlas");
-        }
-
         SwapIntent memory swapData = abi.decode(returnData, (SwapIntent));
 
         // The solver must be bidding less than the intent's maxAmountUserSells
         require(solverOp.bidAmount <= swapData.maxAmountUserSells, "SwapIntentInvertBid: BidTooHigh");
 
         if (_solverBidRetrievalRequired) {
-            // Optimistically transfer to the execution environment the amount that the solver is invert bidding
-            _transferUserERC20(swapData.tokenUserSells, address(this), solverOp.bidAmount);
-            // Approve the solver to retrieve the bid amount from ee
+            // Approve solver to take their bidAmount of the token the user is selling
+            // _getAndApproveUserERC20(swapData.tokenUserSells, solverOp.bidAmount, solverTo);
             SafeTransferLib.safeApprove(swapData.tokenUserSells, solverTo, solverOp.bidAmount);
         } else {
             // Optimistically transfer to the solver contract the amount that the solver is invert bidding
-            _transferUserERC20(swapData.tokenUserSells, solverTo, solverOp.bidAmount);
+            // _transferUserERC20(swapData.tokenUserSells, solverTo, solverOp.bidAmount);
+            SafeTransferLib.safeTransfer(swapData.tokenUserSells, solverTo, solverOp.bidAmount);
         }
     }
 
@@ -164,14 +154,14 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
     * @dev It transfers all the available bid tokens on the contract (instead of only the bid amount,
     *      to avoid leaving any dust on the contract)
     * @param bidToken The address of the token used for the winning solver operation's bid
-    * @param _
+    * @param bidAmount The winning bid amount
     * @param _
     */
     function _allocateValueCall(address bidToken, uint256, bytes calldata) internal override {
-        if (bidToken != address(0)) {
-            SafeTransferLib.safeTransfer(bidToken, _user(), IERC20(bidToken).balanceOf(address(this)));
-        } else {
+        if (bidToken == address(0)) {
             SafeTransferLib.safeTransferETH(_user(), address(this).balance);
+        } else {
+            SafeTransferLib.safeTransfer(bidToken, _user(), IERC20(bidToken).balanceOf(address(this)));
         }
     }
 

@@ -49,6 +49,14 @@ contract AtlETHTest is BaseTest {
 
         assertEq(atlas.balanceOf(solverTwoEOA), solverTwoAtlETH / 2, "solverTwo's atlETH balance should be half of what it was");
 
+        // withdraw should be blocked during metacall
+        vm.revertTo(snapshot);
+        atlas.setLock(address(solverOneEOA), 0, 0);
+        vm.startPrank(solverOneEOA);
+        vm.expectRevert(AtlasErrors.InvalidLockState.selector);
+        atlas.withdraw(1e18);
+        vm.stopPrank();
+
         // Test withdraw 2x AtlETH balance - should revert with custom error
         vm.revertTo(snapshot);
         vm.startPrank(solverTwoEOA);
@@ -130,6 +138,12 @@ contract AtlETHTest is BaseTest {
         assertEq(atlas.accountLastActiveBlock(solverOneEOA), 0, "solverOne's last active block should be 0");
         assertEq(atlas.bondedTotalSupply(), 1e18, "total bonded atlETH supply should be 1 ETH");
 
+        // unbond should be blocked during metacall
+        atlas.setLock(address(solverOneEOA), 0, 0);
+        vm.expectRevert(AtlasErrors.InvalidLockState.selector);
+        atlas.unbond(1e18);
+        atlas.clearTransientStorage();
+
         // Reverts if unbonding more than bonded balance
         vm.expectRevert(); // Underflow error
         atlas.unbond(2e18);
@@ -156,6 +170,12 @@ contract AtlETHTest is BaseTest {
         assertEq(atlas.balanceOf(solverOneEOA), 0, "solverOne's atlETH balance should be 0");
         assertEq(atlas.balanceOfUnbonding(solverOneEOA), 1e18, "solverOne's unbonding atlETH should be 1 ETH");
         assertEq(atlas.bondedTotalSupply(), 1e18, "total bonded atlETH supply should be 1 ETH");
+
+        // redeem should be blocked during metacall
+        atlas.setLock(address(solverOneEOA), 0, 0);
+        vm.expectRevert(AtlasErrors.InvalidLockState.selector);
+        atlas.redeem(1e18);
+        atlas.clearTransientStorage();
 
         vm.expectRevert(AtlasErrors.EscrowLockActive.selector);
         atlas.redeem(1e18);

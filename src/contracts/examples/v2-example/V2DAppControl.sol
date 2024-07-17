@@ -31,6 +31,10 @@ interface IWETH {
     function withdraw(uint256 wad) external;
 }
 
+// A DAppControl that for Uniswap V2 style swaps
+// User call should be made to Uniswap V2 pair contracts (not router)
+// WARNING : Offers no slippage protection, so not recommended for production use.
+// For slippage protection, use V2RewardDAppControl in which user calls are made to router.
 contract V2DAppControl is DAppControl {
     uint256 public constant CONTROL_GAS_USAGE = 250_000;
 
@@ -58,8 +62,8 @@ contract V2DAppControl is DAppControl {
                 trackPreOpsReturnData: false,
                 trackUserReturnData: false,
                 delegateUser: false,
-                preSolver: false,
-                postSolver: false,
+                requirePreSolver: false,
+                requirePostSolver: false,
                 requirePostOps: false,
                 zeroSolvers: true,
                 reuseUserOp: false,
@@ -85,7 +89,7 @@ contract V2DAppControl is DAppControl {
         }
     }
 
-    function _checkUserOperation(UserOperation memory userOp) internal view {
+    function _checkUserOperation(UserOperation memory userOp) internal view override {
         require(bytes4(userOp.data) == SWAP, "ERR-H10 InvalidFunction");
 
         require(
@@ -97,9 +101,6 @@ contract V2DAppControl is DAppControl {
     }
 
     function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory) {
-        // check if dapps using this DAppControl can handle the userOp
-        _checkUserOperation(userOp);
-
         (
             uint256 amount0Out,
             uint256 amount1Out,

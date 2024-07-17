@@ -20,9 +20,10 @@ abstract contract SafetyLocks is Storage {
         uint256 escrowDuration,
         address verification,
         address simulator,
-        address initialSurchargeRecipient
+        address initialSurchargeRecipient,
+        address l2GasCalculator
     )
-        Storage(escrowDuration, verification, simulator, initialSurchargeRecipient)
+        Storage(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
     { }
 
     /// @notice Sets the Atlas lock to the specified execution environment.
@@ -32,15 +33,11 @@ abstract contract SafetyLocks is Storage {
         if (!_isUnlocked()) revert AlreadyInitialized();
 
         // Initialize the Lock
-        _setLock(
-            Lock({
-                activeEnvironment: executionEnvironment,
-                callConfig: dConfig.callConfig,
-                phase: dConfig.callConfig.needsPreOpsCall()
-                    ? uint8(ExecutionPhase.PreOps)
-                    : uint8(ExecutionPhase.UserOperation)
-            })
-        );
+        _setLock({
+            activeEnvironment: executionEnvironment,
+            callConfig: dConfig.callConfig,
+            phase: uint8(ExecutionPhase.PreOps)
+        });
     }
 
     modifier withLockPhase(ExecutionPhase executionPhase) {
@@ -50,7 +47,6 @@ abstract contract SafetyLocks is Storage {
 
     /// @notice Builds an Context struct with the specified parameters, called at the start of
     /// `_preOpsUserExecutionIteration`.
-    /// @param dConfig The DAppConfig of the current DAppControl contract.
     /// @param executionEnvironment The address of the current Execution Environment.
     /// @param userOpHash The UserOperation hash.
     /// @param bundler The address of the bundler.
@@ -58,7 +54,6 @@ abstract contract SafetyLocks is Storage {
     /// @param isSimulation Boolean indicating whether the call is a simulation or not.
     /// @return An Context struct initialized with the provided parameters.
     function _buildContext(
-        DAppConfig memory dConfig,
         address executionEnvironment,
         bytes32 userOpHash,
         address bundler,
@@ -77,7 +72,7 @@ abstract contract SafetyLocks is Storage {
             paymentsSuccessful: false,
             solverIndex: 0,
             solverCount: solverOpCount,
-            phase: dConfig.callConfig.needsPreOpsCall() ? uint8(ExecutionPhase.PreOps) : uint8(ExecutionPhase.UserOperation),
+            phase: uint8(ExecutionPhase.PreOps),
             solverOutcome: 0,
             bidFind: false,
             isSimulation: isSimulation,

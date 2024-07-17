@@ -51,8 +51,8 @@ contract SwapIntentDAppControl is DAppControl {
                 trackPreOpsReturnData: false,
                 trackUserReturnData: true,
                 delegateUser: true,
-                preSolver: true,
-                postSolver: true,
+                requirePreSolver: true,
+                requirePostSolver: true,
                 requirePostOps: false,
                 zeroSolvers: false,
                 reuseUserOp: true,
@@ -130,15 +130,10 @@ contract SwapIntentDAppControl is DAppControl {
     * @return true if the transfer was successful, false otherwise
     */
     function _preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal override {
-        address solverTo = solverOp.solver;
-        if (solverTo == address(this) || solverTo == _control() || solverTo == ATLAS) {
-            revert();
-        }
-
         SwapData memory swapData = abi.decode(returnData, (SwapData));
 
         // Optimistically transfer to the solver contract the tokens that the user is selling
-        _transferUserERC20(swapData.tokenUserSells, solverTo, swapData.amountUserSells);
+        _transferUserERC20(swapData.tokenUserSells, solverOp.solver, swapData.amountUserSells);
 
         return; // success
     }
@@ -179,11 +174,11 @@ contract SwapIntentDAppControl is DAppControl {
     * @param _
     * @param _
     */
-    function _allocateValueCall(address bidToken, uint256, bytes calldata) internal override {
-        if (bidToken != address(0)) {
-            SafeTransferLib.safeTransfer(bidToken, _user(), IERC20(bidToken).balanceOf(address(this)));
+    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
+        if (bidToken == address(0)) {
+            SafeTransferLib.safeTransferETH(_user(), bidAmount);
         } else {
-            SafeTransferLib.safeTransferETH(_user(), address(this).balance);
+            SafeTransferLib.safeTransfer(bidToken, _user(), bidAmount);
         }
     }
 

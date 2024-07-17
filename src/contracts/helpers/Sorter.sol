@@ -63,7 +63,7 @@ contract Sorter is AtlasConstants {
     /// @dev Verifies that the solver is eligible
     /// @dev Does not check solver signature as it might be trusted (solverOp.from == bundler)
     /// @dev Checks other than signature are same as those done in `verifySolverOp()` in AtlasVerification and
-    /// `_validateSolverOpGas()` and `_validateSolverOpDeadline()` in Atlas
+    /// `_validateSolverOpGasAndValue()` and `_validateSolverOpDeadline()` in Atlas
     function _verifySolverEligibility(
         DAppConfig memory dConfig,
         UserOperation calldata userOp,
@@ -142,8 +142,7 @@ contract Sorter is AtlasConstants {
                 solverOps[i].userOpHash == userOpHash && _verifyBidFormat(bidToken, solverOps[i])
                     && _verifySolverEligibility(dConfig, userOp, solverOps[i])
             ) {
-                sortingData[i] =
-                    SortingData({ amount: IDAppControl(dConfig.to).getBidValue(solverOps[i]), valid: true });
+                sortingData[i] = SortingData({ amount: solverOps[i].bidAmount, valid: true });
             } else {
                 sortingData[i] = SortingData({ amount: 0, valid: false });
                 unchecked {

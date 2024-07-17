@@ -111,7 +111,7 @@ contract AtlasVerificationBase is AtlasBaseTest {
     }
 
     function validDAppOperation(DAppConfig memory config, UserOperation memory userOp, SolverOperation[] memory solverOps) public returns (DAppOperationBuilder) {
-        bytes32 callChainHash = CallVerification.getCallChainHash(config, userOp, solverOps);
+        bytes32 callChainHash = CallVerification.getCallChainHash(userOp, solverOps);
         return new DAppOperationBuilder()
             .withFrom(governanceEOA)
             .withTo(address(atlas))
@@ -457,10 +457,9 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
     function test_verifyUserOp_UserFromInvalid_WhenFromInvalidSmartContract() public {
         defaultAtlasEnvironment();
 
-        address[] memory invalidFroms = new address[](3);
+        address[] memory invalidFroms = new address[](2);
         invalidFroms[0] = address(atlas);
         invalidFroms[1] = address(atlasVerification);
-        invalidFroms[2] = address(dAppControl);
 
         for (uint256 i = 0; i < invalidFroms.length; i++) {
             UserOperation memory userOp = validUserOperation()

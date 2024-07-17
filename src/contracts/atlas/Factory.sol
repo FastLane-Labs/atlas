@@ -39,9 +39,9 @@ abstract contract Factory {
     /// @notice Retrieves the address and configuration of an existing execution environment for a given user and DApp
     /// control contract.
     /// @param user The address of the user for whom the execution environment is being queried.
-    /// @param control The address of the DApp control contract associated with the execution environment.
+    /// @param control The address of the DAppControl contract associated with the execution environment.
     /// @return executionEnvironment The address of the queried execution environment.
-    /// @return callConfig The call configuration used by the execution environment, retrieved from the DApp control
+    /// @return callConfig The call configuration used by the execution environment, retrieved from the DAppControl
     /// contract.
     /// @return exists A boolean indicating whether the execution environment already exists (true) or not (false).
     function getExecutionEnvironment(
@@ -59,7 +59,7 @@ abstract contract Factory {
 
     /// @notice Gets an existing execution environment or creates a new one if it does not exist for the specified user
     /// operation.
-    /// @param userOp The user operation containing details about the user and the DApp control contract.
+    /// @param userOp The user operation containing details about the user and the DAppControl contract.
     /// @return executionEnvironment The address of the execution environment that was found or created.
     /// @return dConfig The DAppConfig for the execution environment, specifying how operations should be handled.
     function _getOrCreateExecutionEnvironment(UserOperation calldata userOp)
@@ -82,7 +82,7 @@ abstract contract Factory {
     /// address.
     /// @param user The address of the user for whom the execution environment is being set.
     /// @param control The address of the DAppControl contract providing the operational context.
-    /// @param callConfig CallConfig settings of the DApp control contract.
+    /// @param callConfig CallConfig settings of the DAppControl contract.
     /// @return executionEnvironment The address of the newly created or already existing execution environment.
     function _getOrCreateExecutionEnvironment(
         address user,

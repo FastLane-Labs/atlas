@@ -30,7 +30,7 @@ struct SolverTracker {
 /// @dev Typical usage looks like solverOutcome = (1 << SolverOutcome.InvalidSignature) | (1 <<
 /// SolverOutcome.InvalidUserHash) to indicate SolverOutcome.InvalidSignature and SolverOutcome.InvalidUserHash
 enum SolverOutcome {
-    // no refund (relay error or hostile user)
+    // No Refund (relay error or hostile user)
     InvalidSignature,
     InvalidUserHash,
     DeadlinePassedAlt,
@@ -49,11 +49,12 @@ enum SolverOutcome {
     InsufficientEscrow,
     GasPriceBelowUsers,
     CallValueTooHigh,
-    // execution, with full user refund
     PreSolverFailed,
+    // execution, with Full Refund
     SolverOpReverted,
     PostSolverFailed,
     BidNotPaid,
+    InvertedBidExceedsCeiling,
     BalanceNotReconciled,
     CallbackNotCalled,
     EVMError

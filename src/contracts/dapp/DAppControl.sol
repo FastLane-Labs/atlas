@@ -11,6 +11,7 @@ import "src/contracts/types/ConfigTypes.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
+import { ValidCallsResult } from "src/contracts/types/ValidCalls.sol";
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
 
 /// @title DAppControl
@@ -21,8 +22,6 @@ import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.
 abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     using CallBits for uint32;
 
-    uint8 private constant _CONTROL_DEPTH = 1 << 2;
-
     uint32 public immutable CALL_CONFIG;
     address public immutable CONTROL;
     address public immutable ATLAS_VERIFICATION;
@@ -31,21 +30,10 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     address public pendingGovernance;
 
     constructor(address atlas, address initialGovernance, CallConfig memory callConfig) ExecutionBase(atlas) {
-        if (callConfig.userNoncesSequential && callConfig.dappNoncesSequential) {
-            // Max one of user or dapp nonces can be sequential, not both
-            revert AtlasErrors.BothUserAndDAppNoncesCannotBeSequential();
-        }
-        if (callConfig.trackPreOpsReturnData && callConfig.trackUserReturnData) {
-            // Max one of preOps or userOp return data can be tracked, not both
-            revert AtlasErrors.BothPreOpsAndUserReturnDataCannotBeTracked();
-        }
-        if (callConfig.invertBidValue && callConfig.exPostBids) {
-            // If both invertBidValue and exPostBids are true, solver's retreived bid cannot be determined
-            revert AtlasErrors.InvertBidValueCannotBeExPostBids();
-        }
-        CALL_CONFIG = CallBits.encodeCallConfig(callConfig);
-        CONTROL = address(this);
         ATLAS_VERIFICATION = IAtlas(atlas).VERIFICATION();
+        CALL_CONFIG = CallBits.encodeCallConfig(callConfig);
+        _validateCallConfig(CALL_CONFIG);
+        CONTROL = address(this);
 
         governance = initialGovernance;
     }
@@ -83,6 +71,9 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         onlyPhase(ExecutionPhase.PreOps)
         returns (bytes memory)
     {
+        // check if dapps using this DApontrol can handle the userOp
+        _checkUserOperation(userOp);
+
         return _preOpsCall(userOp);
     }
 
@@ -97,6 +88,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         external
         payable
         validControl
+        validSolver(solverOp)
         onlyAtlasEnvironment
         onlyPhase(ExecutionPhase.PreSolver)
     {
@@ -114,6 +106,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         external
         payable
         validControl
+        validSolver(solverOp)
         onlyAtlasEnvironment
         onlyPhase(ExecutionPhase.PostSolver)
     {
@@ -138,9 +131,9 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     }
 
     /// @notice The postOpsCall hook which may be called as the last phase of a `metacall` transaction.
+    /// @dev Should revert if any DApp-specific checks fail.
     /// @param solved Boolean indicating whether a winning SolverOperation was executed successfully.
     /// @param data Data returned from the previous call phase.
-    /// @return Boolean indicating whether the postOpsCall was successful.
     function postOpsCall(
         bool solved,
         bytes calldata data
@@ -150,9 +143,8 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         validControl
         onlyAtlasEnvironment
         onlyPhase(ExecutionPhase.PostOps)
-        returns (bool)
     {
-        return _postOpsCall(solved, data);
+        _postOpsCall(solved, data);
     }
 
     function userDelegated() external view returns (bool delegated) {
@@ -198,6 +190,20 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     /// @return The address of the current governance account of this DAppControl contract.
     function getDAppSignatory() external view mustBeCalled returns (address) {
         return governance;
+    }
+
+    function _validateCallConfig(uint32 callConfig) internal view {
+        ValidCallsResult result = IAtlasVerification(ATLAS_VERIFICATION).verifyCallConfig(callConfig);
+
+        if (result == ValidCallsResult.InvalidCallConfig) {
+            revert AtlasErrors.BothPreOpsAndUserReturnDataCannotBeTracked();
+        }
+        if (result == ValidCallsResult.BothUserAndDAppNoncesCannotBeSequential) {
+            revert AtlasErrors.BothUserAndDAppNoncesCannotBeSequential();
+        }
+        if (result == ValidCallsResult.InvertBidValueCannotBeExPostBids) {
+            revert AtlasErrors.InvertBidValueCannotBeExPostBids();
+        }
     }
 
     /// @notice Starts the transfer of governance to a new address. Only callable by the current governance address.

@@ -21,8 +21,8 @@ contract CallBitsTest is Test {
             trackPreOpsReturnData: true,
             trackUserReturnData: false,
             delegateUser: true,
-            preSolver: false,
-            postSolver: true,
+            requirePreSolver: false,
+            requirePostSolver: true,
             requirePostOps: false,
             zeroSolvers: true,
             reuseUserOp: false,
@@ -45,8 +45,8 @@ contract CallBitsTest is Test {
             trackPreOpsReturnData: !callConfig1.trackPreOpsReturnData,
             trackUserReturnData: !callConfig1.trackUserReturnData,
             delegateUser: !callConfig1.delegateUser,
-            preSolver: !callConfig1.preSolver,
-            postSolver: !callConfig1.postSolver,
+            requirePreSolver: !callConfig1.requirePreSolver,
+            requirePostSolver: !callConfig1.requirePostSolver,
             requirePostOps: !callConfig1.requirePostOps,
             zeroSolvers: !callConfig1.zeroSolvers,
             reuseUserOp: !callConfig1.reuseUserOp,
@@ -88,8 +88,8 @@ contract CallBitsTest is Test {
         assertEq(decodedCallConfig.trackPreOpsReturnData, true, "trackPreOpsReturnData 1 incorrect");
         assertEq(decodedCallConfig.trackUserReturnData, false, "trackUserReturnData 1 incorrect");
         assertEq(decodedCallConfig.delegateUser, true, "delegateUser 1 incorrect");
-        assertEq(decodedCallConfig.preSolver, false, "preSolver 1 incorrect");
-        assertEq(decodedCallConfig.postSolver, true, "postSolver 1 incorrect");
+        assertEq(decodedCallConfig.requirePreSolver, false, "requirePreSolver 1 incorrect");
+        assertEq(decodedCallConfig.requirePostSolver, true, "requirePostSolver 1 incorrect");
         assertEq(decodedCallConfig.requirePostOps, false, "requirePostOps 1 incorrect");
         assertEq(decodedCallConfig.zeroSolvers, true, "zeroSolvers 1 incorrect");
         assertEq(decodedCallConfig.reuseUserOp, false, "reuseUserOp 1 incorrect");
@@ -112,8 +112,8 @@ contract CallBitsTest is Test {
         assertEq(decodedCallConfig.trackPreOpsReturnData, false, "trackPreOpsReturnData 2 incorrect");
         assertEq(decodedCallConfig.trackUserReturnData, true, "trackUserReturnData 2 incorrect");
         assertEq(decodedCallConfig.delegateUser, false, "delegateUser 2 incorrect");
-        assertEq(decodedCallConfig.preSolver, true, "preSolver 2 incorrect");
-        assertEq(decodedCallConfig.postSolver, false, "postSolver 2 incorrect");
+        assertEq(decodedCallConfig.requirePreSolver, true, "requirePreSolver 2 incorrect");
+        assertEq(decodedCallConfig.requirePostSolver, false, "requirePostSolver 2 incorrect");
         assertEq(decodedCallConfig.requirePostOps, true, "requirePostOps 2 incorrect");
         assertEq(decodedCallConfig.zeroSolvers, false, "zeroSolvers 2 incorrect");
         assertEq(decodedCallConfig.reuseUserOp, true, "reuseUserOp 2 incorrect");
@@ -137,8 +137,8 @@ contract CallBitsTest is Test {
         assertEq(encodedCallConfig.needsPreOpsReturnData(), true, "needsPreOpsReturnData 1 incorrect");
         assertEq(encodedCallConfig.needsUserReturnData(), false, "needsUserReturnData 1 incorrect");
         assertEq(encodedCallConfig.needsDelegateUser(), true, "needsDelegateUser 1 incorrect");
-        assertEq(encodedCallConfig.needsPreSolver(), false, "needsPreSolver 1 incorrect");
-        assertEq(encodedCallConfig.needsSolverPostCall(), true, "needsSolverPostCall 1 incorrect");
+        assertEq(encodedCallConfig.needsPreSolverCall(), false, "needsPreSolverCall 1 incorrect");
+        assertEq(encodedCallConfig.needsPostSolverCall(), true, "needsPostSolverCall 1 incorrect");
         assertEq(encodedCallConfig.needsPostOpsCall(), false, "needsPostOpsCall 1 incorrect");
         assertEq(encodedCallConfig.allowsZeroSolvers(), true, "allowsZeroSolvers 1 incorrect");
         assertEq(encodedCallConfig.allowsReuseUserOps(), false, "allowsReuseUserOps 1 incorrect");
@@ -161,8 +161,8 @@ contract CallBitsTest is Test {
         assertEq(encodedCallConfig.needsPreOpsReturnData(), false, "needsPreOpsReturnData 2 incorrect");
         assertEq(encodedCallConfig.needsUserReturnData(), true, "needsUserReturnData 2 incorrect");
         assertEq(encodedCallConfig.needsDelegateUser(), false, "needsDelegateUser 2 incorrect");
-        assertEq(encodedCallConfig.needsPreSolver(), true, "needsPreSolver 2 incorrect");
-        assertEq(encodedCallConfig.needsSolverPostCall(), false, "needsSolverPostCall 2 incorrect");
+        assertEq(encodedCallConfig.needsPreSolverCall(), true, "needsPreSolverCall 2 incorrect");
+        assertEq(encodedCallConfig.needsPostSolverCall(), false, "needsPostSolverCall 2 incorrect");
         assertEq(encodedCallConfig.needsPostOpsCall(), true, "needsPostOpsCall 2 incorrect");
         assertEq(encodedCallConfig.allowsZeroSolvers(), false, "allowsZeroSolvers 2 incorrect");
         assertEq(encodedCallConfig.allowsReuseUserOps(), true, "allowsReuseUserOps 2 incorrect");

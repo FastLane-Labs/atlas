@@ -30,12 +30,12 @@ struct CallConfig {
     // delegateUser: The userOp call is made using delegatecall from the Execution Environment. If false, userOp is
     // called using call.
     bool delegateUser;
-    // preSolver: The preSolver hook is executed before the solverOp is executed. If false, the preSolver hook is
+    // requirePreSolver: The preSolver hook is executed before the solverOp is executed. If false, the preSolver hook is
     // skipped.
-    bool preSolver;
-    // postSolver: The postSolver hook is executed after the solverOp is executed. If false, the postSolver hook is
-    // skipped.
-    bool postSolver;
+    bool requirePreSolver;
+    // requirePostSolver: The postSolver hook is executed after the solverOp is executed. If false, the postSolver hook
+    // is skipped.
+    bool requirePostSolver;
     // requirePostOps: The postOps hook is executed as the last step of the metacall. If false, the postOps hook is
     // skipped.
     bool requirePostOps;
@@ -85,8 +85,8 @@ enum CallConfigIndex {
     TrackPreOpsReturnData,
     TrackUserReturnData,
     DelegateUser,
-    PreSolver,
-    PostSolver,
+    RequirePreSolver,
+    RequirePostSolver,
     RequirePostOpsCall,
     ZeroSolvers,
     ReuseUserOp,

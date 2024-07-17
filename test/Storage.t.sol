@@ -92,7 +92,7 @@ contract StorageTest is BaseTest {
     }
 
     function test_storage_view_solverOpHashes() public {
-        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0));
+        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0), address(0));
         bytes32 testHash = keccak256(abi.encodePacked("test"));
         assertEq(mockStorage.solverOpHashes(testHash), false, "solverOpHashes[testHash] not false");
         mockStorage.setSolverOpHash(testHash);
@@ -100,7 +100,7 @@ contract StorageTest is BaseTest {
     }
 
     function test_storage_view_cumulativeSurcharge() public {
-        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0));
+        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0), address(0));
         assertEq(mockStorage.cumulativeSurcharge(), 0, "cumulativeSurcharge not 0");
         mockStorage.setCumulativeSurcharge(100);
         assertEq(mockStorage.cumulativeSurcharge(), 100, "cumulativeSurcharge not 100");
@@ -126,7 +126,7 @@ contract StorageTest is BaseTest {
         assertEq(callConfig, 0, "callConfig should start at 0");
         assertEq(phase, 0, "phase should start at 0");
 
-        atlas.setLock(Lock(address(1), 2, 3));
+        atlas.setLock(address(1), 2, 3);
         (activeEnv, callConfig, phase) = atlas.lock();
 
         assertEq(activeEnv, address(1), "activeEnv should be 1");
@@ -144,7 +144,7 @@ contract StorageTest is BaseTest {
     function test_storage_transient_isUnlocked() public {
         assertEq(atlas.isUnlocked(), true, "isUnlocked should start as true");
 
-        atlas.setLock(Lock(address(1), 0, 0));
+        atlas.setLock(address(1), 0, 0);
         assertEq(atlas.isUnlocked(), false, "isUnlocked should be false");
 
         atlas.clearTransientStorage();
@@ -153,7 +153,7 @@ contract StorageTest is BaseTest {
 
     function test_storage_transient_solverLockData() public {
         // MockStorage just used here to access AtlasConstants
-        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0));
+        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0), address(0));
         (address currentSolver, bool calledBack, bool fulfilled) = atlas.solverLockData();
 
         assertEq(currentSolver, address(0), "currentSolver should start at 0");
@@ -193,57 +193,57 @@ contract StorageTest is BaseTest {
     }
 
     function test_storage_transient_claims() public {
-        assertEq(atlas.claims(), 0, "claims should start at 0");
+        assertEq(atlas.getClaims(), 0, "claims should start at 0");
 
         atlas.setClaims(100);
-        assertEq(atlas.claims(), 100, "claims should be 100");
+        assertEq(atlas.getClaims(), 100, "claims should be 100");
 
         atlas.clearTransientStorage();
-        assertEq(atlas.claims(), 0, "claims should be 0 again");
+        assertEq(atlas.getClaims(), 0, "claims should be 0 again");
     }
 
     function test_storage_transient_fees() public {
-        assertEq(atlas.fees(), 0, "fees should start at 0");
+        assertEq(atlas.getFees(), 0, "fees should start at 0");
 
         atlas.setFees(100);
-        assertEq(atlas.fees(), 100, "fees should be 100");
+        assertEq(atlas.getFees(), 100, "fees should be 100");
 
         atlas.clearTransientStorage();
-        assertEq(atlas.fees(), 0, "fees should be 0 again");
+        assertEq(atlas.getFees(), 0, "fees should be 0 again");
     }
 
     function test_storage_transient_writeoffs() public {
-        assertEq(atlas.writeoffs(), 0, "writeoffs should start at 0");
+        assertEq(atlas.getWriteoffs(), 0, "writeoffs should start at 0");
 
         atlas.setWriteoffs(100);
-        assertEq(atlas.writeoffs(), 100, "writeoffs should be 100");
+        assertEq(atlas.getWriteoffs(), 100, "writeoffs should be 100");
 
         atlas.clearTransientStorage();
-        assertEq(atlas.writeoffs(), 0, "writeoffs should be 0 again");
+        assertEq(atlas.getWriteoffs(), 0, "writeoffs should be 0 again");
     }
 
     function test_storage_transient_withdrawals() public {
-        assertEq(atlas.withdrawals(), 0, "withdrawals should start at 0");
+        assertEq(atlas.getWithdrawals(), 0, "withdrawals should start at 0");
 
         atlas.setWithdrawals(100);
-        assertEq(atlas.withdrawals(), 100, "withdrawals should be 100");
+        assertEq(atlas.getWithdrawals(), 100, "withdrawals should be 100");
 
         atlas.clearTransientStorage();
-        assertEq(atlas.withdrawals(), 0, "withdrawals should be 0 again");
+        assertEq(atlas.getWithdrawals(), 0, "withdrawals should be 0 again");
     }
 
     function test_storage_transient_deposits() public {
-        assertEq(atlas.deposits(), 0, "deposits should start at 0");
+        assertEq(atlas.getDeposits(), 0, "deposits should start at 0");
 
         atlas.setDeposits(100);
-        assertEq(atlas.deposits(), 100, "deposits should be 100");
+        assertEq(atlas.getDeposits(), 100, "deposits should be 100");
 
         atlas.clearTransientStorage();
-        assertEq(atlas.deposits(), 0, "deposits should be 0 again");
+        assertEq(atlas.getDeposits(), 0, "deposits should be 0 again");
     }
 
     function test_storage_transient_solverTo() public {
-        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0));
+        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0), address(0));
         assertEq(mockStorage.solverTo(), address(0), "solverTo should start at 0");
 
         mockStorage.setSolverTo(userEOA);
@@ -254,10 +254,10 @@ contract StorageTest is BaseTest {
     }
 
     function test_storage_transient_activeEnvironment() public {
-        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0));
+        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0), address(0));
         assertEq(mockStorage.activeEnvironment(), address(0), "activeEnvironment should start at 0");
 
-        mockStorage.setLock(Lock(address(1), 0, 0));
+        mockStorage.setLock(address(1), 0, 0);
         assertEq(mockStorage.activeEnvironment(), address(1), "activeEnvironment should be 1");
 
         mockStorage.clearTransientStorage();
@@ -265,10 +265,10 @@ contract StorageTest is BaseTest {
     }
 
     function test_storage_transient_activeCallConfig() public {
-        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0));
+        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0), address(0));
         assertEq(mockStorage.activeCallConfig(), 0, "activeCallConfig should start at 0");
 
-        mockStorage.setLock(Lock(address(0), 1, 0));
+        mockStorage.setLock(address(0), 1, 0);
         assertEq(mockStorage.activeCallConfig(), 1, "activeCallConfig should be 1");
 
         mockStorage.clearTransientStorage();
@@ -276,10 +276,10 @@ contract StorageTest is BaseTest {
     }
 
     function test_storage_transient_phase() public {
-        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0));
+        MockStorage mockStorage = new MockStorage(DEFAULT_ESCROW_DURATION, address(0), address(0), address(0), address(0));
         assertEq(mockStorage.phase(), 0, "phase should start at 0");
 
-        mockStorage.setLock(Lock(address(0), 0, 1));
+        mockStorage.setLock(address(0), 0, 1);
         assertEq(mockStorage.phase(), 1, "phase should be 1");
 
         mockStorage.clearTransientStorage();
@@ -298,9 +298,10 @@ contract MockStorage is Storage {
         uint256 escrowDuration,
         address verification,
         address simulator,
-        address initialSurchargeRecipient
+        address initialSurchargeRecipient,
+        address l2GasCalculator
     )
-        Storage(escrowDuration, verification, simulator, initialSurchargeRecipient)
+        Storage(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
     { }
 
     function setSolverOpHash(bytes32 opHash) public {
@@ -334,13 +335,13 @@ contract MockStorage is Storage {
     }
 
     // Setter for the above 3 view functions
-    function setLock(Lock memory newLock) public {
-        _setLock(newLock);
+    function setLock(address activeEnv, uint32 callConfig, uint8 newPhase) public {
+        _setLock(activeEnv, callConfig, newPhase);
     }
 
     // To clear all transient storage vars
     function clearTransientStorage() public {
-        _setLock(Lock(address(0), 0, 0));
+        _setLock(address(0), 0, 0);
         _setSolverLock(0);
         _setSolverTo(address(0));
         _setClaims(0);
@@ -348,5 +349,27 @@ contract MockStorage is Storage {
         _setWriteoffs(0);
         _setWithdrawals(0);
         _setDeposits(0);
+    }
+
+    // View functions
+
+    function getClaims() external view returns (uint256) {
+        return claims();
+    }
+
+    function getFees() external view returns (uint256) {
+        return fees();
+    }
+
+    function getWriteoffs() external view returns (uint256) {
+        return writeoffs();
+    }
+
+    function getWithdrawals() external view returns (uint256) {
+        return withdrawals();
+    }
+
+    function getDeposits() external view returns (uint256) {
+        return deposits();
     }
 }

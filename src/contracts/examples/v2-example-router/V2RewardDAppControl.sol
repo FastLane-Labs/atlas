@@ -48,8 +48,8 @@ contract V2RewardDAppControl is DAppControl {
                 trackPreOpsReturnData: true,
                 trackUserReturnData: false,
                 delegateUser: false,
-                preSolver: false,
-                postSolver: false,
+                requirePreSolver: false,
+                requirePostSolver: false,
                 requirePostOps: true,
                 zeroSolvers: true,
                 reuseUserOp: false,
@@ -130,7 +130,7 @@ contract V2RewardDAppControl is DAppControl {
     //                     Atlas hooks                      //
     // ---------------------------------------------------- //
 
-    function _checkUserOperation(UserOperation memory userOp) internal view {
+    function _checkUserOperation(UserOperation memory userOp) internal view override {
         // User is only allowed to call UniswapV2Router02
         require(userOp.dapp == uniswapV2Router02, "V2RewardDAppControl: InvalidDestination");
     }
@@ -145,19 +145,11 @@ contract V2RewardDAppControl is DAppControl {
         _postOpsCall hook to refund leftover dust, if any
     */
     function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory) {
-        // check if dapps using this DAppControl can handle the userOp
-        _checkUserOperation(userOp);
-
         // The current hook is delegatecalled, so we need to call the userOp.control to access the mappings
         (address tokenSold, uint256 amountSold) = V2RewardDAppControl(userOp.control).getTokenSold(userOp.data);
 
-        if (tokenSold != address(0)) {
-            // Transfer tokens from user to ExecutionEnvironment
-            _transferUserERC20(tokenSold, address(this), amountSold);
-
-            // Approve UniswapV2Router02 to spend the tokens from ExecutionEnvironment
-            SafeTransferLib.safeApprove(tokenSold, uniswapV2Router02, amountSold);
-        }
+        // Pull the tokens from the user and approve UniswapV2Router02 to spend them
+        _getAndApproveUserERC20(tokenSold, amountSold, uniswapV2Router02);
 
         // Return tokenSold for the _postOpsCall hook to be able to refund dust
         return abi.encode(tokenSold);
@@ -170,13 +162,10 @@ contract V2RewardDAppControl is DAppControl {
         token, so we don't have any more steps to take here)
     * @param bidToken The address of the token used for the winning SolverOperation's bid
     * @param bidAmount The winning bid amount
+    * @param _
     */
     function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
         require(bidToken == REWARD_TOKEN, "V2RewardDAppControl: InvalidBidToken");
-
-        if (bidAmount == 0) {
-            return;
-        }
 
         address user = _user();
 
@@ -196,9 +185,8 @@ contract V2RewardDAppControl is DAppControl {
         function and the amount sold is less than the amountInMax)
     * @param data The address of the ERC20 token the user is selling (or address(0) for ETH), that was returned by the
         _preOpsCall hook
-    * @return Boolean indicating whether the postOpsCall was successful
     */
-    function _postOpsCall(bool, bytes calldata data) internal override returns (bool) {
+    function _postOpsCall(bool, bytes calldata data) internal override {
         address tokenSold = abi.decode(data, (address));
         uint256 balance;
 
@@ -214,8 +202,6 @@ contract V2RewardDAppControl is DAppControl {
                 SafeTransferLib.safeTransfer(tokenSold, _user(), balance);
             }
         }
-
-        return true;
     }
 
     // ---------------------------------------------------- //

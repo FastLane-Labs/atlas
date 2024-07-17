@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+//SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.25;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
@@ -13,9 +13,10 @@ abstract contract AtlETH is Permit69 {
         uint256 escrowDuration,
         address verification,
         address simulator,
-        address initialSurchargeRecipient
+        address initialSurchargeRecipient,
+        address l2GasCalculator
     )
-        Permit69(escrowDuration, verification, simulator, initialSurchargeRecipient)
+        Permit69(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
     { }
 
     /*//////////////////////////////////////////////////////////////
@@ -69,7 +70,7 @@ abstract contract AtlETH is Permit69 {
     /// @dev Burns the specified amount of atlETH tokens from the caller's balance and transfers the equivalent amount
     /// of ETH to the caller.
     /// @param amount The amount of atlETH tokens to redeem for ETH.
-    function withdraw(uint256 amount) external {
+    function withdraw(uint256 amount) external onlyWhenUnlocked {
         _burn(msg.sender, amount);
         SafeTransferLib.safeTransferETH(msg.sender, amount);
     }
@@ -151,13 +152,13 @@ abstract contract AtlETH is Permit69 {
     /// held by the sender. Unbonding AtlETH tokens can still be used by solvers while the unbonding
     /// process is ongoing, but adjustments may be made at withdrawal to ensure solvency.
     /// @param amount The amount of AtlETH tokens to unbond.
-    function unbond(uint256 amount) external {
+    function unbond(uint256 amount) external onlyWhenUnlocked {
         _unbond(msg.sender, amount);
     }
 
     /// @notice Redeems the specified amount of AtlETH tokens for withdrawal.
     /// @param amount The amount of AtlETH tokens to redeem for withdrawal.
-    function redeem(uint256 amount) external {
+    function redeem(uint256 amount) external onlyWhenUnlocked {
         _redeem(msg.sender, amount);
     }
 
@@ -276,5 +277,11 @@ abstract contract AtlETH is Permit69 {
         S_surchargeRecipient = msg.sender;
         S_pendingSurchargeRecipient = address(0);
         emit SurchargeRecipientTransferred(msg.sender);
+    }
+
+    /// @notice Blocks certain AtlETH functions during a metacall transaction.
+    modifier onlyWhenUnlocked() {
+        if (!_isUnlocked()) revert InvalidLockState();
+        _;
     }
 }

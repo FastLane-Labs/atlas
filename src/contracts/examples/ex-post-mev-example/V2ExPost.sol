@@ -48,8 +48,8 @@ contract V2ExPost is DAppControl {
                 trackPreOpsReturnData: false,
                 trackUserReturnData: false,
                 delegateUser: false,
-                preSolver: false,
-                postSolver: false,
+                requirePreSolver: false,
+                requirePostSolver: false,
                 requirePostOps: false,
                 zeroSolvers: true,
                 reuseUserOp: false,
@@ -67,7 +67,7 @@ contract V2ExPost is DAppControl {
         )
     { }
 
-    function _checkUserOperation(UserOperation memory userOp) internal view {
+    function _checkUserOperation(UserOperation memory userOp) internal view override {
         require(bytes4(userOp.data) == IUniswapV2Pair.swap.selector, "ERR-H10 InvalidFunction");
         require(
             IUniswapV2Factory(IUniswapV2Pair(userOp.dapp).factory()).getPair(
@@ -78,9 +78,6 @@ contract V2ExPost is DAppControl {
     }
 
     function _preOpsCall(UserOperation calldata userOp) internal override returns (bytes memory returnData) {
-        // check if dapps using this DApontrol can handle the userOp
-        _checkUserOperation(userOp);
-
         (
             uint256 amount0Out,
             uint256 amount1Out,
@@ -109,14 +106,20 @@ contract V2ExPost is DAppControl {
         return new bytes(0);
     }
 
-    // This occurs after a Solver has successfully paid their bid, which is
-    // held in ExecutionEnvironment.
-    function _allocateValueCall(address, uint256, bytes calldata) internal override {
+    /*
+    * @notice This function is called after a solver has successfully paid their bid
+    * @dev This function is delegatecalled: msg.sender = Atlas, address(this) = ExecutionEnvironment
+    * @dev transfers the bid amount to the user supports only WETH
+    * @param bidToken The address of the token used for the winning SolverOperation's bid
+    * @param bidAmount The winning bid amount
+    * @param _
+    */
+    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow
-
-        SafeTransferLib.safeTransfer(WETH, _user(), IERC20(WETH).balanceOf(address(this)));
+        require(bidToken == WETH, "V2ExPost: InvalidBidToken");
+        SafeTransferLib.safeTransfer(bidToken, _user(), bidAmount);
 
         /*
         // ENABLE FOR FOUNDRY TESTING

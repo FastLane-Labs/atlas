@@ -54,7 +54,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         // Verify that the calldata injection came from the dApp frontend
         // and that the signatures are valid.
 
-        bytes32 _userOpHash = _getUserOperationHash(userOp);
+        bytes32 _userOpHash = _getUserOperationHash(userOp, userOp.callConfig.allowsTrustedOpHash());
 
         {
             // Check user signature
@@ -210,6 +210,13 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         }
     }
 
+    /// @notice External function to call the internal _verifyCallConfig function
+    /// @param callConfig The call configuration struct to verify.
+    /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
+    function verifyCallConfig(uint32 callConfig) external pure returns (ValidCallsResult) {
+        return _verifyCallConfig(callConfig);
+    }
+
     /// @notice The _verifyCallConfig internal function verifies the validity of the call configuration.
     /// @param callConfig The call configuration to verify.
     /// @return The result of the ValidCalls check, in enum ValidCallsResult form.
@@ -252,7 +259,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     {
         if (
             dConfig.callConfig.verifyCallChainHash()
-                && dAppOp.callChainHash != CallVerification.getCallChainHash(dConfig, userOp, solverOps)
+                && dAppOp.callChainHash != CallVerification.getCallChainHash(userOp, solverOps)
         ) return (ValidCallsResult.InvalidCallChainHash, false);
 
         if (dConfig.callConfig.allowsUserAuctioneer() && dAppOp.from == userOp.sessionKey) {
@@ -447,7 +454,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         internal
         returns (ValidCallsResult)
     {
-        if (userOp.from == address(this) || userOp.from == ATLAS || userOp.from == userOp.control) {
+        if (userOp.from == address(this) || userOp.from == ATLAS) {
             return ValidCallsResult.UserFromInvalid;
         }
 
@@ -503,11 +510,6 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     /// @param userOp The UserOperation struct to generate the hash for.
     /// @return userOpHash The hash of the UserOperation struct for in inter-operation references.
     function getUserOperationHash(UserOperation calldata userOp) public view returns (bytes32 userOpHash) {
-        userOpHash = _getUserOperationHash(userOp);
-    }
-
-    // TODO: Do we need this??? Why not just call the next function?
-    function _getUserOperationHash(UserOperation calldata userOp) internal view returns (bytes32 userOpHash) {
         userOpHash = _getUserOperationHash(userOp, userOp.callConfig.allowsTrustedOpHash());
     }
 

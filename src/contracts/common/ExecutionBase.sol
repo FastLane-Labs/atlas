@@ -1,12 +1,14 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.25;
 
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
 import { ExecutionPhase } from "src/contracts/types/LockTypes.sol";
 import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "src/contracts/libraries/SafetyBits.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import "src/contracts/types/SolverOperation.sol";
 
 contract Base {
     address public immutable ATLAS;
@@ -23,6 +25,18 @@ contract Base {
 
     modifier onlyAtlasEnvironment() {
         _onlyAtlasEnvironment();
+        _;
+    }
+
+    modifier validSolver(SolverOperation calldata solverOp) {
+        address solverContract = solverOp.solver;
+        if (solverContract == ATLAS || solverContract == _control() || solverContract == address(this)) {
+            revert AtlasErrors.InvalidSolver();
+        }
+        // Verify that the dAppControl contract matches the solver's expectations
+        if (solverOp.control != _control()) {
+            revert AtlasErrors.AlteredControl();
+        }
         _;
     }
 
@@ -47,7 +61,6 @@ contract Base {
             _solverIndex(),
             _solverCount(),
             _phase(),
-            uint8(0),
             _solverOutcome(),
             _bidFind(),
             _simulation(),
@@ -120,34 +133,28 @@ contract Base {
         }
     }
 
-    // EMPTY 8BIT PLACEHOLDER AT shr(248, calldataload(sub(calldatasize(), 51)))
-
     /// @notice Extracts and returns the lock state bitmap of the current metacall tx, from calldata.
-    /// @return phase The lock state bitmap of the current metacall tx, in uint16 form.
+    /// @return phase The lock state bitmap of the current metacall tx, in uint8 form.
     function _phase() internal pure returns (uint8 phase) {
         assembly {
-            phase := shr(248, calldataload(sub(calldatasize(), 52)))
+            phase := shr(248, calldataload(sub(calldatasize(), 51)))
         }
     }
 
-    /// @notice Extracts and returns the call count of the current metacall tx, from calldata.
-    /// @dev Call count is calculated as number of solverOps + 3. This represents 1 call for preOps, userOp, and postOps
-    /// each, then 1 call for each of the solverOps.
-    /// @return solverCount The call count of the current metacall tx.
+    /// @notice Extracts and returns the number of solverOps in the current metacall tx, from calldata.
+    /// @return solverCount The number of solverOps in the current metacall tx.
     function _solverCount() internal pure returns (uint8 solverCount) {
         assembly {
-            solverCount := shr(248, calldataload(sub(calldatasize(), 53)))
+            solverCount := shr(248, calldataload(sub(calldatasize(), 52)))
         }
     }
 
-    /// @notice Extracts and returns the call index of the current metacall tx, from calldata.
-    /// @dev Call index is the index of the current call within the total calls (see `_solverCount()`) of a metacall tx.
-    /// I.e. preOpsCall has an index of 0, userOp has an index of 1, the first solverOp has an index of 2, subsequent
-    /// solverOps have indices of 3, 4, 5, etc, and postOpsCall has an index of `solverCount - 1`.
-    /// @return solverIndex The call index of the current metacall tx.
+    /// @notice Extracts and returns the number of executed solverOps in the current metacall tx, from calldata.
+    /// @dev Solver index is incremented as Atlas iterates through the solverOps array during execution.
+    /// @return solverIndex The count of executed solverOps in the current metacall tx.
     function _solverIndex() internal pure returns (uint8 solverIndex) {
         assembly {
-            solverIndex := shr(248, calldataload(sub(calldatasize(), 54)))
+            solverIndex := shr(248, calldataload(sub(calldatasize(), 53)))
         }
     }
 
@@ -157,7 +164,7 @@ contract Base {
     /// step in the current metacall tx.
     function _paymentsSuccessful() internal pure returns (bool paymentsSuccessful) {
         assembly {
-            paymentsSuccessful := shr(248, calldataload(sub(calldatasize(), 55)))
+            paymentsSuccessful := shr(248, calldataload(sub(calldatasize(), 54)))
         }
     }
 
@@ -167,7 +174,7 @@ contract Base {
     /// current metacall tx.
     function _solverSuccessful() internal pure returns (bool solverSuccessful) {
         assembly {
-            solverSuccessful := shr(248, calldataload(sub(calldatasize(), 56)))
+            solverSuccessful := shr(248, calldataload(sub(calldatasize(), 55)))
         }
     }
 
@@ -178,7 +185,7 @@ contract Base {
     /// @return bundler The current value of the bundler of the current metacall tx.
     function _bundler() internal pure returns (address bundler) {
         assembly {
-            bundler := shr(96, calldataload(sub(calldatasize(), 76)))
+            bundler := shr(96, calldataload(sub(calldatasize(), 75)))
         }
     }
 
@@ -279,5 +286,20 @@ contract ExecutionBase is Base {
         }
 
         return false;
+    }
+
+    /// @notice Transfers ERC20 tokens from the user of the current metacall tx, via Atlas, to the current
+    /// ExecutionEnvironment, and approves the destination address to spend the tokens from the ExecutionEnvironment.
+    /// @param token The address of the ERC20 token contract.
+    /// @param amount The amount of tokens to transfer and approve.
+    /// @param destination The address approved to spend the tokens from the ExecutionEnvironment.
+    function _getAndApproveUserERC20(address token, uint256 amount, address destination) internal {
+        if (token == address(0) || amount == 0) return;
+
+        // Pull tokens from user to ExecutionEnvironment
+        _transferUserERC20(token, address(this), amount);
+
+        // Approve destination to spend the tokens from ExecutionEnvironment
+        SafeTransferLib.safeApprove(token, destination, amount);
     }
 }

@@ -45,8 +45,8 @@ contract TxBuilder {
             IAtlasVerification(verification).getUserNextNonce(user, IDAppControl(control).requireSequentialUserNonces());
     }
 
-    function getControlCodeHash(address dAppControl) external view returns (bytes32) {
-        return dAppControl.codehash;
+    function getControlCodeHash(address _control) external view returns (bytes32) {
+        return _control.codehash;
     }
 
     function getBlockchainID() external view returns (uint256 chainId) {
@@ -123,11 +123,9 @@ contract TxBuilder {
         view
         returns (DAppOperation memory dAppOp)
     {
-        DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
-
         // generate userOpHash depending on CallConfig.trustedOpHash allowed or not
         bytes32 userOpHash = IAtlasVerification(verification).getUserOperationHash(userOp);
-        bytes32 callChainHash = CallVerification.getCallChainHash(dConfig, userOp, solverOps);
+        bytes32 callChainHash = CallVerification.getCallChainHash(userOp, solverOps);
 
         dAppOp = DAppOperation({
             from: governance,
