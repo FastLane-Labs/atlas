@@ -21,7 +21,7 @@ import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 struct Approval {
     address token;
     address spender;
-    uint256 amount; 
+    uint256 amount;
 }
 
 struct Beneficiary {
@@ -30,13 +30,11 @@ struct Beneficiary {
 }
 // NOTE user gets remainder
 
-
 interface IGeneralizedBackrunProxy {
     function getUser() external view returns (address);
 }
 
 contract GeneralizedBackrunUserBundler is DAppControl {
-
     address private _userLock = address(1); // TODO: Convert to transient storage
 
     uint256 private constant _FEE_BASE = 100;
@@ -61,8 +59,8 @@ contract GeneralizedBackrunUserBundler is DAppControl {
                 trackPreOpsReturnData: false,
                 trackUserReturnData: true,
                 delegateUser: true,
-                preSolver: false,
-                postSolver: false,
+                requirePreSolver: false,
+                requirePostSolver: false,
                 requirePostOps: false,
                 zeroSolvers: true,
                 reuseUserOp: true,
@@ -126,7 +124,6 @@ contract GeneralizedBackrunUserBundler is DAppControl {
 
         S_solverOpCache[_solverOpHash] = solverOp;
         S_solverOpHashes[solverOp.userOpHash].push(_solverOpHash);
-
     }
 
     // Entrypoint function for usage with permit / permit2 / bridges / whatever
@@ -135,18 +132,18 @@ contract GeneralizedBackrunUserBundler is DAppControl {
         address transferHelper,
         bytes calldata transferData,
         bytes32[] calldata solverOpHashes
-    )  
-        external 
-        payable 
+    )
+        external
+        payable
         withUserLock(userOp.from)
         onlyAsControl
     {
         // Decode the token information
-        (Approval[] memory _approvals,,,,) = abi.decode(userOp.data[4:], (Approval[], address[], Beneficiary[], address, bytes));
+        (Approval[] memory _approvals,,,,) =
+            abi.decode(userOp.data[4:], (Approval[], address[], Beneficiary[], address, bytes));
 
-        // Process token transfers if necessary.  If transferHelper == address(0), skip. 
+        // Process token transfers if necessary.  If transferHelper == address(0), skip.
         if (transferHelper != address(0)) {
-        
             (bool _success, bytes memory _data) = transferHelper.call(transferData);
             if (!_success) {
                 assembly {
@@ -169,39 +166,41 @@ contract GeneralizedBackrunUserBundler is DAppControl {
 
         bytes32 _userOpHash = IAtlasVerification(ATLAS_VERIFICATION).getUserOperationHash(userOp);
 
-        DAppOperation memory _dAppOp =  DAppOperation({
+        DAppOperation memory _dAppOp = DAppOperation({
             from: address(this), // signer of the DAppOperation
-            to: ATLAS,  // Atlas address
+            to: ATLAS, // Atlas address
             nonce: 0, // Atlas nonce of the DAppOperation available in the AtlasVerification contract
-            deadline: userOp.deadline,  // block.number deadline for the DAppOperation
+            deadline: userOp.deadline, // block.number deadline for the DAppOperation
             control: address(this), // DAppControl address
             bundler: address(this), // Signer of the atlas tx (msg.sender)
-            userOpHash: _userOpHash,// keccak256 of userOp.to, userOp.data
+            userOpHash: _userOpHash, // keccak256 of userOp.to, userOp.data
             callChainHash: bytes32(0), // keccak256 of the solvers' txs
             signature: new bytes(0) // DAppOperation signed by DAppOperation.from
-        });
+         });
 
         // TODO: Add in the solverOp grabber
         SolverOperation[] memory _solverOps = _getSolverOps(solverOpHashes);
 
-        (bool _success, bytes memory _data) = ATLAS.call{value: msg.value}(
-            abi.encodeCall(IAtlas.metacall, (userOp, _solverOps, _dAppOp))
-        );
+        (bool _success, bytes memory _data) =
+            ATLAS.call{ value: msg.value }(abi.encodeCall(IAtlas.metacall, (userOp, _solverOps, _dAppOp)));
         if (!_success) {
             assembly {
                 revert(add(_data, 32), mload(_data))
             }
         }
-        
 
         if (address(this).balance > _bundlerRefundTracker) {
             SafeTransferLib.safeTransferETH(msg.sender, address(this).balance - _bundlerRefundTracker);
         }
 
-        // TODO: add bundler subsidy capabilities for apps. 
+        // TODO: add bundler subsidy capabilities for apps.
     }
 
-    function _getSolverOps(bytes32[] calldata solverOpHashes) internal view returns (SolverOperation[] memory solverOps) {
+    function _getSolverOps(bytes32[] calldata solverOpHashes)
+        internal
+        view
+        returns (SolverOperation[] memory solverOps)
+    {
         solverOps = new SolverOperation[](solverOpHashes.length);
 
         uint256 _j;
@@ -220,15 +219,15 @@ contract GeneralizedBackrunUserBundler is DAppControl {
 
     // NOTE: this is delegatecalled
     function proxyCall(
-        Approval[] calldata approvals, 
+        Approval[] calldata approvals,
         address[] calldata receivables,
         Beneficiary[] calldata beneficiaries,
         address innerTarget,
         bytes calldata innerData
-    )  
-        external 
+    )
+        external
         payable
-        onlyAtlasEnvironment 
+        onlyAtlasEnvironment
         returns (Beneficiary[] memory)
     {
         bool _isProxied;
@@ -237,29 +236,27 @@ contract GeneralizedBackrunUserBundler is DAppControl {
         if (_bundler() == CONTROL) {
             if (IGeneralizedBackrunProxy(CONTROL).getUser() != _user()) revert();
             _isProxied = true;
-        
-        // CASE: Direct 
+
+            // CASE: Direct
         } else if (_bundler() != _user()) {
             // revert if bundler isn't CONTROL or _user()
             revert();
         }
-        
+
         return _proxyCall(approvals, receivables, beneficiaries, innerTarget, innerData, _isProxied);
     }
 
-
     function _proxyCall(
-        Approval[] calldata approvals, 
+        Approval[] calldata approvals,
         address[] calldata receivables,
         Beneficiary[] calldata beneficiaries,
         address innerTarget,
         bytes calldata innerData,
         bool isProxied
-    )  
-        internal 
+    )
+        internal
         returns (Beneficiary[] memory)
     {
-        
         address _recipient = _user();
 
         // Handle approvals
@@ -282,8 +279,8 @@ contract GeneralizedBackrunUserBundler is DAppControl {
         }
 
         // Do the actual call
-        (bool _success, bytes memory _data) = innerTarget.call{ value: msg.value}(innerData);
-        // Bubble up the revert message (note there's not really a reason to do this, 
+        (bool _success, bytes memory _data) = innerTarget.call{ value: msg.value }(innerData);
+        // Bubble up the revert message (note there's not really a reason to do this,
         // we'll replace with a custom error soon.
         if (!_success) {
             assembly {
@@ -308,7 +305,6 @@ contract GeneralizedBackrunUserBundler is DAppControl {
 
         // Return the receivable tokens to the user
         for (uint256 i; i < receivables.length; i++) {
-
             address _receivable = receivables[i];
             uint256 _balance = IERC20(_receivable).balanceOf(address(this));
 
@@ -331,7 +327,6 @@ contract GeneralizedBackrunUserBundler is DAppControl {
     // ---------------------------------------------------- //
 
     function _allocateValueCall(address bidToken, uint256, bytes calldata returnData) internal override {
-        
         // NOTE: The _user() receives any remaining balance after the other beneficiaries are paid.
         Beneficiary[] memory _beneficiaries = abi.decode(returnData, (Beneficiary[]));
 
