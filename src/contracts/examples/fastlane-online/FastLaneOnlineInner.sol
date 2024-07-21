@@ -19,6 +19,7 @@ import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnviro
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
 import { FastLaneOnlineControl } from "src/contracts/examples/fastlane-online/FastLaneControl.sol";
+import { BaseStorage } from "src/contracts/examples/fastlane-online/BaseStorage.sol";
 
 import { SwapIntent, BaselineCall } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
 
@@ -26,7 +27,7 @@ interface IGeneralizedBackrunProxy {
     function getUser() external view returns (address);
 }
 
-contract FastLaneOnlineInner is FastLaneOnlineControl {
+contract FastLaneOnlineInner is BaseStorage, FastLaneOnlineControl {
     error BaselineFailSuccessful(uint256 baselineAmount);
     error BaselineFailFailure();
 
