@@ -52,7 +52,7 @@ contract FastLaneOnlineOuter is SolverGateway {
         
         // Validate the parameters
         require(userOpHash == IAtlasVerification(ATLAS_VERIFICATION).getUserOperationHash(_userOp), "ERR - USER HASH MISMATCH");
-        _validateSwap(deadline, gas, maxFeePerGas);
+        _validateSwap(swapIntent, deadline, gas, maxFeePerGas);
 
         // Transfer the user's sell tokens to here and then approve Atlas for that amount.
         SafeTransferLib.safeTransferFrom(
@@ -66,6 +66,9 @@ contract FastLaneOnlineOuter is SolverGateway {
         // Build DAppOp
         DAppOperation memory _dAppOp = _getDAppOp(userOpHash, deadline);
 
+        // Track the gas token balance to repay the swapper with
+        uint256 _gasTokenBalance = address(this).balance;
+
         // Metacall
         (bool _success, bytes memory _data) =
             ATLAS.call(abi.encodeCall(IAtlas.metacall, (_userOp, _solverOps, _dAppOp)));
@@ -77,28 +80,21 @@ contract FastLaneOnlineOuter is SolverGateway {
 
         // Revert the token approval
         SafeTransferLib.safeApprove(swapIntent.tokenUserSells, ATLAS, 0);
+
+        // Handle gas token balance reimbursement (reimbursement from Atlas and the congestion buy ins)
+        _gasTokenBalance = address(this).balance - _gasTokenBalance + S_aggCongestionBuyIn[userOpHash];
+        delete S_aggCongestionBuyIn[userOpHash];
+        SafeTransferLib.safeTransferETH(msg.sender, _gasTokenBalance);
     }
 
-    function _getDAppOp(bytes32 userOpHash, uint256 deadline) internal view returns (DAppOperation memory dAppOp) {
-        dAppOp = DAppOperation({
-            from: CONTROL, // signer of the DAppOperation
-            to: ATLAS, // Atlas address
-            nonce: 0, // Atlas nonce of the DAppOperation available in the AtlasVerification contract
-            deadline: deadline, // block.number deadline for the DAppOperation
-            control: CONTROL, // DAppControl address
-            bundler: CONTROL, // Signer of the atlas tx (msg.sender)
-            userOpHash: userOpHash, // keccak256 of userOp.to, userOp.data
-            callChainHash: bytes32(0), // keccak256 of the solvers' txs
-            signature: new bytes(0) // DAppOperation signed by DAppOperation.from
-         });
-    }
-
-    function _validateSwap(uint256 deadline, uint256 gas, uint256 maxFeePerGas) internal {
+    function _validateSwap(SwapIntent calldata swapIntent, uint256 deadline, uint256 gas, uint256 maxFeePerGas) internal {
         require(deadline >= block.number, "ERR - DEADLINE PASSED");
         require(maxFeePerGas >= tx.gasprice, "ERR - INVALID GASPRICE");
         require(gas > gasleft(), "ERR - TX GAS TOO HIGH");
         require(gas < gasleft() - 30_000, "ERR - TX GAS TOO LOW");
         require(gas > MAX_SOLVER_GAS * 2, "ERR - GAS LIMIT TOO LOW");
+        require(swapIntent.tokenUserSells != address(0), "ERR - CANT SELL ZERO ADDRESS");
+        require(swapIntent.tokenUserBuys != address(0), "ERR - CANT BUY ZERO ADDRESS");
 
         // Increment the user's local nonce
         unchecked { ++S_userNonces[msg.sender]; }

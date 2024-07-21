@@ -16,6 +16,9 @@ contract BaseStorage {
     //      SolverOpHash  BidValue
     mapping(bytes32 => uint256) public S_congestionBuyIn;
 
+    //      UserOpHash  TotalBidValue
+    mapping(bytes32 => uint256) public S_aggCongestionBuyIn;
+
     //      User        Nonce
     mapping(address => uint256) public S_userNonces;
 

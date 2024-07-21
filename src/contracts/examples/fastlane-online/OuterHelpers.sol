@@ -80,6 +80,20 @@ contract OuterHelpers is FastLaneOnlineInner {
         userOpHash = IAtlasVerification(ATLAS_VERIFICATION).getUserOperationHash(userOp);
     }
 
+    function _getDAppOp(bytes32 userOpHash, uint256 deadline) internal view returns (DAppOperation memory dAppOp) {
+        dAppOp = DAppOperation({
+            from: CONTROL, // signer of the DAppOperation
+            to: ATLAS, // Atlas address
+            nonce: 0, // Atlas nonce of the DAppOperation available in the AtlasVerification contract
+            deadline: deadline, // block.number deadline for the DAppOperation
+            control: CONTROL, // DAppControl address
+            bundler: CONTROL, // Signer of the atlas tx (msg.sender)
+            userOpHash: userOpHash, // keccak256 of userOp.to, userOp.data
+            callChainHash: bytes32(0), // keccak256 of the solvers' txs
+            signature: new bytes(0) // DAppOperation signed by DAppOperation.from
+         });
+    }
+
     //////////////////////////////////////////////
     /////            GETTERS                //////
     //////////////////////////////////////////////

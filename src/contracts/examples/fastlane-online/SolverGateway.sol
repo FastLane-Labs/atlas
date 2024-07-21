@@ -40,6 +40,11 @@ contract SolverGateway is OuterHelpers {
     //              CONTROL-LOCAL FUNCTIONS                //
     //                 (not delegated)                     //
     /////////////////////////////////////////////////////////
+
+
+    /////////////////////////////////////////////////////////
+    //              EXTERNAL INTERFACE FUNCS               //
+    /////////////////////////////////////////////////////////
     function addSolverOp(
             SwapIntent calldata swapIntent,
             BaselineCall calldata baselineCall,
@@ -53,7 +58,7 @@ contract SolverGateway is OuterHelpers {
         external 
         payable 
         onlyAsControl 
-        onlyWhenUnlocked 
+        withUserLock 
     {   
         EscrowAccountAccessData memory _aData = _preValidateSolverOp(swapIntent, baselineCall, deadline, gas, maxFeePerGas, userOpHash, swapper, solverOp);
 
@@ -63,16 +68,87 @@ contract SolverGateway is OuterHelpers {
             swapIntent, gas, maxFeePerGas, solverOp, _aData);
 
         if (_pushAsNew) {
-            S_solverOpHashes[userOpHash].push(_solverOpHash);
+            _pushSolverOp(userOpHash, _solverOpHash);
         } else if (_replaceExisting) {
-            S_solverOpHashes[userOpHash][_replacedIndex] = _solverOpHash;
-            // TODO: handle replaced solver's congestionBuyIn
+            _replaceSolverOp(userOpHash, _solverOpHash, _replacedIndex);
         } else {
             revert("ERR - VALUE TOO LOW");
         }
 
+        // Store the op
         S_solverOpCache[_solverOpHash] = solverOp;
-        S_congestionBuyIn[_solverOpHash] = msg.value;
+    }
+
+    function refundCongestionBuyIns(SolverOperation calldata solverOp) 
+            external
+            withUserLock 
+            onlyAsControl 
+    {
+        // NOTE: Anyone can call this on behalf of the solver
+        // NOTE: the solverOp deadline cannot be before the userOp deadline, therefore if the
+        // solverOp deadline is passed then we know the userOp deadline is passed. 
+        require(solverOp.deadline < block.number, "ERR - DEADLINE NOT PASSED");
+
+        bytes32 _solverOpHash = keccak256(abi.encode(solverOp));
+
+        uint256 _congestionBuyIn = S_congestionBuyIn[_solverOpHash];
+        uint256 _aggCongestionBuyIn = S_aggCongestionBuyIn[solverOp.userOpHash];
+
+        // NOTE: On successful execution, the _aggCongestionBuyIn is set to zero
+        // but the individual _congestionBuyIns are not, so verify both. 
+        if (_congestionBuyIn > 0 && _aggCongestionBuyIn >= _congestionBuyIn) {
+            delete S_congestionBuyIn[_solverOpHash];
+            S_aggCongestionBuyIn[solverOp.userOpHash] -= _congestionBuyIn;
+
+            SafeTransferLib.safeTransferETH(solverOp.from, _congestionBuyIn);
+        }
+    }
+
+
+    /////////////////////////////////////////////////////////
+    //                   INTERNAL FUNCS                    //
+    /////////////////////////////////////////////////////////
+    function _pushSolverOp(bytes32 userOpHash, bytes32 solverOpHash) internal {
+        // Push to array
+        S_solverOpHashes[userOpHash].push(solverOpHash);
+
+        // Accounting
+        if (msg.value > 0) {
+            S_aggCongestionBuyIn[userOpHash] += msg.value;
+            S_congestionBuyIn[solverOpHash] = msg.value;
+        }
+    }
+
+    function _replaceSolverOp(bytes32 userOpHash, bytes32 solverOpHash, uint256 replacedIndex) internal {
+        // Handle the removed solverOp
+        bytes32 _replacedHash = S_solverOpHashes[userOpHash][replacedIndex];
+        uint256 _replacedCongestionBuyIn = S_congestionBuyIn[_replacedHash];
+
+        // Handle xfer back
+        if (_replacedCongestionBuyIn > 0) {
+            // Accounting (remove balance before xfer)
+            delete S_congestionBuyIn[_replacedHash];
+
+            SolverOperation memory _replacedSolverOp = S_solverOpCache[solverOpHash];
+
+            if (_replacedSolverOp.from.code.length == 0) {
+                // Transfer their congestion buyin back
+                SafeTransferLib.safeTransferETH(_replacedSolverOp.from, _replacedCongestionBuyIn);
+            }
+        }
+
+        // Accounting
+        if (_replacedCongestionBuyIn > msg.value) {
+            S_aggCongestionBuyIn[userOpHash] -= (_replacedCongestionBuyIn - msg.value);
+        } else if (_replacedCongestionBuyIn < msg.value) {
+            S_aggCongestionBuyIn[userOpHash] += (msg.value - _replacedCongestionBuyIn);
+        } // if they're equal, do nothing. 
+
+        if (msg.value > 0) {
+            S_congestionBuyIn[solverOpHash] = msg.value;
+        }
+
+        S_solverOpHashes[userOpHash][replacedIndex] = solverOpHash;
     }
 
     function _evaluateForInclusion(
@@ -90,7 +166,7 @@ contract SolverGateway is OuterHelpers {
 
         (uint256 _cumulativeGasReserved, uint256 _cumulativeScore, uint256 _replacedIndex) = _getCumulativeScores(swapIntent, _solverOps, gas, maxFeePerGas);
 
-        uint256 _score = _getWeightedScore(swapIntent, solverOp, gas, msg.value, maxFeePerGas, aData);
+        uint256 _score = _getWeightedScore(swapIntent, solverOp, gas, msg.value, maxFeePerGas, _solverOps.length, aData);
 
         if (_score * gas > _cumulativeScore * solverOp.gas * 2) {
             if (_cumulativeGasReserved + USER_GAS_BUFFER + (solverOp.gas*2) < gas) {
@@ -126,7 +202,7 @@ contract SolverGateway is OuterHelpers {
             
             SolverOperation memory _solverOp = solverOps[_i];
         
-            uint256 _score = _getWeightedScore(gas, maxFeePerGas, swapIntent.minAmountUserBuys, _solverOp);
+            uint256 _score = _getWeightedScore(gas, maxFeePerGas, swapIntent.minAmountUserBuys, solverOps.length, _solverOp);
 
             if (_i == 0 || _score < _lowestScore) {
                 replacedIndex = _i;
@@ -155,6 +231,10 @@ contract SolverGateway is OuterHelpers {
         UserOperation memory _userOp = _getUserOperation(swapper, swapIntent, baselineCall, deadline, gas, maxFeePerGas);
         bytes32 _userOpHash = _getUserOperationHash(_userOp);
 
+        // Verify the signature
+        uint256 _verificationResult = IAtlasVerification(ATLAS_VERIFICATION).verifySolverOp(solverOp, _userOpHash, maxFeePerGas, address(this), false);
+        require(_verificationResult == 0 || _verificationResult == (1 << uint256(SolverOutcome.GasPriceOverCap)), "ERR - UNVERIFIED");
+
         // Make sure the calculated UserOpHash matches the actual UserOpHash. Because the User's nonce is a part of the hash,
         // this ensures that Solvers can't add their solution to an intent that's already been executed (with its nonce incremented).
         require(userOpHash == _userOpHash, "ERR - USER HASH MISMATCH (NONCE)");
@@ -164,13 +244,15 @@ contract SolverGateway is OuterHelpers {
         require(deadline >= block.number, "ERR - DEADLINE PASSED");
         require(solverOp.deadline >= deadline, "ERR - DEADLINE INVALID");
 
-        require(solverOp.maxFeePerGas >= tx.gasprice, "ERR - LOW SOLVER GASPRICE");
+        // Gas
         require(solverOp.maxFeePerGas >= maxFeePerGas, "ERR - INVALID SOLVER GASPRICE");
 
         // Make sure the token is correct
         require(solverOp.bidToken == swapIntent.tokenUserBuys, "ERR - BuyTokenMismatch");
         require(solverOp.bidToken != swapIntent.tokenUserSells, "ERR - SellTokenMismatch");
         require(solverOp.bidAmount >= swapIntent.minAmountUserBuys, "ERR - BID TOO LOW");
+        require(swapIntent.tokenUserSells != address(0), "ERR - CANT SELL ZERO ADDRESS");
+        require(swapIntent.tokenUserBuys != address(0), "ERR - CANT BUY ZERO ADDRESS");
 
         // Validate control address
         require(solverOp.control == CONTROL, "ERR - INVALID CONTROL");
@@ -188,9 +270,10 @@ contract SolverGateway is OuterHelpers {
     }
 
     function _getWeightedScore(
-        uint256 gas, 
+        uint256 totalGas, 
         uint256 maxFeePerGas,
-        uint256 minAmountUserBuys, 
+        uint256 minAmountUserBuys,
+        uint256 solverCount,
         SolverOperation memory solverOp
     ) 
         internal 
@@ -202,11 +285,11 @@ contract SolverGateway is OuterHelpers {
         uint256 _congestionBuyIn = S_congestionBuyIn[_solverOpHash];
 
         score = ( 
-            (_congestionBuyIn + (maxFeePerGas * gas)) // A solver typically has to pay maxFeePerGas * gas as a requirement for winning.
-                * gas 
-                / (gas + solverOp.gas) // double count gas by doing this even in unweighted score (there's value in packing more solutions)
+            (_congestionBuyIn + (maxFeePerGas * totalGas)) // A solver typically has to pay maxFeePerGas * gas as a requirement for winning.
+                * totalGas 
+                / (totalGas + solverOp.gas) // double count gas by doing this even in unweighted score (there's value in packing more solutions)
                 * (uint256(_aData.auctionWins +1)**2)
-                / (uint256(_aData.auctionWins + _aData.auctionFails +3)**2) // TODO: change the 3 into solverOps.length?
+                / (uint256(_aData.auctionWins + _aData.auctionFails + solverCount +1)**2) 
                 * (solverOp.bidAmount > (minAmountUserBuys +1) * 2 ? (minAmountUserBuys +1) * 2 : solverOp.bidAmount)
                 / (minAmountUserBuys +1)
                 / solverOp.gas
@@ -216,9 +299,10 @@ contract SolverGateway is OuterHelpers {
     function _getWeightedScore(
         SwapIntent calldata swapIntent,
         SolverOperation calldata solverOp,
-        uint256 gas, 
+        uint256 totalGas, 
         uint256 congestionBuyIn, 
         uint256 maxFeePerGas,
+        uint256 solverCount,
         EscrowAccountAccessData memory aData
     ) 
         internal 
@@ -226,11 +310,11 @@ contract SolverGateway is OuterHelpers {
         returns (uint256 score) 
     {
         score = ( 
-            (congestionBuyIn + (maxFeePerGas * gas)) // A solver typically has to pay maxFeePerGas * gas as a requirement for winning.
-                * gas 
-                / (gas + solverOp.gas) // double count gas by doing this even in unweighted score (there's value in packing more solutions)
+            (congestionBuyIn + (maxFeePerGas * totalGas)) // A solver typically has to pay maxFeePerGas * gas as a requirement for winning.
+                * totalGas 
+                / (totalGas + solverOp.gas) // double count gas by doing this even in unweighted score (there's value in packing more solutions)
                 * (uint256(aData.auctionWins +1)**2)
-                / (uint256(aData.auctionWins + aData.auctionFails +3)**2) // TODO: change the 3 into solverOps.length?
+                / (uint256(aData.auctionWins + aData.auctionFails + solverCount +1)**2) 
                 * (solverOp.bidAmount > (swapIntent.minAmountUserBuys +1) * 2 ? (swapIntent.minAmountUserBuys +1) * 2 : solverOp.bidAmount)
                 / (swapIntent.minAmountUserBuys +1)
                 / solverOp.gas
