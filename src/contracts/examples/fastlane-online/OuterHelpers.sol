@@ -29,7 +29,6 @@ interface IGeneralizedBackrunProxy {
 }
 
 contract OuterHelpers is FastLaneOnlineInner {
-
     constructor(address _atlas) FastLaneOnlineInner(_atlas) { }
 
     /////////////////////////////////////////////////////////
@@ -40,10 +39,14 @@ contract OuterHelpers is FastLaneOnlineInner {
         address swapper,
         SwapIntent calldata swapIntent,
         BaselineCall calldata baselineCall,
-        uint256 deadline, 
+        uint256 deadline,
         uint256 gas,
         uint256 maxFeePerGas
-    ) external view returns (UserOperation memory userOp) {
+    )
+        external
+        view
+        returns (UserOperation memory userOp)
+    {
         userOp = _getUserOperation(swapper, swapIntent, baselineCall, deadline, gas, maxFeePerGas);
     }
 
@@ -51,13 +54,13 @@ contract OuterHelpers is FastLaneOnlineInner {
         address swapper,
         SwapIntent calldata swapIntent,
         BaselineCall calldata baselineCall,
-        uint256 deadline, 
+        uint256 deadline,
         uint256 gas,
         uint256 maxFeePerGas
-    ) 
-        internal 
-        view 
-        returns (UserOperation memory userOp) 
+    )
+        internal
+        view
+        returns (UserOperation memory userOp)
     {
         userOp = UserOperation({
             from: address(this),
@@ -112,7 +115,8 @@ contract OuterHelpers is FastLaneOnlineInner {
     }
 
     function _getAccessData(address solverFrom) internal view returns (EscrowAccountAccessData memory) {
-        (uint112 _bonded, uint32 _lastAccessedBlock, uint24 _auctionWins, uint24 _auctionFails, uint64 _totalGasUsed) = IAtlas(ATLAS).accessData(solverFrom);
+        (uint112 _bonded, uint32 _lastAccessedBlock, uint24 _auctionWins, uint24 _auctionFails, uint64 _totalGasUsed) =
+            IAtlas(ATLAS).accessData(solverFrom);
         return EscrowAccountAccessData({
             bonded: _bonded,
             lastAccessedBlock: _lastAccessedBlock,
@@ -129,5 +133,4 @@ contract OuterHelpers is FastLaneOnlineInner {
         if (address(this) != CONTROL) revert();
         _;
     }
-
 }

@@ -29,29 +29,32 @@ interface IGeneralizedBackrunProxy {
 }
 
 contract FastLaneOnlineOuter is SolverGateway {
-
     constructor(address _atlas) SolverGateway(_atlas) { }
 
     //////////////////////////////////////////////
     // THIS IS WHAT THE USER INTERACTS THROUGH.
     //////////////////////////////////////////////
     function fastOnlineSwap(
-            SwapIntent calldata swapIntent,
-            BaselineCall calldata baselineCall,
-            uint256 deadline, 
-            uint256 gas,
-            uint256 maxFeePerGas,
-            bytes32 userOpHash
-    ) 
-            external
-            withUserLock 
-            onlyAsControl 
+        SwapIntent calldata swapIntent,
+        BaselineCall calldata baselineCall,
+        uint256 deadline,
+        uint256 gas,
+        uint256 maxFeePerGas,
+        bytes32 userOpHash
+    )
+        external
+        withUserLock
+        onlyAsControl
     {
         // Get the UserOperation
-        UserOperation memory _userOp = _getUserOperation(msg.sender, swapIntent, baselineCall, deadline, gas, maxFeePerGas);
-        
+        UserOperation memory _userOp =
+            _getUserOperation(msg.sender, swapIntent, baselineCall, deadline, gas, maxFeePerGas);
+
         // Validate the parameters
-        require(userOpHash == IAtlasVerification(ATLAS_VERIFICATION).getUserOperationHash(_userOp), "ERR - USER HASH MISMATCH");
+        require(
+            userOpHash == IAtlasVerification(ATLAS_VERIFICATION).getUserOperationHash(_userOp),
+            "ERR - USER HASH MISMATCH"
+        );
         _validateSwap(swapIntent, deadline, gas, maxFeePerGas);
 
         // Transfer the user's sell tokens to here and then approve Atlas for that amount.
@@ -87,7 +90,14 @@ contract FastLaneOnlineOuter is SolverGateway {
         SafeTransferLib.safeTransferETH(msg.sender, _gasTokenBalance);
     }
 
-    function _validateSwap(SwapIntent calldata swapIntent, uint256 deadline, uint256 gas, uint256 maxFeePerGas) internal {
+    function _validateSwap(
+        SwapIntent calldata swapIntent,
+        uint256 deadline,
+        uint256 gas,
+        uint256 maxFeePerGas
+    )
+        internal
+    {
         require(deadline >= block.number, "ERR - DEADLINE PASSED");
         require(maxFeePerGas >= tx.gasprice, "ERR - INVALID GASPRICE");
         require(gas > gasleft(), "ERR - TX GAS TOO HIGH");
@@ -97,6 +107,8 @@ contract FastLaneOnlineOuter is SolverGateway {
         require(swapIntent.tokenUserBuys != address(0), "ERR - CANT BUY ZERO ADDRESS");
 
         // Increment the user's local nonce
-        unchecked { ++S_userNonces[msg.sender]; }
+        unchecked {
+            ++S_userNonces[msg.sender];
+        }
     }
 }

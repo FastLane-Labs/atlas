@@ -4,7 +4,6 @@ pragma solidity 0.8.25;
 import "src/contracts/types/SolverOperation.sol";
 
 contract BaseStorage {
-
     address internal _userLock = address(1); // TODO: Convert to transient storage
 
     //   SolverOpHash   SolverOperation
@@ -22,7 +21,6 @@ contract BaseStorage {
     //      User        Nonce
     mapping(address => uint256) public S_userNonces;
 
-
     //////////////////////////////////////////////
     /////            MODIFIERS              //////
     //////////////////////////////////////////////
@@ -37,5 +35,4 @@ contract BaseStorage {
         if (_userLock != address(1)) revert();
         _;
     }
-
 }
