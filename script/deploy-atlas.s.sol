@@ -26,13 +26,12 @@ contract DeployAtlasScript is DeployBaseScript {
         address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
         address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
         address expectedSimulatorAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
-        bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedAtlasAddr, "AtlasFactory 1.0"));
 
         console.log("Deployer address: \t\t\t\t", deployer);
 
         vm.startBroadcast(deployerPrivateKey);
 
-        ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
+        ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedAtlasAddr);
         atlas = new Atlas({
             escrowDuration: 64,
             verification: expectedAtlasVerificationAddr,
