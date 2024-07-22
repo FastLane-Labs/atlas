@@ -17,7 +17,7 @@ contract DeployAtlasScript is DeployBaseScript {
     function run() external {
         console.log("\n=== DEPLOYING Atlas ===\n");
 
-        console.log("Deploying to chain: ", _getDeployChain());
+        console.log("Deploying to chain: \t", _getDeployChain());
 
         uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
@@ -27,7 +27,7 @@ contract DeployAtlasScript is DeployBaseScript {
         address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
         address expectedSimulatorAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
 
-        console.log("Deployer address: \t\t\t\t", deployer);
+        console.log("Deployer address: \t", deployer);
 
         vm.startBroadcast(deployerPrivateKey);
 
@@ -113,14 +113,14 @@ contract DeployAtlasScript is DeployBaseScript {
 
         // Print the table header
         console.log("\n");
-        console.log("-----------------------------------------------------------");
-        console.log("| Contract              | Address                         |");
-        console.log("-----------------------------------------------------------");
+        console.log("------------------------------------------------------------------------");
+        console.log("| Contract              | Address                                      |");
+        console.log("------------------------------------------------------------------------");
         console.log("| Atlas                 | ", address(atlas), " |");
         console.log("| AtlasVerification     | ", address(atlasVerification), " |");
         console.log("| Simulator             | ", address(simulator), " |");
         console.log("| Sorter                | ", address(sorter), " |");
-        console.log("-----------------------------------------------------------");
+        console.log("------------------------------------------------------------------------");
         console.log("\n");
         console.log("You can find a list of contract addresses from the latest deployment in deployments.json");
     }
