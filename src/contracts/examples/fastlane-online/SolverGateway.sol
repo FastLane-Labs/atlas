@@ -145,9 +145,21 @@ contract SolverGateway is OuterHelpers {
         S_solverOpHashes[userOpHash][replacedIndex] = solverOpHash;
     }
 
+    function _getSolverOps(bytes32 userOpHash) internal view returns (SolverOperation[] memory solverOps) {
+        uint256 _totalSolvers = S_solverOpHashes[userOpHash].length;
+
+        solverOps = new SolverOperation[](_totalSolvers);
+
+        for (uint256 _j; _j < _totalSolvers; _j++) {
+            bytes32 _solverOpHash = S_solverOpHashes[userOpHash][_j];
+            SolverOperation memory _solverOp = S_solverOpCache[_solverOpHash];
+            solverOps[_j] = _solverOp;
+        }
+    }
+
     function _evaluateForInclusion(
         SwapIntent calldata swapIntent,
-        uint256 gas,
+        uint256 totalGas,
         uint256 maxFeePerGas,
         SolverOperation calldata solverOp,
         EscrowAccountAccessData memory aData
@@ -163,30 +175,18 @@ contract SolverGateway is OuterHelpers {
         }
 
         (uint256 _cumulativeGasReserved, uint256 _cumulativeScore, uint256 _replacedIndex) =
-            _getCumulativeScores(swapIntent, _solverOps, gas, maxFeePerGas);
+            _getCumulativeScores(swapIntent, _solverOps, totalGas, maxFeePerGas);
 
-        uint256 _score = _getWeightedScore(swapIntent, solverOp, gas, msg.value, maxFeePerGas, _solverOps.length, aData);
+        uint256 _score = _getWeightedScore(swapIntent, solverOp, totalGas, msg.value, maxFeePerGas, _solverOps.length, aData);
 
-        if (_score * gas > _cumulativeScore * solverOp.gas * 2) {
-            if (_cumulativeGasReserved + USER_GAS_BUFFER + (solverOp.gas * 2) < gas) {
+        if (_score * totalGas > _cumulativeScore * solverOp.gas * 2) {
+            if (_cumulativeGasReserved + USER_GAS_BUFFER + (solverOp.gas * 2) < totalGas) {
                 return (true, false, 0);
             } else {
                 return (false, true, _replacedIndex);
             }
         }
         return (false, false, 0);
-    }
-
-    function _getSolverOps(bytes32 userOpHash) internal view returns (SolverOperation[] memory solverOps) {
-        uint256 _totalSolvers = S_solverOpHashes[userOpHash].length;
-
-        solverOps = new SolverOperation[](_totalSolvers);
-
-        for (uint256 _j; _j < _totalSolvers; _j++) {
-            bytes32 _solverOpHash = S_solverOpHashes[userOpHash][_j];
-            SolverOperation memory _solverOp = S_solverOpCache[_solverOpHash];
-            solverOps[_j] = _solverOp;
-        }
     }
 
     function _getCumulativeScores(
@@ -215,6 +215,62 @@ contract SolverGateway is OuterHelpers {
             cumulativeGasReserved += _solverOp.gas;
         }
     }
+
+    function _getWeightedScore(
+        uint256 totalGas,
+        uint256 maxFeePerGas,
+        uint256 minAmountUserBuys,
+        uint256 solverCount,
+        SolverOperation memory solverOp
+    )
+        internal
+        view
+        returns (uint256 score)
+    {
+        EscrowAccountAccessData memory _aData = _getAccessData(solverOp.from);
+        bytes32 _solverOpHash = keccak256(abi.encode(solverOp));
+        uint256 _congestionBuyIn = S_congestionBuyIn[_solverOpHash];
+
+        score = (
+            (_congestionBuyIn + (maxFeePerGas * totalGas)) // A solver typically has to pay maxFeePerGas * gas as a
+                // requirement for winning.
+                * totalGas / (totalGas + solverOp.gas) // double count gas by doing this even in unweighted score (there's
+                // value in packing more solutions)
+                * (uint256(_aData.auctionWins) + 1)
+                / (uint256(_aData.auctionWins + _aData.auctionFails) + solverCount + 1) 
+                * (solverOp.bidAmount > (minAmountUserBuys + 1) * 2 ? (minAmountUserBuys + 1) * 2 : solverOp.bidAmount)
+                / (minAmountUserBuys + 1) / solverOp.gas
+        );
+    }
+
+    function _getWeightedScore(
+        SwapIntent calldata swapIntent,
+        SolverOperation calldata solverOp,
+        uint256 totalGas,
+        uint256 congestionBuyIn,
+        uint256 maxFeePerGas,
+        uint256 solverCount,
+        EscrowAccountAccessData memory aData
+    )
+        internal
+        pure
+        returns (uint256 score)
+    {
+        score = (
+            (congestionBuyIn + (maxFeePerGas * totalGas)) // A solver typically has to pay maxFeePerGas * gas as a
+                // requirement for winning.
+                * totalGas / (totalGas + solverOp.gas) // double count gas by doing this even in unweighted score (there's
+                // value in packing more solutions)
+                * (uint256(aData.auctionWins) + 1)
+                / (uint256(aData.auctionWins + aData.auctionFails) + solverCount + 1) 
+                * (
+                    solverOp.bidAmount > (swapIntent.minAmountUserBuys + 1) * 2
+                        ? (swapIntent.minAmountUserBuys + 1) * 2
+                        : solverOp.bidAmount
+                ) / (swapIntent.minAmountUserBuys + 1) / solverOp.gas
+        );
+    }
+
 
     function _preValidateSolverOp(
         SwapIntent calldata swapIntent,
@@ -278,60 +334,5 @@ contract SolverGateway is OuterHelpers {
 
         // Check solver eligibility
         require(uint256(aData.lastAccessedBlock) < block.number, "ERR - DOUBLE SOLVE");
-    }
-
-    function _getWeightedScore(
-        uint256 totalGas,
-        uint256 maxFeePerGas,
-        uint256 minAmountUserBuys,
-        uint256 solverCount,
-        SolverOperation memory solverOp
-    )
-        internal
-        view
-        returns (uint256 score)
-    {
-        EscrowAccountAccessData memory _aData = _getAccessData(solverOp.from);
-        bytes32 _solverOpHash = keccak256(abi.encode(solverOp));
-        uint256 _congestionBuyIn = S_congestionBuyIn[_solverOpHash];
-
-        score = (
-            (_congestionBuyIn + (maxFeePerGas * totalGas)) // A solver typically has to pay maxFeePerGas * gas as a
-                // requirement for winning.
-                * totalGas / (totalGas + solverOp.gas) // double count gas by doing this even in unweighted score (there's
-                // value in packing more solutions)
-                * (uint256(_aData.auctionWins + 1) ** 2)
-                / (uint256(_aData.auctionWins + _aData.auctionFails + solverCount + 1) ** 2)
-                * (solverOp.bidAmount > (minAmountUserBuys + 1) * 2 ? (minAmountUserBuys + 1) * 2 : solverOp.bidAmount)
-                / (minAmountUserBuys + 1) / solverOp.gas
-        );
-    }
-
-    function _getWeightedScore(
-        SwapIntent calldata swapIntent,
-        SolverOperation calldata solverOp,
-        uint256 totalGas,
-        uint256 congestionBuyIn,
-        uint256 maxFeePerGas,
-        uint256 solverCount,
-        EscrowAccountAccessData memory aData
-    )
-        internal
-        pure
-        returns (uint256 score)
-    {
-        score = (
-            (congestionBuyIn + (maxFeePerGas * totalGas)) // A solver typically has to pay maxFeePerGas * gas as a
-                // requirement for winning.
-                * totalGas / (totalGas + solverOp.gas) // double count gas by doing this even in unweighted score (there's
-                // value in packing more solutions)
-                * (uint256(aData.auctionWins + 1) ** 2)
-                / (uint256(aData.auctionWins + aData.auctionFails + solverCount + 1) ** 2)
-                * (
-                    solverOp.bidAmount > (swapIntent.minAmountUserBuys + 1) * 2
-                        ? (swapIntent.minAmountUserBuys + 1) * 2
-                        : solverOp.bidAmount
-                ) / (swapIntent.minAmountUserBuys + 1) / solverOp.gas
-        );
     }
 }
