@@ -10,7 +10,7 @@ This is a guide to getting the Atlas smart contracts deployed on an EVM chain.
 git checkout dca0b9946e8f59347610cd24a0bca5e84ddea00e
 ```
 
-2. Set up your `.env` file with the variables relevant to the chain to which you are trying to deploy. Note: the `GOV_PRIVATE_KEY` is the private key to the public address from which the contracts will be deployed. You must also set the `DEPLOY_TO` variable to a valid chain option: `SEPOLIA`, `MAINNET`, `AMOY`, `POLYGON`, or `LOCAL`. In this example we would be deploying to Polygon mainnet.
+2. Set up your `.env` file with the variables relevant to the chain to which you are trying to deploy. Note: the `GOV_PRIVATE_KEY` is the private key to the public address from which the contracts will be deployed. You must also set the `DEPLOY_TO` variable to a valid chain option: `SEPOLIA`, `MAINNET`, `AMOY`, `POLYGON`, or `LOCAL`. In this example we would be deploying to Polygon mainnet. Check out the [Wallet List docs](https://github.com/FastLane-Labs/knowledge-base/blob/main/playbooks/wallets/wallet_list.md) if in doubt about which address to deploy from.
 
 ```bash
 MAINNET_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/XXXXXXXXXXXXXXXXXXXX
