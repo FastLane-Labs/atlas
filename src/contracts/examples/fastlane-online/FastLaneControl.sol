@@ -91,11 +91,11 @@ contract FastLaneOnlineControl is DAppControl {
     }
 
     /*
-    * @notice This function is called before a solver operation executes
+    * @notice This function is called after all solver operations and allocateValue have been executed
     * @dev This function is delegatecalled: msg.sender = Atlas, address(this) = ExecutionEnvironment
-    * @dev It transfers the tokens that the user is selling to the solver
-    * @param solverOp The SolverOperation that is about to execute
-    * @return true if the transfer was successful, false otherwise
+    * @dev It checks if a solver fulfilled the SwapIntent, and if not, attempts to use the baseline call to do so.
+    * @param solved Boolean indicating whether a winning SolverOperation was executed successfully
+    * @param returnData Data returned from the previous call phase
     */
     function _postOpsCall(bool solved, bytes calldata returnData) internal override {
         // Return early if a Solver already beat the reserve price
