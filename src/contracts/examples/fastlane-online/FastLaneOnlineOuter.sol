@@ -116,4 +116,8 @@ contract FastLaneOnlineOuter is SolverGateway {
             ++S_userNonces[msg.sender];
         }
     }
+
+    fallback() external payable { }
+
+    receive() external payable { }
 }
