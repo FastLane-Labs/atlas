@@ -16,20 +16,29 @@ import { SwapIntent, BaselineCall } from "src/contracts/examples/fastlane-online
 import { IUniswapV2Router02 } from "test/base/interfaces/IUniswapV2Router.sol";
 
 contract FastLaneOnlineTest is BaseTest {
+    struct Sig {
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+    }
 
     IERC20 DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     address DAI_ADDRESS = address(DAI);
 
     IUniswapV2Router02 routerV2 = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
 
-    uint256 defaultDeadline = block.timestamp + 1;
     uint256 defaultGasLimit = 5_000_000;
+    uint256 defaultDeadline;
 
     FastLaneOnlineOuter flOnline;
     address executionEnvironment;
 
+    Sig sig;
+
     function setUp() public virtual override {
         BaseTest.setUp();
+
+        defaultDeadline = block.number + 1;
 
         governancePK = 11_112;
         governanceEOA = vm.addr(governancePK);
@@ -37,6 +46,8 @@ contract FastLaneOnlineTest is BaseTest {
         vm.startPrank(governanceEOA);
         flOnline = new FastLaneOnlineOuter(address(atlas));
         atlasVerification.initializeGovernance(address(flOnline));
+        // FLOnline contract must be registered as its own signatory
+        atlasVerification.addSignatory(address(flOnline), address(flOnline));
         vm.stopPrank();
 
         // This EE wont be deployed until the start of the first metacall
@@ -87,14 +98,18 @@ contract FastLaneOnlineTest is BaseTest {
 
         // Solver frontruns the user's fastOnlineSwap call, registering their solverOp in FLOnline
 
-        vm.prank(solverOneEOA);
+        vm.startPrank(solverOneEOA);
+        // Solver deploys RFQ solver contract
         FLOnlineRFQSolver solver = new FLOnlineRFQSolver(WETH_ADDRESS, address(atlas));
+        // Solver bonds 1 ETH in Atlas
+        atlas.bond(1e18);
+
 
         SolverOperation memory solverOp = SolverOperation({
             from: solverOneEOA,
             to: address(atlas),
             value: 0,
-            gas: 1_000_000,
+            gas: flOnline.MAX_SOLVER_GAS() - 1,
             maxFeePerGas: tx.gasprice,
             deadline: defaultDeadline,
             solver: address(solver),
@@ -106,7 +121,10 @@ contract FastLaneOnlineTest is BaseTest {
             signature: new bytes(0)
         });
 
-        vm.prank(solverOneEOA);
+        // Solver signs solverOp
+        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOp));
+        solverOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
         flOnline.addSolverOp({
             swapIntent: swapIntent,
             baselineCall: baselineCall,
@@ -118,6 +136,11 @@ contract FastLaneOnlineTest is BaseTest {
             solverOp: solverOp
         });
 
+        vm.stopPrank();
+
+        // Give solver and user required assets
+        deal(DAI_ADDRESS, userEOA, swapIntent.amountUserSells); // 3000 DAI
+        deal(WETH_ADDRESS, solverOneEOA, swapIntent.minAmountUserBuys); // 1 WETH
 
 
 
@@ -126,15 +149,27 @@ contract FastLaneOnlineTest is BaseTest {
         console.log("User WETH before:", WETH.balanceOf(userEOA));
         console.log("User DAI before:", DAI.balanceOf(userEOA));
 
-        vm.prank(userEOA);
-        flOnline.fastOnlineSwap({
-            swapIntent: swapIntent,
-            baselineCall: baselineCall,
-            deadline: defaultDeadline,
-            gas: defaultGasLimit,
-            maxFeePerGas: tx.gasprice,
-            userOpHash: userOpHash
-        });
+        vm.startPrank(userEOA);
+
+        // User approves FLOnline to take 3000 DAI
+        DAI.approve(address(flOnline), swapIntent.amountUserSells);
+
+        (bool result,) = address(flOnline).call{gas: 5_001_000}(
+            abi.encodeCall(
+                flOnline.fastOnlineSwap, (
+                    swapIntent,
+                    baselineCall,
+                    defaultDeadline,
+                    defaultGasLimit,
+                    tx.gasprice,
+                    userOpHash
+                )
+            )
+        );
+
+        vm.stopPrank();
+
+        assertTrue(result, "fastOnlineSwap failed");
 
         console.log("User WETH after:", WETH.balanceOf(userEOA));
         console.log("User DAI after:", DAI.balanceOf(userEOA));

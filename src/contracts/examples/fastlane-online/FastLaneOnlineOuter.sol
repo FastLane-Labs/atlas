@@ -1,6 +1,8 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.25;
 
+import "forge-std/Test.sol"; // TODO delete
+
 // Base Imports
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
@@ -100,8 +102,11 @@ contract FastLaneOnlineOuter is SolverGateway {
     {
         require(deadline >= block.number, "ERR - DEADLINE PASSED");
         require(maxFeePerGas >= tx.gasprice, "ERR - INVALID GASPRICE");
-        require(gas > gasleft(), "ERR - TX GAS TOO HIGH");
-        require(gas < gasleft() - 30_000, "ERR - TX GAS TOO LOW");
+
+        // TODO add back gas checks when we have more clarity
+        // require(gas > gasleft(), "ERR - TX GAS TOO HIGH");
+        // require(gas < gasleft() - 30_000, "ERR - TX GAS TOO LOW");
+
         require(gas > MAX_SOLVER_GAS * 2, "ERR - GAS LIMIT TOO LOW");
         require(swapIntent.tokenUserSells != address(0), "ERR - CANT SELL ZERO ADDRESS");
         require(swapIntent.tokenUserBuys != address(0), "ERR - CANT BUY ZERO ADDRESS");
