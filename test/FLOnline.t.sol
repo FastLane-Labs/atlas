@@ -22,23 +22,35 @@ contract FastLaneOnlineTest is BaseTest {
         bytes32 s;
     }
 
+    struct FastOnlineSwapArgs {
+        SwapIntent swapIntent;
+        BaselineCall baselineCall;
+        uint256 deadline;
+        uint256 gas;
+        uint256 maxFeePerGas;
+        bytes32 userOpHash;
+    }
+
     IERC20 DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     address DAI_ADDRESS = address(DAI);
 
     IUniswapV2Router02 routerV2 = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
 
     uint256 defaultGasLimit = 5_000_000;
+    uint256 defaultGasPrice;
     uint256 defaultDeadline;
 
     FastLaneOnlineOuter flOnline;
     address executionEnvironment;
 
     Sig sig;
+    FastOnlineSwapArgs args;
 
     function setUp() public virtual override {
         BaseTest.setUp();
 
         defaultDeadline = block.number + 1;
+        defaultGasPrice = tx.gasprice;
 
         governancePK = 11_112;
         governanceEOA = vm.addr(governancePK);
@@ -52,145 +64,224 @@ contract FastLaneOnlineTest is BaseTest {
 
         // This EE wont be deployed until the start of the first metacall
         (executionEnvironment,,) = atlas.getExecutionEnvironment(address(flOnline), address(flOnline));
+
+        // Set fastOnlineSwap args to default values
+        args = _buildDefaultFastOnlineSwapArgs();
+
+        // User starts with 0 WETH (tokenUserBuys) and 3000 DAI (tokenUserSells)
+        deal(args.swapIntent.tokenUserBuys, userEOA, 0); // Burn user's WETH to start at 0
+        deal(args.swapIntent.tokenUserSells, userEOA, args.swapIntent.amountUserSells); // 3000 DAI
+
+        // User approves FLOnline to take 3000 DAI
+        vm.prank(userEOA);
+        IERC20(args.swapIntent.tokenUserSells).approve(address(flOnline), args.swapIntent.amountUserSells);
     }
 
-    function testFastLaneOnlineSwap() public {        
+    function testFLOnlineSwap_OneSolverFulfills_Success() public {
         // First, create the data args the user will pass to the fastOnlineSwap function, which will be intercepted
         // by the solver in the mempool, used to form a solverOp to fulfill the user's SwapIntent, and a
         // frontrunning tx to register this fulfillment solverOp in the FLOnline contract via addSolverOp()
 
-        // Swap 3000 DAI for at least 1 WETH
-        SwapIntent memory swapIntent = SwapIntent({
+        // Set up the solver contract and register the solverOp in the FLOnline contract
+        address winningSolverContract = _setUpSolver(solverOneEOA, solverOnePK, false);
+
+        // User calls fastOnlineSwap, do checks that user and solver balances changed as expected
+        _doFastOnlineSwapWithBalanceChecks(winningSolverContract, true);
+    }
+
+    function testFLOnlineSwap_OneSolverFails_BaselineCallFulfills_Success() public { }
+
+    function testFLOnlineSwap_OneSolverFails_BaselineCallReverts_Failure() public { }
+
+    function testFLOnlineSwap_ZeroSolvers_BaselineCallFullfills_Success() public { }
+
+    function testFLOnlineSwap_ZeroSolvers_BaselineCallReverts_Failure() public { }
+
+    function testFLOnlineSwap_ThreeSolvers_ThirdFullfills_Success() public { }
+
+    function testFLOnlineSwap_ThreeSolvers_AllFail_BaselineCallFullfills_Success() public { }
+
+    function testFLOnlineSwap_ThreeSolvers_AllFail_BaselineCallReverts_Failure() public { }
+
+    // ---------------------------------------------------- //
+    //                        Helpers                       //
+    // ---------------------------------------------------- //
+
+    function _doFastOnlineSwapWithBalanceChecks(address winningSolverContract, bool swapCallShouldSucceed) internal {
+        uint256 userWethBefore = WETH.balanceOf(userEOA);
+        uint256 userDaiBefore = DAI.balanceOf(userEOA);
+        uint256 solverWethBefore = WETH.balanceOf(winningSolverContract);
+        uint256 solverDaiBefore = DAI.balanceOf(winningSolverContract);
+
+        vm.prank(userEOA);
+        (bool result,) = address(flOnline).call{ gas: args.gas + 1000 }(
+            abi.encodeCall(
+                flOnline.fastOnlineSwap,
+                (args.swapIntent, args.baselineCall, args.deadline, args.gas, args.maxFeePerGas, args.userOpHash)
+            )
+        );
+
+        assertTrue(
+            result == swapCallShouldSucceed,
+            swapCallShouldSucceed ? "fastOnlineSwap should have succeeded" : "fastOnlineSwap should have reverted"
+        );
+
+        // Check user's balances changed as expected
+        assertTrue(
+            WETH.balanceOf(userEOA) >= userWethBefore + args.swapIntent.minAmountUserBuys,
+            "User did not recieve expected WETH"
+        );
+        assertEq(
+            DAI.balanceOf(userEOA), userDaiBefore - args.swapIntent.amountUserSells, "User did not send expected DAI"
+        );
+
+        // If winning solver, check balances changed as expected
+        if (winningSolverContract != address(0)) {
+            assertTrue(
+                WETH.balanceOf(winningSolverContract) <= solverWethBefore - args.swapIntent.minAmountUserBuys,
+                "Solver did not send expected WETH"
+            );
+            assertEq(
+                DAI.balanceOf(winningSolverContract),
+                solverDaiBefore + args.swapIntent.amountUserSells,
+                "Solver did not recieve expected DAI"
+            );
+        }
+    }
+
+    // Defaults:
+    // SwapIntent: Swap 3000 DAI for at least 1 WETH
+    // BaselineCall: Swap 3000 DAI for at least 1 WETH via Uniswap V2 Router
+    // UserOpHash: Generated correctly using dapp's getUserOperation() function
+    // Deadline: block.number + 1
+    // Gas: 5_000_000
+    // MaxFeePerGas: tx.gasprice
+    function _buildDefaultFastOnlineSwapArgs() internal view returns (FastOnlineSwapArgs memory newArgs) {
+        newArgs.swapIntent = SwapIntent({
             tokenUserBuys: WETH_ADDRESS,
             minAmountUserBuys: 1 ether,
             tokenUserSells: DAI_ADDRESS,
             amountUserSells: 3000e18
         });
 
-        // Build BaselineCall: swap 3000 DAI for at least 1 WETH via Uniswap V2 Router
-        // TODO check this actually works when calling uni v2 router
-
         address[] memory path = new address[](2);
         path[0] = DAI_ADDRESS;
         path[1] = WETH_ADDRESS;
 
-        BaselineCall memory baselineCall = BaselineCall({
+        newArgs.baselineCall = BaselineCall({
             to: address(routerV2),
-            data: abi.encodeCall(routerV2.swapExactTokensForTokens, (
-                swapIntent.amountUserSells, // amountIn
-                swapIntent.minAmountUserBuys, // amountOutMin
-                path, // path = [DAI, WETH]
-                userEOA, // to
-                defaultDeadline // deadline
-            )),
-            success: true
-        });
+            data: abi.encodeCall(
+                routerV2.swapExactTokensForTokens,
+                (
+                    newArgs.swapIntent.amountUserSells, // amountIn
+                    newArgs.swapIntent.minAmountUserBuys, // amountOutMin
+                    path, // path = [DAI, WETH]
+                    userEOA, // to
+                    defaultDeadline // deadline
+                )
+            ),
+            success: true // TODO check setting this in arg doesn't impact execution logic
+         });
 
-        bytes32 userOpHash = atlasVerification.getUserOperationHash(flOnline.getUserOperation({
-            swapper: userEOA,
-            swapIntent: swapIntent,
-            baselineCall: baselineCall,
-            deadline: defaultDeadline,
-            gas: defaultGasLimit,
-            maxFeePerGas: tx.gasprice
-        }));
+        newArgs.userOpHash = atlasVerification.getUserOperationHash(
+            flOnline.getUserOperation({
+                swapper: userEOA,
+                swapIntent: newArgs.swapIntent,
+                baselineCall: newArgs.baselineCall,
+                deadline: defaultDeadline,
+                gas: defaultGasLimit,
+                maxFeePerGas: defaultGasPrice
+            })
+        );
 
-        // Solver frontruns the user's fastOnlineSwap call, registering their solverOp in FLOnline
-        vm.startPrank(solverOneEOA);
-        // Solver deploys RFQ solver contract
-        FLOnlineRFQSolver solver = new FLOnlineRFQSolver(WETH_ADDRESS, address(atlas));
-        // Solver bonds 1 ETH in Atlas
-        atlas.bond(1e18);
+        newArgs.deadline = defaultDeadline;
+        newArgs.gas = defaultGasLimit;
+        newArgs.maxFeePerGas = defaultGasPrice;
+    }
 
-        // Solver creates solverOp
-        SolverOperation memory solverOp = SolverOperation({
-            from: solverOneEOA,
-            to: address(atlas),
-            value: 0,
-            gas: flOnline.MAX_SOLVER_GAS() - 1,
-            maxFeePerGas: tx.gasprice,
-            deadline: defaultDeadline,
-            solver: address(solver),
-            control: address(flOnline),
-            userOpHash: userOpHash,
-            bidToken: swapIntent.tokenUserBuys,
-            bidAmount: swapIntent.minAmountUserBuys,
-            data: abi.encodeCall(solver.fulfillRFQ, (swapIntent, executionEnvironment)),
-            signature: new bytes(0)
-        });
+    function _setUpSolver(address solverEOA, uint256 solverPK, bool shouldFail) internal returns (address) {
+        vm.startPrank(solverEOA);
+        // Make sure solver has 1 AtlETH bonded in Atlas
+        uint256 bonded = atlas.balanceOfBonded(solverEOA);
+        if (bonded < 1e18) {
+            uint256 atlETHBalance = atlas.balanceOf(solverEOA);
+            if (atlETHBalance < 1e18) {
+                deal(solverEOA, 1e18 - atlETHBalance);
+                atlas.deposit{ value: 1e18 - atlETHBalance }();
+            }
+            atlas.bond(1e18 - bonded);
+        }
 
-        // Solver signs solverOp
-        (sig.v, sig.r, sig.s) = vm.sign(solverOnePK, atlasVerification.getSolverPayload(solverOp));
-        solverOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+        // Deploy RFQ solver contract
+        FLOnlineRFQSolver solver = new FLOnlineRFQSolver(WETH_ADDRESS, address(atlas), shouldFail);
 
+        // Solver signs the solverOp
+        SolverOperation memory solverOp = _buildSolverOp(solverEOA, solverPK, address(solver));
+
+        // Register solverOp in FLOnline in frontrunning tx
         flOnline.addSolverOp({
-            swapIntent: swapIntent,
-            baselineCall: baselineCall,
+            swapIntent: args.swapIntent,
+            baselineCall: args.baselineCall,
             deadline: defaultDeadline,
             gas: defaultGasLimit,
-            maxFeePerGas: tx.gasprice,
-            userOpHash: userOpHash,
+            maxFeePerGas: defaultGasPrice,
+            userOpHash: args.userOpHash,
             swapper: userEOA,
             solverOp: solverOp
         });
+
+        // Give solver contract 1 WETH to fulfill user's SwapIntent
+        deal(args.swapIntent.tokenUserBuys, address(solver), args.swapIntent.minAmountUserBuys);
         vm.stopPrank();
 
-        // Give solver and user required assets
-        deal(WETH_ADDRESS, userEOA, 0); // Burn user's WETH to start at 0
-        deal(DAI_ADDRESS, userEOA, swapIntent.amountUserSells); // 3000 DAI
-        deal(WETH_ADDRESS, address(solver), swapIntent.minAmountUserBuys); // 1 WETH
-        uint256 userWethBefore = WETH.balanceOf(userEOA);
-        uint256 userDaiBefore = DAI.balanceOf(userEOA);
-
-        vm.startPrank(userEOA);
-
-        // User approves FLOnline to take 3000 DAI
-        DAI.approve(address(flOnline), swapIntent.amountUserSells);
-
-         // User calls the FastLaneOnline fastOnlineSwap entry point
-        (bool result,) = address(flOnline).call{gas: 5_001_000}(
-            abi.encodeCall(
-                flOnline.fastOnlineSwap, (
-                    swapIntent,
-                    baselineCall,
-                    defaultDeadline,
-                    defaultGasLimit,
-                    tx.gasprice,
-                    userOpHash
-                )
-            )
-        );
-        vm.stopPrank();
-
-        // Check the call succeeded
-        assertTrue(result, "fastOnlineSwap failed");
-
-        // Check user's balances changed as expected
-        assertTrue(WETH.balanceOf(userEOA) >= userWethBefore + swapIntent.minAmountUserBuys, "User did not recieve enough WETH");
-        assertEq(DAI.balanceOf(userEOA), userDaiBefore - swapIntent.amountUserSells, "User did not send expected DAI");
+        // Returns the address of the solver contract deployed here
+        return address(solver);
     }
 
-    function _verifyBaselineCallSucceeds(BaselineCall memory baselineCall, address caller) public {
-        uint256 snapshot = vm.snapshot();
-        vm.prank(caller);
-        (bool success,) = caller.call(baselineCall.data);
-        assertTrue(success, "BaselineCall failed");
-        vm.revertTo(snapshot);
+    function _buildSolverOp(
+        address solverEOA,
+        uint256 solverPK,
+        address solverContract
+    )
+        internal
+        returns (SolverOperation memory solverOp)
+    {
+        solverOp = SolverOperation({
+            from: solverEOA,
+            to: address(atlas),
+            value: 0,
+            gas: flOnline.MAX_SOLVER_GAS() - 1,
+            maxFeePerGas: defaultGasPrice,
+            deadline: defaultDeadline,
+            solver: solverContract,
+            control: address(flOnline),
+            userOpHash: args.userOpHash,
+            bidToken: args.swapIntent.tokenUserBuys,
+            bidAmount: args.swapIntent.minAmountUserBuys,
+            data: abi.encodeCall(FLOnlineRFQSolver.fulfillRFQ, (args.swapIntent)),
+            signature: new bytes(0)
+        });
+        // Sign solverOp
+        (sig.v, sig.r, sig.s) = vm.sign(solverPK, atlasVerification.getSolverPayload(solverOp));
+        solverOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
     }
 }
 
 // This solver magically has the tokens needed to fulfil the user's swap.
 // This might involve an offchain RFQ system
 contract FLOnlineRFQSolver is SolverBase {
+    bool internal s_shouldFail;
 
-    constructor(address weth, address atlas) SolverBase(weth, atlas, msg.sender) { }
+    constructor(address weth, address atlas, bool shouldFail) SolverBase(weth, atlas, msg.sender) {
+        s_shouldFail = shouldFail;
+    }
 
-    function fulfillRFQ(SwapIntent calldata swapIntent, address executionEnvironment) public {
+    function fulfillRFQ(SwapIntent calldata swapIntent) public view {
+        require(!s_shouldFail, "Solver failed intentionally");
         require(
             IERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells,
             "Did not receive expected amount of tokenUserSells"
         );
-
         // The solver bid representing user's minAmountUserBuys of tokenUserBuys is sent to the
         // Execution Environment in the payBids modifier logic which runs after this function ends.
     }
