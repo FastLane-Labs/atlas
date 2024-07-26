@@ -1,8 +1,6 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.25;
 
-import "forge-std/Test.sol"; // TODO delete
-
 // Base Imports
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
@@ -63,12 +61,18 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
         (, SwapIntent memory _swapIntent,) = abi.decode(returnData, (address, SwapIntent, BaselineCall));
 
         // Make sure the token is correct
-        require(solverOp.bidToken == _swapIntent.tokenUserBuys, "FLOnlineControl: BuyTokenMismatch");
-        require(solverOp.bidToken != _swapIntent.tokenUserSells, "FLOnlineControl: SellTokenMismatch");
+        if (solverOp.bidToken != _swapIntent.tokenUserBuys) {
+            revert FLOnlineControl_PreSolver_BuyTokenMismatch();
+        }
+        if (solverOp.bidToken == _swapIntent.tokenUserSells) {
+            revert FLOnlineControl_PreSolver_SellTokenMismatch();
+        }
 
         // NOTE: This module is unlike the generalized swap intent module - here, the solverOp.bidAmount includes
         // the min amount that the user expects.
-        require(solverOp.bidAmount >= _swapIntent.minAmountUserBuys, "FLOnlineControl: BidBelowReserve");
+        if (solverOp.bidAmount < _swapIntent.minAmountUserBuys) {
+            revert FLOnlineControl_PreSolver_BidBelowReserve();
+        }
 
         // Optimistically transfer to the solver contract the tokens that the user is selling
         _transferUserERC20(_swapIntent.tokenUserSells, solverOp.solver, _swapIntent.amountUserSells);
@@ -114,7 +118,9 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
         // Track the balance (count any previously-forwarded tokens)
         (bool _success, bytes memory _data) =
             _swapIntent.tokenUserBuys.staticcall(abi.encodeCall(IERC20.balanceOf, address(this)));
-        require(_success, "FLOnlineControlPost: BalanceCheckFail1");
+        if (!_success) {
+            revert FLOnlineControl_PostOps_BalanceOfFailed1();
+        }
         uint256 _startingBalance = abi.decode(_data, (uint256));
 
         // Optimistically transfer to this contract the tokens that the user is selling
@@ -122,27 +128,23 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
 
         // Approve the router (NOTE that this approval happens inside the try/catch)
         SafeTransferLib.safeApprove(_swapIntent.tokenUserSells, _baselineCall.to, _swapIntent.amountUserSells);
-
-        console.log("WETH before swap:", IERC20(_swapIntent.tokenUserBuys).balanceOf(address(this)));
-        console.log("DAI before swap:", IERC20(_swapIntent.tokenUserSells).balanceOf(address(this)));
-
         // Perform the Baseline Call
         (_success,) = _baselineCall.to.call(_baselineCall.data);
-        require(_success, "FLOnlineControlPost: BaselineCallFail");
+        if (!_success) {
+            revert FLOnlineControl_PostOps_BaselineCallFailed();
+        }
 
         // Track the balance delta
         (_success, _data) = _swapIntent.tokenUserBuys.staticcall(abi.encodeCall(IERC20.balanceOf, address(this)));
-        require(_success, "FLOnlineControlPost: BalanceCheckFail2");
+        if (!_success) {
+            revert FLOnlineControl_PostOps_BalanceOfFailed2();
+        }
         uint256 _endingBalance = abi.decode(_data, (uint256));
 
-        console.log("ending balance:", _endingBalance);
-        console.log("WETH after swap:", IERC20(_swapIntent.tokenUserBuys).balanceOf(address(this)));
-        console.log("DAI after swap:", IERC20(_swapIntent.tokenUserSells).balanceOf(address(this)));
-
         // Make sure the min amount out was hit
-        require(
-            _endingBalance >= _startingBalance + _swapIntent.minAmountUserBuys, "FLOnlineControlPost: ReserveNotMet"
-        );
+        if (_endingBalance < _startingBalance + _swapIntent.minAmountUserBuys) {
+            revert FLOnlineControl_PostOps_ReserveNotMet();
+        }
 
         // Remove router approval
         SafeTransferLib.safeApprove(_swapIntent.tokenUserSells, _baselineCall.to, 0);

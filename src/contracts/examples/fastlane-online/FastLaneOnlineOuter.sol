@@ -1,8 +1,6 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.25;
 
-import "forge-std/Test.sol"; // TODO delete
-
 // Base Imports
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
@@ -53,10 +51,9 @@ contract FastLaneOnlineOuter is SolverGateway {
             _getUserOperation(msg.sender, swapIntent, baselineCall, deadline, gas, maxFeePerGas);
 
         // Validate the parameters
-        require(
-            userOpHash == IAtlasVerification(ATLAS_VERIFICATION).getUserOperationHash(_userOp),
-            "ERR - USER HASH MISMATCH"
-        );
+        if (userOpHash != IAtlasVerification(ATLAS_VERIFICATION).getUserOperationHash(_userOp)) {
+            revert FLOnlineOuter_FastOnlineSwap_UserOpHashMismatch();
+        }
         _validateSwap(swapIntent, deadline, gas, maxFeePerGas);
 
         // Transfer the user's sell tokens to here and then approve Atlas for that amount.
@@ -100,16 +97,30 @@ contract FastLaneOnlineOuter is SolverGateway {
     )
         internal
     {
-        require(deadline >= block.number, "ERR - DEADLINE PASSED");
-        require(maxFeePerGas >= tx.gasprice, "ERR - INVALID GASPRICE");
+        if (deadline < block.number) {
+            revert FLOnlineOuter_ValidateSwap_DeadlinePassed();
+        }
+        if (maxFeePerGas < tx.gasprice) {
+            revert FLOnlineOuter_ValidateSwap_InvalidGasPrice();
+        }
 
-        // TODO add back gas checks when we have more clarity
-        // require(gas > gasleft(), "ERR - TX GAS TOO HIGH");
-        // require(gas < gasleft() - 30_000, "ERR - TX GAS TOO LOW");
+        // TODO: Add back gas checks when we have more clarity
+        // if (gas > gasleft()) {
+        //     revert FLOnlineOuter_ValidateSwap_TxGasTooHigh();
+        // }
+        // if (gas < gasleft() - 30_000) {
+        //     revert FLOnlineOuter_ValidateSwap_TxGasTooLow();
+        // }
 
-        require(gas > MAX_SOLVER_GAS * 2, "ERR - GAS LIMIT TOO LOW");
-        require(swapIntent.tokenUserSells != address(0), "ERR - CANT SELL ZERO ADDRESS");
-        require(swapIntent.tokenUserBuys != address(0), "ERR - CANT BUY ZERO ADDRESS");
+        if (gas <= MAX_SOLVER_GAS * 2) {
+            revert FLOnlineOuter_ValidateSwap_GasLimitTooLow();
+        }
+        if (swapIntent.tokenUserSells == address(0)) {
+            revert FLOnlineOuter_ValidateSwap_SellTokenZeroAddress();
+        }
+        if (swapIntent.tokenUserBuys == address(0)) {
+            revert FLOnlineOuter_ValidateSwap_BuyTokenZeroAddress();
+        }
 
         // Increment the user's local nonce
         unchecked {
