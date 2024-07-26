@@ -15,8 +15,9 @@ import "src/contracts/types/SolverOperation.sol";
 import "src/contracts/types/LockTypes.sol";
 
 import { SwapIntent, BaselineCall } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
+import { FastLaneOnlineErrors } from "src/contracts/examples/fastlane-online/FastLaneOnlineErrors.sol";
 
-contract FastLaneOnlineControl is DAppControl {
+contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
     constructor(address _atlas)
         DAppControl(
             _atlas,
