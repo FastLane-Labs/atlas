@@ -37,13 +37,15 @@ contract DeployBaseScript is Script {
         // OPTIONS: LOCAL, SEPOLIA, MAINNET
         string memory deployChain = vm.envString("DEPLOY_TO");
         if (
-            keccak256(bytes(deployChain)) == keccak256(bytes("SEPOLIA"))
+            keccak256(bytes(deployChain)) == keccak256(bytes("LOCAL"))
+                || keccak256(bytes(deployChain)) == keccak256(bytes("SEPOLIA"))
                 || keccak256(bytes(deployChain)) == keccak256(bytes("MAINNET"))
-                || keccak256(bytes(deployChain)) == keccak256(bytes("LOCAL"))
+                || keccak256(bytes(deployChain)) == keccak256(bytes("AMOY"))
+                || keccak256(bytes(deployChain)) == keccak256(bytes("POLYGON"))
         ) {
             return deployChain;
         }
-        revert("Error: Set DEPLOY_TO in .env to LOCAL, SEPOLIA, or MAINNET");
+        revert("Error: Set DEPLOY_TO in .env to LOCAL, SEPOLIA, MAINNET, AMOY, or POLYGON");
     }
 
     // NOTE: When handling JSON with StdJson, prefix keys with '.' e.g. '.ATLAS'
