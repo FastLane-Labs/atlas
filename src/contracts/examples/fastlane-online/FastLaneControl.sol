@@ -1,6 +1,8 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.25;
 
+import "forge-std/Test.sol"; // TODO delete
+
 // Base Imports
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
@@ -114,11 +116,14 @@ contract FastLaneOnlineControl is DAppControl {
         require(_success, "FLOnlineControlPost: BalanceCheckFail1");
         uint256 _startingBalance = abi.decode(_data, (uint256));
 
-        // Optimistically transfer to the solver contract the tokens that the user is selling
+        // Optimistically transfer to this contract the tokens that the user is selling
         _transferUserERC20(_swapIntent.tokenUserSells, address(this), _swapIntent.amountUserSells);
 
         // Approve the router (NOTE that this approval happens inside the try/catch)
         SafeTransferLib.safeApprove(_swapIntent.tokenUserSells, _baselineCall.to, _swapIntent.amountUserSells);
+
+        console.log("WETH before swap:", IERC20(_swapIntent.tokenUserBuys).balanceOf(address(this)));
+        console.log("DAI before swap:", IERC20(_swapIntent.tokenUserSells).balanceOf(address(this)));
 
         // Perform the Baseline Call
         (_success,) = _baselineCall.to.call(_baselineCall.data);
@@ -128,6 +133,10 @@ contract FastLaneOnlineControl is DAppControl {
         (_success, _data) = _swapIntent.tokenUserBuys.staticcall(abi.encodeCall(IERC20.balanceOf, address(this)));
         require(_success, "FLOnlineControlPost: BalanceCheckFail2");
         uint256 _endingBalance = abi.decode(_data, (uint256));
+
+        console.log("ending balance:", _endingBalance);
+        console.log("WETH after swap:", IERC20(_swapIntent.tokenUserBuys).balanceOf(address(this)));
+        console.log("DAI after swap:", IERC20(_swapIntent.tokenUserSells).balanceOf(address(this)));
 
         // Make sure the min amount out was hit
         require(
