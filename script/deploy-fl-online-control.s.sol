@@ -22,6 +22,7 @@ contract DeployFLOnlineControlScript is DeployBaseScript {
         atlas = Atlas(payable(_getAddressFromDeploymentsJson("ATLAS")));
         atlasVerification = AtlasVerification(payable(_getAddressFromDeploymentsJson("ATLAS_VERIFICATION")));
 
+        console.log("Deploying to chain: \t\t\t\t", _getDeployChain(), "\n");
         console.log("Deployer address: \t\t\t\t", deployer);
         console.log("Using Atlas deployed at: \t\t\t", address(atlas));
         console.log("Using AtlasVerification deployed at: \t\t", address(atlasVerification));
@@ -38,7 +39,7 @@ contract DeployFLOnlineControlScript is DeployBaseScript {
         _writeAddressToDeploymentsJson("FL_ONLINE_DAPP_CONTROL", address(flOnline));
 
         console.log("\n");
-        console.log("FastLane Online DAppControl deployed at: \t\t", address(flOnline));
+        console.log("FastLane Online DAppControl deployed at: \t", address(flOnline));
         console.log("\n");
         console.log("You can find a list of contract addresses from the latest deployment in deployments.json");
     }
