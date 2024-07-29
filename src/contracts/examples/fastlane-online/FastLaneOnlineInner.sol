@@ -149,7 +149,7 @@ contract FastLaneOnlineInner is BaseStorage, FastLaneOnlineControl {
         // Track the balance (count any previously-forwarded tokens)
         uint256 _startingBalance = abi.decode(_data, (uint256));
 
-        // Optimistically transfer to the solver contract the tokens that the user is selling
+        // Optimistically transfer tokens from dapp to here (EE)
         _transferUserERC20(swapIntent.tokenUserSells, address(this), swapIntent.amountUserSells);
 
         // Approve the router (NOTE that this approval happens inside the try/catch)
