@@ -90,18 +90,41 @@ contract FastLaneOnlineTest is BaseTest {
         address winningSolverContract = _setUpSolver(solverOneEOA, solverOnePK, true);
 
         // User calls fastOnlineSwap, do checks that user and solver balances changed as expected
-        _doFastOnlineSwapWithBalanceChecks(winningSolverContract, true);
+        _doFastOnlineSwapWithBalanceChecks({ winningSolverContract: winningSolverContract, swapCallShouldSucceed: true });
     }
 
     function testFLOnlineSwap_OneSolverFails_BaselineCallFulfills_Success() public {
         // Set up the solver contract and register the solverOp in the FLOnline contract
-        address winningSolverContract = _setUpSolver(solverOneEOA, solverOnePK, false);
+        _setUpSolver(solverOneEOA, solverOnePK, false); // solver should fail
 
         // Check BaselineCall struct is formed correctly and can succeed, revert changes after
         _doBaselineCallWithBalanceChecksThenRevertStateChanges(userEOA, executionEnvironment);
 
-        // User calls fastOnlineSwap, do checks that user and solver balances changed as expected
-        _doFastOnlineSwapWithBalanceChecks(winningSolverContract, true);
+        uint256 snapshotId = vm.snapshot();
+
+        // First, check that fastOnlineSwap fails when 1) no solver succeeds, and 2) the DAppControl/bundler contract
+        // has no AtlETH to pay for the metacall gas cost + Atlas gas surcharge.
+        _doFastOnlineSwapWithBalanceChecks({
+            winningSolverContract: address(0), // No winning solver expected
+            swapCallShouldSucceed: false
+        });
+
+        // Revert state and check again when DAppControl/bundler contract has bonded AtlETH
+        vm.revertTo(snapshotId);
+
+        // TODO add mechanism for this in FLOnline - cannot prank in prod
+        // FLOnline DAppControl/Bundler deposits and bonds AtlETH to pay gas
+        vm.startPrank(address(flOnline));
+        deal(address(flOnline), 1e18);
+        atlas.depositAndBond{ value: 1e18 }(1e18);
+        vm.stopPrank();
+
+        // Now fastOnlineSwap should succeed using BaselineCall for fulfillment, with bundler paying the metacall gas
+        // cost + Atlas gas surcharge.
+        _doFastOnlineSwapWithBalanceChecks({
+            winningSolverContract: address(0), // No winning solver expected
+            swapCallShouldSucceed: true
+        });
     }
 
     function testFLOnlineSwap_OneSolverFails_BaselineCallReverts_Failure() public {
@@ -150,6 +173,9 @@ contract FastLaneOnlineTest is BaseTest {
             result == swapCallShouldSucceed,
             swapCallShouldSucceed ? "fastOnlineSwap should have succeeded" : "fastOnlineSwap should have reverted"
         );
+
+        // Return early if transaction expected to revert. Balance checks below would otherwise fail.
+        if (!swapCallShouldSucceed) return;
 
         // Check user's balances changed as expected
         assertTrue(
