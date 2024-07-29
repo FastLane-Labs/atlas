@@ -97,9 +97,7 @@ contract FastLaneOnlineTest is BaseTest {
         address winningSolverContract = _setUpSolver(solverOneEOA, solverOnePK, false);
 
         // Check BaselineCall struct is formed correctly and can succeed, revert changes after
-        _doBaselineCallWithBalanceChecksThenRevertStateChanges(userEOA);
-
-        return; // TODO debug failure in line below
+        _doBaselineCallWithBalanceChecksThenRevertStateChanges(userEOA, executionEnvironment);
 
         // User calls fastOnlineSwap, do checks that user and solver balances changed as expected
         _doFastOnlineSwapWithBalanceChecks(winningSolverContract, true);
@@ -202,7 +200,7 @@ contract FastLaneOnlineTest is BaseTest {
                     newArgs.swapIntent.amountUserSells, // amountIn
                     newArgs.swapIntent.minAmountUserBuys, // amountOutMin
                     path, // path = [DAI, WETH]
-                    userEOA, // to
+                    executionEnvironment, // to
                     defaultDeadlineTimestamp // deadline
                 )
             ),
@@ -292,10 +290,15 @@ contract FastLaneOnlineTest is BaseTest {
         solverOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
     }
 
-    function _doBaselineCallWithBalanceChecksThenRevertStateChanges(address caller) internal {
+    function _doBaselineCallWithBalanceChecksThenRevertStateChanges(
+        address caller,
+        address tokenOutRecipient
+    )
+        internal
+    {
         uint256 snapshotId = vm.snapshot();
-        uint256 callerWethBefore = WETH.balanceOf(caller);
         uint256 callerDaiBefore = DAI.balanceOf(caller);
+        uint256 recipientWethBefore = WETH.balanceOf(tokenOutRecipient);
 
         vm.startPrank(caller);
         DAI.approve(args.baselineCall.to, args.swapIntent.amountUserSells);
@@ -304,8 +307,8 @@ contract FastLaneOnlineTest is BaseTest {
         // Call success and balance checks
         assertTrue(success, "Baseline call should have succeeded");
         assertTrue(
-            WETH.balanceOf(caller) >= callerWethBefore + args.swapIntent.minAmountUserBuys,
-            "Caller did not recieve expected WETH in baseline call"
+            WETH.balanceOf(tokenOutRecipient) >= recipientWethBefore + args.swapIntent.minAmountUserBuys,
+            "Recipient did not recieve expected WETH in baseline call"
         );
         assertEq(
             DAI.balanceOf(caller),
