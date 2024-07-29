@@ -36,6 +36,7 @@ contract FastLaneOnlineTest is BaseTest {
 
     IUniswapV2Router02 routerV2 = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
 
+    uint256 successfulSolverBidAmount = 1.2 ether; // more than baseline swap amountOut
     uint256 defaultGasLimit = 5_000_000;
     uint256 defaultGasPrice;
     uint256 defaultDeadlineBlock;
@@ -255,7 +256,7 @@ contract FastLaneOnlineTest is BaseTest {
         });
 
         // Give solver contract 1 WETH to fulfill user's SwapIntent
-        deal(args.swapIntent.tokenUserBuys, address(solver), args.swapIntent.minAmountUserBuys);
+        deal(args.swapIntent.tokenUserBuys, address(solver), successfulSolverBidAmount);
         vm.stopPrank();
 
         // Returns the address of the solver contract deployed here
@@ -281,7 +282,7 @@ contract FastLaneOnlineTest is BaseTest {
             control: address(flOnline),
             userOpHash: args.userOpHash,
             bidToken: args.swapIntent.tokenUserBuys,
-            bidAmount: args.swapIntent.minAmountUserBuys,
+            bidAmount: successfulSolverBidAmount,
             data: abi.encodeCall(FLOnlineRFQSolver.fulfillRFQ, (args.swapIntent)),
             signature: new bytes(0)
         });
