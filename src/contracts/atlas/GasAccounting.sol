@@ -411,10 +411,6 @@ abstract contract GasAccounting is SafetyLocks {
         }
 
         if (_amountSolverPays > _amountSolverReceives) {
-            if (!ctx.solverSuccessful) {
-                revert InsufficientTotalBalance(_amountSolverPays - _amountSolverReceives);
-            }
-
             uint256 _currentDeficit =
                 _assign(_winningSolver, _amountSolverPays - _amountSolverReceives, _adjustedClaims, true);
             if (_currentDeficit > claimsPaidToBundler) {
