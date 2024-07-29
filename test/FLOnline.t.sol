@@ -31,6 +31,10 @@ contract FastLaneOnlineTest is BaseTest {
         bytes32 userOpHash;
     }
 
+    // Estimate of gas used in fastOnlineSwap that Atlas does not take a surcharge on
+    uint256 constant NON_SURCHARGE_OVERHEAD = 20_000;
+    uint256 constant ERR_MARGIN = 0.1e18; // 10% error margin
+
     IERC20 DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     address DAI_ADDRESS = address(DAI);
 
@@ -90,7 +94,7 @@ contract FastLaneOnlineTest is BaseTest {
         address winningSolverContract = _setUpSolver(solverOneEOA, solverOnePK, true);
 
         // User calls fastOnlineSwap, do checks that user and solver balances changed as expected
-        _doFastOnlineSwapWithBalanceChecks({ winningSolverContract: winningSolverContract, swapCallShouldSucceed: true });
+        _doFastOnlineSwapWithChecks({ winningSolverContract: winningSolverContract, swapCallShouldSucceed: true });
     }
 
     function testFLOnlineSwap_OneSolverFails_BaselineCallFulfills_Success() public {
@@ -104,7 +108,7 @@ contract FastLaneOnlineTest is BaseTest {
 
         // First, check that fastOnlineSwap fails when 1) no solver succeeds, and 2) the DAppControl/bundler contract
         // has no AtlETH to pay for the metacall gas cost + Atlas gas surcharge.
-        _doFastOnlineSwapWithBalanceChecks({
+        _doFastOnlineSwapWithChecks({
             winningSolverContract: address(0), // No winning solver expected
             swapCallShouldSucceed: false
         });
@@ -121,7 +125,7 @@ contract FastLaneOnlineTest is BaseTest {
 
         // Now fastOnlineSwap should succeed using BaselineCall for fulfillment, with bundler paying the metacall gas
         // cost + Atlas gas surcharge.
-        _doFastOnlineSwapWithBalanceChecks({
+        _doFastOnlineSwapWithChecks({
             winningSolverContract: address(0), // No winning solver expected
             swapCallShouldSucceed: true
         });
@@ -155,19 +159,27 @@ contract FastLaneOnlineTest is BaseTest {
     //                        Helpers                       //
     // ---------------------------------------------------- //
 
-    function _doFastOnlineSwapWithBalanceChecks(address winningSolverContract, bool swapCallShouldSucceed) internal {
+    function _doFastOnlineSwapWithChecks(address winningSolverContract, bool swapCallShouldSucceed) internal {
         uint256 userWethBefore = WETH.balanceOf(userEOA);
         uint256 userDaiBefore = DAI.balanceOf(userEOA);
         uint256 solverWethBefore = WETH.balanceOf(winningSolverContract);
         uint256 solverDaiBefore = DAI.balanceOf(winningSolverContract);
+        uint256 atlasGasSurchargeBefore = atlas.cumulativeSurcharge();
+        uint256 estAtlasGasSurcharge = gasleft(); // Reused below during calculations
 
         vm.prank(userEOA);
+
+        // Do the actual fastOnlineSwap call
         (bool result,) = address(flOnline).call{ gas: args.gas + 1000 }(
             abi.encodeCall(
                 flOnline.fastOnlineSwap,
                 (args.swapIntent, args.baselineCall, args.deadline, args.gas, args.maxFeePerGas, args.userOpHash)
             )
         );
+
+        // Calculate estimated Atlas gas surcharge taken from call above
+        estAtlasGasSurcharge = (estAtlasGasSurcharge - gasleft() - NON_SURCHARGE_OVERHEAD) * defaultGasPrice
+            * atlas.ATLAS_SURCHARGE_RATE() / atlas.SCALE();
 
         assertTrue(
             result == swapCallShouldSucceed,
@@ -176,6 +188,14 @@ contract FastLaneOnlineTest is BaseTest {
 
         // Return early if transaction expected to revert. Balance checks below would otherwise fail.
         if (!swapCallShouldSucceed) return;
+
+        // Check Atlas gas surcharge earned is within 5% of the estimated gas surcharge
+        assertApproxEqRel(
+            atlas.cumulativeSurcharge() - atlasGasSurchargeBefore,
+            estAtlasGasSurcharge,
+            ERR_MARGIN,
+            "Atlas gas surcharge not within estimated range"
+        );
 
         // Check user's balances changed as expected
         assertTrue(
