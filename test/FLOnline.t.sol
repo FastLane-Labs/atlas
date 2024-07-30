@@ -102,7 +102,11 @@ contract FastLaneOnlineTest is BaseTest {
         _setUpSolver(solverOneEOA, solverOnePK, false); // solver should fail
 
         // Check BaselineCall struct is formed correctly and can succeed, revert changes after
-        _doBaselineCallWithBalanceChecksThenRevertStateChanges(userEOA, executionEnvironment);
+        _doBaselineCallWithBalanceChecksThenRevertStateChanges({
+            caller: userEOA,
+            tokenOutRecipient: executionEnvironment,
+            shouldSucceed: true
+        });
 
         uint256 snapshotId = vm.snapshot();
 
@@ -132,7 +136,26 @@ contract FastLaneOnlineTest is BaseTest {
     }
 
     function testFLOnlineSwap_OneSolverFails_BaselineCallReverts_Failure() public {
-        vm.skip(true);
+        // Set baselineCall incorrectly to intentionally fail
+        _setBaselineCallToRevert();
+
+        _setUpSolver(solverOneEOA, solverOnePK, false); // solver should fail
+
+        // Check BaselineCall struct is formed correctly and can revert, revert changes after
+        _doBaselineCallWithBalanceChecksThenRevertStateChanges({
+            caller: userEOA,
+            tokenOutRecipient: executionEnvironment,
+            shouldSucceed: false
+        });
+
+        // TODO remove this when intended behavior in this situation is more clear. Should fastOnlineSwap revert or succeed even though the user does not get fullfilled at all?
+        return;
+
+        // fastOnlineSwap should revert if all solvers fail AND the baseline call also fails
+        _doFastOnlineSwapWithChecks({
+            winningSolverContract: address(0), // No winning solver expected
+            swapCallShouldSucceed: false
+        });
     }
 
     function testFLOnlineSwap_ZeroSolvers_BaselineCallFullfills_Success() public {
@@ -339,7 +362,8 @@ contract FastLaneOnlineTest is BaseTest {
 
     function _doBaselineCallWithBalanceChecksThenRevertStateChanges(
         address caller,
-        address tokenOutRecipient
+        address tokenOutRecipient,
+        bool shouldSucceed
     )
         internal
     {
@@ -351,8 +375,17 @@ contract FastLaneOnlineTest is BaseTest {
         DAI.approve(args.baselineCall.to, args.swapIntent.amountUserSells);
         (bool success,) = args.baselineCall.to.call(args.baselineCall.data);
         vm.stopPrank();
-        // Call success and balance checks
-        assertTrue(success, "Baseline call should have succeeded");
+
+        assertTrue(
+            success == shouldSucceed,
+            shouldSucceed ? "Baseline call should have succeeded" : "Baseline call should have reverted"
+        );
+
+        if (!shouldSucceed) {
+            vm.revertTo(snapshotId);
+            return;
+        }
+
         assertTrue(
             WETH.balanceOf(tokenOutRecipient) >= recipientWethBefore + args.swapIntent.minAmountUserBuys,
             "Recipient did not recieve expected WETH in baseline call"
@@ -364,6 +397,40 @@ contract FastLaneOnlineTest is BaseTest {
         );
         //Revert back to state before baseline call was done
         vm.revertTo(snapshotId);
+    }
+
+    function _setBaselineCallToRevert() internal {
+        // Everything correct except amountOutMin is too high
+        address[] memory path = new address[](2);
+        path[0] = DAI_ADDRESS;
+        path[1] = WETH_ADDRESS;
+
+        args.baselineCall = BaselineCall({
+            to: address(routerV2),
+            data: abi.encodeCall(
+                routerV2.swapExactTokensForTokens,
+                (
+                    args.swapIntent.amountUserSells, // amountIn
+                    9999e18, // BAD amountOutMin
+                    path, // path = [DAI, WETH]
+                    executionEnvironment, // to
+                    defaultDeadlineTimestamp // deadline
+                )
+            ),
+            success: true
+        });
+
+        // Update userOpHash for new args otherwise solverOp will fail verification
+        args.userOpHash = atlasVerification.getUserOperationHash(
+            flOnline.getUserOperation({
+                swapper: userEOA,
+                swapIntent: args.swapIntent,
+                baselineCall: args.baselineCall,
+                deadline: defaultDeadlineBlock,
+                gas: defaultGasLimit,
+                maxFeePerGas: defaultGasPrice
+            })
+        );
     }
 }
 
