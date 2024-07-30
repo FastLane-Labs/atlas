@@ -41,6 +41,7 @@ contract FastLaneOnlineTest is BaseTest {
     IUniswapV2Router02 routerV2 = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
 
     uint256 successfulSolverBidAmount = 1.2 ether; // more than baseline swap amountOut
+    uint256 defaultMsgValue = 1e17; // 0.1 ETH
     uint256 defaultGasLimit = 5_000_000;
     uint256 defaultGasPrice;
     uint256 defaultDeadlineBlock;
@@ -79,6 +80,7 @@ contract FastLaneOnlineTest is BaseTest {
         // User starts with 0 WETH (tokenUserBuys) and 3200 DAI (tokenUserSells)
         deal(args.swapIntent.tokenUserBuys, userEOA, 0); // Burn user's WETH to start at 0
         deal(args.swapIntent.tokenUserSells, userEOA, args.swapIntent.amountUserSells); // 3200 DAI
+        deal(userEOA, 1e18); // Give user 1 ETH to pay for gas (msg.value is 0.1 ETH per call by default)
 
         // User approves FLOnline to take 3200 DAI
         vm.prank(userEOA);
@@ -94,7 +96,10 @@ contract FastLaneOnlineTest is BaseTest {
         address winningSolverContract = _setUpSolver(solverOneEOA, solverOnePK, true);
 
         // User calls fastOnlineSwap, do checks that user and solver balances changed as expected
-        _doFastOnlineSwapWithChecks({ winningSolverContract: winningSolverContract, swapCallShouldSucceed: true });
+        _doFastOnlineSwapWithChecks({
+            winningSolverContract: winningSolverContract,
+            swapCallShouldSucceed: true
+        });
     }
 
     function testFLOnlineSwap_OneSolverFails_BaselineCallFulfills_Success() public {
@@ -108,31 +113,11 @@ contract FastLaneOnlineTest is BaseTest {
             shouldSucceed: true
         });
 
-        uint256 snapshotId = vm.snapshot();
-
-        // First, check that fastOnlineSwap fails when 1) no solver succeeds, and 2) the DAppControl/bundler contract
-        // has no AtlETH to pay for the metacall gas cost + Atlas gas surcharge.
-        _doFastOnlineSwapWithChecks({
-            winningSolverContract: address(0), // No winning solver expected
-            swapCallShouldSucceed: false
-        });
-
-        // Revert state and check again when DAppControl/bundler contract has bonded AtlETH
-        vm.revertTo(snapshotId);
-
-        // TODO add mechanism for this in FLOnline - cannot prank in prod
-        // FLOnline DAppControl/Bundler deposits and bonds AtlETH to pay gas
-        vm.startPrank(address(flOnline));
-        deal(address(flOnline), 1e18);
-        atlas.depositAndBond{ value: 1e18 }(1e18);
-        vm.stopPrank();
-
-        // Now fastOnlineSwap should succeed using BaselineCall for fulfillment, with bundler paying the metacall gas
-        // cost + Atlas gas surcharge.
+        // Now fastOnlineSwap should succeed using BaselineCall for fulfillment, with gas + Atlas gas surcharge paid for by ETH sent as msg.value by user.
         _doFastOnlineSwapWithChecks({
             winningSolverContract: address(0), // No winning solver expected
             swapCallShouldSucceed: true
-        });
+         });
     }
 
     function testFLOnlineSwap_OneSolverFails_BaselineCallReverts_Failure() public {
@@ -148,7 +133,8 @@ contract FastLaneOnlineTest is BaseTest {
             shouldSucceed: false
         });
 
-        // TODO remove this when intended behavior in this situation is more clear. Should fastOnlineSwap revert or succeed even though the user does not get fullfilled at all?
+        // TODO remove this when intended behavior in this situation is more clear. Should fastOnlineSwap revert or
+        // succeed even though the user does not get fullfilled at all?
         return;
 
         // fastOnlineSwap should revert if all solvers fail AND the baseline call also fails
@@ -182,7 +168,12 @@ contract FastLaneOnlineTest is BaseTest {
     //                        Helpers                       //
     // ---------------------------------------------------- //
 
-    function _doFastOnlineSwapWithChecks(address winningSolverContract, bool swapCallShouldSucceed) internal {
+    function _doFastOnlineSwapWithChecks(
+        address winningSolverContract,
+        bool swapCallShouldSucceed
+    )
+        internal
+    {
         uint256 userWethBefore = WETH.balanceOf(userEOA);
         uint256 userDaiBefore = DAI.balanceOf(userEOA);
         uint256 solverWethBefore = WETH.balanceOf(winningSolverContract);
@@ -193,7 +184,7 @@ contract FastLaneOnlineTest is BaseTest {
         vm.prank(userEOA);
 
         // Do the actual fastOnlineSwap call
-        (bool result,) = address(flOnline).call{ gas: args.gas + 1000 }(
+        (bool result,) = address(flOnline).call{ gas: args.gas + 1000, value: defaultMsgValue }(
             abi.encodeCall(
                 flOnline.fastOnlineSwap,
                 (args.swapIntent, args.baselineCall, args.deadline, args.gas, args.maxFeePerGas, args.userOpHash)
