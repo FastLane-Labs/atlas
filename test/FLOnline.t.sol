@@ -96,10 +96,7 @@ contract FastLaneOnlineTest is BaseTest {
         address winningSolverContract = _setUpSolver(solverOneEOA, solverOnePK, true);
 
         // User calls fastOnlineSwap, do checks that user and solver balances changed as expected
-        _doFastOnlineSwapWithChecks({
-            winningSolverContract: winningSolverContract,
-            swapCallShouldSucceed: true
-        });
+        _doFastOnlineSwapWithChecks({ winningSolverContract: winningSolverContract, swapCallShouldSucceed: true });
     }
 
     function testFLOnlineSwap_OneSolverFails_BaselineCallFulfills_Success() public {
@@ -113,11 +110,12 @@ contract FastLaneOnlineTest is BaseTest {
             shouldSucceed: true
         });
 
-        // Now fastOnlineSwap should succeed using BaselineCall for fulfillment, with gas + Atlas gas surcharge paid for by ETH sent as msg.value by user.
+        // Now fastOnlineSwap should succeed using BaselineCall for fulfillment, with gas + Atlas gas surcharge paid for
+        // by ETH sent as msg.value by user.
         _doFastOnlineSwapWithChecks({
             winningSolverContract: address(0), // No winning solver expected
             swapCallShouldSucceed: true
-         });
+        });
     }
 
     function testFLOnlineSwap_OneSolverFails_BaselineCallReverts_Failure() public {
@@ -133,15 +131,11 @@ contract FastLaneOnlineTest is BaseTest {
             shouldSucceed: false
         });
 
-        // TODO remove this when intended behavior in this situation is more clear. Should fastOnlineSwap revert or
-        // succeed even though the user does not get fullfilled at all?
-        return;
-
         // fastOnlineSwap should revert if all solvers fail AND the baseline call also fails
         _doFastOnlineSwapWithChecks({
             winningSolverContract: address(0), // No winning solver expected
-            swapCallShouldSucceed: false
-        });
+            swapCallShouldSucceed: false // fastOnlineSwap should revert
+         });
     }
 
     function testFLOnlineSwap_ZeroSolvers_BaselineCallFullfills_Success() public {
@@ -168,12 +162,7 @@ contract FastLaneOnlineTest is BaseTest {
     //                        Helpers                       //
     // ---------------------------------------------------- //
 
-    function _doFastOnlineSwapWithChecks(
-        address winningSolverContract,
-        bool swapCallShouldSucceed
-    )
-        internal
-    {
+    function _doFastOnlineSwapWithChecks(address winningSolverContract, bool swapCallShouldSucceed) internal {
         uint256 userWethBefore = WETH.balanceOf(userEOA);
         uint256 userDaiBefore = DAI.balanceOf(userEOA);
         uint256 solverWethBefore = WETH.balanceOf(winningSolverContract);
