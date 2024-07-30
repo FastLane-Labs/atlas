@@ -93,7 +93,7 @@ contract FastLaneOnlineTest is BaseTest {
         // frontrunning tx to register this fulfillment solverOp in the FLOnline contract via addSolverOp()
 
         // Set up the solver contract and register the solverOp in the FLOnline contract
-        address winningSolverContract = _setUpSolver(solverOneEOA, solverOnePK, true);
+        address winningSolverContract = _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount, true);
 
         // User calls fastOnlineSwap, do checks that user and solver balances changed as expected
         _doFastOnlineSwapWithChecks({ winningSolverContract: winningSolverContract, swapCallShouldSucceed: true });
@@ -101,7 +101,7 @@ contract FastLaneOnlineTest is BaseTest {
 
     function testFLOnlineSwap_OneSolverFails_BaselineCallFulfills_Success() public {
         // Set up the solver contract and register the solverOp in the FLOnline contract
-        _setUpSolver(solverOneEOA, solverOnePK, false); // solver should fail
+        _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount, false); // solver should fail
 
         // Check BaselineCall struct is formed correctly and can succeed, revert changes after
         _doBaselineCallWithBalanceChecksThenRevertStateChanges({
@@ -122,7 +122,7 @@ contract FastLaneOnlineTest is BaseTest {
         // Set baselineCall incorrectly to intentionally fail
         _setBaselineCallToRevert();
 
-        _setUpSolver(solverOneEOA, solverOnePK, false); // solver should fail
+        _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount, false); // solver should fail
 
         // Check BaselineCall struct is formed correctly and can revert, revert changes after
         _doBaselineCallWithBalanceChecksThenRevertStateChanges({
@@ -139,15 +139,50 @@ contract FastLaneOnlineTest is BaseTest {
     }
 
     function testFLOnlineSwap_ZeroSolvers_BaselineCallFullfills_Success() public {
-        vm.skip(true);
+        // No solverOps at all
+        _doBaselineCallWithBalanceChecksThenRevertStateChanges({
+            caller: userEOA,
+            tokenOutRecipient: executionEnvironment,
+            shouldSucceed: true
+        });
+
+        // Now fastOnlineSwap should succeed using BaselineCall for fulfillment, with gas + Atlas gas surcharge paid for
+        // by ETH sent as msg.value by user.
+        _doFastOnlineSwapWithChecks({
+            winningSolverContract: address(0), // No winning solver expected
+            swapCallShouldSucceed: true
+        });
     }
 
     function testFLOnlineSwap_ZeroSolvers_BaselineCallReverts_Failure() public {
-        vm.skip(true);
+        // No solverOps at all
+
+        // Set baselineCall incorrectly to intentionally fail
+        _setBaselineCallToRevert();
+
+        // Check BaselineCall struct is formed correctly and can revert, revert changes after
+        _doBaselineCallWithBalanceChecksThenRevertStateChanges({
+            caller: userEOA,
+            tokenOutRecipient: executionEnvironment,
+            shouldSucceed: false
+        });
+
+        // fastOnlineSwap should revert if all solvers fail AND the baseline call also fails
+        _doFastOnlineSwapWithChecks({
+            winningSolverContract: address(0), // No winning solver expected
+            swapCallShouldSucceed: false // fastOnlineSwap should revert
+         });
     }
 
     function testFLOnlineSwap_ThreeSolvers_ThirdFullfills_Success() public {
-        vm.skip(true);
+        // Set up the solver contracts and register the solverOps in the FLOnline contract
+        _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount, true);
+        _setUpSolver(solverTwoEOA, solverTwoPK, successfulSolverBidAmount + 1e17, true);
+        address winningSolverContract =
+            _setUpSolver(solverThreeEOA, solverThreePK, successfulSolverBidAmount + 2e17, true);
+
+        // User calls fastOnlineSwap, do checks that user and solver balances changed as expected
+        _doFastOnlineSwapWithChecks({ winningSolverContract: winningSolverContract, swapCallShouldSucceed: true });
     }
 
     function testFLOnlineSwap_ThreeSolvers_AllFail_BaselineCallFullfills_Success() public {
@@ -157,6 +192,8 @@ contract FastLaneOnlineTest is BaseTest {
     function testFLOnlineSwap_ThreeSolvers_AllFail_BaselineCallReverts_Failure() public {
         vm.skip(true);
     }
+
+    // TODO add tests when solverOp is valid, but does not outperform baseline call, baseline call used instead
 
     // ---------------------------------------------------- //
     //                        Helpers                       //
@@ -273,7 +310,15 @@ contract FastLaneOnlineTest is BaseTest {
         newArgs.maxFeePerGas = defaultGasPrice;
     }
 
-    function _setUpSolver(address solverEOA, uint256 solverPK, bool shouldSucceed) internal returns (address) {
+    function _setUpSolver(
+        address solverEOA,
+        uint256 solverPK,
+        uint256 bidAmount,
+        bool shouldSucceed
+    )
+        internal
+        returns (address)
+    {
         vm.startPrank(solverEOA);
         // Make sure solver has 1 AtlETH bonded in Atlas
         uint256 bonded = atlas.balanceOfBonded(solverEOA);
@@ -287,10 +332,11 @@ contract FastLaneOnlineTest is BaseTest {
         }
 
         // Deploy RFQ solver contract
-        FLOnlineRFQSolver solver = new FLOnlineRFQSolver(WETH_ADDRESS, address(atlas), shouldSucceed);
+        bytes32 salt = keccak256(abi.encodePacked(address(flOnline), solverEOA, bidAmount, shouldSucceed));
+        FLOnlineRFQSolver solver = new FLOnlineRFQSolver{ salt: salt }(WETH_ADDRESS, address(atlas), shouldSucceed);
 
         // Solver signs the solverOp
-        SolverOperation memory solverOp = _buildSolverOp(solverEOA, solverPK, address(solver));
+        SolverOperation memory solverOp = _buildSolverOp(solverEOA, solverPK, address(solver), bidAmount);
 
         // Register solverOp in FLOnline in frontrunning tx
         flOnline.addSolverOp({
@@ -305,7 +351,7 @@ contract FastLaneOnlineTest is BaseTest {
         });
 
         // Give solver contract 1 WETH to fulfill user's SwapIntent
-        deal(args.swapIntent.tokenUserBuys, address(solver), successfulSolverBidAmount);
+        deal(args.swapIntent.tokenUserBuys, address(solver), bidAmount);
         vm.stopPrank();
 
         // Returns the address of the solver contract deployed here
@@ -315,7 +361,8 @@ contract FastLaneOnlineTest is BaseTest {
     function _buildSolverOp(
         address solverEOA,
         uint256 solverPK,
-        address solverContract
+        address solverContract,
+        uint256 bidAmount
     )
         internal
         returns (SolverOperation memory solverOp)
@@ -331,7 +378,7 @@ contract FastLaneOnlineTest is BaseTest {
             control: address(flOnline),
             userOpHash: args.userOpHash,
             bidToken: args.swapIntent.tokenUserBuys,
-            bidAmount: successfulSolverBidAmount,
+            bidAmount: bidAmount,
             data: abi.encodeCall(FLOnlineRFQSolver.fulfillRFQ, (args.swapIntent)),
             signature: new bytes(0)
         });
