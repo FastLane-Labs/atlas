@@ -76,10 +76,9 @@ contract FastLaneOnlineOuter is SolverGateway {
         uint256 _gasTokenBalance = address(this).balance;
 
         // Metacall
-        (bool _success, bytes memory _data) =
-            ATLAS.call{
-                gas: _metacallGasLimit(_cumulativeGasReserved, gas, gasleft())
-            }(abi.encodeCall(IAtlas.metacall, (_userOp, _solverOps, _dAppOp)));
+        (bool _success, bytes memory _data) = ATLAS.call{
+            gas: _metacallGasLimit(_cumulativeGasReserved, gas, gasleft())
+        }(abi.encodeCall(IAtlas.metacall, (_userOp, _solverOps, _dAppOp)));
         if (!_success) {
             assembly {
                 revert(add(_data, 32), mload(_data))
