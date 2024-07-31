@@ -57,6 +57,9 @@ contract FastLaneOnlineOuter is SolverGateway {
         );
         _validateSwap(swapIntent, deadline, gas, maxFeePerGas);
 
+        // Now that we have the standardized userOpHash we can update the userOp's gas limit
+        _userOp.gas = METACALL_GAS_BUFFER;
+
         // Transfer the user's sell tokens to here and then approve Atlas for that amount.
         SafeTransferLib.safeTransferFrom(
             swapIntent.tokenUserSells, msg.sender, address(this), swapIntent.amountUserSells
@@ -64,7 +67,7 @@ contract FastLaneOnlineOuter is SolverGateway {
         SafeTransferLib.safeApprove(swapIntent.tokenUserSells, ATLAS, swapIntent.amountUserSells);
 
         // Get any SolverOperations
-        SolverOperation[] memory _solverOps = _getSolverOps(userOpHash);
+        (SolverOperation[] memory _solverOps, uint256 _cumulativeGasReserved) = _getSolverOps(userOpHash);
 
         // Build DAppOp
         DAppOperation memory _dAppOp = _getDAppOp(userOpHash, deadline);
@@ -74,7 +77,9 @@ contract FastLaneOnlineOuter is SolverGateway {
 
         // Metacall
         (bool _success, bytes memory _data) =
-            ATLAS.call(abi.encodeCall(IAtlas.metacall, (_userOp, _solverOps, _dAppOp)));
+            ATLAS.call{
+                gas: _metacallGasLimit(_cumulativeGasReserved, gas, gasleft())
+            }(abi.encodeCall(IAtlas.metacall, (_userOp, _solverOps, _dAppOp)));
         if (!_success) {
             assembly {
                 revert(add(_data, 32), mload(_data))
@@ -110,5 +115,21 @@ contract FastLaneOnlineOuter is SolverGateway {
         unchecked {
             ++S_userNonces[msg.sender];
         }
+    }
+
+    function _metacallGasLimit(
+        uint256 cumulativeGasReserved,
+        uint256 totalGas,
+        uint256 gasLeft
+    )
+        internal
+        pure
+        returns (uint256 metacallGasLimit)
+    {
+        // Reduce any unnecessary gas to avoid Atlas's excessive gas bundler penalty
+        cumulativeGasReserved += METACALL_GAS_BUFFER;
+        metacallGasLimit = totalGas > gasLeft
+            ? (gasLeft > cumulativeGasReserved ? cumulativeGasReserved : gasLeft)
+            : (totalGas > cumulativeGasReserved ? cumulativeGasReserved : totalGas);
     }
 }
