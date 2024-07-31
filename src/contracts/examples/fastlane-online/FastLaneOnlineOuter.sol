@@ -18,6 +18,7 @@ import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.
 import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
+import { BaselineSwapper } from "src/contracts/examples/fastlane-online/BaselineSwapper.sol";
 import { FastLaneOnlineControl } from "src/contracts/examples/fastlane-online/FastLaneControl.sol";
 import { FastLaneOnlineInner } from "src/contracts/examples/fastlane-online/FastLaneOnlineInner.sol";
 import { SolverGateway } from "src/contracts/examples/fastlane-online/SolverGateway.sol";
@@ -26,6 +27,15 @@ import { SwapIntent, BaselineCall } from "src/contracts/examples/fastlane-online
 
 interface IGeneralizedBackrunProxy {
     function getUser() external view returns (address);
+}
+
+interface IBaselineSwapper {
+    function baselineSwap(
+        SwapIntent calldata swapIntent,
+        BaselineCall calldata baselineCall,
+        address swapper
+    )
+        external;
 }
 
 contract FastLaneOnlineOuter is SolverGateway {
@@ -58,12 +68,7 @@ contract FastLaneOnlineOuter is SolverGateway {
         _validateSwap(swapIntent, deadline, gas, maxFeePerGas);
 
         // Track the gas token balance to repay the swapper with
-        uint256 _gasTokenBalance = address(this).balance;
-
-        // Transfer the user's sell tokens to here.
-        SafeTransferLib.safeTransferFrom(
-            swapIntent.tokenUserSells, msg.sender, address(this), swapIntent.amountUserSells
-        );
+        uint256 _gasRefundTracker = address(this).balance;
 
         // Get any SolverOperations
         SolverOperation[] memory _solverOps = _getSolverOps(userOpHash);
@@ -71,7 +76,12 @@ contract FastLaneOnlineOuter is SolverGateway {
         // Execute if we have price improvement potential from Solvers.
         bool _success = _solverOps.length > 0;
         if (_success) {
-            // Approve Atlas for that amount.
+            // Transfer the user's sell tokens to here for Atlas to use
+            SafeTransferLib.safeTransferFrom(
+                swapIntent.tokenUserSells, msg.sender, address(this), swapIntent.amountUserSells
+            );
+
+            // Approve Atlas for that amount (Permit69)
             SafeTransferLib.safeApprove(swapIntent.tokenUserSells, ATLAS, swapIntent.amountUserSells);
 
             // Build DAppOp
@@ -85,21 +95,47 @@ contract FastLaneOnlineOuter is SolverGateway {
 
             // Undo the token approval
             SafeTransferLib.safeApprove(swapIntent.tokenUserSells, ATLAS, 0);
+
+            // If metacall was successful, transfer any leftover sell tokens to the User.
+            // NOTE: The transfer of the bought token is already handled inside either the Atlas call or the baseline
+            // call
+            uint256 _sellTokenBalance = _getERC20Balance(swapIntent.tokenUserSells);
+            if (_success) {
+                if (_sellTokenBalance > 0) {
+                    SafeTransferLib.safeTransfer(swapIntent.tokenUserSells, msg.sender, _sellTokenBalance);
+                }
+
+                // If metacall wasn't successful, transfer the sell tokens to the BaselineSwapper
+            } else {
+                SafeTransferLib.safeTransfer(swapIntent.tokenUserSells, BASELINE_SWAPPER, _sellTokenBalance);
+            }
+
+            // If there were no solvers, bypass the metacall
+        } else {
+            // Transfer tokens straight from the swapper to the BaselineSwapper contract
+            SafeTransferLib.safeTransferFrom(
+                swapIntent.tokenUserSells, msg.sender, BASELINE_SWAPPER, swapIntent.amountUserSells
+            );
         }
 
-        // If metacall failed or if it was never executed, do the baseline call locally
+        // If metacall failed or if it was never executed, do the baseline call from the Baseline contract
         if (!_success) {
-            _baselineSwap(swapIntent, baselineCall);
+            bytes memory _data = abi.encodeCall(IBaselineSwapper.baselineSwap, (swapIntent, baselineCall, msg.sender));
+            (_success, _data) = BASELINE_SWAPPER.call(_data);
+            // Bubble up error on fail
+            if (!_success) {
+                assembly {
+                    revert(add(_data, 32), mload(_data))
+                }
+            }
         }
 
         // Handle gas token balance reimbursement (reimbursement from Atlas and the congestion buy ins)
-        _gasTokenBalance = address(this).balance - _gasTokenBalance + S_aggCongestionBuyIn[userOpHash];
-        delete S_aggCongestionBuyIn[userOpHash];
+        // NOTE: We do not pay the congestion fees to the user
+        _gasRefundTracker = _processCongestionRake(address(this).balance - _gasRefundTracker, userOpHash);
 
-        // Transfer the appropriate gas tokens and any leftover sell tokens to the User.
-        // NOTE: The transfer of the Buy token is already handled inside either the Atlas call or the baseline call
-        SafeTransferLib.safeTransfer(swapIntent.tokenUserSells, msg.sender, _getERC20Balance(swapIntent.tokenUserBuys));
-        SafeTransferLib.safeTransferETH(msg.sender, _gasTokenBalance);
+        // Transfer the appropriate gas tokens
+        SafeTransferLib.safeTransferETH(msg.sender, _gasRefundTracker);
     }
 
     function _validateSwap(
@@ -125,26 +161,13 @@ contract FastLaneOnlineOuter is SolverGateway {
     }
 
     function _baselineSwap(SwapIntent calldata swapIntent, BaselineCall calldata baselineCall) internal {
-        // Track the balance (count any previously-forwarded tokens)
-        uint256 _startingBalance = _getERC20Balance(swapIntent.tokenUserBuys);
-
-        // Approve the baseline router (NOTE that this approval does NOT happen inside the try/catch)
-        SafeTransferLib.safeApprove(swapIntent.tokenUserSells, baselineCall.to, swapIntent.amountUserSells);
-
-        // Perform the Baseline Call
-        (bool _success,) = baselineCall.to.call(baselineCall.data);
-        require(_success, "Outer: BaselineCallFail");
-
-        // Track the balance delta
-        uint256 _endingBalance = _getERC20Balance(swapIntent.tokenUserBuys);
-
-        // Verify swap amount exceeds slippage threshold
-        require(_endingBalance - _startingBalance > swapIntent.minAmountUserBuys, "Outer: InsufficientAmount");
-
-        // Reset the approval
-        SafeTransferLib.safeApprove(swapIntent.tokenUserSells, baselineCall.to, 0);
-
-        // Transfer the purchased tokens to the swapper.
-        SafeTransferLib.safeTransfer(swapIntent.tokenUserBuys, msg.sender, _endingBalance);
+        (bool _success, bytes memory _data) =
+            BASELINE_SWAPPER.call(abi.encodeCall(IBaselineSwapper.baselineSwap, (swapIntent, baselineCall, msg.sender)));
+        // Bubble up error on fail
+        if (!_success) {
+            assembly {
+                revert(add(_data, 32), mload(_data))
+            }
+        }
     }
 }

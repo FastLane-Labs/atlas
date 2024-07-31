@@ -14,10 +14,10 @@ import "src/contracts/types/LockTypes.sol";
 
 import { SwapIntent, BaselineCall } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
 
-
 interface ISolverGateway {
-    function getBidAmount(bytes32 solverOpHash) external view returns (uint256 bidAmount);  
+    function getBidAmount(bytes32 solverOpHash) external view returns (uint256 bidAmount);
 }
+
 contract FastLaneOnlineControl is DAppControl {
     constructor(address _atlas)
         DAppControl(
@@ -78,7 +78,8 @@ contract FastLaneOnlineControl is DAppControl {
         // This needs to be fixed by customizing the getters so they don't work during the actual SolverOps.
         if (!_bidFind()) {
             bytes32 _solverOpHash = keccak256(abi.encode(solverOp));
-            (bool _success, bytes memory _data) = CONTROL.staticcall(abi.encodeCall(ISolverGateway.getBidAmount, (_solverOpHash)));
+            (bool _success, bytes memory _data) =
+                CONTROL.staticcall(abi.encodeCall(ISolverGateway.getBidAmount, (_solverOpHash)));
             require(_success, "FLOnlineControl: BidAmountFail");
 
             uint256 _minBidAmount = abi.decode(_data, (uint256));
