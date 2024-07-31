@@ -57,36 +57,48 @@ contract FastLaneOnlineOuter is SolverGateway {
         );
         _validateSwap(swapIntent, deadline, gas, maxFeePerGas);
 
-        // Transfer the user's sell tokens to here and then approve Atlas for that amount.
+        // Track the gas token balance to repay the swapper with
+        uint256 _gasTokenBalance = address(this).balance;
+
+        // Transfer the user's sell tokens to here.
         SafeTransferLib.safeTransferFrom(
             swapIntent.tokenUserSells, msg.sender, address(this), swapIntent.amountUserSells
         );
-        SafeTransferLib.safeApprove(swapIntent.tokenUserSells, ATLAS, swapIntent.amountUserSells);
 
         // Get any SolverOperations
         SolverOperation[] memory _solverOps = _getSolverOps(userOpHash);
 
-        // Build DAppOp
-        DAppOperation memory _dAppOp = _getDAppOp(userOpHash, deadline);
+        // Execute if we have price improvement potential from Solvers.
+        bool _success = _solverOps.length > 0;
+        if (_success) {
+            // Approve Atlas for that amount.
+            SafeTransferLib.safeApprove(swapIntent.tokenUserSells, ATLAS, swapIntent.amountUserSells);
 
-        // Track the gas token balance to repay the swapper with
-        uint256 _gasTokenBalance = address(this).balance;
+            // Build DAppOp
+            DAppOperation memory _dAppOp = _getDAppOp(userOpHash, deadline);
 
-        // Metacall
-        (bool _success, bytes memory _data) =
-            ATLAS.call(abi.encodeCall(IAtlas.metacall, (_userOp, _solverOps, _dAppOp)));
-        if (!_success) {
-            assembly {
-                revert(add(_data, 32), mload(_data))
-            }
+            // Encode and Metacall
+            bytes memory _data = abi.encodeCall(IAtlas.metacall, (_userOp, _solverOps, _dAppOp));
+
+            (_success, _data) = ATLAS.call(_data);
+            // NOTE: Do not revert if the Atlas call failed.
+
+            // Undo the token approval
+            SafeTransferLib.safeApprove(swapIntent.tokenUserSells, ATLAS, 0);
         }
 
-        // Revert the token approval
-        SafeTransferLib.safeApprove(swapIntent.tokenUserSells, ATLAS, 0);
+        // If metacall failed or if it was never executed, do the baseline call locally
+        if (!_success) {
+            _baselineSwap(swapIntent, baselineCall);
+        }
 
         // Handle gas token balance reimbursement (reimbursement from Atlas and the congestion buy ins)
         _gasTokenBalance = address(this).balance - _gasTokenBalance + S_aggCongestionBuyIn[userOpHash];
         delete S_aggCongestionBuyIn[userOpHash];
+
+        // Transfer the appropriate gas tokens and any leftover sell tokens to the User.
+        // NOTE: The transfer of the Buy token is already handled inside either the Atlas call or the baseline call
+        SafeTransferLib.safeTransfer(swapIntent.tokenUserSells, msg.sender, _getERC20Balance(swapIntent.tokenUserBuys));
         SafeTransferLib.safeTransferETH(msg.sender, _gasTokenBalance);
     }
 
@@ -110,5 +122,29 @@ contract FastLaneOnlineOuter is SolverGateway {
         unchecked {
             ++S_userNonces[msg.sender];
         }
+    }
+
+    function _baselineSwap(SwapIntent calldata swapIntent, BaselineCall calldata baselineCall) internal {
+        // Track the balance (count any previously-forwarded tokens)
+        uint256 _startingBalance = _getERC20Balance(swapIntent.tokenUserBuys);
+
+        // Approve the baseline router (NOTE that this approval does NOT happen inside the try/catch)
+        SafeTransferLib.safeApprove(swapIntent.tokenUserSells, baselineCall.to, swapIntent.amountUserSells);
+
+        // Perform the Baseline Call
+        (bool _success,) = baselineCall.to.call(baselineCall.data);
+        require(_success, "Outer: BaselineCallFail");
+
+        // Track the balance delta
+        uint256 _endingBalance = _getERC20Balance(swapIntent.tokenUserBuys);
+
+        // Verify swap amount exceeds slippage threshold
+        require(_endingBalance - _startingBalance > swapIntent.minAmountUserBuys, "Outer: InsufficientAmount");
+
+        // Reset the approval
+        SafeTransferLib.safeApprove(swapIntent.tokenUserSells, baselineCall.to, 0);
+
+        // Transfer the purchased tokens to the swapper.
+        SafeTransferLib.safeTransfer(swapIntent.tokenUserBuys, msg.sender, _endingBalance);
     }
 }
