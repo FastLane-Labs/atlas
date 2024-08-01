@@ -41,6 +41,22 @@ contract OuterHelpers is FastLaneOnlineInner {
     //              CONTROL-LOCAL FUNCTIONS                //
     //                 (not delegated)                     //
     /////////////////////////////////////////////////////////
+    function getUserOpHash(
+        address swapper,
+        SwapIntent calldata swapIntent,
+        BaselineCall calldata baselineCall,
+        uint256 deadline,
+        uint256 gas,
+        uint256 maxFeePerGas
+    )
+        external
+        view
+        returns (bytes32 userOpHash)
+    {
+        userOpHash =
+            _getUserOperationHash(_getUserOperation(swapper, swapIntent, baselineCall, deadline, gas, maxFeePerGas));
+    }
+
     function getUserOperation(
         address swapper,
         SwapIntent calldata swapIntent,
