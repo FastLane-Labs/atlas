@@ -43,6 +43,7 @@ contract FastLaneOnlineOuter is SolverGateway {
         bytes32 userOpHash
     )
         external
+        payable
         withUserLock
         onlyAsControl
     {
@@ -68,12 +69,12 @@ contract FastLaneOnlineOuter is SolverGateway {
         // Build DAppOp
         DAppOperation memory _dAppOp = _getDAppOp(userOpHash, deadline);
 
-        // Track the gas token balance to repay the swapper with
-        uint256 _gasTokenBalance = address(this).balance;
+        // Track the gas token balance to repay the swapper with, excluding the msg.value sent.
+        uint256 _gasTokenBalance = address(this).balance - msg.value;
 
         // Metacall
         (bool _success, bytes memory _data) =
-            ATLAS.call(abi.encodeCall(IAtlas.metacall, (_userOp, _solverOps, _dAppOp)));
+            ATLAS.call{ value: msg.value }(abi.encodeCall(IAtlas.metacall, (_userOp, _solverOps, _dAppOp)));
         if (!_success) {
             assembly {
                 revert(add(_data, 32), mload(_data))

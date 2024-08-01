@@ -31,7 +31,7 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
                 requirePostSolver: false,
                 requirePostOps: true,
                 zeroSolvers: true,
-                reuseUserOp: false,
+                reuseUserOp: true,
                 userAuctioneer: true,
                 solverAuctioneer: false,
                 unknownAuctioneer: false,
