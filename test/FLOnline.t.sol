@@ -42,7 +42,7 @@ contract FastLaneOnlineTest is BaseTest {
 
     uint256 successfulSolverBidAmount = 1.2 ether; // more than baseline swap amountOut
     uint256 defaultMsgValue = 1e17; // 0.1 ETH
-    uint256 defaultGasLimit = 5_000_000;
+    uint256 defaultGasLimit = 2_000_000;
     uint256 defaultGasPrice;
     uint256 defaultDeadlineBlock;
     uint256 defaultDeadlineTimestamp;
@@ -285,7 +285,7 @@ contract FastLaneOnlineTest is BaseTest {
     // BaselineCall: Swap 3200 DAI for at least 1 WETH via Uniswap V2 Router
     // UserOpHash: Generated correctly using dapp's getUserOperation() function
     // Deadline: block.number + 1
-    // Gas: 5_000_000
+    // Gas: 2_000_000
     // MaxFeePerGas: tx.gasprice
     function _buildDefaultFastOnlineSwapArgs() internal view returns (FastOnlineSwapArgs memory newArgs) {
         newArgs.swapIntent = SwapIntent({

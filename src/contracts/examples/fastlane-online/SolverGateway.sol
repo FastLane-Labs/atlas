@@ -45,6 +45,10 @@ contract SolverGateway is OuterHelpers {
         BASELINE_SWAPPER = address(_baselineSwapper);
     }
 
+    function getSolverGasLimit() public pure override returns (uint32) {
+        return uint32(MAX_SOLVER_GAS);
+    }
+
     /////////////////////////////////////////////////////////
     //              CONTROL-LOCAL FUNCTIONS                //
     //                 (not delegated)                     //
