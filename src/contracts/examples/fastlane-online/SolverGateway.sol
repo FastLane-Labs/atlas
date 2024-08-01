@@ -31,8 +31,12 @@ interface IGeneralizedBackrunProxy {
 
 contract SolverGateway is OuterHelpers {
     uint256 public constant USER_GAS_BUFFER = 500_000;
-    uint256 public constant MAX_SOLVER_GAS = 350_000;
     uint256 public constant METACALL_GAS_BUFFER = 200_000;
+    uint256 public constant MAX_SOLVER_GAS = 350_000;
+
+    uint256 internal constant _GAS_USED_DECIMALS_TO_DROP = 1000; // Must match Atlas contract's value
+    uint256 internal constant _SLIPPAGE_BASE = 100;
+    uint256 internal constant _GLOBAL_MAX_SLIPPAGE = 125; // A lower slippage set by user will override this.
 
     address public immutable BASELINE_SWAPPER;
 
@@ -201,6 +205,10 @@ contract SolverGateway is OuterHelpers {
         uint256 _score =
             _getWeightedScore(swapIntent, solverOp, totalGas, msg.value, maxFeePerGas, _solverOps.length, aData);
 
+        // Check can be grokked more easily in the following format:
+        //      solverOpScore    _cumulativeScore (unweighted)
+        // if  -------------- >  ------------------------------  * 2
+        //      solverOpGas             totalGas
         if (_score * totalGas > _cumulativeScore * solverOp.gas * 2) {
             if (_cumulativeGasReserved + USER_GAS_BUFFER + (solverOp.gas * 2) < totalGas) {
                 return (true, false, 0);
@@ -252,14 +260,18 @@ contract SolverGateway is OuterHelpers {
         bytes32 _solverOpHash = keccak256(abi.encode(solverOp));
         uint256 _congestionBuyIn = S_congestionBuyIn[_solverOpHash];
 
+        uint256 _bidFactor = (solverOp.bidAmount ** 2) * _SLIPPAGE_BASE / (minAmountUserBuys + 1) ** 2;
+        if (_bidFactor > _GLOBAL_MAX_SLIPPAGE) _bidFactor = _GLOBAL_MAX_SLIPPAGE;
+
         score = (
             (_congestionBuyIn + (maxFeePerGas * totalGas)) // A solver typically has to pay maxFeePerGas * gas as a
                 // requirement for winning.
                 * totalGas / (totalGas + solverOp.gas) // double count gas by doing this even in unweighted score (there's
                 // value in packing more solutions)
-                * (uint256(_aData.auctionWins) + 1) / (uint256(_aData.auctionWins + _aData.auctionFails) + solverCount + 1)
-                * (solverOp.bidAmount > (minAmountUserBuys + 1) * 2 ? (minAmountUserBuys + 1) * 2 : solverOp.bidAmount)
-                / (minAmountUserBuys + 1) / solverOp.gas
+                * (uint256(_aData.auctionWins) + 1)
+                / (uint256(_aData.auctionWins + _aData.auctionFails) + solverCount ** 2 + 1) // as solverCount increases,
+                // the dilution of thin auction history increases.
+                * _bidFactor / solverOp.gas
         );
     }
 
@@ -276,17 +288,16 @@ contract SolverGateway is OuterHelpers {
         pure
         returns (uint256 score)
     {
+        uint256 _bidFactor = (solverOp.bidAmount ** 2) * _SLIPPAGE_BASE / (swapIntent.minAmountUserBuys + 1) ** 2;
+        if (_bidFactor > _GLOBAL_MAX_SLIPPAGE) _bidFactor = _GLOBAL_MAX_SLIPPAGE;
+
         score = (
             (congestionBuyIn + (maxFeePerGas * totalGas)) // A solver typically has to pay maxFeePerGas * gas as a
                 // requirement for winning.
                 * totalGas / (totalGas + solverOp.gas) // double count gas by doing this even in unweighted score (there's
                 // value in packing more solutions)
-                * (uint256(aData.auctionWins) + 1) / (uint256(aData.auctionWins + aData.auctionFails) + solverCount + 1)
-                * (
-                    solverOp.bidAmount > (swapIntent.minAmountUserBuys + 1) * 2
-                        ? (swapIntent.minAmountUserBuys + 1) * 2
-                        : solverOp.bidAmount
-                ) / (swapIntent.minAmountUserBuys + 1) / solverOp.gas
+                * (uint256(aData.auctionWins) + 1)
+                / (uint256(aData.auctionWins + aData.auctionFails) + solverCount ** 2 + 1) * _bidFactor / solverOp.gas
         );
     }
 
