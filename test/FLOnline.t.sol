@@ -87,6 +87,10 @@ contract FastLaneOnlineTest is BaseTest {
         IERC20(args.swapIntent.tokenUserSells).approve(address(flOnline), args.swapIntent.amountUserSells);
     }
 
+    // ---------------------------------------------------- //
+    //                     Scenario Tests                   //
+    // ---------------------------------------------------- //
+
     function testFLOnlineSwap_OneSolverFulfills_Success() public {
         // First, create the data args the user will pass to the fastOnlineSwap function, which will be intercepted
         // by the solver in the mempool, used to form a solverOp to fulfill the user's SwapIntent, and a
@@ -192,6 +196,24 @@ contract FastLaneOnlineTest is BaseTest {
     function testFLOnlineSwap_ThreeSolvers_AllFail_BaselineCallReverts_Failure() public {
         vm.skip(true);
     }
+
+    // ---------------------------------------------------- //
+    //                     Unit Tests                     //
+    // ---------------------------------------------------- //
+
+    function testFLOnlineSwap_ValidateSwap_Reverts() public {
+        vm.skip(true);
+    }
+
+    function testFLOnlineSwap_ValidateSwap_UpdatesUserNonce() public {
+        vm.skip(true);
+        // Check userOp created uses the prev nonce (e.g. if 1 to start)
+        // Then the nonce is incremented (e.g. to 2) for use in the next userOp by that swapper
+        // These nonces are then converted to the actual nonce used in the userOp:
+        // keccak256(FLO nonce + 1, swapper addr)
+    }
+
+
 
     // TODO add tests when solverOp is valid, but does not outperform baseline call, baseline call used instead
 
