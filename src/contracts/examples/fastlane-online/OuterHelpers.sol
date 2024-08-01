@@ -53,7 +53,8 @@ contract OuterHelpers is FastLaneOnlineInner {
         view
         returns (bytes32 userOpHash)
     {
-        userOpHash = _getUserOperationHash(_getUserOperation(swapper, swapIntent, baselineCall, deadline, gas, maxFeePerGas));
+        userOpHash =
+            _getUserOperationHash(_getUserOperation(swapper, swapIntent, baselineCall, deadline, gas, maxFeePerGas));
     }
 
     function getUserOperation(
