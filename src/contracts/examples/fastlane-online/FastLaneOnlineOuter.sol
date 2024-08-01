@@ -73,12 +73,6 @@ contract FastLaneOnlineOuter is SolverGateway {
         // Now that we have the standardized userOpHash we can update the userOp's gas limit
         _userOp.gas = METACALL_GAS_BUFFER;
 
-        // Transfer the user's sell tokens to here and then approve Atlas for that amount.
-        SafeTransferLib.safeTransferFrom(
-            swapIntent.tokenUserSells, msg.sender, address(this), swapIntent.amountUserSells
-        );
-        SafeTransferLib.safeApprove(swapIntent.tokenUserSells, ATLAS, swapIntent.amountUserSells);
-
         // Get any SolverOperations
         (SolverOperation[] memory _solverOps, uint256 _cumulativeGasReserved) = _getSolverOps(userOpHash);
 

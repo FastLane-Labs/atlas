@@ -6,11 +6,10 @@ contract FastLaneOnlineErrors {
     error FLOnlineControl_PreSolver_BuyTokenMismatch();
     error FLOnlineControl_PreSolver_SellTokenMismatch();
     error FLOnlineControl_PreSolver_BidBelowReserve();
+    error FLOnlineControl_PreSolver_BidAmountFail();
+    error FLOnlineControl_PreSolver_ExPostBelowAnte();
 
-    error FLOnlineControl_PostOps_BalanceOfFailed1();
-    error FLOnlineControl_PostOps_BalanceOfFailed2();
-    error FLOnlineControl_PostOps_BaselineCallFailed();
-    error FLOnlineControl_PostOps_ReserveNotMet();
+    error FLOnlineControl_BalanceCheckFail();
 
     // FastLaneOnlineInner.sol
     error FLOnlineInner_Swap_OnlyAtlas();
@@ -47,10 +46,15 @@ contract FastLaneOnlineErrors {
     error SolverGateway_PreValidateSolverOp_SellTokenZeroAddress();
     error SolverGateway_PreValidateSolverOp_BuyTokenZeroAddress();
     error SolverGateway_PreValidateSolverOp_InvalidControl();
+    error SolverGateway_PreValidateSolverOp_SneakySneaky();
+    error SolverGateway_PreValidateSolverOp_AWiseGuyEh();
     error SolverGateway_PreValidateSolverOp_UserGasTooLow();
     error SolverGateway_PreValidateSolverOp_SolverGasTooHigh();
     error SolverGateway_PreValidateSolverOp_BondedTooLow();
     error SolverGateway_PreValidateSolverOp_DoubleSolve();
+
+    // OuterHelpers.sol
+    error OuterHelpers_NotMadJustDisappointed();
 
     // FLOnlineOuter.sol
     error FLOnlineOuter_FastOnlineSwap_UserOpHashMismatch();
@@ -62,4 +66,9 @@ contract FastLaneOnlineErrors {
     error FLOnlineOuter_ValidateSwap_GasLimitTooLow();
     error FLOnlineOuter_ValidateSwap_SellTokenZeroAddress();
     error FLOnlineOuter_ValidateSwap_BuyTokenZeroAddress();
+
+    // BaselineSwapper.sol
+    error BaselineSwapper_InvalidEntry();
+    error BaselineSwapper_InsufficientAmount();
+    error BaselineSwapper_BalanceCheckFail();
 }

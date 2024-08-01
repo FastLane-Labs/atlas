@@ -378,8 +378,8 @@ contract SolverGateway is OuterHelpers {
         }
 
         // Make sure no tomfoolery
-        require(solverOp.to != address(this), "ERR - SNEAKY SNEAKY");
-        require(solverOp.to != BASELINE_SWAPPER, "ERR - A WISE GUY EH?");
+        if (solverOp.to == address(this)) revert SolverGateway_PreValidateSolverOp_SneakySneaky();
+        if (solverOp.to == BASELINE_SWAPPER) revert SolverGateway_PreValidateSolverOp_AWiseGuyEh();
 
         // Get the access data
         aData = _getAccessData(msg.sender);

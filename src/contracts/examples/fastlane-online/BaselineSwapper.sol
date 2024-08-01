@@ -6,9 +6,10 @@ import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import { SwapIntent, BaselineCall } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
+import { FastLaneOnlineErrors } from "src/contracts/examples/fastlane-online/FastLaneOnlineErrors.sol";
 
 // NEVER EVER GIVE TOKEN APPROVALS TO THIS CONTRACT
-contract BaselineSwapper {
+contract BaselineSwapper is FastLaneOnlineErrors {
     address public immutable FASTLANE_ONLINE;
 
     constructor() {
@@ -22,7 +23,7 @@ contract BaselineSwapper {
     )
         external
     {
-        require(msg.sender == FASTLANE_ONLINE, "BaselineSwapper - InvalidEntry");
+        if (msg.sender != FASTLANE_ONLINE) revert BaselineSwapper_InvalidEntry();
 
         // Track the balance (count any previously-forwarded tokens)
         uint256 _startingBalance = _getERC20Balance(swapIntent.tokenUserBuys);
@@ -43,7 +44,9 @@ contract BaselineSwapper {
         uint256 _endingBalance = _getERC20Balance(swapIntent.tokenUserBuys);
 
         // Verify swap amount exceeds slippage threshold
-        require(_endingBalance - _startingBalance > swapIntent.minAmountUserBuys, "Outer: InsufficientAmount");
+        if (_endingBalance - _startingBalance <= swapIntent.minAmountUserBuys) {
+            revert BaselineSwapper_InsufficientAmount();
+        }
 
         // Reset the approval
         SafeTransferLib.safeApprove(swapIntent.tokenUserSells, baselineCall.to, 0);
@@ -60,7 +63,7 @@ contract BaselineSwapper {
 
     function _getERC20Balance(address token) internal view returns (uint256 balance) {
         (bool _success, bytes memory _data) = token.staticcall(abi.encodeCall(IERC20.balanceOf, address(this)));
-        require(_success, "BaselineSwapper: BalanceCheckFail");
+        if (!_success) revert BaselineSwapper_BalanceCheckFail();
         balance = abi.decode(_data, (uint256));
     }
 }

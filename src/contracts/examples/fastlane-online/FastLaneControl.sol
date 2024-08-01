@@ -87,10 +87,14 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
             bytes32 _solverOpHash = keccak256(abi.encode(solverOp));
             (bool _success, bytes memory _data) =
                 CONTROL.staticcall(abi.encodeCall(ISolverGateway.getBidAmount, (_solverOpHash)));
-            require(_success, "FLOnlineControl: BidAmountFail");
+            if (!_success) {
+                revert FLOnlineControl_PreSolver_BidAmountFail();
+            }
 
             uint256 _minBidAmount = abi.decode(_data, (uint256));
-            require(solverOp.bidAmount >= _minBidAmount, "FLOnlineControl: ExPostBelowAnte");
+            if (solverOp.bidAmount < _minBidAmount) {
+                revert FLOnlineControl_PreSolver_ExPostBelowAnte();
+            }
         }
 
         // Optimistically transfer to the solver contract the tokens that the user is selling
@@ -131,7 +135,7 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
 
     function _getERC20Balance(address token) internal view returns (uint256 balance) {
         (bool _success, bytes memory _data) = token.staticcall(abi.encodeCall(IERC20.balanceOf, address(this)));
-        require(_success, "OuterHelper: BalanceCheckFail");
+        if (!_success) revert FLOnlineControl_BalanceCheckFail();
         balance = abi.decode(_data, (uint256));
     }
 }

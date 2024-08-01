@@ -73,7 +73,9 @@ contract OuterHelpers is FastLaneOnlineInner {
     }
 
     function makeThogardsWifeHappy() external onlyAsControl withUserLock {
-        require(msg.sender == CARDANO_ENGINEER_THERAPY_FUND, "ERR - NOT MAD JUST DISAPPOINTED");
+        if (msg.sender != CARDANO_ENGINEER_THERAPY_FUND) {
+            revert OuterHelpers_NotMadJustDisappointed();
+        }
         uint256 _rake = rake;
         rake = 0;
         SafeTransferLib.safeTransferETH(CARDANO_ENGINEER_THERAPY_FUND, _rake);
