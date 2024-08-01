@@ -112,7 +112,7 @@ contract FastLaneOnlineInner is BaseStorage, FastLaneOnlineControl {
         returns (uint256 baselineAmount)
     {
         (bool _success, bytes memory _data) =
-            CONTROL.delegatecall(_forward(abi.encodeCall(this.baselineSwapWrapper, (swapIntent, baselineCall))));
+            CONTROL.delegatecall(_forward(abi.encodeCall(this.baselineSwapCatcher, (swapIntent, baselineCall))));
 
         if (_success) revert(); // unreachable
 
@@ -127,7 +127,7 @@ contract FastLaneOnlineInner is BaseStorage, FastLaneOnlineControl {
         return 0;
     }
 
-    function baselineSwapWrapper(SwapIntent calldata swapIntent, BaselineCall calldata baselineCall) external {
+    function baselineSwapCatcher(SwapIntent calldata swapIntent, BaselineCall calldata baselineCall) external {
         (address _activeEnvironment,, uint8 _phase) = IAtlas(ATLAS).lock();
 
         if (address(this) != _activeEnvironment) {
