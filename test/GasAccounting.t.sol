@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
+import "forge-std/Test.sol";
+
 import { GasAccounting } from "src/contracts/atlas/GasAccounting.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import { AtlasConstants } from "src/contracts/types/AtlasConstants.sol";
+
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 import { IL2GasCalculator } from "src/contracts/interfaces/IL2GasCalculator.sol";
 
@@ -17,8 +21,6 @@ import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.
 
 import { TestAtlas } from "test/base/TestAtlas.sol";
 import { BaseTest } from "test/base/BaseTest.t.sol";
-
-import "forge-std/console.sol";
 
 contract MockGasAccounting is TestAtlas, BaseTest {
     uint256 public constant MOCK_SOLVER_GAS_LIMIT = 500_000;
@@ -907,7 +909,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         uint256 bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
         uint256 depositsBefore = mockGasAccounting.getDeposits();
         (uint112 unbondingBefore,) = mockGasAccounting._balanceOf(solverOp.from);
-        vm.expectRevert("SafeCast: value doesn't fit in 112 bits");
+        vm.expectRevert(AtlasErrors.ValueTooLarge.selector);
         mockGasAccounting.assign(solverOp.from, assignedAmount, true);
 
         // Check assign reverted with overflow, and accounting values did not change
