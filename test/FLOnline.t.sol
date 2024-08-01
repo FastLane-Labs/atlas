@@ -213,8 +213,6 @@ contract FastLaneOnlineTest is BaseTest {
         // keccak256(FLO nonce + 1, swapper addr)
     }
 
-
-
     // TODO add tests when solverOp is valid, but does not outperform baseline call, baseline call used instead
 
     // ---------------------------------------------------- //
