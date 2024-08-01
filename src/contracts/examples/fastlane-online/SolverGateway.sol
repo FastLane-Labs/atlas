@@ -31,7 +31,7 @@ interface IGeneralizedBackrunProxy {
 contract SolverGateway is OuterHelpers {
     uint256 public constant USER_GAS_BUFFER = 500_000;
     uint256 public constant MAX_SOLVER_GAS = 350_000;
-    uint256 private constant _CONGESTION_BASE = 1_000_000_000;
+    uint256 public constant METACALL_GAS_BUFFER = 200_000;
 
     constructor(address _atlas) OuterHelpers(_atlas) { }
 
@@ -145,7 +145,11 @@ contract SolverGateway is OuterHelpers {
         S_solverOpHashes[userOpHash][replacedIndex] = solverOpHash;
     }
 
-    function _getSolverOps(bytes32 userOpHash) internal view returns (SolverOperation[] memory solverOps) {
+    function _getSolverOps(bytes32 userOpHash)
+        internal
+        view
+        returns (SolverOperation[] memory solverOps, uint256 cumulativeGasReserved)
+    {
         uint256 _totalSolvers = S_solverOpHashes[userOpHash].length;
 
         solverOps = new SolverOperation[](_totalSolvers);
@@ -154,6 +158,7 @@ contract SolverGateway is OuterHelpers {
             bytes32 _solverOpHash = S_solverOpHashes[userOpHash][_j];
             SolverOperation memory _solverOp = S_solverOpCache[_solverOpHash];
             solverOps[_j] = _solverOp;
+            cumulativeGasReserved += _solverOp.gas;
         }
     }
 
@@ -168,16 +173,17 @@ contract SolverGateway is OuterHelpers {
         view
         returns (bool pushAsNew, bool replaceExisting, uint256)
     {
-        SolverOperation[] memory _solverOps = _getSolverOps(solverOp.userOpHash);
+        (SolverOperation[] memory _solverOps, uint256 _cumulativeGasReserved) = _getSolverOps(solverOp.userOpHash);
 
         if (_solverOps.length == 0) {
             return (true, false, 0);
         }
 
-        (uint256 _cumulativeGasReserved, uint256 _cumulativeScore, uint256 _replacedIndex) =
+        (uint256 _cumulativeScore, uint256 _replacedIndex) =
             _getCumulativeScores(swapIntent, _solverOps, totalGas, maxFeePerGas);
 
-        uint256 _score = _getWeightedScore(swapIntent, solverOp, totalGas, msg.value, maxFeePerGas, _solverOps.length, aData);
+        uint256 _score =
+            _getWeightedScore(swapIntent, solverOp, totalGas, msg.value, maxFeePerGas, _solverOps.length, aData);
 
         if (_score * totalGas > _cumulativeScore * solverOp.gas * 2) {
             if (_cumulativeGasReserved + USER_GAS_BUFFER + (solverOp.gas * 2) < totalGas) {
@@ -197,7 +203,7 @@ contract SolverGateway is OuterHelpers {
     )
         internal
         view
-        returns (uint256 cumulativeGasReserved, uint256 cumulativeScore, uint256 replacedIndex)
+        returns (uint256 cumulativeScore, uint256 replacedIndex)
     {
         uint256 _lowestScore;
         for (uint256 _i; _i < solverOps.length; _i++) {
@@ -212,7 +218,6 @@ contract SolverGateway is OuterHelpers {
             }
 
             cumulativeScore += _score;
-            cumulativeGasReserved += _solverOp.gas;
         }
     }
 
@@ -236,8 +241,7 @@ contract SolverGateway is OuterHelpers {
                 // requirement for winning.
                 * totalGas / (totalGas + solverOp.gas) // double count gas by doing this even in unweighted score (there's
                 // value in packing more solutions)
-                * (uint256(_aData.auctionWins) + 1)
-                / (uint256(_aData.auctionWins + _aData.auctionFails) + solverCount + 1) 
+                * (uint256(_aData.auctionWins) + 1) / (uint256(_aData.auctionWins + _aData.auctionFails) + solverCount + 1)
                 * (solverOp.bidAmount > (minAmountUserBuys + 1) * 2 ? (minAmountUserBuys + 1) * 2 : solverOp.bidAmount)
                 / (minAmountUserBuys + 1) / solverOp.gas
         );
@@ -261,8 +265,7 @@ contract SolverGateway is OuterHelpers {
                 // requirement for winning.
                 * totalGas / (totalGas + solverOp.gas) // double count gas by doing this even in unweighted score (there's
                 // value in packing more solutions)
-                * (uint256(aData.auctionWins) + 1)
-                / (uint256(aData.auctionWins + aData.auctionFails) + solverCount + 1) 
+                * (uint256(aData.auctionWins) + 1) / (uint256(aData.auctionWins + aData.auctionFails) + solverCount + 1)
                 * (
                     solverOp.bidAmount > (swapIntent.minAmountUserBuys + 1) * 2
                         ? (swapIntent.minAmountUserBuys + 1) * 2
@@ -270,7 +273,6 @@ contract SolverGateway is OuterHelpers {
                 ) / (swapIntent.minAmountUserBuys + 1) / solverOp.gas
         );
     }
-
 
     function _preValidateSolverOp(
         SwapIntent calldata swapIntent,
