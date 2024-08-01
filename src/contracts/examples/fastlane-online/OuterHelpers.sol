@@ -29,12 +29,34 @@ interface IGeneralizedBackrunProxy {
 }
 
 contract OuterHelpers is FastLaneOnlineInner {
-    constructor(address _atlas) FastLaneOnlineInner(_atlas) { }
+    // NOTE: Any funds collected in excess of the therapy bills required for the Cardano engineering team
+    // will go towards buying stealth drones programmed to apply deodorant to coders at solana hackathons.
+    address public immutable CARDANO_ENGINEER_THERAPY_FUND;
+
+    constructor(address _atlas) FastLaneOnlineInner(_atlas) {
+        CARDANO_ENGINEER_THERAPY_FUND = msg.sender;
+    }
 
     /////////////////////////////////////////////////////////
     //              CONTROL-LOCAL FUNCTIONS                //
     //                 (not delegated)                     //
     /////////////////////////////////////////////////////////
+    function getUserOpHash(
+        address swapper,
+        SwapIntent calldata swapIntent,
+        BaselineCall calldata baselineCall,
+        uint256 deadline,
+        uint256 gas,
+        uint256 maxFeePerGas
+    )
+        external
+        view
+        returns (bytes32 userOpHash)
+    {
+        userOpHash =
+            _getUserOperationHash(_getUserOperation(swapper, swapIntent, baselineCall, deadline, gas, maxFeePerGas));
+    }
+
     function getUserOperation(
         address swapper,
         SwapIntent calldata swapIntent,
@@ -48,6 +70,13 @@ contract OuterHelpers is FastLaneOnlineInner {
         returns (UserOperation memory userOp)
     {
         userOp = _getUserOperation(swapper, swapIntent, baselineCall, deadline, gas, maxFeePerGas);
+    }
+
+    function makeThogardsWifeHappy() external onlyAsControl withUserLock {
+        require(msg.sender == CARDANO_ENGINEER_THERAPY_FUND, "ERR - NOT MAD JUST DISAPPOINTED");
+        uint256 _rake = rake;
+        rake = 0;
+        SafeTransferLib.safeTransferETH(CARDANO_ENGINEER_THERAPY_FUND, _rake);
     }
 
     function _getUserOperation(
@@ -95,6 +124,32 @@ contract OuterHelpers is FastLaneOnlineInner {
             callChainHash: bytes32(0), // keccak256 of the solvers' txs
             signature: new bytes(0) // DAppOperation signed by DAppOperation.from
          });
+    }
+
+    function _processCongestionRake(
+        uint256 grossGasRefund,
+        bytes32 userOpHash
+    )
+        internal
+        returns (uint256 netGasRefund)
+    {
+        // Add any congestion buyin.
+        // NOTE: Only rake buyins on successful swap, never on refunds.
+
+        uint256 _congestionBuyIns = S_aggCongestionBuyIn[userOpHash];
+
+        if (_congestionBuyIns > 0) {
+            grossGasRefund += S_aggCongestionBuyIn[userOpHash];
+            delete S_aggCongestionBuyIn[userOpHash];
+        }
+
+        uint256 _netRake = grossGasRefund * _CONGESTION_RAKE / _CONGESTION_BASE;
+
+        // Increment cumulative rake
+        rake += _netRake;
+
+        // Return the netGasRefund
+        netGasRefund = grossGasRefund - _netRake;
     }
 
     //////////////////////////////////////////////

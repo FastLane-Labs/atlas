@@ -19,6 +19,7 @@ import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.
 import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
+import { BaselineSwapper } from "src/contracts/examples/fastlane-online/BaselineSwapper.sol";
 import { FastLaneOnlineControl } from "src/contracts/examples/fastlane-online/FastLaneControl.sol";
 import { OuterHelpers } from "src/contracts/examples/fastlane-online/OuterHelpers.sol";
 
@@ -30,14 +31,19 @@ interface IGeneralizedBackrunProxy {
 
 contract SolverGateway is OuterHelpers {
     uint256 public constant USER_GAS_BUFFER = 500_000;
+    uint256 public constant METACALL_GAS_BUFFER = 200_000;
     uint256 public constant MAX_SOLVER_GAS = 350_000;
-    uint256 private constant _CONGESTION_BASE = 1_000_000_000;
-    uint256 internal constant _GAS_USED_DECIMALS_TO_DROP = 1000; // Must match Atlas contract's value
 
+    uint256 internal constant _GAS_USED_DECIMALS_TO_DROP = 1000; // Must match Atlas contract's value
     uint256 internal constant _SLIPPAGE_BASE = 100;
     uint256 internal constant _GLOBAL_MAX_SLIPPAGE = 125; // A lower slippage set by user will override this.
 
-    constructor(address _atlas) OuterHelpers(_atlas) { }
+    address public immutable BASELINE_SWAPPER;
+
+    constructor(address _atlas) OuterHelpers(_atlas) {
+        BaselineSwapper _baselineSwapper = new BaselineSwapper();
+        BASELINE_SWAPPER = address(_baselineSwapper);
+    }
 
     /////////////////////////////////////////////////////////
     //              CONTROL-LOCAL FUNCTIONS                //
@@ -46,6 +52,8 @@ contract SolverGateway is OuterHelpers {
 
     /////////////////////////////////////////////////////////
     //              EXTERNAL INTERFACE FUNCS               //
+    /////////////////////////////////////////////////////////
+    //                  FOR SOLVERS                        //
     /////////////////////////////////////////////////////////
     function addSolverOp(
         SwapIntent calldata swapIntent,
@@ -104,6 +112,14 @@ contract SolverGateway is OuterHelpers {
     }
 
     /////////////////////////////////////////////////////////
+    //              EXTERNAL INTERFACE FUNCS               //
+    //                  FOR DAPP CONTROL                   //
+    /////////////////////////////////////////////////////////
+    function getBidAmount(bytes32 solverOpHash) external view returns (uint256 bidAmount) {
+        return S_solverOpCache[solverOpHash].bidAmount;
+    }
+
+    /////////////////////////////////////////////////////////
     //                   INTERNAL FUNCS                    //
     /////////////////////////////////////////////////////////
     function _pushSolverOp(bytes32 userOpHash, bytes32 solverOpHash) internal {
@@ -149,7 +165,11 @@ contract SolverGateway is OuterHelpers {
         S_solverOpHashes[userOpHash][replacedIndex] = solverOpHash;
     }
 
-    function _getSolverOps(bytes32 userOpHash) internal view returns (SolverOperation[] memory solverOps) {
+    function _getSolverOps(bytes32 userOpHash)
+        internal
+        view
+        returns (SolverOperation[] memory solverOps, uint256 cumulativeGasReserved)
+    {
         uint256 _totalSolvers = S_solverOpHashes[userOpHash].length;
 
         solverOps = new SolverOperation[](_totalSolvers);
@@ -158,6 +178,7 @@ contract SolverGateway is OuterHelpers {
             bytes32 _solverOpHash = S_solverOpHashes[userOpHash][_j];
             SolverOperation memory _solverOp = S_solverOpCache[_solverOpHash];
             solverOps[_j] = _solverOp;
+            cumulativeGasReserved += _solverOp.gas;
         }
     }
 
@@ -172,13 +193,13 @@ contract SolverGateway is OuterHelpers {
         view
         returns (bool pushAsNew, bool replaceExisting, uint256)
     {
-        SolverOperation[] memory _solverOps = _getSolverOps(solverOp.userOpHash);
+        (SolverOperation[] memory _solverOps, uint256 _cumulativeGasReserved) = _getSolverOps(solverOp.userOpHash);
 
         if (_solverOps.length == 0) {
             return (true, false, 0);
         }
 
-        (uint256 _cumulativeGasReserved, uint256 _cumulativeScore, uint256 _replacedIndex) =
+        (uint256 _cumulativeScore, uint256 _replacedIndex) =
             _getCumulativeScores(swapIntent, _solverOps, totalGas, maxFeePerGas);
 
         uint256 _score =
@@ -206,7 +227,7 @@ contract SolverGateway is OuterHelpers {
     )
         internal
         view
-        returns (uint256 cumulativeGasReserved, uint256 cumulativeScore, uint256 replacedIndex)
+        returns (uint256 cumulativeScore, uint256 replacedIndex)
     {
         uint256 _lowestScore;
         for (uint256 _i; _i < solverOps.length; _i++) {
@@ -221,7 +242,6 @@ contract SolverGateway is OuterHelpers {
             }
 
             cumulativeScore += _score;
-            cumulativeGasReserved += (_solverOp.gas * 2); // SolverOps are executed twice each
         }
     }
 
@@ -276,8 +296,8 @@ contract SolverGateway is OuterHelpers {
                 // requirement for winning.
                 * totalGas / (totalGas + solverOp.gas) // double count gas by doing this even in unweighted score (there's
                 // value in packing more solutions)
-                * (uint256(aData.auctionWins) + 1) / (uint256(aData.auctionWins + aData.auctionFails) + solverCount ** 2 + 1)
-                * _bidFactor / solverOp.gas
+                * (uint256(aData.auctionWins) + 1)
+                / (uint256(aData.auctionWins + aData.auctionFails) + solverCount ** 2 + 1) * _bidFactor / solverOp.gas
         );
     }
 
@@ -332,6 +352,10 @@ contract SolverGateway is OuterHelpers {
 
         // Validate control address
         require(solverOp.control == CONTROL, "ERR - INVALID CONTROL");
+
+        // Make sure no tomfoolery
+        require(solverOp.to != address(this), "ERR - SNEAKY SNEAKY");
+        require(solverOp.to != BASELINE_SWAPPER, "ERR - A WISE GUY EH?");
 
         // Get the access data
         aData = _getAccessData(msg.sender);
