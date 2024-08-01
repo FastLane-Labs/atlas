@@ -19,6 +19,7 @@ import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.
 import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
+import { BaselineSwapper } from "src/contracts/examples/fastlane-online/BaselineSwapper.sol";
 import { FastLaneOnlineControl } from "src/contracts/examples/fastlane-online/FastLaneControl.sol";
 import { OuterHelpers } from "src/contracts/examples/fastlane-online/OuterHelpers.sol";
 
@@ -33,7 +34,12 @@ contract SolverGateway is OuterHelpers {
     uint256 public constant MAX_SOLVER_GAS = 350_000;
     uint256 public constant METACALL_GAS_BUFFER = 200_000;
 
-    constructor(address _atlas) OuterHelpers(_atlas) { }
+    address public immutable BASELINE_SWAPPER;
+
+    constructor(address _atlas) OuterHelpers(_atlas) {
+        BaselineSwapper _baselineSwapper = new BaselineSwapper();
+        BASELINE_SWAPPER = address(_baselineSwapper);
+    }
 
     /////////////////////////////////////////////////////////
     //              CONTROL-LOCAL FUNCTIONS                //
@@ -42,6 +48,8 @@ contract SolverGateway is OuterHelpers {
 
     /////////////////////////////////////////////////////////
     //              EXTERNAL INTERFACE FUNCS               //
+    /////////////////////////////////////////////////////////
+    //                  FOR SOLVERS                        //
     /////////////////////////////////////////////////////////
     function addSolverOp(
         SwapIntent calldata swapIntent,
@@ -97,6 +105,14 @@ contract SolverGateway is OuterHelpers {
 
             SafeTransferLib.safeTransferETH(solverOp.from, _congestionBuyIn);
         }
+    }
+
+    /////////////////////////////////////////////////////////
+    //              EXTERNAL INTERFACE FUNCS               //
+    //                  FOR DAPP CONTROL                   //
+    /////////////////////////////////////////////////////////
+    function getBidAmount(bytes32 solverOpHash) external view returns (uint256 bidAmount) {
+        return S_solverOpCache[solverOpHash].bidAmount;
     }
 
     /////////////////////////////////////////////////////////
@@ -325,6 +341,10 @@ contract SolverGateway is OuterHelpers {
 
         // Validate control address
         require(solverOp.control == CONTROL, "ERR - INVALID CONTROL");
+
+        // Make sure no tomfoolery
+        require(solverOp.to != address(this), "ERR - SNEAKY SNEAKY");
+        require(solverOp.to != BASELINE_SWAPPER, "ERR - A WISE GUY EH?");
 
         // Get the access data
         aData = _getAccessData(msg.sender);
