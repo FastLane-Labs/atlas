@@ -70,8 +70,17 @@ contract FastLaneOnlineOuter is SolverGateway {
         // Track the gas token balance to repay the swapper with
         uint256 _gasRefundTracker = address(this).balance;
 
+        // Now that we have the standardized userOpHash we can update the userOp's gas limit
+        _userOp.gas = METACALL_GAS_BUFFER;
+
+        // Transfer the user's sell tokens to here and then approve Atlas for that amount.
+        SafeTransferLib.safeTransferFrom(
+            swapIntent.tokenUserSells, msg.sender, address(this), swapIntent.amountUserSells
+        );
+        SafeTransferLib.safeApprove(swapIntent.tokenUserSells, ATLAS, swapIntent.amountUserSells);
+
         // Get any SolverOperations
-        SolverOperation[] memory _solverOps = _getSolverOps(userOpHash);
+        (SolverOperation[] memory _solverOps, uint256 _cumulativeGasReserved) = _getSolverOps(userOpHash);
 
         // Execute if we have price improvement potential from Solvers.
         bool _success = _solverOps.length > 0;
@@ -88,10 +97,11 @@ contract FastLaneOnlineOuter is SolverGateway {
             DAppOperation memory _dAppOp = _getDAppOp(userOpHash, deadline);
 
             // Encode and Metacall
-            bytes memory _data = abi.encodeCall(IAtlas.metacall, (_userOp, _solverOps, _dAppOp));
-
-            (_success, _data) = ATLAS.call(_data);
             // NOTE: Do not revert if the Atlas call failed.
+
+            (_success,) = ATLAS.call{ gas: _metacallGasLimit(_cumulativeGasReserved, gas, gasleft()) }(
+                abi.encodeCall(IAtlas.metacall, (_userOp, _solverOps, _dAppOp))
+            );
 
             // Undo the token approval
             SafeTransferLib.safeApprove(swapIntent.tokenUserSells, ATLAS, 0);
@@ -169,5 +179,21 @@ contract FastLaneOnlineOuter is SolverGateway {
                 revert(add(_data, 32), mload(_data))
             }
         }
+    }
+
+    function _metacallGasLimit(
+        uint256 cumulativeGasReserved,
+        uint256 totalGas,
+        uint256 gasLeft
+    )
+        internal
+        pure
+        returns (uint256 metacallGasLimit)
+    {
+        // Reduce any unnecessary gas to avoid Atlas's excessive gas bundler penalty
+        cumulativeGasReserved += METACALL_GAS_BUFFER;
+        metacallGasLimit = totalGas > gasLeft
+            ? (gasLeft > cumulativeGasReserved ? cumulativeGasReserved : gasLeft)
+            : (totalGas > cumulativeGasReserved ? cumulativeGasReserved : totalGas);
     }
 }
