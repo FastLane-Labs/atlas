@@ -895,6 +895,10 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(auctionFails, 1, "auctionFails should be incremented by 1");
         assertEq(totalGasUsed, assignedAmount * 2, "totalGasUsed not as expected");
         assertEq(avgGasPriceInGwei, expectedAvgGasPrice / ONE_GWEI, "avgGasPrice should change to expectedAvgGasPrice");
+
+        // Should be able to calculate total gas cost spent by solver
+        uint256 expectedTotalGasCost = (assignedAmount * startGasPrice) + (assignedAmount * endGasPrice);
+        assertEq(totalGasUsed * avgGasPriceInGwei * ONE_GWEI, expectedTotalGasCost, "totalGasCost should be equal to expectedTotalGasCost");
     }
 
     function test_assign_overflow_reverts() public {
