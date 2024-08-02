@@ -275,6 +275,8 @@ abstract contract GasAccounting is SafetyLocks {
             _gasUsed += _getCalldataCost(solverOp.data.length);
         }
 
+        if (_gasUsed == 0) return; // to avoid dividing by zero in _updateAnalytics()
+
         // Calculate what the solver owes
         // NOTE: This will cause an error if you are simulating with a gasPrice of 0
         if (result.bundlersFault()) {
@@ -438,7 +440,7 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param aData The Solver's EscrowAccountAccessData struct to update.
     /// @param auctionWon A boolean indicating whether the solver's solverOp won the auction.
     /// @param gasUsed The amount of gas used by the solverOp.
-    function _updateAnalytics(EscrowAccountAccessData memory aData, bool auctionWon, uint256 gasUsed) internal pure {
+    function _updateAnalytics(EscrowAccountAccessData memory aData, bool auctionWon, uint256 gasUsed) internal view {
         if (auctionWon) {
             unchecked {
                 ++aData.auctionWins;
@@ -449,7 +451,13 @@ abstract contract GasAccounting is SafetyLocks {
             }
         }
 
-        aData.totalGasUsed += uint64(gasUsed / _GAS_USED_DECIMALS_TO_DROP);
+        // Keeps a running average of gas price of the solver's total gas used. In gwei.
+        aData.avgGasPrice = uint16(
+            ((aData.totalGasUsed * aData.avgGasPrice * _GAS_PRICE_DECIMALS_TO_DROP) + (gasUsed * tx.gasprice))
+                / (aData.totalGasUsed + gasUsed) / _GAS_PRICE_DECIMALS_TO_DROP
+        );
+
+        aData.totalGasUsed += uint48(gasUsed);
     }
 
     /// @notice Calculates the gas cost of the calldata used to execute a SolverOperation.

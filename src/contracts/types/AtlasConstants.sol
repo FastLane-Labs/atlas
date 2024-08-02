@@ -13,7 +13,7 @@ contract AtlasConstants {
     // ------------------------------------------------------- //
 
     // Atlas constants
-    uint256 internal constant _GAS_USED_DECIMALS_TO_DROP = 1000;
+    uint256 internal constant _GAS_PRICE_DECIMALS_TO_DROP = 1e9; // measured in gwei
     uint256 internal constant _UNLOCKED = 0;
 
     // Atlas constants used in `_bidFindingIteration()`

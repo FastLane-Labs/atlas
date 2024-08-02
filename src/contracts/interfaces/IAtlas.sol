@@ -78,7 +78,14 @@ interface IAtlas {
     function accessData(address account)
         external
         view
-        returns (uint112 bonded, uint32 lastAccessedBlock, uint24 auctionWins, uint24 auctionFails, uint64 totalGasUsed);
+        returns (
+            uint112 bonded,
+            uint32 lastAccessedBlock,
+            uint24 auctionWins,
+            uint24 auctionFails,
+            uint48 totalGasUsed,
+            uint16 avgGasPrice
+        );
     function solverOpHashes(bytes32 opHash) external view returns (bool);
     function lock() external view returns (address activeEnvironment, uint32 callConfig, uint8 phase);
     function solverLock() external view returns (uint256);

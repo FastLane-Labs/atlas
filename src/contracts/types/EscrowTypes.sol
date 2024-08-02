@@ -12,7 +12,8 @@ struct EscrowAccountAccessData {
     uint32 lastAccessedBlock;
     uint24 auctionWins;
     uint24 auctionFails;
-    uint64 totalGasUsed;
+    uint48 totalGasUsed;
+    uint16 avgGasPrice; // measured in gwei
 }
 
 // Additional struct to avoid Stack Too Deep while tracking variables related to the solver call.

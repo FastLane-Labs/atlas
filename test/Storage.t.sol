@@ -59,36 +59,39 @@ contract StorageTest is BaseTest {
 
     function test_storage_view_accessData() public {
         uint256 depositAmount = 1e18;
-        (uint256 bonded, uint256 lastAccessedBlock, uint256 auctionWins, uint256 auctionFails, uint256 totalGasUsed) = atlas.accessData(userEOA);
+        (uint256 bonded, uint256 lastAccessedBlock, uint256 auctionWins, uint256 auctionFails, uint256 totalGasUsed, uint256 avgGasPrice) = atlas.accessData(userEOA);
 
         assertEq(bonded, 0, "user bonded should start as 0");
         assertEq(lastAccessedBlock, 0, "user lastAccessedBlock should start as 0");
         assertEq(auctionWins, 0, "user auctionWins should start as 0");
         assertEq(auctionFails, 0, "user auctionFails should start as 0");
         assertEq(totalGasUsed, 0, "user totalGasUsed should start as 0");
+        assertEq(avgGasPrice, 0, "user avgGasPrice should start as 0");
 
         vm.deal(userEOA, depositAmount);
         vm.prank(userEOA);
         atlas.depositAndBond{value: depositAmount}(depositAmount);
 
-        (bonded, lastAccessedBlock, auctionWins, auctionFails, totalGasUsed) = atlas.accessData(userEOA);
+        (bonded, lastAccessedBlock, auctionWins, auctionFails, totalGasUsed, avgGasPrice) = atlas.accessData(userEOA);
 
         assertEq(bonded, depositAmount, "user bonded should be equal to depositAmount");
         assertEq(lastAccessedBlock, 0, "user lastAccessedBlock should still be 0");
         assertEq(auctionWins, 0, "user auctionWins should still be 0");
         assertEq(auctionFails, 0, "user auctionFails should still be 0");
         assertEq(totalGasUsed, 0, "user totalGasUsed should still be 0");
+        assertEq(avgGasPrice, 0, "user avgGasPrice should still be 0");
 
         vm.prank(userEOA);
         atlas.unbond(depositAmount);
 
-        (bonded, lastAccessedBlock, auctionWins, auctionFails, totalGasUsed) = atlas.accessData(userEOA);
+        (bonded, lastAccessedBlock, auctionWins, auctionFails, totalGasUsed, avgGasPrice) = atlas.accessData(userEOA);
 
         assertEq(bonded, 0, "user bonded should be 0 again");
         assertEq(lastAccessedBlock, block.number, "user lastAccessedBlock should be equal to block.number");
         assertEq(auctionWins, 0, "user auctionWins should still be 0");
         assertEq(auctionFails, 0, "user auctionFails should still be 0");
         assertEq(totalGasUsed, 0, "user totalGasUsed should still be 0");
+        assertEq(avgGasPrice, 0, "user avgGasPrice should still be 0");
     }
 
     function test_storage_view_solverOpHashes() public {
