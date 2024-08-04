@@ -6,12 +6,20 @@
 The weighted score for a solver's operation is calculated using the following formula:
 
 
+
 $$
 \text{score} = \left( \frac{(\text{congestionBuyIn} + (\text{maxFeePerGas} \times \text{totalGas})) \times \text{totalGas}}{\text{totalGas} + \text{solverOp.gas}} \right) 
+$$
+$$
 \times \left( \frac{\text{aData.auctionWins} + 1}{\text{aData.auctionWins} + \text{aData.auctionFails} + \text{solverCount}^2 + 1} \right)
-\times \left( \frac{\min\left( \left( \frac{\text{solverOp.bidAmount}^2 \times \text{\SLIPPAGEBASE}}{(\text{minAmountUserBuys} + 1)^2} \right), \text{\GLOBAMAXSLIPPAGE} \right)}{1} \right)
+$$
+$$
+\times \left( \frac{\min\left( \left( \frac{\text{solverOp.bidAmount}^2 \times \text{SLIPPAGEBASE}}{(\text{minAmountUserBuys} + 1)^2} \right), \text{GLOBALMAXSLIPPAGE} \right)}{1} \right)
+$$
+$$
 \times \frac{1}{\text{solverOp.gas}}
 $$
+
 
 
 
