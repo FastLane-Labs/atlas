@@ -18,8 +18,10 @@ enum Result {
 }
 
 interface ISimulator {
-
-    function simUserOperation(UserOperation calldata userOp) external payable returns (bool success, Result simResult, uint256);
+    function simUserOperation(UserOperation calldata userOp)
+        external
+        payable
+        returns (bool success, Result simResult, uint256);
 
     function simSolverCall(
         UserOperation calldata userOp,

@@ -99,7 +99,10 @@ contract OuterHelpers is FastLaneOnlineInner {
     function _simulateSolverOp(
         UserOperation calldata userOp,
         SolverOperation calldata solverOp
-    ) internal returns (bool valid) {
+    )
+        internal
+        returns (bool valid)
+    {
         DAppOperation memory _dAppOp = _getDAppOp(solverOp.userOpHash, userOp.deadline);
 
         // NOTE: Valid is false when the solver fails even if postOps is successful
@@ -132,7 +135,7 @@ contract OuterHelpers is FastLaneOnlineInner {
             sessionKey: address(0),
             data: abi.encodeCall(this.swap, (swapIntent, baselineCall)),
             signature: new bytes(0) // User must sign
-        });
+         });
     }
 
     function _getUserOperationHash(UserOperation memory userOp) internal view returns (bytes32 userOpHash) {
@@ -180,8 +183,9 @@ contract OuterHelpers is FastLaneOnlineInner {
         } else {
             // NOTE: We do not refund the congestion buyins to the user because we do not want to create a
             // scenario in which the user can profit from Solvers failing. We also shouldn't give these to the
-            // validator for the same reason. 
-            // TODO: _congestionBuyIns to protocol guild or something because contract authors should be credibly neutral too
+            // validator for the same reason.
+            // TODO: _congestionBuyIns to protocol guild or something because contract authors should be credibly
+            // neutral too
             rake += (_netRake + _congestionBuyIns);
         }
 
@@ -224,18 +228,22 @@ contract OuterHelpers is FastLaneOnlineInner {
 
             if (_matched) {
                 // Get the highest solverOp and add it to sorted array
-                SolverOperation memory _solverOp = unsortedSolverOps[_topBidIndex]; 
+                SolverOperation memory _solverOp = unsortedSolverOps[_topBidIndex];
                 sortedSolverOps[i] = _solverOp;
 
                 // Mark it as sorted in old array
-                unsortedSolverOps[_topBidIndex].bidAmount = 0; 
+                unsortedSolverOps[_topBidIndex].bidAmount = 0;
             }
         }
 
         return sortedSolverOps;
     }
 
-    function _updateSolverReputation(SolverOperation[] memory solverOps, uint128 magnitude, bool solversSuccessful)
+    function _updateSolverReputation(
+        SolverOperation[] memory solverOps,
+        uint128 magnitude,
+        bool solversSuccessful
+    )
         internal
     {
         uint256 _length = solverOps.length;

@@ -66,7 +66,6 @@ contract FastLaneOnlineInner is BaseStorage, FastLaneOnlineControl {
         // Transfer sell token if it isn't gastoken and validate value deposit if it is
         if (swapIntent.tokenUserSells != address(0)) {
             _transferUserERC20(swapIntent.tokenUserSells, address(this), swapIntent.amountUserSells);
-            
         } else {
             // UserOp.value already passed to this contract - ensure that userOp.value matches sell amount
             require(msg.value >= swapIntent.amountUserSells, "SwapIntentDAppControl: NativeTokenValue1");
@@ -113,7 +112,6 @@ contract FastLaneOnlineInner is BaseStorage, FastLaneOnlineControl {
     }
 
     function baselineSwapTryCatcher(SwapIntent calldata swapIntent, BaselineCall calldata baselineCall) external {
-        
         // Do the baseline swap and get the amount received
         uint256 _received = _baselineSwap(swapIntent, baselineCall);
 

@@ -25,17 +25,12 @@ import { SolverGateway } from "src/contracts/examples/fastlane-online/SolverGate
 import { SwapIntent, BaselineCall } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
 
 contract FastLaneOnlineOuter is SolverGateway {
-    constructor(address _atlas, address _simulator) SolverGateway(_atlas, _simulator) {}
+    constructor(address _atlas, address _simulator) SolverGateway(_atlas, _simulator) { }
 
     //////////////////////////////////////////////
     // THIS IS WHAT THE USER INTERACTS THROUGH.
     //////////////////////////////////////////////
-    function fastOnlineSwap(UserOperation calldata userOp)
-        external
-        payable
-        withUserLock(msg.sender)
-        onlyAsControl
-    {
+    function fastOnlineSwap(UserOperation calldata userOp) external payable withUserLock(msg.sender) onlyAsControl {
         // Calculate the magnitude of the impact of this tx on reputation
         uint256 _repMagnitude = gasleft() * tx.gasprice;
 
@@ -58,10 +53,11 @@ contract FastLaneOnlineOuter is SolverGateway {
         // Atlas call
         bool _success;
         bytes memory _data = abi.encodeCall(IAtlas.metacall, (userOp, _solverOps, _dAppOp));
-        (_success, _data) = ATLAS.call{ value: msg.value, gas: _metacallGasLimit(_gasReserved, userOp.gas, gasleft())}(_data);
+        (_success, _data) =
+            ATLAS.call{ value: msg.value, gas: _metacallGasLimit(_gasReserved, userOp.gas, gasleft()) }(_data);
 
         // Revert if the call failed
-        require (_success, "ERR - SOLVERS + BASELINE FAIL");
+        require(_success, "ERR - SOLVERS + BASELINE FAIL");
 
         // Find out if any of the solvers were successful
         _success = abi.decode(_data, (bool));
@@ -76,15 +72,14 @@ contract FastLaneOnlineOuter is SolverGateway {
         if (_gasRefundTracker > 0) SafeTransferLib.safeTransferETH(msg.sender, _gasRefundTracker);
     }
 
-    function _validateSwap(UserOperation calldata userOp)
-        internal
-    {
+    function _validateSwap(UserOperation calldata userOp) internal {
         require(msg.sender == userOp.from, "ERR - INVALID SENDER");
         require(userOp.gas > gasleft(), "ERR - TX GAS TOO HIGH");
         require(userOp.gas < gasleft() - 30_000, "ERR - TX GAS TOO LOW");
         require(userOp.gas > MAX_SOLVER_GAS * 2, "ERR - GAS LIMIT TOO LOW");
 
-        (SwapIntent memory _swapIntent, BaselineCall memory _baselineCall) = abi.decode(userOp.data[4:], (SwapIntent, BaselineCall));
+        (SwapIntent memory _swapIntent, BaselineCall memory _baselineCall) =
+            abi.decode(userOp.data[4:], (SwapIntent, BaselineCall));
 
         // Verify that if we're dealing with the native gas token that the balances add up
         if (_swapIntent.tokenUserSells == address(0)) {

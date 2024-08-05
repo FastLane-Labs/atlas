@@ -68,7 +68,7 @@ contract FastLaneOnlineControl is DAppControl {
         require(solverOp.bidToken != _swapIntent.tokenUserSells, "FLOnlineControl: SellTokenMismatch");
 
         // NOTE: This module is unlike the generalized swap intent module - here, the solverOp.bidAmount includes
-        // the min amount that the user expects. 
+        // the min amount that the user expects.
         // We revert early if the baseline swap returned more than the solver's bid.
         require(solverOp.bidAmount >= _swapIntent.minAmountUserBuys, "FLOnlineControl: BidBelowReserve");
 
@@ -99,7 +99,8 @@ contract FastLaneOnlineControl is DAppControl {
         // If a solver beat the baseline and the amountOutMin, return early
         if (solved) return;
 
-        (SwapIntent memory _swapIntent, BaselineCall memory _baselineCall) = abi.decode(returnData, (SwapIntent, BaselineCall));
+        (SwapIntent memory _swapIntent, BaselineCall memory _baselineCall) =
+            abi.decode(returnData, (SwapIntent, BaselineCall));
 
         // Do the baseline call
         uint256 _buyTokensReceived = _baselineSwap(_swapIntent, _baselineCall);
@@ -129,32 +130,40 @@ contract FastLaneOnlineControl is DAppControl {
         if (swapIntent.tokenUserSells == address(0)) {
             SafeTransferLib.safeTransferETH(_user(), address(this).balance);
         } else {
-            SafeTransferLib.safeTransfer(swapIntent.tokenUserSells, _user(), _getERC20Balance(swapIntent.tokenUserSells));
+            SafeTransferLib.safeTransfer(
+                swapIntent.tokenUserSells, _user(), _getERC20Balance(swapIntent.tokenUserSells)
+            );
         }
     }
 
-    function _baselineSwap(SwapIntent memory swapIntent, BaselineCall memory baselineCall) internal returns (uint256 received) {
+    function _baselineSwap(
+        SwapIntent memory swapIntent,
+        BaselineCall memory baselineCall
+    )
+        internal
+        returns (uint256 received)
+    {
         // Track the balance (count any previously-forwarded tokens)
-        uint256 _startingBalance = swapIntent.tokenUserBuys == address(0) ? 
-            address(this).balance - msg.value : 
-            _getERC20Balance(swapIntent.tokenUserBuys);
+        uint256 _startingBalance = swapIntent.tokenUserBuys == address(0)
+            ? address(this).balance - msg.value
+            : _getERC20Balance(swapIntent.tokenUserBuys);
 
         // CASE not gas token
         // NOTE: if gas token, pass as value
         if (swapIntent.tokenUserSells != address(0)) {
-            // Approve the router (NOTE that this approval happens either inside the try/catch and is reverted 
-            // or in the postOps hook where we cancel it afterwards. 
+            // Approve the router (NOTE that this approval happens either inside the try/catch and is reverted
+            // or in the postOps hook where we cancel it afterwards.
             SafeTransferLib.safeApprove(swapIntent.tokenUserSells, baselineCall.to, swapIntent.amountUserSells);
-        } 
+        }
 
         // Perform the Baseline Call
-        (bool _success,) = baselineCall.to.call{value: baselineCall.value}(baselineCall.data);
+        (bool _success,) = baselineCall.to.call{ value: baselineCall.value }(baselineCall.data);
         require(_success, "BackupRouter: BaselineCallFail"); // dont pass custom errors
 
         // Track the balance delta
-        uint256 _endingBalance = swapIntent.tokenUserBuys == address(0) ? 
-            address(this).balance - msg.value : 
-            _getERC20Balance(swapIntent.tokenUserBuys);
+        uint256 _endingBalance = swapIntent.tokenUserBuys == address(0)
+            ? address(this).balance - msg.value
+            : _getERC20Balance(swapIntent.tokenUserBuys);
 
         require(_endingBalance > _startingBalance, "BackupRouter: NoBalanceIncrease"); // dont pass custom errors
 

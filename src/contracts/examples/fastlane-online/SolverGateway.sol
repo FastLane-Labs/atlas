@@ -33,7 +33,7 @@ contract SolverGateway is OuterHelpers {
     uint256 internal constant _SLIPPAGE_BASE = 100;
     uint256 internal constant _GLOBAL_MAX_SLIPPAGE = 125; // A lower slippage set by user will override this.
 
-    constructor(address _atlas, address _simulator) OuterHelpers(_atlas, _simulator) {}
+    constructor(address _atlas, address _simulator) OuterHelpers(_atlas, _simulator) { }
 
     /////////////////////////////////////////////////////////
     //              CONTROL-LOCAL FUNCTIONS                //
@@ -61,8 +61,7 @@ contract SolverGateway is OuterHelpers {
 
         bytes32 _solverOpHash = keccak256(abi.encode(solverOp));
 
-        (bool _pushAsNew, bool _replaceExisting, uint256 _replacedIndex) =
-            _evaluateForInclusion(userOp, solverOp);
+        (bool _pushAsNew, bool _replaceExisting, uint256 _replacedIndex) = _evaluateForInclusion(userOp, solverOp);
 
         if (_pushAsNew) {
             _pushSolverOp(solverOp.userOpHash, _solverOpHash);
@@ -76,7 +75,11 @@ contract SolverGateway is OuterHelpers {
         S_solverOpCache[_solverOpHash] = solverOp;
     }
 
-    function refundCongestionBuyIns(SolverOperation calldata solverOp) external withUserLock(solverOp.from) onlyAsControl {
+    function refundCongestionBuyIns(SolverOperation calldata solverOp)
+        external
+        withUserLock(solverOp.from)
+        onlyAsControl
+    {
         // NOTE: Anyone can call this on behalf of the solver
         // NOTE: the solverOp deadline cannot be before the userOp deadline, therefore if the
         // solverOp deadline is passed then we know the userOp deadline is passed.
@@ -187,8 +190,9 @@ contract SolverGateway is OuterHelpers {
         (uint256 _cumulativeScore, uint256 _replacedIndex) =
             _getCumulativeScores(swapIntent, _solverOps, userOp.gas, userOp.maxFeePerGas);
 
-        uint256 _score =
-            _getWeightedScoreNewSolver(userOp.gas, userOp.maxFeePerGas, swapIntent.minAmountUserBuys, _solverOps.length, solverOp);
+        uint256 _score = _getWeightedScoreNewSolver(
+            userOp.gas, userOp.maxFeePerGas, swapIntent.minAmountUserBuys, _solverOps.length, solverOp
+        );
 
         // Check can be grokked more easily in the following format:
         //      solverOpScore    _cumulativeScore (unweighted)
@@ -219,8 +223,7 @@ contract SolverGateway is OuterHelpers {
         for (uint256 _i; _i < _length; _i++) {
             SolverOperation memory _solverOp = solverOps[_i];
 
-            uint256 _score =
-                _getWeightedScore(gas, maxFeePerGas, swapIntent.minAmountUserBuys, _length, _solverOp);
+            uint256 _score = _getWeightedScore(gas, maxFeePerGas, swapIntent.minAmountUserBuys, _length, _solverOp);
 
             if (_i == 0 || _score < _lowestScore) {
                 replacedIndex = _i;
