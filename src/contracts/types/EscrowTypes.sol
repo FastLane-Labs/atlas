@@ -12,8 +12,7 @@ struct EscrowAccountAccessData {
     uint32 lastAccessedBlock;
     uint24 auctionWins;
     uint24 auctionFails;
-    uint48 totalGasUsed;
-    uint16 avgGasPrice; // measured in gwei
+    uint64 totalGasValueUsed; // The cumulative ETH value spent on gas in metacalls. Measured in gwei.
 }
 
 // Additional struct to avoid Stack Too Deep while tracking variables related to the solver call.

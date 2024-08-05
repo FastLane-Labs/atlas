@@ -275,8 +275,6 @@ abstract contract GasAccounting is SafetyLocks {
             _gasUsed += _getCalldataCost(solverOp.data.length);
         }
 
-        if (_gasUsed == 0) return; // to avoid dividing by zero in _updateAnalytics()
-
         // Calculate what the solver owes
         // NOTE: This will cause an error if you are simulating with a gasPrice of 0
         if (result.bundlersFault()) {
@@ -451,13 +449,8 @@ abstract contract GasAccounting is SafetyLocks {
             }
         }
 
-        // Keeps a running average of gas price of the solver's total gas used. In gwei.
-        aData.avgGasPrice = uint16(
-            ((aData.totalGasUsed * aData.avgGasPrice * _GAS_PRICE_DECIMALS_TO_DROP) + (gasUsed * tx.gasprice))
-                / (aData.totalGasUsed + gasUsed) / _GAS_PRICE_DECIMALS_TO_DROP
-        );
-
-        aData.totalGasUsed += uint48(gasUsed);
+        // Track total ETH value of gas spent by solver in metacalls. Measured in gwei (1e9 digits truncated).
+        aData.totalGasValueUsed += uint64(gasUsed * tx.gasprice / _GAS_VALUE_DECIMALS_TO_DROP);
     }
 
     /// @notice Calculates the gas cost of the calldata used to execute a SolverOperation.
