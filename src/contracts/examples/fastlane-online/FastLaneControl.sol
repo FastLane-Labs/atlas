@@ -106,10 +106,12 @@ contract FastLaneOnlineControl is DAppControl {
         uint256 _buyTokensReceived = _baselineSwap(_swapIntent, _baselineCall);
 
         // Verify that it exceeds the minAmountOut
-        require(_buyTokensReceived >= _swapIntent.minAmountUserBuys, "ERR - INSUFICCIENT BASELINE");
+        require(_buyTokensReceived >= _swapIntent.minAmountUserBuys, "ERR - INSUFFICIENT BASELINE");
 
-        // Undo the token approval
-        SafeTransferLib.safeApprove(_swapIntent.tokenUserSells, _baselineCall.to, 0);
+        // Undo the token approval, if not gas token.
+        if (_swapIntent.tokenUserSells != address(0)) {
+            SafeTransferLib.safeApprove(_swapIntent.tokenUserSells, _baselineCall.to, 0);
+        }
 
         // Transfer tokens to user
         _sendTokensToUser(_swapIntent);
