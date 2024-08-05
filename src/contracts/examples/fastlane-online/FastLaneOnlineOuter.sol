@@ -18,166 +18,79 @@ import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.
 import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
-import { BaselineSwapper } from "src/contracts/examples/fastlane-online/BaselineSwapper.sol";
 import { FastLaneOnlineControl } from "src/contracts/examples/fastlane-online/FastLaneControl.sol";
 import { FastLaneOnlineInner } from "src/contracts/examples/fastlane-online/FastLaneOnlineInner.sol";
 import { SolverGateway } from "src/contracts/examples/fastlane-online/SolverGateway.sol";
 
 import { SwapIntent, BaselineCall } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
 
-interface IGeneralizedBackrunProxy {
-    function getUser() external view returns (address);
-}
-
-interface IBaselineSwapper {
-    function baselineSwap(
-        SwapIntent calldata swapIntent,
-        BaselineCall calldata baselineCall,
-        address swapper
-    )
-        external;
-}
-
 contract FastLaneOnlineOuter is SolverGateway {
-    constructor(address _atlas) SolverGateway(_atlas) { }
+    constructor(address _atlas, address _simulator) SolverGateway(_atlas, _simulator) {}
 
     //////////////////////////////////////////////
     // THIS IS WHAT THE USER INTERACTS THROUGH.
     //////////////////////////////////////////////
-    function fastOnlineSwap(
-        SwapIntent calldata swapIntent,
-        BaselineCall calldata baselineCall,
-        uint256 deadline,
-        uint256 gas,
-        uint256 maxFeePerGas,
-        bytes32 userOpHash
-    )
+    function fastOnlineSwap(UserOperation calldata userOp)
         external
-        withUserLock
+        payable
+        withUserLock(msg.sender)
         onlyAsControl
     {
-        // Get the UserOperation
-        UserOperation memory _userOp =
-            _getUserOperation(msg.sender, swapIntent, baselineCall, deadline, gas, maxFeePerGas);
-
-        // Validate the parameters
-        require(
-            userOpHash == IAtlasVerification(ATLAS_VERIFICATION).getUserOperationHash(_userOp),
-            "ERR - USER HASH MISMATCH"
-        );
-        _validateSwap(swapIntent, deadline, gas, maxFeePerGas);
+        // Calculate the magnitude of the impact of this tx on reputation
+        uint256 _repMagnitude = gasleft() * tx.gasprice;
 
         // Track the gas token balance to repay the swapper with
-        uint256 _gasRefundTracker = address(this).balance;
+        uint256 _gasRefundTracker = address(this).balance - msg.value;
 
-        // Now that we have the standardized userOpHash we can update the userOp's gas limit
-        _userOp.gas = METACALL_GAS_BUFFER;
+        // Get the userOpHash
+        bytes32 _userOpHash = IAtlasVerification(ATLAS_VERIFICATION).getUserOperationHash(userOp);
 
-        // Transfer the user's sell tokens to here and then approve Atlas for that amount.
-        SafeTransferLib.safeTransferFrom(
-            swapIntent.tokenUserSells, msg.sender, address(this), swapIntent.amountUserSells
-        );
-        SafeTransferLib.safeApprove(swapIntent.tokenUserSells, ATLAS, swapIntent.amountUserSells);
+        // Run gas limit checks on the userOp
+        _validateSwap(userOp);
 
-        // Get any SolverOperations
-        (SolverOperation[] memory _solverOps, uint256 _cumulativeGasReserved) = _getSolverOps(userOpHash);
+        // Get and sortSolverOperations
+        (SolverOperation[] memory _solverOps, uint256 _gasReserved) = _getSolverOps(_userOpHash);
+        _solverOps = _sortSolverOps(_solverOps);
 
-        // Execute if we have price improvement potential from Solvers.
-        bool _success = _solverOps.length > 0;
-        if (_success) {
-            // Transfer the user's sell tokens to here for Atlas to use
-            SafeTransferLib.safeTransferFrom(
-                swapIntent.tokenUserSells, msg.sender, address(this), swapIntent.amountUserSells
-            );
+        // Build dApp operation
+        DAppOperation memory _dAppOp = _getDAppOp(_userOpHash, userOp.deadline);
 
-            // Approve Atlas for that amount (Permit69)
-            SafeTransferLib.safeApprove(swapIntent.tokenUserSells, ATLAS, swapIntent.amountUserSells);
+        // Atlas call
+        bool _success;
+        bytes memory _data = abi.encodeCall(IAtlas.metacall, (userOp, _solverOps, _dAppOp));
+        (_success, _data) = ATLAS.call{ value: msg.value, gas: _metacallGasLimit(_gasReserved, userOp.gas, gasleft())}(_data);
 
-            // Build DAppOp
-            DAppOperation memory _dAppOp = _getDAppOp(userOpHash, deadline);
+        // Revert if the call failed
+        require (_success, "ERR - SOLVERS + BASELINE FAIL");
 
-            // Encode and Metacall
-            // NOTE: Do not revert if the Atlas call failed.
+        // Find out if any of the solvers were successful
+        _success = abi.decode(_data, (bool));
 
-            (_success,) = ATLAS.call{ gas: _metacallGasLimit(_cumulativeGasReserved, gas, gasleft()) }(
-                abi.encodeCall(IAtlas.metacall, (_userOp, _solverOps, _dAppOp))
-            );
-
-            // Undo the token approval
-            SafeTransferLib.safeApprove(swapIntent.tokenUserSells, ATLAS, 0);
-
-            // If metacall was successful, transfer any leftover sell tokens to the User.
-            // NOTE: The transfer of the bought token is already handled inside either the Atlas call or the baseline
-            // call
-            uint256 _sellTokenBalance = _getERC20Balance(swapIntent.tokenUserSells);
-            if (_success) {
-                if (_sellTokenBalance > 0) {
-                    SafeTransferLib.safeTransfer(swapIntent.tokenUserSells, msg.sender, _sellTokenBalance);
-                }
-
-                // If metacall wasn't successful, transfer the sell tokens to the BaselineSwapper
-            } else {
-                SafeTransferLib.safeTransfer(swapIntent.tokenUserSells, BASELINE_SWAPPER, _sellTokenBalance);
-            }
-
-            // If there were no solvers, bypass the metacall
-        } else {
-            // Transfer tokens straight from the swapper to the BaselineSwapper contract
-            SafeTransferLib.safeTransferFrom(
-                swapIntent.tokenUserSells, msg.sender, BASELINE_SWAPPER, swapIntent.amountUserSells
-            );
-        }
-
-        // If metacall failed or if it was never executed, do the baseline call from the Baseline contract
-        if (!_success) {
-            bytes memory _data = abi.encodeCall(IBaselineSwapper.baselineSwap, (swapIntent, baselineCall, msg.sender));
-            (_success, _data) = BASELINE_SWAPPER.call(_data);
-            // Bubble up error on fail
-            if (!_success) {
-                assembly {
-                    revert(add(_data, 32), mload(_data))
-                }
-            }
-        }
+        // Update Reputation
+        _updateSolverReputation(_solverOps, uint128(_repMagnitude), _success);
 
         // Handle gas token balance reimbursement (reimbursement from Atlas and the congestion buy ins)
-        // NOTE: We do not pay the congestion fees to the user
-        _gasRefundTracker = _processCongestionRake(address(this).balance - _gasRefundTracker, userOpHash);
+        _gasRefundTracker = _processCongestionRake(_gasRefundTracker, _userOpHash, _success);
 
         // Transfer the appropriate gas tokens
-        SafeTransferLib.safeTransferETH(msg.sender, _gasRefundTracker);
+        if (_gasRefundTracker > 0) SafeTransferLib.safeTransferETH(msg.sender, _gasRefundTracker);
     }
 
-    function _validateSwap(
-        SwapIntent calldata swapIntent,
-        uint256 deadline,
-        uint256 gas,
-        uint256 maxFeePerGas
-    )
+    function _validateSwap(UserOperation calldata userOp)
         internal
     {
-        require(deadline >= block.number, "ERR - DEADLINE PASSED");
-        require(maxFeePerGas >= tx.gasprice, "ERR - INVALID GASPRICE");
-        require(gas > gasleft(), "ERR - TX GAS TOO HIGH");
-        require(gas < gasleft() - 30_000, "ERR - TX GAS TOO LOW");
-        require(gas > MAX_SOLVER_GAS * 2, "ERR - GAS LIMIT TOO LOW");
-        require(swapIntent.tokenUserSells != address(0), "ERR - CANT SELL ZERO ADDRESS");
-        require(swapIntent.tokenUserBuys != address(0), "ERR - CANT BUY ZERO ADDRESS");
+        require(msg.sender == userOp.from, "ERR - INVALID SENDER");
+        require(userOp.gas > gasleft(), "ERR - TX GAS TOO HIGH");
+        require(userOp.gas < gasleft() - 30_000, "ERR - TX GAS TOO LOW");
+        require(userOp.gas > MAX_SOLVER_GAS * 2, "ERR - GAS LIMIT TOO LOW");
 
-        // Increment the user's local nonce
-        unchecked {
-            ++S_userNonces[msg.sender];
-        }
-    }
+        (SwapIntent memory _swapIntent, BaselineCall memory _baselineCall) = abi.decode(userOp.data[4:], (SwapIntent, BaselineCall));
 
-    function _baselineSwap(SwapIntent calldata swapIntent, BaselineCall calldata baselineCall) internal {
-        (bool _success, bytes memory _data) =
-            BASELINE_SWAPPER.call(abi.encodeCall(IBaselineSwapper.baselineSwap, (swapIntent, baselineCall, msg.sender)));
-        // Bubble up error on fail
-        if (!_success) {
-            assembly {
-                revert(add(_data, 32), mload(_data))
-            }
+        // Verify that if we're dealing with the native gas token that the balances add up
+        if (_swapIntent.tokenUserSells == address(0)) {
+            require(msg.value >= userOp.value, "ERR - INSUFICCIENT BALANCE1");
+            require(userOp.value >= _swapIntent.amountUserSells, "ERR - INSUFICCIENT BALANCE2");
+            require(userOp.value == _baselineCall.value, "ERR - INSUFICCIENT BALANCE3");
         }
     }
 

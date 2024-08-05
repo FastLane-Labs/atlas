@@ -5,6 +5,8 @@ import { IAtlas } from "../interfaces/IAtlas.sol";
 
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+
 import "../types/SolverOperation.sol";
 import "../types/UserOperation.sol";
 import "../types/LockTypes.sol";
@@ -13,16 +15,7 @@ import "../types/ConfigTypes.sol";
 import "../types/ValidCalls.sol";
 import "../types/EscrowTypes.sol";
 
-enum Result {
-    Unknown,
-    VerificationSimFail,
-    PreOpsSimFail,
-    UserOpSimFail,
-    SolverSimFail,
-    AllocateValueSimFail,
-    PostOpsSimFail,
-    SimulationPassed
-}
+import { Result } from "src/contracts/interfaces/ISimulator.sol";
 
 contract Simulator is AtlasErrors {
     address public immutable deployer;
@@ -50,6 +43,7 @@ contract Simulator is AtlasErrors {
         (Result result, uint256 validCallsResult) = _errorCatcher(userOp, solverOps, dAppOp);
         success = uint8(result) > uint8(Result.UserOpSimFail);
         if (success) validCallsResult = uint256(ValidCallsResult.Valid);
+        SafeTransferLib.safeTransferETH(msg.sender, msg.value);
         return (success, result, validCallsResult);
     }
 
@@ -68,6 +62,7 @@ contract Simulator is AtlasErrors {
         (Result result, uint256 solverOutcomeResult) = _errorCatcher(userOp, solverOps, dAppOp);
         success = result == Result.SimulationPassed;
         if (success) solverOutcomeResult = 0; // discard additional error uint if solver stage was successful
+        SafeTransferLib.safeTransferETH(msg.sender, msg.value);
         return (success, result, solverOutcomeResult);
     }
 
@@ -87,6 +82,7 @@ contract Simulator is AtlasErrors {
         (Result result, uint256 solverOutcomeResult) = _errorCatcher(userOp, solverOps, dAppOp);
         success = result == Result.SimulationPassed;
         if (success) solverOutcomeResult = 0; // discard additional error uint if solver stage was successful
+        SafeTransferLib.safeTransferETH(msg.sender, msg.value);
         return (success, result, solverOutcomeResult);
     }
 

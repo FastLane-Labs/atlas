@@ -49,49 +49,47 @@ contract FastLaneOnlineInner is BaseStorage, FastLaneOnlineControl {
     * @return swapIntent The SwapIntent struct
     */
     function swap(
-        address swapper,
         SwapIntent calldata swapIntent,
         BaselineCall calldata baselineCall
     )
         external
         payable
-        returns (address, SwapIntent memory, BaselineCall memory)
+        returns (SwapIntent memory, BaselineCall memory)
     {
         require(msg.sender == ATLAS, "SwapIntentDAppControl: InvalidSender");
         require(address(this) != CONTROL, "SwapIntentDAppControl: MustBeDelegated");
         require(swapIntent.tokenUserSells != swapIntent.tokenUserBuys, "SwapIntentDAppControl: SellIsSurplus");
 
         // User = control = bundler
-        require(_user() == CONTROL, "SwapIntentDAppControl: ControlNotOwner");
         require(_bundler() == CONTROL, "SwapIntentDAppControl: ControlNotBundler");
-        require(IGeneralizedBackrunProxy(CONTROL).getUser() == swapper, "SwapIntentDAppControl: UserNotLocked");
 
-        require(
-            _availableFundsERC20(
-                swapIntent.tokenUserSells, CONTROL, swapIntent.amountUserSells, ExecutionPhase.PreSolver
-            ),
-            "SwapIntentDAppControl: SellFundsUnavailable"
-        );
+        // Transfer sell token if it isn't gastoken and validate value deposit if it is
+        if (swapIntent.tokenUserSells != address(0)) {
+            _transferUserERC20(swapIntent.tokenUserSells, address(this), swapIntent.amountUserSells);
+            
+        } else {
+            // UserOp.value already passed to this contract - ensure that userOp.value matches sell amount
+            require(msg.value >= swapIntent.amountUserSells, "SwapIntentDAppControl: NativeTokenValue1");
+            require(baselineCall.value >= swapIntent.amountUserSells, "SwapIntentDAppControl: NativeTokenValue2");
+        }
 
         // Calculate the baseline swap amount from the frontend-sourced routing
         // This will typically be a uniswap v2 or v3 path.
         // NOTE: This runs inside a try/catch and is reverted.
-        uint256 _baselineAmount = _getSwapBaseline(swapIntent, baselineCall);
+        uint256 _baselineAmount = _catchSwapBaseline(swapIntent, baselineCall);
 
         // Update the minAmountUserBuys with this value
         // NOTE: If all of the solvers fail to exceed this value, we'll redo this swap in the postOpsHook
+        // and verify that the min amount is exceeded.
         if (_baselineAmount >= swapIntent.minAmountUserBuys) {
             SwapIntent memory _swapIntent = swapIntent;
-            BaselineCall memory _baselineCall = baselineCall;
-
             _swapIntent.minAmountUserBuys = _baselineAmount;
-            _baselineCall.success = true;
-            return (swapper, _swapIntent, _baselineCall);
+            return (_swapIntent, baselineCall);
         }
-        return (swapper, swapIntent, baselineCall);
+        return (swapIntent, baselineCall);
     }
 
-    function _getSwapBaseline(
+    function _catchSwapBaseline(
         SwapIntent calldata swapIntent,
         BaselineCall calldata baselineCall
     )
@@ -99,7 +97,7 @@ contract FastLaneOnlineInner is BaseStorage, FastLaneOnlineControl {
         returns (uint256 baselineAmount)
     {
         (bool _success, bytes memory _data) =
-            CONTROL.delegatecall(_forward(abi.encodeCall(this.baselineSwapCatcher, (swapIntent, baselineCall))));
+            CONTROL.delegatecall(_forward(abi.encodeCall(this.baselineSwapTryCatcher, (swapIntent, baselineCall))));
 
         if (_success) revert(); // unreachable
 
@@ -114,38 +112,15 @@ contract FastLaneOnlineInner is BaseStorage, FastLaneOnlineControl {
         return 0;
     }
 
-    function baselineSwapCatcher(SwapIntent calldata swapIntent, BaselineCall calldata baselineCall) external {
-        (address _activeEnvironment,, uint8 _phase) = IAtlas(ATLAS).lock();
-
-        require(address(this) == _activeEnvironment, "BackupRouter: NotActiveEnvironment");
-        require(_phase == _baselinePhase, "BackupRouter: IncorrectPhase");
-        require(msg.sender == ATLAS, "BackupRouter: InvalidSender");
-
-        (bool _success, bytes memory _data) =
-            swapIntent.tokenUserBuys.staticcall(abi.encodeCall(IERC20.balanceOf, address(this)));
-        require(_success, "BackupRouter: BalanceCheckFail1");
-
-        // Track the balance (count any previously-forwarded tokens)
-        uint256 _startingBalance = abi.decode(_data, (uint256));
-
-        // Optimistically transfer to the solver contract the tokens that the user is selling
-        _transferUserERC20(swapIntent.tokenUserSells, address(this), swapIntent.amountUserSells);
-
-        // Approve the router (NOTE that this approval happens inside the try/catch)
-        SafeTransferLib.safeApprove(swapIntent.tokenUserSells, baselineCall.to, swapIntent.amountUserSells);
-
-        // Perform the Baseline Call
-        (_success,) = baselineCall.to.call(baselineCall.data);
-        require(_success, "BackupRouter: BaselineCallFail");
-
-        // Track the balance delta
-        (_success, _data) = swapIntent.tokenUserBuys.staticcall(abi.encodeCall(IERC20.balanceOf, address(this)));
-        require(_success, "BackupRouter: BalanceCheckFail2");
-
-        uint256 _endingBalance = abi.decode(_data, (uint256));
-        require(_endingBalance > _startingBalance, "BackupRouter: NoBalanceIncrease");
+    function baselineSwapTryCatcher(SwapIntent calldata swapIntent, BaselineCall calldata baselineCall) external {
+        
+        // Do the baseline swap and get the amount received
+        uint256 _received = _baselineSwap(swapIntent, baselineCall);
 
         // Revert gracefully to undo the swap but show the baseline amountOut
-        revert BaselineFailSuccessful(_endingBalance - _startingBalance);
+        // NOTE: This does not check the baseline amount against the user's minimum requirement
+        // This is to allow solvers a chance to succeed even if the baseline swap has returned
+        // an unacceptable amount (such as if it were sandwiched to try and nullify the swap).
+        revert BaselineFailSuccessful(_received);
     }
 }
