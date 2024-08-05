@@ -152,7 +152,8 @@ contract OuterHelpers is FastLaneOnlineInner {
             bundler: CONTROL, // Signer of the atlas tx (msg.sender)
             userOpHash: userOpHash, // keccak256 of userOp.to, userOp.data
             callChainHash: bytes32(0), // keccak256 of the solvers' txs
-            signature: new bytes(0) // DAppOperation signed by DAppOperation.from
+            signature: new bytes(0) // NOTE: Control must be registered as signatory of itself, in AtlasVerification.
+                // Then no signature is required here as control is bundler.
          });
     }
 
