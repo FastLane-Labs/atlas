@@ -23,6 +23,7 @@ contract FastLaneOnlineTest is BaseTest {
     }
 
     struct FastOnlineSwapArgs {
+        UserOperation userOp;
         SwapIntent swapIntent;
         BaselineCall baselineCall;
         uint256 deadline;
@@ -233,10 +234,7 @@ contract FastLaneOnlineTest is BaseTest {
 
         // Do the actual fastOnlineSwap call
         (bool result,) = address(flOnline).call{ gas: args.gas + 1000, value: defaultMsgValue }(
-            abi.encodeCall(
-                flOnline.fastOnlineSwap,
-                (args.swapIntent, args.baselineCall, args.deadline, args.gas, args.maxFeePerGas, args.userOpHash)
-            )
+            abi.encodeCall(flOnline.fastOnlineSwap, (args.userOp))
         );
 
         // Calculate estimated Atlas gas surcharge taken from call above
@@ -313,19 +311,17 @@ contract FastLaneOnlineTest is BaseTest {
                     defaultDeadlineTimestamp // deadline
                 )
             ),
-            success: true // TODO check setting this in arg doesn't impact execution logic
-         });
+            value: 0
+        });
 
-        newArgs.userOpHash = atlasVerification.getUserOperationHash(
-            flOnline.getUserOperation({
-                swapper: userEOA,
-                swapIntent: newArgs.swapIntent,
-                baselineCall: newArgs.baselineCall,
-                deadline: defaultDeadlineBlock,
-                gas: defaultGasLimit,
-                maxFeePerGas: defaultGasPrice
-            })
-        );
+        (newArgs.userOp, newArgs.userOpHash) = flOnline.getUserOperationAndHash({
+            swapper: userEOA,
+            swapIntent: newArgs.swapIntent,
+            baselineCall: newArgs.baselineCall,
+            deadline: defaultDeadlineBlock,
+            gas: defaultGasLimit,
+            maxFeePerGas: defaultGasPrice
+        });
 
         newArgs.deadline = defaultDeadlineBlock;
         newArgs.gas = defaultGasLimit;
@@ -361,16 +357,7 @@ contract FastLaneOnlineTest is BaseTest {
         SolverOperation memory solverOp = _buildSolverOp(solverEOA, solverPK, address(solver), bidAmount);
 
         // Register solverOp in FLOnline in frontrunning tx
-        flOnline.addSolverOp({
-            swapIntent: args.swapIntent,
-            baselineCall: args.baselineCall,
-            deadline: defaultDeadlineBlock,
-            gas: defaultGasLimit,
-            maxFeePerGas: defaultGasPrice,
-            userOpHash: args.userOpHash,
-            swapper: userEOA,
-            solverOp: solverOp
-        });
+        flOnline.addSolverOp({ userOp: args.userOp, solverOp: solverOp });
 
         // Give solver contract 1 WETH to fulfill user's SwapIntent
         deal(args.swapIntent.tokenUserBuys, address(solver), bidAmount);
@@ -466,20 +453,18 @@ contract FastLaneOnlineTest is BaseTest {
                     defaultDeadlineTimestamp // deadline
                 )
             ),
-            success: true
+            value: 0
         });
 
         // Update userOpHash for new args otherwise solverOp will fail verification
-        args.userOpHash = atlasVerification.getUserOperationHash(
-            flOnline.getUserOperation({
-                swapper: userEOA,
-                swapIntent: args.swapIntent,
-                baselineCall: args.baselineCall,
-                deadline: defaultDeadlineBlock,
-                gas: defaultGasLimit,
-                maxFeePerGas: defaultGasPrice
-            })
-        );
+        args.userOpHash = flOnline.getUserOpHash({
+            swapper: userEOA,
+            swapIntent: args.swapIntent,
+            baselineCall: args.baselineCall,
+            deadline: defaultDeadlineBlock,
+            gas: defaultGasLimit,
+            maxFeePerGas: defaultGasPrice
+        });
     }
 }
 

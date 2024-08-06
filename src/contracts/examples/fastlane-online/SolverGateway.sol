@@ -33,7 +33,7 @@ contract SolverGateway is OuterHelpers {
     uint256 internal constant _SLIPPAGE_BASE = 100;
     uint256 internal constant _GLOBAL_MAX_SLIPPAGE = 125; // A lower slippage set by user will override this.
 
-    constructor(address _atlas, address _simulator) OuterHelpers(_atlas, _simulator) { }
+    constructor(address _atlas) OuterHelpers(_atlas) { }
 
     function getSolverGasLimit() public pure override returns (uint32) {
         return uint32(MAX_SOLVER_GAS);

@@ -25,7 +25,7 @@ import { SolverGateway } from "src/contracts/examples/fastlane-online/SolverGate
 import { SwapIntent, BaselineCall } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
 
 contract FastLaneOnlineOuter is SolverGateway {
-    constructor(address _atlas, address _simulator) SolverGateway(_atlas, _simulator) { }
+    constructor(address _atlas) SolverGateway(_atlas) { }
 
     //////////////////////////////////////////////
     // THIS IS WHAT THE USER INTERACTS THROUGH.
@@ -81,7 +81,7 @@ contract FastLaneOnlineOuter is SolverGateway {
         // if (gas < gasleft() - 30_000) {
         //     revert FLOnlineOuter_ValidateSwap_TxGasTooLow();
         // }
-        if (gas <= MAX_SOLVER_GAS * 2) {
+        if (userOp.gas <= MAX_SOLVER_GAS * 2) {
             revert FLOnlineOuter_ValidateSwap_GasLimitTooLow();
         }
 

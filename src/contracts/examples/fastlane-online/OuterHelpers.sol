@@ -29,13 +29,11 @@ contract OuterHelpers is FastLaneOnlineInner {
     // NOTE: Any funds collected in excess of the therapy bills required for the Cardano engineering team
     // will go towards buying stealth drones programmed to apply deodorant to coders at solana hackathons.
     address public immutable CARDANO_ENGINEER_THERAPY_FUND;
-
-    // Simulator
     address public immutable SIMULATOR;
 
-    constructor(address _atlas, address _simulator) FastLaneOnlineInner(_atlas) {
+    constructor(address _atlas) FastLaneOnlineInner(_atlas) {
         CARDANO_ENGINEER_THERAPY_FUND = msg.sender;
-        SIMULATOR = _simulator;
+        SIMULATOR = IAtlas(_atlas).SIMULATOR();
     }
 
     /////////////////////////////////////////////////////////
@@ -263,7 +261,7 @@ contract OuterHelpers is FastLaneOnlineInner {
     /////            GETTERS                //////
     //////////////////////////////////////////////
     function _getNextUserNonce(address owner) internal view returns (uint256 nonce) {
-        nonce = IAtlasVerification(ATLAS).getUserNextNonce(owner, false);
+        nonce = IAtlasVerification(ATLAS_VERIFICATION).getUserNextNonce(owner, false);
     }
 
     function isUserNonceValid(address owner, uint256 nonce) external view returns (bool valid) {
@@ -273,20 +271,8 @@ contract OuterHelpers is FastLaneOnlineInner {
     function _isUserNonceValid(address owner, uint256 nonce) internal view returns (bool valid) {
         uint248 _wordIndex = uint248(nonce >> 8);
         uint8 _bitPos = uint8(nonce);
-        uint256 _bitmap = IAtlasVerification(ATLAS).userNonSequentialNonceTrackers(owner, _wordIndex);
+        uint256 _bitmap = IAtlasVerification(ATLAS_VERIFICATION).userNonSequentialNonceTrackers(owner, _wordIndex);
         valid = _bitmap & 1 << _bitPos != 1;
-    }
-
-    function _getAccessData(address solverFrom) internal view returns (EscrowAccountAccessData memory) {
-        (uint112 _bonded, uint32 _lastAccessedBlock, uint24 _auctionWins, uint24 _auctionFails, uint64 _totalGasUsed) =
-            IAtlas(ATLAS).accessData(solverFrom);
-        return EscrowAccountAccessData({
-            bonded: _bonded,
-            lastAccessedBlock: _lastAccessedBlock,
-            auctionWins: _auctionWins,
-            auctionFails: _auctionFails,
-            totalGasUsed: _totalGasUsed
-        });
     }
 
     //////////////////////////////////////////////
