@@ -53,6 +53,7 @@ contract FastLaneOnlineOuter is SolverGateway {
         bytes32 userOpHash
     )
         external
+        payable
         withUserLock
         onlyAsControl
     {
@@ -61,23 +62,13 @@ contract FastLaneOnlineOuter is SolverGateway {
             _getUserOperation(msg.sender, swapIntent, baselineCall, deadline, gas, maxFeePerGas);
 
         // Validate the parameters
-        require(
-            userOpHash == IAtlasVerification(ATLAS_VERIFICATION).getUserOperationHash(_userOp),
-            "ERR - USER HASH MISMATCH"
-        );
+        if (userOpHash != IAtlasVerification(ATLAS_VERIFICATION).getUserOperationHash(_userOp)) {
+            revert FLOnlineOuter_FastOnlineSwap_UserOpHashMismatch();
+        }
         _validateSwap(swapIntent, deadline, gas, maxFeePerGas);
 
         // Track the gas token balance to repay the swapper with
-        uint256 _gasRefundTracker = address(this).balance;
-
-        // Now that we have the standardized userOpHash we can update the userOp's gas limit
-        _userOp.gas = METACALL_GAS_BUFFER;
-
-        // Transfer the user's sell tokens to here and then approve Atlas for that amount.
-        SafeTransferLib.safeTransferFrom(
-            swapIntent.tokenUserSells, msg.sender, address(this), swapIntent.amountUserSells
-        );
-        SafeTransferLib.safeApprove(swapIntent.tokenUserSells, ATLAS, swapIntent.amountUserSells);
+        uint256 _gasRefundTracker = address(this).balance - msg.value;
 
         // Get any SolverOperations
         (SolverOperation[] memory _solverOps, uint256 _cumulativeGasReserved) = _getSolverOps(userOpHash);
@@ -98,7 +89,6 @@ contract FastLaneOnlineOuter is SolverGateway {
 
             // Encode and Metacall
             // NOTE: Do not revert if the Atlas call failed.
-
             (_success,) = ATLAS.call{ gas: _metacallGasLimit(_cumulativeGasReserved, gas, gasleft()) }(
                 abi.encodeCall(IAtlas.metacall, (_userOp, _solverOps, _dAppOp))
             );
@@ -114,14 +104,12 @@ contract FastLaneOnlineOuter is SolverGateway {
                 if (_sellTokenBalance > 0) {
                     SafeTransferLib.safeTransfer(swapIntent.tokenUserSells, msg.sender, _sellTokenBalance);
                 }
-
-                // If metacall wasn't successful, transfer the sell tokens to the BaselineSwapper
             } else {
+                // If metacall wasn't successful, transfer the sell tokens to the BaselineSwapper
                 SafeTransferLib.safeTransfer(swapIntent.tokenUserSells, BASELINE_SWAPPER, _sellTokenBalance);
             }
-
-            // If there were no solvers, bypass the metacall
         } else {
+            // If there were no solvers, bypass the metacall
             // Transfer tokens straight from the swapper to the BaselineSwapper contract
             SafeTransferLib.safeTransferFrom(
                 swapIntent.tokenUserSells, msg.sender, BASELINE_SWAPPER, swapIntent.amountUserSells
@@ -132,7 +120,7 @@ contract FastLaneOnlineOuter is SolverGateway {
         if (!_success) {
             bytes memory _data = abi.encodeCall(IBaselineSwapper.baselineSwap, (swapIntent, baselineCall, msg.sender));
             (_success, _data) = BASELINE_SWAPPER.call(_data);
-            // Bubble up error on fail
+            // If the baseline call fails, revert with bubbled up error. This reverts the token transfers done above
             if (!_success) {
                 assembly {
                     revert(add(_data, 32), mload(_data))
@@ -156,13 +144,30 @@ contract FastLaneOnlineOuter is SolverGateway {
     )
         internal
     {
-        require(deadline >= block.number, "ERR - DEADLINE PASSED");
-        require(maxFeePerGas >= tx.gasprice, "ERR - INVALID GASPRICE");
-        require(gas > gasleft(), "ERR - TX GAS TOO HIGH");
-        require(gas < gasleft() - 30_000, "ERR - TX GAS TOO LOW");
-        require(gas > MAX_SOLVER_GAS * 2, "ERR - GAS LIMIT TOO LOW");
-        require(swapIntent.tokenUserSells != address(0), "ERR - CANT SELL ZERO ADDRESS");
-        require(swapIntent.tokenUserBuys != address(0), "ERR - CANT BUY ZERO ADDRESS");
+        if (deadline < block.number) {
+            revert FLOnlineOuter_ValidateSwap_DeadlinePassed();
+        }
+        if (maxFeePerGas < tx.gasprice) {
+            revert FLOnlineOuter_ValidateSwap_InvalidGasPrice();
+        }
+
+        // TODO: Add back gas checks when we have more clarity
+        // if (gas > gasleft()) {
+        //     revert FLOnlineOuter_ValidateSwap_TxGasTooHigh();
+        // }
+        // if (gas < gasleft() - 30_000) {
+        //     revert FLOnlineOuter_ValidateSwap_TxGasTooLow();
+        // }
+
+        if (gas <= MAX_SOLVER_GAS * 2) {
+            revert FLOnlineOuter_ValidateSwap_GasLimitTooLow();
+        }
+        if (swapIntent.tokenUserSells == address(0)) {
+            revert FLOnlineOuter_ValidateSwap_SellTokenZeroAddress();
+        }
+        if (swapIntent.tokenUserBuys == address(0)) {
+            revert FLOnlineOuter_ValidateSwap_BuyTokenZeroAddress();
+        }
 
         // Increment the user's local nonce
         unchecked {
@@ -181,19 +186,34 @@ contract FastLaneOnlineOuter is SolverGateway {
         }
     }
 
+    // TODO FIX THIS
     function _metacallGasLimit(
         uint256 cumulativeGasReserved,
         uint256 totalGas,
         uint256 gasLeft
     )
         internal
-        pure
+        view
         returns (uint256 metacallGasLimit)
     {
         // Reduce any unnecessary gas to avoid Atlas's excessive gas bundler penalty
-        cumulativeGasReserved += METACALL_GAS_BUFFER;
-        metacallGasLimit = totalGas > gasLeft
-            ? (gasLeft > cumulativeGasReserved ? cumulativeGasReserved : gasLeft)
-            : (totalGas > cumulativeGasReserved ? cumulativeGasReserved : totalGas);
+        cumulativeGasReserved += METACALL_GAS_BUFFER; // TODO maybe make this higher?
+
+        // Sets metacallGasLimit to the minimum of {totalGas, gasLeft, cumulativeGasReserved}
+        // metacallGasLimit = totalGas > gasLeft
+        //     ? (gasLeft > cumulativeGasReserved ? cumulativeGasReserved : gasLeft)
+        //     : (totalGas > cumulativeGasReserved ? cumulativeGasReserved : totalGas);
+
+        // console.log("cumulativeGasReserved:", cumulativeGasReserved);
+        // console.log("totalGas:", totalGas);
+        // console.log("gasLeft:", gasLeft);
+        // console.log("metacallGasLimit:", metacallGasLimit);
+
+        // TODO remove this once fixed, hacky bypass for gas issues
+        return gasLeft - 100_000;
     }
+
+    fallback() external payable { }
+
+    receive() external payable { }
 }

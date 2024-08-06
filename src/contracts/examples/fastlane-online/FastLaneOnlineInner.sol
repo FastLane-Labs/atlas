@@ -57,21 +57,34 @@ contract FastLaneOnlineInner is BaseStorage, FastLaneOnlineControl {
         payable
         returns (address, SwapIntent memory, BaselineCall memory)
     {
-        require(msg.sender == ATLAS, "SwapIntentDAppControl: InvalidSender");
-        require(address(this) != CONTROL, "SwapIntentDAppControl: MustBeDelegated");
-        require(swapIntent.tokenUserSells != swapIntent.tokenUserBuys, "SwapIntentDAppControl: SellIsSurplus");
+        if (msg.sender != ATLAS) {
+            revert FLOnlineInner_Swap_OnlyAtlas();
+        }
+        if (address(this) == CONTROL) {
+            revert FLOnlineInner_Swap_MustBeDelegated();
+        }
+        if (swapIntent.tokenUserSells == swapIntent.tokenUserBuys) {
+            revert FLOnlineInner_Swap_BuyAndSellTokensAreSame();
+        }
 
         // User = control = bundler
-        require(_user() == CONTROL, "SwapIntentDAppControl: ControlNotOwner");
-        require(_bundler() == CONTROL, "SwapIntentDAppControl: ControlNotBundler");
-        require(IGeneralizedBackrunProxy(CONTROL).getUser() == swapper, "SwapIntentDAppControl: UserNotLocked");
+        if (_user() != CONTROL) {
+            revert FLOnlineInner_Swap_ControlNotUser();
+        }
+        if (_bundler() != CONTROL) {
+            revert FLOnlineInner_Swap_ControlNotBundler();
+        }
+        if (IGeneralizedBackrunProxy(CONTROL).getUser() != swapper) {
+            revert FLOnlineInner_Swap_UserNotLocked();
+        }
 
-        require(
-            _availableFundsERC20(
+        if (
+            !_availableFundsERC20(
                 swapIntent.tokenUserSells, CONTROL, swapIntent.amountUserSells, ExecutionPhase.PreSolver
-            ),
-            "SwapIntentDAppControl: SellFundsUnavailable"
-        );
+            )
+        ) {
+            revert FLOnlineInner_Swap_SellFundsUnavailable();
+        }
 
         // Calculate the baseline swap amount from the frontend-sourced routing
         // This will typically be a uniswap v2 or v3 path.
@@ -117,18 +130,26 @@ contract FastLaneOnlineInner is BaseStorage, FastLaneOnlineControl {
     function baselineSwapCatcher(SwapIntent calldata swapIntent, BaselineCall calldata baselineCall) external {
         (address _activeEnvironment,, uint8 _phase) = IAtlas(ATLAS).lock();
 
-        require(address(this) == _activeEnvironment, "BackupRouter: NotActiveEnvironment");
-        require(_phase == _baselinePhase, "BackupRouter: IncorrectPhase");
-        require(msg.sender == ATLAS, "BackupRouter: InvalidSender");
+        if (address(this) != _activeEnvironment) {
+            revert FLOnlineInner_BaselineSwapWrapper_NotActiveEnv();
+        }
+        if (_phase != _baselinePhase) {
+            revert FLOnlineInner_BaselineSwapWrapper_IncorrectPhase();
+        }
+        if (msg.sender != ATLAS) {
+            revert FLOnlineInner_BaselineSwapWrapper_CallerIsNotAtlas();
+        }
 
         (bool _success, bytes memory _data) =
             swapIntent.tokenUserBuys.staticcall(abi.encodeCall(IERC20.balanceOf, address(this)));
-        require(_success, "BackupRouter: BalanceCheckFail1");
+        if (!_success) {
+            revert FLOnlineInner_BaselineSwapWrapper_BalanceOfFailed1();
+        }
 
         // Track the balance (count any previously-forwarded tokens)
         uint256 _startingBalance = abi.decode(_data, (uint256));
 
-        // Optimistically transfer to the solver contract the tokens that the user is selling
+        // Optimistically transfer tokens from dapp to here (EE)
         _transferUserERC20(swapIntent.tokenUserSells, address(this), swapIntent.amountUserSells);
 
         // Approve the router (NOTE that this approval happens inside the try/catch)
@@ -136,14 +157,20 @@ contract FastLaneOnlineInner is BaseStorage, FastLaneOnlineControl {
 
         // Perform the Baseline Call
         (_success,) = baselineCall.to.call(baselineCall.data);
-        require(_success, "BackupRouter: BaselineCallFail");
+        if (!_success) {
+            revert FLOnlineInner_BaselineSwapWrapper_BaselineCallFailed();
+        }
 
         // Track the balance delta
         (_success, _data) = swapIntent.tokenUserBuys.staticcall(abi.encodeCall(IERC20.balanceOf, address(this)));
-        require(_success, "BackupRouter: BalanceCheckFail2");
+        if (!_success) {
+            revert FLOnlineInner_BaselineSwapWrapper_BalanceOfFailed2();
+        }
 
         uint256 _endingBalance = abi.decode(_data, (uint256));
-        require(_endingBalance > _startingBalance, "BackupRouter: NoBalanceIncrease");
+        if (_endingBalance <= _startingBalance) {
+            revert FLOnlineInner_BaselineSwapWrapper_NoBalanceIncrease();
+        }
 
         // Revert gracefully to undo the swap but show the baseline amountOut
         revert BaselineFailSuccessful(_endingBalance - _startingBalance);

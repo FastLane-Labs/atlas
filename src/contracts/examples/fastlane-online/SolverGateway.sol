@@ -45,6 +45,10 @@ contract SolverGateway is OuterHelpers {
         BASELINE_SWAPPER = address(_baselineSwapper);
     }
 
+    function getSolverGasLimit() public pure override returns (uint32) {
+        return uint32(MAX_SOLVER_GAS);
+    }
+
     /////////////////////////////////////////////////////////
     //              CONTROL-LOCAL FUNCTIONS                //
     //                 (not delegated)                     //
@@ -83,7 +87,7 @@ contract SolverGateway is OuterHelpers {
         } else if (_replaceExisting) {
             _replaceSolverOp(userOpHash, _solverOpHash, _replacedIndex);
         } else {
-            revert("ERR - VALUE TOO LOW");
+            revert SolverGateway_AddSolverOp_ValueTooLow();
         }
 
         // Store the op
@@ -94,7 +98,9 @@ contract SolverGateway is OuterHelpers {
         // NOTE: Anyone can call this on behalf of the solver
         // NOTE: the solverOp deadline cannot be before the userOp deadline, therefore if the
         // solverOp deadline is passed then we know the userOp deadline is passed.
-        require(solverOp.deadline < block.number, "ERR - DEADLINE NOT PASSED");
+        if (solverOp.deadline >= block.number) {
+            revert SolverGateway_RefundCongestionBuyIns_DeadlineNotPassed();
+        }
 
         bytes32 _solverOpHash = keccak256(abi.encode(solverOp));
 
@@ -315,7 +321,9 @@ contract SolverGateway is OuterHelpers {
         view
         returns (EscrowAccountAccessData memory aData)
     {
-        require(msg.sender == solverOp.from, "ERR - SOLVER MUST BE SENDER");
+        if (msg.sender != solverOp.from) {
+            revert SolverGateway_PreValidateSolverOp_MsgSenderIsNotSolver();
+        }
 
         UserOperation memory _userOp = _getUserOperation(swapper, swapIntent, baselineCall, deadline, gas, maxFeePerGas);
         bytes32 _userOpHash = _getUserOperationHash(_userOp);
@@ -324,48 +332,76 @@ contract SolverGateway is OuterHelpers {
         uint256 _verificationResult = IAtlasVerification(ATLAS_VERIFICATION).verifySolverOp(
             solverOp, _userOpHash, maxFeePerGas, address(this), false
         );
-        require(
-            _verificationResult == 0 || _verificationResult == (1 << uint256(SolverOutcome.GasPriceOverCap)),
-            "ERR - UNVERIFIED"
-        );
-
+        if (_verificationResult != 0 && _verificationResult != (1 << uint256(SolverOutcome.GasPriceOverCap))) {
+            revert SolverGateway_PreValidateSolverOp_Unverified();
+        }
         // Make sure the calculated UserOpHash matches the actual UserOpHash. Because the User's nonce is a part of the
         // hash,
         // this ensures that Solvers can't add their solution to an intent that's already been executed (with its nonce
         // incremented).
-        require(userOpHash == _userOpHash, "ERR - USER HASH MISMATCH (NONCE)");
-        require(userOpHash == solverOp.userOpHash, "ERR - USER HASH MISMATCH (SOLVER)");
+        if (userOpHash != _userOpHash) {
+            revert SolverGateway_PreValidateSolverOp_UserOpHashMismatch_Nonce();
+        }
+        if (userOpHash != solverOp.userOpHash) {
+            revert SolverGateway_PreValidateSolverOp_UserOpHashMismatch_Solver();
+        }
 
         // Check deadlines
-        require(deadline >= block.number, "ERR - DEADLINE PASSED");
-        require(solverOp.deadline >= deadline, "ERR - DEADLINE INVALID");
+        if (deadline < block.number) {
+            revert SolverGateway_PreValidateSolverOp_DeadlinePassed();
+        }
+        if (solverOp.deadline < deadline) {
+            revert SolverGateway_PreValidateSolverOp_DeadlineInvalid();
+        }
 
         // Gas
-        require(solverOp.maxFeePerGas >= maxFeePerGas, "ERR - INVALID SOLVER GASPRICE");
+        if (solverOp.maxFeePerGas < maxFeePerGas) {
+            revert SolverGateway_PreValidateSolverOp_InvalidSolverGasPrice();
+        }
 
         // Make sure the token is correct
-        require(solverOp.bidToken == swapIntent.tokenUserBuys, "ERR - BuyTokenMismatch");
-        require(solverOp.bidToken != swapIntent.tokenUserSells, "ERR - SellTokenMismatch");
-        require(solverOp.bidAmount >= swapIntent.minAmountUserBuys, "ERR - BID TOO LOW");
-        require(swapIntent.tokenUserSells != address(0), "ERR - CANT SELL ZERO ADDRESS");
-        require(swapIntent.tokenUserBuys != address(0), "ERR - CANT BUY ZERO ADDRESS");
+        if (solverOp.bidToken != swapIntent.tokenUserBuys) {
+            revert SolverGateway_PreValidateSolverOp_BuyTokenMismatch();
+        }
+        if (solverOp.bidToken == swapIntent.tokenUserSells) {
+            revert SolverGateway_PreValidateSolverOp_SellTokenMismatch();
+        }
+        if (solverOp.bidAmount < swapIntent.minAmountUserBuys) {
+            revert SolverGateway_PreValidateSolverOp_BidTooLow();
+        }
+        if (swapIntent.tokenUserSells == address(0)) {
+            revert SolverGateway_PreValidateSolverOp_SellTokenZeroAddress();
+        }
+        if (swapIntent.tokenUserBuys == address(0)) {
+            revert SolverGateway_PreValidateSolverOp_BuyTokenZeroAddress();
+        }
 
         // Validate control address
-        require(solverOp.control == CONTROL, "ERR - INVALID CONTROL");
+        if (solverOp.control != CONTROL) {
+            revert SolverGateway_PreValidateSolverOp_InvalidControl();
+        }
 
         // Make sure no tomfoolery
-        require(solverOp.to != address(this), "ERR - SNEAKY SNEAKY");
-        require(solverOp.to != BASELINE_SWAPPER, "ERR - A WISE GUY EH?");
+        if (solverOp.to == address(this)) revert SolverGateway_PreValidateSolverOp_SneakySneaky();
+        if (solverOp.to == BASELINE_SWAPPER) revert SolverGateway_PreValidateSolverOp_AWiseGuyEh();
 
         // Get the access data
         aData = _getAccessData(msg.sender);
 
         // Check gas limits
-        require(gas > USER_GAS_BUFFER + MAX_SOLVER_GAS * 2, "ERR - USER GAS TOO LOW");
-        require(solverOp.gas < MAX_SOLVER_GAS, "ERR - SOLVER GAS TOO HIGH");
-        require(uint256(aData.bonded) > gas, "ERR - BONDED TOO LOW");
+        if (gas <= USER_GAS_BUFFER + MAX_SOLVER_GAS * 2) {
+            revert SolverGateway_PreValidateSolverOp_UserGasTooLow();
+        }
+        if (solverOp.gas > MAX_SOLVER_GAS) {
+            revert SolverGateway_PreValidateSolverOp_SolverGasTooHigh();
+        }
+        if (uint256(aData.bonded) <= gas) {
+            revert SolverGateway_PreValidateSolverOp_BondedTooLow();
+        }
 
         // Check solver eligibility
-        require(uint256(aData.lastAccessedBlock) < block.number, "ERR - DOUBLE SOLVE");
+        if (uint256(aData.lastAccessedBlock) >= block.number) {
+            revert SolverGateway_PreValidateSolverOp_DoubleSolve();
+        }
     }
 }
