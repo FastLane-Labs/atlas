@@ -43,7 +43,7 @@ contract Simulator is AtlasErrors {
         (Result result, uint256 validCallsResult) = _errorCatcher(userOp, solverOps, dAppOp);
         success = uint8(result) > uint8(Result.UserOpSimFail);
         if (success) validCallsResult = uint256(ValidCallsResult.Valid);
-        SafeTransferLib.safeTransferETH(msg.sender, msg.value);
+        if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
         return (success, result, validCallsResult);
     }
 
@@ -62,7 +62,7 @@ contract Simulator is AtlasErrors {
         (Result result, uint256 solverOutcomeResult) = _errorCatcher(userOp, solverOps, dAppOp);
         success = result == Result.SimulationPassed;
         if (success) solverOutcomeResult = 0; // discard additional error uint if solver stage was successful
-        SafeTransferLib.safeTransferETH(msg.sender, msg.value);
+        if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
         return (success, result, solverOutcomeResult);
     }
 
@@ -82,7 +82,7 @@ contract Simulator is AtlasErrors {
         (Result result, uint256 solverOutcomeResult) = _errorCatcher(userOp, solverOps, dAppOp);
         success = result == Result.SimulationPassed;
         if (success) solverOutcomeResult = 0; // discard additional error uint if solver stage was successful
-        SafeTransferLib.safeTransferETH(msg.sender, msg.value);
+        if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
         return (success, result, solverOutcomeResult);
     }
 
