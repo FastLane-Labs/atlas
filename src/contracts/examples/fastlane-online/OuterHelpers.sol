@@ -122,7 +122,7 @@ contract OuterHelpers is FastLaneOnlineInner {
         returns (UserOperation memory userOp)
     {
         userOp = UserOperation({
-            from: address(this),
+            from: swapper,
             to: ATLAS,
             gas: gas,
             maxFeePerGas: maxFeePerGas,
