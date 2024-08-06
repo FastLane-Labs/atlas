@@ -65,7 +65,7 @@ contract V2RewardDAppControlTest is BaseTest {
         // USER STUFF
 
         vm.startPrank(userEOA);
-        address executionEnvironment = atlas.createExecutionEnvironment(address(v2RewardControl));
+        address executionEnvironment = atlas.createExecutionEnvironment(address(v2RewardControl), userEOA);
         console.log("Execution Environment:", executionEnvironment);
         vm.stopPrank();
         vm.label(address(executionEnvironment), "EXECUTION ENV");

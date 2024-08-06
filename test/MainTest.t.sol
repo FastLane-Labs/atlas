@@ -98,7 +98,7 @@ contract MainTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        address executionEnvironment = atlas.createExecutionEnvironment(userOp.control);
+        address executionEnvironment = atlas.createExecutionEnvironment(userOp.control, userEOA);
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
         console.log("userEOA", userEOA);
@@ -322,8 +322,8 @@ contract MainTest is BaseTest {
         */
 
         vm.startPrank(userEOA);
-        atlas.createExecutionEnvironment(address(v2DAppControl));
-        address newEnvironment = atlas.createExecutionEnvironment(address(v2DAppControl));
+        atlas.createExecutionEnvironment(address(v2DAppControl), userEOA);
+        address newEnvironment = atlas.createExecutionEnvironment(address(v2DAppControl), userEOA);
         vm.stopPrank();
 
         assertTrue(IExecutionEnvironment(newEnvironment).getUser() == userEOA, "Mimic Error - User Mismatch");
@@ -385,7 +385,7 @@ contract MainTest is BaseTest {
         userOp.signature = abi.encodePacked(r, s, v);
 
         vm.startPrank(userEOA);
-        atlas.createExecutionEnvironment(userOp.control);
+        atlas.createExecutionEnvironment(userOp.control, userEOA);
 
         // Failure case, user hasn't approved Atlas for TOKEN_ONE, operation must fail
         (bool simResult,,) = simulator.simUserOperation(userOp);
@@ -429,7 +429,7 @@ contract MainTest is BaseTest {
         (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(r, s, v);
         vm.startPrank(userEOA);
-        atlas.createExecutionEnvironment(userOp.control);
+        atlas.createExecutionEnvironment(userOp.control, userEOA);
         IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
         (bool success, bytes memory data) = address(simulator).call(
             abi.encodeWithSelector(simulator.simSolverCalls.selector, userOp, solverOps, dAppOp)

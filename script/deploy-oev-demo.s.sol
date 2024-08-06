@@ -72,7 +72,7 @@ contract DeployOEVDemoScript is DeployBaseScript {
         // chainlinkDAppControl.setSignersForBaseFeed(CHAINLINK_ETH_USD, getETHUSDSigners_Sepolia());
 
         // Create Execution Environment for Chainlink OEV Metacalls
-        chainlinkExecutionEnv = atlas.createExecutionEnvironment(address(chainlinkDAppControl));
+        chainlinkExecutionEnv = atlas.createExecutionEnvironment(address(chainlinkDAppControl), address(this));
 
         vm.stopBroadcast();
         console.log("Contracts deployed by Chainlink Gov:");
