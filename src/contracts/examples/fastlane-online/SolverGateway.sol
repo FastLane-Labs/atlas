@@ -392,7 +392,7 @@ contract SolverGateway is OuterHelpers {
         if (gas <= USER_GAS_BUFFER + MAX_SOLVER_GAS * 2) {
             revert SolverGateway_PreValidateSolverOp_UserGasTooLow();
         }
-        if (solverOp.gas >= MAX_SOLVER_GAS) {
+        if (solverOp.gas > MAX_SOLVER_GAS) {
             revert SolverGateway_PreValidateSolverOp_SolverGasTooHigh();
         }
         if (uint256(aData.bonded) <= gas) {
