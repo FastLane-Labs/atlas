@@ -72,8 +72,9 @@ contract FastLaneOnlineTest is BaseTest {
         atlasVerification.addSignatory(address(flOnline), address(flOnline));
         vm.stopPrank();
 
-        // This EE wont be deployed until the start of the first metacall
-        (executionEnvironment,,) = atlas.getExecutionEnvironment(address(flOnline), address(flOnline));
+        // User deploys their FLOnline Execution Environment
+        vm.prank(userEOA);
+        executionEnvironment = atlas.createExecutionEnvironment(address(flOnline));
 
         // Set fastOnlineSwap args to default values
         args = _buildDefaultFastOnlineSwapArgs();
@@ -83,9 +84,9 @@ contract FastLaneOnlineTest is BaseTest {
         deal(args.swapIntent.tokenUserSells, userEOA, args.swapIntent.amountUserSells); // 3200 DAI
         deal(userEOA, 1e18); // Give user 1 ETH to pay for gas (msg.value is 0.1 ETH per call by default)
 
-        // User approves FLOnline to take 3200 DAI
+        // User approves their Execution Environment to take their DAI to facilitate the swap
         vm.prank(userEOA);
-        IERC20(args.swapIntent.tokenUserSells).approve(address(flOnline), args.swapIntent.amountUserSells);
+        IERC20(args.swapIntent.tokenUserSells).approve(executionEnvironment, args.swapIntent.amountUserSells);
     }
 
     // ---------------------------------------------------- //
@@ -287,7 +288,7 @@ contract FastLaneOnlineTest is BaseTest {
     // Deadline: block.number + 1
     // Gas: 2_000_000
     // MaxFeePerGas: tx.gasprice
-    function _buildDefaultFastOnlineSwapArgs() internal view returns (FastOnlineSwapArgs memory newArgs) {
+    function _buildDefaultFastOnlineSwapArgs() internal returns (FastOnlineSwapArgs memory newArgs) {
         newArgs.swapIntent = SwapIntent({
             tokenUserBuys: WETH_ADDRESS,
             minAmountUserBuys: 1 ether,
@@ -322,6 +323,10 @@ contract FastLaneOnlineTest is BaseTest {
             gas: defaultGasLimit,
             maxFeePerGas: defaultGasPrice
         });
+
+        // User signs userOp
+        (sig.v, sig.r, sig.s) = vm.sign(userPK, newArgs.userOpHash);
+        newArgs.userOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         newArgs.deadline = defaultDeadlineBlock;
         newArgs.gas = defaultGasLimit;
