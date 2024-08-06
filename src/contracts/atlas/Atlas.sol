@@ -60,11 +60,12 @@ contract Atlas is Escrow, Factory {
             : gasleft() + IL2GasCalculator(L2_GAS_CALCULATOR).initialGasUsed(msg.data.length);
 
         bool _isSimulation = msg.sender == SIMULATOR;
+        address _msgSender = _getMsgSender(_isSimulation);
 
         (address _executionEnvironment, DAppConfig memory _dConfig) = _getOrCreateExecutionEnvironment(userOp);
 
         ValidCallsResult _validCallsResult =
-            VERIFICATION.validateCalls(_dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, _isSimulation);
+            VERIFICATION.validateCalls(_dConfig, userOp, solverOps, dAppOp, msg.value, _msgSender, _isSimulation);
         if (_validCallsResult != ValidCallsResult.Valid) {
             if (_isSimulation) revert VerificationSimFail(_validCallsResult);
 
@@ -84,7 +85,7 @@ contract Atlas is Escrow, Factory {
         // userOpHash has already been calculated and verified in validateCalls at this point, so rather
         // than re-calculate it, we can simply take it from the dAppOp here. It's worth noting that this will
         // be either a TRUSTED or DEFAULT hash, depending on the allowsTrustedOpHash setting.
-        try this.execute(_dConfig, userOp, solverOps, _executionEnvironment, msg.sender, dAppOp.userOpHash) returns (
+        try this.execute(_dConfig, userOp, solverOps, _executionEnvironment, _msgSender, dAppOp.userOpHash) returns (
             Context memory ctx
         ) {
             // Gas Refund to sender only if execution is successful
@@ -100,7 +101,7 @@ contract Atlas is Escrow, Factory {
             // Set lock to FullyLocked to prevent any reentrancy possibility
             _setLockPhase(uint8(ExecutionPhase.FullyLocked));
 
-            // Refund the msg.value to sender if it errored
+            // Refund the msg.value to sender if it errored.
             // WARNING: If msg.sender is a disposable address such as a session key, make sure to remove ETH from it
             // before disposal
             if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
@@ -366,5 +367,13 @@ contract Atlas is Escrow, Factory {
         returns (bool)
     {
         return environment == _getExecutionEnvironmentCustom(user, control, callConfig);
+    }
+
+    /// @notice Returns the bunder/msg.sender address. When called in simulation mode, this returns the address appended
+    /// at the end of msg.data by the simulator. Otherwise, it simply returns the real msg.sender.
+    /// @param isSimulation A boolean indicating whether the current call is a simulation.
+    /// @return The address of the bundler/msg.sender.
+    function _getMsgSender(bool isSimulation) internal view returns (address) {
+        return isSimulation ? address(bytes20(msg.data[msg.data.length - 20:])) : msg.sender;
     }
 }
