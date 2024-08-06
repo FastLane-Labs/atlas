@@ -438,7 +438,7 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param aData The Solver's EscrowAccountAccessData struct to update.
     /// @param auctionWon A boolean indicating whether the solver's solverOp won the auction.
     /// @param gasUsed The amount of gas used by the solverOp.
-    function _updateAnalytics(EscrowAccountAccessData memory aData, bool auctionWon, uint256 gasUsed) internal pure {
+    function _updateAnalytics(EscrowAccountAccessData memory aData, bool auctionWon, uint256 gasUsed) internal view {
         if (auctionWon) {
             unchecked {
                 ++aData.auctionWins;
@@ -449,7 +449,8 @@ abstract contract GasAccounting is SafetyLocks {
             }
         }
 
-        aData.totalGasUsed += uint64(gasUsed / _GAS_USED_DECIMALS_TO_DROP);
+        // Track total ETH value of gas spent by solver in metacalls. Measured in gwei (1e9 digits truncated).
+        aData.totalGasValueUsed += uint64(gasUsed * tx.gasprice / _GAS_VALUE_DECIMALS_TO_DROP);
     }
 
     /// @notice Calculates the gas cost of the calldata used to execute a SolverOperation.

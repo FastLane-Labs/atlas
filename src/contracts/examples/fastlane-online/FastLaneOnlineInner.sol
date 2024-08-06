@@ -56,17 +56,26 @@ contract FastLaneOnlineInner is BaseStorage, FastLaneOnlineControl {
         payable
         returns (SwapIntent memory, BaselineCall memory)
     {
-        require(msg.sender == ATLAS, "SwapIntentDAppControl: InvalidSender");
-        require(address(this) != CONTROL, "SwapIntentDAppControl: MustBeDelegated");
-        require(swapIntent.tokenUserSells != swapIntent.tokenUserBuys, "SwapIntentDAppControl: SellIsSurplus");
+        if (msg.sender != ATLAS) {
+            revert FLOnlineInner_Swap_OnlyAtlas();
+        }
+        if (address(this) == CONTROL) {
+            revert FLOnlineInner_Swap_MustBeDelegated();
+        }
+        if (swapIntent.tokenUserSells == swapIntent.tokenUserBuys) {
+            revert FLOnlineInner_Swap_BuyAndSellTokensAreSame();
+        }
 
-        // User = control = bundler
-        require(_bundler() == CONTROL, "SwapIntentDAppControl: ControlNotBundler");
+        // control = bundler != user
+        if (_bundler() != CONTROL) {
+            revert FLOnlineInner_Swap_ControlNotBundler();
+        }
 
         // Transfer sell token if it isn't gastoken and validate value deposit if it is
         if (swapIntent.tokenUserSells != address(0)) {
             _transferUserERC20(swapIntent.tokenUserSells, address(this), swapIntent.amountUserSells);
         } else {
+            // TODO convert to custom errors
             // UserOp.value already passed to this contract - ensure that userOp.value matches sell amount
             require(msg.value >= swapIntent.amountUserSells, "SwapIntentDAppControl: NativeTokenValue1");
             require(baselineCall.value >= swapIntent.amountUserSells, "SwapIntentDAppControl: NativeTokenValue2");

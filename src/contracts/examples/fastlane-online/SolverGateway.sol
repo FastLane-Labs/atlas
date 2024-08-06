@@ -35,6 +35,10 @@ contract SolverGateway is OuterHelpers {
 
     constructor(address _atlas, address _simulator) OuterHelpers(_atlas, _simulator) { }
 
+    function getSolverGasLimit() public pure override returns (uint32) {
+        return uint32(MAX_SOLVER_GAS);
+    }
+
     /////////////////////////////////////////////////////////
     //              CONTROL-LOCAL FUNCTIONS                //
     //                 (not delegated)                     //
@@ -68,7 +72,7 @@ contract SolverGateway is OuterHelpers {
         } else if (_replaceExisting) {
             _replaceSolverOp(solverOp.userOpHash, _solverOpHash, _replacedIndex);
         } else {
-            revert("ERR - VALUE TOO LOW");
+            revert SolverGateway_AddSolverOp_ValueTooLow();
         }
 
         // Store the op
@@ -83,7 +87,9 @@ contract SolverGateway is OuterHelpers {
         // NOTE: Anyone can call this on behalf of the solver
         // NOTE: the solverOp deadline cannot be before the userOp deadline, therefore if the
         // solverOp deadline is passed then we know the userOp deadline is passed.
-        require(solverOp.deadline < block.number, "ERR - DEADLINE NOT PASSED");
+        if (solverOp.deadline >= block.number) {
+            revert SolverGateway_RefundCongestionBuyIns_DeadlineNotPassed();
+        }
 
         bytes32 _solverOpHash = keccak256(abi.encode(solverOp));
 

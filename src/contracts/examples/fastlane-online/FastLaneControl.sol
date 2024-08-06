@@ -13,12 +13,13 @@ import "src/contracts/types/SolverOperation.sol";
 import "src/contracts/types/LockTypes.sol";
 
 import { SwapIntent, BaselineCall } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
+import { FastLaneOnlineErrors } from "src/contracts/examples/fastlane-online/FastLaneOnlineErrors.sol";
 
 interface ISolverGateway {
     function getBidAmount(bytes32 solverOpHash) external view returns (uint256 bidAmount);
 }
 
-contract FastLaneOnlineControl is DAppControl {
+contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
     constructor(address _atlas)
         DAppControl(
             _atlas,
@@ -64,13 +65,19 @@ contract FastLaneOnlineControl is DAppControl {
         (SwapIntent memory _swapIntent,) = abi.decode(returnData, (SwapIntent, BaselineCall));
 
         // Make sure the token is correct
-        require(solverOp.bidToken == _swapIntent.tokenUserBuys, "FLOnlineControl: BuyTokenMismatch");
-        require(solverOp.bidToken != _swapIntent.tokenUserSells, "FLOnlineControl: SellTokenMismatch");
+        if (solverOp.bidToken != _swapIntent.tokenUserBuys) {
+            revert FLOnlineControl_PreSolver_BuyTokenMismatch();
+        }
+        if (solverOp.bidToken == _swapIntent.tokenUserSells) {
+            revert FLOnlineControl_PreSolver_SellTokenMismatch();
+        }
 
         // NOTE: This module is unlike the generalized swap intent module - here, the solverOp.bidAmount includes
         // the min amount that the user expects.
         // We revert early if the baseline swap returned more than the solver's bid.
-        require(solverOp.bidAmount >= _swapIntent.minAmountUserBuys, "FLOnlineControl: BidBelowReserve");
+        if (solverOp.bidAmount < _swapIntent.minAmountUserBuys) {
+            revert FLOnlineControl_PreSolver_BidBelowReserve();
+        }
 
         // Optimistically transfer the user's sell tokens to the solver.
         if (_swapIntent.tokenUserBuys == address(0)) {
@@ -187,7 +194,7 @@ contract FastLaneOnlineControl is DAppControl {
 
     function _getERC20Balance(address token) internal view returns (uint256 balance) {
         (bool _success, bytes memory _data) = token.staticcall(abi.encodeCall(IERC20.balanceOf, address(this)));
-        require(_success, "OuterHelper: BalanceCheckFail");
+        if (!_success) revert FLOnlineControl_BalanceCheckFail();
         balance = abi.decode(_data, (uint256));
     }
 }

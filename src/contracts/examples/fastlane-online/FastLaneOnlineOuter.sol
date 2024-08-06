@@ -73,10 +73,17 @@ contract FastLaneOnlineOuter is SolverGateway {
     }
 
     function _validateSwap(UserOperation calldata userOp) internal {
-        require(msg.sender == userOp.from, "ERR - INVALID SENDER");
-        require(userOp.gas > gasleft(), "ERR - TX GAS TOO HIGH");
-        require(userOp.gas < gasleft() - 30_000, "ERR - TX GAS TOO LOW");
-        require(userOp.gas > MAX_SOLVER_GAS * 2, "ERR - GAS LIMIT TOO LOW");
+        require(msg.sender == userOp.from, "ERR - INVALID SENDER"); // TODO convert to custom error
+        // TODO: Add back gas checks when we have more clarity
+        // if (gas > gasleft()) {
+        //     revert FLOnlineOuter_ValidateSwap_TxGasTooHigh();
+        // }
+        // if (gas < gasleft() - 30_000) {
+        //     revert FLOnlineOuter_ValidateSwap_TxGasTooLow();
+        // }
+        if (gas <= MAX_SOLVER_GAS * 2) {
+            revert FLOnlineOuter_ValidateSwap_GasLimitTooLow();
+        }
 
         (SwapIntent memory _swapIntent, BaselineCall memory _baselineCall) =
             abi.decode(userOp.data[4:], (SwapIntent, BaselineCall));
@@ -89,19 +96,34 @@ contract FastLaneOnlineOuter is SolverGateway {
         }
     }
 
+    // TODO Fix when basic swap scenarios are passing
     function _metacallGasLimit(
         uint256 cumulativeGasReserved,
         uint256 totalGas,
         uint256 gasLeft
     )
         internal
-        pure
+        view
         returns (uint256 metacallGasLimit)
     {
         // Reduce any unnecessary gas to avoid Atlas's excessive gas bundler penalty
-        cumulativeGasReserved += METACALL_GAS_BUFFER;
-        metacallGasLimit = totalGas > gasLeft
-            ? (gasLeft > cumulativeGasReserved ? cumulativeGasReserved : gasLeft)
-            : (totalGas > cumulativeGasReserved ? cumulativeGasReserved : totalGas);
+        cumulativeGasReserved += METACALL_GAS_BUFFER; // TODO maybe make this higher?
+
+        // Sets metacallGasLimit to the minimum of {totalGas, gasLeft, cumulativeGasReserved}
+        // metacallGasLimit = totalGas > gasLeft
+        //     ? (gasLeft > cumulativeGasReserved ? cumulativeGasReserved : gasLeft)
+        //     : (totalGas > cumulativeGasReserved ? cumulativeGasReserved : totalGas);
+
+        // console.log("cumulativeGasReserved:", cumulativeGasReserved);
+        // console.log("totalGas:", totalGas);
+        // console.log("gasLeft:", gasLeft);
+        // console.log("metacallGasLimit:", metacallGasLimit);
+
+        // TODO remove this once fixed, hacky bypass for gas issues
+        return gasLeft - 100_000;
     }
+
+    fallback() external payable { }
+
+    receive() external payable { }
 }

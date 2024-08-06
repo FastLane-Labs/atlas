@@ -90,7 +90,13 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     function accessData(address account)
         external
         view
-        returns (uint112 bonded, uint32 lastAccessedBlock, uint24 auctionWins, uint24 auctionFails, uint64 totalGasUsed)
+        returns (
+            uint112 bonded,
+            uint32 lastAccessedBlock,
+            uint24 auctionWins,
+            uint24 auctionFails,
+            uint64 totalGasValueUsed
+        )
     {
         EscrowAccountAccessData memory _aData = S_accessData[account];
 
@@ -98,7 +104,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         lastAccessedBlock = _aData.lastAccessedBlock;
         auctionWins = _aData.auctionWins;
         auctionFails = _aData.auctionFails;
-        totalGasUsed = _aData.totalGasUsed;
+        totalGasValueUsed = _aData.totalGasValueUsed;
     }
 
     function solverOpHashes(bytes32 opHash) external view returns (bool) {
