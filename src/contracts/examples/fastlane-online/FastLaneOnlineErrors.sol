@@ -6,8 +6,11 @@ contract FastLaneOnlineErrors {
     error FLOnlineControl_PreSolver_BuyTokenMismatch();
     error FLOnlineControl_PreSolver_SellTokenMismatch();
     error FLOnlineControl_PreSolver_BidBelowReserve();
-    error FLOnlineControl_PreSolver_BidAmountFail();
-    error FLOnlineControl_PreSolver_ExPostBelowAnte();
+
+    error FLOnlineControl_PostOpsCall_InsufficientBaseline();
+
+    error FLOnlineControl_BaselineSwap_BaselineCallFail();
+    error FLOnlineControl_BaselineSwap_NoBalanceIncrease();
 
     error FLOnlineControl_BalanceCheckFail();
 
@@ -15,60 +18,28 @@ contract FastLaneOnlineErrors {
     error FLOnlineInner_Swap_OnlyAtlas();
     error FLOnlineInner_Swap_MustBeDelegated();
     error FLOnlineInner_Swap_BuyAndSellTokensAreSame();
-    error FLOnlineInner_Swap_ControlNotUser();
     error FLOnlineInner_Swap_ControlNotBundler();
-    error FLOnlineInner_Swap_UserNotLocked();
-    error FLOnlineInner_Swap_SellFundsUnavailable();
-
-    error FLOnlineInner_BaselineSwapWrapper_NotActiveEnv();
-    error FLOnlineInner_BaselineSwapWrapper_IncorrectPhase();
-    error FLOnlineInner_BaselineSwapWrapper_CallerIsNotAtlas();
-    error FLOnlineInner_BaselineSwapWrapper_BalanceOfFailed1();
-    error FLOnlineInner_BaselineSwapWrapper_BalanceOfFailed2();
-    error FLOnlineInner_BaselineSwapWrapper_BaselineCallFailed();
-    error FLOnlineInner_BaselineSwapWrapper_NoBalanceIncrease();
+    error FLOnlineInner_Swap_UserOpValueTooLow();
+    error FLOnlineInner_Swap_BaselineCallValueTooLow();
 
     // SolverGateway.sol
+    error SolverGateway_AddSolverOp_SolverMustBeSender();
+    error SolverGateway_AddSolverOp_SimulationFail();
     error SolverGateway_AddSolverOp_ValueTooLow();
 
     error SolverGateway_RefundCongestionBuyIns_DeadlineNotPassed();
-
-    error SolverGateway_PreValidateSolverOp_MsgSenderIsNotSolver();
-    error SolverGateway_PreValidateSolverOp_Unverified();
-    error SolverGateway_PreValidateSolverOp_UserOpHashMismatch_Nonce();
-    error SolverGateway_PreValidateSolverOp_UserOpHashMismatch_Solver();
-    error SolverGateway_PreValidateSolverOp_DeadlinePassed();
-    error SolverGateway_PreValidateSolverOp_DeadlineInvalid();
-    error SolverGateway_PreValidateSolverOp_InvalidSolverGasPrice();
-    error SolverGateway_PreValidateSolverOp_BuyTokenMismatch();
-    error SolverGateway_PreValidateSolverOp_SellTokenMismatch();
-    error SolverGateway_PreValidateSolverOp_BidTooLow();
-    error SolverGateway_PreValidateSolverOp_SellTokenZeroAddress();
-    error SolverGateway_PreValidateSolverOp_BuyTokenZeroAddress();
-    error SolverGateway_PreValidateSolverOp_InvalidControl();
-    error SolverGateway_PreValidateSolverOp_SneakySneaky();
-    error SolverGateway_PreValidateSolverOp_AWiseGuyEh();
-    error SolverGateway_PreValidateSolverOp_UserGasTooLow();
-    error SolverGateway_PreValidateSolverOp_SolverGasTooHigh();
-    error SolverGateway_PreValidateSolverOp_BondedTooLow();
-    error SolverGateway_PreValidateSolverOp_DoubleSolve();
 
     // OuterHelpers.sol
     error OuterHelpers_NotMadJustDisappointed();
 
     // FLOnlineOuter.sol
-    error FLOnlineOuter_FastOnlineSwap_UserOpHashMismatch();
+    error FLOnlineOuter_FastOnlineSwap_NoFulfillment();
 
-    error FLOnlineOuter_ValidateSwap_DeadlinePassed();
-    error FLOnlineOuter_ValidateSwap_InvalidGasPrice();
+    error FLOnlineOuter_ValidateSwap_InvalidSender();
     error FLOnlineOuter_ValidateSwap_TxGasTooHigh();
     error FLOnlineOuter_ValidateSwap_TxGasTooLow();
     error FLOnlineOuter_ValidateSwap_GasLimitTooLow();
-    error FLOnlineOuter_ValidateSwap_SellTokenZeroAddress();
-    error FLOnlineOuter_ValidateSwap_BuyTokenZeroAddress();
-
-    // BaselineSwapper.sol
-    error BaselineSwapper_InvalidEntry();
-    error BaselineSwapper_InsufficientAmount();
-    error BaselineSwapper_BalanceCheckFail();
+    error FLOnlineOuter_ValidateSwap_MsgValueTooLow();
+    error FLOnlineOuter_ValidateSwap_UserOpValueTooLow();
+    error FLOnlineOuter_ValidateSwap_UserOpBaselineValueMismatch();
 }

@@ -66,7 +66,7 @@ contract FastLaneOnlineInner is BaseStorage, FastLaneOnlineControl {
             revert FLOnlineInner_Swap_BuyAndSellTokensAreSame();
         }
 
-        // control = bundler != user
+        // control == bundler != user
         if (_bundler() != CONTROL) {
             revert FLOnlineInner_Swap_ControlNotBundler();
         }
@@ -75,10 +75,9 @@ contract FastLaneOnlineInner is BaseStorage, FastLaneOnlineControl {
         if (swapIntent.tokenUserSells != address(0)) {
             _transferUserERC20(swapIntent.tokenUserSells, address(this), swapIntent.amountUserSells);
         } else {
-            // TODO convert to custom errors
             // UserOp.value already passed to this contract - ensure that userOp.value matches sell amount
-            require(msg.value >= swapIntent.amountUserSells, "SwapIntentDAppControl: NativeTokenValue1");
-            require(baselineCall.value >= swapIntent.amountUserSells, "SwapIntentDAppControl: NativeTokenValue2");
+            if (msg.value < swapIntent.amountUserSells) revert FLOnlineInner_Swap_UserOpValueTooLow();
+            if (baselineCall.value < swapIntent.amountUserSells) revert FLOnlineInner_Swap_BaselineCallValueTooLow();
         }
 
         // Calculate the baseline swap amount from the frontend-sourced routing

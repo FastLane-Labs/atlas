@@ -113,7 +113,9 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
         uint256 _buyTokensReceived = _baselineSwap(_swapIntent, _baselineCall);
 
         // Verify that it exceeds the minAmountOut
-        require(_buyTokensReceived >= _swapIntent.minAmountUserBuys, "ERR - INSUFFICIENT BASELINE");
+        if (_buyTokensReceived < _swapIntent.minAmountUserBuys) {
+            revert FLOnlineControl_PostOpsCall_InsufficientBaseline();
+        }
 
         // Undo the token approval, if not gas token.
         if (_swapIntent.tokenUserSells != address(0)) {
@@ -167,14 +169,16 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
 
         // Perform the Baseline Call
         (bool _success,) = baselineCall.to.call{ value: baselineCall.value }(baselineCall.data);
-        require(_success, "BackupRouter: BaselineCallFail"); // dont pass custom errors
+        // dont pass custom errors
+        if (!_success) revert FLOnlineControl_BaselineSwap_BaselineCallFail();
 
         // Track the balance delta
         uint256 _endingBalance = swapIntent.tokenUserBuys == address(0)
             ? address(this).balance - msg.value
             : _getERC20Balance(swapIntent.tokenUserBuys);
 
-        require(_endingBalance > _startingBalance, "BackupRouter: NoBalanceIncrease"); // dont pass custom errors
+        // dont pass custom errors
+        if (_endingBalance <= _startingBalance) revert FLOnlineControl_BaselineSwap_NoBalanceIncrease();
 
         return _endingBalance - _startingBalance;
     }

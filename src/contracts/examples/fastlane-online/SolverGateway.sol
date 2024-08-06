@@ -58,10 +58,10 @@ contract SolverGateway is OuterHelpers {
         onlyAsControl
         withUserLock(solverOp.from)
     {
-        require(msg.sender == solverOp.from, "ERR - SOLVER MUST BE SENDER");
+        if (msg.sender != solverOp.from) revert SolverGateway_AddSolverOp_SolverMustBeSender();
 
         // Simulate the SolverOp and make sure it's valid
-        require(_simulateSolverOp(userOp, solverOp), "ERR - SIMULATION FAIL");
+        if (!_simulateSolverOp(userOp, solverOp)) revert SolverGateway_AddSolverOp_SimulationFail();
 
         bytes32 _solverOpHash = keccak256(abi.encode(solverOp));
 

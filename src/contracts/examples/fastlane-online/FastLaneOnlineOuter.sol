@@ -56,8 +56,8 @@ contract FastLaneOnlineOuter is SolverGateway {
         (_success, _data) =
             ATLAS.call{ value: msg.value, gas: _metacallGasLimit(_gasReserved, userOp.gas, gasleft()) }(_data);
 
-        // Revert if the call failed
-        require(_success, "ERR - SOLVERS + BASELINE FAIL");
+        // Revert if the metacall failed - neither solvers nor baseline call fulfilled swap intent
+        if (!_success) revert FLOnlineOuter_FastOnlineSwap_NoFulfillment();
 
         // Find out if any of the solvers were successful
         _success = abi.decode(_data, (bool));
@@ -73,7 +73,7 @@ contract FastLaneOnlineOuter is SolverGateway {
     }
 
     function _validateSwap(UserOperation calldata userOp) internal {
-        require(msg.sender == userOp.from, "ERR - INVALID SENDER"); // TODO convert to custom error
+        if (msg.sender != userOp.from) revert FLOnlineOuter_ValidateSwap_InvalidSender();
         // TODO: Add back gas checks when we have more clarity
         // if (gas > gasleft()) {
         //     revert FLOnlineOuter_ValidateSwap_TxGasTooHigh();
@@ -90,9 +90,9 @@ contract FastLaneOnlineOuter is SolverGateway {
 
         // Verify that if we're dealing with the native gas token that the balances add up
         if (_swapIntent.tokenUserSells == address(0)) {
-            require(msg.value >= userOp.value, "ERR - INSUFICCIENT BALANCE1");
-            require(userOp.value >= _swapIntent.amountUserSells, "ERR - INSUFICCIENT BALANCE2");
-            require(userOp.value == _baselineCall.value, "ERR - INSUFICCIENT BALANCE3");
+            if (msg.value < userOp.value) revert FLOnlineOuter_ValidateSwap_MsgValueTooLow();
+            if (userOp.value < _swapIntent.amountUserSells) revert FLOnlineOuter_ValidateSwap_UserOpValueTooLow();
+            if (userOp.value != _baselineCall.value) revert FLOnlineOuter_ValidateSwap_UserOpBaselineValueMismatch();
         }
     }
 
