@@ -62,15 +62,15 @@ Commit hash of deployment: [dca0b99](https://github.com/FastLane-Labs/atlas/comm
 
 ### Polygon Mainnet
 
-Commit hash of deployment: [dca0b99](https://github.com/FastLane-Labs/atlas/commit/dca0b9946e8f59347610cd24a0bca5e84ddea00e)
+Commit hash of deployment: [1aaa10a](https://github.com/FastLane-Labs/atlas/pull/392/commits/1aaa10a91feeef1666ea55596517f32c54c468aa)
 
 | Contract           | Address                                                                                                                       |
 |--------------------|-------------------------------------------------------------------------------------------------------------------------------|
-| Atlas              | [0x892F8f6779ca6927c1A6Cc74319e03d2abEf18D5](https://polygonscan.com/address/0x892F8f6779ca6927c1A6Cc74319e03d2abEf18D5)      |
-| AtlasVerification  | [0xc05DDBe9745ce9DB45C32F5e4C1DA7a3c4FDa220](https://polygonscan.com/address/0xc05DDBe9745ce9DB45C32F5e4C1DA7a3c4FDa220)      |
-| Simulator          | [0xfBc81A39459E0D82EC31B4e585f7A318AFAdB49B](https://polygonscan.com/address/0xfBc81A39459E0D82EC31B4e585f7A318AFAdB49B)      |
-| Sorter             | [0x81f1E70A11A9E10Fa314cC093D149E5ec56EE97f](https://polygonscan.com/address/0x81f1E70A11A9E10Fa314cC093D149E5ec56EE97f)      |
+| Atlas              | [0x57FA2aBf1dc109C5F7ea2FB6A72358D2c624971d](https://polygonscan.com/address/0x57FA2aBf1dc109C5F7ea2FB6A72358D2c624971d)      |
+| AtlasVerification  | [0xA462C35C43355928F114144AD20AddD6Bb09b52f](https://polygonscan.com/address/0xA462C35C43355928F114144AD20AddD6Bb09b52f)      |
+| Simulator          | [0x7f9227d40590D473D9FdD855C506f2D6400687Cb](https://polygonscan.com/address/0x7f9227d40590D473D9FdD855C506f2D6400687Cb)      |
+| Sorter             | [0x0cb4cCc7C853BA2CeA8bc8cB2ECF8142dF67BF79](https://polygonscan.com/address/0x0cb4cCc7C853BA2CeA8bc8cB2ECF8142dF67BF79)      |
 
 | DAppControl        | Address                                                                                                                       |
 |--------------------|-------------------------------------------------------------------------------------------------------------------------------|
-| FastLane Online    | [0x0E3009d01e85ac49D164E453Ec81283EAAf46fB5](https://amoy.polygonscan.com/address/0x0E3009d01e85ac49D164E453Ec81283EAAf46fB5) |
+| FastLane Online    | [0x8e098Dfd60aEC9bCf07fd3cA5933e9F22b1b4A0d](https://amoy.polygonscan.com/address/0x0E3009d01e85ac49D164E453Ec81283EAAf46fB5) |
