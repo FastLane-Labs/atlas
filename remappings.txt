@@ -2,6 +2,7 @@ ds-test/=lib/forge-std/lib/ds-test/src/
 eth-gas-reporter/=node_modules/eth-gas-reporter/
 forge-std/=lib/forge-std/src/
 hardhat/=node_modules/hardhat/
+solady/=lib/solady/src/
 openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/
 openzeppelin-contracts/=lib/openzeppelin-contracts/
 @openzeppelin/contracts=lib/openzeppelin-contracts/contracts/
