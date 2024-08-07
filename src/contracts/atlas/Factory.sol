@@ -37,7 +37,7 @@ abstract contract Factory {
         external
         returns (address executionEnvironment)
     {
-        if (msg.sender != control && msg.sender != user) revert AtlasErrors.Unauthorized();
+        if (msg.sender != user && msg.sender != control) revert AtlasErrors.Unauthorized();
         uint32 _callConfig = IDAppControl(control).CALL_CONFIG();
         executionEnvironment =
             _getOrCreateExecutionEnvironment({ user: user, control: control, callConfig: _callConfig });
