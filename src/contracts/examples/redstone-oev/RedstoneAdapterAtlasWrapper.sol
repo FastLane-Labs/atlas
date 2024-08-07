@@ -3,11 +3,20 @@ pragma solidity 0.8.25;
 
 import { Ownable } from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import { MergedSinglePriceFeedAdapterWithoutRounds } from "lib/redstone-oracles-monorepo/packages/on-chain-relayer/contracts/price-feeds/without-rounds/MergedSinglePriceFeedAdapterWithoutRounds.sol";
+import { AggregatorV2V3Interface } from "src/contracts/examples/oev-example/IChainlinkAtlasWrapper.sol";
 import { IRedstoneAdapter } from "lib/redstone-oracles-monorepo/packages/on-chain-relayer/contracts/core/IRedstoneAdapter.sol";
-import {
-    AggregatorV2V3Interface
-} from "src/contracts/examples/oev-example/IChainlinkAtlasWrapper.sol";
 import "./RedstoneDAppControl.sol";
+
+interface IAdapter {
+    function getDataFeedIds() external view returns (bytes32[] memory);
+    function getAuthorisedSignerIndex(address _receivedSigner) external view returns (uint8);
+}
+
+interface IFeed {
+    function latestAnswer() external view returns (int256);
+    function latestTimestamp() external view returns (uint256);
+    function getPriceFeedAdapter() external view returns (IRedstoneAdapter);
+}
 
 contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWithoutRounds {
     address public immutable ATLAS;
@@ -23,11 +32,11 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
     int256 public atlasAnswer;
     uint256 public atlasAnswerUpdatedAt;
 
-    constructor(address atlas, address _owner, address _baseAdapter, address _baseFeed) {
+    constructor(address atlas, address _owner, address _baseFeed) {
         ATLAS = atlas;
         DAPP_CONTROL = msg.sender;
-        BASE_ADAPTER = _baseAdapter;
         BASE_FEED = _baseFeed;
+        BASE_ADAPTER = address(IFeed(_baseFeed).getPriceFeedAdapter());
         _transferOwnership(_owner);
     }
 
@@ -40,7 +49,7 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
     }
 
     function getDataFeedId() public view virtual override returns (bytes32 dataFeedId){
-        bytes32[] memory dataFeedIds = IRedstoneAdapter(BASE_ADAPTER).getDataFeedIds();
+        bytes32[] memory dataFeedIds = IAdapter(BASE_ADAPTER).getDataFeedIds();
         if (dataFeedIds.length == 0) {
             revert BaseAdapterHasNoDataFeed();
         }
@@ -57,11 +66,11 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
     }
 
     function latestAnswer() public view virtual override returns (int256) {
-        int256 baseAnswer = IAdapter(BASE_ADAPTER).latestAnswer();
+        int256 baseAnswer = IFeed(BASE_FEED).latestAnswer();
         if (atlasAnswer == 0){
             return baseAnswer;
         }
-        uint256 baseLatestTimestamp = IAdapter(BASE_ADAPTER).latestTimestamp();
+        uint256 baseLatestTimestamp = IFeed(BASE_FEED).latestTimestamp();
 
         if (atlasAnswerUpdatedAt > baseLatestTimestamp - BASE_FEED_DELAY) {
             return atlasAnswer;
@@ -70,7 +79,7 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
     }
 
     function latestTimestamp() public view virtual returns (uint256) {
-        uint256 baseLatestTimestamp = IAdapter(BASE_ADAPTER).latestTimestamp();
+        uint256 baseLatestTimestamp = IFeed(BASE_FEED).latestTimestamp();
         if (atlasAnswer == 0){
             return baseLatestTimestamp;
         }
@@ -79,10 +88,4 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
         }
         return baseLatestTimestamp;   
     }
-}
-
-interface IAdapter {
-    function getAuthorisedSignerIndex(address _receivedSigner) external view returns (uint8);
-    function latestAnswer() external view returns (int256);
-    function latestTimestamp() external view returns (uint256);
 }

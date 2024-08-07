@@ -13,7 +13,7 @@ contract RedstoneDAppControl is DAppControl {
     error InvalidRedstoneAdapter();
     error FailedToAllocateOEV();
 
-    event NewRedstoneAtlasAdapterCreated(address indexed wrapper, address indexed owner, address baseAdapter, address baseFeed);
+    event NewRedstoneAtlasAdapterCreated(address indexed wrapper, address indexed owner, address indexed baseFeed);
 
     mapping(address redstoneAtlasAdapter => bool isAdapter) public isRedstoneAdapter;
 
@@ -52,6 +52,8 @@ contract RedstoneDAppControl is DAppControl {
     // ---------------------------------------------------- //
 
     function _allocateValueCall(address, uint256 bidAmount, bytes calldata data) internal virtual override {
+
+
         address adapter = abi.decode(data, (address));
         if (!RedstoneDAppControl(_control()).isRedstoneAdapter(adapter)) {
             revert InvalidRedstoneAdapter();
@@ -74,11 +76,11 @@ contract RedstoneDAppControl is DAppControl {
         return solverOp.bidAmount;
     }
 
-    function createNewAtlasAdapter(address baseAdapter, address baseFeed) external returns (address) {
+    function createNewAtlasAdapter(address baseFeed) external returns (address) {
         if (IChainlinkFeed(baseFeed).latestAnswer() == 0) revert InvalidBaseFeed();
-        address adapter = address(new RedstoneAdapterAtlasWrapper(ATLAS, msg.sender, baseAdapter, baseFeed));
+        address adapter = address(new RedstoneAdapterAtlasWrapper(ATLAS, msg.sender, baseFeed));
         isRedstoneAdapter[adapter] = true;
-        emit NewRedstoneAtlasAdapterCreated(adapter, msg.sender, baseAdapter, baseFeed);
+        emit NewRedstoneAtlasAdapterCreated(adapter, msg.sender, baseFeed);
         return adapter;  
     }
 }
