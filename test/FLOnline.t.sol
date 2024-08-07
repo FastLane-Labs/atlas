@@ -86,7 +86,7 @@ contract FastLaneOnlineTest is BaseTest {
 
         // User approves their Execution Environment to take their DAI to facilitate the swap
         vm.prank(userEOA);
-        IERC20(args.swapIntent.tokenUserSells).approve(executionEnvironment, args.swapIntent.amountUserSells);
+        IERC20(args.swapIntent.tokenUserSells).approve(address(atlas), args.swapIntent.amountUserSells);
     }
 
     // ---------------------------------------------------- //
@@ -146,7 +146,6 @@ contract FastLaneOnlineTest is BaseTest {
     }
 
     function testFLOnlineSwap_ZeroSolvers_BaselineCallFullfills_Success() public {
-        vm.skip(true); // TODO remove skip after merging with flo-overhaul
         // No solverOps at all
         _doBaselineCallWithBalanceChecksThenRevertStateChanges({
             caller: userEOA,
@@ -170,7 +169,7 @@ contract FastLaneOnlineTest is BaseTest {
 
         // Check BaselineCall struct is formed correctly and can revert, revert changes after
         _doBaselineCallWithBalanceChecksThenRevertStateChanges({
-            caller: userEOA,
+            caller: executionEnvironment,
             tokenOutRecipient: executionEnvironment,
             shouldSucceed: false
         });
@@ -412,6 +411,11 @@ contract FastLaneOnlineTest is BaseTest {
         uint256 callerDaiBefore = DAI.balanceOf(caller);
         uint256 recipientWethBefore = WETH.balanceOf(tokenOutRecipient);
 
+        if (callerDaiBefore < args.swapIntent.amountUserSells) {
+            deal(address(DAI), caller, args.swapIntent.amountUserSells);
+            callerDaiBefore = DAI.balanceOf(caller);
+        }
+
         vm.startPrank(caller);
         DAI.approve(args.baselineCall.to, args.swapIntent.amountUserSells);
         (bool success,) = args.baselineCall.to.call(args.baselineCall.data);
@@ -452,7 +456,7 @@ contract FastLaneOnlineTest is BaseTest {
                 routerV2.swapExactTokensForTokens,
                 (
                     args.swapIntent.amountUserSells, // amountIn
-                    9999e18, // BAD amountOutMin
+                    9999e18, // BAD (unrealistic) amountOutMin
                     path, // path = [DAI, WETH]
                     executionEnvironment, // to
                     defaultDeadlineTimestamp // deadline
@@ -461,8 +465,8 @@ contract FastLaneOnlineTest is BaseTest {
             value: 0
         });
 
-        // Update userOpHash for new args otherwise solverOp will fail verification
-        args.userOpHash = flOnline.getUserOpHash({
+        // Need to update the userOp with changes to baseline call
+        (args.userOp, args.userOpHash) = flOnline.getUserOperationAndHash({
             swapper: userEOA,
             swapIntent: args.swapIntent,
             baselineCall: args.baselineCall,
@@ -470,6 +474,10 @@ contract FastLaneOnlineTest is BaseTest {
             gas: defaultGasLimit,
             maxFeePerGas: defaultGasPrice
         });
+
+        // User signs userOp
+        (sig.v, sig.r, sig.s) = vm.sign(userPK, args.userOpHash);
+        args.userOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
     }
 }
 
