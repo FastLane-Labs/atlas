@@ -6,12 +6,16 @@ import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
 import "src/contracts/types/UserOperation.sol";
 import "src/contracts/types/SolverOperation.sol";
 import "./RedstoneAdapterAtlasWrapper.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 contract RedstoneDAppControl is DAppControl {
 
     error InvalidBaseFeed();
     error InvalidRedstoneAdapter();
     error FailedToAllocateOEV();
+    error OnlyGovernance();
+
+    uint private bundlerOEVPercent = 5; 
 
     event NewRedstoneAtlasAdapterCreated(address indexed wrapper, address indexed owner, address indexed baseFeed);
 
@@ -47,19 +51,35 @@ contract RedstoneDAppControl is DAppControl {
         )
     { }
 
+    function setBundlerOEVPercent(uint _percent) external onlyGov {
+        bundlerOEVPercent = _percent;
+    }
+
+    function _onlyGov() internal view {
+        if (msg.sender != governance) revert OnlyGovernance();
+    }
+
+    modifier onlyGov() {
+        _onlyGov();
+        _;
+    }
+
     // ---------------------------------------------------- //
     //                  Atlas Hook Overrides                //
     // ---------------------------------------------------- //
 
     function _allocateValueCall(address, uint256 bidAmount, bytes calldata data) internal virtual override {
-
+        uint256 oevForBundler = bidAmount * bundlerOEVPercent / 100;
+        uint256 oevForSolver = bidAmount - oevForBundler;
 
         address adapter = abi.decode(data, (address));
         if (!RedstoneDAppControl(_control()).isRedstoneAdapter(adapter)) {
             revert InvalidRedstoneAdapter();
         }
-        (bool success,) = adapter.call{ value: bidAmount }("");
-        if (!success) revert FailedToAllocateOEV();        
+        (bool success,) = adapter.call{ value: oevForSolver }("");
+        if (!success) revert FailedToAllocateOEV();
+
+        SafeTransferLib.safeTransferETH(_bundler(), oevForBundler);
     }
 
     // NOTE: Functions below are not delegatecalled
