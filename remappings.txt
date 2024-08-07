@@ -4,4 +4,6 @@ forge-std/=lib/forge-std/src/
 hardhat/=node_modules/hardhat/
 openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/
 openzeppelin-contracts/=lib/openzeppelin-contracts/
-solady/=lib/solady/src/
+@openzeppelin/contracts=lib/openzeppelin-contracts/contracts/
+@redstone-finance/evm-connector/contracts/=lib/redstone-oracles-monorepo/packages/evm-connector/contracts/
+@openzeppelin/contracts=lib/openzeppelin-contracts/contracts/

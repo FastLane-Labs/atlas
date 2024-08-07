@@ -1,75 +1,60 @@
 {
-    "name": "atlas",
-    "version": "1.0.0",
-    "repository": "https://github.com/Polygon-Fast-Lane/atlas",
-    "author": "FastLane",
-    "scripts": {
-      "expenv": "export $(grep -v '^#' .env | xargs)",
-      "source": "source .env",
-      "allexport": "set -o allexport; source .env; set +o allexport",
-      "reinstall": "rm -rf node_modules && rm -f yarn.lock && yarn clean && yarn",
-      "coverage": "forge coverage --ir-minimum --no-match-test SkipCoverage --report lcov && node filter_lcov.js && genhtml lcov_filtered.info --output-directory report && open report/index.html",
-      "gas": "forge test -vv --gas-report",
-      "ftest": "source .env && forge test --gas-price=1500000000",
-      "ftest-fork": "source .env && forge test -vvv --fork-url ${ALCHEMY_APIKEY_MUMBAI} --fork-block-number 26702726 --gas-report",
-      "anvil": "anvil",
-      "anvil-mainnet-fork": "source .env && anvil --fork-url ${MAINNET_RPC_URL} --fork-block-number ${MAINNET_FORK_BLOCK_NUMBER} --code-size-limit ${CODE_SIZE_LIMIT}",
-
-      "deploy-atlas-amoy": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --rpc-url ${AMOY_RPC_URL} --legacy --gas-estimate-multiplier 150 --broadcast --etherscan-api-key ${POLYGONSCAN_API_KEY} --verify --delay 30",
-      "deploy-atlas-polygon": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --rpc-url ${POLYGON_RPC_URL} --legacy --gas-estimate-multiplier 150 --broadcast --etherscan-api-key ${POLYGONSCAN_API_KEY} --verify --delay 30",
-      
-      "deploy-atlas-sepolia": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --rpc-url ${SEPOLIA_RPC_URL} --legacy --gas-estimate-multiplier 150 --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify --delay 30",
-      "deploy-atlas-local": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --fork-url http://localhost:8545 --broadcast",
-
-      "deploy-swap-intent-sepolia": "source .env && forge script script/deploy-swap-intent-control.s.sol:DeploySwapIntentControlScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
-      "deploy-swap-intent-local": "source .env && forge script script/deploy-swap-intent-control.s.sol:DeploySwapIntentControlScript --fork-url http://localhost:8545 --broadcast",
-
-      "deploy-demo-tokens-sepolia": "source .env && forge script script/deploy-demo-tokens.s.sol:DeployDemoTokensScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
-
-      "mint-demo-tokens-sepolia": "source .env && forge script script/mint-demo-tokens.s.sol:MintDemoTokensScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
-
-      "deploy-v2-reward-dapp-sepolia": "source .env && forge script script/deploy-v2-reward-control.s.sol:DeployV2RewardControlScript --rpc-url ${SEPOLIA_RPC_URL} --legacy --gas-estimate-multiplier 150 --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify --delay 30",
-
-      "deploy-oev-demo-sepolia": "source .env && forge script script/deploy-oev-demo.s.sol:DeployOEVDemoScript --rpc-url ${SEPOLIA_RPC_URL} --legacy --gas-estimate-multiplier 150 --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify --delay 30",
-      "set-oev-demo-signers-sepolia": "source .env && forge script script/set-oev-demo-signers.s.sol:SetOEVDemoSignersScript --rpc-url ${SEPOLIA_RPC_URL} --legacy --gas-estimate-multiplier 150 --broadcast",
-      "create-oev-demo-positions-sepolia": "source .env && forge script script/create-oev-demo-positions.s.sol:CreateOEVDemoPositionsScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast",
-
-      "deploy-sorter-sepolia": "source .env && forge script script/deploy-sorter.s.sol:DeploySorterScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
-      "deploy-sorter-local": "source .env && forge script script/deploy-sorter.s.sol:DeploySorterScript --fork-url http://localhost:8545 --broadcast",
-
-      "deploy-tx-builder-sepolia": "source .env && forge script script/deploy-tx-builder.s.sol:DeployTxBuilderScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
-      "deploy-tx-builder-local": "source .env && forge script script/deploy-tx-builder.s.sol:DeployTxBuilderScript --fork-url http://localhost:8545 --broadcast",
-
-      "deploy-solver-sepolia": "source .env && forge script script/deploy-solver.s.sol:DeploySimpleRFQSolverScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
-      "deploy-solver-local": "source .env && forge script script/deploy-solver.s.sol:DeploySimpleRFQSolverScript --fork-url http://localhost:8545 --broadcast",
-
-      "deploy-all-sepolia": "npm run deploy-atlas-sepolia && npm run deploy-swap-intent-sepolia && npm run deploy-tx-builder-sepolia && npm run deploy-solver-sepolia && npm run deploy-sorter-sepolia",
-
-      "deploy-exec-env-sepolia": "source .env && forge script script/deploy-exec-env.s.sol:DeployExecEnvScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
-
-      "deploy-atlas-demo": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --fork-url http://localhost:8545 --broadcast --non-interactive",
-      "deploy-atlas-swap-intent": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasAndSwapIntentDAppControlScript --fork-url http://localhost:8545 --broadcast --non-interactive",
-      "deploy-atlas-swap-intent-tx-builder": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasAndSwapIntentDAppControlAndTxBuilderScript --fork-url http://localhost:8545 --broadcast --non-interactive",
-      "deploy-solver": "source .env && forge script script/deploy-solver.s.sol:DeploySimpleRFQSolverScript --fork-url http://localhost:8545 --broadcast --non-interactive",
-      "solver-deposit": "source .env && forge script script/solver-deposit.s.sol:SolverAtlasDepositScript --fork-url http://localhost:8545 --broadcast --non-interactive",
-      "setup-demo": "npm run deploy-atlas-swap-intent-tx-builder && npm run deploy-solver && npm run solver-deposit",
-
-      "atlas-addr": "echo 'ATLAS:' && jq -r '.ATLAS' deployments.json",
-      "swap-intent-addr": "echo 'SWAP INTENT DAPP CONTROL:' && jq -r '.SWAP_INTENT_DAPP_CONTROL' deployments.json",
-      "tx-builder-addr": "echo 'TX BUILDER:' && jq -r '.TX_BUILDER' deployments.json",
-      "solver-addr": "echo 'SOLVER:' && jq -r '.SIMPLE_RFQ_SOLVER' deployments.json",
-      "addresses": "npm run atlas-addr --silent && npm run swap-intent-addr --silent && npm run tx-builder-addr --silent && npm run solver-addr --silent",
-
-      "give-dai-to": "source .env && cast rpc anvil_impersonateAccount ${DAI_WHALE} && cast send ${DAI} --unlocked --from ${DAI_WHALE} 'transfer(address,uint256)(bool)' ${to} ${amount}",
-      "give-weth-to": "source .env && cast rpc anvil_impersonateAccount ${WETH_WHALE} && cast send ${WETH} --unlocked --from ${WETH_WHALE} 'transfer(address,uint256)(bool)' ${to} ${amount}",
-
-      "log-balances": "source .env && forge script script/log-balances.s.sol:LogDemoBalancesScript --fork-url http://localhost:8545 --broadcast --non-interactive",
-
-      "mappings": "forge remappings > remappings.txt",
-      "slither": "slither . --compile-force-framework foundry --filter-paths 'test|lib'",
-      "snapshot": "source .env && forge snapshot -vvv --gas-report",
-      "sizes": "forge build --sizes",
-      "solc": "solc-select install 0.8.18 && solc-select use 0.8.18"
-    }
+  "name": "atlas",
+  "version": "1.0.0",
+  "repository": "https://github.com/Polygon-Fast-Lane/atlas",
+  "author": "FastLane",
+  "scripts": {
+    "expenv": "export $(grep -v '^#' .env | xargs)",
+    "source": "source .env",
+    "allexport": "set -o allexport; source .env; set +o allexport",
+    "reinstall": "rm -rf node_modules && rm -f yarn.lock && yarn clean && yarn",
+    "coverage": "forge coverage --ir-minimum --no-match-test SkipCoverage --report lcov && node filter_lcov.js && genhtml lcov_filtered.info --output-directory report && open report/index.html",
+    "gas": "forge test -vv --gas-report",
+    "ftest": "source .env && forge test --gas-price=1500000000",
+    "ftest-fork": "source .env && forge test -vvv --fork-url ${ALCHEMY_APIKEY_MUMBAI} --fork-block-number 26702726 --gas-report",
+    "anvil": "anvil",
+    "anvil-mainnet-fork": "source .env && anvil --fork-url ${MAINNET_RPC_URL} --fork-block-number ${MAINNET_FORK_BLOCK_NUMBER} --code-size-limit ${CODE_SIZE_LIMIT}",
+    "deploy-atlas-amoy": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --rpc-url ${AMOY_RPC_URL} --legacy --gas-estimate-multiplier 150 --broadcast --etherscan-api-key ${POLYGONSCAN_API_KEY} --verify --delay 30",
+    "deploy-atlas-polygon": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --rpc-url ${POLYGON_RPC_URL} --legacy --gas-estimate-multiplier 150 --broadcast --etherscan-api-key ${POLYGONSCAN_API_KEY} --verify --delay 30",
+    "deploy-atlas-sepolia": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --rpc-url ${SEPOLIA_RPC_URL} --legacy --gas-estimate-multiplier 150 --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify --delay 30",
+    "deploy-atlas-local": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --fork-url http://localhost:8545 --broadcast",
+    "deploy-swap-intent-sepolia": "source .env && forge script script/deploy-swap-intent-control.s.sol:DeploySwapIntentControlScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
+    "deploy-swap-intent-local": "source .env && forge script script/deploy-swap-intent-control.s.sol:DeploySwapIntentControlScript --fork-url http://localhost:8545 --broadcast",
+    "deploy-demo-tokens-sepolia": "source .env && forge script script/deploy-demo-tokens.s.sol:DeployDemoTokensScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
+    "mint-demo-tokens-sepolia": "source .env && forge script script/mint-demo-tokens.s.sol:MintDemoTokensScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
+    "deploy-v2-reward-dapp-sepolia": "source .env && forge script script/deploy-v2-reward-control.s.sol:DeployV2RewardControlScript --rpc-url ${SEPOLIA_RPC_URL} --legacy --gas-estimate-multiplier 150 --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify --delay 30",
+    "deploy-oev-demo-sepolia": "source .env && forge script script/deploy-oev-demo.s.sol:DeployOEVDemoScript --rpc-url ${SEPOLIA_RPC_URL} --legacy --gas-estimate-multiplier 150 --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify --delay 30",
+    "set-oev-demo-signers-sepolia": "source .env && forge script script/set-oev-demo-signers.s.sol:SetOEVDemoSignersScript --rpc-url ${SEPOLIA_RPC_URL} --legacy --gas-estimate-multiplier 150 --broadcast",
+    "create-oev-demo-positions-sepolia": "source .env && forge script script/create-oev-demo-positions.s.sol:CreateOEVDemoPositionsScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast",
+    "deploy-sorter-sepolia": "source .env && forge script script/deploy-sorter.s.sol:DeploySorterScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
+    "deploy-sorter-local": "source .env && forge script script/deploy-sorter.s.sol:DeploySorterScript --fork-url http://localhost:8545 --broadcast",
+    "deploy-tx-builder-sepolia": "source .env && forge script script/deploy-tx-builder.s.sol:DeployTxBuilderScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
+    "deploy-tx-builder-local": "source .env && forge script script/deploy-tx-builder.s.sol:DeployTxBuilderScript --fork-url http://localhost:8545 --broadcast",
+    "deploy-solver-sepolia": "source .env && forge script script/deploy-solver.s.sol:DeploySimpleRFQSolverScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
+    "deploy-solver-local": "source .env && forge script script/deploy-solver.s.sol:DeploySimpleRFQSolverScript --fork-url http://localhost:8545 --broadcast",
+    "deploy-all-sepolia": "npm run deploy-atlas-sepolia && npm run deploy-swap-intent-sepolia && npm run deploy-tx-builder-sepolia && npm run deploy-solver-sepolia && npm run deploy-sorter-sepolia",
+    "deploy-exec-env-sepolia": "source .env && forge script script/deploy-exec-env.s.sol:DeployExecEnvScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
+    "deploy-atlas-demo": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --fork-url http://localhost:8545 --broadcast --non-interactive",
+    "deploy-atlas-swap-intent": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasAndSwapIntentDAppControlScript --fork-url http://localhost:8545 --broadcast --non-interactive",
+    "deploy-atlas-swap-intent-tx-builder": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasAndSwapIntentDAppControlAndTxBuilderScript --fork-url http://localhost:8545 --broadcast --non-interactive",
+    "deploy-solver": "source .env && forge script script/deploy-solver.s.sol:DeploySimpleRFQSolverScript --fork-url http://localhost:8545 --broadcast --non-interactive",
+    "solver-deposit": "source .env && forge script script/solver-deposit.s.sol:SolverAtlasDepositScript --fork-url http://localhost:8545 --broadcast --non-interactive",
+    "setup-demo": "npm run deploy-atlas-swap-intent-tx-builder && npm run deploy-solver && npm run solver-deposit",
+    "atlas-addr": "echo 'ATLAS:' && jq -r '.ATLAS' deployments.json",
+    "swap-intent-addr": "echo 'SWAP INTENT DAPP CONTROL:' && jq -r '.SWAP_INTENT_DAPP_CONTROL' deployments.json",
+    "tx-builder-addr": "echo 'TX BUILDER:' && jq -r '.TX_BUILDER' deployments.json",
+    "solver-addr": "echo 'SOLVER:' && jq -r '.SIMPLE_RFQ_SOLVER' deployments.json",
+    "addresses": "npm run atlas-addr --silent && npm run swap-intent-addr --silent && npm run tx-builder-addr --silent && npm run solver-addr --silent",
+    "give-dai-to": "source .env && cast rpc anvil_impersonateAccount ${DAI_WHALE} && cast send ${DAI} --unlocked --from ${DAI_WHALE} 'transfer(address,uint256)(bool)' ${to} ${amount}",
+    "give-weth-to": "source .env && cast rpc anvil_impersonateAccount ${WETH_WHALE} && cast send ${WETH} --unlocked --from ${WETH_WHALE} 'transfer(address,uint256)(bool)' ${to} ${amount}",
+    "log-balances": "source .env && forge script script/log-balances.s.sol:LogDemoBalancesScript --fork-url http://localhost:8545 --broadcast --non-interactive",
+    "mappings": "forge remappings > remappings.txt",
+    "slither": "slither . --compile-force-framework foundry --filter-paths 'test|lib'",
+    "snapshot": "source .env && forge snapshot -vvv --gas-report",
+    "sizes": "forge build --sizes",
+    "solc": "solc-select install 0.8.18 && solc-select use 0.8.18"
+  },
+  "dependencies": {
+    "@redstone-finance/evm-connector": "^0.6.1"
   }
-  
+}
