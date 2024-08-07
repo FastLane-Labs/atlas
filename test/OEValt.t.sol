@@ -94,7 +94,7 @@ contract OEVTest is BaseTest {
         transmitter = chainlinkAtlasWrapper.transmitters()[3];
 
         vm.startPrank(transmitter); // User is a Chainlink Node
-        executionEnvironment = atlas.createExecutionEnvironment(address(chainlinkDAppControl));
+        executionEnvironment = atlas.createExecutionEnvironment(address(chainlinkDAppControl), transmitter);
         vm.stopPrank();
 
         txBuilder = new TxBuilder({

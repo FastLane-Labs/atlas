@@ -951,7 +951,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         // NOTE: This is a hack to get the correct gasUsed value will break on setup changes or code changes before
         // handleSolverAccounting is called
-        uint256 gasUsedOffset = 7_073_451_000_000_000; //difference between _gasUsed
+        uint256 gasUsedOffset = 7_073_419_500_000_000; //difference between _gasUsed
 
         // Recalculate expected writeoffs
         uint256 gasUsed =

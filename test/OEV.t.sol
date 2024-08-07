@@ -79,7 +79,7 @@ contract OEVTest is BaseTest {
         vm.stopPrank();
 
         vm.startPrank(userEOA); // User is a Chainlink Node
-        executionEnvironment = atlas.createExecutionEnvironment(address(chainlinkDAppControl));
+        executionEnvironment = atlas.createExecutionEnvironment(address(chainlinkDAppControl), userEOA);
         vm.stopPrank();
         
         vm.startPrank(aaveGovEOA);
