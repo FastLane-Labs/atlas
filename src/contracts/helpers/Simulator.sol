@@ -7,13 +7,13 @@ import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
-import "../types/SolverOperation.sol";
-import "../types/UserOperation.sol";
-import "../types/LockTypes.sol";
-import "../types/DAppOperation.sol";
-import "../types/ConfigTypes.sol";
-import "../types/ValidCalls.sol";
-import "../types/EscrowTypes.sol";
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/LockTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
+import "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/ValidCalls.sol";
+import "src/contracts/types/EscrowTypes.sol";
 
 import { Result } from "src/contracts/interfaces/ISimulator.sol";
 
@@ -94,7 +94,7 @@ contract Simulator is AtlasErrors {
         internal
         returns (Result result, uint256 additionalErrorCode)
     {
-        try this.metacallSimulation{ value: msg.value }(userOp, solverOps, dAppOp) {
+        try this.metacallSimulation{ value: msg.value }(userOp, solverOps, dAppOp, msg.sender) {
             revert Unreachable();
         } catch (bytes memory revertData) {
             bytes4 errorSwitch = bytes4(revertData);
@@ -138,13 +138,34 @@ contract Simulator is AtlasErrors {
     function metacallSimulation(
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
-        DAppOperation calldata dAppOp
+        DAppOperation calldata dAppOp,
+        address caller
     )
         external
         payable
     {
         if (msg.sender != address(this)) revert InvalidEntryFunction();
-        if (!IAtlas(atlas).metacall{ value: msg.value }(userOp, solverOps, dAppOp)) {
+
+        // Encode the standard metacall function call
+        bytes memory _data = abi.encodeCall(IAtlas.metacall, (userOp, solverOps, dAppOp));
+        // Append the real caller (of this Simulator contract) address to the calldata
+        _data = abi.encodePacked(_data, caller);
+
+        // Do metacall
+        bool _success;
+        (_success, _data) = atlas.call{ value: msg.value }(_data);
+
+        // If metacall reverts, bubble up the error
+        if (!_success) {
+            assembly {
+                revert(add(_data, 32), mload(_data))
+            }
+        }
+
+        // If metacall did not revert, decode the returned auctionWon bool
+        bool auctionWon = abi.decode(_data, (bool));
+
+        if (!auctionWon) {
             revert NoAuctionWinner(); // should be unreachable
         }
         revert SimulationPassed();
