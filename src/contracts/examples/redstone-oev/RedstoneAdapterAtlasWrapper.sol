@@ -2,9 +2,11 @@
 pragma solidity 0.8.25;
 
 import { Ownable } from "openzeppelin-contracts/contracts/access/Ownable.sol";
-import { MergedSinglePriceFeedAdapterWithoutRounds } from "lib/redstone-oracles-monorepo/packages/on-chain-relayer/contracts/price-feeds/without-rounds/MergedSinglePriceFeedAdapterWithoutRounds.sol";
+import { MergedSinglePriceFeedAdapterWithoutRounds } from
+    "lib/redstone-oracles-monorepo/packages/on-chain-relayer/contracts/price-feeds/without-rounds/MergedSinglePriceFeedAdapterWithoutRounds.sol";
 import { AggregatorV2V3Interface } from "src/contracts/examples/oev-example/IChainlinkAtlasWrapper.sol";
-import { IRedstoneAdapter } from "lib/redstone-oracles-monorepo/packages/on-chain-relayer/contracts/core/IRedstoneAdapter.sol";
+import { IRedstoneAdapter } from
+    "lib/redstone-oracles-monorepo/packages/on-chain-relayer/contracts/core/IRedstoneAdapter.sol";
 import "./RedstoneDAppControl.sol";
 
 interface IAdapter {
@@ -25,7 +27,7 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
     address public immutable BASE_ADAPTER;
     address public immutable BASE_FEED;
 
-    uint public BASE_FEED_DELAY = 4;
+    uint256 public BASE_FEED_DELAY = 4;
 
     error BaseAdapterHasNoDataFeed();
 
@@ -40,7 +42,7 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
         _transferOwnership(_owner);
     }
 
-    function setBaseFeedDelay(uint _delay) external onlyOwner {
+    function setBaseFeedDelay(uint256 _delay) external onlyOwner {
         BASE_FEED_DELAY = _delay;
     }
 
@@ -48,7 +50,7 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
         return IAdapter(BASE_ADAPTER).getAuthorisedSignerIndex(_receivedSigner);
     }
 
-    function getDataFeedId() public view virtual override returns (bytes32 dataFeedId){
+    function getDataFeedId() public view virtual override returns (bytes32 dataFeedId) {
         bytes32[] memory dataFeedIds = IAdapter(BASE_ADAPTER).getDataFeedIds();
         if (dataFeedIds.length == 0) {
             revert BaseAdapterHasNoDataFeed();
@@ -56,18 +58,15 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
         dataFeedId = dataFeedIds[0];
     }
 
-    //called by Atlas `UserOperation` 
-    function setValues(int256 _answer, uint256 _updatedAt)
-        external
-        onlyOwner
-    {
+    //called by Atlas `UserOperation`
+    function setValues(int256 _answer, uint256 _updatedAt) external onlyOwner {
         atlasAnswer = _answer;
         atlasAnswerUpdatedAt = _updatedAt;
     }
 
     function latestAnswer() public view virtual override returns (int256) {
         int256 baseAnswer = IFeed(BASE_FEED).latestAnswer();
-        if (atlasAnswer == 0){
+        if (atlasAnswer == 0) {
             return baseAnswer;
         }
         uint256 baseLatestTimestamp = IFeed(BASE_FEED).latestTimestamp();
@@ -80,12 +79,12 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
 
     function latestTimestamp() public view virtual returns (uint256) {
         uint256 baseLatestTimestamp = IFeed(BASE_FEED).latestTimestamp();
-        if (atlasAnswer == 0){
+        if (atlasAnswer == 0) {
             return baseLatestTimestamp;
         }
         if (atlasAnswerUpdatedAt > baseLatestTimestamp - BASE_FEED_DELAY) {
             return atlasAnswerUpdatedAt;
         }
-        return baseLatestTimestamp;   
+        return baseLatestTimestamp;
     }
 }

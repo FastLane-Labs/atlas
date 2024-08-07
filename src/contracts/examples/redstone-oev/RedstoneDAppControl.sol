@@ -9,13 +9,12 @@ import "./RedstoneAdapterAtlasWrapper.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
 contract RedstoneDAppControl is DAppControl {
-
     error InvalidBaseFeed();
     error InvalidRedstoneAdapter();
     error FailedToAllocateOEV();
     error OnlyGovernance();
 
-    uint private bundlerOEVPercent = 5; 
+    uint256 private bundlerOEVPercent = 5;
 
     event NewRedstoneAtlasAdapterCreated(address indexed wrapper, address indexed owner, address indexed baseFeed);
 
@@ -51,7 +50,7 @@ contract RedstoneDAppControl is DAppControl {
         )
     { }
 
-    function setBundlerOEVPercent(uint _percent) external onlyGov {
+    function setBundlerOEVPercent(uint256 _percent) external onlyGov {
         bundlerOEVPercent = _percent;
     }
 
@@ -96,15 +95,14 @@ contract RedstoneDAppControl is DAppControl {
         return solverOp.bidAmount;
     }
 
+    // ---------------------------------------------------- //
+    //                   AtlasAdapterFactory                //
+    // ---------------------------------------------------- //
     function createNewAtlasAdapter(address baseFeed) external returns (address) {
-        if (IChainlinkFeed(baseFeed).latestAnswer() == 0) revert InvalidBaseFeed();
+        if (IFeed(baseFeed).latestAnswer() == 0) revert InvalidBaseFeed();
         address adapter = address(new RedstoneAdapterAtlasWrapper(ATLAS, msg.sender, baseFeed));
         isRedstoneAdapter[adapter] = true;
         emit NewRedstoneAtlasAdapterCreated(adapter, msg.sender, baseFeed);
-        return adapter;  
+        return adapter;
     }
-}
-
-interface IChainlinkFeed {
-    function latestAnswer() external view returns (int256);
 }
