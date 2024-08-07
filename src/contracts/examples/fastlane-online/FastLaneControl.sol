@@ -83,7 +83,7 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
         if (_swapIntent.tokenUserBuys == address(0)) {
             SafeTransferLib.safeTransferETH(solverOp.to, _swapIntent.amountUserSells);
         } else {
-            SafeTransferLib.safeTransfer(_swapIntent.tokenUserSells, solverOp.to, _swapIntent.amountUserSells);
+            SafeTransferLib.safeTransfer(_swapIntent.tokenUserSells, solverOp.solver, _swapIntent.amountUserSells);
         }
         return; // success
     }

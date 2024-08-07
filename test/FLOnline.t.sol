@@ -32,8 +32,6 @@ contract FastLaneOnlineTest is BaseTest {
         bytes32 userOpHash;
     }
 
-    // Estimate of gas used in fastOnlineSwap that Atlas does not take a surcharge on
-    uint256 constant NON_SURCHARGE_OVERHEAD = 20_000;
     uint256 constant ERR_MARGIN = 0.1e18; // 10% error margin
 
     IERC20 DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
@@ -84,7 +82,7 @@ contract FastLaneOnlineTest is BaseTest {
         deal(args.swapIntent.tokenUserSells, userEOA, args.swapIntent.amountUserSells); // 3200 DAI
         deal(userEOA, 1e18); // Give user 1 ETH to pay for gas (msg.value is 0.1 ETH per call by default)
 
-        // User approves their Execution Environment to take their DAI to facilitate the swap
+        // User approves Atlas to take their DAI to facilitate the swap
         vm.prank(userEOA);
         IERC20(args.swapIntent.tokenUserSells).approve(address(atlas), args.swapIntent.amountUserSells);
     }
@@ -238,8 +236,8 @@ contract FastLaneOnlineTest is BaseTest {
         );
 
         // Calculate estimated Atlas gas surcharge taken from call above
-        estAtlasGasSurcharge = (estAtlasGasSurcharge - gasleft() - NON_SURCHARGE_OVERHEAD) * defaultGasPrice
-            * atlas.ATLAS_SURCHARGE_RATE() / atlas.SCALE();
+        estAtlasGasSurcharge =
+            (estAtlasGasSurcharge - gasleft()) * defaultGasPrice * atlas.ATLAS_SURCHARGE_RATE() / atlas.SCALE();
 
         assertTrue(
             result == swapCallShouldSucceed,
@@ -249,7 +247,7 @@ contract FastLaneOnlineTest is BaseTest {
         // Return early if transaction expected to revert. Balance checks below would otherwise fail.
         if (!swapCallShouldSucceed) return;
 
-        // Check Atlas gas surcharge earned is within 5% of the estimated gas surcharge
+        // Check Atlas gas surcharge earned is within 10% of the estimated gas surcharge
         assertApproxEqRel(
             atlas.cumulativeSurcharge() - atlasGasSurchargeBefore,
             estAtlasGasSurcharge,
@@ -360,11 +358,11 @@ contract FastLaneOnlineTest is BaseTest {
         // Solver signs the solverOp
         SolverOperation memory solverOp = _buildSolverOp(solverEOA, solverPK, address(solver), bidAmount);
 
-        // Register solverOp in FLOnline in frontrunning tx
-        flOnline.addSolverOp({ userOp: args.userOp, solverOp: solverOp });
-
         // Give solver contract 1 WETH to fulfill user's SwapIntent
         deal(args.swapIntent.tokenUserBuys, address(solver), bidAmount);
+
+        // Register solverOp in FLOnline in frontrunning tx
+        flOnline.addSolverOp({ userOp: args.userOp, solverOp: solverOp });
         vm.stopPrank();
 
         // Returns the address of the solver contract deployed here
