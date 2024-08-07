@@ -85,9 +85,8 @@ contract Atlas is Escrow, Factory {
         // userOpHash has already been calculated and verified in validateCalls at this point, so rather
         // than re-calculate it, we can simply take it from the dAppOp here. It's worth noting that this will
         // be either a TRUSTED or DEFAULT hash, depending on the allowsTrustedOpHash setting.
-        try this.execute(_dConfig, userOp, solverOps, _executionEnvironment, _bundler, dAppOp.userOpHash) returns (
-            Context memory ctx
-        ) {
+        try this.execute(_dConfig, userOp, solverOps, _executionEnvironment, _bundler, dAppOp.userOpHash, _isSimulation)
+        returns (Context memory ctx) {
             // Gas Refund to sender only if execution is successful
             (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) = _settle(ctx, _dConfig.solverGasLimit);
 
@@ -128,7 +127,8 @@ contract Atlas is Escrow, Factory {
         SolverOperation[] calldata solverOps,
         address executionEnvironment,
         address bundler,
-        bytes32 userOpHash
+        bytes32 userOpHash,
+        bool isSimulation
     )
         external
         payable
@@ -138,7 +138,7 @@ contract Atlas is Escrow, Factory {
         if (msg.sender != address(this)) revert InvalidAccess();
 
         // Build the context object
-        ctx = _buildContext(executionEnvironment, userOpHash, bundler, uint8(solverOps.length), bundler == SIMULATOR);
+        ctx = _buildContext(executionEnvironment, userOpHash, bundler, uint8(solverOps.length), isSimulation);
 
         bytes memory _returnData;
 
