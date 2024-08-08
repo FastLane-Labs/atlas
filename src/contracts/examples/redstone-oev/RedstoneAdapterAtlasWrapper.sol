@@ -11,13 +11,13 @@ import "./RedstoneDAppControl.sol";
 
 interface IAdapter {
     function getDataFeedIds() external view returns (bytes32[] memory);
-    function getAuthorisedSignerIndex(address _receivedSigner) external view returns (uint8);
+    function getValueForDataFeed(bytes32 dataFeedId) external view returns (uint256);
+    function getTimestampsFromLatestUpdate() external view returns (uint128 dataTimestamp, uint128 blockTimestamp);
 }
 
 interface IFeed {
-    function latestAnswer() external view returns (int256);
-    function latestTimestamp() external view returns (uint256);
     function getPriceFeedAdapter() external view returns (IRedstoneAdapter);
+    function latestAnswer() external view returns (int256);
 }
 
 contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWithoutRounds {
@@ -33,9 +33,6 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
 
     error BaseAdapterHasNoDataFeed();
     error InvalidAuthorisedSigner();
-
-    int256 public atlasAnswer;
-    uint256 public atlasAnswerUpdatedAt;
 
     constructor(address atlas, address _owner, address _baseFeed) {
         ATLAS = atlas;
@@ -86,26 +83,58 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
     }
 
     function latestAnswer() public view virtual override returns (int256) {
-        int256 baseAnswer = IFeed(BASE_FEED).latestAnswer();
+        bytes32 dataFeedId = getDataFeedId();
+        uint256 baseAnswer = IAdapter(BASE_ADAPTER).getValueForDataFeed(dataFeedId);
+        uint256 atlasAnswer = getValueForDataFeed(dataFeedId);
         if (atlasAnswer == 0) {
-            return baseAnswer;
+            return int256(baseAnswer);
         }
-        uint256 baseLatestTimestamp = IFeed(BASE_FEED).latestTimestamp();
+        (uint256 baseLatestTimestamp,) = IAdapter(BASE_ADAPTER).getTimestampsFromLatestUpdate();
+        (uint256 atlasLatestTimestamp,) = getTimestampsFromLatestUpdate();
 
-        if (atlasAnswerUpdatedAt > baseLatestTimestamp - BASE_FEED_DELAY) {
-            return atlasAnswer;
+        if (atlasLatestTimestamp > baseLatestTimestamp - BASE_FEED_DELAY) {
+            return int256(atlasAnswer);
         }
-        return baseAnswer;
+        return int256(baseAnswer);
     }
 
     function latestTimestamp() public view virtual returns (uint256) {
-        uint256 baseLatestTimestamp = IFeed(BASE_FEED).latestTimestamp();
+        (uint256 baseLatestTimestamp,) = IAdapter(BASE_ADAPTER).getTimestampsFromLatestUpdate();
+        (uint256 atlasLatestTimestamp,) = getTimestampsFromLatestUpdate();
+        uint256 atlasAnswer = getValueForDataFeed(getDataFeedId());
+
         if (atlasAnswer == 0) {
             return baseLatestTimestamp;
         }
-        if (atlasAnswerUpdatedAt > baseLatestTimestamp - BASE_FEED_DELAY) {
-            return atlasAnswerUpdatedAt;
+        if (atlasLatestTimestamp > baseLatestTimestamp - BASE_FEED_DELAY) {
+            return atlasLatestTimestamp;
         }
         return baseLatestTimestamp;
+    }
+    function latestRoundData()
+        public
+        view
+        override
+        virtual
+        returns (
+            uint80 roundId,
+            int256 answer,
+            uint256 startedAt,
+            uint256 updatedAt,
+            uint80 answeredInRound
+        )
+        {
+        roundId = latestRound();
+        answer = latestAnswer();
+
+        uint256 blockTimestamp = getPriceFeedAdapter().getBlockTimestampFromLatestUpdate();
+
+        // These values are equal after chainlink’s OCR update
+        startedAt = blockTimestamp;
+        updatedAt = latestTimestamp();
+
+        // We want to be compatible with Chainlink's interface
+        // And in our case the roundId is always equal to answeredInRound
+        answeredInRound = roundId;
     }
 }
