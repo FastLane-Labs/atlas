@@ -27,9 +27,12 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
     address public immutable BASE_ADAPTER;
     address public immutable BASE_FEED;
 
+    address[] public authorisedSigners;
+
     uint256 public BASE_FEED_DELAY = 4;
 
     error BaseAdapterHasNoDataFeed();
+    error InvalidAuthorisedSigner();
 
     int256 public atlasAnswer;
     uint256 public atlasAnswerUpdatedAt;
@@ -40,6 +43,7 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
         BASE_FEED = _baseFeed;
         BASE_ADAPTER = address(IFeed(_baseFeed).getPriceFeedAdapter());
         _transferOwnership(_owner);
+        authorisedSigners.push(_owner);
     }
 
     function setBaseFeedDelay(uint256 _delay) external onlyOwner {
@@ -47,7 +51,16 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
     }
 
     function getAuthorisedSignerIndex(address _receivedSigner) public view virtual override returns (uint8) {
-        return IAdapter(BASE_ADAPTER).getAuthorisedSignerIndex(_receivedSigner);
+        for (uint8 i = 0; i < authorisedSigners.length; i++) {
+            if (authorisedSigners[i] == _receivedSigner) {
+                return i;
+            }
+        }
+        revert InvalidAuthorisedSigner();
+    }
+
+    function requireAuthorisedUpdater(address updater) public view virtual override {
+        getAuthorisedSignerIndex(updater);
     }
 
     function getDataFeedId() public view virtual override returns (bytes32 dataFeedId) {
@@ -58,10 +71,18 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
         dataFeedId = dataFeedIds[0];
     }
 
-    //called by Atlas `UserOperation`
-    function setValues(int256 _answer, uint256 _updatedAt) external onlyOwner {
-        atlasAnswer = _answer;
-        atlasAnswerUpdatedAt = _updatedAt;
+    function addAuthorisedSigner(address _signer) external onlyOwner {
+        authorisedSigners.push(_signer);
+    }
+
+    function removeAuthorisedSigner(address _signer) external onlyOwner {
+        for (uint256 i = 0; i < authorisedSigners.length; i++) {
+            if (authorisedSigners[i] == _signer) {
+                authorisedSigners[i] = authorisedSigners[authorisedSigners.length - 1];
+                authorisedSigners.pop();
+                break;
+            }
+        }
     }
 
     function latestAnswer() public view virtual override returns (int256) {
