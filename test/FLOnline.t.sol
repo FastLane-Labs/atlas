@@ -70,6 +70,9 @@ contract FastLaneOnlineTest is BaseTest {
         atlasVerification.initializeGovernance(address(flOnline));
         // FLOnline contract must be registered as its own signatory
         atlasVerification.addSignatory(address(flOnline), address(flOnline));
+        // Once set up, burn gov role - only the contract itself should be a signatory
+        flOnline.transferGovernance(address(govBurner));
+        govBurner.burnGovernance(address(flOnline));
         vm.stopPrank();
 
         // User deploys their FLOnline Execution Environment
@@ -106,7 +109,6 @@ contract FastLaneOnlineTest is BaseTest {
     }
 
     function testFLOnlineSwap_OneSolverFails_BaselineCallFulfills_Success() public {
-        vm.skip(true); // TODO remove skip after merging with flo-overhaul
         // Set up the solver contract and register the solverOp in the FLOnline contract
         address failingSolver = _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount);
 
@@ -129,8 +131,6 @@ contract FastLaneOnlineTest is BaseTest {
     }
 
     function testFLOnlineSwap_OneSolverFails_BaselineCallReverts_Failure() public {
-        // TODO cause failure by solver unbonding AtlETH after adding solverOp to bypass sim check
-
         // Set baselineCall incorrectly to intentionally fail
         _setBaselineCallToRevert();
 
