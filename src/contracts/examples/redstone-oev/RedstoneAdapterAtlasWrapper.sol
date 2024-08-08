@@ -17,6 +17,7 @@ interface IAdapter {
 
 interface IFeed {
     function getPriceFeedAdapter() external view returns (IRedstoneAdapter);
+    function getDataFeedId() external view returns (bytes32);
     function latestAnswer() external view returns (int256);
 }
 
@@ -61,11 +62,7 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
     }
 
     function getDataFeedId() public view virtual override returns (bytes32 dataFeedId) {
-        bytes32[] memory dataFeedIds = IAdapter(BASE_ADAPTER).getDataFeedIds();
-        if (dataFeedIds.length == 0) {
-            revert BaseAdapterHasNoDataFeed();
-        }
-        dataFeedId = dataFeedIds[0];
+        return IFeed(BASE_FEED).getDataFeedId();
     }
 
     function addAuthorisedSigner(address _signer) external onlyOwner {
@@ -111,6 +108,7 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
         }
         return baseLatestTimestamp;
     }
+
     function latestRoundData()
         public
         view
