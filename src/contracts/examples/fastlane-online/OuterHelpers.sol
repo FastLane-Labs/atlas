@@ -3,6 +3,7 @@ pragma solidity 0.8.25;
 
 // Base Imports
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { LibSort } from "solady/utils/LibSort.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Imports
@@ -30,6 +31,8 @@ contract OuterHelpers is FastLaneOnlineInner {
     // will go towards buying stealth drones programmed to apply deodorant to coders at solana hackathons.
     address public immutable CARDANO_ENGINEER_THERAPY_FUND;
     address public immutable SIMULATOR;
+
+    uint256 internal constant _BITS_FOR_INDEX = 16;
 
     constructor(address _atlas) FastLaneOnlineInner(_atlas) {
         CARDANO_ENGINEER_THERAPY_FUND = msg.sender;
@@ -199,37 +202,58 @@ contract OuterHelpers is FastLaneOnlineInner {
         pure
         returns (SolverOperation[] memory sortedSolverOps)
     {
-        // This could be made more gas efficient
-
         uint256 _length = unsortedSolverOps.length;
         if (_length == 0) return unsortedSolverOps;
+        if (_length == 1 && unsortedSolverOps[0].bidAmount != 0) return unsortedSolverOps;
 
-        sortedSolverOps = new SolverOperation[](_length);
+        uint256[] memory _bidsAndIndices = new uint256[](_length);
+        uint256 _bidsAndIndicesLastIndex = _length;
+        uint256 _bidAmount;
 
-        uint256 _topBidAmount;
-        uint256 _topBidIndex;
-        bool _matched;
-
+        // First encode each solver's bid and their index in the original solverOps array into a single uint256. Build
+        // an array of these uint256s.
         for (uint256 i; i < _length; ++i) {
-            _topBidAmount = 0;
-            _topBidIndex = i;
-            _matched = false;
+            _bidAmount = unsortedSolverOps[i].bidAmount;
 
-            for (uint256 j = i; j < _length; ++j) {
-                uint256 _bidAmount = unsortedSolverOps[j].bidAmount;
-
-                if (_bidAmount > _topBidAmount) {
-                    _topBidAmount = _bidAmount;
-                    _topBidIndex = j;
-                    _matched = true;
+            // skip zero and overflow bid's
+            if (_bidAmount != 0 && _bidAmount <= type(uint240).max) {
+                // Set to _length, and decremented before use here to avoid underflow
+                unchecked {
+                    --_bidsAndIndicesLastIndex;
                 }
-            }
 
-            if (_matched) {
-                // Get the highest solverOp and add it to sorted array
-                SolverOperation memory _solverOp = unsortedSolverOps[_topBidIndex];
-                sortedSolverOps[i] = _solverOp;
+                // Non-zero bids are packed with their original solverOps index.
+                // The array is filled with non-zero bids from the right.
+                _bidsAndIndices[_bidsAndIndicesLastIndex] = uint256(_bidAmount << _BITS_FOR_INDEX | uint16(i));
             }
+        }
+
+        // Create new SolverOps array, large enough to hold all valid bids.
+        uint256 _sortedSolverOpsLength = _length - _bidsAndIndicesLastIndex;
+        if (_sortedSolverOpsLength == 0) return sortedSolverOps; // return early if no valid bids
+        sortedSolverOps = new SolverOperation[](_sortedSolverOpsLength);
+
+        // Reinitialize _bidsAndIndicesLastIndex to the last index of the array
+        _bidsAndIndicesLastIndex = _length - 1;
+
+        // Sort the array of packed bids and indices in-place, in ascending order of bidAmount.
+        LibSort.insertionSort(_bidsAndIndices);
+
+        // Finally, iterate through sorted bidsAndIndices array in descending order of bidAmount.
+        for (uint256 i = _bidsAndIndicesLastIndex;; /* breaks when 0 */ --i) {
+            // Isolate the bidAmount from the packed uint256 value
+            _bidAmount = _bidsAndIndices[i] >> _BITS_FOR_INDEX;
+
+            // If we reach the zero bids on the left of array, break as all valid bids already checked.
+            if (_bidAmount == 0) break;
+
+            // Recover the original index of the SolverOperation
+            uint256 _index = uint256(uint16(_bidsAndIndices[i]));
+
+            // Add the SolverOperation to the sorted array
+            sortedSolverOps[_bidsAndIndicesLastIndex - i] = unsortedSolverOps[_index];
+
+            if (i == 0) break; // break to prevent underflow in next loop
         }
 
         return sortedSolverOps;

@@ -47,6 +47,7 @@ contract FastLaneOnlineTest is BaseTest {
     uint256 defaultDeadlineTimestamp;
 
     FastLaneOnlineOuter flOnline;
+    MockFastLaneOnline flOnlineMock;
     address executionEnvironment;
 
     Sig sig;
@@ -64,6 +65,7 @@ contract FastLaneOnlineTest is BaseTest {
         governanceEOA = vm.addr(governancePK);
 
         vm.startPrank(governanceEOA);
+        flOnlineMock = new MockFastLaneOnline(address(atlas));
         flOnline = new FastLaneOnlineOuter(address(atlas));
         atlasVerification.initializeGovernance(address(flOnline));
         // FLOnline contract must be registered as its own signatory
@@ -124,6 +126,8 @@ contract FastLaneOnlineTest is BaseTest {
     }
 
     function testFLOnlineSwap_OneSolverFails_BaselineCallReverts_Failure() public {
+        // TODO cause failure by solver unbonding AtlETH after adding solverOp to bypass sim check
+
         // Set baselineCall incorrectly to intentionally fail
         _setBaselineCallToRevert();
 
@@ -212,6 +216,98 @@ contract FastLaneOnlineTest is BaseTest {
         // Then the nonce is incremented (e.g. to 2) for use in the next userOp by that swapper
         // These nonces are then converted to the actual nonce used in the userOp:
         // keccak256(FLO nonce + 1, swapper addr)
+    }
+
+    function testFLOnline_SortSolverOps_SortsInDescendingOrderOfBid() public {
+        SolverOperation[] memory solverOps = new SolverOperation[](0);
+        SolverOperation[] memory solverOpsOut;
+
+        // Empty array should return empty array
+        solverOpsOut = flOnlineMock.sortSolverOps(solverOps);
+        assertEq(solverOpsOut.length, 0, "Not length 0");
+        assertTrue(_isSolverOpsSorted(solverOpsOut), "Empty array, not sorted");
+
+        // 1 solverOp array should return same array
+        solverOps = new SolverOperation[](1);
+        solverOps[0].bidAmount = 1;
+        solverOpsOut = flOnlineMock.sortSolverOps(solverOps);
+        assertEq(solverOpsOut[0].bidAmount, solverOps[0].bidAmount, "1 solverOp array, not same array");
+        assertEq(solverOpsOut.length, 1, "Not length 1");
+        assertTrue(_isSolverOpsSorted(solverOpsOut), "1 solverOp array, not sorted");
+
+        // 2 solverOps array should return same array if already sorted
+        solverOps = new SolverOperation[](2);
+        solverOps[0].bidAmount = 2;
+        solverOps[1].bidAmount = 1;
+        solverOpsOut = flOnlineMock.sortSolverOps(solverOps);
+        assertEq(solverOpsOut[0].bidAmount, solverOps[0].bidAmount, "2 solverOps array, [0] bid mismatch");
+        assertEq(solverOpsOut[1].bidAmount, solverOps[1].bidAmount, "2 solverOps array, [1] bid mismatch");
+        assertTrue(_isSolverOpsSorted(solverOpsOut), "2 solverOps array, not sorted");
+
+        // 2 solverOps array should return sorted array if not sorted
+        solverOps[0].bidAmount = 1;
+        solverOps[1].bidAmount = 2;
+        solverOpsOut = flOnlineMock.sortSolverOps(solverOps);
+        assertEq(solverOpsOut[0].bidAmount, solverOps[1].bidAmount, "2 solverOps array, [1] should be in [0]");
+        assertEq(solverOpsOut[1].bidAmount, solverOps[0].bidAmount, "2 solverOps array, [0] should be in [1]");
+        assertTrue(_isSolverOpsSorted(solverOpsOut), "2 solverOps array, not sorted");
+
+        // 5 solverOps already sorted (descending) should return same array
+        solverOps = new SolverOperation[](5);
+        for (uint256 i = 0; i < 5; i++) {
+            solverOps[i].bidAmount = 5 - i;
+        }
+        solverOpsOut = flOnlineMock.sortSolverOps(solverOps);
+        for (uint256 i = 0; i < 5; i++) {
+            assertEq(solverOpsOut[i].bidAmount, solverOps[i].bidAmount, "5 solverOps sorted, bid mismatch");
+        }
+        assertEq(solverOpsOut.length, 5, "Not length 5, sorted");
+        assertTrue(_isSolverOpsSorted(solverOpsOut), "5 solverOps array, not sorted");
+
+        // 5 solverOps in ascending order should return sorted (descending) array
+        for (uint256 i = 0; i < 5; i++) {
+            solverOps[i].bidAmount = i+1;
+        }
+        solverOpsOut = flOnlineMock.sortSolverOps(solverOps);
+        for (uint256 i = 0; i < 5; i++) {
+            assertEq(solverOpsOut[i].bidAmount, 5 - i, "5 solverOps opposite order, bid mismatch");
+        }
+        assertEq(solverOpsOut.length, 5, "Not length 5, opposite order");
+        assertTrue(_isSolverOpsSorted(solverOpsOut), "5 solverOps opposite order, not sorted");
+
+        // 5 solverOps in random order should return sorted (descending) array
+        solverOps[0].bidAmount = 3;
+        solverOps[1].bidAmount = 1;
+        solverOps[2].bidAmount = 5;
+        solverOps[3].bidAmount = 2;
+        solverOps[4].bidAmount = 4;
+        solverOpsOut = flOnlineMock.sortSolverOps(solverOps);
+        assertEq(solverOpsOut.length, 5, "Not length 5, random order");
+        assertTrue(_isSolverOpsSorted(solverOpsOut), "5 solverOps random order, not sorted");
+    }
+
+    function testFLOnline_SortSolverOps_DropsZeroBids() public {
+        SolverOperation[] memory solverOps = new SolverOperation[](5);
+        SolverOperation[] memory solverOpsOut;
+
+        // 5 solverOps with 0 bid should return empty array
+        for (uint256 i = 0; i < 5; i++) {
+            solverOps[i].bidAmount = 0;
+        }
+        solverOpsOut = flOnlineMock.sortSolverOps(solverOps);
+        assertEq(solverOpsOut.length, 0, "5 solverOps with 0 bid, not empty");
+
+        // 5 solverOps with 0 bid mixed with non-zero bids should return sorted array with 0 bids dropped
+        solverOps[0].bidAmount = 0;
+        solverOps[1].bidAmount = 1;
+        solverOps[2].bidAmount = 0;
+        solverOps[3].bidAmount = 2;
+        solverOps[4].bidAmount = 0;
+        solverOpsOut = flOnlineMock.sortSolverOps(solverOps);
+
+        assertEq(solverOpsOut.length, 2, "5 solverOps with 0 bid mixed, not length 2");
+        assertEq(solverOpsOut[0].bidAmount, 2, "5 solverOps with 0 bid mixed, [0] bid mismatch");
+        assertEq(solverOpsOut[1].bidAmount, 1, "5 solverOps with 0 bid mixed, [1] bid mismatch");
     }
 
     // TODO add tests when solverOp is valid, but does not outperform baseline call, baseline call used instead
@@ -477,6 +573,17 @@ contract FastLaneOnlineTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(userPK, args.userOpHash);
         args.userOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
     }
+
+    // Checks the solverOps array is sorted in descending order of bidAmount
+    function _isSolverOpsSorted(SolverOperation[] memory solverOps) internal pure returns (bool) {
+        if(solverOps.length < 2) return true;
+        for (uint256 i = 0; i < solverOps.length - 1; i++) {
+            if (solverOps[i].bidAmount < solverOps[i + 1].bidAmount) {
+                return false;
+            }
+        }
+        return true;
+    }
 }
 
 // This solver magically has the tokens needed to fulfil the user's swap.
@@ -507,4 +614,13 @@ contract FLOnlineRFQSolver is SolverBase {
 
     fallback() external payable { }
     receive() external payable { }
+}
+
+// Mock contract to expose internal FLOnline functions for unit testing
+contract MockFastLaneOnline is FastLaneOnlineOuter {
+    constructor(address _atlas) FastLaneOnlineOuter(_atlas) { }
+
+    function sortSolverOps(SolverOperation[] memory solverOps) external pure returns (SolverOperation[] memory) {
+        return _sortSolverOps(solverOps);
+    }
 }
