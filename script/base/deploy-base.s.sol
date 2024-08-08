@@ -42,10 +42,11 @@ contract DeployBaseScript is Script {
                 || keccak256(bytes(deployChain)) == keccak256(bytes("MAINNET"))
                 || keccak256(bytes(deployChain)) == keccak256(bytes("AMOY"))
                 || keccak256(bytes(deployChain)) == keccak256(bytes("POLYGON"))
+                || keccak256(bytes(deployChain)) == keccak256(bytes("BSC"))
         ) {
             return deployChain;
         }
-        revert("Error: Set DEPLOY_TO in .env to LOCAL, SEPOLIA, MAINNET, AMOY, or POLYGON");
+        revert("Error: Set DEPLOY_TO in .env to LOCAL, SEPOLIA, MAINNET, AMOY, POLYGON, or BSC");
     }
 
     // NOTE: When handling JSON with StdJson, prefix keys with '.' e.g. '.ATLAS'
