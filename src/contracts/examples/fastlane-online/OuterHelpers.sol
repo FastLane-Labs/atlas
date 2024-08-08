@@ -196,15 +196,13 @@ contract OuterHelpers is FastLaneOnlineInner {
 
     function _sortSolverOps(SolverOperation[] memory unsortedSolverOps)
         internal
-        view
+        pure
         returns (SolverOperation[] memory sortedSolverOps)
     {
         // This could be made more gas efficient
 
         uint256 _length = unsortedSolverOps.length;
-        if (_length == 0) {
-            return unsortedSolverOps;
-        }
+        if (_length == 0) return unsortedSolverOps;
 
         sortedSolverOps = new SolverOperation[](_length);
 
@@ -212,15 +210,15 @@ contract OuterHelpers is FastLaneOnlineInner {
         uint256 _topBidIndex;
         bool _matched;
 
-        for (uint256 i; i < _length; i++) {
+        for (uint256 i; i < _length; ++i) {
             _topBidAmount = 0;
-            _topBidIndex = 0;
+            _topBidIndex = i;
             _matched = false;
 
-            for (uint256 j; j < _length; j++) {
+            for (uint256 j = i; j < _length; ++j) {
                 uint256 _bidAmount = unsortedSolverOps[j].bidAmount;
 
-                if (_bidAmount >= _topBidAmount && _bidAmount != 0) {
+                if (_bidAmount > _topBidAmount) {
                     _topBidAmount = _bidAmount;
                     _topBidIndex = j;
                     _matched = true;
@@ -231,9 +229,6 @@ contract OuterHelpers is FastLaneOnlineInner {
                 // Get the highest solverOp and add it to sorted array
                 SolverOperation memory _solverOp = unsortedSolverOps[_topBidIndex];
                 sortedSolverOps[i] = _solverOp;
-
-                // Mark it as sorted in old array
-                unsortedSolverOps[_topBidIndex].bidAmount = 0;
             }
         }
 
