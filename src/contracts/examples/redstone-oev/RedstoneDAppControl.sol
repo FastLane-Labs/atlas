@@ -38,7 +38,7 @@ contract RedstoneDAppControl is DAppControl {
                 reuseUserOp: false,
                 userAuctioneer: true,
                 solverAuctioneer: false,
-                unknownAuctioneer: true,
+                unknownAuctioneer: false,
                 verifyCallChainHash: true,
                 forwardReturnData: false,
                 requireFulfillment: false, // Update oracle even if all solvers fail

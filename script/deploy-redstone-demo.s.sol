@@ -12,7 +12,7 @@ import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 contract DeployRedstoneDemoScript is DeployBaseScript {
     RedstoneDAppControl redstoneDAppControl;
     address redstoneExecutionEnv;
-    RedstoneAdapterAtlasWrapper redstoneAdapterAtlasWrapper;
+    address redstoneAdapterAtlasWrapper;
 
     function run() external {
         console.log("\n=== DEPLOYING REDSTONE DEMO ===\n");
@@ -21,6 +21,10 @@ contract DeployRedstoneDemoScript is DeployBaseScript {
         address gov = vm.addr(govPrivateKey);
 
         console.log("Redstone Gov address: \t\t\t", gov);
+
+        uint256 oracleOwnerPrivateKey = vm.envUint("ORACLE_OWNER_PRIVATE_KEY");
+        address oracleOwner = vm.addr(oracleOwnerPrivateKey);
+        address baseFeedAddress = vm.envAddress("BASE_FEED_ADDRESS");
 
         atlas = Atlas(payable(vm.envAddress("ATLAS_ADDRESS")));
         atlasVerification = AtlasVerification(payable(vm.envAddress("ATLAS_VERIFICATION_ADDRESS")));
@@ -35,28 +39,21 @@ contract DeployRedstoneDemoScript is DeployBaseScript {
         redstoneDAppControl = new RedstoneDAppControl(address(atlas));
         atlasVerification.initializeGovernance(address(redstoneDAppControl));
 
-        redstoneExecutionEnv = atlas.createExecutionEnvironment(address(redstoneDAppControl));
-
         vm.stopBroadcast();
         console.log("Contracts deployed by Gov:");
         console.log("Redstone DAppControl: \t\t\t", address(redstoneDAppControl));
-        console.log("Redstone Execution Environment: \t\t", redstoneExecutionEnv);
         console.log("\n");
-
-        uint256 oracleOwnerPrivateKey = vm.envUint("ORACLE_OWNER_PRIVATE_KEY");
-        address oracleOwner = vm.addr(oracleOwnerPrivateKey);
-        address baseFeedAddress = vm.envAddress("BASE_FEED_ADDRESS");
 
         console.log("Oracle Owner address: \t\t\t", oracleOwner);
         console.log("Base Feed address: \t\t\t\t", baseFeedAddress);
 
         vm.startBroadcast(oracleOwnerPrivateKey);
         console.log("Deploying from Oracle Owner Account...");
-        redstoneDAppControl.createNewAtlasAdapter(baseFeedAddress);
+        redstoneAdapterAtlasWrapper = redstoneDAppControl.createNewAtlasAdapter(baseFeedAddress);
         vm.stopBroadcast();
 
         console.log("Contracts deployed by Oracle Owner:");
-        console.log("Redstone Adapter Atlas Wrapper: \t\t\t", address(redstoneAdapterAtlasWrapper));
+        console.log("Redstone Adapter Atlas Wrapper: \t\t\t", redstoneAdapterAtlasWrapper);
         console.log("\n");
     }
 }
