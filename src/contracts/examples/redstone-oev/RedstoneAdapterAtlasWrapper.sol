@@ -15,15 +15,11 @@ interface IAdapter {
     function getTimestampsFromLatestUpdate() external view returns (uint128 dataTimestamp, uint128 blockTimestamp);
 }
 
-
-interface IFeedx {
-    function getDataFeedId() external view returns (bytes32);
-}
-
 interface IFeed {
     function getPriceFeedAdapter() external view returns (IRedstoneAdapter);
     function getDataFeedId() external view returns (bytes32);
     function latestAnswer() external view returns (int256);
+    function latestRoundData() external view returns (uint80,int256,uint256,uint256,uint80);
 }
 
 contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWithoutRounds {
@@ -35,13 +31,10 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
 
     address[] public authorisedSigners;
 
-    uint256 public BASE_FEED_DELAY = 4;
+    uint256 public BASE_FEED_DELAY = 4000;
 
     error BaseAdapterHasNoDataFeed();
     error InvalidAuthorisedSigner();
-
-    uint256 atlasLatestAnswer;
-    uint256 atlasLatestTimestamp;
 
     constructor(address atlas, address _owner, address _baseFeed) {
         ATLAS = atlas;
@@ -56,6 +49,9 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
     }
 
     function getAuthorisedSignerIndex(address _receivedSigner) public view virtual override returns (uint8) {
+        if (authorisedSigners.length == 0) {
+            return 0;
+        }
         for (uint8 i = 0; i < authorisedSigners.length; i++) {
             if (authorisedSigners[i] == _receivedSigner) {
                 return i;
@@ -86,47 +82,41 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
         }
     }
 
-    function updateDataFeedsValues(uint256 dataPackagesTimestamp) public virtual override {
-        require(msg.data.length == 68, "Invalid calldata length");
-
-        if (authorisedSigners.length > 0){
-            requireAuthorisedUpdater(msg.sender);
+    function requireMinIntervalBetweenUpdatesPassed() private view {
+        uint256 currentBlockTimestamp = getBlockTimestamp();
+        uint256 blockTimestampFromLatestUpdate = getBlockTimestampFromLatestUpdate();
+        uint256 minIntervalBetweenUpdates = getMinIntervalBetweenUpdates();
+        if (currentBlockTimestamp < blockTimestampFromLatestUpdate + minIntervalBetweenUpdates) {
+            revert MinIntervalBetweenUpdatesHasNotPassedYet(
+                currentBlockTimestamp,
+                blockTimestampFromLatestUpdate,
+                minIntervalBetweenUpdates
+            );
         }
-        
-        uint256 tStamp;
-        assembly {
-            tStamp := calldataload(4)
-        }
-
-        uint256 value;
-        assembly {
-            value := calldataload(36)
-        }
-
-        require(dataPackagesTimestamp == tStamp, "Timestamps must be equal");
-
-        atlasLatestTimestamp = dataPackagesTimestamp;
-        atlasLatestAnswer = value;
     }
 
     function latestAnswer() public view virtual override returns (int256) {
         bytes32 dataFeedId = getDataFeedId();
         uint256 baseAnswer = IAdapter(BASE_ADAPTER).getValueForDataFeed(dataFeedId);
-        if (atlasLatestAnswer == 0) {
+        uint256 atlasAnswer = getValueForDataFeed(dataFeedId);
+        if (atlasAnswer == 0) {
             return int256(baseAnswer);
         }
         (uint256 baseLatestTimestamp,) = IAdapter(BASE_ADAPTER).getTimestampsFromLatestUpdate();
+        (uint256 atlasLatestTimestamp,) = getTimestampsFromLatestUpdate();
 
         if (atlasLatestTimestamp > baseLatestTimestamp - BASE_FEED_DELAY) {
-            return int256(atlasLatestAnswer);
+            return int256(atlasAnswer);
         }
         return int256(baseAnswer);
     }
 
     function latestTimestamp() public view virtual returns (uint256) {
         (uint256 baseLatestTimestamp,) = IAdapter(BASE_ADAPTER).getTimestampsFromLatestUpdate();
+        (uint256 atlasLatestTimestamp,) = getTimestampsFromLatestUpdate();
+        uint256 atlasAnswer = getValueForDataFeed(getDataFeedId());
 
-        if (atlasLatestAnswer == 0) {
+        if (atlasAnswer == 0) {
             return baseLatestTimestamp;
         }
         if (atlasLatestTimestamp > baseLatestTimestamp - BASE_FEED_DELAY) {
@@ -151,11 +141,11 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
         roundId = latestRound();
         answer = latestAnswer();
 
-        uint256 blockTimestamp = getPriceFeedAdapter().getBlockTimestampFromLatestUpdate();
+        uint256 latestTStamp = latestTimestamp();
 
         // These values are equal after chainlink’s OCR update
-        startedAt = blockTimestamp;
-        updatedAt = latestTimestamp();
+        startedAt = latestTStamp/1000;
+        updatedAt = latestTStamp/1000;
 
         // We want to be compatible with Chainlink's interface
         // And in our case the roundId is always equal to answeredInRound
