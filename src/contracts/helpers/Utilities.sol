@@ -15,7 +15,7 @@ contract Utilities is Script {
         string memory fullKey = string.concat(".", chain, ".", key);
 
         address res = json.readAddress(fullKey);
-        if (res == address(0x0000000000000000000000000000000000000020) || res == address(0)) {
+        if (res == address(0x20) || res == address(0)) {
             revert(string.concat(fullKey, " not found in useful-addresses.json"));
         }
         return res;

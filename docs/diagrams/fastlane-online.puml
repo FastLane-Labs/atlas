@@ -1,0 +1,141 @@
+@startuml fastlane-online-offchain
+title FastLane Online Offchain Flow
+
+participant Browser
+participant Wallet
+participant RPC
+participant P2P
+participant Searchers
+participant Validator
+
+autonumber 1.1
+Validator -> P2P: listen for transactions
+autonumber 2.1
+Searchers -> P2P: listen for transactions
+
+autonumber 3.1
+Browser -> RPC: view call to retrieve baseline quote
+Browser -> Browser: create user bundled transaction \nwith SwapIntent and BaselineQuote
+Browser -> Wallet: sign user bundled transaction
+
+Browser -> RPC: submit signed transaction
+RPC -> P2P: gossip transaction
+Browser -> RPC: listen for transaction receipt
+
+autonumber 4.1
+group Searcher loop
+  note right of P2P
+    Different searchers compete through the
+    P2P in a PGA to find the winning solution
+    of the users swap intent.
+  end note
+
+  P2P --> Searchers: user transaction or solver\nfrontrun transaction
+  Searchers -> Searchers: find solution
+  Searchers -> P2P: submit signed solver\nfrontrun transaction
+end
+
+autonumber 5.1
+Validator -> Validator: build block
+Validator -> P2P: gossip block
+
+autonumber 3.7
+RPC -> Browser: transaction receipt
+@enduml
+
+@startuml fastlane-online-onchain
+title FastLane Online Onchain Flow
+
+participant UserEOA
+participant SolverEOA
+participant SolverContract
+participant FastLaneControl
+participant Atlas
+participant ExEnv
+
+== Permit Transaction ==
+
+autonumber 1.1
+UserEOA -> FastLaneControl: permit token to be sold
+
+== Solver Operation Frontrun ==
+
+autonumber 2.1
+SolverEOA -> SolverContract: call some userdata
+SolverContract -> FastLaneControl: register SolverOp for UserOp
+FastLaneControl -> SolverContract: OK
+SolverContract -> SolverEOA: OK
+
+== User Operation ==
+
+autonumber 3.1
+UserEOA -> FastLaneControl: call fastOnlineSwap(UserOperation)
+
+FastLaneControl -> FastLaneControl: transfer from user to control
+UserEOA --> FastLaneControl: TokensUserSells
+
+note over FastLaneControl
+  control loads solverOp registered in 1.1
+  and uses it to create a bundle
+end note
+
+FastLaneControl -> Atlas: call metacall(Bundle)
+
+Atlas -> ExEnv: call userWrapper(userOp)
+ExEnv -> FastLaneControl: delegatecall swap(SwapIntent, BaselineCall)
+note over FastLaneControl
+  re-calculate the Baseline Call
+  expected output amount using
+  current on-chain data
+end note
+
+FastLaneControl -> FastLaneControl: transfer TokensUserSells to exenv
+FastLaneControl -> ExEnv: ReturnData
+FastLaneControl --> ExEnv: TokensUserSells
+
+ExEnv -> Atlas: UserReturnData
+
+Atlas -> Atlas: bidFindingIteration
+
+loop until solver successful
+Atlas -> ExEnv: call solverPreTryCatch(solverOp)
+ExEnv -> FastLaneControl: delegatecall preSolverCall
+
+FastLaneControl -> FastLaneControl: optimistically transfer sold\ntokens to solver
+ExEnv --> SolverContract: TokensUserSells
+
+FastLaneControl -> ExEnv: OK
+ExEnv -> Atlas: OK
+
+Atlas -> SolverContract: call atlasSolverCall(solverOp)
+
+note over SolverContract
+  solver fulfills the intent somehow
+end note
+
+SolverContract -> SolverContract: transfer bought tokens to user
+SolverContract --> ExEnv: TokensUserBuys
+
+SolverContract -> Atlas: OK
+
+end
+
+Atlas -> ExEnv: call allocateValue(bidAmount, returnData)
+
+ExEnv -> ExEnv: transfer TokensUserBuys to user
+ExEnv --> UserEOA: TokensUserBuys
+
+Atlas -> ExEnv: call postOpsWrapper(solved, returnData)
+ExEnv -> FastLaneControl: delegatecall postOpsCall(solved, data)
+
+note over FastLaneControl
+  if a solver fulfills the intent, then this does nothing.
+  otherwise, it will attempt to fulfill the user intent using
+  the baseline call that was provided along with the intent.
+end note
+
+FastLaneControl -> ExEnv: OK
+ExEnv -> Atlas: OK
+Atlas -> FastLaneControl: OK
+FastLaneControl -> UserEOA: OK
+@enduml

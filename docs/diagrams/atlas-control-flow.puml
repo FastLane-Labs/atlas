@@ -1,0 +1,75 @@
+@startuml atlas-control-flow
+
+Participant Caller
+Participant Atlas
+Participant ExecutionEnv
+Participant Control
+Participant DApp
+Participant Solver
+
+autonumber
+
+Caller -> Atlas: call metacall(userOp, solverOps, DAppOp)
+
+alt if callConfig.needsPreOpsCall
+  Atlas -> ExecutionEnv: call preOpsCall(userOp)
+  ExecutionEnv -> Control: delegatecall preOpsCall(userOp)
+  alt if callConfig.trackPreOpsReturnData
+    Control --> ExecutionEnv: returnData
+    ExecutionEnv --> Atlas: returnData 
+  end
+end
+
+Atlas -> ExecutionEnv: call userWrapper(userOp, returnData)
+
+alt if callConfig.delegateUser
+  autonumber 6
+  ExecutionEnv -> DApp: delegatecall userOp.data(returnData)
+else else
+  autonumber 6
+  ExecutionEnv -> DApp: call userOp.data(returnData)
+end
+
+alt if callConfig.trackUserReturnData
+  DApp --> ExecutionEnv: return userReturnData
+  ExecutionEnv --> Atlas: return userReturnData
+end
+
+alt if callConfig.exPostBids
+  Atlas -> Atlas: bidFindingIteration
+else else
+  Atlas -> Atlas: bidKnownIteration
+end
+
+loop until solver successful
+
+  alt if callConfig.requirePreSolver
+    Atlas -> ExecutionEnv: call solverPreTryCatch(solverOp, returnData)
+    ExecutionEnv -> Control: delegatecall preSolverCall(solverOp, returnData)
+    Control --> ExecutionEnv: return ok
+    ExecutionEnv --> Atlas: return ok
+  end
+
+  Atlas -> Solver: call atlasSolverCall(solverOp)
+
+  alt if callConfig.requirePostSolver
+    Atlas -> ExecutionEnv: call solverPostTryCatch(solverOp, returnData)
+    ExecutionEnv -> Control: delegatecall postSolverCall(solverOp, returnData)
+    Control --> ExecutionEnv: return ok
+    ExecutionEnv --> Atlas: return ok
+  end
+end
+
+Atlas -> ExecutionEnv: call allocateValue(bidAmount, returnData)
+ExecutionEnv -> Control: delegatecall allocateValueCall(bidToken, bidAmount, data)
+
+alt if callConfig.requirePostOps
+  Atlas -> ExecutionEnv: call postOpsWrapper(solved, returnData)
+  ExecutionEnv -> Control: delegatecall postOpsCall(solved, data)
+  Control --> ExecutionEnv: return ok
+  ExecutionEnv --> Atlas: return ok
+end
+
+Atlas -> Caller: return ok
+
+@enduml
