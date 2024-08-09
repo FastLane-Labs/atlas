@@ -66,3 +66,14 @@ Commit hash of deployment: [dca0b99](https://github.com/FastLane-Labs/atlas/comm
 | AtlasVerification  | [0xc05DDBe9745ce9DB45C32F5e4C1DA7a3c4FDa220](https://polygonscan.com/address/0xc05DDBe9745ce9DB45C32F5e4C1DA7a3c4FDa220)      |
 | Simulator          | [0xfBc81A39459E0D82EC31B4e585f7A318AFAdB49B](https://polygonscan.com/address/0xfBc81A39459E0D82EC31B4e585f7A318AFAdB49B)      |
 | Sorter             | [0x81f1E70A11A9E10Fa314cC093D149E5ec56EE97f](https://polygonscan.com/address/0x81f1E70A11A9E10Fa314cC093D149E5ec56EE97f)      |
+
+### Binance Smart Chain Mainnet
+
+Commit hash of deployment: [3416300](https://github.com/FastLane-Labs/atlas/commit/3416300be0576f558b5f06c4aad095b9e76d1f3d)
+
+| Contract           | Address                                                                                                                       |
+|--------------------|-------------------------------------------------------------------------------------------------------------------------------|
+| Atlas              | [0xD72D821dA82964c0546a5501347a3959808E072f](https://bscscan.com/address/0xD72D821dA82964c0546a5501347a3959808E072f)          |
+| AtlasVerification  | [0xae631aCDC436b9Dfd75C5629F825330d91459445](https://bscscan.com/address/0xae631aCDC436b9Dfd75C5629F825330d91459445)          |
+| Simulator          | [0xAb665f032e6A20Ef7D43FfD4E92a2f4fd6d5771e](https://bscscan.com/address/0xAb665f032e6A20Ef7D43FfD4E92a2f4fd6d5771e)          |
+| Sorter             | [0xb47387995e866908B25b49e8BaC7e499170461A6](https://bscscan.com/address/0xb47387995e866908B25b49e8BaC7e499170461A6)          |
