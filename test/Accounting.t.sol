@@ -140,7 +140,7 @@ contract AccountingTest is BaseTest {
         solverOps = new SolverOperation[](1);
 
         vm.startPrank(userEOA);
-        address executionEnvironment = atlas.createExecutionEnvironment(txBuilder.control(), userEOA);
+        address executionEnvironment = atlas.createExecutionEnvironment(userEOA, txBuilder.control());
         vm.stopPrank();
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
