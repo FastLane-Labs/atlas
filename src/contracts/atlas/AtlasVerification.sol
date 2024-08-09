@@ -380,8 +380,8 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
 
         // Check actual bundler matches the dApp's intended `dAppOp.bundler`
         // If bundler and auctioneer are the same address, this check is skipped
-        if (dAppOp.bundler != address(0) && msgSender != dAppOp.bundler) {
-            if (!_skipDAppOpChecks && !_isDAppSignatory(dAppOp.control, msgSender)) {
+        if (dAppOp.bundler != address(0) && msgSender != dAppOp.bundler && !isSimulation) {
+            if (!_isDAppSignatory(dAppOp.control, msgSender)) {
                 return ValidCallsResult.InvalidBundler;
             }
         }
