@@ -18,7 +18,12 @@ interface IAtlas {
         returns (bool auctionWon);
 
     // Factory.sol
-    function createExecutionEnvironment(address control) external returns (address executionEnvironment);
+    function createExecutionEnvironment(
+        address control,
+        address user
+    )
+        external
+        returns (address executionEnvironment);
     function getExecutionEnvironment(
         address user,
         address control

@@ -111,7 +111,7 @@ contract ExPostTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        address executionEnvironment = atlas.createExecutionEnvironment(userOp.control);
+        address executionEnvironment = atlas.createExecutionEnvironment(userOp.control, userEOA);
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
         console.log("userEOA", userEOA);
