@@ -315,6 +315,42 @@ contract FastLaneOnlineTest is BaseTest {
         assertEq(solverOpsOut[1].bidAmount, 1, "5 solverOps with 0 bid mixed, [1] bid mismatch");
     }
 
+    function testFLOnline_SetWinningSolver_DoesNotUpdateForUnexpectedCaller() public {
+        (address userEE,,) = atlas.getExecutionEnvironment(userEOA, address(flOnlineMock));
+        assertEq(flOnlineMock.getWinningSolver(), address(0), "winningSolver should start empty");
+
+        vm.prank(userEOA);
+        flOnlineMock.setWinningSolver(solverOneEOA);
+        assertEq(flOnlineMock.getWinningSolver(), address(0), "err 1 - winningSolver should be empty");
+
+        vm.prank(governanceEOA);
+        flOnlineMock.setWinningSolver(solverOneEOA);
+        assertEq(flOnlineMock.getWinningSolver(), address(0), "err 2 - winningSolver should be empty");
+
+        vm.prank(solverOneEOA);
+        flOnlineMock.setWinningSolver(solverOneEOA);
+        assertEq(flOnlineMock.getWinningSolver(), address(0), "err 3 - winningSolver should be empty");
+
+        vm.prank(address(flOnlineMock));
+        flOnlineMock.setWinningSolver(solverOneEOA);
+        assertEq(flOnlineMock.getWinningSolver(), address(0), "err 4 - winningSolver should be empty");
+
+        vm.prank(address(atlas));
+        flOnlineMock.setWinningSolver(solverOneEOA);
+        assertEq(flOnlineMock.getWinningSolver(), address(0), "err 5 - winningSolver should be empty");
+
+        vm.prank(userEE); // userEE is valid caller, but still wont set if userEOA is not in userLock
+        flOnlineMock.setWinningSolver(solverOneEOA);
+        assertEq(flOnlineMock.getWinningSolver(), address(0), "err 6 - winningSolver should be empty");
+
+        // Only valid caller: the user's EE when userEOA is stored in userLock
+        flOnlineMock.setUserLock(userEOA);
+        assertEq(flOnlineMock.getUserLock(), userEOA, "userLock should be userEOA");
+        vm.prank(userEE);
+        flOnlineMock.setWinningSolver(solverOneEOA);
+        assertEq(flOnlineMock.getWinningSolver(), solverOneEOA, "winningSolver should be solverOneEOA");
+    }
+
     // TODO add tests when solverOp is valid, but does not outperform baseline call, baseline call used instead
 
     // ---------------------------------------------------- //
@@ -628,4 +664,22 @@ contract MockFastLaneOnline is FastLaneOnlineOuter {
     function sortSolverOps(SolverOperation[] memory solverOps) external pure returns (SolverOperation[] memory) {
         return _sortSolverOps(solverOps);
     }
+
+    // ---------------------------------------------------- //
+    //                  BaseStorage.sol                     //
+    // ---------------------------------------------------- //
+
+    function getUserLock() external view returns (address) {
+        return _getUserLock();
+    }
+
+    function setUserLock(address user) external {
+        _setUserLock(user);
+    }
+
+    function getWinningSolver() external view returns (address) {
+        return _getWinningSolver();
+    }
+
+    
 }
