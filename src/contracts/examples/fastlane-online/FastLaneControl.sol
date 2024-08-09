@@ -11,9 +11,11 @@ import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
 import "src/contracts/types/UserOperation.sol";
 import "src/contracts/types/SolverOperation.sol";
 import "src/contracts/types/LockTypes.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
 import { SwapIntent, BaselineCall } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
 import { FastLaneOnlineErrors } from "src/contracts/examples/fastlane-online/FastLaneOnlineErrors.sol";
+import { IFastLaneOnline } from "src/contracts/examples/fastlane-online/IFastLaneOnline.sol";
 
 interface ISolverGateway {
     function getBidAmount(bytes32 solverOpHash) external view returns (uint256 bidAmount);
@@ -104,7 +106,11 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
 
     function _postOpsCall(bool solved, bytes calldata returnData) internal override {
         // If a solver beat the baseline and the amountOutMin, return early
-        if (solved) return;
+        if (solved) {
+            (address _winningSolver,,) = IAtlas(ATLAS).solverLockData();
+            IFastLaneOnline(CONTROL).setWinningSolver(_winningSolver);
+            return;
+        }
 
         (SwapIntent memory _swapIntent, BaselineCall memory _baselineCall) =
             abi.decode(returnData, (SwapIntent, BaselineCall));

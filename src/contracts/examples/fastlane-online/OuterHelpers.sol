@@ -43,6 +43,23 @@ contract OuterHelpers is FastLaneOnlineInner {
     //              CONTROL-LOCAL FUNCTIONS                //
     //                 (not delegated)                     //
     /////////////////////////////////////////////////////////
+
+    function setWinningSolver(address winningSolver) external {
+        // Only valid time this can be called is during the PostOps phase of a FLOnline metacall. When a user initiates
+        // that metacall with `fastOnlineSwap()` they are set as the user lock address. So the only time the check below
+        // will pass is when the caller of this function is the Execution Environment created for the currently active
+        // user and the FLOnline DAppControl.
+
+        (address expectedCaller,,) = IAtlas(ATLAS).getExecutionEnvironment(_getUserLock(), CONTROL);
+        if (msg.sender == expectedCaller) {
+            // Set winning solver in transient storage, to be used in `_updateSolverReputation()`
+            _setWinningSolver(winningSolver);
+        }
+
+        // If check above did not pass, gracefully return without setting the winning solver, to not cause the solverOp
+        // simulation to fail in `addSolverOp()`.
+    }
+
     function getUserOperationAndHash(
         address swapper,
         SwapIntent calldata swapIntent,
@@ -259,21 +276,23 @@ contract OuterHelpers is FastLaneOnlineInner {
         return sortedSolverOps;
     }
 
-    function _updateSolverReputation(
-        SolverOperation[] memory solverOps,
-        uint128 magnitude,
-        bool solversSuccessful
-    )
-        internal
-    {
+    function _updateSolverReputation(SolverOperation[] memory solverOps, uint128 magnitude) internal {
         uint256 _length = solverOps.length;
+        address _solverFrom;
+
         for (uint256 i; i < _length; i++) {
-            if (solversSuccessful) {
-                S_solverReputations[solverOps[i].from].successCost += magnitude;
+            _solverFrom = solverOps[i].from;
+
+            // winningSolver will be address(0) unless a winning solver fulfilled the swap intent.
+            if (_solverFrom == _getWinningSolver()) {
+                S_solverReputations[_solverFrom].successCost += magnitude;
             } else {
-                S_solverReputations[solverOps[i].from].failureCost += magnitude;
+                S_solverReputations[_solverFrom].failureCost += magnitude;
             }
         }
+
+        // Clear winning solver, in case `fastOnlineSwap()` is called multiple times in the same tx.
+        _setWinningSolver(address(0));
     }
 
     //////////////////////////////////////////////
