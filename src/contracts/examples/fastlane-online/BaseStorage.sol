@@ -87,6 +87,10 @@ contract BaseStorage {
         _tstore(_WINNING_SOLVER_SLOT, bytes32(uint256(uint160(winningSolverFrom))));
     }
 
+    function _getWinningSolver() internal view returns (address) {
+        return address(uint160(uint256(_tload(_WINNING_SOLVER_SLOT))));
+    }
+
     function _tstore(bytes32 slot, bytes32 value) internal {
         assembly {
             tstore(slot, value)

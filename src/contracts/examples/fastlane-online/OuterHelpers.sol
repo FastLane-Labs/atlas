@@ -276,21 +276,23 @@ contract OuterHelpers is FastLaneOnlineInner {
         return sortedSolverOps;
     }
 
-    function _updateSolverReputation(
-        SolverOperation[] memory solverOps,
-        uint128 magnitude,
-        bool solversSuccessful
-    )
-        internal
-    {
+    function _updateSolverReputation(SolverOperation[] memory solverOps, uint128 magnitude) internal {
         uint256 _length = solverOps.length;
+        address _solverFrom;
+
         for (uint256 i; i < _length; i++) {
-            if (solversSuccessful) {
-                S_solverReputations[solverOps[i].from].successCost += magnitude;
+            _solverFrom = solverOps[i].from;
+
+            // winningSolver will be address(0) unless a winning solver fulfilled the swap intent.
+            if (_solverFrom == _getWinningSolver()) {
+                S_solverReputations[_solverFrom].successCost += magnitude;
             } else {
-                S_solverReputations[solverOps[i].from].failureCost += magnitude;
+                S_solverReputations[_solverFrom].failureCost += magnitude;
             }
         }
+
+        // Clear winning solver, in case `fastOnlineSwap()` is called multiple times in the same tx.
+        _setWinningSolver(address(0));
     }
 
     //////////////////////////////////////////////
