@@ -49,6 +49,11 @@ contract SolverGateway is OuterHelpers {
     /////////////////////////////////////////////////////////
     //                  FOR SOLVERS                        //
     /////////////////////////////////////////////////////////
+
+    // Note: this function involves calling the simulator, which has a few requirements which must be met for this
+    // function to succeed:
+    // - There must be at least 1 million (500k + 500k) gas left by the time `_executeSolverOperation()` is called. So
+    // the make the gas limit of this function call high enough to allow for that. 1.5 million gas should be enough.
     function addSolverOp(
         UserOperation calldata userOp,
         SolverOperation calldata solverOp

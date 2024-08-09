@@ -8,7 +8,7 @@ import { Reputation } from "src/contracts/examples/fastlane-online/FastLaneTypes
 contract BaseStorage {
     error FLOnline_NotUnlocked();
 
-    address internal _userLock = address(1); // TODO: Convert to transient storage
+    bytes32 private constant _USER_LOCK_SLOT = keccak256("FLO_USER_LOCK");
 
     // TODO make mappings internal with external getters
 
@@ -41,15 +41,36 @@ contract BaseStorage {
     //////////////////////////////////////////////
     /////            MODIFIERS              //////
     //////////////////////////////////////////////
+
     modifier withUserLock(address user) {
-        if (_userLock != address(1)) revert FLOnline_NotUnlocked();
-        _userLock = user;
+        if (_getUserLock() != address(0)) revert FLOnline_NotUnlocked();
+        _setUserLock(user);
         _;
-        _userLock = address(1);
+        _setUserLock(address(0));
     }
 
-    modifier onlyWhenUnlocked() {
-        if (_userLock != address(1)) revert FLOnline_NotUnlocked();
-        _;
+    //////////////////////////////////////////////
+    /////           TSTORE HELPERS          //////
+    //////////////////////////////////////////////
+
+    function _setUserLock(address user) internal {
+        _tstore(_USER_LOCK_SLOT, bytes32(uint256(uint160(user))));
+    }
+
+    function _getUserLock() internal view returns (address) {
+        return address(uint160(uint256(_tload(_USER_LOCK_SLOT))));
+    }
+
+    function _tstore(bytes32 slot, bytes32 value) internal {
+        assembly {
+            tstore(slot, value)
+        }
+    }
+
+    function _tload(bytes32 slot) internal view returns (bytes32 value) {
+        assembly {
+            value := tload(slot)
+        }
+        return value;
     }
 }
