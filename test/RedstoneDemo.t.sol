@@ -57,4 +57,56 @@ contract RedstoneDAppControlTest is BaseTest {
         require(success, "Oracle update failed");
     }
    
+    function testUpdateDataFeedsValues() public {
+        bytes32 dataFeed = IFeedx(baseFeedAddress).getDataFeedId();
+        uint32 dataPointValue = 666999;
+        uint48 timestamp = uint48(block.timestamp * 1000);
+        uint32 valueSize = 4;
+        uint24 dataPointsCount = 1;
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(governancePK, keccak256(abi.encodePacked(dataFeed, dataPointValue, timestamp, valueSize, dataPointsCount)));
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        bytes memory payload = abi.encodePacked(
+            // *** SIGNED DATA PACKAGES ***
+            // 1st data package
+            // - 1st data point
+            // -- feed identifier
+            dataFeed,               // 32 bytes
+            // -- value
+            dataPointValue,         // 4 bytes
+            // - more data points
+            // ...
+            // - timestamp (milliseconds)
+            timestamp,              // 6 bytes
+            // - value size
+            valueSize,              // 4 bytes
+            // - data points count
+            dataPointsCount,        // 3 bytes
+            // - signature
+            signature, // 65 bytes
+
+            // more data packages
+            // ...
+
+            // data packages count
+            uint16(1),              // 2 bytes
+
+            // *** UNSIGNED METADATA ***
+            // - message
+            uint256(666),           // 32 bytes
+            // - message size
+            uint24(32),             // 3 bytes
+            // - red stone marker
+            hex"000002ed57011e0000"    // 9 bytes
+        );
+
+        bytes memory call = abi.encodeCall(wrapper.updateDataFeedsValues, (timestamp));
+        call = bytes.concat(call, payload);
+
+        vm.prank(governanceEOA);
+        (bool success,) = address(wrapper).call(call);
+
+        require(success, "Payload attachment failed");
+    }
 }
