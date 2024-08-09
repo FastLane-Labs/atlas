@@ -15,6 +15,11 @@ interface IAdapter {
     function getTimestampsFromLatestUpdate() external view returns (uint128 dataTimestamp, uint128 blockTimestamp);
 }
 
+
+interface IFeedx {
+    function getDataFeedId() external view returns (bytes32);
+}
+
 interface IFeed {
     function getPriceFeedAdapter() external view returns (IRedstoneAdapter);
     function getDataFeedId() external view returns (bytes32);
