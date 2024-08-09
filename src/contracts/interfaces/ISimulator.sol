@@ -6,8 +6,22 @@ import "../types/UserOperation.sol";
 import "../types/ConfigTypes.sol";
 import "src/contracts/types/DAppOperation.sol";
 
+enum Result {
+    Unknown,
+    VerificationSimFail,
+    PreOpsSimFail,
+    UserOpSimFail,
+    SolverSimFail,
+    AllocateValueSimFail,
+    PostOpsSimFail,
+    SimulationPassed
+}
+
 interface ISimulator {
-    function simUserOperation(UserOperation calldata userOp) external returns (bool);
+    function simUserOperation(UserOperation calldata userOp)
+        external
+        payable
+        returns (bool success, Result simResult, uint256);
 
     function simSolverCall(
         UserOperation calldata userOp,
@@ -15,7 +29,8 @@ interface ISimulator {
         DAppOperation calldata verification
     )
         external
-        returns (bool);
+        payable
+        returns (bool success, Result simResult, uint256);
 
     function simSolverCalls(
         UserOperation calldata userOp,
@@ -23,5 +38,6 @@ interface ISimulator {
         DAppOperation calldata verification
     )
         external
-        returns (bool);
+        payable
+        returns (bool success, Result simResult, uint256);
 }

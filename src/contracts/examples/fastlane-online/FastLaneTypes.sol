@@ -12,5 +12,10 @@ struct SwapIntent {
 struct BaselineCall {
     address to; // Address to send the swap if there are no solvers / to get the baseline
     bytes data; // Calldata for the baseline swap
-    bool success; // Records or not the first baseline call was successful
+    uint256 value; // msg.value of the swap (native gas token)
+}
+
+struct Reputation {
+    uint128 successCost;
+    uint128 failureCost;
 }

@@ -18,29 +18,44 @@ import "src/contracts/types/EscrowTypes.sol";
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
 import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
+import { ISimulator } from "src/contracts/interfaces/ISimulator.sol";
 
 import { FastLaneOnlineControl } from "src/contracts/examples/fastlane-online/FastLaneControl.sol";
 import { FastLaneOnlineInner } from "src/contracts/examples/fastlane-online/FastLaneOnlineInner.sol";
 
-import { SwapIntent, BaselineCall } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
-
-interface IGeneralizedBackrunProxy {
-    function getUser() external view returns (address);
-}
+import { SwapIntent, BaselineCall, Reputation } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
 
 contract OuterHelpers is FastLaneOnlineInner {
     // NOTE: Any funds collected in excess of the therapy bills required for the Cardano engineering team
     // will go towards buying stealth drones programmed to apply deodorant to coders at solana hackathons.
     address public immutable CARDANO_ENGINEER_THERAPY_FUND;
+    address public immutable SIMULATOR;
 
     constructor(address _atlas) FastLaneOnlineInner(_atlas) {
         CARDANO_ENGINEER_THERAPY_FUND = msg.sender;
+        SIMULATOR = IAtlas(_atlas).SIMULATOR();
     }
 
     /////////////////////////////////////////////////////////
     //              CONTROL-LOCAL FUNCTIONS                //
     //                 (not delegated)                     //
     /////////////////////////////////////////////////////////
+    function getUserOperationAndHash(
+        address swapper,
+        SwapIntent calldata swapIntent,
+        BaselineCall calldata baselineCall,
+        uint256 deadline,
+        uint256 gas,
+        uint256 maxFeePerGas
+    )
+        external
+        view
+        returns (UserOperation memory userOp, bytes32 userOpHash)
+    {
+        userOp = _getUserOperation(swapper, swapIntent, baselineCall, deadline, gas, maxFeePerGas);
+        userOpHash = _getUserOperationHash(userOp);
+    }
+
     function getUserOpHash(
         address swapper,
         SwapIntent calldata swapIntent,
@@ -72,13 +87,26 @@ contract OuterHelpers is FastLaneOnlineInner {
         userOp = _getUserOperation(swapper, swapIntent, baselineCall, deadline, gas, maxFeePerGas);
     }
 
-    function makeThogardsWifeHappy() external onlyAsControl withUserLock {
+    function makeThogardsWifeHappy() external onlyAsControl withUserLock(msg.sender) {
         if (msg.sender != CARDANO_ENGINEER_THERAPY_FUND) {
             revert OuterHelpers_NotMadJustDisappointed();
         }
         uint256 _rake = rake;
         rake = 0;
         SafeTransferLib.safeTransferETH(CARDANO_ENGINEER_THERAPY_FUND, _rake);
+    }
+
+    function _simulateSolverOp(
+        UserOperation calldata userOp,
+        SolverOperation calldata solverOp
+    )
+        internal
+        returns (bool valid)
+    {
+        DAppOperation memory _dAppOp = _getDAppOp(solverOp.userOpHash, userOp.deadline);
+
+        // NOTE: Valid is false when the solver fails even if postOps is successful
+        (valid,,) = ISimulator(SIMULATOR).simSolverCall(userOp, solverOp, _dAppOp);
     }
 
     function _getUserOperation(
@@ -94,7 +122,7 @@ contract OuterHelpers is FastLaneOnlineInner {
         returns (UserOperation memory userOp)
     {
         userOp = UserOperation({
-            from: address(this),
+            from: swapper,
             to: ATLAS,
             gas: gas,
             maxFeePerGas: maxFeePerGas,
@@ -105,9 +133,9 @@ contract OuterHelpers is FastLaneOnlineInner {
             control: CONTROL,
             callConfig: CALL_CONFIG,
             sessionKey: address(0),
-            data: abi.encodeCall(this.swap, (swapper, swapIntent, baselineCall)),
-            signature: new bytes(0)
-        });
+            data: abi.encodeCall(this.swap, (swapIntent, baselineCall)),
+            signature: new bytes(0) // User must sign
+         });
     }
 
     function _getUserOperationHash(UserOperation memory userOp) internal view returns (bytes32 userOpHash) {
@@ -124,63 +152,127 @@ contract OuterHelpers is FastLaneOnlineInner {
             bundler: CONTROL, // Signer of the atlas tx (msg.sender)
             userOpHash: userOpHash, // keccak256 of userOp.to, userOp.data
             callChainHash: bytes32(0), // keccak256 of the solvers' txs
-            signature: new bytes(0) // DAppOperation signed by DAppOperation.from
+            signature: new bytes(0) // NOTE: Control must be registered as signatory of itself, in AtlasVerification.
+                // Then no signature is required here as control is bundler.
          });
     }
 
     function _processCongestionRake(
-        uint256 grossGasRefund,
-        bytes32 userOpHash
+        uint256 startingBalance,
+        bytes32 userOpHash,
+        bool solversSuccessful
     )
         internal
         returns (uint256 netGasRefund)
     {
-        // Add any congestion buyin.
-        // NOTE: Only rake buyins on successful swap, never on refunds.
+        uint256 _grossGasRefund = address(this).balance - startingBalance;
 
         uint256 _congestionBuyIns = S_aggCongestionBuyIn[userOpHash];
 
         if (_congestionBuyIns > 0) {
-            grossGasRefund += S_aggCongestionBuyIn[userOpHash];
+            if (solversSuccessful) {
+                _grossGasRefund += _congestionBuyIns;
+            }
             delete S_aggCongestionBuyIn[userOpHash];
         }
 
-        uint256 _netRake = grossGasRefund * _CONGESTION_RAKE / _CONGESTION_BASE;
+        uint256 _netRake = _grossGasRefund * _CONGESTION_RAKE / _CONGESTION_BASE;
 
         // Increment cumulative rake
-        rake += _netRake;
+        if (solversSuccessful) {
+            rake += _netRake;
+        } else {
+            // NOTE: We do not refund the congestion buyins to the user because we do not want to create a
+            // scenario in which the user can profit from Solvers failing. We also shouldn't give these to the
+            // validator for the same reason.
+            // TODO: _congestionBuyIns to protocol guild or something because contract authors should be credibly
+            // neutral too
+            rake += (_netRake + _congestionBuyIns);
+        }
 
         // Return the netGasRefund
-        netGasRefund = grossGasRefund - _netRake;
+        netGasRefund = _grossGasRefund - _netRake;
+    }
+
+    function _sortSolverOps(SolverOperation[] memory unsortedSolverOps)
+        internal
+        view
+        returns (SolverOperation[] memory sortedSolverOps)
+    {
+        // This could be made more gas efficient
+
+        uint256 _length = unsortedSolverOps.length;
+        if (_length == 0) {
+            return unsortedSolverOps;
+        }
+
+        sortedSolverOps = new SolverOperation[](_length);
+
+        uint256 _topBidAmount;
+        uint256 _topBidIndex;
+        bool _matched;
+
+        for (uint256 i; i < _length; i++) {
+            _topBidAmount = 0;
+            _topBidIndex = 0;
+            _matched = false;
+
+            for (uint256 j; j < _length; j++) {
+                uint256 _bidAmount = unsortedSolverOps[j].bidAmount;
+
+                if (_bidAmount >= _topBidAmount && _bidAmount != 0) {
+                    _topBidAmount = _bidAmount;
+                    _topBidIndex = j;
+                    _matched = true;
+                }
+            }
+
+            if (_matched) {
+                // Get the highest solverOp and add it to sorted array
+                SolverOperation memory _solverOp = unsortedSolverOps[_topBidIndex];
+                sortedSolverOps[i] = _solverOp;
+
+                // Mark it as sorted in old array
+                unsortedSolverOps[_topBidIndex].bidAmount = 0;
+            }
+        }
+
+        return sortedSolverOps;
+    }
+
+    function _updateSolverReputation(
+        SolverOperation[] memory solverOps,
+        uint128 magnitude,
+        bool solversSuccessful
+    )
+        internal
+    {
+        uint256 _length = solverOps.length;
+        for (uint256 i; i < _length; i++) {
+            if (solversSuccessful) {
+                S_solverReputations[solverOps[i].from].successCost += magnitude;
+            } else {
+                S_solverReputations[solverOps[i].from].failureCost += magnitude;
+            }
+        }
     }
 
     //////////////////////////////////////////////
     /////            GETTERS                //////
     //////////////////////////////////////////////
-    function getUser() external view onlyAsControl returns (address) {
-        address _user = _userLock;
-        if (_user == address(1)) revert();
-        return _user;
-    }
-
-    function getNextUserNonce(address owner) external view returns (uint256 nonce) {
-        nonce = _getNextUserNonce(owner);
-    }
-
     function _getNextUserNonce(address owner) internal view returns (uint256 nonce) {
-        nonce = uint256(keccak256(abi.encode(S_userNonces[owner] + 1, owner)));
+        nonce = IAtlasVerification(ATLAS_VERIFICATION).getUserNextNonce(owner, false);
     }
 
-    function _getAccessData(address solverFrom) internal view returns (EscrowAccountAccessData memory) {
-        (uint112 _bonded, uint32 _lastAccessedBlock, uint24 _auctionWins, uint24 _auctionFails, uint64 _totalGasUsed) =
-            IAtlas(ATLAS).accessData(solverFrom);
-        return EscrowAccountAccessData({
-            bonded: _bonded,
-            lastAccessedBlock: _lastAccessedBlock,
-            auctionWins: _auctionWins,
-            auctionFails: _auctionFails,
-            totalGasUsed: _totalGasUsed
-        });
+    function isUserNonceValid(address owner, uint256 nonce) external view returns (bool valid) {
+        valid = _isUserNonceValid(owner, nonce);
+    }
+
+    function _isUserNonceValid(address owner, uint256 nonce) internal view returns (bool valid) {
+        uint248 _wordIndex = uint248(nonce >> 8);
+        uint8 _bitPos = uint8(nonce);
+        uint256 _bitmap = IAtlasVerification(ATLAS_VERIFICATION).userNonSequentialNonceTrackers(owner, _wordIndex);
+        valid = _bitmap & 1 << _bitPos != 1;
     }
 
     //////////////////////////////////////////////

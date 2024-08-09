@@ -23,6 +23,7 @@ contract FastLaneOnlineTest is BaseTest {
     }
 
     struct FastOnlineSwapArgs {
+        UserOperation userOp;
         SwapIntent swapIntent;
         BaselineCall baselineCall;
         uint256 deadline;
@@ -31,8 +32,6 @@ contract FastLaneOnlineTest is BaseTest {
         bytes32 userOpHash;
     }
 
-    // Estimate of gas used in fastOnlineSwap that Atlas does not take a surcharge on
-    uint256 constant NON_SURCHARGE_OVERHEAD = 20_000;
     uint256 constant ERR_MARGIN = 0.1e18; // 10% error margin
 
     IERC20 DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
@@ -71,8 +70,9 @@ contract FastLaneOnlineTest is BaseTest {
         atlasVerification.addSignatory(address(flOnline), address(flOnline));
         vm.stopPrank();
 
-        // This EE wont be deployed until the start of the first metacall
-        (executionEnvironment,,) = atlas.getExecutionEnvironment(address(flOnline), address(flOnline));
+        // User deploys their FLOnline Execution Environment
+        vm.prank(userEOA);
+        executionEnvironment = atlas.createExecutionEnvironment(address(flOnline));
 
         // Set fastOnlineSwap args to default values
         args = _buildDefaultFastOnlineSwapArgs();
@@ -82,9 +82,9 @@ contract FastLaneOnlineTest is BaseTest {
         deal(args.swapIntent.tokenUserSells, userEOA, args.swapIntent.amountUserSells); // 3200 DAI
         deal(userEOA, 1e18); // Give user 1 ETH to pay for gas (msg.value is 0.1 ETH per call by default)
 
-        // User approves FLOnline to take 3200 DAI
+        // User approves Atlas to take their DAI to facilitate the swap
         vm.prank(userEOA);
-        IERC20(args.swapIntent.tokenUserSells).approve(address(flOnline), args.swapIntent.amountUserSells);
+        IERC20(args.swapIntent.tokenUserSells).approve(address(atlas), args.swapIntent.amountUserSells);
     }
 
     // ---------------------------------------------------- //
@@ -144,7 +144,6 @@ contract FastLaneOnlineTest is BaseTest {
     }
 
     function testFLOnlineSwap_ZeroSolvers_BaselineCallFullfills_Success() public {
-        vm.skip(true); // TODO remove skip after merging with flo-overhaul
         // No solverOps at all
         _doBaselineCallWithBalanceChecksThenRevertStateChanges({
             caller: userEOA,
@@ -168,7 +167,7 @@ contract FastLaneOnlineTest is BaseTest {
 
         // Check BaselineCall struct is formed correctly and can revert, revert changes after
         _doBaselineCallWithBalanceChecksThenRevertStateChanges({
-            caller: userEOA,
+            caller: executionEnvironment,
             tokenOutRecipient: executionEnvironment,
             shouldSucceed: false
         });
@@ -233,15 +232,12 @@ contract FastLaneOnlineTest is BaseTest {
 
         // Do the actual fastOnlineSwap call
         (bool result,) = address(flOnline).call{ gas: args.gas + 1000, value: defaultMsgValue }(
-            abi.encodeCall(
-                flOnline.fastOnlineSwap,
-                (args.swapIntent, args.baselineCall, args.deadline, args.gas, args.maxFeePerGas, args.userOpHash)
-            )
+            abi.encodeCall(flOnline.fastOnlineSwap, (args.userOp))
         );
 
         // Calculate estimated Atlas gas surcharge taken from call above
-        estAtlasGasSurcharge = (estAtlasGasSurcharge - gasleft() - NON_SURCHARGE_OVERHEAD) * defaultGasPrice
-            * atlas.ATLAS_SURCHARGE_RATE() / atlas.SCALE();
+        estAtlasGasSurcharge =
+            (estAtlasGasSurcharge - gasleft()) * defaultGasPrice * atlas.ATLAS_SURCHARGE_RATE() / atlas.SCALE();
 
         assertTrue(
             result == swapCallShouldSucceed,
@@ -251,7 +247,7 @@ contract FastLaneOnlineTest is BaseTest {
         // Return early if transaction expected to revert. Balance checks below would otherwise fail.
         if (!swapCallShouldSucceed) return;
 
-        // Check Atlas gas surcharge earned is within 5% of the estimated gas surcharge
+        // Check Atlas gas surcharge earned is within 10% of the estimated gas surcharge
         assertApproxEqRel(
             atlas.cumulativeSurcharge() - atlasGasSurchargeBefore,
             estAtlasGasSurcharge,
@@ -289,7 +285,7 @@ contract FastLaneOnlineTest is BaseTest {
     // Deadline: block.number + 1
     // Gas: 2_000_000
     // MaxFeePerGas: tx.gasprice
-    function _buildDefaultFastOnlineSwapArgs() internal view returns (FastOnlineSwapArgs memory newArgs) {
+    function _buildDefaultFastOnlineSwapArgs() internal returns (FastOnlineSwapArgs memory newArgs) {
         newArgs.swapIntent = SwapIntent({
             tokenUserBuys: WETH_ADDRESS,
             minAmountUserBuys: 1 ether,
@@ -313,19 +309,21 @@ contract FastLaneOnlineTest is BaseTest {
                     defaultDeadlineTimestamp // deadline
                 )
             ),
-            success: true // TODO check setting this in arg doesn't impact execution logic
-         });
+            value: 0
+        });
 
-        newArgs.userOpHash = atlasVerification.getUserOperationHash(
-            flOnline.getUserOperation({
-                swapper: userEOA,
-                swapIntent: newArgs.swapIntent,
-                baselineCall: newArgs.baselineCall,
-                deadline: defaultDeadlineBlock,
-                gas: defaultGasLimit,
-                maxFeePerGas: defaultGasPrice
-            })
-        );
+        (newArgs.userOp, newArgs.userOpHash) = flOnline.getUserOperationAndHash({
+            swapper: userEOA,
+            swapIntent: newArgs.swapIntent,
+            baselineCall: newArgs.baselineCall,
+            deadline: defaultDeadlineBlock,
+            gas: defaultGasLimit,
+            maxFeePerGas: defaultGasPrice
+        });
+
+        // User signs userOp
+        (sig.v, sig.r, sig.s) = vm.sign(userPK, newArgs.userOpHash);
+        newArgs.userOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         newArgs.deadline = defaultDeadlineBlock;
         newArgs.gas = defaultGasLimit;
@@ -360,20 +358,11 @@ contract FastLaneOnlineTest is BaseTest {
         // Solver signs the solverOp
         SolverOperation memory solverOp = _buildSolverOp(solverEOA, solverPK, address(solver), bidAmount);
 
-        // Register solverOp in FLOnline in frontrunning tx
-        flOnline.addSolverOp({
-            swapIntent: args.swapIntent,
-            baselineCall: args.baselineCall,
-            deadline: defaultDeadlineBlock,
-            gas: defaultGasLimit,
-            maxFeePerGas: defaultGasPrice,
-            userOpHash: args.userOpHash,
-            swapper: userEOA,
-            solverOp: solverOp
-        });
-
         // Give solver contract 1 WETH to fulfill user's SwapIntent
         deal(args.swapIntent.tokenUserBuys, address(solver), bidAmount);
+
+        // Register solverOp in FLOnline in frontrunning tx
+        flOnline.addSolverOp({ userOp: args.userOp, solverOp: solverOp });
         vm.stopPrank();
 
         // Returns the address of the solver contract deployed here
@@ -420,6 +409,11 @@ contract FastLaneOnlineTest is BaseTest {
         uint256 callerDaiBefore = DAI.balanceOf(caller);
         uint256 recipientWethBefore = WETH.balanceOf(tokenOutRecipient);
 
+        if (callerDaiBefore < args.swapIntent.amountUserSells) {
+            deal(address(DAI), caller, args.swapIntent.amountUserSells);
+            callerDaiBefore = DAI.balanceOf(caller);
+        }
+
         vm.startPrank(caller);
         DAI.approve(args.baselineCall.to, args.swapIntent.amountUserSells);
         (bool success,) = args.baselineCall.to.call(args.baselineCall.data);
@@ -460,26 +454,28 @@ contract FastLaneOnlineTest is BaseTest {
                 routerV2.swapExactTokensForTokens,
                 (
                     args.swapIntent.amountUserSells, // amountIn
-                    9999e18, // BAD amountOutMin
+                    9999e18, // BAD (unrealistic) amountOutMin
                     path, // path = [DAI, WETH]
                     executionEnvironment, // to
                     defaultDeadlineTimestamp // deadline
                 )
             ),
-            success: true
+            value: 0
         });
 
-        // Update userOpHash for new args otherwise solverOp will fail verification
-        args.userOpHash = atlasVerification.getUserOperationHash(
-            flOnline.getUserOperation({
-                swapper: userEOA,
-                swapIntent: args.swapIntent,
-                baselineCall: args.baselineCall,
-                deadline: defaultDeadlineBlock,
-                gas: defaultGasLimit,
-                maxFeePerGas: defaultGasPrice
-            })
-        );
+        // Need to update the userOp with changes to baseline call
+        (args.userOp, args.userOpHash) = flOnline.getUserOperationAndHash({
+            swapper: userEOA,
+            swapIntent: args.swapIntent,
+            baselineCall: args.baselineCall,
+            deadline: defaultDeadlineBlock,
+            gas: defaultGasLimit,
+            maxFeePerGas: defaultGasPrice
+        });
+
+        // User signs userOp
+        (sig.v, sig.r, sig.s) = vm.sign(userPK, args.userOpHash);
+        args.userOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
     }
 }
 

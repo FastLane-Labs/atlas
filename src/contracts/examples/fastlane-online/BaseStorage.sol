@@ -3,8 +3,14 @@ pragma solidity 0.8.25;
 
 import "src/contracts/types/SolverOperation.sol";
 
+import { Reputation } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
+
 contract BaseStorage {
+    error FLOnline_NotUnlocked();
+
     address internal _userLock = address(1); // TODO: Convert to transient storage
+
+    // TODO make mappings internal with external getters
 
     //   SolverOpHash   SolverOperation
     mapping(bytes32 => SolverOperation) public S_solverOpCache;
@@ -18,8 +24,8 @@ contract BaseStorage {
     //      UserOpHash  TotalBidValue
     mapping(bytes32 => uint256) public S_aggCongestionBuyIn;
 
-    //      User        Nonce
-    mapping(address => uint256) public S_userNonces;
+    //     SolverFrom  Reputation
+    mapping(address => Reputation) public S_solverReputations;
 
     // OK hear me out
     // 1. We have to rake some of the congestion buyins to maintain incentive compatibility (a low rep solver smurfing
@@ -35,15 +41,15 @@ contract BaseStorage {
     //////////////////////////////////////////////
     /////            MODIFIERS              //////
     //////////////////////////////////////////////
-    modifier withUserLock() {
-        if (_userLock != address(1)) revert();
-        _userLock = msg.sender;
+    modifier withUserLock(address user) {
+        if (_userLock != address(1)) revert FLOnline_NotUnlocked();
+        _userLock = user;
         _;
         _userLock = address(1);
     }
 
     modifier onlyWhenUnlocked() {
-        if (_userLock != address(1)) revert();
+        if (_userLock != address(1)) revert FLOnline_NotUnlocked();
         _;
     }
 }
