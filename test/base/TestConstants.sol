@@ -6,7 +6,7 @@ import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol"
 import { IUniswapV2Pair } from "src/contracts/examples/v2-example/interfaces/IUniswapV2Pair.sol";
 
 contract TestConstants {
-    uint256 public constant BLOCK_START = 17_441_786;
+    uint256 public constant BLOCK_START = 20489151;
 
     uint256 public constant DEFAULT_ESCROW_DURATION = 64;
     uint256 public constant DEFAULT_ATLAS_SURCHARGE_RATE = 1_000_000; // out of 10_000_000 = 10%
