@@ -45,8 +45,19 @@ contract OuterHelpers is FastLaneOnlineInner {
     /////////////////////////////////////////////////////////
 
     function setWinningSolver(address winningSolver) external {
-        // TODO checks
-        _setWinningSolver(winningSolver);
+        // Only valid time this can be called is during the PostOps phase of a FLOnline metacall. When a user initiates
+        // that metacall with `fastOnlineSwap()` they are set as the user lock address. So the only time the check below
+        // will pass is when the caller of this function is the Execution Environment created for the currently active
+        // user and the FLOnline DAppControl.
+
+        (address expectedCaller,,) = IAtlas(ATLAS).getExecutionEnvironment(_getUserLock(), CONTROL);
+        if (msg.sender == expectedCaller) {
+            // Set winning solver in transient storage, to be used in `_updateSolverReputation()`
+            _setWinningSolver(winningSolver);
+        }
+
+        // If check above did not pass, gracefully return without setting the winning solver, to not cause the solverOp
+        // simulation to fail in `addSolverOp()`.
     }
 
     function getUserOperationAndHash(
