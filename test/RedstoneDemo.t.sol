@@ -24,8 +24,6 @@ contract RedstoneDAppControlTest is BaseTest {
     }
 
     function testDeployDAppControlAndCreateWrapper() public {
-        //pushOracleUpdate();
-
         int256 latestAnswer = wrapper.latestAnswer();
 
         require(latestAnswer != 0, "Latest answer should not be zero");
@@ -43,32 +41,20 @@ contract RedstoneDAppControlTest is BaseTest {
         require(answeredInRound == roundId, "Answered in round should match round ID");
     }
 
-//     function pushOracleUpdate(bytes32 dataFeedId) internal {
-//         uint256 dataPackagesTimestamp = 1723101490000;
-//         bytes32[] memory dataFeedIds = new bytes32[](1);
-//         dataFeedIds[0] = dataFeedId;
+    function pushOracleUpdate() internal {
+        uint256 dataPackagesTimestamp = block.timestamp;
 
-//         uint256[] memory values = new uint256[](1);
-//         values[0] = 5000e8;
+        uint256 additionalValue = 123456789; 
 
-//         // Construct the data packages (this is a simplified example)
-//         bytes memory dataPackage = abi.encodePacked(
-//             uint256(dataFeedIds.length),      // Number of data feeds
-//             dataFeedIds[0],                   // First data feed ID
-//             values[0],                        // First data feed value
-//             dataPackagesTimestamp             // Timestamp for the data package
-//         );
+        bytes memory calldataPayload = abi.encodeWithSelector(
+            wrapper.updateDataFeedsValues.selector, 
+            dataPackagesTimestamp, 
+            additionalValue
+        );
 
-//         bytes memory signature = abi.encodePacked(uint8(28), bytes32(0), bytes32(0));
-
-//         bytes memory fullPayload = abi.encodePacked(dataPackage, signature);
-
-//         (bool success, ) = address(wrapper).call(
-//             abi.encodeWithSignature("updateDataFeedsValues(uint256)", dataPackagesTimestamp),
-// fullPayload
-//         );
-
-//         require(success, "Payload attachment failed");
-//     }
-
+        vm.prank(address(0x9876)); 
+        (bool success,) = address(wrapper).call(calldataPayload);
+        require(success, "Oracle update failed");
+    }
+   
 }

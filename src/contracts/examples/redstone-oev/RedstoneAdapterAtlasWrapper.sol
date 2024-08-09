@@ -40,13 +40,15 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
     error BaseAdapterHasNoDataFeed();
     error InvalidAuthorisedSigner();
 
+    uint256 atlasLatestAnswer;
+    uint256 atlasLatestTimestamp;
+
     constructor(address atlas, address _owner, address _baseFeed) {
         ATLAS = atlas;
         DAPP_CONTROL = msg.sender;
         BASE_FEED = _baseFeed;
         BASE_ADAPTER = address(IFeed(_baseFeed).getPriceFeedAdapter());
         _transferOwnership(_owner);
-        authorisedSigners.push(_owner);
     }
 
     function setBaseFeedDelay(uint256 _delay) external onlyOwner {
@@ -84,56 +86,47 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
         }
     }
 
-    function requireMinIntervalBetweenUpdatesPassed() private view {
-        uint256 currentBlockTimestamp = getBlockTimestamp();
-        uint256 blockTimestampFromLatestUpdate = getBlockTimestampFromLatestUpdate();
-        uint256 minIntervalBetweenUpdates = getMinIntervalBetweenUpdates();
-        if (currentBlockTimestamp < blockTimestampFromLatestUpdate + minIntervalBetweenUpdates) {
-            revert MinIntervalBetweenUpdatesHasNotPassedYet(
-                currentBlockTimestamp,
-                blockTimestampFromLatestUpdate,
-                minIntervalBetweenUpdates
-            );
-        }
-    }
-
     function updateDataFeedsValues(uint256 dataPackagesTimestamp) public virtual override {
-        if (authorisedSigners.length > 0) {
+        require(msg.data.length == 68, "Invalid calldata length");
+
+        if (authorisedSigners.length > 0){
             requireAuthorisedUpdater(msg.sender);
         }
-        requireMinIntervalBetweenUpdatesPassed();
-        validateProposedDataPackagesTimestamp(dataPackagesTimestamp);
-        _saveTimestampsOfCurrentUpdate(dataPackagesTimestamp);
+        
+        uint256 tStamp;
+        assembly {
+            tStamp := calldataload(4)
+        }
 
-        bytes32[] memory dataFeedsIdsArray = getDataFeedIds();
+        uint256 value;
+        assembly {
+            value := calldataload(36)
+        }
 
-        uint256[] memory oracleValues = getOracleNumericValuesFromTxMsg(dataFeedsIdsArray);
+        require(dataPackagesTimestamp == tStamp, "Timestamps must be equal");
 
-        _validateAndUpdateDataFeedsValues(dataFeedsIdsArray, oracleValues);
-  }
+        atlasLatestTimestamp = dataPackagesTimestamp;
+        atlasLatestAnswer = value;
+    }
 
     function latestAnswer() public view virtual override returns (int256) {
         bytes32 dataFeedId = getDataFeedId();
         uint256 baseAnswer = IAdapter(BASE_ADAPTER).getValueForDataFeed(dataFeedId);
-        uint256 atlasAnswer = getValueForDataFeed(dataFeedId);
-        if (atlasAnswer == 0) {
+        if (atlasLatestAnswer == 0) {
             return int256(baseAnswer);
         }
         (uint256 baseLatestTimestamp,) = IAdapter(BASE_ADAPTER).getTimestampsFromLatestUpdate();
-        (uint256 atlasLatestTimestamp,) = getTimestampsFromLatestUpdate();
 
         if (atlasLatestTimestamp > baseLatestTimestamp - BASE_FEED_DELAY) {
-            return int256(atlasAnswer);
+            return int256(atlasLatestAnswer);
         }
         return int256(baseAnswer);
     }
 
     function latestTimestamp() public view virtual returns (uint256) {
         (uint256 baseLatestTimestamp,) = IAdapter(BASE_ADAPTER).getTimestampsFromLatestUpdate();
-        (uint256 atlasLatestTimestamp,) = getTimestampsFromLatestUpdate();
-        uint256 atlasAnswer = getValueForDataFeed(getDataFeedId());
 
-        if (atlasAnswer == 0) {
+        if (atlasLatestAnswer == 0) {
             return baseLatestTimestamp;
         }
         if (atlasLatestTimestamp > baseLatestTimestamp - BASE_FEED_DELAY) {
