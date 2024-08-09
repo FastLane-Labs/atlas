@@ -12,11 +12,17 @@ contract RedstoneDAppControlTest is BaseTest {
     address baseFeedAddress = 0xbC5FBcf58CeAEa19D523aBc76515b9AEFb5cfd58;
     uint32 dataPointValue = 666999;
 
+    uint256 oracleOwnerPk;
+
     function setUp() public override {
         super.setUp();
-       
+
+        oracleOwnerPk = 0x98765;
+
         vm.startPrank(governanceEOA);
         dappControl = new RedstoneDAppControl(address(atlas));
+        vm.stopPrank();
+        vm.startPrank(vm.addr(oracleOwnerPk));
         wrapper = RedstoneAdapterAtlasWrapper(dappControl.createNewAtlasAdapter(baseFeedAddress));
         vm.stopPrank();
     }
@@ -53,11 +59,14 @@ contract RedstoneDAppControlTest is BaseTest {
     }
 
     function testAuthorizedUpdateDataFeedsValues() public {
-        vm.prank(governanceEOA);
+        vm.prank(vm.addr(oracleOwnerPk));
         wrapper.addAuthorisedSigner(governanceEOA);
         vm.stopPrank();
 
         bool success = updateDataFeedsValues(0x123123);
+        require(!success, "should fail because of unauthorized signer");
+
+        success = updateDataFeedsValues(oracleOwnerPk);
         require(!success, "should fail because of unauthorized signer");
 
         success = updateDataFeedsValues(governancePK);
@@ -110,7 +119,7 @@ contract RedstoneDAppControlTest is BaseTest {
         bytes memory call = abi.encodeCall(wrapper.updateDataFeedsValues, (timestamp));
         call = bytes.concat(call, payload);
 
-        vm.prank(vm.addr(governancePK));
+        vm.prank(vm.addr(pk));
         (bool success,) = address(wrapper).call(call);
 
         return success;
