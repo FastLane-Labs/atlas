@@ -10,6 +10,7 @@ import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.
 
 import { Sorter } from "src/contracts/helpers/Sorter.sol";
 import { Simulator } from "src/contracts/helpers/Simulator.sol";
+import { GovernanceBurner } from "src/contracts/helpers/GovernanceBurner.sol";
 
 import { Solver } from "src/contracts/solver/src/TestSolver.sol";
 
@@ -50,6 +51,7 @@ contract BaseTest is Test, TestConstants {
 
     Simulator public simulator;
     Sorter public sorter;
+    GovernanceBurner public govBurner;
 
     Solver public solverOne;
     Solver public solverTwo;
@@ -98,6 +100,7 @@ contract BaseTest is Test, TestConstants {
         atlasVerification = new AtlasVerification(address(atlas));
         simulator.setAtlas(address(atlas));
         sorter = new Sorter(address(atlas));
+        govBurner = new GovernanceBurner();
 
         vm.stopPrank();
         vm.startPrank(governanceEOA);

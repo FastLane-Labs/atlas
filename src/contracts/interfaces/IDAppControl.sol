@@ -39,4 +39,8 @@ interface IDAppControl {
     function verificationDelegated() external view returns (bool delegated);
 
     function CALL_CONFIG() external view returns (uint32);
+
+    function transferGovernance(address newGovernance) external;
+
+    function acceptGovernance() external;
 }
