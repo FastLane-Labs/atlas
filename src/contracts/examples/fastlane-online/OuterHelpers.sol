@@ -43,6 +43,12 @@ contract OuterHelpers is FastLaneOnlineInner {
     //              CONTROL-LOCAL FUNCTIONS                //
     //                 (not delegated)                     //
     /////////////////////////////////////////////////////////
+
+    function setWinningSolver(address winningSolver) external {
+        // TODO checks
+        _setWinningSolver(winningSolver);
+    }
+
     function getUserOperationAndHash(
         address swapper,
         SwapIntent calldata swapIntent,

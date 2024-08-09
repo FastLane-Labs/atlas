@@ -17,6 +17,7 @@ contract BaseStorage {
     uint256 internal constant _CONGESTION_RAKE = 33_000;
     uint256 internal constant _CONGESTION_BASE = 100_000;
     bytes32 private constant _USER_LOCK_SLOT = keccak256("FLO_USER_LOCK");
+    bytes32 private constant _WINNING_SOLVER_SLOT = keccak256("FLO_WINNING_SOLVER");
 
     uint256 public rake = 0;
 
@@ -80,6 +81,10 @@ contract BaseStorage {
 
     function _getUserLock() internal view returns (address) {
         return address(uint160(uint256(_tload(_USER_LOCK_SLOT))));
+    }
+
+    function _setWinningSolver(address winningSolverFrom) internal {
+        _tstore(_WINNING_SOLVER_SLOT, bytes32(uint256(uint160(winningSolverFrom))));
     }
 
     function _tstore(bytes32 slot, bytes32 value) internal {
