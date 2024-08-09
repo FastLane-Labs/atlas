@@ -84,6 +84,34 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
         }
     }
 
+    function requireMinIntervalBetweenUpdatesPassed() private view {
+        uint256 currentBlockTimestamp = getBlockTimestamp();
+        uint256 blockTimestampFromLatestUpdate = getBlockTimestampFromLatestUpdate();
+        uint256 minIntervalBetweenUpdates = getMinIntervalBetweenUpdates();
+        if (currentBlockTimestamp < blockTimestampFromLatestUpdate + minIntervalBetweenUpdates) {
+            revert MinIntervalBetweenUpdatesHasNotPassedYet(
+                currentBlockTimestamp,
+                blockTimestampFromLatestUpdate,
+                minIntervalBetweenUpdates
+            );
+        }
+    }
+
+    function updateDataFeedsValues(uint256 dataPackagesTimestamp) public virtual override {
+        if (authorisedSigners.length > 0) {
+            requireAuthorisedUpdater(msg.sender);
+        }
+        requireMinIntervalBetweenUpdatesPassed();
+        validateProposedDataPackagesTimestamp(dataPackagesTimestamp);
+        _saveTimestampsOfCurrentUpdate(dataPackagesTimestamp);
+
+        bytes32[] memory dataFeedsIdsArray = getDataFeedIds();
+
+        uint256[] memory oracleValues = getOracleNumericValuesFromTxMsg(dataFeedsIdsArray);
+
+        _validateAndUpdateDataFeedsValues(dataFeedsIdsArray, oracleValues);
+  }
+
     function latestAnswer() public view virtual override returns (int256) {
         bytes32 dataFeedId = getDataFeedId();
         uint256 baseAnswer = IAdapter(BASE_ADAPTER).getValueForDataFeed(dataFeedId);
