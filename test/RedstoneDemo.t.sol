@@ -15,8 +15,6 @@ contract RedstoneDAppControlTest is BaseTest {
     function setUp() public override {
         super.setUp();
        
-        console.log("base feed", baseFeedAddress);
-        console.log("base adapter", address(IFeed(baseFeedAddress).getPriceFeedAdapter()));
         vm.startPrank(governanceEOA);
         dappControl = new RedstoneDAppControl(address(atlas));
         wrapper = RedstoneAdapterAtlasWrapper(dappControl.createNewAtlasAdapter(baseFeedAddress));
@@ -27,7 +25,7 @@ contract RedstoneDAppControlTest is BaseTest {
         int256 baseAnswer = IFeed(baseFeedAddress).latestAnswer();
         console.log("base answer", uint256(baseAnswer));
 
-        testUpdateDataFeedsValues();
+        updateDataFeedsValues(0x123123);
 
         require(IFeed(baseFeedAddress).latestAnswer() == baseAnswer, "base feed answer should not change");
         int256 answer = wrapper.latestAnswer();
@@ -53,14 +51,26 @@ contract RedstoneDAppControlTest is BaseTest {
         console.log("dataTimestampWrapper", uint256(dataTimestampWrapper));
         console.log("blockTimestampWrapper", uint256(blockTimestampWrapper));
     }
+
+    function testAuthorizedUpdateDataFeedsValues() public {
+        vm.prank(governanceEOA);
+        wrapper.addAuthorisedSigner(governanceEOA);
+        vm.stopPrank();
+
+        bool success = updateDataFeedsValues(0x123123);
+        require(!success, "should fail because of unauthorized signer");
+
+        success = updateDataFeedsValues(governancePK);
+        require(success, "should succeed because of authorized signer");
+    }
    
-    function testUpdateDataFeedsValues() public {
+    function updateDataFeedsValues(uint256 pk) public returns (bool) {
         bytes32 dataFeed = IFeed(baseFeedAddress).getDataFeedId();
         uint48 timestamp = uint48(block.timestamp * 1000);
         uint32 valueSize = 4;
         uint24 dataPointsCount = 1;
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(governancePK, keccak256(abi.encodePacked(dataFeed, dataPointValue, timestamp, valueSize, dataPointsCount)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, keccak256(abi.encodePacked(dataFeed, dataPointValue, timestamp, valueSize, dataPointsCount)));
         bytes memory signature = abi.encodePacked(r, s, v);
 
         bytes memory payload = abi.encodePacked(
@@ -100,9 +110,9 @@ contract RedstoneDAppControlTest is BaseTest {
         bytes memory call = abi.encodeCall(wrapper.updateDataFeedsValues, (timestamp));
         call = bytes.concat(call, payload);
 
-        vm.prank(address(0x123));
+        vm.prank(vm.addr(governancePK));
         (bool success,) = address(wrapper).call(call);
 
-        require(success, "Payload attachment failed");
+        return success;
     }
 }
