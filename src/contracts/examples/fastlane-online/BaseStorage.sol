@@ -8,25 +8,6 @@ import { Reputation } from "src/contracts/examples/fastlane-online/FastLaneTypes
 contract BaseStorage {
     error FLOnline_NotUnlocked();
 
-    bytes32 private constant _USER_LOCK_SLOT = keccak256("FLO_USER_LOCK");
-
-    // TODO make mappings internal with external getters
-
-    //   SolverOpHash   SolverOperation
-    mapping(bytes32 => SolverOperation) public S_solverOpCache;
-
-    //      UserOpHash  SolverOpHash[]
-    mapping(bytes32 => bytes32[]) public S_solverOpHashes;
-
-    //      SolverOpHash  BidValue
-    mapping(bytes32 => uint256) public S_congestionBuyIn;
-
-    //      UserOpHash  TotalBidValue
-    mapping(bytes32 => uint256) public S_aggCongestionBuyIn;
-
-    //     SolverFrom  Reputation
-    mapping(address => Reputation) public S_solverReputations;
-
     // OK hear me out
     // 1. We have to rake some of the congestion buyins to maintain incentive compatibility (a low rep solver smurfing
     // as a user to collect
@@ -35,8 +16,48 @@ contract BaseStorage {
     // we're practically saints.
     uint256 internal constant _CONGESTION_RAKE = 33_000;
     uint256 internal constant _CONGESTION_BASE = 100_000;
+    bytes32 private constant _USER_LOCK_SLOT = keccak256("FLO_USER_LOCK");
 
     uint256 public rake = 0;
+
+    //   SolverOpHash   SolverOperation
+    mapping(bytes32 => SolverOperation) internal S_solverOpCache;
+
+    //      UserOpHash  SolverOpHash[]
+    mapping(bytes32 => bytes32[]) internal S_solverOpHashes;
+
+    //      SolverOpHash  BidValue
+    mapping(bytes32 => uint256) internal S_congestionBuyIn;
+
+    //      UserOpHash  TotalBidValue
+    mapping(bytes32 => uint256) internal S_aggCongestionBuyIn;
+
+    //     SolverFrom  Reputation
+    mapping(address => Reputation) internal S_solverReputations;
+
+    //////////////////////////////////////////////
+    /////          VIEW FUNCTIONS           //////
+    //////////////////////////////////////////////
+
+    function solverOpCache(bytes32 solverOpHash) external view returns (SolverOperation memory) {
+        return S_solverOpCache[solverOpHash];
+    }
+
+    function solverOpHashes(bytes32 userOpHash) external view returns (bytes32[] memory) {
+        return S_solverOpHashes[userOpHash];
+    }
+
+    function congestionBuyIn(bytes32 solverOpHash) external view returns (uint256) {
+        return S_congestionBuyIn[solverOpHash];
+    }
+
+    function aggCongestionBuyIn(bytes32 userOpHash) external view returns (uint256) {
+        return S_aggCongestionBuyIn[userOpHash];
+    }
+
+    function solverReputation(address solver) external view returns (Reputation memory) {
+        return S_solverReputations[solver];
+    }
 
     //////////////////////////////////////////////
     /////            MODIFIERS              //////
