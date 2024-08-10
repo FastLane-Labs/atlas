@@ -53,7 +53,9 @@ contract ChainlinkDAppControl is DAppControl {
     event SignerRemovedForBaseFeed(address indexed baseFeed, address indexed signer);
     event ObservationsQuorumSet(uint256 oldQuorum, uint256 newQuorum);
 
-    constructor(address _atlas)
+    constructor(
+        address _atlas
+    )
         DAppControl(
             _atlas,
             msg.sender,

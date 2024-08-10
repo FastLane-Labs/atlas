@@ -62,7 +62,9 @@ abstract contract Factory {
     /// @param userOp The user operation containing details about the user and the DAppControl contract.
     /// @return executionEnvironment The address of the execution environment that was found or created.
     /// @return dConfig The DAppConfig for the execution environment, specifying how operations should be handled.
-    function _getOrCreateExecutionEnvironment(UserOperation calldata userOp)
+    function _getOrCreateExecutionEnvironment(
+        UserOperation calldata userOp
+    )
         internal
         returns (address executionEnvironment, DAppConfig memory dConfig)
     {

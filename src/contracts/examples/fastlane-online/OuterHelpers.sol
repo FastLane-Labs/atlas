@@ -214,7 +214,9 @@ contract OuterHelpers is FastLaneOnlineInner {
         netGasRefund = _grossGasRefund - _netRake;
     }
 
-    function _sortSolverOps(SolverOperation[] memory unsortedSolverOps)
+    function _sortSolverOps(
+        SolverOperation[] memory unsortedSolverOps
+    )
         internal
         pure
         returns (SolverOperation[] memory sortedSolverOps)

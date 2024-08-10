@@ -22,7 +22,9 @@ interface ISolverGateway {
 }
 
 contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
-    constructor(address _atlas)
+    constructor(
+        address _atlas
+    )
         DAppControl(
             _atlas,
             msg.sender,
