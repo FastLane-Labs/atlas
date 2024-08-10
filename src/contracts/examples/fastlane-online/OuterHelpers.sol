@@ -278,13 +278,14 @@ contract OuterHelpers is FastLaneOnlineInner {
 
     function _updateSolverReputation(SolverOperation[] memory solverOps, uint128 magnitude) internal {
         uint256 _length = solverOps.length;
+        address _winningSolver = _getWinningSolver();
         address _solverFrom;
 
         for (uint256 i; i < _length; i++) {
             _solverFrom = solverOps[i].from;
 
             // winningSolver will be address(0) unless a winning solver fulfilled the swap intent.
-            if (_solverFrom == _getWinningSolver()) {
+            if (_solverFrom == _winningSolver) {
                 S_solverReputations[_solverFrom].successCost += magnitude;
                 // break out of loop to avoid incrementing failureCost for solvers that did not execute due to being
                 // after the winning solver in the sorted array.
