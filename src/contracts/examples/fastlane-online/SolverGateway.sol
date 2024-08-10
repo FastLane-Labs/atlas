@@ -84,7 +84,9 @@ contract SolverGateway is OuterHelpers {
         S_solverOpCache[_solverOpHash] = solverOp;
     }
 
-    function refundCongestionBuyIns(SolverOperation calldata solverOp)
+    function refundCongestionBuyIns(
+        SolverOperation calldata solverOp
+    )
         external
         withUserLock(solverOp.from)
         onlyAsControl
@@ -165,7 +167,9 @@ contract SolverGateway is OuterHelpers {
         S_solverOpHashes[userOpHash][replacedIndex] = solverOpHash;
     }
 
-    function _getSolverOps(bytes32 userOpHash)
+    function _getSolverOps(
+        bytes32 userOpHash
+    )
         internal
         view
         returns (SolverOperation[] memory solverOps, uint256 cumulativeGasReserved)
