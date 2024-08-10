@@ -286,6 +286,9 @@ contract OuterHelpers is FastLaneOnlineInner {
             // winningSolver will be address(0) unless a winning solver fulfilled the swap intent.
             if (_solverFrom == _getWinningSolver()) {
                 S_solverReputations[_solverFrom].successCost += magnitude;
+                // break out of loop to avoid incrementing failureCost for solvers that did not execute due to being
+                // after the winning solver in the sorted array.
+                break;
             } else {
                 S_solverReputations[_solverFrom].failureCost += magnitude;
             }

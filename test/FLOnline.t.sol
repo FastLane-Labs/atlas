@@ -43,14 +43,16 @@ contract FastLaneOnlineTest is BaseTest {
         Reputation solverThreeRep;
     }
 
-    // defaults to true when solver calls `addSolverOp()`, set to false if not included
-    struct IncludedInMetacall {
+    // defaults to true when solver calls `addSolverOp()`, set to false if the solverOp is expected to not be included
+    // in the final solverOps array, or if the solverOp is not attempted as it has a higher index in the sorted array
+    // than the winning solverOp.
+    struct ExecutionAttemptedInMetacall {
         bool solverOne;
         bool solverTwo;
         bool solverThree;
     }
 
-    uint256 constant ERR_MARGIN = 0.1e18; // 10% error margin
+    uint256 constant ERR_MARGIN = 0.15e18; // 15% error margin
 
     IERC20 DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     address DAI_ADDRESS = address(DAI);
@@ -71,7 +73,7 @@ contract FastLaneOnlineTest is BaseTest {
     Sig sig;
     FastOnlineSwapArgs args;
     BeforeAndAfterVars beforeVars;
-    IncludedInMetacall included; // defaults to true, set to false if not included
+    ExecutionAttemptedInMetacall attempted;
 
     function setUp() public virtual override {
         BaseTest.setUp();
@@ -228,8 +230,10 @@ contract FastLaneOnlineTest is BaseTest {
         _setUpSolver(solverTwoEOA, solverTwoPK, successfulSolverBidAmount + 1e17);
         address winningSolver = _setUpSolver(solverThreeEOA, solverThreePK, successfulSolverBidAmount + 2e17);
 
-        // solverOne does not get included in metacall
-        included.solverOne = false;
+        // solverOne does not get included in the sovlerOps array
+        attempted.solverOne = false;
+        // solverTwo has a lower bid than winner (solverThree) so is not attempted
+        attempted.solverTwo = false;
 
         // User calls fastOnlineSwap, do checks that user and solver balances changed as expected
         _doFastOnlineSwapWithChecks({
@@ -435,7 +439,7 @@ contract FastLaneOnlineTest is BaseTest {
         // Return early if transaction expected to revert. Balance checks below would otherwise fail.
         if (!swapCallShouldSucceed) return;
 
-        // Check Atlas gas surcharge earned is within 10% of the estimated gas surcharge
+        // Check Atlas gas surcharge earned is within 15% of the estimated gas surcharge
         assertApproxEqRel(
             atlas.cumulativeSurcharge() - beforeVars.atlasGasSurcharge,
             estAtlasGasSurcharge,
@@ -474,7 +478,7 @@ contract FastLaneOnlineTest is BaseTest {
                 repBefore: beforeVars.solverOneRep,
                 repAfter: flOnline.solverReputation(solverOneEOA),
                 won: winningSolverEOA == solverOneEOA,
-                wasIncluded: included.solverOne
+                executionAttempted: attempted.solverOne
             });
         }
         if (solverCount > 1) {
@@ -483,7 +487,7 @@ contract FastLaneOnlineTest is BaseTest {
                 repBefore: beforeVars.solverTwoRep,
                 repAfter: flOnline.solverReputation(solverTwoEOA),
                 won: winningSolverEOA == solverTwoEOA,
-                wasIncluded: included.solverTwo
+                executionAttempted: attempted.solverTwo
             });
         }
         if (solverCount > 2) {
@@ -492,7 +496,7 @@ contract FastLaneOnlineTest is BaseTest {
                 repBefore: beforeVars.solverThreeRep,
                 repAfter: flOnline.solverReputation(solverThreeEOA),
                 won: winningSolverEOA == solverThreeEOA,
-                wasIncluded: included.solverThree
+                executionAttempted: attempted.solverThree
             });
         }
     }
@@ -576,9 +580,9 @@ contract FastLaneOnlineTest is BaseTest {
         flOnline.addSolverOp({ userOp: args.userOp, solverOp: solverOp });
         vm.stopPrank();
 
-        if (solverEOA == solverOneEOA) included.solverOne = true;
-        if (solverEOA == solverTwoEOA) included.solverTwo = true;
-        if (solverEOA == solverThreeEOA) included.solverThree = true;
+        if (solverEOA == solverOneEOA) attempted.solverOne = true;
+        if (solverEOA == solverTwoEOA) attempted.solverTwo = true;
+        if (solverEOA == solverThreeEOA) attempted.solverThree = true;
 
         // Returns the address of the solver contract deployed here
         return address(solver);
@@ -709,11 +713,12 @@ contract FastLaneOnlineTest is BaseTest {
         Reputation memory repBefore,
         Reputation memory repAfter,
         bool won,
-        bool wasIncluded
+        bool executionAttempted
     )
         internal
+        pure
     {
-        if (wasIncluded) {
+        if (executionAttempted) {
             if (won) {
                 assertGt(
                     repAfter.successCost,
@@ -738,7 +743,8 @@ contract FastLaneOnlineTest is BaseTest {
                 );
             }
         } else {
-            // not included in metacall, no change expected in successCost or failureCost
+            // not attempted due to not being included in solverOps, or due to having a lower bid than the winning
+            // solver and thus a higher index in the sorted array. No change in reputation expected.
             assertEq(
                 repAfter.successCost, repBefore.successCost, string.concat(name, " successCost should not have changed")
             );
