@@ -51,7 +51,7 @@ contract OuterHelpers is FastLaneOnlineInner {
         // user and the FLOnline DAppControl.
 
         (address expectedCaller,,) = IAtlas(ATLAS).getExecutionEnvironment(_getUserLock(), CONTROL);
-        if (msg.sender == expectedCaller) {
+        if (msg.sender == expectedCaller && _getWinningSolver() == address(0)) {
             // Set winning solver in transient storage, to be used in `_updateSolverReputation()`
             _setWinningSolver(winningSolver);
         }

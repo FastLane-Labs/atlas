@@ -396,6 +396,21 @@ contract FastLaneOnlineTest is BaseTest {
         assertEq(flOnlineMock.getWinningSolver(), solverOneEOA, "winningSolver should be solverOneEOA");
     }
 
+    function testFLOnline_SetWinningSolver_DoesNotUpdateIfAlreadySet() public {
+        (address userEE,,) = atlas.getExecutionEnvironment(userEOA, address(flOnlineMock));
+        assertEq(flOnlineMock.getWinningSolver(), address(0), "winningSolver should start empty");
+
+        flOnlineMock.setUserLock(userEOA);
+        vm.prank(userEE);
+        flOnlineMock.setWinningSolver(solverOneEOA);
+        assertEq(flOnlineMock.getWinningSolver(), solverOneEOA, "winningSolver should be solverOneEOA");
+
+        // winningSolver already set, should not update
+        vm.prank(userEE);
+        flOnlineMock.setWinningSolver(address(1));
+        assertEq(flOnlineMock.getWinningSolver(), solverOneEOA, "winningSolver should still be solverOneEOA");
+    }
+
     // TODO add tests when solverOp is valid, but does not outperform baseline call, baseline call used instead
 
     // ---------------------------------------------------- //
