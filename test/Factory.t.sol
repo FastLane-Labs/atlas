@@ -104,7 +104,7 @@ contract FactoryTest is Test {
         vm.startPrank(user);
         vm.expectEmit(true, true, true, true);
         emit AtlasEvents.ExecutionEnvironmentCreated(user, expectedExecutionEnvironment);
-        address actualExecutionEnvironment = mockFactory.createExecutionEnvironment(address(dAppControl), user);
+        address actualExecutionEnvironment = mockFactory.createExecutionEnvironment(user, address(dAppControl));
         vm.stopPrank();
 
         assertFalse(actualExecutionEnvironment.code.length == 0, "Execution environment should exist");
@@ -122,7 +122,7 @@ contract FactoryTest is Test {
         assertTrue(executionEnvironment.codehash == bytes32(0), "Execution environment should not exist");
 
         vm.prank(user);
-        mockFactory.createExecutionEnvironment(address(dAppControl), user);
+        mockFactory.createExecutionEnvironment(user, address(dAppControl));
 
         (executionEnvironment,, exists) = mockFactory.getExecutionEnvironment(user, address(dAppControl));
         assertTrue(exists, "Execution environment should exist");

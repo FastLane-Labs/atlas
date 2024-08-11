@@ -45,6 +45,7 @@ Coming soon...
 
 ## Latest Deployments
 
+
 ### Polygon Amoy Testnet
 
 Commit hash of deployment: [dca0b99](https://github.com/FastLane-Labs/atlas/commit/dca0b9946e8f59347610cd24a0bca5e84ddea00e)
@@ -60,6 +61,7 @@ Commit hash of deployment: [dca0b99](https://github.com/FastLane-Labs/atlas/comm
 |--------------------|-------------------------------------------------------------------------------------------------------------------------------|
 | FastLane Online    | [0xf0E388C7DFfE14a61280a4E5b84d77be3d2875e3](https://amoy.polygonscan.com/address/0xf0E388C7DFfE14a61280a4E5b84d77be3d2875e3) |
 
+
 ### Polygon Mainnet
 
 Commit hash of deployment: [7b8530f](https://github.com/FastLane-Labs/atlas/pull/398/commits/7b8530f55b1719cf51a582ba04fea39085a4c20c)
@@ -74,3 +76,15 @@ Commit hash of deployment: [7b8530f](https://github.com/FastLane-Labs/atlas/pull
 | DAppControl        | Address                                                                                                                       |
 |--------------------|-------------------------------------------------------------------------------------------------------------------------------|
 | FastLane Online    | [0x3BF81d7D921E7a6A1999ce3dfa3B348c50fE8DFd](https://amoy.polygonscan.com/address/0x3BF81d7D921E7a6A1999ce3dfa3B348c50fE8DFd) |
+
+
+### Binance Smart Chain Mainnet
+
+Commit hash of deployment: [3416300](https://github.com/FastLane-Labs/atlas/commit/3416300be0576f558b5f06c4aad095b9e76d1f3d)
+
+| Contract           | Address                                                                                                                       |
+|--------------------|-------------------------------------------------------------------------------------------------------------------------------|
+| Atlas              | [0xD72D821dA82964c0546a5501347a3959808E072f](https://bscscan.com/address/0xD72D821dA82964c0546a5501347a3959808E072f)          |
+| AtlasVerification  | [0xae631aCDC436b9Dfd75C5629F825330d91459445](https://bscscan.com/address/0xae631aCDC436b9Dfd75C5629F825330d91459445)          |
+| Simulator          | [0xAb665f032e6A20Ef7D43FfD4E92a2f4fd6d5771e](https://bscscan.com/address/0xAb665f032e6A20Ef7D43FfD4E92a2f4fd6d5771e)          |
+| Sorter             | [0xb47387995e866908B25b49e8BaC7e499170461A6](https://bscscan.com/address/0xb47387995e866908B25b49e8BaC7e499170461A6)          |

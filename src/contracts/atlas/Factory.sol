@@ -28,11 +28,12 @@ abstract contract Factory {
     }
 
     /// @notice Creates a new Execution Environment for the caller, given a DAppControl contract address.
+    /// @param user The address of the user for whom the execution environment is being created.
     /// @param control The address of the DAppControl contract for which the execution environment is being created.
     /// @return executionEnvironment The address of the newly created Execution Environment instance.
     function createExecutionEnvironment(
-        address control,
-        address user
+        address user,
+        address control
     )
         external
         returns (address executionEnvironment)

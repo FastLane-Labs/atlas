@@ -19,8 +19,8 @@ interface IAtlas {
 
     // Factory.sol
     function createExecutionEnvironment(
-        address control,
-        address user
+        address user,
+        address control
     )
         external
         returns (address executionEnvironment);

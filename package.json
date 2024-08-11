@@ -20,6 +20,7 @@
 
       "deploy-fl-online-amoy": "source .env && forge script script/deploy-fl-online-control.s.sol:DeployFLOnlineControlScript --rpc-url ${AMOY_RPC_URL} --broadcast --etherscan-api-key ${POLYGONSCAN_API_KEY} --verify",
       "deploy-fl-online-polygon": "source .env && forge script script/deploy-fl-online-control.s.sol:DeployFLOnlineControlScript --rpc-url ${POLYGON_RPC_URL} --broadcast --etherscan-api-key ${POLYGONSCAN_API_KEY} --verify",
+      "deploy-atlas-bsc": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --rpc-url ${BSC_RPC_URL} --legacy --broadcast --etherscan-api-key ${BSCSCAN_API_KEY} --verify --delay 30",
       
       "deploy-atlas-sepolia": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --rpc-url ${SEPOLIA_RPC_URL} --legacy --gas-estimate-multiplier 150 --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify --delay 30",
       "deploy-atlas-local": "source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --fork-url http://localhost:8545 --broadcast",
