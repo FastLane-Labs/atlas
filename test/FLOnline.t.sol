@@ -99,7 +99,7 @@ contract FastLaneOnlineTest is BaseTest {
 
         // User deploys their FLOnline Execution Environment
         vm.prank(userEOA);
-        executionEnvironment = atlas.createExecutionEnvironment(address(flOnline));
+        executionEnvironment = atlas.createExecutionEnvironment(userEOA, address(flOnline));
 
         // Set fastOnlineSwap args to default values
         args = _buildDefaultFastOnlineSwapArgs();
