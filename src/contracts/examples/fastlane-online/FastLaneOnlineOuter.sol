@@ -18,25 +18,11 @@ import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.
 import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
-import { BaselineSwapper } from "src/contracts/examples/fastlane-online/BaselineSwapper.sol";
 import { FastLaneOnlineControl } from "src/contracts/examples/fastlane-online/FastLaneControl.sol";
 import { FastLaneOnlineInner } from "src/contracts/examples/fastlane-online/FastLaneOnlineInner.sol";
 import { SolverGateway } from "src/contracts/examples/fastlane-online/SolverGateway.sol";
 
 import { SwapIntent, BaselineCall } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
-
-interface IGeneralizedBackrunProxy {
-    function getUser() external view returns (address);
-}
-
-interface IBaselineSwapper {
-    function baselineSwap(
-        SwapIntent calldata swapIntent,
-        BaselineCall calldata baselineCall,
-        address swapper
-    )
-        external;
-}
 
 contract FastLaneOnlineOuter is SolverGateway {
     constructor(address _atlas) SolverGateway(_atlas) { }
@@ -44,113 +30,49 @@ contract FastLaneOnlineOuter is SolverGateway {
     //////////////////////////////////////////////
     // THIS IS WHAT THE USER INTERACTS THROUGH.
     //////////////////////////////////////////////
-    function fastOnlineSwap(
-        SwapIntent calldata swapIntent,
-        BaselineCall calldata baselineCall,
-        uint256 deadline,
-        uint256 gas,
-        uint256 maxFeePerGas,
-        bytes32 userOpHash
-    )
-        external
-        payable
-        withUserLock
-        onlyAsControl
-    {
-        // Get the UserOperation
-        UserOperation memory _userOp =
-            _getUserOperation(msg.sender, swapIntent, baselineCall, deadline, gas, maxFeePerGas);
-
-        // Validate the parameters
-        if (userOpHash != IAtlasVerification(ATLAS_VERIFICATION).getUserOperationHash(_userOp)) {
-            revert FLOnlineOuter_FastOnlineSwap_UserOpHashMismatch();
-        }
-        _validateSwap(swapIntent, deadline, gas, maxFeePerGas);
+    function fastOnlineSwap(UserOperation calldata userOp) external payable withUserLock(msg.sender) onlyAsControl {
+        // Calculate the magnitude of the impact of this tx on reputation
+        uint256 _repMagnitude = gasleft() * tx.gasprice;
 
         // Track the gas token balance to repay the swapper with
         uint256 _gasRefundTracker = address(this).balance - msg.value;
 
-        // Get any SolverOperations
-        (SolverOperation[] memory _solverOps, uint256 _cumulativeGasReserved) = _getSolverOps(userOpHash);
+        // Get the userOpHash
+        bytes32 _userOpHash = IAtlasVerification(ATLAS_VERIFICATION).getUserOperationHash(userOp);
 
-        // Execute if we have price improvement potential from Solvers.
-        bool _success = _solverOps.length > 0;
-        if (_success) {
-            // Transfer the user's sell tokens to here for Atlas to use
-            SafeTransferLib.safeTransferFrom(
-                swapIntent.tokenUserSells, msg.sender, address(this), swapIntent.amountUserSells
-            );
+        // Run gas limit checks on the userOp
+        _validateSwap(userOp);
 
-            // Approve Atlas for that amount (Permit69)
-            SafeTransferLib.safeApprove(swapIntent.tokenUserSells, ATLAS, swapIntent.amountUserSells);
+        // Get and sortSolverOperations
+        (SolverOperation[] memory _solverOps, uint256 _gasReserved) = _getSolverOps(_userOpHash);
+        _solverOps = _sortSolverOps(_solverOps);
 
-            // Build DAppOp
-            DAppOperation memory _dAppOp = _getDAppOp(userOpHash, deadline);
+        // Build dApp operation
+        DAppOperation memory _dAppOp = _getDAppOp(_userOpHash, userOp.deadline);
 
-            // Encode and Metacall
-            // NOTE: Do not revert if the Atlas call failed.
-            (_success,) = ATLAS.call{ gas: _metacallGasLimit(_cumulativeGasReserved, gas, gasleft()) }(
-                abi.encodeCall(IAtlas.metacall, (_userOp, _solverOps, _dAppOp))
-            );
+        // Atlas call
+        (bool _success,) = ATLAS.call{ value: msg.value, gas: _metacallGasLimit(_gasReserved, userOp.gas, gasleft()) }(
+            abi.encodeCall(IAtlas.metacall, (userOp, _solverOps, _dAppOp))
+        );
 
-            // Undo the token approval
-            SafeTransferLib.safeApprove(swapIntent.tokenUserSells, ATLAS, 0);
+        // Revert if the metacall failed - neither solvers nor baseline call fulfilled swap intent
+        if (!_success) revert FLOnlineOuter_FastOnlineSwap_NoFulfillment();
 
-            // If metacall was successful, transfer any leftover sell tokens to the User.
-            // NOTE: The transfer of the bought token is already handled inside either the Atlas call or the baseline
-            // call
-            uint256 _sellTokenBalance = _getERC20Balance(swapIntent.tokenUserSells);
-            if (_success) {
-                if (_sellTokenBalance > 0) {
-                    SafeTransferLib.safeTransfer(swapIntent.tokenUserSells, msg.sender, _sellTokenBalance);
-                }
-            } else {
-                // If metacall wasn't successful, transfer the sell tokens to the BaselineSwapper
-                SafeTransferLib.safeTransfer(swapIntent.tokenUserSells, BASELINE_SWAPPER, _sellTokenBalance);
-            }
-        } else {
-            // If there were no solvers, bypass the metacall
-            // Transfer tokens straight from the swapper to the BaselineSwapper contract
-            SafeTransferLib.safeTransferFrom(
-                swapIntent.tokenUserSells, msg.sender, BASELINE_SWAPPER, swapIntent.amountUserSells
-            );
-        }
+        // Find out if any of the solvers were successful
+        _success = _getWinningSolver() != address(0);
 
-        // If metacall failed or if it was never executed, do the baseline call from the Baseline contract
-        if (!_success) {
-            bytes memory _data = abi.encodeCall(IBaselineSwapper.baselineSwap, (swapIntent, baselineCall, msg.sender));
-            (_success, _data) = BASELINE_SWAPPER.call(_data);
-            // If the baseline call fails, revert with bubbled up error. This reverts the token transfers done above
-            if (!_success) {
-                assembly {
-                    revert(add(_data, 32), mload(_data))
-                }
-            }
-        }
+        // Update Reputation
+        _updateSolverReputation(_solverOps, uint128(_repMagnitude));
 
         // Handle gas token balance reimbursement (reimbursement from Atlas and the congestion buy ins)
-        // NOTE: We do not pay the congestion fees to the user
-        _gasRefundTracker = _processCongestionRake(address(this).balance - _gasRefundTracker, userOpHash);
+        _gasRefundTracker = _processCongestionRake(_gasRefundTracker, _userOpHash, _success);
 
         // Transfer the appropriate gas tokens
-        SafeTransferLib.safeTransferETH(msg.sender, _gasRefundTracker);
+        if (_gasRefundTracker > 0) SafeTransferLib.safeTransferETH(msg.sender, _gasRefundTracker);
     }
 
-    function _validateSwap(
-        SwapIntent calldata swapIntent,
-        uint256 deadline,
-        uint256 gas,
-        uint256 maxFeePerGas
-    )
-        internal
-    {
-        if (deadline < block.number) {
-            revert FLOnlineOuter_ValidateSwap_DeadlinePassed();
-        }
-        if (maxFeePerGas < tx.gasprice) {
-            revert FLOnlineOuter_ValidateSwap_InvalidGasPrice();
-        }
-
+    function _validateSwap(UserOperation calldata userOp) internal {
+        if (msg.sender != userOp.from) revert FLOnlineOuter_ValidateSwap_InvalidSender();
         // TODO: Add back gas checks when we have more clarity
         // if (gas > gasleft()) {
         //     revert FLOnlineOuter_ValidateSwap_TxGasTooHigh();
@@ -158,35 +80,22 @@ contract FastLaneOnlineOuter is SolverGateway {
         // if (gas < gasleft() - 30_000) {
         //     revert FLOnlineOuter_ValidateSwap_TxGasTooLow();
         // }
-
-        if (gas <= MAX_SOLVER_GAS * 2) {
+        if (userOp.gas <= MAX_SOLVER_GAS * 2) {
             revert FLOnlineOuter_ValidateSwap_GasLimitTooLow();
         }
-        if (swapIntent.tokenUserSells == address(0)) {
-            revert FLOnlineOuter_ValidateSwap_SellTokenZeroAddress();
-        }
-        if (swapIntent.tokenUserBuys == address(0)) {
-            revert FLOnlineOuter_ValidateSwap_BuyTokenZeroAddress();
-        }
 
-        // Increment the user's local nonce
-        unchecked {
-            ++S_userNonces[msg.sender];
+        (SwapIntent memory _swapIntent, BaselineCall memory _baselineCall) =
+            abi.decode(userOp.data[4:], (SwapIntent, BaselineCall));
+
+        // Verify that if we're dealing with the native gas token that the balances add up
+        if (_swapIntent.tokenUserSells == address(0)) {
+            if (msg.value < userOp.value) revert FLOnlineOuter_ValidateSwap_MsgValueTooLow();
+            if (userOp.value < _swapIntent.amountUserSells) revert FLOnlineOuter_ValidateSwap_UserOpValueTooLow();
+            if (userOp.value != _baselineCall.value) revert FLOnlineOuter_ValidateSwap_UserOpBaselineValueMismatch();
         }
     }
 
-    function _baselineSwap(SwapIntent calldata swapIntent, BaselineCall calldata baselineCall) internal {
-        (bool _success, bytes memory _data) =
-            BASELINE_SWAPPER.call(abi.encodeCall(IBaselineSwapper.baselineSwap, (swapIntent, baselineCall, msg.sender)));
-        // Bubble up error on fail
-        if (!_success) {
-            assembly {
-                revert(add(_data, 32), mload(_data))
-            }
-        }
-    }
-
-    // TODO FIX THIS
+    // TODO Fix when basic swap scenarios are passing
     function _metacallGasLimit(
         uint256 cumulativeGasReserved,
         uint256 totalGas,

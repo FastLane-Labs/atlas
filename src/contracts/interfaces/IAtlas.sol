@@ -77,10 +77,16 @@ interface IAtlas {
 
     // Storage.sol
     function VERIFICATION() external view returns (address);
+    function SIMULATOR() external view returns (address);
+    function L2_GAS_CALCULATOR() external view returns (address);
+    function ESCROW_DURATION() external view returns (uint256);
+
     function solverLockData() external view returns (address currentSolver, bool calledBack, bool fulfilled);
     function totalSupply() external view returns (uint256);
     function bondedTotalSupply() external view returns (uint256);
-    function accessData(address account)
+    function accessData(
+        address account
+    )
         external
         view
         returns (
