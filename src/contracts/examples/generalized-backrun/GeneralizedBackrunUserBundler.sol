@@ -48,7 +48,9 @@ contract GeneralizedBackrunUserBundler is DAppControl {
     //      UserOpHash  SolverOpHash[]
     mapping(bytes32 => bytes32[]) public S_solverOpHashes;
 
-    constructor(address _atlas)
+    constructor(
+        address _atlas
+    )
         DAppControl(
             _atlas,
             msg.sender,
@@ -196,7 +198,9 @@ contract GeneralizedBackrunUserBundler is DAppControl {
         // TODO: add bundler subsidy capabilities for apps.
     }
 
-    function _getSolverOps(bytes32[] calldata solverOpHashes)
+    function _getSolverOps(
+        bytes32[] calldata solverOpHashes
+    )
         internal
         view
         returns (SolverOperation[] memory solverOps)

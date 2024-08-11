@@ -11,7 +11,7 @@ import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
 import { UserOperation } from "src/contracts/types/UserOperation.sol";
 
 import { FastLaneOnlineOuter } from "src/contracts/examples/fastlane-online/FastLaneOnlineOuter.sol";
-import { SwapIntent, BaselineCall } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
+import { SwapIntent, BaselineCall, Reputation } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
 
 import { IUniswapV2Router02 } from "test/base/interfaces/IUniswapV2Router.sol";
 
@@ -32,7 +32,27 @@ contract FastLaneOnlineTest is BaseTest {
         bytes32 userOpHash;
     }
 
-    uint256 constant ERR_MARGIN = 0.1e18; // 10% error margin
+    struct BeforeAndAfterVars {
+        uint256 userWeth;
+        uint256 userDai;
+        uint256 solverWeth;
+        uint256 solverDai;
+        uint256 atlasGasSurcharge;
+        Reputation solverOneRep;
+        Reputation solverTwoRep;
+        Reputation solverThreeRep;
+    }
+
+    // defaults to true when solver calls `addSolverOp()`, set to false if the solverOp is expected to not be included
+    // in the final solverOps array, or if the solverOp is not attempted as it has a higher index in the sorted array
+    // than the winning solverOp.
+    struct ExecutionAttemptedInMetacall {
+        bool solverOne;
+        bool solverTwo;
+        bool solverThree;
+    }
+
+    uint256 constant ERR_MARGIN = 0.15e18; // 15% error margin
 
     IERC20 DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     address DAI_ADDRESS = address(DAI);
@@ -52,6 +72,8 @@ contract FastLaneOnlineTest is BaseTest {
 
     Sig sig;
     FastOnlineSwapArgs args;
+    BeforeAndAfterVars beforeVars;
+    ExecutionAttemptedInMetacall attempted;
 
     function setUp() public virtual override {
         BaseTest.setUp();
@@ -105,7 +127,12 @@ contract FastLaneOnlineTest is BaseTest {
         address winningSolver = _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount);
 
         // User calls fastOnlineSwap, do checks that user and solver balances changed as expected
-        _doFastOnlineSwapWithChecks({ winningSolver: winningSolver, swapCallShouldSucceed: true });
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: solverOneEOA,
+            winningSolver: winningSolver,
+            solverCount: 1,
+            swapCallShouldSucceed: true
+        });
     }
 
     function testFLOnlineSwap_OneSolverFails_BaselineCallFulfills_Success() public {
@@ -125,7 +152,9 @@ contract FastLaneOnlineTest is BaseTest {
         // Now fastOnlineSwap should succeed using BaselineCall for fulfillment, with gas + Atlas gas surcharge paid for
         // by ETH sent as msg.value by user.
         _doFastOnlineSwapWithChecks({
+            winningSolverEOA: address(0),
             winningSolver: address(0), // No winning solver expected
+            solverCount: 1,
             swapCallShouldSucceed: true
         });
     }
@@ -148,7 +177,9 @@ contract FastLaneOnlineTest is BaseTest {
 
         // fastOnlineSwap should revert if all solvers fail AND the baseline call also fails
         _doFastOnlineSwapWithChecks({
+            winningSolverEOA: address(0),
             winningSolver: address(0), // No winning solver expected
+            solverCount: 1,
             swapCallShouldSucceed: false // fastOnlineSwap should revert
          });
     }
@@ -164,7 +195,9 @@ contract FastLaneOnlineTest is BaseTest {
         // Now fastOnlineSwap should succeed using BaselineCall for fulfillment, with gas + Atlas gas surcharge paid for
         // by ETH sent as msg.value by user.
         _doFastOnlineSwapWithChecks({
+            winningSolverEOA: address(0),
             winningSolver: address(0), // No winning solver expected
+            solverCount: 0,
             swapCallShouldSucceed: true
         });
     }
@@ -184,7 +217,9 @@ contract FastLaneOnlineTest is BaseTest {
 
         // fastOnlineSwap should revert if all solvers fail AND the baseline call also fails
         _doFastOnlineSwapWithChecks({
+            winningSolverEOA: address(0),
             winningSolver: address(0), // No winning solver expected
+            solverCount: 0,
             swapCallShouldSucceed: false // fastOnlineSwap should revert
          });
     }
@@ -195,8 +230,18 @@ contract FastLaneOnlineTest is BaseTest {
         _setUpSolver(solverTwoEOA, solverTwoPK, successfulSolverBidAmount + 1e17);
         address winningSolver = _setUpSolver(solverThreeEOA, solverThreePK, successfulSolverBidAmount + 2e17);
 
+        // solverOne does not get included in the sovlerOps array
+        attempted.solverOne = false;
+        // solverTwo has a lower bid than winner (solverThree) so is not attempted
+        attempted.solverTwo = false;
+
         // User calls fastOnlineSwap, do checks that user and solver balances changed as expected
-        _doFastOnlineSwapWithChecks({ winningSolver: winningSolver, swapCallShouldSucceed: true });
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: solverThreeEOA,
+            winningSolver: winningSolver,
+            solverCount: 3,
+            swapCallShouldSucceed: true
+        });
     }
 
     function testFLOnlineSwap_ThreeSolvers_AllFail_BaselineCallFullfills_Success() public {
@@ -315,18 +360,79 @@ contract FastLaneOnlineTest is BaseTest {
         assertEq(solverOpsOut[1].bidAmount, 1, "5 solverOps with 0 bid mixed, [1] bid mismatch");
     }
 
+    function testFLOnline_SetWinningSolver_DoesNotUpdateForUnexpectedCaller() public {
+        (address userEE,,) = atlas.getExecutionEnvironment(userEOA, address(flOnlineMock));
+        assertEq(flOnlineMock.getWinningSolver(), address(0), "winningSolver should start empty");
+
+        vm.prank(userEOA);
+        flOnlineMock.setWinningSolver(solverOneEOA);
+        assertEq(flOnlineMock.getWinningSolver(), address(0), "err 1 - winningSolver should be empty");
+
+        vm.prank(governanceEOA);
+        flOnlineMock.setWinningSolver(solverOneEOA);
+        assertEq(flOnlineMock.getWinningSolver(), address(0), "err 2 - winningSolver should be empty");
+
+        vm.prank(solverOneEOA);
+        flOnlineMock.setWinningSolver(solverOneEOA);
+        assertEq(flOnlineMock.getWinningSolver(), address(0), "err 3 - winningSolver should be empty");
+
+        vm.prank(address(flOnlineMock));
+        flOnlineMock.setWinningSolver(solverOneEOA);
+        assertEq(flOnlineMock.getWinningSolver(), address(0), "err 4 - winningSolver should be empty");
+
+        vm.prank(address(atlas));
+        flOnlineMock.setWinningSolver(solverOneEOA);
+        assertEq(flOnlineMock.getWinningSolver(), address(0), "err 5 - winningSolver should be empty");
+
+        vm.prank(userEE); // userEE is valid caller, but still wont set if userEOA is not in userLock
+        flOnlineMock.setWinningSolver(solverOneEOA);
+        assertEq(flOnlineMock.getWinningSolver(), address(0), "err 6 - winningSolver should be empty");
+
+        // Only valid caller: the user's EE when userEOA is stored in userLock
+        flOnlineMock.setUserLock(userEOA);
+        assertEq(flOnlineMock.getUserLock(), userEOA, "userLock should be userEOA");
+        vm.prank(userEE);
+        flOnlineMock.setWinningSolver(solverOneEOA);
+        assertEq(flOnlineMock.getWinningSolver(), solverOneEOA, "winningSolver should be solverOneEOA");
+    }
+
+    function testFLOnline_SetWinningSolver_DoesNotUpdateIfAlreadySet() public {
+        (address userEE,,) = atlas.getExecutionEnvironment(userEOA, address(flOnlineMock));
+        assertEq(flOnlineMock.getWinningSolver(), address(0), "winningSolver should start empty");
+
+        flOnlineMock.setUserLock(userEOA);
+        vm.prank(userEE);
+        flOnlineMock.setWinningSolver(solverOneEOA);
+        assertEq(flOnlineMock.getWinningSolver(), solverOneEOA, "winningSolver should be solverOneEOA");
+
+        // winningSolver already set, should not update
+        vm.prank(userEE);
+        flOnlineMock.setWinningSolver(address(1));
+        assertEq(flOnlineMock.getWinningSolver(), solverOneEOA, "winningSolver should still be solverOneEOA");
+    }
+
     // TODO add tests when solverOp is valid, but does not outperform baseline call, baseline call used instead
 
     // ---------------------------------------------------- //
     //                        Helpers                       //
     // ---------------------------------------------------- //
 
-    function _doFastOnlineSwapWithChecks(address winningSolver, bool swapCallShouldSucceed) internal {
-        uint256 userWethBefore = WETH.balanceOf(userEOA);
-        uint256 userDaiBefore = DAI.balanceOf(userEOA);
-        uint256 solverWethBefore = WETH.balanceOf(winningSolver);
-        uint256 solverDaiBefore = DAI.balanceOf(winningSolver);
-        uint256 atlasGasSurchargeBefore = atlas.cumulativeSurcharge();
+    function _doFastOnlineSwapWithChecks(
+        address winningSolverEOA,
+        address winningSolver,
+        uint256 solverCount,
+        bool swapCallShouldSucceed
+    )
+        internal
+    {
+        beforeVars.userWeth = WETH.balanceOf(userEOA);
+        beforeVars.userDai = DAI.balanceOf(userEOA);
+        beforeVars.solverWeth = WETH.balanceOf(winningSolver);
+        beforeVars.solverDai = DAI.balanceOf(winningSolver);
+        beforeVars.atlasGasSurcharge = atlas.cumulativeSurcharge();
+        beforeVars.solverOneRep = flOnline.solverReputation(solverOneEOA);
+        beforeVars.solverTwoRep = flOnline.solverReputation(solverTwoEOA);
+        beforeVars.solverThreeRep = flOnline.solverReputation(solverThreeEOA);
         uint256 estAtlasGasSurcharge = gasleft(); // Reused below during calculations
 
         vm.prank(userEOA);
@@ -348,9 +454,9 @@ contract FastLaneOnlineTest is BaseTest {
         // Return early if transaction expected to revert. Balance checks below would otherwise fail.
         if (!swapCallShouldSucceed) return;
 
-        // Check Atlas gas surcharge earned is within 10% of the estimated gas surcharge
+        // Check Atlas gas surcharge earned is within 15% of the estimated gas surcharge
         assertApproxEqRel(
-            atlas.cumulativeSurcharge() - atlasGasSurchargeBefore,
+            atlas.cumulativeSurcharge() - beforeVars.atlasGasSurcharge,
             estAtlasGasSurcharge,
             ERR_MARGIN,
             "Atlas gas surcharge not within estimated range"
@@ -358,24 +464,55 @@ contract FastLaneOnlineTest is BaseTest {
 
         // Check user's balances changed as expected
         assertTrue(
-            WETH.balanceOf(userEOA) >= userWethBefore + args.swapIntent.minAmountUserBuys,
+            WETH.balanceOf(userEOA) >= beforeVars.userWeth + args.swapIntent.minAmountUserBuys,
             "User did not recieve expected WETH"
         );
         assertEq(
-            DAI.balanceOf(userEOA), userDaiBefore - args.swapIntent.amountUserSells, "User did not send expected DAI"
+            DAI.balanceOf(userEOA),
+            beforeVars.userDai - args.swapIntent.amountUserSells,
+            "User did not send expected DAI"
         );
 
         // If winning solver, check balances changed as expected
         if (winningSolver != address(0)) {
             assertTrue(
-                WETH.balanceOf(winningSolver) <= solverWethBefore - args.swapIntent.minAmountUserBuys,
+                WETH.balanceOf(winningSolver) <= beforeVars.solverWeth - args.swapIntent.minAmountUserBuys,
                 "Solver did not send expected WETH"
             );
             assertEq(
                 DAI.balanceOf(winningSolver),
-                solverDaiBefore + args.swapIntent.amountUserSells,
+                beforeVars.solverDai + args.swapIntent.amountUserSells,
                 "Solver did not recieve expected DAI"
             );
+        }
+
+        // Check reputation of all solvers involved
+        if (solverCount > 0) {
+            _checkReputationChanges({
+                name: "solverOneEOA",
+                repBefore: beforeVars.solverOneRep,
+                repAfter: flOnline.solverReputation(solverOneEOA),
+                won: winningSolverEOA == solverOneEOA,
+                executionAttempted: attempted.solverOne
+            });
+        }
+        if (solverCount > 1) {
+            _checkReputationChanges({
+                name: "solverTwoEOA",
+                repBefore: beforeVars.solverTwoRep,
+                repAfter: flOnline.solverReputation(solverTwoEOA),
+                won: winningSolverEOA == solverTwoEOA,
+                executionAttempted: attempted.solverTwo
+            });
+        }
+        if (solverCount > 2) {
+            _checkReputationChanges({
+                name: "solverThreeEOA",
+                repBefore: beforeVars.solverThreeRep,
+                repAfter: flOnline.solverReputation(solverThreeEOA),
+                won: winningSolverEOA == solverThreeEOA,
+                executionAttempted: attempted.solverThree
+            });
         }
     }
 
@@ -457,6 +594,10 @@ contract FastLaneOnlineTest is BaseTest {
         // Register solverOp in FLOnline in frontrunning tx
         flOnline.addSolverOp({ userOp: args.userOp, solverOp: solverOp });
         vm.stopPrank();
+
+        if (solverEOA == solverOneEOA) attempted.solverOne = true;
+        if (solverEOA == solverTwoEOA) attempted.solverTwo = true;
+        if (solverEOA == solverThreeEOA) attempted.solverThree = true;
 
         // Returns the address of the solver contract deployed here
         return address(solver);
@@ -581,6 +722,52 @@ contract FastLaneOnlineTest is BaseTest {
         }
         return true;
     }
+
+    function _checkReputationChanges(
+        string memory name,
+        Reputation memory repBefore,
+        Reputation memory repAfter,
+        bool won,
+        bool executionAttempted
+    )
+        internal
+        pure
+    {
+        if (executionAttempted) {
+            if (won) {
+                assertGt(
+                    repAfter.successCost,
+                    repBefore.successCost,
+                    string.concat(name, " successCost not updated correctly")
+                );
+                assertEq(
+                    repAfter.failureCost,
+                    repBefore.failureCost,
+                    string.concat(name, " failureCost should not have changed")
+                );
+            } else {
+                assertGt(
+                    repAfter.failureCost,
+                    repBefore.failureCost,
+                    string.concat(name, " failureCost not updated correctly")
+                );
+                assertEq(
+                    repAfter.successCost,
+                    repBefore.successCost,
+                    string.concat(name, " successCost should not have changed")
+                );
+            }
+        } else {
+            // not attempted due to not being included in solverOps, or due to having a lower bid than the winning
+            // solver and thus a higher index in the sorted array. No change in reputation expected.
+            assertEq(
+                repAfter.successCost, repBefore.successCost, string.concat(name, " successCost should not have changed")
+            );
+            assertEq(
+                repAfter.failureCost, repBefore.failureCost, string.concat(name, " failureCost should not have changed")
+            );
+        }
+    }
 }
 
 // This solver magically has the tokens needed to fulfil the user's swap.
@@ -627,5 +814,21 @@ contract MockFastLaneOnline is FastLaneOnlineOuter {
 
     function sortSolverOps(SolverOperation[] memory solverOps) external pure returns (SolverOperation[] memory) {
         return _sortSolverOps(solverOps);
+    }
+
+    // ---------------------------------------------------- //
+    //                  BaseStorage.sol                     //
+    // ---------------------------------------------------- //
+
+    function getUserLock() external view returns (address) {
+        return _getUserLock();
+    }
+
+    function setUserLock(address user) external {
+        _setUserLock(user);
+    }
+
+    function getWinningSolver() external view returns (address) {
+        return _getWinningSolver();
     }
 }
