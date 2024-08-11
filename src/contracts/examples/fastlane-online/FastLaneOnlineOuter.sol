@@ -51,19 +51,18 @@ contract FastLaneOnlineOuter is SolverGateway {
         DAppOperation memory _dAppOp = _getDAppOp(_userOpHash, userOp.deadline);
 
         // Atlas call
-        bool _success;
-        bytes memory _data = abi.encodeCall(IAtlas.metacall, (userOp, _solverOps, _dAppOp));
-        (_success, _data) =
-            ATLAS.call{ value: msg.value, gas: _metacallGasLimit(_gasReserved, userOp.gas, gasleft()) }(_data);
+        (bool _success,) = ATLAS.call{ value: msg.value, gas: _metacallGasLimit(_gasReserved, userOp.gas, gasleft()) }(
+            abi.encodeCall(IAtlas.metacall, (userOp, _solverOps, _dAppOp))
+        );
 
         // Revert if the metacall failed - neither solvers nor baseline call fulfilled swap intent
         if (!_success) revert FLOnlineOuter_FastOnlineSwap_NoFulfillment();
 
         // Find out if any of the solvers were successful
-        _success = abi.decode(_data, (bool));
+        _success = _getWinningSolver() != address(0);
 
         // Update Reputation
-        _updateSolverReputation(_solverOps, uint128(_repMagnitude), _success);
+        _updateSolverReputation(_solverOps, uint128(_repMagnitude));
 
         // Handle gas token balance reimbursement (reimbursement from Atlas and the congestion buy ins)
         _gasRefundTracker = _processCongestionRake(_gasRefundTracker, _userOpHash, _success);

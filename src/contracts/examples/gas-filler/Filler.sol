@@ -269,7 +269,9 @@ contract Filler is DAppControl {
         delete prepaid;
     }
 
-    function _decodeRawData(bytes calldata data)
+    function _decodeRawData(
+        bytes calldata data
+    )
         internal
         pure
         returns (uint256 gasNeeded, ApprovalTx memory approvalTx)

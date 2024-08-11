@@ -3,6 +3,7 @@ pragma solidity 0.8.25;
 
 // Base Imports
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { LibSort } from "solady/utils/LibSort.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 // Atlas Imports
@@ -31,6 +32,8 @@ contract OuterHelpers is FastLaneOnlineInner {
     address public immutable CARDANO_ENGINEER_THERAPY_FUND;
     address public immutable SIMULATOR;
 
+    uint256 internal constant _BITS_FOR_INDEX = 16;
+
     constructor(address _atlas) FastLaneOnlineInner(_atlas) {
         CARDANO_ENGINEER_THERAPY_FUND = msg.sender;
         SIMULATOR = IAtlas(_atlas).SIMULATOR();
@@ -40,6 +43,23 @@ contract OuterHelpers is FastLaneOnlineInner {
     //              CONTROL-LOCAL FUNCTIONS                //
     //                 (not delegated)                     //
     /////////////////////////////////////////////////////////
+
+    function setWinningSolver(address winningSolver) external {
+        // Only valid time this can be called is during the PostOps phase of a FLOnline metacall. When a user initiates
+        // that metacall with `fastOnlineSwap()` they are set as the user lock address. So the only time the check below
+        // will pass is when the caller of this function is the Execution Environment created for the currently active
+        // user and the FLOnline DAppControl.
+
+        (address expectedCaller,,) = IAtlas(ATLAS).getExecutionEnvironment(_getUserLock(), CONTROL);
+        if (msg.sender == expectedCaller && _getWinningSolver() == address(0)) {
+            // Set winning solver in transient storage, to be used in `_updateSolverReputation()`
+            _setWinningSolver(winningSolver);
+        }
+
+        // If check above did not pass, gracefully return without setting the winning solver, to not cause the solverOp
+        // simulation to fail in `addSolverOp()`.
+    }
+
     function getUserOperationAndHash(
         address swapper,
         SwapIntent calldata swapIntent,
@@ -194,67 +214,91 @@ contract OuterHelpers is FastLaneOnlineInner {
         netGasRefund = _grossGasRefund - _netRake;
     }
 
-    function _sortSolverOps(SolverOperation[] memory unsortedSolverOps)
+    function _sortSolverOps(
+        SolverOperation[] memory unsortedSolverOps
+    )
         internal
-        view
+        pure
         returns (SolverOperation[] memory sortedSolverOps)
     {
-        // This could be made more gas efficient
-
         uint256 _length = unsortedSolverOps.length;
-        if (_length == 0) {
-            return unsortedSolverOps;
+        if (_length == 0) return unsortedSolverOps;
+        if (_length == 1 && unsortedSolverOps[0].bidAmount != 0) return unsortedSolverOps;
+
+        uint256[] memory _bidsAndIndices = new uint256[](_length);
+        uint256 _bidsAndIndicesLastIndex = _length;
+        uint256 _bidAmount;
+
+        // First encode each solver's bid and their index in the original solverOps array into a single uint256. Build
+        // an array of these uint256s.
+        for (uint256 i; i < _length; ++i) {
+            _bidAmount = unsortedSolverOps[i].bidAmount;
+
+            // skip zero and overflow bid's
+            if (_bidAmount != 0 && _bidAmount <= type(uint240).max) {
+                // Set to _length, and decremented before use here to avoid underflow
+                unchecked {
+                    --_bidsAndIndicesLastIndex;
+                }
+
+                // Non-zero bids are packed with their original solverOps index.
+                // The array is filled with non-zero bids from the right.
+                _bidsAndIndices[_bidsAndIndicesLastIndex] = uint256(_bidAmount << _BITS_FOR_INDEX | uint16(i));
+            }
         }
 
-        sortedSolverOps = new SolverOperation[](_length);
+        // Create new SolverOps array, large enough to hold all valid bids.
+        uint256 _sortedSolverOpsLength = _length - _bidsAndIndicesLastIndex;
+        if (_sortedSolverOpsLength == 0) return sortedSolverOps; // return early if no valid bids
+        sortedSolverOps = new SolverOperation[](_sortedSolverOpsLength);
 
-        uint256 _topBidAmount;
-        uint256 _topBidIndex;
-        bool _matched;
+        // Reinitialize _bidsAndIndicesLastIndex to the last index of the array
+        _bidsAndIndicesLastIndex = _length - 1;
 
-        for (uint256 i; i < _length; i++) {
-            _topBidAmount = 0;
-            _topBidIndex = 0;
-            _matched = false;
+        // Sort the array of packed bids and indices in-place, in ascending order of bidAmount.
+        LibSort.insertionSort(_bidsAndIndices);
 
-            for (uint256 j; j < _length; j++) {
-                uint256 _bidAmount = unsortedSolverOps[j].bidAmount;
+        // Finally, iterate through sorted bidsAndIndices array in descending order of bidAmount.
+        for (uint256 i = _bidsAndIndicesLastIndex;; /* breaks when 0 */ --i) {
+            // Isolate the bidAmount from the packed uint256 value
+            _bidAmount = _bidsAndIndices[i] >> _BITS_FOR_INDEX;
 
-                if (_bidAmount >= _topBidAmount && _bidAmount != 0) {
-                    _topBidAmount = _bidAmount;
-                    _topBidIndex = j;
-                    _matched = true;
-                }
-            }
+            // If we reach the zero bids on the left of array, break as all valid bids already checked.
+            if (_bidAmount == 0) break;
 
-            if (_matched) {
-                // Get the highest solverOp and add it to sorted array
-                SolverOperation memory _solverOp = unsortedSolverOps[_topBidIndex];
-                sortedSolverOps[i] = _solverOp;
+            // Recover the original index of the SolverOperation
+            uint256 _index = uint256(uint16(_bidsAndIndices[i]));
 
-                // Mark it as sorted in old array
-                unsortedSolverOps[_topBidIndex].bidAmount = 0;
-            }
+            // Add the SolverOperation to the sorted array
+            sortedSolverOps[_bidsAndIndicesLastIndex - i] = unsortedSolverOps[_index];
+
+            if (i == 0) break; // break to prevent underflow in next loop
         }
 
         return sortedSolverOps;
     }
 
-    function _updateSolverReputation(
-        SolverOperation[] memory solverOps,
-        uint128 magnitude,
-        bool solversSuccessful
-    )
-        internal
-    {
+    function _updateSolverReputation(SolverOperation[] memory solverOps, uint128 magnitude) internal {
         uint256 _length = solverOps.length;
+        address _winningSolver = _getWinningSolver();
+        address _solverFrom;
+
         for (uint256 i; i < _length; i++) {
-            if (solversSuccessful) {
-                S_solverReputations[solverOps[i].from].successCost += magnitude;
+            _solverFrom = solverOps[i].from;
+
+            // winningSolver will be address(0) unless a winning solver fulfilled the swap intent.
+            if (_solverFrom == _winningSolver) {
+                S_solverReputations[_solverFrom].successCost += magnitude;
+                // break out of loop to avoid incrementing failureCost for solvers that did not execute due to being
+                // after the winning solver in the sorted array.
+                break;
             } else {
-                S_solverReputations[solverOps[i].from].failureCost += magnitude;
+                S_solverReputations[_solverFrom].failureCost += magnitude;
             }
         }
+
+        // Clear winning solver, in case `fastOnlineSwap()` is called multiple times in the same tx.
+        _setWinningSolver(address(0));
     }
 
     //////////////////////////////////////////////
