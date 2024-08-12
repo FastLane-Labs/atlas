@@ -20,9 +20,9 @@ interface IFeed {
     function getPriceFeedAdapter() external view returns (IRedstoneAdapter);
     function getDataFeedId() external view returns (bytes32);
     function latestAnswer() external view returns (int256);
-    function latestRoundData() external view returns (uint80,int256,uint256,uint256,uint80);
+    function latestRoundData() external view returns (uint80, int256, uint256, uint256, uint80);
     function latestRound() external view returns (uint80);
-    function getRoundData(uint80) external view returns (uint80,int256,uint256,uint256,uint80);
+    function getRoundData(uint80) external view returns (uint80, int256, uint256, uint256, uint80);
 }
 
 contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWithoutRounds {
@@ -47,7 +47,7 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
         uint80 latestRound = IFeed(_baseFeed).latestRound();
         // check to see if earlier rounds are supported
         // this will revert if the base adapter does not support earlier rounds(historical data)
-        IFeed(_baseFeed).getRoundData(latestRound - 1); 
+        IFeed(_baseFeed).getRoundData(latestRound - 1);
 
         ATLAS = atlas;
         DAPP_CONTROL = msg.sender;
@@ -100,27 +100,26 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
         uint256 minIntervalBetweenUpdates = getMinIntervalBetweenUpdates();
         if (currentBlockTimestamp < blockTimestampFromLatestUpdate + minIntervalBetweenUpdates) {
             revert MinIntervalBetweenUpdatesHasNotPassedYet(
-                currentBlockTimestamp,
-                blockTimestampFromLatestUpdate,
-                minIntervalBetweenUpdates
+                currentBlockTimestamp, blockTimestampFromLatestUpdate, minIntervalBetweenUpdates
             );
         }
     }
 
     function latestAnswer() public view virtual override returns (int256) {
         bytes32 dataFeedId = getDataFeedId();
-        (,uint256 atlasLatestBlockTimestamp) = getTimestampsFromLatestUpdate();
+        (, uint256 atlasLatestBlockTimestamp) = getTimestampsFromLatestUpdate();
         uint256 atlasAnswer = getValueForDataFeed(dataFeedId);
 
         uint80 roundId = IFeed(BASE_FEED).latestRound();
 
         uint256 numIter;
-        for (;;){
-            (uint256 baseValue,, uint128 baseBlockTimestamp) = IAdapterWithRounds(BASE_ADAPTER).getRoundDataFromAdapter(dataFeedId, roundId);
-            if (atlasLatestBlockTimestamp >= baseBlockTimestamp){
+        for (;;) {
+            (uint256 baseValue,, uint128 baseBlockTimestamp) =
+                IAdapterWithRounds(BASE_ADAPTER).getRoundDataFromAdapter(dataFeedId, roundId);
+            if (atlasLatestBlockTimestamp >= baseBlockTimestamp) {
                 return int256(atlasAnswer);
             }
-            if (block.timestamp - baseBlockTimestamp >= BASE_FEED_DELAY){
+            if (block.timestamp - baseBlockTimestamp >= BASE_FEED_DELAY) {
                 return int256(baseValue);
             }
 
@@ -129,7 +128,7 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
                 roundId--;
             }
 
-            if (numIter > MAX_HISTORICAL_FETCH_ITERATIONS){
+            if (numIter > MAX_HISTORICAL_FETCH_ITERATIONS) {
                 revert CannotFetchHistoricalData();
             }
         }
@@ -139,17 +138,18 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
 
     function latestTimestamp() public view virtual returns (uint256) {
         bytes32 dataFeedId = getDataFeedId();
-        (,uint256 atlasLatestBlockTimestamp) = getTimestampsFromLatestUpdate();
+        (, uint256 atlasLatestBlockTimestamp) = getTimestampsFromLatestUpdate();
 
         uint80 roundId = IFeed(BASE_FEED).latestRound();
 
         uint256 numIter;
-        for (;;){
-            (,, uint128 baseBlockTimestamp) = IAdapterWithRounds(BASE_ADAPTER).getRoundDataFromAdapter(dataFeedId, roundId);
-            if (atlasLatestBlockTimestamp >= baseBlockTimestamp){
+        for (;;) {
+            (,, uint128 baseBlockTimestamp) =
+                IAdapterWithRounds(BASE_ADAPTER).getRoundDataFromAdapter(dataFeedId, roundId);
+            if (atlasLatestBlockTimestamp >= baseBlockTimestamp) {
                 return atlasLatestBlockTimestamp;
             }
-            if (block.timestamp - baseBlockTimestamp >= BASE_FEED_DELAY){
+            if (block.timestamp - baseBlockTimestamp >= BASE_FEED_DELAY) {
                 return uint256(baseBlockTimestamp);
             }
 
@@ -158,7 +158,7 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
                 roundId--;
             }
 
-            if (numIter > MAX_HISTORICAL_FETCH_ITERATIONS){
+            if (numIter > MAX_HISTORICAL_FETCH_ITERATIONS) {
                 revert CannotFetchHistoricalData();
             }
         }
@@ -169,16 +169,10 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
     function latestRoundData()
         public
         view
-        override
         virtual
-        returns (
-            uint80 roundId,
-            int256 answer,
-            uint256 startedAt,
-            uint256 updatedAt,
-            uint80 answeredInRound
-        )
-        {
+        override
+        returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)
+    {
         roundId = latestRound();
         answer = latestAnswer();
 

@@ -46,7 +46,7 @@ contract RedstoneDAppControl is DAppControl {
                 invertBidValue: false,
                 exPostBids: false,
                 allowAllocateValueFailure: true // oracle updates should go through even if OEV allocation fails
-            })
+             })
         )
     { }
 
