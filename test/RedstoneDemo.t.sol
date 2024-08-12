@@ -117,7 +117,7 @@ contract RedstoneDAppControlTest is BaseTest {
             control: address(dappControl),
             callConfig: dappControl.CALL_CONFIG(),
             sessionKey: address(0),
-            data: generateUserOperationData(userPK),
+            data: generateUserOperationData(auctioneerPK),
             signature: new bytes(0)
         });
         (sig.v, sig.r, sig.s) = vm.sign(auctioneerPK, atlasVerification.getUserOperationPayload(userOp));
@@ -142,10 +142,10 @@ contract RedstoneDAppControlTest is BaseTest {
         assertNotEq(uint256(wrapper.latestAnswer()), uint256(dataPointValue));
 
         address bundler = address(69);
-        vm.deal(bundler, 10 ether);
+        vm.deal(bundler, 100 ether);
 
         vm.startPrank(bundler);
-        atlas.depositAndBond{value: 5 ether}(5 ether);
+        atlas.depositAndBond{value: 99 ether}(99 ether);
         atlas.metacall(userOp, solverOps, dappOp);
         vm.stopPrank();
 
