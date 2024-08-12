@@ -641,25 +641,36 @@ contract FastLaneOnlineTest is BaseTest {
         newArgs.maxFeePerGas = defaultGasPrice;
     }
 
-    function _buildBaselineCall(SwapIntent memory swapIntent) internal returns (BaselineCall memory) {
+    function _buildBaselineCall(SwapIntent memory swapIntent) internal view returns (BaselineCall memory) {
+        bytes4 v2SwapSelector;
+        uint256 value;
         address[] memory path = new address[](2);
         path[0] = swapIntent.tokenUserSells;
         path[1] = swapIntent.tokenUserBuys;
 
+        if (swapIntent.tokenUserSells == NATIVE_TOKEN) {
+            path[0] = WETH_ADDRESS;
+            v2SwapSelector = routerV2.swapExactETHForTokens.selector;
+            value = swapIntent.amountUserSells;
+        } else if (swapIntent.tokenUserBuys == NATIVE_TOKEN) {
+            path[1] = WETH_ADDRESS;
+            v2SwapSelector = routerV2.swapExactTokensForETH.selector;
+        } else {
+            v2SwapSelector = routerV2.swapExactTokensForTokens.selector;
+        }
+
         return BaselineCall({
             to: address(routerV2),
-            data: abi.encodeCall(
-                routerV2.swapExactTokensForTokens,
-                (
-                    swapIntent.amountUserSells, // amountIn
-                    swapIntent.minAmountUserBuys, // amountOutMin
-                    path, // path = [tokenUserSells, tokenUserBuys]
-                    executionEnvironment, // to
-                    defaultDeadlineTimestamp // deadline
-                )
+            data: abi.encodeWithSelector(
+                v2SwapSelector,
+                swapIntent.amountUserSells, // amountIn
+                swapIntent.minAmountUserBuys, // amountOutMin
+                path, // path = [tokenUserSells, tokenUserBuys]
+                executionEnvironment, // to
+                defaultDeadlineTimestamp // deadline
             ),
-            value: 0 // TODO fix for native token support
-         });
+            value: value
+        });
     }
 
     function _setUpSolver(address solverEOA, uint256 solverPK, uint256 bidAmount) internal returns (address) {
