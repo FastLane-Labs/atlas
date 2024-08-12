@@ -108,9 +108,9 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
     function latestAnswerAndTimestamp() internal view virtual returns (int256, uint256) {
         bytes32 dataFeedId = getDataFeedId();
         (, uint256 atlasLatestBlockTimestamp) = getTimestampsFromLatestUpdate();
-        uint256 atlasAnswer = getValueForDataFeed(dataFeedId);
 
         if (atlasLatestBlockTimestamp >= block.timestamp - BASE_FEED_DELAY) {
+            uint256 atlasAnswer = getValueForDataFeed(dataFeedId);
             return (int256(atlasAnswer), atlasLatestBlockTimestamp);
         }
 
