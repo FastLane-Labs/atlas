@@ -135,26 +135,6 @@ contract FastLaneOnlineTest is BaseTest {
 
     function testFLOnlineSwap_OneSolverFulfills_NativeIn_Success() public {
         vm.skip(true);
-
-        _setUpUser(
-            SwapIntent({
-                tokenUserBuys: DAI_ADDRESS,
-                minAmountUserBuys: 3200e18,
-                tokenUserSells: NATIVE_TOKEN,
-                amountUserSells: 1e18
-            })
-        );
-
-        // Set up the solver contract and register the solverOp in the FLOnline contract
-        address winningSolver = _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount);
-
-        // User calls fastOnlineSwap, do checks that user and solver balances changed as expected
-        _doFastOnlineSwapWithChecks({
-            winningSolverEOA: solverOneEOA,
-            winningSolver: winningSolver,
-            solverCount: 1,
-            swapCallShouldSucceed: true
-        });
     }
 
     function testFLOnlineSwap_OneSolverFails_BaselineCallFulfills_Success() public {
@@ -177,6 +157,10 @@ contract FastLaneOnlineTest is BaseTest {
             solverCount: 1,
             swapCallShouldSucceed: true
         });
+    }
+
+    function testFLOnlineSwap_OneSolverFails_BaselineCallFulfills_NativeIn_Success() public {
+        vm.skip(true);
     }
 
     function testFLOnlineSwap_OneSolverFails_BaselineCallReverts_Failure() public {
@@ -202,10 +186,34 @@ contract FastLaneOnlineTest is BaseTest {
          });
     }
 
-    function testFLOnlineSwap_ZeroSolvers_BaselineCallFullfills_Success() public {
+    function testFLOnlineSwap_ZeroSolvers_BaselineCallFulfills_Success() public {
         _setUpUser(defaultSwapIntent);
 
         // No solverOps at all
+        _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: true });
+
+        // Now fastOnlineSwap should succeed using BaselineCall for fulfillment, with gas + Atlas gas surcharge paid for
+        // by ETH sent as msg.value by user.
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: address(0),
+            winningSolver: address(0), // No winning solver expected
+            solverCount: 0,
+            swapCallShouldSucceed: true
+        });
+    }
+
+    function testFLOnlineSwap_ZeroSolvers_BaselineCallFulfills_NativeIn_Success() public {
+        // TODO work out pricing if ETH is tokenIn and not DAI
+        _setUpUser(
+            SwapIntent({
+                tokenUserBuys: DAI_ADDRESS,
+                minAmountUserBuys: 3000e18,
+                tokenUserSells: NATIVE_TOKEN,
+                amountUserSells: 1e18
+            })
+        );
+
+        // Check BaselineCall struct is formed correctly and can succeed, revert changes after
         _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: true });
 
         // Now fastOnlineSwap should succeed using BaselineCall for fulfillment, with gas + Atlas gas surcharge paid for
@@ -236,7 +244,7 @@ contract FastLaneOnlineTest is BaseTest {
          });
     }
 
-    function testFLOnlineSwap_ThreeSolvers_ThirdFullfills_Success() public {
+    function testFLOnlineSwap_ThreeSolvers_ThirdFulfills_Success() public {
         _setUpUser(defaultSwapIntent);
 
         // Set up the solver contracts and register the solverOps in the FLOnline contract
@@ -258,7 +266,7 @@ contract FastLaneOnlineTest is BaseTest {
         });
     }
 
-    function testFLOnlineSwap_ThreeSolvers_AllFail_BaselineCallFullfills_Success() public {
+    function testFLOnlineSwap_ThreeSolvers_AllFail_BaselineCallFulfills_Success() public {
         _setUpUser(defaultSwapIntent);
 
         // Set up the solver contracts and register the solverOps in the FLOnline contract
@@ -502,17 +510,18 @@ contract FastLaneOnlineTest is BaseTest {
         beforeVars.solverTwoRep = flOnline.solverReputation(solverTwoEOA);
         beforeVars.solverThreeRep = flOnline.solverReputation(solverThreeEOA);
         uint256 estAtlasGasSurcharge = gasleft(); // Reused below during calculations
+        uint256 txGasUsed;
 
         vm.prank(userEOA);
 
         // Do the actual fastOnlineSwap call
-        (bool result,) = address(flOnline).call{ gas: args.gas + 1000, value: defaultMsgValue }(
+        (bool result,) = address(flOnline).call{ gas: args.gas + 1000, value: args.msgValue }(
             abi.encodeCall(flOnline.fastOnlineSwap, (args.userOp))
         );
 
         // Calculate estimated Atlas gas surcharge taken from call above
-        estAtlasGasSurcharge =
-            (estAtlasGasSurcharge - gasleft()) * defaultGasPrice * atlas.ATLAS_SURCHARGE_RATE() / atlas.SCALE();
+        txGasUsed = estAtlasGasSurcharge - gasleft();
+        estAtlasGasSurcharge = txGasUsed * defaultGasPrice * atlas.ATLAS_SURCHARGE_RATE() / atlas.SCALE();
 
         assertTrue(
             result == swapCallShouldSucceed,
@@ -530,17 +539,40 @@ contract FastLaneOnlineTest is BaseTest {
             "Atlas gas surcharge not within estimated range"
         );
 
+        console.log("User ETH before", beforeVars.userTokenInBalance);
+        console.log("User ETH after", _balanceOf(NATIVE_TOKEN, userEOA));
+
         // Check user's balances changed as expected
         assertTrue(
             _balanceOf(args.swapIntent.tokenUserBuys, userEOA)
                 >= beforeVars.userTokenOutBalance + args.swapIntent.minAmountUserBuys,
             "User did not recieve enough tokenOut"
         );
-        assertEq(
-            _balanceOf(args.swapIntent.tokenUserSells, userEOA),
-            beforeVars.userTokenInBalance - args.swapIntent.amountUserSells,
-            "User did not send enough tokenIn"
-        );
+
+        // TODO refactor checks
+        if (args.swapIntent.tokenUserSells == NATIVE_TOKEN) {
+            uint256 bundlerAtlETH = atlas.balanceOfBonded(address(flOnline));
+            console.log("bundler bonded atlETH", bundlerAtlETH);
+
+            uint256 gasAndSurchargeCost =
+                (txGasUsed * tx.gasprice) + (atlas.cumulativeSurcharge() - beforeVars.atlasGasSurcharge);
+
+            uint256 expectedBalanceAfter =
+                beforeVars.userTokenInBalance - args.swapIntent.amountUserSells - gasAndSurchargeCost;
+
+            assertApproxEqRel(
+                _balanceOf(args.swapIntent.tokenUserSells, userEOA),
+                expectedBalanceAfter,
+                0.01e18, // 1% error margin
+                "User did not send enough native tokenIn"
+            );
+        } else {
+            assertEq(
+                _balanceOf(args.swapIntent.tokenUserSells, userEOA),
+                beforeVars.userTokenInBalance - args.swapIntent.amountUserSells,
+                "User did not send enough ERC20 tokenIn"
+            );
+        }
 
         // If winning solver, check balances changed as expected
         if (winningSolver != address(0)) {
@@ -620,6 +652,7 @@ contract FastLaneOnlineTest is BaseTest {
         internal
         returns (FastOnlineSwapArgs memory newArgs)
     {
+        bool nativeTokenIn = swapIntent.tokenUserSells == NATIVE_TOKEN;
         newArgs.swapIntent = swapIntent;
         newArgs.baselineCall = _buildBaselineCall(swapIntent);
 
@@ -629,7 +662,8 @@ contract FastLaneOnlineTest is BaseTest {
             baselineCall: newArgs.baselineCall,
             deadline: defaultDeadlineBlock,
             gas: defaultGasLimit,
-            maxFeePerGas: defaultGasPrice
+            maxFeePerGas: defaultGasPrice,
+            msgValue: nativeTokenIn ? swapIntent.amountUserSells : 0
         });
 
         // User signs userOp
@@ -639,10 +673,14 @@ contract FastLaneOnlineTest is BaseTest {
         newArgs.deadline = defaultDeadlineBlock;
         newArgs.gas = defaultGasLimit;
         newArgs.maxFeePerGas = defaultGasPrice;
+        newArgs.msgValue = defaultMsgValue;
+
+        // Add amountUserSells of ETH to the msg.value of the fastOnlineSwap call
+        if (nativeTokenIn) newArgs.msgValue += swapIntent.amountUserSells;
     }
 
     function _buildBaselineCall(SwapIntent memory swapIntent) internal view returns (BaselineCall memory) {
-        bytes4 v2SwapSelector;
+        bytes memory baselineData;
         uint256 value;
         address[] memory path = new address[](2);
         path[0] = swapIntent.tokenUserSells;
@@ -650,27 +688,42 @@ contract FastLaneOnlineTest is BaseTest {
 
         if (swapIntent.tokenUserSells == NATIVE_TOKEN) {
             path[0] = WETH_ADDRESS;
-            v2SwapSelector = routerV2.swapExactETHForTokens.selector;
             value = swapIntent.amountUserSells;
+            baselineData = abi.encodeCall(
+                routerV2.swapExactETHForTokens,
+                (
+                    swapIntent.minAmountUserBuys, // amountOutMin
+                    path, // path = [tokenUserSells, tokenUserBuys]
+                    executionEnvironment, // to
+                    defaultDeadlineTimestamp // deadline
+                )
+            );
         } else if (swapIntent.tokenUserBuys == NATIVE_TOKEN) {
             path[1] = WETH_ADDRESS;
-            v2SwapSelector = routerV2.swapExactTokensForETH.selector;
+            baselineData = abi.encodeCall(
+                routerV2.swapExactTokensForETH,
+                (
+                    swapIntent.amountUserSells, // amountIn
+                    swapIntent.minAmountUserBuys, // amountOutMin
+                    path, // path = [tokenUserSells, tokenUserBuys]
+                    executionEnvironment, // to
+                    defaultDeadlineTimestamp // deadline
+                )
+            );
         } else {
-            v2SwapSelector = routerV2.swapExactTokensForTokens.selector;
+            baselineData = abi.encodeCall(
+                routerV2.swapExactTokensForTokens,
+                (
+                    swapIntent.amountUserSells, // amountIn
+                    swapIntent.minAmountUserBuys, // amountOutMin
+                    path, // path = [tokenUserSells, tokenUserBuys]
+                    executionEnvironment, // to
+                    defaultDeadlineTimestamp // deadline
+                )
+            );
         }
 
-        return BaselineCall({
-            to: address(routerV2),
-            data: abi.encodeWithSelector(
-                v2SwapSelector,
-                swapIntent.amountUserSells, // amountIn
-                swapIntent.minAmountUserBuys, // amountOutMin
-                path, // path = [tokenUserSells, tokenUserBuys]
-                executionEnvironment, // to
-                defaultDeadlineTimestamp // deadline
-            ),
-            value: value
-        });
+        return BaselineCall({ to: address(routerV2), data: baselineData, value: value });
     }
 
     function _setUpSolver(address solverEOA, uint256 solverPK, uint256 bidAmount) internal returns (address) {
@@ -793,6 +846,7 @@ contract FastLaneOnlineTest is BaseTest {
         vm.revertTo(snapshotId);
     }
 
+    // TODO refactor this for native token support
     function _setBaselineCallToRevert() internal {
         // Everything correct except amountOutMin is too high
         address[] memory path = new address[](2);
@@ -821,7 +875,8 @@ contract FastLaneOnlineTest is BaseTest {
             baselineCall: args.baselineCall,
             deadline: defaultDeadlineBlock,
             gas: defaultGasLimit,
-            maxFeePerGas: defaultGasPrice
+            maxFeePerGas: defaultGasPrice,
+            msgValue: 0
         });
 
         // User signs userOp
