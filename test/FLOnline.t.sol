@@ -245,11 +245,69 @@ contract FastLaneOnlineTest is BaseTest {
     }
 
     function testFLOnlineSwap_ThreeSolvers_AllFail_BaselineCallFullfills_Success() public {
-        vm.skip(true);
+        // Set up the solver contracts and register the solverOps in the FLOnline contract
+        address solver1 = _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount);
+        address solver2 = _setUpSolver(solverTwoEOA, solverTwoPK, successfulSolverBidAmount + 1e17);
+        address solver3 = _setUpSolver(solverThreeEOA, solverThreePK, successfulSolverBidAmount + 2e17);
+
+        // solverOne does not get included in the sovlerOps array
+        attempted.solverOne = false;
+        // solverTwo and solverThree will be attempted but fail
+
+        // Check BaselineCall struct is formed correctly and can succeed, revert changes after
+        _doBaselineCallWithBalanceChecksThenRevertStateChanges({
+            caller: userEOA,
+            tokenOutRecipient: executionEnvironment,
+            shouldSucceed: true
+        });
+
+        // Set all solvers to fail during metacall
+        FLOnlineRFQSolver(payable(solver1)).setShouldSucceed(false);
+        FLOnlineRFQSolver(payable(solver2)).setShouldSucceed(false);
+        FLOnlineRFQSolver(payable(solver3)).setShouldSucceed(false);
+
+        // Now fastOnlineSwap should succeed using BaselineCall for fulfillment, with gas + Atlas gas surcharge paid for
+        // by ETH sent as msg.value by user.
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: address(0),
+            winningSolver: address(0), // No winning solver expected
+            solverCount: 3,
+            swapCallShouldSucceed: true
+        });
     }
 
     function testFLOnlineSwap_ThreeSolvers_AllFail_BaselineCallReverts_Failure() public {
-        vm.skip(true);
+        // Set up the solver contracts and register the solverOps in the FLOnline contract
+        address solver1 = _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount);
+        address solver2 = _setUpSolver(solverTwoEOA, solverTwoPK, successfulSolverBidAmount + 1e17);
+        address solver3 = _setUpSolver(solverThreeEOA, solverThreePK, successfulSolverBidAmount + 2e17);
+
+        // solverOne does not get included in the sovlerOps array
+        attempted.solverOne = false;
+        // solverTwo and solverThree will be attempted but fail
+
+        // Set baselineCall incorrectly to intentionally fail
+        _setBaselineCallToRevert();
+
+        // Check BaselineCall struct is formed correctly and can revert, revert changes after
+        _doBaselineCallWithBalanceChecksThenRevertStateChanges({
+            caller: userEOA,
+            tokenOutRecipient: executionEnvironment,
+            shouldSucceed: false
+        });
+
+        // Set all solvers to fail during metacall
+        FLOnlineRFQSolver(payable(solver1)).setShouldSucceed(false);
+        FLOnlineRFQSolver(payable(solver2)).setShouldSucceed(false);
+        FLOnlineRFQSolver(payable(solver3)).setShouldSucceed(false);
+
+        // fastOnlineSwap should revert if all solvers fail AND the baseline call also fails
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: address(0),
+            winningSolver: address(0), // No winning solver expected
+            solverCount: 3,
+            swapCallShouldSucceed: false // fastOnlineSwap should revert
+         });
     }
 
     // ---------------------------------------------------- //
