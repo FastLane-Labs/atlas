@@ -34,7 +34,7 @@ contract RedstoneDAppControl is DAppControl {
                 requirePreSolver: false,
                 requirePostSolver: false,
                 requirePostOps: false,
-                zeroSolvers: false,
+                zeroSolvers: true, // oracle updates can be made without solvers and no OEV
                 reuseUserOp: false,
                 userAuctioneer: true,
                 solverAuctioneer: false,
@@ -45,7 +45,7 @@ contract RedstoneDAppControl is DAppControl {
                 trustedOpHash: false,
                 invertBidValue: false,
                 exPostBids: false,
-                allowAllocateValueFailure: false
+                allowAllocateValueFailure: true // oracle updates should go through even if OEV allocation fails
             })
         )
     { }
