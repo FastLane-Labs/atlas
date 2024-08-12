@@ -90,7 +90,6 @@ contract RedstoneDAppControlTest is BaseTest {
     function testAuthorizedUpdateDataFeedsValues() public {
         vm.prank(vm.addr(oracleOwnerPk));
         wrapper.addAuthorisedSigner(governanceEOA);
-        vm.stopPrank();
 
         bool success = updateDataFeedsValues(0x123123);
         require(!success, "should fail because of unauthorized signer");
@@ -142,8 +141,13 @@ contract RedstoneDAppControlTest is BaseTest {
 
         assertNotEq(uint256(wrapper.latestAnswer()), uint256(dataPointValue));
 
-        vm.prank(address(69));
+        address bundler = address(69);
+        vm.deal(bundler, 10 ether);
+
+        vm.startPrank(bundler);
+        atlas.depositAndBond{value: 5 ether}(5 ether);
         atlas.metacall(userOp, solverOps, dappOp);
+        vm.stopPrank();
 
         assertEq(uint256(wrapper.latestAnswer()), uint256(dataPointValue));
     }
