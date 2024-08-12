@@ -9,7 +9,7 @@ import { BaseTest } from "test/base/BaseTest.t.sol";
 contract RedstoneDAppControlTest is BaseTest {
     RedstoneDAppControl dappControl;
     RedstoneAdapterAtlasWrapper wrapper;
-    address baseFeedAddress = 0xbC5FBcf58CeAEa19D523aBc76515b9AEFb5cfd58;
+    address baseFeedAddress = 0xdDb6F90fFb4d3257dd666b69178e5B3c5Bf41136; //weETH USD oracle on ETH mainnet
     uint32 dataPointValue = 666999;
 
     uint256 oracleOwnerPk;
@@ -49,13 +49,27 @@ contract RedstoneDAppControlTest is BaseTest {
         console.log("base startedAt", baseStartedAt);
         console.log("base updatedAt", baseUpdatedAt);
 
-        (uint128 dataTimestamp, uint128 blockTimestamp) = IAdapter(address(IFeed(baseFeedAddress).getPriceFeedAdapter())).getTimestampsFromLatestUpdate();
+        (uint128 dataTimestamp, uint128 blockTimestamp) = IAdapterWithRounds(address(IFeed(baseFeedAddress).getPriceFeedAdapter())).getTimestampsFromLatestUpdate();
         console.log("dataTimestamp", uint256(dataTimestamp));
         console.log("blockTimestamp", uint256(blockTimestamp));
 
-        (uint128 dataTimestampWrapper, uint128 blockTimestampWrapper) = IAdapter(address(wrapper)).getTimestampsFromLatestUpdate();
+        (uint128 dataTimestampWrapper, uint128 blockTimestampWrapper) = IAdapterWithRounds(address(wrapper)).getTimestampsFromLatestUpdate();
         console.log("dataTimestampWrapper", uint256(dataTimestampWrapper));
         console.log("blockTimestampWrapper", uint256(blockTimestampWrapper));
+    }
+
+    function testBaseAdapterHistoricalData() public view {
+        uint80 roundId = IFeed(baseFeedAddress).latestRound();
+        IAdapterWithRounds adapter = IAdapterWithRounds(address(IFeed(baseFeedAddress).getPriceFeedAdapter()));
+        for (uint256 i = 0; i < 5; i++) {
+            (uint256 value, uint128 dataTimestamp, uint128 blockTimestamp) = adapter.getRoundDataFromAdapter(IFeed(baseFeedAddress).getDataFeedId(), roundId);
+            console.log("roundId", roundId);
+            console.log("value", value);
+            console.log("dataTimestamp", dataTimestamp);
+            console.log("blockTimestamp", blockTimestamp);
+            console.log("---------------------------------------");
+            roundId--;
+        }
     }
 
     function testAuthorizedUpdateDataFeedsValues() public {

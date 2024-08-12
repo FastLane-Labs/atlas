@@ -9,10 +9,11 @@ import { IRedstoneAdapter } from
     "lib/redstone-oracles-monorepo/packages/on-chain-relayer/contracts/core/IRedstoneAdapter.sol";
 import "./RedstoneDAppControl.sol";
 
-interface IAdapter {
+interface IAdapterWithRounds {
     function getDataFeedIds() external view returns (bytes32[] memory);
     function getValueForDataFeed(bytes32 dataFeedId) external view returns (uint256);
     function getTimestampsFromLatestUpdate() external view returns (uint128 dataTimestamp, uint128 blockTimestamp);
+    function getRoundDataFromAdapter(bytes32, uint256) external view returns (uint256, uint128, uint128);
 }
 
 interface IFeed {
@@ -20,6 +21,8 @@ interface IFeed {
     function getDataFeedId() external view returns (bytes32);
     function latestAnswer() external view returns (int256);
     function latestRoundData() external view returns (uint80,int256,uint256,uint256,uint80);
+    function latestRound() external view returns (uint80);
+    function getRoundData(uint80) external view returns (uint80,int256,uint256,uint256,uint80);
 }
 
 contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWithoutRounds {
@@ -29,14 +32,23 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
     address public immutable BASE_ADAPTER;
     address public immutable BASE_FEED;
 
+    uint256 public constant MAX_HISTORICAL_FETCH_ITERATIONS = 5;
+
     address[] public authorisedSigners;
 
-    uint256 public BASE_FEED_DELAY = 4000;
+    uint256 public BASE_FEED_DELAY = 4; //seconds
 
     error BaseAdapterHasNoDataFeed();
     error InvalidAuthorisedSigner();
+    error BaseAdapterDoesNotSupportHistoricalData();
+    error CannotFetchHistoricalData();
 
     constructor(address atlas, address _owner, address _baseFeed) {
+        uint80 latestRound = IFeed(_baseFeed).latestRound();
+        // check to see if earlier rounds are supported
+        // this will revert if the base adapter does not support earlier rounds(historical data)
+        IFeed(_baseFeed).getRoundData(latestRound - 1); 
+
         ATLAS = atlas;
         DAPP_CONTROL = msg.sender;
         BASE_FEED = _baseFeed;
@@ -97,32 +109,61 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
 
     function latestAnswer() public view virtual override returns (int256) {
         bytes32 dataFeedId = getDataFeedId();
-        uint256 baseAnswer = IAdapter(BASE_ADAPTER).getValueForDataFeed(dataFeedId);
+        (,uint256 atlasLatestBlockTimestamp) = getTimestampsFromLatestUpdate();
         uint256 atlasAnswer = getValueForDataFeed(dataFeedId);
-        if (atlasAnswer == 0) {
-            return int256(baseAnswer);
-        }
-        (uint256 baseLatestTimestamp,) = IAdapter(BASE_ADAPTER).getTimestampsFromLatestUpdate();
-        (uint256 atlasLatestTimestamp,) = getTimestampsFromLatestUpdate();
 
-        if (atlasLatestTimestamp > baseLatestTimestamp - BASE_FEED_DELAY) {
-            return int256(atlasAnswer);
+        uint80 roundId = IFeed(BASE_FEED).latestRound();
+
+        uint256 numIter;
+        for (;;){
+            (uint256 baseValue,, uint128 baseBlockTimestamp) = IAdapterWithRounds(BASE_ADAPTER).getRoundDataFromAdapter(dataFeedId, roundId);
+            if (atlasLatestBlockTimestamp >= baseBlockTimestamp){
+                return int256(atlasAnswer);
+            }
+            if (block.timestamp - baseBlockTimestamp >= BASE_FEED_DELAY){
+                return int256(baseValue);
+            }
+
+            unchecked {
+                numIter++;
+                roundId--;
+            }
+
+            if (numIter > MAX_HISTORICAL_FETCH_ITERATIONS){
+                revert CannotFetchHistoricalData();
+            }
         }
-        return int256(baseAnswer);
+        // unreachable
+        return 0;
     }
 
     function latestTimestamp() public view virtual returns (uint256) {
-        (uint256 baseLatestTimestamp,) = IAdapter(BASE_ADAPTER).getTimestampsFromLatestUpdate();
-        (uint256 atlasLatestTimestamp,) = getTimestampsFromLatestUpdate();
-        uint256 atlasAnswer = getValueForDataFeed(getDataFeedId());
+        bytes32 dataFeedId = getDataFeedId();
+        (,uint256 atlasLatestBlockTimestamp) = getTimestampsFromLatestUpdate();
 
-        if (atlasAnswer == 0) {
-            return baseLatestTimestamp;
+        uint80 roundId = IFeed(BASE_FEED).latestRound();
+
+        uint256 numIter;
+        for (;;){
+            (,, uint128 baseBlockTimestamp) = IAdapterWithRounds(BASE_ADAPTER).getRoundDataFromAdapter(dataFeedId, roundId);
+            if (atlasLatestBlockTimestamp >= baseBlockTimestamp){
+                return atlasLatestBlockTimestamp;
+            }
+            if (block.timestamp - baseBlockTimestamp >= BASE_FEED_DELAY){
+                return uint256(baseBlockTimestamp);
+            }
+
+            unchecked {
+                numIter++;
+                roundId--;
+            }
+
+            if (numIter > MAX_HISTORICAL_FETCH_ITERATIONS){
+                revert CannotFetchHistoricalData();
+            }
         }
-        if (atlasLatestTimestamp > baseLatestTimestamp - BASE_FEED_DELAY) {
-            return atlasLatestTimestamp;
-        }
-        return baseLatestTimestamp;
+        // unreachable
+        return 0;
     }
 
     function latestRoundData()
@@ -144,8 +185,8 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
         uint256 latestTStamp = latestTimestamp();
 
         // These values are equal after chainlink’s OCR update
-        startedAt = latestTStamp/1000;
-        updatedAt = latestTStamp/1000;
+        startedAt = latestTStamp;
+        updatedAt = latestTStamp;
 
         // We want to be compatible with Chainlink's interface
         // And in our case the roundId is always equal to answeredInRound
