@@ -71,8 +71,8 @@ contract FastLaneOnlineInner is BaseStorage, FastLaneOnlineControl {
             revert FLOnlineInner_Swap_ControlNotBundler();
         }
 
-        // Transfer sell token if it isn't gastoken and validate value deposit if it is
-        if (swapIntent.tokenUserSells != address(0)) {
+        // Transfer sell token if it isn't native token and validate value deposit if it is
+        if (swapIntent.tokenUserSells != _NATIVE_TOKEN) {
             _transferUserERC20(swapIntent.tokenUserSells, address(this), swapIntent.amountUserSells);
         } else {
             // UserOp.value already passed to this contract - ensure that userOp.value matches sell amount

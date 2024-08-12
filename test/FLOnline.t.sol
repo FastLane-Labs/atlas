@@ -53,6 +53,7 @@ contract FastLaneOnlineTest is BaseTest {
     }
 
     uint256 constant ERR_MARGIN = 0.15e18; // 15% error margin
+    address internal constant NATIVE_TOKEN = address(0);
 
     IERC20 DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     address DAI_ADDRESS = address(DAI);
@@ -624,6 +625,20 @@ contract FastLaneOnlineTest is BaseTest {
         newArgs.deadline = defaultDeadlineBlock;
         newArgs.gas = defaultGasLimit;
         newArgs.maxFeePerGas = defaultGasPrice;
+    }
+
+    // Supports native token swaps
+    function _setUpUser(SwapIntent memory swapIntent) internal {
+        // TODO in progress...
+
+        // User starts with 0 WETH (tokenUserBuys) and 3200 DAI (tokenUserSells)
+        deal(swapIntent.tokenUserBuys, userEOA, 0); // Burn user's WETH to start at 0
+        deal(swapIntent.tokenUserSells, userEOA, swapIntent.amountUserSells); // 3200 DAI
+        deal(userEOA, 1e18); // Give user 1 ETH to pay for gas (msg.value is 0.1 ETH per call by default)
+
+        // User approves Atlas to take their DAI to facilitate the swap
+        vm.prank(userEOA);
+        IERC20(swapIntent.tokenUserSells).approve(address(atlas), swapIntent.amountUserSells);
     }
 
     function _setUpSolver(address solverEOA, uint256 solverPK, uint256 bidAmount) internal returns (address) {

@@ -87,8 +87,8 @@ contract FastLaneOnlineOuter is SolverGateway {
         (SwapIntent memory _swapIntent, BaselineCall memory _baselineCall) =
             abi.decode(userOp.data[4:], (SwapIntent, BaselineCall));
 
-        // Verify that if we're dealing with the native gas token that the balances add up
-        if (_swapIntent.tokenUserSells == address(0)) {
+        // Verify that if we're dealing with the native token that the balances add up
+        if (_swapIntent.tokenUserSells == _NATIVE_TOKEN) {
             if (msg.value < userOp.value) revert FLOnlineOuter_ValidateSwap_MsgValueTooLow();
             if (userOp.value < _swapIntent.amountUserSells) revert FLOnlineOuter_ValidateSwap_UserOpValueTooLow();
             if (userOp.value != _baselineCall.value) revert FLOnlineOuter_ValidateSwap_UserOpBaselineValueMismatch();
