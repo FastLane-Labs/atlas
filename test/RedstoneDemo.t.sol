@@ -9,6 +9,9 @@ import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 import { BaseTest } from "test/base/BaseTest.t.sol";
 
 contract RedstoneDAppControlTest is BaseTest {
+    uint256 auctioneerPK = 0xabcdef;
+    address auctioneer = vm.addr(auctioneerPK);
+
     RedstoneDAppControl dappControl;
     RedstoneAdapterAtlasWrapper wrapper;
     address baseFeedAddress = 0xdDb6F90fFb4d3257dd666b69178e5B3c5Bf41136; //weETH USD oracle on ETH mainnet
@@ -29,7 +32,7 @@ contract RedstoneDAppControlTest is BaseTest {
 
         oracleOwnerPk = 0x98765;
 
-        vm.startPrank(governanceEOA);
+        vm.startPrank(auctioneer);
         dappControl = new RedstoneDAppControl(address(atlas));
         atlasVerification.initializeGovernance(address(dappControl));
         vm.stopPrank();
@@ -101,14 +104,14 @@ contract RedstoneDAppControlTest is BaseTest {
 
     function testRedstoneMetacall() public {
         vm.prank(vm.addr(oracleOwnerPk));
-        wrapper.addAuthorisedSigner(userEOA);
+        wrapper.addAuthorisedSigner(auctioneer);
 
         UserOperation memory userOp = UserOperation({
-            from: userEOA,
+            from: auctioneer,
             to: address(atlas),
             value: 0,
             gas: 1000000,
-            maxFeePerGas: 1e9,
+            maxFeePerGas: tx.gasprice,
             nonce: 1,
             deadline: block.number,
             dapp: address(wrapper),
@@ -118,13 +121,13 @@ contract RedstoneDAppControlTest is BaseTest {
             data: generateUserOperationData(userPK),
             signature: new bytes(0)
         });
-        (sig.v, sig.r, sig.s) = vm.sign(userPK, atlasVerification.getUserOperationPayload(userOp));
+        (sig.v, sig.r, sig.s) = vm.sign(auctioneerPK, atlasVerification.getUserOperationPayload(userOp));
         userOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         SolverOperation[] memory solverOps = new SolverOperation[](0);
 
         DAppOperation memory dappOp = DAppOperation({
-            from: userEOA,
+            from: auctioneer,
             to: address(atlas),
             nonce: 0,
             deadline: userOp.deadline,
@@ -134,7 +137,7 @@ contract RedstoneDAppControlTest is BaseTest {
             callChainHash: CallVerification.getCallChainHash(userOp, solverOps),
             signature: new bytes(0)
         });
-        (sig.v, sig.r, sig.s) = vm.sign(userPK, atlasVerification.getDAppOperationPayload(dappOp));
+        (sig.v, sig.r, sig.s) = vm.sign(auctioneerPK, atlasVerification.getDAppOperationPayload(dappOp));
         dappOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
         assertNotEq(uint256(wrapper.latestAnswer()), uint256(dataPointValue));
