@@ -20,7 +20,9 @@ contract RedstoneDAppControl is DAppControl {
 
     mapping(address redstoneAtlasAdapter => bool isAdapter) public isRedstoneAdapter;
 
-    constructor(address _atlas)
+    constructor(
+        address _atlas
+    )
         DAppControl(
             _atlas,
             msg.sender,
