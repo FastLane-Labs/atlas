@@ -4,6 +4,8 @@ pragma solidity 0.8.25;
 import "forge-std/Test.sol";
 import "src/contracts/examples/redstone-oev/RedstoneAdapterAtlasWrapper.sol";
 import "src/contracts/examples/redstone-oev/RedstoneDAppControl.sol";
+import "src/contracts/types/DAppOperation.sol";
+import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 import { BaseTest } from "test/base/BaseTest.t.sol";
 
 contract RedstoneDAppControlTest is BaseTest {
@@ -14,6 +16,14 @@ contract RedstoneDAppControlTest is BaseTest {
 
     uint256 oracleOwnerPk;
 
+    Sig public sig;
+
+    struct Sig {
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+    }
+
     function setUp() public override {
         super.setUp();
 
@@ -21,7 +31,9 @@ contract RedstoneDAppControlTest is BaseTest {
 
         vm.startPrank(governanceEOA);
         dappControl = new RedstoneDAppControl(address(atlas));
+        atlasVerification.initializeGovernance(address(dappControl));
         vm.stopPrank();
+
         vm.startPrank(vm.addr(oracleOwnerPk));
         wrapper = RedstoneAdapterAtlasWrapper(dappControl.createNewAtlasAdapter(baseFeedAddress));
         vm.stopPrank();
@@ -86,8 +98,60 @@ contract RedstoneDAppControlTest is BaseTest {
         success = updateDataFeedsValues(governancePK);
         require(success, "should succeed because of authorized signer");
     }
-   
-    function updateDataFeedsValues(uint256 pk) public returns (bool) {
+
+    function testRedstoneMetacall() public {
+        vm.prank(vm.addr(oracleOwnerPk));
+        wrapper.addAuthorisedSigner(userEOA);
+
+        UserOperation memory userOp = UserOperation({
+            from: userEOA,
+            to: address(atlas),
+            value: 0,
+            gas: 1000000,
+            maxFeePerGas: 1e9,
+            nonce: 1,
+            deadline: block.number,
+            dapp: address(wrapper),
+            control: address(dappControl),
+            callConfig: dappControl.CALL_CONFIG(),
+            sessionKey: address(0),
+            data: generateUserOperationData(userPK),
+            signature: new bytes(0)
+        });
+        (sig.v, sig.r, sig.s) = vm.sign(userPK, atlasVerification.getUserOperationPayload(userOp));
+        userOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        SolverOperation[] memory solverOps = new SolverOperation[](0);
+
+        DAppOperation memory dappOp = DAppOperation({
+            from: userEOA,
+            to: address(atlas),
+            nonce: 0,
+            deadline: userOp.deadline,
+            control: address(dappControl),
+            bundler: address(0),
+            userOpHash: atlasVerification.getUserOperationHash(userOp),
+            callChainHash: CallVerification.getCallChainHash(userOp, solverOps),
+            signature: new bytes(0)
+        });
+        (sig.v, sig.r, sig.s) = vm.sign(userPK, atlasVerification.getDAppOperationPayload(dappOp));
+        dappOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        assertNotEq(uint256(wrapper.latestAnswer()), uint256(dataPointValue));
+
+        vm.prank(address(69));
+        atlas.metacall(userOp, solverOps, dappOp);
+
+        assertEq(uint256(wrapper.latestAnswer()), uint256(dataPointValue));
+    }
+
+    function updateDataFeedsValues(uint256 pk) public returns (bool success) {
+        bytes memory data = generateUserOperationData(pk);
+        vm.prank(vm.addr(pk));
+        (success,) = address(wrapper).call(data);
+    }
+
+    function generateUserOperationData(uint256 pk) public view returns (bytes memory call) {
         bytes32 dataFeed = IFeed(baseFeedAddress).getDataFeedId();
         uint48 timestamp = uint48(block.timestamp * 1000);
         uint32 valueSize = 4;
@@ -130,12 +194,7 @@ contract RedstoneDAppControlTest is BaseTest {
             hex"000002ed57011e0000"    // 9 bytes
         );
 
-        bytes memory call = abi.encodeCall(wrapper.updateDataFeedsValues, (timestamp));
+        call = abi.encodeCall(wrapper.updateDataFeedsValues, (timestamp));
         call = bytes.concat(call, payload);
-
-        vm.prank(vm.addr(pk));
-        (bool success,) = address(wrapper).call(call);
-
-        return success;
     }
 }
