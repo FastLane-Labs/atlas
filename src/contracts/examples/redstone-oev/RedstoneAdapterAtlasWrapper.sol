@@ -35,11 +35,13 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
     uint256 public constant MAX_HISTORICAL_FETCH_ITERATIONS = 5;
 
     address[] public authorisedSigners;
+    address[] public authorisedUpdaters;
 
     uint256 public BASE_FEED_DELAY = 4; //seconds
 
     error BaseAdapterHasNoDataFeed();
     error InvalidAuthorisedSigner();
+    error InvalidUpdater();
     error BaseAdapterDoesNotSupportHistoricalData();
     error CannotFetchHistoricalData();
 
@@ -73,7 +75,15 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
     }
 
     function requireAuthorisedUpdater(address updater) public view virtual override {
-        getAuthorisedSignerIndex(updater);
+        if (authorisedUpdaters.length == 0) {
+            return;
+        }
+        for (uint256 i = 0; i < authorisedUpdaters.length; i++) {
+            if (authorisedUpdaters[i] == updater) {
+                return;
+            }
+        }
+        revert InvalidUpdater();
     }
 
     function getDataFeedId() public view virtual override returns (bytes32 dataFeedId) {
@@ -82,6 +92,20 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
 
     function addAuthorisedSigner(address _signer) external onlyOwner {
         authorisedSigners.push(_signer);
+    }
+
+    function addUpdater(address updater) external onlyOwner {
+        authorisedUpdaters.push(updater);
+    }
+
+    function removeUpdater(address updater) external onlyOwner {
+        for (uint256 i = 0; i < authorisedUpdaters.length; i++) {
+            if (authorisedUpdaters[i] == updater) {
+                authorisedUpdaters[i] = authorisedUpdaters[authorisedUpdaters.length - 1];
+                authorisedUpdaters.pop();
+                break;
+            }
+        }
     }
 
     function removeAuthorisedSigner(address _signer) external onlyOwner {
