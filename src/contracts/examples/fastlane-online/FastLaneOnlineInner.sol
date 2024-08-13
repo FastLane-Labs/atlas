@@ -88,7 +88,7 @@ contract FastLaneOnlineInner is BaseStorage, FastLaneOnlineControl {
         // Update the minAmountUserBuys with this value
         // NOTE: If all of the solvers fail to exceed this value, we'll redo this swap in the postOpsHook
         // and verify that the min amount is exceeded.
-        if (_baselineAmount >= swapIntent.minAmountUserBuys) {
+        if (_baselineAmount > swapIntent.minAmountUserBuys) {
             SwapIntent memory _swapIntent = swapIntent;
             _swapIntent.minAmountUserBuys = _baselineAmount;
             return (_swapIntent, baselineCall);
