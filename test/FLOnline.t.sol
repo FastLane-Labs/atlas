@@ -133,6 +133,52 @@ contract FastLaneOnlineTest is BaseTest {
         });
     }
 
+    function testFLOnlineSwap_OneSolverFulfills_NativeIn_Success() public {
+        vm.skip(true); // Fix sim native token issue then enable
+
+        _setUpUser(
+            SwapIntent({
+                tokenUserBuys: DAI_ADDRESS,
+                minAmountUserBuys: 3000e18,
+                tokenUserSells: NATIVE_TOKEN,
+                amountUserSells: 1e18
+            })
+        );
+
+        // Set up the solver contract and register the solverOp in the FLOnline contract
+        address winningSolver = _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount);
+
+        // User calls fastOnlineSwap, do checks that user and solver balances changed as expected
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: solverOneEOA,
+            winningSolver: winningSolver,
+            solverCount: 1,
+            swapCallShouldSucceed: true
+        });
+    }
+
+    function testFLOnlineSwap_OneSolverFulfills_NativeOut_Success() public {
+        _setUpUser(
+            SwapIntent({
+                tokenUserBuys: NATIVE_TOKEN,
+                minAmountUserBuys: 1e18,
+                tokenUserSells: DAI_ADDRESS,
+                amountUserSells: 3200e18
+            })
+        );
+
+        // Set up the solver contract and register the solverOp in the FLOnline contract
+        address winningSolver = _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount);
+
+        // User calls fastOnlineSwap, do checks that user and solver balances changed as expected
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: solverOneEOA,
+            winningSolver: winningSolver,
+            solverCount: 1,
+            swapCallShouldSucceed: true
+        });
+    }
+
     function testFLOnlineSwap_OneSolverFails_BaselineCallFulfills_Success() public {
         _setUpUser(defaultSwapIntent);
 
@@ -242,6 +288,56 @@ contract FastLaneOnlineTest is BaseTest {
 
     function testFLOnlineSwap_ZeroSolvers_BaselineCallReverts_Failure() public {
         _setUpUser(defaultSwapIntent);
+
+        // Set baselineCall incorrectly to intentionally fail
+        _setBaselineCallToRevert();
+
+        // Check BaselineCall struct is formed correctly and can revert, revert changes after
+        _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: false });
+
+        // fastOnlineSwap should revert if all solvers fail AND the baseline call also fails
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: address(0),
+            winningSolver: address(0), // No winning solver expected
+            solverCount: 0,
+            swapCallShouldSucceed: false // fastOnlineSwap should revert
+         });
+    }
+
+    function testFLOnlineSwap_ZeroSolvers_BaselineCallReverts_NativeIn_Failure() public {
+        _setUpUser(
+            SwapIntent({
+                tokenUserBuys: DAI_ADDRESS,
+                minAmountUserBuys: 3000e18,
+                tokenUserSells: NATIVE_TOKEN,
+                amountUserSells: 1e18
+            })
+        );
+
+        // Set baselineCall incorrectly to intentionally fail
+        _setBaselineCallToRevert();
+
+        // Check BaselineCall struct is formed correctly and can revert, revert changes after
+        _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: false });
+
+        // fastOnlineSwap should revert if all solvers fail AND the baseline call also fails
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: address(0),
+            winningSolver: address(0), // No winning solver expected
+            solverCount: 0,
+            swapCallShouldSucceed: false // fastOnlineSwap should revert
+         });
+    }
+
+    function testFLOnlineSwap_ZeroSolvers_BaselineCallReverts_NativeOut_Failure() public {
+        _setUpUser(
+            SwapIntent({
+                tokenUserBuys: NATIVE_TOKEN,
+                minAmountUserBuys: 1e18,
+                tokenUserSells: DAI_ADDRESS,
+                amountUserSells: 3200e18
+            })
+        );
 
         // Set baselineCall incorrectly to intentionally fail
         _setBaselineCallToRevert();
