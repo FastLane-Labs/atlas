@@ -86,8 +86,8 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
         }
 
         // Optimistically transfer the user's sell tokens to the solver.
-        if (_swapIntent.tokenUserBuys == _NATIVE_TOKEN) {
-            SafeTransferLib.safeTransferETH(solverOp.to, _swapIntent.amountUserSells);
+        if (_swapIntent.tokenUserSells == _NATIVE_TOKEN) {
+            SafeTransferLib.safeTransferETH(solverOp.solver, _swapIntent.amountUserSells);
         } else {
             SafeTransferLib.safeTransfer(_swapIntent.tokenUserSells, solverOp.solver, _swapIntent.amountUserSells);
         }
