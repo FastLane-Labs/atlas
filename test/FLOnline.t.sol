@@ -62,7 +62,7 @@ contract FastLaneOnlineTest is BaseTest {
     IUniswapV2Router02 routerV2 = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
 
     uint256 successfulSolverBidAmount = 1.2 ether; // more than baseline swap amountOut
-    uint256 defaultMsgValue = 1e17; // 0.1 ETH
+    uint256 defaultMsgValue = 1e16; // 0.01 ETH for bundler gas, treated as donation
     uint256 defaultGasLimit = 2_000_000;
     uint256 defaultGasPrice;
     uint256 defaultDeadlineBlock;
@@ -203,7 +203,6 @@ contract FastLaneOnlineTest is BaseTest {
     }
 
     function testFLOnlineSwap_ZeroSolvers_BaselineCallFulfills_NativeIn_Success() public {
-        // TODO work out pricing if ETH is tokenIn and not DAI
         _setUpUser(
             SwapIntent({
                 tokenUserBuys: DAI_ADDRESS,
@@ -501,6 +500,8 @@ contract FastLaneOnlineTest is BaseTest {
     )
         internal
     {
+        bool nativeTokenIn = args.swapIntent.tokenUserSells == NATIVE_TOKEN;
+        bool nativeTokenOut = args.swapIntent.tokenUserBuys == NATIVE_TOKEN;
         beforeVars.userTokenOutBalance = _balanceOf(args.swapIntent.tokenUserBuys, userEOA);
         beforeVars.userTokenInBalance = _balanceOf(args.swapIntent.tokenUserSells, userEOA);
         beforeVars.solverTokenOutBalance = _balanceOf(args.swapIntent.tokenUserBuys, winningSolver);
@@ -509,12 +510,15 @@ contract FastLaneOnlineTest is BaseTest {
         beforeVars.solverOneRep = flOnline.solverReputation(solverOneEOA);
         beforeVars.solverTwoRep = flOnline.solverReputation(solverTwoEOA);
         beforeVars.solverThreeRep = flOnline.solverReputation(solverThreeEOA);
-        uint256 estAtlasGasSurcharge = gasleft(); // Reused below during calculations
-        uint256 txGasUsed;
 
-        vm.prank(userEOA);
+        // adjust userTokenInBalance if native token - exclude gas treated as donation
+        if (nativeTokenIn) beforeVars.userTokenInBalance -= defaultMsgValue;
+
+        uint256 txGasUsed;
+        uint256 estAtlasGasSurcharge = gasleft(); // Reused below during calculations
 
         // Do the actual fastOnlineSwap call
+        vm.prank(userEOA);
         (bool result,) = address(flOnline).call{ gas: args.gas + 1000, value: args.msgValue }(
             abi.encodeCall(flOnline.fastOnlineSwap, (args.userOp))
         );
@@ -539,9 +543,6 @@ contract FastLaneOnlineTest is BaseTest {
             "Atlas gas surcharge not within estimated range"
         );
 
-        console.log("User ETH before", beforeVars.userTokenInBalance);
-        console.log("User ETH after", _balanceOf(NATIVE_TOKEN, userEOA));
-
         // Check user's balances changed as expected
         assertTrue(
             _balanceOf(args.swapIntent.tokenUserBuys, userEOA)
@@ -549,11 +550,8 @@ contract FastLaneOnlineTest is BaseTest {
             "User did not recieve enough tokenOut"
         );
 
-        // TODO refactor checks
-        if (args.swapIntent.tokenUserSells == NATIVE_TOKEN) {
-            uint256 bundlerAtlETH = atlas.balanceOfBonded(address(flOnline));
-            console.log("bundler bonded atlETH", bundlerAtlETH);
-
+        if (nativeTokenIn && winningSolverEOA != address(0)) {
+            // If a solver won, gas refund to user will throw off balance diff checks
             uint256 gasAndSurchargeCost =
                 (txGasUsed * tx.gasprice) + (atlas.cumulativeSurcharge() - beforeVars.atlasGasSurcharge);
 
@@ -620,8 +618,8 @@ contract FastLaneOnlineTest is BaseTest {
 
     // NOTE: This MUST be called at the start of each end-to-end test, to set up args
     function _setUpUser(SwapIntent memory swapIntent) internal {
-        // always start with 1 ETH for gas/bundler fees
-        uint256 userStartNativeTokenBalance = 1e18;
+        // always start with 0.01 ETH for gas/bundler fees
+        uint256 userStartNativeTokenBalance = 1e16;
 
         // Add tokens if user is selling native token
         if (swapIntent.tokenUserSells == NATIVE_TOKEN) {
