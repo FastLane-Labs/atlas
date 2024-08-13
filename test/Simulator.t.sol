@@ -227,6 +227,37 @@ contract SimulatorTest is BaseTest {
         assertEq(address(simulator).balance, simBalanceBefore, "Balance should not change");
     }
 
+    // Deployer Function Tests
+
+    function test_simulator_setAtlas() public {
+        assertEq(simulator.atlas(), address(atlas));
+
+        vm.expectRevert(AtlasErrors.Unauthorized.selector);
+        simulator.setAtlas(address(0));
+        assertEq(simulator.atlas(), address(atlas), "Should revert if not deployer");
+        
+        vm.prank(payee);
+        simulator.setAtlas(address(123));
+        assertEq(simulator.atlas(), address(123), "Should set new atlas address");
+    }
+
+    function test_simulator_withdrawETH() public {
+        address recipient = makeAddr("LuckyRecipient");
+        uint256 recipientBalanceBefore = address(recipient).balance;
+        simBalanceBefore = address(simulator).balance;
+        
+
+        vm.expectRevert(AtlasErrors.Unauthorized.selector);
+        simulator.withdrawETH(recipient);
+        assertEq(address(simulator).balance, simBalanceBefore, "Should revert if caller not deployer");
+
+        vm.prank(payee);
+        simulator.withdrawETH(recipient);
+        assertEq(address(simulator).balance, 0, "Should withdraw all balance");
+        assertEq(address(recipient).balance, recipientBalanceBefore + simBalanceBefore, "Should send balance to recipient");
+    }
+
+
     // Test Helpers
 
     function defaultCallConfig() public returns (CallConfigBuilder) {
