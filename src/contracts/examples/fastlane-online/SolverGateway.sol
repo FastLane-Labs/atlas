@@ -65,6 +65,11 @@ contract SolverGateway is OuterHelpers {
     {
         if (msg.sender != solverOp.from) revert SolverGateway_AddSolverOp_SolverMustBeSender();
 
+        if (S_solverOpHashes[solverOp.userOpHash].length == 0) {
+            // First solverOp of each userOp deploys the user's Execution Environment
+            IAtlas(ATLAS).createExecutionEnvironment(userOp.from, address(this));
+        }
+
         // Simulate the SolverOp and make sure it's valid
         if (!_simulateSolverOp(userOp, solverOp)) revert SolverGateway_AddSolverOp_SimulationFail();
 
