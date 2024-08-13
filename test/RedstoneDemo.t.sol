@@ -4,24 +4,39 @@ pragma solidity 0.8.25;
 import "forge-std/Test.sol";
 import "src/contracts/examples/redstone-oev/RedstoneAdapterAtlasWrapper.sol";
 import "src/contracts/examples/redstone-oev/RedstoneDAppControl.sol";
+import "src/contracts/types/DAppOperation.sol";
+import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 import { BaseTest } from "test/base/BaseTest.t.sol";
 
 contract RedstoneDAppControlTest is BaseTest {
+    uint256 auctioneerPK = 0xabcdef;
+    address auctioneer = vm.addr(auctioneerPK);
+
     RedstoneDAppControl dappControl;
     RedstoneAdapterAtlasWrapper wrapper;
-    address baseFeedAddress = 0xbC5FBcf58CeAEa19D523aBc76515b9AEFb5cfd58;
+    address baseFeedAddress = 0xdDb6F90fFb4d3257dd666b69178e5B3c5Bf41136; //weETH USD oracle on ETH mainnet
     uint32 dataPointValue = 666999;
 
     uint256 oracleOwnerPk;
+
+    Sig public sig;
+
+    struct Sig {
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+    }
 
     function setUp() public override {
         super.setUp();
 
         oracleOwnerPk = 0x98765;
 
-        vm.startPrank(governanceEOA);
+        vm.startPrank(auctioneer);
         dappControl = new RedstoneDAppControl(address(atlas));
+        atlasVerification.initializeGovernance(address(dappControl));
         vm.stopPrank();
+
         vm.startPrank(vm.addr(oracleOwnerPk));
         wrapper = RedstoneAdapterAtlasWrapper(dappControl.createNewAtlasAdapter(baseFeedAddress));
         vm.stopPrank();
@@ -49,19 +64,32 @@ contract RedstoneDAppControlTest is BaseTest {
         console.log("base startedAt", baseStartedAt);
         console.log("base updatedAt", baseUpdatedAt);
 
-        (uint128 dataTimestamp, uint128 blockTimestamp) = IAdapter(address(IFeed(baseFeedAddress).getPriceFeedAdapter())).getTimestampsFromLatestUpdate();
+        (uint128 dataTimestamp, uint128 blockTimestamp) = IAdapterWithRounds(address(IFeed(baseFeedAddress).getPriceFeedAdapter())).getTimestampsFromLatestUpdate();
         console.log("dataTimestamp", uint256(dataTimestamp));
         console.log("blockTimestamp", uint256(blockTimestamp));
 
-        (uint128 dataTimestampWrapper, uint128 blockTimestampWrapper) = IAdapter(address(wrapper)).getTimestampsFromLatestUpdate();
+        (uint128 dataTimestampWrapper, uint128 blockTimestampWrapper) = IAdapterWithRounds(address(wrapper)).getTimestampsFromLatestUpdate();
         console.log("dataTimestampWrapper", uint256(dataTimestampWrapper));
         console.log("blockTimestampWrapper", uint256(blockTimestampWrapper));
+    }
+
+    function testBaseAdapterHistoricalData() public view {
+        uint80 roundId = IFeed(baseFeedAddress).latestRound();
+        IAdapterWithRounds adapter = IAdapterWithRounds(address(IFeed(baseFeedAddress).getPriceFeedAdapter()));
+        for (uint256 i = 0; i < 5; i++) {
+            (uint256 value, uint128 dataTimestamp, uint128 blockTimestamp) = adapter.getRoundDataFromAdapter(IFeed(baseFeedAddress).getDataFeedId(), roundId);
+            console.log("roundId", roundId);
+            console.log("value", value);
+            console.log("dataTimestamp", dataTimestamp);
+            console.log("blockTimestamp", blockTimestamp);
+            console.log("---------------------------------------");
+            roundId--;
+        }
     }
 
     function testAuthorizedUpdateDataFeedsValues() public {
         vm.prank(vm.addr(oracleOwnerPk));
         wrapper.addAuthorisedSigner(governanceEOA);
-        vm.stopPrank();
 
         bool success = updateDataFeedsValues(0x123123);
         require(!success, "should fail because of unauthorized signer");
@@ -72,8 +100,65 @@ contract RedstoneDAppControlTest is BaseTest {
         success = updateDataFeedsValues(governancePK);
         require(success, "should succeed because of authorized signer");
     }
-   
-    function updateDataFeedsValues(uint256 pk) public returns (bool) {
+
+    function testRedstoneMetacall() public {
+        vm.prank(vm.addr(oracleOwnerPk));
+        wrapper.addAuthorisedSigner(auctioneer);
+
+        UserOperation memory userOp = UserOperation({
+            from: auctioneer,
+            to: address(atlas),
+            value: 0,
+            gas: 1000000,
+            maxFeePerGas: tx.gasprice,
+            nonce: 1,
+            deadline: block.number,
+            dapp: address(wrapper),
+            control: address(dappControl),
+            callConfig: dappControl.CALL_CONFIG(),
+            sessionKey: address(0),
+            data: generateUserOperationData(auctioneerPK),
+            signature: new bytes(0)
+        });
+        (sig.v, sig.r, sig.s) = vm.sign(auctioneerPK, atlasVerification.getUserOperationPayload(userOp));
+        userOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        SolverOperation[] memory solverOps = new SolverOperation[](0);
+
+        DAppOperation memory dappOp = DAppOperation({
+            from: auctioneer,
+            to: address(atlas),
+            nonce: 0,
+            deadline: userOp.deadline,
+            control: address(dappControl),
+            bundler: address(0),
+            userOpHash: atlasVerification.getUserOperationHash(userOp),
+            callChainHash: CallVerification.getCallChainHash(userOp, solverOps),
+            signature: new bytes(0)
+        });
+        (sig.v, sig.r, sig.s) = vm.sign(auctioneerPK, atlasVerification.getDAppOperationPayload(dappOp));
+        dappOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+
+        assertNotEq(uint256(wrapper.latestAnswer()), uint256(dataPointValue));
+
+        address bundler = address(69);
+        vm.deal(bundler, 100 ether);
+
+        vm.startPrank(bundler);
+        atlas.depositAndBond{value: 99 ether}(99 ether);
+        atlas.metacall(userOp, solverOps, dappOp);
+        vm.stopPrank();
+
+        assertEq(uint256(wrapper.latestAnswer()), uint256(dataPointValue));
+    }
+
+    function updateDataFeedsValues(uint256 pk) public returns (bool success) {
+        bytes memory data = generateUserOperationData(pk);
+        vm.prank(vm.addr(pk));
+        (success,) = address(wrapper).call(data);
+    }
+
+    function generateUserOperationData(uint256 pk) public view returns (bytes memory call) {
         bytes32 dataFeed = IFeed(baseFeedAddress).getDataFeedId();
         uint48 timestamp = uint48(block.timestamp * 1000);
         uint32 valueSize = 4;
@@ -116,12 +201,7 @@ contract RedstoneDAppControlTest is BaseTest {
             hex"000002ed57011e0000"    // 9 bytes
         );
 
-        bytes memory call = abi.encodeCall(wrapper.updateDataFeedsValues, (timestamp));
+        call = abi.encodeCall(wrapper.updateDataFeedsValues, (timestamp));
         call = bytes.concat(call, payload);
-
-        vm.prank(vm.addr(pk));
-        (bool success,) = address(wrapper).call(call);
-
-        return success;
     }
 }
