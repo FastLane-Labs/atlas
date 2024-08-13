@@ -34,8 +34,8 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
 
     uint256 public constant MAX_HISTORICAL_FETCH_ITERATIONS = 5;
 
-    address[] public authorisedSigners;
-    address[] public authorisedUpdaters;
+    address[] public authorisedSigners; // authorised signers who sign the datapoints
+    address[] public authorisedUpdaters; // authorised `msg.sender`s of `updateDataFeedsValues` (execution environments of the userOps)
 
     uint256 public BASE_FEED_DELAY = 4; //seconds
 
@@ -115,17 +115,6 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
                 authorisedSigners.pop();
                 break;
             }
-        }
-    }
-
-    function requireMinIntervalBetweenUpdatesPassed() private view {
-        uint256 currentBlockTimestamp = getBlockTimestamp();
-        uint256 blockTimestampFromLatestUpdate = getBlockTimestampFromLatestUpdate();
-        uint256 minIntervalBetweenUpdates = getMinIntervalBetweenUpdates();
-        if (currentBlockTimestamp < blockTimestampFromLatestUpdate + minIntervalBetweenUpdates) {
-            revert MinIntervalBetweenUpdatesHasNotPassedYet(
-                currentBlockTimestamp, blockTimestampFromLatestUpdate, minIntervalBetweenUpdates
-            );
         }
     }
 
