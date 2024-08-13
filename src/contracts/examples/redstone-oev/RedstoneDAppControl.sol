@@ -13,12 +13,16 @@ contract RedstoneDAppControl is DAppControl {
     error InvalidRedstoneAdapter();
     error FailedToAllocateOEV();
     error OnlyGovernance();
+    error OnlyWhitelistedBundlerAllowed();
 
     uint256 private bundlerOEVPercent = 5;
 
     event NewRedstoneAtlasAdapterCreated(address indexed wrapper, address indexed owner, address indexed baseFeed);
 
     mapping(address redstoneAtlasAdapter => bool isAdapter) public isRedstoneAdapter;
+
+    mapping(address bundler => bool isWhitelisted) public bundlerWhitelist;
+    uint32 public NUM_WHITELISTED_BUNDLERS = 0;
 
     constructor(
         address _atlas
@@ -29,7 +33,7 @@ contract RedstoneDAppControl is DAppControl {
             CallConfig({
                 userNoncesSequential: false,
                 dappNoncesSequential: false,
-                requirePreOps: false,
+                requirePreOps: true,
                 trackPreOpsReturnData: false,
                 trackUserReturnData: true,
                 delegateUser: false,
@@ -56,6 +60,20 @@ contract RedstoneDAppControl is DAppControl {
         bundlerOEVPercent = _percent;
     }
 
+    function addBundlerToWhitelist(address bundler) external onlyGov {
+        if (!bundlerWhitelist[bundler]) {
+            bundlerWhitelist[bundler] = true;
+            NUM_WHITELISTED_BUNDLERS++;
+        }
+    }
+
+    function removeBundlerFromWhitelist(address bundler) external onlyGov {
+        if (bundlerWhitelist[bundler]) {
+            bundlerWhitelist[bundler] = false;
+            NUM_WHITELISTED_BUNDLERS--;
+        }
+    }
+
     function _onlyGov() internal view {
         if (msg.sender != governance) revert OnlyGovernance();
     }
@@ -69,7 +87,15 @@ contract RedstoneDAppControl is DAppControl {
     //                  Atlas Hook Overrides                //
     // ---------------------------------------------------- //
 
+    function _preOpsCall(UserOperation calldata) internal view override returns (bytes memory) {
+        if (NUM_WHITELISTED_BUNDLERS > 0 && !bundlerWhitelist[_bundler()]) revert OnlyWhitelistedBundlerAllowed();
+        bytes memory emptyData;
+        return emptyData;
+    }
+
     function _allocateValueCall(address, uint256 bidAmount, bytes calldata data) internal virtual override {
+        if (bidAmount == 0) return;
+
         uint256 oevForBundler = bidAmount * bundlerOEVPercent / 100;
         uint256 oevForSolver = bidAmount - oevForBundler;
 
