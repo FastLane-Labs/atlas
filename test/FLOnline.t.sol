@@ -133,10 +133,6 @@ contract FastLaneOnlineTest is BaseTest {
         });
     }
 
-    function testFLOnlineSwap_OneSolverFulfills_NativeIn_Success() public {
-        vm.skip(true);
-    }
-
     function testFLOnlineSwap_OneSolverFails_BaselineCallFulfills_Success() public {
         _setUpUser(defaultSwapIntent);
 
@@ -157,10 +153,6 @@ contract FastLaneOnlineTest is BaseTest {
             solverCount: 1,
             swapCallShouldSucceed: true
         });
-    }
-
-    function testFLOnlineSwap_OneSolverFails_BaselineCallFulfills_NativeIn_Success() public {
-        vm.skip(true);
     }
 
     function testFLOnlineSwap_OneSolverFails_BaselineCallReverts_Failure() public {
@@ -209,6 +201,29 @@ contract FastLaneOnlineTest is BaseTest {
                 minAmountUserBuys: 3000e18,
                 tokenUserSells: NATIVE_TOKEN,
                 amountUserSells: 1e18
+            })
+        );
+
+        // Check BaselineCall struct is formed correctly and can succeed, revert changes after
+        _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: true });
+
+        // Now fastOnlineSwap should succeed using BaselineCall for fulfillment, with gas + Atlas gas surcharge paid for
+        // by ETH sent as msg.value by user.
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: address(0),
+            winningSolver: address(0), // No winning solver expected
+            solverCount: 0,
+            swapCallShouldSucceed: true
+        });
+    }
+
+    function testFLOnlineSwap_ZeroSolvers_BaselineCallFulfills_NativeOut_Success() public {
+        _setUpUser(
+            SwapIntent({
+                tokenUserBuys: NATIVE_TOKEN,
+                minAmountUserBuys: 1e18,
+                tokenUserSells: DAI_ADDRESS,
+                amountUserSells: 3200e18
             })
         );
 
