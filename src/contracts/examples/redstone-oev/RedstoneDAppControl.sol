@@ -21,7 +21,7 @@ contract RedstoneDAppControl is DAppControl {
 
     mapping(address redstoneAtlasAdapter => bool isAdapter) public isRedstoneAdapter;
 
-    mapping (address bundler => bool isWhitelisted) public bundlerWhitelist;
+    mapping(address bundler => bool isWhitelisted) public bundlerWhitelist;
     uint32 public NUM_WHITELISTED_BUNDLERS = 0;
 
     constructor(
@@ -86,7 +86,6 @@ contract RedstoneDAppControl is DAppControl {
     // ---------------------------------------------------- //
     //                  Atlas Hook Overrides                //
     // ---------------------------------------------------- //
-
 
     function _preOpsCall(UserOperation calldata) internal view override returns (bytes memory) {
         if (NUM_WHITELISTED_BUNDLERS > 0 && !bundlerWhitelist[_bundler()]) revert OnlyWhitelistedBundlerAllowed();

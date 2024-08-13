@@ -35,7 +35,8 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
     uint256 public constant MAX_HISTORICAL_FETCH_ITERATIONS = 5;
 
     address[] public authorisedSigners; // authorised signers who sign the datapoints
-    address[] public authorisedUpdaters; // authorised `msg.sender`s of `updateDataFeedsValues` (execution environments of the userOps)
+    address[] public authorisedUpdaters; // authorised `msg.sender`s of `updateDataFeedsValues` (execution environments
+        // of the userOps)
 
     uint256 public BASE_FEED_DELAY = 4; //seconds
 
