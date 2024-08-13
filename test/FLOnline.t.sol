@@ -654,7 +654,7 @@ contract FastLaneOnlineTest is BaseTest {
     {
         bool nativeTokenIn = swapIntent.tokenUserSells == NATIVE_TOKEN;
         newArgs.swapIntent = swapIntent;
-        newArgs.baselineCall = _buildBaselineCall(swapIntent);
+        newArgs.baselineCall = _buildBaselineCall(swapIntent, true); // should succeed
 
         (newArgs.userOp, newArgs.userOpHash) = flOnline.getUserOperationAndHash({
             swapper: userEOA,
@@ -679,12 +679,23 @@ contract FastLaneOnlineTest is BaseTest {
         if (nativeTokenIn) newArgs.msgValue += swapIntent.amountUserSells;
     }
 
-    function _buildBaselineCall(SwapIntent memory swapIntent) internal view returns (BaselineCall memory) {
+    function _buildBaselineCall(
+        SwapIntent memory swapIntent,
+        bool shouldSucceed
+    )
+        internal
+        view
+        returns (BaselineCall memory)
+    {
         bytes memory baselineData;
         uint256 value;
+        uint256 amountOutMin = swapIntent.minAmountUserBuys;
         address[] memory path = new address[](2);
         path[0] = swapIntent.tokenUserSells;
         path[1] = swapIntent.tokenUserBuys;
+
+        // Make amountOutMin way too high to cause baseline call to fail
+        if (!shouldSucceed) amountOutMin *= 100; // 100x original amountOutMin
 
         if (swapIntent.tokenUserSells == NATIVE_TOKEN) {
             path[0] = WETH_ADDRESS;
@@ -692,7 +703,7 @@ contract FastLaneOnlineTest is BaseTest {
             baselineData = abi.encodeCall(
                 routerV2.swapExactETHForTokens,
                 (
-                    swapIntent.minAmountUserBuys, // amountOutMin
+                    amountOutMin, // amountOutMin
                     path, // path = [tokenUserSells, tokenUserBuys]
                     executionEnvironment, // to
                     defaultDeadlineTimestamp // deadline
@@ -704,7 +715,7 @@ contract FastLaneOnlineTest is BaseTest {
                 routerV2.swapExactTokensForETH,
                 (
                     swapIntent.amountUserSells, // amountIn
-                    swapIntent.minAmountUserBuys, // amountOutMin
+                    amountOutMin, // amountOutMin
                     path, // path = [tokenUserSells, tokenUserBuys]
                     executionEnvironment, // to
                     defaultDeadlineTimestamp // deadline
@@ -715,7 +726,7 @@ contract FastLaneOnlineTest is BaseTest {
                 routerV2.swapExactTokensForTokens,
                 (
                     swapIntent.amountUserSells, // amountIn
-                    swapIntent.minAmountUserBuys, // amountOutMin
+                    amountOutMin, // amountOutMin
                     path, // path = [tokenUserSells, tokenUserBuys]
                     executionEnvironment, // to
                     defaultDeadlineTimestamp // deadline
@@ -846,27 +857,9 @@ contract FastLaneOnlineTest is BaseTest {
         vm.revertTo(snapshotId);
     }
 
-    // TODO refactor this for native token support
     function _setBaselineCallToRevert() internal {
-        // Everything correct except amountOutMin is too high
-        address[] memory path = new address[](2);
-        path[0] = DAI_ADDRESS;
-        path[1] = WETH_ADDRESS;
-
-        args.baselineCall = BaselineCall({
-            to: address(routerV2),
-            data: abi.encodeCall(
-                routerV2.swapExactTokensForTokens,
-                (
-                    args.swapIntent.amountUserSells, // amountIn
-                    9999e18, // BAD (unrealistic) amountOutMin
-                    path, // path = [DAI, WETH]
-                    executionEnvironment, // to
-                    defaultDeadlineTimestamp // deadline
-                )
-            ),
-            value: 0
-        });
+        // should not succeed
+        args.baselineCall = _buildBaselineCall(args.swapIntent, false);
 
         // Need to update the userOp with changes to baseline call
         (args.userOp, args.userOpHash) = flOnline.getUserOperationAndHash({
