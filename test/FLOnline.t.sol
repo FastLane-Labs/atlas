@@ -107,9 +107,8 @@ contract FastLaneOnlineTest is BaseTest {
         govBurner.burnGovernance(address(flOnline));
         vm.stopPrank();
 
-        // User deploys their FLOnline Execution Environment
-        vm.prank(userEOA);
-        executionEnvironment = atlas.createExecutionEnvironment(userEOA, address(flOnline));
+        // Get but do not deploy user's EE - first solver registered will deploy it
+        (executionEnvironment,,) = atlas.getExecutionEnvironment(userEOA, address(flOnline));
 
         // NOTE: `_setUpUser()` MUST be called at the start of each end-to-end test.
     }
