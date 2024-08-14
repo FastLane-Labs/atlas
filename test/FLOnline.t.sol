@@ -119,7 +119,7 @@ contract FastLaneOnlineTest is BaseTest {
     //                     Scenario Tests                   //
     // ---------------------------------------------------- //
 
-    function testFLOnlineSwap_OneSolverFulfills_Success() public {
+    function testFLOnline_Swap_OneSolverFulfills_Success() public {
         _setUpUser(defaultSwapIntent);
 
         // Set up the solver contract and register the solverOp in the FLOnline contract
@@ -134,7 +134,7 @@ contract FastLaneOnlineTest is BaseTest {
         });
     }
 
-    function testFLOnlineSwap_OneSolverFulfills_NativeIn_Success() public {
+    function testFLOnline_Swap_OneSolverFulfills_NativeIn_Success() public {
         _setUpUser(
             SwapIntent({
                 tokenUserBuys: DAI_ADDRESS,
@@ -156,7 +156,7 @@ contract FastLaneOnlineTest is BaseTest {
         });
     }
 
-    function testFLOnlineSwap_OneSolverFulfills_NativeOut_Success() public {
+    function testFLOnline_Swap_OneSolverFulfills_NativeOut_Success() public {
         _setUpUser(
             SwapIntent({
                 tokenUserBuys: NATIVE_TOKEN,
@@ -178,7 +178,7 @@ contract FastLaneOnlineTest is BaseTest {
         });
     }
 
-    function testFLOnlineSwap_OneSolverFails_BaselineCallFulfills_Success() public {
+    function testFLOnline_Swap_OneSolverFails_BaselineCallFulfills_Success() public {
         _setUpUser(defaultSwapIntent);
 
         // Set up the solver contract and register the solverOp in the FLOnline contract
@@ -200,7 +200,7 @@ contract FastLaneOnlineTest is BaseTest {
         });
     }
 
-    function testFLOnlineSwap_OneSolverFails_BaselineCallFulfills_NativeIn_Success() public {
+    function testFLOnline_Swap_OneSolverFails_BaselineCallFulfills_NativeIn_Success() public {
         _setUpUser(
             SwapIntent({
                 tokenUserBuys: DAI_ADDRESS,
@@ -229,7 +229,7 @@ contract FastLaneOnlineTest is BaseTest {
         });
     }
 
-    function testFLOnlineSwap_OneSolverFails_BaselineCallFulfills_NativeOut_Success() public {
+    function testFLOnline_Swap_OneSolverFails_BaselineCallFulfills_NativeOut_Success() public {
         _setUpUser(
             SwapIntent({
                 tokenUserBuys: NATIVE_TOKEN,
@@ -258,7 +258,7 @@ contract FastLaneOnlineTest is BaseTest {
         });
     }
 
-    function testFLOnlineSwap_OneSolverFails_BaselineCallReverts_Failure() public {
+    function testFLOnline_Swap_OneSolverFails_BaselineCallReverts_Failure() public {
         _setUpUser(defaultSwapIntent);
 
         // Set baselineCall incorrectly to intentionally fail
@@ -281,7 +281,7 @@ contract FastLaneOnlineTest is BaseTest {
          });
     }
 
-    function testFLOnlineSwap_ZeroSolvers_BaselineCallFulfills_Success() public {
+    function testFLOnline_Swap_ZeroSolvers_BaselineCallFulfills_Success() public {
         _setUpUser(defaultSwapIntent);
 
         // No solverOps at all
@@ -297,7 +297,7 @@ contract FastLaneOnlineTest is BaseTest {
         });
     }
 
-    function testFLOnlineSwap_ZeroSolvers_BaselineCallFulfills_NativeIn_Success() public {
+    function testFLOnline_Swap_ZeroSolvers_BaselineCallFulfills_NativeIn_Success() public {
         _setUpUser(
             SwapIntent({
                 tokenUserBuys: DAI_ADDRESS,
@@ -320,7 +320,7 @@ contract FastLaneOnlineTest is BaseTest {
         });
     }
 
-    function testFLOnlineSwap_ZeroSolvers_BaselineCallFulfills_NativeOut_Success() public {
+    function testFLOnline_Swap_ZeroSolvers_BaselineCallFulfills_NativeOut_Success() public {
         _setUpUser(
             SwapIntent({
                 tokenUserBuys: NATIVE_TOKEN,
@@ -343,7 +343,7 @@ contract FastLaneOnlineTest is BaseTest {
         });
     }
 
-    function testFLOnlineSwap_ZeroSolvers_BaselineCallReverts_Failure() public {
+    function testFLOnline_Swap_ZeroSolvers_BaselineCallReverts_Failure() public {
         _setUpUser(defaultSwapIntent);
 
         // Set baselineCall incorrectly to intentionally fail
@@ -361,7 +361,7 @@ contract FastLaneOnlineTest is BaseTest {
          });
     }
 
-    function testFLOnlineSwap_ZeroSolvers_BaselineCallReverts_NativeIn_Failure() public {
+    function testFLOnline_Swap_ZeroSolvers_BaselineCallReverts_NativeIn_Failure() public {
         _setUpUser(
             SwapIntent({
                 tokenUserBuys: DAI_ADDRESS,
@@ -386,7 +386,7 @@ contract FastLaneOnlineTest is BaseTest {
          });
     }
 
-    function testFLOnlineSwap_ZeroSolvers_BaselineCallReverts_NativeOut_Failure() public {
+    function testFLOnline_Swap_ZeroSolvers_BaselineCallReverts_NativeOut_Failure() public {
         _setUpUser(
             SwapIntent({
                 tokenUserBuys: NATIVE_TOKEN,
@@ -411,7 +411,7 @@ contract FastLaneOnlineTest is BaseTest {
          });
     }
 
-    function testFLOnlineSwap_ThreeSolvers_ThirdFulfills_Success() public {
+    function testFLOnline_Swap_ThreeSolvers_ThirdFulfills_Success() public {
         _setUpUser(defaultSwapIntent);
 
         // Set up the solver contracts and register the solverOps in the FLOnline contract
@@ -433,7 +433,7 @@ contract FastLaneOnlineTest is BaseTest {
         });
     }
 
-    function testFLOnlineSwap_ThreeSolvers_ThirdFulfills_NativeIn_Success() public {
+    function testFLOnline_Swap_ThreeSolvers_ThirdFulfills_NativeIn_Success() public {
         _setUpUser(
             SwapIntent({
                 tokenUserBuys: DAI_ADDRESS,
@@ -462,7 +462,7 @@ contract FastLaneOnlineTest is BaseTest {
         });
     }
 
-    function testFLOnlineSwap_ThreeSolvers_ThirdFulfills_NativeOut_Success() public {
+    function testFLOnline_Swap_ThreeSolvers_ThirdFulfills_NativeOut_Success() public {
         _setUpUser(
             SwapIntent({
                 tokenUserBuys: NATIVE_TOKEN,
@@ -491,7 +491,7 @@ contract FastLaneOnlineTest is BaseTest {
         });
     }
 
-    function testFLOnlineSwap_ThreeSolvers_AllFail_BaselineCallFulfills_Success() public {
+    function testFLOnline_Swap_ThreeSolvers_AllFail_BaselineCallFulfills_Success() public {
         _setUpUser(defaultSwapIntent);
 
         // Set up the solver contracts and register the solverOps in the FLOnline contract
@@ -521,7 +521,7 @@ contract FastLaneOnlineTest is BaseTest {
         });
     }
 
-    function testFLOnlineSwap_ThreeSolvers_AllFail_BaselineCallReverts_Failure() public {
+    function testFLOnline_Swap_ThreeSolvers_AllFail_BaselineCallReverts_Failure() public {
         _setUpUser(defaultSwapIntent);
 
         // Set up the solver contracts and register the solverOps in the FLOnline contract
@@ -553,7 +553,7 @@ contract FastLaneOnlineTest is BaseTest {
          });
     }
 
-    function testFLOnlineSwap_SolverBidsSameAsBaselineCall_Success() public {
+    function testFLOnline_Swap_SolverBidsSameAsBaselineCall_Success() public {
         _setUpUser(defaultSwapIntent);
 
         uint256 baselineAmountOut = _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: true });
@@ -576,20 +576,49 @@ contract FastLaneOnlineTest is BaseTest {
     }
 
     // ---------------------------------------------------- //
-    //                     Unit Tests                       //
+    //                addSolverOp() Tests                   //
     // ---------------------------------------------------- //
 
-    function testFLOnlineSwap_ValidateSwap_Reverts() public {
-        vm.skip(true);
+    function testFLOnline_addSolverOp_WrongCaller_Fails() public {
+        _setUpUser(defaultSwapIntent);
+        SolverOperation memory solverOp = _buildSolverOp(solverOneEOA, solverOnePK, address(123), 1);
+
+        vm.prank(userEOA); // Should revert if caller not solverOneEOA
+        vm.expectRevert(FastLaneOnlineErrors.SolverGateway_AddSolverOp_SolverMustBeSender.selector);
+        flOnline.addSolverOp(args.userOp, solverOp);
     }
 
-    function testFLOnlineSwap_ValidateSwap_UpdatesUserNonce() public {
-        vm.skip(true);
-        // Check userOp created uses the prev nonce (e.g. if 1 to start)
-        // Then the nonce is incremented (e.g. to 2) for use in the next userOp by that swapper
-        // These nonces are then converted to the actual nonce used in the userOp:
-        // keccak256(FLO nonce + 1, swapper addr)
+    function testFLOnline_addSolverOp_FirstSolverCreatesEE() public {
+        bool isDeployed;
+        _setUpUser(defaultSwapIntent);
+
+        (,, isDeployed) = atlas.getExecutionEnvironment(userEOA, address(flOnline));
+        assertEq(isDeployed, false, "EE should not be deployed yet");
+
+        // First solver to call addSolverOp() deploys EE
+        _setUpSolver(solverOneEOA, solverOnePK, goodSolverBidETH);
+
+        (,, isDeployed) = atlas.getExecutionEnvironment(userEOA, address(flOnline));
+        assertEq(isDeployed, true, "EE should be deployed");
     }
+
+    function testFLOnline_addSolverOp_SimFail_Fails() public {
+        _setUpUser(defaultSwapIntent);
+
+        vm.startPrank(solverOneEOA); // standard solver set up
+        FLOnlineRFQSolver solver = new FLOnlineRFQSolver{ salt: keccak256("salt") }(WETH_ADDRESS, address(atlas));
+        SolverOperation memory solverOp = _buildSolverOp(solverOneEOA, solverOnePK, address(solver), goodSolverBidETH);
+
+        // Set solver contract to revert, causing sim to fail
+        solver.setShouldSucceed(false);
+
+        vm.expectRevert(FastLaneOnlineErrors.SolverGateway_AddSolverOp_SimulationFail.selector);
+        flOnline.addSolverOp(args.userOp, solverOp);
+    }
+
+    // ---------------------------------------------------- //
+    //                     Unit Tests                       //
+    // ---------------------------------------------------- //
 
     function testFLOnline_SortSolverOps_SortsInDescendingOrderOfBid() public {
         SolverOperation[] memory solverOps = new SolverOperation[](0);
