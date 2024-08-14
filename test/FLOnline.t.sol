@@ -12,6 +12,7 @@ import { UserOperation } from "src/contracts/types/UserOperation.sol";
 
 import { FastLaneOnlineOuter } from "src/contracts/examples/fastlane-online/FastLaneOnlineOuter.sol";
 import { SwapIntent, BaselineCall, Reputation } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
+import { FastLaneOnlineErrors } from "src/contracts/examples/fastlane-online/FastLaneOnlineErrors.sol";
 
 import { IUniswapV2Router02 } from "test/base/interfaces/IUniswapV2Router.sol";
 
@@ -552,6 +553,28 @@ contract FastLaneOnlineTest is BaseTest {
          });
     }
 
+    function testFLOnlineSwap_SolverBidsSameAsBaselineCall_Success() public {
+        _setUpUser(defaultSwapIntent);
+
+        uint256 baselineAmountOut = _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: true });
+
+        // If solver bids below baseline amountOut, addSolverOp will revert
+        bytes4 expectedErr = FastLaneOnlineErrors.SolverGateway_AddSolverOp_SimulationFail.selector;
+        _setUpSolver(solverOneEOA, solverOnePK, baselineAmountOut - 1, expectedErr);
+
+        // But if solver bids equal to baseline amountOut, solver will win if no higher bids
+        address winningSolver = _setUpSolver(solverOneEOA, solverOnePK, baselineAmountOut);
+
+        // Now fastOnlineSwap should succeed using BaselineCall for fulfillment, with gas + Atlas gas surcharge paid for
+        // by ETH sent as msg.value by user.
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: solverOneEOA,
+            winningSolver: winningSolver,
+            solverCount: 1,
+            swapCallShouldSucceed: true
+        });
+    }
+
     // ---------------------------------------------------- //
     //                     Unit Tests                       //
     // ---------------------------------------------------- //
@@ -710,8 +733,6 @@ contract FastLaneOnlineTest is BaseTest {
         flOnlineMock.setWinningSolver(address(1));
         assertEq(flOnlineMock.getWinningSolver(), solverOneEOA, "winningSolver should still be solverOneEOA");
     }
-
-    // TODO add tests when solverOp is valid, but does not outperform baseline call, baseline call used instead
 
     // ---------------------------------------------------- //
     //                        Helpers                       //
@@ -960,6 +981,18 @@ contract FastLaneOnlineTest is BaseTest {
     }
 
     function _setUpSolver(address solverEOA, uint256 solverPK, uint256 bidAmount) internal returns (address) {
+        return _setUpSolver(solverEOA, solverPK, bidAmount, bytes4(0));
+    }
+
+    function _setUpSolver(
+        address solverEOA,
+        uint256 solverPK,
+        uint256 bidAmount,
+        bytes4 addSolverOpError
+    )
+        internal
+        returns (address)
+    {
         vm.startPrank(solverEOA);
         // Make sure solver has 1 AtlETH bonded in Atlas
         uint256 bonded = atlas.balanceOfBonded(solverEOA);
@@ -973,10 +1006,10 @@ contract FastLaneOnlineTest is BaseTest {
         }
 
         // Deploy RFQ solver contract
-        bytes32 salt = keccak256(abi.encodePacked(address(flOnline), solverEOA, bidAmount));
+        bytes32 salt = keccak256(abi.encodePacked(address(flOnline), solverEOA, bidAmount, vm.getNonce(solverEOA)));
         FLOnlineRFQSolver solver = new FLOnlineRFQSolver{ salt: salt }(WETH_ADDRESS, address(atlas));
 
-        // Solver signs the solverOp
+        // Create signed solverOp
         SolverOperation memory solverOp = _buildSolverOp(solverEOA, solverPK, address(solver), bidAmount);
 
         // Give solver contract enough tokenOut to fulfill user's SwapIntent
@@ -987,7 +1020,11 @@ contract FastLaneOnlineTest is BaseTest {
         }
 
         // Register solverOp in FLOnline in frontrunning tx
+        if (addSolverOpError != bytes4(0)) vm.expectRevert(addSolverOpError);
         flOnline.addSolverOp({ userOp: args.userOp, solverOp: solverOp });
+
+        // Return early if addSolverOp expected to revert
+        if (addSolverOpError != bytes4(0)) return address(0);
         vm.stopPrank();
 
         if (solverEOA == solverOneEOA) attempted.solverOne = true;
@@ -1027,11 +1064,13 @@ contract FastLaneOnlineTest is BaseTest {
         solverOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
     }
 
-    function _doBaselineCallWithChecksThenRevertChanges(bool shouldSucceed) internal {
+    // Returns the amount of tokensOut received, which forms the baseline solvers should beat
+    function _doBaselineCallWithChecksThenRevertChanges(bool shouldSucceed) internal returns (uint256) {
         uint256 snapshotId = vm.snapshot(); // Everything below this gets reverted after function ends
 
         uint256 eeTokenInBefore = _balanceOf(args.swapIntent.tokenUserSells, executionEnvironment);
         uint256 eeTokenOutBefore = _balanceOf(args.swapIntent.tokenUserBuys, executionEnvironment);
+        uint256 eeTokenOutAfter;
 
         if (eeTokenInBefore < args.swapIntent.amountUserSells) {
             if (args.swapIntent.tokenUserSells == NATIVE_TOKEN) {
@@ -1062,12 +1101,12 @@ contract FastLaneOnlineTest is BaseTest {
 
         if (!shouldSucceed) {
             vm.revertTo(snapshotId);
-            return;
+            return 0;
         }
 
+        eeTokenOutAfter = _balanceOf(args.swapIntent.tokenUserBuys, executionEnvironment);
         assertTrue(
-            _balanceOf(args.swapIntent.tokenUserBuys, executionEnvironment)
-                >= eeTokenOutBefore + args.swapIntent.minAmountUserBuys,
+            eeTokenOutAfter >= eeTokenOutBefore + args.swapIntent.minAmountUserBuys,
             "EE did not recieve expected tokenOut in baseline call"
         );
         assertEq(
@@ -1077,6 +1116,7 @@ contract FastLaneOnlineTest is BaseTest {
         );
         //Revert back to state before baseline call was done
         vm.revertTo(snapshotId);
+        return eeTokenOutAfter - eeTokenOutBefore;
     }
 
     function _setBaselineCallToRevert() internal {
