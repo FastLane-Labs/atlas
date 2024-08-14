@@ -102,6 +102,8 @@ contract BaseTest is Test, TestConstants {
         sorter = new Sorter(address(atlas));
         govBurner = new GovernanceBurner();
 
+        vm.deal(address(simulator), 1000e18); // to allow userOp.value > 0 sims
+
         vm.stopPrank();
         vm.startPrank(governanceEOA);
 
