@@ -66,13 +66,14 @@ contract OuterHelpers is FastLaneOnlineInner {
         BaselineCall calldata baselineCall,
         uint256 deadline,
         uint256 gas,
-        uint256 maxFeePerGas
+        uint256 maxFeePerGas,
+        uint256 msgValue
     )
         external
         view
         returns (UserOperation memory userOp, bytes32 userOpHash)
     {
-        userOp = _getUserOperation(swapper, swapIntent, baselineCall, deadline, gas, maxFeePerGas);
+        userOp = _getUserOperation(swapper, swapIntent, baselineCall, deadline, gas, maxFeePerGas, msgValue);
         userOpHash = _getUserOperationHash(userOp);
     }
 
@@ -82,14 +83,16 @@ contract OuterHelpers is FastLaneOnlineInner {
         BaselineCall calldata baselineCall,
         uint256 deadline,
         uint256 gas,
-        uint256 maxFeePerGas
+        uint256 maxFeePerGas,
+        uint256 msgValue
     )
         external
         view
         returns (bytes32 userOpHash)
     {
-        userOpHash =
-            _getUserOperationHash(_getUserOperation(swapper, swapIntent, baselineCall, deadline, gas, maxFeePerGas));
+        userOpHash = _getUserOperationHash(
+            _getUserOperation(swapper, swapIntent, baselineCall, deadline, gas, maxFeePerGas, msgValue)
+        );
     }
 
     function getUserOperation(
@@ -98,13 +101,14 @@ contract OuterHelpers is FastLaneOnlineInner {
         BaselineCall calldata baselineCall,
         uint256 deadline,
         uint256 gas,
-        uint256 maxFeePerGas
+        uint256 maxFeePerGas,
+        uint256 msgValue
     )
         external
         view
         returns (UserOperation memory userOp)
     {
-        userOp = _getUserOperation(swapper, swapIntent, baselineCall, deadline, gas, maxFeePerGas);
+        userOp = _getUserOperation(swapper, swapIntent, baselineCall, deadline, gas, maxFeePerGas, msgValue);
     }
 
     function makeThogardsWifeHappy() external onlyAsControl withUserLock(msg.sender) {
@@ -135,7 +139,8 @@ contract OuterHelpers is FastLaneOnlineInner {
         BaselineCall calldata baselineCall,
         uint256 deadline,
         uint256 gas,
-        uint256 maxFeePerGas
+        uint256 maxFeePerGas,
+        uint256 msgValue
     )
         internal
         view
@@ -148,7 +153,7 @@ contract OuterHelpers is FastLaneOnlineInner {
             maxFeePerGas: maxFeePerGas,
             nonce: _getNextUserNonce(swapper),
             deadline: deadline,
-            value: 0,
+            value: msgValue,
             dapp: CONTROL,
             control: CONTROL,
             callConfig: CALL_CONFIG,

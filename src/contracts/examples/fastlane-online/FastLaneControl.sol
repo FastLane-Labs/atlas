@@ -22,6 +22,8 @@ interface ISolverGateway {
 }
 
 contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
+    address internal constant _NATIVE_TOKEN = address(0);
+
     constructor(
         address _atlas
     )
@@ -84,8 +86,8 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
         }
 
         // Optimistically transfer the user's sell tokens to the solver.
-        if (_swapIntent.tokenUserBuys == address(0)) {
-            SafeTransferLib.safeTransferETH(solverOp.to, _swapIntent.amountUserSells);
+        if (_swapIntent.tokenUserSells == _NATIVE_TOKEN) {
+            SafeTransferLib.safeTransferETH(solverOp.solver, _swapIntent.amountUserSells);
         } else {
             SafeTransferLib.safeTransfer(_swapIntent.tokenUserSells, solverOp.solver, _swapIntent.amountUserSells);
         }
@@ -125,8 +127,8 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
             revert FLOnlineControl_PostOpsCall_InsufficientBaseline();
         }
 
-        // Undo the token approval, if not gas token.
-        if (_swapIntent.tokenUserSells != address(0)) {
+        // Undo the token approval, if not native token.
+        if (_swapIntent.tokenUserSells != _NATIVE_TOKEN) {
             SafeTransferLib.safeApprove(_swapIntent.tokenUserSells, _baselineCall.to, 0);
         }
 
@@ -139,14 +141,14 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
     //////////////////////////////////////////////
     function _sendTokensToUser(SwapIntent memory swapIntent) internal {
         // Transfer the buy token
-        if (swapIntent.tokenUserBuys == address(0)) {
+        if (swapIntent.tokenUserBuys == _NATIVE_TOKEN) {
             SafeTransferLib.safeTransferETH(_user(), address(this).balance);
         } else {
             SafeTransferLib.safeTransfer(swapIntent.tokenUserBuys, _user(), _getERC20Balance(swapIntent.tokenUserBuys));
         }
 
         // Transfer any surplus sell token
-        if (swapIntent.tokenUserSells == address(0)) {
+        if (swapIntent.tokenUserSells == _NATIVE_TOKEN) {
             SafeTransferLib.safeTransferETH(_user(), address(this).balance);
         } else {
             SafeTransferLib.safeTransfer(
@@ -163,13 +165,13 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
         returns (uint256 received)
     {
         // Track the balance (count any previously-forwarded tokens)
-        uint256 _startingBalance = swapIntent.tokenUserBuys == address(0)
+        uint256 _startingBalance = swapIntent.tokenUserBuys == _NATIVE_TOKEN
             ? address(this).balance - msg.value
             : _getERC20Balance(swapIntent.tokenUserBuys);
 
-        // CASE not gas token
-        // NOTE: if gas token, pass as value
-        if (swapIntent.tokenUserSells != address(0)) {
+        // CASE not native token
+        // NOTE: if native token, pass as value
+        if (swapIntent.tokenUserSells != _NATIVE_TOKEN) {
             // Approve the router (NOTE that this approval happens either inside the try/catch and is reverted
             // or in the postOps hook where we cancel it afterwards.
             SafeTransferLib.safeApprove(swapIntent.tokenUserSells, baselineCall.to, swapIntent.amountUserSells);
@@ -181,7 +183,7 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
         if (!_success) revert FLOnlineControl_BaselineSwap_BaselineCallFail();
 
         // Track the balance delta
-        uint256 _endingBalance = swapIntent.tokenUserBuys == address(0)
+        uint256 _endingBalance = swapIntent.tokenUserBuys == _NATIVE_TOKEN
             ? address(this).balance - msg.value
             : _getERC20Balance(swapIntent.tokenUserBuys);
 

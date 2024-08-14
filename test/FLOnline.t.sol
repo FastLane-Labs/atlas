@@ -29,14 +29,15 @@ contract FastLaneOnlineTest is BaseTest {
         uint256 deadline;
         uint256 gas;
         uint256 maxFeePerGas;
+        uint256 msgValue;
         bytes32 userOpHash;
     }
 
     struct BeforeAndAfterVars {
-        uint256 userWeth;
-        uint256 userDai;
-        uint256 solverWeth;
-        uint256 solverDai;
+        uint256 userTokenOutBalance;
+        uint256 userTokenInBalance;
+        uint256 solverTokenOutBalance;
+        uint256 solverTokenInBalance;
         uint256 atlasGasSurcharge;
         Reputation solverOneRep;
         Reputation solverTwoRep;
@@ -53,6 +54,7 @@ contract FastLaneOnlineTest is BaseTest {
     }
 
     uint256 constant ERR_MARGIN = 0.15e18; // 15% error margin
+    address internal constant NATIVE_TOKEN = address(0);
 
     IERC20 DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     address DAI_ADDRESS = address(DAI);
@@ -60,11 +62,19 @@ contract FastLaneOnlineTest is BaseTest {
     IUniswapV2Router02 routerV2 = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
 
     uint256 successfulSolverBidAmount = 1.2 ether; // more than baseline swap amountOut
-    uint256 defaultMsgValue = 1e17; // 0.1 ETH
+    uint256 defaultMsgValue = 1e16; // 0.01 ETH for bundler gas, treated as donation
     uint256 defaultGasLimit = 2_000_000;
     uint256 defaultGasPrice;
     uint256 defaultDeadlineBlock;
     uint256 defaultDeadlineTimestamp;
+
+    // 3200 DAI for 1 WETH (no native tokens)
+    SwapIntent defaultSwapIntent = SwapIntent({
+        tokenUserBuys: address(WETH),
+        minAmountUserBuys: 1e18,
+        tokenUserSells: DAI_ADDRESS,
+        amountUserSells: 3200e18
+    });
 
     FastLaneOnlineOuter flOnline;
     MockFastLaneOnline flOnlineMock;
@@ -101,17 +111,7 @@ contract FastLaneOnlineTest is BaseTest {
         vm.prank(userEOA);
         executionEnvironment = atlas.createExecutionEnvironment(userEOA, address(flOnline));
 
-        // Set fastOnlineSwap args to default values
-        args = _buildDefaultFastOnlineSwapArgs();
-
-        // User starts with 0 WETH (tokenUserBuys) and 3200 DAI (tokenUserSells)
-        deal(args.swapIntent.tokenUserBuys, userEOA, 0); // Burn user's WETH to start at 0
-        deal(args.swapIntent.tokenUserSells, userEOA, args.swapIntent.amountUserSells); // 3200 DAI
-        deal(userEOA, 1e18); // Give user 1 ETH to pay for gas (msg.value is 0.1 ETH per call by default)
-
-        // User approves Atlas to take their DAI to facilitate the swap
-        vm.prank(userEOA);
-        IERC20(args.swapIntent.tokenUserSells).approve(address(atlas), args.swapIntent.amountUserSells);
+        // NOTE: `_setUpUser()` MUST be called at the start of each end-to-end test.
     }
 
     // ---------------------------------------------------- //
@@ -119,9 +119,51 @@ contract FastLaneOnlineTest is BaseTest {
     // ---------------------------------------------------- //
 
     function testFLOnlineSwap_OneSolverFulfills_Success() public {
-        // First, create the data args the user will pass to the fastOnlineSwap function, which will be intercepted
-        // by the solver in the mempool, used to form a solverOp to fulfill the user's SwapIntent, and a
-        // frontrunning tx to register this fulfillment solverOp in the FLOnline contract via addSolverOp()
+        _setUpUser(defaultSwapIntent);
+
+        // Set up the solver contract and register the solverOp in the FLOnline contract
+        address winningSolver = _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount);
+
+        // User calls fastOnlineSwap, do checks that user and solver balances changed as expected
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: solverOneEOA,
+            winningSolver: winningSolver,
+            solverCount: 1,
+            swapCallShouldSucceed: true
+        });
+    }
+
+    function testFLOnlineSwap_OneSolverFulfills_NativeIn_Success() public {
+        _setUpUser(
+            SwapIntent({
+                tokenUserBuys: DAI_ADDRESS,
+                minAmountUserBuys: 3000e18,
+                tokenUserSells: NATIVE_TOKEN,
+                amountUserSells: 1e18
+            })
+        );
+
+        // Set up the solver contract and register the solverOp in the FLOnline contract
+        address winningSolver = _setUpSolver(solverOneEOA, solverOnePK, 3100e18);
+
+        // User calls fastOnlineSwap, do checks that user and solver balances changed as expected
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: solverOneEOA,
+            winningSolver: winningSolver,
+            solverCount: 1,
+            swapCallShouldSucceed: true
+        });
+    }
+
+    function testFLOnlineSwap_OneSolverFulfills_NativeOut_Success() public {
+        _setUpUser(
+            SwapIntent({
+                tokenUserBuys: NATIVE_TOKEN,
+                minAmountUserBuys: 1e18,
+                tokenUserSells: DAI_ADDRESS,
+                amountUserSells: 3200e18
+            })
+        );
 
         // Set up the solver contract and register the solverOp in the FLOnline contract
         address winningSolver = _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount);
@@ -136,15 +178,13 @@ contract FastLaneOnlineTest is BaseTest {
     }
 
     function testFLOnlineSwap_OneSolverFails_BaselineCallFulfills_Success() public {
+        _setUpUser(defaultSwapIntent);
+
         // Set up the solver contract and register the solverOp in the FLOnline contract
         address failingSolver = _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount);
 
         // Check BaselineCall struct is formed correctly and can succeed, revert changes after
-        _doBaselineCallWithBalanceChecksThenRevertStateChanges({
-            caller: userEOA,
-            tokenOutRecipient: executionEnvironment,
-            shouldSucceed: true
-        });
+        _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: true });
 
         // Set failingSolver to fail during metacall
         FLOnlineRFQSolver(payable(failingSolver)).setShouldSucceed(false);
@@ -160,17 +200,15 @@ contract FastLaneOnlineTest is BaseTest {
     }
 
     function testFLOnlineSwap_OneSolverFails_BaselineCallReverts_Failure() public {
+        _setUpUser(defaultSwapIntent);
+
         // Set baselineCall incorrectly to intentionally fail
         _setBaselineCallToRevert();
 
         address solver = _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount);
 
         // Check BaselineCall struct is formed correctly and can revert, revert changes after
-        _doBaselineCallWithBalanceChecksThenRevertStateChanges({
-            caller: userEOA,
-            tokenOutRecipient: executionEnvironment,
-            shouldSucceed: false
-        });
+        _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: false });
 
         // Set solver contract to fail during metacall
         FLOnlineRFQSolver(payable(solver)).setShouldSucceed(false);
@@ -184,13 +222,57 @@ contract FastLaneOnlineTest is BaseTest {
          });
     }
 
-    function testFLOnlineSwap_ZeroSolvers_BaselineCallFullfills_Success() public {
+    function testFLOnlineSwap_ZeroSolvers_BaselineCallFulfills_Success() public {
+        _setUpUser(defaultSwapIntent);
+
         // No solverOps at all
-        _doBaselineCallWithBalanceChecksThenRevertStateChanges({
-            caller: userEOA,
-            tokenOutRecipient: executionEnvironment,
-            shouldSucceed: true
+        _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: true });
+
+        // Now fastOnlineSwap should succeed using BaselineCall for fulfillment, with gas + Atlas gas surcharge paid for
+        // by ETH sent as msg.value by user.
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: address(0),
+            winningSolver: address(0), // No winning solver expected
+            solverCount: 0,
+            swapCallShouldSucceed: true
         });
+    }
+
+    function testFLOnlineSwap_ZeroSolvers_BaselineCallFulfills_NativeIn_Success() public {
+        _setUpUser(
+            SwapIntent({
+                tokenUserBuys: DAI_ADDRESS,
+                minAmountUserBuys: 3000e18,
+                tokenUserSells: NATIVE_TOKEN,
+                amountUserSells: 1e18
+            })
+        );
+
+        // Check BaselineCall struct is formed correctly and can succeed, revert changes after
+        _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: true });
+
+        // Now fastOnlineSwap should succeed using BaselineCall for fulfillment, with gas + Atlas gas surcharge paid for
+        // by ETH sent as msg.value by user.
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: address(0),
+            winningSolver: address(0), // No winning solver expected
+            solverCount: 0,
+            swapCallShouldSucceed: true
+        });
+    }
+
+    function testFLOnlineSwap_ZeroSolvers_BaselineCallFulfills_NativeOut_Success() public {
+        _setUpUser(
+            SwapIntent({
+                tokenUserBuys: NATIVE_TOKEN,
+                minAmountUserBuys: 1e18,
+                tokenUserSells: DAI_ADDRESS,
+                amountUserSells: 3200e18
+            })
+        );
+
+        // Check BaselineCall struct is formed correctly and can succeed, revert changes after
+        _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: true });
 
         // Now fastOnlineSwap should succeed using BaselineCall for fulfillment, with gas + Atlas gas surcharge paid for
         // by ETH sent as msg.value by user.
@@ -203,17 +285,13 @@ contract FastLaneOnlineTest is BaseTest {
     }
 
     function testFLOnlineSwap_ZeroSolvers_BaselineCallReverts_Failure() public {
-        // No solverOps at all
+        _setUpUser(defaultSwapIntent);
 
         // Set baselineCall incorrectly to intentionally fail
         _setBaselineCallToRevert();
 
         // Check BaselineCall struct is formed correctly and can revert, revert changes after
-        _doBaselineCallWithBalanceChecksThenRevertStateChanges({
-            caller: executionEnvironment,
-            tokenOutRecipient: executionEnvironment,
-            shouldSucceed: false
-        });
+        _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: false });
 
         // fastOnlineSwap should revert if all solvers fail AND the baseline call also fails
         _doFastOnlineSwapWithChecks({
@@ -224,7 +302,59 @@ contract FastLaneOnlineTest is BaseTest {
          });
     }
 
-    function testFLOnlineSwap_ThreeSolvers_ThirdFullfills_Success() public {
+    function testFLOnlineSwap_ZeroSolvers_BaselineCallReverts_NativeIn_Failure() public {
+        _setUpUser(
+            SwapIntent({
+                tokenUserBuys: DAI_ADDRESS,
+                minAmountUserBuys: 3000e18,
+                tokenUserSells: NATIVE_TOKEN,
+                amountUserSells: 1e18
+            })
+        );
+
+        // Set baselineCall incorrectly to intentionally fail
+        _setBaselineCallToRevert();
+
+        // Check BaselineCall struct is formed correctly and can revert, revert changes after
+        _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: false });
+
+        // fastOnlineSwap should revert if all solvers fail AND the baseline call also fails
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: address(0),
+            winningSolver: address(0), // No winning solver expected
+            solverCount: 0,
+            swapCallShouldSucceed: false // fastOnlineSwap should revert
+         });
+    }
+
+    function testFLOnlineSwap_ZeroSolvers_BaselineCallReverts_NativeOut_Failure() public {
+        _setUpUser(
+            SwapIntent({
+                tokenUserBuys: NATIVE_TOKEN,
+                minAmountUserBuys: 1e18,
+                tokenUserSells: DAI_ADDRESS,
+                amountUserSells: 3200e18
+            })
+        );
+
+        // Set baselineCall incorrectly to intentionally fail
+        _setBaselineCallToRevert();
+
+        // Check BaselineCall struct is formed correctly and can revert, revert changes after
+        _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: false });
+
+        // fastOnlineSwap should revert if all solvers fail AND the baseline call also fails
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: address(0),
+            winningSolver: address(0), // No winning solver expected
+            solverCount: 0,
+            swapCallShouldSucceed: false // fastOnlineSwap should revert
+         });
+    }
+
+    function testFLOnlineSwap_ThreeSolvers_ThirdFulfills_Success() public {
+        _setUpUser(defaultSwapIntent);
+
         // Set up the solver contracts and register the solverOps in the FLOnline contract
         _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount);
         _setUpSolver(solverTwoEOA, solverTwoPK, successfulSolverBidAmount + 1e17);
@@ -244,16 +374,70 @@ contract FastLaneOnlineTest is BaseTest {
         });
     }
 
-    function testFLOnlineSwap_ThreeSolvers_AllFail_BaselineCallFullfills_Success() public {
-        vm.skip(true);
+    function testFLOnlineSwap_ThreeSolvers_AllFail_BaselineCallFulfills_Success() public {
+        _setUpUser(defaultSwapIntent);
+
+        // Set up the solver contracts and register the solverOps in the FLOnline contract
+        address solver1 = _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount);
+        address solver2 = _setUpSolver(solverTwoEOA, solverTwoPK, successfulSolverBidAmount + 1e17);
+        address solver3 = _setUpSolver(solverThreeEOA, solverThreePK, successfulSolverBidAmount + 2e17);
+
+        // solverOne does not get included in the sovlerOps array
+        attempted.solverOne = false;
+        // solverTwo and solverThree will be attempted but fail
+
+        // Check BaselineCall struct is formed correctly and can succeed, revert changes after
+        _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: true });
+
+        // Set all solvers to fail during metacall
+        FLOnlineRFQSolver(payable(solver1)).setShouldSucceed(false);
+        FLOnlineRFQSolver(payable(solver2)).setShouldSucceed(false);
+        FLOnlineRFQSolver(payable(solver3)).setShouldSucceed(false);
+
+        // Now fastOnlineSwap should succeed using BaselineCall for fulfillment, with gas + Atlas gas surcharge paid for
+        // by ETH sent as msg.value by user.
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: address(0),
+            winningSolver: address(0), // No winning solver expected
+            solverCount: 3,
+            swapCallShouldSucceed: true
+        });
     }
 
     function testFLOnlineSwap_ThreeSolvers_AllFail_BaselineCallReverts_Failure() public {
-        vm.skip(true);
+        _setUpUser(defaultSwapIntent);
+
+        // Set up the solver contracts and register the solverOps in the FLOnline contract
+        address solver1 = _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount);
+        address solver2 = _setUpSolver(solverTwoEOA, solverTwoPK, successfulSolverBidAmount + 1e17);
+        address solver3 = _setUpSolver(solverThreeEOA, solverThreePK, successfulSolverBidAmount + 2e17);
+
+        // solverOne does not get included in the sovlerOps array
+        attempted.solverOne = false;
+        // solverTwo and solverThree will be attempted but fail
+
+        // Set baselineCall incorrectly to intentionally fail
+        _setBaselineCallToRevert();
+
+        // Check BaselineCall struct is formed correctly and can revert, revert changes after
+        _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: false });
+
+        // Set all solvers to fail during metacall
+        FLOnlineRFQSolver(payable(solver1)).setShouldSucceed(false);
+        FLOnlineRFQSolver(payable(solver2)).setShouldSucceed(false);
+        FLOnlineRFQSolver(payable(solver3)).setShouldSucceed(false);
+
+        // fastOnlineSwap should revert if all solvers fail AND the baseline call also fails
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: address(0),
+            winningSolver: address(0), // No winning solver expected
+            solverCount: 3,
+            swapCallShouldSucceed: false // fastOnlineSwap should revert
+         });
     }
 
     // ---------------------------------------------------- //
-    //                     Unit Tests                     //
+    //                     Unit Tests                       //
     // ---------------------------------------------------- //
 
     function testFLOnlineSwap_ValidateSwap_Reverts() public {
@@ -425,26 +609,34 @@ contract FastLaneOnlineTest is BaseTest {
     )
         internal
     {
-        beforeVars.userWeth = WETH.balanceOf(userEOA);
-        beforeVars.userDai = DAI.balanceOf(userEOA);
-        beforeVars.solverWeth = WETH.balanceOf(winningSolver);
-        beforeVars.solverDai = DAI.balanceOf(winningSolver);
+        bool nativeTokenIn = args.swapIntent.tokenUserSells == NATIVE_TOKEN;
+        bool nativeTokenOut = args.swapIntent.tokenUserBuys == NATIVE_TOKEN;
+        bool solverWon = winningSolver != address(0);
+
+        beforeVars.userTokenOutBalance = _balanceOf(args.swapIntent.tokenUserBuys, userEOA);
+        beforeVars.userTokenInBalance = _balanceOf(args.swapIntent.tokenUserSells, userEOA);
+        beforeVars.solverTokenOutBalance = _balanceOf(args.swapIntent.tokenUserBuys, winningSolver);
+        beforeVars.solverTokenInBalance = _balanceOf(args.swapIntent.tokenUserSells, winningSolver);
         beforeVars.atlasGasSurcharge = atlas.cumulativeSurcharge();
         beforeVars.solverOneRep = flOnline.solverReputation(solverOneEOA);
         beforeVars.solverTwoRep = flOnline.solverReputation(solverTwoEOA);
         beforeVars.solverThreeRep = flOnline.solverReputation(solverThreeEOA);
+
+        // adjust userTokenInBalance if native token - exclude gas treated as donation
+        if (nativeTokenIn) beforeVars.userTokenInBalance -= defaultMsgValue;
+
+        uint256 txGasUsed;
         uint256 estAtlasGasSurcharge = gasleft(); // Reused below during calculations
 
-        vm.prank(userEOA);
-
         // Do the actual fastOnlineSwap call
-        (bool result,) = address(flOnline).call{ gas: args.gas + 1000, value: defaultMsgValue }(
+        vm.prank(userEOA);
+        (bool result,) = address(flOnline).call{ gas: args.gas + 1000, value: args.msgValue }(
             abi.encodeCall(flOnline.fastOnlineSwap, (args.userOp))
         );
 
         // Calculate estimated Atlas gas surcharge taken from call above
-        estAtlasGasSurcharge =
-            (estAtlasGasSurcharge - gasleft()) * defaultGasPrice * atlas.ATLAS_SURCHARGE_RATE() / atlas.SCALE();
+        txGasUsed = estAtlasGasSurcharge - gasleft();
+        estAtlasGasSurcharge = txGasUsed * defaultGasPrice * atlas.ATLAS_SURCHARGE_RATE() / atlas.SCALE();
 
         assertTrue(
             result == swapCallShouldSucceed,
@@ -464,25 +656,41 @@ contract FastLaneOnlineTest is BaseTest {
 
         // Check user's balances changed as expected
         assertTrue(
-            WETH.balanceOf(userEOA) >= beforeVars.userWeth + args.swapIntent.minAmountUserBuys,
-            "User did not recieve expected WETH"
+            _balanceOf(args.swapIntent.tokenUserBuys, userEOA)
+                >= beforeVars.userTokenOutBalance + args.swapIntent.minAmountUserBuys,
+            "User did not recieve enough tokenOut"
         );
-        assertEq(
-            DAI.balanceOf(userEOA),
-            beforeVars.userDai - args.swapIntent.amountUserSells,
-            "User did not send expected DAI"
-        );
+
+        if (nativeTokenIn && solverWon) {
+            // Allow for small error margin due to gas refund from winning solver
+            uint256 buffer = 1e17; // 0.1 ETH buffer as base for error margin comparison
+            uint256 expectedBalanceAfter = beforeVars.userTokenInBalance - args.swapIntent.amountUserSells;
+
+            assertApproxEqRel(
+                _balanceOf(args.swapIntent.tokenUserSells, userEOA) + buffer,
+                expectedBalanceAfter + buffer,
+                0.01e18, // error marin: 1% of the 0.1 ETH buffer
+                "User did not send enough native tokenIn"
+            );
+        } else {
+            assertEq(
+                _balanceOf(args.swapIntent.tokenUserSells, userEOA),
+                beforeVars.userTokenInBalance - args.swapIntent.amountUserSells,
+                "User did not send enough ERC20 tokenIn"
+            );
+        }
 
         // If winning solver, check balances changed as expected
         if (winningSolver != address(0)) {
             assertTrue(
-                WETH.balanceOf(winningSolver) <= beforeVars.solverWeth - args.swapIntent.minAmountUserBuys,
-                "Solver did not send expected WETH"
+                _balanceOf(args.swapIntent.tokenUserBuys, winningSolver)
+                    <= beforeVars.solverTokenOutBalance - args.swapIntent.minAmountUserBuys,
+                "Solver did not send enough tokenOut"
             );
             assertEq(
-                DAI.balanceOf(winningSolver),
-                beforeVars.solverDai + args.swapIntent.amountUserSells,
-                "Solver did not recieve expected DAI"
+                _balanceOf(args.swapIntent.tokenUserSells, winningSolver),
+                beforeVars.solverTokenInBalance + args.swapIntent.amountUserSells,
+                "Solver did not recieve enough tokenIn"
             );
         }
 
@@ -516,39 +724,43 @@ contract FastLaneOnlineTest is BaseTest {
         }
     }
 
-    // Defaults:
-    // SwapIntent: Swap 3200 DAI for at least 1 WETH
-    // BaselineCall: Swap 3200 DAI for at least 1 WETH via Uniswap V2 Router
-    // UserOpHash: Generated correctly using dapp's getUserOperation() function
-    // Deadline: block.number + 1
-    // Gas: 2_000_000
-    // MaxFeePerGas: tx.gasprice
-    function _buildDefaultFastOnlineSwapArgs() internal returns (FastOnlineSwapArgs memory newArgs) {
-        newArgs.swapIntent = SwapIntent({
-            tokenUserBuys: WETH_ADDRESS,
-            minAmountUserBuys: 1 ether,
-            tokenUserSells: DAI_ADDRESS,
-            amountUserSells: 3200e18
-        });
+    // NOTE: This MUST be called at the start of each end-to-end test, to set up args
+    function _setUpUser(SwapIntent memory swapIntent) internal {
+        // always start with 0.01 ETH for gas/bundler fees
+        uint256 userStartNativeTokenBalance = 1e16;
 
-        address[] memory path = new address[](2);
-        path[0] = DAI_ADDRESS;
-        path[1] = WETH_ADDRESS;
+        // Add tokens if user is selling native token
+        if (swapIntent.tokenUserSells == NATIVE_TOKEN) {
+            userStartNativeTokenBalance += swapIntent.amountUserSells;
+        } else {
+            // Otherwise deal user the ERC20 they are selling, and approve Atlas to take it
+            deal(swapIntent.tokenUserSells, userEOA, swapIntent.amountUserSells);
+            vm.prank(userEOA);
+            IERC20(swapIntent.tokenUserSells).approve(address(atlas), swapIntent.amountUserSells);
+        }
 
-        newArgs.baselineCall = BaselineCall({
-            to: address(routerV2),
-            data: abi.encodeCall(
-                routerV2.swapExactTokensForTokens,
-                (
-                    newArgs.swapIntent.amountUserSells, // amountIn
-                    newArgs.swapIntent.minAmountUserBuys, // amountOutMin
-                    path, // path = [DAI, WETH]
-                    executionEnvironment, // to
-                    defaultDeadlineTimestamp // deadline
-                )
-            ),
-            value: 0
-        });
+        // Burn all user's tokens they are buying, for clearer balance checks
+        // Exception: if user is buying native token, they still need some to pay gas
+        if (swapIntent.tokenUserBuys != NATIVE_TOKEN) {
+            deal(swapIntent.tokenUserBuys, userEOA, 0);
+        }
+
+        // Give user the net amount of native token they need to start with
+        deal(userEOA, userStartNativeTokenBalance);
+
+        // Build the other args data around the user's SwapIntent
+        args = _buildFastOnlineSwapArgs(swapIntent);
+    }
+
+    function _buildFastOnlineSwapArgs(
+        SwapIntent memory swapIntent
+    )
+        internal
+        returns (FastOnlineSwapArgs memory newArgs)
+    {
+        bool nativeTokenIn = swapIntent.tokenUserSells == NATIVE_TOKEN;
+        newArgs.swapIntent = swapIntent;
+        newArgs.baselineCall = _buildBaselineCall(swapIntent, true); // should succeed
 
         (newArgs.userOp, newArgs.userOpHash) = flOnline.getUserOperationAndHash({
             swapper: userEOA,
@@ -556,7 +768,8 @@ contract FastLaneOnlineTest is BaseTest {
             baselineCall: newArgs.baselineCall,
             deadline: defaultDeadlineBlock,
             gas: defaultGasLimit,
-            maxFeePerGas: defaultGasPrice
+            maxFeePerGas: defaultGasPrice,
+            msgValue: nativeTokenIn ? swapIntent.amountUserSells : 0
         });
 
         // User signs userOp
@@ -566,6 +779,68 @@ contract FastLaneOnlineTest is BaseTest {
         newArgs.deadline = defaultDeadlineBlock;
         newArgs.gas = defaultGasLimit;
         newArgs.maxFeePerGas = defaultGasPrice;
+        newArgs.msgValue = defaultMsgValue;
+
+        // Add amountUserSells of ETH to the msg.value of the fastOnlineSwap call
+        if (nativeTokenIn) newArgs.msgValue += swapIntent.amountUserSells;
+    }
+
+    function _buildBaselineCall(
+        SwapIntent memory swapIntent,
+        bool shouldSucceed
+    )
+        internal
+        view
+        returns (BaselineCall memory)
+    {
+        bytes memory baselineData;
+        uint256 value;
+        uint256 amountOutMin = swapIntent.minAmountUserBuys;
+        address[] memory path = new address[](2);
+        path[0] = swapIntent.tokenUserSells;
+        path[1] = swapIntent.tokenUserBuys;
+
+        // Make amountOutMin way too high to cause baseline call to fail
+        if (!shouldSucceed) amountOutMin *= 100; // 100x original amountOutMin
+
+        if (swapIntent.tokenUserSells == NATIVE_TOKEN) {
+            path[0] = WETH_ADDRESS;
+            value = swapIntent.amountUserSells;
+            baselineData = abi.encodeCall(
+                routerV2.swapExactETHForTokens,
+                (
+                    amountOutMin, // amountOutMin
+                    path, // path = [tokenUserSells, tokenUserBuys]
+                    executionEnvironment, // to
+                    defaultDeadlineTimestamp // deadline
+                )
+            );
+        } else if (swapIntent.tokenUserBuys == NATIVE_TOKEN) {
+            path[1] = WETH_ADDRESS;
+            baselineData = abi.encodeCall(
+                routerV2.swapExactTokensForETH,
+                (
+                    swapIntent.amountUserSells, // amountIn
+                    amountOutMin, // amountOutMin
+                    path, // path = [tokenUserSells, tokenUserBuys]
+                    executionEnvironment, // to
+                    defaultDeadlineTimestamp // deadline
+                )
+            );
+        } else {
+            baselineData = abi.encodeCall(
+                routerV2.swapExactTokensForTokens,
+                (
+                    swapIntent.amountUserSells, // amountIn
+                    amountOutMin, // amountOutMin
+                    path, // path = [tokenUserSells, tokenUserBuys]
+                    executionEnvironment, // to
+                    defaultDeadlineTimestamp // deadline
+                )
+            );
+        }
+
+        return BaselineCall({ to: address(routerV2), data: baselineData, value: value });
     }
 
     function _setUpSolver(address solverEOA, uint256 solverPK, uint256 bidAmount) internal returns (address) {
@@ -588,8 +863,12 @@ contract FastLaneOnlineTest is BaseTest {
         // Solver signs the solverOp
         SolverOperation memory solverOp = _buildSolverOp(solverEOA, solverPK, address(solver), bidAmount);
 
-        // Give solver contract 1 WETH to fulfill user's SwapIntent
-        deal(args.swapIntent.tokenUserBuys, address(solver), bidAmount);
+        // Give solver contract enough tokenOut to fulfill user's SwapIntent
+        if (args.swapIntent.tokenUserBuys != NATIVE_TOKEN) {
+            deal(args.swapIntent.tokenUserBuys, address(solver), bidAmount);
+        } else {
+            deal(address(solver), bidAmount);
+        }
 
         // Register solverOp in FLOnline in frontrunning tx
         flOnline.addSolverOp({ userOp: args.userOp, solverOp: solverOp });
@@ -632,25 +911,32 @@ contract FastLaneOnlineTest is BaseTest {
         solverOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
     }
 
-    function _doBaselineCallWithBalanceChecksThenRevertStateChanges(
-        address caller,
-        address tokenOutRecipient,
-        bool shouldSucceed
-    )
-        internal
-    {
-        uint256 snapshotId = vm.snapshot();
-        uint256 callerDaiBefore = DAI.balanceOf(caller);
-        uint256 recipientWethBefore = WETH.balanceOf(tokenOutRecipient);
+    function _doBaselineCallWithChecksThenRevertChanges(bool shouldSucceed) internal {
+        uint256 snapshotId = vm.snapshot(); // Everything below this gets reverted after function ends
 
-        if (callerDaiBefore < args.swapIntent.amountUserSells) {
-            deal(address(DAI), caller, args.swapIntent.amountUserSells);
-            callerDaiBefore = DAI.balanceOf(caller);
+        uint256 eeTokenInBefore = _balanceOf(args.swapIntent.tokenUserSells, executionEnvironment);
+        uint256 eeTokenOutBefore = _balanceOf(args.swapIntent.tokenUserBuys, executionEnvironment);
+
+        if (eeTokenInBefore < args.swapIntent.amountUserSells) {
+            if (args.swapIntent.tokenUserSells == NATIVE_TOKEN) {
+                deal(executionEnvironment, args.swapIntent.amountUserSells);
+            } else {
+                deal(args.swapIntent.tokenUserSells, executionEnvironment, args.swapIntent.amountUserSells);
+            }
+
+            eeTokenInBefore = _balanceOf(args.swapIntent.tokenUserSells, executionEnvironment);
         }
 
-        vm.startPrank(caller);
-        DAI.approve(args.baselineCall.to, args.swapIntent.amountUserSells);
-        (bool success,) = args.baselineCall.to.call(args.baselineCall.data);
+        bool success;
+        vm.startPrank(executionEnvironment);
+
+        if (args.swapIntent.tokenUserSells != NATIVE_TOKEN) {
+            IERC20(args.swapIntent.tokenUserSells).approve(args.baselineCall.to, args.swapIntent.amountUserSells);
+            (success,) = args.baselineCall.to.call(args.baselineCall.data);
+        } else {
+            (success,) = args.baselineCall.to.call{ value: args.swapIntent.amountUserSells }(args.baselineCall.data);
+        }
+
         vm.stopPrank();
 
         assertTrue(
@@ -664,38 +950,22 @@ contract FastLaneOnlineTest is BaseTest {
         }
 
         assertTrue(
-            WETH.balanceOf(tokenOutRecipient) >= recipientWethBefore + args.swapIntent.minAmountUserBuys,
-            "Recipient did not recieve expected WETH in baseline call"
+            _balanceOf(args.swapIntent.tokenUserBuys, executionEnvironment)
+                >= eeTokenOutBefore + args.swapIntent.minAmountUserBuys,
+            "EE did not recieve expected tokenOut in baseline call"
         );
         assertEq(
-            DAI.balanceOf(caller),
-            callerDaiBefore - args.swapIntent.amountUserSells,
-            "Caller did not send expected DAI in baseline call"
+            _balanceOf(args.swapIntent.tokenUserSells, executionEnvironment),
+            eeTokenInBefore - args.swapIntent.amountUserSells,
+            "EE did not send expected tokenIn in baseline call"
         );
         //Revert back to state before baseline call was done
         vm.revertTo(snapshotId);
     }
 
     function _setBaselineCallToRevert() internal {
-        // Everything correct except amountOutMin is too high
-        address[] memory path = new address[](2);
-        path[0] = DAI_ADDRESS;
-        path[1] = WETH_ADDRESS;
-
-        args.baselineCall = BaselineCall({
-            to: address(routerV2),
-            data: abi.encodeCall(
-                routerV2.swapExactTokensForTokens,
-                (
-                    args.swapIntent.amountUserSells, // amountIn
-                    9999e18, // BAD (unrealistic) amountOutMin
-                    path, // path = [DAI, WETH]
-                    executionEnvironment, // to
-                    defaultDeadlineTimestamp // deadline
-                )
-            ),
-            value: 0
-        });
+        // should not succeed
+        args.baselineCall = _buildBaselineCall(args.swapIntent, false);
 
         // Need to update the userOp with changes to baseline call
         (args.userOp, args.userOpHash) = flOnline.getUserOperationAndHash({
@@ -704,7 +974,8 @@ contract FastLaneOnlineTest is BaseTest {
             baselineCall: args.baselineCall,
             deadline: defaultDeadlineBlock,
             gas: defaultGasLimit,
-            maxFeePerGas: defaultGasPrice
+            maxFeePerGas: defaultGasPrice,
+            msgValue: 0
         });
 
         // User signs userOp
@@ -768,11 +1039,21 @@ contract FastLaneOnlineTest is BaseTest {
             );
         }
     }
+
+    // balanceOf helper that supports ERC20 and native token
+    function _balanceOf(address token, address account) internal view returns (uint256) {
+        if (token == NATIVE_TOKEN) {
+            return account.balance;
+        } else {
+            return IERC20(token).balanceOf(account);
+        }
+    }
 }
 
 // This solver magically has the tokens needed to fulfil the user's swap.
 // This might involve an offchain RFQ system
 contract FLOnlineRFQSolver is SolverBase {
+    address internal constant NATIVE_TOKEN = address(0);
     bool internal s_shouldSucceed;
 
     constructor(address weth, address atlas) SolverBase(weth, atlas, msg.sender) {
@@ -789,10 +1070,17 @@ contract FLOnlineRFQSolver is SolverBase {
 
     function fulfillRFQ(SwapIntent calldata swapIntent) public view {
         require(s_shouldSucceed, "Solver failed intentionally");
-        require(
-            IERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells,
-            "Did not receive expected amount of tokenUserSells"
-        );
+
+        if (swapIntent.tokenUserSells == NATIVE_TOKEN) {
+            require(
+                address(this).balance >= swapIntent.amountUserSells, "Did not receive expected amount of tokenUserBuys"
+            );
+        } else {
+            require(
+                IERC20(swapIntent.tokenUserSells).balanceOf(address(this)) >= swapIntent.amountUserSells,
+                "Did not receive expected amount of tokenUserSells"
+            );
+        }
         // The solver bid representing user's minAmountUserBuys of tokenUserBuys is sent to the
         // Execution Environment in the payBids modifier logic which runs after this function ends.
     }

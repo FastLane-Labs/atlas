@@ -5,6 +5,7 @@ import "src/contracts/types/ValidCalls.sol";
 
 contract AtlasErrors {
     // Simulator
+    error SimulatorBalanceTooLow();
     error Unauthorized();
     error Unreachable();
     error NoAuctionWinner();
