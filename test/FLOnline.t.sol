@@ -61,7 +61,8 @@ contract FastLaneOnlineTest is BaseTest {
 
     IUniswapV2Router02 routerV2 = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
 
-    uint256 successfulSolverBidAmount = 1.2 ether; // more than baseline swap amountOut
+    uint256 goodSolverBidETH = 1.2 ether; // more than baseline swap amountOut if tokenOut is WETH/ETH
+    uint256 goodSolverBidDAI = 3100e18; // more than baseline swap amountOut if tokenOut is DAI
     uint256 defaultMsgValue = 1e16; // 0.01 ETH for bundler gas, treated as donation
     uint256 defaultGasLimit = 2_000_000;
     uint256 defaultGasPrice;
@@ -121,7 +122,7 @@ contract FastLaneOnlineTest is BaseTest {
         _setUpUser(defaultSwapIntent);
 
         // Set up the solver contract and register the solverOp in the FLOnline contract
-        address winningSolver = _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount);
+        address winningSolver = _setUpSolver(solverOneEOA, solverOnePK, goodSolverBidETH);
 
         // User calls fastOnlineSwap, do checks that user and solver balances changed as expected
         _doFastOnlineSwapWithChecks({
@@ -143,7 +144,7 @@ contract FastLaneOnlineTest is BaseTest {
         );
 
         // Set up the solver contract and register the solverOp in the FLOnline contract
-        address winningSolver = _setUpSolver(solverOneEOA, solverOnePK, 3100e18);
+        address winningSolver = _setUpSolver(solverOneEOA, solverOnePK, goodSolverBidDAI);
 
         // User calls fastOnlineSwap, do checks that user and solver balances changed as expected
         _doFastOnlineSwapWithChecks({
@@ -165,7 +166,7 @@ contract FastLaneOnlineTest is BaseTest {
         );
 
         // Set up the solver contract and register the solverOp in the FLOnline contract
-        address winningSolver = _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount);
+        address winningSolver = _setUpSolver(solverOneEOA, solverOnePK, goodSolverBidETH);
 
         // User calls fastOnlineSwap, do checks that user and solver balances changed as expected
         _doFastOnlineSwapWithChecks({
@@ -180,7 +181,65 @@ contract FastLaneOnlineTest is BaseTest {
         _setUpUser(defaultSwapIntent);
 
         // Set up the solver contract and register the solverOp in the FLOnline contract
-        address failingSolver = _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount);
+        address failingSolver = _setUpSolver(solverOneEOA, solverOnePK, goodSolverBidETH);
+
+        // Check BaselineCall struct is formed correctly and can succeed, revert changes after
+        _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: true });
+
+        // Set failingSolver to fail during metacall
+        FLOnlineRFQSolver(payable(failingSolver)).setShouldSucceed(false);
+
+        // Now fastOnlineSwap should succeed using BaselineCall for fulfillment, with gas + Atlas gas surcharge paid for
+        // by ETH sent as msg.value by user.
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: address(0),
+            winningSolver: address(0), // No winning solver expected
+            solverCount: 1,
+            swapCallShouldSucceed: true
+        });
+    }
+
+    function testFLOnlineSwap_OneSolverFails_BaselineCallFulfills_NativeIn_Success() public {
+        _setUpUser(
+            SwapIntent({
+                tokenUserBuys: DAI_ADDRESS,
+                minAmountUserBuys: 3000e18,
+                tokenUserSells: NATIVE_TOKEN,
+                amountUserSells: 1e18
+            })
+        );
+
+        // Set up the solver contract and register the solverOp in the FLOnline contract
+        address failingSolver = _setUpSolver(solverOneEOA, solverOnePK, goodSolverBidDAI);
+
+        // Check BaselineCall struct is formed correctly and can succeed, revert changes after
+        _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: true });
+
+        // Set failingSolver to fail during metacall
+        FLOnlineRFQSolver(payable(failingSolver)).setShouldSucceed(false);
+
+        // Now fastOnlineSwap should succeed using BaselineCall for fulfillment, with gas + Atlas gas surcharge paid for
+        // by ETH sent as msg.value by user.
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: address(0),
+            winningSolver: address(0), // No winning solver expected
+            solverCount: 1,
+            swapCallShouldSucceed: true
+        });
+    }
+
+    function testFLOnlineSwap_OneSolverFails_BaselineCallFulfills_NativeOut_Success() public {
+        _setUpUser(
+            SwapIntent({
+                tokenUserBuys: NATIVE_TOKEN,
+                minAmountUserBuys: 1e18,
+                tokenUserSells: DAI_ADDRESS,
+                amountUserSells: 3200e18
+            })
+        );
+
+        // Set up the solver contract and register the solverOp in the FLOnline contract
+        address failingSolver = _setUpSolver(solverOneEOA, solverOnePK, goodSolverBidETH);
 
         // Check BaselineCall struct is formed correctly and can succeed, revert changes after
         _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: true });
@@ -204,7 +263,7 @@ contract FastLaneOnlineTest is BaseTest {
         // Set baselineCall incorrectly to intentionally fail
         _setBaselineCallToRevert();
 
-        address solver = _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount);
+        address solver = _setUpSolver(solverOneEOA, solverOnePK, goodSolverBidETH);
 
         // Check BaselineCall struct is formed correctly and can revert, revert changes after
         _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: false });
@@ -355,9 +414,67 @@ contract FastLaneOnlineTest is BaseTest {
         _setUpUser(defaultSwapIntent);
 
         // Set up the solver contracts and register the solverOps in the FLOnline contract
-        _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount);
-        _setUpSolver(solverTwoEOA, solverTwoPK, successfulSolverBidAmount + 1e17);
-        address winningSolver = _setUpSolver(solverThreeEOA, solverThreePK, successfulSolverBidAmount + 2e17);
+        _setUpSolver(solverOneEOA, solverOnePK, goodSolverBidETH);
+        _setUpSolver(solverTwoEOA, solverTwoPK, goodSolverBidETH + 1e17);
+        address winningSolver = _setUpSolver(solverThreeEOA, solverThreePK, goodSolverBidETH + 2e17);
+
+        // solverOne does not get included in the sovlerOps array
+        attempted.solverOne = false;
+        // solverTwo has a lower bid than winner (solverThree) so is not attempted
+        attempted.solverTwo = false;
+
+        // User calls fastOnlineSwap, do checks that user and solver balances changed as expected
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: solverThreeEOA,
+            winningSolver: winningSolver,
+            solverCount: 3,
+            swapCallShouldSucceed: true
+        });
+    }
+
+    function testFLOnlineSwap_ThreeSolvers_ThirdFulfills_NativeIn_Success() public {
+        _setUpUser(
+            SwapIntent({
+                tokenUserBuys: DAI_ADDRESS,
+                minAmountUserBuys: 3000e18,
+                tokenUserSells: NATIVE_TOKEN,
+                amountUserSells: 1e18
+            })
+        );
+
+        // Set up the solver contracts and register the solverOps in the FLOnline contract
+        _setUpSolver(solverOneEOA, solverOnePK, goodSolverBidDAI);
+        _setUpSolver(solverTwoEOA, solverTwoPK, goodSolverBidDAI + 1e17);
+        address winningSolver = _setUpSolver(solverThreeEOA, solverThreePK, goodSolverBidDAI + 2e17);
+
+        // solverOne does not get included in the sovlerOps array
+        attempted.solverOne = false;
+        // solverTwo has a lower bid than winner (solverThree) so is not attempted
+        attempted.solverTwo = false;
+
+        // User calls fastOnlineSwap, do checks that user and solver balances changed as expected
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: solverThreeEOA,
+            winningSolver: winningSolver,
+            solverCount: 3,
+            swapCallShouldSucceed: true
+        });
+    }
+
+    function testFLOnlineSwap_ThreeSolvers_ThirdFulfills_NativeOut_Success() public {
+        _setUpUser(
+            SwapIntent({
+                tokenUserBuys: NATIVE_TOKEN,
+                minAmountUserBuys: 1e18,
+                tokenUserSells: DAI_ADDRESS,
+                amountUserSells: 3200e18
+            })
+        );
+
+        // Set up the solver contracts and register the solverOps in the FLOnline contract
+        _setUpSolver(solverOneEOA, solverOnePK, goodSolverBidETH);
+        _setUpSolver(solverTwoEOA, solverTwoPK, goodSolverBidETH + 1e17);
+        address winningSolver = _setUpSolver(solverThreeEOA, solverThreePK, goodSolverBidETH + 2e17);
 
         // solverOne does not get included in the sovlerOps array
         attempted.solverOne = false;
@@ -377,9 +494,9 @@ contract FastLaneOnlineTest is BaseTest {
         _setUpUser(defaultSwapIntent);
 
         // Set up the solver contracts and register the solverOps in the FLOnline contract
-        address solver1 = _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount);
-        address solver2 = _setUpSolver(solverTwoEOA, solverTwoPK, successfulSolverBidAmount + 1e17);
-        address solver3 = _setUpSolver(solverThreeEOA, solverThreePK, successfulSolverBidAmount + 2e17);
+        address solver1 = _setUpSolver(solverOneEOA, solverOnePK, goodSolverBidETH);
+        address solver2 = _setUpSolver(solverTwoEOA, solverTwoPK, goodSolverBidETH + 1e17);
+        address solver3 = _setUpSolver(solverThreeEOA, solverThreePK, goodSolverBidETH + 2e17);
 
         // solverOne does not get included in the sovlerOps array
         attempted.solverOne = false;
@@ -407,9 +524,9 @@ contract FastLaneOnlineTest is BaseTest {
         _setUpUser(defaultSwapIntent);
 
         // Set up the solver contracts and register the solverOps in the FLOnline contract
-        address solver1 = _setUpSolver(solverOneEOA, solverOnePK, successfulSolverBidAmount);
-        address solver2 = _setUpSolver(solverTwoEOA, solverTwoPK, successfulSolverBidAmount + 1e17);
-        address solver3 = _setUpSolver(solverThreeEOA, solverThreePK, successfulSolverBidAmount + 2e17);
+        address solver1 = _setUpSolver(solverOneEOA, solverOnePK, goodSolverBidETH);
+        address solver2 = _setUpSolver(solverTwoEOA, solverTwoPK, goodSolverBidETH + 1e17);
+        address solver3 = _setUpSolver(solverThreeEOA, solverThreePK, goodSolverBidETH + 2e17);
 
         // solverOne does not get included in the sovlerOps array
         attempted.solverOne = false;
