@@ -79,6 +79,6 @@ contract DeployRedstoneHoneyPot is DeployBaseScript {
         vm.stopBroadcast();
         console.log("Contracts deployed by Honey Pot Owner:");
         console.log("Honey Pot: \t\t\t\t", address(honeyPot));
-        console.log("\n");        
+        console.log("\n");
     }
 }

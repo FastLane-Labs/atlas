@@ -35,7 +35,7 @@ contract RedstoneDAppControl is DAppControl {
                 dappNoncesSequential: false,
                 requirePreOps: true,
                 trackPreOpsReturnData: false,
-                trackUserReturnData: true,
+                trackUserReturnData: false,
                 delegateUser: false,
                 requirePreSolver: false,
                 requirePostSolver: false,
@@ -87,23 +87,23 @@ contract RedstoneDAppControl is DAppControl {
     //                  Atlas Hook Overrides                //
     // ---------------------------------------------------- //
 
-    function _preOpsCall(UserOperation calldata) internal view override returns (bytes memory) {
+    function _preOpsCall(UserOperation calldata userOp) internal view override returns (bytes memory) {
         if (NUM_WHITELISTED_BUNDLERS > 0 && !bundlerWhitelist[_bundler()]) revert OnlyWhitelistedBundlerAllowed();
-        bytes memory emptyData;
-        return emptyData;
+        return abi.encode(userOp.dapp); //useOp.dapp is the address of the wrapped Atlas adapter //trackUserReturnData
+            // is false
     }
 
     function _allocateValueCall(address, uint256 bidAmount, bytes calldata data) internal virtual override {
         if (bidAmount == 0) return;
 
         uint256 oevForBundler = bidAmount * bundlerOEVPercent / 100;
-        uint256 oevForSolver = bidAmount - oevForBundler;
+        uint256 oevForAdapter = bidAmount - oevForBundler;
 
-        address adapter = abi.decode(data, (address));
+        address adapter = abi.decode(data, (address)); // returned from _preOpsCall
         if (!RedstoneDAppControl(_control()).isRedstoneAdapter(adapter)) {
             revert InvalidRedstoneAdapter();
         }
-        (bool success,) = adapter.call{ value: oevForSolver }("");
+        (bool success,) = adapter.call{ value: oevForAdapter }("");
         if (!success) revert FailedToAllocateOEV();
 
         SafeTransferLib.safeTransferETH(_bundler(), oevForBundler);

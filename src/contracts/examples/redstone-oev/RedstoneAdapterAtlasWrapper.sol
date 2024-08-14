@@ -1,6 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.25;
 
+import { SafeERC20, IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Ownable } from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import { MergedSinglePriceFeedAdapterWithoutRounds } from
     "lib/redstone-oracles-monorepo/packages/on-chain-relayer/contracts/price-feeds/without-rounds/MergedSinglePriceFeedAdapterWithoutRounds.sol";
@@ -45,6 +46,7 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
     error InvalidUpdater();
     error BaseAdapterDoesNotSupportHistoricalData();
     error CannotFetchHistoricalData();
+    error WithdrawETHFailed();
 
     constructor(address atlas, address _owner, address _baseFeed) {
         uint80 latestRound = IFeed(_baseFeed).latestRound();
@@ -85,6 +87,10 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
             }
         }
         revert InvalidUpdater();
+    }
+
+    function getMinIntervalBetweenUpdates() public view virtual override returns (uint256) {
+        return 1; //1 second
     }
 
     function getDataFeedId() public view virtual override returns (bytes32 dataFeedId) {
@@ -177,5 +183,16 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
         updatedAt = startedAt;
 
         answeredInRound = roundId;
+    }
+
+    // Withdraw ETH OEV captured via Atlas solver bids
+    function withdrawETH(address recipient) external onlyOwner {
+        (bool success,) = recipient.call{ value: address(this).balance }("");
+        if (!success) revert WithdrawETHFailed();
+    }
+
+    // Withdraw ERC20 OEV captured via Atlas solver bids
+    function withdrawERC20(address token, address recipient) external onlyOwner {
+        SafeERC20.safeTransfer(IERC20(token), recipient, IERC20(token).balanceOf(address(this)));
     }
 }

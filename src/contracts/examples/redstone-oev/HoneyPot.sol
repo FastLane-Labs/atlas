@@ -20,7 +20,8 @@ contract HoneyPot is Ownable {
         oracle = _oracle;
         _transferOwnership(_owner);
     }
-    receive() external payable {}
+
+    receive() external payable { }
 
     function pay(address recipient, uint256 amount) external onlyOwner {
         SafeTransferLib.safeTransferETH(recipient, amount);
@@ -39,7 +40,7 @@ contract HoneyPot is Ownable {
     }
 
     function liquidate() external {
-        (,int256 ans,uint256 oracleTimestamp,,) = IFeed(oracle).getRoundData(IFeed(oracle).latestRound());
+        (, int256 ans, uint256 oracleTimestamp,,) = IFeed(oracle).getRoundData(IFeed(oracle).latestRound());
         require(block.timestamp - oracleTimestamp <= MAX_LIQUIDATION_DELAY, "HoneyPot: Liquidation delay exceeded");
         require(ans > 0, "HoneyPot: Oracle answer is not positive");
 
