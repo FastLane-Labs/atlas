@@ -6,6 +6,7 @@ import "forge-std/Test.sol";
 import { DeployBaseScript } from "script/base/deploy-base.s.sol";
 import { RedstoneDAppControl } from "src/contracts/examples/redstone-oev/RedstoneDAppControl.sol";
 import { RedstoneAdapterAtlasWrapper } from "src/contracts/examples/redstone-oev/RedstoneAdapterAtlasWrapper.sol";
+import { MockBaseFeed} from "src/contracts/examples/redstone-oev/MockBaseFeed.sol";
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import { HoneyPot } from "src/contracts/examples/redstone-oev/HoneyPot.sol";
@@ -80,5 +81,24 @@ contract DeployRedstoneHoneyPot is DeployBaseScript {
         console.log("Contracts deployed by Honey Pot Owner:");
         console.log("Honey Pot: \t\t\t\t", address(honeyPot));
         console.log("\n");
+    }
+}
+
+contract DeployRedstoneMockBaseFeed is DeployBaseScript {
+    function run() external {
+        console.log("\n=== DEPLOYING REDSTONE MOCK BASE FEED ===\n");
+
+        uint256 authorizedSignerPrivateKey = vm.envUint("BASE_FEED_OWNER");
+        address authorizedSigner = vm.addr(authorizedSignerPrivateKey);
+
+        console.log("Authorized Signer address: \t\t", authorizedSigner);
+
+        vm.startBroadcast(authorizedSignerPrivateKey);
+        console.log("Deploying from Authorized Signer Account...");
+        MockBaseFeed mockBaseFeed = new MockBaseFeed(authorizedSigner);
+        vm.stopBroadcast();
+
+        console.log("Contracts deployed by Authorized Signer:");
+        console.log("Mock Base Feed: \t\t\t", address(mockBaseFeed));
     }
 }
