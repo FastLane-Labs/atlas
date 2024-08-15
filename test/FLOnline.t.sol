@@ -623,7 +623,69 @@ contract FastLaneOnlineTest is BaseTest {
     // ---------------------------------------------------- //
 
     function testFLOnline_CalculateBidFactor() public {
-        vm.skip(true);
+        // bidFactor measured with scale = 100. I.e. 100% = 100
+
+        uint256 BASE_FACTOR = flOnlineMock.SLIPPAGE_BASE();
+        uint256 MAX_FACTOR = flOnlineMock.GLOBAL_MAX_SLIPPAGE();
+        uint256 bidFactor;
+
+        // Case: solver bids minAmountUserBuys + 1 ==> bidFactor should be 100 (floor)
+        bidFactor = flOnlineMock.calculateBidFactor({
+            bidAmount: 1e18 + 1,
+            minAmountUserBuys: 1e18
+        });
+        assertEq(bidFactor, BASE_FACTOR, "bidFactor should be floor (+1 bid)");
+
+        // Case: solver bids under minAmountUserBuys ==> bidFactor should be 100 (floor)
+        bidFactor = flOnlineMock.calculateBidFactor({
+            bidAmount: 1e18 - 1,
+            minAmountUserBuys: 1e18
+        });
+        assertEq(bidFactor, BASE_FACTOR, "bidFactor should be floor (underbid)");
+
+        // Case: solver bids minAmountUserBuys ==> bidFactor should be 100 (floor)
+        bidFactor = flOnlineMock.calculateBidFactor({
+            bidAmount: 1e18,
+            minAmountUserBuys: 1e18
+        });
+        assertEq(bidFactor, BASE_FACTOR, "bidFactor should be floor (match)");
+
+        // Case: still returns floor if minAmountUserBuys is sqrt(type(uint256).max)
+        bidFactor = flOnlineMock.calculateBidFactor({
+            bidAmount: 1e18,
+            minAmountUserBuys: sqrt(type(uint256).max)
+        });
+        assertEq(bidFactor, BASE_FACTOR, "bidFactor should be floor (max minAmountUserBuys)");
+
+        // Case: solver bids 2x minAmountUserBuys ==> bidFactor should be 125 (cap)
+        bidFactor = flOnlineMock.calculateBidFactor({
+            bidAmount: 2e18,
+            minAmountUserBuys: 1e18
+        });
+        assertEq(bidFactor, MAX_FACTOR, "bidFactor should be max (cap)");
+
+        // Case: still returns max if bidAmount is sqrt(type(uint256).max) / 100
+        bidFactor = flOnlineMock.calculateBidFactor({
+            bidAmount: sqrt(type(uint256).max) / 100,
+            minAmountUserBuys: 1e18
+        });
+        assertEq(bidFactor, MAX_FACTOR, "bidFactor should be max (max bidAmount)");
+
+      
+        // Case: solver bids 1.1x minAmountUserBuys ==> bidFactor should be 120
+        bidFactor = flOnlineMock.calculateBidFactor({
+            bidAmount: 1.1e18,
+            minAmountUserBuys: 1e18
+        });
+        assertEq(bidFactor, 120, "bidFactor should be 120");
+
+        // Case: reverts if bidAmount > sqrt(type(uint256).max / 100)
+        // NOTE: This is caught in addSolverOp before revert can happen
+        vm.expectRevert();
+        flOnlineMock.calculateBidFactor({
+            bidAmount: sqrt(type(uint256).max / 100) + 1,
+            minAmountUserBuys: 1e18
+        });
     }
 
     function testFLOnline_CalculateWeightedScore() public {
@@ -1259,6 +1321,19 @@ contract FastLaneOnlineTest is BaseTest {
             return IERC20(token).balanceOf(account);
         }
     }
+
+    function sqrt(uint y) internal pure returns (uint z) {
+        if (y > 3) {
+            z = y;
+            uint x = y / 2 + 1;
+            while (x < z) {
+                z = x;
+                x = (y / x + x) / 2;
+            }
+        } else if (y != 0) {
+            z = 1;
+        }
+    }
 }
 
 // This solver magically has the tokens needed to fulfil the user's swap.
@@ -1311,8 +1386,45 @@ contract FLOnlineRFQSolver is SolverBase {
 contract MockFastLaneOnline is FastLaneOnlineOuter {
     constructor(address _atlas) FastLaneOnlineOuter(_atlas) { }
 
+    // ---------------------------------------------------- //
+    //                  OuterHelpers.sol                    //
+    // ---------------------------------------------------- //
+
     function sortSolverOps(SolverOperation[] memory solverOps) external pure returns (SolverOperation[] memory) {
         return _sortSolverOps(solverOps);
+    }
+
+    // ---------------------------------------------------- //
+    //                 SolverGateway.sol                    //
+    // ---------------------------------------------------- //
+
+    function SLIPPAGE_BASE() external pure returns (uint256) {
+        return _SLIPPAGE_BASE;
+    }
+
+    function GLOBAL_MAX_SLIPPAGE() external pure returns (uint256) {
+        return _GLOBAL_MAX_SLIPPAGE;
+    }
+
+    function calculateBidFactor(uint256 bidAmount, uint256 minAmountUserBuys) external pure returns (uint256) {
+        return _calculateBidFactor(bidAmount, minAmountUserBuys);
+    }
+
+    function calculateWeightedScore(
+        uint256 totalGas,
+        uint256 solverOpGas,
+        uint256 maxFeePerGas,
+        uint256 congestionBuyIn,
+        uint256 solverCount,
+        uint256 bidFactor,
+        Reputation memory rep
+    )
+        external
+        pure
+        returns (uint256)
+    {
+        return
+            _calculateWeightedScore(totalGas, solverOpGas, maxFeePerGas, congestionBuyIn, solverCount, bidFactor, rep);
     }
 
     // ---------------------------------------------------- //

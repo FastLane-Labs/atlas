@@ -24,6 +24,7 @@ contract FastLaneOnlineErrors {
 
     // SolverGateway.sol
     error SolverGateway_AddSolverOp_SolverMustBeSender();
+    error SolverGateway_AddSolverOp_BidTooHigh();
     error SolverGateway_AddSolverOp_SimulationFail();
     error SolverGateway_AddSolverOp_ValueTooLow();
 

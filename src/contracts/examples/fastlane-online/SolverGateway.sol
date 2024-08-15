@@ -33,6 +33,9 @@ contract SolverGateway is OuterHelpers {
     uint256 internal constant _SLIPPAGE_BASE = 100;
     uint256 internal constant _GLOBAL_MAX_SLIPPAGE = 125; // A lower slippage set by user will override this.
 
+    // bids > sqrt(type(uint256).max / 100) will cause overflow in _calculateBidFactor
+    uint256 internal constant _MAX_SOLVER_BID = 34_028_236_692_093_846_346_337_460_743_176_821_145;
+
     constructor(address _atlas) OuterHelpers(_atlas) { }
 
     function getSolverGasLimit() public pure override returns (uint32) {
@@ -64,6 +67,7 @@ contract SolverGateway is OuterHelpers {
         withUserLock(solverOp.from)
     {
         if (msg.sender != solverOp.from) revert SolverGateway_AddSolverOp_SolverMustBeSender();
+        if (solverOp.bidAmount > _MAX_SOLVER_BID) revert SolverGateway_AddSolverOp_BidTooHigh();
 
         if (S_solverOpHashes[solverOp.userOpHash].length == 0) {
             // First solverOp of each userOp deploys the user's Execution Environment
@@ -337,6 +341,10 @@ contract SolverGateway is OuterHelpers {
         pure
         returns (uint256 bidFactor)
     {
+        // To avoid truncating to zero, check and return the minimum slippage
+        if (bidAmount < minAmountUserBuys + 1) return _SLIPPAGE_BASE;
+
+        // NOTE: bidAmount is checked to be < _MAX_SOLVER_BID in addSolverOp to prevent overflow here
         bidFactor = (bidAmount ** 2) * _SLIPPAGE_BASE / (minAmountUserBuys + 1) ** 2;
         if (bidFactor > _GLOBAL_MAX_SLIPPAGE) bidFactor = _GLOBAL_MAX_SLIPPAGE;
     }
