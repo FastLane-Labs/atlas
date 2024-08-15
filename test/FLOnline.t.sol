@@ -616,8 +616,34 @@ contract FastLaneOnlineTest is BaseTest {
         flOnline.addSolverOp(args.userOp, solverOp);
     }
 
+    // TODO more addSolverOp tests
+
     // ---------------------------------------------------- //
-    //                     Unit Tests                       //
+    //                  Reputation Tests                    //
+    // ---------------------------------------------------- //
+
+    function testFLOnline_CalculateBidFactor() public {
+        vm.skip(true);
+    }
+
+    function testFLOnline_CalculateWeightedScore() public {
+        vm.skip(true);
+    }
+
+    function testFLOnline_GetWeightedScore() public {
+        vm.skip(true);
+    }
+
+    function testFLOnline_GetWeightedScoreNewSolver() public {
+        vm.skip(true);
+    }
+
+    // ---------------------------------------------------- //
+    //               Congestion Buy-In Tests                //
+    // ---------------------------------------------------- //
+
+    // ---------------------------------------------------- //
+    //                  Other Unit Tests                    //
     // ---------------------------------------------------- //
 
     function testFLOnline_SortSolverOps_SortsInDescendingOrderOfBid() public {

@@ -265,25 +265,19 @@ contract SolverGateway is OuterHelpers {
         view
         returns (uint256 score)
     {
-        // Get the app-specific reputation
-        Reputation memory _rep = S_solverReputations[solverOp.from];
-
         bytes32 _solverOpHash = keccak256(abi.encode(solverOp));
         uint256 _congestionBuyIn = S_congestionBuyIn[_solverOpHash];
+        uint256 _bidFactor = _calculateBidFactor(solverOp.bidAmount, minAmountUserBuys);
 
-        uint256 _bidFactor = (solverOp.bidAmount ** 2) * _SLIPPAGE_BASE / (minAmountUserBuys + 1) ** 2;
-        if (_bidFactor > _GLOBAL_MAX_SLIPPAGE) _bidFactor = _GLOBAL_MAX_SLIPPAGE;
-
-        score = (
-            (_congestionBuyIn + (maxFeePerGas * totalGas)) // A solver typically has to pay maxFeePerGas * gas as a
-                // requirement for winning.
-                * totalGas / (totalGas + solverOp.gas) // double count gas by doing this even in unweighted score (there's
-                // value in packing more solutions)
-                * (uint256(_rep.successCost) + (maxFeePerGas * totalGas))
-                / (uint256(_rep.failureCost) + (maxFeePerGas * totalGas * (solverCount + 1))) // as solverCount increases,
-                // the dilution of thin auction history increases.
-                * _bidFactor / solverOp.gas
-        );
+        score = _calculateWeightedScore({
+            totalGas: totalGas,
+            solverOpGas: solverOp.gas,
+            maxFeePerGas: maxFeePerGas,
+            congestionBuyIn: _congestionBuyIn,
+            solverCount: solverCount,
+            bidFactor: _bidFactor,
+            rep: S_solverReputations[solverOp.from]
+        });
     }
 
     function _getWeightedScoreNewSolver(
@@ -297,24 +291,53 @@ contract SolverGateway is OuterHelpers {
         view
         returns (uint256 score)
     {
-        // Get the app-specific reputation
-        Reputation memory _rep = S_solverReputations[solverOp.from];
+        uint256 _bidFactor = _calculateBidFactor(solverOp.bidAmount, minAmountUserBuys);
 
-        // Congestion buyin is the msg.value
-        uint256 _congestionBuyIn = msg.value;
+        score = _calculateWeightedScore({
+            totalGas: totalGas,
+            solverOpGas: solverOp.gas,
+            maxFeePerGas: maxFeePerGas,
+            congestionBuyIn: msg.value,
+            solverCount: solverCount,
+            bidFactor: _bidFactor,
+            rep: S_solverReputations[solverOp.from]
+        });
+    }
 
-        uint256 _bidFactor = (solverOp.bidAmount ** 2) * _SLIPPAGE_BASE / (minAmountUserBuys + 1) ** 2;
-        if (_bidFactor > _GLOBAL_MAX_SLIPPAGE) _bidFactor = _GLOBAL_MAX_SLIPPAGE;
-
+    function _calculateWeightedScore(
+        uint256 totalGas,
+        uint256 solverOpGas,
+        uint256 maxFeePerGas,
+        uint256 congestionBuyIn,
+        uint256 solverCount,
+        uint256 bidFactor,
+        Reputation memory rep
+    )
+        internal
+        pure
+        returns (uint256 score)
+    {
         score = (
-            (_congestionBuyIn + (maxFeePerGas * totalGas)) // A solver typically has to pay maxFeePerGas * gas as a
+            (congestionBuyIn + (maxFeePerGas * totalGas)) // A solver typically has to pay maxFeePerGas * gas as a
                 // requirement for winning.
-                * totalGas / (totalGas + solverOp.gas) // double count gas by doing this even in unweighted score (there's
+                * totalGas / (totalGas + solverOpGas) // double count gas by doing this even in unweighted score (there's
                 // value in packing more solutions)
-                * (uint256(_rep.successCost) + (maxFeePerGas * totalGas))
-                / (uint256(_rep.failureCost) + (maxFeePerGas * totalGas * (solverCount + 1))) // as solverCount increases,
+                * (uint256(rep.successCost) + (maxFeePerGas * totalGas))
+                / (uint256(rep.failureCost) + (maxFeePerGas * totalGas * (solverCount + 1))) // as solverCount increases,
                 // the dilution of thin auction history increases.
-                * _bidFactor / solverOp.gas
+                * bidFactor / solverOpGas
         );
+    }
+
+    function _calculateBidFactor(
+        uint256 bidAmount,
+        uint256 minAmountUserBuys
+    )
+        internal
+        pure
+        returns (uint256 bidFactor)
+    {
+        bidFactor = (bidAmount ** 2) * _SLIPPAGE_BASE / (minAmountUserBuys + 1) ** 2;
+        if (bidFactor > _GLOBAL_MAX_SLIPPAGE) bidFactor = _GLOBAL_MAX_SLIPPAGE;
     }
 }
