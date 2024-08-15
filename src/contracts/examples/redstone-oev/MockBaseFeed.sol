@@ -1,7 +1,8 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.25;
 
-import { MergedPriceFeedAdapterWithRounds } from "lib/redstone-oracles-monorepo/packages/on-chain-relayer/contracts/price-feeds/with-rounds/MergedPriceFeedAdapterWithRounds.sol";
+import { MergedPriceFeedAdapterWithRounds } from
+    "lib/redstone-oracles-monorepo/packages/on-chain-relayer/contracts/price-feeds/with-rounds/MergedPriceFeedAdapterWithRounds.sol";
 
 contract MockBaseFeed is MergedPriceFeedAdapterWithRounds {
     error UnauthorizedSigner();
@@ -19,7 +20,7 @@ contract MockBaseFeed is MergedPriceFeedAdapterWithRounds {
         revert UnauthorizedSigner();
     }
 
-    function getDataFeedId() public view virtual override returns (bytes32){
+    function getDataFeedId() public view virtual override returns (bytes32) {
         return bytes32("ATLAS-DEMO-MOCK-FEED");
     }
 }
