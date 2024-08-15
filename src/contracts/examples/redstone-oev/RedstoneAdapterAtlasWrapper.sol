@@ -66,7 +66,7 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
         // check to see if earlier rounds are supported
         // this will revert if the base adapter does not support earlier rounds(historical data)
         IFeed(_baseFeed).getRoundData(latestRound - 1);
-        
+
         BASE_FEED = _baseFeed;
         BASE_ADAPTER = address(IFeed(_baseFeed).getPriceFeedAdapter());
     }
@@ -205,4 +205,8 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
     function withdrawERC20(address token, address recipient) external onlyOwner {
         SafeERC20.safeTransfer(IERC20(token), recipient, IERC20(token).balanceOf(address(this)));
     }
+
+    fallback() external payable { }
+
+    receive() external payable { }
 }
