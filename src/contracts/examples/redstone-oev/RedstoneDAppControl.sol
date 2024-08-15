@@ -79,7 +79,7 @@ contract RedstoneDAppControl is DAppControl {
         _;
     }
 
-    function verifyWhitelist() external view{
+    function verifyWhitelist() external view {
         if (NUM_WHITELISTED_BUNDLERS > 0 && !bundlerWhitelist[_bundler()]) revert OnlyWhitelistedBundlerAllowed();
     }
 
