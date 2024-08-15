@@ -73,13 +73,7 @@ contract FastLaneOnlineOuter is SolverGateway {
 
     function _validateSwap(UserOperation calldata userOp) internal {
         if (msg.sender != userOp.from) revert FLOnlineOuter_ValidateSwap_InvalidSender();
-        // TODO: Add back gas checks when we have more clarity
-        // if (gas > gasleft()) {
-        //     revert FLOnlineOuter_ValidateSwap_TxGasTooHigh();
-        // }
-        // if (gas < gasleft() - 30_000) {
-        //     revert FLOnlineOuter_ValidateSwap_TxGasTooLow();
-        // }
+
         if (userOp.gas <= MAX_SOLVER_GAS * 2) {
             revert FLOnlineOuter_ValidateSwap_GasLimitTooLow();
         }
@@ -95,31 +89,24 @@ contract FastLaneOnlineOuter is SolverGateway {
         }
     }
 
-    // TODO Fix when basic swap scenarios are passing
     function _metacallGasLimit(
         uint256 cumulativeGasReserved,
         uint256 totalGas,
         uint256 gasLeft
     )
         internal
-        view
+        pure
         returns (uint256 metacallGasLimit)
     {
         // Reduce any unnecessary gas to avoid Atlas's excessive gas bundler penalty
-        cumulativeGasReserved += METACALL_GAS_BUFFER; // TODO maybe make this higher?
+
+        // About 850k gas extra required to pass Atlas internal checks
+        cumulativeGasReserved += 850_000;
 
         // Sets metacallGasLimit to the minimum of {totalGas, gasLeft, cumulativeGasReserved}
-        // metacallGasLimit = totalGas > gasLeft
-        //     ? (gasLeft > cumulativeGasReserved ? cumulativeGasReserved : gasLeft)
-        //     : (totalGas > cumulativeGasReserved ? cumulativeGasReserved : totalGas);
-
-        // console.log("cumulativeGasReserved:", cumulativeGasReserved);
-        // console.log("totalGas:", totalGas);
-        // console.log("gasLeft:", gasLeft);
-        // console.log("metacallGasLimit:", metacallGasLimit);
-
-        // TODO remove this once fixed, hacky bypass for gas issues
-        return gasLeft - 100_000;
+        metacallGasLimit = totalGas > gasLeft
+            ? (gasLeft > cumulativeGasReserved ? cumulativeGasReserved : gasLeft)
+            : (totalGas > cumulativeGasReserved ? cumulativeGasReserved : totalGas);
     }
 
     fallback() external payable { }
