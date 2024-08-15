@@ -624,80 +624,234 @@ contract FastLaneOnlineTest is BaseTest {
 
     function testFLOnline_CalculateBidFactor() public {
         // bidFactor measured with scale = 100. I.e. 100% = 100
-
         uint256 BASE_FACTOR = flOnlineMock.SLIPPAGE_BASE();
         uint256 MAX_FACTOR = flOnlineMock.GLOBAL_MAX_SLIPPAGE();
         uint256 bidFactor;
 
         // Case: solver bids minAmountUserBuys + 1 ==> bidFactor should be 100 (floor)
-        bidFactor = flOnlineMock.calculateBidFactor({
-            bidAmount: 1e18 + 1,
-            minAmountUserBuys: 1e18
-        });
+        bidFactor = flOnlineMock.calculateBidFactor({ bidAmount: 1e18 + 1, minAmountUserBuys: 1e18 });
         assertEq(bidFactor, BASE_FACTOR, "bidFactor should be floor (+1 bid)");
 
         // Case: solver bids under minAmountUserBuys ==> bidFactor should be 100 (floor)
-        bidFactor = flOnlineMock.calculateBidFactor({
-            bidAmount: 1e18 - 1,
-            minAmountUserBuys: 1e18
-        });
+        bidFactor = flOnlineMock.calculateBidFactor({ bidAmount: 1e18 - 1, minAmountUserBuys: 1e18 });
         assertEq(bidFactor, BASE_FACTOR, "bidFactor should be floor (underbid)");
 
         // Case: solver bids minAmountUserBuys ==> bidFactor should be 100 (floor)
-        bidFactor = flOnlineMock.calculateBidFactor({
-            bidAmount: 1e18,
-            minAmountUserBuys: 1e18
-        });
+        bidFactor = flOnlineMock.calculateBidFactor({ bidAmount: 1e18, minAmountUserBuys: 1e18 });
         assertEq(bidFactor, BASE_FACTOR, "bidFactor should be floor (match)");
 
         // Case: still returns floor if minAmountUserBuys is sqrt(type(uint256).max)
-        bidFactor = flOnlineMock.calculateBidFactor({
-            bidAmount: 1e18,
-            minAmountUserBuys: sqrt(type(uint256).max)
-        });
+        bidFactor = flOnlineMock.calculateBidFactor({ bidAmount: 1e18, minAmountUserBuys: sqrt(type(uint256).max) });
         assertEq(bidFactor, BASE_FACTOR, "bidFactor should be floor (max minAmountUserBuys)");
 
         // Case: solver bids 2x minAmountUserBuys ==> bidFactor should be 125 (cap)
-        bidFactor = flOnlineMock.calculateBidFactor({
-            bidAmount: 2e18,
-            minAmountUserBuys: 1e18
-        });
+        bidFactor = flOnlineMock.calculateBidFactor({ bidAmount: 2e18, minAmountUserBuys: 1e18 });
         assertEq(bidFactor, MAX_FACTOR, "bidFactor should be max (cap)");
 
         // Case: still returns max if bidAmount is sqrt(type(uint256).max) / 100
-        bidFactor = flOnlineMock.calculateBidFactor({
-            bidAmount: sqrt(type(uint256).max) / 100,
-            minAmountUserBuys: 1e18
-        });
+        bidFactor =
+            flOnlineMock.calculateBidFactor({ bidAmount: sqrt(type(uint256).max) / 100, minAmountUserBuys: 1e18 });
         assertEq(bidFactor, MAX_FACTOR, "bidFactor should be max (max bidAmount)");
 
-      
         // Case: solver bids 1.1x minAmountUserBuys ==> bidFactor should be 120
-        bidFactor = flOnlineMock.calculateBidFactor({
-            bidAmount: 1.1e18,
-            minAmountUserBuys: 1e18
-        });
+        bidFactor = flOnlineMock.calculateBidFactor({ bidAmount: 1.1e18, minAmountUserBuys: 1e18 });
         assertEq(bidFactor, 120, "bidFactor should be 120");
 
         // Case: reverts if bidAmount > sqrt(type(uint256).max / 100)
         // NOTE: This is caught in addSolverOp before revert can happen
         vm.expectRevert();
-        flOnlineMock.calculateBidFactor({
-            bidAmount: sqrt(type(uint256).max / 100) + 1,
-            minAmountUserBuys: 1e18
-        });
+        flOnlineMock.calculateBidFactor({ bidAmount: sqrt(type(uint256).max / 100) + 1, minAmountUserBuys: 1e18 });
     }
 
     function testFLOnline_CalculateWeightedScore() public {
-        vm.skip(true);
-    }
+        Reputation memory rep;
+        uint256 highScore;
+        uint256 lowScore;
 
-    function testFLOnline_GetWeightedScore() public {
-        vm.skip(true);
-    }
+        rep = Reputation({
+            successCost: 1e16, // 0.01 ETH on winning solverOps
+            failureCost: 0 // no failing solverOps
+         });
 
-    function testFLOnline_GetWeightedScoreNewSolver() public {
-        vm.skip(true);
+        // Case: totalGas (userOp.gas) positively impacts score
+        highScore = flOnlineMock.calculateWeightedScore({
+            totalGas: defaultGasLimit,
+            solverOpGas: flOnline.MAX_SOLVER_GAS() - 1,
+            maxFeePerGas: defaultGasPrice,
+            congestionBuyIn: 0,
+            solverCount: 1,
+            bidFactor: 100,
+            rep: rep
+        });
+        lowScore = flOnlineMock.calculateWeightedScore({
+            totalGas: defaultGasLimit / 2,
+            solverOpGas: flOnline.MAX_SOLVER_GAS() - 1,
+            maxFeePerGas: defaultGasPrice,
+            congestionBuyIn: 0,
+            solverCount: 1,
+            bidFactor: 100,
+            rep: rep
+        });
+        assertTrue(highScore > lowScore, "totalGas should positively impact score");
+
+        // Case: solverOpGas negatively impacts score
+        highScore = flOnlineMock.calculateWeightedScore({
+            totalGas: defaultGasLimit,
+            solverOpGas: 200_000,
+            maxFeePerGas: defaultGasPrice,
+            congestionBuyIn: 0,
+            solverCount: 1,
+            bidFactor: 100,
+            rep: rep
+        });
+        lowScore = flOnlineMock.calculateWeightedScore({
+            totalGas: defaultGasLimit,
+            solverOpGas: 300_000,
+            maxFeePerGas: defaultGasPrice,
+            congestionBuyIn: 0,
+            solverCount: 1,
+            bidFactor: 100,
+            rep: rep
+        });
+        assertTrue(highScore > lowScore, "solverOpGas should negatively impact score");
+
+        // Case: maxFeePerGas positively impacts score
+        highScore = flOnlineMock.calculateWeightedScore({
+            totalGas: defaultGasLimit,
+            solverOpGas: flOnline.MAX_SOLVER_GAS() - 1,
+            maxFeePerGas: 20e9, // 20 gwei
+            congestionBuyIn: 0,
+            solverCount: 1,
+            bidFactor: 100,
+            rep: rep
+        });
+        lowScore = flOnlineMock.calculateWeightedScore({
+            totalGas: defaultGasLimit,
+            solverOpGas: flOnline.MAX_SOLVER_GAS() - 1,
+            maxFeePerGas: 5e9, // 5 gwei
+            congestionBuyIn: 0,
+            solverCount: 1,
+            bidFactor: 100,
+            rep: rep
+        });
+        assertTrue(highScore > lowScore, "maxFeePerGas should positively impact score");
+
+        // Case: congestionBuyIn positively impacts score
+        highScore = flOnlineMock.calculateWeightedScore({
+            totalGas: defaultGasLimit,
+            solverOpGas: flOnline.MAX_SOLVER_GAS() - 1,
+            maxFeePerGas: defaultGasPrice,
+            congestionBuyIn: 1e17, // 0.1 ETH
+            solverCount: 1,
+            bidFactor: 100,
+            rep: rep
+        });
+        lowScore = flOnlineMock.calculateWeightedScore({
+            totalGas: defaultGasLimit,
+            solverOpGas: flOnline.MAX_SOLVER_GAS() - 1,
+            maxFeePerGas: defaultGasPrice,
+            congestionBuyIn: 0,
+            solverCount: 1,
+            bidFactor: 100,
+            rep: rep
+        });
+        assertTrue(highScore > lowScore, "congestionBuyIn should positively impact score");
+
+        // Case: solverCount negatively impacts score
+        highScore = flOnlineMock.calculateWeightedScore({
+            totalGas: defaultGasLimit,
+            solverOpGas: flOnline.MAX_SOLVER_GAS() - 1,
+            maxFeePerGas: defaultGasPrice,
+            congestionBuyIn: 0,
+            solverCount: 1,
+            bidFactor: 100,
+            rep: rep
+        });
+        lowScore = flOnlineMock.calculateWeightedScore({
+            totalGas: defaultGasLimit,
+            solverOpGas: flOnline.MAX_SOLVER_GAS() - 1,
+            maxFeePerGas: defaultGasPrice,
+            congestionBuyIn: 0,
+            solverCount: 2,
+            bidFactor: 100,
+            rep: rep
+        });
+        assertTrue(highScore > lowScore, "solverCount should negatively impact score");
+
+        // Case: bidFactor positively impacts score
+        highScore = flOnlineMock.calculateWeightedScore({
+            totalGas: defaultGasLimit,
+            solverOpGas: flOnline.MAX_SOLVER_GAS() - 1,
+            maxFeePerGas: defaultGasPrice,
+            congestionBuyIn: 0,
+            solverCount: 1,
+            bidFactor: 120,
+            rep: rep
+        });
+        lowScore = flOnlineMock.calculateWeightedScore({
+            totalGas: defaultGasLimit,
+            solverOpGas: flOnline.MAX_SOLVER_GAS() - 1,
+            maxFeePerGas: defaultGasPrice,
+            congestionBuyIn: 0,
+            solverCount: 1,
+            bidFactor: 100,
+            rep: rep
+        });
+        assertTrue(highScore > lowScore, "bidFactor should positively impact score");
+
+        // Case: rep.successCost positively impacts score
+        highScore = flOnlineMock.calculateWeightedScore({
+            totalGas: defaultGasLimit,
+            solverOpGas: flOnline.MAX_SOLVER_GAS() - 1,
+            maxFeePerGas: defaultGasPrice,
+            congestionBuyIn: 0,
+            solverCount: 1,
+            bidFactor: 100,
+            rep: Reputation({
+                successCost: 1e17, // 0.1 ETH on winning solverOps
+                failureCost: 0 // no failing solverOps
+             })
+        });
+        lowScore = flOnlineMock.calculateWeightedScore({
+            totalGas: defaultGasLimit,
+            solverOpGas: flOnline.MAX_SOLVER_GAS() - 1,
+            maxFeePerGas: defaultGasPrice,
+            congestionBuyIn: 0,
+            solverCount: 1,
+            bidFactor: 100,
+            rep: Reputation({
+                successCost: 0, // 0 ETH on winning solverOps
+                failureCost: 0 // no failing solverOps
+             })
+        });
+        assertTrue(highScore > lowScore, "rep.successCost should positively impact score");
+
+        // Case: rep.failureCost negatively impacts score
+        highScore = flOnlineMock.calculateWeightedScore({
+            totalGas: defaultGasLimit,
+            solverOpGas: flOnline.MAX_SOLVER_GAS() - 1,
+            maxFeePerGas: defaultGasPrice,
+            congestionBuyIn: 0,
+            solverCount: 1,
+            bidFactor: 100,
+            rep: Reputation({
+                successCost: 0, // 0 ETH on winning solverOps
+                failureCost: 0 // no failing solverOps
+             })
+        });
+        lowScore = flOnlineMock.calculateWeightedScore({
+            totalGas: defaultGasLimit,
+            solverOpGas: flOnline.MAX_SOLVER_GAS() - 1,
+            maxFeePerGas: defaultGasPrice,
+            congestionBuyIn: 0,
+            solverCount: 1,
+            bidFactor: 100,
+            rep: Reputation({
+                successCost: 0, // 0 ETH on winning solverOps
+                failureCost: 1e17 // 0.1 ETH on failing solverOps
+             })
+        });
+        assertTrue(highScore > lowScore, "rep.failureCost should negatively impact score");
     }
 
     // ---------------------------------------------------- //
@@ -1322,10 +1476,10 @@ contract FastLaneOnlineTest is BaseTest {
         }
     }
 
-    function sqrt(uint y) internal pure returns (uint z) {
+    function sqrt(uint256 y) internal pure returns (uint256 z) {
         if (y > 3) {
             z = y;
-            uint x = y / 2 + 1;
+            uint256 x = y / 2 + 1;
             while (x < z) {
                 z = x;
                 x = (y / x + x) / 2;
