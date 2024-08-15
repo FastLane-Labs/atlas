@@ -15,7 +15,7 @@ contract RedstoneDAppControl is DAppControl {
     error OnlyGovernance();
     error OnlyWhitelistedBundlerAllowed();
 
-    uint256 private bundlerOEVPercent = 5;
+    uint256 public immutable bundlerOEVPercent = 5;
 
     event NewRedstoneAtlasAdapterCreated(address indexed wrapper, address indexed owner, address indexed baseFeed);
 
@@ -56,10 +56,6 @@ contract RedstoneDAppControl is DAppControl {
         )
     { }
 
-    function setBundlerOEVPercent(uint256 _percent) external onlyGov {
-        bundlerOEVPercent = _percent;
-    }
-
     function addBundlerToWhitelist(address bundler) external onlyGov {
         if (!bundlerWhitelist[bundler]) {
             bundlerWhitelist[bundler] = true;
@@ -83,12 +79,16 @@ contract RedstoneDAppControl is DAppControl {
         _;
     }
 
+    function verifyWhitelist() external view{
+        if (NUM_WHITELISTED_BUNDLERS > 0 && !bundlerWhitelist[_bundler()]) revert OnlyWhitelistedBundlerAllowed();
+    }
+
     // ---------------------------------------------------- //
     //                  Atlas Hook Overrides                //
     // ---------------------------------------------------- //
 
     function _preOpsCall(UserOperation calldata userOp) internal view override returns (bytes memory) {
-        if (NUM_WHITELISTED_BUNDLERS > 0 && !bundlerWhitelist[_bundler()]) revert OnlyWhitelistedBundlerAllowed();
+        RedstoneDAppControl(userOp.control).verifyWhitelist();
         return abi.encode(userOp.dapp); //useOp.dapp is the address of the wrapped Atlas adapter //trackUserReturnData
             // is false // trackPreOpsReturnData is true
     }
