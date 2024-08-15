@@ -34,7 +34,7 @@ contract RedstoneDAppControl is DAppControl {
                 userNoncesSequential: false,
                 dappNoncesSequential: false,
                 requirePreOps: true,
-                trackPreOpsReturnData: false,
+                trackPreOpsReturnData: true,
                 trackUserReturnData: false,
                 delegateUser: false,
                 requirePreSolver: false,
@@ -90,13 +90,13 @@ contract RedstoneDAppControl is DAppControl {
     function _preOpsCall(UserOperation calldata userOp) internal view override returns (bytes memory) {
         if (NUM_WHITELISTED_BUNDLERS > 0 && !bundlerWhitelist[_bundler()]) revert OnlyWhitelistedBundlerAllowed();
         return abi.encode(userOp.dapp); //useOp.dapp is the address of the wrapped Atlas adapter //trackUserReturnData
-            // is false
+            // is false // trackPreOpsReturnData is true
     }
 
     function _allocateValueCall(address, uint256 bidAmount, bytes calldata data) internal virtual override {
         if (bidAmount == 0) return;
 
-        uint256 oevForBundler = bidAmount * bundlerOEVPercent / 100;
+        uint256 oevForBundler = (bidAmount * bundlerOEVPercent) / 100;
         uint256 oevForAdapter = bidAmount - oevForBundler;
 
         address adapter = abi.decode(data, (address)); // returned from _preOpsCall

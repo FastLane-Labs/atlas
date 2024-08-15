@@ -38,7 +38,7 @@ contract RedstoneDAppControlTest is BaseTest {
         vm.stopPrank();
 
         vm.startPrank(vm.addr(oracleOwnerPk));
-        wrapper = RedstoneAdapterAtlasWrapper(dappControl.createNewAtlasAdapter(baseFeedAddress));
+        wrapper = RedstoneAdapterAtlasWrapper(payable(dappControl.createNewAtlasAdapter(baseFeedAddress)));
         vm.stopPrank();
     }
 
