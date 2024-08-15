@@ -30,8 +30,8 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
     address public immutable ATLAS;
     address public immutable DAPP_CONTROL;
 
-    address public immutable BASE_ADAPTER;
-    address public immutable BASE_FEED;
+    address public BASE_ADAPTER;
+    address public BASE_FEED;
 
     uint256 public constant MAX_HISTORICAL_FETCH_ITERATIONS = 5;
 
@@ -39,7 +39,7 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
     address[] public authorisedUpdaters; // authorised `msg.sender`s of `updateDataFeedsValues` (execution environments
         // of the userOps)
 
-    uint256 public BASE_FEED_DELAY = 4; //seconds
+    uint256 public BASE_FEED_DELAY = 8; //seconds
 
     error BaseAdapterHasNoDataFeed();
     error InvalidAuthorisedSigner();
@@ -59,6 +59,16 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
         BASE_FEED = _baseFeed;
         BASE_ADAPTER = address(IFeed(_baseFeed).getPriceFeedAdapter());
         _transferOwnership(_owner);
+    }
+
+    function setBaseFeed(address _baseFeed) external onlyOwner {
+        uint80 latestRound = IFeed(_baseFeed).latestRound();
+        // check to see if earlier rounds are supported
+        // this will revert if the base adapter does not support earlier rounds(historical data)
+        IFeed(_baseFeed).getRoundData(latestRound - 1);
+        
+        BASE_FEED = _baseFeed;
+        BASE_ADAPTER = address(IFeed(_baseFeed).getPriceFeedAdapter());
     }
 
     function setBaseFeedDelay(uint256 _delay) external onlyOwner {
