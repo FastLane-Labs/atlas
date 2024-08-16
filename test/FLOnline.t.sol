@@ -11,6 +11,7 @@ import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
 import { UserOperation } from "src/contracts/types/UserOperation.sol";
 
 import { FastLaneOnlineOuter } from "src/contracts/examples/fastlane-online/FastLaneOnlineOuter.sol";
+import { FastLaneOnlineInner } from "src/contracts/examples/fastlane-online/FastLaneOnlineInner.sol";
 import { SwapIntent, BaselineCall, Reputation } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
 import { FastLaneOnlineErrors } from "src/contracts/examples/fastlane-online/FastLaneOnlineErrors.sol";
 
@@ -1047,6 +1048,22 @@ contract FastLaneOnlineTest is BaseTest {
         vm.prank(userEE);
         flOnlineMock.setWinningSolver(address(1));
         assertEq(flOnlineMock.getWinningSolver(), solverOneEOA, "winningSolver should still be solverOneEOA");
+    }
+
+    function testFLOnline_BaselineEstablishedEvent() public {
+        _setUpUser(defaultSwapIntent);
+        _setUpSolver(solverOneEOA, solverOnePK, goodSolverBidETH);
+
+        uint256 expectedBaselineAmountOut = _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: true });
+
+        vm.startPrank(userEOA);
+        vm.expectEmit(false, false, false, true, address(executionEnvironment));
+        emit FastLaneOnlineInner.BaselineEstablished(defaultSwapIntent.minAmountUserBuys, expectedBaselineAmountOut);
+        (bool result,) = address(flOnline).call{ gas: args.gas + 1000, value: args.msgValue }(
+            abi.encodeCall(flOnline.fastOnlineSwap, (args.userOp))
+        );
+        assertTrue(result, "fastOnlineSwap should have succeeded");
+        vm.stopPrank();
     }
 
     // ---------------------------------------------------- //
