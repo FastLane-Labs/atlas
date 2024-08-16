@@ -75,7 +75,7 @@ Commit hash of deployment: [7b8530f](https://github.com/FastLane-Labs/atlas/pull
 
 | DAppControl        | Address                                                                                                                       |
 |--------------------|-------------------------------------------------------------------------------------------------------------------------------|
-| FastLane Online    | [0xCf00A98bA4ea1D967f34B07Ff76f61E1A5521B96](https://amoy.polygonscan.com/address/0xCf00A98bA4ea1D967f34B07Ff76f61E1A5521B96) |
+| FastLane Online    | [0x87f9B954C403Fec2A9964CFFB8AcA9CD7ED55FDf](https://polygonscan.com/address/0x87f9B954C403Fec2A9964CFFB8AcA9CD7ED55FDf)      |
 
 
 ### Binance Smart Chain Mainnet

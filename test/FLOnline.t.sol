@@ -580,8 +580,6 @@ contract FastLaneOnlineTest is BaseTest {
     //                addSolverOp() Tests                   //
     // ---------------------------------------------------- //
 
-    // TODO more addSolverOp tests
-
     function testFLOnline_addSolverOp_WrongCaller_Fails() public {
         _setUpUser(defaultSwapIntent);
         SolverOperation memory solverOp = _buildSolverOp(solverOneEOA, solverOnePK, address(123), 1);
@@ -855,6 +853,18 @@ contract FastLaneOnlineTest is BaseTest {
         assertTrue(highScore > lowScore, "rep.failureCost should negatively impact score");
     }
 
+    function testFLOnline_EvaluateForInclusion() public {
+        vm.skip(true);
+    }
+
+    function testFLOnline_PushSolverOp() public {
+        vm.skip(true);
+    }
+
+    function testFLOnline_ReplaceSolverOp() public {
+        vm.skip(true);
+    }
+
     // ---------------------------------------------------- //
     //               Congestion Buy-In Tests                //
     // ---------------------------------------------------- //
@@ -901,6 +911,10 @@ contract FastLaneOnlineTest is BaseTest {
         flOnline.refundCongestionBuyIns(solverOp);
 
         assertEq(address(solverOneEOA).balance, solverBalanceBefore + congestionBuyIn, "cbi not refunded");
+    }
+
+    function testFLOnline_ProcessCongestionRake() public {
+        vm.skip(true);
     }
 
     // ---------------------------------------------------- //
@@ -1048,6 +1062,10 @@ contract FastLaneOnlineTest is BaseTest {
         vm.prank(userEE);
         flOnlineMock.setWinningSolver(address(1));
         assertEq(flOnlineMock.getWinningSolver(), solverOneEOA, "winningSolver should still be solverOneEOA");
+    }
+
+    function testFLOnline_WithdrawRake() public {
+        vm.skip(true);
     }
 
     function testFLOnline_BaselineEstablishedEvent() public {
