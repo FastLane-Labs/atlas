@@ -579,6 +579,8 @@ contract FastLaneOnlineTest is BaseTest {
     //                addSolverOp() Tests                   //
     // ---------------------------------------------------- //
 
+    // TODO more addSolverOp tests
+
     function testFLOnline_addSolverOp_WrongCaller_Fails() public {
         _setUpUser(defaultSwapIntent);
         SolverOperation memory solverOp = _buildSolverOp(solverOneEOA, solverOnePK, address(123), 1);
@@ -615,8 +617,6 @@ contract FastLaneOnlineTest is BaseTest {
         vm.expectRevert(FastLaneOnlineErrors.SolverGateway_AddSolverOp_SimulationFail.selector);
         flOnline.addSolverOp(args.userOp, solverOp);
     }
-
-    // TODO more addSolverOp tests
 
     // ---------------------------------------------------- //
     //                  Reputation Tests                    //
@@ -857,6 +857,50 @@ contract FastLaneOnlineTest is BaseTest {
     // ---------------------------------------------------- //
     //               Congestion Buy-In Tests                //
     // ---------------------------------------------------- //
+
+    function testFLOnline_RefundCongestionBuyIns() public {
+        uint256 congestionBuyIn = 1e17;
+        _setUpUser(defaultSwapIntent);
+
+        // Solver registers with 1e17 congestion buy-in
+        SolverOperation memory solverOp = _setUpSolver(solverOneEOA, solverOnePK, goodSolverBidETH, congestionBuyIn);
+        uint256 solverBalanceBefore = address(solverOneEOA).balance;
+
+        assertTrue(block.number < solverOp.deadline, "should not be past solverOp.deadline");
+
+        vm.prank(solverOneEOA);
+        vm.expectRevert(FastLaneOnlineErrors.SolverGateway_RefundCongestionBuyIns_DeadlineNotPassed.selector);
+        flOnline.refundCongestionBuyIns(solverOp);
+
+        uint256 snapshotId = vm.snapshot();
+
+        _doFastOnlineSwapWithChecks({
+            winningSolverEOA: solverOneEOA,
+            winningSolver: solverOp.solver,
+            solverCount: 1,
+            swapCallShouldSucceed: true
+        });
+
+        // Skip forward past solverOp.deadline
+        vm.roll(solverOp.deadline + 1);
+        assertTrue(block.number > solverOp.deadline, "now should be past solverOp.deadline");
+
+        vm.prank(solverOneEOA);
+        flOnline.refundCongestionBuyIns(solverOp);
+
+        assertEq(address(solverOneEOA).balance, solverBalanceBefore, "solver should not get refund if executed");
+
+        vm.revertTo(snapshotId); // go back to before the swap
+
+        // Skip forward past solverOp.deadline
+        vm.roll(solverOp.deadline + 1);
+        assertTrue(block.number > solverOp.deadline, "now should be past solverOp.deadline");
+
+        vm.prank(solverOneEOA);
+        flOnline.refundCongestionBuyIns(solverOp);
+
+        assertEq(address(solverOneEOA).balance, solverBalanceBefore + congestionBuyIn, "cbi not refunded");
+    }
 
     // ---------------------------------------------------- //
     //                  Other Unit Tests                    //
@@ -1251,8 +1295,22 @@ contract FastLaneOnlineTest is BaseTest {
         return BaselineCall({ to: address(routerV2), data: baselineData, value: value });
     }
 
-    function _setUpSolver(address solverEOA, uint256 solverPK, uint256 bidAmount) internal returns (address) {
-        return _setUpSolver(solverEOA, solverPK, bidAmount, bytes4(0));
+    function _setUpSolver(address solverEOA, uint256 solverPK, uint256 bidAmount) internal returns (address solver) {
+        (solver,) = _setUpSolver(solverEOA, solverPK, bidAmount, 0, bytes4(0));
+        return solver;
+    }
+
+    function _setUpSolver(
+        address solverEOA,
+        uint256 solverPK,
+        uint256 bidAmount,
+        uint256 congestionBuyIn
+    )
+        internal
+        returns (SolverOperation memory solverOp)
+    {
+        (, solverOp) = _setUpSolver(solverEOA, solverPK, bidAmount, congestionBuyIn, bytes4(0));
+        return solverOp;
     }
 
     function _setUpSolver(
@@ -1262,7 +1320,21 @@ contract FastLaneOnlineTest is BaseTest {
         bytes4 addSolverOpError
     )
         internal
-        returns (address)
+        returns (address solver)
+    {
+        (solver,) = _setUpSolver(solverEOA, solverPK, bidAmount, 0, addSolverOpError);
+        return solver;
+    }
+
+    function _setUpSolver(
+        address solverEOA,
+        uint256 solverPK,
+        uint256 bidAmount,
+        uint256 congestionBuyIn,
+        bytes4 addSolverOpError
+    )
+        internal
+        returns (address solverContract, SolverOperation memory solverOp)
     {
         vm.startPrank(solverEOA);
         // Make sure solver has 1 AtlETH bonded in Atlas
@@ -1281,7 +1353,7 @@ contract FastLaneOnlineTest is BaseTest {
         FLOnlineRFQSolver solver = new FLOnlineRFQSolver{ salt: salt }(WETH_ADDRESS, address(atlas));
 
         // Create signed solverOp
-        SolverOperation memory solverOp = _buildSolverOp(solverEOA, solverPK, address(solver), bidAmount);
+        solverOp = _buildSolverOp(solverEOA, solverPK, address(solver), bidAmount);
 
         // Give solver contract enough tokenOut to fulfill user's SwapIntent
         if (args.swapIntent.tokenUserBuys != NATIVE_TOKEN) {
@@ -1289,13 +1361,14 @@ contract FastLaneOnlineTest is BaseTest {
         } else {
             deal(address(solver), bidAmount);
         }
+        if (congestionBuyIn > 0) deal(solverEOA, congestionBuyIn);
 
         // Register solverOp in FLOnline in frontrunning tx
         if (addSolverOpError != bytes4(0)) vm.expectRevert(addSolverOpError);
-        flOnline.addSolverOp({ userOp: args.userOp, solverOp: solverOp });
+        flOnline.addSolverOp{ value: congestionBuyIn }({ userOp: args.userOp, solverOp: solverOp });
 
         // Return early if addSolverOp expected to revert
-        if (addSolverOpError != bytes4(0)) return address(0);
+        if (addSolverOpError != bytes4(0)) return (address(0), solverOp);
         vm.stopPrank();
 
         if (solverEOA == solverOneEOA) attempted.solverOne = true;
@@ -1303,7 +1376,7 @@ contract FastLaneOnlineTest is BaseTest {
         if (solverEOA == solverThreeEOA) attempted.solverThree = true;
 
         // Returns the address of the solver contract deployed here
-        return address(solver);
+        return (address(solver), solverOp);
     }
 
     function _buildSolverOp(
