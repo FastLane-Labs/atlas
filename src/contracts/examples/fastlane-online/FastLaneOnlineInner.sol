@@ -31,6 +31,8 @@ contract FastLaneOnlineInner is BaseStorage, FastLaneOnlineControl {
     error BaselineFailSuccessful(uint256 baselineAmount);
     error BaselineFailFailure();
 
+    event BaselineEstablished(uint256 userMinAmountOut, uint256 baselineAmountOut);
+
     uint8 private constant _baselinePhase = uint8(ExecutionPhase.UserOperation);
 
     constructor(address _atlas) FastLaneOnlineControl(_atlas) { }
@@ -84,6 +86,8 @@ contract FastLaneOnlineInner is BaseStorage, FastLaneOnlineControl {
         // This will typically be a uniswap v2 or v3 path.
         // NOTE: This runs inside a try/catch and is reverted.
         uint256 _baselineAmount = _catchSwapBaseline(swapIntent, baselineCall);
+
+        emit BaselineEstablished(swapIntent.minAmountUserBuys, _baselineAmount);
 
         // Update the minAmountUserBuys with this value
         // NOTE: If all of the solvers fail to exceed this value, we'll redo this swap in the postOpsHook
