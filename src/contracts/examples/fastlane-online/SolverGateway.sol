@@ -26,8 +26,7 @@ import { OuterHelpers } from "src/contracts/examples/fastlane-online/OuterHelper
 import { SwapIntent, BaselineCall, Reputation } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
 
 contract SolverGateway is OuterHelpers {
-    uint256 public constant USER_GAS_BUFFER = 500_000;
-    uint256 public constant METACALL_GAS_BUFFER = 200_000;
+    uint256 public constant USER_GAS_BUFFER = 350_000;
     uint256 public constant MAX_SOLVER_GAS = 500_000;
 
     uint256 internal constant _SLIPPAGE_BASE = 100;
@@ -86,6 +85,7 @@ contract SolverGateway is OuterHelpers {
         } else if (_replaceExisting) {
             _replaceSolverOp(solverOp.userOpHash, _solverOpHash, _replacedIndex);
         } else {
+            // revert if pushAsNew = false and replaceExisting = false
             revert SolverGateway_AddSolverOp_ValueTooLow();
         }
 
@@ -201,7 +201,7 @@ contract SolverGateway is OuterHelpers {
     )
         internal
         view
-        returns (bool pushAsNew, bool replaceExisting, uint256)
+        returns (bool pushAsNew, bool replaceExisting, uint256 /* replacedIndex */ )
     {
         (SolverOperation[] memory _solverOps, uint256 _cumulativeGasReserved) = _getSolverOps(solverOp.userOpHash);
 
@@ -222,6 +222,7 @@ contract SolverGateway is OuterHelpers {
         //      solverOpScore    _cumulativeScore (unweighted)
         // if  -------------- >  ------------------------------  * 2
         //      solverOpGas             totalGas
+
         if (_score * userOp.gas > _cumulativeScore * solverOp.gas * 2) {
             if (_cumulativeGasReserved + USER_GAS_BUFFER + (solverOp.gas * 2) < userOp.gas) {
                 return (true, false, 0);
