@@ -576,18 +576,16 @@ contract FastLaneOnlineTest is BaseTest {
         });
     }
 
+    function testFLOnline_Swap_ComplexOverlappingSwaps() public {
+        vm.skip(true);
+        // 2 different userOps in the same block
+        // 2 solvers each, 1st replaces solverOp with higher bid and wins
+        // check losing solver can withdraw congestion buy-in
+    }
+
     // ---------------------------------------------------- //
     //                addSolverOp() Tests                   //
     // ---------------------------------------------------- //
-
-    function testFLOnline_addSolverOp_WrongCaller_Fails() public {
-        _setUpUser(defaultSwapIntent);
-        SolverOperation memory solverOp = _buildSolverOp(solverOneEOA, solverOnePK, address(123), 1);
-
-        vm.prank(userEOA); // Should revert if caller not solverOneEOA
-        vm.expectRevert(FastLaneOnlineErrors.SolverGateway_AddSolverOp_SolverMustBeSender.selector);
-        flOnline.addSolverOp(args.userOp, solverOp);
-    }
 
     function testFLOnline_addSolverOp_FirstSolverCreatesEE() public {
         bool isDeployed;
@@ -603,6 +601,15 @@ contract FastLaneOnlineTest is BaseTest {
         assertEq(isDeployed, true, "EE should be deployed");
     }
 
+    function testFLOnline_addSolverOp_WrongCaller_Fails() public {
+        _setUpUser(defaultSwapIntent);
+        SolverOperation memory solverOp = _buildSolverOp(solverOneEOA, solverOnePK, address(123), 1);
+
+        vm.prank(userEOA); // Should revert if caller not solverOneEOA
+        vm.expectRevert(FastLaneOnlineErrors.SolverGateway_AddSolverOp_SolverMustBeSender.selector);
+        flOnline.addSolverOp(args.userOp, solverOp);
+    }
+
     function testFLOnline_addSolverOp_SimFail_Fails() public {
         _setUpUser(defaultSwapIntent);
 
@@ -615,6 +622,76 @@ contract FastLaneOnlineTest is BaseTest {
 
         vm.expectRevert(FastLaneOnlineErrors.SolverGateway_AddSolverOp_SimulationFail.selector);
         flOnline.addSolverOp(args.userOp, solverOp);
+    }
+
+    function testFLOnline_addSolverOp_NoInclusion_Fails() public {
+        vm.skip(true);
+        // Should trigger the revert where pushAsNew = false and replaceExisting = false
+    }
+
+    function testFLOnline_addSolverOp_ThreeNew() public {
+        // TODO to fix:
+        // - remove the * 2 part of evalForInclusion formula (not using ex post bids)
+        // - denominator in evalForInclusion formula should be _cumulativeGasReserved, not totalGas
+
+        _setUpUser(defaultSwapIntent);
+        uint256 buyInAmount = 1e17;
+        deal(solverOneEOA, buyInAmount);
+        deal(solverTwoEOA, buyInAmount);
+        deal(solverThreeEOA, buyInAmount);
+
+        bytes32[] memory solverOpHashes = flOnline.solverOpHashes(args.userOpHash);
+        assertEq(solverOpHashes.length, 0, "solverOpHashes should start empty");
+
+        SolverOperation memory solverOp1 = _setUpSolver(solverOneEOA, solverOnePK, goodSolverBidETH, buyInAmount);
+
+        solverOpHashes = flOnline.solverOpHashes(args.userOpHash);
+        assertEq(solverOpHashes.length, 1, "solverOpHashes should have 1 element");
+        assertEq(solverOpHashes[0], keccak256(abi.encode(solverOp1)), "solverOpHashes[0] should be keccak(solverOp1)");
+        assertEq(
+            flOnline.congestionBuyIn(keccak256(abi.encode(solverOp1))),
+            buyInAmount,
+            "solverOp1 buy in should be buyInAmount"
+        );
+        assertEq(
+            flOnline.aggCongestionBuyIn(args.userOpHash), buyInAmount, "aggCongestionBuyIn should be 1x buyInAmount"
+        );
+
+        SolverOperation memory solverOp2 = _setUpSolver(solverTwoEOA, solverTwoPK, goodSolverBidETH, buyInAmount);
+
+        solverOpHashes = flOnline.solverOpHashes(args.userOpHash);
+        assertEq(solverOpHashes.length, 2, "solverOpHashes should have 2 elements");
+        assertEq(solverOpHashes[1], keccak256(abi.encode(solverOp2)), "solverOpHashes[1] should be keccak(solverOp2)");
+        assertEq(
+            flOnline.congestionBuyIn(keccak256(abi.encode(solverOp2))),
+            buyInAmount,
+            "solverOp2 buy in should be buyInAmount"
+        );
+        assertEq(
+            flOnline.aggCongestionBuyIn(args.userOpHash), 2 * buyInAmount, "aggCongestionBuyIn should be 2x buyInAmount"
+        );
+
+        SolverOperation memory solverOp3 = _setUpSolver(solverThreeEOA, solverThreePK, goodSolverBidETH, buyInAmount);
+
+        solverOpHashes = flOnline.solverOpHashes(args.userOpHash);
+        assertEq(solverOpHashes.length, 3, "solverOpHashes should have 3 elements");
+        assertEq(solverOpHashes[2], keccak256(abi.encode(solverOp3)), "solverOpHashes[2] should be keccak(solverOp3)");
+        assertEq(
+            flOnline.congestionBuyIn(keccak256(abi.encode(solverOp3))),
+            buyInAmount,
+            "solverOp3 buy in should be buyInAmount"
+        );
+        assertEq(
+            flOnline.aggCongestionBuyIn(args.userOpHash), 3 * buyInAmount, "aggCongestionBuyIn should be 3x buyInAmount"
+        );
+    }
+
+    function testFLOnline_addSolverOp_TwoNew_OneReplace() public {
+        vm.skip(true);
+    }
+
+    function testFLOnline_EvaluateForInclusion() public {
+        vm.skip(true);
     }
 
     // ---------------------------------------------------- //
@@ -851,18 +928,6 @@ contract FastLaneOnlineTest is BaseTest {
              })
         });
         assertTrue(highScore > lowScore, "rep.failureCost should negatively impact score");
-    }
-
-    function testFLOnline_EvaluateForInclusion() public {
-        vm.skip(true);
-    }
-
-    function testFLOnline_PushSolverOp() public {
-        vm.skip(true);
-    }
-
-    function testFLOnline_ReplaceSolverOp() public {
-        vm.skip(true);
     }
 
     // ---------------------------------------------------- //
@@ -1687,6 +1752,25 @@ contract MockFastLaneOnline is FastLaneOnlineOuter {
     {
         return
             _calculateWeightedScore(totalGas, solverOpGas, maxFeePerGas, congestionBuyIn, solverCount, bidFactor, rep);
+    }
+
+    function pushSolverOp(bytes32 userOpHash, bytes32 solverOpHash) external {
+        _pushSolverOp(userOpHash, solverOpHash);
+    }
+
+    function replaceSolverOp(bytes32 userOpHash, bytes32 solverOpHash, uint256 replacedIndex) external {
+        _replaceSolverOp(userOpHash, solverOpHash, replacedIndex);
+    }
+
+    function evaluateForInclusion(
+        UserOperation calldata userOp,
+        SolverOperation calldata solverOp
+    )
+        external
+        view
+        returns (bool pushAsNew, bool replaceExisting, uint256)
+    {
+        return _evaluateForInclusion(userOp, solverOp);
     }
 
     // ---------------------------------------------------- //
