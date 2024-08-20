@@ -221,16 +221,17 @@ contract SolverGateway is OuterHelpers {
         );
 
         // Check can be grokked more easily in the following format:
-        //      solverOpScore    _cumulativeScore (unweighted)
-        // if  -------------- >  ------------------------------
-        //      solverOpGas             totalGas
+        //      solverOpScore     _cumulativeScore (unweighted)
+        // if  -------------- >=  ------------------------------
+        //      solverOpGas          _cumulativeGasReserved
 
         console.log("Score comp:");
-        console.log("LHS:", _score * userOp.gas);
+        console.log("LHS:", _score * _cumulativeGasReserved);
         console.log("RHS:", _cumulativeScore * solverOp.gas);
 
-        // If new solverOp has better score/gas ratio than the average score/gas ratio of solverOps so far, include it.
-        if (_score * userOp.gas > _cumulativeScore * solverOp.gas) {
+        // If new solverOp has same or better score/gas ratio than the average score/gas ratio of solverOps so far,
+        // include it.
+        if (_score * _cumulativeGasReserved >= _cumulativeScore * solverOp.gas) {
             console.log("Gas comp:");
             console.log("LHS:", _cumulativeGasReserved + USER_GAS_BUFFER + solverOp.gas);
             console.log("RHS:", userOp.gas);

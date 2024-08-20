@@ -499,10 +499,7 @@ contract FastLaneOnlineTest is BaseTest {
         address solver1 = _setUpSolver(solverOneEOA, solverOnePK, goodSolverBidETH);
         address solver2 = _setUpSolver(solverTwoEOA, solverTwoPK, goodSolverBidETH + 1e17);
         address solver3 = _setUpSolver(solverThreeEOA, solverThreePK, goodSolverBidETH + 2e17);
-
-        // solverOne does not get included in the sovlerOps array
-        attempted.solverOne = false;
-        // solverTwo and solverThree will be attempted but fail
+        // all 3 solvers will be included and attempted but fail
 
         // Check BaselineCall struct is formed correctly and can succeed, revert changes after
         _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: true });
