@@ -1,6 +1,8 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.25;
 
+import "forge-std/Test.sol"; // TODO remove
+
 // Base Imports
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
@@ -86,7 +88,7 @@ contract SolverGateway is OuterHelpers {
             _replaceSolverOp(solverOp.userOpHash, _solverOpHash, _replacedIndex);
         } else {
             // revert if pushAsNew = false and replaceExisting = false
-            revert SolverGateway_AddSolverOp_ValueTooLow();
+            revert SolverGateway_AddSolverOp_ScoreTooLow();
         }
 
         // Store the op
@@ -220,16 +222,29 @@ contract SolverGateway is OuterHelpers {
 
         // Check can be grokked more easily in the following format:
         //      solverOpScore    _cumulativeScore (unweighted)
-        // if  -------------- >  ------------------------------  * 2
+        // if  -------------- >  ------------------------------
         //      solverOpGas             totalGas
 
-        if (_score * userOp.gas > _cumulativeScore * solverOp.gas * 2) {
-            if (_cumulativeGasReserved + USER_GAS_BUFFER + (solverOp.gas * 2) < userOp.gas) {
+        console.log("Score comp:");
+        console.log("LHS:", _score * userOp.gas);
+        console.log("RHS:", _cumulativeScore * solverOp.gas);
+
+        // If new solverOp has better score/gas ratio than the average score/gas ratio of solverOps so far, include it.
+        if (_score * userOp.gas > _cumulativeScore * solverOp.gas) {
+            console.log("Gas comp:");
+            console.log("LHS:", _cumulativeGasReserved + USER_GAS_BUFFER + solverOp.gas);
+            console.log("RHS:", userOp.gas);
+
+            if (_cumulativeGasReserved + USER_GAS_BUFFER + solverOp.gas < userOp.gas) {
+                // If enough gas in metacall limit to fit new solverOp, add as new.
                 return (true, false, 0);
             } else {
+                // Otherwise replace the solverOp with lowest score.
                 return (false, true, _replacedIndex);
             }
         }
+        // If the new solverOp has a lower score/gas ratio than the average score/gas ratio of solverOps so far, don't
+        // include it at all. This will result in a SolverGateway_AddSolverOp_ScoreTooLow error in `addSolverOp()`.
         return (false, false, 0);
     }
 
