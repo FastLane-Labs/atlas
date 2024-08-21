@@ -43,6 +43,9 @@ contract BaseTest is Test, TestConstants {
     uint256 public solverThreePK = 55_555;
     address public solverThreeEOA = vm.addr(solverThreePK);
 
+    uint256 public solverFourPK = 66_666;
+    address public solverFourEOA = vm.addr(solverFourPK);
+
     uint256 public userPK = 44_444;
     address public userEOA = vm.addr(userPK);
 
