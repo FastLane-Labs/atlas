@@ -1,8 +1,6 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.25;
 
-import "forge-std/Test.sol"; // TODO remove
-
 // Base Imports
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
@@ -225,17 +223,9 @@ contract SolverGateway is OuterHelpers {
         // if  -------------- >=  ------------------------------
         //      solverOpGas          _cumulativeGasReserved
 
-        console.log("Score comp:");
-        console.log("LHS:", _score * _cumulativeGasReserved);
-        console.log("RHS:", _cumulativeScore * solverOp.gas);
-
         // If new solverOp has same or better score/gas ratio than the average score/gas ratio of solverOps so far,
         // include it.
         if (_score * _cumulativeGasReserved >= _cumulativeScore * solverOp.gas) {
-            console.log("Gas comp:");
-            console.log("LHS:", _cumulativeGasReserved + USER_GAS_BUFFER + solverOp.gas);
-            console.log("RHS:", userOp.gas);
-
             if (_cumulativeGasReserved + USER_GAS_BUFFER + solverOp.gas < userOp.gas) {
                 // If enough gas in metacall limit to fit new solverOp, add as new.
                 return (true, false, 0);
