@@ -299,7 +299,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     /// @param solverOp The SolverOperation struct to verify.
     /// @return A boolean indicating if the signature is valid.
     function _verifySolverSignature(SolverOperation calldata solverOp) internal view returns (bool) {
-        (address _signer,) = _hashTypedDataV4(_getSolverOpHash(solverOp)).tryRecover(solverOp.signature);
+        (address _signer,,) = _hashTypedDataV4(_getSolverOpHash(solverOp)).tryRecover(solverOp.signature);
         return _signer == solverOp.from;
     }
 
@@ -417,7 +417,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     /// @param dAppOp The DAppOperation struct to verify.
     /// @return A boolean indicating if the signature is valid.
     function _verifyDAppSignature(DAppOperation calldata dAppOp) internal view returns (bool) {
-        (address _signer,) = _hashTypedDataV4(_getDAppOpHash(dAppOp)).tryRecover(dAppOp.signature);
+        (address _signer,,) = _hashTypedDataV4(_getDAppOpHash(dAppOp)).tryRecover(dAppOp.signature);
         return _signer == dAppOp.from;
     }
 

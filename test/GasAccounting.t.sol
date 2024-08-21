@@ -3,6 +3,8 @@ pragma solidity 0.8.25;
 
 import "forge-std/Test.sol";
 
+import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
+
 import { GasAccounting } from "src/contracts/atlas/GasAccounting.sol";
 import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
@@ -950,7 +952,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         // Testing uint112 boundary values for casting from uint256 to uint112 in _credit()
         uint256 overflowAmount = uint256(type(uint112).max) + 1;
-        vm.expectRevert("SafeCast: value doesn't fit in 112 bits");
+        vm.expectRevert(abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 112, overflowAmount));
         mockGasAccounting.credit(solverOp.from, overflowAmount, overflowAmount);
     }
 
