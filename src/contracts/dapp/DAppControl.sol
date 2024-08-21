@@ -63,7 +63,9 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     /// @notice The preOpsCall hook which may be called before the UserOperation is executed.
     /// @param userOp The UserOperation struct.
     /// @return data Data to be passed to the next call phase.
-    function preOpsCall(UserOperation calldata userOp)
+    function preOpsCall(
+        UserOperation calldata userOp
+    )
         external
         payable
         validControl
@@ -162,7 +164,9 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     /// @notice Returns the DAppConfig struct of this DAppControl contract.
     /// @param userOp The UserOperation struct.
     /// @return dConfig The DAppConfig struct of this DAppControl contract.
-    function getDAppConfig(UserOperation calldata userOp)
+    function getDAppConfig(
+        UserOperation calldata userOp
+    )
         external
         view
         mustBeCalled

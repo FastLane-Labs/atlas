@@ -40,7 +40,9 @@ contract SwapIntentDAppControl is DAppControl {
     uint256 public constant USER_CONDITION_GAS_LIMIT = 20_000;
     uint256 public constant MAX_USER_CONDITIONS = 5;
 
-    constructor(address _atlas)
+    constructor(
+        address _atlas
+    )
         DAppControl(
             _atlas,
             msg.sender,
