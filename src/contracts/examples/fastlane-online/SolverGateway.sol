@@ -220,12 +220,10 @@ contract SolverGateway is OuterHelpers {
 
         // Check can be grokked more easily in the following format:
         //      solverOpScore     _cumulativeScore (unweighted)
-        // if  -------------- >=  ------------------------------
-        //      solverOpGas          _cumulativeGasReserved
+        // if  -------------- >  ------------------------------ * 2
+        //      solverOpGas              totalGas
 
-        // If new solverOp has same or better score/gas ratio than the average score/gas ratio of solverOps so far,
-        // include it.
-        if (_score * _cumulativeGasReserved >= _cumulativeScore * solverOp.gas) {
+        if (_score * userOp.gas > _cumulativeScore * solverOp.gas * 2) {
             if (_cumulativeGasReserved + USER_GAS_BUFFER + solverOp.gas < userOp.gas) {
                 // If enough gas in metacall limit to fit new solverOp, add as new.
                 return (true, false, 0);
@@ -234,8 +232,8 @@ contract SolverGateway is OuterHelpers {
                 return (false, true, _replacedIndex);
             }
         }
-        // If the new solverOp has a lower score/gas ratio than the average score/gas ratio of solverOps so far, don't
-        // include it at all. This will result in a SolverGateway_AddSolverOp_ScoreTooLow error in `addSolverOp()`.
+        // If the new solverOp's score/gas ratio is too low, don't include it at all. This will result in a
+        // SolverGateway_AddSolverOp_ScoreTooLow error in `addSolverOp()`.
         return (false, false, 0);
     }
 
