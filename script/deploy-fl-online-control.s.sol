@@ -18,6 +18,7 @@ contract DeployFLOnlineControlScript is DeployBaseScript {
 
         uint256 deployerPrivateKey = vm.envUint("DAPP_GOV_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
+        address protocolGuild = u.getUsefulContractAddress(_getDeployChain(), "PROTOCOL_GUILD");
 
         atlas = Atlas(payable(_getAddressFromDeploymentsJson("ATLAS")));
         atlasVerification = AtlasVerification(payable(_getAddressFromDeploymentsJson("ATLAS_VERIFICATION")));
@@ -26,10 +27,11 @@ contract DeployFLOnlineControlScript is DeployBaseScript {
         console.log("Deployer address: \t\t\t\t", deployer);
         console.log("Using Atlas deployed at: \t\t\t", address(atlas));
         console.log("Using AtlasVerification deployed at: \t\t", address(atlasVerification));
+        console.log("Using Protocol Guild wallet: \t\t", protocolGuild);
 
         vm.startBroadcast(deployerPrivateKey);
         // Deploy the DAppControl contract
-        flOnline = new FastLaneOnlineOuter(address(atlas));
+        flOnline = new FastLaneOnlineOuter(address(atlas), protocolGuild);
         // Integrate FLOnline with Atlas
         atlasVerification.initializeGovernance(address(flOnline));
         // FLOnline contract must be registered as its own signatory

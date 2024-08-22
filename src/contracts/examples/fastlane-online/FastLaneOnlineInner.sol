@@ -33,9 +33,7 @@ contract FastLaneOnlineInner is BaseStorage, FastLaneOnlineControl {
 
     event BaselineEstablished(uint256 userMinAmountOut, uint256 baselineAmountOut);
 
-    uint8 private constant _baselinePhase = uint8(ExecutionPhase.UserOperation);
-
-    constructor(address _atlas) FastLaneOnlineControl(_atlas) { }
+    constructor(address atlas) FastLaneOnlineControl(atlas) { }
 
     /////////////////////////////////////////////////////////
     //        EXECUTION ENVIRONMENT FUNCTIONS              //

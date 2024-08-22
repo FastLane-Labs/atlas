@@ -30,13 +30,15 @@ contract OuterHelpers is FastLaneOnlineInner {
     // NOTE: Any funds collected in excess of the therapy bills required for the Cardano engineering team
     // will go towards buying stealth drones programmed to apply deodorant to coders at solana hackathons.
     address public immutable CARDANO_ENGINEER_THERAPY_FUND;
+    address public immutable PROTOCOL_GUILD_WALLET;
     address public immutable SIMULATOR;
 
     uint256 internal constant _BITS_FOR_INDEX = 16;
 
-    constructor(address _atlas) FastLaneOnlineInner(_atlas) {
+    constructor(address atlas, address protocolGuildWallet) FastLaneOnlineInner(atlas) {
         CARDANO_ENGINEER_THERAPY_FUND = msg.sender;
-        SIMULATOR = IAtlas(_atlas).SIMULATOR();
+        PROTOCOL_GUILD_WALLET = protocolGuildWallet;
+        SIMULATOR = IAtlas(atlas).SIMULATOR();
     }
 
     /////////////////////////////////////////////////////////
@@ -190,8 +192,9 @@ contract OuterHelpers is FastLaneOnlineInner {
         internal
         returns (uint256 netGasRefund)
     {
+        // Bundler gas rebate from Atlas
         uint256 _grossGasRefund = address(this).balance - startingBalance;
-
+        // Total congestion buyins for the current userOpHash/metacall
         uint256 _congestionBuyIns = S_aggCongestionBuyIn[userOpHash];
 
         if (_congestionBuyIns > 0) {
@@ -203,19 +206,21 @@ contract OuterHelpers is FastLaneOnlineInner {
 
         uint256 _netRake = _grossGasRefund * _CONGESTION_RAKE / _CONGESTION_BASE;
 
-        // Increment cumulative rake
         if (solversSuccessful) {
+            // If there was a winning solver, increase the FLOnline rake
             S_rake += _netRake;
         } else {
             // NOTE: We do not refund the congestion buyins to the user because we do not want to create a
             // scenario in which the user can profit from Solvers failing. We also shouldn't give these to the
-            // validator for the same reason.
-            // TODO: _congestionBuyIns to protocol guild or something because contract authors should be credibly
-            // neutral too
-            S_rake += (_netRake + _congestionBuyIns);
+            // validator for the same reason, nor to the authors of this contract as they should also be credibly
+            // neutral.
+
+            // So if there is no winning solver, congestion buyins are sent to protocol guild.
+            SafeTransferLib.safeTransferETH(PROTOCOL_GUILD_WALLET, _congestionBuyIns);
+            S_rake += _netRake; // rake is only taken on bundler gas rebate from Atlas
         }
 
-        // Return the netGasRefund
+        // Return the netGasRefund to be sent back to the user
         netGasRefund = _grossGasRefund - _netRake;
     }
 

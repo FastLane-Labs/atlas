@@ -35,7 +35,7 @@ contract SolverGateway is OuterHelpers {
     // bids > sqrt(type(uint256).max / 100) will cause overflow in _calculateBidFactor
     uint256 internal constant _MAX_SOLVER_BID = 34_028_236_692_093_846_346_337_460_743_176_821_145;
 
-    constructor(address _atlas) OuterHelpers(_atlas) { }
+    constructor(address atlas, address protocolGuildWallet) OuterHelpers(atlas, protocolGuildWallet) { }
 
     function getSolverGasLimit() public pure override returns (uint32) {
         return uint32(MAX_SOLVER_GAS);

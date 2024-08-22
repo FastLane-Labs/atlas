@@ -25,7 +25,7 @@ import { SolverGateway } from "src/contracts/examples/fastlane-online/SolverGate
 import { SwapIntent, BaselineCall } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
 
 contract FastLaneOnlineOuter is SolverGateway {
-    constructor(address _atlas) SolverGateway(_atlas) { }
+    constructor(address atlas, address protocolGuildWallet) SolverGateway(atlas, protocolGuildWallet) { }
 
     //////////////////////////////////////////////
     // THIS IS WHAT THE USER INTERACTS THROUGH.
