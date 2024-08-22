@@ -100,6 +100,19 @@ contract DeployBaseScript is Script {
         vm.writeJson(vm.toString(addr), path, fullKey);
     }
 
+    function _getUsefulContractAddress(string memory key) internal view returns (address) {
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/useful-addresses.json");
+        string memory json = vm.readFile(path);
+        string memory fullKey = string.concat(".", _getDeployChain(), ".", key);
+
+        address res = json.readAddress(fullKey);
+        if (res == address(0x20) || res == address(0)) {
+            revert(string.concat(fullKey, " not found in useful-addresses.json"));
+        }
+        return res;
+    }
+
     function _logTokenBalances(address account, string memory accountLabel) internal view {
         console.log("Balances for", accountLabel);
         console.log("WETH balance: \t\t\t\t", WETH.balanceOf(account));

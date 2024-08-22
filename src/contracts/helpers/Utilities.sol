@@ -8,6 +8,7 @@ import "forge-std/StdJson.sol";
 contract Utilities is Script {
     using stdJson for string;
 
+    // NOTE: this is deprecated - use the version in the DeployBaseScript
     function getUsefulContractAddress(string memory chain, string memory key) public view returns (address) {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/useful-addresses.json");
