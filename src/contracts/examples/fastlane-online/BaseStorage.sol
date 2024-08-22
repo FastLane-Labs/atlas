@@ -19,7 +19,7 @@ contract BaseStorage {
     bytes32 private constant _USER_LOCK_SLOT = keccak256("FLO_USER_LOCK");
     bytes32 private constant _WINNING_SOLVER_SLOT = keccak256("FLO_WINNING_SOLVER");
 
-    uint256 public rake = 0;
+    uint256 internal S_rake;
 
     //   SolverOpHash   SolverOperation
     mapping(bytes32 => SolverOperation) internal S_solverOpCache;
@@ -39,6 +39,10 @@ contract BaseStorage {
     //////////////////////////////////////////////
     /////          VIEW FUNCTIONS           //////
     //////////////////////////////////////////////
+
+    function rake() external view returns (uint256) {
+        return S_rake;
+    }
 
     function solverOpCache(bytes32 solverOpHash) external view returns (SolverOperation memory) {
         return S_solverOpCache[solverOpHash];

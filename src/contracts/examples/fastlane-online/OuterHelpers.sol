@@ -115,8 +115,8 @@ contract OuterHelpers is FastLaneOnlineInner {
         if (msg.sender != CARDANO_ENGINEER_THERAPY_FUND) {
             revert OuterHelpers_NotMadJustDisappointed();
         }
-        uint256 _rake = rake;
-        rake = 0;
+        uint256 _rake = S_rake;
+        S_rake = 0;
         SafeTransferLib.safeTransferETH(CARDANO_ENGINEER_THERAPY_FUND, _rake);
     }
 
@@ -205,14 +205,14 @@ contract OuterHelpers is FastLaneOnlineInner {
 
         // Increment cumulative rake
         if (solversSuccessful) {
-            rake += _netRake;
+            S_rake += _netRake;
         } else {
             // NOTE: We do not refund the congestion buyins to the user because we do not want to create a
             // scenario in which the user can profit from Solvers failing. We also shouldn't give these to the
             // validator for the same reason.
             // TODO: _congestionBuyIns to protocol guild or something because contract authors should be credibly
             // neutral too
-            rake += (_netRake + _congestionBuyIns);
+            S_rake += (_netRake + _congestionBuyIns);
         }
 
         // Return the netGasRefund
