@@ -63,6 +63,8 @@ contract FastLaneOnlineTest is BaseTest {
     IERC20 DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     address DAI_ADDRESS = address(DAI);
 
+    address protocolGuildWallet = 0x25941dC771bB64514Fc8abBce970307Fb9d477e9;
+
     IUniswapV2Router02 routerV2 = IUniswapV2Router02(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
 
     uint256 goodSolverBidETH = 1.2 ether; // more than baseline swap amountOut if tokenOut is WETH/ETH
@@ -102,8 +104,8 @@ contract FastLaneOnlineTest is BaseTest {
         governanceEOA = vm.addr(governancePK);
 
         vm.startPrank(governanceEOA);
-        flOnlineMock = new MockFastLaneOnline(address(atlas));
-        flOnline = new FastLaneOnlineOuter(address(atlas));
+        flOnlineMock = new MockFastLaneOnline(address(atlas), protocolGuildWallet);
+        flOnline = new FastLaneOnlineOuter(address(atlas), protocolGuildWallet);
         atlasVerification.initializeGovernance(address(flOnline));
         // FLOnline contract must be registered as its own signatory
         atlasVerification.addSignatory(address(flOnline), address(flOnline));
@@ -575,13 +577,6 @@ contract FastLaneOnlineTest is BaseTest {
         });
     }
 
-    function testFLOnline_Swap_ComplexOverlappingSwaps() public {
-        vm.skip(true);
-        // 2 different userOps in the same block
-        // 2 solvers each, 1st replaces solverOp with higher bid and wins
-        // check losing solver can withdraw congestion buy-in
-    }
-
     // ---------------------------------------------------- //
     //                addSolverOp() Tests                   //
     // ---------------------------------------------------- //
@@ -1033,7 +1028,68 @@ contract FastLaneOnlineTest is BaseTest {
     }
 
     function testFLOnline_ProcessCongestionRake() public {
-        vm.skip(true);
+        bytes32 userOpHash = keccak256("userOpHash");
+        uint256 aggCongestionBuyIn = 5e17; // 0.5 ETH
+        uint256 atlasBundlerRebate = 1e17; // 0.1 ETH
+        uint256 snapshotId;
+        uint256 netGasRefund;
+        uint256 expectedRake;
+        uint256 protocolGuildBefore = protocolGuildWallet.balance;
+
+        // Scenario setup for mock testing:
+        // - Solver gave a congestion buy-in of 0.5 ETH, which is also the FLO starting balance
+        // - FLOnline received a 0.1 ETH gas rebate after the metacall from Atlas
+
+        flOnlineMock.setAggCongestionBuyIn(userOpHash, aggCongestionBuyIn);
+        deal(address(flOnlineMock), aggCongestionBuyIn + atlasBundlerRebate);
+        assertEq(flOnlineMock.rake(), 0, "rake should start at 0");
+        assertEq(flOnlineMock.aggCongestionBuyIn(userOpHash), aggCongestionBuyIn, "aggCongestionBuyIn should be set");
+
+        snapshotId = vm.snapshot(); // checkpoint to start tests from
+
+        // Case: solverSuccessful = true
+        // -> rake increases by: (atlasGasRebate + aggCongestionBuyIn) * rake cut
+        // -> netGasRefund should be: atlasGasRebate + aggCongestionBuyIn - rake from both
+        // -> aggCongestionBuyIn[userOpHash] set to 0
+        // -> no funds sent to protocol guild
+
+        netGasRefund = flOnlineMock.processCongestionRake({
+            startingBalance: aggCongestionBuyIn,
+            userOpHash: userOpHash,
+            solversSuccessful: true
+        });
+
+        expectedRake = (aggCongestionBuyIn + atlasBundlerRebate) * 33 / 100; // 33% rake cut
+        assertEq(flOnlineMock.rake(), expectedRake, "rake should increase correctly");
+        assertEq(
+            netGasRefund,
+            aggCongestionBuyIn + atlasBundlerRebate - expectedRake,
+            "netGasRefund expected: gas rebate + aggCongestionBuyIn - rake"
+        );
+        assertEq(flOnlineMock.aggCongestionBuyIn(userOpHash), 0, "aggCongestionBuyIn should be set to 0");
+        assertEq(protocolGuildWallet.balance, protocolGuildBefore, "no funds should be sent to protocol guild");
+
+        vm.revertTo(snapshotId); // restart from checkpoint
+
+        // Case: solverSuccessful = false
+        // -> rake increases by: (atlasGasRebate only) * rake cut
+        // -> netGasRefund should be: atlasGasRebate - rake
+        // -> aggCongestionBuyIn[userOpHash] set to 0
+        // -> protocol guild gets congestionBuyIn funds
+
+        netGasRefund = flOnlineMock.processCongestionRake({
+            startingBalance: aggCongestionBuyIn,
+            userOpHash: userOpHash,
+            solversSuccessful: false
+        });
+
+        expectedRake = atlasBundlerRebate * 33 / 100; // 33% rake cut
+        assertEq(flOnlineMock.rake(), expectedRake, "rake should increase correctly");
+        assertEq(netGasRefund, atlasBundlerRebate - expectedRake, "netGasRefund expected: gas rebate - rake");
+        assertEq(flOnlineMock.aggCongestionBuyIn(userOpHash), 0, "aggCongestionBuyIn should be set to 0");
+        assertEq(
+            protocolGuildWallet.balance, protocolGuildBefore + aggCongestionBuyIn, "protocol guild should get funds"
+        );
     }
 
     // ---------------------------------------------------- //
@@ -1184,7 +1240,26 @@ contract FastLaneOnlineTest is BaseTest {
     }
 
     function testFLOnline_WithdrawRake() public {
-        vm.skip(true);
+        deal(address(flOnlineMock), 1e18);
+        flOnlineMock.setRake(1e18);
+        uint256 rakeBefore = flOnlineMock.rake();
+        uint256 callerBalanceBefore;
+        assertEq(rakeBefore, 1e18, "rake should start at 1 ETH");
+
+        callerBalanceBefore = address(userEOA).balance;
+        vm.prank(userEOA);
+        vm.expectRevert(FastLaneOnlineErrors.OuterHelpers_NotMadJustDisappointed.selector);
+        flOnlineMock.makeThogardsWifeHappy();
+
+        assertEq(flOnlineMock.rake(), rakeBefore, "rake should not change if withdraw fails");
+        assertEq(address(userEOA).balance, callerBalanceBefore, "caller balance should not change if withdraw fails");
+
+        callerBalanceBefore = address(governanceEOA).balance;
+        vm.prank(governanceEOA);
+        flOnlineMock.makeThogardsWifeHappy();
+
+        assertEq(flOnlineMock.rake(), 0, "rake should be 0 after withdraw");
+        assertEq(address(governanceEOA).balance, callerBalanceBefore + rakeBefore, "governance balance should increase");
     }
 
     function testFLOnline_BaselineEstablishedEvent() public {
@@ -1765,7 +1840,7 @@ contract FLOnlineRFQSolver is SolverBase {
 
 // Mock contract to expose internal FLOnline functions for unit testing
 contract MockFastLaneOnline is FastLaneOnlineOuter {
-    constructor(address _atlas) FastLaneOnlineOuter(_atlas) { }
+    constructor(address atlas, address protocolGuildWallet) FastLaneOnlineOuter(atlas, protocolGuildWallet) { }
 
     // ---------------------------------------------------- //
     //                  OuterHelpers.sol                    //
@@ -1773,6 +1848,25 @@ contract MockFastLaneOnline is FastLaneOnlineOuter {
 
     function sortSolverOps(SolverOperation[] memory solverOps) external pure returns (SolverOperation[] memory) {
         return _sortSolverOps(solverOps);
+    }
+
+    function processCongestionRake(
+        uint256 startingBalance,
+        bytes32 userOpHash,
+        bool solversSuccessful
+    )
+        external
+        returns (uint256 netGasRefund)
+    {
+        netGasRefund = _processCongestionRake(startingBalance, userOpHash, solversSuccessful);
+    }
+
+    function setAggCongestionBuyIn(bytes32 userOpHash, uint256 newAggCongestionBuyIn) external {
+        S_aggCongestionBuyIn[userOpHash] = newAggCongestionBuyIn;
+    }
+
+    function setRake(uint256 newRake) external {
+        S_rake = newRake;
     }
 
     // ---------------------------------------------------- //
