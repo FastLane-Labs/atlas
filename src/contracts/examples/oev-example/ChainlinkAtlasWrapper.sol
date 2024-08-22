@@ -35,12 +35,10 @@ contract ChainlinkAtlasWrapper is Ownable, IChainlinkAtlasWrapper {
 
     event TransmitterStatusChanged(address indexed transmitter, bool trusted);
 
-    constructor(address atlas, address baseChainlinkFeed, address _owner) {
+    constructor(address atlas, address baseChainlinkFeed, address _owner) Ownable(_owner) {
         ATLAS = atlas;
         BASE_FEED = AggregatorV2V3Interface(baseChainlinkFeed);
         DAPP_CONTROL = IChainlinkDAppControl(msg.sender); // Chainlink DAppControl is also wrapper factory
-
-        _transferOwnership(_owner);
     }
 
     // ---------------------------------------------------- //
