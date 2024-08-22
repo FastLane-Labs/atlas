@@ -86,7 +86,7 @@ contract SolverGateway is OuterHelpers {
             _replaceSolverOp(solverOp.userOpHash, _solverOpHash, _replacedIndex);
         } else {
             // revert if pushAsNew = false and replaceExisting = false
-            revert SolverGateway_AddSolverOp_ValueTooLow();
+            revert SolverGateway_AddSolverOp_ScoreTooLow();
         }
 
         // Store the op
@@ -219,17 +219,21 @@ contract SolverGateway is OuterHelpers {
         );
 
         // Check can be grokked more easily in the following format:
-        //      solverOpScore    _cumulativeScore (unweighted)
-        // if  -------------- >  ------------------------------  * 2
-        //      solverOpGas             totalGas
+        //      solverOpScore     _cumulativeScore (unweighted)
+        // if  -------------- >  ------------------------------ * 2
+        //      solverOpGas              totalGas
 
         if (_score * userOp.gas > _cumulativeScore * solverOp.gas * 2) {
-            if (_cumulativeGasReserved + USER_GAS_BUFFER + (solverOp.gas * 2) < userOp.gas) {
+            if (_cumulativeGasReserved + USER_GAS_BUFFER + solverOp.gas < userOp.gas) {
+                // If enough gas in metacall limit to fit new solverOp, add as new.
                 return (true, false, 0);
             } else {
+                // Otherwise replace the solverOp with lowest score.
                 return (false, true, _replacedIndex);
             }
         }
+        // If the new solverOp's score/gas ratio is too low, don't include it at all. This will result in a
+        // SolverGateway_AddSolverOp_ScoreTooLow error in `addSolverOp()`.
         return (false, false, 0);
     }
 

@@ -44,6 +44,7 @@ contract FastLaneOnlineTest is BaseTest {
         Reputation solverOneRep;
         Reputation solverTwoRep;
         Reputation solverThreeRep;
+        Reputation solverFourRep;
     }
 
     // defaults to true when solver calls `addSolverOp()`, set to false if the solverOp is expected to not be included
@@ -53,6 +54,7 @@ contract FastLaneOnlineTest is BaseTest {
         bool solverOne;
         bool solverTwo;
         bool solverThree;
+        bool solverFour;
     }
 
     uint256 constant ERR_MARGIN = 0.15e18; // 15% error margin
@@ -499,10 +501,7 @@ contract FastLaneOnlineTest is BaseTest {
         address solver1 = _setUpSolver(solverOneEOA, solverOnePK, goodSolverBidETH);
         address solver2 = _setUpSolver(solverTwoEOA, solverTwoPK, goodSolverBidETH + 1e17);
         address solver3 = _setUpSolver(solverThreeEOA, solverThreePK, goodSolverBidETH + 2e17);
-
-        // solverOne does not get included in the sovlerOps array
-        attempted.solverOne = false;
-        // solverTwo and solverThree will be attempted but fail
+        // all 3 solvers will be included and attempted but fail
 
         // Check BaselineCall struct is formed correctly and can succeed, revert changes after
         _doBaselineCallWithChecksThenRevertChanges({ shouldSucceed: true });
@@ -624,16 +623,7 @@ contract FastLaneOnlineTest is BaseTest {
         flOnline.addSolverOp(args.userOp, solverOp);
     }
 
-    function testFLOnline_addSolverOp_NoInclusion_Fails() public {
-        vm.skip(true);
-        // Should trigger the revert where pushAsNew = false and replaceExisting = false
-    }
-
     function testFLOnline_addSolverOp_ThreeNew() public {
-        // TODO to fix:
-        // - remove the * 2 part of evalForInclusion formula (not using ex post bids)
-        // - denominator in evalForInclusion formula should be _cumulativeGasReserved, not totalGas
-
         _setUpUser(defaultSwapIntent);
         uint256 buyInAmount = 1e17;
         deal(solverOneEOA, buyInAmount);
@@ -686,12 +676,76 @@ contract FastLaneOnlineTest is BaseTest {
         );
     }
 
-    function testFLOnline_addSolverOp_TwoNew_OneReplace() public {
-        vm.skip(true);
+    function testFLOnline_addSolverOp_ThreeNew_FourthBidsHigher_ReplacesFirst() public {
+        // Similar to test above, but here the 4th solver will not fit into the userOp.gas limit imposed on the
+        // metacall. When it has a higher congestion buy-in than the others it should replace solverOp1.
+        _setUpUser(defaultSwapIntent);
+        uint256 buyInAmount = 1e17;
+        deal(solverOneEOA, buyInAmount);
+        deal(solverTwoEOA, buyInAmount);
+        deal(solverThreeEOA, buyInAmount);
+        deal(solverFourEOA, buyInAmount * 2); // double normal buy-in
+
+        bytes32[] memory solverOpHashes = flOnline.solverOpHashes(args.userOpHash);
+        assertEq(solverOpHashes.length, 0, "solverOpHashes should start empty");
+
+        SolverOperation memory solverOp1 = _setUpSolver(solverOneEOA, solverOnePK, goodSolverBidETH, buyInAmount);
+        SolverOperation memory solverOp2 = _setUpSolver(solverTwoEOA, solverTwoPK, goodSolverBidETH, buyInAmount);
+        SolverOperation memory solverOp3 = _setUpSolver(solverThreeEOA, solverThreePK, goodSolverBidETH, buyInAmount);
+
+        solverOpHashes = flOnline.solverOpHashes(args.userOpHash);
+        assertEq(solverOpHashes.length, 3, "solverOpHashes should have 3 elements");
+        assertEq(solverOpHashes[0], keccak256(abi.encode(solverOp1)), "solverOpHashes[0] should be keccak(solverOp1)");
+        assertEq(solverOpHashes[1], keccak256(abi.encode(solverOp2)), "solverOpHashes[1] should be keccak(solverOp2)");
+        assertEq(solverOpHashes[2], keccak256(abi.encode(solverOp3)), "solverOpHashes[2] should be keccak(solverOp3)");
+        assertEq(flOnline.aggCongestionBuyIn(args.userOpHash), 3 * buyInAmount, "total buy in expected buyInAmountx3");
+
+        // Now add 4th solverOp with higher congestion buy-in - should replace 1st solverOp
+        SolverOperation memory solverOp4 = _setUpSolver(solverFourEOA, solverFourPK, goodSolverBidETH, buyInAmount * 2);
+
+        solverOpHashes = flOnline.solverOpHashes(args.userOpHash);
+        assertEq(solverOpHashes.length, 3, "solverOpHashes should still have 3 elements");
+        assertEq(solverOpHashes[0], keccak256(abi.encode(solverOp4)), "solverOpHashes[0] should be keccak(solverOp4)");
+        assertEq(solverOpHashes[1], keccak256(abi.encode(solverOp2)), "solverOpHashes[1] should be keccak(solverOp2)");
+        assertEq(solverOpHashes[2], keccak256(abi.encode(solverOp3)), "solverOpHashes[2] should be keccak(solverOp3)");
+        assertEq(flOnline.aggCongestionBuyIn(args.userOpHash), 4 * buyInAmount, "total buy in expected buyInAmountx4");
     }
 
-    function testFLOnline_EvaluateForInclusion() public {
-        vm.skip(true);
+    function testFLOnline_addSolverOp_ThreeNew_FourthBidsLower_Fails() public {
+        // Similar to test above, but here the 4th solver sends a lower congestion buy-in, does not get included at all,
+        // and addSolverOp reverts.
+        _setUpUser(defaultSwapIntent);
+        uint256 buyInAmount = 1e17;
+        deal(solverOneEOA, buyInAmount);
+        deal(solverTwoEOA, buyInAmount);
+        deal(solverThreeEOA, buyInAmount);
+        deal(solverFourEOA, buyInAmount / 2); // half normal buy-in
+
+        bytes32[] memory solverOpHashes = flOnline.solverOpHashes(args.userOpHash);
+        assertEq(solverOpHashes.length, 0, "solverOpHashes should start empty");
+
+        SolverOperation memory solverOp1 = _setUpSolver(solverOneEOA, solverOnePK, goodSolverBidETH, buyInAmount);
+        SolverOperation memory solverOp2 = _setUpSolver(solverTwoEOA, solverTwoPK, goodSolverBidETH, buyInAmount);
+        SolverOperation memory solverOp3 = _setUpSolver(solverThreeEOA, solverThreePK, goodSolverBidETH, buyInAmount);
+
+        solverOpHashes = flOnline.solverOpHashes(args.userOpHash);
+        assertEq(solverOpHashes.length, 3, "solverOpHashes should have 3 elements");
+        assertEq(solverOpHashes[0], keccak256(abi.encode(solverOp1)), "solverOpHashes[0] should be keccak(solverOp1)");
+        assertEq(solverOpHashes[1], keccak256(abi.encode(solverOp2)), "solverOpHashes[1] should be keccak(solverOp2)");
+        assertEq(solverOpHashes[2], keccak256(abi.encode(solverOp3)), "solverOpHashes[2] should be keccak(solverOp3)");
+        assertEq(flOnline.aggCongestionBuyIn(args.userOpHash), 3 * buyInAmount, "total buy in expected buyInAmountx3");
+
+        // Now add 4th solverOp with lower congestion buy-in - should fail
+        bytes4 expectedErr = FastLaneOnlineErrors.SolverGateway_AddSolverOp_ScoreTooLow.selector;
+        _setUpSolver(solverFourEOA, solverFourPK, goodSolverBidETH, buyInAmount / 2, expectedErr);
+
+        // Registered solverOp state same as before 4th solver attempt
+        solverOpHashes = flOnline.solverOpHashes(args.userOpHash);
+        assertEq(solverOpHashes.length, 3, "solverOpHashes should have 3 elements");
+        assertEq(solverOpHashes[0], keccak256(abi.encode(solverOp1)), "solverOpHashes[0] should be keccak(solverOp1)");
+        assertEq(solverOpHashes[1], keccak256(abi.encode(solverOp2)), "solverOpHashes[1] should be keccak(solverOp2)");
+        assertEq(solverOpHashes[2], keccak256(abi.encode(solverOp3)), "solverOpHashes[2] should be keccak(solverOp3)");
+        assertEq(flOnline.aggCongestionBuyIn(args.userOpHash), 3 * buyInAmount, "total buy in expected buyInAmountx3");
     }
 
     // ---------------------------------------------------- //
