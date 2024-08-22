@@ -17,7 +17,7 @@ contract DeployAtlasScript is DeployBaseScript {
     function run() external {
         console.log("\n=== DEPLOYING Atlas ===\n");
 
-        console.log("Deploying to chain: \t", _getDeployChain());
+        console.log("Deploying to chain: \t\t", _getDeployChain());
 
         uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
@@ -27,7 +27,11 @@ contract DeployAtlasScript is DeployBaseScript {
         address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
         address expectedSimulatorAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
 
-        console.log("Deployer address: \t", deployer);
+        address prevSimAddr = _getAddressFromDeploymentsJson("SIMULATOR");
+        uint256 prevSimBalance = (prevSimAddr == address(0)) ? 0 : prevSimAddr.balance;
+
+        console.log("Deployer address: \t\t", deployer);
+        console.log("Prev Simulator balance: \t", prevSimBalance);
 
         vm.startBroadcast(deployerPrivateKey);
 
@@ -44,6 +48,11 @@ contract DeployAtlasScript is DeployBaseScript {
 
         simulator = new Simulator();
         simulator.setAtlas(address(atlas));
+
+        // If prev Simulator deployment has native assets, withdraw them to new Simulator
+        if (prevSimBalance > 0) {
+            Simulator(payable(prevSimAddr)).withdrawETH(address(simulator));
+        }
 
         sorter = new Sorter(address(atlas));
 
