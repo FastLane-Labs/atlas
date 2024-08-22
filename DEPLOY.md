@@ -10,7 +10,7 @@ This is a guide to getting the Atlas smart contracts deployed on an EVM chain.
 git checkout dca0b9946e8f59347610cd24a0bca5e84ddea00e
 ```
 
-2. Set up your `.env` file with the variables relevant to the chain to which you are trying to deploy. Note: the `GOV_PRIVATE_KEY` is the private key to the public address from which the contracts will be deployed. You must also set the `DEPLOY_TO` variable to a valid chain option: `SEPOLIA`, `MAINNET`, `AMOY`, `POLYGON`, or `LOCAL`. In this example we would be deploying to Polygon mainnet. Check out the [Wallet List docs](https://github.com/FastLane-Labs/knowledge-base/blob/main/playbooks/wallets/wallet_list.md) if in doubt about which address to deploy from.
+2. Set up your `.env` file with the variables relevant to the chain to which you are trying to deploy. Note: the `GOV_PRIVATE_KEY` is the private key to the public address from which the contracts will be deployed. Check out the [Wallet List docs](https://github.com/FastLane-Labs/knowledge-base/blob/main/playbooks/wallets/wallet_list.md) if in doubt about which address to deploy from.
 
 ```bash
 MAINNET_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/XXXXXXXXXXXXXXXXXXXX
@@ -21,8 +21,6 @@ ETHERSCAN_API_KEY=XXXXXXXXXXXXXXXXXXXX
 POLYGONSCAN_API_KEY=XXXXXXXXXXXXXXXXXXXX
 
 GOV_PRIVATE_KEY=0x123456789...
-
-DEPLOY_TO=POLYGON
 ```
 
 3. Run the deployment script in simulation mode to verify everything works. Note: exclude the `--broadcast` flag to run the script in simulation mode. See Foundry's [script command options](https://book.getfoundry.sh/reference/cli/forge/script).
@@ -37,7 +35,7 @@ source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --rpc-ur
 source .env && forge script script/deploy-atlas.s.sol:DeployAtlasScript --rpc-url ${POLYGON_RPC_URL} --legacy --broadcast --etherscan-api-key ${POLYGONSCAN_API_KEY} --verify
 ```
 
-If all goes well, the script will output the addresses of the deployed contracts, and handle verification through Etherscan or Polygonscan automatically. These addresses will also be saved in the `deployments.json` file.
+If all goes well, the script will output the addresses of the deployed contracts, and handle verification through Etherscan or Polygonscan automatically. These addresses will also be saved in the `deployments.json` file. NOTE: the chain in `deployments.json` is detected using `block.chainid`, and is thus dependent on specifying the correct `--rpc-url` when running the deployment script.
 
 ## DAppControl Deployment Process
 
