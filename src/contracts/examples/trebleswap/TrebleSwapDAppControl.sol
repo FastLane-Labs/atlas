@@ -13,6 +13,9 @@ import "src/contracts/types/SolverOperation.sol";
 // Support for native in/out?
 // Support for bid token (TREB) in/out?
 
+// ODOS v2 Router on Base: https://basescan.org/address/0x19ceead7105607cd444f5ad10dd51356436095a1
+// Main function: swapCompact()
+
 contract TrebleSwapDAppControl is DAppControl {
     // TODO WETH on Base for now, change to TREB when token deployed
     address public constant TREB = address(0x4200000000000000000000000000000000000006);
