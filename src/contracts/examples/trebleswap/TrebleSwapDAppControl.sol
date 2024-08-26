@@ -9,10 +9,6 @@ import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
 import "src/contracts/types/UserOperation.sol";
 import "src/contracts/types/SolverOperation.sol";
 
-// NOTES:
-// Support for native in/out?
-// Support for bid token (TREB) in/out?
-
 // ODOS v2 Router on Base: https://basescan.org/address/0x19ceead7105607cd444f5ad10dd51356436095a1
 // Main function: swapCompact()
 
@@ -26,13 +22,16 @@ struct SwapTokenInfo {
 contract TrebleSwapDAppControl is DAppControl {
     address public constant ODOS_ROUTER = 0x19cEeAd7105607Cd444F5ad10dd51356436095a1;
 
-    // TODO WETH on Base for now, change to TREB when token deployed
-    address public constant TREB = address(0x4200000000000000000000000000000000000006);
+    // TODO TREB token not available yet - replace when it is. DEGEN address for now.
+    address public constant TREB = 0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed;
     address internal constant _ETH = address(0);
+    address internal constant _BURN = address(0xdead);
 
     error InvalidUserOpData();
     error UserOpDappNotOdosRouter();
     error InsufficientUserOpValue();
+    error InsufficientTrebBalance();
+    error InsufficientOutputBalance();
 
     constructor(
         address atlas
@@ -73,30 +72,56 @@ contract TrebleSwapDAppControl is DAppControl {
     function _preOpsCall(UserOperation calldata userOp) internal virtual override returns (bytes memory) {
         if (userOp.dapp != ODOS_ROUTER) revert UserOpDappNotOdosRouter();
 
-        (bool success, bytes memory data) =
+        (bool success, bytes memory swapData) =
             CONTROL.staticcall(abi.encodePacked(this.decodeUserOpData.selector, userOp.data));
 
         if (!success) revert InvalidUserOpData();
 
-        SwapTokenInfo memory swapTokenInfo = abi.decode(data, (SwapTokenInfo));
+        SwapTokenInfo memory _swapInfo = abi.decode(swapData, (SwapTokenInfo));
 
         // If inputToken is ERC20, transfer tokens from user to EE, and approve Odos router for swap
-        if (swapTokenInfo.inputToken != _ETH) {
-            _transferUserERC20(swapTokenInfo.inputToken, address(this), swapTokenInfo.inputAmount);
-            SafeTransferLib.safeApprove(swapTokenInfo.inputToken, ODOS_ROUTER, swapTokenInfo.inputAmount);
+        if (_swapInfo.inputToken != _ETH) {
+            _transferUserERC20(_swapInfo.inputToken, address(this), _swapInfo.inputAmount);
+            SafeTransferLib.safeApprove(_swapInfo.inputToken, ODOS_ROUTER, _swapInfo.inputAmount);
         } else {
-            if (userOp.value < swapTokenInfo.inputAmount) revert InsufficientUserOpValue();
+            if (userOp.value < _swapInfo.inputAmount) revert InsufficientUserOpValue();
         }
 
-        return data; // return SwapTokenInfo in bytes format, to be used in allocateValue.
+        return swapData; // return SwapTokenInfo in bytes format, to be used in allocateValue.
     }
 
-    // UserOperation happens here. EE calls router (userOp.dapp) with userOp.data as calldata.
+    function _allocateValueCall(address, uint256 bidAmount, bytes calldata data) internal virtual override {
+        SwapTokenInfo memory _swapInfo = abi.decode(data, (SwapTokenInfo));
+        uint256 _outputTokenBalance = _balanceOf(_swapInfo.outputToken);
 
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) internal virtual override {
-        // Solver bid (in TREB) gets burnt here
-        // Send user back their tokenOut from the swap, and any leftover tokenIn
-        // Revert here if swap fails
+        // Check enough output token was received after swap
+        if (_swapInfo.outputToken == TREB) {
+            // If outputToken is TREB, check there is enough to burn the solver bid and fulfill user swap
+            if (_outputTokenBalance < bidAmount + _swapInfo.outputMin) revert InsufficientTrebBalance();
+            _outputTokenBalance -= bidAmount; // deduct solver bid to get final user output amount to send
+        } else {
+            if (_outputTokenBalance < _swapInfo.outputMin) revert InsufficientOutputBalance();
+        }
+
+        // Transfer output token to user
+        if (_swapInfo.outputToken == _ETH) {
+            SafeTransferLib.safeTransferETH(_user(), _outputTokenBalance);
+        } else {
+            SafeTransferLib.safeTransfer(_swapInfo.outputToken, _user(), _outputTokenBalance);
+        }
+
+        // If solver won, burn TREB bid
+        if (bidAmount > 0) SafeTransferLib.safeTransfer(TREB, _BURN, bidAmount);
+
+        // If any leftover input token, transfer back to user
+        uint256 _inputTokenBalance = _balanceOf(_swapInfo.inputToken);
+        if (_inputTokenBalance > 0) {
+            if (_swapInfo.inputToken == _ETH) {
+                SafeTransferLib.safeTransferETH(_user(), _inputTokenBalance);
+            } else {
+                SafeTransferLib.safeTransfer(_swapInfo.inputToken, _user(), _inputTokenBalance);
+            }
+        }
     }
 
     // ---------------------------------------------------- //
@@ -182,6 +207,14 @@ contract TrebleSwapDAppControl is DAppControl {
                 let slippageTolerance := shr(232, calldataload(pos))
                 mstore(add(swapTokenInfo, 0x60), div(mul(outputQuote, sub(0xFFFFFF, slippageTolerance)), 0xFFFFFF))
             }
+        }
+    }
+
+    function _balanceOf(address token) internal view returns (uint256) {
+        if (token == _ETH) {
+            return address(this).balance;
+        } else {
+            return SafeTransferLib.balanceOf(token, address(this));
         }
     }
 }
