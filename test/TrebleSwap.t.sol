@@ -91,7 +91,7 @@ contract TrebleSwapTest is BaseTest {
             hex"83bd37f9000400014da78059d97f155e18b37765e2e042270f4e0fc4040bc108800601d1d9f50a5a028f5c0001f73f77f9466da712590ae432a80f07fd50a7de600001616535324976f8dbcef19df0705b95ace86ebb480001736F6980876FDa51A610AB79E2856528a62Bf80e0000000006020207003401000001020180000005020a0004040500000301010003060119ff0000000000000000000000000000000000000000000000000000000000000000616535324976f8dbcef19df0705b95ace86ebb48833589fcd6edb6e08f4c7c32d4f71b54bda02913569d81c17b5b4ac08929dc1769b8e39668d3ae29f6c0a374a483101e04ef5f7ac9bd15d9142bac95d9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca42000000000000000000000000000000000000060000000000000000";
 
         bytes memory encodedCall = abi.encodePacked(this.decodeSwapCompactCalldata.selector, swapCompactCalldata);
-        (bool res, bytes memory returnData) = address(this).call(encodedCall);
+        (bool res, bytes memory returnData) = address(this).staticcall(encodedCall);
 
         console.log("res", res);
 
@@ -130,7 +130,7 @@ contract TrebleSwapTest is BaseTest {
     // }
 
     // TODO once this works, move to TrebleSwapDAppControl
-    function decodeSwapCompactCalldata() public returns (SwapTokenInfo memory swapTokenInfo) {
+    function decodeSwapCompactCalldata() public view returns (SwapTokenInfo memory swapTokenInfo) {
         assembly {
             // helper function to get address either from storage or calldata
             function getAddress(currPos) -> result, newPos {
@@ -156,7 +156,7 @@ contract TrebleSwapTest is BaseTest {
                     let success :=
                         staticcall(
                             gas(), // gas remaining
-                            0x19cEeAd7105607Cd444F5ad10dd51356436095a1, // Odos v2 Router on Base
+                            ODOS_ROUTER,
                             ptr, // input location
                             0x24, // input size (4 byte selector + uint256 arg)
                             ptr, // output location
