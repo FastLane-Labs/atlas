@@ -74,29 +74,8 @@ contract BaseTest is Test, TestConstants {
         deal(TOKEN_ONE, address(userEOA), 10e30);
 
         // Deploy contracts
-        vm.startPrank(payee);
+        _BaseTest_DeployAtlasContracts();
 
-        simulator = new Simulator();
-
-        // Computes the addresses at which AtlasVerification will be deployed
-        address expectedAtlasAddr = vm.computeCreateAddress(payee, vm.getNonce(payee) + 1);
-        address expectedAtlasVerificationAddr = vm.computeCreateAddress(payee, vm.getNonce(payee) + 2);
-        bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedAtlasAddr, "AtlasFactory 1.0"));
-        ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
-
-        atlas = new TestAtlas({
-            escrowDuration: DEFAULT_ESCROW_DURATION,
-            verification: expectedAtlasVerificationAddr,
-            simulator: address(simulator),
-            executionTemplate: address(execEnvTemplate),
-            initialSurchargeRecipient: payee,
-            l2GasCalculator: address(0)
-        });
-        atlasVerification = new AtlasVerification(address(atlas));
-        simulator.setAtlas(address(atlas));
-        sorter = new Sorter(address(atlas));
-
-        vm.stopPrank();
         vm.startPrank(governanceEOA);
 
         v2DAppControl = new V2DAppControl(address(atlas));
@@ -146,5 +125,31 @@ contract BaseTest is Test, TestConstants {
         vm.label(userEOA, "USER");
         vm.label(address(atlas), "ATLAS");
         vm.label(address(v2DAppControl), "V2 DAPP CONTROL");
+    }
+
+    function _BaseTest_DeployAtlasContracts() internal {
+        vm.startPrank(payee);
+
+        simulator = new Simulator();
+
+        // Computes the addresses at which AtlasVerification will be deployed
+        address expectedAtlasAddr = vm.computeCreateAddress(payee, vm.getNonce(payee) + 1);
+        address expectedAtlasVerificationAddr = vm.computeCreateAddress(payee, vm.getNonce(payee) + 2);
+        bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedAtlasAddr, "AtlasFactory 1.0"));
+        ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
+
+        atlas = new TestAtlas({
+            escrowDuration: DEFAULT_ESCROW_DURATION,
+            verification: expectedAtlasVerificationAddr,
+            simulator: address(simulator),
+            executionTemplate: address(execEnvTemplate),
+            initialSurchargeRecipient: payee,
+            l2GasCalculator: address(0)
+        });
+        atlasVerification = new AtlasVerification(address(atlas));
+        simulator.setAtlas(address(atlas));
+        sorter = new Sorter(address(atlas));
+
+        vm.stopPrank();
     }
 }
