@@ -42,7 +42,7 @@ contract TrebleSwapTest is BaseTest {
     Args public args;
 
     // Odos Router v2 on Base
-    address public constant ODOS_ROUTER = address(0x19cEeAd7105607Cd444F5ad10dd51356436095a1);
+    address public constant ODOS_ROUTER = 0x19cEeAd7105607Cd444F5ad10dd51356436095a1;
 
     // Base ERC20 addresses
     IERC20 bWETH = IERC20(0x4200000000000000000000000000000000000006);
@@ -130,7 +130,7 @@ contract TrebleSwapTest is BaseTest {
     // }
 
     // TODO once this works, move to TrebleSwapDAppControl
-    function decodeSwapCompactCalldata() public pure returns (SwapTokenInfo memory swapTokenInfo) {
+    function decodeSwapCompactCalldata() public returns (SwapTokenInfo memory swapTokenInfo) {
         assembly {
             // helper function to get address either from storage or calldata
             function getAddress(currPos) -> result, newPos {
@@ -144,13 +144,28 @@ contract TrebleSwapTest is BaseTest {
                     result := and(shr(80, calldataload(currPos)), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
                     newPos := add(currPos, 22)
                 }
-                // TODO generalize below cases into default that calls Odos v2 addressList array getter
-                case 0x0002 {
-                    result := 0x4200000000000000000000000000000000000006 // WETH
-                    newPos := add(currPos, 2)
-                }
-                case 0x0004 {
-                    result := 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 // USDC
+                default {
+                    // 0000 and 0001 are reserved for cases above, so offset by 2 for addressList index
+                    let arg := sub(inputPos, 2)
+                    let selector := 0xb810fb43 // function selector for "addressList(uint256)"
+                    let ptr := mload(0x40) // get the free memory pointer
+                    mstore(ptr, shl(224, selector)) // shift selector to left of slot and store
+                    mstore(add(ptr, 4), arg) // store the uint256 argument after the selector
+
+                    // Perform the external call
+                    let success :=
+                        staticcall(
+                            gas(), // gas remaining
+                            0x19cEeAd7105607Cd444F5ad10dd51356436095a1, // Odos v2 Router on Base
+                            ptr, // input location
+                            0x24, // input size (4 byte selector + uint256 arg)
+                            ptr, // output location
+                            0x20 // output size (32 bytes for the address)
+                        )
+
+                    if eq(success, 0) { revert(0, 0) }
+
+                    result := mload(ptr)
                     newPos := add(currPos, 2)
                 }
             }
