@@ -50,7 +50,7 @@ contract TrebleSwapDAppControl is DAppControl {
                 requirePostSolver: false,
                 requirePostOps: true,
                 zeroSolvers: true,
-                reuseUserOp: false,
+                reuseUserOp: true,
                 userAuctioneer: true,
                 solverAuctioneer: false,
                 unknownAuctioneer: false,
@@ -90,18 +90,17 @@ contract TrebleSwapDAppControl is DAppControl {
         return swapData; // return SwapTokenInfo in bytes format, to be used in allocateValue.
     }
 
-    function _allocateValueCall(address, uint256 bidAmount, bytes calldata data) internal virtual override {
+    function _allocateValueCall(address, uint256 bidAmount, bytes calldata) internal virtual override {
+        // Burn TREB bid
+        if (bidAmount > 0) SafeTransferLib.safeTransfer(TREB, _BURN, bidAmount);
+    }
+
+    function _postOpsCall(bool, bytes calldata data) internal virtual override {
         SwapTokenInfo memory _swapInfo = abi.decode(data, (SwapTokenInfo));
         uint256 _outputTokenBalance = _balanceOf(_swapInfo.outputToken);
+        uint256 _inputTokenBalance = _balanceOf(_swapInfo.inputToken);
 
-        // Check enough output token was received after swap
-        if (_swapInfo.outputToken == TREB) {
-            // If outputToken is TREB, check there is enough to burn the solver bid and fulfill user swap
-            if (_outputTokenBalance < bidAmount + _swapInfo.outputMin) revert InsufficientTrebBalance();
-            _outputTokenBalance -= bidAmount; // deduct solver bid to get final user output amount to send
-        } else {
-            if (_outputTokenBalance < _swapInfo.outputMin) revert InsufficientOutputBalance();
-        }
+        if (_outputTokenBalance < _swapInfo.outputMin) revert InsufficientOutputBalance();
 
         // Transfer output token to user
         if (_swapInfo.outputToken == _ETH) {
@@ -110,11 +109,7 @@ contract TrebleSwapDAppControl is DAppControl {
             SafeTransferLib.safeTransfer(_swapInfo.outputToken, _user(), _outputTokenBalance);
         }
 
-        // If solver won, burn TREB bid
-        if (bidAmount > 0) SafeTransferLib.safeTransfer(TREB, _BURN, bidAmount);
-
         // If any leftover input token, transfer back to user
-        uint256 _inputTokenBalance = _balanceOf(_swapInfo.inputToken);
         if (_inputTokenBalance > 0) {
             if (_swapInfo.inputToken == _ETH) {
                 SafeTransferLib.safeTransferETH(_user(), _inputTokenBalance);
