@@ -33,31 +33,52 @@ contract DeployBaseScript is Script {
 
     Utilities public u;
 
+    // Uses block.chainid to determine current chain to update deployments.json
     function _getDeployChain() internal view returns (string memory) {
-        // OPTIONS: LOCAL, SEPOLIA, MAINNET
-        string memory deployChain = vm.envString("DEPLOY_TO");
-        if (
-            keccak256(bytes(deployChain)) == keccak256(bytes("LOCAL"))
-                || keccak256(bytes(deployChain)) == keccak256(bytes("SEPOLIA"))
-                || keccak256(bytes(deployChain)) == keccak256(bytes("MAINNET"))
-                || keccak256(bytes(deployChain)) == keccak256(bytes("AMOY"))
-                || keccak256(bytes(deployChain)) == keccak256(bytes("POLYGON"))
-                || keccak256(bytes(deployChain)) == keccak256(bytes("BSC"))
-        ) {
-            return deployChain;
+        uint256 chainId = block.chainid;
+
+        if (chainId == 31_337) {
+            return "LOCAL";
+        } else if (chainId == 1) {
+            return "MAINNET";
+        } else if (chainId == 42) {
+            return "SEPOLIA";
+        } else if (chainId == 17_000) {
+            return "HOLESKY";
+        } else if (chainId == 137) {
+            return "POLYGON";
+        } else if (chainId == 80_002) {
+            return "AMOY";
+        } else if (chainId == 56) {
+            return "BSC";
+        } else if (chainId == 97) {
+            return "BSC TESTNET";
+        } else if (chainId == 10) {
+            return "OP MAINNET";
+        } else if (chainId == 11_155_420) {
+            return "OP SEPOLIA";
+        } else if (chainId == 42_161) {
+            return "ARBITRUM";
+        } else if (chainId == 421_614) {
+            return "ARBITRUM SEPOLIA";
+        } else if (chainId == 8453) {
+            return "BASE";
+        } else if (chainId == 84_532) {
+            return "BASE SEPOLIA";
+        } else {
+            revert("Error: Chain ID not recognized");
         }
-        revert("Error: Set DEPLOY_TO in .env to LOCAL, SEPOLIA, MAINNET, AMOY, POLYGON, or BSC");
     }
 
     // NOTE: When handling JSON with StdJson, prefix keys with '.' e.g. '.ATLAS'
     // These 2 functions abstract away the '.' thing though.
-    // Just pass in a key like 'ATLAS' and set DEPLOY_TO in .env to LOCAL, SEPOLIA, or MAINNET
+    // Pass in a key like 'ATLAS', and the current chain will be detected via `block.chainid` in `_getDeployChain()`
     function _getAddressFromDeploymentsJson(string memory key) internal view returns (address) {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/deployments.json");
         string memory json = vm.readFile(path);
 
-        // Read target chain from DEPLOY_TO in .env and use to form full key
+        // Get target chain using `block.chainid` and use to form full key
         string memory fullKey = string.concat(".", _getDeployChain(), ".", key);
 
         // console.log("Getting", fullKey, "from deployments.json");
@@ -70,13 +91,26 @@ contract DeployBaseScript is Script {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/deployments.json");
 
-        // Read target chain from DEPLOY_TO in .env and use to form full key
+        // Get target chain using `block.chainid` and use to form full key
         string memory fullKey = string.concat(".", _getDeployChain(), ".", key);
 
         // console.log(string.concat("Writing \t\t'", fullKey), "': '", addr, "'\t\t to deployments.json");
 
         // NOTE: Use fullKey method above for safety
         vm.writeJson(vm.toString(addr), path, fullKey);
+    }
+
+    function _getUsefulContractAddress(string memory key) internal view returns (address) {
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/useful-addresses.json");
+        string memory json = vm.readFile(path);
+        string memory fullKey = string.concat(".", _getDeployChain(), ".", key);
+
+        address res = json.readAddress(fullKey);
+        if (res == address(0x20) || res == address(0)) {
+            revert(string.concat(fullKey, " not found in useful-addresses.json"));
+        }
+        return res;
     }
 
     function _logTokenBalances(address account, string memory accountLabel) internal view {
