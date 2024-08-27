@@ -43,6 +43,7 @@ Coming soon...
 
 ## Latest Deployments
 
+
 ### Polygon Amoy Testnet
 
 Commit hash of deployment: [dca0b99](https://github.com/FastLane-Labs/atlas/commit/dca0b9946e8f59347610cd24a0bca5e84ddea00e)
@@ -54,16 +55,26 @@ Commit hash of deployment: [dca0b99](https://github.com/FastLane-Labs/atlas/comm
 | Simulator          | [0x3efbaBE0ee916A4677D281c417E895a3e7411Ac2](https://amoy.polygonscan.com/address/0x3efbaBE0ee916A4677D281c417E895a3e7411Ac2) |
 | Sorter             | [0xa55051bd82eFeA1dD487875C84fE9c016859659B](https://amoy.polygonscan.com/address/0xa55051bd82eFeA1dD487875C84fE9c016859659B) |
 
+| DAppControl        | Address                                                                                                                       |
+|--------------------|-------------------------------------------------------------------------------------------------------------------------------|
+| FastLane Online    | [0xf0E388C7DFfE14a61280a4E5b84d77be3d2875e3](https://amoy.polygonscan.com/address/0xf0E388C7DFfE14a61280a4E5b84d77be3d2875e3) |
+
+
 ### Polygon Mainnet
 
-Commit hash of deployment: [dca0b99](https://github.com/FastLane-Labs/atlas/commit/dca0b9946e8f59347610cd24a0bca5e84ddea00e)
+Commit hash of deployment: [e99082f](https://github.com/FastLane-Labs/atlas/pull/401/commits/e99082faf649927408072769a68e6b815cc20b63)
 
 | Contract           | Address                                                                                                                       |
 |--------------------|-------------------------------------------------------------------------------------------------------------------------------|
-| Atlas              | [0x892F8f6779ca6927c1A6Cc74319e03d2abEf18D5](https://polygonscan.com/address/0x892F8f6779ca6927c1A6Cc74319e03d2abEf18D5)      |
-| AtlasVerification  | [0xc05DDBe9745ce9DB45C32F5e4C1DA7a3c4FDa220](https://polygonscan.com/address/0xc05DDBe9745ce9DB45C32F5e4C1DA7a3c4FDa220)      |
-| Simulator          | [0xfBc81A39459E0D82EC31B4e585f7A318AFAdB49B](https://polygonscan.com/address/0xfBc81A39459E0D82EC31B4e585f7A318AFAdB49B)      |
-| Sorter             | [0x81f1E70A11A9E10Fa314cC093D149E5ec56EE97f](https://polygonscan.com/address/0x81f1E70A11A9E10Fa314cC093D149E5ec56EE97f)      |
+| Atlas              | [0x912AceADa1b9c9B378894D0610C5684167710FDD](https://polygonscan.com/address/0x912AceADa1b9c9B378894D0610C5684167710FDD)      |
+| AtlasVerification  | [0x2fBF38a38D753E4ce398000CCC552Efa50702e1e](https://polygonscan.com/address/0x2fBF38a38D753E4ce398000CCC552Efa50702e1e)      |
+| Simulator          | [0x1244E4B8D93D2A72692Bf3600f7f5a494e24895a](https://polygonscan.com/address/0x1244E4B8D93D2A72692Bf3600f7f5a494e24895a)      |
+| Sorter             | [0xFac7bf300E7eb17A2eD0Be67b60f5FeDd2E28E90](https://polygonscan.com/address/0xFac7bf300E7eb17A2eD0Be67b60f5FeDd2E28E90)      |
+
+| DAppControl        | Address                                                                                                                       |
+|--------------------|-------------------------------------------------------------------------------------------------------------------------------|
+| FastLane Online    | [0x498aC70345AD6b161eEf4AFBEA8F010401cfa780](https://polygonscan.com/address/0x498aC70345AD6b161eEf4AFBEA8F010401cfa780)      |
+
 
 ### Binance Smart Chain Mainnet
 

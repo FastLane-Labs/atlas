@@ -207,8 +207,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         // Compute expected addresses for the deployment
         address expectedAtlasAddr = vm.computeCreateAddress(payee, vm.getNonce(payee) + 1);
-        bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedAtlasAddr, "AtlasFactory 1.0"));
-        ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
+        ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedAtlasAddr);
 
         // Initialize MockGasAccounting
         mockGasAccounting = new MockGasAccounting(
@@ -976,7 +975,12 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         uint256 expectedWriteoffs = initialWriteoffs + AccountingMath.withAtlasAndBundlerSurcharges(gasUsed);
         // Verify writeoffs have increased
-        assertApproxEqRel(mockGasAccounting.getWriteoffs(), expectedWriteoffs, 1e15, "Writeoffs not within 0.1% error margin");
+        assertApproxEqRel(
+            mockGasAccounting.getWriteoffs(),
+            expectedWriteoffs,
+            1e15, // 0.1% margin for error
+            "Writeoffs should be approximately equal to expected value"
+        );
     }
 
     function test_handleSolverAccounting_solverResponsible() public {

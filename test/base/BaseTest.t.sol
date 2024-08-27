@@ -10,6 +10,7 @@ import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.
 
 import { Sorter } from "src/contracts/helpers/Sorter.sol";
 import { Simulator } from "src/contracts/helpers/Simulator.sol";
+import { GovernanceBurner } from "src/contracts/helpers/GovernanceBurner.sol";
 
 import { Solver } from "src/contracts/solver/src/TestSolver.sol";
 
@@ -39,6 +40,12 @@ contract BaseTest is Test, TestConstants {
     uint256 public solverTwoPK = 33_333;
     address public solverTwoEOA = vm.addr(solverTwoPK);
 
+    uint256 public solverThreePK = 55_555;
+    address public solverThreeEOA = vm.addr(solverThreePK);
+
+    uint256 public solverFourPK = 66_666;
+    address public solverFourEOA = vm.addr(solverFourPK);
+
     uint256 public userPK = 44_444;
     address public userEOA = vm.addr(userPK);
 
@@ -47,6 +54,7 @@ contract BaseTest is Test, TestConstants {
 
     Simulator public simulator;
     Sorter public sorter;
+    GovernanceBurner public govBurner;
 
     Solver public solverOne;
     Solver public solverTwo;
@@ -95,6 +103,9 @@ contract BaseTest is Test, TestConstants {
         atlasVerification = new AtlasVerification(address(atlas));
         simulator.setAtlas(address(atlas));
         sorter = new Sorter(address(atlas));
+        govBurner = new GovernanceBurner();
+
+        vm.deal(address(simulator), 1000e18); // to allow userOp.value > 0 sims
 
         vm.stopPrank();
         vm.startPrank(governanceEOA);
