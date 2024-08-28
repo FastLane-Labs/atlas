@@ -18,10 +18,6 @@ import { TrebleSwapDAppControl } from "src/contracts/examples/trebleswap/TrebleS
 
 // TODO refactor this (and other tests) using multi-chain forking and User/Solver/Dapp Op builders
 
-// Odos Test Txs on Base:
-// 1. USDC -> WUF https://basescan.org/tx/0x0ef4a9c24bbede2b39e12f5e5417733fa8183f372e41ee099c2c7523064c1b55
-// 2. ETH -> USDC https://basescan.org/tx/0x3f090e4dacb80f592a5d4e4c9fee23fdca1f3011b893740b4cb441256887d486
-
 contract TrebleSwapTest is BaseTest {
     struct Sig {
         uint8 v;
@@ -54,16 +50,18 @@ contract TrebleSwapTest is BaseTest {
         uint256 atlasGasSurcharge;
     }
 
-    // Odos Router v2 on Base
+    // Base addresses
     address constant ODOS_ROUTER = 0x19cEeAd7105607Cd444F5ad10dd51356436095a1;
-    address constant ETH = address(0);
     address constant BURN = address(0xdead);
+    address constant ETH = address(0);
+    address constant bWETH = 0x4200000000000000000000000000000000000006;
+    address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
+    address constant WUF = 0x4da78059D97f155E18B37765e2e042270f4E0fC4;
+    address constant DAI = 0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb;
+    address constant TREB = 0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed;
+    // TODO DEGEN for now, replace when TREB available
 
-    // Base ERC20 addresses
-    IERC20 bWETH = IERC20(0x4200000000000000000000000000000000000006);
-    IERC20 USDC = IERC20(0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913);
-    IERC20 WUF = IERC20(0x4da78059D97f155E18B37765e2e042270f4E0fC4);
-    IERC20 TREB = IERC20(0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed); // TODO DEGEN for now, replace when TREB available
+    uint256 bundlerGasEth = 1e16;
 
     TrebleSwapDAppControl trebleSwapControl;
     address executionEnvironment;
@@ -93,10 +91,11 @@ contract TrebleSwapTest is BaseTest {
         // TODO refactor all this into base properly
         deal(userEOA, 1e18); // give user ETH for metacall msg.value for Atlas surcharge
 
-        vm.label(address(bWETH), "WETH");
-        vm.label(address(USDC), "USDC");
-        vm.label(address(WUF), "WUF");
-        vm.label(address(TREB), "DEGEN"); // TODO change label to TREB when TREB token available
+        vm.label(bWETH, "WETH");
+        vm.label(USDC, "USDC");
+        vm.label(WUF, "WUF");
+        vm.label(DAI, "DAI");
+        vm.label(TREB, "DEGEN"); // TODO change label to TREB when TREB token available
     }
 
     // ---------------------------------------------------- //
@@ -111,9 +110,9 @@ contract TrebleSwapTest is BaseTest {
         args.nativeInput = false;
         args.nativeOutput = false;
         swapInfo = SwapTokenInfo({
-            inputToken: address(USDC),
+            inputToken: USDC,
             inputAmount: 197_200_000,
-            outputToken: address(WUF),
+            outputToken: WUF,
             outputMin: 1_980_808_360_295
         });
         vm.roll(args.blockBefore);
@@ -136,21 +135,35 @@ contract TrebleSwapTest is BaseTest {
     }
 
     function testTrebleSwap_Metacall_EthToErc20_ZeroSolvers() public {
-        vm.skip(true);
+        // Tx: https://basescan.org/tx/0xe138def4155bea056936038b9374546a366828ab8bf1233056f9e2fe4c6af999
+        // Swaps 0.123011147164483512 ETH for at least 307.405807527716546728 DAI
 
-        // Tx 1: https://basescan.org/tx/0xdc4f046b052cfaf227ccb1ad83b4a86521cf4f2bcf5343793f22fc39f61dfe02
+        args.blockBefore = 19_026_442;
+        args.nativeInput = true;
+        args.nativeOutput = false;
+        swapInfo = SwapTokenInfo({
+            inputToken: ETH,
+            inputAmount: 123_011_147_164_483_512,
+            outputToken: DAI,
+            outputMin: 307_405_807_527_716_546_728
+        });
+        vm.roll(args.blockBefore);
 
-        // swapCompact calldata:
-        // 83bd37f900000004072386f26fc10000040180ef410147ae0001f73f77f9466da712590ae432a80f07fd50a7de60000000013eb8b2f4584c642a43ed5cad2f83182de41b5de2000000010301020300040101020a0001010201ff000000000000000000000000000000000074cb6260be6f31965c239df6d6ef2ac2b5d4f0204200000000000000000000000000000000000006000000000000000000000000000000000000000000000000
+        // Modify swapCompact() calldata to replace original caller (0xadF6918eD87a5D7aE334bB42Ca2d98971B527306) with
+        // user's Execution Environment address:
+        bytes memory calldataPart1 =
+            hex"83bd37f9000000050801b505fc9226ffb80910d5345f06a9650000028f5c0001f73f77f9466da712590ae432a80f07fd50a7de6000000001";
+        bytes memory calldataPart2 =
+            hex"000000000401020500040101020a000202030100340101000104007ffffffaff00000000005fb33b095c6e739be19364ab408cd8f102262bb672ab388e2e2f6facef59e3c3fa2c4e29011c2d384200000000000000000000000000000000000006833589fcd6edb6e08f4c7c32d4f71b54bda0291300000000000000000000000000000000";
+        bytes memory swapCompactCalldata = abi.encodePacked(calldataPart1, executionEnvironment, calldataPart2);
 
-        // From: 0x3EB8b2F4584c642a43eD5caD2F83182de41B5dE2
-
-        // Tx 2: https://basescan.org/tx/0xe138def4155bea056936038b9374546a366828ab8bf1233056f9e2fe4c6af999
-
-        // swapCompact calldata:
-        // 0x83bd37f9000000050801b505fc9226ffb80910d5345f06a9650000028f5c0001f73f77f9466da712590ae432a80f07fd50a7de6000000001adf6918ed87a5d7ae334bb42ca2d98971b527306000000000401020500040101020a000202030100340101000104007ffffffaff00000000005fb33b095c6e739be19364ab408cd8f102262bb672ab388e2e2f6facef59e3c3fa2c4e29011c2d384200000000000000000000000000000000000006833589fcd6edb6e08f4c7c32d4f71b54bda0291300000000000000000000000000000000
-
-        // From: 0xadF6918eD87a5D7aE334bB42Ca2d98971B527306
+        _checkActualCalldataMatchesExpected(swapCompactCalldata);
+        _buildUserOp(swapCompactCalldata);
+        // no solverOps
+        _buildAndSignDAppOp();
+        _setBalancesAndApprovals();
+        _checkSimulationsPass();
+        _doMetacallAndChecks({ winningSolverEOA: address(0), winningSolver: address(0) });
     }
 
     // ---------------------------------------------------- //
@@ -165,18 +178,22 @@ contract TrebleSwapTest is BaseTest {
         beforeVars.solverOutputTokenBalance = _balanceOf(swapInfo.outputToken, winningSolverEOA);
         beforeVars.burnAddressTrebBalance = _balanceOf(address(TREB), BURN);
         beforeVars.atlasGasSurcharge = atlas.cumulativeSurcharge();
+        uint256 msgValue = (args.nativeInput ? swapInfo.inputAmount : 0) + bundlerGasEth;
+        if (args.nativeInput) beforeVars.userInputTokenBalance -= bundlerGasEth;
 
         vm.prank(userEOA);
-        bool auctionWon = atlas.metacall{ value: 1e17 }(args.userOp, args.solverOps, args.dAppOp);
+        bool auctionWon = atlas.metacall{ value: msgValue }(args.userOp, args.solverOps, args.dAppOp);
 
         assertEq(auctionWon, auctionWonExpected, "auctionWon not as expected");
 
-        // Check user balance changes
+        // user input token
         assertEq(
             _balanceOf(swapInfo.inputToken, userEOA),
             beforeVars.userInputTokenBalance - swapInfo.inputAmount,
             "wrong user input token balance change"
         );
+
+        // user output token
         assertTrue(
             _balanceOf(swapInfo.outputToken, userEOA) >= beforeVars.userOutputTokenBalance + swapInfo.outputMin,
             "wrong user output token balance change"
@@ -202,8 +219,9 @@ contract TrebleSwapTest is BaseTest {
     function _setBalancesAndApprovals() internal {
         // User input token and Atlas approval
         if (args.nativeInput) {
-            deal(userEOA, swapInfo.inputAmount);
+            deal(userEOA, swapInfo.inputAmount + bundlerGasEth);
         } else {
+            deal(userEOA, bundlerGasEth);
             deal(swapInfo.inputToken, userEOA, swapInfo.inputAmount);
             vm.prank(userEOA);
             IERC20(swapInfo.inputToken).approve(address(atlas), swapInfo.inputAmount);
