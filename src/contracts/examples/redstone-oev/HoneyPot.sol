@@ -13,7 +13,7 @@ interface IFeed {
 
 contract HoneyPot is Ownable {
     struct HoneyPotDetails {
-        int256 liquidationPrice;
+        int256 currentPrice;
         uint256 balance;
     }
 
@@ -35,23 +35,22 @@ contract HoneyPot is Ownable {
     }
 
     function createHoneyPot() external payable {
-        require(honeyPots[msg.sender].liquidationPrice == 0, "Liquidation price already set for this user");
         require(msg.value > 0, "No value sent");
 
         (, int256 currentPrice,,,) = IFeed(oracle).latestRoundData();
 
-        honeyPots[msg.sender].liquidationPrice = currentPrice;
+        honeyPots[msg.sender].currentPrice = currentPrice;
         honeyPots[msg.sender].balance = msg.value;
 
         emit HoneyPotCreated(msg.sender, currentPrice, msg.value);
     }
 
-    function _emptyPotForUser(address user, address recipient) internal returns (uint256 amount) {
+    function _emptyPotForUser(address user, address recipient, int256 _currentPrice) internal returns (uint256 amount) {
         HoneyPotDetails storage userPot = honeyPots[user];
 
         amount = userPot.balance;
         userPot.balance = 0; // reset the balance
-        userPot.liquidationPrice = 0; // reset the liquidation price
+        userPot.currentPrice = _currentPrice; // reset the current price
         Address.sendValue(payable(recipient), amount);
     }
 
@@ -61,15 +60,16 @@ contract HoneyPot is Ownable {
 
         HoneyPotDetails storage userPot = honeyPots[user];
 
-        require(currentPrice != userPot.liquidationPrice, "Liquidation price reached for this user");
+        require(currentPrice != userPot.currentPrice, "Price hasn't changed");
         require(userPot.balance > 0, "No balance to withdraw");
 
-        uint256 withdrawnAmount = _emptyPotForUser(user, msg.sender);
+        uint256 withdrawnAmount = _emptyPotForUser(user, msg.sender, currentPrice);
         emit HoneyPotEmptied(user, msg.sender, withdrawnAmount);
     }
 
-    function resetPot() external {
-        uint256 withdrawnAmount = _emptyPotForUser(msg.sender, msg.sender);
+    function resetPot() external onlyOwner {
+        (, int256 currentPrice,,,) = IFeed(oracle).latestRoundData();
+        uint256 withdrawnAmount = _emptyPotForUser(msg.sender, msg.sender, currentPrice);
         emit HoneyPotReset(msg.sender, withdrawnAmount);
     }
 }
