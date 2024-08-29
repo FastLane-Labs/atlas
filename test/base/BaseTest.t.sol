@@ -27,6 +27,12 @@ import { V2Helper } from "../V2Helper.sol";
 import { Utilities } from "src/contracts/helpers/Utilities.sol";
 
 contract BaseTest is Test, TestConstants {
+    struct Sig {
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+    }
+
     address public me = address(this);
 
     address public payee; // = makeAddr("FastLanePayee");

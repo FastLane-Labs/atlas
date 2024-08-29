@@ -28,12 +28,6 @@ import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import "forge-std/Test.sol";
 
 contract ExPostTest is BaseTest {
-    struct Sig {
-        bytes32 r;
-        bytes32 s;
-        uint8 v;
-    }
-
     V2ExPost public v2ExPost;
     /// forge-config: default.gas_price = 15000000000
 

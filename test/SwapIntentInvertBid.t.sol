@@ -22,12 +22,6 @@ contract SwapIntentTest is BaseTest {
     IERC20 DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
     address DAI_ADDRESS = address(DAI);
 
-    struct Sig {
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-    }
-
     function setUp() public virtual override {
         BaseTest.setUp();
 

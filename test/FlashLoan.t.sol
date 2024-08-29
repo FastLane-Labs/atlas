@@ -29,12 +29,6 @@ interface IWETH {
 contract FlashLoanTest is BaseTest {
     DummyDAppControlBuilder public control;
 
-    struct Sig {
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-    }
-
     Sig public sig;
 
     function setUp() public virtual override {

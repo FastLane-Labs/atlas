@@ -19,12 +19,6 @@ import { TrebleSwapDAppControl } from "src/contracts/examples/trebleswap/TrebleS
 // TODO refactor this (and other tests) using multi-chain forking and User/Solver/Dapp Op builders
 
 contract TrebleSwapTest is BaseTest {
-    struct Sig {
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-    }
-
     struct SwapTokenInfo {
         address inputToken;
         uint256 inputAmount;

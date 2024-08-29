@@ -18,12 +18,6 @@ import { FastLaneOnlineErrors } from "src/contracts/examples/fastlane-online/Fas
 import { IUniswapV2Router02 } from "test/base/interfaces/IUniswapV2Router.sol";
 
 contract FastLaneOnlineTest is BaseTest {
-    struct Sig {
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-    }
-
     struct FastOnlineSwapArgs {
         UserOperation userOp;
         SwapIntent swapIntent;
