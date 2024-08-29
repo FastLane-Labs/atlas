@@ -37,9 +37,7 @@ contract V2ExPost is DAppControl {
 
     event GiftedGovernanceToken(address indexed user, address indexed token, uint256 amount);
 
-    constructor(
-        address _atlas
-    )
+    constructor(address _atlas)
         DAppControl(
             _atlas,
             msg.sender,

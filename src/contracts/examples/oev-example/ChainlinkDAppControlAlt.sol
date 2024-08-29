@@ -49,9 +49,7 @@ contract ChainlinkDAppControl is DAppControl {
     event SignerAddedForBaseFeed(address indexed baseFeed, address indexed signer);
     event SignerRemovedForBaseFeed(address indexed baseFeed, address indexed signer);
 
-    constructor(
-        address _atlas
-    )
+    constructor(address _atlas)
         DAppControl(
             _atlas,
             msg.sender,
