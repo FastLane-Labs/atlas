@@ -16,8 +16,6 @@ import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { TrebleSwapDAppControl } from "src/contracts/examples/trebleswap/TrebleSwapDAppControl.sol";
 
-// TODO refactor this (and other tests) using multi-chain forking and User/Solver/Dapp Op builders
-
 contract TrebleSwapTest is BaseTest {
     struct SwapTokenInfo {
         address inputToken;
@@ -45,15 +43,15 @@ contract TrebleSwapTest is BaseTest {
     }
 
     // Base addresses
-    address constant ODOS_ROUTER = 0x19cEeAd7105607Cd444F5ad10dd51356436095a1;
-    address constant BURN = address(0xdead);
-    address constant ETH = address(0);
-    address constant bWETH = 0x4200000000000000000000000000000000000006;
-    address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
-    address constant WUF = 0x4da78059D97f155E18B37765e2e042270f4E0fC4;
-    address constant DAI = 0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb;
-    address constant BRETT = 0x532f27101965dd16442E59d40670FaF5eBB142E4;
-    address constant TREB = 0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed;
+    address ODOS_ROUTER = 0x19cEeAd7105607Cd444F5ad10dd51356436095a1;
+    address BURN = address(0xdead);
+    address ETH = address(0);
+    address bWETH = 0x4200000000000000000000000000000000000006;
+    address USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
+    address WUF = 0x4da78059D97f155E18B37765e2e042270f4E0fC4;
+    address bDAI = 0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb;
+    address BRETT = 0x532f27101965dd16442E59d40670FaF5eBB142E4;
+    address TREB = 0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed;
     // TODO DEGEN for now, replace when TREB available
 
     uint256 bundlerGasEth = 1e16;
@@ -69,11 +67,9 @@ contract TrebleSwapTest is BaseTest {
     function setUp() public virtual override {
         // Fork Base
         vm.createSelectFork(vm.envString("BASE_RPC_URL"), 18_906_794);
-        // TODO make this before all tx blocks in this file - atlas deployed before
-
-        _BaseTest_DeployAtlasContracts();
-
-        // TODO refactor how BaseTest handles forking chains and deploying Atlas.
+        __createAndLabelAccounts();
+        __deployAtlasContracts();
+        __fundSolversAndDepositAtlETH();
 
         vm.startPrank(governanceEOA);
         trebleSwapControl = new TrebleSwapDAppControl(address(atlas));
@@ -83,13 +79,10 @@ contract TrebleSwapTest is BaseTest {
         vm.prank(userEOA);
         executionEnvironment = atlas.createExecutionEnvironment(userEOA, address(trebleSwapControl));
 
-        // TODO refactor all this into base properly
-        deal(userEOA, 1e18); // give user ETH for metacall msg.value for Atlas surcharge
-
         vm.label(bWETH, "WETH");
         vm.label(USDC, "USDC");
         vm.label(WUF, "WUF");
-        vm.label(DAI, "DAI");
+        vm.label(bDAI, "DAI");
         vm.label(TREB, "DEGEN"); // TODO change label to TREB when TREB token available
     }
 
@@ -139,7 +132,7 @@ contract TrebleSwapTest is BaseTest {
         swapInfo = SwapTokenInfo({
             inputToken: ETH,
             inputAmount: 123_011_147_164_483_512,
-            outputToken: DAI,
+            outputToken: bDAI,
             outputMin: 307_405_807_527_716_546_728
         });
         vm.roll(args.blockBefore);

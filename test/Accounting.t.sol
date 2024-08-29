@@ -34,15 +34,8 @@ contract AccountingTest is BaseTest {
     UserOperation userOp;
     DAppOperation dAppOp;
 
-    IERC20 DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
-    address DAI_ADDRESS = address(DAI);
-
     function setUp() public virtual override {
         BaseTest.setUp();
-
-        // Creating new gov address (SignatoryActive error if already registered with control)
-        governancePK = 11_112;
-        governanceEOA = vm.addr(governancePK);
 
         // Deploy new SwapIntent Control from new gov and initialize in Atlas
         vm.startPrank(governanceEOA);
@@ -55,6 +48,10 @@ contract AccountingTest is BaseTest {
             _atlas: address(atlas),
             _verification: address(atlasVerification)
         });
+
+        deal(WETH_ADDRESS, userEOA, 10e18);
+        deal(WETH_ADDRESS, solverOneEOA, 10e18);
+        deal(WETH_ADDRESS, solverTwoEOA, 10e18);
     }
 
     function testSolverBorrowRepaySuccessfully_SkipCoverage() public {
@@ -125,12 +122,6 @@ contract AccountingTest is BaseTest {
         deal(DAI_ADDRESS, rfqSolver, swapIntent.amountUserBuys);
         assertEq(DAI.balanceOf(rfqSolver), swapIntent.amountUserBuys, "Did not give enough DAI to solver");
 
-        // TODO remove
-        // Give solverMsgValue (1e18, reusing var for stacktoodeep) of ETH to solver as well
-        // deal(address(rfqSolver), solverMsgValue);
-
-        // Input params for Atlas.metacall() - will be populated below
-
         solverOps = new SolverOperation[](1);
 
         vm.startPrank(userEOA);
@@ -161,7 +152,7 @@ contract AccountingTest is BaseTest {
         bytes memory solverOpData =
             abi.encodeCall(HonestRFQSolver.fulfillRFQ, (swapIntent, executionEnvironment));
 
-        vm.prank(address(solverOneEOA));
+        vm.prank(solverOneEOA);
         atlas.bond(1 ether);
 
         // Builds the SolverCall
