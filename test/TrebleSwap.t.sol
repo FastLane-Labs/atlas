@@ -235,7 +235,15 @@ contract TrebleSwapTest is BaseTest {
     }
 
     function _checkSimulationsPass() internal {
-        // TODO do all variations of sim calls here with checks
+        bool success;
+
+        (success,,) = simulator.simUserOperation(args.userOp);
+        assertEq(success, true, "simUserOperation failed");
+
+        if (args.solverOps.length > 0) {
+            (success,,) = simulator.simSolverCalls(args.userOp, args.solverOps, args.dAppOp);
+            assertEq(success, true, "simSolverCalls failed");
+        }
     }
 
     function _checkActualCalldataMatchesExpected(bytes memory userOpData) internal {
