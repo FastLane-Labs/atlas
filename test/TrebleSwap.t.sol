@@ -58,6 +58,7 @@ contract TrebleSwapTest is BaseTest {
     address constant USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
     address constant WUF = 0x4da78059D97f155E18B37765e2e042270f4E0fC4;
     address constant DAI = 0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb;
+    address constant BRETT = 0x532f27101965dd16442E59d40670FaF5eBB142E4;
     address constant TREB = 0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed;
     // TODO DEGEN for now, replace when TREB available
 
@@ -166,6 +167,38 @@ contract TrebleSwapTest is BaseTest {
         _doMetacallAndChecks({ winningSolverEOA: address(0), winningSolver: address(0) });
     }
 
+    function testTrebleSwap_Metacall_Erc20ToEth_ZeroSolvers() public {
+        // https://basescan.org/tx/0xaf26570fceddf2d21219a9e03f2cfee52c600a40ddfdfc5d82eff14f3d322f8f
+        // Swaps 24831.337726043809120256 BRETT for at least 0.786534993470006277 ETH
+
+        args.blockBefore = 19_044_388;
+        args.nativeInput = false;
+        args.nativeOutput = true;
+        swapInfo = SwapTokenInfo({
+            inputToken: BRETT,
+            inputAmount: 24_831_337_726_043_809_120_256,
+            outputToken: ETH,
+            outputMin: 786_534_993_470_006_277
+        });
+        vm.roll(args.blockBefore);
+
+        // Modify swapCompact() calldata to replace original caller (0x24971B34b7d4e4c880983e4ebc015558af5FF7dB) with
+        // user's Execution Environment address:
+        bytes memory calldataPart1 =
+            hex"83bd37f90001532f27101965dd16442e59d40670faf5ebb142e400000a05421c0933c565400000080aed2177322a39000041890001f73f77f9466da712590ae432a80f07fd50a7de6000000001";
+        bytes memory calldataPart2 =
+            hex"0000000003010204010e6604680a0100010200000a0100030200020400000001ff0000000036a46dff597c5a444bbc521d26787f57867d2214532f27101965dd16442e59d40670faf5ebb142e44e829f8a5213c42535ab84aa40bd4adcce9cba0200000000";
+        bytes memory swapCompactCalldata = abi.encodePacked(calldataPart1, executionEnvironment, calldataPart2);
+
+        _checkActualCalldataMatchesExpected(swapCompactCalldata);
+        _buildUserOp(swapCompactCalldata);
+        // no solverOps
+        _buildAndSignDAppOp();
+        _setBalancesAndApprovals();
+        _checkSimulationsPass();
+        _doMetacallAndChecks({ winningSolverEOA: address(0), winningSolver: address(0) });
+    }
+
     // ---------------------------------------------------- //
     //                    Helper Functions                  //
     // ---------------------------------------------------- //
@@ -180,6 +213,7 @@ contract TrebleSwapTest is BaseTest {
         beforeVars.atlasGasSurcharge = atlas.cumulativeSurcharge();
         uint256 msgValue = (args.nativeInput ? swapInfo.inputAmount : 0) + bundlerGasEth;
         if (args.nativeInput) beforeVars.userInputTokenBalance -= bundlerGasEth;
+        if (args.nativeOutput) beforeVars.userOutputTokenBalance -= bundlerGasEth;
 
         vm.prank(userEOA);
         bool auctionWon = atlas.metacall{ value: msgValue }(args.userOp, args.solverOps, args.dAppOp);
