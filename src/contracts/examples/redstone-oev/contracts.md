@@ -1,0 +1,3 @@
+Honey Pot test token: 0x434c51ec46c665d9a318ed1ddf4a9d7c5c7b06a4
+Oracle Feed: 0x0b0d94a7904925649c749f8e5cd68c60fd388bfe
+honey pot: 0x1eea3be2263f1e050adbcca56476fc530bc7fc7b
