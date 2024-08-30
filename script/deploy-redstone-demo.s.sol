@@ -10,6 +10,7 @@ import { MockBaseFeed } from "src/contracts/examples/redstone-oev/MockBaseFeed.s
 import { Atlas } from "src/contracts/atlas/Atlas.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import { HoneyPot } from "src/contracts/examples/redstone-oev/HoneyPot.sol";
+import { HoneyPotTestToken } from "src/contracts/examples/redstone-oev/HoneyPotTestToken.sol";
 
 contract DeployRedstoneDemoScript is DeployBaseScript {
     RedstoneDAppControl redstoneDAppControl;
@@ -68,14 +69,16 @@ contract DeployRedstoneHoneyPot is DeployBaseScript {
         address honeyPotOwner = vm.addr(honeyPotPrivateKey);
 
         address oracle = vm.envAddress("ORACLE_ADDRESS");
+        address settlementToken = vm.envAddress("SETTLEMENT_TOKEN_ADDRESS");
 
         console.log("Honey Pot Owner address: \t\t", honeyPotOwner);
         console.log("Oracle address: \t\t\t", oracle);
+        console.log("Settlement token address: \t\t\t", settlementToken);
 
         vm.startBroadcast(honeyPotPrivateKey);
         console.log("Deploying from Honey Pot Owner Account...");
 
-        HoneyPot honeyPot = new HoneyPot(honeyPotOwner, oracle);
+        HoneyPot honeyPot = new HoneyPot(honeyPotOwner, oracle, settlementToken);
 
         vm.stopBroadcast();
         console.log("Contracts deployed by Honey Pot Owner:");
@@ -102,3 +105,23 @@ contract DeployRedstoneMockBaseFeed is DeployBaseScript {
         console.log("Mock Base Feed: \t\t\t", address(mockBaseFeed));
     }
 }
+
+contract DeployHoneyPotTestToken is DeployBaseScript {
+    function run() external {
+        console.log("\n=== DEPLOYING HONEY POT TEST TOKEN ===\n");
+
+        uint256 honeyPotTestTokenOwner = vm.envUint("HONEY_POT_TEST_TOKEN_OWNER");
+        address authorizedSigner = vm.addr(honeyPotTestTokenOwner);
+
+        console.log("Authorized Signer address: \t\t", authorizedSigner);
+
+        vm.startBroadcast(honeyPotTestTokenOwner);
+        console.log("Deploying from Authorized Signer Account...");
+        HoneyPotTestToken honeyPotTestToken = new HoneyPotTestToken();
+        vm.stopBroadcast();
+
+        console.log("Contracts deployed by Authorized Signer:");
+        console.log("Honey pot test token address: \t\t\t", address(honeyPotTestToken));
+    }
+}
+

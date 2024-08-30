@@ -3,6 +3,7 @@ pragma solidity 0.8.25;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { Address } from "@openzeppelin/contracts/utils/Address.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 interface IFeed {
     function latestRoundData()
@@ -19,14 +20,16 @@ contract HoneyPot is Ownable {
 
     mapping(address => HoneyPotDetails) public honeyPots;
     address public oracle; // Oval serving as a Chainlink oracle
+    address public settlementToken;
 
     event OracleUpdated(address indexed newOracle);
     event HoneyPotCreated(address indexed owner, int256 initialPrice, uint256 amount);
     event HoneyPotEmptied(address indexed owner, address indexed liquidator, uint256 amount);
     event HoneyPotReset(address indexed owner, uint256 amount);
 
-    constructor(address _owner, address _oracle) Ownable(_owner) {
+    constructor(address _owner, address _oracle, address _settlementToken) Ownable(_owner) {
         oracle = _oracle;
+        settlementToken = _settlementToken;
     }
 
     function setOracle(address _oracle) external onlyOwner {
@@ -34,13 +37,15 @@ contract HoneyPot is Ownable {
         emit OracleUpdated(address(_oracle));
     }
 
-    function createHoneyPot() external payable {
-        require(msg.value > 0, "No value sent");
+    function createHoneyPot(uint256 _amount) external payable {
+        require(_amount > 0, "No value sent");
+
+        IERC20(settlementToken).transferFrom(msg.sender, address(this), _amount);
 
         (, int256 currentPrice,,,) = IFeed(oracle).latestRoundData();
 
         honeyPots[msg.sender].currentPrice = currentPrice;
-        honeyPots[msg.sender].balance = msg.value;
+        honeyPots[msg.sender].balance = _amount;
 
         emit HoneyPotCreated(msg.sender, currentPrice, msg.value);
     }
@@ -51,7 +56,7 @@ contract HoneyPot is Ownable {
         amount = userPot.balance;
         userPot.balance = 0; // reset the balance
         userPot.currentPrice = _currentPrice; // reset the current price
-        Address.sendValue(payable(recipient), amount);
+        IERC20(settlementToken).transfer(recipient, amount);
     }
 
     function emptyHoneyPot(address user) external {
