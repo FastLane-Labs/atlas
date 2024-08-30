@@ -1796,7 +1796,7 @@ contract FLOnlineRFQSolver is SolverBase {
         s_shouldSucceed = succeed;
     }
 
-    function fulfillRFQ(SwapIntent calldata swapIntent) public view {
+    function fulfillRFQ(SwapIntent calldata swapIntent) public view onlySelf {
         require(s_shouldSucceed, "Solver failed intentionally");
 
         if (swapIntent.tokenUserSells == NATIVE_TOKEN) {
