@@ -90,12 +90,37 @@ contract TrebleSwapDAppControl is DAppControl {
         return swapData; // return SwapTokenInfo in bytes format, to be used in allocateValue.
     }
 
-    function _allocateValueCall(address, uint256 bidAmount, bytes calldata) internal virtual override {
+    function _allocateValueCall(address, uint256 bidAmount, bytes calldata data) internal virtual override {
+        SwapTokenInfo memory _swapInfo = abi.decode(data, (SwapTokenInfo));
+        uint256 _outputTokenBalance = _balanceOf(_swapInfo.outputToken);
+        uint256 _inputTokenBalance = _balanceOf(_swapInfo.inputToken);
+
+        if (_outputTokenBalance < _swapInfo.outputMin) revert InsufficientOutputBalance();
+
         // Burn TREB bid
-        if (bidAmount > 0) SafeTransferLib.safeTransfer(TREB, _BURN, bidAmount);
+        SafeTransferLib.safeTransfer(TREB, _BURN, bidAmount);
+
+        // Transfer output token to user
+        if (_swapInfo.outputToken == _ETH) {
+            SafeTransferLib.safeTransferETH(_user(), _outputTokenBalance);
+        } else {
+            SafeTransferLib.safeTransfer(_swapInfo.outputToken, _user(), _outputTokenBalance);
+        }
+
+        // If any leftover input token, transfer back to user
+        if (_inputTokenBalance > 0) {
+            if (_swapInfo.inputToken == _ETH) {
+                SafeTransferLib.safeTransferETH(_user(), _inputTokenBalance);
+            } else {
+                SafeTransferLib.safeTransfer(_swapInfo.inputToken, _user(), _inputTokenBalance);
+            }
+        }
     }
 
-    function _postOpsCall(bool, bytes calldata data) internal virtual override {
+
+    function _postOpsCall(bool solved, bytes calldata data) internal virtual override {
+        if(solved) return; // token distribution already handled in allocateValue hook
+
         SwapTokenInfo memory _swapInfo = abi.decode(data, (SwapTokenInfo));
         uint256 _outputTokenBalance = _balanceOf(_swapInfo.outputToken);
         uint256 _inputTokenBalance = _balanceOf(_swapInfo.inputToken);
