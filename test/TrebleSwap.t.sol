@@ -53,6 +53,7 @@ contract TrebleSwapTest is BaseTest {
     address TREB = 0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed;
     // TODO DEGEN for now, replace when TREB available
 
+    uint256 ERR_MARGIN = 0.18e18; // 18% error margin
     uint256 bundlerGasEth = 1e16;
 
     TrebleSwapDAppControl trebleSwapControl;
@@ -141,6 +142,36 @@ contract TrebleSwapTest is BaseTest {
         _doMetacallAndChecks({ winningSolver: solverContract });
     }
 
+    function testTrebleSwap_Metacall_Erc20ToErc20_SwapsEvenIfSolverFails() public {
+        // Tx: https://basescan.org/tx/0x0ef4a9c24bbede2b39e12f5e5417733fa8183f372e41ee099c2c7523064c1b55
+        // Swaps 197.2 USDC for at least 198,080,836.0295 WUF
+
+        args.blockBefore = 18_906_794;
+        args.nativeInput = false;
+        args.nativeOutput = false;
+        swapInfo = SwapTokenInfo({
+            inputToken: USDC,
+            inputAmount: 197_200_000,
+            outputToken: WUF,
+            outputMin: 1_980_808_360_295
+        });
+        vm.roll(args.blockBefore);
+
+        bytes memory userOpData = _buildUserOpData("Erc20ToErc20");
+        _checkActualCalldataMatchesExpected(userOpData);
+        _buildUserOp(userOpData);
+        address solverContract = _setUpSolver(solverOneEOA, solverOnePK, 1e18);
+        _buildDAppOp();
+
+        _setBalancesAndApprovals();
+        _checkSimulationsPass();
+
+        // Set solver to fail during metacall, user swap should still go through
+        MockTrebleSolver(payable(solverContract)).setShouldSucceed(false);
+
+        _doMetacallAndChecks({ winningSolver: address(0) });
+    }
+
     function testTrebleSwap_Metacall_EthToErc20_ZeroSolvers() public {
         // Tx: https://basescan.org/tx/0xe138def4155bea056936038b9374546a366828ab8bf1233056f9e2fe4c6af999
         // Swaps 0.123011147164483512 ETH for at least 307.405807527716546728 DAI
@@ -165,6 +196,32 @@ contract TrebleSwapTest is BaseTest {
         _setBalancesAndApprovals();
         _checkSimulationsPass();
         _doMetacallAndChecks({ winningSolver: address(0) });
+    }
+
+    function testTrebleSwap_Metacall_EthToErc20_OneSolver() public {
+        // Tx: https://basescan.org/tx/0xe138def4155bea056936038b9374546a366828ab8bf1233056f9e2fe4c6af999
+        // Swaps 0.123011147164483512 ETH for at least 307.405807527716546728 DAI
+
+        args.blockBefore = 19_026_442;
+        args.nativeInput = true;
+        args.nativeOutput = false;
+        swapInfo = SwapTokenInfo({
+            inputToken: ETH,
+            inputAmount: 123_011_147_164_483_512,
+            outputToken: bDAI,
+            outputMin: 307_405_807_527_716_546_728
+        });
+        vm.roll(args.blockBefore);
+
+        bytes memory userOpData = _buildUserOpData("EthToErc20");
+        _checkActualCalldataMatchesExpected(userOpData);
+        _buildUserOp(userOpData);
+        address solverContract = _setUpSolver(solverOneEOA, solverOnePK, 1e18);
+        _buildDAppOp();
+
+        _setBalancesAndApprovals();
+        _checkSimulationsPass();
+        _doMetacallAndChecks({ winningSolver: solverContract });
     }
 
     function testTrebleSwap_Metacall_Erc20ToEth_ZeroSolvers() public {
@@ -193,6 +250,32 @@ contract TrebleSwapTest is BaseTest {
         _doMetacallAndChecks({ winningSolver: address(0) });
     }
 
+    function testTrebleSwap_Metacall_Erc20ToEth_OneSolver() public {
+        // https://basescan.org/tx/0xaf26570fceddf2d21219a9e03f2cfee52c600a40ddfdfc5d82eff14f3d322f8f
+        // Swaps 24831.337726043809120256 BRETT for at least 0.786534993470006277 ETH
+
+        args.blockBefore = 19_044_388;
+        args.nativeInput = false;
+        args.nativeOutput = true;
+        swapInfo = SwapTokenInfo({
+            inputToken: BRETT,
+            inputAmount: 24_831_337_726_043_809_120_256,
+            outputToken: ETH,
+            outputMin: 786_534_993_470_006_277
+        });
+        vm.roll(args.blockBefore);
+
+        bytes memory userOpData = _buildUserOpData("Erc20ToEth");
+        _checkActualCalldataMatchesExpected(userOpData);
+        _buildUserOp(userOpData);
+        address solverContract = _setUpSolver(solverOneEOA, solverOnePK, 1e18);
+        _buildDAppOp();
+
+        _setBalancesAndApprovals();
+        _checkSimulationsPass();
+        _doMetacallAndChecks({ winningSolver: solverContract });
+    }
+
     // ---------------------------------------------------- //
     //                    Helper Functions                  //
     // ---------------------------------------------------- //
@@ -208,25 +291,54 @@ contract TrebleSwapTest is BaseTest {
         if (args.nativeInput) beforeVars.userInputTokenBalance -= bundlerGasEth;
         if (args.nativeOutput) beforeVars.userOutputTokenBalance -= bundlerGasEth;
 
+        uint256 txGasUsed;
+        uint256 estAtlasGasSurcharge = gasleft(); // Reused below during calculations
+
+        // Do the actual metacall
         vm.prank(userEOA);
         bool auctionWon = atlas.metacall{ value: msgValue }(args.userOp, args.solverOps, args.dAppOp);
 
+        // Estimate gas surcharge Atlas should have taken
+        txGasUsed = estAtlasGasSurcharge - gasleft();
+        estAtlasGasSurcharge = txGasUsed * tx.gasprice * atlas.ATLAS_SURCHARGE_RATE() / atlas.SCALE();
+
+        // Check Atlas auctionWon return value
         assertEq(auctionWon, auctionWonExpected, "auctionWon not as expected");
 
-        // user input token
-        assertEq(
-            _balanceOf(swapInfo.inputToken, userEOA),
-            beforeVars.userInputTokenBalance - swapInfo.inputAmount,
-            "wrong user input token balance change"
+        // Check Atlas gas surcharge change
+        assertApproxEqRel(
+            atlas.cumulativeSurcharge() - beforeVars.atlasGasSurcharge,
+            estAtlasGasSurcharge,
+            ERR_MARGIN,
+            "Atlas gas surcharge not within estimated range"
         );
 
-        // user output token
+        // Check user input token change
+        if (args.nativeInput && auctionWonExpected) {
+            // solver will refund some bundler ETH to user, throwing off ETH balance
+            uint256 buffer = 1e17; // 0.1 ETH buffer as base for error margin comparison
+            uint256 expectedBalanceAfter = beforeVars.userInputTokenBalance - swapInfo.inputAmount;
+            assertApproxEqRel(
+                _balanceOf(swapInfo.inputToken, userEOA) + buffer,
+                expectedBalanceAfter + buffer,
+                0.01e18, // error marin: 1% of the 0.1 ETH buffer
+                "wrong user input token (ETH) balance change"
+            );
+        } else {
+            assertEq(
+                _balanceOf(swapInfo.inputToken, userEOA),
+                beforeVars.userInputTokenBalance - swapInfo.inputAmount,
+                "wrong user input token (ERC20/ETH) balance change"
+            );
+        }
+
+        // Check user output token change
         assertTrue(
             _balanceOf(swapInfo.outputToken, userEOA) >= beforeVars.userOutputTokenBalance + swapInfo.outputMin,
             "wrong user output token balance change"
         );
 
-        // solver TREB balance
+        // Check solver and burn address TREB balance change
         if (auctionWonExpected) {
             // Solver TREB decreased by bidAmount
             assertEq(
