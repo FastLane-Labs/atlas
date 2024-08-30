@@ -37,15 +37,8 @@ contract SwapIntentTest is BaseTest {
     TxBuilder public txBuilder;
     Sig public sig;
 
-    IERC20 DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
-    address DAI_ADDRESS = address(DAI);
-
     function setUp() public virtual override {
         BaseTest.setUp();
-
-        // Creating new gov address (SignatoryActive error if already registered with control)
-        governancePK = 11_112;
-        governanceEOA = vm.addr(governancePK);
 
         // Deploy new SwapIntent Control from new gov and initialize in Atlas
         vm.startPrank(governanceEOA);
@@ -59,9 +52,7 @@ contract SwapIntentTest is BaseTest {
             _verification: address(atlasVerification)
         });
 
-        // Deposit ETH from Searcher signer to pay for searcher's gas
-        // vm.prank(solverOneEOA);
-        // atlas.deposit{value: 1e18}();
+        deal(WETH_ADDRESS, userEOA, 10e18);
     }
 
     function testAtlasSwapIntentWithBasicRFQ_GasCheck_SkipCoverage() public {

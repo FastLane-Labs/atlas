@@ -236,7 +236,7 @@ contract SimulatorTest is BaseTest {
         simulator.setAtlas(address(0));
         assertEq(simulator.atlas(), address(atlas), "Should revert if not deployer");
         
-        vm.prank(payee);
+        vm.prank(deployer);
         simulator.setAtlas(address(123));
         assertEq(simulator.atlas(), address(123), "Should set new atlas address");
     }
@@ -251,7 +251,7 @@ contract SimulatorTest is BaseTest {
         simulator.withdrawETH(recipient);
         assertEq(address(simulator).balance, simBalanceBefore, "Should revert if caller not deployer");
 
-        vm.prank(payee);
+        vm.prank(deployer);
         simulator.withdrawETH(recipient);
         assertEq(address(simulator).balance, 0, "Should withdraw all balance");
         assertEq(address(recipient).balance, recipientBalanceBefore + simBalanceBefore, "Should send balance to recipient");

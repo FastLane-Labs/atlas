@@ -206,7 +206,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         super.setUp();
 
         // Compute expected addresses for the deployment
-        address expectedAtlasAddr = vm.computeCreateAddress(payee, vm.getNonce(payee) + 1);
+        address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedAtlasAddr);
 
         // Initialize MockGasAccounting
@@ -214,7 +214,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             DEFAULT_ESCROW_DURATION,
             address(atlasVerification),
             address(simulator),
-            payee,
+            deployer,
             address(0),
             address(execEnvTemplate)
         );
@@ -1112,7 +1112,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             DEFAULT_ESCROW_DURATION,
             address(atlasVerification),
             address(simulator),
-            payee,
+            deployer,
             address(gasCalculator),
             address(0)
         );

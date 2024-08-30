@@ -11,8 +11,12 @@ import { BaseTest } from "test/base/BaseTest.t.sol";
 contract StorageTest is BaseTest {
     using stdStorage for StdStorage;
 
+    uint256 constant DEFAULT_ATLAS_SURCHARGE_RATE = 1_000_000; // out of 10_000_000 = 10%
+    uint256 constant DEFAULT_BUNDLER_SURCHARGE_RATE = 1_000_000; // out of 10_000_000 = 10%
+    uint256 constant DEFAULT_SCALE = 10_000_000; // out of 10_000_000 = 100%
+    uint256 constant DEFAULT_FIXED_GAS_OFFSET = 85_000;
+
     function setUp() public override {
-        // Set up the environment
         super.setUp();
     }
 
@@ -107,12 +111,12 @@ contract StorageTest is BaseTest {
     }
 
     function test_storage_view_surchargeRecipient() public {
-        assertEq(atlas.surchargeRecipient(), payee, "surchargeRecipient set incorrectly");
+        assertEq(atlas.surchargeRecipient(), deployer, "surchargeRecipient set incorrectly");
     }
 
     function test_storage_view_pendingSurchargeRecipient() public {
         assertEq(atlas.pendingSurchargeRecipient(), address(0), "pendingSurchargeRecipient should start at 0");
-        vm.prank(payee);
+        vm.prank(deployer);
         atlas.transferSurchargeRecipient(userEOA);
         assertEq(atlas.pendingSurchargeRecipient(), userEOA, "pendingSurchargeRecipient should be userEOA");
     }

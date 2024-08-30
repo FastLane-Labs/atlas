@@ -19,15 +19,10 @@ import "src/contracts/types/DAppOperation.sol";
 contract SwapIntentTest is BaseTest {
     Sig public sig;
 
-    IERC20 DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
-    address DAI_ADDRESS = address(DAI);
-
     function setUp() public virtual override {
         BaseTest.setUp();
 
-        // Creating new gov address (SignatoryActive error if already registered with control)
-        governancePK = 11_112;
-        governanceEOA = vm.addr(governancePK);
+        deal(WETH_ADDRESS, userEOA, 10e18);
     }
 
     function testAtlasSwapIntentInvertBid_solverBidRetreivalNotRequired_SkipCoverage() public {

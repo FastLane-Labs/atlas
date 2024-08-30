@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import { AtlasBaseTest } from "./base/AtlasBaseTest.t.sol";
+import { BaseTest } from "./base/BaseTest.t.sol";
 
 import { DummyDAppControl } from "./base/DummyDAppControl.sol";
 import { DummyDAppControlBuilder } from "./helpers/DummyDAppControlBuilder.sol";
@@ -12,16 +12,11 @@ import { SolverOperationBuilder } from "./base/builders/SolverOperationBuilder.s
 import "src/contracts/types/UserOperation.sol";
 import "src/contracts/types/SolverOperation.sol";
 
-contract SorterTest is AtlasBaseTest {
+contract SorterTest is BaseTest {
     DummyDAppControl dAppControl;
     UserOperation userOp;
 
-    // Solvers 1 and 2 already defined in AtlasBaseTest
-    uint256 public solverThreePK = 333_333;
-    address public solverThreeEOA = vm.addr(solverThreePK);
-
-    uint256 public solverFourPK = 444_444;
-    address public solverFourEOA = vm.addr(solverFourPK);
+    // Solvers 1 - 4 already defined in BaseTest
 
     uint256 public solverFivePK = 555_555;
     address public solverFiveEOA = vm.addr(solverFivePK);
