@@ -9,9 +9,6 @@ import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
 import "src/contracts/types/UserOperation.sol";
 import "src/contracts/types/SolverOperation.sol";
 
-// ODOS v2 Router on Base: https://basescan.org/address/0x19ceead7105607cd444f5ad10dd51356436095a1
-// Main function: swapCompact()
-
 struct SwapTokenInfo {
     address inputToken;
     uint256 inputAmount;
