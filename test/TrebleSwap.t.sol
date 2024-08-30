@@ -36,8 +36,7 @@ contract TrebleSwapTest is BaseTest {
     struct BeforeAndAfterVars {
         uint256 userInputTokenBalance;
         uint256 userOutputTokenBalance;
-        uint256 solverInputTokenBalance;
-        uint256 solverOutputTokenBalance;
+        uint256 solverTrebBalance;
         uint256 burnAddressTrebBalance;
         uint256 atlasGasSurcharge;
     }
@@ -116,10 +115,45 @@ contract TrebleSwapTest is BaseTest {
         _checkActualCalldataMatchesExpected(swapCompactCalldata);
         _buildUserOp(swapCompactCalldata);
         // no solverOps
-        _buildAndSignDAppOp();
+        _buildDAppOp();
         _setBalancesAndApprovals();
         _checkSimulationsPass();
-        _doMetacallAndChecks({ winningSolverEOA: address(0), winningSolver: address(0) });
+        _doMetacallAndChecks({ winningSolver: address(0) });
+    }
+
+    function testTrebleSwap_Metacall_Erc20ToErc20_OneSolver() public {
+        // Tx: https://basescan.org/tx/0x0ef4a9c24bbede2b39e12f5e5417733fa8183f372e41ee099c2c7523064c1b55
+        // Swaps 197.2 USDC for at least 198,080,836.0295 WUF
+
+        args.blockBefore = 18_906_794;
+        args.nativeInput = false;
+        args.nativeOutput = false;
+        swapInfo = SwapTokenInfo({
+            inputToken: USDC,
+            inputAmount: 197_200_000,
+            outputToken: WUF,
+            outputMin: 1_980_808_360_295
+        });
+        vm.roll(args.blockBefore);
+
+        // Modify swapCompact() calldata to replace original caller (0xa4a9220dE44D699f453DdF7F7630A96cDEdf6463) with
+        // user's Execution Environment address:
+        bytes memory calldataPart1 =
+            hex"83bd37f9000400014da78059d97f155e18b37765e2e042270f4e0fc4040bc108800601d1d9f50a5a028f5c0001f73f77f9466da712590ae432a80f07fd50a7de600001616535324976f8dbcef19df0705b95ace86ebb480001";
+        bytes memory calldataPart2 =
+            hex"0000000006020207003401000001020180000005020a0004040500000301010003060119ff0000000000000000000000000000000000000000000000000000000000000000616535324976f8dbcef19df0705b95ace86ebb48833589fcd6edb6e08f4c7c32d4f71b54bda02913569d81c17b5b4ac08929dc1769b8e39668d3ae29f6c0a374a483101e04ef5f7ac9bd15d9142bac95d9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca42000000000000000000000000000000000000060000000000000000";
+        bytes memory swapCompactCalldata = abi.encodePacked(calldataPart1, executionEnvironment, calldataPart2);
+
+        _checkActualCalldataMatchesExpected(swapCompactCalldata);
+
+        _buildUserOp(swapCompactCalldata);
+        address solverContract = _setUpSolver(solverOneEOA, solverOnePK, 1e18);
+        _buildDAppOp();
+
+        _setBalancesAndApprovals();
+
+        _checkSimulationsPass();
+        _doMetacallAndChecks({ winningSolver: solverContract });
     }
 
     function testTrebleSwap_Metacall_EthToErc20_ZeroSolvers() public {
@@ -148,10 +182,10 @@ contract TrebleSwapTest is BaseTest {
         _checkActualCalldataMatchesExpected(swapCompactCalldata);
         _buildUserOp(swapCompactCalldata);
         // no solverOps
-        _buildAndSignDAppOp();
+        _buildDAppOp();
         _setBalancesAndApprovals();
         _checkSimulationsPass();
-        _doMetacallAndChecks({ winningSolverEOA: address(0), winningSolver: address(0) });
+        _doMetacallAndChecks({ winningSolver: address(0) });
     }
 
     function testTrebleSwap_Metacall_Erc20ToEth_ZeroSolvers() public {
@@ -180,22 +214,21 @@ contract TrebleSwapTest is BaseTest {
         _checkActualCalldataMatchesExpected(swapCompactCalldata);
         _buildUserOp(swapCompactCalldata);
         // no solverOps
-        _buildAndSignDAppOp();
+        _buildDAppOp();
         _setBalancesAndApprovals();
         _checkSimulationsPass();
-        _doMetacallAndChecks({ winningSolverEOA: address(0), winningSolver: address(0) });
+        _doMetacallAndChecks({ winningSolver: address(0) });
     }
 
     // ---------------------------------------------------- //
     //                    Helper Functions                  //
     // ---------------------------------------------------- //
 
-    function _doMetacallAndChecks(address winningSolverEOA, address winningSolver) internal {
+    function _doMetacallAndChecks(address winningSolver) internal {
         bool auctionWonExpected = winningSolver != address(0);
         beforeVars.userInputTokenBalance = _balanceOf(swapInfo.inputToken, userEOA);
         beforeVars.userOutputTokenBalance = _balanceOf(swapInfo.outputToken, userEOA);
-        beforeVars.solverInputTokenBalance = _balanceOf(swapInfo.inputToken, winningSolverEOA);
-        beforeVars.solverOutputTokenBalance = _balanceOf(swapInfo.outputToken, winningSolverEOA);
+        beforeVars.solverTrebBalance = _balanceOf(address(TREB), winningSolver);
         beforeVars.burnAddressTrebBalance = _balanceOf(address(TREB), BURN);
         beforeVars.atlasGasSurcharge = atlas.cumulativeSurcharge();
         uint256 msgValue = (args.nativeInput ? swapInfo.inputAmount : 0) + bundlerGasEth;
@@ -219,6 +252,31 @@ contract TrebleSwapTest is BaseTest {
             _balanceOf(swapInfo.outputToken, userEOA) >= beforeVars.userOutputTokenBalance + swapInfo.outputMin,
             "wrong user output token balance change"
         );
+
+        // solver TREB balance
+        if (auctionWonExpected) {
+            // Solver TREB decreased by bidAmount
+            assertEq(
+                _balanceOf(address(TREB), winningSolver),
+                beforeVars.solverTrebBalance - args.solverOps[0].bidAmount,
+                "wrong solver TREB balance change"
+            );
+            // Burn address TREB increased by bidAmount
+            assertEq(
+                _balanceOf(address(TREB), BURN),
+                beforeVars.burnAddressTrebBalance + args.solverOps[0].bidAmount,
+                "wrong burn address TREB balance change"
+            );
+        } else {
+            // No change in solver TREB
+            assertEq(
+                _balanceOf(address(TREB), winningSolver), beforeVars.solverTrebBalance, "solver TREB balance changed"
+            );
+            // No change in burn address TREB
+            assertEq(
+                _balanceOf(address(TREB), BURN), beforeVars.burnAddressTrebBalance, "burn address TREB balance changed"
+            );
+        }
     }
 
     function _checkSimulationsPass() internal {
@@ -256,7 +314,10 @@ contract TrebleSwapTest is BaseTest {
             IERC20(swapInfo.inputToken).approve(address(atlas), swapInfo.inputAmount);
         }
 
-        // TODO give solver contracts TREB for bids
+        // Give bidAmount of TREB to solver contract for each solverOp
+        for (uint256 i = 0; i < args.solverOps.length; i++) {
+            deal(TREB, args.solverOps[i].solver, args.solverOps[i].bidAmount);
+        }
     }
 
     function _buildUserOp(bytes memory userOpData) internal {
@@ -277,7 +338,68 @@ contract TrebleSwapTest is BaseTest {
         });
     }
 
-    function _buildAndSignDAppOp() internal {
+    function _setUpSolver(
+        address solverEOA,
+        uint256 solverPK,
+        uint256 bidAmount
+    )
+        internal
+        returns (address solverContract)
+    {
+        vm.startPrank(solverEOA);
+        // Make sure solver has 1 AtlETH bonded in Atlas
+        uint256 bonded = atlas.balanceOfBonded(solverEOA);
+        if (bonded < 1e18) {
+            uint256 atlETHBalance = atlas.balanceOf(solverEOA);
+            if (atlETHBalance < 1e18) {
+                deal(solverEOA, 1e18 - atlETHBalance);
+                atlas.deposit{ value: 1e18 - atlETHBalance }();
+            }
+            atlas.bond(1e18 - bonded);
+        }
+
+        // Deploy solver contract
+        MockTrebleSolver solver = new MockTrebleSolver(bWETH, address(atlas));
+
+        // Create signed solverOp
+        SolverOperation memory solverOp = _buildSolverOp(solverEOA, solverPK, address(solver), bidAmount);
+        vm.stopPrank();
+
+        // add to solverOps array and return solver contract address
+        args.solverOps.push(solverOp);
+        return address(solver);
+    }
+
+    function _buildSolverOp(
+        address solverEOA,
+        uint256 solverPK,
+        address solverContract,
+        uint256 bidAmount
+    )
+        internal
+        returns (SolverOperation memory solverOp)
+    {
+        solverOp = SolverOperation({
+            from: solverEOA,
+            to: address(atlas),
+            value: 0,
+            gas: 100_000,
+            maxFeePerGas: args.userOp.maxFeePerGas,
+            deadline: args.userOp.deadline,
+            solver: solverContract,
+            control: address(trebleSwapControl),
+            userOpHash: atlasVerification.getUserOperationHash(args.userOp),
+            bidToken: trebleSwapControl.getBidFormat(args.userOp),
+            bidAmount: bidAmount,
+            data: abi.encodeCall(MockTrebleSolver.solve, ()),
+            signature: new bytes(0)
+        });
+        // Sign solverOp
+        (sig.v, sig.r, sig.s) = vm.sign(solverPK, atlasVerification.getSolverPayload(solverOp));
+        solverOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
+    }
+
+    function _buildDAppOp() internal {
         args.dAppOp = DAppOperation({
             from: governanceEOA,
             to: address(atlas),
@@ -303,6 +425,36 @@ contract TrebleSwapTest is BaseTest {
     }
 }
 
-interface IOdosRouterV2 {
-    function swapCompact() external payable returns (uint256);
+// Just bids `bidAmount` in TREB token - doesn't do anything else
+contract MockTrebleSolver is SolverBase {
+    bool internal s_shouldSucceed;
+
+    constructor(address weth, address atlas) SolverBase(weth, atlas, msg.sender) {
+        s_shouldSucceed = true; // should succeed by default, can be set to false
+    }
+
+    function shouldSucceed() public view returns (bool) {
+        return s_shouldSucceed;
+    }
+
+    function setShouldSucceed(bool succeed) public {
+        s_shouldSucceed = succeed;
+    }
+
+    function solve() public view onlySelf {
+        require(s_shouldSucceed, "Solver failed intentionally");
+
+        // The solver bid representing user's minAmountUserBuys of tokenUserBuys is sent to the
+        // Execution Environment in the payBids modifier logic which runs after this function ends.
+    }
+
+    // This ensures a function can only be called through atlasSolverCall
+    // which includes security checks to work safely with Atlas
+    modifier onlySelf() {
+        require(msg.sender == address(this), "Not called via atlasSolverCall");
+        _;
+    }
+
+    fallback() external payable { }
+    receive() external payable { }
 }
