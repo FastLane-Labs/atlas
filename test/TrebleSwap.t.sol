@@ -50,8 +50,7 @@ contract TrebleSwapTest is BaseTest {
     address WUF = 0x4da78059D97f155E18B37765e2e042270f4E0fC4;
     address bDAI = 0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb;
     address BRETT = 0x532f27101965dd16442E59d40670FaF5eBB142E4;
-    address TREB = 0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed;
-    // TODO DEGEN for now, replace when TREB available
+    address TREB; // will be set to value in DAppControl in setUp
 
     uint256 ERR_MARGIN = 0.18e18; // 18% error margin
     uint256 bundlerGasEth = 1e16;
@@ -79,11 +78,13 @@ contract TrebleSwapTest is BaseTest {
         vm.prank(userEOA);
         executionEnvironment = atlas.createExecutionEnvironment(userEOA, address(trebleSwapControl));
 
+        TREB = trebleSwapControl.TREB();
+
         vm.label(bWETH, "WETH");
         vm.label(USDC, "USDC");
         vm.label(WUF, "WUF");
         vm.label(bDAI, "DAI");
-        vm.label(TREB, "DEGEN"); // TODO change label to TREB when TREB token available
+        vm.label(TREB, "TREB");
     }
 
     // ---------------------------------------------------- //
