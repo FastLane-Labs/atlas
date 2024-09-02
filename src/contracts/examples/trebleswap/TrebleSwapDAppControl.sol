@@ -30,9 +30,7 @@ contract TrebleSwapDAppControl is DAppControl {
     error InsufficientTrebBalance();
     error InsufficientOutputBalance();
 
-    constructor(
-        address atlas
-    )
+    constructor(address atlas)
         DAppControl(
             atlas,
             msg.sender,
@@ -56,7 +54,7 @@ contract TrebleSwapDAppControl is DAppControl {
                 requireFulfillment: false,
                 trustedOpHash: false,
                 invertBidValue: false,
-                exPostBids: true, // TODO confirm: bids discovered on-chain?
+                exPostBids: false,
                 allowAllocateValueFailure: false
             })
         )
@@ -114,9 +112,8 @@ contract TrebleSwapDAppControl is DAppControl {
         }
     }
 
-
     function _postOpsCall(bool solved, bytes calldata data) internal virtual override {
-        if(solved) return; // token distribution already handled in allocateValue hook
+        if (solved) return; // token distribution already handled in allocateValue hook
 
         SwapTokenInfo memory _swapInfo = abi.decode(data, (SwapTokenInfo));
         uint256 _outputTokenBalance = _balanceOf(_swapInfo.outputToken);
