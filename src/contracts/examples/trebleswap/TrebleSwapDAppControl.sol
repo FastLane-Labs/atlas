@@ -95,21 +95,7 @@ contract TrebleSwapDAppControl is DAppControl {
         // Burn TREB bid
         SafeTransferLib.safeTransfer(TREB, _BURN, bidAmount);
 
-        // Transfer output token to user
-        if (_swapInfo.outputToken == _ETH) {
-            SafeTransferLib.safeTransferETH(_user(), _outputTokenBalance);
-        } else {
-            SafeTransferLib.safeTransfer(_swapInfo.outputToken, _user(), _outputTokenBalance);
-        }
-
-        // If any leftover input token, transfer back to user
-        if (_inputTokenBalance > 0) {
-            if (_swapInfo.inputToken == _ETH) {
-                SafeTransferLib.safeTransferETH(_user(), _inputTokenBalance);
-            } else {
-                SafeTransferLib.safeTransfer(_swapInfo.inputToken, _user(), _inputTokenBalance);
-            }
-        }
+        _transferUserTokens(_swapInfo, _outputTokenBalance, _inputTokenBalance);
     }
 
     function _postOpsCall(bool solved, bytes calldata data) internal virtual override {
@@ -121,21 +107,7 @@ contract TrebleSwapDAppControl is DAppControl {
 
         if (_outputTokenBalance < _swapInfo.outputMin) revert InsufficientOutputBalance();
 
-        // Transfer output token to user
-        if (_swapInfo.outputToken == _ETH) {
-            SafeTransferLib.safeTransferETH(_user(), _outputTokenBalance);
-        } else {
-            SafeTransferLib.safeTransfer(_swapInfo.outputToken, _user(), _outputTokenBalance);
-        }
-
-        // If any leftover input token, transfer back to user
-        if (_inputTokenBalance > 0) {
-            if (_swapInfo.inputToken == _ETH) {
-                SafeTransferLib.safeTransferETH(_user(), _inputTokenBalance);
-            } else {
-                SafeTransferLib.safeTransfer(_swapInfo.inputToken, _user(), _inputTokenBalance);
-            }
-        }
+        _transferUserTokens(_swapInfo, _outputTokenBalance, _inputTokenBalance);
     }
 
     // ---------------------------------------------------- //
@@ -148,6 +120,30 @@ contract TrebleSwapDAppControl is DAppControl {
 
     function getBidValue(SolverOperation calldata solverOp) public view virtual override returns (uint256) {
         return solverOp.bidAmount;
+    }
+
+    function _transferUserTokens(
+        SwapTokenInfo memory swapInfo,
+        uint256 outputTokenBalance,
+        uint256 inputTokenBalance
+    )
+        internal
+    {
+        // Transfer output token to user
+        if (swapInfo.outputToken == _ETH) {
+            SafeTransferLib.safeTransferETH(_user(), outputTokenBalance);
+        } else {
+            SafeTransferLib.safeTransfer(swapInfo.outputToken, _user(), outputTokenBalance);
+        }
+
+        // If any leftover input token, transfer back to user
+        if (inputTokenBalance > 0) {
+            if (swapInfo.inputToken == _ETH) {
+                SafeTransferLib.safeTransferETH(_user(), inputTokenBalance);
+            } else {
+                SafeTransferLib.safeTransfer(swapInfo.inputToken, _user(), inputTokenBalance);
+            }
+        }
     }
 
     // Call this helper with userOp.data appended as calldata, to decode swap info in the Odos calldata.
