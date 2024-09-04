@@ -40,9 +40,7 @@ contract ExecutionEnvironment is Base {
     /// corresponding `preOpsCall` function.
     /// @param userOp The UserOperation struct.
     /// @return preOpsData Data to be passed to the next call phase.
-    function preOpsWrapper(
-        UserOperation calldata userOp
-    )
+    function preOpsWrapper(UserOperation calldata userOp)
         external
         validUser(userOp)
         onlyAtlasEnvironment
@@ -64,9 +62,7 @@ contract ExecutionEnvironment is Base {
     /// with `userOp.data` as calldata, depending on the the needsDelegateUser flag.
     /// @param userOp The UserOperation struct.
     /// @return returnData Data to be passed to the next call phase.
-    function userWrapper(
-        UserOperation calldata userOp
-    )
+    function userWrapper(UserOperation calldata userOp)
         external
         payable
         validUser(userOp)

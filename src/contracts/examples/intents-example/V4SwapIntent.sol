@@ -103,9 +103,7 @@ contract V4SwapIntentControl is DAppControl {
     }
 
     // selector 0x04e45aaf
-    function exactInputSingle(
-        ExactInputSingleParams calldata params
-    )
+    function exactInputSingle(ExactInputSingleParams calldata params)
         external
         payable
         verifyCall(params.tokenIn, params.tokenOut, params.amountIn)
@@ -133,9 +131,7 @@ contract V4SwapIntentControl is DAppControl {
     }
 
     // selector 0x5023b4df
-    function exactOutputSingle(
-        ExactOutputSingleParams calldata params
-    )
+    function exactOutputSingle(ExactOutputSingleParams calldata params)
         external
         payable
         verifyCall(params.tokenIn, params.tokenOut, params.amountInMaximum)
