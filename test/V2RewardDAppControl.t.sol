@@ -20,15 +20,6 @@ import { IUniswapV2Router01, IUniswapV2Router02 } from "src/contracts/examples/v
 import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
 contract V2RewardDAppControlTest is BaseTest {
-
-    struct Sig {
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-    }
-
-    IERC20 DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
-    address DAI_ADDRESS = address(DAI);
     address V2_ROUTER = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
 
     V2RewardDAppControl v2RewardControl;

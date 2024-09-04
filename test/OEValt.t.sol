@@ -43,14 +43,6 @@ contract OEVTest is BaseTest {
     uint256 liquidationReward = 10e18;
     uint256 solverWinningBid = 1e18;
 
-    IERC20 public DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
-
-    struct Sig {
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-    }
-
     struct TransmitData {
         bytes report;
         bytes32[] rs;

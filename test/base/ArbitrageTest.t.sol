@@ -24,36 +24,36 @@ contract ArbitrageTest is BaseTest {
         // Increase DAI reserve and decrease WETH reserve on Uniswap LP
         // Increase WETH reserve and decrease DAI reserve on Sushiswap LP
         // This should create an arbitrage opportunity
-        setUpArbitragePools(chain.weth, chain.dai, 50e18, 100_000e18, address(v2Router), address(s2Router));
+        setUpArbitragePools(WETH_ADDRESS, DAI_ADDRESS, 50e18, 100_000e18, address(v2Router), address(s2Router));
 
         // Arbitrage is fulfilled by swapping WETH for DAI on Uniswap, then DAI for WETH on Sushiswap
         (uint256 revenue, uint256 optimalAmountIn) =
-            ternarySearch(chain.weth, chain.dai, address(v2Router), address(s2Router), 1, 50e18, 0, 20);
+            ternarySearch(WETH_ADDRESS, DAI_ADDRESS, address(v2Router), address(s2Router), 1, 50e18, 0, 20);
 
         assertTrue(revenue - optimalAmountIn > 0, "No arbitrage opportunity");
 
-        deal(chain.weth, swapper, optimalAmountIn);
-        uint256 balanceBefore = IERC20(chain.weth).balanceOf(swapper);
+        deal(WETH_ADDRESS, swapper, optimalAmountIn);
+        uint256 balanceBefore = WETH.balanceOf(swapper);
 
         address[] memory path = new address[](2);
-        path[0] = chain.weth;
-        path[1] = chain.dai;
+        path[0] = WETH_ADDRESS;
+        path[1] = DAI_ADDRESS;
 
         vm.startPrank(swapper);
-        IERC20(chain.weth).approve(v2Router, optimalAmountIn);
+        WETH.approve(v2Router, optimalAmountIn);
         uint256 daiOut =
             IUniswapV2Router02(v2Router).swapExactTokensForTokens(optimalAmountIn, 0, path, swapper, block.timestamp)[1];
         vm.stopPrank();
 
-        path[0] = chain.dai;
-        path[1] = chain.weth;
+        path[0] = DAI_ADDRESS;
+        path[1] = WETH_ADDRESS;
 
         vm.startPrank(swapper);
-        IERC20(chain.dai).approve(s2Router, daiOut);
+        DAI.approve(s2Router, daiOut);
         IUniswapV2Router02(s2Router).swapExactTokensForTokens(daiOut, 0, path, swapper, block.timestamp);
         vm.stopPrank();
 
-        uint256 balanceAfter = IERC20(chain.weth).balanceOf(swapper);
+        uint256 balanceAfter = WETH.balanceOf(swapper);
 
         assertTrue(balanceAfter > balanceBefore, "Arbitrage failed");
         console.log("WETH revenue: ", balanceAfter - balanceBefore);

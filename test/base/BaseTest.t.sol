@@ -3,101 +3,87 @@ pragma solidity 0.8.25;
 
 import "forge-std/Test.sol";
 
-// import { Atlas } from "src/contracts/atlas/Atlas.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+
 import { TestAtlas } from "./TestAtlas.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
-
 import { Sorter } from "src/contracts/helpers/Sorter.sol";
 import { Simulator } from "src/contracts/helpers/Simulator.sol";
 import { GovernanceBurner } from "src/contracts/helpers/GovernanceBurner.sol";
 
-import { Solver } from "src/contracts/solver/src/TestSolver.sol";
+contract BaseTest is Test {
+    struct Sig {
+        uint8 v;
+        bytes32 r;
+        bytes32 s;
+    }
 
-import { V2ExPost } from "src/contracts/examples/ex-post-mev-example/V2ExPost.sol";
+    address deployer = makeAddr("Deployer");
 
-import { SolverExPost } from "src/contracts/solver/src/TestSolverExPost.sol";
+    uint256 governancePK;
+    address governanceEOA;
 
-import { V2DAppControl } from "src/contracts/examples/v2-example/V2DAppControl.sol";
+    uint256 userPK;
+    address userEOA;
 
-import { TestConstants } from "./TestConstants.sol";
+    uint256 solverOnePK;
+    address solverOneEOA;
 
-import { V2Helper } from "../V2Helper.sol";
+    uint256 solverTwoPK;
+    address solverTwoEOA;
 
-import { Utilities } from "src/contracts/helpers/Utilities.sol";
+    uint256 solverThreePK;
+    address solverThreeEOA;
 
-contract BaseTest is Test, TestConstants {
-    address public me = address(this);
+    uint256 solverFourPK;
+    address solverFourEOA;
 
-    address public payee; // = makeAddr("FastLanePayee");
+    TestAtlas atlas;
+    AtlasVerification atlasVerification;
+    Simulator simulator;
+    Sorter sorter;
+    GovernanceBurner govBurner;
 
-    uint256 public governancePK = 11_111;
-    address public governanceEOA = vm.addr(governancePK);
+    address WETH_ADDRESS = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    address DAI_ADDRESS = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
+    IERC20 WETH = IERC20(WETH_ADDRESS);
+    IERC20 DAI = IERC20(DAI_ADDRESS);
 
-    uint256 public solverOnePK = 22_222;
-    address public solverOneEOA = vm.addr(solverOnePK);
-
-    uint256 public solverTwoPK = 33_333;
-    address public solverTwoEOA = vm.addr(solverTwoPK);
-
-    uint256 public solverThreePK = 55_555;
-    address public solverThreeEOA = vm.addr(solverThreePK);
-
-    uint256 public solverFourPK = 66_666;
-    address public solverFourEOA = vm.addr(solverFourPK);
-
-    uint256 public userPK = 44_444;
-    address public userEOA = vm.addr(userPK);
-
-    TestAtlas public atlas;
-    AtlasVerification public atlasVerification;
-
-    Simulator public simulator;
-    Sorter public sorter;
-    GovernanceBurner public govBurner;
-
-    Solver public solverOne;
-    Solver public solverTwo;
-
-    SolverExPost public solverOneXP;
-    SolverExPost public solverTwoXP;
-
-    V2DAppControl public v2DAppControl;
-
-    V2Helper public helper;
-
-    Utilities public u;
-
-    // Fork stuff
-    ChainVars public chain = mainnet;
-    uint256 public forkNetwork;
+    uint256 DEFAULT_ESCROW_DURATION = 64;
+    uint256 MAINNET_FORK_BLOCK = 17_441_786;
 
     function setUp() public virtual {
-        forkNetwork = vm.createFork(vm.envString(chain.rpcUrlKey));
-        vm.selectFork(forkNetwork);
-        vm.rollFork(forkNetwork, chain.forkBlock);
+        vm.createSelectFork(vm.envString("MAINNET_RPC_URL"), MAINNET_FORK_BLOCK);
+        __createAndLabelAccounts();
+        __deployAtlasContracts();
+        __fundSolversAndDepositAtlETH();
+    }
 
-        // Deal to user
-        deal(TOKEN_ZERO, address(userEOA), 10e30);
-        deal(TOKEN_ONE, address(userEOA), 10e30);
+    function __createAndLabelAccounts() internal {
+        (userEOA, userPK) = makeAddrAndKey("userEOA");
+        (governanceEOA, governancePK) = makeAddrAndKey("govEOA");
+        (solverOneEOA, solverOnePK) = makeAddrAndKey("solverOneEOA");
+        (solverTwoEOA, solverTwoPK) = makeAddrAndKey("solverTwoEOA");
+        (solverThreeEOA, solverThreePK) = makeAddrAndKey("solverThreeEOA");
+        (solverFourEOA, solverFourPK) = makeAddrAndKey("solverFourEOA");
+    }
 
-        // Deploy contracts
-        vm.startPrank(payee);
-
+    function __deployAtlasContracts() internal {
+        vm.startPrank(deployer);
         simulator = new Simulator();
 
         // Computes the addresses at which AtlasVerification will be deployed
-        address expectedAtlasAddr = vm.computeCreateAddress(payee, vm.getNonce(payee) + 1);
-        address expectedAtlasVerificationAddr = vm.computeCreateAddress(payee, vm.getNonce(payee) + 2);
-        bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedAtlasAddr, "AtlasFactory 1.0"));
-        ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
+        address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
+        address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
+        ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedAtlasAddr);
 
         atlas = new TestAtlas({
             escrowDuration: DEFAULT_ESCROW_DURATION,
             verification: expectedAtlasVerificationAddr,
             simulator: address(simulator),
             executionTemplate: address(execEnvTemplate),
-            initialSurchargeRecipient: payee,
+            initialSurchargeRecipient: deployer,
             l2GasCalculator: address(0)
         });
         atlasVerification = new AtlasVerification(address(atlas));
@@ -106,56 +92,24 @@ contract BaseTest is Test, TestConstants {
         govBurner = new GovernanceBurner();
 
         vm.deal(address(simulator), 1000e18); // to allow userOp.value > 0 sims
-
-        vm.stopPrank();
-        vm.startPrank(governanceEOA);
-
-        v2DAppControl = new V2DAppControl(address(atlas));
-        atlasVerification.initializeGovernance(address(v2DAppControl));
-
         vm.stopPrank();
 
-        vm.deal(solverOneEOA, 100e18);
+        vm.label(address(atlas), "Atlas");
+        vm.label(address(atlasVerification), "AtlasVerification");
+        vm.label(address(simulator), "Simulator");
+        vm.label(address(sorter), "Sorter");
+        vm.label(address(govBurner), "GovBurner");
+    }
 
-        vm.startPrank(solverOneEOA);
-
-        // Salt to avoid clashes caused by vm.rollFork() in other tests
-        solverOne = new Solver{ salt: keccak256("1") }(WETH_ADDRESS, address(atlas), solverOneEOA);
-        solverOneXP = new SolverExPost{ salt: keccak256("2") }(WETH_ADDRESS, address(atlas), solverOneEOA, 60);
+    function __fundSolversAndDepositAtlETH() internal {
+        // All solverEOAs start with 100 ETH and 1 ETH deposited in Atlas
+        hoax(solverOneEOA, 100e18);
         atlas.deposit{ value: 1e18 }();
-
-        vm.stopPrank();
-
-        deal(TOKEN_ZERO, address(solverOne), 10e24);
-        deal(TOKEN_ONE, address(solverOne), 10e24);
-
-        deal(TOKEN_ZERO, address(solverOneXP), 10e24);
-        deal(TOKEN_ONE, address(solverOneXP), 10e24);
-
-        vm.deal(solverTwoEOA, 100e18);
-
-        vm.startPrank(solverTwoEOA);
-
-        solverTwo = new Solver(WETH_ADDRESS, address(atlas), solverTwoEOA);
-        solverTwoXP = new SolverExPost(WETH_ADDRESS, address(atlas), solverTwoEOA, 80);
+        hoax(solverTwoEOA, 100e18);
         atlas.deposit{ value: 1e18 }();
-
-        vm.stopPrank();
-
-        deal(TOKEN_ZERO, address(solverTwo), 10e24);
-        deal(TOKEN_ONE, address(solverTwo), 10e24);
-
-        deal(TOKEN_ZERO, address(solverTwoXP), 10e24);
-        deal(TOKEN_ONE, address(solverTwoXP), 10e24);
-
-        helper = new V2Helper(address(v2DAppControl), address(atlas), address(atlasVerification));
-        u = new Utilities();
-
-        deal(TOKEN_ZERO, address(atlas), 1);
-        deal(TOKEN_ONE, address(atlas), 1);
-
-        vm.label(userEOA, "USER");
-        vm.label(address(atlas), "ATLAS");
-        vm.label(address(v2DAppControl), "V2 DAPP CONTROL");
+        hoax(solverThreeEOA, 100e18);
+        atlas.deposit{ value: 1e18 }();
+        hoax(solverFourEOA, 100e18);
+        atlas.deposit{ value: 1e18 }();
     }
 }

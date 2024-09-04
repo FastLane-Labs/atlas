@@ -29,20 +29,10 @@ interface IWETH {
 contract FlashLoanTest is BaseTest {
     DummyDAppControlBuilder public control;
 
-    struct Sig {
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-    }
-
     Sig public sig;
 
     function setUp() public virtual override {
         BaseTest.setUp();
-
-        // Creating new gov address (SignatoryActive error if already registered with control)
-        governancePK = 11_112;
-        governanceEOA = vm.addr(governancePK);
 
         // Deploy
         vm.startPrank(governanceEOA);
@@ -215,7 +205,7 @@ contract FlashLoanTest is BaseTest {
         assertEq(solverStartingTotal, 1e18, "solver incorrect starting WETH");
         solverStartingTotal += (atlas.balanceOf(solverOneEOA) + atlas.balanceOfBonded(solverOneEOA));
 
-        assertEq(atlasStartingETH, 102e18, "atlas incorrect starting ETH"); // 2e initial + 1e solver + 100e user deposit
+        assertEq(atlasStartingETH, 104e18, "atlas incorrect starting ETH"); // 4e from solvers + 100e user deposit
 
         uint256 netSurcharge = atlas.cumulativeSurcharge();
 

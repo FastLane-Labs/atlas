@@ -18,12 +18,6 @@ import { FastLaneOnlineErrors } from "src/contracts/examples/fastlane-online/Fas
 import { IUniswapV2Router02 } from "test/base/interfaces/IUniswapV2Router.sol";
 
 contract FastLaneOnlineTest is BaseTest {
-    struct Sig {
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-    }
-
     struct FastOnlineSwapArgs {
         UserOperation userOp;
         SwapIntent swapIntent;
@@ -59,9 +53,6 @@ contract FastLaneOnlineTest is BaseTest {
 
     uint256 constant ERR_MARGIN = 0.15e18; // 15% error margin
     address internal constant NATIVE_TOKEN = address(0);
-
-    IERC20 DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
-    address DAI_ADDRESS = address(DAI);
 
     address protocolGuildWallet = 0x25941dC771bB64514Fc8abBce970307Fb9d477e9;
 
@@ -100,11 +91,8 @@ contract FastLaneOnlineTest is BaseTest {
         defaultDeadlineTimestamp = block.timestamp + 1;
         defaultGasPrice = tx.gasprice;
 
-        governancePK = 11_112;
-        governanceEOA = vm.addr(governancePK);
-
         vm.startPrank(governanceEOA);
-        flOnlineMock = new MockFastLaneOnline(address(atlas), protocolGuildWallet);
+        flOnlineMock = new MockFastLaneOnline{ salt: bytes32("1") }(address(atlas), protocolGuildWallet);
         flOnline = new FastLaneOnlineOuter(address(atlas), protocolGuildWallet);
         atlasVerification.initializeGovernance(address(flOnline));
         // FLOnline contract must be registered as its own signatory
@@ -1433,9 +1421,7 @@ contract FastLaneOnlineTest is BaseTest {
         args = _buildFastOnlineSwapArgs(swapIntent);
     }
 
-    function _buildFastOnlineSwapArgs(
-        SwapIntent memory swapIntent
-    )
+    function _buildFastOnlineSwapArgs(SwapIntent memory swapIntent)
         internal
         returns (FastOnlineSwapArgs memory newArgs)
     {
@@ -1810,7 +1796,7 @@ contract FLOnlineRFQSolver is SolverBase {
         s_shouldSucceed = succeed;
     }
 
-    function fulfillRFQ(SwapIntent calldata swapIntent) public view {
+    function fulfillRFQ(SwapIntent calldata swapIntent) public view onlySelf {
         require(s_shouldSucceed, "Solver failed intentionally");
 
         if (swapIntent.tokenUserSells == NATIVE_TOKEN) {
