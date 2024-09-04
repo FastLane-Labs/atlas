@@ -609,8 +609,8 @@ abstract contract Escrow is AtlETH {
                     solverOp.bidToken,
                     bidAmount,
                     solverOp.data,
-                    // Only pass the returnData to solver if it came from userOp call and not from preOps call.
-                    _activeCallConfig().needsUserReturnData() ? returnData : new bytes(0)
+                    // Only pass the returnData (either from userOp or preOps) if the dApp requires it
+                    _activeCallConfig().forwardReturnData() ? returnData : new bytes(0)
                 )
             )
         );
