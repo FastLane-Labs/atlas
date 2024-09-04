@@ -113,3 +113,10 @@ The _borrow() function makes flash loans available from the Atlas Escrow balance
 ### Notes:
 
 Note that the auctioneer (typically the frontend) and/or the Operations relay may want to use a reputation system for solver bids to efficiently use the space in the solverOps[]. This isnt necessarily required - it's not an economic issue - it's just that it's important to be a good member of the ecosystem and not waste too much precious blockspace by filling it with probabalistic solver txs that have a low success rate but a high profit-to-cost ratio.
+
+### Development:
+
+Conflicts between `foundry`'s formatter versions can lead to CI/CD failure. Developers are advised to lock in their local `foundry` version to match the one used by this repository workflows, by running the following command:
+```
+foundryup -v nightly-0d8302880b79fa9c3c4aa52ab446583dece19a34
+```

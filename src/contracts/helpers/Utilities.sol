@@ -8,6 +8,7 @@ import "forge-std/StdJson.sol";
 contract Utilities is Script {
     using stdJson for string;
 
+    // NOTE: this is deprecated - use the version in the DeployBaseScript
     function getUsefulContractAddress(string memory chain, string memory key) public view returns (address) {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/useful-addresses.json");
@@ -15,7 +16,7 @@ contract Utilities is Script {
         string memory fullKey = string.concat(".", chain, ".", key);
 
         address res = json.readAddress(fullKey);
-        if (res == address(0x0000000000000000000000000000000000000020)) {
+        if (res == address(0x20) || res == address(0)) {
             revert(string.concat(fullKey, " not found in useful-addresses.json"));
         }
         return res;

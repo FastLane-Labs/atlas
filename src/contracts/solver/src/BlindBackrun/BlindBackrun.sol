@@ -33,7 +33,7 @@ contract BlindBackrun is Ownable {
         WETH_ADDRESS = _wethAddress;
     }
     */
-    constructor() { }
+    constructor() Ownable(msg.sender) { }
 
     /// @notice Executes an arbitrage transaction between two Uniswap V2 pairs.
     /// @notice Pair addresses need to be computed off-chain.

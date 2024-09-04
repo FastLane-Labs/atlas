@@ -79,7 +79,7 @@ contract OEVTest is BaseTest {
         vm.stopPrank();
 
         vm.startPrank(userEOA); // User is a Chainlink Node
-        executionEnvironment = atlas.createExecutionEnvironment(address(chainlinkDAppControl));
+        executionEnvironment = atlas.createExecutionEnvironment(userEOA, address(chainlinkDAppControl));
         vm.stopPrank();
         
         vm.startPrank(aaveGovEOA);
@@ -250,9 +250,9 @@ contract OEVTest is BaseTest {
         assertEq(DAI.balanceOf(aaveGovEOA), 0, "Aave Gov should have 0 DAI");
 
         vm.startPrank(chainlinkGovEOA);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, chainlinkGovEOA));
         chainlinkAtlasWrapper.withdrawETH(chainlinkGovEOA);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, chainlinkGovEOA));
         chainlinkAtlasWrapper.withdrawERC20(address(DAI), chainlinkGovEOA);
         vm.stopPrank();
 
@@ -275,11 +275,11 @@ contract OEVTest is BaseTest {
 
         // Wrapper emits event on deployment to show ownership transfer
         vm.expectEmit(true, false, false, true);
-        emit Ownable.OwnershipTransferred(address(this), address(chainlinkAtlasWrapper.owner()));
+        emit Ownable.OwnershipTransferred(address(0), address(chainlinkAtlasWrapper.owner()));
         new ChainlinkAtlasWrapper(address(atlas), chainlinkETHUSD, aaveGovEOA);
 
         vm.prank(chainlinkGovEOA);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, chainlinkGovEOA));
         chainlinkAtlasWrapper.setTransmitterStatus(mockEE, true);
 
         assertEq(chainlinkAtlasWrapper.transmitters(mockEE), false, "EE should not be trusted yet");

@@ -61,7 +61,7 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         vm.prank(user);
         executionEnvironment =
-            ExecutionEnvironment(payable(IAtlas(address(atlas)).createExecutionEnvironment(address(dAppControl))));
+            ExecutionEnvironment(payable(IAtlas(address(atlas)).createExecutionEnvironment(user, address(dAppControl))));
     }
 
     function test_modifier_validUser_SkipCoverage() public {

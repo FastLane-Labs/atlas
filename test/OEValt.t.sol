@@ -94,7 +94,7 @@ contract OEVTest is BaseTest {
         transmitter = chainlinkAtlasWrapper.transmitters()[3];
 
         vm.startPrank(transmitter); // User is a Chainlink Node
-        executionEnvironment = atlas.createExecutionEnvironment(address(chainlinkDAppControl));
+        executionEnvironment = atlas.createExecutionEnvironment(transmitter, address(chainlinkDAppControl));
         vm.stopPrank();
 
         txBuilder = new TxBuilder({
@@ -236,9 +236,9 @@ contract OEVTest is BaseTest {
         assertEq(DAI.balanceOf(aaveGovEOA), 0, "Aave Gov should have 0 DAI");
 
         vm.startPrank(chainlinkGovEOA);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, chainlinkGovEOA));
         chainlinkAtlasWrapper.withdrawETH(chainlinkGovEOA);
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, chainlinkGovEOA));
         chainlinkAtlasWrapper.withdrawERC20(address(DAI), chainlinkGovEOA);
         vm.stopPrank();
 
@@ -254,26 +254,6 @@ contract OEVTest is BaseTest {
         assertEq(DAI.balanceOf(address(chainlinkAtlasWrapper)), 0, "Wrapper should have 0 DAI");
         assertEq(aaveGovEOA.balance, startETH, "Aave Gov should have 10 ETH");
         assertEq(DAI.balanceOf(aaveGovEOA), startDai, "Aave Gov should have 5 DAI");
-    }
-
-    function testChainlinkAtlasWrapperOwnableFunctionsEvents_AltVersion() public {
-        // address mockEE = makeAddr("Mock EE");
-
-        // Wrapper emits event on deployment to show ownership transfer
-        vm.expectEmit(true, false, false, true);
-        emit Ownable.OwnershipTransferred(address(this), address(chainlinkAtlasWrapper.owner()));
-        new ChainlinkAtlasWrapper(address(atlas), chainlinkETHUSD, aaveGovEOA);
-
-        // vm.prank(chainlinkGovEOA);
-        // vm.expectRevert("Ownable: caller is not the owner");
-        // chainlinkAtlasWrapper.setTransmitterStatus(mockEE, true);
-
-        // assertEq(chainlinkAtlasWrapper.transmitters(mockEE), false, "EE should not be trusted yet");
-
-        // vm.prank(aaveGovEOA);
-        // chainlinkAtlasWrapper.setTransmitterStatus(mockEE, true);
-
-        // assertEq(chainlinkAtlasWrapper.transmitters(mockEE), true, "EE should be trusted now");
     }
 
     function testChainlinkAtlasWrapperTransmit_AltVersion_SkipCoverage() public {

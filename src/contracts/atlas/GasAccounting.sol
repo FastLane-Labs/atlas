@@ -175,13 +175,13 @@ abstract contract GasAccounting is SafetyLocks {
     /// increase transient solver deposits.
     /// @param owner The address of the owner from whom AtlETH is taken.
     /// @param amount The amount of AtlETH to be taken.
-    /// @param gasUsed The amount of gas used in the SolverOperation.
+    /// @param gasValueUsed The ETH value of gas used in the SolverOperation.
     /// @param solverWon A boolean indicating whether the solver won the bid.
     /// @return deficit The amount of AtlETH that was not repaid, if any.
     function _assign(
         address owner,
         uint256 amount,
-        uint256 gasUsed,
+        uint256 gasValueUsed,
         bool solverWon
     )
         internal
@@ -222,8 +222,8 @@ abstract contract GasAccounting is SafetyLocks {
             _aData.bonded -= _amt;
         }
 
-        // Update analytics (auctionWins, auctionFails, totalGasUsed) and lastAccessedBlock
-        _updateAnalytics(_aData, solverWon && deficit == 0, gasUsed);
+        // Update analytics (auctionWins, auctionFails, totalGasValueUsed) and lastAccessedBlock
+        _updateAnalytics(_aData, solverWon && deficit == 0, gasValueUsed);
         _aData.lastAccessedBlock = uint32(block.number);
 
         // Persist changes in the _aData memory struct back to storage
@@ -236,7 +236,8 @@ abstract contract GasAccounting is SafetyLocks {
     /// @notice Increases the owner's bonded balance by the specified amount.
     /// @param owner The address of the owner whose bonded balance will be increased.
     /// @param amount The amount by which to increase the owner's bonded balance.
-    function _credit(address owner, uint256 amount, uint256 gasUsed) internal {
+    /// @param gasValueUsed The ETH value of gas used in the SolverOperation.
+    function _credit(address owner, uint256 amount, uint256 gasValueUsed) internal {
         uint112 _amt = SafeCast.toUint112(amount);
 
         EscrowAccountAccessData memory _aData = S_accessData[owner];
@@ -246,8 +247,8 @@ abstract contract GasAccounting is SafetyLocks {
 
         S_bondedTotalSupply += amount;
 
-        // Update analytics (auctionWins, auctionFails, totalGasUsed)
-        _updateAnalytics(_aData, true, gasUsed);
+        // Update analytics (auctionWins, auctionFails, totalGasValueUsed)
+        _updateAnalytics(_aData, true, gasValueUsed);
 
         // Persist changes in the _aData memory struct back to storage
         S_accessData[owner] = _aData;
@@ -437,8 +438,15 @@ abstract contract GasAccounting is SafetyLocks {
     /// @dev This function is only ever called in the context of bidFind = false so no risk of doublecounting changes.
     /// @param aData The Solver's EscrowAccountAccessData struct to update.
     /// @param auctionWon A boolean indicating whether the solver's solverOp won the auction.
-    /// @param gasUsed The amount of gas used by the solverOp.
-    function _updateAnalytics(EscrowAccountAccessData memory aData, bool auctionWon, uint256 gasUsed) internal pure {
+    /// @param gasValueUsed The ETH value of gas used by the solverOp. Should be calculated as gasUsed * tx.gasprice.
+    function _updateAnalytics(
+        EscrowAccountAccessData memory aData,
+        bool auctionWon,
+        uint256 gasValueUsed
+    )
+        internal
+        pure
+    {
         if (auctionWon) {
             unchecked {
                 ++aData.auctionWins;
@@ -449,7 +457,8 @@ abstract contract GasAccounting is SafetyLocks {
             }
         }
 
-        aData.totalGasUsed += uint64(gasUsed / _GAS_USED_DECIMALS_TO_DROP);
+        // Track total ETH value of gas spent by solver in metacalls. Measured in gwei (1e9 digits truncated).
+        aData.totalGasValueUsed += SafeCast.toUint64(gasValueUsed / _GAS_VALUE_DECIMALS_TO_DROP);
     }
 
     /// @notice Calculates the gas cost of the calldata used to execute a SolverOperation.

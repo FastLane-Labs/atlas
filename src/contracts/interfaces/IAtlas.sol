@@ -18,7 +18,12 @@ interface IAtlas {
         returns (bool auctionWon);
 
     // Factory.sol
-    function createExecutionEnvironment(address control) external returns (address executionEnvironment);
+    function createExecutionEnvironment(
+        address user,
+        address control
+    )
+        external
+        returns (address executionEnvironment);
     function getExecutionEnvironment(
         address user,
         address control
@@ -72,13 +77,23 @@ interface IAtlas {
 
     // Storage.sol
     function VERIFICATION() external view returns (address);
+    function SIMULATOR() external view returns (address);
+    function L2_GAS_CALCULATOR() external view returns (address);
+    function ESCROW_DURATION() external view returns (uint256);
+
     function solverLockData() external view returns (address currentSolver, bool calledBack, bool fulfilled);
     function totalSupply() external view returns (uint256);
     function bondedTotalSupply() external view returns (uint256);
     function accessData(address account)
         external
         view
-        returns (uint112 bonded, uint32 lastAccessedBlock, uint24 auctionWins, uint24 auctionFails, uint64 totalGasUsed);
+        returns (
+            uint112 bonded,
+            uint32 lastAccessedBlock,
+            uint24 auctionWins,
+            uint24 auctionFails,
+            uint64 totalGasValueUsed
+        );
     function solverOpHashes(bytes32 opHash) external view returns (bool);
     function lock() external view returns (address activeEnvironment, uint32 callConfig, uint8 phase);
     function solverLock() external view returns (uint256);

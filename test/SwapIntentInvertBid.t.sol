@@ -170,7 +170,7 @@ contract SwapIntentTest is BaseTest {
 
     function createExecutionEnvironment(address control) internal returns (address){
         vm.startPrank(userEOA);
-        address executionEnvironment = atlas.createExecutionEnvironment(control);
+        address executionEnvironment = atlas.createExecutionEnvironment(userEOA, control);
         console.log("executionEnvironment", executionEnvironment);
         vm.stopPrank();
         vm.label(address(executionEnvironment), "EXECUTION ENV");

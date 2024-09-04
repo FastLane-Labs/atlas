@@ -110,7 +110,7 @@ contract SwapIntentTest is BaseTest {
         DAppOperation memory dAppOp;
 
         vm.startPrank(userEOA);
-        address executionEnvironment = atlas.createExecutionEnvironment(txBuilder.control());
+        address executionEnvironment = atlas.createExecutionEnvironment(userEOA, txBuilder.control());
         console.log("executionEnvironment", executionEnvironment);
         vm.stopPrank();
         vm.label(address(executionEnvironment), "EXECUTION ENV");
@@ -236,7 +236,7 @@ contract SwapIntentTest is BaseTest {
         DAppOperation memory dAppOp;
 
         vm.startPrank(userEOA);
-        address executionEnvironment = atlas.createExecutionEnvironment(txBuilder.control());
+        address executionEnvironment = atlas.createExecutionEnvironment(userEOA, txBuilder.control());
         console.log("executionEnvironment a", executionEnvironment);
         vm.stopPrank();
         vm.label(address(executionEnvironment), "EXECUTION ENV");

@@ -230,7 +230,7 @@ contract EscrowTest is AtlasBaseTest {
         );
 
         vm.prank(userEOA);
-        address executionEnvironment = atlas.createExecutionEnvironment(address(dAppControl));
+        address executionEnvironment = atlas.createExecutionEnvironment(userEOA, address(dAppControl));
 
         vm.expectEmit(false, false, false, true, executionEnvironment);
         emit MEVPaymentSuccess(address(0), defaultBidAmount);

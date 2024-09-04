@@ -38,7 +38,7 @@ contract DemoLendingProtocol is Ownable {
     event Withdraw(address indexed account, uint256 amount);
     event Liquidation(address indexed account, address indexed recipient, uint256 amount);
 
-    constructor(address depositToken) Ownable() {
+    constructor(address depositToken) Ownable(msg.sender) {
         DEPOSIT_TOKEN = IERC20(depositToken);
     }
 
