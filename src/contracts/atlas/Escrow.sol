@@ -96,7 +96,7 @@ abstract contract Escrow is AtlETH {
             revert InsufficientEscrow();
         }
 
-        (_success, _data) = ctx.executionEnvironment.call{ value: userOp.value }(
+        (_success, _data) = ctx.executionEnvironment.call{ value: userOp.value, gas: userOp.gas }(
             abi.encodePacked(
                 abi.encodeCall(IExecutionEnvironment.userWrapper, userOp), ctx.setAndPack(ExecutionPhase.UserOperation)
             )
