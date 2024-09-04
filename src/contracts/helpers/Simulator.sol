@@ -27,9 +27,7 @@ contract Simulator is AtlasErrors {
         deployer = msg.sender;
     }
 
-    function simUserOperation(
-        UserOperation calldata userOp
-    )
+    function simUserOperation(UserOperation calldata userOp)
         external
         payable
         returns (bool success, Result simResult, uint256)

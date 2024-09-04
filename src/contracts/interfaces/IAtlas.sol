@@ -84,9 +84,7 @@ interface IAtlas {
     function solverLockData() external view returns (address currentSolver, bool calledBack, bool fulfilled);
     function totalSupply() external view returns (uint256);
     function bondedTotalSupply() external view returns (uint256);
-    function accessData(
-        address account
-    )
+    function accessData(address account)
         external
         view
         returns (

@@ -87,9 +87,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         return S_bondedTotalSupply;
     }
 
-    function accessData(
-        address account
-    )
+    function accessData(address account)
         external
         view
         returns (

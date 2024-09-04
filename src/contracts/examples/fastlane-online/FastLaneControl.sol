@@ -24,9 +24,7 @@ interface ISolverGateway {
 contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
     address internal constant _NATIVE_TOKEN = address(0);
 
-    constructor(
-        address _atlas
-    )
+    constructor(address _atlas)
         DAppControl(
             _atlas,
             msg.sender,
