@@ -80,7 +80,7 @@ contract Atlas is Escrow, Factory {
 
         // Initialize the environment lock and accounting values
         _setEnvironmentLock(_dConfig, _executionEnvironment);
-        _initializeAccountingValues(_gasMarker);
+        _initializeAccountingValues(_gasMarker, solverOps.length == 0);
 
         // userOpHash has already been calculated and verified in validateCalls at this point, so rather
         // than re-calculate it, we can simply take it from the dAppOp here. It's worth noting that this will

@@ -29,16 +29,19 @@ abstract contract GasAccounting is SafetyLocks {
         SafetyLocks(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
     { }
 
-    /// @notice Sets the initial accounting values for the metacall transaction.
+    /// @notice Sets the initial accounting values for the metacall transaction. Note: If there are no solverOps, the
+    /// Atlas and bundler surcharges are not applied.
     /// @param gasMarker The gas marker used to calculate the initial accounting values.
-    function _initializeAccountingValues(uint256 gasMarker) internal {
+    /// @param zeroSolvers A boolean indicating whether there are zero solverOps in the metacall (true) or at least one
+    /// solverOp (false).
+    function _initializeAccountingValues(uint256 gasMarker, bool zeroSolvers) internal {
         uint256 _rawClaims = (FIXED_GAS_OFFSET + gasMarker) * tx.gasprice;
 
         // Set any withdraws or deposits
-        _setClaims(_rawClaims.withBundlerSurcharge());
+        _setClaims(zeroSolvers ? _rawClaims : _rawClaims.withBundlerSurcharge());
 
         // Atlas surcharge is based on the raw claims value.
-        _setFees(_rawClaims.getAtlasSurcharge());
+        _setFees(zeroSolvers ? 0 : _rawClaims.getAtlasSurcharge());
         _setDeposits(msg.value);
 
         // Explicitly set writeoffs and withdrawals to 0 in case multiple metacalls in single tx.
@@ -318,18 +321,35 @@ abstract contract GasAccounting is SafetyLocks {
             uint256 netAtlasGasSurcharge
         )
     {
-        uint256 _surcharge = S_cumulativeSurcharge;
-        uint256 _fees = fees();
+        uint256 _gasLeft;
+        uint256 _gasRemainder;
 
         adjustedWithdrawals = withdrawals();
         adjustedDeposits = deposits();
         adjustedClaims = claims();
-        adjustedWriteoffs = writeoffs();
 
-        uint256 _gasLeft = gasleft(); // Hold this constant for the calculations
+        if (ctx.solverCount == 0) {
+            // If zero solvers, do not apply the bundler or atlas gas surcharges.
+
+            // Calculate gas value remaining and adjust claims without surcharges
+            _gasLeft = gasleft();
+            _gasRemainder = _gasLeft * tx.gasprice;
+            adjustedClaims -= _gasRemainder;
+
+            // withdrawals and deposits are not adjusted.
+            // adjustedWriteoffs and netAtlasGasSurcharge are set to zero.
+            return (adjustedWithdrawals, adjustedDeposits, adjustedClaims, 0, 0);
+            // return early without loading S_cumulativeSurcharge, fees, or writeoffs.
+        }
+
+        adjustedWriteoffs = writeoffs();
+        uint256 _surcharge = S_cumulativeSurcharge;
+        uint256 _fees = fees();
+
+        _gasLeft = gasleft(); // Hold this constant for the calculations
 
         // Estimate the unspent, remaining gas that the Solver will not be liable for.
-        uint256 _gasRemainder = _gasLeft * tx.gasprice;
+        _gasRemainder = _gasLeft * tx.gasprice;
 
         // Calculate the preadjusted netAtlasGasSurcharge
         netAtlasGasSurcharge = _fees - _gasRemainder.getAtlasSurcharge();

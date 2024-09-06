@@ -125,7 +125,7 @@ contract MockGasAccounting is TestAtlas, BaseTest {
     function initializeLock(address executionEnvironment, uint256 gasMarker) external payable {
         DAppConfig memory dConfig;
         _setEnvironmentLock(dConfig, executionEnvironment);
-        _initializeAccountingValues(gasMarker);
+        _initializeAccountingValues(gasMarker, false);
     }
 
     function increaseBondedBalance(address account, uint256 amount) external {
@@ -141,7 +141,7 @@ contract MockGasAccounting is TestAtlas, BaseTest {
     }
 
     function initializeAccountingValues(uint256 gasMarker) external {
-        _initializeAccountingValues(gasMarker);
+        _initializeAccountingValues(gasMarker, false);
     }
 
     // View functions
