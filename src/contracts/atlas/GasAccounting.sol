@@ -35,13 +35,24 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param zeroSolvers A boolean indicating whether there are zero solverOps in the metacall (true) or at least one
     /// solverOp (false).
     function _initializeAccountingValues(uint256 gasMarker, bool zeroSolvers) internal {
-        uint256 _rawClaims = (FIXED_GAS_OFFSET + gasMarker) * tx.gasprice;
+        uint256 _rawClaims;
 
-        // Set any withdraws or deposits
-        _setClaims(zeroSolvers ? _rawClaims : _rawClaims.withBundlerSurcharge());
+        if (zeroSolvers) {
+            // No need for FIXED_GAS_OFFSET as there are no solvers to reimburse the bundler for that gas.
+            _rawClaims = gasMarker * tx.gasprice;
 
-        // Atlas surcharge is based on the raw claims value.
-        _setFees(zeroSolvers ? 0 : _rawClaims.getAtlasSurcharge());
+            // No surcharges are applied if there are no solverOps in the metacall
+            _setClaims(_rawClaims);
+            _setFees(0);
+        } else {
+            // Gas offset added to account for the gas used after the final gas snapshot is taken in `_settle()`, as the
+            // winning solver must reimburse the bundler for that gas.
+            _rawClaims = (FIXED_GAS_OFFSET + gasMarker) * tx.gasprice;
+
+            _setClaims(_rawClaims.withBundlerSurcharge());
+            _setFees(_rawClaims.getAtlasSurcharge());
+        }
+
         _setDeposits(msg.value);
 
         // Explicitly set writeoffs and withdrawals to 0 in case multiple metacalls in single tx.
@@ -255,7 +266,7 @@ abstract contract GasAccounting is SafetyLocks {
 
         // Persist changes in the _aData memory struct back to storage
         S_accessData[owner] = _aData;
-        _setWithdrawals(withdrawals() + amount);
+        // _setWithdrawals(withdrawals() + amount); //TODO why withdrawals increase here?
     }
 
     /// @notice Accounts for the gas cost of a failed SolverOperation, either by increasing writeoffs (if the bundler is
@@ -419,6 +430,21 @@ abstract contract GasAccounting is SafetyLocks {
             _amountSolverPays = _withdrawals - _deposits;
         } else {
             _amountSolverReceives = _deposits - _withdrawals;
+        }
+
+        // If zero solvers, no surcharges applied -> opp for early return or revert
+        if (ctx.solverCount == 0) {
+            // If withdrawals > deposits, and no solvers to pay shortfall, revert
+            if (_amountSolverPays > 0) revert InsufficientTotalBalance(_amountSolverPays);
+            // TODO maybe change ^ to unique error
+
+            // If deposits > withdrawals, and no solvers to receive surplus, credit bundler's bonded AtlETH balance
+            if (_amountSolverReceives > 0) _credit(ctx.bundler, _amountSolverReceives, _adjustedClaims);
+
+            // Set lock to FullyLocked to prevent any reentrancy possibility
+            _setLockPhase(uint8(ExecutionPhase.FullyLocked));
+            return (0, 0);
+            // 0 claims paid directly to bundler, 0 Atlas Gas Surcharge taken because zero solvers
         }
 
         // Only force solver to pay gas claims if they aren't also the bundler
