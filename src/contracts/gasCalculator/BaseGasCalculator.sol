@@ -16,9 +16,11 @@ contract BaseGasCalculator is IL2GasCalculator, Ownable {
     uint256 internal constant _BASE_TRANSACTION_GAS_USED = 21_000;
 
     address public immutable gasPriceOracle;
+    int256 public calldataLengthOffset;
 
-    constructor(address _gasPriceOracle) Ownable(msg.sender) {
+    constructor(address _gasPriceOracle, int256 _calldataLengthOffset) Ownable(msg.sender) {
         gasPriceOracle = _gasPriceOracle;
+        calldataLengthOffset = _calldataLengthOffset;
     }
 
     /// @notice Calculate the cost of calldata in ETH on a L2 with a different fee structure than mainnet
@@ -33,12 +35,29 @@ contract BaseGasCalculator is IL2GasCalculator, Ownable {
         // L1 data cost.
         // `getL1FeeUpperBound` adds 68 to the size because it expects an unsigned transaction size.
         // Remove 68 to the length to account for this.
-        calldataCost += IGasPriceOracle(gasPriceOracle).getL1FeeUpperBound(calldataLength - 68);
+        if (calldataLength < 68) {
+            calldataLength = 0;
+        } else {
+            calldataLength -= 68;
+        }
+
+        if (calldataLengthOffset < 0 && calldataLength < uint256(-calldataLengthOffset)) {
+            return calldataCost;
+        }
+
+        calldataLength += uint256(calldataLengthOffset);
+        calldataCost += IGasPriceOracle(gasPriceOracle).getL1FeeUpperBound(calldataLength);
     }
 
     /// @notice Gets the cost of initial gas used for a transaction with a different calldata fee than mainnet
     /// @param calldataLength The length of the calldata in bytes
     function initialGasUsed(uint256 calldataLength) external pure override returns (uint256 gasUsed) {
         return _BASE_TRANSACTION_GAS_USED + (calldataLength * _CALLDATA_LENGTH_PREMIUM);
+    }
+
+    /// @notice Sets the calldata length offset
+    /// @param _calldataLengthOffset The new calldata length offset
+    function setCalldataLengthOffset(int256 _calldataLengthOffset) external onlyOwner {
+        calldataLengthOffset = _calldataLengthOffset;
     }
 }
