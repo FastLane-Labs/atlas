@@ -1,6 +1,7 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.25;
 
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IL2GasCalculator } from "src/contracts/interfaces/IL2GasCalculator.sol";
 
 /// @notice Implementation:
@@ -10,14 +11,13 @@ interface IGasPriceOracle {
     function getL1FeeUpperBound(uint256 _unsignedTxSize) external view returns (uint256);
 }
 
-contract BaseGasCalculator is IL2GasCalculator {
-    uint256 public constant _CALLDATA_LENGTH_PREMIUM = 32; // TODO: copied value from Atlas, should it be different for
-        // Base?
+contract BaseGasCalculator is IL2GasCalculator, Ownable {
+    uint256 internal constant _CALLDATA_LENGTH_PREMIUM = 32;
     uint256 internal constant _BASE_TRANSACTION_GAS_USED = 21_000;
 
     address public immutable gasPriceOracle;
 
-    constructor(address _gasPriceOracle) {
+    constructor(address _gasPriceOracle) Ownable(msg.sender) {
         gasPriceOracle = _gasPriceOracle;
     }
 
