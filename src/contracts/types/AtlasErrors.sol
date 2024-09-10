@@ -106,6 +106,7 @@ contract AtlasErrors {
     error InsufficientSolverBalance(uint256 actual, uint256 msgValue, uint256 holds, uint256 needed);
     error InsufficientAtlETHBalance(uint256 actual, uint256 needed);
     error InsufficientTotalBalance(uint256 shortfall);
+    error SettleDeficitZeroSolvers(uint256 shortfall);
     error UnbalancedAccounting();
 
     // SafetyLocks

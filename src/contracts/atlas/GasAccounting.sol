@@ -435,8 +435,7 @@ abstract contract GasAccounting is SafetyLocks {
         // If zero solvers, no surcharges applied -> opp for early return or revert
         if (ctx.solverCount == 0) {
             // If withdrawals > deposits, and no solvers to pay shortfall, revert
-            if (_amountSolverPays > 0) revert InsufficientTotalBalance(_amountSolverPays);
-            // TODO maybe change ^ to unique error
+            if (_amountSolverPays > 0) revert SettleDeficitZeroSolvers(_amountSolverPays);
 
             // If deposits > withdrawals, and no solvers to receive surplus, credit bundler's bonded AtlETH balance
             if (_amountSolverReceives > 0) _credit(ctx.bundler, _amountSolverReceives, _adjustedClaims);
