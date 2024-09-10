@@ -40,6 +40,7 @@ abstract contract GasAccounting is SafetyLocks {
         // Atlas surcharge is based on the raw claims value.
         _setFees(_rawClaims.getAtlasSurcharge());
         _setDeposits(msg.value);
+        _setSolverSurcharge(0);
 
         // Explicitly set writeoffs and withdrawals to 0 in case multiple metacalls in single tx.
         _setWriteoffs(0);
@@ -285,6 +286,7 @@ abstract contract GasAccounting is SafetyLocks {
         } else {
             // CASE: Solver failed, so we calculate what they owe.
             uint256 _gasUsedWithSurcharges = _gasUsed.withAtlasAndBundlerSurcharges();
+            _setSolverSurcharge(solverSurcharge() + _gasUsedWithSurcharges - _gasUsed);
             _assign(solverOp.from, _gasUsedWithSurcharges, _gasUsedWithSurcharges, false);
         }
     }
@@ -319,24 +321,33 @@ abstract contract GasAccounting is SafetyLocks {
         )
     {
         uint256 _surcharge = S_cumulativeSurcharge;
-        uint256 _fees = fees();
 
         adjustedWithdrawals = withdrawals();
         adjustedDeposits = deposits();
         adjustedClaims = claims();
         adjustedWriteoffs = writeoffs();
+        uint256 _fees = fees();
 
         uint256 _gasLeft = gasleft(); // Hold this constant for the calculations
 
         // Estimate the unspent, remaining gas that the Solver will not be liable for.
         uint256 _gasRemainder = _gasLeft * tx.gasprice;
 
-        // Calculate the preadjusted netAtlasGasSurcharge
-        netAtlasGasSurcharge = _fees - _gasRemainder.getAtlasSurcharge();
-
         adjustedClaims -= _gasRemainder.withBundlerSurcharge();
-        adjustedWithdrawals += netAtlasGasSurcharge;
-        S_cumulativeSurcharge = _surcharge + netAtlasGasSurcharge; // Update the cumulative surcharge
+
+        if (ctx.solverSuccessful) {
+            // Calculate the preadjusted netAtlasGasSurcharge
+            netAtlasGasSurcharge = _fees - _gasRemainder.getAtlasSurcharge();
+
+            adjustedWithdrawals += netAtlasGasSurcharge;
+
+            S_cumulativeSurcharge = _surcharge + netAtlasGasSurcharge; // Update the cumulative surcharge
+
+        } else {
+            netAtlasGasSurcharge = solverSurcharge();
+            S_cumulativeSurcharge = _surcharge + netAtlasGasSurcharge; // Update the cumulative surcharge
+            return (adjustedWithdrawals, adjustedDeposits, adjustedClaims, adjustedWriteoffs, netAtlasGasSurcharge);
+        }
 
         // Calculate whether or not the bundler used an excessive amount of gas and, if so, reduce their
         // gas rebate. By reducing the claims, solvers end up paying less in total.
