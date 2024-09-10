@@ -283,17 +283,24 @@ contract TrebleSwapTest is BaseTest {
 
     function _doMetacallAndChecks(address winningSolver) internal {
         bool auctionWonExpected = winningSolver != address(0);
+        bool zeroSolvers = args.solverOps.length == 0;
         beforeVars.userInputTokenBalance = _balanceOf(swapInfo.inputToken, userEOA);
         beforeVars.userOutputTokenBalance = _balanceOf(swapInfo.outputToken, userEOA);
         beforeVars.solverTrebBalance = _balanceOf(address(TREB), winningSolver);
         beforeVars.burnAddressTrebBalance = _balanceOf(address(TREB), BURN);
         beforeVars.atlasGasSurcharge = atlas.cumulativeSurcharge();
-        uint256 msgValue = (args.nativeInput ? swapInfo.inputAmount : 0) + bundlerGasEth;
-        if (args.nativeInput) beforeVars.userInputTokenBalance -= bundlerGasEth;
-        if (args.nativeOutput) beforeVars.userOutputTokenBalance -= bundlerGasEth;
+        uint256 msgValue = (args.nativeInput ? swapInfo.inputAmount : 0) + (zeroSolvers ? 0 : bundlerGasEth);
+
+        // For native token balance, offset by the amount of ETH sent as msg.value to pay for atlas gas surcharge, which
+        // will not be returned as ETH but rather as bonded atlETH to the bundler, UNLESS there are no solvers, in which
+        // case no extra ETH is required as surcharges are not applied, so no need to offset if zeroSolvers
+        if (args.nativeInput && !zeroSolvers) beforeVars.userInputTokenBalance -= bundlerGasEth;
+        if (args.nativeOutput && !zeroSolvers) beforeVars.userOutputTokenBalance -= bundlerGasEth;
 
         uint256 txGasUsed;
         uint256 estAtlasGasSurcharge = gasleft(); // Reused below during calculations
+
+        console.log("msgValue for metacall:", msgValue);
 
         // Do the actual metacall
         vm.prank(userEOA);
@@ -307,12 +314,20 @@ contract TrebleSwapTest is BaseTest {
         assertEq(auctionWon, auctionWonExpected, "auctionWon not as expected");
 
         // Check Atlas gas surcharge change
-        assertApproxEqRel(
-            atlas.cumulativeSurcharge() - beforeVars.atlasGasSurcharge,
-            estAtlasGasSurcharge,
-            ERR_MARGIN,
-            "Atlas gas surcharge not within estimated range"
-        );
+        if (zeroSolvers) {
+            assertEq(
+                atlas.cumulativeSurcharge(),
+                beforeVars.atlasGasSurcharge,
+                "Atlas gas surcharge changed when zero solvers"
+            );
+        } else {
+            assertApproxEqRel(
+                atlas.cumulativeSurcharge() - beforeVars.atlasGasSurcharge,
+                estAtlasGasSurcharge,
+                ERR_MARGIN,
+                "Atlas gas surcharge not within estimated range"
+            );
+        }
 
         // Check user input token change
         if (args.nativeInput && auctionWonExpected) {
