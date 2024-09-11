@@ -89,7 +89,7 @@ contract RedstoneDAppControl is DAppControl {
 
     function _preOpsCall(UserOperation calldata userOp) internal view override returns (bytes memory) {
         RedstoneDAppControl(userOp.control).verifyWhitelist();
-        return abi.encode(userOp.dapp); 
+        return abi.encode(userOp.dapp);
     }
 
     function _allocateValueCall(address, uint256 bidAmount, bytes calldata data) internal virtual override {

@@ -8,7 +8,6 @@ import "src/contracts/types/SolverOperation.sol";
 import "./RedstoneAdapterAtlasWrapper.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
-
 contract RedstoneOevDappControl is DAppControl {
     error FailedToAllocateOEV();
     error OnlyGovernance();
@@ -138,7 +137,7 @@ contract RedstoneOevDappControl is DAppControl {
     //                    UserOp function                   //
     // ---------------------------------------------------- //
 
-    function update(address oracle, bytes calldata callData) external  {
+    function update(address oracle, bytes calldata callData) external {
         RedstoneOevDappControl(_control()).verifyBundlerWhitelist();
         (bool success,) = oracle.call(callData);
         if (!success) revert OracleUpdateFailed();
