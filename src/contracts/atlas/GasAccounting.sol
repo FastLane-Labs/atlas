@@ -342,7 +342,6 @@ abstract contract GasAccounting is SafetyLocks {
             adjustedWithdrawals += netAtlasGasSurcharge;
 
             S_cumulativeSurcharge = _surcharge + netAtlasGasSurcharge; // Update the cumulative surcharge
-
         } else {
             netAtlasGasSurcharge = solverSurcharge();
             S_cumulativeSurcharge = _surcharge + netAtlasGasSurcharge; // Update the cumulative surcharge
