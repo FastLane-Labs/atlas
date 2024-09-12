@@ -17,7 +17,7 @@ contract RedstoneOevDappControl is DAppControl {
     uint256 public bundlerOEVPercent;
     uint256 public atlasOEVPercent;
     address public atlasVault;
-    address public oracleVault;
+    mapping(address oracle => address oracleVault) public oracleVaults;
 
     mapping(address bundler => bool isWhitelisted) public bundlerWhitelist;
     uint32 public NUM_WHITELISTED_BUNDLERS = 0;
@@ -25,7 +25,6 @@ contract RedstoneOevDappControl is DAppControl {
     constructor(
         address _atlas,
         address _atlasVault,
-        address _oracleVault,
         uint256 _bundlerOEVPercent,
         uint256 _atlasOEVPercent
     )
@@ -37,7 +36,7 @@ contract RedstoneOevDappControl is DAppControl {
                 dappNoncesSequential: false,
                 requirePreOps: false,
                 trackPreOpsReturnData: false,
-                trackUserReturnData: false,
+                trackUserReturnData: true,
                 delegateUser: false,
                 requirePreSolver: false,
                 requirePostSolver: false,
@@ -60,7 +59,6 @@ contract RedstoneOevDappControl is DAppControl {
         bundlerOEVPercent = _bundlerOEVPercent;
         atlasOEVPercent = _atlasOEVPercent;
         atlasVault = _atlasVault;
-        oracleVault = _oracleVault;
     }
 
     function setBundlerOEVPercent(uint256 _bundlerOEVPercent) external onlyGov {
@@ -77,8 +75,8 @@ contract RedstoneOevDappControl is DAppControl {
         atlasVault = _atlasVault;
     }
 
-    function setOracleVault(address _oracleVault) external onlyGov {
-        oracleVault = _oracleVault;
+    function setOracleVault(address oracle, address _oracleVault) external onlyGov {
+        oracleVaults[oracle] = _oracleVault;
     }
 
     function addBundlerToWhitelist(address bundler) external onlyGov {
@@ -112,24 +110,22 @@ contract RedstoneOevDappControl is DAppControl {
     //                  Atlas Hook Overrides                //
     // ---------------------------------------------------- //
 
-    function _allocateValueCall(address, uint256 bidAmount, bytes calldata) internal virtual override {
+    function _allocateValueCall(address, uint256 bidAmount, bytes calldata returnData) internal virtual override {
         if (bidAmount == 0) return;
+
+        address oracle = abi.decode(returnData, (address));
 
         uint256 oevPercentBundler = RedstoneOevDappControl(_control()).bundlerOEVPercent();
         uint256 oevPercentAtlas = RedstoneOevDappControl(_control()).atlasOEVPercent();
         address vaultAtlas = RedstoneOevDappControl(_control()).atlasVault();
-        address vaultOracle = RedstoneOevDappControl(_control()).oracleVault();
+        address vaultOracle = RedstoneOevDappControl(_control()).oracleVaults(oracle);
 
         uint256 bundlerOev = (bidAmount * oevPercentBundler) / 100;
         uint256 atlasOev = (bidAmount * oevPercentAtlas) / 100;
         uint256 oracleOev = bidAmount - bundlerOev - atlasOev;
 
-        (bool success,) = vaultOracle.call{ value: oracleOev }("");
-        if (!success) revert FailedToAllocateOEV();
-
-        (success,) = vaultAtlas.call{ value: atlasOev }("");
-        if (!success) revert FailedToAllocateOEV();
-
+        if (oracleOev > 0) SafeTransferLib.safeTransferETH(vaultOracle, oracleOev);
+        if (atlasOev > 0) SafeTransferLib.safeTransferETH(vaultAtlas, atlasOev);
         if (bundlerOev > 0) SafeTransferLib.safeTransferETH(_bundler(), bundlerOev);
     }
 
@@ -137,10 +133,11 @@ contract RedstoneOevDappControl is DAppControl {
     //                    UserOp function                   //
     // ---------------------------------------------------- //
 
-    function update(address oracle, bytes calldata callData) external {
+    function update(address oracle, bytes calldata callData) external returns (bytes memory) {
         RedstoneOevDappControl(_control()).verifyBundlerWhitelist();
         (bool success,) = oracle.call(callData);
         if (!success) revert OracleUpdateFailed();
+        return abi.encode(oracle);
     }
 
     // NOTE: Functions below are not delegatecalled
