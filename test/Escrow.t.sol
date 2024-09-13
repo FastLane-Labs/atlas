@@ -191,6 +191,9 @@ contract EscrowTest is BaseTest {
                 .withAllowAllocateValueFailure(false) // Do not allow the value allocation to fail
                 .build()
         );
+
+        dAppControl.setAllocateValueShouldRevert(true);
+
         executeHookCase(false, 1, AtlasErrors.AllocateValueFail.selector);
     }
 
@@ -463,11 +466,6 @@ contract EscrowTest is BaseTest {
             .withBidAmount(bidAmount)
             .signAndBuild(address(atlasVerification), solverOnePK);
 
-        console.log("DApp control balance", address(gasSponsorControl).balance);
-        console.log("Solver balance", address(dummySolver).balance);
-        console.log("Bid amount (to trigger partial)", bidAmount);
-        console.log("Solver bonded amt", atlas.balanceOfBonded(solverOneEOA));
-
         uint256 expectedResult = 0; // Success expected
         executeSolverOperationCase(userOp, solverOps, true, true, expectedResult, false);
     }
@@ -479,7 +477,6 @@ contract EscrowTest is BaseTest {
         uint256 solverOpValue = address(atlas).balance;
         assertTrue(solverOpValue > 0, "solverOpValue must be greater than 0");
         
-
         deal(address(solver), 10e18); // plenty of ETH to repay what solver owes
 
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
@@ -494,6 +491,67 @@ contract EscrowTest is BaseTest {
         (bool success,) = address(atlas).call(abi.encodeCall(atlas.metacall, (userOp, solverOps, dappOp)));
         assertTrue(success, "metacall should have succeeded");
     }
+
+    function test_executeSolverOperation_ForwardReturnData_True() public {
+        // Checks that the solver CAN receive the data returned from the userOp phase
+        uint256 expectedDataValue = 123;
+        DummySolverContributor solver = new DummySolverContributor(address(atlas));
+        assertEq(solver.forwardedData().length, 0, "solver forwardedData should start empty");
+        deal(address(solver), 1 ether); // 1 ETH covers default bid (1) + 0.5 ETH gas cost
+
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
+            defaultCallConfig()
+            .withTrackUserReturnData(true)
+            .withForwardReturnData(true)
+            .withRequireFulfillment(true)
+            .build()
+        );
+
+        userOp = validUserOperation(address(dAppControl))
+            .withData(abi.encodeWithSelector(dAppControl.userOperationCall.selector, false, expectedDataValue))
+            .signAndBuild(address(atlasVerification), userPK);
+
+        solverOps[0] = validSolverOperation(userOp)
+            .withSolver(address(solver))
+            .withBidAmount(defaultBidAmount)
+            .signAndBuild(address(atlasVerification), solverOnePK);
+
+        uint256 result = 0; // Success
+        executeSolverOperationCase(userOp, solverOps, true, true, result, false);
+
+        uint256 forwardedData = abi.decode(solver.forwardedData(), (uint256));
+        assertEq(forwardedData, expectedDataValue, "solver should have received the userOp data");
+    }
+
+    function test_executeSolverOperation_ForwardReturnData_False() public {
+        // Checks that the solver CANNOT receive the data returned from the userOp phase
+        uint256 dataValue = 123;
+        DummySolverContributor solver = new DummySolverContributor(address(atlas));
+        assertEq(solver.forwardedData().length, 0, "solver forwardedData should start empty");
+        deal(address(solver), 1 ether); // 1 ETH covers default bid (1) + 0.5 ETH gas cost
+
+        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
+            defaultCallConfig()
+            .withTrackUserReturnData(true)
+            .withForwardReturnData(false)
+            .withRequireFulfillment(true)
+            .build()
+        );
+
+        userOp = validUserOperation(address(dAppControl))
+            .withData(abi.encodeWithSelector(dAppControl.userOperationCall.selector, false, dataValue))
+            .signAndBuild(address(atlasVerification), userPK);
+
+        solverOps[0] = validSolverOperation(userOp)
+            .withSolver(address(solver))
+            .withBidAmount(defaultBidAmount)
+            .signAndBuild(address(atlasVerification), solverOnePK);
+
+        uint256 result = 0; // Success
+        executeSolverOperationCase(userOp, solverOps, true, true, result, false);
+        assertEq(solver.forwardedData().length, 0, "solver forwardedData should still be empty");
+    }
+
 
     function test_executeSolverOperation_solverOpWrapper_defaultCase() public {
         // Can't find a way to reach the default case (which is a good thing)
@@ -547,7 +605,7 @@ contract DummySolver {
     }
 
     function atlasSolverCall(
-        address solverOpFrom,
+        address /* solverOpFrom */,
         address executionEnvironment,
         address,
         uint256 bidAmount,
@@ -567,7 +625,6 @@ contract DummySolver {
         if (address(this).balance >= bidAmount) {
             SafeTransferLib.safeTransferETH(executionEnvironment, bidAmount);
         }
-
         
         if (bidAmount == noGasPayBack) {
             // Don't pay gas
@@ -575,10 +632,6 @@ contract DummySolver {
         } else if (bidAmount == partialGasPayBack) {
             // Only pay half of shortfall owed - expect postSolverCall hook in DAppControl to pay the rest
             uint256 _shortfall = IAtlas(_atlas).shortfall();
-
-            console.log("Solver shortfall", _shortfall);
-            console.log("gas price", tx.gasprice);
-
             IAtlas(_atlas).reconcile(_shortfall / 2);
             return;
         }
@@ -591,31 +644,34 @@ contract DummySolver {
 }
 
 contract DummySolverContributor {
-    address private _atlas;
+    address private immutable ATLAS;
+    bytes public forwardedData;
 
     constructor(address atlas) {
-        _atlas = atlas;
+        ATLAS = atlas;
     }
 
     function atlasSolverCall(
-        address solverOpFrom,
+        address /* solverOpFrom */,
         address executionEnvironment,
         address,
         uint256 bidAmount,
         bytes calldata,
-        bytes calldata
+        bytes calldata userReturnData
     )
         external
         payable
     {
+        if (userReturnData.length > 0) forwardedData = userReturnData;
+
         // Pay bid
         if (address(this).balance >= bidAmount) {
             SafeTransferLib.safeTransferETH(executionEnvironment, bidAmount);
         }
 
         // Pay borrowed ETH + gas used
-        uint256 shortfall = IAtlas(_atlas).shortfall();
-        IAtlas(_atlas).reconcile{value: shortfall}(0);
+        uint256 shortfall = IAtlas(ATLAS).shortfall();
+        IAtlas(ATLAS).reconcile{value: shortfall}(0);
 
         return;
     }
