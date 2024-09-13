@@ -15,16 +15,17 @@ contract BaseGasCalculator is IL2GasCalculator, Ownable {
     uint256 internal constant _CALLDATA_LENGTH_PREMIUM = 32;
     uint256 internal constant _BASE_TRANSACTION_GAS_USED = 21_000;
 
-    address public immutable gasPriceOracle;
+    address public immutable GAS_PRICE_ORACLE;
     int256 public calldataLengthOffset;
 
-    constructor(address _gasPriceOracle, int256 _calldataLengthOffset) Ownable(msg.sender) {
-        gasPriceOracle = _gasPriceOracle;
-        calldataLengthOffset = _calldataLengthOffset;
+    constructor(address gasPriceOracle, int256 calldataLenOffset) Ownable(msg.sender) {
+        GAS_PRICE_ORACLE = gasPriceOracle;
+        calldataLengthOffset = calldataLenOffset;
     }
 
     /// @notice Calculate the cost of calldata in ETH on a L2 with a different fee structure than mainnet
     /// @param calldataLength The length of the calldata in bytes
+    /// @return calldataCost The cost of the calldata in ETH
     function getCalldataCost(uint256 calldataLength) external view override returns (uint256 calldataCost) {
         // `getL1FeeUpperBound` returns the upper bound of the L1 fee in wei. It expects an unsigned transaction size in
         // bytes, *not calldata length only*, which makes this function a rough estimate.
@@ -41,12 +42,14 @@ contract BaseGasCalculator is IL2GasCalculator, Ownable {
             calldataLength -= 68;
         }
 
-        if (calldataLengthOffset < 0 && calldataLength < uint256(-calldataLengthOffset)) {
+        int256 _calldataLenOffset = calldataLengthOffset;
+        
+        if (_calldataLenOffset < 0 && calldataLength < uint256(-_calldataLenOffset)) {
             return calldataCost;
         }
 
-        calldataLength += uint256(calldataLengthOffset);
-        calldataCost += IGasPriceOracle(gasPriceOracle).getL1FeeUpperBound(calldataLength);
+        calldataLength += uint256(_calldataLenOffset);
+        calldataCost += IGasPriceOracle(GAS_PRICE_ORACLE).getL1FeeUpperBound(calldataLength);
     }
 
     /// @notice Gets the cost of initial gas used for a transaction with a different calldata fee than mainnet
@@ -57,7 +60,7 @@ contract BaseGasCalculator is IL2GasCalculator, Ownable {
 
     /// @notice Sets the calldata length offset
     /// @param _calldataLengthOffset The new calldata length offset
-    function setCalldataLengthOffset(int256 _calldataLengthOffset) external onlyOwner {
-        calldataLengthOffset = _calldataLengthOffset;
+    function setCalldataLengthOffset(int256 calldataLenOffset) external onlyOwner {
+        calldataLengthOffset = calldataLenOffset;
     }
 }
