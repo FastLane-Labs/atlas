@@ -43,7 +43,7 @@ contract BaseGasCalculator is IL2GasCalculator, Ownable {
         }
 
         int256 _calldataLenOffset = calldataLengthOffset;
-        
+
         if (_calldataLenOffset < 0 && calldataLength < uint256(-_calldataLenOffset)) {
             return calldataCost;
         }
@@ -59,7 +59,7 @@ contract BaseGasCalculator is IL2GasCalculator, Ownable {
     }
 
     /// @notice Sets the calldata length offset
-    /// @param _calldataLengthOffset The new calldata length offset
+    /// @param calldataLenOffset The new calldata length offset
     function setCalldataLengthOffset(int256 calldataLenOffset) external onlyOwner {
         calldataLengthOffset = calldataLenOffset;
     }
