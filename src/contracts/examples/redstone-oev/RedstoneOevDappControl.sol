@@ -42,7 +42,7 @@ contract RedstoneOevDappControl is DAppControl {
                 requirePostSolver: false,
                 requirePostOps: false,
                 zeroSolvers: true, // oracle updates can be made without solvers and no OEV
-                reuseUserOp: false,
+                reuseUserOp: true,
                 userAuctioneer: true,
                 solverAuctioneer: false,
                 unknownAuctioneer: false,
