@@ -14,6 +14,13 @@ library CallConfigBuilder {
 }
 
 contract DummyDAppControl is DAppControl {
+    bool public preOpsShouldRevert;
+    bool public userOpShouldRevert;
+    bool public preSolverShouldRevert;
+    bool public postSolverShouldRevert;
+    bool public allocateValueShouldRevert;
+    bool public postOpsShouldRevert;
+
     event MEVPaymentSuccess(address bidToken, uint256 bidAmount);
 
     constructor(
@@ -78,7 +85,7 @@ contract DummyDAppControl is DAppControl {
             return;
         }
 
-        (bool shouldRevert) = abi.decode(data, (bool));
+        bool shouldRevert = DummyDAppControl(CONTROL).allocateValueShouldRevert();
         require(!shouldRevert, "_allocateValueCall revert requested");
         emit MEVPaymentSuccess(bidToken, winningAmount);
     }
@@ -96,5 +103,31 @@ contract DummyDAppControl is DAppControl {
     function userOperationCall(bool shouldRevert, uint256 returnValue) public pure returns (uint256) {
         require(!shouldRevert, "userOperationCall revert requested");
         return returnValue;
+    }
+
+    // Revert settings
+
+    function setPreOpsShouldRevert(bool _preOpsShouldRevert) public {
+        preOpsShouldRevert = _preOpsShouldRevert;
+    }
+
+    function setUserOpShouldRevert(bool _userOpShouldRevert) public {
+        userOpShouldRevert = _userOpShouldRevert;
+    }
+
+    function setPreSolverShouldRevert(bool _preSolverShouldRevert) public {
+        preSolverShouldRevert = _preSolverShouldRevert;
+    }
+
+    function setPostSolverShouldRevert(bool _postSolverShouldRevert) public {
+        postSolverShouldRevert = _postSolverShouldRevert;
+    }
+
+    function setAllocateValueShouldRevert(bool _allocateValueShouldRevert) public {
+        allocateValueShouldRevert = _allocateValueShouldRevert;
+    }
+
+    function setPostOpsShouldRevert(bool _postOpsShouldRevert) public {
+        postOpsShouldRevert = _postOpsShouldRevert;
     }
 }
