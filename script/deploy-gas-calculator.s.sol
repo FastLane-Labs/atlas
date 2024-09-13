@@ -33,8 +33,8 @@ contract DeployGasCalculatorScript is DeployBaseScript {
         if (chainId == 8453 || chainId == 84_532) {
             // Base or Base Sepolia
             BaseGasCalculator gasCalculator = new BaseGasCalculator({
-                _gasPriceOracle: BASE_GAS_PRICE_ORACLE,
-                _calldataLengthOffset: BASE_CALLDATA_LENGTH_OFFSET
+                gasPriceOracle: BASE_GAS_PRICE_ORACLE,
+                calldataLenOffset: BASE_CALLDATA_LENGTH_OFFSET
             });
             deploymentAddr = address(gasCalculator);
         } else {
