@@ -3,14 +3,15 @@ pragma solidity 0.8.25;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
-import { SafetyLocks } from "src/contracts/atlas/SafetyLocks.sol";
-import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
-import { AccountingMath } from "src/contracts/libraries/AccountingMath.sol";
-import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
-import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
-import { IL2GasCalculator } from "src/contracts/interfaces/IL2GasCalculator.sol";
-import "src/contracts/types/EscrowTypes.sol";
-import "src/contracts/types/LockTypes.sol";
+
+import { SafetyLocks } from "./SafetyLocks.sol";
+import { EscrowBits } from "../libraries/EscrowBits.sol";
+import { AccountingMath } from "../libraries/AccountingMath.sol";
+import { SolverOperation } from "../types/SolverOperation.sol";
+import { DAppConfig } from "../types/ConfigTypes.sol";
+import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
+import "../types/EscrowTypes.sol";
+import "../types/LockTypes.sol";
 
 /// @title GasAccounting
 /// @author FastLane Labs

@@ -3,8 +3,8 @@ pragma solidity 0.8.25;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
-import { Permit69 } from "src/contracts/atlas/Permit69.sol";
-import "src/contracts/types/EscrowTypes.sol";
+import { Permit69 } from "./Permit69.sol";
+import "../types/EscrowTypes.sol";
 
 /// @author FastLane Labs
 /// @dev Do not manually set balances without updating totalSupply, as the sum of all user balances must not exceed it.
