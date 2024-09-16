@@ -21,6 +21,8 @@ contract DummyDAppControl is DAppControl {
     bool public allocateValueShouldRevert;
     bool public postOpsShouldRevert;
 
+    // TODO add storage vars to store input data for each hook, then test hooks were passed the correct data
+
     event MEVPaymentSuccess(address bidToken, uint256 bidAmount);
 
     constructor(
@@ -38,38 +40,49 @@ contract DummyDAppControl is DAppControl {
     function _checkUserOperation(UserOperation memory) internal pure virtual override { }
 
     function _preOpsCall(UserOperation calldata userOp) internal virtual override returns (bytes memory) {
-        if (userOp.data.length == 0) {
-            return new bytes(0);
-        }
+        bool shouldRevert = DummyDAppControl(CONTROL).preOpsShouldRevert();
+        require(!shouldRevert, "_preOpsCall revert requested");
 
-        (bool success, bytes memory data) = address(userOp.dapp).call(userOp.data);
-        require(success, "_preOpsCall reverted");
+        if (userOp.data.length == 0) return new bytes(0);
+
+        (, bytes memory data) = address(userOp.dapp).call(userOp.data);
         return data;
     }
 
-    function _postOpsCall(bool, bytes calldata data) internal pure virtual override {
+    function _postOpsCall(bool, bytes calldata data) internal view virtual override {
+        bool shouldRevert = DummyDAppControl(CONTROL).postOpsShouldRevert();
+        require(!shouldRevert, "_postOpsCall revert requested");
         if (data.length == 0) return;
 
-        (bool shouldRevert) = abi.decode(data, (bool));
-        require(!shouldRevert, "_postOpsCall revert requested");
+        // TODO store input data and check it was passed correctly in Escrow.t.sol
+        // (bool shouldRevert) = abi.decode(data, (bool));
+        // require(!shouldRevert, "_postOpsCall revert requested");
     }
 
     function _preSolverCall(SolverOperation calldata, bytes calldata returnData) internal view virtual override {
+        bool shouldRevert = DummyDAppControl(CONTROL).preSolverShouldRevert();
+        require(!shouldRevert, "_preSolverCall revert requested");
+
         if (returnData.length == 0) {
             return;
         }
 
-        (bool shouldRevert) = abi.decode(returnData, (bool));
-        require(!shouldRevert, "_preSolverCall revert requested");
+        // TODO store input data and check it was passed correctly in Escrow.t.sol
+        // (bool shouldRevert) = abi.decode(returnData, (bool));
+        // require(!shouldRevert, "_preSolverCall revert requested");
     }
 
-    function _postSolverCall(SolverOperation calldata, bytes calldata returnData) internal pure virtual override {
+    function _postSolverCall(SolverOperation calldata, bytes calldata returnData) internal view virtual override {
+        bool shouldRevert = DummyDAppControl(CONTROL).postSolverShouldRevert();
+        require(!shouldRevert, "_postSolverCall revert requested");
+
         if (returnData.length == 0) {
             return;
         }
 
-        (bool shouldRevert) = abi.decode(returnData, (bool));
-        require(!shouldRevert, "_postSolverCall revert requested");
+        // TODO store input data and check it was passed correctly in Escrow.t.sol
+        // (bool shouldRevert) = abi.decode(returnData, (bool));
+        // require(!shouldRevert, "_postSolverCall revert requested");
     }
 
     function _allocateValueCall(
@@ -81,12 +94,10 @@ contract DummyDAppControl is DAppControl {
         virtual
         override
     {
-        if (data.length == 0) {
-            return;
-        }
-
         bool shouldRevert = DummyDAppControl(CONTROL).allocateValueShouldRevert();
         require(!shouldRevert, "_allocateValueCall revert requested");
+
+        // TODO store input data and check it was passed correctly in Escrow.t.sol
         emit MEVPaymentSuccess(bidToken, winningAmount);
     }
 
@@ -100,8 +111,11 @@ contract DummyDAppControl is DAppControl {
     // Custom functions
     // ****************************************
 
-    function userOperationCall(bool shouldRevert, uint256 returnValue) public pure returns (uint256) {
+    function userOperationCall(uint256 returnValue) public view returns (uint256) {
+        bool shouldRevert = DummyDAppControl(CONTROL).userOpShouldRevert();
         require(!shouldRevert, "userOperationCall revert requested");
+
+        // TODO store input data and check it was passed correctly in Escrow.t.sol
         return returnValue;
     }
 

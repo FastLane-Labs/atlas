@@ -143,7 +143,7 @@ contract EscrowTest is BaseTest {
                 .withAllowAllocateValueFailure(true) // Allow the value allocation to fail
                 .build()
         );
-        executeHookCase(false, block.timestamp * 2, noError);
+        executeHookCase(block.timestamp * 2, noError);
     }
 
     // Ensure metacall reverts with the proper error when the preOps hook reverts.
@@ -154,7 +154,8 @@ contract EscrowTest is BaseTest {
                 .withReuseUserOp(true) // Allow metacall to revert
                 .build()
         );
-        executeHookCase(true, 0, AtlasErrors.PreOpsFail.selector);
+        dAppControl.setPreOpsShouldRevert(true);
+        executeHookCase(0, AtlasErrors.PreOpsFail.selector);
     }
 
     // Ensure the user operation executes successfully. To ensure the operation's returned data is as expected, we
@@ -168,7 +169,7 @@ contract EscrowTest is BaseTest {
                 .withAllowAllocateValueFailure(true) // Allow the value allocation to fail
                 .build()
         );
-        executeHookCase(false, block.timestamp * 3, noError);
+        executeHookCase(block.timestamp * 3, noError);
     }
 
     // Ensure metacall reverts with the proper error when the user operation reverts.
@@ -178,7 +179,8 @@ contract EscrowTest is BaseTest {
                 .withReuseUserOp(true) // Allow metacall to revert
                 .build()
         );
-        executeHookCase(true, 0, AtlasErrors.UserOpFail.selector);
+        dAppControl.setUserOpShouldRevert(true);
+        executeHookCase(0, AtlasErrors.UserOpFail.selector);
     }
 
     // Ensure metacall reverts with the proper error when the allocateValue hook reverts.
@@ -194,7 +196,7 @@ contract EscrowTest is BaseTest {
 
         dAppControl.setAllocateValueShouldRevert(true);
 
-        executeHookCase(false, 1, AtlasErrors.AllocateValueFail.selector);
+        executeHookCase(1, AtlasErrors.AllocateValueFail.selector);
     }
 
     // Ensure the postOps hook is successfully called. No return data is expected from the postOps hook, so we do not
@@ -205,7 +207,7 @@ contract EscrowTest is BaseTest {
                 .withRequirePostOps(true) // Execute the postOps hook
                 .build()
         );
-        executeHookCase(false, 0, noError);
+        executeHookCase(0, noError);
     }
 
     // Ensure metacall reverts with the proper error when the postOps hook reverts.
@@ -219,7 +221,8 @@ contract EscrowTest is BaseTest {
                 .withAllowAllocateValueFailure(true) // Allow the value allocation to fail
                 .build()
         );
-        executeHookCase(false, 1, AtlasErrors.PostOpsFail.selector);
+        dAppControl.setPostOpsShouldRevert(true);
+        executeHookCase(1, AtlasErrors.PostOpsFail.selector);
     }
 
     // Ensure the allocateValue hook is successfully called. No return data is expected from the allocateValue hook, so
@@ -237,17 +240,16 @@ contract EscrowTest is BaseTest {
 
         vm.expectEmit(false, false, false, true, executionEnvironment);
         emit MEVPaymentSuccess(address(0), defaultBidAmount);
-        this.executeHookCase(false, 0, noError);
+        this.executeHookCase(0, noError);
     }
 
-    function executeHookCase(bool hookShouldRevert, uint256 expectedHookReturnValue, bytes4 expectedError) public {
+    function executeHookCase(uint256 expectedHookReturnValue, bytes4 expectedError) public {
         bool revertExpected = expectedError != noError;
 
         UserOperation memory userOp = validUserOperation(address(dAppControl))
             .withData(
                 abi.encodeWithSelector(
                     dAppControl.userOperationCall.selector,
-                    hookShouldRevert,
                     expectedHookReturnValue
                 )
             )
@@ -385,7 +387,7 @@ contract EscrowTest is BaseTest {
         );
 
         UserOperation memory userOp = validUserOperation(address(dAppControl))
-            .withData(abi.encodeWithSelector(dAppControl.userOperationCall.selector, false, 1))
+            .withData(abi.encodeWithSelector(dAppControl.userOperationCall.selector, 1))
             .signAndBuild(address(atlasVerification), userPK);
         
         SolverOperation[] memory solverOps = new SolverOperation[](1);
@@ -394,6 +396,8 @@ contract EscrowTest is BaseTest {
             .signAndBuild(address(atlasVerification), solverOnePK);
 
         uint256 result = (1 << uint256(SolverOutcome.PreSolverFailed));
+        dAppControl.setPreSolverShouldRevert(true);
+
         executeSolverOperationCase(userOp, solverOps, false, false, result, true);
     }
 
@@ -409,7 +413,7 @@ contract EscrowTest is BaseTest {
         );
 
         UserOperation memory userOp = validUserOperation(address(dAppControl))
-            .withData(abi.encodeWithSelector(dAppControl.userOperationCall.selector, false, 1))
+            .withData(abi.encodeWithSelector(dAppControl.userOperationCall.selector, 1))
             .signAndBuild(address(atlasVerification), userPK);
         
         SolverOperation[] memory solverOps = new SolverOperation[](1);
@@ -418,6 +422,8 @@ contract EscrowTest is BaseTest {
             .signAndBuild(address(atlasVerification), solverOnePK);
         
         uint256 result = (1 << uint256(SolverOutcome.PostSolverFailed));
+        dAppControl.setPostSolverShouldRevert(true);
+
         executeSolverOperationCase(userOp, solverOps, true, false, result, true);
     }
 
@@ -508,7 +514,7 @@ contract EscrowTest is BaseTest {
         );
 
         userOp = validUserOperation(address(dAppControl))
-            .withData(abi.encodeWithSelector(dAppControl.userOperationCall.selector, false, expectedDataValue))
+            .withData(abi.encodeWithSelector(dAppControl.userOperationCall.selector, expectedDataValue))
             .signAndBuild(address(atlasVerification), userPK);
 
         solverOps[0] = validSolverOperation(userOp)
@@ -539,7 +545,7 @@ contract EscrowTest is BaseTest {
         );
 
         userOp = validUserOperation(address(dAppControl))
-            .withData(abi.encodeWithSelector(dAppControl.userOperationCall.selector, false, dataValue))
+            .withData(abi.encodeWithSelector(dAppControl.userOperationCall.selector, dataValue))
             .signAndBuild(address(atlasVerification), userPK);
 
         solverOps[0] = validSolverOperation(userOp)
@@ -565,7 +571,7 @@ contract EscrowTest is BaseTest {
         defaultAtlasWithCallConfig(callConfig);
 
         userOp = validUserOperation(address(dAppControl))
-            .withData(abi.encodeWithSelector(dAppControl.userOperationCall.selector, false, 0))
+            .withData(abi.encodeWithSelector(dAppControl.userOperationCall.selector, 0))
             .signAndBuild(address(atlasVerification), userPK);
         
         solverOps = new SolverOperation[](1);
