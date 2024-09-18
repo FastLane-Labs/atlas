@@ -143,7 +143,10 @@ contract EscrowTest is BaseTest {
                 .withAllowAllocateValueFailure(true) // Allow the value allocation to fail
                 .build()
         );
-        executeHookCase(block.timestamp * 2, noError);
+
+        (UserOperation memory userOp,,) = executeHookCase(block.timestamp * 2, noError);
+        bytes memory expectedInput = abi.encode(userOp);
+        assertEq(expectedInput, dAppControl.preOpsInputData(), "preOpsInputData should match expectedInput");
     }
 
     // Ensure metacall reverts with the proper error when the preOps hook reverts.
@@ -170,6 +173,8 @@ contract EscrowTest is BaseTest {
                 .build()
         );
         executeHookCase(block.timestamp * 3, noError);
+        bytes memory expectedInput = abi.encode(block.timestamp * 3);
+        assertEq(expectedInput, dAppControl.userOpInputData(), "userOpInputData should match expectedInput");
     }
 
     // Ensure metacall reverts with the proper error when the user operation reverts.
@@ -195,7 +200,6 @@ contract EscrowTest is BaseTest {
         );
 
         dAppControl.setAllocateValueShouldRevert(true);
-
         executeHookCase(1, AtlasErrors.AllocateValueFail.selector);
     }
 
@@ -208,6 +212,8 @@ contract EscrowTest is BaseTest {
                 .build()
         );
         executeHookCase(0, noError);
+        bytes memory expectedInput = abi.encode(true, new bytes(0));
+        assertEq(expectedInput, dAppControl.postOpsInputData(), "postOpsInputData should match expectedInput");
     }
 
     // Ensure metacall reverts with the proper error when the postOps hook reverts.
@@ -234,19 +240,22 @@ contract EscrowTest is BaseTest {
                 .withTrackUserReturnData(true) // Track the user operation's return data
                 .build()
         );
+        uint256 userOpArg = 321;
 
-        vm.prank(userEOA);
-        address executionEnvironment = atlas.createExecutionEnvironment(userEOA, address(dAppControl));
+        executeHookCase(userOpArg, noError);
 
-        vm.expectEmit(false, false, false, true, executionEnvironment);
-        emit MEVPaymentSuccess(address(0), defaultBidAmount);
-        this.executeHookCase(0, noError);
+        bytes memory expectedInput = abi.encode(address(0), defaultBidAmount, abi.encode(userOpArg));
+        assertEq(expectedInput, dAppControl.allocateValueInputData(), "allocateValueInputData should match expectedInput");
     }
 
-    function executeHookCase(uint256 expectedHookReturnValue, bytes4 expectedError) public {
+    function executeHookCase(uint256 expectedHookReturnValue, bytes4 expectedError) public returns(
+        UserOperation memory userOp,
+        SolverOperation[] memory solverOps,
+        DAppOperation memory dappOp
+    ) {
         bool revertExpected = expectedError != noError;
 
-        UserOperation memory userOp = validUserOperation(address(dAppControl))
+        userOp = validUserOperation(address(dAppControl))
             .withData(
                 abi.encodeWithSelector(
                     dAppControl.userOperationCall.selector,
@@ -255,13 +264,13 @@ contract EscrowTest is BaseTest {
             )
             .signAndBuild(address(atlasVerification), userPK);
 
-        SolverOperation[] memory solverOps = new SolverOperation[](1);
+        solverOps = new SolverOperation[](1);
         solverOps[0] = validSolverOperation(userOp)
             .withBidAmount(defaultBidAmount)
             .withData(abi.encode(expectedHookReturnValue))
             .signAndBuild(address(atlasVerification), solverOnePK);
 
-        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+        dappOp = validDAppOperation(userOp, solverOps).build();
 
         if (revertExpected) {
             vm.expectRevert(expectedError);
