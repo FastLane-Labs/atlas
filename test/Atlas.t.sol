@@ -3,22 +3,23 @@ pragma solidity 0.8.25;
 
 import "forge-std/Test.sol";
 
-import { BaseTest } from "test/base/BaseTest.t.sol";
-import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
-import { UserOperationBuilder } from "test/base/builders/UserOperationBuilder.sol";
-
-import { Atlas } from "src/contracts/atlas/Atlas.sol";
-import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
-import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
-import { Sorter } from "src/contracts/helpers/Sorter.sol";
-import { Simulator } from "src/contracts/helpers/Simulator.sol";
-import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
-import { UserOperation } from "src/contracts/types/UserOperation.sol";
-import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/DAppOperation.sol";
-import "src/contracts/types/LockTypes.sol";
-
 import { LibSort } from "solady/utils/LibSort.sol";
+
+import { BaseTest } from "./base/BaseTest.t.sol";
+import { UserOperationBuilder } from "./base/builders/UserOperationBuilder.sol";
+
+import { Atlas } from "../src/contracts/atlas/Atlas.sol";
+import { AtlasVerification } from "../src/contracts/atlas/AtlasVerification.sol";
+import { ExecutionEnvironment } from "../src/contracts/common/ExecutionEnvironment.sol";
+import { Sorter } from "../src/contracts/helpers/Sorter.sol";
+import { Simulator } from "../src/contracts/helpers/Simulator.sol";
+import { SolverOperation } from "../src/contracts/types/SolverOperation.sol";
+import { UserOperation } from "../src/contracts/types/UserOperation.sol";
+import { DAppConfig } from "../src/contracts/types/ConfigTypes.sol";
+import "../src/contracts/types/DAppOperation.sol";
+import "../src/contracts/types/LockTypes.sol";
+import { TxBuilder } from "../src/contracts/helpers/TxBuilder.sol";
+
 
 // These tests focus on the functions found in the Atlas.sol file
 contract AtlasTest is BaseTest {

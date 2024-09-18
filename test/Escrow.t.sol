@@ -5,12 +5,12 @@ import "forge-std/Test.sol";
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
-import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
-import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
-import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
-import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
-import { CallBits } from "src/contracts/libraries/CallBits.sol";
-import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
+import { IAtlas } from "../src/contracts/interfaces/IAtlas.sol";
+import { IDAppControl } from "../src/contracts/interfaces/IDAppControl.sol";
+import { AtlasEvents } from "../src/contracts/types/AtlasEvents.sol";
+import { AtlasErrors } from "../src/contracts/types/AtlasErrors.sol";
+import { CallBits } from "../src/contracts/libraries/CallBits.sol";
+import { EscrowBits } from "../src/contracts/libraries/EscrowBits.sol";
 
 import { DummyDAppControl } from "./base/DummyDAppControl.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
@@ -21,11 +21,11 @@ import { SolverOperationBuilder } from "./base/builders/SolverOperationBuilder.s
 import { DAppOperationBuilder } from "./base/builders/DAppOperationBuilder.sol";
 import { GasSponsorDAppControl } from "./base/GasSponsorDAppControl.sol";
 
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/DAppOperation.sol";
-import "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/EscrowTypes.sol";
+import "../src/contracts/types/UserOperation.sol";
+import "../src/contracts/types/SolverOperation.sol";
+import "../src/contracts/types/DAppOperation.sol";
+import "../src/contracts/types/ConfigTypes.sol";
+import "../src/contracts/types/EscrowTypes.sol";
 
 contract EscrowTest is BaseTest {
     using CallBits for CallConfig;

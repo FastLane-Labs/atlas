@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
+import { TxBuilder } from "../src/contracts/helpers/TxBuilder.sol";
 
-import { IUniswapV2Pair } from "src/contracts/examples/v2-example/interfaces/IUniswapV2Pair.sol";
+import { IUniswapV2Pair } from "../src/contracts/examples/v2-example/interfaces/IUniswapV2Pair.sol";
 
-import { BlindBackrun } from "src/contracts/solver/src/BlindBackrun/BlindBackrun.sol";
+import { BlindBackrun } from "../src/contracts/solver/src/BlindBackrun/BlindBackrun.sol";
 
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/EscrowTypes.sol";
-import "src/contracts/types/LockTypes.sol";
-import "src/contracts/types/ConfigTypes.sol";
+import "../src/contracts/types/SolverOperation.sol";
+import "../src/contracts/types/UserOperation.sol";
+import "../src/contracts/types/ConfigTypes.sol";
+import "../src/contracts/types/EscrowTypes.sol";
+import "../src/contracts/types/LockTypes.sol";
+import "../src/contracts/types/ConfigTypes.sol";
 
 import "forge-std/Test.sol";
 

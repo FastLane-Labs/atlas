@@ -3,10 +3,10 @@ pragma solidity 0.8.25;
 
 import "forge-std/Test.sol";
 
-import { Storage } from "src/contracts/atlas/Storage.sol";
-import "src/contracts/types/LockTypes.sol";
+import { Storage } from "../src/contracts/atlas/Storage.sol";
+import "../src/contracts/types/LockTypes.sol";
 
-import { BaseTest } from "test/base/BaseTest.t.sol";
+import { BaseTest } from "./base/BaseTest.t.sol";
 
 contract StorageTest is BaseTest {
     using stdStorage for StdStorage;

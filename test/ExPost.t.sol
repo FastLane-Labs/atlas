@@ -1,31 +1,27 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
+import "forge-std/Test.sol";
+
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
+import { IExecutionEnvironment } from "../src/contracts/interfaces/IExecutionEnvironment.sol";
+import { Atlas } from "../src/contracts/atlas/Atlas.sol";
+import { Result } from "../src/contracts/helpers/Simulator.sol";
+import { V2ExPost } from "../src/contracts/examples/ex-post-mev-example/V2ExPost.sol";
+import { SolverExPost } from "../src/contracts/solver/src/TestSolverExPost.sol";
+import { AtlasEvents } from "../src/contracts/types/AtlasEvents.sol";
 
-import { Atlas } from "src/contracts/atlas/Atlas.sol";
-
-import { Result } from "src/contracts/helpers/Simulator.sol";
-
-import { V2ExPost } from "src/contracts/examples/ex-post-mev-example/V2ExPost.sol";
-
-import { SolverExPost } from "src/contracts/solver/src/TestSolverExPost.sol";
-
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/EscrowTypes.sol";
-import "src/contracts/types/LockTypes.sol";
-import "src/contracts/types/DAppOperation.sol";
-import "src/contracts/types/ConfigTypes.sol";
+import "../src/contracts/types/UserOperation.sol";
+import "../src/contracts/types/SolverOperation.sol";
+import "../src/contracts/types/EscrowTypes.sol";
+import "../src/contracts/types/LockTypes.sol";
+import "../src/contracts/types/DAppOperation.sol";
+import "../src/contracts/types/ConfigTypes.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { V2Helper } from "./V2Helper.sol";
-import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
-
-import "forge-std/Test.sol";
 
 contract ExPostTest is BaseTest {
     /// forge-config: default.gas_price = 15000000000

@@ -3,15 +3,15 @@ pragma solidity 0.8.25;
 
 import "forge-std/Test.sol";
 
-import { Atlas } from "src/contracts/atlas/Atlas.sol";
-import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
-import { Factory } from "src/contracts/atlas/Factory.sol";
-import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
+import { Atlas } from "../src/contracts/atlas/Atlas.sol";
+import { AtlasVerification } from "../src/contracts/atlas/AtlasVerification.sol";
+import { Factory } from "../src/contracts/atlas/Factory.sol";
+import { ExecutionEnvironment } from "../src/contracts/common/ExecutionEnvironment.sol";
 import { DummyDAppControl, CallConfigBuilder } from "./base/DummyDAppControl.sol";
-import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
-import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import { AtlasEvents } from "../src/contracts/types/AtlasEvents.sol";
+import { AtlasErrors } from "../src/contracts/types/AtlasErrors.sol";
 
-import "src/contracts/types/UserOperation.sol";
+import "../src/contracts/types/UserOperation.sol";
 
 import "./base/TestUtils.sol";
 
