@@ -21,7 +21,6 @@ contract DummyDAppControl is DAppControl {
     bool public allocateValueShouldRevert;
     bool public postOpsShouldRevert;
 
-    // TODO add storage vars to store input data for each hook, then test hooks were passed the correct data
     bytes public preOpsInputData;
     bytes public userOpInputData;
     bytes public preSolverInputData;
