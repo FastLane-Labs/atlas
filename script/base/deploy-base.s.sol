@@ -7,15 +7,15 @@ import "forge-std/StdJson.sol";
 
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-import { Atlas } from "src/contracts/atlas/Atlas.sol";
-import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
-import { SwapIntentDAppControl } from "src/contracts/examples/intents-example/SwapIntentDAppControl.sol";
-import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
-import { Simulator } from "src/contracts/helpers/Simulator.sol";
-import { Sorter } from "src/contracts/helpers/Sorter.sol";
-import { SimpleRFQSolver } from "test/SwapIntent.t.sol";
+import { Atlas } from "../../src/contracts/atlas/Atlas.sol";
+import { AtlasVerification } from "../../src/contracts/atlas/AtlasVerification.sol";
+import { SwapIntentDAppControl } from "../../src/contracts/examples/intents-example/SwapIntentDAppControl.sol";
+import { TxBuilder } from "../../src/contracts/helpers/TxBuilder.sol";
+import { Simulator } from "../../src/contracts/helpers/Simulator.sol";
+import { Sorter } from "../../src/contracts/helpers/Sorter.sol";
+import { SimpleRFQSolver } from "../../test/SwapIntent.t.sol";
 
-import { Utilities } from "src/contracts/helpers/Utilities.sol";
+import { Utilities } from "../../src/contracts/helpers/Utilities.sol";
 
 contract DeployBaseScript is Script {
     using stdJson for string;
