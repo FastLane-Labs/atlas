@@ -7,11 +7,16 @@ import "src/contracts/types/UserOperation.sol";
 import "src/contracts/types/SolverOperation.sol";
 import "./RedstoneAdapterAtlasWrapper.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
+import { IRedstoneAdapter } from
+    "lib/redstone-oracles-monorepo/packages/on-chain-relayer/contracts/core/IRedstoneAdapter.sol";
 
 contract RedstoneOevDappControl is DAppControl {
-    error FailedToAllocateOEV();
     error OnlyGovernance();
     error OnlyWhitelistedBundlerAllowed();
+    error OnlyWhitelistedOracleAllowed();
+    error InvalidUserDestination();
+    error InvalidUserEntryCall();
+    error InvalidUserUpdateCall();
     error OracleUpdateFailed();
 
     uint256 public bundlerOEVPercent;
@@ -21,6 +26,9 @@ contract RedstoneOevDappControl is DAppControl {
 
     mapping(address bundler => bool isWhitelisted) public bundlerWhitelist;
     uint32 public NUM_WHITELISTED_BUNDLERS = 0;
+
+    mapping(address oracle => bool isWhitelisted) public oracleWhitelist;
+    uint32 public NUM_WHITELISTED_ORACLES = 0;
 
     constructor(
         address _atlas,
@@ -34,14 +42,14 @@ contract RedstoneOevDappControl is DAppControl {
             CallConfig({
                 userNoncesSequential: false,
                 dappNoncesSequential: false,
-                requirePreOps: false,
+                requirePreOps: true,
                 trackPreOpsReturnData: false,
                 trackUserReturnData: true,
                 delegateUser: false,
                 requirePreSolver: false,
                 requirePostSolver: false,
                 requirePostOps: false,
-                zeroSolvers: true, // oracle updates can be made without solvers and no OEV
+                zeroSolvers: true, // Oracle updates can be made without solvers and no OEV
                 reuseUserOp: true,
                 userAuctioneer: true,
                 solverAuctioneer: false,
@@ -52,13 +60,22 @@ contract RedstoneOevDappControl is DAppControl {
                 trustedOpHash: false,
                 invertBidValue: false,
                 exPostBids: false,
-                allowAllocateValueFailure: true // oracle updates should go through even if OEV allocation fails
+                allowAllocateValueFailure: true // Oracle updates should go through even if OEV allocation fails
              })
         )
     {
         bundlerOEVPercent = _bundlerOEVPercent;
         atlasOEVPercent = _atlasOEVPercent;
         atlasVault = _atlasVault;
+    }
+
+    // ---------------------------------------------------- //
+    //                   Custom Functions                   //
+    // ---------------------------------------------------- //
+
+    modifier onlyGov() {
+        if (msg.sender != governance) revert OnlyGovernance();
+        _;
     }
 
     function setBundlerOEVPercent(uint256 _bundlerOEVPercent) external onlyGov {
@@ -79,6 +96,15 @@ contract RedstoneOevDappControl is DAppControl {
         oracleVaults[oracle] = _oracleVault;
     }
 
+    // ---------------------------------------------------- //
+    //              Bundler Related Functions               //
+    // ---------------------------------------------------- //
+
+    function verifyBundlerWhitelist() external view {
+        // Whitelisting is enforced only if the whitelist is not empty
+        if (NUM_WHITELISTED_BUNDLERS > 0 && !bundlerWhitelist[_bundler()]) revert OnlyWhitelistedBundlerAllowed();
+    }
+
     function addBundlerToWhitelist(address bundler) external onlyGov {
         if (!bundlerWhitelist[bundler]) {
             bundlerWhitelist[bundler] = true;
@@ -93,22 +119,62 @@ contract RedstoneOevDappControl is DAppControl {
         }
     }
 
-    function _onlyGov() internal view {
-        if (msg.sender != governance) revert OnlyGovernance();
+    // ---------------------------------------------------- //
+    //               Oracle Related Functions               //
+    // ---------------------------------------------------- //
+
+    function verifyOracleWhitelist(address oracle) external view {
+        // Whitelisting is enforced only if the whitelist is not empty
+        if (NUM_WHITELISTED_ORACLES > 0 && !oracleWhitelist[oracle]) revert OnlyWhitelistedOracleAllowed();
     }
 
-    modifier onlyGov() {
-        _onlyGov();
-        _;
+    function addOracleToWhitelist(address oracle) external onlyGov {
+        if (!oracleWhitelist[oracle]) {
+            oracleWhitelist[oracle] = true;
+            NUM_WHITELISTED_ORACLES++;
+        }
     }
 
-    function verifyBundlerWhitelist() external view {
-        if (NUM_WHITELISTED_BUNDLERS > 0 && !bundlerWhitelist[_bundler()]) revert OnlyWhitelistedBundlerAllowed();
+    function removeOracleFromWhitelist(address oracle) external onlyGov {
+        if (oracleWhitelist[oracle]) {
+            oracleWhitelist[oracle] = false;
+            NUM_WHITELISTED_ORACLES--;
+        }
     }
 
     // ---------------------------------------------------- //
     //                  Atlas Hook Overrides                //
     // ---------------------------------------------------- //
+
+    /**
+     * @notice Checks if the bundler is whitelisted and if the user is calling the update function
+     * @param userOp The user operation to check
+     * @return An empty bytes array
+     */
+    function _preOpsCall(UserOperation calldata userOp) internal view override returns (bytes memory) {
+        // The bundler must be whitelisted
+        RedstoneOevDappControl(_control()).verifyBundlerWhitelist();
+
+        // The user must be calling the present contract
+        if (userOp.dapp != _control()) revert InvalidUserDestination();
+
+        // The user must be calling the update function
+        if (bytes4(userOp.data) != bytes4(RedstoneOevDappControl.update.selector)) {
+            revert InvalidUserEntryCall();
+        }
+
+        (address oracle, bytes memory updateCallData) = abi.decode(userOp.data[4:], (address, bytes));
+
+        // The called oracle must be whitelisted
+        RedstoneOevDappControl(_control()).verifyOracleWhitelist(oracle);
+
+        // The update call data must be a valid updateDataFeedsValues call
+        if (bytes4(updateCallData) != bytes4(IRedstoneAdapter.updateDataFeedsValues.selector)) {
+            revert InvalidUserUpdateCall();
+        }
+
+        return "";
+    }
 
     function _allocateValueCall(address, uint256 bidAmount, bytes calldata returnData) internal virtual override {
         if (bidAmount == 0) return;
@@ -130,17 +196,23 @@ contract RedstoneOevDappControl is DAppControl {
     }
 
     // ---------------------------------------------------- //
-    //                    UserOp function                   //
+    //                    UserOp Function                   //
     // ---------------------------------------------------- //
 
+    /**
+     * @notice Updates the oracle with the new values
+     * @param oracle The oracle to update
+     * @param callData The call data to update the oracle with
+     * @return The encoded address of the updated oracle, that will be later on used in _allocateValueCall
+     */
     function update(address oracle, bytes calldata callData) external returns (bytes memory) {
-        RedstoneOevDappControl(_control()).verifyBundlerWhitelist();
+        // Parameters have already been validated in _preOpsCall
         (bool success,) = oracle.call(callData);
         if (!success) revert OracleUpdateFailed();
+
         return abi.encode(oracle);
     }
 
-    // NOTE: Functions below are not delegatecalled
     // ---------------------------------------------------- //
     //                    View Functions                    //
     // ---------------------------------------------------- //
