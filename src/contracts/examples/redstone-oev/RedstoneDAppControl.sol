@@ -24,9 +24,7 @@ contract RedstoneDAppControl is DAppControl {
     mapping(address bundler => bool isWhitelisted) public bundlerWhitelist;
     uint32 public NUM_WHITELISTED_BUNDLERS = 0;
 
-    constructor(
-        address _atlas
-    )
+    constructor(address _atlas)
         DAppControl(
             _atlas,
             msg.sender,
