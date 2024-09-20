@@ -4,14 +4,14 @@ pragma solidity 0.8.25;
 import "forge-std/Script.sol";
 import "forge-std/Test.sol";
 
-import { DeployBaseScript } from "script/base/deploy-base.s.sol";
+import { DeployBaseScript } from "./base/deploy-base.s.sol";
 
-import { Atlas } from "src/contracts/atlas/Atlas.sol";
-import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
-import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
-import { Simulator } from "src/contracts/helpers/Simulator.sol";
-import { Sorter } from "src/contracts/helpers/Sorter.sol";
-import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
+import { Atlas } from "../src/contracts/atlas/Atlas.sol";
+import { AtlasVerification } from "../src/contracts/atlas/AtlasVerification.sol";
+import { TxBuilder } from "../src/contracts/helpers/TxBuilder.sol";
+import { Simulator } from "../src/contracts/helpers/Simulator.sol";
+import { Sorter } from "../src/contracts/helpers/Sorter.sol";
+import { ExecutionEnvironment } from "../src/contracts/common/ExecutionEnvironment.sol";
 
 contract DeployAtlasScript is DeployBaseScript {
     function run() external {

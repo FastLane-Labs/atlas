@@ -3,11 +3,11 @@ pragma solidity 0.8.25;
 
 import "forge-std/Test.sol";
 
-import { Atlas } from "src/contracts/atlas/Atlas.sol";
-import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
-import { DAppIntegration } from "src/contracts/atlas/DAppIntegration.sol";
-import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
-import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
+import { Atlas } from "../src/contracts/atlas/Atlas.sol";
+import { ExecutionEnvironment } from "../src/contracts/common/ExecutionEnvironment.sol";
+import { DAppIntegration } from "../src/contracts/atlas/DAppIntegration.sol";
+import { AtlasErrors } from "../src/contracts/types/AtlasErrors.sol";
+import { AtlasVerification } from "../src/contracts/atlas/AtlasVerification.sol";
 
 import { DummyDAppControl, CallConfigBuilder } from "./base/DummyDAppControl.sol";
 

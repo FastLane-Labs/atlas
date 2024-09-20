@@ -1,14 +1,14 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.25;
 
-import "src/contracts/types/EscrowTypes.sol";
-import "src/contracts/types/LockTypes.sol";
-import "src/contracts/libraries/AccountingMath.sol";
+import "../types/EscrowTypes.sol";
+import "../types/LockTypes.sol";
+import "../libraries/AccountingMath.sol";
 
-import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
-import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
-import { AtlasConstants } from "src/contracts/types/AtlasConstants.sol";
-import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
+import { AtlasEvents } from "../types/AtlasEvents.sol";
+import { AtlasErrors } from "../types/AtlasErrors.sol";
+import { AtlasConstants } from "../types/AtlasConstants.sol";
+import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
 
 /// @title Storage
 /// @author FastLane Labs

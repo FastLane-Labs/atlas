@@ -6,11 +6,11 @@ import "forge-std/Test.sol";
 
 import { DeployBaseScript } from "script/base/deploy-base.s.sol";
 
-import { ChainlinkDAppControl } from "src/contracts/examples/oev-example/ChainlinkDAppControl.sol";
-import { ChainlinkAtlasWrapper } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapper.sol";
+import { ChainlinkDAppControl } from "../src/contracts/examples/oev-example/ChainlinkDAppControl.sol";
+import { ChainlinkAtlasWrapper } from "../src/contracts/examples/oev-example/ChainlinkAtlasWrapper.sol";
 
-import { Token } from "src/contracts/helpers/DemoToken.sol";
-import { DemoLendingProtocol } from "src/contracts/helpers/DemoLendingProtocol.sol";
+import { Token } from "../src/contracts/helpers/DemoToken.sol";
+import { DemoLendingProtocol } from "../src/contracts/helpers/DemoLendingProtocol.sol";
 
 // Sets up a few liquidatable positions in the Lending Protocol. ETH for gas fees distributed by Lending Gov.
 contract CreateOEVDemoPositionsScript is DeployBaseScript {

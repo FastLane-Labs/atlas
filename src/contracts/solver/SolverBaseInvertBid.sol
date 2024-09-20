@@ -4,10 +4,10 @@ pragma solidity 0.8.25;
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
-import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
+import { IAtlas } from "../interfaces/IAtlas.sol";
+import { ISolverContract } from "../interfaces/ISolverContract.sol";
 
-import "src/contracts/types/SolverOperation.sol";
+import "../types/SolverOperation.sol";
 
 interface IWETH9 {
     function deposit() external payable;

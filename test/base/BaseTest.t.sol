@@ -6,11 +6,11 @@ import "forge-std/Test.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import { TestAtlas } from "./TestAtlas.sol";
-import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
-import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
-import { Sorter } from "src/contracts/helpers/Sorter.sol";
-import { Simulator } from "src/contracts/helpers/Simulator.sol";
-import { GovernanceBurner } from "src/contracts/helpers/GovernanceBurner.sol";
+import { AtlasVerification } from "../../src/contracts/atlas/AtlasVerification.sol";
+import { ExecutionEnvironment } from "../../src/contracts/common/ExecutionEnvironment.sol";
+import { Sorter } from "../../src/contracts/helpers/Sorter.sol";
+import { Simulator } from "../../src/contracts/helpers/Simulator.sol";
+import { GovernanceBurner } from "../../src/contracts/helpers/GovernanceBurner.sol";
 
 contract BaseTest is Test {
     struct Sig {

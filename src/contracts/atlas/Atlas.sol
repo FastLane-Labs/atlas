@@ -7,17 +7,17 @@ import { LibSort } from "solady/utils/LibSort.sol";
 import { Escrow } from "./Escrow.sol";
 import { Factory } from "./Factory.sol";
 
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/LockTypes.sol";
-import "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/DAppOperation.sol";
-import "src/contracts/types/ValidCalls.sol";
+import "../types/SolverOperation.sol";
+import "../types/UserOperation.sol";
+import "../types/LockTypes.sol";
+import "../types/ConfigTypes.sol";
+import "../types/DAppOperation.sol";
+import "../types/ValidCalls.sol";
 
-import { CallBits } from "src/contracts/libraries/CallBits.sol";
-import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
-import { IL2GasCalculator } from "src/contracts/interfaces/IL2GasCalculator.sol";
-import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
+import { CallBits } from "../libraries/CallBits.sol";
+import { SafetyBits } from "../libraries/SafetyBits.sol";
+import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
+import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
 /// @title Atlas V1
 /// @author FastLane Labs

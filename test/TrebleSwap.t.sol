@@ -5,16 +5,16 @@ import "forge-std/Test.sol";
 
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
-import { UserOperation } from "src/contracts/types/UserOperation.sol";
-import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
-import { DAppOperation } from "src/contracts/types/DAppOperation.sol";
-import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
+import { SolverOperation } from "../src/contracts/types/SolverOperation.sol";
+import { UserOperation } from "../src/contracts/types/UserOperation.sol";
+import { DAppConfig } from "../src/contracts/types/ConfigTypes.sol";
+import { DAppOperation } from "../src/contracts/types/DAppOperation.sol";
+import { CallVerification } from "../src/contracts/libraries/CallVerification.sol";
 
-import { SolverBase } from "src/contracts/solver/SolverBase.sol";
+import { SolverBase } from "../src/contracts/solver/SolverBase.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
-import { TrebleSwapDAppControl } from "src/contracts/examples/trebleswap/TrebleSwapDAppControl.sol";
+import { TrebleSwapDAppControl } from "../src/contracts/examples/trebleswap/TrebleSwapDAppControl.sol";
 
 contract TrebleSwapTest is BaseTest {
     struct SwapTokenInfo {

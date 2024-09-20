@@ -6,14 +6,14 @@ import "forge-std/Test.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
-import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
-import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
-import { UserOperation } from "src/contracts/types/UserOperation.sol";
-import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/DAppOperation.sol";
+import { TxBuilder } from "../src/contracts/helpers/TxBuilder.sol";
+import { SolverOperation } from "../src/contracts/types/SolverOperation.sol";
+import { UserOperation } from "../src/contracts/types/UserOperation.sol";
+import { DAppConfig } from "../src/contracts/types/ConfigTypes.sol";
+import "../src/contracts/types/DAppOperation.sol";
 
-import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
-import "src/contracts/types/LockTypes.sol";
+import { SafetyBits } from "../src/contracts/libraries/SafetyBits.sol";
+import "../src/contracts/types/LockTypes.sol";
 
 import { TestUtils } from "./base/TestUtils.sol";
 
@@ -21,9 +21,9 @@ import {
     SwapIntentDAppControl,
     SwapIntent,
     Condition
-} from "src/contracts/examples/intents-example/SwapIntentDAppControl.sol";
+} from "../src/contracts/examples/intents-example/SwapIntentDAppControl.sol";
 
-import { SolverBase } from "src/contracts/solver/SolverBase.sol";
+import { SolverBase } from "../src/contracts/solver/SolverBase.sol";
 
 contract AccountingTest is BaseTest {
     SwapIntentDAppControl public swapIntentControl;

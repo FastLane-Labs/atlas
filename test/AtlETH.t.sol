@@ -4,8 +4,8 @@ pragma solidity 0.8.25;
 import "forge-std/Test.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
-import {AtlasEvents} from "src/contracts/types/AtlasEvents.sol";
-import {AtlasErrors} from "src/contracts/types/AtlasErrors.sol";
+import {AtlasEvents} from "../src/contracts/types/AtlasEvents.sol";
+import {AtlasErrors} from "../src/contracts/types/AtlasErrors.sol";
 
 contract AtlETHTest is BaseTest {
 
