@@ -30,10 +30,10 @@ contract RedstoneOevDappControl is DAppControl {
     address public oevAllocationDestination;
 
     mapping(address bundler => bool isWhitelisted) public bundlerWhitelist;
-    uint32 public NUM_WHITELISTED_BUNDLERS = 0;
+    uint32 public whitelistedBundlersCount = 0;
 
     mapping(address oracle => bool isWhitelisted) public oracleWhitelist;
-    uint32 public NUM_WHITELISTED_ORACLES = 0;
+    uint32 public whitelistedOraclesCount = 0;
 
     constructor(
         address atlas,
@@ -107,20 +107,20 @@ contract RedstoneOevDappControl is DAppControl {
 
     function verifyBundlerWhitelist() external view {
         // Whitelisting is enforced only if the whitelist is not empty
-        if (NUM_WHITELISTED_BUNDLERS > 0 && !bundlerWhitelist[_bundler()]) revert OnlyWhitelistedBundlerAllowed();
+        if (whitelistedBundlersCount > 0 && !bundlerWhitelist[_bundler()]) revert OnlyWhitelistedBundlerAllowed();
     }
 
     function addBundlerToWhitelist(address bundler) external onlyGov {
         if (!bundlerWhitelist[bundler]) {
             bundlerWhitelist[bundler] = true;
-            NUM_WHITELISTED_BUNDLERS++;
+            whitelistedBundlersCount++;
         }
     }
 
     function removeBundlerFromWhitelist(address bundler) external onlyGov {
         if (bundlerWhitelist[bundler]) {
             bundlerWhitelist[bundler] = false;
-            NUM_WHITELISTED_BUNDLERS--;
+            whitelistedBundlersCount--;
         }
     }
 
@@ -130,20 +130,20 @@ contract RedstoneOevDappControl is DAppControl {
 
     function verifyOracleWhitelist(address oracle) external view {
         // Whitelisting is enforced only if the whitelist is not empty
-        if (NUM_WHITELISTED_ORACLES > 0 && !oracleWhitelist[oracle]) revert OnlyWhitelistedOracleAllowed();
+        if (whitelistedOraclesCount > 0 && !oracleWhitelist[oracle]) revert OnlyWhitelistedOracleAllowed();
     }
 
     function addOracleToWhitelist(address oracle) external onlyGov {
         if (!oracleWhitelist[oracle]) {
             oracleWhitelist[oracle] = true;
-            NUM_WHITELISTED_ORACLES++;
+            whitelistedOraclesCount++;
         }
     }
 
     function removeOracleFromWhitelist(address oracle) external onlyGov {
         if (oracleWhitelist[oracle]) {
             oracleWhitelist[oracle] = false;
-            NUM_WHITELISTED_ORACLES--;
+            whitelistedOraclesCount--;
         }
     }
 
