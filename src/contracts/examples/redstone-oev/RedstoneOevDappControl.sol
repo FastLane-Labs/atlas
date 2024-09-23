@@ -3,12 +3,12 @@ pragma solidity 0.8.25;
 
 import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
 import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/SolverOperation.sol";
-import "./RedstoneAdapterAtlasWrapper.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IRedstoneAdapter } from
     "lib/redstone-oracles-monorepo/packages/on-chain-relayer/contracts/core/IRedstoneAdapter.sol";
+
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/SolverOperation.sol";
 
 contract RedstoneOevDappControl is DAppControl {
     error OnlyGovernance();
@@ -19,10 +19,14 @@ contract RedstoneOevDappControl is DAppControl {
     error InvalidUserUpdateCall();
     error OracleUpdateFailed();
     error InvalidOevShare();
+    error InvalidOevAllocationDestination();
 
     uint256 public constant OEV_SHARE_SCALE = 10_000;
 
-    uint256 public oevShareBundler; // In hundredth of percent
+    // OEV shares are in hundredth of percent
+    uint256 public oevShareBundler;
+    uint256 public oevShareFastlane;
+
     address public oevAllocationDestination;
 
     mapping(address bundler => bool isWhitelisted) public bundlerWhitelist;
@@ -32,19 +36,20 @@ contract RedstoneOevDappControl is DAppControl {
     uint32 public NUM_WHITELISTED_ORACLES = 0;
 
     constructor(
-        address _atlas,
-        uint256 _oevShareBundler,
-        address _oevAllocationDestination
+        address atlas,
+        uint256 oevShareBundler_,
+        uint256 oevShareFastlane_,
+        address oevAllocationDestination_
     )
         DAppControl(
-            _atlas,
+            atlas,
             msg.sender,
             CallConfig({
                 userNoncesSequential: false,
                 dappNoncesSequential: false,
                 requirePreOps: true,
                 trackPreOpsReturnData: false,
-                trackUserReturnData: true,
+                trackUserReturnData: false,
                 delegateUser: false,
                 requirePreSolver: false,
                 requirePostSolver: false,
@@ -64,8 +69,12 @@ contract RedstoneOevDappControl is DAppControl {
              })
         )
     {
-        oevShareBundler = _oevShareBundler;
-        oevAllocationDestination = _oevAllocationDestination;
+        if (oevShareBundler_ + oevShareFastlane_ > OEV_SHARE_SCALE) revert InvalidOevShare();
+        if (oevAllocationDestination_ == address(0)) revert InvalidOevAllocationDestination();
+
+        oevShareBundler = oevShareBundler_;
+        oevShareFastlane = oevShareFastlane_;
+        oevAllocationDestination = oevAllocationDestination_;
     }
 
     // ---------------------------------------------------- //
@@ -77,13 +86,19 @@ contract RedstoneOevDappControl is DAppControl {
         _;
     }
 
-    function setOevShareBundler(uint256 _oevShareBundler) external onlyGov {
-        if (_oevShareBundler > OEV_SHARE_SCALE) revert InvalidOevShare();
-        oevShareBundler = _oevShareBundler;
+    function setOevShareBundler(uint256 oevShareBundler_) external onlyGov {
+        if (oevShareBundler_ + oevShareFastlane > OEV_SHARE_SCALE) revert InvalidOevShare();
+        oevShareBundler = oevShareBundler_;
     }
 
-    function setOevAllocationDestination(address _oevAllocationDestination) external onlyGov {
-        oevAllocationDestination = _oevAllocationDestination;
+    function setOevShareFastlane(uint256 oevShareFastlane_) external onlyGov {
+        if (oevShareFastlane_ + oevShareBundler > OEV_SHARE_SCALE) revert InvalidOevShare();
+        oevShareFastlane = oevShareFastlane_;
+    }
+
+    function setOevAllocationDestination(address oevAllocationDestination_) external onlyGov {
+        if (oevAllocationDestination_ == address(0)) revert InvalidOevAllocationDestination();
+        oevAllocationDestination = oevAllocationDestination_;
     }
 
     // ---------------------------------------------------- //
@@ -154,13 +169,13 @@ contract RedstoneOevDappControl is DAppControl {
             revert InvalidUserEntryCall();
         }
 
-        (address oracle, bytes memory updateCallData) = abi.decode(userOp.data[4:], (address, bytes));
+        (address _oracle, bytes memory _updateCallData) = abi.decode(userOp.data[4:], (address, bytes));
 
         // The called oracle must be whitelisted
-        RedstoneOevDappControl(_control()).verifyOracleWhitelist(oracle);
+        RedstoneOevDappControl(_control()).verifyOracleWhitelist(_oracle);
 
         // The update call data must be a valid updateDataFeedsValues call
-        if (bytes4(updateCallData) != bytes4(IRedstoneAdapter.updateDataFeedsValues.selector)) {
+        if (bytes4(_updateCallData) != bytes4(IRedstoneAdapter.updateDataFeedsValues.selector)) {
             revert InvalidUserUpdateCall();
         }
 
@@ -170,21 +185,23 @@ contract RedstoneOevDappControl is DAppControl {
     /**
      * @notice Allocates the bid amount to the relevant parties
      * @param bidAmount The bid amount to be allocated
-     * @param returnData The return data from the user operation
+     * @dev This function is delegatcalled
      */
-    function _allocateValueCall(address, uint256 bidAmount, bytes calldata returnData) internal virtual override {
+    function _allocateValueCall(address, uint256 bidAmount, bytes calldata) internal virtual override {
         if (bidAmount == 0) return;
 
-        // Returned from the user operation
-        address oracle = abi.decode(returnData, (address));
-
         // Get the OEV share for the bundler and transfer it
-        uint256 oevShareBundler = bidAmount * RedstoneOevDappControl(_control()).oevShareBundler() / OEV_SHARE_SCALE;
-        if (oevShareBundler > 0) SafeTransferLib.safeTransferETH(_bundler(), oevShareBundler);
+        uint256 _oevShareBundler = bidAmount * RedstoneOevDappControl(_control()).oevShareBundler() / OEV_SHARE_SCALE;
+        if (_oevShareBundler > 0) SafeTransferLib.safeTransferETH(_bundler(), _oevShareBundler);
+
+        // Get the OEV share for Fastlane and transfer it
+        uint256 _oevShareFastlane = bidAmount * RedstoneOevDappControl(_control()).oevShareFastlane() / OEV_SHARE_SCALE;
+        if (_oevShareFastlane > 0) SafeTransferLib.safeTransferETH(oevAllocationDestination, _oevShareFastlane);
 
         // Transfer the rest
         SafeTransferLib.safeTransferETH(
-            RedstoneOevDappControl(_control()).oevAllocationDestination(), bidAmount - oevShareBundler
+            RedstoneOevDappControl(_control()).oevAllocationDestination(),
+            bidAmount - _oevShareBundler - _oevShareFastlane
         );
     }
 
@@ -196,14 +213,14 @@ contract RedstoneOevDappControl is DAppControl {
      * @notice Updates the oracle with the new values
      * @param oracle The oracle to update
      * @param callData The call data to update the oracle with
-     * @return The encoded address of the updated oracle, that will be later on used in _allocateValueCall
+     * @return An empty bytes array
      */
     function update(address oracle, bytes calldata callData) external returns (bytes memory) {
         // Parameters have already been validated in _preOpsCall
         (bool success,) = oracle.call(callData);
         if (!success) revert OracleUpdateFailed();
 
-        return abi.encode(oracle);
+        return "";
     }
 
     // ---------------------------------------------------- //
