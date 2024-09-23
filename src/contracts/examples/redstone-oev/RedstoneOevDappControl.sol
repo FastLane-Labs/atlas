@@ -18,11 +18,12 @@ contract RedstoneOevDappControl is DAppControl {
     error InvalidUserEntryCall();
     error InvalidUserUpdateCall();
     error OracleUpdateFailed();
+    error InvalidOevShare();
 
-    uint256 public bundlerOEVPercent;
-    uint256 public atlasOEVPercent;
-    address public atlasVault;
-    mapping(address oracle => address oracleVault) public oracleVaults;
+    uint256 public constant OEV_SHARE_SCALE = 10_000;
+
+    uint256 public oevShareBundler; // In hundredth of percent
+    address public oevAllocationDestination;
 
     mapping(address bundler => bool isWhitelisted) public bundlerWhitelist;
     uint32 public NUM_WHITELISTED_BUNDLERS = 0;
@@ -32,9 +33,8 @@ contract RedstoneOevDappControl is DAppControl {
 
     constructor(
         address _atlas,
-        address _atlasVault,
-        uint256 _bundlerOEVPercent,
-        uint256 _atlasOEVPercent
+        uint256 _oevShareBundler,
+        address _oevAllocationDestination
     )
         DAppControl(
             _atlas,
@@ -64,9 +64,8 @@ contract RedstoneOevDappControl is DAppControl {
              })
         )
     {
-        bundlerOEVPercent = _bundlerOEVPercent;
-        atlasOEVPercent = _atlasOEVPercent;
-        atlasVault = _atlasVault;
+        oevShareBundler = _oevShareBundler;
+        oevAllocationDestination = _oevAllocationDestination;
     }
 
     // ---------------------------------------------------- //
@@ -78,22 +77,13 @@ contract RedstoneOevDappControl is DAppControl {
         _;
     }
 
-    function setBundlerOEVPercent(uint256 _bundlerOEVPercent) external onlyGov {
-        require(_bundlerOEVPercent + atlasOEVPercent <= 100, "Invalid OEV percent");
-        bundlerOEVPercent = _bundlerOEVPercent;
+    function setOevShareBundler(uint256 _oevShareBundler) external onlyGov {
+        if (_oevShareBundler > OEV_SHARE_SCALE) revert InvalidOevShare();
+        oevShareBundler = _oevShareBundler;
     }
 
-    function setAtlasOEVPercent(uint256 _atlasOEVPercent) external onlyGov {
-        require(_atlasOEVPercent + bundlerOEVPercent <= 100, "Invalid OEV percent");
-        atlasOEVPercent = _atlasOEVPercent;
-    }
-
-    function setAtlasVault(address _atlasVault) external onlyGov {
-        atlasVault = _atlasVault;
-    }
-
-    function setOracleVault(address oracle, address _oracleVault) external onlyGov {
-        oracleVaults[oracle] = _oracleVault;
+    function setOevAllocationDestination(address _oevAllocationDestination) external onlyGov {
+        oevAllocationDestination = _oevAllocationDestination;
     }
 
     // ---------------------------------------------------- //
@@ -150,6 +140,7 @@ contract RedstoneOevDappControl is DAppControl {
      * @notice Checks if the bundler is whitelisted and if the user is calling the update function
      * @param userOp The user operation to check
      * @return An empty bytes array
+     * @dev This function is delegatcalled
      */
     function _preOpsCall(UserOperation calldata userOp) internal view override returns (bytes memory) {
         // The bundler must be whitelisted
@@ -176,23 +167,25 @@ contract RedstoneOevDappControl is DAppControl {
         return "";
     }
 
+    /**
+     * @notice Allocates the bid amount to the relevant parties
+     * @param bidAmount The bid amount to be allocated
+     * @param returnData The return data from the user operation
+     */
     function _allocateValueCall(address, uint256 bidAmount, bytes calldata returnData) internal virtual override {
         if (bidAmount == 0) return;
 
+        // Returned from the user operation
         address oracle = abi.decode(returnData, (address));
 
-        uint256 oevPercentBundler = RedstoneOevDappControl(_control()).bundlerOEVPercent();
-        uint256 oevPercentAtlas = RedstoneOevDappControl(_control()).atlasOEVPercent();
-        address vaultAtlas = RedstoneOevDappControl(_control()).atlasVault();
-        address vaultOracle = RedstoneOevDappControl(_control()).oracleVaults(oracle);
+        // Get the OEV share for the bundler and transfer it
+        uint256 oevShareBundler = bidAmount * RedstoneOevDappControl(_control()).oevShareBundler() / OEV_SHARE_SCALE;
+        if (oevShareBundler > 0) SafeTransferLib.safeTransferETH(_bundler(), oevShareBundler);
 
-        uint256 bundlerOev = (bidAmount * oevPercentBundler) / 100;
-        uint256 atlasOev = (bidAmount * oevPercentAtlas) / 100;
-        uint256 oracleOev = bidAmount - bundlerOev - atlasOev;
-
-        if (oracleOev > 0) SafeTransferLib.safeTransferETH(vaultOracle, oracleOev);
-        if (atlasOev > 0) SafeTransferLib.safeTransferETH(vaultAtlas, atlasOev);
-        if (bundlerOev > 0) SafeTransferLib.safeTransferETH(_bundler(), bundlerOev);
+        // Transfer the rest
+        SafeTransferLib.safeTransferETH(
+            RedstoneOevDappControl(_control()).oevAllocationDestination(), bidAmount - oevShareBundler
+        );
     }
 
     // ---------------------------------------------------- //
