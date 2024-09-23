@@ -199,10 +199,12 @@ contract RedstoneOevDappControl is DAppControl {
         if (_oevShareFastlane > 0) SafeTransferLib.safeTransferETH(oevAllocationDestination, _oevShareFastlane);
 
         // Transfer the rest
-        SafeTransferLib.safeTransferETH(
-            RedstoneOevDappControl(_control()).oevAllocationDestination(),
-            bidAmount - _oevShareBundler - _oevShareFastlane
-        );
+        uint256 _oevShareDestination = bidAmount - _oevShareBundler - _oevShareFastlane;
+        if (_oevShareDestination > 0) {
+            SafeTransferLib.safeTransferETH(
+                RedstoneOevDappControl(_control()).oevAllocationDestination(), _oevShareDestination
+            );
+        }
     }
 
     // ---------------------------------------------------- //
