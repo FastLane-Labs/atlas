@@ -440,13 +440,6 @@ abstract contract GasAccounting is SafetyLocks {
         } else {
             claimsPaidToBundler = 0;
             _winningSolver = ctx.bundler;
-
-            // Get the Bundler portion of the solver surcharge by subtracting the atlas portion from the total
-            uint256 _solverSurcharge = solverSurcharge();
-            if (_solverSurcharge != 0) {
-                // Add the bundler's portion of the solver surcharge to the amount the solver receives
-                _amountSolverReceives += (_solverSurcharge - netAtlasGasSurcharge);
-            }
         }
 
         if (_amountSolverPays > _amountSolverReceives) {
