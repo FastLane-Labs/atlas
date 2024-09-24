@@ -52,19 +52,19 @@ contract DeployBaseScript is Script {
         } else if (chainId == 56) {
             return "BSC";
         } else if (chainId == 97) {
-            return "BSC TESTNET";
+            return "BSC_TESTNET";
         } else if (chainId == 10) {
-            return "OP MAINNET";
+            return "OP_MAINNET";
         } else if (chainId == 11_155_420) {
-            return "OP SEPOLIA";
+            return "OP_SEPOLIA";
         } else if (chainId == 42_161) {
             return "ARBITRUM";
         } else if (chainId == 421_614) {
-            return "ARBITRUM SEPOLIA";
+            return "ARBITRUM_SEPOLIA";
         } else if (chainId == 8453) {
             return "BASE";
         } else if (chainId == 84_532) {
-            return "BASE SEPOLIA";
+            return "BASE_SEPOLIA";
         } else {
             revert("Error: Chain ID not recognized");
         }
