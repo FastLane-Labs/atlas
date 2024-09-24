@@ -11,7 +11,7 @@ import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
 import { ValidCallsResult } from "src/contracts/types/ValidCalls.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { DummyDAppControl } from "./base/DummyDAppControl.sol";
-import { AtlasBaseTest } from "./base/AtlasBaseTest.t.sol";
+import { BaseTest } from "./base/BaseTest.t.sol";
 import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { SolverOutcome } from "src/contracts/types/EscrowTypes.sol";
@@ -51,7 +51,7 @@ contract DummySmartWallet {
     }
 }
 
-contract AtlasVerificationBase is AtlasBaseTest {
+contract AtlasVerificationBase is BaseTest {
     DummyDAppControl dAppControl;
 
     struct ValidCallsCall {
@@ -169,12 +169,12 @@ contract AtlasVerificationBase is AtlasBaseTest {
     }
 
     function defaultAtlasEnvironment() public {
-        AtlasBaseTest.setUp();
+        BaseTest.setUp();
         dAppControl = defaultDAppControl().buildAndIntegrate(atlasVerification);
     }
 
     function defaultAtlasWithCallConfig(CallConfig memory callConfig) public {
-        AtlasBaseTest.setUp();
+        BaseTest.setUp();
         dAppControl = defaultDAppControl().withCallConfig(callConfig).buildAndIntegrate(atlasVerification);
     }
 }
@@ -187,7 +187,7 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
     using CallVerification for UserOperation;
 
     function setUp() public override {
-        AtlasBaseTest.setUp();
+        BaseTest.setUp();
         dAppControl = defaultDAppControl().buildAndIntegrate(atlasVerification);
     }
 

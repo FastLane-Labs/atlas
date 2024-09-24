@@ -13,7 +13,7 @@ import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
 
 import { DummyDAppControl } from "./base/DummyDAppControl.sol";
-import { AtlasBaseTest } from "./base/AtlasBaseTest.t.sol";
+import { BaseTest } from "./base/BaseTest.t.sol";
 import { DummyDAppControlBuilder } from "./helpers/DummyDAppControlBuilder.sol";
 import { CallConfigBuilder } from "./helpers/CallConfigBuilder.sol";
 import { UserOperationBuilder } from "./base/builders/UserOperationBuilder.sol";
@@ -27,7 +27,7 @@ import "src/contracts/types/DAppOperation.sol";
 import "src/contracts/types/ConfigTypes.sol";
 import "src/contracts/types/EscrowTypes.sol";
 
-contract EscrowTest is AtlasBaseTest {
+contract EscrowTest is BaseTest {
     using CallBits for CallConfig;
 
     DummyDAppControl dAppControl;
@@ -230,7 +230,7 @@ contract EscrowTest is AtlasBaseTest {
         );
 
         vm.prank(userEOA);
-        address executionEnvironment = atlas.createExecutionEnvironment(address(dAppControl));
+        address executionEnvironment = atlas.createExecutionEnvironment(userEOA, address(dAppControl));
 
         vm.expectEmit(false, false, false, true, executionEnvironment);
         emit MEVPaymentSuccess(address(0), defaultBidAmount);

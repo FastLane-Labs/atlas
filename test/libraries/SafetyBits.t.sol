@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 
 import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 import "src/contracts/types/LockTypes.sol";
-import "../base/TestUtils.sol";
+import "test/base/TestUtils.sol";
 
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 

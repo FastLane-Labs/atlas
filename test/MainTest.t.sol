@@ -28,16 +28,54 @@ import "forge-std/Test.sol";
 
 contract MainTest is BaseTest {
     /// forge-config: default.gas_price = 15000000000
+    V2DAppControl public v2DAppControl;
+    V2Helper public helper;
+
+    address FXS_ADDRESS = 0x3432B6A60D23Ca0dFCa7761B7ab56459D9C964D0;
+    IERC20 FXS = IERC20(FXS_ADDRESS);
+
+    address V2_FXS_ETH = 0xecBa967D84fCF0405F6b32Bc45F4d36BfDBB2E81;
+    address S2_FXS_ETH = 0x61eB53ee427aB4E007d78A9134AaCb3101A2DC23;
+
+    address POOL_ONE = V2_FXS_ETH;
+    address POOL_TWO = S2_FXS_ETH;
+    address TOKEN_ZERO = FXS_ADDRESS;
+    address TOKEN_ONE = WETH_ADDRESS;
+
+    Solver public solverOne;
+    Solver public solverTwo;
+
     function setUp() public virtual override {
         BaseTest.setUp();
 
+        // Deal to user
+        deal(TOKEN_ZERO, address(userEOA), 10e30);
+        deal(TOKEN_ONE, address(userEOA), 10e30);
+
+        vm.startPrank(governanceEOA);
+        v2DAppControl = new V2DAppControl(address(atlas));
+        atlasVerification.initializeGovernance(address(v2DAppControl));
+        vm.stopPrank();
+
+        helper = new V2Helper(address(v2DAppControl), address(atlas), address(atlasVerification));
+
         // Deposit ETH from Searcher1 signer to pay for searcher's gas
-        vm.prank(solverOneEOA);
+        vm.startPrank(solverOneEOA);
+        solverOne = new Solver(WETH_ADDRESS, address(atlas), solverOneEOA);
         atlas.deposit{ value: 1e18 }();
+        vm.stopPrank();
+
+        deal(TOKEN_ZERO, address(solverOne), 10e24);
+        deal(TOKEN_ONE, address(solverOne), 10e24);
 
         // Deposit ETH from Searcher2 signer to pay for searcher's gas
-        vm.prank(solverTwoEOA);
+        vm.startPrank(solverTwoEOA);
+        solverTwo = new Solver(WETH_ADDRESS, address(atlas), solverTwoEOA);
         atlas.deposit{ value: 1e18 }();
+        vm.stopPrank();
+
+        deal(TOKEN_ZERO, address(solverTwo), 10e24);
+        deal(TOKEN_ONE, address(solverTwo), 10e24);
     }
 
     function testMain() public {
@@ -98,7 +136,7 @@ contract MainTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        address executionEnvironment = atlas.createExecutionEnvironment(userOp.control);
+        address executionEnvironment = atlas.createExecutionEnvironment(userEOA, userOp.control);
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
         console.log("userEOA", userEOA);
@@ -322,8 +360,7 @@ contract MainTest is BaseTest {
         */
 
         vm.startPrank(userEOA);
-        atlas.createExecutionEnvironment(address(v2DAppControl));
-        address newEnvironment = atlas.createExecutionEnvironment(address(v2DAppControl));
+        address newEnvironment = atlas.createExecutionEnvironment(userEOA, address(v2DAppControl));
         vm.stopPrank();
 
         assertTrue(IExecutionEnvironment(newEnvironment).getUser() == userEOA, "Mimic Error - User Mismatch");
@@ -385,7 +422,7 @@ contract MainTest is BaseTest {
         userOp.signature = abi.encodePacked(r, s, v);
 
         vm.startPrank(userEOA);
-        atlas.createExecutionEnvironment(userOp.control);
+        atlas.createExecutionEnvironment(userEOA, userOp.control);
 
         // Failure case, user hasn't approved Atlas for TOKEN_ONE, operation must fail
         (bool simResult,,) = simulator.simUserOperation(userOp);
@@ -429,7 +466,7 @@ contract MainTest is BaseTest {
         (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(r, s, v);
         vm.startPrank(userEOA);
-        atlas.createExecutionEnvironment(userOp.control);
+        atlas.createExecutionEnvironment(userEOA, userOp.control);
         IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
         (bool success, bytes memory data) = address(simulator).call(
             abi.encodeWithSelector(simulator.simSolverCalls.selector, userOp, solverOps, dAppOp)

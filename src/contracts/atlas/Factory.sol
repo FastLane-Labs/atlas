@@ -28,12 +28,20 @@ abstract contract Factory {
     }
 
     /// @notice Creates a new Execution Environment for the caller, given a DAppControl contract address.
+    /// @param user The address of the user for whom the execution environment is being created.
     /// @param control The address of the DAppControl contract for which the execution environment is being created.
     /// @return executionEnvironment The address of the newly created Execution Environment instance.
-    function createExecutionEnvironment(address control) external returns (address executionEnvironment) {
+    function createExecutionEnvironment(
+        address user,
+        address control
+    )
+        external
+        returns (address executionEnvironment)
+    {
+        if (msg.sender != user && msg.sender != control) revert AtlasErrors.Unauthorized();
         uint32 _callConfig = IDAppControl(control).CALL_CONFIG();
         executionEnvironment =
-            _getOrCreateExecutionEnvironment({ user: msg.sender, control: control, callConfig: _callConfig });
+            _getOrCreateExecutionEnvironment({ user: user, control: control, callConfig: _callConfig });
     }
 
     /// @notice Retrieves the address and configuration of an existing execution environment for a given user and DApp

@@ -1,9 +1,9 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.25;
 
-import "../types/UserOperation.sol";
-import "../types/SolverOperation.sol";
-import "../types/ConfigTypes.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/ConfigTypes.sol";
 
 interface IDAppControl {
     function preOpsCall(UserOperation calldata userOp) external payable returns (bytes memory);
@@ -39,4 +39,8 @@ interface IDAppControl {
     function verificationDelegated() external view returns (bool delegated);
 
     function CALL_CONFIG() external view returns (uint32);
+
+    function transferGovernance(address newGovernance) external;
+
+    function acceptGovernance() external;
 }

@@ -61,7 +61,7 @@ contract ExecutionEnvironmentTest is BaseTest {
 
         vm.prank(user);
         executionEnvironment =
-            ExecutionEnvironment(payable(IAtlas(address(atlas)).createExecutionEnvironment(address(dAppControl))));
+            ExecutionEnvironment(payable(IAtlas(address(atlas)).createExecutionEnvironment(user, address(dAppControl))));
     }
 
     function test_modifier_validUser_SkipCoverage() public {
@@ -272,7 +272,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         bool revertsAsExpected;
 
         vm.prank(solver);
-        MockSolverContract solverContract = new MockSolverContract(chain.weth, address(atlas));
+        MockSolverContract solverContract = new MockSolverContract(WETH_ADDRESS, address(atlas));
 
         SolverOperation memory solverOp;
         solverOp.from = solver;
@@ -333,7 +333,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         bool revertsAsExpected;
 
         vm.prank(solver);
-        MockSolverContract solverContract = new MockSolverContract(chain.weth, address(atlas));
+        MockSolverContract solverContract = new MockSolverContract(WETH_ADDRESS, address(atlas));
 
         SolverTracker memory solverTracker;
         solverTracker.etherIsBidToken = true;
@@ -437,23 +437,23 @@ contract ExecutionEnvironmentTest is BaseTest {
 
 
         // Valid
-        deal(chain.weth, address(executionEnvironment), 2e18);
-        assertEq(IERC20(chain.weth).balanceOf(address(executionEnvironment)), 2e18);
-        assertEq(IERC20(chain.weth).balanceOf(user), 0);
+        deal(WETH_ADDRESS, address(executionEnvironment), 2e18);
+        assertEq(WETH.balanceOf(address(executionEnvironment)), 2e18);
+        assertEq(WETH.balanceOf(user), 0);
         vm.prank(user);
-        executionEnvironment.withdrawERC20(chain.weth, 2e18);
-        assertEq(IERC20(chain.weth).balanceOf(address(executionEnvironment)), 0);
-        assertEq(IERC20(chain.weth).balanceOf(user), 2e18);
+        executionEnvironment.withdrawERC20(WETH_ADDRESS, 2e18);
+        assertEq(WETH.balanceOf(address(executionEnvironment)), 0);
+        assertEq(WETH.balanceOf(user), 2e18);
 
         // NotEnvironmentOwner
         vm.prank(invalid); // Invalid caller
         vm.expectRevert(AtlasErrors.NotEnvironmentOwner.selector);
-        executionEnvironment.withdrawERC20(chain.weth, 2e18);
+        executionEnvironment.withdrawERC20(WETH_ADDRESS, 2e18);
 
         // BalanceTooLow
         vm.prank(user);
         vm.expectRevert(AtlasErrors.ExecutionEnvironmentBalanceTooLow.selector);
-        executionEnvironment.withdrawERC20(chain.weth, 2e18);
+        executionEnvironment.withdrawERC20(WETH_ADDRESS, 2e18);
 
         // The following line changes an Atlas storage value in order to make the test succeed.
         // lock value is normally initialized in the _initializeContext function,
@@ -468,7 +468,7 @@ contract ExecutionEnvironmentTest is BaseTest {
         // EscrowLocked
         vm.prank(user);
         vm.expectRevert(AtlasErrors.AtlasLockActive.selector);
-        executionEnvironment.withdrawERC20(chain.weth, 2e18);
+        executionEnvironment.withdrawERC20(WETH_ADDRESS, 2e18);
     }
 
     function test_withdrawEther_SkipCoverage() public {

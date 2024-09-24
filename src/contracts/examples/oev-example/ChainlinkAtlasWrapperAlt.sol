@@ -25,12 +25,10 @@ contract ChainlinkAtlasWrapper is Ownable {
 
     event SignerStatusChanged(address indexed account, bool isSigner);
 
-    constructor(address atlas, address baseChainlinkFeed, address _owner) {
+    constructor(address atlas, address baseChainlinkFeed, address _owner) Ownable(_owner) {
         ATLAS = atlas;
         BASE_FEED = IChainlinkFeed(baseChainlinkFeed);
         DAPP_CONTROL = IChainlinkDAppControl(msg.sender); // Chainlink DAppControl is also wrapper factory
-
-        _transferOwnership(_owner);
 
         // do a gas usage check on an invalid trasmitting address
         address _aggregator = BASE_FEED.aggregator();

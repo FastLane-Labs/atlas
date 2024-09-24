@@ -5,7 +5,7 @@ import { WETH } from "solady/tokens/WETH.sol";
 import { Ownable } from "openzeppelin-contracts/contracts/access/Ownable.sol";
 
 contract DemoWETH is WETH, Ownable {
-    constructor() WETH() Ownable() { }
+    constructor() WETH() Ownable(msg.sender) { }
 
     function mint(address to, uint256 amount) external onlyOwner {
         _mint(to, amount);

@@ -14,11 +14,9 @@ import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
 import "src/contracts/types/ConfigTypes.sol";
 
-import { TestConstants } from "./base/TestConstants.sol";
-
 import "forge-std/Test.sol";
 
-contract V2Helper is Test, TestConstants, TxBuilder {
+contract V2Helper is Test, TxBuilder {
     uint256 public immutable maxFeePerGas;
 
     constructor(address _control, address _atlas, address _verification) TxBuilder(_control, _atlas, _verification) {

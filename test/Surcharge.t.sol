@@ -11,7 +11,7 @@ contract SurchargeTest is BaseTest {
 
     function testSurchargeRecipient() public {
         // Check if the surcharge recipient is set to the correct address on deploy
-        assertEq(atlas.surchargeRecipient(), payee, "surcharge recipient should be set to payee");
+        assertEq(atlas.surchargeRecipient(), deployer, "surcharge recipient should be set to deployer");
         assertEq(atlas.pendingSurchargeRecipient(), address(0), "pending surcharge recipient should be 0x0");
     
         // Check a random cant transfer the surcharge recipient
@@ -21,9 +21,9 @@ contract SurchargeTest is BaseTest {
         // Check the transfer process works as expected
         vm.startPrank(atlas.surchargeRecipient());
         vm.expectEmit(true, true, true, true);
-        emit AtlasEvents.SurchargeRecipientTransferStarted(payee, address(this));
+        emit AtlasEvents.SurchargeRecipientTransferStarted(deployer, address(this));
         atlas.transferSurchargeRecipient(address(this));
-        assertEq(atlas.surchargeRecipient(), payee, "recipient should not change until accepted by new address");
+        assertEq(atlas.surchargeRecipient(), deployer, "recipient should not change until accepted by new address");
         assertEq(atlas.pendingSurchargeRecipient(), address(this), "pending surcharge recipient should now be address(this)");
 
         // Check that only correct recipient can accept the transfer
@@ -51,12 +51,12 @@ contract SurchargeTest is BaseTest {
         deal(address(atlas), 1 ether);
 
         // Test actual withdrawal
-        vm.startPrank(payee);
-        uint256 startingBalance = address(payee).balance;
+        vm.startPrank(deployer);
+        uint256 startingBalance = address(deployer).balance;
         vm.expectEmit(true, true, true, true);
-        emit AtlasEvents.SurchargeWithdrawn(payee, 1 ether);
+        emit AtlasEvents.SurchargeWithdrawn(deployer, 1 ether);
         atlas.withdrawSurcharge();
-        uint256 endingBalance = address(payee).balance;
-        assertEq(endingBalance, startingBalance + 1 ether, "payee's balance should increase by 1 ether");
+        uint256 endingBalance = address(deployer).balance;
+        assertEq(endingBalance, startingBalance + 1 ether, "deployer's balance should increase by 1 ether");
     }
 }
