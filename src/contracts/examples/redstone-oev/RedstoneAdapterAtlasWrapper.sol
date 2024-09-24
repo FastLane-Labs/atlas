@@ -48,7 +48,7 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
     error CannotFetchHistoricalData();
     error WithdrawETHFailed();
 
-    constructor(address atlas, address _owner, address _baseFeed) {
+    constructor(address atlas, address _owner, address _baseFeed) Ownable(_owner) {
         uint80 latestRound = IFeed(_baseFeed).latestRound();
         // check to see if earlier rounds are supported
         // this will revert if the base adapter does not support earlier rounds(historical data)
@@ -58,7 +58,6 @@ contract RedstoneAdapterAtlasWrapper is Ownable, MergedSinglePriceFeedAdapterWit
         DAPP_CONTROL = msg.sender;
         BASE_FEED = _baseFeed;
         BASE_ADAPTER = address(IFeed(_baseFeed).getPriceFeedAdapter());
-        _transferOwnership(_owner);
     }
 
     function setBaseFeed(address _baseFeed) external onlyOwner {

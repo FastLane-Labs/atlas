@@ -15,17 +15,11 @@ contract RedstoneDAppControlTest is BaseTest {
     RedstoneDAppControl dappControl;
     RedstoneAdapterAtlasWrapper wrapper;
     address baseFeedAddress = 0xdDb6F90fFb4d3257dd666b69178e5B3c5Bf41136; //weETH USD oracle on ETH mainnet
-    uint32 dataPointValue = 666999;
+    uint32 dataPointValue = 666_999;
 
     uint256 oracleOwnerPk;
 
     Sig public sig;
-
-    struct Sig {
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-    }
 
     function setUp() public override {
         super.setUp();
@@ -60,15 +54,17 @@ contract RedstoneDAppControlTest is BaseTest {
         console.log("startedAt", startedAt);
         console.log("updatedAt", updatedAt);
 
-        (,,uint256 baseStartedAt, uint256 baseUpdatedAt,) = IFeed(baseFeedAddress).latestRoundData();
+        (,, uint256 baseStartedAt, uint256 baseUpdatedAt,) = IFeed(baseFeedAddress).latestRoundData();
         console.log("base startedAt", baseStartedAt);
         console.log("base updatedAt", baseUpdatedAt);
 
-        (uint128 dataTimestamp, uint128 blockTimestamp) = IAdapterWithRounds(address(IFeed(baseFeedAddress).getPriceFeedAdapter())).getTimestampsFromLatestUpdate();
+        (uint128 dataTimestamp, uint128 blockTimestamp) =
+            IAdapterWithRounds(address(IFeed(baseFeedAddress).getPriceFeedAdapter())).getTimestampsFromLatestUpdate();
         console.log("dataTimestamp", uint256(dataTimestamp));
         console.log("blockTimestamp", uint256(blockTimestamp));
 
-        (uint128 dataTimestampWrapper, uint128 blockTimestampWrapper) = IAdapterWithRounds(address(wrapper)).getTimestampsFromLatestUpdate();
+        (uint128 dataTimestampWrapper, uint128 blockTimestampWrapper) =
+            IAdapterWithRounds(address(wrapper)).getTimestampsFromLatestUpdate();
         console.log("dataTimestampWrapper", uint256(dataTimestampWrapper));
         console.log("blockTimestampWrapper", uint256(blockTimestampWrapper));
     }
@@ -77,7 +73,8 @@ contract RedstoneDAppControlTest is BaseTest {
         uint80 roundId = IFeed(baseFeedAddress).latestRound();
         IAdapterWithRounds adapter = IAdapterWithRounds(address(IFeed(baseFeedAddress).getPriceFeedAdapter()));
         for (uint256 i = 0; i < 5; i++) {
-            (uint256 value, uint128 dataTimestamp, uint128 blockTimestamp) = adapter.getRoundDataFromAdapter(IFeed(baseFeedAddress).getDataFeedId(), roundId);
+            (uint256 value, uint128 dataTimestamp, uint128 blockTimestamp) =
+                adapter.getRoundDataFromAdapter(IFeed(baseFeedAddress).getDataFeedId(), roundId);
             console.log("roundId", roundId);
             console.log("value", value);
             console.log("dataTimestamp", dataTimestamp);
@@ -109,7 +106,7 @@ contract RedstoneDAppControlTest is BaseTest {
             from: auctioneer,
             to: address(atlas),
             value: 0,
-            gas: 1000000,
+            gas: 1_000_000,
             maxFeePerGas: tx.gasprice,
             nonce: 1,
             deadline: block.number,
@@ -145,7 +142,7 @@ contract RedstoneDAppControlTest is BaseTest {
         vm.deal(bundler, 100 ether);
 
         vm.startPrank(bundler);
-        atlas.depositAndBond{value: 99 ether}(99 ether);
+        atlas.depositAndBond{ value: 99 ether }(99 ether);
         atlas.metacall(userOp, solverOps, dappOp);
         vm.stopPrank();
 
@@ -164,7 +161,8 @@ contract RedstoneDAppControlTest is BaseTest {
         uint32 valueSize = 4;
         uint24 dataPointsCount = 1;
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, keccak256(abi.encodePacked(dataFeed, dataPointValue, timestamp, valueSize, dataPointsCount)));
+        (uint8 v, bytes32 r, bytes32 s) =
+            vm.sign(pk, keccak256(abi.encodePacked(dataFeed, dataPointValue, timestamp, valueSize, dataPointsCount)));
         bytes memory signature = abi.encodePacked(r, s, v);
 
         bytes memory payload = abi.encodePacked(
@@ -172,33 +170,31 @@ contract RedstoneDAppControlTest is BaseTest {
             // 1st data package
             // - 1st data point
             // -- feed identifier
-            dataFeed,               // 32 bytes
+            dataFeed, // 32 bytes
             // -- value
-            dataPointValue,         // 4 bytes
+            dataPointValue, // 4 bytes
             // - more data points
             // ...
             // - timestamp (milliseconds)
-            timestamp,              // 6 bytes
+            timestamp, // 6 bytes
             // - value size
-            valueSize,              // 4 bytes
+            valueSize, // 4 bytes
             // - data points count
-            dataPointsCount,        // 3 bytes
+            dataPointsCount, // 3 bytes
             // - signature
             signature, // 65 bytes
-
             // more data packages
             // ...
 
             // data packages count
-            uint16(1),              // 2 bytes
-
+            uint16(1), // 2 bytes
             // *** UNSIGNED METADATA ***
             // - message
-            uint256(666),           // 32 bytes
+            uint256(666), // 32 bytes
             // - message size
-            uint24(32),             // 3 bytes
+            uint24(32), // 3 bytes
             // - red stone marker
-            hex"000002ed57011e0000"    // 9 bytes
+            hex"000002ed57011e0000" // 9 bytes
         );
 
         call = abi.encodeCall(wrapper.updateDataFeedsValues, (timestamp));
