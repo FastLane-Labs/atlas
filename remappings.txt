@@ -7,3 +7,4 @@ openzeppelin-contracts/=lib/openzeppelin-contracts/
 @openzeppelin/contracts=lib/openzeppelin-contracts/contracts/
 solady/=lib/solady/src/
 @redstone-finance/evm-connector/contracts/=lib/redstone-oracles-monorepo/packages/evm-connector/contracts/
+@chainlink/contracts/=lib/chainlink/contracts/
