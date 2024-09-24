@@ -37,9 +37,7 @@ contract Simulator is AtlasErrors {
         atlas = _atlas;
     }
 
-    function simUserOperation(
-        UserOperation calldata userOp
-    )
+    function simUserOperation(UserOperation calldata userOp)
         external
         payable
         returns (bool success, Result simResult, uint256)

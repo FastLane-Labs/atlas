@@ -172,9 +172,7 @@ contract ChainlinkAtlasWrapper is Ownable, IChainlinkAtlasWrapper {
     }
 
     // Pass-through call to base oracle's `getRoundData()` function
-    function getRoundData(
-        uint80 _roundId
-    )
+    function getRoundData(uint80 _roundId)
         external
         view
         override
