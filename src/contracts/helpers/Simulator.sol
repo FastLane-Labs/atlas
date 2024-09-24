@@ -1,49 +1,39 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.25;
 
-import { IAtlas } from "../interfaces/IAtlas.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
-import "../types/SolverOperation.sol";
-import "../types/UserOperation.sol";
-import "../types/LockTypes.sol";
-import "../types/DAppOperation.sol";
-import "../types/ConfigTypes.sol";
-import "../types/ValidCalls.sol";
-import "../types/EscrowTypes.sol";
+import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
-enum Result {
-    Unknown,
-    VerificationSimFail,
-    PreOpsSimFail,
-    UserOpSimFail,
-    SolverSimFail,
-    AllocateValueSimFail,
-    PostOpsSimFail,
-    SimulationPassed
-}
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/LockTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
+import "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/ValidCalls.sol";
+import "src/contracts/types/EscrowTypes.sol";
+
+import { Result } from "src/contracts/interfaces/ISimulator.sol";
 
 contract Simulator is AtlasErrors {
     address public immutable deployer;
     address public atlas;
 
+    event DeployerWithdrawal(address indexed to, uint256 amount);
+
     constructor() {
         deployer = msg.sender;
     }
 
-    function setAtlas(address _atlas) external {
-        if (msg.sender != deployer) revert Unauthorized();
-        atlas = _atlas;
-    }
-
-    function simUserOperation(
-        UserOperation calldata userOp
-    )
+    function simUserOperation(UserOperation calldata userOp)
         external
         payable
         returns (bool success, Result simResult, uint256)
     {
+        if (userOp.value > address(this).balance) revert SimulatorBalanceTooLow();
+
         SolverOperation[] memory solverOps = new SolverOperation[](0);
         DAppOperation memory dAppOp;
         dAppOp.to = atlas;
@@ -52,6 +42,7 @@ contract Simulator is AtlasErrors {
         (Result result, uint256 validCallsResult) = _errorCatcher(userOp, solverOps, dAppOp);
         success = uint8(result) > uint8(Result.UserOpSimFail);
         if (success) validCallsResult = uint256(ValidCallsResult.Valid);
+        if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
         return (success, result, validCallsResult);
     }
 
@@ -64,12 +55,15 @@ contract Simulator is AtlasErrors {
         payable
         returns (bool success, Result simResult, uint256)
     {
+        if (userOp.value > address(this).balance) revert SimulatorBalanceTooLow();
+
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         solverOps[0] = solverOp;
 
         (Result result, uint256 solverOutcomeResult) = _errorCatcher(userOp, solverOps, dAppOp);
         success = result == Result.SimulationPassed;
         if (success) solverOutcomeResult = 0; // discard additional error uint if solver stage was successful
+        if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
         return (success, result, solverOutcomeResult);
     }
 
@@ -82,6 +76,8 @@ contract Simulator is AtlasErrors {
         payable
         returns (bool success, Result simResult, uint256)
     {
+        if (userOp.value > address(this).balance) revert SimulatorBalanceTooLow();
+
         if (solverOps.length == 0) {
             // Returns number out of usual range of SolverOutcome enum to indicate no solverOps
             return (false, Result.Unknown, uint256(type(SolverOutcome).max) + 1);
@@ -89,6 +85,7 @@ contract Simulator is AtlasErrors {
         (Result result, uint256 solverOutcomeResult) = _errorCatcher(userOp, solverOps, dAppOp);
         success = result == Result.SimulationPassed;
         if (success) solverOutcomeResult = 0; // discard additional error uint if solver stage was successful
+        if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
         return (success, result, solverOutcomeResult);
     }
 
@@ -100,7 +97,7 @@ contract Simulator is AtlasErrors {
         internal
         returns (Result result, uint256 additionalErrorCode)
     {
-        try this.metacallSimulation{ value: msg.value }(userOp, solverOps, dAppOp) {
+        try this.metacallSimulation{ value: userOp.value }(userOp, solverOps, dAppOp) {
             revert Unreachable();
         } catch (bytes memory revertData) {
             bytes4 errorSwitch = bytes4(revertData);
@@ -154,6 +151,22 @@ contract Simulator is AtlasErrors {
             revert NoAuctionWinner(); // should be unreachable
         }
         revert SimulationPassed();
+    }
+
+    // ---------------------------------------------------- //
+    //                   Deployer Functions                 //
+    // ---------------------------------------------------- //
+
+    function setAtlas(address _atlas) external {
+        if (msg.sender != deployer) revert Unauthorized();
+        atlas = _atlas;
+    }
+
+    function withdrawETH(address to) external {
+        if (msg.sender != deployer) revert Unauthorized();
+        uint256 _balance = address(this).balance;
+        SafeTransferLib.safeTransferETH(to, _balance);
+        emit DeployerWithdrawal(to, _balance);
     }
 
     receive() external payable { }

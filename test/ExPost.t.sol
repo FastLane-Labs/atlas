@@ -28,27 +28,56 @@ import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
 import "forge-std/Test.sol";
 
 contract ExPostTest is BaseTest {
-    struct Sig {
-        bytes32 r;
-        bytes32 s;
-        uint8 v;
-    }
-
-    V2ExPost public v2ExPost;
     /// forge-config: default.gas_price = 15000000000
+    V2ExPost public v2ExPost;
+    V2Helper public helper;
+
+    address FXS_ADDRESS = 0x3432B6A60D23Ca0dFCa7761B7ab56459D9C964D0;
+    IERC20 FXS = IERC20(FXS_ADDRESS);
+
+    address V2_FXS_ETH = 0xecBa967D84fCF0405F6b32Bc45F4d36BfDBB2E81;
+    address S2_FXS_ETH = 0x61eB53ee427aB4E007d78A9134AaCb3101A2DC23;
+
+    address POOL_ONE = V2_FXS_ETH;
+    address POOL_TWO = S2_FXS_ETH;
+    address TOKEN_ZERO = FXS_ADDRESS;
+    address TOKEN_ONE = WETH_ADDRESS;
+
+    SolverExPost public solverOneXP;
+    SolverExPost public solverTwoXP;
 
     function setUp() public virtual override {
         BaseTest.setUp();
 
+        // Deal to user
+        deal(TOKEN_ZERO, address(userEOA), 10e30);
+        deal(TOKEN_ONE, address(userEOA), 10e30);
+
+        vm.startPrank(governanceEOA);
+        v2ExPost = new V2ExPost(address(atlas));
+        atlasVerification.initializeGovernance(address(v2ExPost));
+        vm.stopPrank();
+
+        helper = new V2Helper(address(v2ExPost), address(atlas), address(atlasVerification));
+
         // Deposit ETH from Searcher1 signer to pay for searcher's gas
-        vm.prank(solverOneEOA);
+        vm.startPrank(solverOneEOA);
+        solverOneXP = new SolverExPost(WETH_ADDRESS, address(atlas), solverOneEOA, 60);
         atlas.deposit{ value: 1e18 }();
+        vm.stopPrank();
+
+        deal(TOKEN_ZERO, address(solverOneXP), 10e24);
+        deal(TOKEN_ONE, address(solverOneXP), 10e24);
 
         // Deposit ETH from Searcher2 signer to pay for searcher's gas
-        vm.prank(solverTwoEOA);
+        vm.startPrank(solverTwoEOA);
+        solverTwoXP = new SolverExPost(WETH_ADDRESS, address(atlas), solverTwoEOA, 80);
         atlas.deposit{ value: 1e18 }();
+        vm.stopPrank();
 
-        v2ExPost = new V2ExPost(address(atlas));
+        deal(TOKEN_ZERO, address(solverTwoXP), 10e24);
+        deal(TOKEN_ONE, address(solverTwoXP), 10e24);
+        
     }
 
     function test_ExPostMEV_SkipCoverage() public {
@@ -111,7 +140,7 @@ contract ExPostTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        address executionEnvironment = atlas.createExecutionEnvironment(userOp.control);
+        address executionEnvironment = atlas.createExecutionEnvironment(userEOA, userOp.control);
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
         console.log("userEOA", userEOA);

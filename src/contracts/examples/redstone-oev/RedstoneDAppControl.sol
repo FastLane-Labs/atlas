@@ -24,9 +24,7 @@ contract RedstoneDAppControl is DAppControl {
     mapping(address bundler => bool isWhitelisted) public bundlerWhitelist;
     uint32 public NUM_WHITELISTED_BUNDLERS = 0;
 
-    constructor(
-        address _atlas
-    )
+    constructor(address _atlas)
         DAppControl(
             _atlas,
             msg.sender,
@@ -89,8 +87,7 @@ contract RedstoneDAppControl is DAppControl {
 
     function _preOpsCall(UserOperation calldata userOp) internal view override returns (bytes memory) {
         RedstoneDAppControl(userOp.control).verifyWhitelist();
-        return abi.encode(userOp.dapp); //useOp.dapp is the address of the wrapped Atlas adapter //trackUserReturnData
-            // is false // trackPreOpsReturnData is true
+        return abi.encode(userOp.dapp);
     }
 
     function _allocateValueCall(address, uint256 bidAmount, bytes calldata data) internal virtual override {

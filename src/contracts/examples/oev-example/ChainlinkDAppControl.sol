@@ -53,9 +53,7 @@ contract ChainlinkDAppControl is DAppControl {
     event SignerRemovedForBaseFeed(address indexed baseFeed, address indexed signer);
     event ObservationsQuorumSet(uint256 oldQuorum, uint256 newQuorum);
 
-    constructor(
-        address _atlas
-    )
+    constructor(address _atlas)
         DAppControl(
             _atlas,
             msg.sender,
@@ -165,7 +163,7 @@ contract ChainlinkDAppControl is DAppControl {
         if (observations < observationsQuorum || observations > MAX_NUM_ORACLES) return false;
 
         for (uint256 i; i < observations; ++i) {
-            (address signer,) = ECDSA.tryRecover(reportHash, uint8(rawVs[i]) + 27, rs[i], ss[i]);
+            (address signer,,) = ECDSA.tryRecover(reportHash, uint8(rawVs[i]) + 27, rs[i], ss[i]);
             currentOracle = verificationVar.oracles[signer];
 
             // Signer must be pre-approved and only 1 observation per signer

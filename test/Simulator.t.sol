@@ -26,9 +26,9 @@ import { SolverBase } from "src/contracts/solver/SolverBase.sol";
 
 
 contract SimulatorTest is BaseTest {
-
+    uint256 simBalanceBefore;
     DummyDAppControl dAppControl;
-
+    
     struct ValidCallsCall {
         UserOperation userOp;
         SolverOperation[] solverOps;
@@ -41,6 +41,7 @@ contract SimulatorTest is BaseTest {
     function setUp() public override {
         BaseTest.setUp();
         dAppControl = defaultDAppControl().buildAndIntegrate(atlasVerification);
+        simBalanceBefore = address(simulator).balance;
     }
 
     function test_simUserOperation_success_valid_SkipCoverage() public {
@@ -51,6 +52,20 @@ contract SimulatorTest is BaseTest {
         assertEq(success, true);
         assertTrue(uint(result) > uint(Result.UserOpSimFail)); // Actually fails with SolverSimFail here
         assertEq(validCallsResult, 0);
+        assertEq(address(simulator).balance, simBalanceBefore, "Balance should not change");
+    }
+
+    function test_simUserOperation_success_valid_UserOpValue_SkipCoverage() public {
+        UserOperation memory userOp = validUserOperation()
+            .withValue(1e18)
+            .signAndBuild(address(atlasVerification), userPK);
+
+        (bool success, Result result, uint256 validCallsResult) = simulator.simUserOperation(userOp);
+
+        assertEq(success, true);
+        assertTrue(uint(result) > uint(Result.UserOpSimFail)); // Actually fails with SolverSimFail here
+        assertEq(validCallsResult, 0);
+        assertEq(address(simulator).balance, simBalanceBefore, "Balance should not change");
     }
 
     function test_simUserOperation_fail_bubblesUpValidCallsResult() public {
@@ -60,6 +75,7 @@ contract SimulatorTest is BaseTest {
         assertEq(success, false);
         assertEq(uint(result), uint(Result.VerificationSimFail));
         assertEq(validCallsResult, uint256(ValidCallsResult.GasPriceHigherThanMax));
+        assertEq(address(simulator).balance, simBalanceBefore, "Balance should not change");
     }
 
     function test_simSolverCall_success_validSolverOutcome_SkipCoverage() public {
@@ -81,6 +97,31 @@ contract SimulatorTest is BaseTest {
         assertEq(success, true);
         assertEq(uint(result), uint(Result.SimulationPassed));
         assertEq(solverOutcomeResult, 0);
+        assertEq(address(simulator).balance, simBalanceBefore, "Balance should not change");
+    }
+
+    function test_simSolverCall_success_validSolverOutcome_UserOpValue_SkipCoverage() public {
+        vm.startPrank(solverOneEOA);
+        DummySolver solver = new DummySolver(WETH_ADDRESS, address(atlas));
+        atlas.bond(1e18);
+        vm.stopPrank();
+
+        UserOperation memory userOp = validUserOperation()
+            .withValue(1e18)
+            .signAndBuild(address(atlasVerification), userPK);
+        SolverOperation[] memory solverOps = new SolverOperation[](1);
+        solverOps[0] = validSolverOperation(userOp)
+            .withSolver(address(solver))
+            .withData(abi.encodeWithSelector(solver.solverFunc.selector))
+            .signAndBuild(address(atlasVerification), solverOnePK);
+        DAppOperation memory dAppOp = validDAppOperation(userOp, solverOps).build();
+
+        (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCall(userOp, solverOps[0], dAppOp);
+
+        assertEq(success, true);
+        assertEq(uint(result), uint(Result.SimulationPassed));
+        assertEq(solverOutcomeResult, 0);
+        assertEq(address(simulator).balance, simBalanceBefore, "Balance should not change");
     }
 
     function test_simSolverCall_fail_bubblesUpSolverOutcomeResult_SkipCoverage() public {
@@ -102,6 +143,7 @@ contract SimulatorTest is BaseTest {
         assertEq(success, false);
         assertEq(uint(result), uint(Result.SolverSimFail));
         assertEq(solverOutcomeResult, 1 << uint256(SolverOutcome.InsufficientEscrow));
+        assertEq(address(simulator).balance, simBalanceBefore, "Balance should not change");
     }
 
     function test_simSolverCalls_success_validSolverOutcome_SkipCoverage() public {
@@ -123,6 +165,31 @@ contract SimulatorTest is BaseTest {
         assertEq(success, true);
         assertEq(uint(result), uint(Result.SimulationPassed));
         assertEq(solverOutcomeResult, 0);
+        assertEq(address(simulator).balance, simBalanceBefore, "Balance should not change");
+    }
+
+    function test_simSolverCalls_success_validSolverOutcome_UserOpValue_SkipCoverage() public {
+        vm.startPrank(solverOneEOA);
+        DummySolver solver = new DummySolver(WETH_ADDRESS, address(atlas));
+        atlas.bond(1e18);
+        vm.stopPrank();
+
+        UserOperation memory userOp = validUserOperation()
+            .withValue(1e18)
+            .signAndBuild(address(atlasVerification), userPK);
+        SolverOperation[] memory solverOps = new SolverOperation[](1);
+        solverOps[0] = validSolverOperation(userOp)
+            .withSolver(address(solver))
+            .withData(abi.encodeWithSelector(solver.solverFunc.selector))
+            .signAndBuild(address(atlasVerification), solverOnePK);
+        DAppOperation memory dAppOp = validDAppOperation(userOp, solverOps).build();
+
+        (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
+
+        assertEq(success, true);
+        assertEq(uint(result), uint(Result.SimulationPassed));
+        assertEq(solverOutcomeResult, 0);
+        assertEq(address(simulator).balance, simBalanceBefore, "Balance should not change");
     }
 
     function test_simSolverCalls_fail_noSolverOps() public {
@@ -135,6 +202,7 @@ contract SimulatorTest is BaseTest {
         assertEq(success, false);
         assertEq(uint(result), uint(Result.Unknown)); // Should return Unknown if no solverOps given
         assertEq(solverOutcomeResult, uint256(type(SolverOutcome).max) + 1);
+        assertEq(address(simulator).balance, simBalanceBefore, "Balance should not change");
     }
 
     function test_simSolverCalls_fail_bubblesUpSolverOutcomeResult_SkipCoverage() public {
@@ -156,7 +224,39 @@ contract SimulatorTest is BaseTest {
         assertEq(success, false);
         assertEq(uint(result), uint(Result.SolverSimFail));
         assertEq(solverOutcomeResult, 1 << uint256(SolverOutcome.InsufficientEscrow));
+        assertEq(address(simulator).balance, simBalanceBefore, "Balance should not change");
     }
+
+    // Deployer Function Tests
+
+    function test_simulator_setAtlas() public {
+        assertEq(simulator.atlas(), address(atlas));
+
+        vm.expectRevert(AtlasErrors.Unauthorized.selector);
+        simulator.setAtlas(address(0));
+        assertEq(simulator.atlas(), address(atlas), "Should revert if not deployer");
+        
+        vm.prank(deployer);
+        simulator.setAtlas(address(123));
+        assertEq(simulator.atlas(), address(123), "Should set new atlas address");
+    }
+
+    function test_simulator_withdrawETH() public {
+        address recipient = makeAddr("LuckyRecipient");
+        uint256 recipientBalanceBefore = address(recipient).balance;
+        simBalanceBefore = address(simulator).balance;
+        
+
+        vm.expectRevert(AtlasErrors.Unauthorized.selector);
+        simulator.withdrawETH(recipient);
+        assertEq(address(simulator).balance, simBalanceBefore, "Should revert if caller not deployer");
+
+        vm.prank(deployer);
+        simulator.withdrawETH(recipient);
+        assertEq(address(simulator).balance, 0, "Should withdraw all balance");
+        assertEq(address(recipient).balance, recipientBalanceBefore + simBalanceBefore, "Should send balance to recipient");
+    }
+
 
     // Test Helpers
 

@@ -4,8 +4,6 @@ pragma solidity 0.8.25;
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { LibSort } from "solady/utils/LibSort.sol";
 
-import { IDAppControl } from "../interfaces/IDAppControl.sol";
-
 import { Escrow } from "./Escrow.sol";
 import { Factory } from "./Factory.sol";
 
@@ -19,6 +17,7 @@ import "src/contracts/types/ValidCalls.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 import { IL2GasCalculator } from "src/contracts/interfaces/IL2GasCalculator.sol";
+import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 
 /// @title Atlas V1
 /// @author FastLane Labs
@@ -60,11 +59,12 @@ contract Atlas is Escrow, Factory {
             : gasleft() + IL2GasCalculator(L2_GAS_CALCULATOR).initialGasUsed(msg.data.length);
 
         bool _isSimulation = msg.sender == SIMULATOR;
+        address _bundler = _isSimulation ? dAppOp.bundler : msg.sender;
 
         (address _executionEnvironment, DAppConfig memory _dConfig) = _getOrCreateExecutionEnvironment(userOp);
 
         ValidCallsResult _validCallsResult =
-            VERIFICATION.validateCalls(_dConfig, userOp, solverOps, dAppOp, msg.value, msg.sender, _isSimulation);
+            VERIFICATION.validateCalls(_dConfig, userOp, solverOps, dAppOp, msg.value, _bundler, _isSimulation);
         if (_validCallsResult != ValidCallsResult.Valid) {
             if (_isSimulation) revert VerificationSimFail(_validCallsResult);
 
@@ -84,9 +84,8 @@ contract Atlas is Escrow, Factory {
         // userOpHash has already been calculated and verified in validateCalls at this point, so rather
         // than re-calculate it, we can simply take it from the dAppOp here. It's worth noting that this will
         // be either a TRUSTED or DEFAULT hash, depending on the allowsTrustedOpHash setting.
-        try this.execute(_dConfig, userOp, solverOps, _executionEnvironment, msg.sender, dAppOp.userOpHash) returns (
-            Context memory ctx
-        ) {
+        try this.execute(_dConfig, userOp, solverOps, _executionEnvironment, _bundler, dAppOp.userOpHash, _isSimulation)
+        returns (Context memory ctx) {
             // Gas Refund to sender only if execution is successful
             (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) = _settle(ctx, _dConfig.solverGasLimit);
 
@@ -127,7 +126,8 @@ contract Atlas is Escrow, Factory {
         SolverOperation[] calldata solverOps,
         address executionEnvironment,
         address bundler,
-        bytes32 userOpHash
+        bytes32 userOpHash,
+        bool isSimulation
     )
         external
         payable
@@ -137,7 +137,7 @@ contract Atlas is Escrow, Factory {
         if (msg.sender != address(this)) revert InvalidAccess();
 
         // Build the context object
-        ctx = _buildContext(executionEnvironment, userOpHash, bundler, uint8(solverOps.length), bundler == SIMULATOR);
+        ctx = _buildContext(executionEnvironment, userOpHash, bundler, uint8(solverOps.length), isSimulation);
 
         bytes memory _returnData;
 

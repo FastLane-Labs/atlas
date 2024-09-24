@@ -6,7 +6,7 @@ import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnviro
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
-import { IDAppControl } from "../interfaces/IDAppControl.sol";
+import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 
 import { SafeCall } from "src/contracts/libraries/SafeCall/SafeCall.sol";
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
