@@ -10,7 +10,7 @@ import { IRedstoneAdapter } from
 import "src/contracts/types/UserOperation.sol";
 import "src/contracts/types/SolverOperation.sol";
 
-contract RedstoneOevDappControl is DAppControl {
+contract RedstoneOevDAppControl is DAppControl {
     error OnlyGovernance();
     error OnlyWhitelistedBundlerAllowed();
     error OnlyWhitelistedOracleAllowed();
@@ -159,20 +159,20 @@ contract RedstoneOevDappControl is DAppControl {
      */
     function _preOpsCall(UserOperation calldata userOp) internal view override returns (bytes memory) {
         // The bundler must be whitelisted
-        RedstoneOevDappControl(_control()).verifyBundlerWhitelist();
+        RedstoneOevDAppControl(_control()).verifyBundlerWhitelist();
 
         // The user must be calling the present contract
         if (userOp.dapp != _control()) revert InvalidUserDestination();
 
         // The user must be calling the update function
-        if (bytes4(userOp.data) != bytes4(RedstoneOevDappControl.update.selector)) {
+        if (bytes4(userOp.data) != bytes4(RedstoneOevDAppControl.update.selector)) {
             revert InvalidUserEntryCall();
         }
 
         (address _oracle, bytes memory _updateCallData) = abi.decode(userOp.data[4:], (address, bytes));
 
         // The called oracle must be whitelisted
-        RedstoneOevDappControl(_control()).verifyOracleWhitelist(_oracle);
+        RedstoneOevDAppControl(_control()).verifyOracleWhitelist(_oracle);
 
         // The update call data must be a valid updateDataFeedsValues call
         if (bytes4(_updateCallData) != bytes4(IRedstoneAdapter.updateDataFeedsValues.selector)) {
@@ -191,18 +191,18 @@ contract RedstoneOevDappControl is DAppControl {
         if (bidAmount == 0) return;
 
         // Get the OEV share for the bundler and transfer it
-        uint256 _oevShareBundler = bidAmount * RedstoneOevDappControl(_control()).oevShareBundler() / OEV_SHARE_SCALE;
+        uint256 _oevShareBundler = bidAmount * RedstoneOevDAppControl(_control()).oevShareBundler() / OEV_SHARE_SCALE;
         if (_oevShareBundler > 0) SafeTransferLib.safeTransferETH(_bundler(), _oevShareBundler);
 
         // Get the OEV share for Fastlane and transfer it
-        uint256 _oevShareFastlane = bidAmount * RedstoneOevDappControl(_control()).oevShareFastlane() / OEV_SHARE_SCALE;
+        uint256 _oevShareFastlane = bidAmount * RedstoneOevDAppControl(_control()).oevShareFastlane() / OEV_SHARE_SCALE;
         if (_oevShareFastlane > 0) SafeTransferLib.safeTransferETH(oevAllocationDestination, _oevShareFastlane);
 
         // Transfer the rest
         uint256 _oevShareDestination = bidAmount - _oevShareBundler - _oevShareFastlane;
         if (_oevShareDestination > 0) {
             SafeTransferLib.safeTransferETH(
-                RedstoneOevDappControl(_control()).oevAllocationDestination(), _oevShareDestination
+                RedstoneOevDAppControl(_control()).oevAllocationDestination(), _oevShareDestination
             );
         }
     }
