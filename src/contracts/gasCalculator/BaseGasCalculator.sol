@@ -12,7 +12,7 @@ interface IGasPriceOracle {
 }
 
 contract BaseGasCalculator is IL2GasCalculator, Ownable {
-    uint256 internal constant _CALLDATA_LENGTH_PREMIUM = 32;
+    uint256 internal constant _CALLDATA_LENGTH_PREMIUM = 16;
     uint256 internal constant _BASE_TRANSACTION_GAS_USED = 21_000;
 
     address public immutable GAS_PRICE_ORACLE;
