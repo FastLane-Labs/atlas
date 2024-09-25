@@ -42,7 +42,7 @@ contract SolverBase is ISolverContract {
         address bidToken,
         uint256 bidAmount,
         bytes calldata solverOpData,
-        bytes calldata
+        bytes calldata forwardedData
     )
         external
         payable
