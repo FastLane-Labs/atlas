@@ -315,6 +315,7 @@ abstract contract GasAccounting is SafetyLocks {
     /// @return adjustedWriteoffs Writeoffs of the current metacall, adjusted by adding the bundler gas overage penalty
     /// if applicable.
     /// @return netAtlasGasSurcharge The net gas surcharge of the metacall, taken by Atlas.
+    /// @return estMetacallGasCost The estimated gas cost of the metacall without bundler surcharge.
     /// @dev This function is called internally to adjust the accounting for fees based on the gas usage.
     /// Note: The behavior of this function depends on whether `_bidFindingIteration()` or `_bidKnownIteration()` is
     /// used, as they both use a different order of execution.
@@ -323,6 +324,7 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 solverGasLimit
     )
         internal
+        view
         returns (
             uint256 adjustedWithdrawals,
             uint256 adjustedDeposits,
@@ -457,7 +459,7 @@ abstract contract GasAccounting is SafetyLocks {
 
             if (_amountSolverReceives > _amountSolverPays) {
                 _netSolverCredit = _amountSolverReceives - _amountSolverPays;
-                uint256 _maxBundlerRefund = _gasCost * 80 / 100;
+                uint256 _maxBundlerRefund = _gasCost * 80 / 100; // TODO refactor constants nicely
                 if (_netSolverCredit > _maxBundlerRefund) {
                     netAtlasGasSurcharge += _netSolverCredit - _maxBundlerRefund;
                     _netSolverCredit = _maxBundlerRefund;
