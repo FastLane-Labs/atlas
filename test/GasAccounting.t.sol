@@ -72,7 +72,8 @@ contract MockGasAccounting is TestAtlas, BaseTest {
             uint256 adjustedDeposits,
             uint256 adjustedClaims,
             uint256 adjustedWriteoffs,
-            uint256 netAtlasGasSurcharge
+            uint256 netAtlasGasSurcharge,
+            uint256 estMetacallGasCost
         )
     {
         return _adjustAccountingForFees(ctx, MOCK_SOLVER_GAS_LIMIT);
