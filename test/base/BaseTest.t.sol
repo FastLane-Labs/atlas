@@ -45,16 +45,16 @@ contract BaseTest is Test {
     Sorter sorter;
     GovernanceBurner govBurner;
 
-    address WETH_ADDRESS = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    address DAI_ADDRESS = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
+    address WETH_ADDRESS = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
+    address DAI_ADDRESS = 0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1;
     IERC20 WETH = IERC20(WETH_ADDRESS);
     IERC20 DAI = IERC20(DAI_ADDRESS);
 
     uint256 DEFAULT_ESCROW_DURATION = 64;
-    uint256 MAINNET_FORK_BLOCK = 17_441_786;
+    uint256 ARBITUM_FORK_BLOCK = 259_824_410;
 
     function setUp() public virtual {
-        vm.createSelectFork(vm.envString("MAINNET_RPC_URL"), MAINNET_FORK_BLOCK);
+        vm.createSelectFork(vm.envString("ARBITUM_RPC_URL"), ARBITUM_FORK_BLOCK);
         __createAndLabelAccounts();
         __deployAtlasContracts();
         __fundSolversAndDepositAtlETH();
