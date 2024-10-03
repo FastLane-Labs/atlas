@@ -25,8 +25,6 @@ import { IUniswapV2Factory } from "./interfaces/IUniswapV2Factory.sol";
 // Misc
 import { SwapMath } from "./SwapMath.sol";
 
-import { ChainAddresses } from "test/helpers/ChainAddresses.sol";
-
 // import "forge-std/Test.sol";
 
 interface IWETH {
@@ -35,7 +33,7 @@ interface IWETH {
 }
 
 contract V2ExPost is DAppControl {
-    address public constant WETH = address(ChainAddresses.WETH_ADDRESS);
+    address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
     event GiftedGovernanceToken(address indexed user, address indexed token, uint256 amount);
 
