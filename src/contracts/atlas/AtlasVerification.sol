@@ -103,19 +103,20 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
 
         uint256 _solverOpCount = solverOps.length;
 
-        {
+        {   
+            uint256 currentBlockNumber = SafeBlockNumber.get();
             // Check number of solvers not greater than max, to prevent overflows in `solverIndex`
             if (_solverOpCount > _MAX_SOLVERS) {
                 return ValidCallsResult.TooManySolverOps;
             }
 
             // Check if past user's deadline
-            if (userOp.deadline != 0 && SafeBlockNumber.get() > userOp.deadline) {
+            if (userOp.deadline != 0 && currentBlockNumber > userOp.deadline) {
                 return ValidCallsResult.UserDeadlineReached;
             }
 
             // Check if past dapp's deadline
-            if (dAppOp.deadline != 0 && SafeBlockNumber.get() > dAppOp.deadline) {
+            if (dAppOp.deadline != 0 && currentBlockNumber > dAppOp.deadline) {
                 return ValidCallsResult.DAppDeadlineReached;
             }
 
