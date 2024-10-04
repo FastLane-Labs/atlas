@@ -12,7 +12,10 @@ library SafeBlockNumber {
 
     function get() internal view returns (uint256) {
         uint256 chainId = block.chainid;
-        if (chainId == ARBITRUM_ONE_CHAIN_ID || chainId == ARBITRUM_NOVA_CHAIN_ID || chainId == ARBITRUM_SEPOLIA_CHAIN_ID) {
+        if (
+            chainId == ARBITRUM_ONE_CHAIN_ID || chainId == ARBITRUM_NOVA_CHAIN_ID
+                || chainId == ARBITRUM_SEPOLIA_CHAIN_ID
+        ) {
             // Arbitrum One or Nova chain
             return ARB_SYS.arbBlockNumber();
         } else {
