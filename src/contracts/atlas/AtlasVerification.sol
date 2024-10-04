@@ -9,6 +9,7 @@ import { NonceManager } from "src/contracts/atlas/NonceManager.sol";
 
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
+import { SafeBlockNumber } from "src/contracts/libraries/SafeBlockNumber.sol";
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 import { AtlasConstants } from "src/contracts/types/AtlasConstants.sol";
 import "src/contracts/types/SolverOperation.sol";
@@ -109,12 +110,12 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             }
 
             // Check if past user's deadline
-            if (userOp.deadline != 0 && block.number > userOp.deadline) {
+            if (userOp.deadline != 0 && SafeBlockNumber.get() > userOp.deadline) {
                 return ValidCallsResult.UserDeadlineReached;
             }
 
             // Check if past dapp's deadline
-            if (dAppOp.deadline != 0 && block.number > dAppOp.deadline) {
+            if (dAppOp.deadline != 0 && SafeBlockNumber.get() > dAppOp.deadline) {
                 return ValidCallsResult.DAppDeadlineReached;
             }
 
