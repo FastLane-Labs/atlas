@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { Test, console } from "forge-std/Test.sol";
-import { BaseTest } from "../base/BaseTest.t.sol";
+import { console } from "forge-std/Test.sol";
 import { ArbitrumTest } from "./ArbitrumTest.t.sol";
 
 import { SafeBlockNumber } from "src/contracts/libraries/SafeBlockNumber.sol";
