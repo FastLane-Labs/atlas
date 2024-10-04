@@ -143,8 +143,7 @@ contract V4DAppControl is DAppControl {
         } else {
             if (params.amountSpecified > 0) {
                 // Buying Pool's token0 with amountSpecified of User's token1
-            }
-            else {
+            } else {
                 // Buying amountSpecified of Pool's token0 with User's token1
             }
         }
@@ -177,7 +176,9 @@ contract V4DAppControl is DAppControl {
         // Flag the pool to be open for trading for the remainder of the block
         bytes32 sequenceKey = keccak256(
             abi.encodePacked(
-                IPoolManager.Currency.unwrap(key.currency0), IPoolManager.Currency.unwrap(key.currency1), SafeBlockNumber.get()
+                IPoolManager.Currency.unwrap(key.currency0),
+                IPoolManager.Currency.unwrap(key.currency1),
+                SafeBlockNumber.get()
             )
         );
 
