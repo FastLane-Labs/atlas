@@ -20,9 +20,9 @@ contract ArbitrumGasCalculatorTest is ArbitrumTest {
         uint256 cost = calculator.getCalldataCost(calldataLength);
 
         // Calculate expected cost based on our mock values and calculator logic
-        uint256 perL2Tx = 224423613120;
-        uint256 perArbGasTotal = 10000000;
-        uint256 l1BaseFee = 100189113;
+        uint256 perL2Tx = 224_423_613_120;
+        uint256 perArbGasTotal = 10_000_000;
+        uint256 l1BaseFee = 100_189_113;
 
         uint256 expectedL2Cost = calldataLength * 16 * perArbGasTotal;
         uint256 expectedL1Cost = calldataLength * 16 * l1BaseFee;
@@ -37,7 +37,7 @@ contract ArbitrumGasCalculatorTest is ArbitrumTest {
 
         // Calculate expected gas used based on our mock values and calculator logic
         uint256 perL1CalldataByte = 160;
-        uint256 expectedGasUsed = 21000 + (calldataLength * perL1CalldataByte);
+        uint256 expectedGasUsed = 21_000 + (calldataLength * perL1CalldataByte);
 
         assertEq(gasUsed, expectedGasUsed, "Initial gas used calculation is incorrect");
     }
@@ -50,9 +50,9 @@ contract ArbitrumGasCalculatorTest is ArbitrumTest {
         uint256 cost = calculator.getCalldataCost(calldataLength);
 
         // Calculate expected cost for Nova
-        uint256 perL2Tx = 224423613120;
-        uint256 perArbGasTotal = 10000000;
-        uint256 l1BaseFee = 100189113;
+        uint256 perL2Tx = 224_423_613_120;
+        uint256 perArbGasTotal = 10_000_000;
+        uint256 l1BaseFee = 100_189_113;
 
         uint256 expectedL2Cost = calldataLength * 16 * perArbGasTotal;
         uint256 expectedL1Cost = calldataLength * l1BaseFee; // Note: No 16 multiplier for Nova

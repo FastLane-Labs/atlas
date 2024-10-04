@@ -11,10 +11,10 @@ contract ArbitrumGasCalculator is IL2GasCalculator, Ownable {
     // Constants for gas calculations
     uint256 internal constant _CALLDATA_LENGTH_PREMIUM = 16;
     uint256 internal constant _BASE_TRANSACTION_GAS_USED = 21_000;
-    
+
     // Interface to interact with Arbitrum's gas info precompile
     ArbGasInfo public immutable ARB_GAS_INFO;
-    
+
     // Offset applied to calldata length for custom adjustments
     int256 public calldataLengthOffset;
 
@@ -35,8 +35,8 @@ contract ArbitrumGasCalculator is IL2GasCalculator, Ownable {
     /// @return calldataCostETH The cost of the calldata in ETH
     function getCalldataCost(uint256 calldataLength) external view override returns (uint256 calldataCostETH) {
         // Get gas prices from Arbitrum
-        (uint256 perL2Tx, , , , , uint256 perArbGasTotal) = ARB_GAS_INFO.getPricesInWei();
-        
+        (uint256 perL2Tx,,,,, uint256 perArbGasTotal) = ARB_GAS_INFO.getPricesInWei();
+
         // Get L1 base fee estimate
         uint256 l1BaseFee = ARB_GAS_INFO.getL1BaseFeeEstimate();
 
@@ -71,7 +71,7 @@ contract ArbitrumGasCalculator is IL2GasCalculator, Ownable {
     /// @return gasUsed The amount of gas used
     function initialGasUsed(uint256 calldataLength) external view override returns (uint256 gasUsed) {
         // Get the price per L1 calldata byte in ArbGas
-        (, uint256 perL1CalldataByte, ) = ARB_GAS_INFO.getPricesInArbGas();
+        (, uint256 perL1CalldataByte,) = ARB_GAS_INFO.getPricesInArbGas();
         // Calculate initial gas used
         return _BASE_TRANSACTION_GAS_USED + (calldataLength * perL1CalldataByte);
     }
