@@ -20,38 +20,11 @@ import "src/contracts/types/LockTypes.sol";
 
 import { LibSort } from "solady/utils/LibSort.sol";
 
-// These tests focus on the functions found in the Atlas.sol file
-contract AtlasTest is BaseTest {
-
-    function setUp_bidFindingIteration() public {
-        // super.setUp();
-
-        // vm.startPrank(payee);
-        // simulator = new Simulator();
-
-        // // Computes the addresses at which AtlasVerification will be deployed
-        // address expectedAtlasAddr = vm.computeCreateAddress(payee, vm.getNonce(payee) + 1);
-        // address expectedAtlasVerificationAddr = vm.computeCreateAddress(payee, vm.getNonce(payee) + 2);
-        // bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedAtlasAddr, "AtlasFactory 1.0"));
-        // ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedAtlasAddr);
-
-        // atlas = new MockAtlas({
-        //     escrowDuration: 64,
-        //     verification: expectedAtlasVerificationAddr,
-        //     simulator: address(simulator),
-        //     executionTemplate: address(execEnvTemplate),
-        //     surchargeRecipient: payee
-        // });
-        // atlasVerification = new AtlasVerification(address(atlas));
-        // simulator.setAtlas(address(atlas));
-        // sorter = new Sorter(address(atlas));
-        // vm.stopPrank();
-    }
-
+contract BidFindingTest is BaseTest {
     function test_bidFindingIteration_sortingOrder() public pure {
         // Test order of bidsAndIndices after insertionSort
 
-        // 3 items. [200, 0, 100] --> [0, 100, 200] 
+        // 3 items. [200, 0, 100] --> [0, 100, 200]
         uint256[] memory bidsAndIndices = new uint256[](3);
         bidsAndIndices[0] = 100;
         bidsAndIndices[1] = 0;
@@ -80,7 +53,7 @@ contract AtlasTest is BaseTest {
     }
 
     function test_bidFindingIteration_packBidAndIndex() public pure {
-        uint256 bid = 12345;
+        uint256 bid = 12_345;
         uint256 index = 2;
 
         uint256 packed = _packBidAndIndex(bid, index);
@@ -113,7 +86,6 @@ contract AtlasTest is BaseTest {
         assertEq(unpackedIndex, index);
     }
 
-
     // Packs bid and index into a single uint256, replicates logic used in `_bidFindingIteration()`
     function _packBidAndIndex(uint256 bid, uint256 index) internal pure returns (uint256) {
         return uint256(bid << 16 | uint16(index));
@@ -126,30 +98,5 @@ contract AtlasTest is BaseTest {
 
         // uint256 solverOpsIndex = bidsAndIndices[i] & FIRST_16_BITS_MASK;
         index = packed & uint256(0xFFFF);
-    }
-}
-
-// MockAtlas exposes Atlas' internal functions for testing
-contract MockAtlas is Atlas {
-    constructor(
-        uint256 _escrowDuration,
-        address _verification,
-        address _simulator,
-        address _surchargeRecipient,
-        address _l2GasCalculator,
-        address _executionTemplate
-    ) 
-        Atlas(_escrowDuration, _verification, _simulator, _surchargeRecipient, _l2GasCalculator, _executionTemplate) 
-    { }
-
-    function bidFindingIteration(
-        DAppConfig calldata dConfig,
-        UserOperation calldata userOp,
-        SolverOperation[] calldata solverOps,
-        bytes memory returnData,
-        Context memory ctx
-    ) public returns (Context memory) {
-        _bidFindingIteration(ctx, dConfig, userOp, solverOps, returnData);
-        return ctx;
     }
 }

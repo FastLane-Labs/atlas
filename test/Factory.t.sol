@@ -47,6 +47,9 @@ contract MockFactory is Factory, Test {
 }
 
 contract FactoryTest is Test {
+    uint256 DEFAULT_ATLAS_SURCHARGE_RATE = 1_000_000; // 10%
+    uint256 DEFAULT_BUNDLER_SURCHARGE_RATE = 1_000_000; // 10%
+
     Atlas public atlas;
     AtlasVerification public atlasVerification;
     MockFactory public mockFactory;
@@ -66,6 +69,8 @@ contract FactoryTest is Test {
         vm.startPrank(deployer);
         atlas = new Atlas({
             escrowDuration: 64,
+            atlasSurchargeRate: DEFAULT_ATLAS_SURCHARGE_RATE,
+            bundlerSurchargeRate: DEFAULT_BUNDLER_SURCHARGE_RATE,
             verification: expectedAtlasVerificationAddr,
             simulator: address(0),
             executionTemplate: address(execEnvTemplate),
