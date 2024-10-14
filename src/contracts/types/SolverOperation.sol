@@ -6,8 +6,8 @@ bytes32 constant SOLVER_TYPEHASH = keccak256(
 );
 
 // NOTE: The calldata length of this SolverOperation struct is 608 bytes when the `data` field is excluded. This value
-// is stored in the `_SOLVER_OP_BASE_CALLDATA` constant in Storage.sol and must be kept up-to-date with any changes to
-// this struct.
+// is stored in the `_SOLVER_OP_BASE_CALLDATA` constant in AtlasConstants.sol and must be kept up-to-date with any
+// changes to this struct.
 struct SolverOperation {
     address from; // Solver address
     address to; // Atlas address
