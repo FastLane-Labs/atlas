@@ -28,6 +28,8 @@ contract DummyDAppControl is DAppControl {
     bytes public allocateValueInputData;
     bytes public postOpsInputData;
 
+    uint256 public userOpGasLeft;
+
     event MEVPaymentSuccess(address bidToken, uint256 bidAmount);
 
     constructor(
@@ -106,6 +108,8 @@ contract DummyDAppControl is DAppControl {
     // ****************************************
 
     function userOperationCall(uint256 returnValue) public returns (uint256) {
+        DummyDAppControl(CONTROL).setUserOpGasLeft();
+
         bool shouldRevert = DummyDAppControl(CONTROL).userOpShouldRevert();
         require(!shouldRevert, "userOperationCall revert requested");
 
@@ -153,5 +157,10 @@ contract DummyDAppControl is DAppControl {
         if (hook == 3) postSolverInputData = inputData;
         if (hook == 4) allocateValueInputData = inputData;
         if (hook == 5) postOpsInputData = inputData;
+    }
+
+    // Called by the EE to save gas left for testing at start of userOperationCall
+    function setUserOpGasLeft() public {
+        userOpGasLeft = gasleft();
     }
 }
