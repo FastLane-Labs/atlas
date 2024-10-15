@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import { DummyDAppControl } from "../base/DummyDAppControl.sol";
+import { DummyDAppControl } from "test/base/DummyDAppControl.sol";
 import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
 import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
 

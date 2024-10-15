@@ -1,19 +1,19 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.25;
 
-import { IAtlas } from "../interfaces/IAtlas.sol";
+import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 
 import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 
-import "../types/SolverOperation.sol";
-import "../types/UserOperation.sol";
-import "../types/LockTypes.sol";
-import "../types/DAppOperation.sol";
-import "../types/ConfigTypes.sol";
-import "../types/ValidCalls.sol";
-import "../types/EscrowTypes.sol";
+import "src/contracts/types/SolverOperation.sol";
+import "src/contracts/types/UserOperation.sol";
+import "src/contracts/types/LockTypes.sol";
+import "src/contracts/types/DAppOperation.sol";
+import "src/contracts/types/ConfigTypes.sol";
+import "src/contracts/types/ValidCalls.sol";
+import "src/contracts/types/EscrowTypes.sol";
 
 import { Result } from "src/contracts/interfaces/ISimulator.sol";
 

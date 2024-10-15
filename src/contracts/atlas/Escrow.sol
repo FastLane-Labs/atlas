@@ -6,7 +6,7 @@ import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnviro
 import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
 import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
 import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
-import { IDAppControl } from "../interfaces/IDAppControl.sol";
+import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 
 import { SafeCall } from "src/contracts/libraries/SafeCall/SafeCall.sol";
 import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
@@ -31,12 +31,22 @@ abstract contract Escrow is AtlETH {
 
     constructor(
         uint256 escrowDuration,
+        uint256 atlasSurchargeRate,
+        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
         address l2GasCalculator
     )
-        AtlETH(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
+        AtlETH(
+            escrowDuration,
+            atlasSurchargeRate,
+            bundlerSurchargeRate,
+            verification,
+            simulator,
+            initialSurchargeRecipient,
+            l2GasCalculator
+        )
     {
         if (escrowDuration == 0) revert InvalidEscrowDuration();
     }
@@ -610,8 +620,8 @@ abstract contract Escrow is AtlETH {
                     solverOp.bidToken,
                     bidAmount,
                     solverOp.data,
-                    // Only pass the returnData to solver if it came from userOp call and not from preOps call.
-                    _activeCallConfig().needsUserReturnData() ? returnData : new bytes(0)
+                    // Only pass the returnData (either from userOp or preOps) if the dApp requires it
+                    _activeCallConfig().forwardReturnData() ? returnData : new bytes(0)
                 )
             )
         );

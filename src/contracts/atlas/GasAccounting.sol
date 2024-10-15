@@ -21,12 +21,22 @@ abstract contract GasAccounting is SafetyLocks {
 
     constructor(
         uint256 escrowDuration,
+        uint256 atlasSurchargeRate,
+        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
         address l2GasCalculator
     )
-        SafetyLocks(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
+        SafetyLocks(
+            escrowDuration,
+            atlasSurchargeRate,
+            bundlerSurchargeRate,
+            verification,
+            simulator,
+            initialSurchargeRecipient,
+            l2GasCalculator
+        )
     { }
 
     /// @notice Sets the initial accounting values for the metacall transaction.
@@ -35,10 +45,10 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 _rawClaims = (FIXED_GAS_OFFSET + gasMarker) * tx.gasprice;
 
         // Set any withdraws or deposits
-        _setClaims(_rawClaims.withBundlerSurcharge());
+        _setClaims(_rawClaims.withSurcharge(BUNDLER_SURCHARGE_RATE));
 
         // Atlas surcharge is based on the raw claims value.
-        _setFees(_rawClaims.getAtlasSurcharge());
+        _setFees(_rawClaims.getSurcharge(ATLAS_SURCHARGE_RATE));
         _setDeposits(msg.value);
 
         // Explicitly set writeoffs and withdrawals to 0 in case multiple metacalls in single tx.
@@ -281,16 +291,16 @@ abstract contract GasAccounting is SafetyLocks {
         if (result.bundlersFault()) {
             // CASE: Solver is not responsible for the failure of their operation, so we blame the bundler
             // and reduce the total amount refunded to the bundler
-            _setWriteoffs(writeoffs() + _gasUsed.withAtlasAndBundlerSurcharges());
+            _setWriteoffs(writeoffs() + _gasUsed.withSurcharges(ATLAS_SURCHARGE_RATE, BUNDLER_SURCHARGE_RATE));
         } else {
             // CASE: Solver failed, so we calculate what they owe.
-            uint256 _gasUsedWithSurcharges = _gasUsed.withAtlasAndBundlerSurcharges();
+            uint256 _gasUsedWithSurcharges = _gasUsed.withSurcharges(ATLAS_SURCHARGE_RATE, BUNDLER_SURCHARGE_RATE);
             _assign(solverOp.from, _gasUsedWithSurcharges, _gasUsedWithSurcharges, false);
         }
     }
 
     function _writeOffBidFindGasCost(uint256 gasUsed) internal {
-        _setWriteoffs(writeoffs() + gasUsed.withAtlasAndBundlerSurcharges());
+        _setWriteoffs(writeoffs() + gasUsed.withSurcharges(ATLAS_SURCHARGE_RATE, BUNDLER_SURCHARGE_RATE));
     }
 
     /// @param ctx Context struct containing relevant context information for the Atlas auction.
@@ -332,9 +342,9 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 _gasRemainder = _gasLeft * tx.gasprice;
 
         // Calculate the preadjusted netAtlasGasSurcharge
-        netAtlasGasSurcharge = _fees - _gasRemainder.getAtlasSurcharge();
+        netAtlasGasSurcharge = _fees - _gasRemainder.getSurcharge(ATLAS_SURCHARGE_RATE);
 
-        adjustedClaims -= _gasRemainder.withBundlerSurcharge();
+        adjustedClaims -= _gasRemainder.withSurcharge(BUNDLER_SURCHARGE_RATE);
         adjustedWithdrawals += netAtlasGasSurcharge;
         S_cumulativeSurcharge = _surcharge + netAtlasGasSurcharge; // Update the cumulative surcharge
 
@@ -342,7 +352,7 @@ abstract contract GasAccounting is SafetyLocks {
         // gas rebate. By reducing the claims, solvers end up paying less in total.
         if (ctx.solverCount > 0) {
             // Calculate the unadjusted bundler gas surcharge
-            uint256 _grossBundlerGasSurcharge = adjustedClaims.withoutBundlerSurcharge();
+            uint256 _grossBundlerGasSurcharge = adjustedClaims.withoutSurcharge(BUNDLER_SURCHARGE_RATE);
 
             // Calculate an estimate for how much gas should be remaining
             // NOTE: There is a free buffer of one SolverOperation because solverIndex starts at 0.

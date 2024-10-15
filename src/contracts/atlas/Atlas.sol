@@ -4,8 +4,6 @@ pragma solidity 0.8.25;
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { LibSort } from "solady/utils/LibSort.sol";
 
-import { IDAppControl } from "../interfaces/IDAppControl.sol";
-
 import { Escrow } from "./Escrow.sol";
 import { Factory } from "./Factory.sol";
 
@@ -19,6 +17,7 @@ import "src/contracts/types/ValidCalls.sol";
 import { CallBits } from "src/contracts/libraries/CallBits.sol";
 import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
 import { IL2GasCalculator } from "src/contracts/interfaces/IL2GasCalculator.sol";
+import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
 
 /// @title Atlas V1
 /// @author FastLane Labs
@@ -29,13 +28,23 @@ contract Atlas is Escrow, Factory {
 
     constructor(
         uint256 escrowDuration,
+        uint256 atlasSurchargeRate,
+        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
         address l2GasCalculator,
         address executionTemplate
     )
-        Escrow(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
+        Escrow(
+            escrowDuration,
+            atlasSurchargeRate,
+            bundlerSurchargeRate,
+            verification,
+            simulator,
+            initialSurchargeRecipient,
+            l2GasCalculator
+        )
         Factory(executionTemplate)
     { }
 
