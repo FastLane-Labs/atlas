@@ -357,8 +357,13 @@ abstract contract GasAccounting is SafetyLocks {
             S_cumulativeSurcharge = _surcharge + netAtlasGasSurcharge;
         } else {
             // If no successful solvers, only collect partial surcharges from solver's fault failures (if any)
-            netAtlasGasSurcharge = solverSurcharge();
-            if (netAtlasGasSurcharge > 0) S_cumulativeSurcharge = _surcharge + netAtlasGasSurcharge;
+            uint256 _solverSurcharge = solverSurcharge();
+            if (_solverSurcharge > 0) {
+                // NOTE: This only works when BUNDLER_SURCHARGE > ATLAS_SURCHARGE.
+                netAtlasGasSurcharge = _solverSurcharge.getAtlasPortionFromTotalSurcharge();
+                adjustedWithdrawals += netAtlasGasSurcharge;
+                S_cumulativeSurcharge = _surcharge + netAtlasGasSurcharge;
+            }
             return (adjustedWithdrawals, adjustedDeposits, adjustedClaims, adjustedWriteoffs, netAtlasGasSurcharge);
         }
 
@@ -430,6 +435,8 @@ abstract contract GasAccounting is SafetyLocks {
         if (ctx.solverSuccessful && _winningSolver != ctx.bundler) {
             _amountSolverPays += _adjustedClaims;
             claimsPaidToBundler = _adjustedClaims;
+        } else if (_winningSolver == ctx.bundler) {
+            claimsPaidToBundler = 0;
         } else {
             claimsPaidToBundler = 0;
             _winningSolver = ctx.bundler;

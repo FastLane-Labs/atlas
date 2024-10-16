@@ -26,6 +26,10 @@ library AccountingMath {
         surcharge = amount * _ATLAS_SURCHARGE_RATE / _SCALE;
     }
 
+    function getAtlasPortionFromTotalSurcharge(uint256 totalSurcharge) internal pure returns (uint256 atlasSurcharge) {
+        atlasSurcharge = totalSurcharge * _ATLAS_SURCHARGE_RATE / (_ATLAS_SURCHARGE_RATE + _BUNDLER_SURCHARGE_RATE);
+    }
+
     function solverGasLimitScaledDown(
         uint256 solverOpGasLimit,
         uint256 dConfigGasLimit
