@@ -361,7 +361,7 @@ abstract contract GasAccounting is SafetyLocks {
             if (_solverSurcharge > 0) {
                 // NOTE: This only works when BUNDLER_SURCHARGE > ATLAS_SURCHARGE.
                 netAtlasGasSurcharge = _solverSurcharge.getAtlasPortionFromTotalSurcharge();
-                adjustedWithdrawals += netAtlasGasSurcharge;                
+                adjustedWithdrawals += netAtlasGasSurcharge;
                 S_cumulativeSurcharge = _surcharge + netAtlasGasSurcharge;
             }
             return (adjustedWithdrawals, adjustedDeposits, adjustedClaims, adjustedWriteoffs, netAtlasGasSurcharge);
