@@ -27,7 +27,6 @@ import { BaseTest } from "test/base/BaseTest.t.sol";
 contract MockGasAccounting is TestAtlas, BaseTest {
     uint256 public constant MOCK_SOLVER_GAS_LIMIT = 500_000;
     
-
     constructor(
         uint256 _escrowDuration,
         uint256 _atlasSurchargeRate,
@@ -1024,15 +1023,6 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         // Verify bonded balance has decreased
         (uint112 unbonding,) = mockGasAccounting._balanceOf(solverOp.from);
         assertEq(unbonding, unbondingBefore);
-    }
-
-    function test_settle_withFailedsolver_reverts() public {
-        // Setup context with initial claims and deposits
-        Context memory ctx = setupContext(1 ether, 1 ether, 4000 ether, 1000 ether, false);
-
-        // Expect a revert due to insufficient total balance for a failed solver
-        vm.expectRevert();
-        mockGasAccounting.settle(ctx);
     }
 
     function test_settle_with_deposits() public {

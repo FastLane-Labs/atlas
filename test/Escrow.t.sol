@@ -351,7 +351,7 @@ contract EscrowTest is BaseTest {
             .withGas(solverGasLimit)
             .signAndBuild(address(atlasVerification), solverOnePK);
 
-        executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.InsufficientEscrow), true);
+        executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.InsufficientEscrow), false);
     }
 
     function test_executeSolverOperation_validateSolverOperation_callValueTooHigh_SkipCoverage() public {
@@ -370,7 +370,7 @@ contract EscrowTest is BaseTest {
     function test_executeSolverOperation_validateSolverOperation_userOutOfGas_SkipCoverage() public {
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
         this.executeSolverOperationCase{gas: _VALIDATION_GAS_LIMIT + _SOLVER_GAS_LIMIT + 1_000_000}(
-            userOp, solverOps, false, false, 1 << uint256(SolverOutcome.UserOutOfGas), true
+            userOp, solverOps, false, false, 1 << uint256(SolverOutcome.UserOutOfGas), false
         );
     }
 
