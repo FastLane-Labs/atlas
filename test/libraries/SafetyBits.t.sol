@@ -3,13 +3,13 @@ pragma solidity 0.8.25;
 
 import "forge-std/Test.sol";
 
-import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
-import "src/contracts/types/LockTypes.sol";
-import "test/base/TestUtils.sol";
+import { SafetyBits } from "../../src/contracts/libraries/SafetyBits.sol";
+import "../../src/contracts/types/LockTypes.sol";
+import "../base/TestUtils.sol";
 
-import { CallBits } from "src/contracts/libraries/CallBits.sol";
+import { CallBits } from "../../src/contracts/libraries/CallBits.sol";
 
-import { CallConfigIndex } from "src/contracts/types/ConfigTypes.sol";
+import { CallConfigIndex } from "../../src/contracts/types/ConfigTypes.sol";
 
 contract SafetyBitsTest is Test {
     using SafetyBits for Context;

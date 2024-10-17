@@ -2,17 +2,17 @@
 pragma solidity 0.8.25;
 
 import { DAppControlTemplate } from "./ControlTemplate.sol";
-import { ExecutionBase } from "src/contracts/common/ExecutionBase.sol";
-import { ExecutionPhase } from "src/contracts/types/LockTypes.sol";
-import { CallBits } from "src/contracts/libraries/CallBits.sol";
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/ConfigTypes.sol";
-import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
-import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
-import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
-import { ValidCallsResult } from "src/contracts/types/ValidCalls.sol";
-import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
+import { ExecutionBase } from "../common/ExecutionBase.sol";
+import { ExecutionPhase } from "../types/LockTypes.sol";
+import { CallBits } from "../libraries/CallBits.sol";
+import "../types/SolverOperation.sol";
+import "../types/UserOperation.sol";
+import "../types/ConfigTypes.sol";
+import { AtlasErrors } from "../types/AtlasErrors.sol";
+import { AtlasEvents } from "../types/AtlasEvents.sol";
+import { IAtlas } from "../interfaces/IAtlas.sol";
+import { ValidCallsResult } from "../types/ValidCalls.sol";
+import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
 
 /// @title DAppControl
 /// @author FastLane Labs

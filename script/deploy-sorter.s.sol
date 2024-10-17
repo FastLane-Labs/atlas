@@ -4,9 +4,9 @@ pragma solidity 0.8.25;
 import "forge-std/Script.sol";
 import "forge-std/Test.sol";
 
-import { DeployBaseScript } from "script/base/deploy-base.s.sol";
+import { DeployBaseScript } from "./base/deploy-base.s.sol";
 
-import { Sorter } from "src/contracts/helpers/Sorter.sol";
+import { Sorter } from "../src/contracts/helpers/Sorter.sol";
 
 contract DeploySorterScript is DeployBaseScript {
     function run() external {

@@ -6,11 +6,11 @@ import "forge-std/Test.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 import { TestAtlas } from "./TestAtlas.sol";
-import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
-import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
-import { Sorter } from "src/contracts/helpers/Sorter.sol";
-import { Simulator } from "src/contracts/helpers/Simulator.sol";
-import { GovernanceBurner } from "src/contracts/helpers/GovernanceBurner.sol";
+import { AtlasVerification } from "../../src/contracts/atlas/AtlasVerification.sol";
+import { ExecutionEnvironment } from "../../src/contracts/common/ExecutionEnvironment.sol";
+import { Sorter } from "../../src/contracts/helpers/Sorter.sol";
+import { Simulator } from "../../src/contracts/helpers/Simulator.sol";
+import { GovernanceBurner } from "../../src/contracts/helpers/GovernanceBurner.sol";
 
 contract BaseTest is Test {
     struct Sig {
@@ -51,6 +51,8 @@ contract BaseTest is Test {
     IERC20 DAI = IERC20(DAI_ADDRESS);
 
     uint256 DEFAULT_ESCROW_DURATION = 64;
+    uint256 DEFAULT_ATLAS_SURCHARGE_RATE = 1_000_000; // 10%
+    uint256 DEFAULT_BUNDLER_SURCHARGE_RATE = 1_000_000; // 10%
     uint256 MAINNET_FORK_BLOCK = 17_441_786;
 
     function setUp() public virtual {
@@ -80,6 +82,8 @@ contract BaseTest is Test {
 
         atlas = new TestAtlas({
             escrowDuration: DEFAULT_ESCROW_DURATION,
+            atlasSurchargeRate: DEFAULT_ATLAS_SURCHARGE_RATE,
+            bundlerSurchargeRate: DEFAULT_BUNDLER_SURCHARGE_RATE,
             verification: expectedAtlasVerificationAddr,
             simulator: address(simulator),
             executionTemplate: address(execEnvTemplate),

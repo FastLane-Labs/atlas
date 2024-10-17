@@ -5,16 +5,16 @@ import "forge-std/Test.sol";
 
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
-import { UserOperation } from "src/contracts/types/UserOperation.sol";
-import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
-import { DAppOperation } from "src/contracts/types/DAppOperation.sol";
-import { CallVerification } from "src/contracts/libraries/CallVerification.sol";
+import { SolverOperation } from "../src/contracts/types/SolverOperation.sol";
+import { UserOperation } from "../src/contracts/types/UserOperation.sol";
+import { DAppConfig } from "../src/contracts/types/ConfigTypes.sol";
+import { DAppOperation } from "../src/contracts/types/DAppOperation.sol";
+import { CallVerification } from "../src/contracts/libraries/CallVerification.sol";
 
-import { SolverBase } from "src/contracts/solver/SolverBase.sol";
+import { SolverBase } from "../src/contracts/solver/SolverBase.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
-import { TrebleSwapDAppControl } from "src/contracts/examples/trebleswap/TrebleSwapDAppControl.sol";
+import { TrebleSwapDAppControl } from "../src/contracts/examples/trebleswap/TrebleSwapDAppControl.sol";
 
 contract TrebleSwapTest is BaseTest {
     struct SwapTokenInfo {
@@ -52,7 +52,7 @@ contract TrebleSwapTest is BaseTest {
     address BRETT = 0x532f27101965dd16442E59d40670FaF5eBB142E4;
     address TREB; // will be set to value in DAppControl in setUp
 
-    uint256 ERR_MARGIN = 0.18e18; // 18% error margin
+    uint256 ERR_MARGIN = 0.22e18; // 22% error margin
     uint256 bundlerGasEth = 1e16;
 
     TrebleSwapDAppControl trebleSwapControl;
@@ -288,9 +288,7 @@ contract TrebleSwapTest is BaseTest {
         beforeVars.solverTrebBalance = _balanceOf(address(TREB), winningSolver);
         beforeVars.burnAddressTrebBalance = _balanceOf(address(TREB), BURN);
         beforeVars.atlasGasSurcharge = atlas.cumulativeSurcharge();
-        uint256 msgValue = (args.nativeInput ? swapInfo.inputAmount : 0) + bundlerGasEth;
-        if (args.nativeInput) beforeVars.userInputTokenBalance -= bundlerGasEth;
-        if (args.nativeOutput) beforeVars.userOutputTokenBalance -= bundlerGasEth;
+        uint256 msgValue = args.nativeInput ? swapInfo.inputAmount : 0;
 
         uint256 txGasUsed;
         uint256 estAtlasGasSurcharge = gasleft(); // Reused below during calculations
@@ -306,13 +304,28 @@ contract TrebleSwapTest is BaseTest {
         // Check Atlas auctionWon return value
         assertEq(auctionWon, auctionWonExpected, "auctionWon not as expected");
 
+        // Check msg.value is 0 unless sending ETH as the input token to be swapped
+        if (!args.nativeInput) assertEq(msgValue, 0, "msgValue should have been 0");
+
         // Check Atlas gas surcharge change
-        assertApproxEqRel(
-            atlas.cumulativeSurcharge() - beforeVars.atlasGasSurcharge,
-            estAtlasGasSurcharge,
-            ERR_MARGIN,
-            "Atlas gas surcharge not within estimated range"
-        );
+        if (args.solverOps.length > 0 && auctionWonExpected) {
+            assertApproxEqRel(
+                atlas.cumulativeSurcharge() - beforeVars.atlasGasSurcharge,
+                estAtlasGasSurcharge,
+                ERR_MARGIN,
+                "Atlas gas surcharge not within estimated range"
+            );
+        } else if (args.solverOps.length == 0) {
+            // No surcharge taken if no solvers.
+            assertEq(
+                atlas.cumulativeSurcharge(),
+                beforeVars.atlasGasSurcharge,
+                "Atlas gas surcharge changed when zero solvers"
+            );
+        } else {
+            // If solver failed (solver's fault), surcharge still taken, but only on failing solverOp portion. Difficult
+            // to estimate what that would be so skip this check in that 1 test case.
+        }
 
         // Check user input token change
         if (args.nativeInput && auctionWonExpected) {

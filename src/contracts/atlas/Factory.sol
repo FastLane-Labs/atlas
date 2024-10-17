@@ -1,12 +1,12 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.25;
 
-import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
-import { Mimic } from "src/contracts/common/Mimic.sol";
-import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
-import { UserOperation } from "src/contracts/types/UserOperation.sol";
-import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
-import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import { IDAppControl } from "../interfaces/IDAppControl.sol";
+import { Mimic } from "../common/Mimic.sol";
+import { DAppConfig } from "../types/ConfigTypes.sol";
+import { UserOperation } from "../types/UserOperation.sol";
+import { AtlasEvents } from "../types/AtlasEvents.sol";
+import { AtlasErrors } from "../types/AtlasErrors.sol";
 
 /// @title Factory
 /// @author FastLane Labs

@@ -3,9 +3,9 @@ pragma solidity 0.8.25;
 
 import "forge-std/Test.sol";
 
-import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
-import "src/contracts/types/EscrowTypes.sol";
-import "test/base/TestUtils.sol";
+import { EscrowBits } from "../../src/contracts/libraries/EscrowBits.sol";
+import "../../src/contracts/types/EscrowTypes.sol";
+import "../base/TestUtils.sol";
 
 contract EscrowBitsTest is Test {
     using EscrowBits for uint256;
