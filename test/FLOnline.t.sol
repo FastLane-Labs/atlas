@@ -5,17 +5,17 @@ import "forge-std/Test.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
-import { SolverBase } from "src/contracts/solver/SolverBase.sol";
+import { SolverBase } from "../src/contracts/solver/SolverBase.sol";
 
-import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
-import { UserOperation } from "src/contracts/types/UserOperation.sol";
+import { SolverOperation } from "../src/contracts/types/SolverOperation.sol";
+import { UserOperation } from "../src/contracts/types/UserOperation.sol";
 
-import { FastLaneOnlineOuter } from "src/contracts/examples/fastlane-online/FastLaneOnlineOuter.sol";
-import { FastLaneOnlineInner } from "src/contracts/examples/fastlane-online/FastLaneOnlineInner.sol";
-import { SwapIntent, BaselineCall, Reputation } from "src/contracts/examples/fastlane-online/FastLaneTypes.sol";
-import { FastLaneOnlineErrors } from "src/contracts/examples/fastlane-online/FastLaneOnlineErrors.sol";
+import { FastLaneOnlineOuter } from "../src/contracts/examples/fastlane-online/FastLaneOnlineOuter.sol";
+import { FastLaneOnlineInner } from "../src/contracts/examples/fastlane-online/FastLaneOnlineInner.sol";
+import { SwapIntent, BaselineCall, Reputation } from "../src/contracts/examples/fastlane-online/FastLaneTypes.sol";
+import { FastLaneOnlineErrors } from "../src/contracts/examples/fastlane-online/FastLaneOnlineErrors.sol";
 
-import { IUniswapV2Router02 } from "test/base/interfaces/IUniswapV2Router.sol";
+import { IUniswapV2Router02 } from "./base/interfaces/IUniswapV2Router.sol";
 
 contract FastLaneOnlineTest is BaseTest {
     struct FastOnlineSwapArgs {

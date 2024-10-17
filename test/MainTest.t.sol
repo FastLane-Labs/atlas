@@ -4,25 +4,25 @@ pragma solidity 0.8.25;
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
-import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
+import { IExecutionEnvironment } from "../src/contracts/interfaces/IExecutionEnvironment.sol";
 
-import { Atlas } from "src/contracts/atlas/Atlas.sol";
-import { Mimic } from "src/contracts/common/Mimic.sol";
+import { Atlas } from "../src/contracts/atlas/Atlas.sol";
+import { Mimic } from "../src/contracts/common/Mimic.sol";
 
-import { V2DAppControl } from "src/contracts/examples/v2-example/V2DAppControl.sol";
+import { V2DAppControl } from "../src/contracts/examples/v2-example/V2DAppControl.sol";
 
-import { Solver } from "src/contracts/solver/src/TestSolver.sol";
+import { Solver } from "../src/contracts/solver/src/TestSolver.sol";
 
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/EscrowTypes.sol";
-import "src/contracts/types/LockTypes.sol";
-import "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/DAppOperation.sol";
+import "../src/contracts/types/UserOperation.sol";
+import "../src/contracts/types/SolverOperation.sol";
+import "../src/contracts/types/EscrowTypes.sol";
+import "../src/contracts/types/LockTypes.sol";
+import "../src/contracts/types/ConfigTypes.sol";
+import "../src/contracts/types/DAppOperation.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
 import { V2Helper } from "./V2Helper.sol";
-import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
+import { AtlasEvents } from "../src/contracts/types/AtlasEvents.sol";
 
 import "forge-std/Test.sol";
 

@@ -5,12 +5,12 @@ import "forge-std/Test.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
 
-import { Base } from "src/contracts/common/ExecutionBase.sol";
-import { ExecutionPhase } from "src/contracts/types/LockTypes.sol";
+import { Base } from "../src/contracts/common/ExecutionBase.sol";
+import { ExecutionPhase } from "../src/contracts/types/LockTypes.sol";
 
-import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
+import { SafetyBits } from "../src/contracts/libraries/SafetyBits.sol";
 
-import "src/contracts/libraries/SafetyBits.sol";
+import "../src/contracts/libraries/SafetyBits.sol";
 
 contract ExecutionBaseTest is BaseTest {
     using SafetyBits for Context;

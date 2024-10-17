@@ -5,16 +5,16 @@ import "forge-std/Test.sol";
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { BaseTest } from "./base/BaseTest.t.sol";
-import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
-import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
-import { UserOperation } from "src/contracts/types/UserOperation.sol";
-import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
-import { SwapIntent, SwapIntentInvertBidDAppControl } from "src/contracts/examples/intents-example/SwapIntentInvertBidDAppControl.sol";
-import { SolverBaseInvertBid } from "src/contracts/solver/SolverBaseInvertBid.sol";
-import { DAppControl } from "src/contracts/dapp/DAppControl.sol";
-import { CallConfig } from "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/LockTypes.sol";
-import "src/contracts/types/DAppOperation.sol";
+import { TxBuilder } from "../src/contracts/helpers/TxBuilder.sol";
+import { SolverOperation } from "../src/contracts/types/SolverOperation.sol";
+import { UserOperation } from "../src/contracts/types/UserOperation.sol";
+import { DAppConfig } from "../src/contracts/types/ConfigTypes.sol";
+import { SwapIntent, SwapIntentInvertBidDAppControl } from "../src/contracts/examples/intents-example/SwapIntentInvertBidDAppControl.sol";
+import { SolverBaseInvertBid } from "../src/contracts/solver/SolverBaseInvertBid.sol";
+import { DAppControl } from "../src/contracts/dapp/DAppControl.sol";
+import { CallConfig } from "../src/contracts/types/ConfigTypes.sol";
+import "../src/contracts/types/LockTypes.sol";
+import "../src/contracts/types/DAppOperation.sol";
 
 contract SwapIntentTest is BaseTest {
     Sig public sig;

@@ -2,22 +2,22 @@
 pragma solidity 0.8.25;
 
 import { AtlETH } from "./AtlETH.sol";
-import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
-import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
-import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
-import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
-import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
+import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
+import { IAtlas } from "../interfaces/IAtlas.sol";
+import { ISolverContract } from "../interfaces/ISolverContract.sol";
+import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
+import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
-import { SafeCall } from "src/contracts/libraries/SafeCall/SafeCall.sol";
-import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
-import { CallBits } from "src/contracts/libraries/CallBits.sol";
-import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
-import { AccountingMath } from "src/contracts/libraries/AccountingMath.sol";
-import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/EscrowTypes.sol";
-import "src/contracts/types/LockTypes.sol";
+import { SafeCall } from "../libraries/SafeCall/SafeCall.sol";
+import { EscrowBits } from "../libraries/EscrowBits.sol";
+import { CallBits } from "../libraries/CallBits.sol";
+import { SafetyBits } from "../libraries/SafetyBits.sol";
+import { AccountingMath } from "../libraries/AccountingMath.sol";
+import { DAppConfig } from "../types/ConfigTypes.sol";
+import "../types/SolverOperation.sol";
+import "../types/UserOperation.sol";
+import "../types/EscrowTypes.sol";
+import "../types/LockTypes.sol";
 
 /// @title Escrow
 /// @author FastLane Labs

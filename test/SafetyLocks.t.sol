@@ -3,12 +3,12 @@ pragma solidity 0.8.25;
 
 import "forge-std/Test.sol";
 
-import { SafetyLocks } from "src/contracts/atlas/SafetyLocks.sol";
-import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
-import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
+import { SafetyLocks } from "../src/contracts/atlas/SafetyLocks.sol";
+import { AtlasEvents } from "../src/contracts/types/AtlasEvents.sol";
+import { AtlasErrors } from "../src/contracts/types/AtlasErrors.sol";
 
-import "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/LockTypes.sol";
+import "../src/contracts/types/ConfigTypes.sol";
+import "../src/contracts/types/LockTypes.sol";
 
 contract MockSafetyLocks is SafetyLocks {
     constructor() SafetyLocks(0, 1000000, 1000000, address(0), address(0), address(0), address(0)) { }

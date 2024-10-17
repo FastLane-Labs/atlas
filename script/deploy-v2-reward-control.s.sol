@@ -4,11 +4,11 @@ pragma solidity 0.8.25;
 import "forge-std/Script.sol";
 import "forge-std/Test.sol";
 
-import { DeployBaseScript } from "script/base/deploy-base.s.sol";
+import { DeployBaseScript } from "./base/deploy-base.s.sol";
 
-import { Atlas } from "src/contracts/atlas/Atlas.sol";
-import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
-import { V2RewardDAppControl } from "src/contracts/examples/v2-example-router/V2RewardDAppControl.sol";
+import { Atlas } from "../src/contracts/atlas/Atlas.sol";
+import { AtlasVerification } from "../src/contracts/atlas/AtlasVerification.sol";
+import { V2RewardDAppControl } from "../src/contracts/examples/v2-example-router/V2RewardDAppControl.sol";
 
 contract DeployV2RewardControlScript is DeployBaseScript {
     V2RewardDAppControl v2RewardControl;

@@ -2,7 +2,7 @@
 pragma solidity 0.8.25;
 
 import "forge-std/Test.sol";
-import "src/contracts/libraries/AccountingMath.sol";
+import "../src/contracts/libraries/AccountingMath.sol";
 
 contract AccountingMathTest is Test {
     uint256 DEFAULT_ATLAS_SURCHARGE_RATE = 1_000_000; // 10%
