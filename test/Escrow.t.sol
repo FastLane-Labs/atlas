@@ -188,6 +188,39 @@ contract EscrowTest is BaseTest {
         executeHookCase(0, AtlasErrors.UserOpFail.selector);
     }
 
+    function test_executeUserOperation_enforcesUserOpGasLimit() public {
+        uint256 userGasLim = 123_456; // default is 1 million in other tests in this file
+
+        // First do metacall with default userOp gas limit (1 million)
+        defaultAtlasWithCallConfig(defaultCallConfig().build());
+        executeHookCase(1, noError);
+        assertGt(dAppControl.userOpGasLeft(), userGasLim, "userOpGasLeft should be > userGasLim");
+
+        // Now do metacall with way lower gas limit (123_456)
+        vm.roll(block.number + 1);
+        UserOperation memory userOp = validUserOperation(address(dAppControl))
+            .withData(
+                abi.encodeWithSelector(
+                    dAppControl.userOperationCall.selector,
+                    1
+                )
+            ).withGas(userGasLim)
+            .signAndBuild(address(atlasVerification), userPK);
+        deal(address(dummySolver), defaultBidAmount);
+        SolverOperation[] memory solverOps = new SolverOperation[](1);
+        solverOps[0] = validSolverOperation(userOp)
+            .withBidAmount(defaultBidAmount)
+            .withData(abi.encode(1))
+            .signAndBuild(address(atlasVerification), solverOnePK);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        vm.prank(userEOA);
+        bool auctionWon = atlas.metacall(userOp, solverOps, dappOp);
+        
+        assertLe(dAppControl.userOpGasLeft(), userGasLim, "userOpGasLeft should be <= userGasLim");
+        assertTrue(auctionWon, "2nd auction should have been won");
+    }
+
     // Ensure metacall reverts with the proper error when the allocateValue hook reverts.
     function test_executeAllocateValueCall_failure_SkipCoverage() public {
         defaultAtlasWithCallConfig(

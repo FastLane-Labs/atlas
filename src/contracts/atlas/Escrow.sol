@@ -101,12 +101,13 @@ abstract contract Escrow is AtlETH {
     {
         bool _success;
         bytes memory _data;
+        uint256 _gasLimit = userOp.gas > gasleft() ? gasleft() : userOp.gas;
 
         if (!_borrow(userOp.value)) {
             revert InsufficientEscrow();
         }
 
-        (_success, _data) = ctx.executionEnvironment.call{ value: userOp.value }(
+        (_success, _data) = ctx.executionEnvironment.call{ value: userOp.value, gas: _gasLimit }(
             abi.encodePacked(
                 abi.encodeCall(IExecutionEnvironment.userWrapper, userOp), ctx.setAndPack(ExecutionPhase.UserOperation)
             )
