@@ -359,8 +359,16 @@ abstract contract GasAccounting is SafetyLocks {
             // If no successful solvers, only collect partial surcharges from solver's fault failures (if any)
             uint256 _solverSurcharge = solverSurcharge();
             if (_solverSurcharge > 0) {
-                // NOTE: This only works when BUNDLER_SURCHARGE > ATLAS_SURCHARGE.
                 netAtlasGasSurcharge = _solverSurcharge.getAtlasPortionFromTotalSurcharge();
+
+                // When no winning solvers, bundler max refund is 80% of metacall gas cost. The remaining 20% can be
+                // collected through storage refunds. Any excess bundler surcharge is instead taken as Atlas surcharge.
+                uint256 _bundlerSurcharge = _solverSurcharge - netAtlasGasSurcharge;
+                uint256 _maxBundlerRefund = adjustedClaims.withoutBundlerSurcharge().maxBundlerRefund();
+                if (_bundlerSurcharge > _maxBundlerRefund) {
+                    netAtlasGasSurcharge += _bundlerSurcharge - _maxBundlerRefund;
+                }
+
                 adjustedWithdrawals += netAtlasGasSurcharge;
                 S_cumulativeSurcharge = _surcharge + netAtlasGasSurcharge;
             }

@@ -51,8 +51,9 @@ contract FastLaneOnlineTest is BaseTest {
         bool solverFour;
     }
 
-    uint256 constant SURCHARGE_PER_SOLVER_IF_ALL_FAIL = 28_000e9; // 28k Gwei (avg, differs for ERC20/native in/out)
-    uint256 constant ERR_MARGIN = 0.15e18; // 15% error margin
+    // Only Atlas surcharge kept if all fail, bundler surcharge paid to bundler
+    uint256 constant SURCHARGE_PER_SOLVER_IF_ALL_FAIL = 14_000e9; // 14k Gwei (avg, differs for ERC20/native in/out)
+    uint256 constant ERR_MARGIN = 0.22e18; // 22% error margin
     address internal constant NATIVE_TOKEN = address(0);
 
     address protocolGuildWallet = 0x25941dC771bB64514Fc8abBce970307Fb9d477e9;
@@ -61,7 +62,6 @@ contract FastLaneOnlineTest is BaseTest {
 
     uint256 goodSolverBidETH = 1.2 ether; // more than baseline swap amountOut if tokenOut is WETH/ETH
     uint256 goodSolverBidDAI = 3100e18; // more than baseline swap amountOut if tokenOut is DAI
-    uint256 defaultMsgValue = 1e16; // 0.01 ETH for bundler gas, treated as donation
     uint256 defaultGasLimit = 2_000_000;
     uint256 defaultGasPrice;
     uint256 defaultDeadlineBlock;
@@ -1291,9 +1291,6 @@ contract FastLaneOnlineTest is BaseTest {
         beforeVars.solverTwoRep = flOnline.solverReputation(solverTwoEOA);
         beforeVars.solverThreeRep = flOnline.solverReputation(solverThreeEOA);
 
-        // adjust userTokenInBalance if native token - exclude gas treated as donation
-        if (nativeTokenIn) beforeVars.userTokenInBalance -= defaultMsgValue;
-
         uint256 txGasUsed;
         uint256 estAtlasGasSurcharge = gasleft(); // Reused below during calculations
 
@@ -1459,10 +1456,9 @@ contract FastLaneOnlineTest is BaseTest {
         newArgs.deadline = defaultDeadlineBlock;
         newArgs.gas = defaultGasLimit;
         newArgs.maxFeePerGas = defaultGasPrice;
-        newArgs.msgValue = defaultMsgValue;
 
         // Add amountUserSells of ETH to the msg.value of the fastOnlineSwap call
-        if (nativeTokenIn) newArgs.msgValue += swapIntent.amountUserSells;
+        if (nativeTokenIn) newArgs.msgValue = swapIntent.amountUserSells;
     }
 
     function _buildBaselineCall(
