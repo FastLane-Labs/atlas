@@ -9,13 +9,24 @@ import "../../src/contracts/atlas/Atlas.sol";
 contract TestAtlas is Atlas {
     constructor(
         uint256 escrowDuration,
+        uint256 atlasSurchargeRate,
+        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
         address l2GasCalculator,
         address executionTemplate
     )
-        Atlas(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator, executionTemplate)
+        Atlas(
+            escrowDuration,
+            atlasSurchargeRate,
+            bundlerSurchargeRate,
+            verification,
+            simulator,
+            initialSurchargeRecipient,
+            l2GasCalculator,
+            executionTemplate
+        )
     { }
 
     // Public functions to expose internal transient helpers for testing

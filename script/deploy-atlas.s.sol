@@ -14,6 +14,10 @@ import { Sorter } from "../src/contracts/helpers/Sorter.sol";
 import { ExecutionEnvironment } from "../src/contracts/common/ExecutionEnvironment.sol";
 
 contract DeployAtlasScript is DeployBaseScript {
+    uint256 ESCROW_DURATION = 64;
+    uint256 ATLAS_SURCHARGE_RATE = 1_000_000; // 10%
+    uint256 BUNDLER_SURCHARGE_RATE = 1_000_000; // 10%
+
     function run() external {
         console.log("\n=== DEPLOYING Atlas ===\n");
 
@@ -37,7 +41,9 @@ contract DeployAtlasScript is DeployBaseScript {
 
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedAtlasAddr);
         atlas = new Atlas({
-            escrowDuration: 64,
+            escrowDuration: ESCROW_DURATION,
+            atlasSurchargeRate: ATLAS_SURCHARGE_RATE,
+            bundlerSurchargeRate: BUNDLER_SURCHARGE_RATE,
             verification: expectedAtlasVerificationAddr,
             simulator: expectedSimulatorAddr,
             executionTemplate: address(execEnvTemplate),

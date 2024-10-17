@@ -18,12 +18,22 @@ abstract contract SafetyLocks is Storage {
 
     constructor(
         uint256 escrowDuration,
+        uint256 atlasSurchargeRate,
+        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
         address l2GasCalculator
     )
-        Storage(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
+        Storage(
+            escrowDuration,
+            atlasSurchargeRate,
+            bundlerSurchargeRate,
+            verification,
+            simulator,
+            initialSurchargeRecipient,
+            l2GasCalculator
+        )
     { }
 
     /// @notice Sets the Atlas lock to the specified execution environment.

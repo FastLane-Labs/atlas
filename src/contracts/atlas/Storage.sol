@@ -18,6 +18,8 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     address public immutable SIMULATOR;
     address public immutable L2_GAS_CALCULATOR;
     uint256 public immutable ESCROW_DURATION;
+    uint256 public immutable ATLAS_SURCHARGE_RATE;
+    uint256 public immutable BUNDLER_SURCHARGE_RATE;
 
     // AtlETH public constants
     // These constants double as interface functions for the ERC20 standard, hence the lowercase naming convention.
@@ -26,8 +28,6 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint8 public constant decimals = 18;
 
     // Gas Accounting public constants
-    uint256 public constant ATLAS_SURCHARGE_RATE = AccountingMath._ATLAS_SURCHARGE_RATE;
-    uint256 public constant BUNDLER_SURCHARGE_RATE = AccountingMath._BUNDLER_SURCHARGE_RATE;
     uint256 public constant SCALE = AccountingMath._SCALE;
     uint256 public constant FIXED_GAS_OFFSET = AccountingMath._FIXED_GAS_OFFSET;
 
@@ -35,11 +35,13 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     bytes32 private constant _T_LOCK_SLOT = keccak256("ATLAS_LOCK");
     bytes32 private constant _T_SOLVER_LOCK_SLOT = keccak256("ATLAS_SOLVER_LOCK");
     bytes32 private constant _T_SOLVER_TO_SLOT = keccak256("ATLAS_SOLVER_TO");
+
     bytes32 private constant _T_CLAIMS_SLOT = keccak256("ATLAS_CLAIMS");
     bytes32 private constant _T_FEES_SLOT = keccak256("ATLAS_FEES");
     bytes32 private constant _T_WRITEOFFS_SLOT = keccak256("ATLAS_WRITEOFFS");
     bytes32 private constant _T_WITHDRAWALS_SLOT = keccak256("ATLAS_WITHDRAWALS");
     bytes32 private constant _T_DEPOSITS_SLOT = keccak256("ATLAS_DEPOSITS");
+    bytes32 private constant _T_SOLVER_SURCHARGE_SLOT = keccak256("ATLAS_SOLVER_SURCHARGE");
 
     // AtlETH storage
     uint256 internal S_totalSupply;
@@ -56,6 +58,8 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
 
     constructor(
         uint256 escrowDuration,
+        uint256 atlasSurchargeRate,
+        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
@@ -67,6 +71,8 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         SIMULATOR = simulator;
         L2_GAS_CALCULATOR = l2GasCalculator;
         ESCROW_DURATION = escrowDuration;
+        ATLAS_SURCHARGE_RATE = atlasSurchargeRate;
+        BUNDLER_SURCHARGE_RATE = bundlerSurchargeRate;
 
         // Gas Accounting
         // Initialized with msg.value to seed flash loan liquidity
@@ -169,6 +175,10 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         return uint256(_tload(_T_DEPOSITS_SLOT));
     }
 
+    function solverSurcharge() internal view returns (uint256) {
+        return uint256(_tload(_T_SOLVER_SURCHARGE_SLOT));
+    }
+
     function _lock() internal view returns (address activeEnvironment, uint32 callConfig, uint8 phase) {
         bytes32 _lockData = _tload(_T_LOCK_SLOT);
         activeEnvironment = address(uint160(uint256(_lockData >> 40)));
@@ -260,6 +270,12 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
 
     function _setDeposits(uint256 newDeposits) internal {
         _tstore(_T_DEPOSITS_SLOT, bytes32(newDeposits));
+    }
+
+    // NOTE: Only captures surcharges for failed solver Ops where
+    // solver is at fault
+    function _setSolverSurcharge(uint256 newSurcharge) internal {
+        _tstore(_T_SOLVER_SURCHARGE_SLOT, bytes32(newSurcharge));
     }
 
     // ------------------------------------------------------ //

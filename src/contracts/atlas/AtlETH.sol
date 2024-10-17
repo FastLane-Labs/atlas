@@ -11,12 +11,22 @@ import "../types/EscrowTypes.sol";
 abstract contract AtlETH is Permit69 {
     constructor(
         uint256 escrowDuration,
+        uint256 atlasSurchargeRate,
+        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
         address l2GasCalculator
     )
-        Permit69(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
+        Permit69(
+            escrowDuration,
+            atlasSurchargeRate,
+            bundlerSurchargeRate,
+            verification,
+            simulator,
+            initialSurchargeRecipient,
+            l2GasCalculator
+        )
     { }
 
     /*//////////////////////////////////////////////////////////////
