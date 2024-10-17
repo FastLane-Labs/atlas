@@ -28,13 +28,23 @@ contract Atlas is Escrow, Factory {
 
     constructor(
         uint256 escrowDuration,
+        uint256 atlasSurchargeRate,
+        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
         address l2GasCalculator,
         address executionTemplate
     )
-        Escrow(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
+        Escrow(
+            escrowDuration,
+            atlasSurchargeRate,
+            bundlerSurchargeRate,
+            verification,
+            simulator,
+            initialSurchargeRecipient,
+            l2GasCalculator
+        )
         Factory(executionTemplate)
     { }
 

@@ -31,12 +31,22 @@ abstract contract Escrow is AtlETH {
 
     constructor(
         uint256 escrowDuration,
+        uint256 atlasSurchargeRate,
+        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
         address l2GasCalculator
     )
-        AtlETH(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
+        AtlETH(
+            escrowDuration,
+            atlasSurchargeRate,
+            bundlerSurchargeRate,
+            verification,
+            simulator,
+            initialSurchargeRecipient,
+            l2GasCalculator
+        )
     {
         if (escrowDuration == 0) revert InvalidEscrowDuration();
     }
@@ -91,12 +101,13 @@ abstract contract Escrow is AtlETH {
     {
         bool _success;
         bytes memory _data;
+        uint256 _gasLimit = userOp.gas > gasleft() ? gasleft() : userOp.gas;
 
         if (!_borrow(userOp.value)) {
             revert InsufficientEscrow();
         }
 
-        (_success, _data) = ctx.executionEnvironment.call{ value: userOp.value }(
+        (_success, _data) = ctx.executionEnvironment.call{ value: userOp.value, gas: _gasLimit }(
             abi.encodePacked(
                 abi.encodeCall(IExecutionEnvironment.userWrapper, userOp), ctx.setAndPack(ExecutionPhase.UserOperation)
             )
@@ -609,8 +620,8 @@ abstract contract Escrow is AtlETH {
                     solverOp.bidToken,
                     bidAmount,
                     solverOp.data,
-                    // Only pass the returnData to solver if it came from userOp call and not from preOps call.
-                    _activeCallConfig().needsUserReturnData() ? returnData : new bytes(0)
+                    // Only pass the returnData (either from userOp or preOps) if the dApp requires it
+                    _activeCallConfig().forwardReturnData() ? returnData : new bytes(0)
                 )
             )
         );

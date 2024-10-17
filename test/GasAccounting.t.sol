@@ -29,13 +29,15 @@ contract MockGasAccounting is TestAtlas, BaseTest {
     
     constructor(
         uint256 _escrowDuration,
+        uint256 _atlasSurchargeRate,
+        uint256 _bundlerSurchargeRate,
         address _verification,
         address _simulator,
         address _surchargeRecipient,
         address _l2GasCalculator,
         address _executionTemplate
     )
-        TestAtlas(_escrowDuration, _verification, _simulator, _surchargeRecipient, _l2GasCalculator, _executionTemplate)
+        TestAtlas(_escrowDuration, _atlasSurchargeRate, _bundlerSurchargeRate, _verification, _simulator, _surchargeRecipient, _l2GasCalculator, _executionTemplate)
     { }
 
     /////////////////////////////////////////////////////////
@@ -171,14 +173,6 @@ contract MockGasAccounting is TestAtlas, BaseTest {
     function getFixedGasOffset() external pure returns (uint256) {
         return AccountingMath._FIXED_GAS_OFFSET;
     }
-
-    function getAtlasSurchargeRate() external pure returns (uint256) {
-        return AccountingMath._ATLAS_SURCHARGE_RATE;
-    }
-
-    function getBundlerSurchargeRate() external pure returns (uint256) {
-        return AccountingMath._BUNDLER_SURCHARGE_RATE;
-    }
 }
 
 contract MockGasCalculator is IL2GasCalculator, Test {
@@ -211,6 +205,8 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         // Initialize MockGasAccounting
         mockGasAccounting = new MockGasAccounting(
             DEFAULT_ESCROW_DURATION,
+            DEFAULT_ATLAS_SURCHARGE_RATE,
+            DEFAULT_BUNDLER_SURCHARGE_RATE,
             address(atlasVerification),
             address(simulator),
             deployer,
@@ -972,7 +968,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             (gasWaterMark + mockGasAccounting.getSolverBaseGasUsed() - gasleft()) * tx.gasprice + gasUsedOffset;
         mockGasAccounting.handleSolverAccounting(solverOp, gasWaterMark, result, false);
 
-        uint256 expectedWriteoffs = initialWriteoffs + AccountingMath.withAtlasAndBundlerSurcharges(gasUsed);
+        uint256 expectedWriteoffs = initialWriteoffs + AccountingMath.withSurcharges(gasUsed, DEFAULT_ATLAS_SURCHARGE_RATE, DEFAULT_BUNDLER_SURCHARGE_RATE);
         // Verify writeoffs have increased
         assertApproxEqRel(
             mockGasAccounting.getWriteoffs(),
@@ -1100,6 +1096,8 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         IL2GasCalculator gasCalculator = new MockGasCalculator();
         MockGasAccounting mockL2GasAccounting = new MockGasAccounting(
             DEFAULT_ESCROW_DURATION,
+            DEFAULT_ATLAS_SURCHARGE_RATE,
+            DEFAULT_BUNDLER_SURCHARGE_RATE,
             address(atlasVerification),
             address(simulator),
             deployer,

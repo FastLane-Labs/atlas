@@ -18,6 +18,8 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     address public immutable SIMULATOR;
     address public immutable L2_GAS_CALCULATOR;
     uint256 public immutable ESCROW_DURATION;
+    uint256 public immutable ATLAS_SURCHARGE_RATE;
+    uint256 public immutable BUNDLER_SURCHARGE_RATE;
 
     // AtlETH public constants
     // These constants double as interface functions for the ERC20 standard, hence the lowercase naming convention.
@@ -26,8 +28,6 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint8 public constant decimals = 18;
 
     // Gas Accounting public constants
-    uint256 public constant ATLAS_SURCHARGE_RATE = AccountingMath._ATLAS_SURCHARGE_RATE;
-    uint256 public constant BUNDLER_SURCHARGE_RATE = AccountingMath._BUNDLER_SURCHARGE_RATE;
     uint256 public constant SCALE = AccountingMath._SCALE;
     uint256 public constant FIXED_GAS_OFFSET = AccountingMath._FIXED_GAS_OFFSET;
 
@@ -58,6 +58,8 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
 
     constructor(
         uint256 escrowDuration,
+        uint256 atlasSurchargeRate,
+        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
@@ -69,6 +71,8 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         SIMULATOR = simulator;
         L2_GAS_CALCULATOR = l2GasCalculator;
         ESCROW_DURATION = escrowDuration;
+        ATLAS_SURCHARGE_RATE = atlasSurchargeRate;
+        BUNDLER_SURCHARGE_RATE = bundlerSurchargeRate;
 
         // Gas Accounting
         // Initialized with msg.value to seed flash loan liquidity
