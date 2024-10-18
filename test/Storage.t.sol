@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 
@@ -228,13 +228,13 @@ contract StorageTest is BaseTest {
     }
 
     function test_storage_transient_claims() public {
-        assertEq(atlas.getClaims(), 0, "claims should start at 0");
+        assertEq(atlas.claims(), 0, "claims should start at 0");
 
         atlas.setClaims(100);
-        assertEq(atlas.getClaims(), 100, "claims should be 100");
+        assertEq(atlas.claims(), 100, "claims should be 100");
 
         atlas.clearTransientStorage();
-        assertEq(atlas.getClaims(), 0, "claims should be 0 again");
+        assertEq(atlas.claims(), 0, "claims should be 0 again");
     }
 
     function test_storage_transient_fees() public {
@@ -420,7 +420,7 @@ contract MockStorage is Storage {
         _setLock(address(0), 0, 0);
         _setSolverLock(0);
         _setSolverTo(address(0));
-        _setClaims(0);
+        claims = 0;
         _setFees(0);
         _setWriteoffs(0);
         _setWithdrawals(0);
@@ -428,10 +428,6 @@ contract MockStorage is Storage {
     }
 
     // View functions
-
-    function getClaims() external view returns (uint256) {
-        return claims();
-    }
 
     function getFees() external view returns (uint256) {
         return fees();

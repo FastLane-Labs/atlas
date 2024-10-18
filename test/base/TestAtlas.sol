@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import "../../src/contracts/atlas/Atlas.sol";
 
@@ -35,7 +35,7 @@ contract TestAtlas is Atlas {
         _setLock(address(0), 0, 0);
         _setSolverLock(0);
         _setSolverTo(address(0));
-        _setClaims(0);
+        claims = 0;
         _setFees(0);
         _setWriteoffs(0);
         _setWithdrawals(0);
@@ -59,7 +59,7 @@ contract TestAtlas is Atlas {
     }
 
     function setClaims(uint256 newClaims) public {
-        _setClaims(newClaims);
+        claims = newClaims;
     }
 
     function setFees(uint256 newFees) public {
@@ -79,10 +79,6 @@ contract TestAtlas is Atlas {
     }
 
     // View functions
-
-    function getClaims() external view returns (uint256) {
-        return claims();
-    }
 
     function getFees() external view returns (uint256) {
         return fees();

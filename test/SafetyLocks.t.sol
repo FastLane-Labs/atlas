@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 
@@ -57,7 +57,7 @@ contract MockSafetyLocks is SafetyLocks {
     }
 
     function setClaims(uint256 _claims) external {
-        _setClaims(_claims);
+        claims = _claims;
     }
 
     function setWithdrawals(uint256 _withdrawals) external {
@@ -89,10 +89,6 @@ contract MockSafetyLocks is SafetyLocks {
     }
 
     // View functions
-
-    function getClaims() external view returns (uint256) {
-        return claims();
-    }
 
     function getFees() external view returns (uint256) {
         return fees();
@@ -158,7 +154,7 @@ contract SafetyLocksTest is Test {
 
         safetyLocks.setClaims(newClaims);
 
-        uint256 claims = safetyLocks.getClaims();
+        uint256 claims = safetyLocks.claims();
         assertEq(claims, newClaims);
     }
 
@@ -245,7 +241,7 @@ contract SafetyLocksTest is Test {
         safetyLocks.setSolverLock(0x456);
 
         (address activeEnv, uint32 callConfig, uint8 phase) = safetyLocks.lock();
-        uint256 claims = safetyLocks.getClaims();
+        uint256 claims = safetyLocks.claims();
         uint256 withdrawals = safetyLocks.getWithdrawals();
         uint256 deposits = safetyLocks.getDeposits();
         uint256 fees = safetyLocks.getFees();

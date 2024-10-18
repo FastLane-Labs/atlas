@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
@@ -46,7 +46,7 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 _rawClaims = (FIXED_GAS_OFFSET + gasMarker) * tx.gasprice;
 
         // Set any withdraws or deposits
-        _setClaims(_rawClaims.withSurcharge(BUNDLER_SURCHARGE_RATE));
+        claims = _rawClaims.withSurcharge(BUNDLER_SURCHARGE_RATE);
 
         // Atlas surcharge is based on the raw claims value.
         _setFees(_rawClaims.getSurcharge(ATLAS_SURCHARGE_RATE));
@@ -105,7 +105,7 @@ abstract contract GasAccounting is SafetyLocks {
     }
 
     function _deficit() internal view returns (uint256) {
-        return claims() + withdrawals() + fees() - writeoffs();
+        return claims + withdrawals() + fees() - writeoffs();
     }
 
     /// @notice Allows a solver to settle any outstanding ETH owed, either to repay gas used by their solverOp or to
@@ -346,7 +346,7 @@ abstract contract GasAccounting is SafetyLocks {
 
         adjustedWithdrawals = withdrawals();
         adjustedDeposits = deposits();
-        adjustedClaims = claims();
+        adjustedClaims = claims;
         adjustedWriteoffs = writeoffs();
         uint256 _fees = fees();
 

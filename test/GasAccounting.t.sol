@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 
@@ -661,7 +661,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         vm.prank(executionEnvironment);
         mockGasAccounting.contribute{ value: 10 ether }();
 
-        assertEq(mockGasAccounting.getClaims(), 10 ether, "Claims should be set to 10 ether");
+        assertEq(mockGasAccounting.claims(), 10 ether, "Claims should be set to 10 ether");
         assertEq(address(mockGasAccounting).balance, 10 ether, "mockGasAccounting should have 10 ether");
     }
 
@@ -1040,7 +1040,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         (uint256 claimsPaidToBundler, uint256 netGasSurcharge) = mockGasAccounting.settle(ctx);
 
         // Check final balances and perform assertions
-        uint256 finalClaims = mockGasAccounting.getClaims();
+        uint256 finalClaims = mockGasAccounting.claims();
         uint256 finalBonded = mockGasAccounting.balanceOfBonded(solverOneEOA);
         uint256 finalUnbonding = mockGasAccounting.balanceOfUnbonding(solverOneEOA);
         {
@@ -1086,7 +1086,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertTrue(claimsPaidToBundler > 0, "Claims paid to bundler should be non-zero");
         assertTrue(netGasSurcharge > 0, "Net gas surcharge should be non-zero");
         assertLe(
-            mockGasAccounting.getClaims(),
+            mockGasAccounting.claims(),
             3 ether,
             "Final claims should be less than or equal to initial claims plus deposits"
         );

@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
@@ -36,7 +36,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     bytes32 private constant _T_SOLVER_LOCK_SLOT = keccak256("ATLAS_SOLVER_LOCK");
     bytes32 private constant _T_SOLVER_TO_SLOT = keccak256("ATLAS_SOLVER_TO");
 
-    bytes32 private constant _T_CLAIMS_SLOT = keccak256("ATLAS_CLAIMS");
+    uint256 public transient claims;
     bytes32 private constant _T_FEES_SLOT = keccak256("ATLAS_FEES");
     bytes32 private constant _T_WRITEOFFS_SLOT = keccak256("ATLAS_WRITEOFFS");
     bytes32 private constant _T_WITHDRAWALS_SLOT = keccak256("ATLAS_WITHDRAWALS");
@@ -155,10 +155,6 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     //              Transient Internal Getters              //
     // ---------------------------------------------------- //
 
-    function claims() internal view returns (uint256) {
-        return uint256(_tload(_T_CLAIMS_SLOT));
-    }
-
     function fees() internal view returns (uint256) {
         return uint256(_tload(_T_FEES_SLOT));
     }
@@ -250,10 +246,6 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
 
     function _setSolverTo(address newSolverTo) internal {
         _tstore(_T_SOLVER_TO_SLOT, bytes32(uint256(uint160(newSolverTo))));
-    }
-
-    function _setClaims(uint256 newClaims) internal {
-        _tstore(_T_CLAIMS_SLOT, bytes32(newClaims));
     }
 
     function _setFees(uint256 newFees) internal {
