@@ -59,12 +59,6 @@ contract V2Helper is Test, TxBuilder {
     {
         (uint256 token0Balance, uint256 token1Balance) = _getTradeAmtAndDirection(firstPool, secondPool, tokenIn);
 
-        console.log("-");
-        console.log("sell token", tokenIn);
-        console.log("token0 in ", token0Balance);
-        console.log("token1 in ", token1Balance);
-        console.log("-");
-
         return TxBuilder.buildUserOperation(
             from, firstPool, maxFeePerGas, 0, block.number + 2, buildV2SwapCalldata(token0Balance, token1Balance, from)
         );

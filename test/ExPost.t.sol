@@ -139,11 +139,6 @@ contract ExPostTest is BaseTest {
         address executionEnvironment = atlas.createExecutionEnvironment(userEOA, userOp.control);
         vm.label(address(executionEnvironment), "EXECUTION ENV");
 
-        console.log("userEOA", userEOA);
-        console.log("atlas", address(atlas));
-        console.log("v2 ExPost Control", address(v2ExPost));
-        console.log("executionEnvironment", executionEnvironment);
-
         // User must approve Atlas
         IERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
         IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
@@ -362,8 +357,6 @@ contract ExPostTest is BaseTest {
         (bool success,) =
             address(atlas).call(abi.encodeWithSelector(atlas.metacall.selector, userOp, solverOps, dAppOp));
         console.log("Metacall Gas Cost:", gasLeftBefore - gasleft());
-        if (success) console.log("success!");
-        else console.log("failure");
         assertTrue(success);
         vm.stopPrank();
     }
