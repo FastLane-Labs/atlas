@@ -37,11 +37,11 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     bytes32 private constant _T_SOLVER_TO_SLOT = keccak256("ATLAS_SOLVER_TO");
 
     uint256 public transient claims;
-    bytes32 private constant _T_FEES_SLOT = keccak256("ATLAS_FEES");
-    bytes32 private constant _T_WRITEOFFS_SLOT = keccak256("ATLAS_WRITEOFFS");
-    bytes32 private constant _T_WITHDRAWALS_SLOT = keccak256("ATLAS_WITHDRAWALS");
-    bytes32 private constant _T_DEPOSITS_SLOT = keccak256("ATLAS_DEPOSITS");
-    bytes32 private constant _T_SOLVER_SURCHARGE_SLOT = keccak256("ATLAS_SOLVER_SURCHARGE");
+    uint256 public transient fees;
+    uint256 public transient writeoffs;
+    uint256 public transient withdrawals;
+    uint256 public transient deposits;
+    uint256 public transient solverSurcharge; // total surcharge collected from failed solverOps due to solver fault.
 
     // AtlETH storage
     uint256 internal S_totalSupply;
@@ -155,26 +155,6 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     //              Transient Internal Getters              //
     // ---------------------------------------------------- //
 
-    function fees() internal view returns (uint256) {
-        return uint256(_tload(_T_FEES_SLOT));
-    }
-
-    function writeoffs() internal view returns (uint256) {
-        return uint256(_tload(_T_WRITEOFFS_SLOT));
-    }
-
-    function withdrawals() internal view returns (uint256) {
-        return uint256(_tload(_T_WITHDRAWALS_SLOT));
-    }
-
-    function deposits() internal view returns (uint256) {
-        return uint256(_tload(_T_DEPOSITS_SLOT));
-    }
-
-    function solverSurcharge() internal view returns (uint256) {
-        return uint256(_tload(_T_SOLVER_SURCHARGE_SLOT));
-    }
-
     function _lock() internal view returns (address activeEnvironment, uint32 callConfig, uint8 phase) {
         bytes32 _lockData = _tload(_T_LOCK_SLOT);
         activeEnvironment = address(uint160(uint256(_lockData >> 40)));
@@ -246,28 +226,6 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
 
     function _setSolverTo(address newSolverTo) internal {
         _tstore(_T_SOLVER_TO_SLOT, bytes32(uint256(uint160(newSolverTo))));
-    }
-
-    function _setFees(uint256 newFees) internal {
-        _tstore(_T_FEES_SLOT, bytes32(newFees));
-    }
-
-    function _setWriteoffs(uint256 newWriteoffs) internal {
-        _tstore(_T_WRITEOFFS_SLOT, bytes32(newWriteoffs));
-    }
-
-    function _setWithdrawals(uint256 newWithdrawals) internal {
-        _tstore(_T_WITHDRAWALS_SLOT, bytes32(newWithdrawals));
-    }
-
-    function _setDeposits(uint256 newDeposits) internal {
-        _tstore(_T_DEPOSITS_SLOT, bytes32(newDeposits));
-    }
-
-    // NOTE: Only captures surcharges for failed solver Ops where
-    // solver is at fault
-    function _setSolverSurcharge(uint256 newSurcharge) internal {
-        _tstore(_T_SOLVER_SURCHARGE_SLOT, bytes32(newSurcharge));
     }
 
     // ------------------------------------------------------ //

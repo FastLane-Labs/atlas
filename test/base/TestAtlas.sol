@@ -36,10 +36,11 @@ contract TestAtlas is Atlas {
         _setSolverLock(0);
         _setSolverTo(address(0));
         claims = 0;
-        _setFees(0);
-        _setWriteoffs(0);
-        _setWithdrawals(0);
-        _setDeposits(0);
+        fees = 0;
+        writeoffs = 0;
+        withdrawals = 0;
+        deposits = 0;
+        solverSurcharge = 0;
     }
 
     function setLock(address activeEnvironment, uint32 callConfig, uint8 phase) public {
@@ -63,36 +64,18 @@ contract TestAtlas is Atlas {
     }
 
     function setFees(uint256 newFees) public {
-        _setFees(newFees);
+        fees = newFees;
     }
 
     function setWriteoffs(uint256 newWriteoffs) public {
-        _setWriteoffs(newWriteoffs);
+        writeoffs = newWriteoffs;
     }
 
     function setWithdrawals(uint256 newWithdrawals) public {
-        _setWithdrawals(newWithdrawals);
+        withdrawals = newWithdrawals;
     }
 
     function setDeposits(uint256 newDeposits) public {
-        _setDeposits(newDeposits);
-    }
-
-    // View functions
-
-    function getFees() external view returns (uint256) {
-        return fees();
-    }
-
-    function getWriteoffs() external view returns (uint256) {
-        return writeoffs();
-    }
-
-    function getWithdrawals() external view returns (uint256) {
-        return withdrawals();
-    }
-
-    function getDeposits() external view returns (uint256) {
-        return deposits();
+        deposits = newDeposits;
     }
 }

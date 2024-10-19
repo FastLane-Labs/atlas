@@ -60,20 +60,20 @@ contract MockSafetyLocks is SafetyLocks {
         claims = _claims;
     }
 
-    function setWithdrawals(uint256 _withdrawals) external {
-        _setWithdrawals(_withdrawals);
+    function setFees(uint256 newFees) public {
+        fees = newFees;
     }
 
-    function setDeposits(uint256 _deposits) external {
-        _setDeposits(_deposits);
+    function setWriteoffs(uint256 newWriteoffs) public {
+        writeoffs = newWriteoffs;
     }
 
-    function setFees(uint256 _fees) external {
-        _setFees(_fees);
+    function setWithdrawals(uint256 newWithdrawals) public {
+        withdrawals = newWithdrawals;
     }
 
-    function setWriteoffs(uint256 _writeoffs) external {
-        _setWriteoffs(_writeoffs);
+    function setDeposits(uint256 newDeposits) public {
+        deposits = newDeposits;
     }
 
      function setSolverLock(uint256 newSolverLock) external {
@@ -86,24 +86,6 @@ contract MockSafetyLocks is SafetyLocks {
 
     function solverTo() external view returns (address) {
         return _solverTo();
-    }
-
-    // View functions
-
-    function getFees() external view returns (uint256) {
-        return fees();
-    }
-
-    function getWriteoffs() external view returns (uint256) {
-        return writeoffs();
-    }
-
-    function getWithdrawals() external view returns (uint256) {
-        return withdrawals();
-    }
-
-    function getDeposits() external view returns (uint256) {
-        return deposits();
     }
 }
 
@@ -163,7 +145,7 @@ contract SafetyLocksTest is Test {
 
         safetyLocks.setWithdrawals(newWithdrawals);
 
-        uint256 withdrawals = safetyLocks.getWithdrawals();
+        uint256 withdrawals = safetyLocks.withdrawals();
         assertEq(withdrawals, newWithdrawals);
     }
 
@@ -172,7 +154,7 @@ contract SafetyLocksTest is Test {
 
         safetyLocks.setDeposits(newDeposits);
 
-        uint256 deposits = safetyLocks.getDeposits();
+        uint256 deposits = safetyLocks.deposits();
         assertEq(deposits, newDeposits);
     }
 
@@ -181,7 +163,7 @@ contract SafetyLocksTest is Test {
 
         safetyLocks.setFees(newFees);
 
-        uint256 fees = safetyLocks.getFees();
+        uint256 fees = safetyLocks.fees();
         assertEq(fees, newFees);
     }
 
@@ -190,7 +172,7 @@ contract SafetyLocksTest is Test {
 
         safetyLocks.setWriteoffs(newWriteoffs);
 
-        uint256 writeoffs = safetyLocks.getWriteoffs();
+        uint256 writeoffs = safetyLocks.writeoffs();
         assertEq(writeoffs, newWriteoffs);
     }
 
@@ -242,10 +224,10 @@ contract SafetyLocksTest is Test {
 
         (address activeEnv, uint32 callConfig, uint8 phase) = safetyLocks.lock();
         uint256 claims = safetyLocks.claims();
-        uint256 withdrawals = safetyLocks.getWithdrawals();
-        uint256 deposits = safetyLocks.getDeposits();
-        uint256 fees = safetyLocks.getFees();
-        uint256 writeoffs = safetyLocks.getWriteoffs();
+        uint256 withdrawals = safetyLocks.withdrawals();
+        uint256 deposits = safetyLocks.deposits();
+        uint256 fees = safetyLocks.fees();
+        uint256 writeoffs = safetyLocks.writeoffs();
         (address solverTo,,) = safetyLocks.solverLockData();
 
         assertEq(safetyLocks.isUnlocked(), false);
