@@ -32,17 +32,17 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint256 public constant FIXED_GAS_OFFSET = AccountingMath._FIXED_GAS_OFFSET;
 
     // Transient storage slots
-    bytes32 private constant _T_LOCK_SLOT = keccak256("ATLAS_LOCK");
-    
+    uint256 internal transient t_lock; // contains activeAddress, callConfig, and phase
     uint256 internal transient t_solverLock; 
     address internal transient t_solverTo; // current solverOp.solver contract address
 
+    // solverSurcharge = total surcharge collected from failed solverOps due to solver fault.
+    uint256 internal transient t_solverSurcharge;
     uint256 internal transient t_claims;
     uint256 internal transient t_fees;
     uint256 internal transient t_writeoffs;
     uint256 internal transient t_withdrawals;
     uint256 internal transient t_deposits;
-    uint256 internal transient t_solverSurcharge; // total surcharge collected from failed solverOps due to solver fault.
 
     // AtlETH storage
     uint256 internal S_totalSupply;
@@ -157,25 +157,25 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     // ---------------------------------------------------- //
 
     function _lock() internal view returns (address activeEnvironment, uint32 callConfig, uint8 phase) {
-        bytes32 _lockData = _tload(_T_LOCK_SLOT);
-        activeEnvironment = address(uint160(uint256(_lockData >> 40)));
-        callConfig = uint32(uint256(_lockData >> 8));
-        phase = uint8(uint256(_lockData));
+        uint256 _lockData = t_lock;
+        activeEnvironment = address(uint160(_lockData >> 40));
+        callConfig = uint32(_lockData >> 8);
+        phase = uint8(_lockData);
     }
 
     function _activeEnvironment() internal view returns (address) {
         // right shift 40 bits to remove the callConfig and phase, only activeEnvironment remains
-        return address(uint160(uint256(_tload(_T_LOCK_SLOT) >> 40)));
+        return address(uint160(t_lock >> 40));
     }
 
     function _activeCallConfig() internal view returns (uint32) {
         // right shift 8 bits to remove the phase, cast to uint32 to remove the activeEnvironment
-        return uint32(uint256(_tload(_T_LOCK_SLOT) >> 8));
+        return uint32(t_lock >> 8);
     }
 
     function _phase() internal view returns (uint8) {
         // right-most 8 bits of Lock are the phase
-        return uint8(uint256(_tload(_T_LOCK_SLOT)));
+        return uint8(t_lock);
     }
 
     /// @notice Returns information about the current state of the solver lock.
@@ -190,7 +190,7 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     }
 
     function _isUnlocked() internal view returns (bool) {
-        return _tload(_T_LOCK_SLOT) == bytes32(_UNLOCKED);
+        return t_lock == _UNLOCKED;
     }
 
     // ---------------------------------------------------- //
@@ -201,36 +201,15 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         // Pack the lock slot from the right:
         // [   56 bits   ][     160 bits      ][  32 bits   ][ 8 bits ]
         // [ unused bits ][ activeEnvironment ][ callConfig ][ phase  ]
-        _tstore(
-            _T_LOCK_SLOT,
-            bytes32(uint256(uint160(activeEnvironment))) << 40 | bytes32(uint256(callConfig)) << 8
-                | bytes32(uint256(phase))
-        );
+        t_lock = uint256(uint160(activeEnvironment)) << 40 | uint256(callConfig) << 8 | uint256(phase);
     }
 
     function _releaseLock() internal {
-        _tstore(_T_LOCK_SLOT, bytes32(_UNLOCKED));
+        t_lock = _UNLOCKED;
     }
 
     // Sets the Lock phase without changing the activeEnvironment or callConfig.
     function _setLockPhase(uint8 newPhase) internal {
-        _tstore(_T_LOCK_SLOT, (_tload(_T_LOCK_SLOT) & _LOCK_PHASE_MASK) | bytes32(uint256(newPhase)));
-    }
-
-    // ------------------------------------------------------ //
-    //                Transient Storage Helpers               //
-    // ------------------------------------------------------ //
-
-    function _tstore(bytes32 slot, bytes32 value) internal {
-        assembly {
-            tstore(slot, value)
-        }
-    }
-
-    function _tload(bytes32 slot) internal view returns (bytes32 value) {
-        assembly {
-            value := tload(slot)
-        }
-        return value;
+        t_lock = (t_lock & _LOCK_PHASE_MASK) | uint256(newPhase);
     }
 }

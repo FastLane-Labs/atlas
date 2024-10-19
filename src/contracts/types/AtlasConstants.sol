@@ -37,7 +37,7 @@ contract AtlasConstants {
     uint256 internal constant _SOLVER_FULFILLED_MASK = 1 << 162;
 
     // Used to set Lock phase without changing the activeEnvironment or callConfig.
-    bytes32 internal constant _LOCK_PHASE_MASK = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00;
+    uint256 internal constant _LOCK_PHASE_MASK = uint256(0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00);
 
     // ValidCalls error threshold before which the metacall reverts, and after which it returns gracefully to store
     // nonces as used.
