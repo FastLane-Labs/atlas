@@ -33,15 +33,16 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
 
     // Transient storage slots
     bytes32 private constant _T_LOCK_SLOT = keccak256("ATLAS_LOCK");
-    bytes32 private constant _T_SOLVER_LOCK_SLOT = keccak256("ATLAS_SOLVER_LOCK");
-    bytes32 private constant _T_SOLVER_TO_SLOT = keccak256("ATLAS_SOLVER_TO");
+    
+    uint256 internal transient t_solverLock; 
+    address internal transient t_solverTo; // current solverOp.solver contract address
 
-    uint256 public transient claims;
-    uint256 public transient fees;
-    uint256 public transient writeoffs;
-    uint256 public transient withdrawals;
-    uint256 public transient deposits;
-    uint256 public transient solverSurcharge; // total surcharge collected from failed solverOps due to solver fault.
+    uint256 internal transient t_claims;
+    uint256 internal transient t_fees;
+    uint256 internal transient t_writeoffs;
+    uint256 internal transient t_withdrawals;
+    uint256 internal transient t_deposits;
+    uint256 internal transient t_solverSurcharge; // total surcharge collected from failed solverOps due to solver fault.
 
     // AtlETH storage
     uint256 internal S_totalSupply;
@@ -182,14 +183,10 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     /// @return calledBack Boolean indicating whether the solver has called back via `reconcile`.
     /// @return fulfilled Boolean indicating whether the solver's outstanding debt has been repaid via `reconcile`.
     function _solverLockData() internal view returns (address currentSolver, bool calledBack, bool fulfilled) {
-        uint256 _solverLock = uint256(_tload(_T_SOLVER_LOCK_SLOT));
+        uint256 _solverLock = t_solverLock;
         currentSolver = address(uint160(_solverLock));
         calledBack = _solverLock & _SOLVER_CALLED_BACK_MASK != 0;
         fulfilled = _solverLock & _SOLVER_FULFILLED_MASK != 0;
-    }
-
-    function _solverTo() internal view returns (address) {
-        return address(uint160(uint256(_tload(_T_SOLVER_TO_SLOT))));
     }
 
     function _isUnlocked() internal view returns (bool) {
@@ -218,14 +215,6 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     // Sets the Lock phase without changing the activeEnvironment or callConfig.
     function _setLockPhase(uint8 newPhase) internal {
         _tstore(_T_LOCK_SLOT, (_tload(_T_LOCK_SLOT) & _LOCK_PHASE_MASK) | bytes32(uint256(newPhase)));
-    }
-
-    function _setSolverLock(uint256 newSolverLock) internal {
-        _tstore(_T_SOLVER_LOCK_SLOT, bytes32(newSolverLock));
-    }
-
-    function _setSolverTo(address newSolverTo) internal {
-        _tstore(_T_SOLVER_TO_SLOT, bytes32(uint256(uint160(newSolverTo))));
     }
 
     // ------------------------------------------------------ //

@@ -33,14 +33,14 @@ contract TestAtlas is Atlas {
 
     function clearTransientStorage() public {
         _setLock(address(0), 0, 0);
-        _setSolverLock(0);
-        _setSolverTo(address(0));
-        claims = 0;
-        fees = 0;
-        writeoffs = 0;
-        withdrawals = 0;
-        deposits = 0;
-        solverSurcharge = 0;
+        t_solverLock = 0;
+        t_solverTo = address(0);
+        t_claims = 0;
+        t_fees = 0;
+        t_writeoffs = 0;
+        t_withdrawals = 0;
+        t_deposits = 0;
+        t_solverSurcharge = 0;
     }
 
     function setLock(address activeEnvironment, uint32 callConfig, uint8 phase) public {
@@ -52,30 +52,52 @@ contract TestAtlas is Atlas {
     }
 
     function setSolverLock(uint256 newSolverLock) public {
-        _setSolverLock(newSolverLock);
+        t_solverLock = newSolverLock;
     }
 
     function setSolverTo(address newSolverTo) public {
-        _setSolverTo(newSolverTo);
+        t_solverTo = newSolverTo;
     }
 
     function setClaims(uint256 newClaims) public {
-        claims = newClaims;
+        t_claims = newClaims;
     }
 
     function setFees(uint256 newFees) public {
-        fees = newFees;
+        t_fees = newFees;
     }
 
     function setWriteoffs(uint256 newWriteoffs) public {
-        writeoffs = newWriteoffs;
+        t_writeoffs = newWriteoffs;
     }
 
     function setWithdrawals(uint256 newWithdrawals) public {
-        withdrawals = newWithdrawals;
+        t_withdrawals = newWithdrawals;
     }
 
     function setDeposits(uint256 newDeposits) public {
-        deposits = newDeposits;
+        t_deposits = newDeposits;
+    }
+
+    // Transient Var View Functions
+
+    function claims() external view returns (uint256) {
+        return t_claims;
+    }
+
+    function fees() external view returns (uint256) {
+        return t_fees;
+    }
+
+    function writeoffs() external view returns (uint256) {
+        return t_writeoffs;
+    }
+
+    function withdrawals() external view returns (uint256) {
+        return t_withdrawals;
+    }
+
+    function deposits() external view returns (uint256) {
+        return t_deposits;
     }
 }

@@ -116,7 +116,7 @@ contract MockGasAccounting is TestAtlas, BaseTest {
     }
 
     function setSolverLock(address _solverFrom) external {
-        _setSolverLock(uint256(uint160(_solverFrom)));
+        t_solverLock = (uint256(uint160(_solverFrom)));
     }
 
     function _balanceOf(address account) external view returns (uint112, uint112) {

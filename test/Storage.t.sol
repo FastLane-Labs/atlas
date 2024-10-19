@@ -391,11 +391,11 @@ contract MockStorage is Storage {
     // For internal view functions without external versions
 
     function solverTo() public view returns (address) {
-        return _solverTo();
+        return t_solverTo;
     }
 
     function setSolverTo(address newSolverTo) public {
-        _setSolverTo(newSolverTo);
+        t_solverTo = newSolverTo;
     }
 
     function activeEnvironment() public view returns (address) {
@@ -418,13 +418,13 @@ contract MockStorage is Storage {
     // To clear all transient storage vars
     function clearTransientStorage() public {
         _setLock(address(0), 0, 0);
-        _setSolverLock(0);
-        _setSolverTo(address(0));
-        claims = 0;
-        fees = 0;
-        writeoffs = 0;
-        withdrawals = 0;
-        deposits = 0;
-        solverSurcharge = 0;
+        t_solverLock = 0;
+        t_solverTo = address(0);
+        t_claims = 0;
+        t_fees = 0;
+        t_writeoffs = 0;
+        t_withdrawals = 0;
+        t_deposits = 0;
+        t_solverSurcharge = 0;
     }
 }
