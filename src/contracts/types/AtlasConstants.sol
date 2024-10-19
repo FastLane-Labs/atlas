@@ -18,6 +18,7 @@ contract AtlasConstants {
 
     // Atlas constants used in `_bidFindingIteration()`
     uint256 internal constant _BITS_FOR_INDEX = 16;
+    uint256 internal constant _FIRST_16_BITS_TRUE_MASK = uint256(0xFFFF);
 
     // Escrow constants
     uint256 internal constant _VALIDATION_GAS_LIMIT = 500_000;
@@ -47,16 +48,5 @@ contract AtlasConstants {
     //               ATLAS VERIFICATION CONSTANTS              //
     // ------------------------------------------------------- //
 
-    uint256 internal constant _FULL_BITMAP = _FIRST_240_BITS_TRUE_MASK;
-    uint256 internal constant _NONCES_PER_BITMAP = 240;
     uint8 internal constant _MAX_SOLVERS = type(uint8).max - 1;
-
-    // ------------------------------------------------------- //
-    //                     SHARED CONSTANTS                    //
-    // ------------------------------------------------------- //
-
-    uint256 internal constant _FIRST_240_BITS_TRUE_MASK =
-        uint256(0x0000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF);
-    uint256 internal constant _FIRST_16_BITS_TRUE_MASK = uint256(0xFFFF);
-    uint256 internal constant _FIRST_4_BITS_TRUE_MASK = uint256(0xF);
 }
