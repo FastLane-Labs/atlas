@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 
@@ -228,53 +228,53 @@ contract StorageTest is BaseTest {
     }
 
     function test_storage_transient_claims() public {
-        assertEq(atlas.getClaims(), 0, "claims should start at 0");
+        assertEq(atlas.claims(), 0, "claims should start at 0");
 
         atlas.setClaims(100);
-        assertEq(atlas.getClaims(), 100, "claims should be 100");
+        assertEq(atlas.claims(), 100, "claims should be 100");
 
         atlas.clearTransientStorage();
-        assertEq(atlas.getClaims(), 0, "claims should be 0 again");
+        assertEq(atlas.claims(), 0, "claims should be 0 again");
     }
 
     function test_storage_transient_fees() public {
-        assertEq(atlas.getFees(), 0, "fees should start at 0");
+        assertEq(atlas.fees(), 0, "fees should start at 0");
 
         atlas.setFees(100);
-        assertEq(atlas.getFees(), 100, "fees should be 100");
+        assertEq(atlas.fees(), 100, "fees should be 100");
 
         atlas.clearTransientStorage();
-        assertEq(atlas.getFees(), 0, "fees should be 0 again");
+        assertEq(atlas.fees(), 0, "fees should be 0 again");
     }
 
     function test_storage_transient_writeoffs() public {
-        assertEq(atlas.getWriteoffs(), 0, "writeoffs should start at 0");
+        assertEq(atlas.writeoffs(), 0, "writeoffs should start at 0");
 
         atlas.setWriteoffs(100);
-        assertEq(atlas.getWriteoffs(), 100, "writeoffs should be 100");
+        assertEq(atlas.writeoffs(), 100, "writeoffs should be 100");
 
         atlas.clearTransientStorage();
-        assertEq(atlas.getWriteoffs(), 0, "writeoffs should be 0 again");
+        assertEq(atlas.writeoffs(), 0, "writeoffs should be 0 again");
     }
 
     function test_storage_transient_withdrawals() public {
-        assertEq(atlas.getWithdrawals(), 0, "withdrawals should start at 0");
+        assertEq(atlas.withdrawals(), 0, "withdrawals should start at 0");
 
         atlas.setWithdrawals(100);
-        assertEq(atlas.getWithdrawals(), 100, "withdrawals should be 100");
+        assertEq(atlas.withdrawals(), 100, "withdrawals should be 100");
 
         atlas.clearTransientStorage();
-        assertEq(atlas.getWithdrawals(), 0, "withdrawals should be 0 again");
+        assertEq(atlas.withdrawals(), 0, "withdrawals should be 0 again");
     }
 
     function test_storage_transient_deposits() public {
-        assertEq(atlas.getDeposits(), 0, "deposits should start at 0");
+        assertEq(atlas.deposits(), 0, "deposits should start at 0");
 
         atlas.setDeposits(100);
-        assertEq(atlas.getDeposits(), 100, "deposits should be 100");
+        assertEq(atlas.deposits(), 100, "deposits should be 100");
 
         atlas.clearTransientStorage();
-        assertEq(atlas.getDeposits(), 0, "deposits should be 0 again");
+        assertEq(atlas.deposits(), 0, "deposits should be 0 again");
     }
 
     function test_storage_transient_solverTo() public {
@@ -391,11 +391,11 @@ contract MockStorage is Storage {
     // For internal view functions without external versions
 
     function solverTo() public view returns (address) {
-        return _solverTo();
+        return t_solverTo;
     }
 
     function setSolverTo(address newSolverTo) public {
-        _setSolverTo(newSolverTo);
+        t_solverTo = newSolverTo;
     }
 
     function activeEnvironment() public view returns (address) {
@@ -418,34 +418,13 @@ contract MockStorage is Storage {
     // To clear all transient storage vars
     function clearTransientStorage() public {
         _setLock(address(0), 0, 0);
-        _setSolverLock(0);
-        _setSolverTo(address(0));
-        _setClaims(0);
-        _setFees(0);
-        _setWriteoffs(0);
-        _setWithdrawals(0);
-        _setDeposits(0);
-    }
-
-    // View functions
-
-    function getClaims() external view returns (uint256) {
-        return claims();
-    }
-
-    function getFees() external view returns (uint256) {
-        return fees();
-    }
-
-    function getWriteoffs() external view returns (uint256) {
-        return writeoffs();
-    }
-
-    function getWithdrawals() external view returns (uint256) {
-        return withdrawals();
-    }
-
-    function getDeposits() external view returns (uint256) {
-        return deposits();
+        t_solverLock = 0;
+        t_solverTo = address(0);
+        t_claims = 0;
+        t_fees = 0;
+        t_writeoffs = 0;
+        t_withdrawals = 0;
+        t_deposits = 0;
+        t_solverSurcharge = 0;
     }
 }

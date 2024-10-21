@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 library AccountingMath {
     uint256 internal constant _MAX_BUNDLER_REFUND_RATE = 8_000_000; // out of 10_000_000 = 80%
