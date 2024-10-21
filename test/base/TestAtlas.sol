@@ -15,7 +15,7 @@ contract TestAtlas is Atlas {
         address simulator,
         address initialSurchargeRecipient,
         address l2GasCalculator,
-        address executionTemplate
+        address factoryLib
     )
         Atlas(
             escrowDuration,
@@ -25,7 +25,7 @@ contract TestAtlas is Atlas {
             simulator,
             initialSurchargeRecipient,
             l2GasCalculator,
-            executionTemplate
+            factoryLib
         )
     { }
 

@@ -8,6 +8,7 @@ import "./base/TestUtils.sol";
 
 import { Permit69 } from "../src/contracts/atlas/Permit69.sol";
 import { Mimic } from "../src/contracts/common/Mimic.sol";
+import { FactoryLib } from "../src/contracts/atlas/FactoryLib.sol";
 
 import { SAFE_USER_TRANSFER, SAFE_DAPP_TRANSFER } from "../src/contracts/atlas/Permit69.sol";
 import { AtlasEvents } from "../src/contracts/types/AtlasEvents.sol";
@@ -35,27 +36,31 @@ contract Permit69Test is BaseTest {
         BaseTest.setUp();
 
         mockUser = address(0x13371337);
-        address deployer = address(333);
-        address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 0);
-        address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
-        address expectedFactoryAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
-        bytes32 salt = keccak256(abi.encodePacked(block.chainid, expectedFactoryAddr));
-        ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment{ salt: salt }(expectedFactoryAddr);
+
+        address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
+        address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
 
         vm.startPrank(deployer);
+        ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedAtlasAddr);
+        FactoryLib factoryLib = new FactoryLib(address(execEnvTemplate));
+
         mockAtlas = new MockAtlasForPermit69Tests({
-            _escrowDuration: 64,
-            _atlasSurchargeRate: DEFAULT_ATLAS_SURCHARGE_RATE,
-            _bundlerSurchargeRate: DEFAULT_BUNDLER_SURCHARGE_RATE,
-            _verification: expectedAtlasVerificationAddr,
-            _simulator: address(0),
-            _executionTemplate: address(execEnvTemplate),
+            escrowDuration: 64,
+            atlasSurchargeRate: DEFAULT_ATLAS_SURCHARGE_RATE,
+            bundlerSurchargeRate: DEFAULT_BUNDLER_SURCHARGE_RATE,
+            verification: expectedAtlasVerificationAddr,
+            simulator: address(0),
+            factoryLib: address(factoryLib),
             _surchargeRecipient: deployer,
-            _l2GasCalculator: address(0)
+            l2GasCalculator: address(0)
         });
+        vm.stopPrank();
+
+        console.log("Mock Atlas address: ", address(mockAtlas));
+        console.log("Predicted atlas address: ", expectedAtlasAddr);
+
 
         assertEq(address(mockAtlas), expectedAtlasAddr, "Atlas address mismatch");
-        vm.stopPrank();
 
         mockDAppControl = address(0x123321);
         mockCallConfig = 0;
@@ -301,24 +306,24 @@ contract Permit69Test is BaseTest {
 // Mock Atlas with standard implementations of Permit69's virtual functions
 contract MockAtlasForPermit69Tests is Atlas {
     constructor(
-        uint256 _escrowDuration,
-        uint256 _atlasSurchargeRate,
-        uint256 _bundlerSurchargeRate,
-        address _verification,
-        address _simulator,
+        uint256 escrowDuration,
+        uint256 atlasSurchargeRate,
+        uint256 bundlerSurchargeRate,
+        address verification,
+        address simulator,
         address _surchargeRecipient,
-        address _l2GasCalculator,
-        address _executionTemplate
+        address l2GasCalculator,
+        address factoryLib
     )
         Atlas(
-            _escrowDuration,
-            _atlasSurchargeRate,
-            _bundlerSurchargeRate,
-            _verification,
-            _simulator,
+            escrowDuration,
+            atlasSurchargeRate,
+            bundlerSurchargeRate,
+            verification,
+            simulator,
             _surchargeRecipient,
-            _l2GasCalculator,
-            _executionTemplate
+            l2GasCalculator,
+            factoryLib
         )
     { }
 
@@ -375,14 +380,13 @@ contract MockAtlasForPermit69Tests is Atlas {
         uint32 callConfig
     )
         internal
-        view
         returns (bool)
     {
         return _verifyUserControlExecutionEnv(sender, user, control, callConfig);
     }
 
     // Exposing above overridden function for testing and Permit69 coverage
-    function verifyCallerIsExecutionEnv(address user, address control, uint32 callConfig) public view returns (bool) {
+    function verifyCallerIsExecutionEnv(address user, address control, uint32 callConfig) public returns (bool) {
         if (!_verifyUserControlExecutionEnv(msg.sender, user, control, callConfig)) {
             revert AtlasErrors.InvalidEnvironment();
         }

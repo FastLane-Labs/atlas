@@ -117,7 +117,7 @@ contract TrebleSwapTest is BaseTest {
         _doMetacallAndChecks({ winningSolver: address(0) });
     }
 
-    function testTrebleSwap_Metacall_Erc20ToErc20_OneSolver() public {
+    function testTrebleSwap_Metacall_Erc20ToErc20_OneSolver_GasCheck() public {
         // Tx: https://basescan.org/tx/0x0ef4a9c24bbede2b39e12f5e5417733fa8183f372e41ee099c2c7523064c1b55
         // Swaps 197.2 USDC for at least 198,080,836.0295 WUF
 
@@ -199,7 +199,7 @@ contract TrebleSwapTest is BaseTest {
         _doMetacallAndChecks({ winningSolver: address(0) });
     }
 
-    function testTrebleSwap_Metacall_EthToErc20_OneSolver() public {
+    function testTrebleSwap_Metacall_EthToErc20_OneSolver_GasCheck() public {
         // Tx: https://basescan.org/tx/0xe138def4155bea056936038b9374546a366828ab8bf1233056f9e2fe4c6af999
         // Swaps 0.123011147164483512 ETH for at least 307.405807527716546728 DAI
 
@@ -300,6 +300,9 @@ contract TrebleSwapTest is BaseTest {
         // Estimate gas surcharge Atlas should have taken
         txGasUsed = estAtlasGasSurcharge - gasleft();
         estAtlasGasSurcharge = txGasUsed * tx.gasprice * atlas.ATLAS_SURCHARGE_RATE() / atlas.SCALE();
+
+        // For benchmarking
+        console.log("Metacall gas cost: ", txGasUsed);
 
         // Check Atlas auctionWon return value
         assertEq(auctionWon, auctionWonExpected, "auctionWon not as expected");
