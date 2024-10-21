@@ -67,10 +67,10 @@ contract FactoryTest is Test {
         user = address(999);
         address deployer = address(333);
 
-        address expectedFactoryLibAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer));
-        address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
-        address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
-        address expectedFactoryAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
+        address expectedFactoryLibAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
+        address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
+        address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
+        address expectedFactoryAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 4);
 
         vm.startPrank(deployer);
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedFactoryAddr);
@@ -110,7 +110,7 @@ contract FactoryTest is Test {
                     keccak256(
                         abi.encodePacked(
                             bytes1(0xff),
-                            address(factoryLib),
+                            address(mockFactory),
                             mockFactory.computeSalt(user, address(dAppControl), callConfig),
                             keccak256(abi.encodePacked(creationCode))
                         )
