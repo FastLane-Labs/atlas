@@ -35,6 +35,7 @@ contract FactoryLib {
         bytes32 salt
     )
         public
+        payable
         returns (address executionEnvironment)
     {
         bytes memory _creationCode = _getMimicCreationCode({ user: user, control: control, callConfig: callConfig });
