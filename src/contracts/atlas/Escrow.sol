@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import { AtlETH } from "./AtlETH.sol";
 import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
@@ -573,8 +573,8 @@ abstract contract Escrow is AtlETH {
         bool _success;
 
         // Set the solver lock and solver address at the beginning to ensure reliability
-        _setSolverLock(uint256(uint160(solverOp.from)));
-        _setSolverTo(solverOp.solver);
+        t_solverLock = uint256(uint160(solverOp.from));
+        t_solverTo = solverOp.solver;
 
         // ------------------------------------- //
         //             Pre-Solver Call           //

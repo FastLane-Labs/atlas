@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import { TxBuilder } from "../src/contracts/helpers/TxBuilder.sol";
 
