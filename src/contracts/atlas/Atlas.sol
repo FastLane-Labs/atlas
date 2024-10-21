@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { LibSort } from "solady/utils/LibSort.sol";
@@ -34,7 +34,7 @@ contract Atlas is Escrow, Factory {
         address simulator,
         address initialSurchargeRecipient,
         address l2GasCalculator,
-        address executionTemplate
+        address factoryLib
     )
         Escrow(
             escrowDuration,
@@ -45,7 +45,7 @@ contract Atlas is Escrow, Factory {
             initialSurchargeRecipient,
             l2GasCalculator
         )
-        Factory(executionTemplate)
+        Factory(factoryLib)
     { }
 
     /// @notice metacall is the entrypoint function for the Atlas transactions.
@@ -371,7 +371,6 @@ contract Atlas is Escrow, Factory {
         uint32 callConfig
     )
         internal
-        view
         override
         returns (bool)
     {

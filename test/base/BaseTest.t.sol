@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
+import { FactoryLib } from "../../src/contracts/atlas/FactoryLib.sol";
 import { TestAtlas } from "./TestAtlas.sol";
 import { AtlasVerification } from "../../src/contracts/atlas/AtlasVerification.sol";
 import { ExecutionEnvironment } from "../../src/contracts/common/ExecutionEnvironment.sol";
@@ -76,9 +77,10 @@ contract BaseTest is Test {
         simulator = new Simulator();
 
         // Computes the addresses at which AtlasVerification will be deployed
-        address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
-        address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
+        address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
+        address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedAtlasAddr);
+        FactoryLib factoryLib = new FactoryLib(address(execEnvTemplate));
 
         atlas = new TestAtlas({
             escrowDuration: DEFAULT_ESCROW_DURATION,
@@ -86,7 +88,7 @@ contract BaseTest is Test {
             bundlerSurchargeRate: DEFAULT_BUNDLER_SURCHARGE_RATE,
             verification: expectedAtlasVerificationAddr,
             simulator: address(simulator),
-            executionTemplate: address(execEnvTemplate),
+            factoryLib: address(factoryLib),
             initialSurchargeRecipient: deployer,
             l2GasCalculator: address(0)
         });

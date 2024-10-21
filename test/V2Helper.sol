@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import { TxBuilder } from "../src/contracts/helpers/TxBuilder.sol";
 
@@ -58,12 +58,6 @@ contract V2Helper is Test, TxBuilder {
         returns (UserOperation memory userOp)
     {
         (uint256 token0Balance, uint256 token1Balance) = _getTradeAmtAndDirection(firstPool, secondPool, tokenIn);
-
-        console.log("-");
-        console.log("sell token", tokenIn);
-        console.log("token0 in ", token0Balance);
-        console.log("token1 in ", token1Balance);
-        console.log("-");
 
         return TxBuilder.buildUserOperation(
             from, firstPool, maxFeePerGas, 0, block.number + 2, buildV2SwapCalldata(token0Balance, token1Balance, from)
