@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.25;
 
-import { console } from "forge-std/Console.sol";
+import "forge-std/Test.sol";
 import { DeployBaseScript } from "script/base/deploy-base.s.sol";
 import { ArbitrumGasCalculator } from "src/contracts/gasCalculator/ArbitrumGasCalculator.sol";
 
