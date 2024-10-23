@@ -23,15 +23,12 @@ contract DeployAtlasScript is DeployBaseScript {
         uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
 
-
-        
-
         // Computes the addresses at which contracts will be deployed
         address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
         address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
         address expectedSimulatorAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
 
-         // Deploy gas calculator for Arbitrum chains after other deployments
+        // Deploy gas calculator for Arbitrum chains after other deployments
         address l2GasCalculatorAddr = address(0);
         uint256 chainId = block.chainid;
 
@@ -57,7 +54,7 @@ contract DeployAtlasScript is DeployBaseScript {
             executionTemplate: address(execEnvTemplate),
             initialSurchargeRecipient: deployer,
             l2GasCalculator: l2GasCalculatorAddr // is 0 if not on Arbitrum
-        });
+         });
         atlasVerification = new AtlasVerification(address(atlas));
 
         simulator = new Simulator();
@@ -154,7 +151,7 @@ contract DeployAtlasScript is DeployBaseScript {
         console.log("| Simulator             | ", address(simulator), " |");
         console.log("| Sorter                | ", address(sorter), " |");
         if (l2GasCalculatorAddr != address(0)) {
-            console.log("| L2 Gas Calculator      | ", l2GasCalculatorAddr, " |");
+            console.log("| L2 Gas Calculator     | ", l2GasCalculatorAddr, " |");
         }
         console.log("------------------------------------------------------------------------");
         console.log("\n");

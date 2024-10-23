@@ -48,10 +48,8 @@ contract DeployGasCalculatorScript is DeployBaseScript {
             deploymentAddr = address(gasCalculator);
         } else if (chainId == 42_170) {
             // Arbitrum Nova
-            ArbitrumGasCalculator gasCalculator = new ArbitrumGasCalculator({
-                calldataLenOffset: ARBITRUM_CALLDATA_LENGTH_OFFSET,
-                _isArbitrumNova: true
-            });
+            ArbitrumGasCalculator gasCalculator =
+                new ArbitrumGasCalculator({ calldataLenOffset: ARBITRUM_CALLDATA_LENGTH_OFFSET, _isArbitrumNova: true });
             deploymentAddr = address(gasCalculator);
         } else {
             revert("Error: Chain ID not supported for gas calculator deployment");
