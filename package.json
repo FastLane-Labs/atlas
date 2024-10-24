@@ -62,6 +62,8 @@
       "solver-deposit": "source .env && forge script script/solver-deposit.s.sol:SolverAtlasDepositScript --fork-url http://localhost:8545 --broadcast --non-interactive",
       "setup-demo": "npm run deploy-atlas-swap-intent-tx-builder && npm run deploy-solver && npm run solver-deposit",
 
+      "deploy-gas-calculator-base": "source .env && forge script script/deploy-gas-calculator.s.sol:DeployGasCalculatorScript --rpc-url ${BASE_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
+
       "atlas-addr": "echo 'ATLAS:' && jq -r '.ATLAS' deployments.json",
       "swap-intent-addr": "echo 'SWAP INTENT DAPP CONTROL:' && jq -r '.SWAP_INTENT_DAPP_CONTROL' deployments.json",
       "tx-builder-addr": "echo 'TX BUILDER:' && jq -r '.TX_BUILDER' deployments.json",

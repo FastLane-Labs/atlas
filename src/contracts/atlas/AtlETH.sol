@@ -1,23 +1,34 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
-import { SafeBlockNumber } from "src/contracts/libraries/SafeBlockNumber.sol";
-import { Permit69 } from "src/contracts/atlas/Permit69.sol";
-import "src/contracts/types/EscrowTypes.sol";
+
+import { SafeBlockNumber } from "../libraries/SafeBlockNumber.sol";
+import { Permit69 } from "./Permit69.sol";
+import "../types/EscrowTypes.sol";
 
 /// @author FastLane Labs
 /// @dev Do not manually set balances without updating totalSupply, as the sum of all user balances must not exceed it.
 abstract contract AtlETH is Permit69 {
     constructor(
         uint256 escrowDuration,
+        uint256 atlasSurchargeRate,
+        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
         address l2GasCalculator
     )
-        Permit69(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
+        Permit69(
+            escrowDuration,
+            atlasSurchargeRate,
+            bundlerSurchargeRate,
+            verification,
+            simulator,
+            initialSurchargeRecipient,
+            l2GasCalculator
+        )
     { }
 
     /*//////////////////////////////////////////////////////////////

@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
-import { SafeBlockNumber } from "src/contracts/libraries/SafeBlockNumber.sol";
-import {AtlasEvents} from "src/contracts/types/AtlasEvents.sol";
-import {AtlasErrors} from "src/contracts/types/AtlasErrors.sol";
+
+import { SafeBlockNumber } from "../src/contracts/libraries/SafeBlockNumber.sol";
+import { AtlasEvents } from "../src/contracts/types/AtlasEvents.sol";
+import { AtlasErrors } from "../src/contracts/types/AtlasErrors.sol";
 
 contract AtlETHTest is BaseTest {
 

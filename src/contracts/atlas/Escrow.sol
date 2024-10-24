@@ -1,24 +1,24 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import { AtlETH } from "./AtlETH.sol";
-import { IExecutionEnvironment } from "src/contracts/interfaces/IExecutionEnvironment.sol";
-import { IAtlas } from "src/contracts/interfaces/IAtlas.sol";
-import { ISolverContract } from "src/contracts/interfaces/ISolverContract.sol";
-import { IAtlasVerification } from "src/contracts/interfaces/IAtlasVerification.sol";
-import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
+import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
+import { IAtlas } from "../interfaces/IAtlas.sol";
+import { ISolverContract } from "../interfaces/ISolverContract.sol";
+import { IAtlasVerification } from "../interfaces/IAtlasVerification.sol";
+import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
-import { SafeCall } from "src/contracts/libraries/SafeCall/SafeCall.sol";
-import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
-import { CallBits } from "src/contracts/libraries/CallBits.sol";
-import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
-import { SafeBlockNumber } from "src/contracts/libraries/SafeBlockNumber.sol";
-import { AccountingMath } from "src/contracts/libraries/AccountingMath.sol";
-import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/EscrowTypes.sol";
-import "src/contracts/types/LockTypes.sol";
+import { SafeCall } from "../libraries/SafeCall/SafeCall.sol";
+import { SafeBlockNumber } from "../libraries/SafeBlockNumber.sol";
+import { EscrowBits } from "../libraries/EscrowBits.sol";
+import { CallBits } from "../libraries/CallBits.sol";
+import { SafetyBits } from "../libraries/SafetyBits.sol";
+import { AccountingMath } from "../libraries/AccountingMath.sol";
+import { DAppConfig } from "../types/ConfigTypes.sol";
+import "../types/SolverOperation.sol";
+import "../types/UserOperation.sol";
+import "../types/EscrowTypes.sol";
+import "../types/LockTypes.sol";
 
 /// @title Escrow
 /// @author FastLane Labs
@@ -32,12 +32,22 @@ abstract contract Escrow is AtlETH {
 
     constructor(
         uint256 escrowDuration,
+        uint256 atlasSurchargeRate,
+        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
         address l2GasCalculator
     )
-        AtlETH(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
+        AtlETH(
+            escrowDuration,
+            atlasSurchargeRate,
+            bundlerSurchargeRate,
+            verification,
+            simulator,
+            initialSurchargeRecipient,
+            l2GasCalculator
+        )
     {
         if (escrowDuration == 0) revert InvalidEscrowDuration();
     }
@@ -92,12 +102,13 @@ abstract contract Escrow is AtlETH {
     {
         bool _success;
         bytes memory _data;
+        uint256 _gasLimit = userOp.gas > gasleft() ? gasleft() : userOp.gas;
 
         if (!_borrow(userOp.value)) {
             revert InsufficientEscrow();
         }
 
-        (_success, _data) = ctx.executionEnvironment.call{ value: userOp.value }(
+        (_success, _data) = ctx.executionEnvironment.call{ value: userOp.value, gas: _gasLimit }(
             abi.encodePacked(
                 abi.encodeCall(IExecutionEnvironment.userWrapper, userOp), ctx.setAndPack(ExecutionPhase.UserOperation)
             )
@@ -564,8 +575,8 @@ abstract contract Escrow is AtlETH {
         bool _success;
 
         // Set the solver lock and solver address at the beginning to ensure reliability
-        _setSolverLock(uint256(uint160(solverOp.from)));
-        _setSolverTo(solverOp.solver);
+        t_solverLock = uint256(uint160(solverOp.from));
+        t_solverTo = solverOp.solver;
 
         // ------------------------------------- //
         //             Pre-Solver Call           //
@@ -611,8 +622,8 @@ abstract contract Escrow is AtlETH {
                     solverOp.bidToken,
                     bidAmount,
                     solverOp.data,
-                    // Only pass the returnData to solver if it came from userOp call and not from preOps call.
-                    _activeCallConfig().needsUserReturnData() ? returnData : new bytes(0)
+                    // Only pass the returnData (either from userOp or preOps) if the dApp requires it
+                    _activeCallConfig().forwardReturnData() ? returnData : new bytes(0)
                 )
             )
         );

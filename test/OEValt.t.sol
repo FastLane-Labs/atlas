@@ -1,23 +1,23 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { Ownable } from "openzeppelin-contracts/contracts/access/Ownable.sol";
 
-import { BaseTest } from "test/base/BaseTest.t.sol";
-import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
+import { BaseTest } from "./base/BaseTest.t.sol";
+import { TxBuilder } from "../src/contracts/helpers/TxBuilder.sol";
 import { UserOperationBuilder } from "test/base/builders/UserOperationBuilder.sol";
 
-import { SolverOperation } from "src/contracts/types/SolverOperation.sol";
-import { UserOperation } from "src/contracts/types/UserOperation.sol";
-import { DAppConfig } from "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/DAppOperation.sol";
+import { SolverOperation } from "../src/contracts/types/SolverOperation.sol";
+import { UserOperation } from "../src/contracts/types/UserOperation.sol";
+import { DAppConfig } from "../src/contracts/types/ConfigTypes.sol";
+import "../src/contracts/types/DAppOperation.sol";
 
-import { ChainlinkDAppControl, Oracle, Role } from "src/contracts/examples/oev-example/ChainlinkDAppControlAlt.sol";
-import {ChainlinkAtlasWrapper, IChainlinkFeed } from "src/contracts/examples/oev-example/ChainlinkAtlasWrapperAlt.sol";
-import { SolverBase } from "src/contracts/solver/SolverBase.sol";
+import { ChainlinkDAppControl, Oracle, Role } from "../src/contracts/examples/oev-example/ChainlinkDAppControlAlt.sol";
+import {ChainlinkAtlasWrapper, IChainlinkFeed } from "../src/contracts/examples/oev-example/ChainlinkAtlasWrapperAlt.sol";
+import { SolverBase } from "../src/contracts/solver/SolverBase.sol";
 
 
 // Using this Chainlink update to ETHUSD feed as an example:

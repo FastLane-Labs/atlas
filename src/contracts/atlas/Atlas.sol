@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: BUSL-1.1
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import { SafeTransferLib } from "solady/utils/SafeTransferLib.sol";
 import { LibSort } from "solady/utils/LibSort.sol";
@@ -7,17 +7,17 @@ import { LibSort } from "solady/utils/LibSort.sol";
 import { Escrow } from "./Escrow.sol";
 import { Factory } from "./Factory.sol";
 
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/UserOperation.sol";
-import "src/contracts/types/LockTypes.sol";
-import "src/contracts/types/ConfigTypes.sol";
-import "src/contracts/types/DAppOperation.sol";
-import "src/contracts/types/ValidCalls.sol";
+import "../types/SolverOperation.sol";
+import "../types/UserOperation.sol";
+import "../types/LockTypes.sol";
+import "../types/ConfigTypes.sol";
+import "../types/DAppOperation.sol";
+import "../types/ValidCalls.sol";
 
-import { CallBits } from "src/contracts/libraries/CallBits.sol";
-import { SafetyBits } from "src/contracts/libraries/SafetyBits.sol";
-import { IL2GasCalculator } from "src/contracts/interfaces/IL2GasCalculator.sol";
-import { IDAppControl } from "src/contracts/interfaces/IDAppControl.sol";
+import { CallBits } from "../libraries/CallBits.sol";
+import { SafetyBits } from "../libraries/SafetyBits.sol";
+import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
+import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
 /// @title Atlas V1
 /// @author FastLane Labs
@@ -28,14 +28,24 @@ contract Atlas is Escrow, Factory {
 
     constructor(
         uint256 escrowDuration,
+        uint256 atlasSurchargeRate,
+        uint256 bundlerSurchargeRate,
         address verification,
         address simulator,
         address initialSurchargeRecipient,
         address l2GasCalculator,
-        address executionTemplate
+        address factoryLib
     )
-        Escrow(escrowDuration, verification, simulator, initialSurchargeRecipient, l2GasCalculator)
-        Factory(executionTemplate)
+        Escrow(
+            escrowDuration,
+            atlasSurchargeRate,
+            bundlerSurchargeRate,
+            verification,
+            simulator,
+            initialSurchargeRecipient,
+            l2GasCalculator
+        )
+        Factory(factoryLib)
     { }
 
     /// @notice metacall is the entrypoint function for the Atlas transactions.
@@ -361,7 +371,6 @@ contract Atlas is Escrow, Factory {
         uint32 callConfig
     )
         internal
-        view
         override
         returns (bool)
     {
