@@ -35,17 +35,11 @@ contract GasCalculatorDeployHelper is Test {
                 calldataLenOffset: BASE_CALLDATA_LENGTH_OFFSET
             });
             l2GasCalculatorAddr = address(gasCalculator);
-        } else if (chainId == ARBITRUM_ONE || chainId == ARBITRUM_SEPOLIA) {
+        } else if (chainId == ARBITRUM_ONE || chainId == ARBITRUM_SEPOLIA || chainId == ARBITRUM_NOVA) {
             // Arbitrum One or Arbitrum Sepolia
             ArbitrumGasCalculator gasCalculator = new ArbitrumGasCalculator({
-                calldataLenOffset: ARBITRUM_CALLDATA_LENGTH_OFFSET,
-                _isArbitrumNova: false
+                calldataLenOffset: ARBITRUM_CALLDATA_LENGTH_OFFSET
             });
-            l2GasCalculatorAddr = address(gasCalculator);
-        } else if (chainId == ARBITRUM_NOVA) {
-            // Arbitrum Nova
-            ArbitrumGasCalculator gasCalculator =
-                new ArbitrumGasCalculator({ calldataLenOffset: ARBITRUM_CALLDATA_LENGTH_OFFSET, _isArbitrumNova: true });
             l2GasCalculatorAddr = address(gasCalculator);
         } else {
             revert("Error: Chain ID not supported for L2 Gas Calculator deployment");

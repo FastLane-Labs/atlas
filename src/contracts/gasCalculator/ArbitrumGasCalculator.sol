@@ -11,6 +11,7 @@ contract ArbitrumGasCalculator is IL2GasCalculator, Ownable {
     // Constants for gas calculations
     uint256 internal constant _CALLDATA_LENGTH_PREMIUM = 16;
     uint256 internal constant _BASE_TRANSACTION_GAS_USED = 21_000;
+    uint256 internal constant _ARBITRUM_NOVA_CHAINID = 42_170;
 
     // Interface to interact with Arbitrum's gas info precompile
     ArbGasInfo public immutable ARB_GAS_INFO;
@@ -23,11 +24,10 @@ contract ArbitrumGasCalculator is IL2GasCalculator, Ownable {
 
     /// @notice Constructor
     /// @param calldataLenOffset Initial offset for calldata length calculations
-    /// @param _isArbitrumNova Flag to indicate if this is Arbitrum Nova
-    constructor(int256 calldataLenOffset, bool _isArbitrumNova) Ownable(msg.sender) {
+    constructor(int256 calldataLenOffset) Ownable(msg.sender) {
         ARB_GAS_INFO = ArbGasInfo(address(0x6c));
         calldataLengthOffset = calldataLenOffset;
-        isArbitrumNova = _isArbitrumNova;
+        isArbitrumNova = block.chainid == _ARBITRUM_NOVA_CHAINID;
     }
 
     /// @notice Calculate the cost of calldata in ETH

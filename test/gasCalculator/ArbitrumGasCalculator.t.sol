@@ -12,7 +12,7 @@ contract ArbitrumGasCalculatorTest is ArbitrumTest {
     function setUp() public override {
         super.setUp();
         // Deploy the calculator with initial values
-        calculator = new ArbitrumGasCalculator(0, false);
+        calculator = new ArbitrumGasCalculator(0);
     }
 
     function testGetCalldataCost() public {
