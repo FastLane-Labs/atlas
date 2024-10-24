@@ -59,8 +59,14 @@ contract DeployAtlasScript is DeployBaseScript, GasCalculatorDeployHelper {
             l2GasCalculator: expectedL2GasCalculatorAddr // address(0) if chain not an L2
          });
         atlasVerification = new AtlasVerification(address(atlas));
-
         simulator = new Simulator();
+
+        // If chain is an L2, expectedL2GasCalculatorAddr will be non-zero
+        if (expectedL2GasCalculatorAddr != address(0)) {
+            actualL2GasCalculatorAddr = _newGasCalculator();
+        }
+
+        // After predicted address deployments done, do other setup txs:
         simulator.setAtlas(address(atlas));
 
         // If prev Simulator deployment has native assets, withdraw them to new Simulator
@@ -68,12 +74,8 @@ contract DeployAtlasScript is DeployBaseScript, GasCalculatorDeployHelper {
             Simulator(payable(prevSimAddr)).withdrawETH(address(simulator));
         }
 
+        // Sorter address not predicted or required in the other contracts, so deployed last.
         sorter = new Sorter(address(atlas));
-
-        // If chain is an L2, expectedL2GasCalculatorAddr will be non-zero
-        if (expectedL2GasCalculatorAddr != address(0)) {
-            actualL2GasCalculatorAddr = _newGasCalculator();
-        }
 
         vm.stopBroadcast();
 
