@@ -7,8 +7,19 @@ import { DeployBaseScript } from "script/base/deploy-base.s.sol";
 import { ArbitrumGasCalculator } from "src/contracts/gasCalculator/ArbitrumGasCalculator.sol";
 import { BaseGasCalculator } from "src/contracts/gasCalculator/BaseGasCalculator.sol";
 
-contract DeployGasCalculatorScript is DeployBaseScript, GasCalculatorDeployHelper {
+contract GasCalculatorDeployHelper {
+    function _newGasCalculator() internal returns (address) {
+        // TODO
+        return address(0);
+    }
 
+    function _predictGasCalculatorAddress(address deployer, uint256 deployNonce) internal returns (address) {
+        // TODO
+        return address(0);
+    }
+}
+
+contract DeployGasCalculatorScript is GasCalculatorDeployHelper, DeployBaseScript {
     // TODO this should also move to helper contract that creates new contract
     // NOTE: Adjust the constructor parameters as needed here:
     // -----------------------------------------------------------------------------------------------
@@ -48,21 +59,6 @@ contract DeployGasCalculatorScript is DeployBaseScript, GasCalculatorDeployHelpe
     }
 }
 
-contract GasCalculatorDeployHelper {
-
-    function _newGasCalculator() internal returns(address) {
-        // TODO
-        return address(0);
-    }
-
-    function _predictGasCalculatorAddress(address deployer, uint256 deployNonce) internal returns(address) {
-        // TODO
-        return address(0);
-    }
-
-}
-
-
 // For deploy helper
 // if (chainId == 8453 || chainId == 84_532) {
 //             // Base or Base Sepolia
@@ -74,7 +70,6 @@ contract GasCalculatorDeployHelper {
 //         } else {
 //             revert("Error: Chain ID not supported");
 //         }
-
 
 // function deployL2GasCalculator() public returns (address) {
 //         uint256 chainId = block.chainid;
@@ -90,7 +85,8 @@ contract GasCalculatorDeployHelper {
 //         } else if (chainId == 42_170) {
 //             // Arbitrum Nova
 //             ArbitrumGasCalculator gasCalculator =
-//                 new ArbitrumGasCalculator({ calldataLenOffset: ARBITRUM_CALLDATA_LENGTH_OFFSET, _isArbitrumNova: true });
+//                 new ArbitrumGasCalculator({ calldataLenOffset: ARBITRUM_CALLDATA_LENGTH_OFFSET, _isArbitrumNova: true
+// });
 //             deploymentAddr = address(gasCalculator);
 //         } else {
 //             revert("Error: Chain ID not supported for gas calculator deployment");
