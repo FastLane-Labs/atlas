@@ -85,7 +85,14 @@ contract DeployBaseScript is Script {
 
         // console.log("Getting", fullKey, "from deployments.json");
 
-        // NOTE: Use fullKey method above for safety
+        // Revert if key doesn't exist in JSON.
+        if (!json.keyExists(fullKey)) revert(string.concat(fullKey, " not found in deployments.json"));
+
+        // If key exists but is empty, return address(0)
+        address decodedAddr = abi.decode(json.parseRaw(fullKey), (address));
+        if (decodedAddr == address(0x20) || decodedAddr == address(0)) return address(0);
+
+        // Otherwise, return the address
         return json.readAddress(fullKey);
     }
 
