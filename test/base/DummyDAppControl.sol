@@ -118,6 +118,14 @@ contract DummyDAppControl is DAppControl {
         return returnValue;
     }
 
+    // Used to use all gas available during a call to get OOG error.
+    function burnEntireGasLimit() public {
+        uint256 _uselessSum;
+        while (true) {
+            _uselessSum += uint256(keccak256(abi.encodePacked(_uselessSum, gasleft()))) / 1e18;
+        }
+    }
+
     // Revert settings
 
     function setPreOpsShouldRevert(bool _preOpsShouldRevert) public {
