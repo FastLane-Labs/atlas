@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 
+import { FactoryLib } from "../src/contracts/atlas/FactoryLib.sol";
 import { Atlas } from "../src/contracts/atlas/Atlas.sol";
 import { ExecutionEnvironment } from "../src/contracts/common/ExecutionEnvironment.sol";
 import { DAppIntegration } from "../src/contracts/atlas/DAppIntegration.sol";
@@ -23,6 +24,7 @@ contract DAppIntegrationTest is Test {
     MockDAppIntegration public dAppIntegration;
     DummyDAppControl public dAppControl;
     AtlasVerification atlasVerification;
+    FactoryLib factoryLib;
 
     address atlasDeployer = makeAddr("atlas deployer");
     address governance = makeAddr("governance");
@@ -33,12 +35,13 @@ contract DAppIntegrationTest is Test {
         vm.startPrank(atlasDeployer);
         
         // Compute expected addresses for Atlas
-        address expectedAtlasAddr = vm.computeCreateAddress(atlasDeployer, vm.getNonce(atlasDeployer) + 2);
+        address expectedAtlasAddr = vm.computeCreateAddress(atlasDeployer, vm.getNonce(atlasDeployer) + 3);
 
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedAtlasAddr);
 
         // Deploy the AtlasVerification contract
         atlasVerification = new AtlasVerification(expectedAtlasAddr);
+        factoryLib = new FactoryLib(address(execEnvTemplate));
 
         // Deploy the Atlas contract with correct parameters
         atlas = new Atlas({
@@ -47,7 +50,7 @@ contract DAppIntegrationTest is Test {
             bundlerSurchargeRate: DEFAULT_BUNDLER_SURCHARGE_RATE,
             verification: address(atlasVerification),
             simulator: address(0),
-            executionTemplate: address(execEnvTemplate),
+            factoryLib: address(factoryLib),
             initialSurchargeRecipient: atlasDeployer,
             l2GasCalculator: address(0)
         });
