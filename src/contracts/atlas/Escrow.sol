@@ -101,7 +101,11 @@ abstract contract Escrow is AtlETH {
     {
         bool _success;
         bytes memory _data;
-        uint256 _gasLimit = userOp.gas > gasleft() ? gasleft() : userOp.gas;
+
+        // Calculate gas limit ceiling, including gas to return gracefully even if userOp call is OOG.
+        uint256 _gasLimit = gasleft() * 63 / 64 - _GRACEFUL_RETURN_GAS_OFFSET;
+        // Use the smaller of userOp.gas and the gas limit ceiling
+        _gasLimit = userOp.gas < _gasLimit ? userOp.gas : _gasLimit;
 
         if (!_borrow(userOp.value)) {
             revert InsufficientEscrow();
@@ -121,6 +125,7 @@ abstract contract Escrow is AtlETH {
                 return returnData;
             }
         }
+
         // revert for failed
         if (ctx.isSimulation) revert UserOpSimFail();
         revert UserOpFail();

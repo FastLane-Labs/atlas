@@ -23,6 +23,7 @@ contract AtlasConstants {
     // Escrow constants
     uint256 internal constant _VALIDATION_GAS_LIMIT = 500_000;
     uint256 internal constant _FASTLANE_GAS_BUFFER = 125_000; // integer amount
+    uint256 internal constant _GRACEFUL_RETURN_GAS_OFFSET = 40_000;
 
     // Gas Accounting constants
     uint256 internal constant _CALLDATA_LENGTH_PREMIUM = 32; // 16 (default) * 2
@@ -38,7 +39,8 @@ contract AtlasConstants {
     uint256 internal constant _SOLVER_FULFILLED_MASK = 1 << 162;
 
     // Used to set Lock phase without changing the activeEnvironment or callConfig.
-    uint256 internal constant _LOCK_PHASE_MASK = uint256(0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00);
+    uint256 internal constant _LOCK_PHASE_MASK =
+        uint256(0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00);
 
     // ValidCalls error threshold before which the metacall reverts, and after which it returns gracefully to store
     // nonces as used.
