@@ -86,6 +86,15 @@ contract ExecutionEnvironment is Base {
         }
     }
 
+    function userOpFailedWrapper(UserOperation calldata userOp) external onlyAtlasEnvironment {
+        bytes memory _data = _forward(abi.encodeCall(IDAppControl.userOpFailedCall, userOp));
+        bool _success;
+
+        (_success,) = _control().delegatecall(_data);
+
+        if (!_success) revert AtlasErrors.UserOpFailedWrapperDelegatecallFail();
+    }
+
     /// @notice The postOpsWrapper function may be called by Atlas as the last phase of a `metacall` transaction.
     /// @dev This contract is called by the Atlas contract, and delegatecalls the DAppControl contract via the
     /// corresponding `postOpsCall` function.

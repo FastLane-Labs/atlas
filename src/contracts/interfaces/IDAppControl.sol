@@ -16,6 +16,8 @@ interface IDAppControl {
 
     function allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) external;
 
+    function userOpFailedCall(UserOperation calldata userOp) external;
+
     function getDAppConfig(UserOperation calldata userOp) external view returns (DAppConfig memory dConfig);
 
     function getCallConfig() external view returns (CallConfig memory callConfig);

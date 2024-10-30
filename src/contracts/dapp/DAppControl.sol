@@ -77,6 +77,17 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         return _preOpsCall(userOp);
     }
 
+    /// @notice The userOpFailed hook which is called if the UserOperation fails, before the metacall tx ends.
+    /// @param userOp The UserOperation struct.
+    function userOpFailedCall(UserOperation calldata userOp)
+        external
+        validControl
+        onlyAtlasEnvironment
+        onlyPhase(ExecutionPhase.UserOpFailed)
+    {
+        _userOpFailedCall(userOp);
+    }
+
     /// @notice The preSolverCall hook which may be called before the SolverOperation is executed.
     /// @dev Should revert if any DApp-specific checks fail to indicate non-fulfillment.
     /// @param solverOp The SolverOperation to be executed after this hook has been called.

@@ -38,6 +38,7 @@ contract AtlasErrors {
     error SolverSimFail(uint256 solverOutcomeResult); // uint param is result returned in `verifySolverOp`
     error AllocateValueSimFail();
     error PostOpsSimFail();
+    error UserOpFailedHookSimFail();
     error ValidCalls(ValidCallsResult);
 
     // Execution Environment
@@ -51,6 +52,7 @@ contract AtlasErrors {
     error PostOpsDelegatecallFail();
     error PostOpsDelegatecallReturnedFalse();
     error AllocateValueDelegatecallFail();
+    error UserOpFailedWrapperDelegatecallFail();
     error NotEnvironmentOwner();
     error ExecutionEnvironmentBalanceTooLow();
 
@@ -60,6 +62,7 @@ contract AtlasErrors {
     // error SolverFail(); // Only sim version of err is used
     error AllocateValueFail();
     error PostOpsFail();
+    error UserOpFailedHookFail();
     error InvalidAccess();
 
     // Escrow

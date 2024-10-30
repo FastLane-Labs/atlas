@@ -62,6 +62,28 @@ abstract contract DAppControlTemplate {
     function _checkUserOperation(UserOperation memory) internal virtual { }
 
     /////////////////////////////////////////////////////////
+    //         USER OPERATION FAILED                       //
+    /////////////////////////////////////////////////////////
+    //
+    // UserOpFailedHook:
+    // Data should be decoded as:
+    //
+    //     bytes memory userOpData
+    //
+
+    // _userOpFailedCall
+    // Details:
+    //  userOpFailed/delegate =
+    //      Inputs: User's calldata
+    //      Function: Executing the function set by DAppControl
+    //      Container: Inside of the FastLane ExecutionEnvironment
+    //      Access: With storage access (read + write) only to the ExecutionEnvironment
+    //
+    // DApp exposure: Trustless
+    // User exposure: Trustless
+    function _userOpFailedCall(UserOperation calldata) internal virtual { }
+
+    /////////////////////////////////////////////////////////
     //                MEV ALLOCATION                       //
     /////////////////////////////////////////////////////////
     //

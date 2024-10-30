@@ -105,7 +105,15 @@ contract Atlas is Escrow, Factory {
             );
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
-            _handleErrors(revertData, _dConfig.callConfig);
+            bool _doUserOpFailedHook = _handleErrors(revertData, _dConfig.callConfig);
+
+            // If appropriate, execute the userOpFailed hook. If it reverts, let the whole metacall revert.
+            if (_doUserOpFailedHook) {
+                _executeUserOpFailedHook(
+                    _buildUserOpFailedContext(_executionEnvironment, _bundler, _isSimulation), userOp
+                );
+            }
+
             // Set lock to FullyLocked to prevent any reentrancy possibility
             _setLockPhase(uint8(ExecutionPhase.FullyLocked));
 
@@ -320,7 +328,8 @@ contract Atlas is Escrow, Factory {
     /// @notice Called at the end of `metacall` to bubble up specific error info in a revert.
     /// @param revertData Revert data from a failure during the execution of the metacall.
     /// @param callConfig The CallConfig of the current metacall tx.
-    function _handleErrors(bytes memory revertData, uint32 callConfig) internal view {
+    /// @return A boolean indicating whether the error was a UserOpFail, which should trigger the userOpFailed hook.
+    function _handleErrors(bytes memory revertData, uint32 callConfig) internal view returns (bool) {
         bytes4 _errorSwitch = bytes4(revertData);
         if (msg.sender == SIMULATOR) {
             // Simulation
@@ -342,6 +351,11 @@ contract Atlas is Escrow, Factory {
                 revert PostOpsSimFail();
             }
         }
+        if (_errorSwitch == UserOpFail.selector) {
+            // TODO check callConfig.needsUserOpFailedHook() if we include that setting
+            // TODO ensure needsUserOpFailedHook and allowsReuseUserOps are mutually exclusive
+            return true;
+        }
         if (_errorSwitch == UserNotFulfilled.selector) {
             revert UserNotFulfilled();
         }
@@ -355,6 +369,9 @@ contract Atlas is Escrow, Factory {
                 revert(0, 4)
             }
         }
+
+        // If we reach this, do not trigger the userOpFailed hook.
+        return false;
     }
 
     /// @notice Returns whether or not the execution environment address matches what's expected from the set of inputs.

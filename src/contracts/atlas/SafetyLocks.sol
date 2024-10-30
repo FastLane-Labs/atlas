@@ -89,4 +89,29 @@ abstract contract SafetyLocks is Storage {
             callDepth: 0
         });
     }
+
+    function _buildUserOpFailedContext(
+        address executionEnvironment,
+        address bundler,
+        bool isSimulation
+    )
+        internal
+        pure
+        returns (Context memory)
+    {
+        return Context({
+            executionEnvironment: executionEnvironment,
+            userOpHash: bytes32(0),
+            bundler: bundler,
+            solverSuccessful: false,
+            paymentsSuccessful: false,
+            solverIndex: 0,
+            solverCount: 0,
+            phase: uint8(ExecutionPhase.UserOpFailed),
+            solverOutcome: 0,
+            bidFind: false,
+            isSimulation: isSimulation,
+            callDepth: 0
+        });
+    }
 }

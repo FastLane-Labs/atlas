@@ -131,6 +131,26 @@ abstract contract Escrow is AtlETH {
         revert UserOpFail();
     }
 
+    function _executeUserOpFailedHook(
+        Context memory ctx,
+        UserOperation calldata userOp
+    )
+        internal
+        withLockPhase(ExecutionPhase.UserOpFailed)
+    {
+        (bool _success,) = ctx.executionEnvironment.call(
+            abi.encodePacked(
+                abi.encodeCall(IExecutionEnvironment.userOpFailedWrapper, userOp),
+                ctx.setAndPack(ExecutionPhase.UserOpFailed)
+            )
+        );
+
+        if (!_success) {
+            if (ctx.isSimulation) revert UserOpFailedHookSimFail();
+            revert UserOpFailedHookFail();
+        }
+    }
+
     /// @notice Checks if the trusted operation hash matches and sets the appropriate error bit if it doesn't.
     /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
     /// @param prevalidated Boolean flag indicating whether the SolverOperation has been prevalidated to skip certain
