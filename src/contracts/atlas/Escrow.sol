@@ -19,6 +19,8 @@ import "src/contracts/types/UserOperation.sol";
 import "src/contracts/types/EscrowTypes.sol";
 import "src/contracts/types/LockTypes.sol";
 
+import "forge-std/Test.sol";
+
 /// @title Escrow
 /// @author FastLane Labs
 /// @notice This Escrow component of Atlas handles execution of stages by calling corresponding functions on the
@@ -61,9 +63,13 @@ abstract contract Escrow is AtlETH {
             )
         );
 
+        // Decode _data as a tuple of (Reimbursement, bytes)
+        (Reimbursement memory reimbursement, bytes memory preOpsData) = abi.decode(_data, (Reimbursement, bytes));
+        console.log(reimbursement.reimburser);
+
         if (_success) {
             if (dConfig.callConfig.needsPreOpsReturnData()) {
-                return abi.decode(_data, (bytes));
+                return abi.decode(preOpsData, (bytes));
             } else {
                 return new bytes(0);
             }

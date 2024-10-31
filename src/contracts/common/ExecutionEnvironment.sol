@@ -15,6 +15,8 @@ import "src/contracts/types/SolverOperation.sol";
 import "src/contracts/types/UserOperation.sol";
 import "src/contracts/types/EscrowTypes.sol";
 
+import "forge-std/Test.sol";
+
 /// @title ExecutionEnvironment
 /// @author FastLane Labs
 /// @notice An Execution Environment contract is deployed for each unique combination of User address x DAppControl
@@ -46,14 +48,32 @@ contract ExecutionEnvironment is Base {
         onlyAtlasEnvironment
         returns (bytes memory)
     {
+        uint256 gasBefore = gasleft();
+        
         bytes memory _preOpsData = _forward(abi.encodeCall(IDAppControl.preOpsCall, userOp));
 
         bool _success;
         (_success, _preOpsData) = _control().delegatecall(_preOpsData);
 
-        if (!_success) revert AtlasErrors.PreOpsDelegatecallFail();
+        uint256 gasUsed = gasBefore - gasleft();
 
-        _preOpsData = abi.decode(_preOpsData, (bytes));
+        // if (!_success) revert AtlasErrors.PreOpsDelegatecallFail();
+        // Create reimbursement struct based on the success of the delegate call
+        Reimbursement memory reimbursement = Reimbursement({
+            gasUsed: gasUsed,
+            reimburser: 0x1234567890123456789012345678901234567890 //need to get this from somewhere
+        });
+
+        // If the delegate call failed, encode the reimbursement data only
+        if (!_success) {
+            _preOpsData = abi.encode(reimbursement, bytes(""));
+        } else {
+            _preOpsData = abi.decode(_preOpsData, (bytes));
+            _preOpsData = abi.encode(reimbursement, _preOpsData);
+        }
+
+        // _preOpsData = abi.decode(_preOpsData, (bytes));
+        // console.logBytes(_preOpsData);
         return _preOpsData;
     }
 
