@@ -57,26 +57,46 @@ abstract contract Escrow is AtlETH {
         withLockPhase(ExecutionPhase.PreOps)
         returns (bytes memory)
     {
+        uint256 gasBefore = gasleft();
+
         (bool _success, bytes memory _data) = ctx.executionEnvironment.call(
             abi.encodePacked(
                 abi.encodeCall(IExecutionEnvironment.preOpsWrapper, userOp), ctx.setAndPack(ExecutionPhase.PreOps)
             )
         );
 
-        // Decode _data as a tuple of (Reimbursement, bytes)
-        (Reimbursement memory reimbursement, bytes memory preOpsData) = abi.decode(_data, (Reimbursement, bytes));
-        console.log(reimbursement.reimburser);
+        uint256 gasUsed = gasBefore - gasleft();
+        
+        Reimbursement memory newReimbursement = Reimbursement({
+            gasUsed: gasUsed,
+            reimburser: 0x1234567890123456789012345678901234567890
+        });
+
+        // Create a new memory array with an additional slot
+        Reimbursement[] memory updatedReimbursements = new Reimbursement[](ctx.reimbursements.length + 1);
+
+        // Copy existing elements
+        for (uint i = 0; i < ctx.reimbursements.length; i++) {
+            updatedReimbursements[i] = ctx.reimbursements[i];
+        }
+        
+        // Add the new reimbursement at the end
+        updatedReimbursements[ctx.reimbursements.length] = newReimbursement;
+
+        // Update the context with the new array
+        ctx.reimbursements = updatedReimbursements;
 
         if (_success) {
             if (dConfig.callConfig.needsPreOpsReturnData()) {
-                return abi.decode(preOpsData, (bytes));
+                return abi.decode(_data, (bytes));
             } else {
                 return new bytes(0);
             }
         }
 
         if (ctx.isSimulation) revert PreOpsSimFail();
-        revert PreOpsFail();
+        // revert PreOpsFail();
+        return new bytes(0);
     }
 
     /// @notice Executes the user operation logic defined in the Execution Environment.

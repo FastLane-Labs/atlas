@@ -24,11 +24,6 @@ struct SolverTracker {
     bool invertsBidValue;
 }
 
-struct Reimbursement {
-    uint256 gasUsed;
-    address reimburser;
-}
-
 /// @title SolverOutcome
 /// @notice Enum for SolverOutcome
 /// @dev Multiple SolverOutcomes can be used to represent the outcome of a solver call
