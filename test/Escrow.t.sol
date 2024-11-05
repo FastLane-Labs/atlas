@@ -222,6 +222,33 @@ contract EscrowTest is BaseTest {
         assertTrue(auctionWon, "2nd auction should have been won");
     }
 
+    function test_executeUserOperation_gracefullyReturnsWhenUserOpOOG() public {
+        // userOp.gas should be more than ceiling calculated in _executeUserOperation()
+        uint256 userGasLim = 500_000;
+        uint256 metacallGasLim = 300_000; // will trigger use of userOp gas ceiling
+
+        defaultAtlasWithCallConfig(defaultCallConfig().build());
+        UserOperation memory userOp = validUserOperation(address(dAppControl))
+            .withData(
+                abi.encodeWithSelector(
+                    dAppControl.burnEntireGasLimit.selector)
+            ).withGas(userGasLim)
+            .signAndBuild(address(atlasVerification), userPK);
+        deal(address(dummySolver), defaultBidAmount);
+        SolverOperation[] memory solverOps = new SolverOperation[](1);
+        solverOps[0] = validSolverOperation(userOp)
+            .withBidAmount(defaultBidAmount)
+            .withData(abi.encode(1))
+            .signAndBuild(address(atlasVerification), solverOnePK);
+        DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
+
+        // Send msg.value so it must be sent back, testing the upper bound of remaining gas for graceful return 
+        deal(userEOA, 1 ether);
+        vm.prank(userEOA);
+        bool auctionWon = atlas.metacall{gas: metacallGasLim, value: 1 ether}(userOp, solverOps, dappOp);
+        assertEq(auctionWon, false, "call should not revert but auction should not be won either");
+    }
+
     // Ensure metacall reverts with the proper error when the allocateValue hook reverts.
     function test_executeAllocateValueCall_failure_SkipCoverage() public {
         defaultAtlasWithCallConfig(
