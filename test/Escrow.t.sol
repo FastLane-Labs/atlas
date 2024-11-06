@@ -41,11 +41,6 @@ contract EscrowTest is BaseTest {
     uint256 private constant _SOLVER_GAS_BUFFER = 5; // out of 100
     uint256 private constant _FASTLANE_GAS_BUFFER = 125_000; // integer amount
 
-    event MEVPaymentSuccess(address bidToken, uint256 bidAmount);
-    event SolverTxResult(
-        address indexed solverTo, address indexed solverFrom, bool executed, bool success, uint256 result
-    );
-
     function defaultCallConfig() public returns (CallConfigBuilder) {
         return new CallConfigBuilder();
     }
@@ -662,7 +657,14 @@ contract EscrowTest is BaseTest {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         vm.expectEmit(false, false, false, true, address(atlas));
-        emit SolverTxResult(solverOps[0].solver, solverOps[0].from, solverOpExecuted, solverOpSuccess, expectedResult);
+        emit AtlasEvents.SolverTxResult(
+            solverOps[0].solver,
+            solverOps[0].from,
+            solverOpExecuted,
+            solverOpSuccess,
+            expectedResult,
+            solverOps[0].bidAmount
+        );
 
         vm.prank(userEOA);
         if (metacallShouldRevert) vm.expectRevert(); // Metacall should revert, the reason isn't important, we're only checking the event

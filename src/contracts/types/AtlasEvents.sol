@@ -21,7 +21,12 @@ contract AtlasEvents {
 
     // Escrow events
     event SolverTxResult(
-        address indexed solverTo, address indexed solverFrom, bool executed, bool success, uint256 result
+        address indexed solverTo,
+        address indexed solverFrom,
+        bool executed,
+        bool success,
+        uint256 result,
+        uint256 bidAmount
     );
 
     // Factory events
