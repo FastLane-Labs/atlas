@@ -26,7 +26,8 @@ contract AtlasEvents {
         bool executed,
         bool success,
         uint256 result,
-        uint256 bidAmount
+        uint256 bidAmount,
+        address bidToken
     );
 
     // Factory events

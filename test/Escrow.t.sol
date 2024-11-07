@@ -663,7 +663,8 @@ contract EscrowTest is BaseTest {
             solverOpExecuted,
             solverOpSuccess,
             expectedResult,
-            solverOps[0].bidAmount
+            solverOps[0].bidAmount,
+            solverOps[0].bidToken
         );
 
         vm.prank(userEOA);
