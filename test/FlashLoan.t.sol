@@ -27,10 +27,18 @@ interface IWETH {
     function withdraw(uint256 wad) external;
 }
 
+struct Balances{
+    uint256 eth;
+    uint256 atlETH;
+    uint256 bonded;
+}
+
 contract FlashLoanTest is BaseTest {
     DummyDAppControlBuilder public control;
 
     Sig public sig;
+    Balances public userBefore;
+    Balances public userAfter;
 
     function setUp() public virtual override {
         BaseTest.setUp();
@@ -111,7 +119,9 @@ contract FlashLoanTest is BaseTest {
         vm.startPrank(userEOA);
         vm.expectEmit(true, true, true, true);
         uint256 result = (1 << uint256(SolverOutcome.BidNotPaid));
-        emit AtlasEvents.SolverTxResult(address(solver), solverOneEOA, true, false, result);
+        emit AtlasEvents.SolverTxResult(
+            address(solver), solverOneEOA, true, false, result, solverOps[0].bidAmount, solverOps[0].bidToken
+        );
         vm.expectRevert();
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
@@ -154,7 +164,9 @@ contract FlashLoanTest is BaseTest {
         vm.expectEmit(true, true, true, true);
         result = (1 << uint256(SolverOutcome.CallValueTooHigh));
         console.log("result", result);
-        emit AtlasEvents.SolverTxResult(address(solver), solverOneEOA, false, false, result);
+        emit AtlasEvents.SolverTxResult(
+            address(solver), solverOneEOA, false, false, result, solverOps[0].bidAmount, solverOps[0].bidToken
+        );
         vm.expectRevert();
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
@@ -193,15 +205,12 @@ contract FlashLoanTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-        address _solver = address(solver);
-
-        uint256 solverStartingTotal = WETH.balanceOf(_solver);
-
+        uint256 solverStartingTotal = WETH.balanceOf(address(solver));
         uint256 atlasStartingETH = address(atlas).balance;
 
-        uint256 userStartingETH = address(userEOA).balance;
-        uint256 userStartingAtlETH = atlas.balanceOf(userEOA);
-        uint256 userStartingBonded = atlas.balanceOfBonded(userEOA);
+        userBefore.eth = address(userEOA).balance;
+        userBefore.atlETH = atlas.balanceOf(userEOA);
+        userBefore.bonded = atlas.balanceOfBonded(userEOA);
 
         assertEq(solverStartingTotal, 1e18, "solver incorrect starting WETH");
         solverStartingTotal += (atlas.balanceOf(solverOneEOA) + atlas.balanceOfBonded(solverOneEOA));
@@ -214,7 +223,9 @@ contract FlashLoanTest is BaseTest {
         vm.startPrank(userEOA);
         result = 0;
         vm.expectEmit(true, true, true, true);
-        emit AtlasEvents.SolverTxResult(_solver, solverOneEOA, true, true, result);
+        emit AtlasEvents.SolverTxResult(
+            address(solver), solverOneEOA, true, true, result, solverOps[0].bidAmount, solverOps[0].bidToken
+        );
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
 
@@ -223,18 +234,18 @@ contract FlashLoanTest is BaseTest {
 
         {
             console.log("solverStartingTotal:  ", solverStartingTotal);
-            console.log("solverEndingTotal  :  ", WETH.balanceOf(_solver) + atlas.balanceOf(solverOneEOA) + atlas.balanceOfBonded(solverOneEOA));
-            solverStartingTotal -= (WETH.balanceOf(_solver) + atlas.balanceOf(solverOneEOA) + atlas.balanceOfBonded(solverOneEOA));
+            console.log("solverEndingTotal  :  ", WETH.balanceOf(address(solver)) + atlas.balanceOf(solverOneEOA) + atlas.balanceOfBonded(solverOneEOA));
+            solverStartingTotal -= (WETH.balanceOf(address(solver)) + atlas.balanceOf(solverOneEOA) + atlas.balanceOfBonded(solverOneEOA));
             console.log("solverDeltaTotal   :  ", solverStartingTotal);
         }
 
-        uint256 userEndingETH = address(userEOA).balance;
-        uint256 userEndingAtlETH = atlas.balanceOf(userEOA);
-        uint256 userEndingBonded = atlas.balanceOfBonded(userEOA);
+        userAfter.eth = address(userEOA).balance;
+        userAfter.atlETH = atlas.balanceOf(userEOA);
+        userAfter.bonded = atlas.balanceOfBonded(userEOA);
 
         {
-            console.log("userStartingTotal  :", userStartingETH + userStartingAtlETH + userStartingBonded);
-            console.log("userEndingTotal    :", userEndingETH + userEndingAtlETH + userEndingBonded);
+            console.log("userStartingTotal  :", userBefore.eth + userBefore.atlETH + userBefore.bonded);
+            console.log("userEndingTotal    :", userAfter.eth + userAfter.atlETH + userAfter.bonded);
 
             console.log("atlasStartingETH   :", atlasStartingETH);
             console.log("atlasEndingETH     :", address(atlas).balance);
@@ -243,7 +254,7 @@ contract FlashLoanTest is BaseTest {
         netSurcharge = atlas.cumulativeSurcharge() - netSurcharge;
         console.log("NetCumulativeSrchrg:       ", netSurcharge);
 
-        assertEq(WETH.balanceOf(_solver), 0, "solver WETH not used");
+        assertEq(WETH.balanceOf(address(solver)), 0, "solver WETH not used");
         assertEq(atlas.balanceOf(solverOneEOA), 0, "solver atlETH not used");
         console.log("atlasStartingETH   :", atlasStartingETH);
         console.log("atlasEnding  ETH   :", address(atlas).balance);
@@ -251,10 +262,10 @@ contract FlashLoanTest is BaseTest {
         // NOTE: solverStartingTotal is the solverTotal delta, not starting.
         assertTrue(address(atlas).balance >= atlasStartingETH - solverStartingTotal, "atlas incorrect ending ETH"); // atlas should NEVER lose balance during a metacall
 
-        console.log("userStartingETH    :", userStartingETH);
-        console.log("userEndingETH      :", userEndingETH);
-        assertTrue((userEndingETH - userStartingETH) >= 1 ether, "user incorrect ending ETH"); // user bal should increase by 1e (bid) + gas refund
-        assertTrue((userEndingBonded - userStartingBonded) == 0, "user incorrect ending bonded AtlETH"); // user bonded bal should increase by gas refund
+        console.log("userStartingETH    :", userBefore.eth);
+        console.log("userEndingETH      :", userAfter.eth);
+        assertTrue((userAfter.eth - userBefore.eth) >= 1 ether, "user incorrect ending ETH"); // user bal should increase by 1e (bid) + gas refund
+        assertTrue((userAfter.bonded - userBefore.bonded) == 0, "user incorrect ending bonded AtlETH"); // user bonded bal should increase by gas refund
     }
 }
 
