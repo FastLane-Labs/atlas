@@ -661,11 +661,12 @@ contract EscrowTest is BaseTest {
         emit AtlasEvents.SolverTxResult(
             solverOps[0].solver,
             solverOps[0].from,
+            userOp.control,
+            solverOps[0].bidToken,
+            solverOps[0].bidAmount,
             solverOpExecuted,
             solverOpSuccess,
-            expectedResult,
-            solverOps[0].bidAmount,
-            solverOps[0].bidToken
+            expectedResult
         );
 
         vm.prank(userEOA);

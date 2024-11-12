@@ -120,7 +120,14 @@ contract FlashLoanTest is BaseTest {
         vm.expectEmit(true, true, true, true);
         uint256 result = (1 << uint256(SolverOutcome.BidNotPaid));
         emit AtlasEvents.SolverTxResult(
-            address(solver), solverOneEOA, true, false, result, solverOps[0].bidAmount, solverOps[0].bidToken
+            address(solver),
+            solverOneEOA,
+            userOp.control,
+            solverOps[0].bidToken,
+            solverOps[0].bidAmount,
+            true,
+            false,
+            result
         );
         vm.expectRevert();
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
@@ -165,7 +172,14 @@ contract FlashLoanTest is BaseTest {
         result = (1 << uint256(SolverOutcome.CallValueTooHigh));
         console.log("result", result);
         emit AtlasEvents.SolverTxResult(
-            address(solver), solverOneEOA, false, false, result, solverOps[0].bidAmount, solverOps[0].bidToken
+            address(solver),
+            solverOneEOA,
+            userOp.control,
+            solverOps[0].bidToken,
+            solverOps[0].bidAmount,
+            false,
+            false,
+            result
         );
         vm.expectRevert();
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
@@ -224,7 +238,14 @@ contract FlashLoanTest is BaseTest {
         result = 0;
         vm.expectEmit(true, true, true, true);
         emit AtlasEvents.SolverTxResult(
-            address(solver), solverOneEOA, true, true, result, solverOps[0].bidAmount, solverOps[0].bidToken
+            address(solver),
+            solverOneEOA,
+            userOp.control,
+            solverOps[0].bidToken,
+            solverOps[0].bidAmount,
+            true,
+            true,
+            result
         );
         atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
         vm.stopPrank();
