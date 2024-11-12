@@ -23,6 +23,7 @@ contract AtlasEvents {
     event SolverTxResult(
         address indexed solverTo,
         address indexed solverFrom,
+        address indexed dAppControl,
         bool executed,
         bool success,
         uint256 result,
