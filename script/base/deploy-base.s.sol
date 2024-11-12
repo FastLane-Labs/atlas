@@ -70,6 +70,19 @@ contract DeployBaseScript is Script {
         }
     }
 
+    function _getSurchargeRates() internal view returns (uint256 atlasSurchargeRate, uint256 bundlerSurchargeRate) {
+        uint256 chainId = block.chainid;
+        if (chainId == 137 || chainId == 80_002) {
+            // POLYGON and AMOY
+            atlasSurchargeRate = 5_000_000; // 50%
+            bundlerSurchargeRate = 5_000_000; // 50%
+        } else {
+            // Default - for all other chains
+            atlasSurchargeRate = 1_000_000; // 10%
+            bundlerSurchargeRate = 1_000_000; // 10%
+        }
+    }
+
     // NOTE: When handling JSON with StdJson, prefix keys with '.' e.g. '.ATLAS'
     // These 2 functions abstract away the '.' thing though.
     // Pass in a key like 'ATLAS', and the current chain will be detected via `block.chainid` in `_getDeployChain()`

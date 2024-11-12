@@ -16,8 +16,8 @@ import { ExecutionEnvironment } from "../src/contracts/common/ExecutionEnvironme
 
 contract DeployAtlasScript is DeployBaseScript {
     uint256 ESCROW_DURATION = 64;
-    uint256 ATLAS_SURCHARGE_RATE = 1_000_000; // 10%
-    uint256 BUNDLER_SURCHARGE_RATE = 1_000_000; // 10%
+    uint256 ATLAS_SURCHARGE_RATE; // Set below
+    uint256 BUNDLER_SURCHARGE_RATE; // Set below
 
     function run() external {
         console.log("\n=== DEPLOYING Atlas ===\n");
@@ -26,6 +26,8 @@ contract DeployAtlasScript is DeployBaseScript {
 
         uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
+
+        (ATLAS_SURCHARGE_RATE, BUNDLER_SURCHARGE_RATE) = _getSurchargeRates();
 
         // Computes the addresses at which AtlasVerification will be deployed
         address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
