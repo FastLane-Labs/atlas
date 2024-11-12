@@ -23,11 +23,12 @@ contract AtlasEvents {
     event SolverTxResult(
         address indexed solverTo,
         address indexed solverFrom,
+        address indexed dAppControl,
+        address bidToken,
+        uint256 bidAmount,
         bool executed,
         bool success,
-        uint256 result,
-        uint256 bidAmount,
-        address bidToken
+        uint256 result
     );
 
     // Factory events
