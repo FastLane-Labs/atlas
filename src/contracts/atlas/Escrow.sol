@@ -207,7 +207,7 @@ abstract contract Escrow is AtlETH {
                 if (_result.executionSuccessful()) {
                     // First successful solver call that paid what it bid
                     emit SolverTxResult(
-                        solverOp.solver, solverOp.from, dConfig.to, true, true, _result, bidAmount, solverOp.bidToken
+                        solverOp.solver, solverOp.from, dConfig.to, solverOp.bidToken, bidAmount, true, true, _result
                     );
 
                     ctx.solverSuccessful = true;
@@ -227,11 +227,11 @@ abstract contract Escrow is AtlETH {
             solverOp.solver,
             solverOp.from,
             dConfig.to,
+            solverOp.bidToken,
+            bidAmount,
             _result.executedWithError(),
             false,
-            _result,
-            bidAmount,
-            solverOp.bidToken
+            _result
         );
 
         return 0;
