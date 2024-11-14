@@ -9,6 +9,8 @@ import { DeployBaseScript } from "script/base/deploy-base.s.sol";
 import { Token } from "../src/contracts/helpers/DemoToken.sol";
 import { WETH } from "solady/tokens/WETH.sol";
 
+import { stdMath } from "forge-std/StdMath.sol";
+
 // Deploy 3 stablecoin tokens (DAI, USDA, USDB) - all 18 decimals
 // Use WETH recognized by Uniswap V3 Router on the target chain
 // Make WETH/Stable pools on Uniswap V3 for each stablecoin
@@ -55,43 +57,76 @@ contract DeployDemoTokensScript is DeployBaseScript {
         usda = new Token("USDA Stablecoin", "USDA", 18);
         usdb = new Token("USDB Stablecoin", "USDB", 18);
 
-        address token0;
-        address token1;
-        uint160 sqrtPriceX96 = 1.0001e18;
+        address daiWethPool;
+        address usdaWethPool;
+        address usdbWethPool;
+        address daiUsdaPool;
+        address daiUsdbPool;
+        address usdaUsdbPool;
         uint24 fee = 100;
 
         // Create WETH/Stablecoin pools on Uniswap V3
         console.log("Creating Uniswap V3 Pools...\n");
 
-        token0 = address(dai) < address(weth) ? address(dai) : address(weth);
-        token1 = address(dai) < address(weth) ? address(weth) : address(dai);
-        address daiWethPool = IUniswapV3NonfungiblePositionManager(UNISWAP_V3_NONFUNGIBLE_POSITION_MANAGER)
-            .createAndInitializePoolIfNecessary(token0, token1, fee, sqrtPriceX96);
+        {
+            address token0 = address(dai) < address(weth) ? address(dai) : address(weth);
+            address token1 = address(dai) < address(weth) ? address(weth) : address(dai);
+            uint256 amount0 = address(dai) < address(weth) ? STABLE_AMOUNT : WETH_AMOUNT;
+            uint256 amount1 = address(dai) < address(weth) ? WETH_AMOUNT : STABLE_AMOUNT;
+            uint160 sqrtPriceX96 = uint160((sqrt((amount1 * 1e18) / amount0) * 2 ** 96) / 1e9);
+            daiWethPool = IUniswapV3NonfungiblePositionManager(UNISWAP_V3_NONFUNGIBLE_POSITION_MANAGER)
+                .createAndInitializePoolIfNecessary(token0, token1, fee, sqrtPriceX96);
+        }
 
-        token0 = address(usda) < address(weth) ? address(usda) : address(weth);
-        token1 = address(usda) < address(weth) ? address(weth) : address(usda);
-        address usdaWethPool = IUniswapV3NonfungiblePositionManager(UNISWAP_V3_NONFUNGIBLE_POSITION_MANAGER)
-            .createAndInitializePoolIfNecessary(token0, token1, fee, sqrtPriceX96);
+        {
+            address token0 = address(usda) < address(weth) ? address(usda) : address(weth);
+            address token1 = address(usda) < address(weth) ? address(weth) : address(usda);
+            uint256 amount0 = address(usda) < address(weth) ? STABLE_AMOUNT : WETH_AMOUNT;
+            uint256 amount1 = address(usda) < address(weth) ? WETH_AMOUNT : STABLE_AMOUNT;
+            uint160 sqrtPriceX96 = uint160((sqrt((amount1 * 1e18) / amount0) * 2 ** 96) / 1e9);
+            usdaWethPool = IUniswapV3NonfungiblePositionManager(UNISWAP_V3_NONFUNGIBLE_POSITION_MANAGER)
+                .createAndInitializePoolIfNecessary(token0, token1, fee, sqrtPriceX96);
+        }
 
-        token0 = address(usdb) < address(weth) ? address(usdb) : address(weth);
-        token1 = address(usdb) < address(weth) ? address(weth) : address(usdb);
-        address usdbWethPool = IUniswapV3NonfungiblePositionManager(UNISWAP_V3_NONFUNGIBLE_POSITION_MANAGER)
-            .createAndInitializePoolIfNecessary(token0, token1, fee, sqrtPriceX96);
+        {
+            address token0 = address(usdb) < address(weth) ? address(usdb) : address(weth);
+            address token1 = address(usdb) < address(weth) ? address(weth) : address(usdb);
+            uint256 amount0 = address(usdb) < address(weth) ? STABLE_AMOUNT : WETH_AMOUNT;
+            uint256 amount1 = address(usdb) < address(weth) ? WETH_AMOUNT : STABLE_AMOUNT;
+            uint160 sqrtPriceX96 = uint160((sqrt((amount1 * 1e18) / amount0) * 2 ** 96) / 1e9);
+            usdbWethPool = IUniswapV3NonfungiblePositionManager(UNISWAP_V3_NONFUNGIBLE_POSITION_MANAGER)
+                .createAndInitializePoolIfNecessary(token0, token1, fee, sqrtPriceX96);
+        }
 
-        token0 = address(dai) < address(usda) ? address(dai) : address(usda);
-        token1 = address(dai) < address(usda) ? address(usda) : address(dai);
-        address daiUsdaPool = IUniswapV3NonfungiblePositionManager(UNISWAP_V3_NONFUNGIBLE_POSITION_MANAGER)
-            .createAndInitializePoolIfNecessary(token0, token1, fee, sqrtPriceX96);
+        {
+            address token0 = address(dai) < address(usda) ? address(dai) : address(usda);
+            address token1 = address(dai) < address(usda) ? address(usda) : address(dai);
+            uint256 amount0 = STABLE_AMOUNT;
+            uint256 amount1 = STABLE_AMOUNT;
+            uint160 sqrtPriceX96 = uint160((sqrt((amount1 * 1e18) / amount0) * 2 ** 96) / 1e9);
+            daiUsdaPool = IUniswapV3NonfungiblePositionManager(UNISWAP_V3_NONFUNGIBLE_POSITION_MANAGER)
+                .createAndInitializePoolIfNecessary(token0, token1, fee, sqrtPriceX96);
+        }
 
-        token0 = address(dai) < address(usdb) ? address(dai) : address(usdb);
-        token1 = address(dai) < address(usdb) ? address(usdb) : address(dai);
-        address daiUsdbPool = IUniswapV3NonfungiblePositionManager(UNISWAP_V3_NONFUNGIBLE_POSITION_MANAGER)
-            .createAndInitializePoolIfNecessary(token0, token1, fee, sqrtPriceX96);
+        {
+            address token0 = address(dai) < address(usdb) ? address(dai) : address(usdb);
+            address token1 = address(dai) < address(usdb) ? address(usdb) : address(dai);
+            uint256 amount0 = STABLE_AMOUNT;
+            uint256 amount1 = STABLE_AMOUNT;
+            uint160 sqrtPriceX96 = uint160((sqrt((amount1 * 1e18) / amount0) * 2 ** 96) / 1e9);
+            daiUsdbPool = IUniswapV3NonfungiblePositionManager(UNISWAP_V3_NONFUNGIBLE_POSITION_MANAGER)
+                .createAndInitializePoolIfNecessary(token0, token1, fee, sqrtPriceX96);
+        }
 
-        token0 = address(usda) < address(usdb) ? address(usda) : address(usdb);
-        token1 = address(usda) < address(usdb) ? address(usdb) : address(usda);
-        address usdaUsdbPool = IUniswapV3NonfungiblePositionManager(UNISWAP_V3_NONFUNGIBLE_POSITION_MANAGER)
-            .createAndInitializePoolIfNecessary(token0, token1, fee, sqrtPriceX96);
+        {
+            address token0 = address(usda) < address(usdb) ? address(usda) : address(usdb);
+            address token1 = address(usda) < address(usdb) ? address(usdb) : address(usda);
+            uint256 amount0 = STABLE_AMOUNT;
+            uint256 amount1 = STABLE_AMOUNT;
+            uint160 sqrtPriceX96 = uint160((sqrt((amount1 * 1e18) / amount0) * 2 ** 96) / 1e9);
+            usdaUsdbPool = IUniswapV3NonfungiblePositionManager(UNISWAP_V3_NONFUNGIBLE_POSITION_MANAGER)
+                .createAndInitializePoolIfNecessary(token0, token1, fee, sqrtPriceX96);
+        }
 
         // Add liquidity to stablecoin/weth pools: 900 Stablecoin / 0.3 WETH = $3000 per WETH
         console.log("Adding liquidity to STABLE/WETH pools...\n");
@@ -163,6 +198,19 @@ contract DeployDemoTokensScript is DeployBaseScript {
                 deadline: block.timestamp + 1000
             })
         );
+    }
+
+    function sqrt(uint256 y) internal pure returns (uint256 z) {
+        if (y > 3) {
+            z = y;
+            uint256 x = y / 2 + 1;
+            while (x < z) {
+                z = x;
+                x = (y / x + x) / 2;
+            }
+        } else if (y != 0) {
+            z = 1;
+        }
     }
 }
 
