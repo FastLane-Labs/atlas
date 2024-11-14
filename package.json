@@ -35,6 +35,7 @@
       "deploy-swap-intent-local": "source .env && forge script script/deploy-swap-intent-control.s.sol:DeploySwapIntentControlScript --fork-url http://localhost:8545 --broadcast",
 
       "deploy-demo-tokens-sepolia": "source .env && forge script script/deploy-demo-tokens.s.sol:DeployDemoTokensScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
+      "deploy-demo-tokens-base-sepolia": "source .env && forge script script/deploy-demo-tokens-v3.s.sol:DeployDemoTokensScript --rpc-url ${BASE_SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${BASESCAN_API_KEY} --verify",
 
       "mint-demo-tokens-sepolia": "source .env && forge script script/mint-demo-tokens.s.sol:MintDemoTokensScript --rpc-url ${SEPOLIA_RPC_URL} --broadcast --etherscan-api-key ${ETHERSCAN_API_KEY} --verify",
 
