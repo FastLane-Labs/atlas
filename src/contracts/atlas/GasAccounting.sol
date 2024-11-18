@@ -197,7 +197,6 @@ abstract contract GasAccounting is SafetyLocks {
         internal
         returns (uint256 deficit)
     {
-        if (amount > type(uint112).max) revert ValueTooLarge();
         uint112 _amt = SafeCast.toUint112(amount);
 
         EscrowAccountAccessData memory _aData = S_accessData[owner];
