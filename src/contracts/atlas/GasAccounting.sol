@@ -428,6 +428,8 @@ abstract contract GasAccounting is SafetyLocks {
         // If a solver won, their address is still in the _solverLock
         (address _winningSolver,,) = _solverLockData();
 
+        if (gasRefundBeneficiary == address(0)) gasRefundBeneficiary = ctx.bundler;
+
         // Load what we can from storage so that it shows up in the gasleft() calc
 
         uint256 _claims;
@@ -457,8 +459,9 @@ abstract contract GasAccounting is SafetyLocks {
         } else if (_winningSolver == ctx.bundler) {
             claimsPaidToBundler = 0;
         } else {
+            // this else block is only executed if there is no successful solver
             claimsPaidToBundler = 0;
-            _winningSolver = ctx.bundler;
+            _winningSolver = gasRefundBeneficiary;
         }
 
         if (_amountSolverPays > _amountSolverReceives) {
@@ -473,10 +476,6 @@ abstract contract GasAccounting is SafetyLocks {
             }
             claimsPaidToBundler -= _currentDeficit;
         } else {
-            if (_winningSolver == ctx.bundler) {
-                _winningSolver = gasRefundBeneficiary;
-            }
-
             _credit(_winningSolver, _amountSolverReceives - _amountSolverPays, _adjustedClaims);
         }
 

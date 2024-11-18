@@ -101,9 +101,8 @@ contract Atlas is Escrow, Factory {
         try this.execute(_dConfig, userOp, solverOps, _executionEnvironment, _bundler, dAppOp.userOpHash, _isSimulation)
         returns (Context memory ctx) {
             // Gas Refund to sender only if execution is successful
-            (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) = _settle(
-                ctx, _dConfig.solverGasLimit, gasRefundBeneficiary != address(0) ? gasRefundBeneficiary : msg.sender
-            );
+            (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) =
+                _settle(ctx, _dConfig.solverGasLimit, gasRefundBeneficiary);
 
             auctionWon = ctx.solverSuccessful;
             emit MetacallResult(
