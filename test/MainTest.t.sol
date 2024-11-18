@@ -412,7 +412,7 @@ contract MainTest is BaseTest {
         assertTrue(exists, "ExecutionEnvironment wasn't created");
     }
 
-    function testTestUserOperation_SkipCoverage() public {
+    function testUserOperation_SkipCoverage() public {
         uint8 v;
         bytes32 r;
         bytes32 s;
@@ -495,7 +495,7 @@ contract MainTest is BaseTest {
         vm.stopPrank();
     }
 
-    function testgasRefundBeneficiarySolverSucceeds() public {
+    function testGasRefundBeneficiarySolverSucceeds() public {
         uint8 v;
         bytes32 r;
         bytes32 s;
@@ -540,7 +540,7 @@ contract MainTest is BaseTest {
         assertEq(bondedBalanceAfter, 0, "Beneficiary's AtlETH bonded balance should still be 0");
     }
 
-    function testgasRefundBeneficiarySolverFails() public {
+    function testGasRefundBeneficiarySolverFails() public {
         uint8 v;
         bytes32 r;
         bytes32 s;
