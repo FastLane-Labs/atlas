@@ -70,15 +70,14 @@ contract Atlas is Escrow, Factory {
             ? gasleft() + _BASE_TRANSACTION_GAS_USED + (msg.data.length * _CALLDATA_LENGTH_PREMIUM)
             : gasleft() + IL2GasCalculator(L2_GAS_CALCULATOR).initialGasUsed(msg.data.length);
 
-        bool _isSimulation = msg.sender == SIMULATOR;
-        address _bundler = _isSimulation ? dAppOp.bundler : msg.sender;
-
+        address _bundler = msg.sender == SIMULATOR ? dAppOp.bundler : msg.sender;
         (address _executionEnvironment, DAppConfig memory _dConfig) = _getOrCreateExecutionEnvironment(userOp);
 
-        ValidCallsResult _validCallsResult =
-            VERIFICATION.validateCalls(_dConfig, userOp, solverOps, dAppOp, msg.value, _bundler, _isSimulation);
+        ValidCallsResult _validCallsResult = VERIFICATION.validateCalls(
+            _dConfig, userOp, solverOps, dAppOp, msg.value, _bundler, msg.sender == SIMULATOR
+        );
         if (_validCallsResult != ValidCallsResult.Valid) {
-            if (_isSimulation) revert VerificationSimFail(_validCallsResult);
+            if (msg.sender == SIMULATOR) revert VerificationSimFail(_validCallsResult);
 
             // Gracefully return for results that need nonces to be stored and prevent replay attacks
             if (uint8(_validCallsResult) >= _GRACEFUL_RETURN_THRESHOLD && !_dConfig.callConfig.allowsReuseUserOps()) {
@@ -96,8 +95,9 @@ contract Atlas is Escrow, Factory {
         // userOpHash has already been calculated and verified in validateCalls at this point, so rather
         // than re-calculate it, we can simply take it from the dAppOp here. It's worth noting that this will
         // be either a TRUSTED or DEFAULT hash, depending on the allowsTrustedOpHash setting.
-        try this.execute(_dConfig, userOp, solverOps, _executionEnvironment, _bundler, dAppOp.userOpHash, _isSimulation)
-        returns (Context memory ctx) {
+        try this.execute(
+            _dConfig, userOp, solverOps, _executionEnvironment, _bundler, dAppOp.userOpHash, msg.sender == SIMULATOR
+        ) returns (Context memory ctx) {
             // Gas Refund to sender only if execution is successful
             (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) = _settle(
                 ctx, _dConfig.solverGasLimit, gasRefundBeneficiary != address(0) ? gasRefundBeneficiary : msg.sender
