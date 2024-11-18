@@ -96,7 +96,7 @@ abstract contract AtlETH is Permit69 {
     function _mint(address to, uint256 amount) internal {
         S_totalSupply += amount;
         s_balanceOf[to].balance += SafeCast.toUint112(amount);
-        emit Transfer(address(0), to, amount);
+        emit Mint(to, amount);
     }
 
     /// @notice Burns atlETH tokens from the specified account.
@@ -105,7 +105,7 @@ abstract contract AtlETH is Permit69 {
     function _burn(address from, uint256 amount) internal {
         _deduct(from, amount);
         S_totalSupply -= amount;
-        emit Transfer(from, address(0), amount);
+        emit Burn(from, amount);
     }
 
     /// @notice Deducts atlETH tokens from the specified account.

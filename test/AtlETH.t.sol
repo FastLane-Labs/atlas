@@ -18,7 +18,7 @@ contract AtlETHTest is BaseTest {
         deal(userEOA, 1e18);
         vm.prank(userEOA);
         vm.expectEmit(true, true, false, true);
-        emit AtlasEvents.Transfer(address(0), userEOA, 1e18);
+        emit AtlasEvents.Mint(userEOA, 1e18);
         atlas.deposit{ value: 1e18 }();
 
         assertEq(atlas.balanceOf(userEOA), 1e18, "user's atlETH balance should be 1 ETH");
@@ -32,7 +32,7 @@ contract AtlETHTest is BaseTest {
 
         vm.prank(solverOneEOA);
         vm.expectEmit(true, true, false, true);
-        emit AtlasEvents.Transfer(solverOneEOA, address(0), 1e18);
+        emit AtlasEvents.Burn(solverOneEOA, 1e18);
         atlas.withdraw(1e18);
 
         assertEq(atlas.balanceOf(solverOneEOA), 0, "solverOne's atlETH balance should be 0");
@@ -118,7 +118,7 @@ contract AtlETHTest is BaseTest {
 
         vm.prank(userEOA);
         vm.expectEmit(true, true, false, true);
-        emit AtlasEvents.Transfer(address(0), userEOA, 1e18);
+        emit AtlasEvents.Mint(userEOA, 1e18);
         vm.expectEmit(true, true, false, true);
         emit AtlasEvents.Bond(userEOA, 1e18);
         atlas.depositAndBond{ value: 1e18 }(1e18);

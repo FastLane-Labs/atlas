@@ -16,7 +16,8 @@ contract AtlasEvents {
     event Bond(address indexed owner, uint256 amount);
     event Unbond(address indexed owner, uint256 amount, uint256 earliestAvailable);
     event Redeem(address indexed owner, uint256 amount);
-    event Transfer(address indexed from, address indexed to, uint256 amount);
+    event Mint(address indexed to, uint256 amount);
+    event Burn(address indexed from, uint256 amount);
 
     // Escrow events
     event SolverTxResult(
