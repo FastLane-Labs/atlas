@@ -182,7 +182,7 @@ contract GeneralizedBackrunUserBundler is DAppControl {
         SolverOperation[] memory _solverOps = _getSolverOps(solverOpHashes);
 
         (bool _success, bytes memory _data) =
-            ATLAS.call{ value: msg.value }(abi.encodeCall(IAtlas.metacall, (userOp, _solverOps, _dAppOp)));
+            ATLAS.call{ value: msg.value }(abi.encodeCall(IAtlas.metacall, (userOp, _solverOps, _dAppOp, address(0))));
         if (!_success) {
             assembly {
                 revert(add(_data, 32), mload(_data))

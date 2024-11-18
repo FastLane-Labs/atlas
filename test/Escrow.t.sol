@@ -210,7 +210,7 @@ contract EscrowTest is BaseTest {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         vm.prank(userEOA);
-        bool auctionWon = atlas.metacall(userOp, solverOps, dappOp);
+        bool auctionWon = atlas.metacall(userOp, solverOps, dappOp, address(0));
         
         assertLe(dAppControl.userOpGasLeft(), userGasLim, "userOpGasLeft should be <= userGasLim");
         assertTrue(auctionWon, "2nd auction should have been won");
@@ -239,7 +239,7 @@ contract EscrowTest is BaseTest {
         // Send msg.value so it must be sent back, testing the upper bound of remaining gas for graceful return 
         deal(userEOA, 1 ether);
         vm.prank(userEOA);
-        bool auctionWon = atlas.metacall{gas: metacallGasLim, value: 1 ether}(userOp, solverOps, dappOp);
+        bool auctionWon = atlas.metacall{gas: metacallGasLim, value: 1 ether}(userOp, solverOps, dappOp, address(0));
         assertEq(auctionWon, false, "call should not revert but auction should not be won either");
     }
 
@@ -332,7 +332,7 @@ contract EscrowTest is BaseTest {
         }
 
         vm.prank(userEOA);
-        bool auctionWon = atlas.metacall(userOp, solverOps, dappOp);
+        bool auctionWon = atlas.metacall(userOp, solverOps, dappOp, address(0));
         
         if (!revertExpected) {
             assertTrue(auctionWon, "auction should have been won");
@@ -558,7 +558,7 @@ contract EscrowTest is BaseTest {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
 
         vm.prank(userEOA);
-        (bool success,) = address(atlas).call(abi.encodeCall(atlas.metacall, (userOp, solverOps, dappOp)));
+        (bool success,) = address(atlas).call(abi.encodeCall(atlas.metacall, (userOp, solverOps, dappOp, address(0))));
         assertTrue(success, "metacall should have succeeded");
     }
 
@@ -670,7 +670,7 @@ contract EscrowTest is BaseTest {
 
         vm.prank(userEOA);
         if (metacallShouldRevert) vm.expectRevert(); // Metacall should revert, the reason isn't important, we're only checking the event
-        atlas.metacall(userOp, solverOps, dappOp);
+        atlas.metacall(userOp, solverOps, dappOp, address(0));
     }
 }
 

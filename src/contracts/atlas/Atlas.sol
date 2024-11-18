@@ -54,11 +54,13 @@ contract Atlas is Escrow, Factory {
     /// @param userOp The UserOperation struct containing the user's transaction data.
     /// @param solverOps The SolverOperation array containing the solvers' transaction data.
     /// @param dAppOp The DAppOperation struct containing the DApp's transaction data.
+    /// @param gasRefundBeneficiary The address to receive the gas refund.
     /// @return auctionWon A boolean indicating whether there was a successful, winning solver.
     function metacall(
         UserOperation calldata userOp, // set by user
         SolverOperation[] calldata solverOps, // supplied by ops relay
-        DAppOperation calldata dAppOp // supplied by front end via atlas SDK
+        DAppOperation calldata dAppOp, // supplied by front end via atlas SDK
+        address gasRefundBeneficiary // address(0) = msg.sender
     )
         external
         payable
@@ -97,7 +99,9 @@ contract Atlas is Escrow, Factory {
         try this.execute(_dConfig, userOp, solverOps, _executionEnvironment, _bundler, dAppOp.userOpHash, _isSimulation)
         returns (Context memory ctx) {
             // Gas Refund to sender only if execution is successful
-            (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) = _settle(ctx, _dConfig.solverGasLimit);
+            (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) = _settle(
+                ctx, _dConfig.solverGasLimit, gasRefundBeneficiary != address(0) ? gasRefundBeneficiary : msg.sender
+            );
 
             auctionWon = ctx.solverSuccessful;
             emit MetacallResult(

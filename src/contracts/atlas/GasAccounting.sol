@@ -414,11 +414,13 @@ abstract contract GasAccounting is SafetyLocks {
     /// refund for gas spent, and Atlas' gas surcharge is updated.
     /// @param ctx Context struct containing relevant context information for the Atlas auction.
     /// @param solverGasLimit The dApp's maximum gas limit for a solver, as set in the DAppConfig.
+    /// @param gasRefundBeneficiary The address to receive the gas refund.
     /// @return claimsPaidToBundler The amount of ETH paid to the bundler in this function.
     /// @return netAtlasGasSurcharge The net gas surcharge of the metacall, taken by Atlas.
     function _settle(
         Context memory ctx,
-        uint256 solverGasLimit
+        uint256 solverGasLimit,
+        address gasRefundBeneficiary
     )
         internal
         returns (uint256 claimsPaidToBundler, uint256 netAtlasGasSurcharge)
@@ -474,13 +476,17 @@ abstract contract GasAccounting is SafetyLocks {
             }
             claimsPaidToBundler -= _currentDeficit;
         } else {
+            if (_winningSolver == ctx.bundler) {
+                _winningSolver = gasRefundBeneficiary;
+            }
+
             _credit(_winningSolver, _amountSolverReceives - _amountSolverPays, _adjustedClaims);
         }
 
         // Set lock to FullyLocked to prevent any reentrancy possibility
         _setLockPhase(uint8(ExecutionPhase.FullyLocked));
 
-        if (claimsPaidToBundler != 0) SafeTransferLib.safeTransferETH(ctx.bundler, claimsPaidToBundler);
+        if (claimsPaidToBundler != 0) SafeTransferLib.safeTransferETH(gasRefundBeneficiary, claimsPaidToBundler);
 
         return (claimsPaidToBundler, netAtlasGasSurcharge);
     }

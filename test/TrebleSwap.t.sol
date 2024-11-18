@@ -295,7 +295,7 @@ contract TrebleSwapTest is BaseTest {
 
         // Do the actual metacall
         vm.prank(userEOA);
-        bool auctionWon = atlas.metacall{ value: msgValue }(args.userOp, args.solverOps, args.dAppOp);
+        bool auctionWon = atlas.metacall{ value: msgValue }(args.userOp, args.solverOps, args.dAppOp, address(0));
 
         // Estimate gas surcharge Atlas should have taken
         txGasUsed = estAtlasGasSurcharge - gasleft();

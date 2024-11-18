@@ -189,7 +189,7 @@ contract ExPostTest is BaseTest {
         // uint256 solverTwoAtlEthBalance = atlas.balanceOf(solverTwoEOA);
 
         (bool success,) =
-            address(atlas).call(abi.encodeCall(atlas.metacall, (userOp, solverOps, dAppOp)));
+            address(atlas).call(abi.encodeCall(atlas.metacall, (userOp, solverOps, dAppOp, address(0))));
 
         if (success) {
             console.log("success!");

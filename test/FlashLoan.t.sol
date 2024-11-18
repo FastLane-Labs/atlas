@@ -129,7 +129,7 @@ contract FlashLoanTest is BaseTest {
             result
         );
         vm.expectRevert();
-        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
+        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
         vm.stopPrank();
 
         // now try it again with a valid solverOp - but dont fully pay back
@@ -181,7 +181,7 @@ contract FlashLoanTest is BaseTest {
             result
         );
         vm.expectRevert();
-        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
+        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
         vm.stopPrank();
 
         // final try, should be successful with full payback
@@ -246,7 +246,7 @@ contract FlashLoanTest is BaseTest {
             true,
             result
         );
-        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
+        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
         vm.stopPrank();
 
         // atlas 2e beginning bal + 1e from solver +100e eth from user = 103e atlas total

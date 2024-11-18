@@ -11,7 +11,8 @@ interface IAtlas {
     function metacall(
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
-        DAppOperation calldata dAppOp
+        DAppOperation calldata dAppOp,
+        address gasRefundBeneficiary
     )
         external
         payable

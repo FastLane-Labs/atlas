@@ -64,7 +64,7 @@ contract MockGasAccounting is TestAtlas, BaseTest {
     }
 
     function settle(Context memory ctx) external returns (uint256, uint256) {
-        return _settle(ctx, MOCK_SOLVER_GAS_LIMIT);
+        return _settle(ctx, MOCK_SOLVER_GAS_LIMIT, msg.sender);
     }
 
     function adjustAccountingForFees(Context memory ctx)

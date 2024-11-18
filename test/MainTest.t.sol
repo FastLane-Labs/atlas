@@ -404,7 +404,7 @@ contract MainTest is BaseTest {
 
         vm.startPrank(userEOA);
         IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
-        atlas.metacall(userOp, solverOps, dAppOp);
+        atlas.metacall(userOp, solverOps, dAppOp, address(0));
         vm.stopPrank();
 
         // Execution environment should exist now
