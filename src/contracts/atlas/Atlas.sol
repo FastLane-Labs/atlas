@@ -326,13 +326,9 @@ contract Atlas is Escrow, Factory {
     /// @param callConfig The CallConfig of the current metacall tx.
     function _handleErrors(bytes memory revertData, uint32 callConfig) internal view {
         bytes4 _errorSwitch = bytes4(revertData);
+
         if (msg.sender == SIMULATOR) {
-            // Simulation
-            if (_errorSwitch == PreOpsSimFail.selector) {
-                revert PreOpsSimFail();
-            } else if (_errorSwitch == UserOpSimFail.selector) {
-                revert UserOpSimFail();
-            } else if (_errorSwitch == SolverSimFail.selector) {
+            if (_errorSwitch == SolverSimFail.selector) {
                 // Expects revertData in form [bytes4, uint256]
                 uint256 _solverOutcomeResult;
                 assembly {
@@ -340,20 +336,22 @@ contract Atlas is Escrow, Factory {
                     _solverOutcomeResult := mload(add(dataLocation, sub(mload(revertData), 32)))
                 }
                 revert SolverSimFail(_solverOutcomeResult);
-            } else if (_errorSwitch == AllocateValueSimFail.selector) {
-                revert AllocateValueSimFail();
-            } else if (_errorSwitch == PostOpsSimFail.selector) {
-                revert PostOpsSimFail();
+            } else if (
+                _errorSwitch == PreOpsSimFail.selector || _errorSwitch == UserOpSimFail.selector
+                    || _errorSwitch == AllocateValueSimFail.selector || _errorSwitch == PostOpsSimFail.selector
+            ) {
+                assembly {
+                    mstore(0, _errorSwitch)
+                    revert(0, 4)
+                }
             }
         }
-        if (_errorSwitch == UserNotFulfilled.selector) {
-            revert UserNotFulfilled();
-        }
-        // If allowReuseUserOps = true, it reverts and bubbles up whatever the error
-        // was that it caught. This is to prevent storing the nonce as used so the userOp
-        // can be reused. Otherwise, the whole metacall doesn't revert but the inner
+
+        // NOTE: If error was UserNotFulfilled, we revert and bubble up the error.
+        // For any other error, we only bubble up the revert if allowReuseUserOps = true. This is to prevent storing the
+        // nonce as used so the userOp can be reused. Otherwise, the whole metacall doesn't revert but the inner
         // execute() does so, no operation changes are persisted.
-        if (callConfig.allowsReuseUserOps()) {
+        if (_errorSwitch == UserNotFulfilled.selector || callConfig.allowsReuseUserOps()) {
             assembly {
                 mstore(0, _errorSwitch)
                 revert(0, 4)

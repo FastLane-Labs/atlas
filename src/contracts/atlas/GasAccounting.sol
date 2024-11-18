@@ -197,7 +197,6 @@ abstract contract GasAccounting is SafetyLocks {
         internal
         returns (uint256 deficit)
     {
-        if (amount > type(uint112).max) revert ValueTooLarge();
         uint112 _amt = SafeCast.toUint112(amount);
 
         EscrowAccountAccessData memory _aData = S_accessData[owner];
@@ -248,12 +247,10 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param amount The amount by which to increase the owner's bonded balance.
     /// @param gasValueUsed The ETH value of gas used in the SolverOperation.
     function _credit(address owner, uint256 amount, uint256 gasValueUsed) internal {
-        uint112 _amt = SafeCast.toUint112(amount);
-
         EscrowAccountAccessData memory _aData = S_accessData[owner];
 
         _aData.lastAccessedBlock = uint32(block.number);
-        _aData.bonded += _amt;
+        _aData.bonded += SafeCast.toUint112(amount);
 
         S_bondedTotalSupply += amount;
 
