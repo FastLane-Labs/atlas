@@ -54,11 +54,13 @@ contract Atlas is Escrow, Factory {
     /// @param userOp The UserOperation struct containing the user's transaction data.
     /// @param solverOps The SolverOperation array containing the solvers' transaction data.
     /// @param dAppOp The DAppOperation struct containing the DApp's transaction data.
+    /// @param gasRefundBeneficiary The address to receive the gas refund.
     /// @return auctionWon A boolean indicating whether there was a successful, winning solver.
     function metacall(
         UserOperation calldata userOp, // set by user
         SolverOperation[] calldata solverOps, // supplied by ops relay
-        DAppOperation calldata dAppOp // supplied by front end via atlas SDK
+        DAppOperation calldata dAppOp, // supplied by front end via atlas SDK
+        address gasRefundBeneficiary // address(0) = msg.sender
     )
         external
         payable
@@ -70,21 +72,23 @@ contract Atlas is Escrow, Factory {
 
         bool _isSimulation = msg.sender == SIMULATOR;
         address _bundler = _isSimulation ? dAppOp.bundler : msg.sender;
-
         (address _executionEnvironment, DAppConfig memory _dConfig) = _getOrCreateExecutionEnvironment(userOp);
 
-        ValidCallsResult _validCallsResult =
-            VERIFICATION.validateCalls(_dConfig, userOp, solverOps, dAppOp, msg.value, _bundler, _isSimulation);
-        if (_validCallsResult != ValidCallsResult.Valid) {
-            if (_isSimulation) revert VerificationSimFail(_validCallsResult);
+        {
+            ValidCallsResult _validCallsResult =
+                VERIFICATION.validateCalls(_dConfig, userOp, solverOps, dAppOp, msg.value, _bundler, _isSimulation);
+            if (_validCallsResult != ValidCallsResult.Valid) {
+                if (_isSimulation) revert VerificationSimFail(_validCallsResult);
 
-            // Gracefully return for results that need nonces to be stored and prevent replay attacks
-            if (uint8(_validCallsResult) >= _GRACEFUL_RETURN_THRESHOLD && !_dConfig.callConfig.allowsReuseUserOps()) {
-                return false;
+                // Gracefully return for results that need nonces to be stored and prevent replay attacks
+                if (uint8(_validCallsResult) >= _GRACEFUL_RETURN_THRESHOLD && !_dConfig.callConfig.allowsReuseUserOps())
+                {
+                    return false;
+                }
+
+                // Revert for all other results
+                revert ValidCalls(_validCallsResult);
             }
-
-            // Revert for all other results
-            revert ValidCalls(_validCallsResult);
         }
 
         // Initialize the environment lock and accounting values
@@ -97,7 +101,8 @@ contract Atlas is Escrow, Factory {
         try this.execute(_dConfig, userOp, solverOps, _executionEnvironment, _bundler, dAppOp.userOpHash, _isSimulation)
         returns (Context memory ctx) {
             // Gas Refund to sender only if execution is successful
-            (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) = _settle(ctx, _dConfig.solverGasLimit);
+            (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) =
+                _settle(ctx, _dConfig.solverGasLimit, gasRefundBeneficiary);
 
             auctionWon = ctx.solverSuccessful;
             emit MetacallResult(

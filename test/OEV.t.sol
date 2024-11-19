@@ -165,7 +165,7 @@ contract OEVTest is BaseTest {
 
         // Should Fail
         vm.prank(userEOA);
-        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
+        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
 
         assertEq(uint(chainlinkAtlasWrapper.latestAnswer()), uint(AggregatorV2V3Interface(chainlinkETHUSD).latestAnswer()), "Metacall unexpectedly succeeded");
 
@@ -176,7 +176,7 @@ contract OEVTest is BaseTest {
 
         // Should Succeed
         vm.prank(userEOA);
-        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
+        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
 
         console.log("Metacall Gas Cost:", gasLeftBefore - gasleft());
 

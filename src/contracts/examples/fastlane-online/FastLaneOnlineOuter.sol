@@ -52,7 +52,7 @@ contract FastLaneOnlineOuter is SolverGateway {
 
         // Atlas call
         (bool _success,) = ATLAS.call{ value: msg.value, gas: _metacallGasLimit(_gasReserved, userOp.gas, gasleft()) }(
-            abi.encodeCall(IAtlas.metacall, (userOp, _solverOps, _dAppOp))
+            abi.encodeCall(IAtlas.metacall, (userOp, _solverOps, _dAppOp, address(0)))
         );
 
         // Revert if the metacall failed - neither solvers nor baseline call fulfilled swap intent

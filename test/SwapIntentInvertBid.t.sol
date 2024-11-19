@@ -245,7 +245,7 @@ contract SwapIntentTest is BaseTest {
         uint256 gasLeftBefore = gasleft();
 
         vm.startPrank(userEOA);
-        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
+        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
 
         console.log("Metacall Gas Cost:", gasLeftBefore - gasleft());
         vm.stopPrank();
