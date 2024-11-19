@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import { ArbitrumGasCalculator } from "src/contracts/gasCalculator/ArbitrumGasCalculator.sol";
 import { ArbGasInfoMock } from "../arbitrum/ArbGasInfoMock.sol";
@@ -12,7 +12,7 @@ contract ArbitrumGasCalculatorTest is ArbitrumTest {
     function setUp() public override {
         super.setUp();
         // Deploy the calculator with initial values
-        calculator = new ArbitrumGasCalculator(0, false);
+        calculator = new ArbitrumGasCalculator(0);
     }
 
     function testGetCalldataCost() public {

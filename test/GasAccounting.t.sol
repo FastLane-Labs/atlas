@@ -1,43 +1,44 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 
 import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 
-import { GasAccounting } from "src/contracts/atlas/GasAccounting.sol";
-import { AtlasEvents } from "src/contracts/types/AtlasEvents.sol";
-import { AtlasErrors } from "src/contracts/types/AtlasErrors.sol";
-import { AtlasConstants } from "src/contracts/types/AtlasConstants.sol";
+import { GasAccounting } from "../src/contracts/atlas/GasAccounting.sol";
+import { AtlasEvents } from "../src/contracts/types/AtlasEvents.sol";
+import { AtlasErrors } from "../src/contracts/types/AtlasErrors.sol";
+import { AtlasConstants } from "../src/contracts/types/AtlasConstants.sol";
 
-import { EscrowBits } from "src/contracts/libraries/EscrowBits.sol";
-import { SafeBlockNumber } from "src/contracts/libraries/SafeBlockNumber.sol";
-import { IL2GasCalculator } from "src/contracts/interfaces/IL2GasCalculator.sol";
+import { SafeBlockNumber } from "../src/contracts/libraries/SafeBlockNumber.sol";
+import { EscrowBits } from "../src/contracts/libraries/EscrowBits.sol";
+import { IL2GasCalculator } from "../src/contracts/interfaces/IL2GasCalculator.sol";
 
-import "src/contracts/libraries/AccountingMath.sol";
-import "src/contracts/types/EscrowTypes.sol";
-import "src/contracts/types/LockTypes.sol";
-import "src/contracts/types/SolverOperation.sol";
-import "src/contracts/types/ConfigTypes.sol";
+import "../src/contracts/libraries/AccountingMath.sol";
+import "../src/contracts/types/EscrowTypes.sol";
+import "../src/contracts/types/LockTypes.sol";
+import "../src/contracts/types/SolverOperation.sol";
+import "../src/contracts/types/ConfigTypes.sol";
 
-import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
+import { ExecutionEnvironment } from "../src/contracts/common/ExecutionEnvironment.sol";
 
-import { TestAtlas } from "test/base/TestAtlas.sol";
-import { BaseTest } from "test/base/BaseTest.t.sol";
+import { TestAtlas } from "./base/TestAtlas.sol";
+import { BaseTest } from "./base/BaseTest.t.sol";
 
 contract MockGasAccounting is TestAtlas, BaseTest {
     uint256 public constant MOCK_SOLVER_GAS_LIMIT = 500_000;
     
-
     constructor(
         uint256 _escrowDuration,
+        uint256 _atlasSurchargeRate,
+        uint256 _bundlerSurchargeRate,
         address _verification,
         address _simulator,
         address _surchargeRecipient,
         address _l2GasCalculator,
         address _executionTemplate
     )
-        TestAtlas(_escrowDuration, _verification, _simulator, _surchargeRecipient, _l2GasCalculator, _executionTemplate)
+        TestAtlas(_escrowDuration, _atlasSurchargeRate, _bundlerSurchargeRate, _verification, _simulator, _surchargeRecipient, _l2GasCalculator, _executionTemplate)
     { }
 
     /////////////////////////////////////////////////////////
@@ -64,7 +65,7 @@ contract MockGasAccounting is TestAtlas, BaseTest {
     }
 
     function settle(Context memory ctx) external returns (uint256, uint256) {
-        return _settle(ctx, MOCK_SOLVER_GAS_LIMIT);
+        return _settle(ctx, MOCK_SOLVER_GAS_LIMIT, makeAddr("bundler"));
     }
 
     function adjustAccountingForFees(Context memory ctx)
@@ -116,7 +117,7 @@ contract MockGasAccounting is TestAtlas, BaseTest {
     }
 
     function setSolverLock(address _solverFrom) external {
-        _setSolverLock(uint256(uint160(_solverFrom)));
+        t_solverLock = (uint256(uint160(_solverFrom)));
     }
 
     function _balanceOf(address account) external view returns (uint112, uint112) {
@@ -173,14 +174,6 @@ contract MockGasAccounting is TestAtlas, BaseTest {
     function getFixedGasOffset() external pure returns (uint256) {
         return AccountingMath._FIXED_GAS_OFFSET;
     }
-
-    function getAtlasSurchargeRate() external pure returns (uint256) {
-        return AccountingMath._ATLAS_SURCHARGE_RATE;
-    }
-
-    function getBundlerSurchargeRate() external pure returns (uint256) {
-        return AccountingMath._BUNDLER_SURCHARGE_RATE;
-    }
 }
 
 contract MockGasCalculator is IL2GasCalculator, Test {
@@ -213,6 +206,8 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         // Initialize MockGasAccounting
         mockGasAccounting = new MockGasAccounting(
             DEFAULT_ESCROW_DURATION,
+            DEFAULT_ATLAS_SURCHARGE_RATE,
+            DEFAULT_BUNDLER_SURCHARGE_RATE,
             address(atlasVerification),
             address(simulator),
             deployer,
@@ -321,7 +316,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         // Verify the balances after contribution
         assertEq(address(mockGasAccounting).balance, contributeValue);
-        assertEq(mockGasAccounting.getDeposits(), contributeValue);
+        assertEq(mockGasAccounting.deposits(), contributeValue);
     }
 
     function test_multipleContributes() public {
@@ -340,7 +335,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         // Verify the balances after the first contribution
         assertEq(address(mockGasAccounting).balance, firstContributeValue);
-        assertEq(mockGasAccounting.getDeposits(), firstContributeValue);
+        assertEq(mockGasAccounting.deposits(), firstContributeValue);
 
         // Perform the second valid contribute call
         vm.prank(executionEnvironment);
@@ -348,7 +343,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         // Verify the balances after the second contribution
         assertEq(address(mockGasAccounting).balance, totalContributeValue);
-        assertEq(mockGasAccounting.getDeposits(), totalContributeValue);
+        assertEq(mockGasAccounting.deposits(), totalContributeValue);
     }
 
     function test_contribute_withZeroValue() public {
@@ -364,7 +359,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         // Verify the balances after the contribution is zero
         assertEq(address(mockGasAccounting).balance, contributeValue);
-        assertEq(mockGasAccounting.getDeposits(), contributeValue);
+        assertEq(mockGasAccounting.deposits(), contributeValue);
     }
 
     function test_borrow_preOpsPhase() public {
@@ -379,7 +374,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(
             solverOneEOA.balance, borrowedAmount, "Execution environment balance should be equal to borrowed amount"
         );
-        assertEq(borrowedAmount, mockGasAccounting.getWithdrawals(), "Withdrawals should be equal to borrowed amount");
+        assertEq(borrowedAmount, mockGasAccounting.withdrawals(), "Withdrawals should be equal to borrowed amount");
     }
 
     function test_borrow_userOperationPhase() public {
@@ -396,7 +391,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             borrowedAmount,
             "Execution environment balance should be equal to borrowed amount"
         );
-        assertEq(borrowedAmount, mockGasAccounting.getWithdrawals(), "Withdrawals should be equal to borrowed amount");
+        assertEq(borrowedAmount, mockGasAccounting.withdrawals(), "Withdrawals should be equal to borrowed amount");
     }
 
     function test_borrow_preSolverPhase() public {
@@ -413,7 +408,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             borrowedAmount,
             "Execution environment balance should be equal to borrowed amount"
         );
-        assertEq(borrowedAmount, mockGasAccounting.getWithdrawals(), "Withdrawals should be equal to borrowed amount");
+        assertEq(borrowedAmount, mockGasAccounting.withdrawals(), "Withdrawals should be equal to borrowed amount");
     }
 
     function test_borrow_solverOperationPhase() public {
@@ -429,12 +424,12 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             borrowedAmount,
             "Execution environment balance should be equal to borrowed amount"
         );
-        assertEq(borrowedAmount, mockGasAccounting.getWithdrawals(), "Withdrawals should be equal to borrowed amount");
+        assertEq(borrowedAmount, mockGasAccounting.withdrawals(), "Withdrawals should be equal to borrowed amount");
     }
 
     function test_borrow_postSolverPhase_reverts() public {
         uint256 borrowedAmount = 1e18;
-        uint256 withdrawalsBefore = mockGasAccounting.getWithdrawals();
+        uint256 withdrawalsBefore = mockGasAccounting.withdrawals();
         fundContract(borrowedAmount);
 
         mockGasAccounting.setLock(executionEnvironment, 0, uint8(ExecutionPhase.PostSolver));
@@ -443,12 +438,12 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         mockGasAccounting.borrow(borrowedAmount);
 
         assertEq(executionEnvironment.balance, 0, "Execution environment balance should remain zero");
-        assertEq(withdrawalsBefore, mockGasAccounting.getWithdrawals(), "Withdrawals should remain unchanged");
+        assertEq(withdrawalsBefore, mockGasAccounting.withdrawals(), "Withdrawals should remain unchanged");
     }
 
     function test_borrow_allocateValuePhase_reverts() public {
         uint256 borrowedAmount = 1e18;
-        uint256 withdrawalsBefore = mockGasAccounting.getWithdrawals();
+        uint256 withdrawalsBefore = mockGasAccounting.withdrawals();
         fundContract(borrowedAmount);
 
         mockGasAccounting.setLock(executionEnvironment, 0, uint8(ExecutionPhase.AllocateValue));
@@ -457,12 +452,12 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         mockGasAccounting.borrow(borrowedAmount);
 
         assertEq(executionEnvironment.balance, 0, "Execution environment balance should remain zero");
-        assertEq(withdrawalsBefore, mockGasAccounting.getWithdrawals(), "Withdrawals should remain unchanged");
+        assertEq(withdrawalsBefore, mockGasAccounting.withdrawals(), "Withdrawals should remain unchanged");
     }
 
     function test_borrow_postOpsPhase_reverts() public {
         uint256 borrowedAmount = 1e18;
-        uint256 withdrawalsBefore = mockGasAccounting.getWithdrawals();
+        uint256 withdrawalsBefore = mockGasAccounting.withdrawals();
         fundContract(borrowedAmount);
 
         mockGasAccounting.setLock(executionEnvironment, 0, uint8(ExecutionPhase.PostOps));
@@ -471,7 +466,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         mockGasAccounting.borrow(borrowedAmount);
 
         assertEq(executionEnvironment.balance, 0, "Execution environment balance should remain zero");
-        assertEq(withdrawalsBefore, mockGasAccounting.getWithdrawals(), "Withdrawals should remain unchanged");
+        assertEq(withdrawalsBefore, mockGasAccounting.withdrawals(), "Withdrawals should remain unchanged");
     }
 
     function test_multipleBorrows() public {
@@ -535,7 +530,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             "Final contract balance should be initial balance minus total borrowed amount"
         );
         assertEq(
-            totalBorrowAmount, mockGasAccounting.getWithdrawals(), "Withdrawals should equal total borrowed amount"
+            totalBorrowAmount, mockGasAccounting.withdrawals(), "Withdrawals should equal total borrowed amount"
         );
     }
 
@@ -667,7 +662,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         vm.prank(executionEnvironment);
         mockGasAccounting.contribute{ value: 10 ether }();
 
-        assertEq(mockGasAccounting.getClaims(), 10 ether, "Claims should be set to 10 ether");
+        assertEq(mockGasAccounting.claims(), 10 ether, "Claims should be set to 10 ether");
         assertEq(address(mockGasAccounting).balance, 10 ether, "mockGasAccounting should have 10 ether");
     }
 
@@ -741,7 +736,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(currentSolver, solverOneEOA, "Current solver should match execution environment");
 
         // Verify that deposits did not increase
-        assertEq(mockGasAccounting.getDeposits(), initialClaims, "Deposits should remain unchanged");
+        assertEq(mockGasAccounting.deposits(), initialClaims, "Deposits should remain unchanged");
     }
 
     function test_reconcileWithETH() public {
@@ -768,7 +763,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(currentSolver, solverOneEOA, "Current solver should match execution environment");
 
         // Verify that deposits increased by the reconciled amount
-        assertEq(mockGasAccounting.getDeposits(), initialClaims, "Deposits should match the amount sent as msg.value");
+        assertEq(mockGasAccounting.deposits(), initialClaims, "Deposits should match the amount sent as msg.value");
     }
 
     function test_assign_zeroAmount() public {
@@ -790,7 +785,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         // Get initial values
         uint256 bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
-        uint256 depositsBefore = mockGasAccounting.getDeposits();
+        uint256 depositsBefore = mockGasAccounting.deposits();
 
         uint256 deficit = mockGasAccounting.assign(solverOp.from, assignedAmount, assignedAmount, true);
         assertEq(deficit, 0, "Deficit should be 0");
@@ -799,7 +794,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(lastAccessedBlock, uint32(SafeBlockNumber.get()));
 
         uint256 bondedTotalSupplyAfter = mockGasAccounting.bondedTotalSupply();
-        uint256 depositsAfter = mockGasAccounting.getDeposits();
+        uint256 depositsAfter = mockGasAccounting.deposits();
 
         assertEq(bondedTotalSupplyAfter, bondedTotalSupplyBefore - assignedAmount);
         assertEq(depositsAfter, depositsBefore + assignedAmount);
@@ -815,7 +810,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         mockGasAccounting.increaseBondedBalance(solverOp.from, bondedAmount); // Set bonded balance to 500
 
         uint256 bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
-        uint256 depositsBefore = mockGasAccounting.getDeposits();
+        uint256 depositsBefore = mockGasAccounting.deposits();
 
         // Call the assign function and capture the deficit
         uint256 deficit = mockGasAccounting.assign(solverOp.from, assignedAmount, assignedAmount, true);
@@ -831,7 +826,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             bondedTotalSupplyBefore - assignedAmount,
             "Bonded total supply mismatch"
         );
-        assertEq(mockGasAccounting.getDeposits(), depositsBefore + assignedAmount, "Deposits mismatch");
+        assertEq(mockGasAccounting.deposits(), depositsBefore + assignedAmount, "Deposits mismatch");
 
         // Retrieve and check the updated balances
         (uint112 bonded, uint112 unbonding) = mockGasAccounting._balanceOf(solverOp.from);
@@ -849,13 +844,13 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         mockGasAccounting.increaseBondedBalance(solverOp.from, bondedAmount);
 
         uint256 bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
-        uint256 depositsBefore = mockGasAccounting.getDeposits();
+        uint256 depositsBefore = mockGasAccounting.deposits();
         uint256 deficit = mockGasAccounting.assign(solverOp.from, assignedAmount, assignedAmount, true);
         assertEq(deficit, assignedAmount - (unbondingAmount + bondedAmount));
         (, uint32 lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
         assertEq(lastAccessedBlock, uint32(SafeBlockNumber.get()));
         assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore - (unbondingAmount + bondedAmount));
-        assertEq(mockGasAccounting.getDeposits(), depositsBefore + (unbondingAmount + bondedAmount));
+        assertEq(mockGasAccounting.deposits(), depositsBefore + (unbondingAmount + bondedAmount));
         (uint112 bonded, uint112 unbonding) = mockGasAccounting._balanceOf(solverOp.from);
         assertEq(unbonding, 0);
         assertEq(bonded, 0);
@@ -918,14 +913,14 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         mockGasAccounting.increaseBondedBalance(solverOp.from, bondedAmount);
         uint256 bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
-        uint256 depositsBefore = mockGasAccounting.getDeposits();
+        uint256 depositsBefore = mockGasAccounting.deposits();
         (uint112 unbondingBefore,) = mockGasAccounting._balanceOf(solverOp.from);
-        vm.expectRevert(AtlasErrors.ValueTooLarge.selector);
+        vm.expectRevert(abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 112, assignedAmount));
         mockGasAccounting.assign(solverOp.from, assignedAmount, assignedAmount, true);
 
         // Check assign reverted with overflow, and accounting values did not change
         assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore);
-        assertEq(mockGasAccounting.getDeposits(), depositsBefore);
+        assertEq(mockGasAccounting.deposits(), depositsBefore);
         (uint112 unbonding,) = mockGasAccounting._balanceOf(solverOp.from);
         assertEq(unbonding, unbondingBefore);
     }
@@ -935,7 +930,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         uint256 lastAccessedBlock;
 
         uint256 bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
-        uint256 withdrawalsBefore = mockGasAccounting.getWithdrawals();
+        uint256 withdrawalsBefore = mockGasAccounting.withdrawals();
         (uint112 bondedBefore,,,,) = mockGasAccounting.accessData(solverOp.from);
         (, lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
         assertEq(lastAccessedBlock, 0);
@@ -948,7 +943,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(lastAccessedBlock, uint32(SafeBlockNumber.get()));
         assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore + creditedAmount);
         assertEq(bondedAfter, bondedBefore + uint112(creditedAmount));
-        assertEq(mockGasAccounting.getWithdrawals(), withdrawalsBefore + creditedAmount);
+        assertEq(mockGasAccounting.withdrawals(), withdrawalsBefore + creditedAmount);
 
         // Testing uint112 boundary values for casting from uint256 to uint112 in _credit()
         uint256 overflowAmount = uint256(type(uint112).max) + 1;
@@ -960,7 +955,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         // Setup
         solverOp.data = "";
         uint256 gasWaterMark = gasleft() + 5000;
-        uint256 initialWriteoffs = mockGasAccounting.getWriteoffs();
+        uint256 initialWriteoffs = mockGasAccounting.writeoffs();
 
         // Simulate solver not responsible for failure
         uint256 result = EscrowBits._NO_REFUND;
@@ -974,10 +969,10 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             (gasWaterMark + mockGasAccounting.getSolverBaseGasUsed() - gasleft()) * tx.gasprice + gasUsedOffset;
         mockGasAccounting.handleSolverAccounting(solverOp, gasWaterMark, result, false);
 
-        uint256 expectedWriteoffs = initialWriteoffs + AccountingMath.withAtlasAndBundlerSurcharges(gasUsed);
+        uint256 expectedWriteoffs = initialWriteoffs + AccountingMath.withSurcharges(gasUsed, DEFAULT_ATLAS_SURCHARGE_RATE, DEFAULT_BUNDLER_SURCHARGE_RATE);
         // Verify writeoffs have increased
         assertApproxEqRel(
-            mockGasAccounting.getWriteoffs(),
+            mockGasAccounting.writeoffs(),
             expectedWriteoffs,
             1e15, // 0.1% margin for error
             "Writeoffs should be approximately equal to expected value"
@@ -1031,15 +1026,6 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(unbonding, unbondingBefore);
     }
 
-    function test_settle_withFailedsolver_reverts() public {
-        // Setup context with initial claims and deposits
-        Context memory ctx = setupContext(1 ether, 1 ether, 4000 ether, 1000 ether, false);
-
-        // Expect a revert due to insufficient total balance for a failed solver
-        vm.expectRevert();
-        mockGasAccounting.settle(ctx);
-    }
-
     function test_settle_with_deposits() public {
         Context memory ctx = setupContext(1 ether, 0.5 ether, 4000 ether, 1000 ether, true);
         // Check initial balances
@@ -1055,7 +1041,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         (uint256 claimsPaidToBundler, uint256 netGasSurcharge) = mockGasAccounting.settle(ctx);
 
         // Check final balances and perform assertions
-        uint256 finalClaims = mockGasAccounting.getClaims();
+        uint256 finalClaims = mockGasAccounting.claims();
         uint256 finalBonded = mockGasAccounting.balanceOfBonded(solverOneEOA);
         uint256 finalUnbonding = mockGasAccounting.balanceOfUnbonding(solverOneEOA);
         {
@@ -1101,7 +1087,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertTrue(claimsPaidToBundler > 0, "Claims paid to bundler should be non-zero");
         assertTrue(netGasSurcharge > 0, "Net gas surcharge should be non-zero");
         assertLe(
-            mockGasAccounting.getClaims(),
+            mockGasAccounting.claims(),
             3 ether,
             "Final claims should be less than or equal to initial claims plus deposits"
         );
@@ -1111,6 +1097,8 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         IL2GasCalculator gasCalculator = new MockGasCalculator();
         MockGasAccounting mockL2GasAccounting = new MockGasAccounting(
             DEFAULT_ESCROW_DURATION,
+            DEFAULT_ATLAS_SURCHARGE_RATE,
+            DEFAULT_BUNDLER_SURCHARGE_RATE,
             address(atlasVerification),
             address(simulator),
             deployer,

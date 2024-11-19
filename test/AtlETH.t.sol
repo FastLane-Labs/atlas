@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 
 import { BaseTest } from "./base/BaseTest.t.sol";
-import { SafeBlockNumber } from "src/contracts/libraries/SafeBlockNumber.sol";
-import {AtlasEvents} from "src/contracts/types/AtlasEvents.sol";
-import {AtlasErrors} from "src/contracts/types/AtlasErrors.sol";
+
+import { SafeBlockNumber } from "../src/contracts/libraries/SafeBlockNumber.sol";
+import { AtlasEvents } from "../src/contracts/types/AtlasEvents.sol";
+import { AtlasErrors } from "../src/contracts/types/AtlasErrors.sol";
 
 contract AtlETHTest is BaseTest {
 
@@ -19,7 +20,7 @@ contract AtlETHTest is BaseTest {
         deal(userEOA, 1e18);
         vm.prank(userEOA);
         vm.expectEmit(true, true, false, true);
-        emit AtlasEvents.Transfer(address(0), userEOA, 1e18);
+        emit AtlasEvents.Mint(userEOA, 1e18);
         atlas.deposit{ value: 1e18 }();
 
         assertEq(atlas.balanceOf(userEOA), 1e18, "user's atlETH balance should be 1 ETH");
@@ -33,7 +34,7 @@ contract AtlETHTest is BaseTest {
 
         vm.prank(solverOneEOA);
         vm.expectEmit(true, true, false, true);
-        emit AtlasEvents.Transfer(solverOneEOA, address(0), 1e18);
+        emit AtlasEvents.Burn(solverOneEOA, 1e18);
         atlas.withdraw(1e18);
 
         assertEq(atlas.balanceOf(solverOneEOA), 0, "solverOne's atlETH balance should be 0");
@@ -119,7 +120,7 @@ contract AtlETHTest is BaseTest {
 
         vm.prank(userEOA);
         vm.expectEmit(true, true, false, true);
-        emit AtlasEvents.Transfer(address(0), userEOA, 1e18);
+        emit AtlasEvents.Mint(userEOA, 1e18);
         vm.expectEmit(true, true, false, true);
         emit AtlasEvents.Bond(userEOA, 1e18);
         atlas.depositAndBond{ value: 1e18 }(1e18);

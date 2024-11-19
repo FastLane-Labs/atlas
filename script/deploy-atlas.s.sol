@@ -1,20 +1,25 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.25;
+pragma solidity 0.8.28;
 
 import "forge-std/Script.sol";
 import "forge-std/Test.sol";
 
-import { DeployBaseScript } from "script/base/deploy-base.s.sol";
-import { DeployGasCalculatorScript } from "script/deploy-gas-calculator.s.sol";
+import { DeployBaseScript } from "./base/deploy-base.s.sol";
+import { GasCalculatorDeployHelper } from "./deploy-gas-calculator.s.sol";
 
-import { Atlas } from "src/contracts/atlas/Atlas.sol";
-import { AtlasVerification } from "src/contracts/atlas/AtlasVerification.sol";
-import { TxBuilder } from "src/contracts/helpers/TxBuilder.sol";
-import { Simulator } from "src/contracts/helpers/Simulator.sol";
-import { Sorter } from "src/contracts/helpers/Sorter.sol";
-import { ExecutionEnvironment } from "src/contracts/common/ExecutionEnvironment.sol";
+import { FactoryLib } from "../src/contracts/atlas/FactoryLib.sol";
+import { Atlas } from "../src/contracts/atlas/Atlas.sol";
+import { AtlasVerification } from "../src/contracts/atlas/AtlasVerification.sol";
+import { TxBuilder } from "../src/contracts/helpers/TxBuilder.sol";
+import { Simulator } from "../src/contracts/helpers/Simulator.sol";
+import { Sorter } from "../src/contracts/helpers/Sorter.sol";
+import { ExecutionEnvironment } from "../src/contracts/common/ExecutionEnvironment.sol";
 
-contract DeployAtlasScript is DeployBaseScript {
+contract DeployAtlasScript is DeployBaseScript, GasCalculatorDeployHelper {
+    uint256 ESCROW_DURATION = 64;
+    uint256 ATLAS_SURCHARGE_RATE; // Set below
+    uint256 BUNDLER_SURCHARGE_RATE; // Set below
+
     function run() external {
         console.log("\n=== DEPLOYING Atlas ===\n");
 
@@ -23,19 +28,16 @@ contract DeployAtlasScript is DeployBaseScript {
         uint256 deployerPrivateKey = vm.envUint("GOV_PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
 
-        // Computes the addresses at which contracts will be deployed
-        address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 1);
-        address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
-        address expectedSimulatorAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
+        (ATLAS_SURCHARGE_RATE, BUNDLER_SURCHARGE_RATE) = _getSurchargeRates();
 
-        // Deploy gas calculator for Arbitrum chains after other deployments
-        address l2GasCalculatorAddr = address(0);
-        uint256 chainId = block.chainid;
+        // Computes the addresses at which AtlasVerification will be deployed
+        address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
+        address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
+        address expectedSimulatorAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 4);
 
-        if (chainId == 42_161 || chainId == 42_170 || chainId == 421_614) {
-            // Deploy gas calculator for Arbitrum chains
-            l2GasCalculatorAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 4);
-        }
+        // Deploy L2 Gas Calculator after other deployments
+        address expectedL2GasCalculatorAddr = _predictGasCalculatorAddress(deployer, vm.getNonce(deployer) + 5);
+        address actualL2GasCalculatorAddr; // Set below during deployment if chain is an L2
 
         address prevSimAddr = _getAddressFromDeploymentsJson("SIMULATOR");
         uint256 prevSimBalance = (prevSimAddr == address(0)) ? 0 : prevSimAddr.balance;
@@ -47,17 +49,26 @@ contract DeployAtlasScript is DeployBaseScript {
         vm.startBroadcast(deployerPrivateKey);
 
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedAtlasAddr);
+        FactoryLib factoryLib = new FactoryLib(address(execEnvTemplate));
         atlas = new Atlas({
-            escrowDuration: 64,
+            escrowDuration: ESCROW_DURATION,
+            atlasSurchargeRate: ATLAS_SURCHARGE_RATE,
+            bundlerSurchargeRate: BUNDLER_SURCHARGE_RATE,
             verification: expectedAtlasVerificationAddr,
             simulator: expectedSimulatorAddr,
-            executionTemplate: address(execEnvTemplate),
+            factoryLib: address(factoryLib),
             initialSurchargeRecipient: deployer,
-            l2GasCalculator: l2GasCalculatorAddr // is 0 if not on Arbitrum
+            l2GasCalculator: expectedL2GasCalculatorAddr // address(0) if chain not an L2
          });
         atlasVerification = new AtlasVerification(address(atlas));
-
         simulator = new Simulator();
+
+        // If chain is an L2, expectedL2GasCalculatorAddr will be non-zero
+        if (expectedL2GasCalculatorAddr != address(0)) {
+            actualL2GasCalculatorAddr = _newGasCalculator();
+        }
+
+        // After predicted address deployments done, do other setup txs:
         simulator.setAtlas(address(atlas));
 
         // If prev Simulator deployment has native assets, withdraw them to new Simulator
@@ -65,14 +76,8 @@ contract DeployAtlasScript is DeployBaseScript {
             Simulator(payable(prevSimAddr)).withdrawETH(address(simulator));
         }
 
+        // Sorter address not predicted or required in the other contracts, so deployed last.
         sorter = new Sorter(address(atlas));
-
-        if (chainId == 42_161 || chainId == 42_170 || chainId == 421_614) {
-            // Deploy gas calculator for Arbitrum chains
-            console.log("Deploying L2 Gas Calculator at: ", l2GasCalculatorAddr);
-            DeployGasCalculatorScript gasCalculatorDeployer = new DeployGasCalculatorScript();
-            l2GasCalculatorAddr = gasCalculatorDeployer.deployL2GasCalculator();
-        }
 
         vm.stopBroadcast();
 
@@ -122,6 +127,25 @@ contract DeployAtlasScript is DeployBaseScript {
             console.log("ERROR: Sorter deployment address is 0x0");
             error = true;
         }
+        // Check FactoryLib address set correctly in Atlas
+        if (address(factoryLib) != atlas.FACTORY_LIB()) {
+            console.log("ERROR: FactoryLib address not set correctly in Atlas");
+            error = true;
+        }
+        // Check ExecutionEnvironment address set correctly in FactoryLib
+        if (address(execEnvTemplate) != factoryLib.EXECUTION_ENV_TEMPLATE()) {
+            console.log("ERROR: ExecutionEnvironment address not set correctly in FactoryLib");
+            error = true;
+        }
+        // Check L2 Gas Calculator address set correctly
+        if (actualL2GasCalculatorAddr != atlas.L2_GAS_CALCULATOR()) {
+            console.log("ERROR: L2 Gas Calculator address not set correctly in Atlas");
+            error = true;
+        }
+        if (actualL2GasCalculatorAddr != expectedL2GasCalculatorAddr) {
+            console.log("ERROR: L2 Gas Calculator deployment address not as expected");
+            error = true;
+        }
         // Check ESCROW_DURATION was not set to 0
         if (atlas.ESCROW_DURATION() == 0) {
             console.log("ERROR: ESCROW_DURATION was set to 0");
@@ -137,8 +161,8 @@ contract DeployAtlasScript is DeployBaseScript {
         _writeAddressToDeploymentsJson("ATLAS_VERIFICATION", address(atlasVerification));
         _writeAddressToDeploymentsJson("SIMULATOR", address(simulator));
         _writeAddressToDeploymentsJson("SORTER", address(sorter));
-        if (l2GasCalculatorAddr != address(0)) {
-            _writeAddressToDeploymentsJson("L2_GAS_CALCULATOR", l2GasCalculatorAddr);
+        if (actualL2GasCalculatorAddr != address(0)) {
+            _writeAddressToDeploymentsJson("L2_GAS_CALCULATOR", actualL2GasCalculatorAddr);
         }
 
         // Print the table header
@@ -150,8 +174,8 @@ contract DeployAtlasScript is DeployBaseScript {
         console.log("| AtlasVerification     | ", address(atlasVerification), " |");
         console.log("| Simulator             | ", address(simulator), " |");
         console.log("| Sorter                | ", address(sorter), " |");
-        if (l2GasCalculatorAddr != address(0)) {
-            console.log("| L2 Gas Calculator     | ", l2GasCalculatorAddr, " |");
+        if (actualL2GasCalculatorAddr != address(0)) {
+            console.log("| L2 Gas Calculator     | ", actualL2GasCalculatorAddr, " |");
         }
         console.log("------------------------------------------------------------------------");
         console.log("\n");
