@@ -35,12 +35,13 @@ contract AtlasConstants {
     // First 160 bits of _solverLock are the address of the current solver.
     // The 161st bit represents whether the solver has called back via `reconcile`.
     // The 162nd bit represents whether the solver's outstanding debt has been repaid via `reconcile`.
-    uint256 internal constant _SOLVER_CALLED_BACK_MASK = 2923003274661805836407369665432566039311865085952; // 1 << 161;
-    uint256 internal constant _SOLVER_FULFILLED_MASK = 5846006549323611672814739330865132078623730171904; // 1 << 162;
+    uint256 internal constant _SOLVER_CALLED_BACK_MASK =
+        2_923_003_274_661_805_836_407_369_665_432_566_039_311_865_085_952; // 1 << 161;
+    uint256 internal constant _SOLVER_FULFILLED_MASK = 5_846_006_549_323_611_672_814_739_330_865_132_078_623_730_171_904; // 1
+        // << 162;
 
     // Used to set Lock phase without changing the activeEnvironment or callConfig.
-    uint256 internal constant _LOCK_PHASE_MASK =
-        0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00;
+    uint256 internal constant _LOCK_PHASE_MASK = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00;
 
     // ValidCalls error threshold before which the metacall reverts, and after which it returns gracefully to store
     // nonces as used.
