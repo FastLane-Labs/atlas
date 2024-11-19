@@ -82,7 +82,8 @@ abstract contract AtlETH is Permit69 {
     /// @dev Burns the specified amount of atlETH tokens from the caller's balance and transfers the equivalent amount
     /// of ETH to the caller.
     /// @param amount The amount of atlETH tokens to redeem for ETH.
-    function withdraw(uint256 amount) external onlyWhenUnlocked {
+    function withdraw(uint256 amount) external {
+        _checkIfUnlocked();
         _burn(msg.sender, amount);
         SafeTransferLib.safeTransferETH(msg.sender, amount);
     }
@@ -97,7 +98,7 @@ abstract contract AtlETH is Permit69 {
     function _mint(address to, uint256 amount) internal {
         S_totalSupply += amount;
         s_balanceOf[to].balance += SafeCast.toUint112(amount);
-        emit Transfer(address(0), to, amount);
+        emit Mint(to, amount);
     }
 
     /// @notice Burns atlETH tokens from the specified account.
@@ -106,7 +107,7 @@ abstract contract AtlETH is Permit69 {
     function _burn(address from, uint256 amount) internal {
         _deduct(from, amount);
         S_totalSupply -= amount;
-        emit Transfer(from, address(0), amount);
+        emit Burn(from, amount);
     }
 
     /// @notice Deducts atlETH tokens from the specified account.
@@ -164,13 +165,15 @@ abstract contract AtlETH is Permit69 {
     /// held by the sender. Unbonding AtlETH tokens can still be used by solvers while the unbonding
     /// process is ongoing, but adjustments may be made at withdrawal to ensure solvency.
     /// @param amount The amount of AtlETH tokens to unbond.
-    function unbond(uint256 amount) external onlyWhenUnlocked {
+    function unbond(uint256 amount) external {
+        _checkIfUnlocked();
         _unbond(msg.sender, amount);
     }
 
     /// @notice Redeems the specified amount of AtlETH tokens for withdrawal.
     /// @param amount The amount of AtlETH tokens to redeem for withdrawal.
-    function redeem(uint256 amount) external onlyWhenUnlocked {
+    function redeem(uint256 amount) external {
+        _checkIfUnlocked();
         _redeem(msg.sender, amount);
     }
 
@@ -291,9 +294,7 @@ abstract contract AtlETH is Permit69 {
         emit SurchargeRecipientTransferred(msg.sender);
     }
 
-    /// @notice Blocks certain AtlETH functions during a metacall transaction.
-    modifier onlyWhenUnlocked() {
+    function _checkIfUnlocked() internal view {
         if (!_isUnlocked()) revert InvalidLockState();
-        _;
     }
 }

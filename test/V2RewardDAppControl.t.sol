@@ -133,7 +133,7 @@ contract V2RewardDAppControlTest is BaseTest {
         console.log("User DAI balance", DAI.balanceOf(userEOA));
 
         vm.prank(governanceEOA);
-        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp });
+        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
 
         console.log("\nAFTER METACALL");
         console.log("User WETH balance", WETH.balanceOf(userEOA));

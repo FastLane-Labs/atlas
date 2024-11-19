@@ -65,7 +65,7 @@ contract MockGasAccounting is TestAtlas, BaseTest {
     }
 
     function settle(Context memory ctx) external returns (uint256, uint256) {
-        return _settle(ctx, MOCK_SOLVER_GAS_LIMIT);
+        return _settle(ctx, MOCK_SOLVER_GAS_LIMIT, makeAddr("bundler"));
     }
 
     function adjustAccountingForFees(Context memory ctx)
@@ -915,7 +915,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         uint256 bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
         uint256 depositsBefore = mockGasAccounting.deposits();
         (uint112 unbondingBefore,) = mockGasAccounting._balanceOf(solverOp.from);
-        vm.expectRevert(AtlasErrors.ValueTooLarge.selector);
+        vm.expectRevert(abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 112, assignedAmount));
         mockGasAccounting.assign(solverOp.from, assignedAmount, assignedAmount, true);
 
         // Check assign reverted with overflow, and accounting values did not change

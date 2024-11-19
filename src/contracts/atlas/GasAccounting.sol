@@ -198,7 +198,6 @@ abstract contract GasAccounting is SafetyLocks {
         internal
         returns (uint256 deficit)
     {
-        if (amount > type(uint112).max) revert ValueTooLarge();
         uint112 _amt = SafeCast.toUint112(amount);
 
         EscrowAccountAccessData memory _aData = S_accessData[owner];
@@ -249,12 +248,10 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param amount The amount by which to increase the owner's bonded balance.
     /// @param gasValueUsed The ETH value of gas used in the SolverOperation.
     function _credit(address owner, uint256 amount, uint256 gasValueUsed) internal {
-        uint112 _amt = SafeCast.toUint112(amount);
-
         EscrowAccountAccessData memory _aData = S_accessData[owner];
 
         _aData.lastAccessedBlock = uint32(SafeBlockNumber.get());
-        _aData.bonded += _amt;
+        _aData.bonded += SafeCast.toUint112(amount);
 
         S_bondedTotalSupply += amount;
 
@@ -415,11 +412,13 @@ abstract contract GasAccounting is SafetyLocks {
     /// refund for gas spent, and Atlas' gas surcharge is updated.
     /// @param ctx Context struct containing relevant context information for the Atlas auction.
     /// @param solverGasLimit The dApp's maximum gas limit for a solver, as set in the DAppConfig.
+    /// @param gasRefundBeneficiary The address to receive the gas refund.
     /// @return claimsPaidToBundler The amount of ETH paid to the bundler in this function.
     /// @return netAtlasGasSurcharge The net gas surcharge of the metacall, taken by Atlas.
     function _settle(
         Context memory ctx,
-        uint256 solverGasLimit
+        uint256 solverGasLimit,
+        address gasRefundBeneficiary
     )
         internal
         returns (uint256 claimsPaidToBundler, uint256 netAtlasGasSurcharge)
@@ -429,6 +428,8 @@ abstract contract GasAccounting is SafetyLocks {
 
         // If a solver won, their address is still in the _solverLock
         (address _winningSolver,,) = _solverLockData();
+
+        if (gasRefundBeneficiary == address(0)) gasRefundBeneficiary = ctx.bundler;
 
         // Load what we can from storage so that it shows up in the gasleft() calc
 
@@ -459,8 +460,9 @@ abstract contract GasAccounting is SafetyLocks {
         } else if (_winningSolver == ctx.bundler) {
             claimsPaidToBundler = 0;
         } else {
+            // this else block is only executed if there is no successful solver
             claimsPaidToBundler = 0;
-            _winningSolver = ctx.bundler;
+            _winningSolver = gasRefundBeneficiary;
         }
 
         if (_amountSolverPays > _amountSolverReceives) {
@@ -481,7 +483,7 @@ abstract contract GasAccounting is SafetyLocks {
         // Set lock to FullyLocked to prevent any reentrancy possibility
         _setLockPhase(uint8(ExecutionPhase.FullyLocked));
 
-        if (claimsPaidToBundler != 0) SafeTransferLib.safeTransferETH(ctx.bundler, claimsPaidToBundler);
+        if (claimsPaidToBundler != 0) SafeTransferLib.safeTransferETH(gasRefundBeneficiary, claimsPaidToBundler);
 
         return (claimsPaidToBundler, netAtlasGasSurcharge);
     }
