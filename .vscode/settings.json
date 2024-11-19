@@ -6,5 +6,6 @@
   "search.exclude": { "lib": true },
   "files.associations": {
     ".gas-snapshot": "julia"
-  }
+  },
+  "makefile.configureOnOpen": false
 }

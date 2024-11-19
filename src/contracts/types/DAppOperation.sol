@@ -1,9 +1,8 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.28;
 
-bytes32 constant DAPP_TYPEHASH = keccak256(
-    "DAppOperation(address from,address to,uint256 nonce,uint256 deadline,address control,address bundler,bytes32 userOpHash,bytes32 callChainHash)"
-);
+//keccak256("DAppOperation(address from,address to,uint256 nonce,uint256 deadline,address control,address bundler,bytes32 userOpHash,bytes32 callChainHash)");
+bytes32 constant DAPP_TYPEHASH = 0x88ef8fc82c1c9cd8c70c0ba2062b71d8e01324e34aea7264c6a6f2220a2e21a5; 
 
 struct DAppOperation {
     address from; // signer of the DAppOperation

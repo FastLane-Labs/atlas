@@ -13,12 +13,12 @@ contract AtlasConstants {
     // ------------------------------------------------------- //
 
     // Atlas constants
-    uint256 internal constant _GAS_VALUE_DECIMALS_TO_DROP = 1e9; // measured in gwei
+    uint256 internal constant _GAS_VALUE_DECIMALS_TO_DROP = 0x3b9aca00; // 1e9; // measured in gwei
     uint256 internal constant _UNLOCKED = 0;
 
     // Atlas constants used in `_bidFindingIteration()`
     uint256 internal constant _BITS_FOR_INDEX = 16;
-    uint256 internal constant _FIRST_16_BITS_TRUE_MASK = uint256(0xFFFF);
+    uint256 internal constant _FIRST_16_BITS_TRUE_MASK = 0xFFFF;
 
     // Escrow constants
     uint256 internal constant _VALIDATION_GAS_LIMIT = 500_000;
@@ -35,12 +35,12 @@ contract AtlasConstants {
     // First 160 bits of _solverLock are the address of the current solver.
     // The 161st bit represents whether the solver has called back via `reconcile`.
     // The 162nd bit represents whether the solver's outstanding debt has been repaid via `reconcile`.
-    uint256 internal constant _SOLVER_CALLED_BACK_MASK = 1 << 161;
-    uint256 internal constant _SOLVER_FULFILLED_MASK = 1 << 162;
+    uint256 internal constant _SOLVER_CALLED_BACK_MASK = 2923003274661805836407369665432566039311865085952; // 1 << 161;
+    uint256 internal constant _SOLVER_FULFILLED_MASK = 5846006549323611672814739330865132078623730171904; // 1 << 162;
 
     // Used to set Lock phase without changing the activeEnvironment or callConfig.
     uint256 internal constant _LOCK_PHASE_MASK =
-        uint256(0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00);
+        0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00;
 
     // ValidCalls error threshold before which the metacall reverts, and after which it returns gracefully to store
     // nonces as used.
@@ -50,5 +50,5 @@ contract AtlasConstants {
     //               ATLAS VERIFICATION CONSTANTS              //
     // ------------------------------------------------------- //
 
-    uint8 internal constant _MAX_SOLVERS = type(uint8).max - 1;
+    uint8 internal constant _MAX_SOLVERS = 254; // type(uint8).max - 1;
 }
