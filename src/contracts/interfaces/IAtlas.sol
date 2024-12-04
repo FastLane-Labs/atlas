@@ -49,7 +49,7 @@ interface IAtlas {
     function withdrawSurcharge() external;
     function transferSurchargeRecipient(address newRecipient) external;
     function becomeSurchargeRecipient() external;
-    function setAtlasSurchargeRate(uint256 rate) external;
+    function setSurchargeRates(uint128 newAtlasRate, uint128 newBundlerRate) external;
 
     // Permit69.sol
     function transferUserERC20(
@@ -104,4 +104,5 @@ interface IAtlas {
     function surchargeRecipient() external view returns (address);
     function pendingSurchargeRecipient() external view returns (address);
     function atlasSurchargeRate() external view returns (uint256);
+    function bundlerSurchargeRate() external view returns (uint256);
 }
