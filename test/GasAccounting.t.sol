@@ -281,7 +281,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         uint256 rawClaims = (_gasMarker + mockGasAccounting.FIXED_GAS_OFFSET()) * tx.gasprice;
         claims = rawClaims
             * (
-                mockGasAccounting.SCALE() + mockGasAccounting.ATLAS_SURCHARGE_RATE()
+                mockGasAccounting.SCALE() + mockGasAccounting.atlasSurchargeRate()
                     + mockGasAccounting.BUNDLER_SURCHARGE_RATE()
             ) / mockGasAccounting.SCALE();
     }

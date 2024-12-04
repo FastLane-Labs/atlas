@@ -1302,7 +1302,7 @@ contract FastLaneOnlineTest is BaseTest {
 
         // Calculate estimated Atlas gas surcharge taken from call above
         txGasUsed = estAtlasGasSurcharge - gasleft();
-        estAtlasGasSurcharge = txGasUsed * defaultGasPrice * atlas.ATLAS_SURCHARGE_RATE() / atlas.SCALE();
+        estAtlasGasSurcharge = txGasUsed * defaultGasPrice * atlas.atlasSurchargeRate() / atlas.SCALE();
 
         assertTrue(
             result == swapCallShouldSucceed,

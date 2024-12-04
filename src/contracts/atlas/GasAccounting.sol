@@ -49,7 +49,7 @@ abstract contract GasAccounting is SafetyLocks {
         t_claims = _rawClaims.withSurcharge(BUNDLER_SURCHARGE_RATE);
 
         // Atlas surcharge is based on the raw claims value.
-        t_fees = _rawClaims.getSurcharge(ATLAS_SURCHARGE_RATE);
+        t_fees = _rawClaims.getSurcharge(S_atlasSurchargeRate);
         t_deposits = msg.value;
 
         // Explicitly set other transient vars to 0 in case multiple metacalls in single tx.
@@ -288,10 +288,10 @@ abstract contract GasAccounting is SafetyLocks {
         if (result.bundlersFault()) {
             // CASE: Solver is not responsible for the failure of their operation, so we blame the bundler
             // and reduce the total amount refunded to the bundler
-            t_writeoffs += _gasUsed.withSurcharges(ATLAS_SURCHARGE_RATE, BUNDLER_SURCHARGE_RATE);
+            t_writeoffs += _gasUsed.withSurcharges(S_atlasSurchargeRate, BUNDLER_SURCHARGE_RATE);
         } else {
             // CASE: Solver failed, so we calculate what they owe.
-            uint256 _gasUsedWithSurcharges = _gasUsed.withSurcharges(ATLAS_SURCHARGE_RATE, BUNDLER_SURCHARGE_RATE);
+            uint256 _gasUsedWithSurcharges = _gasUsed.withSurcharges(S_atlasSurchargeRate, BUNDLER_SURCHARGE_RATE);
             uint256 _surchargesOnly = _gasUsedWithSurcharges - _gasUsed;
 
             // In `_assign()`, the failing solver's bonded AtlETH balance is reduced by `_gasUsedWithSurcharges`. Any
@@ -309,7 +309,7 @@ abstract contract GasAccounting is SafetyLocks {
     }
 
     function _writeOffBidFindGasCost(uint256 gasUsed) internal {
-        t_writeoffs += gasUsed.withSurcharges(ATLAS_SURCHARGE_RATE, BUNDLER_SURCHARGE_RATE);
+        t_writeoffs += gasUsed.withSurcharges(S_atlasSurchargeRate, BUNDLER_SURCHARGE_RATE);
     }
 
     /// @param ctx Context struct containing relevant context information for the Atlas auction.
@@ -358,7 +358,7 @@ abstract contract GasAccounting is SafetyLocks {
             // be offset by any gas surcharge paid by failed solvers, which would have been added to deposits or
             // writeoffs in _handleSolverAccounting(). As such, the winning solver does not pay for surcharge on the gas
             // used by other solvers.
-            netAtlasGasSurcharge = _fees - _gasRemainder.getSurcharge(ATLAS_SURCHARGE_RATE);
+            netAtlasGasSurcharge = _fees - _gasRemainder.getSurcharge(S_atlasSurchargeRate);
             adjustedWithdrawals += netAtlasGasSurcharge;
             S_cumulativeSurcharge = _surcharge + netAtlasGasSurcharge;
         } else {
@@ -366,8 +366,8 @@ abstract contract GasAccounting is SafetyLocks {
             uint256 _solverSurcharge = t_solverSurcharge;
             if (_solverSurcharge > 0) {
                 netAtlasGasSurcharge = _solverSurcharge.getPortionFromTotalSurcharge({
-                    targetSurchargeRate: ATLAS_SURCHARGE_RATE,
-                    totalSurchargeRate: ATLAS_SURCHARGE_RATE + BUNDLER_SURCHARGE_RATE
+                    targetSurchargeRate: S_atlasSurchargeRate,
+                    totalSurchargeRate: S_atlasSurchargeRate + BUNDLER_SURCHARGE_RATE
                 });
 
                 // When no winning solvers, bundler max refund is 80% of metacall gas cost. The remaining 20% can be

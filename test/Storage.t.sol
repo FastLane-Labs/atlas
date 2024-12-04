@@ -29,7 +29,6 @@ contract StorageTest is BaseTest {
         assertEq(atlas.symbol(), "atlETH", "symbol set incorrectly");
         assertEq(atlas.decimals(), 18, "decimals set incorrectly");
 
-        assertEq(atlas.ATLAS_SURCHARGE_RATE(), DEFAULT_ATLAS_SURCHARGE_RATE, "ATLAS_SURCHARGE_RATE set incorrectly");
         assertEq(
             atlas.BUNDLER_SURCHARGE_RATE(), DEFAULT_BUNDLER_SURCHARGE_RATE, "BUNDLER_SURCHARGE_RATE set incorrectly"
         );
@@ -141,6 +140,13 @@ contract StorageTest is BaseTest {
         vm.prank(deployer);
         atlas.transferSurchargeRecipient(userEOA);
         assertEq(atlas.pendingSurchargeRecipient(), userEOA, "pendingSurchargeRecipient should be userEOA");
+    }
+
+    function test_storage_view_atlasSurchargeRate() public {
+        assertEq(atlas.atlasSurchargeRate(), DEFAULT_ATLAS_SURCHARGE_RATE, "atlasSurchargeRate set incorrectly");
+        vm.prank(deployer);
+        atlas.setAtlasSurchargeRate(100);
+        assertEq(atlas.atlasSurchargeRate(), 100, "atlasSurchargeRate set incorrectly");
     }
 
     // Transient Storage Getters and Setters
