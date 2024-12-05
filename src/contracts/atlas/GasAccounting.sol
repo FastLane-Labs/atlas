@@ -104,7 +104,24 @@ abstract contract GasAccounting is SafetyLocks {
     }
 
     function _deficit() internal view returns (uint256) {
-        return t_claims + t_withdrawals + t_fees - t_writeoffs;
+        // _deficit() is compared against t_deposits which includes:
+        // + msg.value deposited
+        // + gas cost + A + B (prev solver fault fails)
+
+        // _deficit() is therefore composed of:
+        // + withdrawals = msg.value borrowed
+        // + claims = gas cost + B (full tx)
+        // + fees = A (full tx)
+        // - writeoffs = gas cost + A + B (prev bundler fault fails)
+
+        // Such that `deficit() - t_deposits` =
+        // + msg.value still owed
+        // + gas cost + A + B (full tx)
+        // - gas cost + A + B (prev solver fault fails)
+        // - gas cost + A + B (prev bundler fault fails)
+        // == only what the current solver owes if they win
+
+        return t_withdrawals + t_claims + t_fees - t_writeoffs;
     }
 
     /// @notice Allows a solver to settle any outstanding ETH owed, either to repay gas used by their solverOp or to
@@ -438,8 +455,7 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 _withdrawals;
         uint256 _deposits = t_deposits; // load here, not used in adjustment function below
 
-        (_withdrawals, _claims, _writeoffs, netAtlasGasSurcharge) =
-            _adjustAccountingForFees(ctx, solverGasLimit);
+        (_withdrawals, _claims, _writeoffs, netAtlasGasSurcharge) = _adjustAccountingForFees(ctx, solverGasLimit);
 
         uint256 _amountSolverPays;
         uint256 _amountSolverReceives;
