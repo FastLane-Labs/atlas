@@ -12,7 +12,7 @@ contract StorageTest is BaseTest {
     using stdStorage for StdStorage;
 
     uint256 constant DEFAULT_SCALE = 10_000_000; // out of 10_000_000 = 100%
-    uint256 constant DEFAULT_FIXED_GAS_OFFSET = 85_000;
+    uint256 constant DEFAULT_FIXED_GAS_OFFSET = 120_000;
 
     function setUp() public override {
         super.setUp();

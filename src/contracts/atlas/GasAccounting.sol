@@ -521,7 +521,7 @@ abstract contract GasAccounting is SafetyLocks {
         if (L2_GAS_CALCULATOR == address(0)) {
             // Default to using mainnet gas calculations
             // _SOLVER_OP_BASE_CALLDATA = SolverOperation calldata length excluding solverOp.data
-            calldataCost = (calldataLength + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM * tx.gasprice;
+            calldataCost = (calldataLength + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM_HALVED * tx.gasprice;
         } else {
             calldataCost =
                 IL2GasCalculator(L2_GAS_CALCULATOR).getCalldataCost(calldataLength + _SOLVER_OP_BASE_CALLDATA);

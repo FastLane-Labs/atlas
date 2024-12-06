@@ -162,8 +162,8 @@ contract MockGasAccounting is TestAtlas, BaseTest {
         return _activeEnvironment();
     }
 
-    function getCalldataLengthPremium() external pure returns (uint256) {
-        return _CALLDATA_LENGTH_PREMIUM;
+    function getCalldataLengthPremiumHalved() external pure returns (uint256) {
+        return _CALLDATA_LENGTH_PREMIUM_HALVED;
     }
 
     function getContractGasPrice() external view returns (uint256) {
