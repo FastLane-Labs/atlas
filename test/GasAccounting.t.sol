@@ -71,7 +71,6 @@ contract MockGasAccounting is TestAtlas, BaseTest {
         external
         returns (
             uint256 adjustedWithdrawals,
-            uint256 adjustedDeposits,
             uint256 adjustedClaims,
             uint256 adjustedWriteoffs,
             uint256 netAtlasGasSurcharge
@@ -281,8 +280,8 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         uint256 rawClaims = (_gasMarker + mockGasAccounting.FIXED_GAS_OFFSET()) * tx.gasprice;
         claims = rawClaims
             * (
-                mockGasAccounting.SCALE() + mockGasAccounting.ATLAS_SURCHARGE_RATE()
-                    + mockGasAccounting.BUNDLER_SURCHARGE_RATE()
+                mockGasAccounting.SCALE() + mockGasAccounting.atlasSurchargeRate()
+                    + mockGasAccounting.bundlerSurchargeRate()
             ) / mockGasAccounting.SCALE();
     }
 
