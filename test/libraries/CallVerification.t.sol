@@ -47,7 +47,13 @@ contract CallVerificationTest is Test {
     }
 
     function testGetCallChainHash() public view {
-        DAppConfig memory dConfig = DAppConfig({ to: address(0x1), callConfig: 1, bidToken: address(0), solverGasLimit: 1_000_000 });
+        DAppConfig memory dConfig = DAppConfig({
+            to: address(0x1),
+            callConfig: 1,
+            bidToken: address(0),
+            solverGasLimit: 1_000_000,
+            dAppGasLimit: 2_000_000
+        });
         UserOperation memory userOp = buildUserOperation();
         SolverOperation[] memory solverOps = new SolverOperation[](2);
         solverOps[0] = builderSolverOperation();
@@ -55,12 +61,7 @@ contract CallVerificationTest is Test {
         this._testGetCallChainHash(userOp, solverOps);
     }
 
-    function _testGetCallChainHash(
-        UserOperation calldata userOp,
-        SolverOperation[] calldata solverOps
-    )
-        external pure
-    {
+    function _testGetCallChainHash(UserOperation calldata userOp, SolverOperation[] calldata solverOps) external pure {
         bytes32 callChainHash = CallVerification.getCallChainHash(userOp, solverOps);
         assertEq(
             callChainHash,
