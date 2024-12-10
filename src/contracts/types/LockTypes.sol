@@ -14,6 +14,7 @@ struct Context {
     bool bidFind;
     bool isSimulation;
     address bundler;
+    uint32 dappGasLeft; // Gas used on preOps, allocateValue, and postOps hooks
 }
 
 enum ExecutionPhase {

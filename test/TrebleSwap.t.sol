@@ -434,6 +434,7 @@ contract TrebleSwapTest is BaseTest {
             dapp: ODOS_ROUTER,
             control: address(trebleSwapControl),
             callConfig: trebleSwapControl.CALL_CONFIG(),
+            dappGasLimit: trebleSwapControl.getDAppGasLimit(),
             sessionKey: address(0),
             data: userOpData,
             signature: new bytes(0)

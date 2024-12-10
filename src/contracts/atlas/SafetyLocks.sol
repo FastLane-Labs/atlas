@@ -86,7 +86,8 @@ abstract contract SafetyLocks is Storage {
             solverOutcome: 0,
             bidFind: false,
             isSimulation: isSimulation,
-            callDepth: 0
+            callDepth: 0,
+            dappGasLeft: 0
         });
     }
 }

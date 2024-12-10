@@ -22,6 +22,7 @@ contract CallVerificationTest is Test {
             dapp: address(0x2),
             control: address(0x3),
             callConfig: 321,
+            dappGasLimit: 654,
             sessionKey: address(0),
             data: "data",
             signature: "signature"
@@ -47,13 +48,6 @@ contract CallVerificationTest is Test {
     }
 
     function testGetCallChainHash() public view {
-        DAppConfig memory dConfig = DAppConfig({
-            to: address(0x1),
-            callConfig: 1,
-            bidToken: address(0),
-            solverGasLimit: 1_000_000,
-            dAppGasLimit: 2_000_000
-        });
         UserOperation memory userOp = buildUserOperation();
         SolverOperation[] memory solverOps = new SolverOperation[](2);
         solverOps[0] = builderSolverOperation();

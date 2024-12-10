@@ -159,6 +159,7 @@ contract OuterHelpers is FastLaneOnlineInner {
             dapp: CONTROL,
             control: CONTROL,
             callConfig: CALL_CONFIG,
+            dappGasLimit: getDAppGasLimit(),
             sessionKey: address(0),
             data: abi.encodeCall(this.swap, (swapIntent, baselineCall)),
             signature: new bytes(0) // User must sign
