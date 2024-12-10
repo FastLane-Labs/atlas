@@ -107,7 +107,7 @@ contract MockGasAccounting is TestAtlas, BaseTest {
             bidFind: false,
             isSimulation: false,
             callDepth: 0,
-            dAppGasLeft: 0
+            dappGasLeft: 0
         });
     }
 

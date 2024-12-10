@@ -27,6 +27,14 @@ import { DAppOperationBuilder } from "./base/builders/DAppOperationBuilder.sol";
 // - Scroll down for the actual tests - //
 //
 
+
+
+
+// TODO add tests for the gasLimitSum stuff
+
+
+
+
 contract DummyNotSmartWallet {
 }
 
@@ -85,6 +93,7 @@ contract AtlasVerificationBase is BaseTest {
             .withDeadline(block.number + 2)
             .withControl(address(dAppControl))
             .withCallConfig(dAppControl.CALL_CONFIG())
+            .withDAppGasLimit(dAppControl.getDAppGasLimit())
             .withSessionKey(address(0))
             .withData("")
             .sign(address(atlasVerification), userPK);
@@ -137,10 +146,10 @@ contract AtlasVerificationBase is BaseTest {
             .sign(address(atlasVerification), governancePK);
     }
 
-    function doValidateCalls(ValidCallsCall memory call) public returns (ValidCallsResult result) {
+    function doValidateCalls(ValidCallsCall memory call) public returns (uint256 gasLimitSum, ValidCallsResult result) {
         DAppConfig memory config = dAppControl.getDAppConfig(call.userOp);
         vm.startPrank(address(atlas));
-        result = atlasVerification.validateCalls(
+        (gasLimitSum, result) = atlasVerification.validateCalls(
             config,
             call.userOp,
             call.solverOps,
@@ -159,7 +168,8 @@ contract AtlasVerificationBase is BaseTest {
 
     function callAndAssert(ValidCallsCall memory call, ValidCallsResult expected) public {
         ValidCallsResult result;
-        result = doValidateCalls(call);
+        uint256 gasLimitSum;
+        (gasLimitSum, result) = doValidateCalls(call);
         assertValidCallsResult(result, expected);
     }
 

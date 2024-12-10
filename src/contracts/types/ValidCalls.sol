@@ -33,6 +33,7 @@ enum ValidCallsResult {
     InvalidSolverGasLimit,
     InvalidCallConfig,
     CallConfigMismatch,
+    DAppGasLimitMismatch,
     DAppToInvalid,
     UserToInvalid,
     ControlMismatch,

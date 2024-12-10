@@ -66,6 +66,7 @@ contract Atlas is Escrow, Factory {
         payable
         returns (bool auctionWon)
     {
+        // TODO refactor this to use gasLimitSum below instead of gasleft() here
         uint256 _gasMarker = L2_GAS_CALCULATOR == address(0)
             ? gasleft() + _BASE_TRANSACTION_GAS_USED + (msg.data.length * _CALLDATA_LENGTH_PREMIUM_HALVED)
             : gasleft() + IL2GasCalculator(L2_GAS_CALCULATOR).initialGasUsed(msg.data.length);
@@ -75,7 +76,10 @@ contract Atlas is Escrow, Factory {
         (address _executionEnvironment, DAppConfig memory _dConfig) = _getOrCreateExecutionEnvironment(userOp);
 
         {
-            ValidCallsResult _validCallsResult =
+            // TODO add gasLimitSum to _gasMarker before it goes out of scope here
+            // TODO but first make sure tests are passing - this change will disrupt gas acc a lot
+
+            (uint256 gasLimitSum, ValidCallsResult _validCallsResult) =
                 VERIFICATION.validateCalls(_dConfig, userOp, solverOps, dAppOp, msg.value, _bundler, _isSimulation);
             if (_validCallsResult != ValidCallsResult.Valid) {
                 if (_isSimulation) revert VerificationSimFail(_validCallsResult);

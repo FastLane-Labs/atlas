@@ -64,6 +64,7 @@ contract EscrowTest is BaseTest {
             .withDapp(_control)
             .withControl(_control)
             .withCallConfig(IDAppControl(_control).CALL_CONFIG())
+            .withDAppGasLimit(IDAppControl(_control).getDAppGasLimit())
             .withSessionKey(address(0))
             .withData("")
             .sign(address(atlasVerification), userPK);

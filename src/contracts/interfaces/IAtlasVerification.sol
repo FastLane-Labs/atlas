@@ -20,7 +20,7 @@ interface IAtlasVerification {
         bool isSimulation
     )
         external
-        returns (ValidCallsResult);
+        returns (uint256 gasLimitSum, ValidCallsResult);
     function verifySolverOp(
         SolverOperation calldata solverOp,
         bytes32 userOpHash,
