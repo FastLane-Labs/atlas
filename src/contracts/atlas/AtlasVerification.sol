@@ -27,7 +27,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     using CallBits for uint32;
     using CallVerification for UserOperation;
 
-    constructor(address atlas) EIP712("AtlasVerification", "1.0") DAppIntegration(atlas) { }
+    constructor(address atlas) EIP712("AtlasVerification", "1.4") DAppIntegration(atlas) { }
 
     /// @notice The validateCalls function verifies the validity of the metacall calldata components.
     /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
