@@ -73,6 +73,7 @@ contract FlashLoanTest is BaseTest {
             .withDapp(address(control))
             .withControl(address(control))
             .withCallConfig(control.CALL_CONFIG())
+            .withDAppGasLimit(control.getDAppGasLimit())
             .withDeadline(block.number + 2)
             .withData(new bytes(0))
             .build();

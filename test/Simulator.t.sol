@@ -281,6 +281,8 @@ contract SimulatorTest is BaseTest {
             .withNonce(address(atlasVerification), userEOA)
             .withDeadline(block.number + 2)
             .withControl(address(dAppControl))
+            .withCallConfig(dAppControl.CALL_CONFIG())
+            .withDAppGasLimit(dAppControl.getDAppGasLimit())
             .withSessionKey(address(0))
             .withData("")
             .sign(address(atlasVerification), userPK);
