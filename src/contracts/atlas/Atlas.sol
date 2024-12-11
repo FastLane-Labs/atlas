@@ -156,7 +156,9 @@ contract Atlas is Escrow, Factory {
         if (msg.sender != address(this)) revert InvalidAccess();
 
         // Build the context object
-        ctx = _buildContext(executionEnvironment, userOpHash, bundler, uint8(solverOps.length), isSimulation);
+        ctx = _buildContext(
+            executionEnvironment, userOpHash, bundler, dConfig.dappGasLimit, uint8(solverOps.length), isSimulation
+        );
 
         bytes memory _returnData;
 

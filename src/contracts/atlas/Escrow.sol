@@ -65,11 +65,15 @@ abstract contract Escrow is AtlETH {
         withLockPhase(ExecutionPhase.PreOps)
         returns (bytes memory)
     {
-        (bool _success, bytes memory _data) = ctx.executionEnvironment.call(
+        uint256 _dappGasWaterMark = gasleft();
+
+        (bool _success, bytes memory _data) = ctx.executionEnvironment.call{ gas: ctx.dappGasLeft }(
             abi.encodePacked(
                 abi.encodeCall(IExecutionEnvironment.preOpsWrapper, userOp), ctx.setAndPack(ExecutionPhase.PreOps)
             )
         );
+
+        _updateDAppGasLeft(ctx, _dappGasWaterMark);
 
         if (_success) {
             if (dConfig.callConfig.needsPreOpsReturnData()) {
@@ -101,6 +105,8 @@ abstract contract Escrow is AtlETH {
     {
         bool _success;
         bytes memory _data;
+
+        // TODO remove this min() find operation when dapp gas limit added
 
         // Calculate gas limit ceiling, including gas to return gracefully even if userOp call is OOG.
         uint256 _gasLimit = gasleft() * 63 / 64 - _GRACEFUL_RETURN_GAS_OFFSET;
@@ -256,12 +262,16 @@ abstract contract Escrow is AtlETH {
         internal
         withLockPhase(ExecutionPhase.AllocateValue)
     {
-        (bool _success, bytes memory _returnData) = ctx.executionEnvironment.call(
+        uint256 _dappGasWaterMark = gasleft();
+
+        (bool _success, bytes memory _returnData) = ctx.executionEnvironment.call{ gas: ctx.dappGasLeft }(
             abi.encodePacked(
                 abi.encodeCall(IExecutionEnvironment.allocateValue, (dConfig.bidToken, bidAmount, returnData)),
                 ctx.setAndPack(ExecutionPhase.AllocateValue)
             )
         );
+
+        _updateDAppGasLeft(ctx, _dappGasWaterMark);
 
         // If the call from Atlas to EE succeeded, decode the return data to check if the allocateValue delegatecall
         // from EE to DAppControl succeeded.
@@ -292,12 +302,16 @@ abstract contract Escrow is AtlETH {
         internal
         withLockPhase(ExecutionPhase.PostOps)
     {
-        (bool _success,) = ctx.executionEnvironment.call(
+        uint256 _dappGasWaterMark = gasleft();
+
+        (bool _success,) = ctx.executionEnvironment.call{ gas: ctx.dappGasLeft }(
             abi.encodePacked(
                 abi.encodeCall(IExecutionEnvironment.postOpsWrapper, (solved, returnData)),
                 ctx.setAndPack(ExecutionPhase.PostOps)
             )
         );
+
+        _updateDAppGasLeft(ctx, _dappGasWaterMark);
 
         if (!_success) {
             if (ctx.isSimulation) revert PostOpsSimFail();
@@ -683,6 +697,20 @@ abstract contract Escrow is AtlETH {
         // If the flag is set, revert with `BidFindSuccessful` and include the solver's bid amount in `solverTracker`.
         // This indicates that the bid search process has completed successfully.
         if (ctx.bidFind) revert BidFindSuccessful(solverTracker.bidAmount);
+    }
+
+    /// Updates ctx.dappGasLeft based on the gas used in the DApp hook call just performed.
+    /// @dev Measure the gasWaterMarkBefore using `gasleft()` just before performing the DApp hook call.
+    /// @dev Will revert if the gas used exceeds the remaining dappGasLeft.
+    /// @param ctx Memory pointer to the metacalls' Context object.
+    /// @param gasWaterMarkBefore The gasleft() value just before the DApp hook call.
+    function _updateDAppGasLeft(Context memory ctx, uint256 gasWaterMarkBefore) internal view {
+        uint256 _gasUsed = gasWaterMarkBefore - gasleft();
+
+        if (_gasUsed > ctx.dappGasLeft) revert DAppGasLimitReached();
+
+        // No need to SafeCast - will revert above if too large for uint32
+        ctx.dappGasLeft -= uint32(_gasUsed);
     }
 
     receive() external payable { }

@@ -60,6 +60,7 @@ abstract contract SafetyLocks is Storage {
     /// @param executionEnvironment The address of the current Execution Environment.
     /// @param userOpHash The UserOperation hash.
     /// @param bundler The address of the bundler.
+    /// @param dappGasLimit The DAppControl's gas limit for preOps, allocateValue, and postOps hooks.
     /// @param solverOpCount The count of SolverOperations.
     /// @param isSimulation Boolean indicating whether the call is a simulation or not.
     /// @return An Context struct initialized with the provided parameters.
@@ -67,6 +68,7 @@ abstract contract SafetyLocks is Storage {
         address executionEnvironment,
         bytes32 userOpHash,
         address bundler,
+        uint32 dappGasLimit,
         uint8 solverOpCount,
         bool isSimulation
     )
@@ -87,7 +89,7 @@ abstract contract SafetyLocks is Storage {
             bidFind: false,
             isSimulation: isSimulation,
             callDepth: 0,
-            dappGasLeft: 0
+            dappGasLeft: dappGasLimit
         });
     }
 }

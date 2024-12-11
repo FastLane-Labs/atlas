@@ -65,6 +65,7 @@ contract AtlasErrors {
     // Escrow
     error UncoveredResult();
     error InvalidEscrowDuration();
+    error DAppGasLimitReached();
 
     // AtlETH
     error EscrowLockActive();
