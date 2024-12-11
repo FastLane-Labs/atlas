@@ -140,8 +140,12 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             }
         }
 
-        // Calculate the sum of the various operation gas limits
+        // Calculate the sum of the various operation gas limits.
+        // If bid finding is done on-chain (exPostBids), add extra gas for bid-finding execution of each solverOp
         gasLimitSum = userOp.gas + dConfig.dappGasLimit + (_solverOpCount * dConfig.solverGasLimit);
+        if (dConfig.callConfig.exPostBids()) {
+            gasLimitSum += (dConfig.solverGasLimit + _BID_FIND_OVERHEAD) * _solverOpCount;
+        }
 
         // Some checks are only needed when call is not a simulation
         if (isSimulation) {

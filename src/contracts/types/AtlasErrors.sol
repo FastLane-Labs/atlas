@@ -61,6 +61,7 @@ contract AtlasErrors {
     error AllocateValueFail();
     error PostOpsFail();
     error InvalidAccess();
+    error GasLimitTooHigh();
 
     // Escrow
     error UncoveredResult();

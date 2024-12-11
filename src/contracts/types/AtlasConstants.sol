@@ -29,7 +29,7 @@ contract AtlasConstants {
     uint256 internal constant _CALLDATA_LENGTH_PREMIUM_HALVED = 8; // Half of the upper gas cost per byte of calldata
         // (16 gas). Multiplied by msg.data.length. Equivalent to `msg.data.length / 2 * 16` because 2 hex chars per
         // byte.
-    uint256 internal constant _BASE_TRANSACTION_GAS_USED = 21_000;
+    uint256 internal constant _BASE_TX_GAS_USED = 21_000;
     uint256 internal constant _SOLVER_OP_BASE_CALLDATA = 608; // SolverOperation calldata length excluding solverOp.data
     uint256 internal constant _SOLVER_BASE_GAS_USED = 5000; // Base gas charged to solver in `_handleSolverAccounting()`
     uint256 internal constant _BUNDLER_GAS_PENALTY_BUFFER = 500_000;
@@ -53,4 +53,6 @@ contract AtlasConstants {
     // ------------------------------------------------------- //
 
     uint8 internal constant _MAX_SOLVERS = type(uint8).max - 1;
+    uint256 internal constant _BID_FIND_OVERHEAD = 5000; // Overhead gas for the logic required to execute and sort each
+        // solverOp in `_bidFindingIteration()`
 }

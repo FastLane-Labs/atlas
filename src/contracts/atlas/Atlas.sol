@@ -66,20 +66,18 @@ contract Atlas is Escrow, Factory {
         payable
         returns (bool auctionWon)
     {
-        // TODO refactor this to use gasLimitSum below instead of gasleft() here
+        // First, calculate the calldata gas cost and store in _gasMarker. The execution component of the gas cost is
+        // calculated and added below.
         uint256 _gasMarker = L2_GAS_CALCULATOR == address(0)
-            ? gasleft() + _BASE_TRANSACTION_GAS_USED + (msg.data.length * _CALLDATA_LENGTH_PREMIUM_HALVED)
-            : gasleft() + IL2GasCalculator(L2_GAS_CALCULATOR).initialGasUsed(msg.data.length);
+            ? msg.data.length * _CALLDATA_LENGTH_PREMIUM_HALVED
+            : IL2GasCalculator(L2_GAS_CALCULATOR).initialGasUsed(msg.data.length);
 
         bool _isSimulation = msg.sender == SIMULATOR;
         address _bundler = _isSimulation ? dAppOp.bundler : msg.sender;
         (address _executionEnvironment, DAppConfig memory _dConfig) = _getOrCreateExecutionEnvironment(userOp);
 
         {
-            // TODO add gasLimitSum to _gasMarker before it goes out of scope here
-            // TODO but first make sure tests are passing - this change will disrupt gas acc a lot
-
-            (uint256 gasLimitSum, ValidCallsResult _validCallsResult) =
+            (uint256 _gasLimitSum, ValidCallsResult _validCallsResult) =
                 VERIFICATION.validateCalls(_dConfig, userOp, solverOps, dAppOp, msg.value, _bundler, _isSimulation);
             if (_validCallsResult != ValidCallsResult.Valid) {
                 if (_isSimulation) revert VerificationSimFail(_validCallsResult);
@@ -93,6 +91,12 @@ contract Atlas is Escrow, Factory {
                 // Revert for all other results
                 revert ValidCalls(_validCallsResult);
             }
+
+            // Add gas buffers to get total execution gas limit.
+            // Add this execution gas limit to the calldata gas cost in _gasMarker.
+            _gasMarker += _gasLimitSum + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET;
+            if (gasleft() > _gasLimitSum) revert GasLimitTooHigh();
+            // A high gas limit will cause an underflow in `gasMarker - gasleft()` in _settle(). Revert here instead.
         }
 
         // Initialize the environment lock and accounting values
