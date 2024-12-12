@@ -34,6 +34,7 @@ contract OuterHelpers is FastLaneOnlineInner {
     address public immutable SIMULATOR;
 
     uint256 internal constant _BITS_FOR_INDEX = 16;
+    uint256 internal constant _SOLVER_SIM_GAS_LIM = 4500000;
 
     constructor(address atlas, address protocolGuildWallet) FastLaneOnlineInner(atlas) {
         CARDANO_ENGINEER_THERAPY_FUND = msg.sender;
@@ -132,7 +133,7 @@ contract OuterHelpers is FastLaneOnlineInner {
         DAppOperation memory _dAppOp = _getDAppOp(solverOp.userOpHash, userOp.deadline);
 
         // NOTE: Valid is false when the solver fails even if postOps is successful
-        (valid,,) = ISimulator(SIMULATOR).simSolverCall(userOp, solverOp, _dAppOp);
+        (valid,,) = ISimulator(SIMULATOR).simSolverCall{gas: _SOLVER_SIM_GAS_LIM}(userOp, solverOp, _dAppOp);
     }
 
     function _getUserOperation(

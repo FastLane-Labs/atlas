@@ -25,7 +25,11 @@ import { SolverGateway } from "./SolverGateway.sol";
 import { SwapIntent, BaselineCall } from "./FastLaneTypes.sol";
 
 contract FastLaneOnlineOuter is SolverGateway {
-    constructor(address atlas, address protocolGuildWallet) SolverGateway(atlas, protocolGuildWallet) { }
+    uint256 internal immutable _BASE_METACALL_GAS_LIM;
+
+    constructor(address atlas, address protocolGuildWallet) SolverGateway(atlas, protocolGuildWallet) {
+        _BASE_METACALL_GAS_LIM = getDAppGasLimit();
+    }
 
     //////////////////////////////////////////////
     // THIS IS WHAT THE USER INTERACTS THROUGH.
@@ -51,7 +55,7 @@ contract FastLaneOnlineOuter is SolverGateway {
         DAppOperation memory _dAppOp = _getDAppOp(_userOpHash, userOp.deadline);
 
         // Atlas call
-        (bool _success,) = ATLAS.call{ value: msg.value, gas: _metacallGasLimit(_gasReserved, userOp.gas, gasleft()) }(
+        (bool _success,) = ATLAS.call{ value: msg.value, gas: _metacallGasLimit(userOp, _solverOps.length) }(
             abi.encodeCall(IAtlas.metacall, (userOp, _solverOps, _dAppOp, address(0)))
         );
 
@@ -90,23 +94,14 @@ contract FastLaneOnlineOuter is SolverGateway {
     }
 
     function _metacallGasLimit(
-        uint256 cumulativeGasReserved,
-        uint256 totalGas,
-        uint256 gasLeft
+        UserOperation calldata userOp,
+        uint256 solverOpCount
     )
         internal
-        pure
+        view
         returns (uint256 metacallGasLimit)
     {
-        // Reduce any unnecessary gas to avoid Atlas's excessive gas bundler penalty
-
-        // About 850k gas extra required to pass Atlas internal checks
-        cumulativeGasReserved += 850_000;
-
-        // Sets metacallGasLimit to the minimum of {totalGas, gasLeft, cumulativeGasReserved}
-        metacallGasLimit = totalGas > gasLeft
-            ? (gasLeft > cumulativeGasReserved ? cumulativeGasReserved : gasLeft)
-            : (totalGas > cumulativeGasReserved ? cumulativeGasReserved : totalGas);
+        return getDAppGasLimit() + userOp.gas + (solverOpCount * getSolverGasLimit()) + 500_000;
     }
 
     fallback() external payable { }

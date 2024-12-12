@@ -115,6 +115,8 @@ contract FlashLoanTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
+        uint256 gasLim = _gasLim(userOp, solverOps, dAppOp);
+
         // make the actual atlas call that should revert
         vm.startPrank(userEOA);
         vm.expectEmit(true, true, true, true);
@@ -130,7 +132,7 @@ contract FlashLoanTest is BaseTest {
             result
         );
         vm.expectRevert();
-        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
+        atlas.metacall{gas: gasLim}({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
         vm.stopPrank();
 
         // now try it again with a valid solverOp - but dont fully pay back
@@ -182,7 +184,7 @@ contract FlashLoanTest is BaseTest {
             result
         );
         vm.expectRevert();
-        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
+        atlas.metacall{gas: gasLim}({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
         vm.stopPrank();
 
         // final try, should be successful with full payback
@@ -247,7 +249,7 @@ contract FlashLoanTest is BaseTest {
             true,
             result
         );
-        atlas.metacall({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
+        atlas.metacall{gas: gasLim}({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
         vm.stopPrank();
 
         // atlas 2e beginning bal + 1e from solver +100e eth from user = 103e atlas total

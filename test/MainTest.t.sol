@@ -129,10 +129,11 @@ contract MainTest is BaseTest {
 
         // DAppOperation call
         DAppOperation memory dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
-
         (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
-
         dAppOp.signature = abi.encodePacked(r, s, v);
+
+        uint256 gasLim = _gasLim(userOp, solverOps, dAppOp);
+
 
         vm.startPrank(userEOA);
 
@@ -166,7 +167,7 @@ contract MainTest is BaseTest {
         uint256 solverTwoAtlEthBalance = atlas.balanceOf(solverTwoEOA);
 
         (bool success,) =
-            address(atlas).call(abi.encodeWithSelector(atlas.metacall.selector, userOp, solverOps, dAppOp));
+            address(atlas).call{gas: gasLim}(abi.encodeWithSelector(atlas.metacall.selector, userOp, solverOps, dAppOp));
 
         if (success) {
             console.log("success!");
@@ -397,6 +398,7 @@ contract MainTest is BaseTest {
         DAppOperation memory dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
         (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(r, s, v);
+        uint256 gasLim = _gasLim(userOp, solverOps, dAppOp);
 
         // Execution environment should not exist yet
         (,, bool exists) = atlas.getExecutionEnvironment(userEOA, address(v2DAppControl));
@@ -404,7 +406,7 @@ contract MainTest is BaseTest {
 
         vm.startPrank(userEOA);
         IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
-        atlas.metacall(userOp, solverOps, dAppOp, address(0));
+        atlas.metacall{gas: gasLim}(userOp, solverOps, dAppOp, address(0));
         vm.stopPrank();
 
         // Execution environment should exist now
@@ -420,18 +422,19 @@ contract MainTest is BaseTest {
         UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
         (v, r, s) = vm.sign(userPK, atlasVerification.getUserOperationPayload(userOp));
         userOp.signature = abi.encodePacked(r, s, v);
+        uint256 gasLim = _gasLimSim(userOp);
 
         vm.startPrank(userEOA);
         atlas.createExecutionEnvironment(userEOA, userOp.control);
 
         // Failure case, user hasn't approved Atlas for TOKEN_ONE, operation must fail
-        (bool simResult,,) = simulator.simUserOperation(userOp);
+        (bool simResult,,) = simulator.simUserOperation{gas: gasLim}(userOp);
         assertFalse(simResult, "metasimUserOperationcall tested true");
 
         // Success case
         IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
 
-        (simResult,,) = simulator.simUserOperation(userOp);
+        (simResult,,) = simulator.simUserOperation{gas: gasLim}(userOp);
         assertTrue(simResult, "metasimUserOperationcall tested false");
 
         vm.stopPrank();
@@ -465,10 +468,13 @@ contract MainTest is BaseTest {
         DAppOperation memory dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
         (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(r, s, v);
+        uint256 gasLim = _gasLimSim(userOp, solverOps, dAppOp);
+
+
         vm.startPrank(userEOA);
         atlas.createExecutionEnvironment(userEOA, userOp.control);
         IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
-        (bool success, bytes memory data) = address(simulator).call(
+        (bool success, bytes memory data) = address(simulator).call{gas: gasLim}(
             abi.encodeWithSelector(simulator.simSolverCalls.selector, userOp, solverOps, dAppOp)
         );
 
@@ -485,8 +491,9 @@ contract MainTest is BaseTest {
         dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
         (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(r, s, v);
+
         vm.startPrank(userEOA);
-        (success, data) = address(simulator).call(
+        (success, data) = address(simulator).call{gas: gasLim}(
             abi.encodeWithSelector(simulator.simSolverCalls.selector, userOp, solverOps, dAppOp)
         );
 
@@ -517,6 +524,7 @@ contract MainTest is BaseTest {
         DAppOperation memory dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
         (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(r, s, v);
+        uint256 gasLim = _gasLim(userOp, solverOps, dAppOp);
 
         uint256 bondedBalanceBefore = atlas.balanceOfBonded(beneficiary);
 
@@ -528,7 +536,7 @@ contract MainTest is BaseTest {
 
         vm.startPrank(userEOA);
         IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
-        atlas.metacall(userOp, solverOps, dAppOp, beneficiary);
+        atlas.metacall{gas: gasLim}(userOp, solverOps, dAppOp, beneficiary);
         vm.stopPrank();
 
         uint256 bondedBalanceAfter = atlas.balanceOfBonded(beneficiary);
@@ -562,6 +570,7 @@ contract MainTest is BaseTest {
         DAppOperation memory dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
         (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(r, s, v);
+        uint256 gasLim = _gasLim(userOp, solverOps, dAppOp);
 
         uint256 bondedBalanceBefore = atlas.balanceOfBonded(beneficiary);
 
@@ -573,7 +582,7 @@ contract MainTest is BaseTest {
 
         vm.startPrank(userEOA);
         IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
-        atlas.metacall(userOp, solverOps, dAppOp, beneficiary);
+        atlas.metacall{gas: gasLim}(userOp, solverOps, dAppOp, beneficiary);
         vm.stopPrank();
 
         uint256 bondedBalanceAfter = atlas.balanceOfBonded(beneficiary);

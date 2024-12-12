@@ -289,13 +289,15 @@ contract TrebleSwapTest is BaseTest {
         beforeVars.burnAddressTrebBalance = _balanceOf(address(TREB), BURN);
         beforeVars.atlasGasSurcharge = atlas.cumulativeSurcharge();
         uint256 msgValue = args.nativeInput ? swapInfo.inputAmount : 0;
+        uint256 gasLimit = _gasLim(args.userOp, args.solverOps, args.dAppOp);
 
         uint256 txGasUsed;
         uint256 estAtlasGasSurcharge = gasleft(); // Reused below during calculations
 
         // Do the actual metacall
         vm.prank(userEOA);
-        bool auctionWon = atlas.metacall{ value: msgValue }(args.userOp, args.solverOps, args.dAppOp, address(0));
+        bool auctionWon =
+            atlas.metacall{ value: msgValue, gas: gasLimit }(args.userOp, args.solverOps, args.dAppOp, address(0));
 
         // Estimate gas surcharge Atlas should have taken
         txGasUsed = estAtlasGasSurcharge - gasleft();
@@ -383,12 +385,14 @@ contract TrebleSwapTest is BaseTest {
 
     function _checkSimulationsPass() internal {
         bool success;
+        uint256 gasLimit = _gasLimSim(args.userOp);
 
-        (success,,) = simulator.simUserOperation(args.userOp);
+        (success,,) = simulator.simUserOperation{gas: gasLimit}(args.userOp);
         assertEq(success, true, "simUserOperation failed");
 
+        gasLimit = _gasLimSim(args.userOp, args.solverOps, args.dAppOp);
         if (args.solverOps.length > 0) {
-            (success,,) = simulator.simSolverCalls(args.userOp, args.solverOps, args.dAppOp);
+            (success,,) = simulator.simSolverCalls{gas: gasLimit}(args.userOp, args.solverOps, args.dAppOp);
             assertEq(success, true, "simSolverCalls failed");
         }
     }
