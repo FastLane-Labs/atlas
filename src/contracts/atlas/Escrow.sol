@@ -348,8 +348,6 @@ abstract contract Escrow is AtlETH {
 
         gasLimit = AccountingMath.solverGasLimitScaledDown(solverOp.gas, dConfig.solverGasLimit) + _FASTLANE_GAS_BUFFER;
 
-        uint256 _gasCost = (tx.gasprice * gasLimit) + _getCalldataCost(solverOp.data.length);
-
         // Verify that we can lend the solver their tx value
         if (solverOp.value > address(this).balance) {
             result |= 1 << uint256(SolverOutcome.CallValueTooHigh);
@@ -361,8 +359,11 @@ abstract contract Escrow is AtlETH {
 
         uint256 _solverBalance = S_accessData[solverOp.from].bonded;
 
-        // see if solver's escrow can afford tx gascost
-        if (_gasCost > _solverBalance) {
+        // Claims + Fees represents the base gas cost + the Atlas surcharge + the Bundler surcharge, if the full gas
+        // limit of the tx is used. This is the maximum a solver would need to pay in gas charges from their bonded
+        // AtlETH, should they win the auction. If they lose, or win with less than the full gas limit used, the amount
+        // charged will be lower.
+        if (t_claims + t_fees > _solverBalance) {
             // charge solver for calldata so that we can avoid vampire attacks from solver onto user
             result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
         }
