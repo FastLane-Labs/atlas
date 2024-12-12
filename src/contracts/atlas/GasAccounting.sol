@@ -40,17 +40,26 @@ abstract contract GasAccounting is SafetyLocks {
         )
     { }
 
-    /// @notice Sets the initial accounting values for the metacall transaction.
-    /// @param gasMarker The gas marker used to calculate the initial accounting values.
+    /// @notice Sets the initial gas accounting values for the metacall transaction.
+    /// @param gasMarker The gasMarker measurement at the start of the metacall, which includes Execution gas limits,
+    /// Calldata gas costs, and an additional buffer for safety.
     function _initializeAccountingValues(uint256 gasMarker) internal {
         (uint256 _atlasSurchargeRate, uint256 _bundlerSurchargeRate) = _surchargeRates();
         uint256 _rawClaims = gasMarker * tx.gasprice;
 
-        // Set any withdraws or deposits
+        // The 3 components of gas cost charged to solvers are:
+        // - Base gas cost (g)
+        // - Atlas gas surcharge (A)
+        // - Bundler gas surcharge (B)
+        // = g + A + B
+
+        // Claims records the g + B portions of gas charge
         t_claims = _rawClaims.withSurcharge(_bundlerSurchargeRate);
 
-        // Atlas surcharge is based on the raw claims value.
+        // Fees records only the A portion of gas charge
         t_fees = _rawClaims.getSurcharge(_atlasSurchargeRate);
+
+        // If any native token sent in the metacall, add to the deposits account
         t_deposits = msg.value;
 
         // Explicitly set other transient vars to 0 in case multiple metacalls in single tx.
