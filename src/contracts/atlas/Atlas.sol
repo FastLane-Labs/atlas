@@ -66,11 +66,14 @@ contract Atlas is Escrow, Factory {
         payable
         returns (bool auctionWon)
     {
-        // First, calculate the calldata gas cost and store in _gasMarker. The execution component of the gas cost is
-        // calculated and added below.
-        uint256 _gasMarker = L2_GAS_CALCULATOR == address(0)
-            ? msg.data.length * _CALLDATA_LENGTH_PREMIUM_HALVED
-            : IL2GasCalculator(L2_GAS_CALCULATOR).initialGasUsed(msg.data.length);
+        // _gasMarker calculated as (Execution gas cost) + (Calldata gas cost). Any gas left at the end of the metacall
+        // is deducted from this _gasMarker, resulting in actual execution gas used + calldata gas costs + buffer.
+        uint256 _gasMarker = (gasleft() + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET)
+            + (
+                L2_GAS_CALCULATOR == address(0)
+                    ? msg.data.length * _CALLDATA_LENGTH_PREMIUM_HALVED
+                    : IL2GasCalculator(L2_GAS_CALCULATOR).initialGasUsed(msg.data.length)
+            );
 
         bool _isSimulation = msg.sender == SIMULATOR;
         address _bundler = _isSimulation ? dAppOp.bundler : msg.sender;
@@ -79,6 +82,8 @@ contract Atlas is Escrow, Factory {
         {
             (uint256 _gasLimitSum, ValidCallsResult _validCallsResult) =
                 VERIFICATION.validateCalls(_dConfig, userOp, solverOps, dAppOp, msg.value, _bundler, _isSimulation);
+
+            // First handle the ValidCallsResult
             if (_validCallsResult != ValidCallsResult.Valid) {
                 if (_isSimulation) revert VerificationSimFail(_validCallsResult);
 
@@ -92,15 +97,9 @@ contract Atlas is Escrow, Factory {
                 revert ValidCalls(_validCallsResult);
             }
 
-            // Add gas buffers to get total execution gas limit.
-            uint256 executionOnlyGasLimit = _gasLimitSum + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET;
-
-            // Revert here if gas limit is much higher than expected.
-            if (gasleft() > executionOnlyGasLimit) revert GasLimitTooHigh();
-
-            // Add this execution gas limit to the calldata gas cost in _gasMarker. This will be used to calculate the
-            // actual gas used
-            _gasMarker += gasleft() + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET;
+            // Then check if gas limit was set too high, based on gas left for execution, and a conservative buffer
+            // added to the expected execution gas limit. Revert if unexpectedly high gas limit.
+            if (gasleft() > _gasLimitSum + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET) revert GasLimitTooHigh();
         }
 
         // Initialize the environment lock and accounting values
