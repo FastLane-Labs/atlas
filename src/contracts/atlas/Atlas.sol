@@ -93,10 +93,14 @@ contract Atlas is Escrow, Factory {
             }
 
             // Add gas buffers to get total execution gas limit.
-            // Add this execution gas limit to the calldata gas cost in _gasMarker.
-            _gasMarker += _gasLimitSum + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET;
-            if (gasleft() > _gasLimitSum) revert GasLimitTooHigh();
-            // A high gas limit will cause an underflow in `gasMarker - gasleft()` in _settle(). Revert here instead.
+            uint256 executionOnlyGasLimit = _gasLimitSum + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET;
+
+            // Revert here if gas limit is much higher than expected.
+            if (gasleft() > executionOnlyGasLimit) revert GasLimitTooHigh();
+
+            // Add this execution gas limit to the calldata gas cost in _gasMarker. This will be used to calculate the
+            // actual gas used
+            _gasMarker += gasleft() + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET;
         }
 
         // Initialize the environment lock and accounting values
