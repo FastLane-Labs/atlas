@@ -106,16 +106,11 @@ abstract contract Escrow is AtlETH {
         bool _success;
         bytes memory _data;
 
-        // Calculate gas limit ceiling, including gas to return gracefully even if userOp call is OOG.
-        uint256 _gasLimit = gasleft() * 63 / 64 - _GRACEFUL_RETURN_GAS_OFFSET;
-        // Use the smaller of userOp.gas and the gas limit ceiling
-        _gasLimit = userOp.gas < _gasLimit ? userOp.gas : _gasLimit;
-
         if (!_borrow(userOp.value)) {
             revert InsufficientEscrow();
         }
 
-        (_success, _data) = ctx.executionEnvironment.call{ value: userOp.value, gas: _gasLimit }(
+        (_success, _data) = ctx.executionEnvironment.call{ value: userOp.value, gas: userOp.gas }(
             abi.encodePacked(
                 abi.encodeCall(IExecutionEnvironment.userWrapper, userOp), ctx.setAndPack(ExecutionPhase.UserOperation)
             )

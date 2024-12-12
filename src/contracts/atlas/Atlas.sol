@@ -106,11 +106,16 @@ contract Atlas is Escrow, Factory {
         _setEnvironmentLock(_dConfig, _executionEnvironment);
         _initializeAccountingValues(_gasMarker);
 
+        // Calculate `execute` gas limit such that it can fail due to an OOG error caused by any of the hook calls, and
+        // the metacall will still have enough gas to gracefully finish and return, storing any nonces required.
+        uint256 _gasLimit = gasleft() * 63 / 64 - _GRACEFUL_RETURN_GAS_OFFSET;
+
         // userOpHash has already been calculated and verified in validateCalls at this point, so rather
         // than re-calculate it, we can simply take it from the dAppOp here. It's worth noting that this will
         // be either a TRUSTED or DEFAULT hash, depending on the allowsTrustedOpHash setting.
-        try this.execute(_dConfig, userOp, solverOps, _executionEnvironment, _bundler, dAppOp.userOpHash, _isSimulation)
-        returns (Context memory ctx) {
+        try this.execute{ gas: _gasLimit }(
+            _dConfig, userOp, solverOps, dAppOp.userOpHash, _executionEnvironment, _bundler, _isSimulation
+        ) returns (Context memory ctx) {
             // Gas Refund to sender only if execution is successful
             (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) =
                 _settle(ctx, _dConfig.solverGasLimit, gasRefundBeneficiary);
@@ -150,9 +155,9 @@ contract Atlas is Escrow, Factory {
         DAppConfig memory dConfig,
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
+        bytes32 userOpHash,
         address executionEnvironment,
         address bundler,
-        bytes32 userOpHash,
         bool isSimulation
     )
         external
