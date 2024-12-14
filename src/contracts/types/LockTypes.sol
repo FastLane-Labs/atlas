@@ -17,6 +17,14 @@ struct Context {
     uint32 dappGasLeft; // Gas used on preOps, allocateValue, and postOps hooks
 }
 
+struct StackVars {
+    uint256 allSolversGasLimit;
+    bytes32 userOpHash;
+    address executionEnvironment;
+    address bundler;
+    bool isSimulation;
+}
+
 enum ExecutionPhase {
     Uninitialized,
     PreOps,
