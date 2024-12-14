@@ -84,16 +84,15 @@ contract Atlas is Escrow, Factory {
 
             _vars = StackVars({
                 userOpHash: dAppOp.userOpHash,
-                allSolversGasLimit: 0, // TODO helper to calc this
+                allSolversGasLimit: 0, // calculated in validateCalls, set below
                 bundler: _isSimulation ? dAppOp.bundler : msg.sender,
                 isSimulation: _isSimulation,
                 executionEnvironment: _executionEnvironment
             });
         }
         {
-            (uint256 _gasLimitSum, ValidCallsResult _validCallsResult) = VERIFICATION.validateCalls(
-                _dConfig, userOp, solverOps, dAppOp, msg.value, _vars.bundler, _vars.isSimulation
-            );
+            (uint256 _gasLimitSum, uint256 _allSolversGasLimit, ValidCallsResult _validCallsResult) = VERIFICATION
+                .validateCalls(_dConfig, userOp, solverOps, dAppOp, msg.value, _vars.bundler, _vars.isSimulation);
 
             // First handle the ValidCallsResult
             if (_validCallsResult != ValidCallsResult.Valid) {
@@ -112,6 +111,9 @@ contract Atlas is Escrow, Factory {
             // Then check if gas limit was set too high, based on gas left for execution, and a conservative buffer
             // added to the expected execution gas limit. Revert if unexpectedly high gas limit.
             if (gasleft() > _gasLimitSum + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET) revert GasLimitTooHigh();
+
+            // allSolversGasLimit used in calculation of sufficient bonded balance check before solverOp execution
+            _vars.allSolversGasLimit = _allSolversGasLimit;
         }
 
         // Initialize the environment lock and accounting values

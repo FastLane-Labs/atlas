@@ -149,7 +149,7 @@ contract AtlasVerificationBase is BaseTest {
     function doValidateCalls(ValidCallsCall memory call) public returns (uint256 gasLimitSum, ValidCallsResult result) {
         DAppConfig memory config = dAppControl.getDAppConfig(call.userOp);
         vm.startPrank(address(atlas));
-        (gasLimitSum, result) = atlasVerification.validateCalls(
+        (gasLimitSum,, result) = atlasVerification.validateCalls(
             config,
             call.userOp,
             call.solverOps,
