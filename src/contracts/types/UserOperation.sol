@@ -15,6 +15,9 @@ bytes32 constant USER_TYPEHASH_TRUSTED = keccak256(
     "UserOperation(address from,address to,address dapp,address control,uint32 callConfig,address sessionKey)"
 );
 
+// Length of UserOperation in hex chars, assuming empty signature field, excluding the dynamic userOp.data field.
+uint256 constant USER_OP_STATIC_LENGTH = 544;
+
 struct UserOperation {
     address from; // User address
     address to; // Atlas address

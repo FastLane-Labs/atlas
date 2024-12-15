@@ -3,7 +3,9 @@ pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 
+import { Atlas } from "../src/contracts/atlas/Atlas.sol";
 import { AtlasVerification, USER_TYPEHASH_DEFAULT, USER_TYPEHASH_TRUSTED } from "../src/contracts/atlas/AtlasVerification.sol";
+import { TestAtlasVerification } from "./base/TestAtlasVerification.sol";
 import { DAppConfig, CallConfig } from "../src/contracts/types/ConfigTypes.sol";
 import "../src/contracts/types/DAppOperation.sol";
 import { UserOperation } from "../src/contracts/types/UserOperation.sol";
@@ -28,10 +30,7 @@ import { DAppOperationBuilder } from "./base/builders/DAppOperationBuilder.sol";
 //
 
 
-
-
 // TODO add tests for the gasLimitSum stuff
-
 
 
 
@@ -46,7 +45,6 @@ contract DummySmartWallet {
         bytes32,
         bytes memory
     ) public view returns (bytes4) {
-        console.log("DummySmartWallet.isValidSignature called, isValidResult: ", isValidResult);
         if (isValidResult) {
             return EIP1271_MAGIC_VALUE;
         } else {
@@ -146,8 +144,10 @@ contract AtlasVerificationBase is BaseTest {
             .sign(address(atlasVerification), governancePK);
     }
 
+    // TODO update tests to check gasLimitSum + allSolversGasLimit return values
     function doValidateCalls(ValidCallsCall memory call) public returns (uint256 gasLimitSum, ValidCallsResult result) {
         DAppConfig memory config = dAppControl.getDAppConfig(call.userOp);
+        uint256 msgDataLength= abi.encode(call.userOp, call.dAppOp, call.solverOps, address(0)).length;
         vm.startPrank(address(atlas));
         (gasLimitSum,, result) = atlasVerification.validateCalls(
             config,
@@ -155,6 +155,7 @@ contract AtlasVerificationBase is BaseTest {
             call.solverOps,
             call.dAppOp,
             call.msgValue,
+            msgDataLength,
             call.msgSender,
             call.isSimulation);
         vm.stopPrank();
@@ -343,7 +344,31 @@ contract AtlasVerificationVerifySolverOpTest is AtlasVerificationBase {
         );
         assertEq(result, 0, "Expected No Errors 2"); // 0 = No SolverOutcome errors
     }
+
+    function test_getSolverOpsCalldataLength() public {
+        TestAtlasVerification tVerification = new TestAtlasVerification(address(atlas));
+        UserOperation memory userOp;
+        DAppOperation memory dAppOp;
+
+        // Test Case 1 - simpler calldata
+        SolverOperation[] memory solverOps = new SolverOperation[](1); // Only 1 solverOp
+        userOp.data = abi.encode(address(1), address(2), uint128(3), 4); // random complex data
+        // Leave signature fields empty, makes other calldata lower, to find upper bound on solverOps calldata
+
+        // Put into metacall calldata format, and get hex char length
+        uint256 msgDataLength = abi.encodeCall(Atlas.metacall, (userOp, solverOps, dAppOp, address(0))).length;
+        uint256 predicted = tVerification.getSolverOpsCalldataLength(userOp.data.length, msgDataLength);
+        assertEq(predicted, abi.encode(solverOps).length, "solverOps len prediction 1 wrong");
+
+        // Test Case 2 - larger, more complex calldata
+        solverOps = new SolverOperation[](23); // 23 solverOps
+        userOp.data = abi.encode(1,2,3,4,5,6,userOp); // new random complex data
+
+        msgDataLength = abi.encodeCall(Atlas.metacall, (userOp, solverOps, dAppOp, address(0))).length;
+        predicted = tVerification.getSolverOpsCalldataLength(userOp.data.length, msgDataLength);
+        assertEq(predicted, abi.encode(solverOps).length, "solverOps len prediction 2 wrong");
     }
+}
 
 //
 // ---- VALID CALLS TESTS BEGIN HERE ---- //
@@ -712,7 +737,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
         DAppConfig memory config = dAppControl.getDAppConfig(userOp);
         vm.expectRevert(AtlasErrors.InvalidCaller.selector);
-        atlasVerification.validateCalls(config, userOp, solverOps, dappOp, 0, userEOA, false);
+        atlasVerification.validateCalls(config, userOp, solverOps, dappOp, 0, 0, userEOA, false);
     }
 
     //

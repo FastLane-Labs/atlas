@@ -55,4 +55,6 @@ contract AtlasConstants {
     uint8 internal constant _MAX_SOLVERS = type(uint8).max - 1;
     uint256 internal constant _BID_FIND_OVERHEAD = 5000; // Overhead gas for the logic required to execute and sort each
         // solverOp in `_bidFindingIteration()`
+    uint256 internal constant _EXTRA_METACALL_CALLDATA_LENGTH = 36; // The length of the extra static metacall calldata
+        // besides the core UserOp, DAppOp, and SolverOps components.
 }

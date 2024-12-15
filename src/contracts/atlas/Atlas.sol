@@ -75,6 +75,9 @@ contract Atlas is Escrow, Factory {
                     : IL2GasCalculator(L2_GAS_CALCULATOR).initialGasUsed(msg.data.length)
             );
 
+
+        // TODO update any Operation struct length calcs for changes to structs
+
         DAppConfig memory _dConfig;
         StackVars memory _vars;
         {
@@ -92,7 +95,7 @@ contract Atlas is Escrow, Factory {
         }
         {
             (uint256 _gasLimitSum, uint256 _allSolversGasLimit, ValidCallsResult _validCallsResult) = VERIFICATION
-                .validateCalls(_dConfig, userOp, solverOps, dAppOp, msg.value, _vars.bundler, _vars.isSimulation);
+                .validateCalls(_dConfig, userOp, solverOps, dAppOp, msg.value, msg.data.length, _vars.bundler, _vars.isSimulation);
 
             // First handle the ValidCallsResult
             if (_validCallsResult != ValidCallsResult.Valid) {

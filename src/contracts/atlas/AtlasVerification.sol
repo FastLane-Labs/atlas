@@ -46,6 +46,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         SolverOperation[] calldata solverOps,
         DAppOperation calldata dAppOp,
         uint256 msgValue,
+        uint256 msgDataLength,
         address msgSender,
         bool isSimulation
     )
@@ -150,8 +151,8 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
 
         // Calculate the portion of the final _gasMarker var that solvers may repay if all fail. This does not include
         // the bid-finding gas costs which the bundler always pays for. Needs calldata and exeuction components.
-        allSolversGasLimit =
-            (abi.encode(solverOps).length * _CALLDATA_LENGTH_PREMIUM_HALVED) + (_solverOpCount * dConfig.solverGasLimit);
+        allSolversGasLimit = (_getSolverOpsCalldataLength(userOp.data.length, msgDataLength) * _CALLDATA_LENGTH_PREMIUM_HALVED)
+            + (_solverOpCount * dConfig.solverGasLimit);
 
         // Some checks are only needed when call is not a simulation
         if (isSimulation) {
@@ -575,5 +576,19 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
                 )
             );
         }
+    }
+
+    // Helper to gas efficiently calculate calldata length of the solverOps array.
+    // Assumes empty userOp and dAppOp signature fields to get the upper bound of solverOps length.
+    function _getSolverOpsCalldataLength(
+        uint256 userOpDataLength,
+        uint256 msgDataLength
+    )
+        internal
+        pure
+        returns (uint256 solverOpsLength)
+    {
+        solverOpsLength =
+            msgDataLength - (USER_OP_STATIC_LENGTH + userOpDataLength) - DAPP_OP_LENGTH - _EXTRA_METACALL_CALLDATA_LENGTH;
     }
 }
