@@ -190,7 +190,8 @@ abstract contract Escrow is AtlETH {
         if (_result.canExecute()) {
             uint256 _gasLimit;
             // Verify gasLimit again
-            (_result, _gasLimit) = _validateSolverOpGasAndValue(dConfig, solverOp, _gasWaterMark, _result);
+            (_result, _gasLimit) =
+                _validateSolverOpGasAndValue(dConfig, solverOp, ctx.allSolversGasLimit, _gasWaterMark, _result);
             _result |= _validateSolverOpDeadline(solverOp, dConfig);
 
             // Check for trusted operation hash
@@ -328,6 +329,7 @@ abstract contract Escrow is AtlETH {
     function _validateSolverOpGasAndValue(
         DAppConfig memory dConfig,
         SolverOperation calldata solverOp,
+        uint256 allSolversGasLimit,
         uint256 gasWaterMark,
         uint256 result
     )
@@ -354,11 +356,16 @@ abstract contract Escrow is AtlETH {
 
         uint256 _solverBalance = S_accessData[solverOp.from].bonded;
 
+        // TODO apply surcharges carefully to all components in bigger GasAcc PR
+        // Max gas value payable = max total gas limit at start - all solvers' gas limits + current solver's gas limit
+        uint256 _maxGasValue = (t_claims + t_fees) - allSolversGasLimit + gasLimit
+            + ((solverOp.data.length + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM_HALVED);
+
         // Claims + Fees represents the base gas cost + the Atlas surcharge + the Bundler surcharge, if the full gas
         // limit of the tx is used. This is the maximum a solver would need to pay in gas charges from their bonded
         // AtlETH, should they win the auction. If they lose, or win with less than the full gas limit used, the amount
         // charged will be lower.
-        if (t_claims + t_fees > _solverBalance) {
+        if (_maxGasValue > _solverBalance) {
             // charge solver for calldata so that we can avoid vampire attacks from solver onto user
             result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
         }
@@ -433,7 +440,8 @@ abstract contract Escrow is AtlETH {
         );
 
         _result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, _result);
-        (_result, _gasLimit) = _validateSolverOpGasAndValue(dConfig, solverOp, _gasWaterMark, _result);
+        (_result, _gasLimit) =
+            _validateSolverOpGasAndValue(dConfig, solverOp, ctx.allSolversGasLimit, _gasWaterMark, _result);
         _result |= _validateSolverOpDeadline(solverOp, dConfig);
 
         // Verify the transaction.

@@ -84,7 +84,8 @@ contract Permit69Test is BaseTest {
             bidFind: false,
             isSimulation: false,
             callDepth: 0,
-            dappGasLeft: 0
+            dappGasLeft: 0,
+            allSolversGasLimit: 0
         });
 
         mockAtlas.setLock(mockExecutionEnvAddress, mockCallConfig);
