@@ -75,8 +75,6 @@ contract Atlas is Escrow, Factory {
                     : IL2GasCalculator(L2_GAS_CALCULATOR).initialGasUsed(msg.data.length)
             );
 
-        // TODO update any Operation struct length calcs for changes to structs
-
         DAppConfig memory _dConfig;
         StackVars memory _vars;
         {
