@@ -39,7 +39,6 @@ contract EscrowTest is BaseTest {
     uint256 private constant _SOLVER_GAS_LIMIT = 1_000_000;
     uint256 private constant _VALIDATION_GAS_LIMIT = 500_000;
     uint256 private constant _SOLVER_GAS_BUFFER = 5; // out of 100
-    uint256 private constant _FASTLANE_GAS_BUFFER = 125_000; // integer amount
 
     function defaultCallConfig() public returns (CallConfigBuilder) {
         return new CallConfigBuilder();

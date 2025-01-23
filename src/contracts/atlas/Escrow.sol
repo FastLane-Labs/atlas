@@ -28,6 +28,7 @@ abstract contract Escrow is AtlETH {
     using CallBits for uint32;
     using SafetyBits for Context;
     using SafeCall for address;
+    using AccountingMath for uint256;
 
     constructor(
         uint256 escrowDuration,
@@ -343,7 +344,7 @@ abstract contract Escrow is AtlETH {
             return (result, gasLimit); // gasLimit = 0
         }
 
-        gasLimit = AccountingMath.solverGasLimitScaledDown(solverOp.gas, dConfig.solverGasLimit) + _FASTLANE_GAS_BUFFER;
+        gasLimit = AccountingMath.solverGasLimitScaledDown(solverOp.gas, dConfig.solverGasLimit);
 
         // Verify that we can lend the solver their tx value
         if (solverOp.value > address(this).balance) {
@@ -351,15 +352,21 @@ abstract contract Escrow is AtlETH {
             return (result, gasLimit);
         }
 
-        // subtract out the gas buffer since the solver's metaTx won't use it
-        gasLimit -= _FASTLANE_GAS_BUFFER;
-
         uint256 _solverBalance = S_accessData[solverOp.from].bonded;
+        uint256 _maxGasValue;
 
-        // TODO apply surcharges carefully to all components in bigger GasAcc PR
-        // Max gas value payable = max total gas limit at start - all solvers' gas limits + current solver's gas limit
-        uint256 _maxGasValue = (t_claims + t_fees) - allSolversGasLimit + gasLimit
-            + ((solverOp.data.length + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM_HALVED);
+        {
+            (uint256 _atlasSurchargeRate, uint256 _bundlerSurchargeRate) = _surchargeRates();
+            uint256 _solverOpCalldataGas = (solverOp.data.length + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM_HALVED;
+
+            // Max gas value payable by solver calculated as:
+            // = max metacall gas cost (execution + calldata) (incl surcharges) 
+            // - (all solvers' gas limits - current solver's gas limit) * tx.gasprice * (base + surcharges)
+
+            _maxGasValue = (t_claims + t_fees)
+            - ((allSolversGasLimit - (gasLimit + _solverOpCalldataGas)) * tx.gasprice)
+                .withSurcharges(_atlasSurchargeRate, _bundlerSurchargeRate);
+        }
 
         // Claims + Fees represents the base gas cost + the Atlas surcharge + the Bundler surcharge, if the full gas
         // limit of the tx is used. This is the maximum a solver would need to pay in gas charges from their bonded

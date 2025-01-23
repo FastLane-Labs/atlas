@@ -22,13 +22,11 @@ contract AtlasConstants {
 
     // Escrow constants
     uint256 internal constant _VALIDATION_GAS_LIMIT = 500_000;
-    uint256 internal constant _FASTLANE_GAS_BUFFER = 125_000; // integer amount
     uint256 internal constant _GRACEFUL_RETURN_GAS_OFFSET = 40_000;
 
     // Gas Accounting constants
-    uint256 internal constant _CALLDATA_LENGTH_PREMIUM_HALVED = 8; // Half of the upper gas cost per byte of calldata
-        // (16 gas). Multiplied by msg.data.length. Equivalent to `msg.data.length / 2 * 16` because 2 hex chars per
-        // byte.
+    uint256 internal constant _CALLDATA_LENGTH_PREMIUM_HALVED = 8;
+    // Half of the upper gas cost per byte of calldata (16 gas). Multiplied by msg.data.length. Equivalent to `msg.data.length / 2 * 16` because 2 hex chars per byte.
     uint256 internal constant _BASE_TX_GAS_USED = 21_000;
     uint256 internal constant _SOLVER_OP_BASE_CALLDATA = 608; // SolverOperation calldata length excluding solverOp.data
     uint256 internal constant _SOLVER_BASE_GAS_USED = 5000; // Base gas charged to solver in `_handleSolverAccounting()`
