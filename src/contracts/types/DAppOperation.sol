@@ -5,6 +5,9 @@ bytes32 constant DAPP_TYPEHASH = keccak256(
     "DAppOperation(address from,address to,uint256 nonce,uint256 deadline,address control,address bundler,bytes32 userOpHash,bytes32 callChainHash)"
 );
 
+// Length of DAppOperation in hex chars, assuming empty signature field
+uint256 constant DAPP_OP_LENGTH = 352;
+
 struct DAppOperation {
     address from; // signer of the DAppOperation
     address to; // Atlas address

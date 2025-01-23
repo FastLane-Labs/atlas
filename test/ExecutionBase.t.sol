@@ -86,7 +86,8 @@ contract ExecutionBaseTest is BaseTest {
             bidFind: true,
             isSimulation: false,
             callDepth: 1,
-            dappGasLeft: 0
+            dappGasLeft: 0,
+            allSolversGasLimit: 0
         });
 
         firstSet = abi.encodePacked(

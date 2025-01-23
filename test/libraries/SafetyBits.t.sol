@@ -49,7 +49,8 @@ contract SafetyBitsTest is Test {
             bidFind: false,
             isSimulation: isSimulation,
             callDepth: 0,
-            dappGasLeft: 0
+            dappGasLeft: 0,
+            allSolversGasLimit: 0
         });
     }
 

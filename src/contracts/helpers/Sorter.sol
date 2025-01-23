@@ -10,13 +10,15 @@ import { AccountingMath } from "../libraries/AccountingMath.sol";
 import { CallVerification } from "../libraries/CallVerification.sol";
 import { AtlasConstants } from "../types/AtlasConstants.sol";
 
-import "../types/SolverOperation.sol";
 import "../types/UserOperation.sol";
+import "../types/SolverOperation.sol";
+import "../types/DAppOperation.sol";
 import "../types/ConfigTypes.sol";
 
 contract Sorter is AtlasConstants {
     using CallBits for uint32;
     using CallVerification for UserOperation;
+    using AccountingMath for uint256;
 
     IAtlas public immutable ATLAS;
     IAtlasVerification public immutable VERIFICATION;
@@ -68,7 +70,8 @@ contract Sorter is AtlasConstants {
     function _verifySolverEligibility(
         DAppConfig memory dConfig,
         UserOperation calldata userOp,
-        SolverOperation calldata solverOp
+        SolverOperation calldata solverOp,
+        uint256 totalSurchargeRate
     )
         internal
         view
@@ -76,14 +79,18 @@ contract Sorter is AtlasConstants {
     {
         // Make sure the solver has enough funds bonded
         uint256 solverBalance = IAtlas(address(ATLAS)).balanceOfBonded(solverOp.from);
+        uint256 solverOpGasLimit = AccountingMath.solverGasLimitScaledDown(solverOp.gas, dConfig.solverGasLimit);
 
-        uint256 gasLimit =
-            AccountingMath.solverGasLimitScaledDown(solverOp.gas, dConfig.solverGasLimit) + _FASTLANE_GAS_BUFFER;
+        // Calldata gas a winning solver would pay for: non-solverOp calldata + their own solverOp calldata
+        uint256 calldataGas =
+            (USER_OP_STATIC_LENGTH + DAPP_OP_LENGTH + _SOLVER_OP_BASE_CALLDATA + userOp.data.length + solverOp.data.length) * _CALLDATA_LENGTH_PREMIUM_HALVED ;
 
-        uint256 calldataCost =
-            (solverOp.data.length + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM_HALVED * solverOp.maxFeePerGas;
-        uint256 gasCost = (solverOp.maxFeePerGas * gasLimit) + calldataCost;
-        if (solverBalance < gasCost) {
+        // Execution gas a winning solver would pay for
+        uint256 executionGas = _BASE_TX_GAS_USED + AccountingMath._FIXED_GAS_OFFSET + solverOpGasLimit + userOp.gas +  dConfig.dappGasLimit;
+
+        uint256 maxSolverCost = (solverOp.maxFeePerGas * (executionGas + calldataGas)).withSurcharge(totalSurchargeRate);
+
+        if (solverBalance < maxSolverCost) {
             return false;
         }
 
@@ -133,6 +140,8 @@ contract Sorter is AtlasConstants {
     {
         address bidToken = IDAppControl(dConfig.to).getBidFormat(userOp);
 
+        uint256 totalSurchargeRate = ATLAS.atlasSurchargeRate() + ATLAS.bundlerSurchargeRate();
+
         SortingData[] memory sortingData = new SortingData[](count);
 
         bytes32 userOpHash = VERIFICATION.getUserOperationHash(userOp);
@@ -141,7 +150,7 @@ contract Sorter is AtlasConstants {
         for (uint256 i; i < count; ++i) {
             if (
                 solverOps[i].userOpHash == userOpHash && _verifyBidFormat(bidToken, solverOps[i])
-                    && _verifySolverEligibility(dConfig, userOp, solverOps[i])
+                    && _verifySolverEligibility(dConfig, userOp, solverOps[i], totalSurchargeRate)
             ) {
                 sortingData[i] = SortingData({ amount: solverOps[i].bidAmount, valid: true });
             } else {

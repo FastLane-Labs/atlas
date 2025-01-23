@@ -57,29 +57,23 @@ abstract contract SafetyLocks is Storage {
 
     /// @notice Builds an Context struct with the specified parameters, called at the start of
     /// `_preOpsUserExecutionIteration`.
-    /// @param executionEnvironment The address of the current Execution Environment.
-    /// @param userOpHash The UserOperation hash.
-    /// @param bundler The address of the bundler.
+    /// @param vars The StackVars struct containing some input variables for building the Context.
     /// @param dappGasLimit The DAppControl's gas limit for preOps, allocateValue, and postOps hooks.
     /// @param solverOpCount The count of SolverOperations.
-    /// @param isSimulation Boolean indicating whether the call is a simulation or not.
     /// @return An Context struct initialized with the provided parameters.
     function _buildContext(
-        address executionEnvironment,
-        bytes32 userOpHash,
-        address bundler,
+        StackVars memory vars,
         uint32 dappGasLimit,
-        uint8 solverOpCount,
-        bool isSimulation
+        uint8 solverOpCount
     )
         internal
         pure
         returns (Context memory)
     {
         return Context({
-            executionEnvironment: executionEnvironment,
-            userOpHash: userOpHash,
-            bundler: bundler,
+            executionEnvironment: vars.executionEnvironment,
+            userOpHash: vars.userOpHash,
+            bundler: vars.bundler,
             solverSuccessful: false,
             paymentsSuccessful: false,
             solverIndex: 0,
@@ -87,9 +81,10 @@ abstract contract SafetyLocks is Storage {
             phase: uint8(ExecutionPhase.PreOps),
             solverOutcome: 0,
             bidFind: false,
-            isSimulation: isSimulation,
+            isSimulation: vars.isSimulation,
             callDepth: 0,
-            dappGasLeft: dappGasLimit
+            dappGasLeft: dappGasLimit,
+            allSolversGasLimit: uint32(vars.allSolversGasLimit)
         });
     }
 }
