@@ -210,15 +210,14 @@ abstract contract GasAccounting is SafetyLocks {
 
     /// @notice Takes AtlETH from the owner's bonded balance and, if necessary, from the owner's unbonding balance to
     /// increase transient solver deposits.
-    /// @param owner The address of the owner from whom AtlETH is taken.
+    /// @param account The address of the account from which AtlETH is taken.
     /// @param amount The amount of AtlETH to be taken.
-    /// @param gasValueUsed The ETH value of gas used in the SolverOperation.
     /// @param solverWon A boolean indicating whether the solver won the bid.
     /// @return deficit The amount of AtlETH that was not repaid, if any.
     function _assign(
-        address owner,
+        EscrowAccountAccessData memory accountData,
+        address account,
         uint256 amount,
-        uint256 gasValueUsed,
         bool solverWon
     )
         internal
@@ -226,65 +225,55 @@ abstract contract GasAccounting is SafetyLocks {
     {
         uint112 _amt = SafeCast.toUint112(amount);
 
-        EscrowAccountAccessData memory _aData = S_accessData[owner];
+        // EscrowAccountAccessData memory _aData = S_accessData[account];
 
-        if (_amt > _aData.bonded) {
+        if (_amt > accountData.bonded) {
             // The bonded balance does not cover the amount owed. Check if there is enough unbonding balance to
             // make up for the missing difference. If not, there is a deficit. Atlas does not consider drawing from
             // the regular AtlETH balance (not bonded nor unbonding) to cover the remaining deficit because it is
             // not meant to be used within an Atlas transaction, and must remain independent.
 
-            EscrowAccountBalance memory _bData = s_balanceOf[owner];
-            uint256 _total = uint256(_bData.unbonding) + uint256(_aData.bonded);
+            EscrowAccountBalance memory _bData = s_balanceOf[account];
+            uint256 _total = uint256(_bData.unbonding) + uint256(accountData.bonded);
 
             if (_amt > _total) {
                 // The unbonding balance is insufficient to cover the remaining amount owed. There is a deficit. Set
                 // both bonded and unbonding balances to 0 and adjust the "amount" variable to reflect the amount
                 // that was actually deducted.
                 deficit = amount - _total;
-                s_balanceOf[owner].unbonding = 0;
-                _aData.bonded = 0;
+                s_balanceOf[account].unbonding = 0;
+                accountData.bonded = 0;
 
                 t_writeoffs += deficit;
                 amount -= deficit; // Set amount equal to total to accurately track the changing bondedTotalSupply
             } else {
                 // The unbonding balance is sufficient to cover the remaining amount owed. Draw everything from the
                 // bonded balance, and adjust the unbonding balance accordingly.
-                s_balanceOf[owner].unbonding = SafeCast.toUint112(_total - _amt);
-                _aData.bonded = 0;
+                s_balanceOf[account].unbonding = SafeCast.toUint112(_total - _amt);
+                accountData.bonded = 0;
             }
         } else {
             // The bonded balance is sufficient to cover the amount owed.
-            _aData.bonded -= _amt;
+            accountData.bonded -= _amt;
         }
 
-        // Update analytics (auctionWins, auctionFails, totalGasValueUsed) and lastAccessedBlock
-        _updateAnalytics(_aData, solverWon && deficit == 0, gasValueUsed);
-        _aData.lastAccessedBlock = uint32(block.number); // update lastAccessedBlock since balance is decreasing
+        // update lastAccessedBlock since balance is decreasing
+        accountData.lastAccessedBlock = uint32(block.number); 
 
-        // Persist changes in the _aData memory struct back to storage
-        S_accessData[owner] = _aData;
+        // NOTE: accountData changes must be persisted to storage separately
 
         S_bondedTotalSupply -= amount;
         t_deposits += amount;
     }
 
     /// @notice Increases the owner's bonded balance by the specified amount.
-    /// @param owner The address of the owner whose bonded balance will be increased.
+    /// @param accountData The EscrowAccountAccessData memory struct of the account being credited.
     /// @param amount The amount by which to increase the owner's bonded balance.
     /// @param gasValueUsed The ETH value of gas used in the SolverOperation.
-    function _credit(address owner, uint256 amount, uint256 gasValueUsed) internal {
-        EscrowAccountAccessData memory _aData = S_accessData[owner];
-
-        _aData.bonded += SafeCast.toUint112(amount);
-
+    function _credit(EscrowAccountAccessData memory accountData, uint256 amount, uint256 gasValueUsed) internal {
+        accountData.bonded += SafeCast.toUint112(amount);
         S_bondedTotalSupply += amount;
-
-        // Update analytics (auctionWins, auctionFails, totalGasValueUsed)
-        _updateAnalytics(_aData, true, gasValueUsed);
-
-        // Persist changes in the _aData memory struct back to storage
-        S_accessData[owner] = _aData;
+        // NOTE: accountData changes must be persisted to storage separately
     }
 
     /// @notice Accounts for the gas cost of a failed SolverOperation, either by increasing writeoffs (if the bundler is
@@ -320,10 +309,20 @@ abstract contract GasAccounting is SafetyLocks {
             uint256 _gasUsedWithSurcharges = _gasUsed.withSurcharges(_atlasSurchargeRate, _bundlerSurchargeRate);
             uint256 _surchargesOnly = _gasUsedWithSurcharges - _gasUsed;
 
+            EscrowAccountAccessData memory _solverAccountData = S_accessData[solverOp.from];
+
             // In `_assign()`, the failing solver's bonded AtlETH balance is reduced by `_gasUsedWithSurcharges`. Any
             // deficit from that operation is added to `writeoffs` and returned as `_assignDeficit` below. The portion
             // that can be covered by the solver's AtlETH is added to `deposits`, to account that it has been paid.
-            uint256 _assignDeficit = _assign(solverOp.from, _gasUsedWithSurcharges, _gasUsedWithSurcharges, false);
+            uint256 _assignDeficit = _assign(_solverAccountData, solverOp.from, _gasUsedWithSurcharges, false);
+
+            // Solver's analytics updated:
+            // - increment auctionFails
+            // - increase totalGasValueUsed by gas cost + surcharges paid by solver, less any deficit
+            _updateAnalytics(_solverAccountData, false, _gasUsedWithSurcharges - _assignDeficit);
+
+            // Persist the updated solver account data to storage
+            S_accessData[solverOp.from] = _solverAccountData;
 
             // We track the surcharges (in excess of deficit - so the actual AtlETH that can be collected) separately,
             // so that in the event of no successful solvers, any `_assign()`ed surcharges can be attributed to an
@@ -468,20 +467,31 @@ abstract contract GasAccounting is SafetyLocks {
             _winningSolver = gasRefundBeneficiary;
         }
 
+        // Load winning solver's bonded/lastAccessedBlock/analytics data into memory
+        EscrowAccountAccessData memory _winningSolverData = S_accessData[_winningSolver];
+
         if (_amountSolverPays > _amountSolverReceives) {
             if (!ctx.solverSuccessful) {
                 revert InsufficientTotalBalance(_amountSolverPays - _amountSolverReceives);
             }
 
             uint256 _currentDeficit =
-                _assign(_winningSolver, _amountSolverPays - _amountSolverReceives, _adjustedClaims, true);
+                _assign(_winningSolverData, _winningSolver, _amountSolverPays - _amountSolverReceives, true);
             if (_currentDeficit > claimsPaidToBundler) {
                 revert InsufficientTotalBalance(_currentDeficit - claimsPaidToBundler);
             }
             claimsPaidToBundler -= _currentDeficit;
         } else {
-            _credit(_winningSolver, _amountSolverReceives - _amountSolverPays, _adjustedClaims);
+            _credit(_winningSolverData, _amountSolverReceives - _amountSolverPays, _adjustedClaims);
         }
+
+        // Update analytics for the winning solver
+        // If no winning solver, all analytics updates have already been made in _handleSolverAccounting()
+        if (ctx.solverSuccessful) _updateAnalytics(_winningSolverData, true, _adjustedClaims);
+
+        // Persist changes to winning solver's data back to storage
+        S_accessData[_winningSolver] = _winningSolverData;
+
 
         // Set lock to FullyLocked to prevent any reentrancy possibility
         _setLockPhase(uint8(ExecutionPhase.FullyLocked));
