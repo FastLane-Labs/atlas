@@ -285,7 +285,6 @@ abstract contract GasAccounting is SafetyLocks {
 
         // Persist changes in the _aData memory struct back to storage
         S_accessData[owner] = _aData;
-        t_withdrawals += amount;
     }
 
     /// @notice Accounts for the gas cost of a failed SolverOperation, either by increasing writeoffs (if the bundler is
