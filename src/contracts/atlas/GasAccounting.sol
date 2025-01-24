@@ -269,8 +269,7 @@ abstract contract GasAccounting is SafetyLocks {
     /// @notice Increases the owner's bonded balance by the specified amount.
     /// @param accountData The EscrowAccountAccessData memory struct of the account being credited.
     /// @param amount The amount by which to increase the owner's bonded balance.
-    /// @param gasValueUsed The ETH value of gas used in the SolverOperation.
-    function _credit(EscrowAccountAccessData memory accountData, uint256 amount, uint256 gasValueUsed) internal {
+    function _credit(EscrowAccountAccessData memory accountData, uint256 amount) internal {
         accountData.bonded += SafeCast.toUint112(amount);
         S_bondedTotalSupply += amount;
         // NOTE: accountData changes must be persisted to storage separately
@@ -482,7 +481,7 @@ abstract contract GasAccounting is SafetyLocks {
             }
             claimsPaidToBundler -= _currentDeficit;
         } else {
-            _credit(_winningSolverData, _amountSolverReceives - _amountSolverPays, _adjustedClaims);
+            _credit(_winningSolverData, _amountSolverReceives - _amountSolverPays);
         }
 
         // Update analytics for the winning solver
