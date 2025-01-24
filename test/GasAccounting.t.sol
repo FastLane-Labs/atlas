@@ -44,12 +44,28 @@ contract MockGasAccounting is TestAtlas, BaseTest {
     //  Expose access to internal functions for testing    //
     /////////////////////////////////////////////////////////
 
-    function assign(address owner, uint256 amount, uint256 gasValueUsed, bool solverWon) external returns (uint256) {
-        return _assign(owner, amount, gasValueUsed, solverWon);
+    function assign(
+        EscrowAccountAccessData memory accountData,
+        address account,
+        uint256 amount,
+        bool solverWon
+    ) external returns (uint256) {
+        return _assign(accountData, account, amount, solverWon);
     }
 
-    function credit(address owner, uint256 amount, uint256 gasValueUsed) external {
-        _credit(owner, amount, gasValueUsed);
+    function credit(EscrowAccountAccessData memory accountData, uint256 amount) external {
+        _credit(accountData, amount);
+    }
+
+    // This reads an account's EscrowAccountAccessData to memory to test credit() / assign() behaviour
+    function getAccountData(address account) external view returns (EscrowAccountAccessData memory) {
+        return S_accessData[account];
+    }
+
+    // For use in tests to check credit() / assign() behaviour in memory/storage.
+    // This helps persist the changes in memory to storage
+    function persistAccountData(EscrowAccountAccessData memory accountData, address account) external {
+        S_accessData[account] = accountData;
     }
 
     function handleSolverAccounting(
@@ -787,7 +803,13 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         uint256 bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
         uint256 depositsBefore = mockGasAccounting.deposits();
 
-        uint256 deficit = mockGasAccounting.assign(solverOp.from, assignedAmount, assignedAmount, true);
+        EscrowAccountAccessData memory accountData = mockGasAccounting.getAccountData(solverOp.from);
+
+        uint256 deficit = mockGasAccounting.assign(accountData, solverOp.from, assignedAmount, true);
+
+        // Persist changes to accountData to storage for the sake of testing assign()
+        mockGasAccounting.persistAccountData(accountData, solverOp.from);
+
         assertEq(deficit, 0, "Deficit should be 0");
 
         (, uint32 lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
@@ -812,8 +834,14 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         uint256 bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
         uint256 depositsBefore = mockGasAccounting.deposits();
 
+        EscrowAccountAccessData memory accountData = mockGasAccounting.getAccountData(solverOp.from);
+
         // Call the assign function and capture the deficit
-        uint256 deficit = mockGasAccounting.assign(solverOp.from, assignedAmount, assignedAmount, true);
+        uint256 deficit = mockGasAccounting.assign(accountData, solverOp.from, assignedAmount, true);
+
+        // Persist changes to accountData to storage for the sake of testing assign()
+        mockGasAccounting.persistAccountData(accountData, solverOp.from);
+        
         assertEq(deficit, 0, "Deficit should be 0");
 
         // Retrieve and check the updated access data
@@ -845,7 +873,14 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         uint256 bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
         uint256 depositsBefore = mockGasAccounting.deposits();
-        uint256 deficit = mockGasAccounting.assign(solverOp.from, assignedAmount, assignedAmount, true);
+
+        EscrowAccountAccessData memory accountData = mockGasAccounting.getAccountData(solverOp.from);
+
+        uint256 deficit = mockGasAccounting.assign(accountData, solverOp.from, assignedAmount, true);
+
+        // Persist changes to accountData to storage for the sake of testing assign()
+        mockGasAccounting.persistAccountData(accountData, solverOp.from);
+
         assertEq(deficit, assignedAmount - (unbondingAmount + bondedAmount));
         (, uint32 lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
         assertEq(lastAccessedBlock, uint32(block.number));
@@ -877,12 +912,18 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         vm.txGasPrice(startGasPrice); // Set gas price to 2e9
         assertEq(tx.gasprice, startGasPrice, "tx.gasprice should be 2e9");
         assignedAmount = gasUsedAmount * tx.gasprice;
+
+        EscrowAccountAccessData memory accountData = mockGasAccounting.getAccountData(solverOp.from);
+
         mockGasAccounting.assign({
-            owner: solverOp.from,
+            accountData: accountData,
+            account: solverOp.from,
             amount: assignedAmount,
-            gasValueUsed: assignedAmount,
             solverWon: true
         });
+
+        // Persist changes to accountData to storage for the sake of testing assign()
+        mockGasAccounting.persistAccountData(accountData, solverOp.from);
 
         (,, auctionWins, auctionFails, totalGasValueUsed) = mockGasAccounting.accessData(solverOp.from);
         expectedTotalGasValueUsed = assignedAmount / ONE_GWEI;
@@ -893,12 +934,18 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         vm.txGasPrice(endGasPrice); // Set gas price to 4e9
         assertEq(tx.gasprice, endGasPrice, "tx.gasprice should be 4e9");
         assignedAmount = gasUsedAmount * tx.gasprice;
+
+        accountData = mockGasAccounting.getAccountData(solverOp.from);
+
         mockGasAccounting.assign({
-            owner: solverOp.from,
+            accountData: accountData,
+            account: solverOp.from,
             amount: assignedAmount,
-            gasValueUsed: assignedAmount,
             solverWon: false
         });
+
+        // Persist changes to accountData to storage for the sake of testing assign()
+        mockGasAccounting.persistAccountData(accountData, solverOp.from);
 
         (,, auctionWins, auctionFails, totalGasValueUsed) = mockGasAccounting.accessData(solverOp.from);
         expectedTotalGasValueUsed += assignedAmount / ONE_GWEI;
@@ -915,8 +962,11 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         uint256 bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
         uint256 depositsBefore = mockGasAccounting.deposits();
         (uint112 unbondingBefore,) = mockGasAccounting._balanceOf(solverOp.from);
+
+        EscrowAccountAccessData memory accountData = mockGasAccounting.getAccountData(solverOp.from);
+
         vm.expectRevert(abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 112, assignedAmount));
-        mockGasAccounting.assign(solverOp.from, assignedAmount, assignedAmount, true);
+        mockGasAccounting.assign(accountData, solverOp.from, assignedAmount, true);
 
         // Check assign reverted with overflow, and accounting values did not change
         assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore);
@@ -934,7 +984,12 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         (, lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
         assertEq(lastAccessedBlock, 0);
 
-        mockGasAccounting.credit(solverOp.from, creditedAmount, creditedAmount);
+        EscrowAccountAccessData memory accountData = mockGasAccounting.getAccountData(solverOp.from);
+
+        mockGasAccounting.credit(accountData, creditedAmount);
+
+        // Persist changes to accountData to storage for the sake of testing credit()
+        mockGasAccounting.persistAccountData(accountData, solverOp.from);
 
         (, lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
         (uint112 bondedAfter,,,,) = mockGasAccounting.accessData(solverOp.from);
@@ -943,10 +998,12 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore + creditedAmount);
         assertEq(bondedAfter, bondedBefore + uint112(creditedAmount));
 
+        accountData = mockGasAccounting.getAccountData(solverOp.from);
+
         // Testing uint112 boundary values for casting from uint256 to uint112 in _credit()
         uint256 overflowAmount = uint256(type(uint112).max) + 1;
         vm.expectRevert(abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 112, overflowAmount));
-        mockGasAccounting.credit(solverOp.from, overflowAmount, overflowAmount);
+        mockGasAccounting.credit(accountData, overflowAmount);
     }
 
     function test_handleSolverAccounting_solverNotResponsible() public {
