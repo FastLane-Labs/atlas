@@ -883,7 +883,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         assertEq(deficit, assignedAmount - (unbondingAmount + bondedAmount));
         (, uint32 lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
-        assertEq(lastAccessedBlock, uint32(block.number));
+        assertEq(lastAccessedBlock, uint32(block.number), "assign should update lastAccessedBlock");
         assertEq(mockGasAccounting.bondedTotalSupply(), bondedTotalSupplyBefore - (unbondingAmount + bondedAmount));
         assertEq(mockGasAccounting.deposits(), depositsBefore + (unbondingAmount + bondedAmount));
         (uint112 bonded, uint112 unbonding) = mockGasAccounting._balanceOf(solverOp.from);
@@ -891,6 +891,8 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(bonded, 0);
     }
 
+
+    // TODO refactor to direct updateAnalytics test
     function test_assign_reputationAnalytics() public {
         // NOTE: the `amount` and `gasValueUsed` params for `_assign()` should be measured in ETH value. I.e. they should be calculated as `gasUsed * tx.gasprice`.
         uint256 startGasPrice = 2e9;
@@ -1147,6 +1149,9 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             "Final claims should be less than or equal to initial claims plus deposits"
         );
     }
+
+    // TODO
+    function test_settle_updatesAnalyticsIfWinningSolver() public {}
 
     function test_l2GasCalculatorCall() public {
         IL2GasCalculator gasCalculator = new MockGasCalculator();
