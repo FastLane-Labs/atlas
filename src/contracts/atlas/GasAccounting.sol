@@ -212,13 +212,11 @@ abstract contract GasAccounting is SafetyLocks {
     /// increase transient solver deposits.
     /// @param account The address of the account from which AtlETH is taken.
     /// @param amount The amount of AtlETH to be taken.
-    /// @param solverWon A boolean indicating whether the solver won the bid.
     /// @return deficit The amount of AtlETH that was not repaid, if any.
     function _assign(
         EscrowAccountAccessData memory accountData,
         address account,
-        uint256 amount,
-        bool solverWon
+        uint256 amount
     )
         internal
         returns (uint256 deficit)
