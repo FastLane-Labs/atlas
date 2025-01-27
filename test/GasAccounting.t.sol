@@ -44,16 +44,41 @@ contract MockGasAccounting is TestAtlas, BaseTest {
     //  Expose access to internal functions for testing    //
     /////////////////////////////////////////////////////////
 
+
     function assign(
         EscrowAccountAccessData memory accountData,
         address account,
         uint256 amount
     ) external returns (uint256) {
-        return _assign(accountData, account, amount);
+        uint256 deficit = _assign(accountData, account, amount);
+
+        // Persists memory changes to storage for testing - THIS IS NOT DONE IN THE REAL _assign() func
+        S_accessData[account] = accountData;
+
+        return deficit;
     }
 
-    function credit(EscrowAccountAccessData memory accountData, uint256 amount) external {
+    // Standard args: accountData, amount
+    // Additional arg for tests: account (to store in correct mapping slot)
+    function credit(EscrowAccountAccessData memory accountData,uint256 amount, address account) external {
         _credit(accountData, amount);
+
+        // Persists memory changes to storage for testing - THIS IS NOT DONE IN THE REAL _credit() func
+        S_accessData[account] = accountData;
+    }
+
+    // Standard args: accountData, auctionWon, gasValueUsed
+    // Additional arg for tests: account (to store in correct mapping slot)
+    function updateAnalytics(
+        EscrowAccountAccessData memory aData,
+        bool auctionWon,
+        uint256 gasValueUsed,
+        address account
+    ) external {
+        _updateAnalytics(aData, auctionWon, gasValueUsed);
+
+        // Persists memory changes to storage for testing - THIS IS NOT DONE IN THE REAL _updateAnalytics() func
+        S_accessData[account] = aData;
     }
 
     // This reads an account's EscrowAccountAccessData to memory to test credit() / assign() behaviour
@@ -61,8 +86,6 @@ contract MockGasAccounting is TestAtlas, BaseTest {
         return S_accessData[account];
     }
 
-    // For use in tests to check credit() / assign() behaviour in memory/storage.
-    // This helps persist the changes in memory to storage
     function persistAccountData(EscrowAccountAccessData memory accountData, address account) external {
         S_accessData[account] = accountData;
     }
@@ -806,9 +829,6 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         uint256 deficit = mockGasAccounting.assign(accountData, solverOp.from, assignedAmount);
 
-        // Persist changes to accountData to storage for the sake of testing assign()
-        mockGasAccounting.persistAccountData(accountData, solverOp.from);
-
         assertEq(deficit, 0, "Deficit should be 0");
 
         (, uint32 lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
@@ -837,9 +857,6 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         // Call the assign function and capture the deficit
         uint256 deficit = mockGasAccounting.assign(accountData, solverOp.from, assignedAmount);
-
-        // Persist changes to accountData to storage for the sake of testing assign()
-        mockGasAccounting.persistAccountData(accountData, solverOp.from);
         
         assertEq(deficit, 0, "Deficit should be 0");
 
@@ -873,12 +890,11 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         uint256 bondedTotalSupplyBefore = mockGasAccounting.bondedTotalSupply();
         uint256 depositsBefore = mockGasAccounting.deposits();
 
+        console.log("block:", block.number);
+
         EscrowAccountAccessData memory accountData = mockGasAccounting.getAccountData(solverOp.from);
 
         uint256 deficit = mockGasAccounting.assign(accountData, solverOp.from, assignedAmount);
-
-        // Persist changes to accountData to storage for the sake of testing assign()
-        mockGasAccounting.persistAccountData(accountData, solverOp.from);
 
         assertEq(deficit, assignedAmount - (unbondingAmount + bondedAmount));
         (, uint32 lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
@@ -890,67 +906,42 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(bonded, 0);
     }
 
-
-    // TODO refactor to direct updateAnalytics test
-    function test_assign_reputationAnalytics() public {
-        // NOTE: the `amount` and `gasValueUsed` params for `_assign()` should be measured in ETH value. I.e. they should be calculated as `gasUsed * tx.gasprice`.
-        uint256 startGasPrice = 2e9;
-        uint256 endGasPrice = 4e9;
-        
-        uint256 gasUsedAmount = 1_234_567;
-        uint256 assignedAmount;
-        uint24 auctionWins;
-        uint24 auctionFails;
-        uint64 totalGasValueUsed;
-        uint256 expectedTotalGasValueUsed;
-
-        mockGasAccounting.increaseBondedBalance(solverOp.from, 100e18);
-        (,, auctionWins, auctionFails, totalGasValueUsed) = mockGasAccounting.accessData(solverOp.from);
-        assertEq(auctionWins, 0, "auctionWins should start at 0");
-        assertEq(auctionFails, 0, "auctionFails should start at 0");
-        assertEq(totalGasValueUsed, 0, "totalGasValueUsed should start at 0");
-
-        vm.txGasPrice(startGasPrice); // Set gas price to 2e9
-        assertEq(tx.gasprice, startGasPrice, "tx.gasprice should be 2e9");
-        assignedAmount = gasUsedAmount * tx.gasprice;
-
-        EscrowAccountAccessData memory accountData = mockGasAccounting.getAccountData(solverOp.from);
-
-        mockGasAccounting.assign({
-            accountData: accountData,
-            account: solverOp.from,
-            amount: assignedAmount
+    function test_updateAnalytics() public {
+        EscrowAccountAccessData memory accountData = EscrowAccountAccessData({
+            bonded: 0,
+            lastAccessedBlock: 0,
+            auctionWins: 0,
+            auctionFails: 0,
+            totalGasValueUsed: 0
         });
 
-        // Persist changes to accountData to storage for the sake of testing assign()
-        mockGasAccounting.persistAccountData(accountData, solverOp.from);
+        uint256 DECIMALS_DROPPED = 1e9;
+        uint256 gasValueUsed = 0.5e18; // 0.5 ETH in gas cost
 
-        (,, auctionWins, auctionFails, totalGasValueUsed) = mockGasAccounting.accessData(solverOp.from);
-        expectedTotalGasValueUsed = assignedAmount / ONE_GWEI;
-        assertEq(auctionWins, 1, "auctionWins should be incremented by 1");
-        assertEq(auctionFails, 0, "auctionFails should remain at 0");
-        assertEq(totalGasValueUsed, expectedTotalGasValueUsed, "totalGasValueUsed not as expected");
+        // Win = true, gasValueUsed = 0.5 ETH first
+        mockGasAccounting.updateAnalytics(accountData, true, gasValueUsed, solverOp.from);
 
-        vm.txGasPrice(endGasPrice); // Set gas price to 4e9
-        assertEq(tx.gasprice, endGasPrice, "tx.gasprice should be 4e9");
-        assignedAmount = gasUsedAmount * tx.gasprice;
+        (uint112 bonded, uint32 lastAccessedBlock, uint24 auctionWins, uint24 auctionFails, uint64 totalGasValueUsed) =
+            mockGasAccounting.accessData(solverOp.from);
+
+        assertEq(bonded, 0, "bonded should not change");
+        assertEq(lastAccessedBlock, 0, "lastAccessedBlock should not change");
+        assertEq(auctionWins, 1, "auctionWins should increase to 1");
+        assertEq(auctionFails, 0, "auctionFails should stay 0");
+        assertEq(totalGasValueUsed, gasValueUsed / DECIMALS_DROPPED, "totalGasValueUsed should be updated");
 
         accountData = mockGasAccounting.getAccountData(solverOp.from);
 
-        mockGasAccounting.assign({
-            accountData: accountData,
-            account: solverOp.from,
-            amount: assignedAmount
-        });
+        // Win = false, gasValueUsed = 1 ETH now
+        mockGasAccounting.updateAnalytics(accountData, false, gasValueUsed * 2, solverOp.from);
 
-        // Persist changes to accountData to storage for the sake of testing assign()
-        mockGasAccounting.persistAccountData(accountData, solverOp.from);
+        (bonded, lastAccessedBlock, auctionWins, auctionFails, totalGasValueUsed) = mockGasAccounting.accessData(solverOp.from);
 
-        (,, auctionWins, auctionFails, totalGasValueUsed) = mockGasAccounting.accessData(solverOp.from);
-        expectedTotalGasValueUsed += assignedAmount / ONE_GWEI;
-        assertEq(auctionWins, 1, "auctionWins should remain at 1");
-        assertEq(auctionFails, 1, "auctionFails should be incremented by 1");
-        assertEq(totalGasValueUsed, expectedTotalGasValueUsed, "totalGasValueUsed not as expected");
+        assertEq(bonded, 0, "bonded should not change");
+        assertEq(lastAccessedBlock, 0, "lastAccessedBlock should not change");
+        assertEq(auctionWins, 1, "auctionWins should stay 1");
+        assertEq(auctionFails, 1, "auctionFails should increase to 1");
+        assertEq(totalGasValueUsed, gasValueUsed * 3 / DECIMALS_DROPPED, "totalGasValueUsed should be updated");
     }
 
     function test_assign_overflow_reverts() public {
@@ -985,10 +976,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         EscrowAccountAccessData memory accountData = mockGasAccounting.getAccountData(solverOp.from);
 
-        mockGasAccounting.credit(accountData, creditedAmount);
-
-        // Persist changes to accountData to storage for the sake of testing credit()
-        mockGasAccounting.persistAccountData(accountData, solverOp.from);
+        mockGasAccounting.credit(accountData, creditedAmount, solverOp.from);
 
         (, lastAccessedBlock,,,) = mockGasAccounting.accessData(solverOp.from);
         (uint112 bondedAfter,,,,) = mockGasAccounting.accessData(solverOp.from);
@@ -1002,7 +990,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         // Testing uint112 boundary values for casting from uint256 to uint112 in _credit()
         uint256 overflowAmount = uint256(type(uint112).max) + 1;
         vm.expectRevert(abi.encodeWithSelector(SafeCast.SafeCastOverflowedUintDowncast.selector, 112, overflowAmount));
-        mockGasAccounting.credit(accountData, overflowAmount);
+        mockGasAccounting.credit(accountData, overflowAmount, solverOp.from);
     }
 
     function test_handleSolverAccounting_solverNotResponsible() public {
