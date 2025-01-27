@@ -311,7 +311,7 @@ abstract contract GasAccounting is SafetyLocks {
             // In `_assign()`, the failing solver's bonded AtlETH balance is reduced by `_gasUsedWithSurcharges`. Any
             // deficit from that operation is added to `writeoffs` and returned as `_assignDeficit` below. The portion
             // that can be covered by the solver's AtlETH is added to `deposits`, to account that it has been paid.
-            uint256 _assignDeficit = _assign(_solverAccountData, solverOp.from, _gasUsedWithSurcharges, false);
+            uint256 _assignDeficit = _assign(_solverAccountData, solverOp.from, _gasUsedWithSurcharges);
 
             // Solver's analytics updated:
             // - increment auctionFails
@@ -473,7 +473,7 @@ abstract contract GasAccounting is SafetyLocks {
             }
 
             uint256 _currentDeficit =
-                _assign(_winningSolverData, _winningSolver, _amountSolverPays - _amountSolverReceives, true);
+                _assign(_winningSolverData, _winningSolver, _amountSolverPays - _amountSolverReceives);
             if (_currentDeficit > claimsPaidToBundler) {
                 revert InsufficientTotalBalance(_currentDeficit - claimsPaidToBundler);
             }
