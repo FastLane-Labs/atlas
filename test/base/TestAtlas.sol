@@ -38,7 +38,8 @@ contract TestAtlas is Atlas {
         t_claims = 0;
         t_fees = 0;
         t_writeoffs = 0;
-        t_withdrawals = 0;
+        t_borrows = 0;
+        t_repays = 0;
         t_deposits = 0;
         t_solverSurcharge = 0;
     }
@@ -71,8 +72,12 @@ contract TestAtlas is Atlas {
         t_writeoffs = newWriteoffs;
     }
 
-    function setWithdrawals(uint256 newWithdrawals) public {
-        t_withdrawals = newWithdrawals;
+    function setBorrows(uint256 newBorrows) public {
+        t_borrows = newBorrows;
+    }
+
+    function setRepays(uint256 newRepays) public {
+        t_repays = newRepays;
     }
 
     function setDeposits(uint256 newDeposits) public {
@@ -93,8 +98,12 @@ contract TestAtlas is Atlas {
         return t_writeoffs;
     }
 
-    function withdrawals() external view returns (uint256) {
-        return t_withdrawals;
+    function borrows() external view returns (uint256) {
+        return t_borrows;
+    }
+
+    function repays() external view returns (uint256) {
+        return t_repays;
     }
 
     function deposits() external view returns (uint256) {

@@ -151,8 +151,9 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
 
         // Calculate the portion of the final _gasMarker var that solvers may repay if all fail. This does not include
         // the bid-finding gas costs which the bundler always pays for. Needs calldata and execution components.
-        allSolversGasLimit = (_getSolverOpsCalldataLength(userOp.data.length, msgDataLength) * _CALLDATA_LENGTH_PREMIUM_HALVED)
-            + (_solverOpCount * dConfig.solverGasLimit);
+        allSolversGasLimit = (
+            _getSolverOpsCalldataLength(userOp.data.length, msgDataLength) * _CALLDATA_LENGTH_PREMIUM_HALVED
+        ) + (_solverOpCount * dConfig.solverGasLimit);
 
         // Some checks are only needed when call is not a simulation
         if (isSimulation) {
@@ -588,7 +589,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         pure
         returns (uint256 solverOpsLength)
     {
-        solverOpsLength =
-            msgDataLength - (USER_OP_STATIC_LENGTH + userOpDataLength) - DAPP_OP_LENGTH - _EXTRA_METACALL_CALLDATA_LENGTH;
+        solverOpsLength = msgDataLength - (USER_OP_STATIC_LENGTH + userOpDataLength) - DAPP_OP_LENGTH
+            - _EXTRA_METACALL_CALLDATA_LENGTH;
     }
 }
