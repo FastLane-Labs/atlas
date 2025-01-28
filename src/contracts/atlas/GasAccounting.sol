@@ -7,6 +7,7 @@ import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.s
 import { SafetyLocks } from "./SafetyLocks.sol";
 import { EscrowBits } from "../libraries/EscrowBits.sol";
 import { AccountingMath } from "../libraries/AccountingMath.sol";
+import { GasAccLib, GasLedger, BorrowsLedger } from "../libraries/GasAccLib.sol";
 import { SolverOperation } from "../types/SolverOperation.sol";
 import { DAppConfig } from "../types/ConfigTypes.sol";
 import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
@@ -19,6 +20,8 @@ import "../types/LockTypes.sol";
 abstract contract GasAccounting is SafetyLocks {
     using EscrowBits for uint256;
     using AccountingMath for uint256;
+    using GasAccLib for GasLedger;
+    using GasAccLib for BorrowsLedger;
 
     constructor(
         uint256 escrowDuration,
@@ -46,6 +49,18 @@ abstract contract GasAccounting is SafetyLocks {
     function _initializeAccountingValues(uint256 gasMarker) internal {
         (uint256 _atlasSurchargeRate, uint256 _bundlerSurchargeRate) = _surchargeRates();
         uint256 _rawClaims = gasMarker * tx.gasprice;
+
+        t_gasLedger = GasLedger({
+            totalMetacallGas: uint64(gasMarker), // TODO cleaner cast or arg starts as uint64
+            solverFaultFailureGas: 0,
+            unreachedSolverGas: 123, // TODO get this
+            maxApprovedGasSpend: 0
+        }).pack();
+
+        t_borrowsLedger = BorrowsLedger({
+            borrows: 0,
+            repays: uint128(msg.value)
+        }).pack();
 
         // The 3 components of gas cost charged to solvers are:
         // - Base gas cost (g)
