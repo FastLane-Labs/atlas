@@ -41,10 +41,14 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
     uint256 internal transient t_writeoffs;
     uint256 internal transient t_deposits; // TODO use for gas repayments for now. Will be removed in gas acc refactor
     uint256 internal transient t_maxApprovedGasSpend; // Solver's max gas spend set when calling reconcile()
-
-    // Tracks native token value of all borrows and repayments
     uint256 internal transient t_borrows;
     uint256 internal transient t_repays;
+
+    // TODO remove above t vars when this ledger works
+    uint256 internal transient t_gasLedger;
+
+    // Tracks native token value of all borrows and repayments
+    uint256 internal transient t_borrowsLedger;
 
     // AtlETH storage
     uint256 internal S_totalSupply;
