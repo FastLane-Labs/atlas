@@ -180,6 +180,11 @@ contract Storage is AtlasEvents, AtlasErrors, AtlasConstants {
         bundlerRate = _bothRates & ((1 << 128) - 1);
     }
 
+    function _totalSurchargeRate() internal view returns(uint256 totalSurchargeRate) {
+        (uint256 atlasRate, uint256 bundlerRate) = _surchargeRates();
+        totalSurchargeRate = atlasRate + bundlerRate;
+    }
+
     // ---------------------------------------------------- //
     //              Transient External Getters              //
     // ---------------------------------------------------- //

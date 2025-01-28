@@ -20,8 +20,10 @@ import "../types/LockTypes.sol";
 abstract contract GasAccounting is SafetyLocks {
     using EscrowBits for uint256;
     using AccountingMath for uint256;
+    using SafeCast for uint256;
     using GasAccLib for GasLedger;
     using GasAccLib for BorrowsLedger;
+    using GasAccLib for uint256;
 
     constructor(
         uint256 escrowDuration,
@@ -46,21 +48,18 @@ abstract contract GasAccounting is SafetyLocks {
     /// @notice Sets the initial gas accounting values for the metacall transaction.
     /// @param gasMarker The gasMarker measurement at the start of the metacall, which includes Execution gas limits,
     /// Calldata gas costs, and an additional buffer for safety.
-    function _initializeAccountingValues(uint256 gasMarker) internal {
+    function _initializeAccountingValues(uint256 gasMarker, uint256 allSolverOpsGas) internal {
         (uint256 _atlasSurchargeRate, uint256 _bundlerSurchargeRate) = _surchargeRates();
         uint256 _rawClaims = gasMarker * tx.gasprice;
 
         t_gasLedger = GasLedger({
-            totalMetacallGas: uint64(gasMarker), // TODO cleaner cast or arg starts as uint64
+            totalMetacallGas: uint64(gasMarker),
             solverFaultFailureGas: 0,
-            unreachedSolverGas: 123, // TODO get this
+            unreachedSolverGas: uint64(allSolverOpsGas),
             maxApprovedGasSpend: 0
         }).pack();
 
-        t_borrowsLedger = BorrowsLedger({
-            borrows: 0,
-            repays: uint128(msg.value)
-        }).pack();
+        t_borrowsLedger = BorrowsLedger({ borrows: 0, repays: uint128(msg.value) }).pack();
 
         // The 3 components of gas cost charged to solvers are:
         // - Base gas cost (g)
@@ -81,6 +80,7 @@ abstract contract GasAccounting is SafetyLocks {
         t_writeoffs = 0;
         t_borrows = 0;
         t_solverSurcharge = 0;
+
         t_solverLock = 0;
         t_solverTo = address(0);
 
@@ -124,31 +124,10 @@ abstract contract GasAccounting is SafetyLocks {
     /// balance or native token.
     /// @return borrowLiability The total value of ETH borrowed but not yet repaid, only repayable using native token.
     function shortfall() external view returns (uint256 gasLiability, uint256 borrowLiability) {
-        gasLiability = t_claims + t_fees - t_writeoffs - t_deposits;
-        borrowLiability = (t_borrows < t_repays) ? 0 : t_borrows - t_repays;
-    }
+        gasLiability = t_gasLedger.toGasLedger().solverGasLiability(_totalSurchargeRate());
 
-    // TODO rework comments and logic in gas acc refactor
-    function _gasDeficit() internal view returns (uint256) {
-        // _deficit() is compared against t_deposits which includes:
-        // + msg.value deposited
-        // + gas cost + A + B (prev solver fault fails)
-
-        // _deficit() is therefore composed of:
-        // + withdrawals = msg.value borrowed
-        // + claims = gas cost + B (full tx)
-        // + fees = A (full tx)
-        // - writeoffs = gas cost + A + B (prev bundler fault fails)
-
-        // Such that `deficit() - t_deposits` =
-        // + msg.value still owed
-        // + gas cost + A + B (full tx)
-        // - gas cost + A + B (prev solver fault fails)
-        // - gas cost + A + B (prev bundler fault fails)
-        // == only what the current solver owes if they win
-
-        // NOTE: Above is outdated. This is gas deficit only. Not borrow-repay deficit
-        return t_claims + t_fees - t_writeoffs;
+        BorrowsLedger memory bL = t_borrowsLedger.toBorrowsLedger();
+        borrowLiability = (bL.borrows < bL.repays) ? 0 : bL.borrows - bL.repays;
     }
 
     /// @notice Allows a solver to settle any outstanding ETH owed, either to repay gas used by their solverOp or to
@@ -179,16 +158,24 @@ abstract contract GasAccounting is SafetyLocks {
         // Solver can only approve up to their bonded balance, not more
         if (maxApprovedGasSpend > _bondedBalance) maxApprovedGasSpend = _bondedBalance;
 
-        // Store solver's maxApprovedGasSpend for use in the _isBalanceReconciled() check
-        t_maxApprovedGasSpend = maxApprovedGasSpend;
+        GasLedger memory gL = t_gasLedger.toGasLedger();
+        BorrowsLedger memory bL = t_borrowsLedger.toBorrowsLedger();
 
-        uint256 _borrows = t_borrows; // total native borrows
-        uint256 _repays = t_repays; // total native repayments of borrows
-        uint256 _maxGasLiability = _gasDeficit(); // max gas liability of winning solver
+        uint256 _borrows = bL.borrows; // total native borrows
+        uint256 _repays = bL.repays; // total native repayments of borrows
+        uint256 _maxGasLiability = gL.solverGasLiability(_totalSurchargeRate()); // max gas liability of winning solver
 
+        // Store update to repays in t_borrowLedger, if any msg.value sent
         if (msg.value > 0) {
             _repays += msg.value;
-            t_repays = _repays;
+            bL.repays = _repays.toUint128();
+        }
+
+        // Store solver's maxApprovedGasSpend for use in the _isBalanceReconciled() check
+        if (maxApprovedGasSpend > 0) {
+            // Convert maxApprovedGasSpend from wei (native token) units to gas units
+            gL.maxApprovedGasSpend = uint64(maxApprovedGasSpend / tx.gasprice);
+            t_gasLedger = gL.pack();
         }
 
         // Check if fullfilled:
@@ -213,7 +200,11 @@ abstract contract GasAccounting is SafetyLocks {
 
     /// @notice Internal function to handle ETH contribution, increasing deposits if a non-zero value is sent.
     function _contribute() internal {
-        if (msg.value != 0) t_repays += msg.value;
+        if (msg.value == 0) return;
+
+        BorrowsLedger memory bL = t_borrowsLedger.toBorrowsLedger();
+        bL.repays += msg.value.toUint128();
+        t_borrowsLedger = bL.pack();
     }
 
     /// @notice Borrows ETH from the contract, transferring the specified amount to the caller if available.
@@ -226,7 +217,9 @@ abstract contract GasAccounting is SafetyLocks {
         if (amount == 0) return true;
         if (address(this).balance < amount) return false;
 
-        t_borrows += amount;
+        BorrowsLedger memory borrowsLedger = t_borrowsLedger.toBorrowsLedger();
+        borrowsLedger.borrows += amount.toUint128();
+        t_borrowsLedger = borrowsLedger.pack();
 
         return true;
     }
@@ -244,7 +237,7 @@ abstract contract GasAccounting is SafetyLocks {
         internal
         returns (uint256 deficit)
     {
-        uint112 _amt = SafeCast.toUint112(amount);
+        uint112 _amt = amount.toUint112();
 
         // EscrowAccountAccessData memory _aData = S_accessData[account];
 
@@ -270,7 +263,7 @@ abstract contract GasAccounting is SafetyLocks {
             } else {
                 // The unbonding balance is sufficient to cover the remaining amount owed. Draw everything from the
                 // bonded balance, and adjust the unbonding balance accordingly.
-                s_balanceOf[account].unbonding = SafeCast.toUint112(_total - _amt);
+                s_balanceOf[account].unbonding = (_total - _amt).toUint112();
                 accountData.bonded = 0;
             }
         } else {
@@ -558,6 +551,9 @@ abstract contract GasAccounting is SafetyLocks {
     /// @notice Checks all obligations have been reconciled: native borrows AND gas liabilities.
     /// @return True if both dimensions are reconciled, false otherwise.
     function _isBalanceReconciled() internal view returns (bool) {
-        return t_repays >= t_borrows && t_deposits + t_maxApprovedGasSpend >= _gasDeficit();
+        GasLedger memory gL = t_gasLedger.toGasLedger();
+        BorrowsLedger memory bL = t_borrowsLedger.toBorrowsLedger();
+
+        return (bL.repays >= bL.borrows) && (gL.maxApprovedGasSpend >= gL.solverGasLiability(_totalSurchargeRate()));
     }
 }

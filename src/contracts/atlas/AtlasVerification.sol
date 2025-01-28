@@ -149,6 +149,8 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             gasLimitSum += (dConfig.solverGasLimit + _BID_FIND_OVERHEAD) * _solverOpCount;
         }
 
+        // TODO change to loop for accuracy per item: solverOp.gas + solverOp.data.length
+
         // Calculate the portion of the final _gasMarker var that solvers may repay if all fail. This does not include
         // the bid-finding gas costs which the bundler always pays for. Needs calldata and execution components.
         allSolversGasLimit = (

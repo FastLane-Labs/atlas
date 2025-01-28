@@ -120,7 +120,7 @@ contract Atlas is Escrow, Factory {
 
         // Initialize the environment lock and accounting values
         _setEnvironmentLock(_dConfig, _vars.executionEnvironment);
-        _initializeAccountingValues(_gasMarker);
+        _initializeAccountingValues(_gasMarker, _vars.allSolversGasLimit);
 
         // Calculate `execute` gas limit such that it can fail due to an OOG error caused by any of the hook calls, and
         // the metacall will still have enough gas to gracefully finish and return, storing any nonces required.
@@ -131,8 +131,7 @@ contract Atlas is Escrow, Factory {
         // be either a TRUSTED or DEFAULT hash, depending on the allowsTrustedOpHash setting.
         try this.execute{ gas: _gasLimit }(_dConfig, userOp, solverOps, _vars) returns (Context memory ctx) {
             // Gas Refund to sender only if execution is successful
-            (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) =
-                _settle(ctx, gasRefundBeneficiary);
+            (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) = _settle(ctx, gasRefundBeneficiary);
 
             auctionWon = ctx.solverSuccessful;
             emit MetacallResult(

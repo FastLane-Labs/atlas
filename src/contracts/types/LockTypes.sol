@@ -18,6 +18,8 @@ struct Context {
     uint32 allSolversGasLimit; // Gas limit for all solvers, used in bonded balance check calc
 }
 
+// TODO might not need allSolversGasLimit anymore ^^
+
 struct StackVars {
     uint256 allSolversGasLimit; // TODO either do uint32 here or uint256 in Context
     bytes32 userOpHash;

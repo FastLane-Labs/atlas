@@ -181,7 +181,6 @@ abstract contract Escrow is AtlETH {
         uint256 _gasWaterMark = gasleft();
         uint256 _result;
         if (!prevalidated) {
-
             // TODO return total solver gas here = solverOp.gas + solverOp calldata gas
             // pass it below to: check bonded, writeoff, assign
             // if solver wins: decrease remainingSolverGas, and continue to _settle()
@@ -362,15 +361,17 @@ abstract contract Escrow is AtlETH {
 
         {
             (uint256 _atlasSurchargeRate, uint256 _bundlerSurchargeRate) = _surchargeRates();
-            uint256 _solverOpCalldataGas = (solverOp.data.length + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM_HALVED;
+            uint256 _solverOpCalldataGas =
+                (solverOp.data.length + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM_HALVED;
 
             // Max gas value payable by solver calculated as:
-            // = max metacall gas cost (execution + calldata) (incl surcharges) 
+            // = max metacall gas cost (execution + calldata) (incl surcharges)
             // - (all solvers' gas limits - current solver's gas limit) * tx.gasprice * (base + surcharges)
 
             _maxGasValue = (t_claims + t_fees)
-            - ((allSolversGasLimit - (gasLimit + _solverOpCalldataGas)) * tx.gasprice)
-                .withSurcharges(_atlasSurchargeRate, _bundlerSurchargeRate);
+                - ((allSolversGasLimit - (gasLimit + _solverOpCalldataGas)) * tx.gasprice).withSurcharges(
+                    _atlasSurchargeRate, _bundlerSurchargeRate
+                );
         }
 
         // Claims + Fees represents the base gas cost + the Atlas surcharge + the Bundler surcharge, if the full gas
