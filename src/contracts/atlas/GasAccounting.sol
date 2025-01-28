@@ -59,8 +59,8 @@ abstract contract GasAccounting is SafetyLocks {
         // Fees records only the A portion of gas charge
         t_fees = _rawClaims.getSurcharge(_atlasSurchargeRate);
 
-        // If any native token sent in the metacall, add to the deposits account
-        t_deposits = msg.value;
+        // If any native token sent in the metacall, add to the repays account
+        t_repays = msg.value;
 
         // Explicitly set other transient vars to 0 in case multiple metacalls in single tx.
         t_writeoffs = 0;
@@ -198,7 +198,7 @@ abstract contract GasAccounting is SafetyLocks {
 
     /// @notice Internal function to handle ETH contribution, increasing deposits if a non-zero value is sent.
     function _contribute() internal {
-        if (msg.value != 0) t_deposits += msg.value;
+        if (msg.value != 0) t_repays += msg.value;
     }
 
     /// @notice Borrows ETH from the contract, transferring the specified amount to the caller if available.
