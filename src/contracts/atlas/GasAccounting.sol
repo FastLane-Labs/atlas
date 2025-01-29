@@ -126,8 +126,8 @@ abstract contract GasAccounting is SafetyLocks {
     function shortfall() external view returns (uint256 gasLiability, uint256 borrowLiability) {
         gasLiability = t_gasLedger.toGasLedger().solverGasLiability(_totalSurchargeRate());
 
-        BorrowsLedger memory bL = t_borrowsLedger.toBorrowsLedger();
-        borrowLiability = (bL.borrows < bL.repays) ? 0 : bL.borrows - bL.repays;
+        BorrowsLedger memory _bL = t_borrowsLedger.toBorrowsLedger();
+        borrowLiability = (_bL.borrows < _bL.repays) ? 0 : _bL.borrows - _bL.repays;
     }
 
     /// @notice Allows a solver to settle any outstanding ETH owed, either to repay gas used by their solverOp or to
@@ -158,24 +158,25 @@ abstract contract GasAccounting is SafetyLocks {
         // Solver can only approve up to their bonded balance, not more
         if (maxApprovedGasSpend > _bondedBalance) maxApprovedGasSpend = _bondedBalance;
 
-        GasLedger memory gL = t_gasLedger.toGasLedger();
-        BorrowsLedger memory bL = t_borrowsLedger.toBorrowsLedger();
+        GasLedger memory _gL = t_gasLedger.toGasLedger();
+        BorrowsLedger memory _bL = t_borrowsLedger.toBorrowsLedger();
 
-        uint256 _borrows = bL.borrows; // total native borrows
-        uint256 _repays = bL.repays; // total native repayments of borrows
-        uint256 _maxGasLiability = gL.solverGasLiability(_totalSurchargeRate()); // max gas liability of winning solver
+        uint256 _borrows = _bL.borrows; // total native borrows
+        uint256 _repays = _bL.repays; // total native repayments of borrows
+        uint256 _maxGasLiability = _gL.solverGasLiability(_totalSurchargeRate()); // max gas liability of winning solver
 
         // Store update to repays in t_borrowLedger, if any msg.value sent
         if (msg.value > 0) {
             _repays += msg.value;
-            bL.repays = _repays.toUint128();
+            _bL.repays = _repays.toUint128();
+            t_borrowsLedger = _bL.pack();
         }
 
         // Store solver's maxApprovedGasSpend for use in the _isBalanceReconciled() check
         if (maxApprovedGasSpend > 0) {
             // Convert maxApprovedGasSpend from wei (native token) units to gas units
-            gL.maxApprovedGasSpend = uint64(maxApprovedGasSpend / tx.gasprice);
-            t_gasLedger = gL.pack();
+            _gL.maxApprovedGasSpend = uint64(maxApprovedGasSpend / tx.gasprice);
+            t_gasLedger = _gL.pack();
         }
 
         // Check if fullfilled:
@@ -202,9 +203,9 @@ abstract contract GasAccounting is SafetyLocks {
     function _contribute() internal {
         if (msg.value == 0) return;
 
-        BorrowsLedger memory bL = t_borrowsLedger.toBorrowsLedger();
-        bL.repays += msg.value.toUint128();
-        t_borrowsLedger = bL.pack();
+        BorrowsLedger memory _bL = t_borrowsLedger.toBorrowsLedger();
+        _bL.repays += msg.value.toUint128();
+        t_borrowsLedger = _bL.pack();
     }
 
     /// @notice Borrows ETH from the contract, transferring the specified amount to the caller if available.
@@ -217,9 +218,9 @@ abstract contract GasAccounting is SafetyLocks {
         if (amount == 0) return true;
         if (address(this).balance < amount) return false;
 
-        BorrowsLedger memory borrowsLedger = t_borrowsLedger.toBorrowsLedger();
-        borrowsLedger.borrows += amount.toUint128();
-        t_borrowsLedger = borrowsLedger.pack();
+        BorrowsLedger memory _bL = t_borrowsLedger.toBorrowsLedger();
+        _bL.borrows += amount.toUint128();
+        t_borrowsLedger = _bL.pack();
 
         return true;
     }
@@ -238,8 +239,6 @@ abstract contract GasAccounting is SafetyLocks {
         returns (uint256 deficit)
     {
         uint112 _amt = amount.toUint112();
-
-        // EscrowAccountAccessData memory _aData = S_accessData[account];
 
         if (_amt > accountData.bonded) {
             // The bonded balance does not cover the amount owed. Check if there is enough unbonding balance to
