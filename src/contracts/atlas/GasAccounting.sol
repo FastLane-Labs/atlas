@@ -206,64 +206,11 @@ abstract contract GasAccounting is SafetyLocks {
 
     /// @notice Takes AtlETH from the owner's bonded balance and, if necessary, from the owner's unbonding balance to
     /// increase transient solver deposits.
+    /// @dev No GasLedger accounting changes are made in this function - should be done separately.
     /// @param account The address of the account from which AtlETH is taken.
     /// @param amount The amount of AtlETH to be taken.
     /// @return deficit The amount of AtlETH that was not repaid, if any.
     function _assign(
-        EscrowAccountAccessData memory accountData,
-        address account,
-        uint256 amount
-    )
-        internal
-        returns (uint256 deficit)
-    {
-        uint112 _amt = amount.toUint112();
-
-        if (_amt > accountData.bonded) {
-            // The bonded balance does not cover the amount owed. Check if there is enough unbonding balance to
-            // make up for the missing difference. If not, there is a deficit. Atlas does not consider drawing from
-            // the regular AtlETH balance (not bonded nor unbonding) to cover the remaining deficit because it is
-            // not meant to be used within an Atlas transaction, and must remain independent.
-
-            EscrowAccountBalance memory _bData = s_balanceOf[account];
-            uint256 _total = uint256(_bData.unbonding) + uint256(accountData.bonded);
-
-            if (_amt > _total) {
-                // The unbonding balance is insufficient to cover the remaining amount owed. There is a deficit. Set
-                // both bonded and unbonding balances to 0 and adjust the "amount" variable to reflect the amount
-                // that was actually deducted.
-                deficit = amount - _total;
-                s_balanceOf[account].unbonding = 0;
-                accountData.bonded = 0;
-
-                t_writeoffs += deficit;
-                amount -= deficit; // Set amount equal to total to accurately track the changing bondedTotalSupply
-            } else {
-                // The unbonding balance is sufficient to cover the remaining amount owed. Draw everything from the
-                // bonded balance, and adjust the unbonding balance accordingly.
-                s_balanceOf[account].unbonding = (_total - _amt).toUint112();
-                accountData.bonded = 0;
-            }
-        } else {
-            // The bonded balance is sufficient to cover the amount owed.
-            accountData.bonded -= _amt;
-        }
-
-        // update lastAccessedBlock since balance is decreasing
-        accountData.lastAccessedBlock = uint32(block.number);
-
-        // NOTE: accountData changes must be persisted to storage separately
-
-        S_bondedTotalSupply -= amount;
-        t_deposits += amount;
-    }
-
-    // TODO clean this up - attempt to split _assign() into funds and accounting functions
-
-    // Funds part of the original _assign() function.
-    // Takes funds from account's bonded balance, and from unbonding balance if bonded is insufficient.
-    // Returns any deficit that could not be covered by bonded and unbonding balances.
-    function _assignAccount(
         EscrowAccountAccessData memory accountData,
         address account,
         uint256 amount
