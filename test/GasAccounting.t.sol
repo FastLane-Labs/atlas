@@ -90,7 +90,7 @@ contract MockGasAccounting is TestAtlas, BaseTest {
         S_accessData[account] = accountData;
     }
 
-    function handleSolverAccounting(
+    function handleSolverFailAccounting(
         SolverOperation calldata solverOp,
         uint256 gasWaterMark,
         uint256 result,
@@ -98,7 +98,7 @@ contract MockGasAccounting is TestAtlas, BaseTest {
     )
         external
     {
-        _handleSolverAccounting(solverOp, gasWaterMark, result, includeCalldata);
+        _handleSolverFailAccounting(solverOp, gasWaterMark, result, includeCalldata);
     }
 
     function settle(Context memory ctx) external returns (uint256, uint256) {
@@ -813,7 +813,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         vm.skip(true);
         // the gas amount param passed to _assign() can never be zero in Atlas core contracts.
         // _assign() is called in 2 places:
-        // 1. in _handleSolverAccounting() where the amount is explicitly checked and will return before calling
+        // 1. in _handleSolverFailAccounting() where the amount is explicitly checked and will return before calling
         // _assign() if the gasUsed amount is zero.
         // 2. in _settle() where the amount is calculated as (_amountSolverPays - _amountSolverReceives) and only
         // done when _amountSolverPays > _amountSolverReceives, so that amount is always greater than zero.

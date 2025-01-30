@@ -30,7 +30,8 @@ contract AtlasConstants {
     // `msg.data.length / 2 * 16` because 2 hex chars per byte.
     uint256 internal constant _BASE_TX_GAS_USED = 21_000;
     uint256 internal constant _SOLVER_OP_BASE_CALLDATA = 608; // SolverOperation calldata length excluding solverOp.data
-    uint256 internal constant _SOLVER_BASE_GAS_USED = 5000; // Base gas charged to solver in `_handleSolverAccounting()`
+    uint256 internal constant _SOLVER_BASE_GAS_USED = 5000; // Base gas charged to solver in
+        // `_handleSolverFailAccounting()`
     uint256 internal constant _BUNDLER_GAS_PENALTY_BUFFER = 500_000;
 
     // First 160 bits of _solverLock are the address of the current solver.

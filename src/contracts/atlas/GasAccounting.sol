@@ -272,7 +272,7 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param gasWaterMark The `gasleft()` watermark taken at the start of executing the SolverOperation.
     /// @param result The result bitmap of the SolverOperation execution.
     /// @param includeCalldata Whether to include calldata cost in the gas calculation.
-    function _handleSolverAccounting(
+    function _handleSolverFailAccounting(
         SolverOperation calldata solverOp,
         uint256 gasWaterMark,
         uint256 result,
@@ -287,14 +287,13 @@ abstract contract GasAccounting is SafetyLocks {
         uint256 _gasUsed = gasWaterMark + _SOLVER_BASE_GAS_USED - gasleft();
 
         // TODO check if we still need includeCalldata - true when prevalidated = false???
-        // TODO also deduct solverOp gas limit from remainingMaxGas
 
         if (includeCalldata) {
             _gasUsed += _calldataGas;
         }
 
         // TODO make sure this mirror calc in AtlasVerification. May need buffer. Refactor to lib.
-        _gL.remainingMaxGas -= uint48(solverOp.gas + _calldataGas);
+        _gL.remainingMaxGas -= uint48(solverOp.gas + _calldataGas); // deduct solverOp's max gas
 
         // Calculate what the solver owes
         // NOTE: This will cause an error if you are simulating with a gasPrice of 0
@@ -308,11 +307,9 @@ abstract contract GasAccounting is SafetyLocks {
 
             EscrowAccountAccessData memory _solverAccountData = S_accessData[solverOp.from];
 
-            // TODO update comment to indicate no GasAcc changes in assignAccount
-            // In `_assign()`, the failing solver's bonded AtlETH balance is reduced by `_gasUsedWithSurcharges`. Any
-            // deficit from that operation is added to `writeoffs` and returned as `_assignDeficit` below. The portion
-            // that can be covered by the solver's AtlETH is added to `deposits`, to account that it has been paid.
-            uint256 _assignDeficit = _assignAccount(_solverAccountData, solverOp.from, _gasValueWithSurcharges);
+            // In `_assign()`, the solver's bonded AtlETH balance is reduced by `_gasValueWithSurcharges`. Any deficit
+            // from that operation is returned as `_assignDeficit` below. GasLedger is not modified in _assign().
+            uint256 _assignDeficit = _assign(_solverAccountData, solverOp.from, _gasValueWithSurcharges);
 
             // Solver's analytics updated:
             // - increment auctionFails
@@ -340,9 +337,10 @@ abstract contract GasAccounting is SafetyLocks {
         }
     }
 
-    function _writeOffBidFindGasCost(uint256 gasUsed) internal {
-        (uint256 _atlasSurchargeRate, uint256 _bundlerSurchargeRate) = _surchargeRates();
-        t_writeoffs += gasUsed.withSurcharges(_atlasSurchargeRate, _bundlerSurchargeRate);
+    function _writeOffBidFindGas(uint256 gasUsed) internal {
+        GasLedger memory _gL = t_gasLedger.toGasLedger();
+        _gL.writeoffsGas += uint48(gasUsed);
+        t_gasLedger = _gL.pack();
     }
 
     /// @param ctx Context struct containing relevant context information for the Atlas auction.
@@ -383,7 +381,8 @@ abstract contract GasAccounting is SafetyLocks {
             // If a solver was successful, calc the full Atlas gas surcharge on the gas cost of the entire metacall, and
             // add it to withdrawals so that the cost is assigned to winning solver by the end of _settle(). This will
             // be offset by any gas surcharge paid by failed solvers, which would have been added to deposits or
-            // writeoffs in _handleSolverAccounting(). As such, the winning solver does not pay for surcharge on the gas
+            // writeoffs in _handleSolverFailAccounting(). As such, the winning solver does not pay for surcharge on the
+            // gas
             // used by other solvers.
             netAtlasGasSurcharge = _fees - _gasRemainder.getSurcharge(_atlasSurchargeRate);
             adjustedBorrows += netAtlasGasSurcharge;
@@ -487,7 +486,7 @@ abstract contract GasAccounting is SafetyLocks {
         }
 
         // Update analytics for the winning solver
-        // If no winning solver, all analytics updates have already been made in _handleSolverAccounting()
+        // If no winning solver, all analytics updates have already been made in _handleSolverFailAccounting()
         if (ctx.solverSuccessful) _updateAnalytics(_winningSolverData, true, _adjustedClaims);
 
         // Persist changes to winning solver's data back to storage
