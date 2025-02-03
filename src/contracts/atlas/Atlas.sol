@@ -74,6 +74,7 @@ contract Atlas is Escrow, Factory {
                     ? msg.data.length * _CALLDATA_LENGTH_PREMIUM_HALVED
                     : IL2GasCalculator(L2_GAS_CALCULATOR).initialGasUsed(msg.data.length)
             );
+            // TODO move ^ into GasAccLib
 
         DAppConfig memory _dConfig;
         StackVars memory _vars;

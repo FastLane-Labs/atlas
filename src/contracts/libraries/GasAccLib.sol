@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import { AccountingMath } from "./AccountingMath.sol";
+import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
 
 // All GasLedger vars are measured in units of gas.
 // All GasLedger vars also include calldata and execution gas components.
@@ -27,6 +28,10 @@ struct BorrowsLedger {
 
 library GasAccLib {
     using AccountingMath for uint256;
+
+    // TODO refactor AtlasConstants to a lib and import here
+    uint256 internal constant _SOLVER_OP_BASE_CALLDATA = 608;
+    uint256 internal constant _CALLDATA_LENGTH_PREMIUM_HALVED = 8;
 
     function pack(GasLedger memory gasLedger) internal pure returns (uint256) {
         return uint256(gasLedger.remainingMaxGas) | (uint256(gasLedger.writeoffsGas) << 48)
@@ -61,5 +66,15 @@ library GasAccLib {
     // including dApp hook gas limits and userOp gas limit.
     function solverGasLiability(GasLedger memory gL, uint256 totalSurchargeRate) internal pure returns (uint256) {
         return uint256(gL.remainingMaxGas - gL.unreachedSolverGas).withSurcharge(totalSurchargeRate);
+    }
+
+    function solverOpCalldataGas(uint256 calldataLength, address l2GasCalculator) internal view returns (uint256 calldataGas) {
+        if (l2GasCalculator == address(0)) {
+            // Default to using mainnet gas calculations
+            // _SOLVER_OP_BASE_CALLDATA = SolverOperation calldata length excluding solverOp.data
+            calldataGas = (calldataLength + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM_HALVED;
+        } else {
+            calldataGas = IL2GasCalculator(l2GasCalculator).getCalldataGas(calldataLength + _SOLVER_OP_BASE_CALLDATA);
+        }
     }
 }

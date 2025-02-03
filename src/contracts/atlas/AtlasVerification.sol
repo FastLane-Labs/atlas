@@ -9,6 +9,7 @@ import { NonceManager } from "./NonceManager.sol";
 
 import { CallBits } from "../libraries/CallBits.sol";
 import { CallVerification } from "../libraries/CallVerification.sol";
+import { GasAccLib } from "../libraries/GasAccLib.sol";
 import { AtlasErrors } from "../types/AtlasErrors.sol";
 import { AtlasConstants } from "../types/AtlasConstants.sol";
 import "../types/SolverOperation.sol";
@@ -27,7 +28,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     using CallBits for uint32;
     using CallVerification for UserOperation;
 
-    constructor(address atlas) EIP712("AtlasVerification", "1.4") DAppIntegration(atlas) { }
+    constructor(address atlas, address l2GasCalculator) EIP712("AtlasVerification", "1.4") DAppIntegration(atlas, l2GasCalculator) { }
 
     /// @notice The validateCalls function verifies the validity of the metacall calldata components.
     /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
@@ -144,7 +145,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
 
         // Calculate the sum of the various operation gas limits.
         // If bid finding is done on-chain (exPostBids), add extra gas for bid-finding execution of each solverOp
-        gasLimitSum = userOp.gas + dConfig.dappGasLimit + (_solverOpCount * dConfig.solverGasLimit);
+        executionGasLimitSum = userOp.gas + dConfig.dappGasLimit + (_solverOpCount * dConfig.solverGasLimit);
         if (dConfig.callConfig.exPostBids()) {
             gasLimitSum += (dConfig.solverGasLimit + _BID_FIND_OVERHEAD) * _solverOpCount;
         }
@@ -153,9 +154,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
 
         // Calculate the portion of the final _gasMarker var that solvers may repay if all fail. This does not include
         // the bid-finding gas costs which the bundler always pays for. Needs calldata and execution components.
-        allSolversGasLimit = (
-            _getSolverOpsCalldataLength(userOp.data.length, msgDataLength) * _CALLDATA_LENGTH_PREMIUM_HALVED
-        ) + (_solverOpCount * dConfig.solverGasLimit);
+        allSolversGasLimit = _sumSolverOpsMaxGas(solverOps);
 
         // Some checks are only needed when call is not a simulation
         if (isSimulation) {
@@ -581,6 +580,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         }
     }
 
+    // TODO remove this if not used
     // Helper to gas efficiently calculate calldata length of the solverOps array.
     // Assumes empty userOp and dAppOp signature fields to get the upper bound of solverOps length.
     function _getSolverOpsCalldataLength(
@@ -593,5 +593,26 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     {
         solverOpsLength = msgDataLength - (USER_OP_STATIC_LENGTH + userOpDataLength) - DAPP_OP_LENGTH
             - _EXTRA_METACALL_CALLDATA_LENGTH;
+    }
+
+    function _sumSolverOpsMaxGas(SolverOperation[] calldata solverOps, uint256 userOpGas, uint256 dappGasLimit,  uint256 msgDataLength, uint256 maxSolverExecGas, bool exPostBids) internal view returns (uint256 gasSum) {
+        // for (uint256 i = 0; i < solverOps.length; ++i) {
+        //     // TODO make batch func in GasCalculator to get all solverOps calldata gas in 1 call
+        //     uint256 calldataGas = GasAccLib.solverOpCalldataGas(solverOps[i].data.length, L2_GAS_CALCULATOR);
+        //     gasSum += solverOps[i].gas + _SOLVER_BASE_GAS_USED + calldataGas;
+        // }
+
+        // OLD ^
+
+        // TODO once the batch calldata func is in GasCalculator, do something like:
+        uint256 allSolverCalldataGas = GasCalculator.getBatchSolverOpsCalldataGas(solverOps, L2_GAS_CALCULATOR);
+        uint256 allSolverExecutionGas = _solverOpCount * dConfig.solverGasLimit;
+        uint256 metacallMaxGas = BASE_GAS + FIXED_GAS_OFFSET + GasAccLib.initialGasUsed(msgDataLength) + userOp.gas + dappGasLimit + allSolverExecutionGas;
+
+        if (dConfig.callConfig.exPostBids()) {
+            metacallMaxGas += (dConfig.solverGasLimit + _BID_FIND_OVERHEAD) * _solverOpCount;
+        }
+
+        return (metacallMaxGas, allSolverCalldataGas + allSolverExecutionGas);
     }
 }

@@ -283,7 +283,7 @@ abstract contract GasAccounting is SafetyLocks {
         // Load vars before taking solver's end gasleft snapshot
         GasLedger memory _gL = t_gasLedger.toGasLedger();
         uint256 _bothSurchargeRates = _totalSurchargeRate();
-        uint256 _calldataGas = _solverOpCalldataGas(solverOp.data.length);
+        uint256 _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR);
         uint256 _gasUsed = gasWaterMark + _SOLVER_BASE_GAS_USED - gasleft();
 
         // TODO check if we still need includeCalldata - true when prevalidated = false???
@@ -525,23 +525,6 @@ abstract contract GasAccounting is SafetyLocks {
 
         // Track total ETH value of gas spent by solver in metacalls. Measured in gwei (1e9 digits truncated).
         aData.totalGasValueUsed += SafeCast.toUint64(gasValueUsed / _GAS_VALUE_DECIMALS_TO_DROP);
-    }
-
-    // TODO use _solverOpCalldataGas() in AtlasVerification calcs and anywhere else (loop at end of settle?)
-
-    /// @notice Calculates the gas cost of the calldata used to execute a SolverOperation.
-    /// @param calldataLength The length of the `data` field in the SolverOperation.
-    /// @return calldataGas The gas cost of the calldata used to execute the SolverOperation.
-    function _solverOpCalldataGas(uint256 calldataLength) internal view returns (uint256 calldataGas) {
-        if (L2_GAS_CALCULATOR == address(0)) {
-            // Default to using mainnet gas calculations
-            // _SOLVER_OP_BASE_CALLDATA = SolverOperation calldata length excluding solverOp.data
-            calldataGas = (calldataLength + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM_HALVED;
-        } else {
-            // TODO need to refactor GasCalculators to only return gas units. If too complex, return value and divide by
-            // tx.gasprice here.
-            calldataGas = IL2GasCalculator(L2_GAS_CALCULATOR).getCalldataCost(calldataLength + _SOLVER_OP_BASE_CALLDATA);
-        }
     }
 
     /// @notice Checks all obligations have been reconciled: native borrows AND gas liabilities.
