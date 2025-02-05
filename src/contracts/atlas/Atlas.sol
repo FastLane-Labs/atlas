@@ -16,6 +16,7 @@ import "../types/ValidCalls.sol";
 
 import { CallBits } from "../libraries/CallBits.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
+import { GasAccLib } from "../libraries/GasAccLib.sol";
 import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
@@ -68,13 +69,8 @@ contract Atlas is Escrow, Factory {
     {
         // _gasMarker calculated as (Execution gas cost) + (Calldata gas cost). Any gas left at the end of the metacall
         // is deducted from this _gasMarker, resulting in actual execution gas used + calldata gas costs + buffer.
-        uint256 _gasMarker = (gasleft() + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET)
-            + (
-                L2_GAS_CALCULATOR == address(0)
-                    ? msg.data.length * _CALLDATA_LENGTH_PREMIUM_HALVED
-                    : IL2GasCalculator(L2_GAS_CALCULATOR).initialGasUsed(msg.data.length)
-            );
-            // TODO move ^ into GasAccLib
+        uint256 _gasMarker = gasleft() + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET
+            + GasAccLib.metacallCalldataGas(msg.data.length, L2_GAS_CALCULATOR);
 
         DAppConfig memory _dConfig;
         StackVars memory _vars;
@@ -92,9 +88,9 @@ contract Atlas is Escrow, Factory {
             });
         }
         {
-            (uint256 _gasLimitSum, uint256 _allSolversGasLimit, ValidCallsResult _validCallsResult) = VERIFICATION
-                .validateCalls(
-                _dConfig, userOp, solverOps, dAppOp, msg.value, msg.data.length, _vars.bundler, _vars.isSimulation
+            (uint256 _metacallMaxExecutionGas, uint256 _allSolversGasLimit, ValidCallsResult _validCallsResult) =
+            VERIFICATION.validateCalls(
+                _dConfig, userOp, solverOps, dAppOp, msg.value, _vars.bundler, _vars.isSimulation
             );
 
             // First handle the ValidCallsResult
@@ -113,7 +109,9 @@ contract Atlas is Escrow, Factory {
 
             // Then check if gas limit was set too high, based on gas left for execution, and a conservative buffer
             // added to the expected execution gas limit. Revert if unexpectedly high gas limit.
-            if (gasleft() > _gasLimitSum + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET) revert GasLimitTooHigh();
+            if (gasleft() > _metacallMaxExecutionGas) revert GasLimitTooHigh();
+
+            // TODO we also need a GasLimitTooLow() check I think
 
             // allSolversGasLimit used in calculation of sufficient bonded balance check before solverOp execution
             _vars.allSolversGasLimit = _allSolversGasLimit;

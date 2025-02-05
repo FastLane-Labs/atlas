@@ -180,8 +180,8 @@ contract MockGasAccounting is TestAtlas, BaseTest {
         S_bondedTotalSupply += amount;
     }
 
-    function initializeAccountingValues(uint256 gasMarker) external {
-        _initializeAccountingValues(gasMarker);
+    function initializeAccountingValues(uint256 gasMarker, uint256 allSolversGasLimit) external {
+        _initializeAccountingValues(gasMarker, allSolversGasLimit);
     }
 
     // View functions
@@ -191,10 +191,6 @@ contract MockGasAccounting is TestAtlas, BaseTest {
 
     function getSolverOpBaseCalldata() external pure returns (uint256) {
         return _SOLVER_OP_BASE_CALLDATA;
-    }
-
-    function getCalldataCost(uint256 length) external view returns (uint256) {
-        return _getCalldataCost(length);
     }
 
     function getActiveEnvironment() public view returns (address) {

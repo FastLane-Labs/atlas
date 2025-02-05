@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import { AccountingMath } from "./AccountingMath.sol";
 import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
+import { SolverOperation } from "../types/SolverOperation.sol";
 
 // All GasLedger vars are measured in units of gas.
 // All GasLedger vars also include calldata and execution gas components.
@@ -11,7 +12,7 @@ import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
 // Only stores base gas values. Does not include the surcharges or gasprice components.
 // type(uint48).max ~= 2.8 x 10^14, plenty even for gigagas (10^9) blocks
 struct GasLedger {
-    uint48 remainingMaxGas; // Measured by gasMarker at start, decreased by solverOp gas limits when reached
+    uint48 remainingMaxGas; // Measured at start, decreased by solverOp gas limits when reached
     uint48 writeoffsGas; // Gas used for solverOps but written off due to bundler fault
     uint48 solverFaultFailureGas; // Gas used by solverOps that failed due to solver fault
     uint48 unreachedSolverGas; // Sum of gas limits of solverOps not yet reached in the current metacall
@@ -68,13 +69,61 @@ library GasAccLib {
         return uint256(gL.remainingMaxGas - gL.unreachedSolverGas).withSurcharge(totalSurchargeRate);
     }
 
-    function solverOpCalldataGas(uint256 calldataLength, address l2GasCalculator) internal view returns (uint256 calldataGas) {
+    function solverOpCalldataGas(
+        uint256 calldataLength,
+        address l2GasCalculator
+    )
+        internal
+        view
+        returns (uint256 calldataGas)
+    {
         if (l2GasCalculator == address(0)) {
             // Default to using mainnet gas calculations
             // _SOLVER_OP_BASE_CALLDATA = SolverOperation calldata length excluding solverOp.data
             calldataGas = (calldataLength + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM_HALVED;
         } else {
             calldataGas = IL2GasCalculator(l2GasCalculator).getCalldataGas(calldataLength + _SOLVER_OP_BASE_CALLDATA);
+        }
+    }
+
+    function sumSolverOpsCalldataGas(
+        SolverOperation[] calldata solverOps,
+        address l2GasCalculator
+    )
+        internal
+        view
+        returns (uint256 sumCalldataGas)
+    {
+        uint256 solverOpsLength = solverOps.length;
+        uint256 sumDataLengths;
+
+        if (solverOpsLength == 0) return 0;
+
+        for (uint256 i = 0; i < solverOpsLength; ++i) {
+            sumDataLengths += solverOps[i].data.length;
+        }
+
+        uint256 sumSolverOpsCalldata = solverOpsLength * _SOLVER_OP_BASE_CALLDATA + sumDataLengths;
+
+        if (l2GasCalculator == address(0)) {
+            sumCalldataGas = sumSolverOpsCalldata * _CALLDATA_LENGTH_PREMIUM_HALVED;
+        } else {
+            sumCalldataGas = IL2GasCalculator(l2GasCalculator).getCalldataGas(sumSolverOpsCalldata);
+        }
+    }
+
+    function metacallCalldataGas(
+        uint256 msgDataLength,
+        address l2GasCalculator
+    )
+        internal
+        view
+        returns (uint256 calldataGas)
+    {
+        if (l2GasCalculator == address(0)) {
+            calldataGas = msgDataLength * _CALLDATA_LENGTH_PREMIUM_HALVED;
+        } else {
+            calldataGas = IL2GasCalculator(l2GasCalculator).initialGasUsed(msgDataLength);
         }
     }
 }
