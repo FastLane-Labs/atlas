@@ -57,7 +57,7 @@ contract DeployAtlasScript is DeployBaseScript {
             initialSurchargeRecipient: deployer,
             l2GasCalculator: address(0)
         });
-        atlasVerification = new AtlasVerification(address(atlas));
+        atlasVerification = new AtlasVerification({ atlas: expectedAtlasAddr, l2GasCalculator: address(0) });
 
         simulator = new Simulator();
         simulator.setAtlas(address(atlas));

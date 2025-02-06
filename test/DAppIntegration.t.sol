@@ -12,16 +12,12 @@ import { AtlasVerification } from "../src/contracts/atlas/AtlasVerification.sol"
 
 import { DummyDAppControl, CallConfigBuilder } from "./base/DummyDAppControl.sol";
 
-contract MockDAppIntegration is DAppIntegration {
-    constructor(address _atlas) DAppIntegration(_atlas) { }
-}
-
 contract DAppIntegrationTest is Test {
     uint256 DEFAULT_ATLAS_SURCHARGE_RATE = 1_000_000; // 10%
     uint256 DEFAULT_BUNDLER_SURCHARGE_RATE = 1_000_000; // 10%
 
     Atlas public atlas;
-    MockDAppIntegration public dAppIntegration;
+    DAppIntegration public dAppIntegration;
     DummyDAppControl public dAppControl;
     AtlasVerification atlasVerification;
     FactoryLib factoryLib;
@@ -40,7 +36,10 @@ contract DAppIntegrationTest is Test {
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedAtlasAddr);
 
         // Deploy the AtlasVerification contract
-        atlasVerification = new AtlasVerification(expectedAtlasAddr);
+        atlasVerification = new AtlasVerification({
+            atlas: expectedAtlasAddr,
+            l2GasCalculator: address(0)
+        });
         factoryLib = new FactoryLib(address(execEnvTemplate));
 
         // Deploy the Atlas contract with correct parameters
@@ -58,7 +57,7 @@ contract DAppIntegrationTest is Test {
         assertEq(address(atlas), expectedAtlasAddr, "Atlas address should be as expected");
 
         // Deploy the MockDAppIntegration contract
-        dAppIntegration = new MockDAppIntegration(address(atlas));
+        dAppIntegration = DAppIntegration(address(atlas));
         vm.stopPrank();
 
         // Deploy the DummyDAppControl contract

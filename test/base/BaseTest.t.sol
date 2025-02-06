@@ -102,7 +102,10 @@ contract BaseTest is Test {
             initialSurchargeRecipient: deployer,
             l2GasCalculator: address(0)
         });
-        atlasVerification = new AtlasVerification(address(atlas));
+        atlasVerification = new AtlasVerification({
+            atlas: expectedAtlasAddr,
+            l2GasCalculator: address(0)
+        });
         simulator.setAtlas(address(atlas));
         sorter = new Sorter(address(atlas));
         govBurner = new GovernanceBurner();

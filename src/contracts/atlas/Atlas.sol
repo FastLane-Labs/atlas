@@ -69,6 +69,7 @@ contract Atlas is Escrow, Factory {
     {
         // _gasMarker calculated as (Execution gas cost) + (Calldata gas cost). Any gas left at the end of the metacall
         // is deducted from this _gasMarker, resulting in actual execution gas used + calldata gas costs + buffer.
+        // The calldata component is added below after validateCalls().
         uint256 _gasMarker = gasleft() + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET
             + GasAccLib.metacallCalldataGas(msg.data.length, L2_GAS_CALCULATOR);
 
@@ -88,7 +89,7 @@ contract Atlas is Escrow, Factory {
             });
         }
         {
-            (uint256 _metacallMaxExecutionGas, uint256 _allSolversGasLimit, ValidCallsResult _validCallsResult) =
+            (uint256 _metacallExecutionGas, uint256 _allSolversGasLimit, ValidCallsResult _validCallsResult) =
             VERIFICATION.validateCalls(
                 _dConfig, userOp, solverOps, dAppOp, msg.value, _vars.bundler, _vars.isSimulation
             );
@@ -107,11 +108,13 @@ contract Atlas is Escrow, Factory {
                 revert ValidCalls(_validCallsResult);
             }
 
-            // Then check if gas limit was set too high, based on gas left for execution, and a conservative buffer
-            // added to the expected execution gas limit. Revert if unexpectedly high gas limit.
-            if (gasleft() > _metacallMaxExecutionGas) revert GasLimitTooHigh();
+            // Gas limit set by the bundler cannot be too high or too low. Use Simulator contract to estimate gas limit.
+            // If gas limit is too low, the bonded balance threshold checked may not cover all gas reimbursements.
+            if (gasleft() < _metacallExecutionGas - _EXECUTION_GAS_BUFFER) revert GasLimitTooLow();
+            // If gas limit is too high, the bonded balance threshold checked could unexpectedly price out solvers.
+            if (gasleft() > _metacallExecutionGas) revert GasLimitTooHigh();
 
-            // TODO we also need a GasLimitTooLow() check I think
+            // TODO add helpers to Simulator to estimate metacall gaslimit + solver's max gas liability
 
             // allSolversGasLimit used in calculation of sufficient bonded balance check before solverOp execution
             _vars.allSolversGasLimit = _allSolversGasLimit;
@@ -120,6 +123,7 @@ contract Atlas is Escrow, Factory {
         // Initialize the environment lock and accounting values
         _setEnvironmentLock(_dConfig, _vars.executionEnvironment);
         _initializeAccountingValues(_gasMarker, _vars.allSolversGasLimit);
+        // TODO if I move this up into above scope, can maybe remove allSolversGasLimit from vars struct
 
         // Calculate `execute` gas limit such that it can fail due to an OOG error caused by any of the hook calls, and
         // the metacall will still have enough gas to gracefully finish and return, storing any nonces required.
