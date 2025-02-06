@@ -58,7 +58,7 @@ contract BaseGasCalculator is IL2GasCalculator, Ownable {
     /// @notice Gets the cost of initial gas used for a transaction with a different calldata fee than mainnet
     /// @param calldataLength The length of the calldata in bytes
     function initialGasUsed(uint256 calldataLength) external pure override returns (uint256 gasUsed) {
-        return _BASE_TX_GAS_USED + (calldataLength * _CALLDATA_LENGTH_PREMIUM_HALVED);
+        return calldataLength * _CALLDATA_LENGTH_PREMIUM_HALVED;
     }
 
     /// @notice Sets the calldata length offset
