@@ -1,6 +1,8 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.28;
 
+import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
+
 import { AtlETH } from "./AtlETH.sol";
 import { IExecutionEnvironment } from "../interfaces/IExecutionEnvironment.sol";
 import { IAtlas } from "../interfaces/IAtlas.sol";
@@ -13,6 +15,7 @@ import { EscrowBits } from "../libraries/EscrowBits.sol";
 import { CallBits } from "../libraries/CallBits.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
 import { AccountingMath } from "../libraries/AccountingMath.sol";
+import { GasAccLib, GasLedger } from "../libraries/GasAccLib.sol";
 import { DAppConfig } from "../types/ConfigTypes.sol";
 import "../types/SolverOperation.sol";
 import "../types/UserOperation.sol";
@@ -28,7 +31,10 @@ abstract contract Escrow is AtlETH {
     using CallBits for uint32;
     using SafetyBits for Context;
     using SafeCall for address;
+    using SafeCast for uint256;
     using AccountingMath for uint256;
+    using GasAccLib for uint256; // To load GasLedger from a transient uint265 var
+    using GasAccLib for GasLedger;
 
     constructor(
         uint256 escrowDuration,
@@ -161,7 +167,7 @@ abstract contract Escrow is AtlETH {
     /// @param userOp UserOperation struct containing the user's transaction data relevant to this SolverOperation.
     /// @param solverOp SolverOperation struct containing the solver's bid and execution data.
     /// @param bidAmount The amount of bid submitted by the solver for this operation.
-    /// @param prevalidated Boolean flag indicating whether the SolverOperation has been prevalidated to skip certain
+    /// @param prevalidated Boolean flag indicating if the solverOp has been prevalidated in bidFind (exPostBids).
     /// @param returnData Data returned from UserOp execution, used as input if necessary.
     /// @return bidAmount The determined bid amount for the SolverOperation if all validations pass and the operation is
     /// executed successfully; otherwise, returns 0.
@@ -195,8 +201,7 @@ abstract contract Escrow is AtlETH {
         if (_result.canExecute()) {
             uint256 _gasLimit;
             // Verify gasLimit again
-            (_result, _gasLimit) =
-                _validateSolverOpGasAndValue(dConfig, solverOp, ctx.allSolversGasLimit, _gasWaterMark, _result);
+            (_result, _gasLimit) = _validateSolverOpGasAndValue(dConfig, solverOp, _gasWaterMark, _result);
             _result |= _validateSolverOpDeadline(solverOp, dConfig);
 
             // Check for trusted operation hash
@@ -208,6 +213,9 @@ abstract contract Escrow is AtlETH {
 
                 // Execute the solver call
                 (_result, _solverTracker) = _solverOpWrapper(ctx, solverOp, bidAmount, _gasLimit, returnData);
+
+                // NOTE: we intentionally do not change GasLedger here as we have found a winning solver and don't need
+                // it anymore
 
                 if (_result.executionSuccessful()) {
                     // First successful solver call that paid what it bid
@@ -226,7 +234,7 @@ abstract contract Escrow is AtlETH {
         ctx.solverOutcome = uint24(_result);
 
         // Account for failed SolverOperation gas costs
-        _handleSolverFailAccounting(solverOp, _gasWaterMark, _result, !prevalidated);
+        _handleSolverFailAccounting(solverOp, dConfig.solverGasLimit, _gasWaterMark, _result, !prevalidated);
 
         emit SolverTxResult(
             solverOp.solver,
@@ -334,14 +342,18 @@ abstract contract Escrow is AtlETH {
     function _validateSolverOpGasAndValue(
         DAppConfig memory dConfig,
         SolverOperation calldata solverOp,
-        uint256 allSolversGasLimit,
         uint256 gasWaterMark,
         uint256 result
     )
         internal
-        view
         returns (uint256, uint256 gasLimit)
     {
+        // Decrease unreachedSolverGas by the current solverOp's (C + E) max gas
+        GasLedger memory _gL = t_gasLedger.toGasLedger();
+        _gL.unreachedSolverGas -= uint48(dConfig.solverGasLimit)
+            + GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR).toUint48();
+        t_gasLedger = _gL.pack(); // Persist changes to transient storage before any returns below
+
         if (gasWaterMark < _VALIDATION_GAS_LIMIT + dConfig.solverGasLimit) {
             // Make sure to leave enough gas for dApp validation calls
             result |= 1 << uint256(SolverOutcome.UserOutOfGas);
@@ -357,28 +369,9 @@ abstract contract Escrow is AtlETH {
         }
 
         uint256 _solverBalance = S_accessData[solverOp.from].bonded;
-        uint256 _maxGasValue;
 
-        {
-            (uint256 _atlasSurchargeRate, uint256 _bundlerSurchargeRate) = _surchargeRates();
-            uint256 _solverOpCalldataGas =
-                (solverOp.data.length + _SOLVER_OP_BASE_CALLDATA) * _CALLDATA_LENGTH_PREMIUM_HALVED;
-
-            // Max gas value payable by solver calculated as:
-            // = max metacall gas cost (execution + calldata) (incl surcharges)
-            // - (all solvers' gas limits - current solver's gas limit) * tx.gasprice * (base + surcharges)
-
-            _maxGasValue = (t_claims + t_fees)
-                - ((allSolversGasLimit - (gasLimit + _solverOpCalldataGas)) * tx.gasprice).withSurcharges(
-                    _atlasSurchargeRate, _bundlerSurchargeRate
-                );
-        }
-
-        // Claims + Fees represents the base gas cost + the Atlas surcharge + the Bundler surcharge, if the full gas
-        // limit of the tx is used. This is the maximum a solver would need to pay in gas charges from their bonded
-        // AtlETH, should they win the auction. If they lose, or win with less than the full gas limit used, the amount
-        // charged will be lower.
-        if (_maxGasValue > _solverBalance) {
+        // Checks if solver's bonded balance is enough to cover the max charge should they win, including surcharges
+        if (_solverBalance < _gL.solverGasLiability(_totalSurchargeRate()) * tx.gasprice) {
             // charge solver for calldata so that we can avoid vampire attacks from solver onto user
             result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
         }
@@ -453,8 +446,7 @@ abstract contract Escrow is AtlETH {
         );
 
         _result = _checkSolverBidToken(solverOp.bidToken, dConfig.bidToken, _result);
-        (_result, _gasLimit) =
-            _validateSolverOpGasAndValue(dConfig, solverOp, ctx.allSolversGasLimit, _gasWaterMark, _result);
+        (_result, _gasLimit) = _validateSolverOpGasAndValue(dConfig, solverOp, _gasWaterMark, _result);
         _result |= _validateSolverOpDeadline(solverOp, dConfig);
 
         // Verify the transaction.

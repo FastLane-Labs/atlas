@@ -13,6 +13,7 @@ import { AtlasConstants } from "../src/contracts/types/AtlasConstants.sol";
 import { EscrowBits } from "../src/contracts/libraries/EscrowBits.sol";
 import { IL2GasCalculator } from "../src/contracts/interfaces/IL2GasCalculator.sol";
 
+import { GasLedger } from "../src/contracts/libraries/GasAccLib.sol";
 import "../src/contracts/libraries/AccountingMath.sol";
 import "../src/contracts/types/EscrowTypes.sol";
 import "../src/contracts/types/LockTypes.sol";
@@ -94,13 +95,14 @@ contract MockGasAccounting is TestAtlas, BaseTest {
 
     function handleSolverFailAccounting(
         SolverOperation calldata solverOp,
+        uint256 dConfigSolverGasLimit,
         uint256 gasWaterMark,
         uint256 result,
         bool includeCalldata
     )
         external
     {
-        _handleSolverFailAccounting(solverOp, gasWaterMark, result, includeCalldata);
+        _handleSolverFailAccounting(solverOp, dConfigSolverGasLimit, gasWaterMark, result, includeCalldata);
     }
 
     function settle(Context memory ctx) external returns (uint256, uint256) {

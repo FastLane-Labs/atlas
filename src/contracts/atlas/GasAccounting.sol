@@ -21,9 +21,9 @@ abstract contract GasAccounting is SafetyLocks {
     using EscrowBits for uint256;
     using AccountingMath for uint256;
     using SafeCast for uint256;
+    using GasAccLib for uint256; // To load GasLedger from a transient uint265 var
     using GasAccLib for GasLedger;
     using GasAccLib for BorrowsLedger;
-    using GasAccLib for uint256;
 
     constructor(
         uint256 escrowDuration,
@@ -274,26 +274,28 @@ abstract contract GasAccounting is SafetyLocks {
     /// @param includeCalldata Whether to include calldata cost in the gas calculation.
     function _handleSolverFailAccounting(
         SolverOperation calldata solverOp,
+        uint256 dConfigSolverGasLimit,
         uint256 gasWaterMark,
         uint256 result,
         bool includeCalldata
     )
         internal
     {
-        // Load vars before taking solver's end gasleft snapshot
         GasLedger memory _gL = t_gasLedger.toGasLedger();
         uint256 _bothSurchargeRates = _totalSurchargeRate();
         uint256 _calldataGas = GasAccLib.solverOpCalldataGas(solverOp.data.length, L2_GAS_CALCULATOR);
         uint256 _gasUsed = gasWaterMark + _SOLVER_BASE_GAS_USED - gasleft();
+        // TODO ^ need to add SOLVER_BASE_GAS_USED to total calcs in AtlasVerification
 
-        // TODO check if we still need includeCalldata - true when prevalidated = false???
-
+        // TODO If we don't charge failed solvers for calldata in exPostBids, winner should not pay for that - breaks
+        // property where solver can predict upfront the max liability of entering a metacall. Instead need to write
+        // off, so bundler pays.
         if (includeCalldata) {
             _gasUsed += _calldataGas;
         }
 
-        // TODO make sure this mirror calc in AtlasVerification. May need buffer. Refactor to lib.
-        _gL.remainingMaxGas -= uint48(solverOp.gas + _calldataGas); // deduct solverOp's max gas
+        // Deduct solver's max (C + E) gas from remainingMaxGas, for future solver gas liability calculations
+        _gL.remainingMaxGas -= uint48(dConfigSolverGasLimit + _calldataGas);
 
         // Calculate what the solver owes
         // NOTE: This will cause an error if you are simulating with a gasPrice of 0
@@ -331,10 +333,10 @@ abstract contract GasAccounting is SafetyLocks {
             // value will be used to calculate what the winning solver should pay at the end (should not include gas
             // used for failed solverOps).
             _gL.solverFaultFailureGas += uint48(_gasUsed);
-
-            // Persist Gas Ledger changes to transient storage
-            t_gasLedger = _gL.pack();
         }
+
+        // Persist the updated gas ledger to transient storage
+        t_gasLedger = _gL.pack();
     }
 
     function _writeOffBidFindGas(uint256 gasUsed) internal {

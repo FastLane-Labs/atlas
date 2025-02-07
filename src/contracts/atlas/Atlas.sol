@@ -16,7 +16,7 @@ import "../types/ValidCalls.sol";
 
 import { CallBits } from "../libraries/CallBits.sol";
 import { SafetyBits } from "../libraries/SafetyBits.sol";
-import { GasAccLib } from "../libraries/GasAccLib.sol";
+import { GasAccLib, GasLedger } from "../libraries/GasAccLib.sol";
 import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
 import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
@@ -26,6 +26,8 @@ import { IDAppControl } from "../interfaces/IDAppControl.sol";
 contract Atlas is Escrow, Factory {
     using CallBits for uint32;
     using SafetyBits for Context;
+    using GasAccLib for uint256; // To load GasLedger from a transient uint265 var
+    using GasAccLib for GasLedger;
 
     constructor(
         uint256 escrowDuration,
@@ -241,6 +243,9 @@ contract Atlas is Escrow, Factory {
         uint256 _bidsAndIndicesLastIndex = solverOpsLength - 1; // Start from the last index
         uint256 _gasWaterMark = gasleft();
 
+        // Get a snapshot of the GasLedger from transient storage, to reset to after bid-finding below
+        uint256 _gasLedgerSnapshot = t_gasLedger; 
+
         // First, get all bid amounts. Bids of zero are ignored by only storing non-zero bids in the array, from right
         // to left. If there are any zero bids they will end up on the left as uint(0) values - in their sorted
         // position. This reduces operations needed later when sorting the array in ascending order.
@@ -269,6 +274,9 @@ contract Atlas is Escrow, Factory {
                 }
             }
         }
+
+        // Reset transient GasLedger to its state before the bid-finding loop above
+        t_gasLedger = _gasLedgerSnapshot;
 
         // Reinitialize _bidsAndIndicesLastIndex to iterate through the sorted array in descending order
         _bidsAndIndicesLastIndex = solverOpsLength - 1;
