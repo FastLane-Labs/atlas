@@ -244,7 +244,7 @@ contract Atlas is Escrow, Factory {
         uint256 _gasWaterMark = gasleft();
 
         // Get a snapshot of the GasLedger from transient storage, to reset to after bid-finding below
-        uint256 _gasLedgerSnapshot = t_gasLedger; 
+        uint256 _gasLedgerSnapshot = t_gasLedger;
 
         // First, get all bid amounts. Bids of zero are ignored by only storing non-zero bids in the array, from right
         // to left. If there are any zero bids they will end up on the left as uint(0) values - in their sorted
