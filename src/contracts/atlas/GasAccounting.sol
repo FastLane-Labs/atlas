@@ -503,6 +503,111 @@ abstract contract GasAccounting is SafetyLocks {
         return (claimsPaidToBundler, netAtlasGasSurcharge);
     }
 
+    // TODO NEW VERSION OF SETTLE
+    function _settle2(
+        Context memory ctx,
+        uint256 gasMarker,
+        address gasRefundBeneficiary
+    )
+        internal
+        returns (uint256 claimsPaidToBundler, uint256 netAtlasGasSurcharge)
+    {
+        // TODO still need the unreached solvers to pay for their calldata. Do before gasleft().
+        // They should also pay for the cost of that loop, as bundler could grief winner with SLOADS from those assigns
+        // Add payments to solverFaultFailureGas as it contributes to partial refund of bundler.
+
+        EscrowAccountAccessData memory _winningSolverData;
+        GasLedger memory _gL = t_gasLedger.toGasLedger();
+        BorrowsLedger memory _bL = t_borrowsLedger.toBorrowsLedger();
+        (uint256 _atlasSurchargeRate, uint256 _bundlerSurchargeRate) = _surchargeRates();
+        (address _winningSolver,,) = _solverLockData();
+
+        // No need to SLOAD bonded balance etc. if no winning solver
+        if (ctx.solverSuccessful) _winningSolverData = S_accessData[_winningSolver];
+
+        // Send gas refunds to bundler if no gas refund beneficiary specified
+        if (gasRefundBeneficiary == address(0)) gasRefundBeneficiary = ctx.bundler;
+
+        // TODO Do we actually need to check borrows were repaid? Double check
+
+        // First check if all borrows have been repaid.
+        // Borrows can only be repaid in native token, not bonded AtlETH.
+        int256 _netRepayments = _bL.netRepayments();
+        if (_netRepayments < 0) revert BorrowsNotRepaid(_bL.borrows, _bL.repays);
+        // TODO deduct netRepayments from final bill
+
+        uint256 _winnerGasCharge;
+        uint256 _gasLeft = gasleft();
+
+        if (ctx.solverSuccessful) {
+            _winnerGasCharge = gasMarker - _gL.writeoffsGas - _gL.solverFaultFailureGas - _gasLeft;
+            uint256 _gasPaidBySolvers = _gL.solverFaultFailureGas + _winnerGasCharge;
+
+            // Bundler gets base gas cost + bundler surcharge of (solver fault fails + winning solver charge)
+            claimsPaidToBundler = _gasPaidBySolvers.withSurcharge(_bundlerSurchargeRate) * tx.gasprice;
+
+            // Atlas gets only the Atlas surcharge of (solver fault fails + winning solver charge)
+            netAtlasGasSurcharge = _gasPaidBySolvers.getSurcharge(_atlasSurchargeRate) * tx.gasprice;
+
+            // Calculate what winning solver pays: add surcharges and multiply by gas price
+            _winnerGasCharge = _winnerGasCharge.withSurcharge(_atlasSurchargeRate + _bundlerSurchargeRate) * tx.gasprice;
+
+            uint256 _deficit; // Any shortfall that the winning solver is not able to repay from bonded balance
+            if (_winnerGasCharge < uint256(_netRepayments)) {
+                // CASE: solver recieves more than they pay --> net credit to account
+                _credit(_winningSolverData, uint256(_netRepayments) - _winnerGasCharge);
+            } else {
+                // CASE: solver pays more than they recieve --> net assign to account
+                _deficit = _assign(_winningSolverData, _winningSolver, _winnerGasCharge - uint256(_netRepayments));
+            }
+
+            if (_deficit > claimsPaidToBundler) revert AssignDeficitTooLarge(_deficit, claimsPaidToBundler);
+            claimsPaidToBundler -= _deficit;
+        }
+
+        if (!ctx.solverSuccessful) {
+            // CASE: No winning solver.
+            // Bundler may still recover a partial refund (from solver fault failure charges) up to 80% of the gas cost
+            // of the metacall. The remaining 20% could be recovered through storage refunds, and it is important that
+            // metacalls with no winning solver are not profitable for the bundler.
+
+            // Includes any excess repayments in this comparison.
+            // TODO should we also subtract writeoffs here? probably...
+            uint256 _maxRefund = (gasMarker - _gL.writeoffsGas - _gasLeft) * 8 / 10 * tx.gasprice;
+            uint256 _gasChargeTaken = uint256(_gL.solverFaultFailureGas).withSurcharge(
+                _atlasSurchargeRate + _bundlerSurchargeRate
+            ) * tx.gasprice + uint256(_netRepayments);
+
+            if (_gasChargeTaken > _maxRefund) {
+                // More than max gas refund was taken by failed/unreached solvers, excess goes to Atlas
+                claimsPaidToBundler = _maxRefund;
+                netAtlasGasSurcharge = _gasChargeTaken - _maxRefund;
+            } else {
+                // Otherwise, the bundler can receive the full solver fault failure gas
+                claimsPaidToBundler = _gasChargeTaken;
+            }
+        } else if (_winningSolver == ctx.bundler) {
+            // CASE: Winning solver is the bundler.
+            // - claimsPaidToBundler is left as 0.
+            // - netAtlasGasSurcharge gets any repaid value, and solver fail gas charged.
+            // TODO doublecheck this ^ seems unfair to bundler
+        }
+        else {
+            // CASE: Winning solver is not the bundler.
+
+            // TODO This is all done above - just need to restructure if tree nicely
+        }
+
+        // Update analytics for the winning solver
+        // If no winning solver, all analytics updates have already been made in _handleSolverFailAccounting()
+        if (ctx.solverSuccessful) _updateAnalytics(_winningSolverData, true, _winnerGasCharge);
+
+        // Set lock to FullyLocked to prevent any reentrancy possibility in refund transfer below
+        _setLockPhase(uint8(ExecutionPhase.FullyLocked));
+
+        if (claimsPaidToBundler != 0) SafeTransferLib.safeTransferETH(gasRefundBeneficiary, claimsPaidToBundler);
+    }
+
     /// @notice Updates auctionWins, auctionFails, and totalGasUsed values of a solver's EscrowAccountAccessData.
     /// @dev This function is only ever called in the context of bidFind = false so no risk of doublecounting changes.
     /// @param aData The Solver's EscrowAccountAccessData struct to update.

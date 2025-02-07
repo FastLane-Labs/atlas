@@ -1,6 +1,8 @@
 //SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.28;
 
+import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
+
 import { AccountingMath } from "./AccountingMath.sol";
 import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
 import { SolverOperation } from "../types/SolverOperation.sol";
@@ -31,6 +33,7 @@ struct BorrowsLedger {
 
 library GasAccLib {
     using AccountingMath for uint256;
+    using SafeCast for uint256;
 
     // TODO refactor AtlasConstants to a lib and import here
     uint256 internal constant _SOLVER_OP_BASE_CALLDATA = 608;
@@ -58,6 +61,10 @@ library GasAccLib {
 
     function toBorrowsLedger(uint256 borrowsLedgerPacked) internal pure returns (BorrowsLedger memory) {
         return BorrowsLedger({ borrows: uint128(borrowsLedgerPacked), repays: uint128(borrowsLedgerPacked >> 128) });
+    }
+
+    function netRepayments(BorrowsLedger memory bL) internal pure returns (int256) {
+        return uint256(bL.repays).toInt256() - uint256(bL.borrows).toInt256();
     }
 
     // Returns the max gas liability for the current solver.
