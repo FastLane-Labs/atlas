@@ -47,6 +47,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     /// @param isSimulation A boolean indicating if the call is a simulation.
     /// @return metacallExecutionGas The sum of all gas limit components (userOp, solverOps, dapp).
     /// @return allSolversGasLimit The calldata and execution gas limits of all solverOps summed.
+    /// @return bidFindOverhead The gas overhead for bid-finding loop in exPostBids mode.
     /// @return verifyCallsResult The result of the ValidCalls check, in enum ValidCallsResult form.
     function validateCalls(
         DAppConfig calldata dConfig,
@@ -58,7 +59,12 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         bool isSimulation
     )
         external
-        returns (uint256 metacallExecutionGas, uint256 allSolversGasLimit, ValidCallsResult verifyCallsResult)
+        returns (
+            uint256 metacallExecutionGas,
+            uint256 allSolversGasLimit,
+            uint256 bidFindOverhead,
+            ValidCallsResult verifyCallsResult
+        )
     {
         if (msg.sender != ATLAS) revert AtlasErrors.InvalidCaller();
         // Verify that the calldata injection came from the dApp frontend
@@ -70,7 +76,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             // Check user signature
             verifyCallsResult = _verifyUser(dConfig, userOp, _userOpHash, msgSender, isSimulation);
             if (verifyCallsResult != ValidCallsResult.Valid) {
-                return (metacallExecutionGas, allSolversGasLimit, verifyCallsResult);
+                return (metacallExecutionGas, allSolversGasLimit, bidFindOverhead, verifyCallsResult);
             }
 
             // allowUnapprovedDAppSignatories still verifies signature match, but does not check
@@ -80,33 +86,33 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
                 _verifyAuctioneer(dConfig, userOp, solverOps, dAppOp, msgSender);
 
             if (verifyCallsResult != ValidCallsResult.Valid && !isSimulation) {
-                return (metacallExecutionGas, allSolversGasLimit, verifyCallsResult);
+                return (metacallExecutionGas, allSolversGasLimit, bidFindOverhead, verifyCallsResult);
             }
 
             // Check dapp signature
             verifyCallsResult = _verifyDApp(dConfig, dAppOp, msgSender, allowUnapprovedDAppSignatories, isSimulation);
             if (verifyCallsResult != ValidCallsResult.Valid) {
-                return (metacallExecutionGas, allSolversGasLimit, verifyCallsResult);
+                return (metacallExecutionGas, allSolversGasLimit, bidFindOverhead, verifyCallsResult);
             }
         }
 
         // Check if the call configuration is valid
         verifyCallsResult = _verifyCallConfig(dConfig.callConfig);
         if (verifyCallsResult != ValidCallsResult.Valid) {
-            return (metacallExecutionGas, allSolversGasLimit, verifyCallsResult);
+            return (metacallExecutionGas, allSolversGasLimit, bidFindOverhead, verifyCallsResult);
         }
 
         // CASE: Solvers trust app to update content of UserOp after submission of solverOp
         if (dConfig.callConfig.allowsTrustedOpHash()) {
             // SessionKey must match explicitly - cannot be skipped
             if (userOp.sessionKey != dAppOp.from && !isSimulation) {
-                return (metacallExecutionGas, allSolversGasLimit, ValidCallsResult.InvalidAuctioneer);
+                return (metacallExecutionGas, allSolversGasLimit, bidFindOverhead, ValidCallsResult.InvalidAuctioneer);
             }
 
             // msgSender (the bundler) must be userOp.from, userOp.sessionKey / dappOp.from, or dappOp.bundler
             if (!(msgSender == dAppOp.from || msgSender == dAppOp.bundler || msgSender == userOp.from) && !isSimulation)
             {
-                return (metacallExecutionGas, allSolversGasLimit, ValidCallsResult.InvalidBundler);
+                return (metacallExecutionGas, allSolversGasLimit, bidFindOverhead, ValidCallsResult.InvalidBundler);
             }
         }
 
@@ -115,64 +121,71 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
         {
             // Check number of solvers not greater than max, to prevent overflows in `solverIndex`
             if (_solverOpCount > _MAX_SOLVERS) {
-                return (metacallExecutionGas, allSolversGasLimit, ValidCallsResult.TooManySolverOps);
+                return (metacallExecutionGas, allSolversGasLimit, bidFindOverhead, ValidCallsResult.TooManySolverOps);
             }
 
             // Check if past user's deadline
             if (userOp.deadline != 0 && block.number > userOp.deadline) {
-                return (metacallExecutionGas, allSolversGasLimit, ValidCallsResult.UserDeadlineReached);
+                return (metacallExecutionGas, allSolversGasLimit, bidFindOverhead, ValidCallsResult.UserDeadlineReached);
             }
 
             // Check if past dapp's deadline
             if (dAppOp.deadline != 0 && block.number > dAppOp.deadline) {
-                return (metacallExecutionGas, allSolversGasLimit, ValidCallsResult.DAppDeadlineReached);
+                return (metacallExecutionGas, allSolversGasLimit, bidFindOverhead, ValidCallsResult.DAppDeadlineReached);
             }
 
             // Check gas price is within user's limit
             if (tx.gasprice > userOp.maxFeePerGas) {
-                return (metacallExecutionGas, allSolversGasLimit, ValidCallsResult.GasPriceHigherThanMax);
+                return
+                    (metacallExecutionGas, allSolversGasLimit, bidFindOverhead, ValidCallsResult.GasPriceHigherThanMax);
             }
 
             // Check that the value of the tx is greater than or equal to the value specified
             if (msgValue < userOp.value) {
-                return (metacallExecutionGas, allSolversGasLimit, ValidCallsResult.TxValueLowerThanCallValue);
+                return (
+                    metacallExecutionGas,
+                    allSolversGasLimit,
+                    bidFindOverhead,
+                    ValidCallsResult.TxValueLowerThanCallValue
+                );
             }
 
             // Check the call config read from DAppControl at start of metacall matches userOp value
             if (dConfig.callConfig != userOp.callConfig) {
-                return (metacallExecutionGas, allSolversGasLimit, ValidCallsResult.CallConfigMismatch);
+                return (metacallExecutionGas, allSolversGasLimit, bidFindOverhead, ValidCallsResult.CallConfigMismatch);
             }
 
             // Check the dappGasLimit read from DAppControl at start of metacall matches userOp value
             if (dConfig.dappGasLimit != userOp.dappGasLimit) {
-                return (metacallExecutionGas, allSolversGasLimit, ValidCallsResult.DAppGasLimitMismatch);
+                return
+                    (metacallExecutionGas, allSolversGasLimit, bidFindOverhead, ValidCallsResult.DAppGasLimitMismatch);
             }
         }
 
-        (metacallExecutionGas, allSolversGasLimit) = _getGasLimits(solverOps, dConfig, userOp.gas);
+        (metacallExecutionGas, allSolversGasLimit, bidFindOverhead) = _getGasLimits(solverOps, dConfig, userOp.gas);
 
         // Some checks are only needed when call is not a simulation
         if (isSimulation) {
             // Add all solver ops if simulation
-            return (metacallExecutionGas, allSolversGasLimit, ValidCallsResult.Valid);
+            return (metacallExecutionGas, allSolversGasLimit, bidFindOverhead, ValidCallsResult.Valid);
         }
 
         // Verify a solver was successfully verified.
         if (_solverOpCount == 0) {
             if (!dConfig.callConfig.allowsZeroSolvers()) {
-                return (metacallExecutionGas, allSolversGasLimit, ValidCallsResult.NoSolverOp);
+                return (metacallExecutionGas, allSolversGasLimit, bidFindOverhead, ValidCallsResult.NoSolverOp);
             }
 
             if (dConfig.callConfig.needsFulfillment()) {
-                return (metacallExecutionGas, allSolversGasLimit, ValidCallsResult.NoSolverOp);
+                return (metacallExecutionGas, allSolversGasLimit, bidFindOverhead, ValidCallsResult.NoSolverOp);
             }
         }
 
         if (_userOpHash != dAppOp.userOpHash) {
-            return (metacallExecutionGas, allSolversGasLimit, ValidCallsResult.OpHashMismatch);
+            return (metacallExecutionGas, allSolversGasLimit, bidFindOverhead, ValidCallsResult.OpHashMismatch);
         }
 
-        return (metacallExecutionGas, allSolversGasLimit, ValidCallsResult.Valid);
+        return (metacallExecutionGas, allSolversGasLimit, bidFindOverhead, ValidCallsResult.Valid);
     }
 
     /// @notice The verifySolverOp function verifies the validity of a SolverOperation.
@@ -588,7 +601,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
     )
         internal
         view
-        returns (uint256 metacallExecutionGas, uint256 allSolversGasLimit)
+        returns (uint256 metacallExecutionGas, uint256 allSolversGasLimit, uint256 bidFindOverhead)
     {
         uint256 dConfigSolverGasLimit = dConfig.solverGasLimit;
         uint256 allSolverCalldataGas = solverOps.sumSolverOpsCalldataGas(L2_GAS_CALCULATOR);
@@ -598,9 +611,10 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             + allSolverExecutionGas;
 
         if (dConfig.callConfig.exPostBids()) {
-            metacallExecutionGas += (dConfigSolverGasLimit + _BID_FIND_OVERHEAD) * solverOps.length;
+            bidFindOverhead = solverOps.length * (_BID_FIND_OVERHEAD + dConfigSolverGasLimit);
+            metacallExecutionGas += bidFindOverhead;
         }
 
-        return (metacallExecutionGas, allSolverCalldataGas + allSolverExecutionGas);
+        return (metacallExecutionGas, allSolverCalldataGas + allSolverExecutionGas, bidFindOverhead);
     }
 }

@@ -423,6 +423,7 @@ abstract contract GasAccounting is SafetyLocks {
     /// @return netAtlasGasSurcharge The net gas surcharge of the metacall, taken by Atlas.
     function _settle(
         Context memory ctx,
+        uint256 gasMarker,
         address gasRefundBeneficiary
     )
         internal

@@ -76,7 +76,7 @@ contract Atlas is Escrow, Factory {
             + GasAccLib.metacallCalldataGas(msg.data.length, L2_GAS_CALCULATOR);
 
         DAppConfig memory _dConfig;
-        StackVars memory _vars;
+        StackVars memory _vars; // TODO dont need this now, no more stack too deep
         {
             bool _isSimulation = msg.sender == SIMULATOR;
             address _executionEnvironment;
@@ -91,8 +91,12 @@ contract Atlas is Escrow, Factory {
             });
         }
         {
-            (uint256 _metacallExecutionGas, uint256 _allSolversGasLimit, ValidCallsResult _validCallsResult) =
-            VERIFICATION.validateCalls(
+            (
+                uint256 _metacallExecutionGas,
+                uint256 _allSolversGasLimit,
+                uint256 _bidFindOverhead,
+                ValidCallsResult _validCallsResult
+            ) = VERIFICATION.validateCalls(
                 _dConfig, userOp, solverOps, dAppOp, msg.value, _vars.bundler, _vars.isSimulation
             );
 
@@ -116,16 +120,18 @@ contract Atlas is Escrow, Factory {
             // If gas limit is too high, the bonded balance threshold checked could unexpectedly price out solvers.
             if (gasleft() > _metacallExecutionGas) revert GasLimitTooHigh();
 
+            // TODO return exPostBids overhead from validateCalls (also included in _metacallExecutionGas) and deduct
+            // from remainingMaxGas (_gasMarker) as solver wont pay for it
             // TODO add helpers to Simulator to estimate metacall gaslimit + solver's max gas liability
 
             // allSolversGasLimit used in calculation of sufficient bonded balance check before solverOp execution
             _vars.allSolversGasLimit = _allSolversGasLimit;
-        }
 
-        // Initialize the environment lock and accounting values
-        _setEnvironmentLock(_dConfig, _vars.executionEnvironment);
-        _initializeAccountingValues(_gasMarker, _vars.allSolversGasLimit);
-        // TODO if I move this up into above scope, can maybe remove allSolversGasLimit from vars struct
+            // Initialize the environment lock and accounting values
+            _setEnvironmentLock(_dConfig, _vars.executionEnvironment);
+            _initializeAccountingValues(_gasMarker - _bidFindOverhead, _vars.allSolversGasLimit);
+            // _gasMarker - _bidFindOverhead = estimated winning solver gas liability for (not charged for bid-find gas)
+        }
 
         // Calculate `execute` gas limit such that it can fail due to an OOG error caused by any of the hook calls, and
         // the metacall will still have enough gas to gracefully finish and return, storing any nonces required.
@@ -136,7 +142,7 @@ contract Atlas is Escrow, Factory {
         // be either a TRUSTED or DEFAULT hash, depending on the allowsTrustedOpHash setting.
         try this.execute{ gas: _gasLimit }(_dConfig, userOp, solverOps, _vars) returns (Context memory ctx) {
             // Gas Refund to sender only if execution is successful
-            (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) = _settle(ctx, gasRefundBeneficiary);
+            (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) = _settle(ctx, _gasMarker, gasRefundBeneficiary);
 
             auctionWon = ctx.solverSuccessful;
             emit MetacallResult(
