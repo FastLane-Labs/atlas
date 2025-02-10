@@ -141,11 +141,12 @@ contract Atlas is Escrow, Factory {
         // than re-calculate it, we can simply take it from the dAppOp here. It's worth noting that this will
         // be either a TRUSTED or DEFAULT hash, depending on the allowsTrustedOpHash setting.
         try this.execute{ gas: _gasLimit }(_dConfig, userOp, solverOps, _vars) returns (Context memory ctx) {
-            uint256 _unreachedCalldataValuePaid = _chargeUnreachedSolversForCalldata(solverOps, ctx.solverIndex);
+            GasLedger memory _gL = t_gasLedger.toGasLedger(); // Final load, no need to persist changes after this
+            uint256 _unreachedCalldataValuePaid = _chargeUnreachedSolversForCalldata(solverOps, _gL, ctx.solverIndex);
 
             // Gas Refund to sender only if execution is successful
             (uint256 _ethPaidToBundler, uint256 _netGasSurcharge) =
-                _settle2(ctx, _gasMarker, gasRefundBeneficiary, _unreachedCalldataValuePaid);
+                _settle(ctx, _gL, _gasMarker, gasRefundBeneficiary, _unreachedCalldataValuePaid);
 
             auctionWon = ctx.solverSuccessful;
             emit MetacallResult(
