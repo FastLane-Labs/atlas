@@ -423,7 +423,6 @@ abstract contract GasAccounting is SafetyLocks {
     /// @return netAtlasGasSurcharge The net gas surcharge of the metacall, taken by Atlas.
     function _settle(
         Context memory ctx,
-        uint256 gasMarker,
         address gasRefundBeneficiary
     )
         internal
@@ -503,11 +502,37 @@ abstract contract GasAccounting is SafetyLocks {
         return (claimsPaidToBundler, netAtlasGasSurcharge);
     }
 
+    function _chargeUnreachedSolversForCalldata(
+        SolverOperation[] calldata solverOps,
+        uint256 solverIdx
+    )
+        internal
+        returns (uint256 unreachedCalldataValuePaid)
+    {
+        EscrowAccountAccessData memory _solverData;
+        uint256 _calldataGasCost;
+        uint256 _deficit;
+
+        // TODO add cost of this loop to writeoffs
+
+        // Start at the solver after the current solverIdx, because current solverIdx is the winner
+        for (uint256 i = solverIdx + 1; i < solverOps.length; ++i) {
+            _calldataGasCost = GasAccLib.solverOpCalldataGas(solverOps[i].data.length, L2_GAS_CALCULATOR) * tx.gasprice;
+            _solverData = S_accessData[solverOps[i].from];
+
+            // No surcharges added to calldata cost for unreached solvers
+            _deficit = _assign(_solverData, solverOps[i].from, _calldataGasCost);
+
+            unreachedCalldataValuePaid += _calldataGasCost - _deficit;
+        }
+    }
+
     // TODO NEW VERSION OF SETTLE
     function _settle2(
         Context memory ctx,
         uint256 gasMarker,
-        address gasRefundBeneficiary
+        address gasRefundBeneficiary,
+        uint256 unreachedCalldataValuePaid
     )
         internal
         returns (uint256 claimsPaidToBundler, uint256 netAtlasGasSurcharge)
