@@ -105,20 +105,20 @@ contract MockGasAccounting is TestAtlas, BaseTest {
         _handleSolverFailAccounting(solverOp, dConfigSolverGasLimit, gasWaterMark, result, includeCalldata);
     }
 
-    function settle(Context memory ctx) external returns (uint256, uint256) {
-        return _settle(ctx, makeAddr("bundler"));
-    }
-
-    function adjustAccountingForFees(Context memory ctx)
-        external
-        returns (
-            uint256 adjustedWithdrawals,
-            uint256 adjustedClaims,
-            uint256 adjustedWriteoffs,
-            uint256 netAtlasGasSurcharge
-        )
-    {
-        return _adjustAccountingForFees(ctx);
+    function settle(
+        Context memory ctx,
+        GasLedger memory gL,
+        uint256 gasMarker,
+        address gasRefundBeneficiary,
+        uint256 unreachedCalldataValuePaid
+    ) external returns (uint256, uint256) {
+        return _settle(
+            ctx,
+            gL,
+            gasMarker,
+            gasRefundBeneficiary,
+            unreachedCalldataValuePaid
+        );
     }
 
     /////////////////////////////////////////////////////////
