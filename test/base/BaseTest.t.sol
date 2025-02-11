@@ -173,9 +173,10 @@ contract BaseTest is Test {
         view
         returns (uint256)
     {
+        // TODO refactor to use real constants
         uint256 _bidFindOverhead = 5000;
         uint256 _baseTxGasUsed = 21_000;
-        uint256 _fixedGasOffset = 120_000;
+        uint256 _fixedGasOffset = 150_000;
         DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
 
         // Calculate execution gas cost

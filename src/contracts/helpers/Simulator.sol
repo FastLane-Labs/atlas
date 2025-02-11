@@ -11,10 +11,19 @@ import "../types/ConfigTypes.sol";
 import "../types/ValidCalls.sol";
 import "../types/EscrowTypes.sol";
 import { AtlasErrors } from "../types/AtlasErrors.sol";
+import { AtlasConstants } from "../types/AtlasConstants.sol";
+import { AccountingMath } from "../libraries/AccountingMath.sol";
+import { GasAccLib } from "../libraries/GasAccLib.sol";
+import { CallBits } from "../libraries/CallBits.sol";
 import { Result } from "../interfaces/ISimulator.sol";
 import { IAtlas } from "../interfaces/IAtlas.sol";
+import { IDAppControl } from "../interfaces/IDAppControl.sol";
 
-contract Simulator is AtlasErrors {
+import "forge-std/console.sol";
+
+contract Simulator is AtlasErrors, AtlasConstants {
+    using CallBits for uint32;
+
     address public immutable deployer;
     address public atlas;
 
@@ -22,6 +31,37 @@ contract Simulator is AtlasErrors {
 
     constructor() {
         deployer = msg.sender;
+    }
+
+    function estimateMetacallGasLimit(
+        UserOperation calldata userOp,
+        SolverOperation[] calldata solverOps,
+        DAppOperation calldata dAppOp
+    )
+        external
+        view
+        returns (uint256)
+    {
+        // TODO refactor some of this into a shared lib with AtlasVerification - GasAccLib probably
+        DAppConfig memory dConfig = IDAppControl(dAppOp.control).getDAppConfig(userOp);
+        uint256 metacallCalldataLength = msg.data.length + 20; // Add the extra address param len for metacall
+
+        // TODO delete
+        uint256 realLength = abi.encode(userOp, solverOps, dAppOp, address(0)).length;
+        console.log("real metacall length", realLength);
+        console.log("estimated metacall length", metacallCalldataLength);
+
+        uint256 metacallCalldataGas =
+            GasAccLib.metacallCalldataGas(metacallCalldataLength, IAtlas(atlas).L2_GAS_CALCULATOR());
+
+        uint256 metacallExecutionGas = _BASE_TX_GAS_USED + AccountingMath._FIXED_GAS_OFFSET + userOp.gas
+            + dConfig.dappGasLimit + solverOps.length * dConfig.solverGasLimit;
+
+        if (dConfig.callConfig.exPostBids()) {
+            metacallExecutionGas += solverOps.length * (_BID_FIND_OVERHEAD + dConfig.solverGasLimit);
+        }
+
+        return metacallCalldataGas + metacallExecutionGas;
     }
 
     function simUserOperation(UserOperation calldata userOp)

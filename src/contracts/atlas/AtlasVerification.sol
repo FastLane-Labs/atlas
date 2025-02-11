@@ -614,7 +614,7 @@ contract AtlasVerification is EIP712, NonceManager, DAppIntegration {
             bidFindOverhead = solverOps.length * (_BID_FIND_OVERHEAD + dConfigSolverGasLimit);
             metacallExecutionGas += bidFindOverhead;
         }
-
+        
         return (metacallExecutionGas, allSolverCalldataGas + allSolverExecutionGas, bidFindOverhead);
     }
 }
