@@ -289,7 +289,7 @@ contract TrebleSwapTest is BaseTest {
         beforeVars.burnAddressTrebBalance = _balanceOf(address(TREB), BURN);
         beforeVars.atlasGasSurcharge = atlas.cumulativeSurcharge();
         uint256 msgValue = args.nativeInput ? swapInfo.inputAmount : 0;
-        uint256 gasLimit = _gasLim(args.userOp, args.solverOps, args.dAppOp);
+        uint256 gasLimit = _gasLim(args.userOp, args.solverOps);
 
         uint256 txGasUsed;
         uint256 estAtlasGasSurcharge = gasleft(); // Reused below during calculations

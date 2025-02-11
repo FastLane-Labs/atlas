@@ -174,7 +174,7 @@ contract ExPostTest is BaseTest {
         (simSuccess, simResult,) = simulator.simSolverCalls{gas: gasLim}(userOp, solverOps, dAppOp);
         assertTrue(simSuccess, "all solverOps together should succeed in simulator");
         
-        gasLim = _gasLim(userOp, solverOps, dAppOp);
+        gasLim = _gasLim(userOp, solverOps);
         vm.startPrank(userEOA);
 
         // uint256 userEOABalance = userEOA.balance;
@@ -357,7 +357,7 @@ contract ExPostTest is BaseTest {
             assertTrue(simSuccess, "solverOps fail in simulator");
         }
 
-        gasLim = _gasLim(userOp, solverOps, dAppOp);
+        gasLim = _gasLim(userOp, solverOps);
         vm.startPrank(userEOA);
         uint256 gasLeftBefore = gasleft(); // reusing var because stack too deep
         (bool success,) =

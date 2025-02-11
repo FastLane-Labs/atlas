@@ -35,21 +35,16 @@ contract Simulator is AtlasErrors, AtlasConstants {
 
     function estimateMetacallGasLimit(
         UserOperation calldata userOp,
-        SolverOperation[] calldata solverOps,
-        DAppOperation calldata dAppOp
+        SolverOperation[] calldata solverOps
     )
         external
         view
         returns (uint256)
     {
         // TODO refactor some of this into a shared lib with AtlasVerification - GasAccLib probably
-        DAppConfig memory dConfig = IDAppControl(dAppOp.control).getDAppConfig(userOp);
-        uint256 metacallCalldataLength = msg.data.length + 20; // Add the extra address param len for metacall
-
-        // TODO delete
-        uint256 realLength = abi.encode(userOp, solverOps, dAppOp, address(0)).length;
-        console.log("real metacall length", realLength);
-        console.log("estimated metacall length", metacallCalldataLength);
+        DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
+        uint256 metacallCalldataLength = msg.data.length + DAPP_OP_LENGTH + 28;
+        // Additional 28 length accounts for missing address param
 
         uint256 metacallCalldataGas =
             GasAccLib.metacallCalldataGas(metacallCalldataLength, IAtlas(atlas).L2_GAS_CALCULATOR());

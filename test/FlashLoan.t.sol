@@ -115,7 +115,7 @@ contract FlashLoanTest is BaseTest {
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
 
-        uint256 gasLim = _gasLim(userOp, solverOps, dAppOp);
+        uint256 gasLim = _gasLim(userOp, solverOps);
 
         // make the actual atlas call that should revert
         vm.startPrank(userEOA);

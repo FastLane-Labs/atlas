@@ -132,7 +132,7 @@ contract MainTest is BaseTest {
         (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(r, s, v);
 
-        uint256 gasLim = _gasLim(userOp, solverOps, dAppOp);
+        uint256 gasLim = _gasLim(userOp, solverOps);
 
 
         vm.startPrank(userEOA);
@@ -398,7 +398,7 @@ contract MainTest is BaseTest {
         DAppOperation memory dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
         (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(r, s, v);
-        uint256 gasLim = _gasLim(userOp, solverOps, dAppOp);
+        uint256 gasLim = _gasLim(userOp, solverOps);
 
         // Execution environment should not exist yet
         (,, bool exists) = atlas.getExecutionEnvironment(userEOA, address(v2DAppControl));
@@ -524,7 +524,7 @@ contract MainTest is BaseTest {
         DAppOperation memory dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
         (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(r, s, v);
-        uint256 gasLim = _gasLim(userOp, solverOps, dAppOp);
+        uint256 gasLim = _gasLim(userOp, solverOps);
 
         uint256 bondedBalanceBefore = atlas.balanceOfBonded(beneficiary);
 
@@ -570,7 +570,7 @@ contract MainTest is BaseTest {
         DAppOperation memory dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
         (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(r, s, v);
-        uint256 gasLim = _gasLim(userOp, solverOps, dAppOp);
+        uint256 gasLim = _gasLim(userOp, solverOps);
 
         uint256 bondedBalanceBefore = atlas.balanceOfBonded(beneficiary);
 

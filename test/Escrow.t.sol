@@ -208,7 +208,7 @@ contract EscrowTest is BaseTest {
             .withData(abi.encode(1))
             .signAndBuild(address(atlasVerification), solverOnePK);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
-        uint256 gasLim = _gasLim(userOp, solverOps, dappOp);
+        uint256 gasLim = _gasLim(userOp, solverOps);
 
         vm.prank(userEOA);
         bool auctionWon = atlas.metacall{gas: gasLim}(userOp, solverOps, dappOp, address(0));
@@ -323,7 +323,7 @@ contract EscrowTest is BaseTest {
         ).signAndBuild(address(atlasVerification), solverOnePK);
 
         dappOp = validDAppOperation(userOp, solverOps).build();
-        uint256 gasLim = _gasLim(userOp, solverOps, dappOp);
+        uint256 gasLim = _gasLim(userOp, solverOps);
 
         if (revertExpected) {
             vm.expectRevert(expectedError);
@@ -553,7 +553,7 @@ contract EscrowTest is BaseTest {
             defaultBidAmount
         ).signAndBuild(address(atlasVerification), solverOnePK);
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
-        uint256 gasLim = _gasLim(userOp, solverOps, dappOp);
+        uint256 gasLim = _gasLim(userOp, solverOps);
 
         vm.prank(userEOA);
         (bool success,) =
@@ -654,7 +654,7 @@ contract EscrowTest is BaseTest {
         public
     {
         DAppOperation memory dappOp = validDAppOperation(userOp, solverOps).build();
-        uint256 gasLim = _gasLim(userOp, solverOps, dappOp);
+        uint256 gasLim = _gasLim(userOp, solverOps);
 
         vm.expectEmit(false, false, false, true, address(atlas));
         emit AtlasEvents.SolverTxResult(

@@ -295,7 +295,7 @@ contract SwapIntentTest is BaseTest {
         (bool simResult,,) = simulator.simUserOperation{ gas: gasLim }(userOp);
         assertTrue(simResult, "metasimUserOperationcall tested false c");
 
-        gasLim = _gasLim(userOp, solverOps, dAppOp);
+        gasLim = _gasLim(userOp, solverOps);
         uint256 gasLeftBefore = gasleft();
 
         vm.startPrank(userEOA);

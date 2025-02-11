@@ -171,7 +171,7 @@ contract SwapIntentTest is BaseTest {
         (simResult,,) = simulator.simUserOperation{ gas: gasLim }(userOp);
         assertTrue(simResult, "metasimUserOperationcall tested false c");
 
-        gasLim = _gasLim(userOp, solverOps, dAppOp);
+        gasLim = _gasLim(userOp, solverOps);
         uint256 gasLeftBefore = gasleft();
 
         atlas.metacall{ gas: gasLim }({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
@@ -302,7 +302,7 @@ contract SwapIntentTest is BaseTest {
         // Check solver does NOT have DAI - it must use Uniswap to get it during metacall
         assertEq(DAI.balanceOf(address(uniswapSolver)), 0, "Solver has DAI before metacall");
 
-        gasLim = _gasLim(userOp, solverOps, dAppOp);
+        gasLim = _gasLim(userOp, solverOps);
 
         // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
         atlas.metacall{gas: gasLim}({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });

@@ -160,34 +160,18 @@ contract BaseTest is Test {
 
         // Add calldata cost for Simulator call gas limits.
         uint256 _gasLimit = abi.encode(userOp, dAppOp, solverOps, address(0)).length * _calldataHexCharCost;
-        return _gasLimit + _gasLim(userOp, solverOps, dAppOp);
+        return _gasLimit + _gasLim(userOp, solverOps);
     }
 
     // For direct Atlas metacalls
     function _gasLim(
         UserOperation memory userOp,
-        SolverOperation[] memory solverOps,
-        DAppOperation memory /* dAppOp */
+        SolverOperation[] memory solverOps
     )
         internal
         view
         returns (uint256)
     {
-        // TODO refactor to use real constants
-        uint256 _bidFindOverhead = 5000;
-        uint256 _baseTxGasUsed = 21_000;
-        uint256 _fixedGasOffset = 150_000;
-        DAppConfig memory dConfig = IDAppControl(userOp.control).getDAppConfig(userOp);
-
-        // Calculate execution gas cost
-        uint256 _gasLimit = userOp.gas + dConfig.dappGasLimit + (solverOps.length * dConfig.solverGasLimit);
-
-        // Adjust to 2x solverOp gas limit + buffer for ex-post bids
-        if (dConfig.callConfig.exPostBids()) {
-            _gasLimit += (dConfig.solverGasLimit + _bidFindOverhead) * solverOps.length;
-        }
-
-        // Add buffer constants
-        return _gasLimit + _baseTxGasUsed + _fixedGasOffset;
+        return simulator.estimateMetacallGasLimit(userOp, solverOps);
     }
 }
