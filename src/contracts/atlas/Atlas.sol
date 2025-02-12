@@ -120,10 +120,6 @@ contract Atlas is Escrow, Factory {
             // If gas limit is too high, the bonded balance threshold checked could unexpectedly price out solvers.
             if (gasleft() > _metacallExecutionGas) revert GasLimitTooHigh();
 
-            // TODO return exPostBids overhead from validateCalls (also included in _metacallExecutionGas) and deduct
-            // from remainingMaxGas (_gasMarker) as solver wont pay for it
-            // TODO add helpers to Simulator to estimate metacall gaslimit + solver's max gas liability
-
             // allSolversGasLimit used in calculation of sufficient bonded balance check before solverOp execution
             _vars.allSolversGasLimit = _allSolversGasLimit;
 

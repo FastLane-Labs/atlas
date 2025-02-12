@@ -90,7 +90,11 @@ contract BaseTest is Test {
         address expectedAtlasAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 2);
         address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedAtlasAddr);
-        FactoryLib factoryLib = new FactoryLib(address(execEnvTemplate));
+
+        // Deploy FactoryLib using precompile from Atlas v1.3 - avoids adjusting Mimic assembly
+        FactoryLib factoryLib = FactoryLib(
+            deployCode("src/contracts/precompiles/FactoryLib.sol/FactoryLib.json", abi.encode(address(execEnvTemplate)))
+        );
 
         atlas = new TestAtlas({
             escrowDuration: DEFAULT_ESCROW_DURATION,
