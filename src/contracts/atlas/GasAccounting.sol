@@ -465,6 +465,8 @@ abstract contract GasAccounting is SafetyLocks {
             }
         }
 
+        S_cumulativeSurcharge += netAtlasGasSurcharge;
+
         // Set lock to FullyLocked to prevent any reentrancy possibility in refund transfer below
         _setLockPhase(uint8(ExecutionPhase.FullyLocked));
 
