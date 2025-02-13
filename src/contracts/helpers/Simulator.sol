@@ -24,6 +24,9 @@ import "forge-std/console.sol";
 contract Simulator is AtlasErrors, AtlasConstants {
     using CallBits for uint32;
 
+    uint256 internal constant _SIM_GAS_SUGGESTED_BUFFER = 30_000; // TODO calc properly
+    uint256 internal constant _SIM_GAS_BEFORE_METACALL = 10_000; // TODO calc properly
+
     address public immutable deployer;
     address public atlas;
 
@@ -35,9 +38,9 @@ contract Simulator is AtlasErrors, AtlasConstants {
 
     function estimateMetacallGasLimit(
         UserOperation calldata userOp,
-        SolverOperation[] calldata solverOps
+        SolverOperation[] memory solverOps
     )
-        external
+        public
         view
         returns (uint256)
     {
@@ -59,6 +62,10 @@ contract Simulator is AtlasErrors, AtlasConstants {
         return metacallCalldataGas + metacallExecutionGas;
     }
 
+    // TODO consider returning estimatedGasLimit in the simUserOp, simSolverOps functions for convenience
+    // NOTE: If simulator sets gas lim for metacalls, make sure caller knows to set really high gas limit. Otherwise
+    // will form the ceiling and sim result will be inaccurate
+
     function simUserOperation(UserOperation calldata userOp)
         external
         payable
@@ -71,7 +78,9 @@ contract Simulator is AtlasErrors, AtlasConstants {
         dAppOp.to = atlas;
         dAppOp.control = userOp.control;
 
-        (Result result, uint256 validCallsResult) = _errorCatcher(userOp, solverOps, dAppOp);
+        uint256 estGasLim = estimateMetacallGasLimit(userOp, solverOps);
+
+        (Result result, uint256 validCallsResult) = _errorCatcher(userOp, solverOps, dAppOp, estGasLim);
         success = uint8(result) > uint8(Result.UserOpSimFail);
         if (success) validCallsResult = uint256(ValidCallsResult.Valid);
         if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
@@ -92,7 +101,9 @@ contract Simulator is AtlasErrors, AtlasConstants {
         SolverOperation[] memory solverOps = new SolverOperation[](1);
         solverOps[0] = solverOp;
 
-        (Result result, uint256 solverOutcomeResult) = _errorCatcher(userOp, solverOps, dAppOp);
+        uint256 estGasLim = estimateMetacallGasLimit(userOp, solverOps);
+
+        (Result result, uint256 solverOutcomeResult) = _errorCatcher(userOp, solverOps, dAppOp, estGasLim);
         success = result == Result.SimulationPassed;
         if (success) solverOutcomeResult = 0; // discard additional error uint if solver stage was successful
         if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
@@ -114,7 +125,10 @@ contract Simulator is AtlasErrors, AtlasConstants {
             // Returns number out of usual range of SolverOutcome enum to indicate no solverOps
             return (false, Result.Unknown, uint256(type(SolverOutcome).max) + 1);
         }
-        (Result result, uint256 solverOutcomeResult) = _errorCatcher(userOp, solverOps, dAppOp);
+
+        uint256 estGasLim = estimateMetacallGasLimit(userOp, solverOps);
+
+        (Result result, uint256 solverOutcomeResult) = _errorCatcher(userOp, solverOps, dAppOp, estGasLim);
         success = result == Result.SimulationPassed;
         if (success) solverOutcomeResult = 0; // discard additional error uint if solver stage was successful
         if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
@@ -124,12 +138,17 @@ contract Simulator is AtlasErrors, AtlasConstants {
     function _errorCatcher(
         UserOperation memory userOp,
         SolverOperation[] memory solverOps,
-        DAppOperation memory dAppOp
+        DAppOperation memory dAppOp,
+        uint256 estGasLimit
     )
         internal
         returns (Result result, uint256 additionalErrorCode)
     {
-        try this.metacallSimulation{ value: userOp.value }(userOp, solverOps, dAppOp) {
+        if (gasleft() < estGasLimit + _SIM_GAS_BEFORE_METACALL) {
+            revert GasLimitInsufficientForMetacall(estGasLimit, estGasLimit + _SIM_GAS_SUGGESTED_BUFFER);
+        }
+
+        try this.metacallSimulation{ value: userOp.value, gas: estGasLimit }(userOp, solverOps, dAppOp) {
             revert Unreachable();
         } catch (bytes memory revertData) {
             bytes4 errorSwitch = bytes4(revertData);

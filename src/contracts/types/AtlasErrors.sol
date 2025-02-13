@@ -39,6 +39,7 @@ contract AtlasErrors {
     error AllocateValueSimFail();
     error PostOpsSimFail();
     error ValidCalls(ValidCallsResult);
+    error GasLimitInsufficientForMetacall(uint256 estimatedMetacallGas, uint256 suggestedSimGas);
 
     // Execution Environment
     error InvalidUser();
