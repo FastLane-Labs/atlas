@@ -84,7 +84,6 @@ contract Atlas is Escrow, Factory {
 
             _vars = StackVars({
                 userOpHash: dAppOp.userOpHash,
-                allSolversGasLimit: 0, // calculated in validateCalls, set below
                 bundler: _isSimulation ? dAppOp.bundler : msg.sender,
                 isSimulation: _isSimulation,
                 executionEnvironment: _executionEnvironment
@@ -120,12 +119,9 @@ contract Atlas is Escrow, Factory {
             // If gas limit is too high, the bonded balance threshold checked could unexpectedly price out solvers.
             if (gasleft() > _metacallExecutionGas) revert GasLimitTooHigh();
 
-            // allSolversGasLimit used in calculation of sufficient bonded balance check before solverOp execution
-            _vars.allSolversGasLimit = _allSolversGasLimit;
-
             // Initialize the environment lock and accounting values
             _setEnvironmentLock(_dConfig, _vars.executionEnvironment);
-            _initializeAccountingValues(_gasMarker - _bidFindOverhead, _vars.allSolversGasLimit);
+            _initializeAccountingValues(_gasMarker - _bidFindOverhead, _allSolversGasLimit);
             // _gasMarker - _bidFindOverhead = estimated winning solver gas liability for (not charged for bid-find gas)
         }
 
@@ -171,7 +167,7 @@ contract Atlas is Escrow, Factory {
     /// @param dConfig Configuration data for the DApp involved, containing execution parameters and settings.
     /// @param userOp UserOperation struct of the current metacall tx.
     /// @param solverOps SolverOperation array of the current metacall tx.
-    /// @param vars StackVars struct containing allSolversGasLimit and inputs for `_buildContext()`.
+    /// @param vars StackVars struct containing inputs for `_buildContext()`.
     /// @return ctx Context struct containing relevant context information for the Atlas auction.
     function execute(
         DAppConfig memory dConfig,

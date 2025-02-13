@@ -140,7 +140,6 @@ contract SafetyLocksTest is Test {
     function test_buildContext() public {
         safetyLocks.initializeLock(executionEnvironment, 0, 0);
         StackVars memory vars = StackVars({
-            allSolversGasLimit: 0,
             userOpHash: bytes32(uint256(1)),
             executionEnvironment: executionEnvironment,
             bundler: address(2),

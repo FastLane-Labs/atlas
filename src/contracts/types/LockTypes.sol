@@ -15,13 +15,10 @@ struct Context {
     bool isSimulation;
     address bundler;
     uint32 dappGasLeft; // Gas used on preOps, allocateValue, and postOps hooks
-    uint32 allSolversGasLimit; // Gas limit for all solvers, used in bonded balance check calc
 }
 
-// TODO might not need allSolversGasLimit anymore ^^
-
+// TODO double check we even need this struct after via-IR
 struct StackVars {
-    uint256 allSolversGasLimit; // TODO either do uint32 here or uint256 in Context
     bytes32 userOpHash;
     address executionEnvironment;
     address bundler;
