@@ -1291,14 +1291,16 @@ contract FastLaneOnlineTest is BaseTest {
         beforeVars.solverTwoRep = flOnline.solverReputation(solverTwoEOA);
         beforeVars.solverThreeRep = flOnline.solverReputation(solverThreeEOA);
 
-        args.gas = _gasLimSim(args.userOp); // Dont have solverOps or dAppOp here
+        args.gas = _gasLim(args.userOp); // Dont have solverOps or dAppOp here
 
         uint256 txGasUsed;
         uint256 estAtlasGasSurcharge = gasleft(); // Reused below during calculations
 
+        // TODO need to change FLOnline - we don't know est gas limit here - will depend on how many solvers are registered
+
         // Do the actual fastOnlineSwap call
         vm.prank(userEOA);
-        (bool result,) = address(flOnline).call{ gas: args.gas + 1000, value: args.msgValue }(
+        (bool result,) = address(flOnline).call{ gas: args.gas + 200_000, value: args.msgValue }(
             abi.encodeCall(flOnline.fastOnlineSwap, (args.userOp))
         );
 

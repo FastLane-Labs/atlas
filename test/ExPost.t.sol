@@ -131,7 +131,6 @@ contract ExPostTest is BaseTest {
         DAppOperation memory dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
-        uint256 gasLim = _gasLimSim(userOp);
 
         vm.startPrank(userEOA);
 
@@ -145,10 +144,8 @@ contract ExPostTest is BaseTest {
         vm.stopPrank();
 
         // Simulate the UserOp
-        (bool simSuccess, Result simResult,) = simulator.simUserOperation{gas: gasLim}(userOp);
+        (bool simSuccess, Result simResult,) = simulator.simUserOperation(userOp);
         assertTrue(simSuccess, "userOp should succeed in simulator");
-
-        gasLim = _gasLimSim(userOp);
 
         // Simulate the first SolverOp
         SolverOperation[] memory tempSolverOps = new SolverOperation[](1);
@@ -156,7 +153,7 @@ contract ExPostTest is BaseTest {
         dAppOp = helper.buildDAppOperation(governanceEOA, userOp, tempSolverOps);
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
-        (simSuccess, simResult,) = simulator.simSolverCall{gas: gasLim}(userOp, solverOps[0], dAppOp);
+        (simSuccess, simResult,) = simulator.simSolverCall(userOp, solverOps[0], dAppOp);
         assertEq(simSuccess, false, "solverOps[0] should fail in sim due to swap path");
 
         // Simulate the second SolverOp
@@ -164,17 +161,17 @@ contract ExPostTest is BaseTest {
         dAppOp = helper.buildDAppOperation(governanceEOA, userOp, tempSolverOps);
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
-        (simSuccess, simResult,) = simulator.simSolverCall{gas: gasLim}(userOp, solverOps[1], dAppOp);
+        (simSuccess, simResult,) = simulator.simSolverCall(userOp, solverOps[1], dAppOp);
         assertEq(simSuccess, true, "solverOps[1] should succeed in simulator");
 
         // Simulate all SolverOps together
         dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
         (sig.v, sig.r, sig.s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(sig.r, sig.s, sig.v);
-        (simSuccess, simResult,) = simulator.simSolverCalls{gas: gasLim}(userOp, solverOps, dAppOp);
+        (simSuccess, simResult,) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
         assertTrue(simSuccess, "all solverOps together should succeed in simulator");
         
-        gasLim = _gasLim(userOp, solverOps);
+        uint256 gasLim = _gasLim(userOp, solverOps);
         vm.startPrank(userEOA);
 
         // uint256 userEOABalance = userEOA.balance;
@@ -343,21 +340,17 @@ contract ExPostTest is BaseTest {
         IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
         vm.stopPrank();
 
-        uint256 gasLim = _gasLimSim(userOp);
-
         // Simulate the UserOp
         {
-            (bool simSuccess, Result simResult,) = simulator.simUserOperation{gas: gasLim}(userOp);
+            (bool simSuccess, Result simResult,) = simulator.simUserOperation(userOp);
             assertTrue(simSuccess, "userOp fails in simulator");
 
-            gasLim = _gasLimSim(userOp, solverOps, dAppOp);
-
             // Simulate the SolverOps
-            (simSuccess, simResult,) = simulator.simSolverCalls{gas: gasLim}(userOp, solverOps, dAppOp);
+            (simSuccess, simResult,) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
             assertTrue(simSuccess, "solverOps fail in simulator");
         }
 
-        gasLim = _gasLim(userOp, solverOps);
+        uint256 gasLim = _gasLim(userOp, solverOps);
         vm.startPrank(userEOA);
         uint256 gasLeftBefore = gasleft(); // reusing var because stack too deep
         (bool success,) =

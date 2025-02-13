@@ -24,6 +24,7 @@ import { DummyDAppControlBuilder } from "./helpers/DummyDAppControlBuilder.sol";
 import { DummyDAppControl } from "./base/DummyDAppControl.sol";
 import { SolverBase } from "../src/contracts/solver/SolverBase.sol";
 
+// TODO add tests for Simulator changes in big Gas Acc refactor
 
 contract SimulatorTest is BaseTest {
     uint256 simBalanceBefore;
@@ -46,9 +47,8 @@ contract SimulatorTest is BaseTest {
 
     function test_simUserOperation_success_valid_SkipCoverage() public {
         UserOperation memory userOp = validUserOperation().build();
-        uint256 gasLim = _gasLimSim(userOp);
 
-        (bool success, Result result, uint256 validCallsResult) = simulator.simUserOperation{gas: gasLim}(userOp);
+        (bool success, Result result, uint256 validCallsResult) = simulator.simUserOperation(userOp);
 
         assertEq(success, true);
         assertTrue(uint(result) > uint(Result.UserOpSimFail)); // Actually fails with SolverSimFail here
@@ -60,9 +60,8 @@ contract SimulatorTest is BaseTest {
         UserOperation memory userOp = validUserOperation()
             .withValue(1e18)
             .signAndBuild(address(atlasVerification), userPK);
-        uint256 gasLim = _gasLimSim(userOp);
 
-        (bool success, Result result, uint256 validCallsResult) = simulator.simUserOperation{gas: gasLim}(userOp);
+        (bool success, Result result, uint256 validCallsResult) = simulator.simUserOperation(userOp);
 
         assertEq(success, true);
         assertTrue(uint(result) > uint(Result.UserOpSimFail)); // Actually fails with SolverSimFail here
@@ -72,9 +71,8 @@ contract SimulatorTest is BaseTest {
 
     function test_simUserOperation_fail_bubblesUpValidCallsResult() public {
         UserOperation memory userOp = validUserOperation().withMaxFeePerGas(1).signAndBuild(address(atlasVerification), userPK);
-        uint256 gasLim = _gasLimSim(userOp);
 
-        (bool success, Result result, uint256 validCallsResult) = simulator.simUserOperation{gas: gasLim}(userOp);
+        (bool success, Result result, uint256 validCallsResult) = simulator.simUserOperation(userOp);
 
         assertEq(success, false);
         assertEq(uint(result), uint(Result.VerificationSimFail));
@@ -95,9 +93,8 @@ contract SimulatorTest is BaseTest {
             .withData(abi.encodeWithSelector(solver.solverFunc.selector))
             .signAndBuild(address(atlasVerification), solverOnePK);
         DAppOperation memory dAppOp = validDAppOperation(userOp, solverOps).build();
-        uint256 gasLim = _gasLimSim(userOp, solverOps, dAppOp);
 
-        (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCall{gas: gasLim}(userOp, solverOps[0], dAppOp);
+        (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCall(userOp, solverOps[0], dAppOp);
 
         assertEq(success, true);
         assertEq(uint(result), uint(Result.SimulationPassed));
@@ -120,9 +117,8 @@ contract SimulatorTest is BaseTest {
             .withData(abi.encodeWithSelector(solver.solverFunc.selector))
             .signAndBuild(address(atlasVerification), solverOnePK);
         DAppOperation memory dAppOp = validDAppOperation(userOp, solverOps).build();
-        uint256 gasLim = _gasLimSim(userOp, solverOps, dAppOp);
 
-        (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCall{gas: gasLim}(userOp, solverOps[0], dAppOp);
+        (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCall(userOp, solverOps[0], dAppOp);
 
         assertEq(success, true);
         assertEq(uint(result), uint(Result.SimulationPassed));
@@ -144,9 +140,8 @@ contract SimulatorTest is BaseTest {
             .withData(abi.encodeWithSelector(solver.solverFunc.selector))
             .signAndBuild(address(atlasVerification), solverOnePK);
         DAppOperation memory dAppOp = validDAppOperation(userOp, solverOps).build();
-        uint256 gasLim = _gasLimSim(userOp, solverOps, dAppOp);
 
-        (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCall{gas: gasLim}(userOp, solverOps[0], dAppOp);
+        (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCall(userOp, solverOps[0], dAppOp);
 
         assertEq(success, false);
         assertEq(uint(result), uint(Result.SolverSimFail));
@@ -167,9 +162,8 @@ contract SimulatorTest is BaseTest {
             .withData(abi.encodeWithSelector(solver.solverFunc.selector))
             .signAndBuild(address(atlasVerification), solverOnePK);
         DAppOperation memory dAppOp = validDAppOperation(userOp, solverOps).build();
-        uint256 gasLim = _gasLimSim(userOp, solverOps, dAppOp);
 
-        (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCalls{gas: gasLim}(userOp, solverOps, dAppOp);
+        (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
 
         assertEq(success, true);
         assertEq(uint(result), uint(Result.SimulationPassed));
@@ -192,9 +186,8 @@ contract SimulatorTest is BaseTest {
             .withData(abi.encodeWithSelector(solver.solverFunc.selector))
             .signAndBuild(address(atlasVerification), solverOnePK);
         DAppOperation memory dAppOp = validDAppOperation(userOp, solverOps).build();
-        uint256 gasLim = _gasLimSim(userOp, solverOps, dAppOp);
 
-        (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCalls{gas: gasLim}(userOp, solverOps, dAppOp);
+        (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
 
         assertEq(success, true);
         assertEq(uint(result), uint(Result.SimulationPassed));
@@ -206,9 +199,8 @@ contract SimulatorTest is BaseTest {
         UserOperation memory userOp = validUserOperation().build();
         SolverOperation[] memory solverOps = new SolverOperation[](0);
         DAppOperation memory dAppOp = validDAppOperation(userOp, solverOps).build();
-        uint256 gasLim = _gasLimSim(userOp, solverOps, dAppOp);
 
-        (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCalls{gas: gasLim}(userOp, solverOps, dAppOp);
+        (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
 
         assertEq(success, false);
         assertEq(uint(result), uint(Result.Unknown)); // Should return Unknown if no solverOps given
@@ -229,9 +221,8 @@ contract SimulatorTest is BaseTest {
             .withData(abi.encodeWithSelector(solver.solverFunc.selector))
             .signAndBuild(address(atlasVerification), solverOnePK);
         DAppOperation memory dAppOp = validDAppOperation(userOp, solverOps).build();
-        uint256 gasLim = _gasLimSim(userOp, solverOps, dAppOp);
 
-        (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCalls{gas: gasLim}(userOp, solverOps, dAppOp);
+        (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCalls(userOp, solverOps, dAppOp);
 
         assertEq(success, false);
         assertEq(uint(result), uint(Result.SolverSimFail));

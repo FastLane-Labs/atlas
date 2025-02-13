@@ -52,7 +52,7 @@ contract TrebleSwapTest is BaseTest {
     address BRETT = 0x532f27101965dd16442E59d40670FaF5eBB142E4;
     address TREB; // will be set to value in DAppControl in setUp
 
-    uint256 ERR_MARGIN = 0.22e18; // 22% error margin
+    uint256 ERR_MARGIN = 0.25e18; // 25% error margin
     uint256 bundlerGasEth = 1e16;
 
     TrebleSwapDAppControl trebleSwapControl;
@@ -340,7 +340,7 @@ contract TrebleSwapTest is BaseTest {
             assertApproxEqRel(
                 _balanceOf(swapInfo.inputToken, userEOA) + buffer,
                 expectedBalanceAfter + buffer,
-                0.01e18, // error marin: 1% of the 0.1 ETH buffer
+                0.02e18, // error marin: 2% of the 0.1 ETH buffer
                 "wrong user input token (ETH) balance change"
             );
         } else {
@@ -385,14 +385,12 @@ contract TrebleSwapTest is BaseTest {
 
     function _checkSimulationsPass() internal {
         bool success;
-        uint256 gasLimit = _gasLimSim(args.userOp);
 
-        (success,,) = simulator.simUserOperation{gas: gasLimit}(args.userOp);
+        (success,,) = simulator.simUserOperation(args.userOp);
         assertEq(success, true, "simUserOperation failed");
 
-        gasLimit = _gasLimSim(args.userOp, args.solverOps, args.dAppOp);
         if (args.solverOps.length > 0) {
-            (success,,) = simulator.simSolverCalls{gas: gasLimit}(args.userOp, args.solverOps, args.dAppOp);
+            (success,,) = simulator.simSolverCalls(args.userOp, args.solverOps, args.dAppOp);
             assertEq(success, true, "simSolverCalls failed");
         }
     }

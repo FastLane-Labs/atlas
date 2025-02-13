@@ -153,8 +153,6 @@ contract SwapIntentTest is BaseTest {
 
         assertTrue(userWethBalanceBefore >= swapIntent.amountUserSells, "Not enough starting WETH");
 
-        uint256 gasLim = _gasLimSim(userOp);
-
         console.log("\nBEFORE METACALL");
         console.log("User WETH balance", WETH.balanceOf(userEOA));
         console.log("User DAI balance", DAI.balanceOf(userEOA));
@@ -163,15 +161,15 @@ contract SwapIntentTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        (bool simResult,,) = simulator.simUserOperation{ gas: gasLim }(userOp);
+        (bool simResult,,) = simulator.simUserOperation(userOp);
         assertFalse(simResult, "metasimUserOperationcall tested true a");
 
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
-        (simResult,,) = simulator.simUserOperation{ gas: gasLim }(userOp);
+        (simResult,,) = simulator.simUserOperation(userOp);
         assertTrue(simResult, "metasimUserOperationcall tested false c");
 
-        gasLim = _gasLim(userOp, solverOps);
+        uint256 gasLim = _gasLim(userOp, solverOps);
         uint256 gasLeftBefore = gasleft();
 
         atlas.metacall{ gas: gasLim }({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
@@ -281,7 +279,6 @@ contract SwapIntentTest is BaseTest {
         userWethBalanceBefore = WETH.balanceOf(userEOA);
 
         assertTrue(userWethBalanceBefore >= swapIntent.amountUserSells, "Not enough starting WETH");
-        uint256 gasLim = _gasLimSim(userOp);
 
         console.log("\nBEFORE METACALL");
         console.log("User WETH balance", WETH.balanceOf(userEOA));
@@ -291,18 +288,18 @@ contract SwapIntentTest is BaseTest {
 
         vm.startPrank(userEOA);
 
-        (bool simResult,,) = simulator.simUserOperation{gas: gasLim}(userOp);
+        (bool simResult,,) = simulator.simUserOperation(userOp);
         assertFalse(simResult, "metasimUserOperationcall tested true a");
 
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 
-        (simResult,,) = simulator.simUserOperation{gas: gasLim}(userOp);
+        (simResult,,) = simulator.simUserOperation(userOp);
         assertTrue(simResult, "metasimUserOperationcall tested false c");
 
         // Check solver does NOT have DAI - it must use Uniswap to get it during metacall
         assertEq(DAI.balanceOf(address(uniswapSolver)), 0, "Solver has DAI before metacall");
 
-        gasLim = _gasLim(userOp, solverOps);
+        uint256 gasLim = _gasLim(userOp, solverOps);
 
         // NOTE: Should metacall return something? Feels like a lot of data you might want to know about the tx
         atlas.metacall{gas: gasLim}({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });

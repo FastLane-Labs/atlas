@@ -422,19 +422,18 @@ contract MainTest is BaseTest {
         UserOperation memory userOp = helper.buildUserOperation(POOL_ONE, POOL_TWO, userEOA, TOKEN_ONE);
         (v, r, s) = vm.sign(userPK, atlasVerification.getUserOperationPayload(userOp));
         userOp.signature = abi.encodePacked(r, s, v);
-        uint256 gasLim = _gasLimSim(userOp);
 
         vm.startPrank(userEOA);
         atlas.createExecutionEnvironment(userEOA, userOp.control);
 
         // Failure case, user hasn't approved Atlas for TOKEN_ONE, operation must fail
-        (bool simResult,,) = simulator.simUserOperation{gas: gasLim}(userOp);
+        (bool simResult,,) = simulator.simUserOperation(userOp);
         assertFalse(simResult, "metasimUserOperationcall tested true");
 
         // Success case
         IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
 
-        (simResult,,) = simulator.simUserOperation{gas: gasLim}(userOp);
+        (simResult,,) = simulator.simUserOperation(userOp);
         assertTrue(simResult, "metasimUserOperationcall tested false");
 
         vm.stopPrank();
@@ -468,13 +467,12 @@ contract MainTest is BaseTest {
         DAppOperation memory dAppOp = helper.buildDAppOperation(governanceEOA, userOp, solverOps);
         (v, r, s) = vm.sign(governancePK, atlasVerification.getDAppOperationPayload(dAppOp));
         dAppOp.signature = abi.encodePacked(r, s, v);
-        uint256 gasLim = _gasLimSim(userOp, solverOps, dAppOp);
 
 
         vm.startPrank(userEOA);
         atlas.createExecutionEnvironment(userEOA, userOp.control);
         IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
-        (bool success, bytes memory data) = address(simulator).call{gas: gasLim}(
+        (bool success, bytes memory data) = address(simulator).call(
             abi.encodeWithSelector(simulator.simSolverCalls.selector, userOp, solverOps, dAppOp)
         );
 
@@ -493,7 +491,7 @@ contract MainTest is BaseTest {
         dAppOp.signature = abi.encodePacked(r, s, v);
 
         vm.startPrank(userEOA);
-        (success, data) = address(simulator).call{gas: gasLim}(
+        (success, data) = address(simulator).call(
             abi.encodeWithSelector(simulator.simSolverCalls.selector, userOp, solverOps, dAppOp)
         );
 

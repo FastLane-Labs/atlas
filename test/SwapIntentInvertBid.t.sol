@@ -283,8 +283,6 @@ contract SwapIntentTest is BaseTest {
     )
         internal
     {
-        uint256 gasLim = _gasLimSim(userOp);
-
         vm.startPrank(userEOA);
 
         // (bool simResult,,) = simulator.simUserOperation(userOp);
@@ -292,10 +290,10 @@ contract SwapIntentTest is BaseTest {
 
         WETH.approve(address(atlas), swapIntent.maxAmountUserSells);
 
-        (bool simResult,,) = simulator.simUserOperation{ gas: gasLim }(userOp);
+        (bool simResult,,) = simulator.simUserOperation(userOp);
         assertTrue(simResult, "metasimUserOperationcall tested false c");
 
-        gasLim = _gasLim(userOp, solverOps);
+        uint256 gasLim = _gasLim(userOp, solverOps);
         uint256 gasLeftBefore = gasleft();
 
         vm.startPrank(userEOA);
