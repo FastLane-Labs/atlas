@@ -17,6 +17,7 @@ import "../../types/LockTypes.sol";
 import { IAtlasVerification } from "../../interfaces/IAtlasVerification.sol";
 import { IExecutionEnvironment } from "../../interfaces/IExecutionEnvironment.sol";
 import { IAtlas } from "../../interfaces/IAtlas.sol";
+import { ISimulator } from "../../interfaces/ISimulator.sol";
 
 import { FastLaneOnlineControl } from "./FastLaneControl.sol";
 import { FastLaneOnlineInner } from "./FastLaneOnlineInner.sol";
@@ -25,6 +26,7 @@ import { SolverGateway } from "./SolverGateway.sol";
 import { SwapIntent, BaselineCall } from "./FastLaneTypes.sol";
 
 contract FastLaneOnlineOuter is SolverGateway {
+    uint256 internal constant _FL_ONLINE_SWAP_GAS_BUFFER = 100_000;
     uint256 internal immutable _BASE_METACALL_GAS_LIM;
 
     constructor(address atlas, address protocolGuildWallet) SolverGateway(atlas, protocolGuildWallet) {
@@ -54,8 +56,11 @@ contract FastLaneOnlineOuter is SolverGateway {
         // Build dApp operation
         DAppOperation memory _dAppOp = _getDAppOp(_userOpHash, userOp.deadline);
 
+        // Call Simulator to get the metacall gas limit to set in the call below
+        uint256 _metacallGasLimit = _metacallGasLimit(userOp, _solverOps);
+
         // Atlas call
-        (bool _success,) = ATLAS.call{ value: msg.value, gas: _metacallGasLimit(userOp, _solverOps.length) }(
+        (bool _success,) = ATLAS.call{ value: msg.value, gas: _metacallGasLimit }(
             abi.encodeCall(IAtlas.metacall, (userOp, _solverOps, _dAppOp, address(0)))
         );
 
@@ -75,6 +80,21 @@ contract FastLaneOnlineOuter is SolverGateway {
         if (_gasRefundTracker > 0) SafeTransferLib.safeTransferETH(msg.sender, _gasRefundTracker);
     }
 
+    function _metacallGasLimit(
+        UserOperation calldata userOp,
+        SolverOperation[] memory solverOps
+    )
+        internal
+        view
+        returns (uint256 metacallGasLim)
+    {
+        metacallGasLim = ISimulator(SIMULATOR).estimateMetacallGasLimit(userOp, solverOps);
+
+        if (gasleft() < metacallGasLim + _FL_ONLINE_SWAP_GAS_BUFFER) {
+            revert FLOnlineOuter_FastOnlineSwap_GasLimitTooLow();
+        }
+    }
+
     function _validateSwap(UserOperation calldata userOp) internal {
         if (msg.sender != userOp.from) revert FLOnlineOuter_ValidateSwap_InvalidSender();
 
@@ -91,17 +111,6 @@ contract FastLaneOnlineOuter is SolverGateway {
             if (userOp.value < _swapIntent.amountUserSells) revert FLOnlineOuter_ValidateSwap_UserOpValueTooLow();
             if (userOp.value != _baselineCall.value) revert FLOnlineOuter_ValidateSwap_UserOpBaselineValueMismatch();
         }
-    }
-
-    function _metacallGasLimit(
-        UserOperation calldata userOp,
-        uint256 solverOpCount
-    )
-        internal
-        view
-        returns (uint256 metacallGasLimit)
-    {
-        return getDAppGasLimit() + userOp.gas + (solverOpCount * getSolverGasLimit()) + 500_000;
     }
 
     fallback() external payable { }

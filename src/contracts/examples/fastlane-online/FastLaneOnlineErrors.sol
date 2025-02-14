@@ -35,6 +35,7 @@ contract FastLaneOnlineErrors {
 
     // FLOnlineOuter.sol
     error FLOnlineOuter_FastOnlineSwap_NoFulfillment();
+    error FLOnlineOuter_FastOnlineSwap_GasLimitTooLow();
 
     error FLOnlineOuter_ValidateSwap_InvalidSender();
     error FLOnlineOuter_ValidateSwap_TxGasTooHigh();
