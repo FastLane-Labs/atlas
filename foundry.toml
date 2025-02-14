@@ -24,4 +24,4 @@
   quote_style = "double"
   tab_width = 4
   wrap_comments = true
-  ignore = ["./**/*.t.sol"]
+  ignore = ["./**/*.t.sol", "src/contracts/atlas/Storage.sol"]
