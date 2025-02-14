@@ -18,6 +18,14 @@ enum Result {
 }
 
 interface ISimulator {
+    function estimateMetacallGasLimit(
+        UserOperation calldata userOp,
+        SolverOperation[] calldata solverOps
+    )
+        external
+        view
+        returns (uint256);
+
     function simUserOperation(UserOperation calldata userOp)
         external
         payable
