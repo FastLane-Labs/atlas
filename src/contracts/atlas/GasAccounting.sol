@@ -451,17 +451,23 @@ abstract contract GasAccounting is SafetyLocks {
             // metacalls with no winning solver are not profitable for the bundler.
 
             uint256 _maxRefund = (gasMarker - gL.writeoffsGas - _gasLeft) * 8 / 10 * tx.gasprice;
-            uint256 _gasChargeTaken = uint256(gL.solverFaultFailureGas).withSurcharge(
-                _atlasSurchargeRate + _bundlerSurchargeRate
-            ) * tx.gasprice + uint256(_netRepayments) + unreachedCalldataValuePaid;
 
-            if (_gasChargeTaken > _maxRefund) {
+            // Bundler gets (base gas cost + bundler surcharge) of solver fault failures, plus any net repayments, plus
+            // base gas cost of unreached solver calldata. This is compared to _maxRefund below.
+            uint256 _bundlerCutBeforeLimit = uint256(gL.solverFaultFailureGas).withSurcharge(_bundlerSurchargeRate)
+                * tx.gasprice + uint256(_netRepayments) + unreachedCalldataValuePaid;
+
+            // Atlas only keeps the Atlas surcharge of solver fault failures, and any gas due to bundler that exceeds
+            // the 80% limit.
+            netAtlasGasSurcharge = uint256(gL.solverFaultFailureGas).getSurcharge(_atlasSurchargeRate) * tx.gasprice;
+
+            if (_bundlerCutBeforeLimit > _maxRefund) {
                 // More than max gas refund was taken by failed/unreached solvers, excess goes to Atlas
                 claimsPaidToBundler = _maxRefund;
-                netAtlasGasSurcharge = _gasChargeTaken - _maxRefund;
+                netAtlasGasSurcharge += _bundlerCutBeforeLimit - _maxRefund;
             } else {
                 // Otherwise, the bundler can receive the full solver fault failure gas
-                claimsPaidToBundler = _gasChargeTaken;
+                claimsPaidToBundler = _bundlerCutBeforeLimit;
             }
         }
 
