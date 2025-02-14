@@ -415,8 +415,8 @@ abstract contract GasAccounting is SafetyLocks {
             // - Gas (C + E) used by other reached solvers (bundler or solver fault failures)
             // - Gas (C only) used by unreached solvers
             // - Gas (E only) used during the bid-finding or unreached solver calldata charge loops
-            _winnerGasCharge =
-                gasMarker - gL.writeoffsGas - gL.solverFaultFailureGas - unreachedCalldataValuePaid - _gasLeft;
+            _winnerGasCharge = gasMarker - gL.writeoffsGas - gL.solverFaultFailureGas
+                - (unreachedCalldataValuePaid / tx.gasprice) - _gasLeft;
             uint256 _surchargedGasPaidBySolvers = gL.solverFaultFailureGas + _winnerGasCharge;
 
             // Bundler gets base gas cost + bundler surcharge of (solver fault fails + winning solver charge)
