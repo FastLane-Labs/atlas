@@ -15,17 +15,13 @@ interface IAtlasVerification {
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
         DAppOperation calldata dAppOp,
+        uint256 metacallGasLeft,
         uint256 msgValue,
         address msgSender,
         bool isSimulation
     )
         external
-        returns (
-            uint256 gasLimitSum,
-            uint256 allSolversGasLimit,
-            uint256 bidFindOverhead,
-            ValidCallsResult verifyCallsResult
-        );
+        returns (uint256 allSolversGasLimit, uint256 bidFindOverhead, ValidCallsResult verifyCallsResult);
     function verifySolverOp(
         SolverOperation calldata solverOp,
         bytes32 userOpHash,

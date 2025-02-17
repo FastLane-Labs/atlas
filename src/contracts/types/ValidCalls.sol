@@ -34,6 +34,8 @@ enum ValidCallsResult {
     InvalidCallConfig,
     CallConfigMismatch,
     DAppGasLimitMismatch,
+    MetacallGasLimitTooLow,
+    MetacallGasLimitTooHigh,
     DAppToInvalid,
     UserToInvalid,
     ControlMismatch,

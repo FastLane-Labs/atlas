@@ -11,15 +11,16 @@ contract TestAtlasVerification is AtlasVerification {
 
     // Public functions to expose internal transient helpers for testing
 
-    function getGasLimits(
+    function getAndVerifyGasLimits(
         SolverOperation[] calldata solverOps,
         DAppConfig calldata dConfig,
-        uint256 userOpGas
+        uint256 userOpGas,
+        uint256 metacallGasLeft
     )
         public
         view
-        returns (uint256 metacallMaxExecutionGas, uint256 allSolversGasLimit, uint256 bidFindOverhead)
+        returns (ValidCallsResult validCallsResult, uint256 allSolversGasLimit, uint256 bidFindOverhead)
     {
-        return _getGasLimits(solverOps, dConfig, userOpGas);
+        return _getAndVerifyGasLimits(solverOps, dConfig, userOpGas, metacallGasLeft);
     }
 }

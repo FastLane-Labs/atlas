@@ -58,4 +58,10 @@ contract AtlasConstants {
         // solverOp in `_bidFindingIteration()`
     uint256 internal constant _EXTRA_METACALL_CALLDATA_LENGTH = 36; // The length of the extra static metacall calldata
         // besides the core UserOp, DAppOp, and SolverOps components.
+
+    // Params below are used to calculate the tolerated max diff between actual gasleft and expected gasleft, in the
+    // `_getAndVerifyGasLimits()` function. This tolerance is mostly for calldata gas cost differences.
+    uint256 internal constant _UPPER_BASE_EXEC_GAS_TOLERANCE = 20_000;
+    uint256 internal constant _LOWER_BASE_EXEC_GAS_TOLERANCE = 60_000;
+    uint256 internal constant _TOLERANCE_PER_SOLVER = 33_000;
 }

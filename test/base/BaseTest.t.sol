@@ -140,35 +140,6 @@ contract BaseTest is Test {
     //              Metacall Gas Limit Helpers              //
     // ---------------------------------------------------- //
 
-    // NOTE: Since Big GasAcc refactor - maybe easier to let simulator estimate gas limit and set in the sim metacall. No need to have caller estimate before a simulation call if they need to call the sim to do that anyway
-
-    // NOTE: Calldata cost not deducted when top level call is directly to Atlas, but is deducted when calling the
-    // Simulator which calls Atlas. Hence the different helper functions.
-
-    // For simUserOperation calls
-    // function _gasLimSim(UserOperation memory userOp) internal view returns (uint256) {
-    //     DAppOperation memory dAppOp;
-    //     return _gasLimSim(userOp, new SolverOperation[](0), dAppOp);
-    // }
-
-    // // For simSolverCall calls
-    // function _gasLimSim(
-    //     UserOperation memory userOp,
-    //     SolverOperation[] memory solverOps,
-    //     DAppOperation memory dAppOp
-    // )
-    //     internal
-    //     view
-    //     returns (uint256)
-    // {
-    //     // 16 gas per byte. 8 gas per hex char.
-    //     uint256 _calldataHexCharCost = 8;
-
-    //     // Add calldata cost for Simulator call gas limits.
-    //     uint256 _gasLimit = abi.encode(userOp, dAppOp, solverOps, address(0)).length * _calldataHexCharCost;
-    //     return _gasLimit + _gasLim(userOp, solverOps);
-    // }
-
     function _gasLim(UserOperation memory userOp) internal view returns (uint256) {
         return _gasLim(userOp, new SolverOperation[](0));
     }

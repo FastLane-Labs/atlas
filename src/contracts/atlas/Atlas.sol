@@ -72,7 +72,8 @@ contract Atlas is Escrow, Factory {
         // _gasMarker calculated as (Execution gas cost) + (Calldata gas cost). Any gas left at the end of the metacall
         // is deducted from this _gasMarker, resulting in actual execution gas used + calldata gas costs + buffer.
         // The calldata component is added below after validateCalls().
-        uint256 _gasMarker = gasleft() + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET
+        uint256 _gasLeft = gasleft();
+        uint256 _gasMarker = _gasLeft + _BASE_TX_GAS_USED + FIXED_GAS_OFFSET
             + GasAccLib.metacallCalldataGas(msg.data.length, L2_GAS_CALCULATOR);
 
         DAppConfig memory _dConfig;
@@ -90,14 +91,8 @@ contract Atlas is Escrow, Factory {
             });
         }
         {
-            (
-                uint256 _metacallExecutionGas,
-                uint256 _allSolversGasLimit,
-                uint256 _bidFindOverhead,
-                ValidCallsResult _validCallsResult
-            ) = VERIFICATION.validateCalls(
-                _dConfig, userOp, solverOps, dAppOp, msg.value, _vars.bundler, _vars.isSimulation
-            );
+            (uint256 _allSolversGasLimit, uint256 _bidFindOverhead, ValidCallsResult _validCallsResult) = VERIFICATION
+                .validateCalls(_dConfig, userOp, solverOps, dAppOp, _gasLeft, msg.value, _vars.bundler, _vars.isSimulation);
 
             // First handle the ValidCallsResult
             if (_validCallsResult != ValidCallsResult.Valid) {
@@ -112,12 +107,6 @@ contract Atlas is Escrow, Factory {
                 // Revert for all other results
                 revert ValidCalls(_validCallsResult);
             }
-
-            // Gas limit set by the bundler cannot be too high or too low. Use Simulator contract to estimate gas limit.
-            // If gas limit is too low, the bonded balance threshold checked may not cover all gas reimbursements.
-            if (gasleft() < _metacallExecutionGas - _EXECUTION_GAS_BUFFER) revert GasLimitTooLow();
-            // If gas limit is too high, the bonded balance threshold checked could unexpectedly price out solvers.
-            if (gasleft() > _metacallExecutionGas) revert GasLimitTooHigh();
 
             // Initialize the environment lock and accounting values
             _setEnvironmentLock(_dConfig, _vars.executionEnvironment);

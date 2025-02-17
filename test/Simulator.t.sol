@@ -34,6 +34,7 @@ contract SimulatorTest is BaseTest {
         UserOperation userOp;
         SolverOperation[] solverOps;
         DAppOperation dAppOp;
+        uint256 metacallGasLeft;
         uint256 msgValue;
         address msgSender;
         bool isSimulation;

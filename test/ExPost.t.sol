@@ -338,6 +338,8 @@ contract ExPostTest is BaseTest {
         // User must approve Atlas
         IERC20(TOKEN_ZERO).approve(address(atlas), type(uint256).max);
         IERC20(TOKEN_ONE).approve(address(atlas), type(uint256).max);
+        // User creates EE - to exclude EE creation from metacall gas (in real or sim metacalls)
+        atlas.createExecutionEnvironment(userEOA, userOp.control);
         vm.stopPrank();
 
         // Simulate the UserOp
@@ -351,6 +353,7 @@ contract ExPostTest is BaseTest {
         }
 
         uint256 gasLim = _gasLim(userOp, solverOps);
+        
         vm.startPrank(userEOA);
         uint256 gasLeftBefore = gasleft(); // reusing var because stack too deep
         (bool success,) =
