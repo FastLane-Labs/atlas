@@ -261,58 +261,6 @@ contract StorageTest is BaseTest {
         assertEq(fulfilled, false, "fulfilled should be false again");
     }
 
-    function test_storage_transient_claims() public {
-        assertEq(atlas.claims(), 0, "claims should start at 0");
-
-        atlas.setClaims(100);
-        assertEq(atlas.claims(), 100, "claims should be 100");
-
-        atlas.clearTransientStorage();
-        assertEq(atlas.claims(), 0, "claims should be 0 again");
-    }
-
-    function test_storage_transient_fees() public {
-        assertEq(atlas.fees(), 0, "fees should start at 0");
-
-        atlas.setFees(100);
-        assertEq(atlas.fees(), 100, "fees should be 100");
-
-        atlas.clearTransientStorage();
-        assertEq(atlas.fees(), 0, "fees should be 0 again");
-    }
-
-    function test_storage_transient_writeoffs() public {
-        assertEq(atlas.writeoffs(), 0, "writeoffs should start at 0");
-
-        atlas.setWriteoffs(100);
-        assertEq(atlas.writeoffs(), 100, "writeoffs should be 100");
-
-        atlas.clearTransientStorage();
-        assertEq(atlas.writeoffs(), 0, "writeoffs should be 0 again");
-    }
-
-    // TODO fix all of this after gas acc refactor
-
-    // function test_storage_transient_withdrawals() public {
-    //     assertEq(atlas.withdrawals(), 0, "withdrawals should start at 0");
-
-    //     atlas.setWithdrawals(100);
-    //     assertEq(atlas.withdrawals(), 100, "withdrawals should be 100");
-
-    //     atlas.clearTransientStorage();
-    //     assertEq(atlas.withdrawals(), 0, "withdrawals should be 0 again");
-    // }
-
-    function test_storage_transient_deposits() public {
-        assertEq(atlas.deposits(), 0, "deposits should start at 0");
-
-        atlas.setDeposits(100);
-        assertEq(atlas.deposits(), 100, "deposits should be 100");
-
-        atlas.clearTransientStorage();
-        assertEq(atlas.deposits(), 0, "deposits should be 0 again");
-    }
-
     function test_storage_transient_solverTo() public {
         MockStorage mockStorage = new MockStorage(
             DEFAULT_ESCROW_DURATION,
@@ -456,12 +404,5 @@ contract MockStorage is Storage {
         _setLock(address(0), 0, 0);
         t_solverLock = 0;
         t_solverTo = address(0);
-        t_claims = 0;
-        t_fees = 0;
-        t_writeoffs = 0;
-        t_borrows = 0;
-        t_repays = 0;
-        t_deposits = 0;
-        t_solverSurcharge = 0;
     }
 }

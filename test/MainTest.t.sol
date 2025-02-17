@@ -546,7 +546,10 @@ contract MainTest is BaseTest {
         assertEq(bondedBalanceAfter, 0, "Beneficiary's AtlETH bonded balance should still be 0");
     }
 
-    function testGasRefundBeneficiarySolverFails() public {
+    // NOTE: In the old system, when there was no winning solver, the partial refund to bundler/beneficiary was credited in bonded form, and refund only sent in ETH if winning solver.
+    // In new system, all refunds are in ETH form (as the bonded period skip has been patched).
+    // TODO: Any reason refunds in no winning solver metacalls should be diverted to bonded form?
+    function testGasRefundBeneficiarySolverFailsPartialRefund() public {
         uint8 v;
         bytes32 r;
         bytes32 s;
