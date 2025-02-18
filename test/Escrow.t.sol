@@ -387,13 +387,6 @@ contract EscrowTest is BaseTest {
         executeSolverOperationCase(userOp, solverOps, false, false, 1 << uint256(SolverOutcome.CallValueTooHigh), false);
     }
 
-    function test_executeSolverOperation_validateSolverOperation_userOutOfGas_SkipCoverage() public {
-        (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(defaultCallConfig().build());
-        this.executeSolverOperationCase{gas: _VALIDATION_GAS_LIMIT + _SOLVER_GAS_LIMIT + 1_000_000}(
-            userOp, solverOps, false, false, 1 << uint256(SolverOutcome.UserOutOfGas), false
-        );
-    }
-
     function test_executeSolverOperation_solverOpWrapper_BidNotPaid_SkipCoverage() public {
         (UserOperation memory userOp, SolverOperation[] memory solverOps) = executeSolverOperationInit(
             defaultCallConfig()

@@ -22,9 +22,6 @@ import "../types/UserOperation.sol";
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
 
-// TODO delete
-import "forge-std/console.sol";
-
 /// @title Escrow
 /// @author FastLane Labs
 /// @notice This Escrow component of Atlas handles execution of stages by calling corresponding functions on the

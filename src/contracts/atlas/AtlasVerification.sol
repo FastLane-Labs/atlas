@@ -19,9 +19,6 @@ import "../types/DAppOperation.sol";
 import "../types/EscrowTypes.sol";
 import "../types/ValidCalls.sol";
 
-// TODO delete
-import "forge-std/console.sol";
-
 /// @title AtlasVerification
 /// @author FastLane Labs
 /// @notice AtlasVerification handles the verification of DAppConfigs, UserOperations, SolverOperations, and

@@ -14,9 +14,6 @@ import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
 
-// TODO delete
-import "forge-std/console.sol";
-
 /// @title GasAccounting
 /// @author FastLane Labs
 /// @notice GasAccounting manages the accounting of gas surcharges and escrow balances for the Atlas protocol.
@@ -521,6 +518,11 @@ abstract contract GasAccounting is SafetyLocks {
         GasLedger memory gL = t_gasLedger.toGasLedger();
         BorrowsLedger memory bL = t_borrowsLedger.toBorrowsLedger();
 
-        return (bL.repays >= bL.borrows) && (gL.maxApprovedGasSpend >= gL.solverGasLiability(_totalSurchargeRate()));
+        // DApp's excess repayments via `contribute()` can offset solverGasLiability
+        uint256 _netRepayments;
+        if (bL.repays > bL.borrows) _netRepayments = bL.repays - bL.borrows;
+
+        return (bL.repays >= bL.borrows)
+            && (gL.maxApprovedGasSpend + _netRepayments >= gL.solverGasLiability(_totalSurchargeRate()));
     }
 }
