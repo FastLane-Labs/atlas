@@ -145,10 +145,10 @@ contract Simulator is AtlasErrors, AtlasConstants {
         returns (Result result, uint256 additionalErrorCode)
     {
         if (gasleft() < estGasLimit + _SIM_GAS_BEFORE_METACALL) {
-            revert GasLimitInsufficientForMetacall(estGasLimit, estGasLimit + _SIM_GAS_SUGGESTED_BUFFER);
+            revert InsufficientGasForMetacallSimulation(estGasLimit, estGasLimit + _SIM_GAS_SUGGESTED_BUFFER);
         }
 
-        try this.metacallSimulation{ value: userOp.value, gas: estGasLimit }(userOp, solverOps, dAppOp) {
+        try this.metacallSimulation{ value: userOp.value }(userOp, solverOps, dAppOp, estGasLimit) {
             revert Unreachable();
         } catch (bytes memory revertData) {
             bytes4 errorSwitch = bytes4(revertData);
@@ -192,13 +192,14 @@ contract Simulator is AtlasErrors, AtlasConstants {
     function metacallSimulation(
         UserOperation calldata userOp,
         SolverOperation[] calldata solverOps,
-        DAppOperation calldata dAppOp
+        DAppOperation calldata dAppOp,
+        uint256 estGasLimit
     )
         external
         payable
     {
         if (msg.sender != address(this)) revert InvalidEntryFunction();
-        if (!IAtlas(atlas).metacall{ value: msg.value }(userOp, solverOps, dAppOp, address(0))) {
+        if (!IAtlas(atlas).metacall{ value: msg.value, gas: estGasLimit }(userOp, solverOps, dAppOp, address(0))) {
             revert NoAuctionWinner(); // should be unreachable
         }
         revert SimulationPassed();
