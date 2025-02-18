@@ -22,6 +22,9 @@ import "../types/UserOperation.sol";
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
 
+// TODO delete
+import "forge-std/console.sol";
+
 /// @title Escrow
 /// @author FastLane Labs
 /// @notice This Escrow component of Atlas handles execution of stages by calling corresponding functions on the
@@ -187,10 +190,6 @@ abstract contract Escrow is AtlETH {
         uint256 _gasWaterMark = gasleft();
         uint256 _result;
         if (!prevalidated) {
-            // TODO return total solver gas here = solverOp.gas + solverOp calldata gas
-            // pass it below to: check bonded, writeoff, assign
-            // if solver wins: decrease remainingSolverGas, and continue to _settle()
-
             _result = VERIFICATION.verifySolverOp(
                 solverOp, ctx.userOpHash, userOp.maxFeePerGas, ctx.bundler, dConfig.callConfig.allowsTrustedOpHash()
             );
@@ -371,7 +370,7 @@ abstract contract Escrow is AtlETH {
         uint256 _solverBalance = S_accessData[solverOp.from].bonded;
 
         // Checks if solver's bonded balance is enough to cover the max charge should they win, including surcharges
-        if (_solverBalance < _gL.solverGasLiability(_totalSurchargeRate()) * tx.gasprice) {
+        if (_solverBalance < _gL.solverGasLiability(_totalSurchargeRate())) {
             // charge solver for calldata so that we can avoid vampire attacks from solver onto user
             result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
         }

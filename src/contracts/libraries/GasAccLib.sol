@@ -67,15 +67,15 @@ library GasAccLib {
         return uint256(bL.repays).toInt256() - uint256(bL.borrows).toInt256();
     }
 
-    // Returns the max gas liability for the current solver.
+    // Returns the max gas liability (in native token units) for the current solver.
     // `remainingMaxGas` is max gas limit as measured at start of metacall, with the gas limit of each solverOp
     // subtracted at the end of its execution.
     // `unreachedSolverGas` is the sum of solverOp gas limits not yet reached, with gas limit of current solverOp
     // subtracted at the start of its execution, before bonded balance check.
     // Thus `remainingMaxGas - unreachedSolverGas` is the max gas the current solver might need to pay for if they win,
     // including dApp hook gas limits and userOp gas limit.
-    function solverGasLiability(GasLedger memory gL, uint256 totalSurchargeRate) internal pure returns (uint256) {
-        return uint256(gL.remainingMaxGas - gL.unreachedSolverGas).withSurcharge(totalSurchargeRate);
+    function solverGasLiability(GasLedger memory gL, uint256 totalSurchargeRate) internal view returns (uint256) {
+        return uint256(gL.remainingMaxGas - gL.unreachedSolverGas).withSurcharge(totalSurchargeRate) * tx.gasprice;
     }
 
     function solverOpCalldataGas(
