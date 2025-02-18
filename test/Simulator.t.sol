@@ -144,9 +144,9 @@ contract SimulatorTest is BaseTest {
 
         (bool success, Result result, uint256 solverOutcomeResult) = simulator.simSolverCall(userOp, solverOps[0], dAppOp);
 
-        assertEq(success, false);
-        assertEq(uint(result), uint(Result.SolverSimFail));
-        assertEq(solverOutcomeResult, 1 << uint256(SolverOutcome.InsufficientEscrow));
+        assertEq(success, false, "call should fail");
+        assertEq(uint(result), uint(Result.SolverSimFail), "result should be SolverSimFail");
+        assertEq(solverOutcomeResult, 1 << uint256(SolverOutcome.InsufficientEscrow), "solverOutcomeResult should be InsufficientEscrow");
         assertEq(address(simulator).balance, simBalanceBefore, "Balance should not change");
     }
 

@@ -14,6 +14,9 @@ import { IL2GasCalculator } from "../interfaces/IL2GasCalculator.sol";
 import "../types/EscrowTypes.sol";
 import "../types/LockTypes.sol";
 
+// TODO delete
+import "forge-std/console.sol";
+
 /// @title GasAccounting
 /// @author FastLane Labs
 /// @notice GasAccounting manages the accounting of gas surcharges and escrow balances for the Atlas protocol.
@@ -321,17 +324,21 @@ abstract contract GasAccounting is SafetyLocks {
             // Persist the updated solver account data to storage
             S_accessData[solverOp.from] = _solverAccountData;
 
+            uint256 _gasWrittenOff;
             if (_assignDeficit > 0) {
                 // If any deficit, calculate the gas units unpaid for due to assign deficit.
-                uint256 _gasWrittenOff = _assignDeficit / tx.gasprice;
+                _gasWrittenOff = _assignDeficit / tx.gasprice;
+
+                // Writeoffs tracks unsurcharged gas units, so cap gasWrittenOff at gasUsed
+                if (_gasWrittenOff > _gasUsed) _gasWrittenOff = _gasUsed;
+
                 // Deduct gas written off from gas tracked as "paid for" by failed solver
                 _gasUsed -= _gasWrittenOff;
                 _gL.writeoffsGas += uint48(_gasWrittenOff); // add to writeoffs in gasLedger
             }
 
-            // The solver fault failure gas used is tracked as it has already been paid for by the current solver. This
-            // value will be used to calculate what the winning solver should pay at the end (should not include gas
-            // used for failed solverOps).
+            // The gas paid for here by failed solver, and gas written off due to shortfall in `_assign()`, will offset
+            // what the winning solver owes in `_settle()`.
             _gL.solverFaultFailureGas += uint48(_gasUsed);
         }
 
@@ -374,6 +381,8 @@ abstract contract GasAccounting is SafetyLocks {
         gL.writeoffsGas += (_writeoffGasMarker - gasleft()).toUint48();
     }
 
+    // TODO some rounding bugs - e.g. in fail (testGasRefundBeneficiarySolverFails) atlasSurcharge + bundler base +
+    // surcharge refunds is slightly less than amount assigned to solver for failure.
     function _settle(
         Context memory ctx,
         GasLedger memory gL,
