@@ -24,6 +24,7 @@ import {
 } from "../src/contracts/examples/intents-example/SwapIntentDAppControl.sol";
 
 import { SolverBase } from "../src/contracts/solver/SolverBase.sol";
+import { AtlasErrors } from "../src/contracts/types/AtlasErrors.sol";
 
 contract AccountingTest is BaseTest {
     SwapIntentDAppControl public swapIntentControl;
@@ -63,6 +64,9 @@ contract AccountingTest is BaseTest {
         SolverOperation[] memory solverOps = _setupBorrowRepayTestUsingBasicSwapIntent(address(honestSolver));
         uint256 gasLim = _gasLim(userOp, solverOps);
 
+        // Give solver contract enough ETH to pay bid (1 ETH)
+        vm.deal(address(honestSolver), solverOps[0].bidAmount);
+
         vm.startPrank(userEOA);
         atlas.metacall{ value: 0, gas: gasLim }({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
         vm.stopPrank();
@@ -83,7 +87,6 @@ contract AccountingTest is BaseTest {
     function testSolverBorrowWithoutRepayingReverts_SkipCoverage() public {
         // Solver deploys the RFQ solver contract (defined at bottom of this file)
         vm.startPrank(solverOneEOA);
-        // TODO make evil solver
         HonestRFQSolver evilSolver = new HonestRFQSolver(WETH_ADDRESS, address(atlas));
         // atlas.deposit{value: gasCostCoverAmount}(solverOneEOA);
         vm.stopPrank();
@@ -92,6 +95,7 @@ contract AccountingTest is BaseTest {
         uint256 gasLim = _gasLim(userOp, solverOps);
 
         vm.startPrank(userEOA);
+        vm.expectRevert(AtlasErrors.UserNotFulfilled.selector);
         atlas.metacall{ value: 0, gas: gasLim }({ userOp: userOp, solverOps: solverOps, dAppOp: dAppOp, gasRefundBeneficiary: address(0) });
         vm.stopPrank();
     }
@@ -201,7 +205,7 @@ contract AccountingTest is BaseTest {
         vm.startPrank(userEOA);
 
         (bool simResult,,) = simulator.simUserOperation(userOp);
-        assertFalse(simResult, "metasimUserOperationcall tested true a");
+        assertFalse(simResult, "metasimUserOperationcall should have failed");
 
         WETH.approve(address(atlas), swapIntent.amountUserSells);
 

@@ -375,12 +375,9 @@ contract SimpleSolver {
         (success, data) = address(this).call{ value: msg.value }(solverOpData);
 
         if (bytes4(solverOpData[:4]) == SimpleSolver.payback.selector) {
-            uint256 shortfall = IAtlas(atlas).shortfall();
-
-            if (shortfall < msg.value) shortfall = 0;
-            else shortfall -= msg.value;
-
-            IAtlas(atlas).reconcile{ value: msg.value }(shortfall);
+            (uint256 gasLiability, uint256 borrowLiability) = IAtlas(atlas).shortfall();
+            uint256 nativeRepayment = borrowLiability < msg.value ? borrowLiability : msg.value;
+            IAtlas(atlas).reconcile{ value: nativeRepayment }(gasLiability);
         }
     }
 

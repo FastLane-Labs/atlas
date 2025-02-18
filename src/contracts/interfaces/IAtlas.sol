@@ -72,7 +72,7 @@ interface IAtlas {
     // GasAccounting.sol
     function contribute() external payable;
     function borrow(uint256 amount) external payable;
-    function shortfall() external view returns (uint256);
+    function shortfall() external view returns (uint256 gasLiability, uint256 borrowLiability);
     function reconcile(uint256 maxApprovedGasSpend) external payable returns (uint256 owed);
 
     // SafetyLocks.sol

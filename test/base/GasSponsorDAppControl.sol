@@ -58,12 +58,15 @@ contract GasSponsorDAppControl is DAppControl {
     }
 
     function _postSolverCall(SolverOperation calldata, bytes calldata) internal virtual override {
-        uint256 _solverShortfall = IAtlas(ATLAS).shortfall();
+        (uint256 gasLiability, uint256 borrowLiability) = IAtlas(ATLAS).shortfall();
 
-        GasSponsorDAppControl(CONTROL).sponsorETHViaExecutionEnvironment(_solverShortfall);
+        uint256 totalETH = gasLiability + borrowLiability;
 
-        require(address(this).balance >= _solverShortfall, "Not enough ETH in DAppControl to pay solver shortfall");
-        IAtlas(ATLAS).contribute{ value: _solverShortfall }();
+        // Request gas liability + borrow liability from DAppControl contract (this is currently in EE context)
+        GasSponsorDAppControl(CONTROL).sponsorETHViaExecutionEnvironment(totalETH);
+
+        require(address(this).balance >= totalETH, "Not enough ETH in DAppControl to pay solver shortfall");
+        IAtlas(ATLAS).contribute{ value: totalETH }();
     }
 
     function _allocateValueCall(

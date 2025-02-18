@@ -705,20 +705,21 @@ contract DummySolver {
         if (address(this).balance >= bidAmount) {
             SafeTransferLib.safeTransferETH(executionEnvironment, bidAmount);
         }
+
+        (uint256 gasLiability, uint256 borrowLiability) = IAtlas(_atlas).shortfall();
         
         if (bidAmount == noGasPayBack) {
             // Don't pay gas
             return;
         } else if (bidAmount == partialGasPayBack) {
             // Only pay half of shortfall owed - expect postSolverCall hook in DAppControl to pay the rest
-            uint256 _shortfall = IAtlas(_atlas).shortfall();
-            IAtlas(_atlas).reconcile(_shortfall / 2);
+            IAtlas(_atlas).reconcile(gasLiability / 2);
             return;
         }
         
         // Default: Pay gas
-        uint256 shortfall = IAtlas(_atlas).shortfall();
-        IAtlas(_atlas).reconcile(shortfall);
+        uint256 nativeRepayment = borrowLiability < msg.value ? borrowLiability : msg.value;
+        IAtlas(_atlas).reconcile{ value: nativeRepayment }(gasLiability);
         return;
     }
 }
@@ -750,8 +751,9 @@ contract DummySolverContributor {
         }
 
         // Pay borrowed ETH + gas used
-        uint256 shortfall = IAtlas(ATLAS).shortfall();
-        IAtlas(ATLAS).reconcile{value: shortfall}(0);
+        (uint256 gasLiability, uint256 borrowLiability) = IAtlas(ATLAS).shortfall();
+        uint256 nativeRepayment = borrowLiability < msg.value ? borrowLiability : msg.value;
+        IAtlas(ATLAS).reconcile{ value: nativeRepayment }(gasLiability);
 
         return;
     }
