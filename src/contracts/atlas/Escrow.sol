@@ -368,7 +368,6 @@ abstract contract Escrow is AtlETH {
 
         // Checks if solver's bonded balance is enough to cover the max charge should they win, including surcharges
         if (_solverBalance < _gL.solverGasLiability(_totalSurchargeRate())) {
-            // charge solver for calldata so that we can avoid vampire attacks from solver onto user
             result |= 1 << uint256(SolverOutcome.InsufficientEscrow);
         }
 

@@ -1760,7 +1760,7 @@ contract AtlasVerificationValidCallsTest is AtlasVerificationBase {
 
     function testGetDomainSeparatorInAtlasVerification() public view {
         bytes32 hashedName = keccak256(bytes("AtlasVerification"));
-        bytes32 hashedVersion = keccak256(bytes("1.4"));
+        bytes32 hashedVersion = keccak256(bytes("1.5"));
         bytes32 typeHash = keccak256(
             "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
         );
