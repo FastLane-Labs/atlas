@@ -370,6 +370,8 @@ abstract contract GasAccounting is SafetyLocks {
             // No surcharges added to calldata cost for unreached solvers
             _deficit = _assign(_solverData, solverOps[i].from, _calldataGasCost);
 
+            // TODO decide if we should track analytics for unreached solvers - cost but also win/loss?
+
             unreachedCalldataValuePaid += _calldataGasCost - _deficit;
         }
 

@@ -78,7 +78,7 @@ contract Sorter is AtlasConstants {
         returns (bool)
     {
         // Make sure the solver has enough funds bonded
-        uint256 solverBalance = IAtlas(address(ATLAS)).balanceOfBonded(solverOp.from);
+        uint256 solverBalance = ATLAS.balanceOfBonded(solverOp.from);
         uint256 solverOpGasLimit = AccountingMath.solverGasLimitScaledDown(solverOp.gas, dConfig.solverGasLimit);
 
         // Calldata gas a winning solver would pay for: non-solverOp calldata + their own solverOp calldata
@@ -103,7 +103,7 @@ contract Sorter is AtlasConstants {
         }
 
         // Solvers can only do one tx per block - this prevents double counting bonded balances
-        uint256 solverLastActiveBlock = IAtlas(address(ATLAS)).accountLastActiveBlock(solverOp.from);
+        uint256 solverLastActiveBlock = ATLAS.accountLastActiveBlock(solverOp.from);
         if (solverLastActiveBlock >= block.number) {
             return false;
         }
