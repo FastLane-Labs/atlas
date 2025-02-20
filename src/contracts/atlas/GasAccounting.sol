@@ -449,6 +449,9 @@ abstract contract GasAccounting is SafetyLocks {
             claimsPaidToBundler -= _deficit;
 
             _updateAnalytics(_winningSolverData, true, _winnerGasCharge);
+
+            // Persist the updated winning solver account data to storage
+            S_accessData[_winningSolver] = _winningSolverData;
         } else {
             // CASE: No winning solver.
 
