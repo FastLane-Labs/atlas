@@ -65,6 +65,10 @@ contract DeployBaseScript is Script {
             return "BASE";
         } else if (chainId == 84_532) {
             return "BASE SEPOLIA";
+        } else if (chainId == 80_094) {
+            return "BERACHAIN";
+        } else if (chainId == 80_069) {
+            return "BERACHAIN BEPOLIA";
         } else {
             revert("Error: Chain ID not recognized");
         }
