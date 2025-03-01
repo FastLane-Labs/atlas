@@ -507,8 +507,13 @@ abstract contract Escrow is AtlETH {
             address(this).call{ gas: gasLimit }(abi.encodeCall(this.solverCall, (ctx, solverOp, bidAmount, returnData)));
 
         if (_success) {
-            // If solverCall() was successful, intentionally leave uint256 result unset as 0 indicates success.
-            solverTracker = abi.decode(_data, (SolverTracker));
+            if (bidAmount != 0) {
+                // If solverCall() was successful, intentionally leave uint256 result unset as 0 indicates success.
+                solverTracker = abi.decode(_data, (SolverTracker));
+            }
+            else {
+                result = 1 << uint256(SolverOutcome.BidNotPaid);
+            }
         } else {
             // If solverCall() failed, catch the error and encode the failure case in the result uint accordingly.
             bytes4 _errorSwitch = bytes4(_data);
