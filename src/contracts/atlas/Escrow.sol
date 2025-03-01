@@ -511,6 +511,7 @@ abstract contract Escrow is AtlETH {
                 // If solverCall() was successful, intentionally leave uint256 result unset as 0 indicates success.
                 solverTracker = abi.decode(_data, (SolverTracker));
             } else {
+                // If solverCall() was successful but bidAmount was 0, do not end auction, keep executing solvers. 
                 result = 1 << uint256(SolverOutcome.BidNotPaid);
             }
         } else {
