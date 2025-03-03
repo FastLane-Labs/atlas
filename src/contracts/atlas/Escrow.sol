@@ -236,7 +236,7 @@ abstract contract Escrow is AtlETH {
         ctx.solverOutcome = uint24(_result);
 
         // Account for failed SolverOperation gas costs
-        // In multipleSuccessfulSolvers solvers must each pay as if they each reverted.
+        // In multipleSuccessfulSolvers solvers must each pay a FULL_REFUND.
         _handleSolverAccounting(solverOp, _gasWaterMark, _result, !prevalidated);
 
         emit SolverTxResult(
@@ -550,6 +550,7 @@ abstract contract Escrow is AtlETH {
             address(this).call{ gas: gasLimit }(abi.encodeCall(this.solverCall, (ctx, solverOp, bidAmount, returnData)));
 
         if (_success) {
+            // If solverCall() was successful, intentionally leave uint256 result unset as 0 indicates success.
             solverTracker = abi.decode(_data, (SolverTracker));
         } else {
             // If solverCall() failed, catch the error and encode the failure case in the result uint accordingly.
