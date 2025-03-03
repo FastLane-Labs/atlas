@@ -206,33 +206,30 @@ abstract contract Escrow is AtlETH {
 
                 // First successful solver call that paid what it bid
                 if (_result.executionSuccessful()) {
+                    // Emit event
+                    emit SolverTxResult(
+                        solverOp.solver, solverOp.from, dConfig.to, solverOp.bidToken, bidAmount, true, true, _result
+                    );
+
                     // Keep executing solvers without ending the auction if multipleSuccessfulSolvers is set
                     if (CallBits.multipleSuccessfulSolvers(dConfig.callConfig)) {
                         _result = 1 << (uint256(SolverOutcome.MultipleSolvers));
 
+                        // In multipleSuccessfulSolvers solvers must each pay a FULL_REFUND.
+                        _handleSolverAccounting(solverOp, _gasWaterMark, _result, !prevalidated);
+
                         // End auction with first successful solver that paid what it bid
                     } else {
-                        emit SolverTxResult(
-                            solverOp.solver,
-                            solverOp.from,
-                            dConfig.to,
-                            solverOp.bidToken,
-                            bidAmount,
-                            true,
-                            true,
-                            _result
-                        );
-
+                        // Mark as complete
                         ctx.solverSuccessful = true;
-                        ctx.solverOutcome = uint24(_result);
-                        return _solverTracker.bidAmount;
                     }
+                    ctx.solverOutcome = uint24(_result);
+                    return _solverTracker.bidAmount;
                 }
             }
         }
 
         // If we reach this point, the solver call did not execute successfully.
-        // In multipleSuccessfulSolvers we reach this point with each successful solver.
         ctx.solverOutcome = uint24(_result);
 
         // Account for failed SolverOperation gas costs
