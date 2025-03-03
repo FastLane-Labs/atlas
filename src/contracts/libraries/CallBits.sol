@@ -104,7 +104,7 @@ library CallBits {
             invertBidValue: invertsBidValue(encodedCallConfig),
             exPostBids: exPostBids(encodedCallConfig),
             allowAllocateValueFailure: allowAllocateValueFailure(encodedCallConfig),
-            multipleSuccessfulSolvers: (encodedCallConfig & (1 << uint32(CallConfigIndex.MultipleSuccessfulSolvers))) != 0
+            multipleSuccessfulSolvers: multipleSuccessfulSolvers(encodedCallConfig)
         });
     }
 
