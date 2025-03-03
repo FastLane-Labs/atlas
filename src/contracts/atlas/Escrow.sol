@@ -201,29 +201,42 @@ abstract contract Escrow is AtlETH {
             if (_result.canExecute()) {
                 SolverTracker memory _solverTracker;
 
-                bool multipleSuccessfulSolversFlag = CallBits.multipleSuccessfulSolvers(dConfig.callConfig);
-
                 // Execute the solver call
-                (_result, _solverTracker) =
-                    _solverOpWrapper(ctx, solverOp, bidAmount, _gasLimit, returnData, multipleSuccessfulSolversFlag);
+                (_result, _solverTracker) = _solverOpWrapper(ctx, solverOp, bidAmount, _gasLimit, returnData);
 
+                // First successful solver call that paid what it bid
                 if (_result.executionSuccessful()) {
-                    // First successful solver call that paid what it bid
-                    emit SolverTxResult(
-                        solverOp.solver, solverOp.from, dConfig.to, solverOp.bidToken, bidAmount, true, true, _result
-                    );
+                    // Keep executing solvers without ending the auction if multipleSuccessfulSolvers is set
+                    if (CallBits.multipleSuccessfulSolvers(dConfig.callConfig)) {
+                        _result = 1 << (uint256(SolverOutcome.MultipleSolvers));
 
-                    ctx.solverSuccessful = true;
-                    ctx.solverOutcome = uint24(_result);
-                    return _solverTracker.bidAmount;
+                        // End auction with first successful solver that paid what it bid
+                    } else {
+                        emit SolverTxResult(
+                            solverOp.solver,
+                            solverOp.from,
+                            dConfig.to,
+                            solverOp.bidToken,
+                            bidAmount,
+                            true,
+                            true,
+                            _result
+                        );
+
+                        ctx.solverSuccessful = true;
+                        ctx.solverOutcome = uint24(_result);
+                        return _solverTracker.bidAmount;
+                    }
                 }
             }
         }
 
         // If we reach this point, the solver call did not execute successfully.
+        // In multipleSuccessfulSolvers we reach this point with each successful solver.
         ctx.solverOutcome = uint24(_result);
 
         // Account for failed SolverOperation gas costs
+        // In multipleSuccessfulSolvers solvers must each pay as if they each reverted.
         _handleSolverAccounting(solverOp, _gasWaterMark, _result, !prevalidated);
 
         emit SolverTxResult(
@@ -525,8 +538,7 @@ abstract contract Escrow is AtlETH {
         SolverOperation calldata solverOp,
         uint256 bidAmount,
         uint256 gasLimit,
-        bytes memory returnData,
-        bool multipleSuccessfulSolversFlag
+        bytes memory returnData
     )
         internal
         returns (uint256 result, SolverTracker memory solverTracker)
@@ -538,11 +550,7 @@ abstract contract Escrow is AtlETH {
             address(this).call{ gas: gasLimit }(abi.encodeCall(this.solverCall, (ctx, solverOp, bidAmount, returnData)));
 
         if (_success) {
-            if (bidAmount == 0 && multipleSuccessfulSolversFlag) {
-                result = 1 << uint256(SolverOutcome.BidNotPaid);
-            } else {
-                solverTracker = abi.decode(_data, (SolverTracker));
-            }
+            solverTracker = abi.decode(_data, (SolverTracker));
         } else {
             // If solverCall() failed, catch the error and encode the failure case in the result uint accordingly.
             bytes4 _errorSwitch = bytes4(_data);
