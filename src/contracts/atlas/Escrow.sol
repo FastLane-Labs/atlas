@@ -204,7 +204,8 @@ abstract contract Escrow is AtlETH {
                 bool multipleSuccessfulSolversFlag = CallBits.multipleSuccessfulSolvers(dConfig.callConfig);
 
                 // Execute the solver call
-                (_result, _solverTracker) = _solverOpWrapper(ctx, solverOp, bidAmount, _gasLimit, returnData, multipleSuccessfulSolversFlag);
+                (_result, _solverTracker) =
+                    _solverOpWrapper(ctx, solverOp, bidAmount, _gasLimit, returnData, multipleSuccessfulSolversFlag);
 
                 if (_result.executionSuccessful()) {
                     // First successful solver call that paid what it bid

@@ -104,4 +104,5 @@ enum CallConfigIndex {
     ExPostBids,
     AllowAllocateValueFailure,
     MultipleSuccessfulSolvers // NEW!
+
 }
