@@ -317,7 +317,7 @@ contract Atlas is Escrow, Factory {
                 return _bidAmount;
             }
         }
-        if (dConfig.callConfig.multipleSuccessfulSolvers() && _bidAmount > 0) {
+        if (dConfig.callConfig.multipleSuccessfulSolvers()) {
             ctx.solverSuccessful = true;
             return _bidAmount;
         }
