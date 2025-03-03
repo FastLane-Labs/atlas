@@ -208,14 +208,7 @@ abstract contract Escrow is AtlETH {
                 if (_result.executionSuccessful()) {
                     // Emit event
                     emit SolverTxResult(
-                        solverOp.solver,
-                        solverOp.from,
-                        dConfig.to,
-                        solverOp.bidToken,
-                        bidAmount,
-                        true,
-                        true,
-                        _result
+                        solverOp.solver, solverOp.from, dConfig.to, solverOp.bidToken, bidAmount, true, true, _result
                     );
 
                     // Keep executing solvers without ending the auction if multipleSuccessfulSolvers is set
