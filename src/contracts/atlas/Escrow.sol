@@ -201,8 +201,10 @@ abstract contract Escrow is AtlETH {
             if (_result.canExecute()) {
                 SolverTracker memory _solverTracker;
 
+                bool multipleSuccessfulSolversFlag = CallBits.multipleSuccessfulSolvers(dConfig.callConfig);
+
                 // Execute the solver call
-                (_result, _solverTracker) = _solverOpWrapper(ctx, solverOp, bidAmount, _gasLimit, returnData);
+                (_result, _solverTracker) = _solverOpWrapper(ctx, solverOp, bidAmount, _gasLimit, returnData, multipleSuccessfulSolversFlag);
 
                 if (_result.executionSuccessful()) {
                     // First successful solver call that paid what it bid
@@ -522,7 +524,8 @@ abstract contract Escrow is AtlETH {
         SolverOperation calldata solverOp,
         uint256 bidAmount,
         uint256 gasLimit,
-        bytes memory returnData
+        bytes memory returnData,
+        bool multipleSuccessfulSolversFlag
     )
         internal
         returns (uint256 result, SolverTracker memory solverTracker)
@@ -534,8 +537,11 @@ abstract contract Escrow is AtlETH {
             address(this).call{ gas: gasLimit }(abi.encodeCall(this.solverCall, (ctx, solverOp, bidAmount, returnData)));
 
         if (_success) {
-            // If solverCall() was successful, intentionally leave uint256 result unset as 0 indicates success.
-            solverTracker = abi.decode(_data, (SolverTracker));
+            if (bidAmount == 0 && multipleSuccessfulSolversFlag) {
+                result = 1 << uint256(SolverOutcome.BidNotPaid);
+            } else {
+                solverTracker = abi.decode(_data, (SolverTracker));
+            }
         } else {
             // If solverCall() failed, catch the error and encode the failure case in the result uint accordingly.
             bytes4 _errorSwitch = bytes4(_data);
