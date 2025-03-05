@@ -91,10 +91,22 @@ contract BaseTest is Test {
         address expectedAtlasVerificationAddr = vm.computeCreateAddress(deployer, vm.getNonce(deployer) + 3);
         ExecutionEnvironment execEnvTemplate = new ExecutionEnvironment(expectedAtlasAddr);
 
-        // Deploy FactoryLib using precompile from Atlas v1.3 - avoids adjusting Mimic assembly
-        FactoryLib factoryLib = FactoryLib(
-            deployCode("src/contracts/precompiles/FactoryLib.sol/FactoryLib.json", abi.encode(address(execEnvTemplate)))
-        );
+        // Deploy FactoryLib using precompile from Atlas v1.3 - avoids adjusting Mimic assembly.
+        // The conditional logic below handles local Atlas repo, and another repo importing Atlas as a lib.
+        FactoryLib factoryLib;
+        string memory pathInAtlasRepo = "src/contracts/precompiles/FactoryLib.sol/FactoryLib.json";
+        // TODO change 'atlas-certora' to 'atlas' once merged back to original Atlas repo
+        string memory pathInImporterRepo = "lib/atlas-certora/src/contracts/precompiles/FactoryLib.sol/FactoryLib.json";
+        if (vm.exists(pathInImporterRepo) && vm.isFile(pathInImporterRepo)) {
+            console.log("Context seems to be importer repo");
+            factoryLib = FactoryLib(
+                deployCode(pathInImporterRepo, abi.encode(address(execEnvTemplate)))
+            );
+        } else {
+            factoryLib = FactoryLib(
+                deployCode(pathInAtlasRepo, abi.encode(address(execEnvTemplate)))
+            );
+        }
 
         atlas = new TestAtlas({
             escrowDuration: DEFAULT_ESCROW_DURATION,
