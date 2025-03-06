@@ -40,13 +40,6 @@ contract GasSponsorDAppControl is DAppControl {
         return data;
     }
 
-    function _postOpsCall(bool, bytes calldata data) internal pure virtual override {
-        if (data.length == 0) return;
-
-        (bool shouldRevert) = abi.decode(data, (bool));
-        require(!shouldRevert, "_postOpsCall revert requested");
-    }
-
     function _preSolverCall(SolverOperation calldata, bytes calldata returnData) internal pure virtual override {
         if (returnData.length == 0) {
             return;
@@ -70,6 +63,7 @@ contract GasSponsorDAppControl is DAppControl {
     }
 
     function _allocateValueCall(
+        bool solved,
         address bidToken,
         uint256 winningAmount,
         bytes calldata data

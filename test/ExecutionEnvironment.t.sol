@@ -244,29 +244,6 @@ contract ExecutionEnvironmentTest is BaseTest {
         (status,) = address(executionEnvironment).call(userData);
     }
 
-    function test_postOpsWrapper_SkipCoverage() public {
-        bytes memory postOpsData;
-        bool status;
-
-        atlas.setLockPhase(ExecutionPhase.PostOps);
-
-        // Valid
-        ctx.solverCount = 4;
-        ctx.solverIndex = ctx.solverCount - 1;
-        postOpsData = abi.encodeCall(executionEnvironment.postOpsWrapper, (false, abi.encode(false)));
-        postOpsData = abi.encodePacked(postOpsData, ctx.setAndPack(ExecutionPhase.PostOps));
-        vm.prank(address(atlas));
-        (status,) = address(executionEnvironment).call(postOpsData);
-        assertTrue(status);
-
-        // DelegateRevert
-        postOpsData = abi.encodeCall(executionEnvironment.postOpsWrapper, (false, abi.encode(true)));
-        postOpsData = abi.encodePacked(postOpsData, ctx.setAndPack(ExecutionPhase.PostOps));
-        vm.prank(address(atlas));
-        vm.expectRevert(AtlasErrors.PostOpsDelegatecallFail.selector);
-        (status,) = address(executionEnvironment).call(postOpsData);
-    }
-
     function test_solverPreTryCatch_SkipCoverage() public {
         bytes memory preTryCatchMetaData;
         bool revertsAsExpected;
@@ -551,13 +528,6 @@ contract MockDAppControl is DAppControl {
         return new bytes(0);
     }
 
-    function _postOpsCall(bool, bytes calldata data) internal view override {
-        console.log("before decode");
-        bool shouldRevert = abi.decode(data, (bool));
-        console.log("after decode");
-        require(!shouldRevert, "_postSolverCall revert requested");
-    }
-
     function _preSolverCall(
         SolverOperation calldata,
         bytes calldata returnData
@@ -584,7 +554,7 @@ contract MockDAppControl is DAppControl {
         if (!returnValue) revert("_postSolverCall returned false");
     }
 
-    function _allocateValueCall(address, uint256, bytes calldata data) internal virtual override {
+    function _allocateValueCall(bool solved, address, uint256, bytes calldata data) internal virtual override {
         (bool shouldRevert) = abi.decode(data, (bool));
         require(!shouldRevert, "_allocateValueCall revert requested");
     }

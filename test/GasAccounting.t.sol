@@ -144,7 +144,7 @@ contract MockGasAccounting is TestAtlas, BaseTest {
             paymentsSuccessful: paymentsSuccessful,
             solverIndex: uint8(winningSolverIndex),
             solverCount: uint8(solverCount),
-            phase: uint8(ExecutionPhase.PostOps),
+            phase: uint8(ExecutionPhase.AllocateValue),
             solverOutcome: 0,
             bidFind: false,
             isSimulation: false,

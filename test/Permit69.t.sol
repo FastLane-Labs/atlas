@@ -243,11 +243,10 @@ contract Permit69Test is BaseTest {
 
         uint8 preSolverOpsPhaseSafe = uint8(ExecutionPhase.PreSolver);
         uint8 postSolverOpsPhaseSafe = uint8(ExecutionPhase.PostSolver);
-        // verificationPhaseSafe = 0000 0100 0000 0000
-        uint8 verificationPhaseSafe = uint8(ExecutionPhase.PostOps);
+        uint8 allocateValuePhaseSafe = uint8(ExecutionPhase.AllocateValue);
 
         uint8 expectedSafeUserTransferBitMap =
-            preOpsPhaseSafe | userOpPhaseSafe | preSolverOpsPhaseSafe | postSolverOpsPhaseSafe | verificationPhaseSafe;
+            preOpsPhaseSafe | userOpPhaseSafe | preSolverOpsPhaseSafe | postSolverOpsPhaseSafe | allocateValuePhaseSafe;
 
         assertEq(
             mockAtlas.getSafeUserTransfer(),
@@ -275,11 +274,9 @@ contract Permit69Test is BaseTest {
         uint8 preSolverOpsPhaseSafe = uint8(ExecutionPhase.PreSolver);
         uint8 postSolverOpsPhaseSafe = uint8(ExecutionPhase.PostSolver);
         uint8 allocateValuePhaseSafe = uint8(ExecutionPhase.AllocateValue);
-        // verificationPhaseSafe = 0000 0100 0000 0000
-        uint8 verificationPhaseSafe = uint8(ExecutionPhase.PostOps);
 
         uint16 expectedSafeDAppTransferBitMap = preOpsPhaseSafe | preSolverOpsPhaseSafe | postSolverOpsPhaseSafe
-            | allocateValuePhaseSafe | verificationPhaseSafe;
+            | allocateValuePhaseSafe;
 
         assertEq(
             mockAtlas.getSafeDAppTransfer(),

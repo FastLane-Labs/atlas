@@ -76,7 +76,14 @@ abstract contract DAppControlTemplate {
     //
     // DApp exposure: Trustless
     // User exposure: Trustless
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata data) internal virtual;
+    function _allocateValueCall(
+        bool solved,
+        address bidToken,
+        uint256 bidAmount,
+        bytes calldata data
+    )
+        internal
+        virtual;
 
     /////////////////////////////////////////////////////////
     //              INTENT FULFILLMENT                     //
@@ -126,26 +133,6 @@ abstract contract DAppControlTemplate {
     //      the user's 'intent.'
 
     function _postSolverCall(SolverOperation calldata, bytes calldata) internal virtual {
-        revert AtlasErrors.NotImplemented();
-    }
-
-    /////////////////////////////////////////////////////////
-    //                  VERIFICATION                       //
-    /////////////////////////////////////////////////////////
-    //
-    // Data should be decoded as:
-    //
-    //    bytes memory returnData
-    //
-
-    // _postOpsCall
-    // Details:
-    //  verification/delegatecall =
-    //      Inputs: User's return data + preOps call's returnData
-    //      Function: Executing the function set by DAppControl
-    //      Container: Inside of the FastLane ExecutionEnvironment
-    //      Access: Storage access (read+write) to the ExecutionEnvironment contract
-    function _postOpsCall(bool, bytes calldata) internal virtual {
         revert AtlasErrors.NotImplemented();
     }
 

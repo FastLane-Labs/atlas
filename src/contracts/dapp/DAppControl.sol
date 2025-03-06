@@ -118,6 +118,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
     /// @param bidAmount The winning bid amount.
     /// @param data Data returned from the previous call phase.
     function allocateValueCall(
+        bool solved,
         address bidToken,
         uint256 bidAmount,
         bytes calldata data
@@ -127,24 +128,7 @@ abstract contract DAppControl is DAppControlTemplate, ExecutionBase {
         onlyAtlasEnvironment
         onlyPhase(ExecutionPhase.AllocateValue)
     {
-        _allocateValueCall(bidToken, bidAmount, data);
-    }
-
-    /// @notice The postOpsCall hook which may be called as the last phase of a `metacall` transaction.
-    /// @dev Should revert if any DApp-specific checks fail.
-    /// @param solved Boolean indicating whether a winning SolverOperation was executed successfully.
-    /// @param data Data returned from the previous call phase.
-    function postOpsCall(
-        bool solved,
-        bytes calldata data
-    )
-        external
-        payable
-        validControl
-        onlyAtlasEnvironment
-        onlyPhase(ExecutionPhase.PostOps)
-    {
-        _postOpsCall(solved, data);
+        _allocateValueCall(solved, bidToken, bidAmount, data);
     }
 
     function userDelegated() external view returns (bool delegated) {

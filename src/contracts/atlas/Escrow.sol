@@ -269,7 +269,9 @@ abstract contract Escrow is AtlETH {
 
         (bool _success, bytes memory _returnData) = ctx.executionEnvironment.call{ gas: ctx.dappGasLeft }(
             abi.encodePacked(
-                abi.encodeCall(IExecutionEnvironment.allocateValue, (dConfig.bidToken, bidAmount, returnData)),
+                abi.encodeCall(
+                    IExecutionEnvironment.allocateValue, (ctx.solverSuccessful, dConfig.bidToken, bidAmount, returnData)
+                ),
                 ctx.setAndPack(ExecutionPhase.AllocateValue)
             )
         );
@@ -289,37 +291,6 @@ abstract contract Escrow is AtlETH {
         // paymentsSuccessful is part of the data forwarded to the postOps hook, dApps can easily check the value by
         // calling _paymentsSuccessful()
         ctx.paymentsSuccessful = _success;
-    }
-
-    /// @notice Executes post-operation logic after SolverOperation, depending on the outcome of the auction.
-    /// @dev Calls the postOpsWrapper function in the Execution Environment, which handles any necessary cleanup or
-    /// finalization logic after the winning SolverOperation.
-    /// @param ctx Context struct containing the current state of the escrow lock.
-    /// @param solved Boolean indicating whether a SolverOperation was successful and won the auction.
-    /// @param returnData Data returned from execution of the UserOp call, which may be required for the postOps logic.
-    function _executePostOpsCall(
-        Context memory ctx,
-        bool solved,
-        bytes memory returnData
-    )
-        internal
-        withLockPhase(ExecutionPhase.PostOps)
-    {
-        uint256 _dappGasWaterMark = gasleft();
-
-        (bool _success,) = ctx.executionEnvironment.call{ gas: ctx.dappGasLeft }(
-            abi.encodePacked(
-                abi.encodeCall(IExecutionEnvironment.postOpsWrapper, (solved, returnData)),
-                ctx.setAndPack(ExecutionPhase.PostOps)
-            )
-        );
-
-        _updateDAppGasLeft(ctx, _dappGasWaterMark);
-
-        if (!_success) {
-            if (ctx.isSimulation) revert PostOpsSimFail();
-            revert PostOpsFail();
-        }
     }
 
     /// @notice Validates a SolverOperation's gas requirements against the escrow state.

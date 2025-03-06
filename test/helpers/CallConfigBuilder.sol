@@ -14,7 +14,6 @@ contract CallConfigBuilder is Test {
     bool delegateUser;
     bool requirePreSolver;
     bool requirePostSolver;
-    bool requirePostOps;
     bool zeroSolvers;
     bool reuseUserOp;
     bool userAuctioneer;
@@ -65,11 +64,6 @@ contract CallConfigBuilder is Test {
 
     function withRequirePostSolver(bool _requirePostSolver) public returns (CallConfigBuilder) {
         requirePostSolver = _requirePostSolver;
-        return this;
-    }
-
-    function withRequirePostOps(bool _requirePostOps) public returns (CallConfigBuilder) {
-        requirePostOps = _requirePostOps;
         return this;
     }
 
@@ -143,7 +137,6 @@ contract CallConfigBuilder is Test {
             delegateUser,
             requirePreSolver,
             requirePostSolver,
-            requirePostOps,
             zeroSolvers,
             reuseUserOp,
             userAuctioneer,

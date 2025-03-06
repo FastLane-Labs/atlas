@@ -50,7 +50,6 @@ contract V2ExPost is DAppControl {
                 delegateUser: false,
                 requirePreSolver: false,
                 requirePostSolver: false,
-                requirePostOps: false,
                 zeroSolvers: true,
                 reuseUserOp: false,
                 userAuctioneer: true,
@@ -114,7 +113,7 @@ contract V2ExPost is DAppControl {
     * @param bidAmount The winning bid amount
     * @param _
     */
-    function _allocateValueCall(address bidToken, uint256 bidAmount, bytes calldata) internal override {
+    function _allocateValueCall(bool solved, address bidToken, uint256 bidAmount, bytes calldata) internal override {
         // This function is delegatecalled
         // address(this) = ExecutionEnvironment
         // msg.sender = Escrow

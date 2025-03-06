@@ -37,7 +37,6 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
                 delegateUser: true,
                 requirePreSolver: true,
                 requirePostSolver: false,
-                requirePostOps: true,
                 zeroSolvers: true,
                 reuseUserOp: true,
                 userAuctioneer: true,
@@ -101,14 +100,12 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
     * @param _
     * @param _
     */
-    function _allocateValueCall(address, uint256, bytes calldata returnData) internal override {
-        (SwapIntent memory _swapIntent,) = abi.decode(returnData, (SwapIntent, BaselineCall));
-        _sendTokensToUser(_swapIntent);
-    }
-
-    function _postOpsCall(bool solved, bytes calldata returnData) internal override {
+    function _allocateValueCall(bool solved, address, uint256, bytes calldata returnData) internal override {
         // If a solver beat the baseline and the amountOutMin, return early
         if (solved) {
+            (SwapIntent memory _swapIntent,) = abi.decode(returnData, (SwapIntent, BaselineCall));
+            _sendTokensToUser(_swapIntent);
+
             (address _winningSolver,,) = IAtlas(ATLAS).solverLockData();
             IFastLaneOnline(CONTROL).setWinningSolver(_winningSolver);
             return;

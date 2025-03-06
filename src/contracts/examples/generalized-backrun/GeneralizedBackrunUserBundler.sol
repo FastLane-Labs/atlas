@@ -61,7 +61,6 @@ contract GeneralizedBackrunUserBundler is DAppControl {
                 delegateUser: true,
                 requirePreSolver: false,
                 requirePostSolver: false,
-                requirePostOps: false,
                 zeroSolvers: true,
                 reuseUserOp: true,
                 userAuctioneer: true,
@@ -326,7 +325,7 @@ contract GeneralizedBackrunUserBundler is DAppControl {
     //                     Atlas hooks                      //
     // ---------------------------------------------------- //
 
-    function _allocateValueCall(address bidToken, uint256, bytes calldata returnData) internal override {
+    function _allocateValueCall(bool solved, address bidToken, uint256, bytes calldata returnData) internal override {
         // NOTE: The _user() receives any remaining balance after the other beneficiaries are paid.
         Beneficiary[] memory _beneficiaries = abi.decode(returnData, (Beneficiary[]));
 

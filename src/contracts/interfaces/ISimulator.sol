@@ -13,7 +13,6 @@ enum Result {
     UserOpSimFail,
     SolverSimFail,
     AllocateValueSimFail,
-    PostOpsSimFail,
     SimulationPassed
 }
 

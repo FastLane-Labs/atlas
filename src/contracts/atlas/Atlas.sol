@@ -190,14 +190,7 @@ contract Atlas is Escrow, Factory {
             : _bidKnownIteration(ctx, dConfig, userOp, solverOps, _returnData);
 
         // AllocateValue Call
-        if (ctx.solverSuccessful) {
-            _allocateValue(ctx, dConfig, _winningBidAmount, _returnData);
-        }
-
-        // PostOp Call
-        if (dConfig.callConfig.needsPostOpsCall()) {
-            _executePostOpsCall(ctx, ctx.solverSuccessful, _returnData);
-        }
+        _allocateValue(ctx, dConfig, _winningBidAmount, _returnData);
     }
 
     /// @notice Called above in `execute` if the DAppConfig requires ex post bids. Sorts solverOps by bid amount and
@@ -365,7 +358,7 @@ contract Atlas is Escrow, Factory {
                 revert SolverSimFail(_solverOutcomeResult);
             } else if (
                 _errorSwitch == PreOpsSimFail.selector || _errorSwitch == UserOpSimFail.selector
-                    || _errorSwitch == AllocateValueSimFail.selector || _errorSwitch == PostOpsSimFail.selector
+                    || _errorSwitch == AllocateValueSimFail.selector
             ) {
                 assembly {
                     mstore(0, _errorSwitch)

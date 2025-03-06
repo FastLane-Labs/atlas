@@ -33,6 +33,5 @@ enum ExecutionPhase {
     SolverOperation,
     PostSolver,
     AllocateValue,
-    PostOps,
     FullyLocked
 }

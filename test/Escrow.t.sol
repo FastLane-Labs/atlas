@@ -259,34 +259,6 @@ contract EscrowTest is BaseTest {
         executeHookCase(1, AtlasErrors.AllocateValueFail.selector);
     }
 
-    // Ensure the postOps hook is successfully called. No return data is expected from the postOps hook, so we do not
-    // forward any data to the solver call.
-    function test_executePostOpsCall_success_SkipCoverage() public {
-        defaultAtlasWithCallConfig(
-            defaultCallConfig()
-                .withRequirePostOps(true) // Execute the postOps hook
-                .build()
-        );
-        executeHookCase(0, noError);
-        bytes memory expectedInput = abi.encode(true, new bytes(0));
-        assertEq(expectedInput, dAppControl.postOpsInputData(), "postOpsInputData should match expectedInput");
-    }
-
-    // Ensure metacall reverts with the proper error when the postOps hook reverts.
-    function test_executePostOpsCall_failure_SkipCoverage() public {
-        defaultAtlasWithCallConfig(
-            defaultCallConfig()
-                .withTrackUserReturnData(true) // Track the user operation's return data
-                .withForwardReturnData(true) // Forward the user operation's return data to the solver call
-                .withRequirePostOps(true) // Execute the postOps hook
-                .withReuseUserOp(true) // Allow metacall to revert
-                .withAllowAllocateValueFailure(true) // Allow the value allocation to fail
-                .build()
-        );
-        dAppControl.setPostOpsShouldRevert(true);
-        executeHookCase(1, AtlasErrors.PostOpsFail.selector);
-    }
-
     // Ensure the allocateValue hook is successfully called. No return data is expected from the allocateValue hook, so
     // we check by emitting an event in the hook. The emitter must be the executionEnvironment since allocateValue is
     // delegatecalled.

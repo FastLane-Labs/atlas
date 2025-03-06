@@ -19,14 +19,12 @@ contract DummyDAppControl is DAppControl {
     bool public preSolverShouldRevert;
     bool public postSolverShouldRevert;
     bool public allocateValueShouldRevert;
-    bool public postOpsShouldRevert;
 
     bytes public preOpsInputData;
     bytes public userOpInputData;
     bytes public preSolverInputData;
     bytes public postSolverInputData;
     bytes public allocateValueInputData;
-    bytes public postOpsInputData;
 
     uint256 public userOpGasLeft;
 
@@ -59,13 +57,6 @@ contract DummyDAppControl is DAppControl {
         return data;
     }
 
-    function _postOpsCall(bool solved, bytes calldata data) internal virtual override {
-        bool shouldRevert = DummyDAppControl(CONTROL).postOpsShouldRevert();
-        require(!shouldRevert, "_postOpsCall revert requested");
-
-        DummyDAppControl(CONTROL).setInputData(abi.encode(solved, data), 5);
-    }
-
     function _preSolverCall(SolverOperation calldata solverOp, bytes calldata returnData) internal virtual override {
         bool shouldRevert = DummyDAppControl(CONTROL).preSolverShouldRevert();
         require(!shouldRevert, "_preSolverCall revert requested");
@@ -81,6 +72,7 @@ contract DummyDAppControl is DAppControl {
     }
 
     function _allocateValueCall(
+        bool solved,
         address bidToken,
         uint256 winningAmount,
         bytes calldata data
@@ -148,10 +140,6 @@ contract DummyDAppControl is DAppControl {
         allocateValueShouldRevert = _allocateValueShouldRevert;
     }
 
-    function setPostOpsShouldRevert(bool _postOpsShouldRevert) public {
-        postOpsShouldRevert = _postOpsShouldRevert;
-    }
-
     // Called by the EE to save input data for testing after the metacall ends
     function setInputData(
         bytes memory inputData,
@@ -164,7 +152,6 @@ contract DummyDAppControl is DAppControl {
         if (hook == 2) preSolverInputData = inputData;
         if (hook == 3) postSolverInputData = inputData;
         if (hook == 4) allocateValueInputData = inputData;
-        if (hook == 5) postOpsInputData = inputData;
     }
 
     // Called by the EE to save gas left for testing at start of userOperationCall
