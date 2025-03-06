@@ -389,8 +389,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         atlas.setLockPhase(ExecutionPhase.AllocateValue);
 
         // Valid
-        allocateData = abi.encodeWithSelector(
-            executionEnvironment.allocateValue.selector, address(0), uint256(0), abi.encode(false)
+        allocateData = abi.encodeCall(
+            executionEnvironment.allocateValue, (false, address(0), uint256(0), abi.encode(false))
         );
         allocateData = abi.encodePacked(allocateData, ctx.setAndPack(ExecutionPhase.AllocateValue));
         vm.prank(address(atlas));
@@ -398,8 +398,8 @@ contract ExecutionEnvironmentTest is BaseTest {
         assertTrue(status);
 
         // DelegateRevert
-        allocateData = abi.encodeWithSelector(
-            executionEnvironment.allocateValue.selector, address(0), uint256(0), abi.encode(true)
+        allocateData = abi.encodeCall(
+            executionEnvironment.allocateValue, (false, address(0), uint256(0), abi.encode(true))
         );
         allocateData = abi.encodePacked(allocateData, ctx.setAndPack(ExecutionPhase.AllocateValue));
         vm.prank(address(atlas));

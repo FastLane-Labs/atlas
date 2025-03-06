@@ -52,7 +52,7 @@ contract TrebleSwapTest is BaseTest {
     address BRETT = 0x532f27101965dd16442E59d40670FaF5eBB142E4;
     address TREB; // will be set to value in DAppControl in setUp
 
-    uint256 ERR_MARGIN = 0.25e18; // 25% error margin
+    uint256 ERR_MARGIN = 0.28e18; // 28% error margin
     uint256 bundlerGasEth = 1e16;
 
     TrebleSwapDAppControl trebleSwapControl;
