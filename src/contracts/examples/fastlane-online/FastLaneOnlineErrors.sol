@@ -7,7 +7,7 @@ contract FastLaneOnlineErrors {
     error FLOnlineControl_PreSolver_SellTokenMismatch();
     error FLOnlineControl_PreSolver_BidBelowReserve();
 
-    error FLOnlineControl_PostOpsCall_InsufficientBaseline();
+    error FLOnlineControl_AllocateValue_InsufficientBaseline();
 
     error FLOnlineControl_BaselineSwap_BaselineCallFail();
     error FLOnlineControl_BaselineSwap_NoBalanceIncrease();

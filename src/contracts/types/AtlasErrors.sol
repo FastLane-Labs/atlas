@@ -48,8 +48,6 @@ contract AtlasErrors {
     error UserOpValueExceedsBalance();
     error UserWrapperDelegatecallFail();
     error UserWrapperCallFail();
-    error PostOpsDelegatecallFail();
-    error PostOpsDelegatecallReturnedFalse();
     error AllocateValueDelegatecallFail();
     error NotEnvironmentOwner();
     error ExecutionEnvironmentBalanceTooLow();

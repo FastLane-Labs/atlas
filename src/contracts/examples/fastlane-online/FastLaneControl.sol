@@ -119,7 +119,7 @@ contract FastLaneOnlineControl is DAppControl, FastLaneOnlineErrors {
 
         // Verify that it exceeds the minAmountOut
         if (_buyTokensReceived < _swapIntent.minAmountUserBuys) {
-            revert FLOnlineControl_PostOpsCall_InsufficientBaseline();
+            revert FLOnlineControl_AllocateValue_InsufficientBaseline();
         }
 
         // Undo the token approval, if not native token.
