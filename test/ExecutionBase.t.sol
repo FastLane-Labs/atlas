@@ -78,7 +78,6 @@ contract ExecutionBaseTest is BaseTest {
             userOpHash: bytes32(uint256(456)),
             bundler: address(789),
             solverSuccessful: false,
-            paymentsSuccessful: true,
             solverIndex: 7,
             solverCount: 11,
             phase: uint8(_phase),
@@ -92,7 +91,6 @@ contract ExecutionBaseTest is BaseTest {
         firstSet = abi.encodePacked(
             _ctx.bundler,
             _ctx.solverSuccessful,
-            _ctx.paymentsSuccessful,
             _ctx.solverIndex,
             _ctx.solverCount,
             _ctx.phase,

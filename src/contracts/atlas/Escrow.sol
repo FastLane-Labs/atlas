@@ -287,10 +287,6 @@ abstract contract Escrow is AtlETH {
             if (ctx.isSimulation) revert AllocateValueSimFail();
             revert AllocateValueFail();
         }
-
-        // paymentsSuccessful is part of the data forwarded to the postOps hook, dApps can easily check the value by
-        // calling _paymentsSuccessful()
-        ctx.paymentsSuccessful = _success;
     }
 
     /// @notice Validates a SolverOperation's gas requirements against the escrow state.

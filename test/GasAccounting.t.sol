@@ -128,7 +128,6 @@ contract MockGasAccounting is TestAtlas, BaseTest {
     function buildContext(
         address bundler,
         bool solverSuccessful,
-        bool paymentsSuccessful,
         uint256 winningSolverIndex,
         uint256 solverCount
     )
@@ -141,7 +140,6 @@ contract MockGasAccounting is TestAtlas, BaseTest {
             userOpHash: bytes32(0),
             bundler: bundler,
             solverSuccessful: solverSuccessful,
-            paymentsSuccessful: paymentsSuccessful,
             solverIndex: uint8(winningSolverIndex),
             solverCount: uint8(solverCount),
             phase: uint8(ExecutionPhase.AllocateValue),

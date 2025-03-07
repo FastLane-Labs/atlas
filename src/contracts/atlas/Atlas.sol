@@ -130,9 +130,7 @@ contract Atlas is Escrow, Factory {
                 _settle(ctx, _gL, _gasMarker, gasRefundBeneficiary, _unreachedCalldataValuePaid);
 
             auctionWon = ctx.solverSuccessful;
-            emit MetacallResult(
-                msg.sender, userOp.from, auctionWon, ctx.paymentsSuccessful, _ethPaidToBundler, _netGasSurcharge
-            );
+            emit MetacallResult(msg.sender, userOp.from, auctionWon, _ethPaidToBundler, _netGasSurcharge);
         } catch (bytes memory revertData) {
             // Bubble up some specific errors
             _handleErrors(revertData, _dConfig.callConfig);
@@ -145,7 +143,7 @@ contract Atlas is Escrow, Factory {
             if (msg.value != 0) SafeTransferLib.safeTransferETH(msg.sender, msg.value);
 
             // Emit event indicating the metacall failed in `execute()`
-            emit MetacallResult(msg.sender, userOp.from, false, false, 0, 0);
+            emit MetacallResult(msg.sender, userOp.from, false, 0, 0);
         }
 
         // The environment lock is explicitly released here to allow multiple metacalls in a single transaction.

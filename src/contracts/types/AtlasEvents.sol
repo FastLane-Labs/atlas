@@ -7,7 +7,6 @@ contract AtlasEvents {
         address indexed bundler,
         address indexed user,
         bool solverSuccessful,
-        bool disbursementSuccessful,
         uint256 ethPaidToBundler,
         uint256 netGasSurcharge
     );

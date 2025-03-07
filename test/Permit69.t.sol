@@ -76,7 +76,6 @@ contract Permit69Test is BaseTest {
             userOpHash: bytes32(0),
             bundler: address(0),
             solverSuccessful: false,
-            paymentsSuccessful: false,
             solverIndex: 0,
             solverCount: 0,
             phase: uint8(ExecutionPhase.PreOps),

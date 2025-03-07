@@ -58,7 +58,6 @@ contract Base {
         data = abi.encodePacked(
             _bundler(),
             _solverSuccessful(),
-            _paymentsSuccessful(),
             _solverIndex(),
             _solverCount(),
             _phase(),
@@ -159,23 +158,13 @@ contract Base {
         }
     }
 
-    /// @notice Extracts and returns the boolean indicating whether the payments were successful after the allocateValue
-    /// step in the current metacall tx, from calldata.
-    /// @return paymentsSuccessful The boolean indicating whether the payments were successful after the allocateValue
-    /// step in the current metacall tx.
-    function _paymentsSuccessful() internal pure returns (bool paymentsSuccessful) {
-        assembly {
-            paymentsSuccessful := shr(248, calldataload(sub(calldatasize(), 54)))
-        }
-    }
-
     /// @notice Extracts and returns the boolean indicating whether the winning solverOp was executed successfully in
     /// the current metacall tx, from calldata.
     /// @return solverSuccessful The boolean indicating whether the winning solverOp was executed successfully in the
     /// current metacall tx.
     function _solverSuccessful() internal pure returns (bool solverSuccessful) {
         assembly {
-            solverSuccessful := shr(248, calldataload(sub(calldatasize(), 55)))
+            solverSuccessful := shr(248, calldataload(sub(calldatasize(), 54)))
         }
     }
 
@@ -186,7 +175,7 @@ contract Base {
     /// @return bundler The current value of the bundler of the current metacall tx.
     function _bundler() internal pure returns (address bundler) {
         assembly {
-            bundler := shr(96, calldataload(sub(calldatasize(), 75)))
+            bundler := shr(96, calldataload(sub(calldatasize(), 74)))
         }
     }
 

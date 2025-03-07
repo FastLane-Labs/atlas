@@ -10,7 +10,6 @@ struct Context {
     uint8 callDepth;
     uint8 phase;
     bool solverSuccessful;
-    bool paymentsSuccessful;
     bool bidFind;
     bool isSimulation;
     address bundler;

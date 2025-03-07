@@ -21,7 +21,6 @@ library SafetyBits {
         packedCtx = abi.encodePacked(
             self.bundler,
             self.solverSuccessful,
-            self.paymentsSuccessful,
             self.solverIndex,
             self.solverCount,
             uint8(phase),
