@@ -135,7 +135,6 @@ contract EscrowTest is BaseTest {
                 .withRequirePreOps(true) // Execute the preOps hook
                 .withTrackPreOpsReturnData(true) // Track the preOps hook's return data
                 .withForwardReturnData(true) // Forward the preOps hook's return data to the solver call
-                .withAllowAllocateValueFailure(true) // Allow the value allocation to fail
                 .build()
         );
 
@@ -164,7 +163,6 @@ contract EscrowTest is BaseTest {
             defaultCallConfig()
                 .withTrackUserReturnData(true) // Track the user operation's return data
                 .withForwardReturnData(true) // Forward the user operation's return data to the solver call
-                .withAllowAllocateValueFailure(true) // Allow the value allocation to fail
                 .build()
         );
         executeHookCase(block.timestamp * 3, noError);
@@ -251,7 +249,6 @@ contract EscrowTest is BaseTest {
                 .withTrackUserReturnData(true) // Track the user operation's return data
                 .withForwardReturnData(true) // Forward the user operation's return data to the solver call
                 .withReuseUserOp(true) // Allow metacall to revert
-                .withAllowAllocateValueFailure(false) // Do not allow the value allocation to fail
                 .build()
         );
 
@@ -272,7 +269,7 @@ contract EscrowTest is BaseTest {
 
         executeHookCase(userOpArg, noError);
 
-        bytes memory expectedInput = abi.encode(address(0), defaultBidAmount, abi.encode(userOpArg));
+        bytes memory expectedInput = abi.encode(true, address(0), defaultBidAmount, abi.encode(userOpArg));
         assertEq(expectedInput, dAppControl.allocateValueInputData(), "allocateValueInputData should match expectedInput");
     }
 

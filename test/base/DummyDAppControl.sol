@@ -84,7 +84,7 @@ contract DummyDAppControl is DAppControl {
         bool shouldRevert = DummyDAppControl(CONTROL).allocateValueShouldRevert();
         require(!shouldRevert, "_allocateValueCall revert requested");
 
-        DummyDAppControl(CONTROL).setInputData(abi.encode(bidToken, winningAmount, data), 4);
+        DummyDAppControl(CONTROL).setInputData(abi.encode(solved, bidToken, winningAmount, data), 4);
 
         // emit MEVPaymentSuccess(bidToken, winningAmount);
     }

@@ -71,9 +71,6 @@ struct CallConfig {
     // exPostBids: Bids are found on-chain using `_getBidAmount` in Atlas, and solverOp.bidAmount is used as the max
     // bid. If solverOp.bidAmount is 0, then there is no max bid limit for that solver.
     bool exPostBids;
-    // allowAllocateValueFailure: If true, the metacall will proceed even if the allocate value hook fails. If false,
-    // the metacall will revert if the allocate value hook fails.
-    bool allowAllocateValueFailure;
 }
 
 enum CallConfigIndex {
@@ -96,6 +93,5 @@ enum CallConfigIndex {
     RequireFulfillment,
     TrustedOpHash,
     InvertBidValue,
-    ExPostBids,
-    AllowAllocateValueFailure
+    ExPostBids
 }

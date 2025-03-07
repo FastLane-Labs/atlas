@@ -267,7 +267,7 @@ abstract contract Escrow is AtlETH {
     {
         uint256 _dappGasWaterMark = gasleft();
 
-        (bool _success, bytes memory _returnData) = ctx.executionEnvironment.call{ gas: ctx.dappGasLeft }(
+        (bool _success,) = ctx.executionEnvironment.call{ gas: ctx.dappGasLeft }(
             abi.encodePacked(
                 abi.encodeCall(
                     IExecutionEnvironment.allocateValue, (ctx.solverSuccessful, dConfig.bidToken, bidAmount, returnData)
@@ -278,12 +278,8 @@ abstract contract Escrow is AtlETH {
 
         _updateDAppGasLeft(ctx, _dappGasWaterMark);
 
-        // If the call from Atlas to EE succeeded, decode the return data to check if the allocateValue delegatecall
-        // from EE to DAppControl succeeded.
-        if (_success) _success = abi.decode(_returnData, (bool));
-
         // Revert if allocateValue failed at any point, unless the call config allows allocate value failure.
-        if (!_success && !dConfig.callConfig.allowAllocateValueFailure()) {
+        if (!_success) {
             if (ctx.isSimulation) revert AllocateValueSimFail();
             revert AllocateValueFail();
         }

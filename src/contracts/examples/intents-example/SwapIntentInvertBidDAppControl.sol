@@ -64,8 +64,7 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
                 requireFulfillment: true,
                 trustedOpHash: true,
                 invertBidValue: true,
-                exPostBids: false,
-                allowAllocateValueFailure: true
+                exPostBids: false
             })
         )
     {
@@ -157,6 +156,7 @@ contract SwapIntentInvertBidDAppControl is DAppControl {
     * @param _
     */
     function _allocateValueCall(bool solved, address bidToken, uint256, bytes calldata) internal override {
+        if (!solved) return;
         if (bidToken == address(0)) {
             SafeTransferLib.safeTransferETH(_user(), address(this).balance);
         } else {
