@@ -181,6 +181,11 @@ abstract contract Escrow is AtlETH {
         uint256 _gasWaterMark = gasleft();
         uint256 _result;
         if (!prevalidated) {
+
+            // TODO return total solver gas here = solverOp.gas + solverOp calldata gas
+            // pass it below to: check bonded, writeoff, assign
+            // if solver wins: decrease remainingSolverGas, and continue to _settle()
+
             _result = VERIFICATION.verifySolverOp(
                 solverOp, ctx.userOpHash, userOp.maxFeePerGas, ctx.bundler, dConfig.callConfig.allowsTrustedOpHash()
             );

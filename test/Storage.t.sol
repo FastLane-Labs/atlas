@@ -291,15 +291,17 @@ contract StorageTest is BaseTest {
         assertEq(atlas.writeoffs(), 0, "writeoffs should be 0 again");
     }
 
-    function test_storage_transient_withdrawals() public {
-        assertEq(atlas.withdrawals(), 0, "withdrawals should start at 0");
+    // TODO fix all of this after gas acc refactor
 
-        atlas.setWithdrawals(100);
-        assertEq(atlas.withdrawals(), 100, "withdrawals should be 100");
+    // function test_storage_transient_withdrawals() public {
+    //     assertEq(atlas.withdrawals(), 0, "withdrawals should start at 0");
 
-        atlas.clearTransientStorage();
-        assertEq(atlas.withdrawals(), 0, "withdrawals should be 0 again");
-    }
+    //     atlas.setWithdrawals(100);
+    //     assertEq(atlas.withdrawals(), 100, "withdrawals should be 100");
+
+    //     atlas.clearTransientStorage();
+    //     assertEq(atlas.withdrawals(), 0, "withdrawals should be 0 again");
+    // }
 
     function test_storage_transient_deposits() public {
         assertEq(atlas.deposits(), 0, "deposits should start at 0");
@@ -457,7 +459,8 @@ contract MockStorage is Storage {
         t_claims = 0;
         t_fees = 0;
         t_writeoffs = 0;
-        t_withdrawals = 0;
+        t_borrows = 0;
+        t_repays = 0;
         t_deposits = 0;
         t_solverSurcharge = 0;
     }

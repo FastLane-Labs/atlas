@@ -102,7 +102,7 @@ contract MockGasAccounting is TestAtlas, BaseTest {
     }
 
     function settle(Context memory ctx) external returns (uint256, uint256) {
-        return _settle(ctx, MOCK_SOLVER_GAS_LIMIT, makeAddr("bundler"));
+        return _settle(ctx, makeAddr("bundler"));
     }
 
     function adjustAccountingForFees(Context memory ctx)
@@ -114,7 +114,7 @@ contract MockGasAccounting is TestAtlas, BaseTest {
             uint256 netAtlasGasSurcharge
         )
     {
-        return _adjustAccountingForFees(ctx, MOCK_SOLVER_GAS_LIMIT);
+        return _adjustAccountingForFees(ctx);
     }
 
     /////////////////////////////////////////////////////////
@@ -211,6 +211,11 @@ contract MockGasAccounting is TestAtlas, BaseTest {
 
     function getFixedGasOffset() external pure returns (uint256) {
         return AccountingMath._FIXED_GAS_OFFSET;
+    }
+
+    function totalShortfall() external view returns (uint256) {
+        (uint256 gasLiability, uint256 borrowLiability) = this.shortfall();
+        return gasLiability + borrowLiability;
     }
 }
 
@@ -412,7 +417,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         assertEq(
             solverOneEOA.balance, borrowedAmount, "Execution environment balance should be equal to borrowed amount"
         );
-        assertEq(borrowedAmount, mockGasAccounting.withdrawals(), "Withdrawals should be equal to borrowed amount");
+        assertEq(borrowedAmount, mockGasAccounting.borrows(), "Borrows should be equal to borrowed amount");
     }
 
     function test_borrow_userOperationPhase() public {
@@ -429,7 +434,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             borrowedAmount,
             "Execution environment balance should be equal to borrowed amount"
         );
-        assertEq(borrowedAmount, mockGasAccounting.withdrawals(), "Withdrawals should be equal to borrowed amount");
+        assertEq(borrowedAmount, mockGasAccounting.borrows(), "Borrows should be equal to borrowed amount");
     }
 
     function test_borrow_preSolverPhase() public {
@@ -446,7 +451,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             borrowedAmount,
             "Execution environment balance should be equal to borrowed amount"
         );
-        assertEq(borrowedAmount, mockGasAccounting.withdrawals(), "Withdrawals should be equal to borrowed amount");
+        assertEq(borrowedAmount, mockGasAccounting.borrows(), "Borrows should be equal to borrowed amount");
     }
 
     function test_borrow_solverOperationPhase() public {
@@ -462,12 +467,12 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             borrowedAmount,
             "Execution environment balance should be equal to borrowed amount"
         );
-        assertEq(borrowedAmount, mockGasAccounting.withdrawals(), "Withdrawals should be equal to borrowed amount");
+        assertEq(borrowedAmount, mockGasAccounting.borrows(), "Borrows should be equal to borrowed amount");
     }
 
     function test_borrow_postSolverPhase_reverts() public {
         uint256 borrowedAmount = 1e18;
-        uint256 withdrawalsBefore = mockGasAccounting.withdrawals();
+        uint256 borrowsBefore = mockGasAccounting.borrows();
         fundContract(borrowedAmount);
 
         mockGasAccounting.setLock(executionEnvironment, 0, uint8(ExecutionPhase.PostSolver));
@@ -476,12 +481,12 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         mockGasAccounting.borrow(borrowedAmount);
 
         assertEq(executionEnvironment.balance, 0, "Execution environment balance should remain zero");
-        assertEq(withdrawalsBefore, mockGasAccounting.withdrawals(), "Withdrawals should remain unchanged");
+        assertEq(borrowsBefore, mockGasAccounting.borrows(), "Borrows should remain unchanged");
     }
 
     function test_borrow_allocateValuePhase_reverts() public {
         uint256 borrowedAmount = 1e18;
-        uint256 withdrawalsBefore = mockGasAccounting.withdrawals();
+        uint256 borrowsBefore = mockGasAccounting.borrows();
         fundContract(borrowedAmount);
 
         mockGasAccounting.setLock(executionEnvironment, 0, uint8(ExecutionPhase.AllocateValue));
@@ -490,12 +495,12 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         mockGasAccounting.borrow(borrowedAmount);
 
         assertEq(executionEnvironment.balance, 0, "Execution environment balance should remain zero");
-        assertEq(withdrawalsBefore, mockGasAccounting.withdrawals(), "Withdrawals should remain unchanged");
+        assertEq(borrowsBefore, mockGasAccounting.borrows(), "Borrows should remain unchanged");
     }
 
     function test_borrow_postOpsPhase_reverts() public {
         uint256 borrowedAmount = 1e18;
-        uint256 withdrawalsBefore = mockGasAccounting.withdrawals();
+        uint256 borrowsBefore = mockGasAccounting.borrows();
         fundContract(borrowedAmount);
 
         mockGasAccounting.setLock(executionEnvironment, 0, uint8(ExecutionPhase.PostOps));
@@ -504,7 +509,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         mockGasAccounting.borrow(borrowedAmount);
 
         assertEq(executionEnvironment.balance, 0, "Execution environment balance should remain zero");
-        assertEq(withdrawalsBefore, mockGasAccounting.withdrawals(), "Withdrawals should remain unchanged");
+        assertEq(borrowsBefore, mockGasAccounting.borrows(), "Borrows should remain unchanged");
     }
 
     function test_multipleBorrows() public {
@@ -568,7 +573,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
             "Final contract balance should be initial balance minus total borrowed amount"
         );
         assertEq(
-            totalBorrowAmount, mockGasAccounting.withdrawals(), "Withdrawals should equal total borrowed amount"
+            totalBorrowAmount, mockGasAccounting.borrows(), "Borrows should equal total borrowed amount"
         );
     }
 
@@ -581,7 +586,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         mockGasAccounting.setClaims(initialClaims);
 
         // Verify initial shortfall
-        assertEq(mockGasAccounting.shortfall(), initialClaims, "Initial shortfall should be equal to initial claims");
+        assertEq(mockGasAccounting.totalShortfall(), initialClaims, "Initial shortfall should be equal to initial claims");
 
         // Contribute to the contract
         mockGasAccounting.setLock(executionEnvironment, 0, uint8(ExecutionPhase.PreOps));
@@ -590,7 +595,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         mockGasAccounting.contribute{ value: initialClaims }();
 
         // Verify shortfall after contribution
-        assertEq(mockGasAccounting.shortfall(), 0, "Shortfall should be zero after contribution");
+        assertEq(mockGasAccounting.totalShortfall(), 0, "Shortfall should be zero after contribution");
     }
 
     function test_shortfall_claimsAndWithdrawals() public {
@@ -601,12 +606,12 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         initialClaims = 1000;
         uint256 withdrawals = 500;
         mockGasAccounting.setClaims(initialClaims);
-        mockGasAccounting.setWithdrawals(withdrawals);
+        mockGasAccounting.setBorrows(withdrawals);
 
         // Verify initial shortfall
         uint256 expectedShortfall = initialClaims + withdrawals;
         assertEq(
-            mockGasAccounting.shortfall(), expectedShortfall, "Initial shortfall should be claims plus withdrawals"
+            mockGasAccounting.totalShortfall(), expectedShortfall, "Initial shortfall should be claims plus withdrawals"
         );
 
         // Contribute to the contract
@@ -616,7 +621,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         mockGasAccounting.contribute{ value: expectedShortfall }();
 
         // Verify shortfall after contribution
-        assertEq(mockGasAccounting.shortfall(), 0, "Shortfall should be zero after contribution");
+        assertEq(mockGasAccounting.totalShortfall(), 0, "Shortfall should be zero after contribution");
     }
 
     function test_shortfall_claimsAndFees() public {
@@ -631,7 +636,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         // Verify initial shortfall
         uint256 expectedShortfall = initialClaims + fees;
-        assertEq(mockGasAccounting.shortfall(), expectedShortfall, "Initial shortfall should be claims plus fees");
+        assertEq(mockGasAccounting.totalShortfall(), expectedShortfall, "Initial shortfall should be claims plus fees");
 
         // Contribute to the contract
         mockGasAccounting.setLock(executionEnvironment, 0, uint8(ExecutionPhase.PreOps));
@@ -640,7 +645,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         mockGasAccounting.contribute{ value: expectedShortfall }();
 
         // Verify shortfall after contribution
-        assertEq(mockGasAccounting.shortfall(), 0, "Shortfall should be zero after contribution");
+        assertEq(mockGasAccounting.totalShortfall(), 0, "Shortfall should be zero after contribution");
     }
 
     function test_shortfall_claimsAndWriteoffs() public {
@@ -655,7 +660,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         // Verify initial shortfall
         uint256 expectedShortfall = initialClaims - writeoffs;
-        assertEq(mockGasAccounting.shortfall(), expectedShortfall, "Initial shortfall should be claims minus writeoffs");
+        assertEq(mockGasAccounting.totalShortfall(), expectedShortfall, "Initial shortfall should be claims minus writeoffs");
 
         // Contribute to the contract
         mockGasAccounting.setLock(executionEnvironment, 0, uint8(ExecutionPhase.PreOps));
@@ -664,7 +669,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         mockGasAccounting.contribute{ value: expectedShortfall }();
 
         // Verify shortfall after contribution
-        assertEq(mockGasAccounting.shortfall(), 0, "Shortfall should be zero after contribution");
+        assertEq(mockGasAccounting.totalShortfall(), 0, "Shortfall should be zero after contribution");
     }
 
     function test_shortfall_claimsAndDeposits() public {
@@ -679,7 +684,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
 
         // Verify initial shortfall
         uint256 expectedShortfall = initialClaims - deposits;
-        assertEq(mockGasAccounting.shortfall(), expectedShortfall, "Initial shortfall should be claims minus deposits");
+        assertEq(mockGasAccounting.totalShortfall(), expectedShortfall, "Initial shortfall should be claims minus deposits");
 
         // Contribute to the contract
         mockGasAccounting.setLock(executionEnvironment, 0, uint8(ExecutionPhase.PreOps));
@@ -688,7 +693,7 @@ contract GasAccountingTest is AtlasConstants, BaseTest {
         mockGasAccounting.contribute{ value: expectedShortfall }();
 
         // Verify shortfall after contribution
-        assertEq(mockGasAccounting.shortfall(), 0, "Shortfall should be zero after contribution");
+        assertEq(mockGasAccounting.totalShortfall(), 0, "Shortfall should be zero after contribution");
     }
 
     function test_reconcile_initializeClaimsAndDeposits() public {
